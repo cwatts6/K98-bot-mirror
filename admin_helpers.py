@@ -8,7 +8,7 @@ import os
 import discord
 
 from bot_config import ADMIN_USER_MENTION
-from constants import DATABASE, DOWNLOAD_FOLDER, INPUT_LOG, PASSWORD, SERVER, USERNAME
+from constants import DATABASE, DOWNLOAD_FOLDER, FAILED_LOG, INPUT_LOG, PASSWORD, SERVER, USERNAME
 from embed_utils import send_embed
 from file_utils import append_csv_line
 from input_helpers import wait_with_reminder
@@ -47,8 +47,8 @@ async def prompt_admin_inputs(bot, user: discord.User, admin_id: int):
 
         save_cached_input(today_str, rank, seed)
         return rank, seed
-    except Exception as e:
-        logger.error(f"[INPUT] Failed to collect admin inputs: {e}")
+    except Exception:
+        logger.exception("[INPUT] Failed to collect admin inputs")
         return "default", "default"
 
 
@@ -74,31 +74,37 @@ async def log_processing_result(
     notify_channel = bot.get_channel(notify_channel_id)
 
     # Log rank/seed input
-    await append_csv_line(
-        INPUT_LOG, [end_time.strftime("%Y-%m-%d %H:%M:%S"), str(user), rank, seed]
-    )
+    try:
+        await append_csv_line(
+            INPUT_LOG, [end_time.strftime("%Y-%m-%d %H:%M:%S"), str(user), rank, seed]
+        )
+    except Exception:
+        logger.exception("Failed to log rank/seed input to INPUT_LOG")
 
     # Fallbacks for slash commands (no message object)
     channel_name = message.channel.name if message else "slash"
     author_name = message.author.name if message else str(user)
 
     # Log full processing result
-    await append_csv_line(
-        summary_log_path,
-        [
-            end_time.strftime("%Y-%m-%d %H:%M:%S"),
-            channel_name,
-            filename,
-            author_name,
-            os.path.join(DOWNLOAD_FOLDER, filename),
-            str(success_excel),
-            str(success_archive),
-            str(success_sql),
-            str(success_export),
-            str(success_proc_import),
-            f"{duration:.1f}",
-        ],
-    )
+    try:
+        await append_csv_line(
+            summary_log_path,
+            [
+                end_time.strftime("%Y-%m-%d %H:%M:%S"),
+                channel_name,
+                filename,
+                author_name,
+                os.path.join(DOWNLOAD_FOLDER, filename),
+                str(success_excel),
+                str(success_archive),
+                str(success_sql),
+                str(success_export),
+                str(success_proc_import),
+                f"{duration:.1f}",
+            ],
+        )
+    except Exception:
+        logger.exception("Failed to log processing result to summary log")
 
     # Determine embed metadata
     attempted = {
@@ -127,48 +133,60 @@ async def log_processing_result(
         color = 0xE74C3C
         mention = ADMIN_USER_MENTION
 
-    print(
-        f"[DEBUG] Step Success – Excel: {success_excel}, Archive: {success_archive}, SQL: {success_sql}, Export: {success_export}, ProcConfig: {success_proc_import}"
+    logger.debug(
+        "Step Success – Excel: %s, Archive: %s, SQL: %s, Export: %s, ProcConfig: %s",
+        success_excel,
+        success_archive,
+        success_sql,
+        success_export,
+        success_proc_import,
     )
 
-    # Final embed
-    await send_embed(
-        notify_channel,
-        title,
-        {
-            "Filename": filename,
-            "User": author_name,
-            "Rank": rank,
-            "Seed": seed,
-            "Excel Success": str(success_excel),
-            "Archive Success": str(success_archive),
-            "SQL Success": str(success_sql),
-            "Export Success": str(success_export),
-            "ProcConfig Import": str(success_proc_import),
-            "Duration": f"{duration:.1f} sec",
-        },
-        color,
-        mention=mention,
-    )
+    # Check that notify_channel is valid before sending embed
+    if notify_channel is None:
+        logger.warning("notify_channel is None; skipping send_embed call")
+    else:
+        # Final embed
+        await send_embed(
+            notify_channel,
+            title,
+            {
+                "Filename": filename,
+                "User": author_name,
+                "Rank": rank,
+                "Seed": seed,
+                "Excel Success": str(success_excel),
+                "Archive Success": str(success_archive),
+                "SQL Success": str(success_sql),
+                "Export Success": str(success_export),
+                "ProcConfig Import": str(success_proc_import),
+                "Duration": f"{duration:.1f} sec",
+            },
+            color,
+            mention=mention,
+        )
 
     # Log failure separately
     if not all(v for v in attempted.values()):
-        await append_csv_line(
-            "failed_log.csv",
-            [
-                end_time.strftime("%Y-%m-%d %H:%M:%S"),
-                filename,
-                author_name,
-                rank,
-                seed,
-                str(success_excel),
-                str(success_archive),
-                str(success_sql),
-                str(success_export),
-                str(success_proc_import),
-                f"{duration:.1f} sec",
-            ],
-        )
+        try:
+            await append_csv_line(
+                FAILED_LOG,
+                [
+                    end_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    filename,
+                    author_name,
+                    rank,
+                    seed,
+                    str(success_excel),
+                    str(success_archive),
+                    str(success_sql),
+                    str(success_export),
+                    str(success_proc_import),
+                    f"{duration:.1f} sec",
+                ],
+            )
+        except Exception:
+            logger.exception("Failed to log failure to FAILED_LOG")
 
         # ✅ Post stats update embed if all steps succeeded
     if all([success_excel, success_archive, success_sql, success_export, success_proc_import]):
@@ -185,5 +203,5 @@ async def log_processing_result(
                 sql_conn_str=sql_conn_str,
             )
             logger.info("[STATS EMBED] Stats update embed sent successfully.")
-        except Exception as e:
-            logger.error(f"[STATS EMBED] Failed to send embed: {e}")
+        except Exception:
+            logger.exception("[STATS EMBED] Failed to send embed")
