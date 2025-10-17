@@ -1,0 +1,84 @@
+🏅 KVK Honour Ingestion & Reporting Pipeline
+Overview
+
+The KVK Honour pipeline ingests full honour snapshots (per-KVK) and automatically refreshes leaderboard embeds in Discord.
+
+It complements the existing Pre-KVK and All-Kingdom data flows:
+
+Pipeline	Purpose	Source Channel	Frequency	Embed
+Pre-KVK Scores	Marauders / Training / Encampments	#pre-kvk-tracking	Daily until Pass 4	Pre-KVK Embed
+Honour Scores	Map-based Honour points during active KVK	#honour-tracking	Multiple per day	Pre-KVK (pre-fighting) + KVK embeds
+All-Kingdom KVK Data	Fighting stats (Kills / Deads / DKP)	#kvk-data-ingest	Each new KVK file	KVK Embed
+📥 File Input
+
+Expected filename pattern
+
+1198_databook.xlsx
+
+
+Accepted variants
+
+TEST_1198_databook.xlsx
+
+DEMO_1198_databook.xlsx
+
+SAMPLE_1198_databook.xlsx
+
+Any file beginning with 1198_databook and ending .xlsx
+
+Source channel
+HONOR_CHANNEL_ID (configured as #honour-tracking)
+
+⚙️ Processing Flow
+
+File Upload → Bot Detects Match
+
+Regex pattern allows TEST/DEMO/SAMPLE prefixes and extra words.
+
+Pre-parse
+
+parse_honor_xlsx() extracts GovernorID / Name / HonourPoints.
+
+Row count logged for status embed.
+
+Database Ingest
+
+ingest_honor_snapshot() stores full snapshot in:
+
+[dbo].[KVK_Honor_Scan]
+
+[dbo].[KVK_Honor_AllPlayers_Raw]
+
+Each import creates a new ScanID for the active KVK.
+
+Embed Refresh
+
+Calls send_stats_update_embed() with:
+
+is_kvk=True
+
+is_test flag (see below)
+
+Honour Top-3 auto-updates in Pre-KVK or KVK embeds if data > 0.
+
+🧪 Test vs. Live Uploads
+Mode	How to trigger	Behaviour
+Test	Add [test] to message text or prefix filename with TEST_, DEMO_, or SAMPLE_	No @everyone ping, no daily send-guard claim, “(TEST)” label in success embed
+Live	Upload standard filename 1198_databook.xlsx	Normal import + KVK/Pre-KVK embed update with @everyone (once per day)
+
+After verifying a test import, use the purge command to remove the test scan.
+
+🧹 Maintenance / Admin Commands
+Command	Access	Description
+/honor_top [limit]	Admin	Displays latest Honour Top-N (default 10, max 50). Ephemeral output.
+/honor_purge_last	Admin	Deletes the most recent honour scan (header + rows). Ephemeral confirmation embed.
+
+Both commands use your standard decorator stack:
+@versioned(), @is_admin_and_notify_channel(), @safe_command, and @track_usage().
+
+🔒 Data Model Summary
+Table	Purpose	Key Columns
+KVK_Honor_Scan	Header row per snapshot	KVK_NO, ScanID, ScanDateUTC
+KVK_Honor_AllPlayers_Raw	Player-level honour points	KVK_NO, ScanID, GovernorID, GovernorName, HonorPoints
+
+The latest snapshot per KVK drives the Top-3 shown in Discord.
