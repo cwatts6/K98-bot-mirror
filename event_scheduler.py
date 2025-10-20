@@ -32,6 +32,10 @@ from utils import ensure_aware_utc, parse_isoformat_utc, utcnow
 # dm_scheduled_tracker: { event_id: { user_id: set(delta_seconds) } }
 dm_scheduled_tracker = {}
 
+# Grace window for rehydration: if a reminder should have been sent in the last N seconds,
+# we'll send it immediately rather than discarding it as stale
+REHYDRATE_STALE_GRACE_SECONDS = 60
+
 # --- Throttled logging helpers ---------------------------------------------
 _LAST_TRACKER_STATS_LOG = 0.0
 
@@ -726,9 +730,219 @@ async def send_user_reminder(user, event, delta):
         save_dm_scheduled_tracker()
 
 
+async def rehydrate_dm_scheduled_tasks(bot):
+    """
+    Rehydrate scheduled DM tasks from dm_scheduled_tracker after bot restart.
+
+    This function restores asyncio tasks for scheduled DMs that were persisted to disk
+    but lost when the bot restarted. It:
+    - Validates each scheduled marker against current upcoming events
+    - Removes stale markers (missing events or events >48h away)
+    - Recreates tasks for valid scheduled reminders
+    - Handles recently-past reminders within grace window (immediate send)
+    """
+    if not dm_scheduled_tracker:
+        logger.info("[DM_REHYDRATE] No scheduled tasks to rehydrate (tracker empty).")
+        return
+
+    logger.info("[DM_REHYDRATE] Starting rehydration of scheduled DM tasks...")
+    now = utcnow()
+
+    # Build event lookup by event_id
+    upcoming_events = get_all_upcoming_events()
+    event_lookup = {make_event_id(e): e for e in upcoming_events}
+
+    rehydrated_count = 0
+    immediate_count = 0
+    removed_count = 0
+    error_count = 0
+
+    # Iterate through all scheduled markers
+    for event_id in list(dm_scheduled_tracker.keys()):
+        per_user = dm_scheduled_tracker.get(event_id, {})
+
+        # Find matching event
+        event = event_lookup.get(event_id)
+
+        # Check if event is stale or missing
+        if not event:
+            logger.info(
+                "[DM_REHYDRATE] Removed stale scheduled DM marker for %s (event not found)",
+                event_id,
+            )
+            dm_scheduled_tracker.pop(event_id, None)
+            removed_count += len([uid for uid in per_user.keys()])
+            continue
+
+        # Check if event is too far in future (>48h) or already past
+        start_time = ensure_aware_utc(event["start_time"])
+        time_until_event = (start_time - now).total_seconds()
+
+        if time_until_event > 48 * 3600:
+            logger.debug(
+                "[DM_REHYDRATE] Skipping event %s (>48h away: %.1fh)",
+                event_id,
+                time_until_event / 3600,
+            )
+            dm_scheduled_tracker.pop(event_id, None)
+            removed_count += len([uid for uid in per_user.keys()])
+            continue
+
+        if time_until_event < -3600:  # Event ended >1h ago
+            logger.info(
+                "[DM_REHYDRATE] Removed stale scheduled DM marker for %s (event already past)",
+                event_id,
+            )
+            dm_scheduled_tracker.pop(event_id, None)
+            removed_count += len([uid for uid in per_user.keys()])
+            continue
+
+        # Process each user's scheduled reminders for this event
+        for uid in list(per_user.keys()):
+            delta_set = per_user.get(uid, set())
+
+            for delta_seconds in list(delta_set):
+                try:
+                    # Calculate when this reminder should fire
+                    delta = timedelta(seconds=delta_seconds)
+                    reminder_time = start_time - delta
+                    seconds_until = (reminder_time - now).total_seconds()
+
+                    # Check if already sent
+                    if delta_seconds in dm_sent_tracker.get(event_id, {}).get(uid, []):
+                        logger.debug(
+                            "[DM_REHYDRATE] Skipping %s for %s at T-%s (already sent)",
+                            uid,
+                            event_id,
+                            delta,
+                        )
+                        delta_set.discard(delta_seconds)
+                        removed_count += 1
+                        continue
+
+                    # If reminder time is in the future, rehydrate the task
+                    if seconds_until > 0:
+                        try:
+                            user = await bot.fetch_user(int(uid))
+                            task = asyncio.create_task(
+                                delayed_user_dm(bot, user, event, delta, seconds_until)
+                            )
+                            register_user_task(
+                                user.id,
+                                task,
+                                meta={
+                                    "event_id": event_id,
+                                    "delta_seconds": delta_seconds,
+                                },
+                            )
+                            logger.info(
+                                "[DM_REHYDRATE] Restored scheduled DM for user %s for %s at T-%s in %ds",
+                                uid,
+                                event_id,
+                                delta,
+                                int(seconds_until),
+                            )
+                            rehydrated_count += 1
+                        except discord.errors.NotFound:
+                            logger.warning(
+                                "[DM_REHYDRATE] User %s not found, removing scheduled marker for %s",
+                                uid,
+                                event_id,
+                            )
+                            delta_set.discard(delta_seconds)
+                            removed_count += 1
+                        except Exception as e:
+                            logger.warning(
+                                "[DM_REHYDRATE] Failed to fetch user %s for %s: %s",
+                                uid,
+                                event_id,
+                                e,
+                            )
+                            delta_set.discard(delta_seconds)
+                            removed_count += 1
+                            error_count += 1
+
+                    # If within grace window (just missed), send immediately
+                    elif seconds_until >= -REHYDRATE_STALE_GRACE_SECONDS:
+                        try:
+                            user = await bot.fetch_user(int(uid))
+                            task = asyncio.create_task(send_user_reminder(user, event, delta))
+                            register_user_task(
+                                user.id,
+                                task,
+                                meta={
+                                    "event_id": event_id,
+                                    "delta_seconds": delta_seconds,
+                                },
+                            )
+                            logger.info(
+                                "[DM_REHYDRATE] Sending immediate DM for user %s for %s at T-%s (within grace window)",
+                                uid,
+                                event_id,
+                                delta,
+                            )
+                            immediate_count += 1
+                        except Exception as e:
+                            logger.warning(
+                                "[DM_REHYDRATE] Failed to send immediate reminder to %s for %s: %s",
+                                uid,
+                                event_id,
+                                e,
+                            )
+                            delta_set.discard(delta_seconds)
+                            removed_count += 1
+                            error_count += 1
+
+                    # Too stale, remove marker
+                    else:
+                        logger.debug(
+                            "[DM_REHYDRATE] Removed stale scheduled DM marker for %s (%s at T-%s, missed by %ds)",
+                            uid,
+                            event_id,
+                            delta,
+                            int(-seconds_until),
+                        )
+                        delta_set.discard(delta_seconds)
+                        removed_count += 1
+
+                except Exception as e:
+                    logger.warning(
+                        "[DM_REHYDRATE] Error processing scheduled marker for %s/%s at T-%ds: %s",
+                        event_id,
+                        uid,
+                        delta_seconds,
+                        e,
+                    )
+                    error_count += 1
+
+            # Clean up empty user buckets
+            if not delta_set:
+                per_user.pop(uid, None)
+
+        # Clean up empty event buckets
+        if not per_user:
+            dm_scheduled_tracker.pop(event_id, None)
+
+    # Persist cleaned tracker
+    save_dm_scheduled_tracker()
+
+    logger.info(
+        "[DM_REHYDRATE] Rehydration complete: %d tasks restored, %d immediate sends, "
+        "%d stale markers removed, %d errors",
+        rehydrated_count,
+        immediate_count,
+        removed_count,
+        error_count,
+    )
+
+
 async def schedule_event_reminders(bot, notify_channel_id, test_mode=False, test_user_id=None):
     load_dm_sent_tracker()
     load_dm_scheduled_tracker()
+
+    # Rehydrate scheduled DM tasks after loading trackers (skip in test mode)
+    if not test_mode:
+        await rehydrate_dm_scheduled_tasks(bot)
 
     if test_mode:
         now = utcnow()
