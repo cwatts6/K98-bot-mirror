@@ -1,0 +1,182 @@
+# =========================
+# Python / build artifacts
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+.build/
+dist/
+pip-wheel-metadata/
+*.manifest
+*.spec
+
+# =========================
+# Virtual environments
+# =========================
+.venv/
+venv/
+env/
+botenv/
+
+# =========================
+# Secrets & credentials
+# =========================
+.env
+*.env
+.env.*
+.envrc
+credentials/**
+*service_account*.json
+*credentials*.json
+*token*.json
+*.pem
+*.p12
+*.pfx
+*.key
+*.crt
+*.cer
+*.der
+*.jks
+*.p7b
+*.p7c
+*.asc
+*.gpg
+*.agekey
+.ssh/**
+!.ssh/known_hosts.example
+
+# =========================
+# Logs / temp / OS junk
+# =========================
+*.log
+logs/
+*.tmp
+*.bak
+*.old
+*.orig
+*.swp
+.DS_Store
+Thumbs.db
+
+# =========================
+# IDE / editor
+# =========================
+.vscode/
+.idea/
+*.code-workspace
+
+# =========================
+# Testing / typing / lint
+# =========================
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# =========================
+# Notebooks
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Databases / data dumps
+# =========================
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.db
+*.csv
+*.xlsx
+*.xls
+
+# =========================
+# Archives / bundles
+# =========================
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.rar
+
+# =========================
+# Project runtime artifacts
+# =========================
+downloads/
+Databook_Archive/
+archive/
+restart_log.csv
+download_log.csv
+input_log.csv
+*.ics
+
+# JSON caches / trackers (project-specific)
+data/*.json
+data/*.json.bak-*
+data/*.bak.json
+bot_pid.txt
+statsupdate-*.json
+*cache*.json
+kingdom_input_cache.json
+player_stats_cache.json
+player_profile_cache.json
+subscriptions_tracker.json
+governor_registry.json
+view_tracker.json
+active_reminders.json
+failed_dm_log.json
+LAST_SHUTDOWN_INFO.json
+LAST_RESTART_INFO
+KVK_EVENT_CACHE.json
+command_cache.json
+live_queue_cache.json
+restart_flag.json
+WATCHDOG_LOCK.json
+BOT_LOCK.json
+*.lock
+.last_sync_*.txt
+.exit_code
+
+# =========================
+# Assets
+# (keep publishable images in assets/public/)
+# =========================
+assets/raw/**
+!.env.example
+
+# === Extras (added) ===
+build/
+.python-version
+.tool-versions
+.coverage.*
+.coverage/
+*.jsonl
+.pyre/
+.vs/
+.pre-commit-cache/**
+BOT_LOCK.json
+WATCHDOG_LOCK.json
+*LOCK.json
+
+# runtime caches
+*cache.json
+*_cache.json
+live_queue_cache.json
+kingdom_input_cache.json
+
+bot_pid.txt
+*.pid
+
+# runtime markers & logs
+.exit_code
+.restart_flag.json
+.shutdown_marker
+logs/**
+data/*.json
+.pre-commit-home/
+.pre-commit-home/**
+.pre-commit-home/tmp/**
