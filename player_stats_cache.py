@@ -4,31 +4,67 @@ from __future__ import annotations
 import asyncio
 from datetime import date, datetime
 import json
+import logging
 import os
+import time
 from typing import Any
 
 import pyodbc
 
-from constants import (
-    DATABASE,
-    PASSWORD,
-    PLAYER_STATS_CACHE,
-    SERVER,
-    USERNAME,
-)
+from constants import PLAYER_STATS_CACHE, _conn
+
+logger = logging.getLogger(__name__)
 
 # =========================
-# DB helpers
+# Configurable retry params (via env)
 # =========================
-_DSN = (
-    f"DRIVER={{ODBC Driver 17 for SQL Server}};"
-    f"SERVER={SERVER};DATABASE={DATABASE};UID={USERNAME};PWD={PASSWORD}"
-)
+_DB_RETRIES = int(os.getenv("PLAYER_STATS_DB_RETRIES", "5"))
+_DB_BACKOFF_BASE = float(os.getenv("PLAYER_STATS_DB_BACKOFF", "1.0"))
+
+# =========================
+# SQL
+# =========================
 _SQL = "SELECT * FROM dbo.[STATS_FOR_UPLOAD]"  # spelled as provided
 
 
-def _conn():
-    return pyodbc.connect(_DSN, timeout=10)
+# =========================
+# helpers
+# =========================
+def _get_conn_with_retries():
+    """
+    Get a DB connection with retry logic and exponential backoff.
+    Retries on pyodbc.OperationalError with configurable attempts and backoff.
+    """
+    attempt = 0
+    backoff = _DB_BACKOFF_BASE
+    last_exc = None
+    while attempt < _DB_RETRIES:
+        attempt += 1
+        try:
+            logger.debug("Attempting DB connection (attempt %d/%d)", attempt, _DB_RETRIES)
+            return _conn()
+        except pyodbc.OperationalError as e:
+            last_exc = e
+            logger.warning(
+                "DB connection attempt %d/%d failed: %s. Retrying in %.1fs",
+                attempt,
+                _DB_RETRIES,
+                e,
+                backoff,
+            )
+            if attempt >= _DB_RETRIES:
+                break
+            time.sleep(backoff)
+            backoff *= 2
+        except Exception as e:
+            # Non-operational error — log and re-raise
+            logger.exception("Unexpected exception while connecting to DB: %s", e)
+            raise
+
+    logger.error("All %d DB connection attempts failed. Last exception: %s", _DB_RETRIES, last_exc)
+    if last_exc:
+        raise last_exc
+    raise pyodbc.OperationalError("Unknown DB connection failure")
 
 
 # =========================
@@ -145,7 +181,7 @@ def _map_row(row: pyodbc.Row, cols: list[str]) -> dict[str, Any] | None:
 # =========================
 def _build_cache_sync() -> dict[str, Any]:
     output: dict[str, Any] = {}
-    with _conn() as cn:
+    with _get_conn_with_retries() as cn:
         cur = cn.cursor()
         cur.execute(_SQL)
         cols = [c[0] for c in cur.description]
@@ -186,15 +222,42 @@ def _build_cache_sync() -> dict[str, Any]:
 async def build_player_stats_cache():
     """
     Async wrapper that runs the blocking SQL read & JSON write off the event loop.
+    Includes exception handling and fallback logic to preserve existing cache on failure.
     """
-    output = await asyncio.to_thread(_build_cache_sync)
+    try:
+        output = await asyncio.to_thread(_build_cache_sync)
 
-    os.makedirs(os.path.dirname(PLAYER_STATS_CACHE) or ".", exist_ok=True)
-    # Pretty JSON for diffs; switch to separators=(",", ":") for smaller file
-    with open(PLAYER_STATS_CACHE, "w", encoding="utf-8") as f:
-        json.dump(output, f, indent=2, ensure_ascii=False)
+        os.makedirs(os.path.dirname(PLAYER_STATS_CACHE) or ".", exist_ok=True)
+        # Pretty JSON for diffs; switch to separators=(",", ":") for smaller file
+        with open(PLAYER_STATS_CACHE, "w", encoding="utf-8") as f:
+            json.dump(output, f, indent=2, ensure_ascii=False)
 
-    print(f"[CACHE] ✅ player_stats_cache.json written with {output['_meta']['count']} entries.")
+        print(f"[CACHE] ✅ player_stats_cache.json written with {output['_meta']['count']} entries.")
+    except Exception as e:
+        logger.error("Failed to build player stats cache: %s", e, exc_info=True)
+        
+        # If cache exists, preserve it
+        if os.path.exists(PLAYER_STATS_CACHE):
+            logger.warning(
+                "Preserving existing cache file at %s due to SQL failure",
+                PLAYER_STATS_CACHE
+            )
+            print(f"[CACHE] ⚠️  Preserved existing cache due to error: {e}")
+        else:
+            # Write minimal error-indicating JSON
+            os.makedirs(os.path.dirname(PLAYER_STATS_CACHE) or ".", exist_ok=True)
+            error_cache = {
+                "_meta": {
+                    "source": "SQL:dbo.STATS_FOR_UPLOAD",
+                    "generated_at": datetime.utcnow().isoformat() + "Z",
+                    "count": 0,
+                    "error": f"SQL connection failed: {str(e)}",
+                }
+            }
+            with open(PLAYER_STATS_CACHE, "w", encoding="utf-8") as f:
+                json.dump(error_cache, f, indent=2, ensure_ascii=False)
+            logger.warning("Wrote minimal error cache to %s", PLAYER_STATS_CACHE)
+            print(f"[CACHE] ⚠️  Wrote error cache: {e}")
 
 
 # Optional: run manually: `python player_stats_cache.py`
