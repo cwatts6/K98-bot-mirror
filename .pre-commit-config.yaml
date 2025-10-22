@@ -1,0 +1,106 @@
+﻿exclude: >
+  (?x)^(
+    venv/|
+    \.venv/|
+    downloads/|
+    Databook_Archive/|
+    old_discord_bot_package/|
+    archive/|
+    Archive/|
+    logs/|
+    assets/raw/|
+    __pycache__/|
+    .*\.csv$|
+    .*\.xlsx$|
+    .*\.xls$|
+    .*\.zip$|
+    .*\.7z$|
+    .*\.tar(\.gz)?$|
+    .*\.png$|
+    .*\.jpg$|
+    .*\.jpeg$|
+    .*\.gif$|
+    .*\.mp4$|
+    .*\.mov$|
+    .*\.ttf$|
+    .*\.otf$|
+    .*\.woff2$
+  )
+
+repos:
+  # 1) Basic hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        types: [python, markdown, rst, toml, yaml, json, text]
+        files: \.(py|md|rst|txt|toml|ya?ml|json)$
+      - id: end-of-file-fixer
+        types_or: [python, markdown, rst, toml, yaml, json, text]
+        files: \.(py|md|rst|txt|toml|ya?ml|json)$
+        exclude: '(^|/)(BOT_LOCK\.json|WATCHDOG_LOCK\.json)$'   # ← add
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        files: \.(py|md|txt|toml|ya?ml|json)$
+        exclude: '(^|/)(BOT_LOCK\.json|WATCHDOG_LOCK\.json)$'   # ← add
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=3000"]  # adjust if you need larger assets tracked
+
+  # 2) Lint (fast) — auto-fix imports, pyupgrade rules, etc.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.1
+    hooks:
+      - id: ruff
+        types_or: [python]
+
+  # 3) Format (deterministic)
+  - repo: https://github.com/psf/black
+    rev: 25.9.0
+    hooks:
+      - id: black
+        types_or: [python]
+
+  # 4) Secrets scan (on staged content)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+        args: ["--staged", "--redact"]
+
+  # 5) Type checking (repo-wide; runs once per commit)
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.406
+    hooks:
+      - id: pyright
+        pass_filenames: false
+        additional_dependencies:
+        - python-dotenv
+        
+        # By default runs at 'pre-commit' stage; that's fine.
+        # If it's too slow/noisy, you can move it to 'pre-push':
+        # stages: [pre-push]
+  - repo: local
+    hooks:
+      - id: forbid-logging-basicconfig
+        name: Forbid logging.basicConfig
+        entry: python
+        language: system
+        pass_filenames: true
+        files: '\.py$'
+        args:
+          - -c
+          - |
+            import sys, re, pathlib
+            bad = []
+            for p in map(pathlib.Path, sys.argv[1:]):
+                try:
+                    txt = p.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    continue
+                if re.search(r'\blogging\.basicConfig\s*\(', txt):
+                    bad.append(str(p))
+            if bad:
+                print("logging.basicConfig() is not allowed. Offenders:\n - " + "\n - ".join(bad))
+                sys.exit(1)
