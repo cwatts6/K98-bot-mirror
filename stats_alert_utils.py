@@ -38,6 +38,7 @@ from file_utils import (
     read_csv_rows_safe,
     resolve_path,
 )
+from stats_alert.time_and_format import format_date_utc, format_time_utc
 from stats_helpers import fetch_all_dicts
 from utils import date_to_utc_start, ensure_aware_utc, parse_isoformat_utc, utcnow
 
@@ -473,7 +474,7 @@ def _claim_send(kind: str, *, max_per_day: int = 1) -> bool:
                 header = rows[0]
                 data_rows = rows[1:]
 
-            time_str = utcnow().strftime("%H:%M:%S")
+            time_str = format_time_utc(utcnow(), "%H:%M:%S")
             data_rows.append([today, time_str, kind])
 
             # Write header + data rows atomically
@@ -932,7 +933,7 @@ async def _send_prekvk_embed(
     # Date range (best-effort)
     try:
         kvk_date_range = (
-            f"{start_dt.strftime('%d %b')} – {end_dt.strftime('%d %b')}"
+            f"{format_date_utc(start_dt, '%d %b')} – {format_date_utc(end_dt, '%d %b')}"
             if start_dt and end_dt
             else ""
         )
@@ -971,22 +972,18 @@ async def _send_prekvk_embed(
     if banner_url:
         embed.set_image(url=banner_url)
 
-    def _fmt_date(d):
-        try:
-            return d.strftime("%d %b %Y") if d else "TBD"
-        except Exception:
-            return "TBD"
-
     tl_lines = []
     if reg_dt:
-        tl_lines.append(f"📜 Registration: **{_fmt_date(reg_dt)}**")
+        tl_lines.append(f"📜 Registration: **{format_date_utc(reg_dt, '%d %b %Y')}**")
     if start_dt:
-        tl_lines.append(f"🗺 **KVK Map opens** : **{_fmt_date(start_dt)}**")
+        tl_lines.append(f"🗺 **KVK Map opens** : **{format_date_utc(start_dt, '%d %b %Y')}**")
     if fight_start:
         try:
             tl_lines.append(f"⚔️ Fighting starts: **{fight_start:%d %b %Y}** ({_fmt_dd(d_fight)})")
         except Exception:
-            tl_lines.append(f"⚔️ Fighting starts: **{_fmt_date(fight_start)}** ({_fmt_dd(d_fight)})")
+            tl_lines.append(
+                f"⚔️ Fighting starts: **{format_date_utc(fight_start, '%d %b %Y')}** ({_fmt_dd(d_fight)})"
+            )
     embed.add_field(
         name="Season timeline", value=("\n".join(tl_lines) if tl_lines else "—"), inline=False
     )
@@ -1558,7 +1555,9 @@ async def _send_kvk_embed(
         kvk_name = meta_sql["kvk_name"]
         start_dt, end_dt = meta_sql["start_date"], meta_sql["end_date"]
         try:
-            kvk_date_range = f"{start_dt.strftime('%d %b')} – {end_dt.strftime('%d %b')}"
+            kvk_date_range = (
+                f"{format_date_utc(start_dt, '%d %b')} – {format_date_utc(end_dt, '%d %b')}"
+            )
         except Exception:
             kvk_date_range = ""
         banner_url = KVK_BANNER_MAP.get((kvk_name or "KVK").lower(), None)
@@ -1568,9 +1567,7 @@ async def _send_kvk_embed(
         if meta:
             kvk_no = meta["kvk_no"]
             kvk_name = meta["kvk_name"]
-            kvk_date_range = (
-                f"{meta['start_date'].strftime('%d %b')} – {meta['end_date'].strftime('%d %b')}"
-            )
+            kvk_date_range = f"{format_date_utc(meta['start_date'], '%d %b')} – {format_date_utc(meta['end_date'], '%d %b')}"
             banner_url = KVK_BANNER_MAP.get(kvk_name.lower(), None)
         else:
             kvk_no = "?"
