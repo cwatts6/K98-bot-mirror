@@ -1,0 +1,13 @@
+* text=auto
+*.py   text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.txt  text eol=lf
+*.ps1 text eol=crlf
+n*.ps1 text eol=lf
+*.bat text eol=crlf
+*.sh   text eol=lf
+n*.ps1 text eol=lf
