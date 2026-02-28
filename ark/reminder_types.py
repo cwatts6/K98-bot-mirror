@@ -1,0 +1,18 @@
+from __future__ import annotations
+
+REMINDER_DAILY = "daily"
+REMINDER_FINAL_DAY = "final_day"
+
+REMINDER_24H = "24h"
+REMINDER_4H = "4h"
+REMINDER_1H = "1h"
+REMINDER_START = "start"
+REMINDER_CHECKIN_12H = "checkin_12h"
+
+ALL_DM_REMINDER_TYPES = {
+    REMINDER_24H,
+    REMINDER_4H,
+    REMINDER_1H,
+    REMINDER_START,
+    REMINDER_CHECKIN_12H,
+}

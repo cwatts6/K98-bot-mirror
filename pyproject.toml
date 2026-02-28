@@ -1,0 +1,96 @@
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+extend-exclude = '''
+(
+  old_discord_bot_package
+)
+'''
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["logs","downloads","archive","Archive","Databook_Archive","assets/raw",".venv","venv","env","__pycache__"]
+
+# ✅ Let Ruff fix, but only safe fixes
+fix = true
+unsafe-fixes = false
+
+[tool.ruff.lint]
+# keep the full set, but ignore the opinionated stuff for PR-0
+select = ["E","F","W","I","B","UP","RUF"]
+ignore = [
+  "E501",   # black handles line length
+  "E402",   # imports not at top (we’ll refactor later)
+  "E731",   # lambda-assignment (style)
+  "W293",   # trailing whitespace (fixed by pre-commit hook anyway)
+  "B007",   # unused loop control variable
+  "B008",   # call in default arg
+  "B012",   # jump in finally
+  "B023",   # function uses loop var
+  "B028",   # no explicit stacklevel
+  "B904",   # raise without from (styleish)
+  "RUF001","RUF002","RUF003",  # ambiguous Unicode (strings/docs/comments)
+  "RUF005",                    # literal concat
+  "RUF006",                    # asyncio dangling task (needs design, later)
+  "RUF013",                    # implicit Optional
+  "RUF034",                    # useless if-else
+  "RUF046",                    # unnecessary cast to int
+  "RUF059",                    # unused unpacked var
+]
+
+per-file-ignores = { "usage_tracker.py" = ["F401","F841","UP"], "stats_alert_utils.py" = ["F401"] }
+# F401 = unused import, F841 = assigned but unused variable, UP = pyupgrade edits
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-sort-within-sections = true
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
+
+# Only check the minimal things we care about in PR-0
+include = [
+  "bot_config.py",
+  "scripts",            # scripts/validate_env.py, scripts/smoke_imports.py, etc.
+]
+
+# Everything else is out-of-scope for PR-0
+exclude = [
+  "Archive/**",
+  "archive/**",
+  "Databook_Archive/**",
+  "downloads/**",
+  "logs/**",
+  "assets/**",
+  "old_discord_bot_package/**",
+  ".venv/**",
+  "venv/**",
+  "__pycache__/**",
+  # Large or dependency-heavy modules (defer to PR-1)
+  "bot_instance.py",
+  "Commands.py",
+  "cogs/**",
+  "embed_utils.py",
+  "embed_player_profile.py",
+  "event_*.py",
+  "event_cache.py",
+  "event_data_loader.py",
+  "event_embed_manager.py",
+  "event_scheduler.py",
+  "profile_cache.py",
+  "player_stats_cache.py",
+  "target_utils.py",
+  "utils.py",
+]
+
+# Downgrade or silence noisy categories for PR-0
+reportMissingImports = "warning"
+reportMissingModuleSource = "warning"
+reportOptionalMemberAccess = "none"
+reportAttributeAccessIssue = "none"
+reportArgumentType = "none"
+reportInvalidTypeForm = "none"
+reportReturnType = "none"
+reportTypedDictNotRequiredAccess = "none"

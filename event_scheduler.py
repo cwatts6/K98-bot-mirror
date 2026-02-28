@@ -1,0 +1,1292 @@
+# event_scheduler.py
+import asyncio
+from datetime import datetime, timedelta
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+import os
+import random
+import re
+import time
+
+import discord
+
+from constants import (
+    DEFAULT_REMINDER_TIMES,
+    DM_SCHEDULED_TRACKER_FILE,
+    DM_SENT_TRACKER_FILE,
+    FAILED_DM_LOG,
+    REMINDER_MAP,
+    REMINDER_TRACKING_FILE,
+    REMINDER_WINDOWS,
+    TEST_REMINDER_WINDOWS,
+)
+from embed_utils import LocalTimeToggleView, fmt_short
+from event_cache import get_all_upcoming_events
+
+# Centralized event helpers
+from event_utils import serialize_event
+from file_utils import atomic_write_json, read_json_safe, run_blocking_in_thread
+from governor_registry import load_registry
+from reminder_task_registry import register_user_task
+from subscription_tracker import get_all_subscribers
+from utils import ensure_aware_utc, parse_isoformat_utc, utcnow
+
+# Per-user trackers (nested):
+# dm_sent_tracker:      { event_id: { user_id: [delta_seconds, ...] } }
+# dm_scheduled_tracker: { event_id: { user_id: set(delta_seconds) } }
+dm_scheduled_tracker = {}
+
+# --- Throttled logging helpers ---------------------------------------------
+_LAST_TRACKER_STATS_LOG = 0.0
+
+
+def _log_tracker_stats_if_due():
+    """
+    Log tracker sizes at most once per 60s to avoid spamming the logging sink.
+    (Important for non-blocking event loop behaviour.)
+    """
+    global _LAST_TRACKER_STATS_LOG
+    now = time.monotonic()
+    if now - _LAST_TRACKER_STATS_LOG >= 60.0:
+        try:
+            logger.info(
+                "[DM_TRACKER_STATS] Events with sent: %d | Events with scheduled: %d",
+                len(dm_sent_tracker),
+                len(dm_scheduled_tracker),
+            )
+        except Exception:
+            # Never raise from logging
+            pass
+        _LAST_TRACKER_STATS_LOG = now
+        return True
+    return False
+
+
+# Robust ISO-timestamp extraction helper
+_ISO_TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+\-]\d{2}:\d{2})")
+
+
+def _extract_event_ts(event_id: str) -> str | None:
+    """
+    Extract the ISO timestamp substring from event_id robustly.
+    Returns the ISO string (unchanged) or None if not found/valid.
+
+    Supports forms:
+      - "major:2025-11-20T00:00:00+00:00"
+      - "major:slug_name:2025-11-20T00:00:00+00:00"
+    """
+    if not isinstance(event_id, str):
+        return None
+    # Fast path: right-split on colon to get last token
+    try:
+        maybe_ts = event_id.rsplit(":", 1)[-1]
+        # Normalize 'Z' to "+00:00" for fromisoformat validation
+        _ = datetime.fromisoformat(maybe_ts.replace("Z", "+00:00"))
+        return maybe_ts
+    except Exception:
+        pass
+
+    # Fallback: regex search for ISO-like timestamp and validate
+    m = _ISO_TS_RE.search(event_id)
+    if not m:
+        return None
+    ts = m.group(0)
+    try:
+        _ = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        return ts
+    except Exception:
+        return None
+
+
+sent_reminders = {}  # {event_id: set[timedelta]}
+active_reminders = {}  # {event_id: discord.Message}
+
+EXPIRY_DELAY = 3600  # 1 hour in seconds
+
+REHYDRATE_STALE_GRACE_SECONDS = (
+    60  # grace window (seconds) for near-immediate sends when rehydrating
+)
+
+# --- Quotes ---------------------------------------------------------------
+# Personalized DM quotes — placeholders:
+#   {name} -> Discord display name
+#   {gov}  -> Main Governor Name (fallback to {name} if unknown)
+DM_QUOTES: dict[str, list[str]] = {
+    "ruins": [
+        "Ruins incoming, {gov}! Time to claim what’s ours.",
+        "The timer's up soon, {name}. March fast, earn that honour!",
+        "Ruins window opening be there {gov}!",
+    ],
+    "altars": [
+        "Altar fight brewing hold the line, {gov}!",
+        "No surrender, {name}. We fight with purpose.",
+        "Altar pressure wins wars. Be early, {gov}!",
+    ],
+    "major": [
+        "Pass fight let’s get ready to rumble, {gov}!",
+        "Its fighting time, {name}! Today we write history.",
+        "Lets smash our enemy! Sharpen those spears, {gov}!",
+    ],
+    "chronicle": [
+        "New page in the Chronicle, make your mark {name}.",
+        "History remembers the bold. Be there, {gov}.",
+        "Chronicle incoming get ready, {name}.",
+    ],
+    "_default": [
+        "Opportunity knocks, {gov}. Answer in force.",
+        "Discipline wins the day, {name}. Form up.",
+        "Steel your resolve, {gov}.",
+    ],
+}
+
+# Public quotes (non-personalized) shown only at T-1h and T-0 in channel reminders
+PUBLIC_QUOTES: dict[str, list[str]] = {
+    "ruins": [
+        "Ruins window opens soon,  send your marches.",
+        "Eye on Ruins: lets earn that honour!",
+    ],
+    "altars": [
+        "Altar fight ahead, no surrender forward march!",
+        "Hold the altar, destroy our enemy. Buffs, marches and heals ready.",
+    ],
+    "major": [
+        "Pass fight prep — gather at staging, check rallies and markers.",
+        "Big push soon — comms on, formations locked.",
+    ],
+    "chronicle": [
+        "New Chronicle approaching — check out whats needed.",
+        "New stage unlocking — watch objectives and timers.",
+    ],
+    "_default": [
+        "Next event approaching — be ready.",
+        "Countdown on — gear up and form ranks.",
+    ],
+}
+reminder_stats = {"dm_success": 0, "dm_dm_disabled": 0, "dm_failed": 0}
+
+dm_sent_tracker = {}  # {event_id: { user_id: [delta_seconds,...] }}
+
+
+def _get_main_governor_name_for_user(user_id: int | str) -> str | None:
+    """Return the Main governor name for a user (fallback to any registered)."""
+    try:
+        reg = load_registry()
+        entry = reg.get(str(user_id)) or {}
+        accounts = entry.get("accounts") or {}
+        if "Main" in accounts:
+            name = (accounts["Main"].get("GovernorName") or "").strip()
+            return name or None
+        # Fallback to the first account if Main not present
+        for _label, acct in accounts.items():
+            name = (acct.get("GovernorName") or "").strip()
+            if name:
+                return name
+    except Exception:
+        pass
+    return None
+
+
+def _ensure_parent(path: str):
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+
+
+def load_dm_sent_tracker():
+    """Load and migrate dm_sent_tracker to per-user nested dict."""
+    global dm_sent_tracker
+    dm_sent_tracker = {}
+    raw = read_json_safe(DM_SENT_TRACKER_FILE, default={}) or {}
+    migrated = {}
+    for event_id, value in (raw.items() if isinstance(raw, dict) else []):
+        if isinstance(value, list):
+            migrated[event_id] = {}
+        elif isinstance(value, dict):
+            per_user = {}
+            for uid, lst in value.items():
+                per_user[str(uid)] = list(lst) if isinstance(lst, list) else []
+            migrated[event_id] = per_user
+        else:
+            migrated[event_id] = {}
+    dm_sent_tracker = migrated
+    logger.info("[DM_TRACKER] Loaded dm_sent_tracker with migration.")
+
+
+def save_dm_sent_tracker():
+    """Persist dm_sent_tracker ensuring inner values are lists."""
+    serializable = {}
+    for event_id, per_user in (
+        dm_sent_tracker.items() if isinstance(dm_sent_tracker, dict) else []
+    ):
+        serializable[event_id] = {}
+        for uid, lst in (per_user.items() if isinstance(per_user, dict) else []):
+            serializable[event_id][str(uid)] = list(lst or [])
+    atomic_write_json(DM_SENT_TRACKER_FILE, serializable, ensure_parent_dir=True)
+    logger.info("[DM_TRACKER] Saved dm_sent_tracker to disk.")
+
+
+def save_dm_scheduled_tracker():
+    """Persist dm_scheduled_tracker ensuring inner sets are serialized to lists."""
+    serializable = {}
+    for event_id, per_user in (
+        dm_scheduled_tracker.items() if isinstance(dm_scheduled_tracker, dict) else []
+    ):
+        serializable[event_id] = {}
+        for uid, s in (per_user.items() if isinstance(per_user, dict) else []):
+            serializable[event_id][str(uid)] = list(s or set())
+    atomic_write_json(DM_SCHEDULED_TRACKER_FILE, serializable, ensure_parent_dir=True)
+    logger.info("[DM_TRACKER] Saved dm_scheduled_tracker to disk.")
+
+
+def load_dm_scheduled_tracker():
+    """Load and migrate dm_scheduled_tracker to per-user nested dict with sets."""
+    global dm_scheduled_tracker
+    dm_scheduled_tracker = {}
+    raw = read_json_safe(DM_SCHEDULED_TRACKER_FILE, default={}) or {}
+    migrated = {}
+    for event_id, value in (raw.items() if isinstance(raw, dict) else []):
+        if isinstance(value, list):
+            migrated[event_id] = {}
+        elif isinstance(value, dict):
+            per_user = {}
+            for uid, lst in value.items():
+                per_user[str(uid)] = set(lst) if isinstance(lst, list) else set()
+            migrated[event_id] = per_user
+        else:
+            migrated[event_id] = {}
+    dm_scheduled_tracker = migrated
+    logger.info("[DM_TRACKER] Loaded dm_scheduled_tracker with migration.")
+
+
+async def load_dm_sent_tracker_async():
+    if run_blocking_in_thread:
+        await run_blocking_in_thread(load_dm_sent_tracker, name="load_dm_sent_tracker")
+        return
+
+    await asyncio.to_thread(load_dm_sent_tracker)
+
+
+async def save_dm_sent_tracker_async():
+    if run_blocking_in_thread:
+        await run_blocking_in_thread(save_dm_sent_tracker, name="save_dm_sent_tracker")
+        return
+
+    await asyncio.to_thread(save_dm_sent_tracker)
+
+
+async def load_dm_scheduled_tracker_async():
+    if run_blocking_in_thread:
+        await run_blocking_in_thread(load_dm_scheduled_tracker, name="load_dm_scheduled_tracker")
+        return
+
+    await asyncio.to_thread(load_dm_scheduled_tracker)
+
+
+async def save_dm_scheduled_tracker_async():
+    if run_blocking_in_thread:
+        await run_blocking_in_thread(save_dm_scheduled_tracker, name="save_dm_scheduled_tracker")
+        return
+
+    await asyncio.to_thread(save_dm_scheduled_tracker)
+
+
+def log_failed_dm(user_id, event, delta, reason):
+    log_entry = {
+        "user_id": str(user_id),
+        "event_name": event["name"],
+        "event_time": (
+            ensure_aware_utc(event["start_time"]).isoformat()
+            if isinstance(event.get("start_time"), datetime)
+            else str(event.get("start_time"))
+        ),
+        "delta_seconds": int(delta.total_seconds()),
+        "reason": reason,
+        "timestamp": utcnow().isoformat(),
+    }
+
+    try:
+        if os.path.exists(FAILED_DM_LOG):
+            with open(FAILED_DM_LOG, encoding="utf-8") as f:
+                data = json.load(f)
+        else:
+            data = []
+
+        data.append(log_entry)
+
+        with open(FAILED_DM_LOG, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+
+    except Exception as e:
+        logger.error(f"[DM_REMINDER_LOG_FAILED] Could not log DM failure: {e}")
+
+
+async def cleanup_dm_scheduled_tracker_async(max_age_days=2):
+    """Remove stale events and empty user buckets from the scheduled tracker."""
+    now = utcnow()
+    removed_events = 0
+    try:
+        for event_id in list(dm_scheduled_tracker.keys()):
+            stale_event = False
+            timestamp_str = _extract_event_ts(event_id)
+            if not timestamp_str:
+                logger.warning(f"[DM_SCHEDULE_TRACKER] Failed timestamp extract for {event_id}")
+                stale_event = True
+            else:
+                try:
+                    event_time = ensure_aware_utc(parse_isoformat_utc(timestamp_str))
+                    if now - event_time > timedelta(days=max_age_days):
+                        stale_event = True
+                except Exception as e:
+                    logger.warning(
+                        f"[DM_SCHEDULE_TRACKER] Failed timestamp parse for {event_id}: {e}"
+                    )
+                    stale_event = True
+
+            if stale_event:
+                dm_scheduled_tracker.pop(event_id, None)
+                removed_events += 1
+                continue
+
+            # prune empty users
+            per_user = dm_scheduled_tracker.get(event_id, {})
+            for uid in [u for u, s in per_user.items() if not s]:
+                per_user.pop(uid, None)
+            if not per_user:
+                dm_scheduled_tracker.pop(event_id, None)
+                removed_events += 1
+
+        if removed_events > 0:
+            await save_dm_scheduled_tracker_async()
+            logger.info(
+                "[DM_SCHEDULED_TRACKER] Removed %d stale/empty scheduled entries.", removed_events
+            )
+    except Exception as e:
+        logger.error(f"[DM_SCHEDULED_TRACKER] Cleanup failed: {e}")
+
+
+async def cleanup_dm_sent_tracker_async(max_age_days=2):
+    """Remove stale events and empty user buckets from dm_sent_tracker."""
+    now = utcnow()
+    removed_events = 0
+    try:
+        for event_id in list(dm_sent_tracker.keys()):
+            stale_event = False
+            timestamp_str = _extract_event_ts(event_id)
+            if not timestamp_str:
+                logger.warning(f"[DM_TRACKER_FAILED] TS extract failed for {event_id}")
+                stale_event = True
+            else:
+                try:
+                    event_time = ensure_aware_utc(parse_isoformat_utc(timestamp_str))
+                    if now - event_time > timedelta(days=max_age_days):
+                        stale_event = True
+                except Exception as e:
+                    logger.warning(f"[DM_TRACKER_FAILED] TS parse failed for {event_id}: {e}")
+                    stale_event = True
+
+            if stale_event:
+                dm_sent_tracker.pop(event_id, None)
+                removed_events += 1
+                continue
+
+            # prune empty users
+            per_user = dm_sent_tracker.get(event_id, {})
+            for uid in [u for u, lst in per_user.items() if not lst]:
+                per_user.pop(uid, None)
+            if not per_user:
+                dm_sent_tracker.pop(event_id, None)
+                removed_events += 1
+
+        if removed_events > 0:
+            await save_dm_sent_tracker_async()
+            logger.info(
+                "[DM_TRACKER] Removed %d stale/empty entries from dm_sent_tracker.", removed_events
+            )
+    except Exception as e:
+        logger.error(f"[DM_TRACKER_FAILED] Failed to clean dm_sent_tracker: {e}")
+
+
+def get_event_thumbnail(event_type: str) -> str:
+    raw = (event_type or "").lower()
+    typ = {
+        "next ruins": "ruins",
+        "ruins": "ruins",
+        "next altar fight": "altars",
+        "altar": "altars",
+        "altars": "altars",
+        "chronicle": "chronicle",
+        "major": "major",
+    }.get(raw, raw)
+    thumbs = {
+        "ruins": "https://i.ibb.co/CsK1GNVv/Ruins.jpg",
+        "altars": "https://i.ibb.co/cKxCkTpW/altar.jpg",
+        "major": "https://i.ibb.co/ksjMLzPN/rise-of-kingdoms-best-leonidas-builds.jpg",
+        "chronicle": "https://i.ibb.co/CK0Lr5vL/chronicle-event.png",
+    }
+    return thumbs.get(typ, "https://i.ibb.co/0jM8R7GW/kvk-mistakes.jpg")
+
+
+def make_event_id(event):
+    """
+    Canonical event id builder.
+
+    Uses the centralized serializer to ensure the start_time portion of the id
+    is always in the same canonical ISO UTC string format across the codebase.
+    """
+    raw_type = (event.get("type") or "").lower()
+    typ = {
+        "next ruins": "ruins",
+        "ruins": "ruins",
+        "next altar fight": "altars",
+        "altar": "altars",
+        "altars": "altars",
+        "chronicle": "chronicle",
+        "major": "major",
+    }.get(raw_type, raw_type)
+
+    name_tok = (
+        str(event.get("name") or event.get("title") or "").strip().lower().replace(" ", "_")[:64]
+    )
+
+    try:
+        ts = serialize_event(event).get("start_time")
+    except Exception:
+        try:
+            ts = ensure_aware_utc(event["start_time"]).isoformat()
+        except Exception:
+            ts = str(event.get("start_time"))
+
+    return f"{typ}:{name_tok}:{ts}"
+
+
+def save_active_reminders():
+    try:
+        dirpath = os.path.dirname(REMINDER_TRACKING_FILE) or "."
+        os.makedirs(dirpath, exist_ok=True)
+        to_save = {}
+
+        for eid, msg in active_reminders.items():
+            base = {"channel_id": msg.channel.id, "message_id": msg.id}
+
+            event = next((e for e in get_all_upcoming_events() if make_event_id(e) == eid), None)
+
+            if event:
+                base["event"] = {
+                    k: (ensure_aware_utc(v).isoformat() if isinstance(v, datetime) else v)
+                    for k, v in event.items()
+                }
+            else:
+                logger.warning(
+                    f"[REMINDER_CACHE] No event found for {eid} — saving basic info only."
+                )
+
+            to_save[eid] = base
+
+        with open(REMINDER_TRACKING_FILE, "w", encoding="utf-8") as f:
+            json.dump(to_save, f, indent=2, sort_keys=True)
+
+        logger.debug("[REMINDER_CACHE] Saved active reminders to disk.")
+
+    except Exception as e:
+        logger.warning(f"[REMINDER_CACHE] Failed to save: {e}")
+
+
+async def safe_delete_reminder(event_id: str):
+    msg = active_reminders.get(event_id)
+    if not msg:
+        return
+
+    try:
+        await msg.delete()
+        logger.debug(f"[REMINDER_CACHE] Deleted reminder for {event_id}")
+    except discord.NotFound:
+        logger.warning(f"[REMINDER_CACHE] Reminder already deleted for {event_id}")
+    except Exception as e:
+        logger.warning(f"[REMINDER_CACHE] Error deleting reminder for {event_id}: {e}")
+    finally:
+        active_reminders.pop(event_id, None)
+        save_active_reminders()
+
+
+async def load_active_reminders(bot):
+    raw_ids = set()
+
+    try:
+        if not os.path.exists(REMINDER_TRACKING_FILE):
+            return set()
+
+        with open(REMINDER_TRACKING_FILE, encoding="utf-8") as f:
+            raw = json.load(f)
+
+        required_keys = {"channel_id", "message_id"}
+
+        for eid, data in raw.items():
+            raw_ids.add(eid)  # Track even if broken
+
+            if not isinstance(data, dict):
+                logger.warning(f"[REMINDER_CACHE] Invalid data type for {eid}: {data}")
+                continue
+
+            if not required_keys.issubset(data):
+                logger.warning(f"[REMINDER_CACHE] Incomplete data for {eid}: {data}")
+                continue
+
+            try:
+                channel = await bot.fetch_channel(data["channel_id"])
+                msg = await channel.fetch_message(data["message_id"])
+
+                # Try to match from live event cache
+                matched_event = next(
+                    (e for e in get_all_upcoming_events() if make_event_id(e) == eid), None
+                )
+
+                # Fallback to stored event metadata
+                if not matched_event and "event" in data:
+                    try:
+                        event_data = data["event"]
+                        event_data["start_time"] = parse_isoformat_utc(event_data["start_time"])
+                        event_data["end_time"] = parse_isoformat_utc(event_data["end_time"])
+                        matched_event = event_data
+                        logger.debug(f"[REMINDER_CACHE] Used stored event data for {eid}")
+                    except Exception as parse_error:
+                        logger.warning(
+                            f"[REMINDER_CACHE] Failed to parse stored event for {eid}: {parse_error}"
+                        )
+
+                if not matched_event:
+                    logger.warning(
+                        f"[REMINDER_CACHE] Could not find matching event for {eid} — skipping view reattachment."
+                    )
+                    continue
+
+                raw_type = matched_event.get("type", "unknown").replace(" ", "_")
+                prefix = f"reminder_{raw_type}"
+
+                try:
+                    view = LocalTimeToggleView(events=[matched_event], prefix=prefix)
+                    await msg.edit(view=view)
+                    logger.info(
+                        f"[REMINDER_CACHE_REHYDRATE] Re-attached reminder view for {eid} with prefix {prefix}"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"[REMINDER_CACHE_REHYDRATE] Failed to reattach view for {eid}: {e}"
+                    )
+
+                active_reminders[eid] = msg
+                logger.debug(f"[REMINDER_CACHE] Restored message {data['message_id']} for {eid}")
+
+            except discord.NotFound:
+                logger.warning(f"[REMINDER_CACHE] Message not found for {eid}")
+            except Exception as e:
+                logger.warning(f"[REMINDER_CACHE] Failed to restore {eid}: {e}")
+
+        logger.info(f"[REMINDER_CACHE] Loaded {len(active_reminders)} active reminders.")
+        return raw_ids
+
+    except Exception as e:
+        logger.warning(f"[REMINDER_CACHE] Failed to load reminders from disk: {e}")
+        return set()
+
+
+def get_embed_color(delta):
+    total_seconds = delta.total_seconds()
+    if total_seconds >= 12 * 3600:
+        return 0x3498DB  # Blue
+    elif total_seconds >= 4 * 3600:
+        return 0x2ECC71  # Green
+    elif total_seconds >= 1 * 3600:
+        return 0xE67E22  # Orange
+    else:
+        return 0xE74C3C  # Red
+
+
+async def cleanup_orphaned_reminders(loaded_ids: set):
+    upcoming_events = get_all_upcoming_events()
+
+    if not upcoming_events:
+        logger.warning(
+            "[REMINDER_CACHE] Skipping orphan cleanup — event cache is empty or not ready."
+        )
+        return
+
+    valid_ids = {make_event_id(e) for e in upcoming_events}
+    orphaned = [eid for eid in loaded_ids if eid not in valid_ids]
+
+    for eid in orphaned:
+        await safe_delete_reminder(eid)
+
+    if orphaned:
+        save_active_reminders()
+
+
+async def send_reminder_at(bot, channel_id, event, delta):
+    event_start = ensure_aware_utc(event["start_time"])
+    seconds_until = (event_start - delta - utcnow()).total_seconds()
+    if seconds_until > 0:
+        await asyncio.sleep(seconds_until)
+
+    event_id = make_event_id(event)
+    logger.debug(f"[REMINDER_CACHE] Triggered send_reminder_at for {event_id} at T-{delta}")
+
+    try:
+        now = utcnow()
+        time_remaining = ensure_aware_utc(event["start_time"]) - now
+        is_now = abs(time_remaining.total_seconds()) < 60
+        embed_color = get_embed_color(time_remaining)
+
+        # 🚫 Skip false T-0s
+        if delta == timedelta(0) and not is_now:
+            logger.warning(
+                f"[REMINDER_CACHE] Event {event_id} triggered at T-0 but it's not now: {time_remaining}"
+            )
+            return
+
+        description = (
+            "**Starts NOW**"
+            if delta == timedelta(0) and is_now
+            else f"**Starts <t:{int(ensure_aware_utc(event['start_time']).timestamp())}:R>**"
+        )
+
+        # Add a non-personalized hype quote at T-1h and T-0
+        add_public_quote = delta in (timedelta(hours=1), timedelta(seconds=0))
+        if add_public_quote:
+            etype = (event.get("type") or "").lower().strip()
+            pub_candidates = PUBLIC_QUOTES.get(etype) or PUBLIC_QUOTES["_default"]
+            pub_quote = random.choice(pub_candidates)
+            description = f"{description}\n\n💬 *{pub_quote}*"
+
+        embed = discord.Embed(
+            title=f"📣 {event['name']}", description=description, color=embed_color
+        )
+        # Use centralized short-time formatter for consistency
+        try:
+            embed.set_footer(
+                text=f"Event starts: {fmt_short(ensure_aware_utc(event['start_time']))}"
+            )
+        except Exception:
+            # Fallback to previous formatting in case fmt_short fails
+            embed.set_footer(
+                text=f"Event starts: {ensure_aware_utc(event['start_time']).strftime('%A, %d %B %Y at %H:%M UTC')}"
+            )
+
+        mention = "@everyone" if delta in [timedelta(hours=1), timedelta(minutes=0)] else None
+
+        # Delete previous reminder for this event
+        prev_msg = active_reminders.get(event_id)
+        if prev_msg:
+            try:
+                await prev_msg.delete()
+                logger.debug(f"[REMINDER_CACHE] Deleted previous reminder for {event_id}")
+            except Exception as e:
+                logger.warning(
+                    f"[REMINDER_CACHE] Failed to delete previous reminder for {event_id}: {e}"
+                )
+
+        channel = bot.get_channel(channel_id)
+        if not channel:
+            logger.warning(f"[REMINDER_CACHE_WARNING] Channel {channel_id} not found.")
+            return
+
+        prefix = f"reminder_{event['type'].replace(' ', '_')}"
+        view = LocalTimeToggleView(events=[event], prefix=prefix)
+        msg = await channel.send(content=mention, embed=embed, view=view)
+        active_reminders[event_id] = msg
+        save_active_reminders()
+        logger.debug(f"[REMINDER_CACHE] Sent new reminder for {event_id} at T-{delta}")
+
+        if delta == timedelta(0) and event.get("end_time"):
+            expiry_seconds = (
+                ensure_aware_utc(event["end_time"]) - utcnow()
+            ).total_seconds() + EXPIRY_DELAY
+            asyncio.create_task(expire_single_reminder(event_id, expiry_seconds))
+
+    except Exception as e:
+        logger.error(
+            f"[REMINDER_CACHE_CRITICAL] Failed to send reminder for {event_id} at T-{delta}: {e}"
+        )
+
+
+async def expire_single_reminder(event_id, delay_seconds):
+    await asyncio.sleep(delay_seconds)
+    await safe_delete_reminder(event_id)
+
+
+# Insert the new rehydration function somewhere near the top-level async helpers
+# (e.g. after expire_single_reminder or after delayed_user_dm). Replace or insert exactly.
+
+
+async def rehydrate_dm_scheduled_tasks(bot):
+    """
+    Recreate delayed_user_dm / immediate send tasks for persisted dm_scheduled_tracker entries.
+
+    Behavior:
+      - For each event_id / uid / delta_seconds in dm_scheduled_tracker:
+        - Try to find a matching event in get_all_upcoming_events().
+        - If no matching event or event >48h in future or event already long-past: remove marker.
+        - Else compute seconds_until = start_time - delta - now
+            - If seconds_until > 0: create delayed_user_dm task and register it
+            - If seconds_until <= 0 and >= -REHYDRATE_STALE_GRACE_SECONDS: schedule immediate send_user_reminder task
+            - If seconds_until < -REHYDRATE_STALE_GRACE_SECONDS: treat as stale and remove marker
+      - Save dm_scheduled_tracker after pruning/restoring.
+    """
+    try:
+        if not dm_scheduled_tracker:
+            logger.debug("[DM_REHYDRATE] No persisted scheduled DM markers to rehydrate.")
+            return
+
+        logger.info("[DM_REHYDRATE] Attempting to rehydrate persisted scheduled DMs from disk.")
+        # Build a mapping of event_id -> event for quick lookup
+        upcoming = get_all_upcoming_events() or []
+        event_map = {make_event_id(e): e for e in upcoming}
+
+        now = utcnow()
+        removed_any = False
+        restored_count = 0
+
+        # Iterate a copy to allow safe mutation
+        for event_id, per_event in list(dm_scheduled_tracker.items()):
+            # per_event: { uid: set(delta_seconds, ...) }
+            # If event missing in current event cache, we'll attempt to use stored event info? (keep simple: prune)
+            event = event_map.get(event_id)
+            # If event not found, try to parse event_time from event_id — but prefer pruning to avoid spurious resends.
+            if not event:
+                # Remove all markers for this event
+                logger.info(
+                    "[DM_REHYDRATE] No matching upcoming event for %s — removing %d scheduled marker(s).",
+                    event_id,
+                    sum(len(s) for s in per_event.values()) if isinstance(per_event, dict) else 0,
+                )
+                dm_scheduled_tracker.pop(event_id, None)
+                removed_any = True
+                continue
+
+            # Resolve start time
+            try:
+                start_time = ensure_aware_utc(event["start_time"])
+            except Exception:
+                logger.warning(
+                    "[DM_REHYDRATE] Could not parse start_time for %s — removing markers.", event_id
+                )
+                dm_scheduled_tracker.pop(event_id, None)
+                removed_any = True
+                continue
+
+            # Skip events >48h out (we will allow scheduler to handle them later)
+            if start_time - now > timedelta(hours=48):
+                logger.debug(
+                    "[DM_REHYDRATE] Event %s >48h away — leaving markers for normal scheduling.",
+                    event_id,
+                )
+                continue
+
+            # For each user and each delta
+            for uid, delta_set in list(per_event.items()):
+                # iterate copy of set to allow mutation
+                for delta_seconds in list(delta_set):
+                    try:
+                        delta = timedelta(seconds=int(delta_seconds))
+                        seconds_until = (start_time - delta - utcnow()).total_seconds()
+
+                        # Case: in future -> recreate a delayed task
+                        if seconds_until > 0:
+                            try:
+                                user = await bot.fetch_user(int(uid))
+                            except Exception as e:
+                                logger.warning(
+                                    "[DM_REHYDRATE] Failed to fetch user %s for %s: %s — removing marker.",
+                                    uid,
+                                    event_id,
+                                    e,
+                                )
+                                # remove the marker to avoid permanent blocking
+                                dm_scheduled_tracker.get(event_id, {}).get(uid, set()).discard(
+                                    delta_seconds
+                                )
+                                removed_any = True
+                                continue
+
+                            task = asyncio.create_task(
+                                delayed_user_dm(bot, user, event, delta, seconds_until)
+                            )
+                            register_user_task(
+                                user.id,
+                                task,
+                                meta={"event_id": event_id, "delta_seconds": int(delta_seconds)},
+                            )
+                            logger.info(
+                                "[DM_REHYDRATE] Restored scheduled DM for user %s for %s at T-%s in %ds",
+                                uid,
+                                event_id,
+                                delta,
+                                int(seconds_until),
+                            )
+                            restored_count += 1
+                            # Leave the persisted marker in place — it's already correct
+                            continue
+
+                        # Case: overdue but within grace window -> immediate send
+                        if seconds_until >= -REHYDRATE_STALE_GRACE_SECONDS:
+                            try:
+                                user = await bot.fetch_user(int(uid))
+                            except Exception as e:
+                                logger.warning(
+                                    "[DM_REHYDRATE] Failed to fetch user %s for immediate send for %s: %s — removing marker.",
+                                    uid,
+                                    event_id,
+                                    e,
+                                )
+                                dm_scheduled_tracker.get(event_id, {}).get(uid, set()).discard(
+                                    delta_seconds
+                                )
+                                removed_any = True
+                                continue
+
+                            # Schedule immediate send via register_user_task
+                            task = asyncio.create_task(send_user_reminder(user, event, delta))
+                            register_user_task(
+                                user.id,
+                                task,
+                                meta={"event_id": event_id, "delta_seconds": int(delta_seconds)},
+                            )
+                            logger.info(
+                                "[DM_REHYDRATE] Performed immediate rehydrated DM to user %s for %s at T-%s (late by %ds)",
+                                uid,
+                                event_id,
+                                delta,
+                                int(-seconds_until),
+                            )
+                            restored_count += 1
+                            # record will be kept by dm_sent_tracker when send_user_reminder succeeds
+                            continue
+
+                        # Case: stale beyond grace window -> remove
+                        logger.info(
+                            "[DM_REHYDRATE] Scheduled marker for %s user %s at T-%s is stale (%.1fs) — removing.",
+                            event_id,
+                            uid,
+                            delta,
+                            seconds_until,
+                        )
+                        dm_scheduled_tracker.get(event_id, {}).get(uid, set()).discard(
+                            delta_seconds
+                        )
+                        removed_any = True
+
+                    except Exception as e:
+                        # Defensive: don't abort rehydration on per-item error
+                        logger.warning(
+                            "[DM_REHYDRATE] Error rehydrating marker %s / %s / %s: %s",
+                            event_id,
+                            uid,
+                            delta_seconds,
+                            e,
+                        )
+                        # Best-effort: remove the problematic marker to avoid permanent blocking
+                        try:
+                            dm_scheduled_tracker.get(event_id, {}).get(uid, set()).discard(
+                                delta_seconds
+                            )
+                            removed_any = True
+                        except Exception:
+                            pass
+
+                # If user's set is empty, remove the uid entry
+                if not dm_scheduled_tracker.get(event_id, {}).get(uid):
+                    dm_scheduled_tracker.get(event_id, {}).pop(uid, None)
+                    removed_any = True
+
+            # If event bucket is empty after removals, remove it
+            if not dm_scheduled_tracker.get(event_id):
+                dm_scheduled_tracker.pop(event_id, None)
+                removed_any = True
+
+        if removed_any:
+            try:
+                save_dm_scheduled_tracker()
+            except Exception as e:
+                logger.warning(
+                    "[DM_REHYDRATE] Failed to save dm_scheduled_tracker after pruning: %s", e
+                )
+
+        logger.info(
+            "[DM_REHYDRATE] Rehydration complete — restored=%d removed_markers=%s",
+            restored_count,
+            removed_any,
+        )
+    except Exception as e:
+        # Fail-safe: never crash the scheduler due to rehydrate errors
+        logger.exception("[DM_REHYDRATE] Unexpected error during DM rehydration: %s", e)
+
+
+async def delayed_user_dm(bot, user, event, delta, seconds_until):
+    event_id = make_event_id(event)
+    uid = str(user.id)
+    delta_seconds = int(delta.total_seconds())
+
+    # Skip if already sent to this user
+    if delta_seconds in dm_sent_tracker.get(event_id, {}).get(uid, []):
+        logger.info(
+            "[DM_REMINDER_SKIP_DELAYED] Skipping delayed task for %s %s at T-%s",
+            user.id,
+            event_id,
+            delta,
+        )
+        return
+
+    try:
+        await asyncio.sleep(seconds_until)
+        await send_user_reminder(user, event, delta)
+    except Exception as e:
+        logger.error(
+            "[DM_REMINDER_DELAYED_FAILED] Error while waiting/sending DM to %s for %s at T-%s: %s",
+            user.id,
+            event_id,
+            delta,
+            e,
+        )
+    finally:
+        try:
+            dm_scheduled_tracker.get(event_id, {}).get(uid, set()).discard(delta_seconds)
+        finally:
+            await save_dm_scheduled_tracker_async()
+
+
+async def send_user_reminder(user, event, delta):
+    event_id = make_event_id(event)
+    uid = str(user.id)
+    delta_seconds = int(delta.total_seconds())
+
+    try:
+        # 🚫 SKIP IF ALREADY SENT (per-user)
+        if delta_seconds in dm_sent_tracker.get(event_id, {}).get(uid, []):
+            logger.info(
+                "[DM_REMINDER] ⚠️ Skipping duplicate DM to %s for %s at T-%s", user, event_id, delta
+            )
+            return
+
+        # Names for personalization
+        discord_name = getattr(user, "display_name", None) or str(user)
+        main_gov = _get_main_governor_name_for_user(user.id) or discord_name
+
+        # Select a quote by event type
+        etype = (event.get("type") or "").lower().strip()
+        candidates = DM_QUOTES.get(etype) or DM_QUOTES["_default"]
+        quote_tpl = random.choice(candidates)
+        quote = quote_tpl.format(name=discord_name, gov=main_gov)
+
+        starts_at = int(ensure_aware_utc(event["start_time"]).timestamp())
+        t0 = timedelta(0)
+        is_now = delta == t0
+
+        # Build DM embed
+        _title_suffix = (
+            "NOW"
+            if is_now
+            else f"in {((ensure_aware_utc(event['start_time']) - utcnow()).total_seconds() // 60):.0f} min"
+        )
+        title = f"📬 {event['name']} – Reminder"
+
+        # Friendly line at top + quote below
+        greeting = f"Hey **{discord_name}** ({main_gov})!"
+        description = f"{greeting}\n" f"⏰ Starts <t:{starts_at}:R>\n\n" f"💬 *{quote}*"
+
+        embed = discord.Embed(title=title, description=description, color=discord.Color.green())
+        embed.set_footer(text="Manage with /modify_subscription or /unsubscribe")
+
+        await user.send(embed=embed)
+
+        # ✅ Record successful send (per-user)
+        dm_sent_tracker.setdefault(event_id, {}).setdefault(uid, [])
+        if delta_seconds not in dm_sent_tracker[event_id][uid]:
+            dm_sent_tracker[event_id][uid].append(delta_seconds)
+            await save_dm_sent_tracker_async()
+
+        reminder_stats["dm_success"] += 1
+        logger.info("[DM_REMINDER] ✅ Sent DM to %s for %s at T-%s", user, event_id, delta)
+
+        if reminder_stats["dm_success"] % 10 == 0:
+            logger.info(
+                f"[DM_REMINDER_SUMMARY] Running total — Sent: {reminder_stats['dm_success']}, "
+                f"Blocked: {reminder_stats['dm_dm_disabled']}, Failed: {reminder_stats['dm_failed']}"
+            )
+
+    except discord.Forbidden:
+        logger.warning("[DM_REMINDER] Cannot DM user %s — DMs disabled.", user)
+        reminder_stats["dm_dm_disabled"] += 1
+        log_failed_dm(user.id, event, delta, "DMs disabled")
+    except Exception as e:
+        logger.exception("[DM_REMINDER] Failed to DM user %s for %s: %s", user, event_id, e)
+        reminder_stats["dm_failed"] += 1
+        log_failed_dm(user.id, event, delta, str(e))
+    finally:
+        dm_scheduled_tracker.get(event_id, {}).get(uid, set()).discard(delta_seconds)
+        await save_dm_scheduled_tracker_async()
+
+
+async def schedule_event_reminders(bot, notify_channel_id, test_mode=False, test_user_id=None):
+    await load_dm_sent_tracker_async()
+    await load_dm_scheduled_tracker_async()
+
+    if not test_mode:
+        # Rehydrate any persisted scheduled DM tasks so restarts don't permanently block reminders.
+        try:
+            await rehydrate_dm_scheduled_tasks(bot)
+        except Exception as e:
+            logger.warning("[DM_REHYDRATE] Rehydration attempt failed at startup: %s", e)
+
+    if test_mode:
+        now = utcnow()
+        test_event = {
+            "name": "Test Ruins",
+            "type": "ruins",
+            "start_time": now + timedelta(minutes=2),
+            "end_time": now + timedelta(minutes=2, seconds=30),
+            "zone": "Test Zone",
+        }
+        for delta in TEST_REMINDER_WINDOWS:
+            asyncio.create_task(send_reminder_at(bot, notify_channel_id, test_event, delta))
+        return
+
+    while True:
+        all_events = get_all_upcoming_events()
+        now = utcnow()
+        subscribers = get_all_subscribers()
+        logger.debug("[DM_REMINDER_SCHEDULER] Loaded %d subscribers", len(subscribers))
+
+        for event in all_events:
+            raw_type = (event["type"] or "").lower().strip()
+            if raw_type not in {"ruins", "altars", "major", "chronicle"}:
+                continue
+            event_type = raw_type  # already normalized by the loader
+
+            event_id = make_event_id(event)
+            start_time = ensure_aware_utc(event["start_time"])
+
+            if start_time - now > timedelta(hours=48):
+                continue
+
+            if event_id not in sent_reminders:
+                sent_reminders[event_id] = set()
+
+            for delta in REMINDER_WINDOWS:
+                reminder_time = start_time - delta
+
+                if not (now <= reminder_time <= now + timedelta(minutes=5)):
+                    continue
+
+                if delta in sent_reminders[event_id]:
+                    continue
+
+                asyncio.create_task(send_reminder_at(bot, notify_channel_id, event, delta))
+                sent_reminders[event_id].add(delta)
+                logger.debug("[SCHEDULE_CACHE] Reminder for %s scheduled at T-%s", event_id, delta)
+
+            # yield a tick between events to keep the loop responsive
+            await asyncio.sleep(0)
+
+            for user_id, config in subscribers.items():
+                try:
+                    user = await bot.fetch_user(int(user_id))
+                    logger.debug("[DM_REMINDER_USER] USER ID found %s", user_id)
+                except Exception as e:
+                    logger.error("[DM_REMINDER] Failed to fetch user %s: %s", user_id, e)
+                    continue
+
+                if not user:
+                    logger.error("[DM_REMINDER] Could not fetch user object for ID %s", user_id)
+                    continue
+
+                subscribed_types = config.get("subscriptions", [])
+                reminder_times = config.get("reminder_times", DEFAULT_REMINDER_TIMES)
+
+                expanded_types = set(subscribed_types)
+                if "fights" in expanded_types:
+                    expanded_types.update(["altars", "major"])
+                if "all" in expanded_types:
+                    expanded_types.update(
+                        ["ruins", "altars", "major"]
+                    )  # (add "chronicle" if you want)
+
+                if event_type not in expanded_types:
+                    continue
+
+                for rt in reminder_times:
+                    delta = REMINDER_MAP.get(rt)
+
+                    if not delta:
+                        continue
+
+                    # Ensure per-user buckets exist
+                    dm_sent_tracker.setdefault(event_id, {}).setdefault(str(user.id), [])
+                    dm_scheduled_tracker.setdefault(event_id, {}).setdefault(str(user.id), set())
+
+                    delta_seconds = int(delta.total_seconds())
+                    user_sent = dm_sent_tracker[event_id][str(user.id)]
+                    user_sched = dm_scheduled_tracker[event_id][str(user.id)]
+
+                    if delta_seconds in user_sent:
+                        logger.debug(
+                            "[DM_REMINDER_DUPLICATE] Skipping %s for %s at T-%s — already sent.",
+                            user_id,
+                            event_id,
+                            delta,
+                        )
+                        continue
+
+                    if delta_seconds in user_sched:
+                        logger.debug(
+                            "[DM_REMINDER_DUPLICATE_TASK] Already scheduled for %s at %s T-%s",
+                            user_id,
+                            event_id,
+                            delta,
+                        )
+                        continue
+
+                    seconds_until = (start_time - delta - now).total_seconds()
+                    logger.debug(
+                        "[DM_REMINDER_DEBUG] User %s | Event: %s | Delta: %s | Seconds until: %d",
+                        user_id,
+                        event_id,
+                        delta,
+                        int(seconds_until),
+                    )
+
+                    user_sched.add(delta_seconds)
+                    save_dm_scheduled_tracker()
+
+                    if seconds_until <= 0:
+                        logger.info(
+                            "[DM_REMINDER_LATE] Sending immediate DM to %s for %s at T-%s",
+                            user_id,
+                            event_id,
+                            delta,
+                        )
+                        register_user_task(
+                            user.id,
+                            asyncio.create_task(send_user_reminder(user, event, delta)),
+                            meta={
+                                "event_id": event_id,
+                                "delta_seconds": int(delta.total_seconds()),
+                            },
+                        )
+                    else:
+                        logger.debug(
+                            "[DM_REMINDER_SCHEDULED] Scheduling DM to %s for %s at T-%s in %ds",
+                            user_id,
+                            event_id,
+                            delta,
+                            int(seconds_until),
+                        )
+                        register_user_task(
+                            user.id,
+                            asyncio.create_task(
+                                delayed_user_dm(bot, user, event, delta, seconds_until)
+                            ),
+                            meta={
+                                "event_id": event_id,
+                                "delta_seconds": int(delta.total_seconds()),
+                            },
+                        )
+
+                # small yield within the per-user loop to avoid long bursts
+                await asyncio.sleep(0)
+
+        reminder_stats["dm_success"] = 0
+        reminder_stats["dm_dm_disabled"] = 0
+        reminder_stats["dm_failed"] = 0
+
+        await cleanup_dm_scheduled_tracker_async()
+        await cleanup_dm_sent_tracker_async()
+        _log_tracker_stats_if_due()
+        # yield once after logging, then sleep normally
+        await asyncio.sleep(0)
+        await asyncio.sleep(300)
+
+
+async def reminder_cleanup_loop():
+    while True:
+        now = utcnow()
+        expired = []
+
+        for eid in list(active_reminders):
+            try:
+                ts = _extract_event_ts(eid)
+                if not ts:
+                    raise ValueError(f"Failed to extract timestamp for {eid}")
+                event_time = parse_isoformat_utc(ts)
+                if now > event_time + timedelta(minutes=15):
+                    await safe_delete_reminder(eid)
+                    expired.append(eid)
+            except Exception as e:
+                logger.error(
+                    f"[SCHEDULE_CACHE_CLEANUP] Failed to parse or clean reminder {eid}: {e}"
+                )
+
+        if expired:
+            logger.info(
+                f"[SCHEDULE_CACHE_CLEANUP] Cleanup loop removed {len(expired)} expired reminders."
+            )
+        await asyncio.sleep(600)
+
+
+async def refresh_reminder_format(bot, notify_channel_id):
+    try:
+        updated = 0
+        # Build a quick lookup of upcoming events by event_id
+        events = {make_event_id(e): e for e in get_all_upcoming_events()}
+
+        for event_id, msg in list(active_reminders.items()):
+            # Find event (prefer live cache, else skip)
+            event = events.get(event_id)
+            if not event:
+                logger.debug(f"[SCHEDULE_CACHE_REFRESH] No live event for {event_id}; skipping.")
+                continue
+
+            # Only refresh the kinds we show
+            etype = (event.get("type") or "").lower().strip()
+            if etype not in {"ruins", "altars", "major", "chronicle"}:
+                continue
+
+            now = utcnow()
+            time_remaining = ensure_aware_utc(event["start_time"]) - now
+            is_now = abs(time_remaining.total_seconds()) < 60
+
+            # Build description same as send_reminder_at
+            description = (
+                "**Starts NOW**"
+                if is_now
+                else f"**Starts <t:{int(ensure_aware_utc(event['start_time']).timestamp())}:R>**"
+            )
+
+            # Add non-personalized quote at T-1h or NOW
+            if time_remaining <= timedelta(hours=1):
+                pub_candidates = PUBLIC_QUOTES.get(etype) or PUBLIC_QUOTES["_default"]
+                pub_quote = random.choice(pub_candidates)
+                description = f"{description}\n\n💬 *{pub_quote}*"
+
+            embed_color = get_embed_color(time_remaining)
+            embed = discord.Embed(
+                title=f"📣 {event['name']}", description=description, color=embed_color
+            )
+            try:
+                embed.set_footer(
+                    text=f"Event starts: {fmt_short(ensure_aware_utc(event['start_time']))}"
+                )
+            except Exception:
+                embed.set_footer(
+                    text=f"Event starts: {ensure_aware_utc(event['start_time']).strftime('%A, %d %B %Y at %H:%M UTC')}"
+                )
+
+            try:
+                await msg.edit(embed=embed)  # keep existing view
+                updated += 1
+            except Exception as e:
+                logger.error(f"[SCHEDULE_CACHE_REFRESH] Failed to edit message for {event_id}: {e}")
+
+        logger.info(
+            f"[SCHEDULE_CACHE_REFRESH] Reminder update complete. Edited {updated} messages."
+        )
+    except Exception as e:
+        logger.error(f"[SCHEDULE_CACHE_REFRESH] Entire function failed: {e}")
