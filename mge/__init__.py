@@ -1,0 +1,1 @@
+"""MGE subsystem package."""
