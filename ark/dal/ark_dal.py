@@ -754,6 +754,7 @@ async def upsert_team_preference(
     updated_by: str,
 ) -> dict[str, Any] | None:
     sql = """
+        SET NOCOUNT ON;
         DECLARE @GovernorID bigint = CAST(? AS bigint);
         DECLARE @PreferredTeam int = CAST(? AS int);
         DECLARE @UpdatedBy nvarchar(100) = CAST(? AS nvarchar(100));

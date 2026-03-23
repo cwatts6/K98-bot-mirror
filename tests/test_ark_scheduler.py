@@ -7,6 +7,7 @@ import pytest
 
 from ark.ark_scheduler import (
     ArkSchedulerState,
+    _post_initial_registration,
     _schedule_once,
     _task_key,
     ensure_confirmation_message,
@@ -128,6 +129,9 @@ async def test_scheduler_does_not_relock_locked_matches(monkeypatch):
             }
         ]
 
+    async def _list_completed():
+        return []
+
     async def _lock(*_a, **_k):
         called["lock"] = True
 
@@ -157,6 +161,9 @@ async def test_scheduler_does_not_relock_locked_matches(monkeypatch):
 
     monkeypatch.setattr("ark.ark_scheduler.get_config", _get_config)
     monkeypatch.setattr("ark.ark_scheduler.list_open_matches", _list_open_matches)
+    monkeypatch.setattr(
+        "ark.ark_scheduler.list_completed_matches_pending_completion", _list_completed
+    )
     monkeypatch.setattr("ark.ark_scheduler.lock_match_and_post_confirmation", _lock)
     monkeypatch.setattr("ark.ark_scheduler.ensure_confirmation_message", _ensure)
     monkeypatch.setattr("ark.ark_scheduler.sync_ark_matches_from_calendar", _auto_create)
@@ -204,6 +211,20 @@ async def test_scheduler_updates_match_complete_immediately(monkeypatch):
         called["mark"] = True
         return True
 
+    async def _auto_create(**_kwargs):
+        return type(
+            "R",
+            (),
+            {
+                "scanned": 0,
+                "created": 0,
+                "existing": 0,
+                "skipped_cancelled_match": 0,
+                "invalid_title": 0,
+                "errors": 0,
+            },
+        )()
+
     async def _sleep(_):
         raise asyncio.CancelledError
 
@@ -215,6 +236,7 @@ async def test_scheduler_updates_match_complete_immediately(monkeypatch):
     )
     monkeypatch.setattr("ark.ark_scheduler.ensure_confirmation_message", _ensure)
     monkeypatch.setattr("ark.ark_scheduler.mark_match_completion_posted", _mark)
+    monkeypatch.setattr("ark.ark_scheduler.sync_ark_matches_from_calendar", _auto_create)
     monkeypatch.setattr("ark.ark_scheduler.asyncio.sleep", _sleep)
 
     with pytest.raises(asyncio.CancelledError):
@@ -254,6 +276,20 @@ async def test_scheduler_schedules_match_complete(monkeypatch):
         scheduled["key"] = key
         scheduled["when"] = when
 
+    async def _auto_create(**_kwargs):
+        return type(
+            "R",
+            (),
+            {
+                "scanned": 0,
+                "created": 0,
+                "existing": 0,
+                "skipped_cancelled_match": 0,
+                "invalid_title": 0,
+                "errors": 0,
+            },
+        )()
+
     async def _sleep(_):
         raise asyncio.CancelledError
 
@@ -264,6 +300,7 @@ async def test_scheduler_schedules_match_complete(monkeypatch):
         "ark.ark_scheduler.list_completed_matches_pending_completion", _list_completed
     )
     monkeypatch.setattr("ark.ark_scheduler._schedule_once", _schedule_once)
+    monkeypatch.setattr("ark.ark_scheduler.sync_ark_matches_from_calendar", _auto_create)
     monkeypatch.setattr("ark.ark_scheduler.asyncio.sleep", _sleep)
 
     with pytest.raises(asyncio.CancelledError):
@@ -271,3 +308,266 @@ async def test_scheduler_schedules_match_complete(monkeypatch):
 
     assert scheduled["key"] == _task_key(99, "complete")
     assert scheduled["when"] == complete_at
+
+
+def _make_auto_create_result():
+    return type(
+        "AutoCreateResult",
+        (),
+        {
+            "scanned": 0,
+            "created": 0,
+            "existing": 0,
+            "skipped_cancelled_match": 0,
+            "invalid_title": 0,
+            "errors": 0,
+        },
+    )()
+
+
+@pytest.mark.asyncio
+async def test_scheduler_schedules_reg_post_for_future_scheduled_match(monkeypatch):
+    """Scheduler schedules reg_post task at match_dt when no registration message exists yet."""
+    scheduled = {}
+    now = datetime(2026, 3, 23, 12, 0, tzinfo=UTC)
+    match_dt = now + timedelta(days=12)  # future event
+
+    async def _get_config():
+        return {"PlayersCap": 30, "SubsCap": 15, "CheckInActivationOffsetHours": 12}
+
+    async def _list_open_matches():
+        return [
+            {
+                "MatchId": 20,
+                "Alliance": "k98A",
+                "ArkWeekendDate": match_dt.date(),
+                "MatchDay": "Sat",
+                "MatchTimeUtc": match_dt.time().replace(microsecond=0),
+                "SignupCloseUtc": match_dt - timedelta(days=1),
+                "Status": "Scheduled",
+                "RegistrationMessageId": None,
+                "RegistrationChannelId": None,
+            }
+        ]
+
+    async def _list_completed():
+        return []
+
+    async def _schedule_once_stub(*, state, key, when, coro_factory):
+        scheduled[key] = when
+
+    async def _run_match_dispatch(*_a, **_k):
+        return None
+
+    async def _auto_create(**_kwargs):
+        return _make_auto_create_result()
+
+    async def _sleep(_):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr("ark.ark_scheduler._utcnow", lambda: now)
+    monkeypatch.setattr("ark.ark_scheduler.get_config", _get_config)
+    monkeypatch.setattr("ark.ark_scheduler.list_open_matches", _list_open_matches)
+    monkeypatch.setattr(
+        "ark.ark_scheduler.list_completed_matches_pending_completion", _list_completed
+    )
+    monkeypatch.setattr("ark.ark_scheduler._schedule_once", _schedule_once_stub)
+    monkeypatch.setattr("ark.ark_scheduler.sync_ark_matches_from_calendar", _auto_create)
+    monkeypatch.setattr("ark.ark_scheduler._run_match_reminder_dispatch", _run_match_dispatch)
+    monkeypatch.setattr("ark.ark_scheduler.asyncio.sleep", _sleep)
+
+    with pytest.raises(asyncio.CancelledError):
+        await schedule_ark_lifecycle(DummyClient(), poll_interval_seconds=1)
+
+    assert _task_key(20, "reg_post") in scheduled
+    assert scheduled[_task_key(20, "reg_post")] == match_dt
+
+
+@pytest.mark.asyncio
+async def test_scheduler_posts_reg_immediately_when_match_dt_passed(monkeypatch):
+    """Scheduler posts registration immediately if match_dt is already past and no message exists."""
+    called = {"reg_post": False}
+    now = datetime(2026, 4, 4, 21, 0, tzinfo=UTC)
+    match_dt = now - timedelta(hours=1)  # match_dt is in the past
+
+    async def _get_config():
+        return {"PlayersCap": 30, "SubsCap": 15, "CheckInActivationOffsetHours": 12}
+
+    async def _list_open_matches():
+        return [
+            {
+                "MatchId": 20,
+                "Alliance": "k98A",
+                "ArkWeekendDate": match_dt.date(),
+                "MatchDay": "Sat",
+                "MatchTimeUtc": match_dt.time().replace(microsecond=0),
+                "SignupCloseUtc": match_dt + timedelta(hours=2),
+                "Status": "Scheduled",
+                "RegistrationMessageId": None,
+                "RegistrationChannelId": None,
+            }
+        ]
+
+    async def _list_completed():
+        return []
+
+    async def _post_initial_reg(**_kw):
+        called["reg_post"] = True
+
+    async def _run_match_dispatch(*_a, **_k):
+        return None
+
+    async def _auto_create(**_kwargs):
+        return _make_auto_create_result()
+
+    async def _sleep(_):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr("ark.ark_scheduler._utcnow", lambda: now)
+    monkeypatch.setattr("ark.ark_scheduler.get_config", _get_config)
+    monkeypatch.setattr("ark.ark_scheduler.list_open_matches", _list_open_matches)
+    monkeypatch.setattr(
+        "ark.ark_scheduler.list_completed_matches_pending_completion", _list_completed
+    )
+    monkeypatch.setattr("ark.ark_scheduler._post_initial_registration", _post_initial_reg)
+    monkeypatch.setattr("ark.ark_scheduler.sync_ark_matches_from_calendar", _auto_create)
+    monkeypatch.setattr("ark.ark_scheduler._run_match_reminder_dispatch", _run_match_dispatch)
+    monkeypatch.setattr("ark.ark_scheduler.asyncio.sleep", _sleep)
+
+    with pytest.raises(asyncio.CancelledError):
+        await schedule_ark_lifecycle(DummyClient(), poll_interval_seconds=1)
+
+    assert called["reg_post"] is True
+
+
+@pytest.mark.asyncio
+async def test_scheduler_skips_reg_post_when_message_already_exists(monkeypatch):
+    """Scheduler does not schedule or call reg_post when RegistrationMessageId is already set."""
+    scheduled = {}
+    called = {"reg_post": False}
+    now = datetime(2026, 3, 23, 12, 0, tzinfo=UTC)
+    match_dt = now + timedelta(days=12)
+
+    async def _get_config():
+        return {"PlayersCap": 30, "SubsCap": 15, "CheckInActivationOffsetHours": 12}
+
+    async def _list_open_matches():
+        return [
+            {
+                "MatchId": 20,
+                "Alliance": "k98A",
+                "ArkWeekendDate": match_dt.date(),
+                "MatchDay": "Sat",
+                "MatchTimeUtc": match_dt.time().replace(microsecond=0),
+                "SignupCloseUtc": match_dt - timedelta(days=1),
+                "Status": "Scheduled",
+                "RegistrationMessageId": 99999,
+                "RegistrationChannelId": 11111,
+            }
+        ]
+
+    async def _list_completed():
+        return []
+
+    async def _schedule_once_stub(*, state, key, when, coro_factory):
+        scheduled[key] = when
+
+    async def _post_initial_reg(**_kw):
+        called["reg_post"] = True
+
+    async def _run_match_dispatch(*_a, **_k):
+        return None
+
+    async def _auto_create(**_kwargs):
+        return _make_auto_create_result()
+
+    async def _sleep(_):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr("ark.ark_scheduler._utcnow", lambda: now)
+    monkeypatch.setattr("ark.ark_scheduler.get_config", _get_config)
+    monkeypatch.setattr("ark.ark_scheduler.list_open_matches", _list_open_matches)
+    monkeypatch.setattr(
+        "ark.ark_scheduler.list_completed_matches_pending_completion", _list_completed
+    )
+    monkeypatch.setattr("ark.ark_scheduler._schedule_once", _schedule_once_stub)
+    monkeypatch.setattr("ark.ark_scheduler._post_initial_registration", _post_initial_reg)
+    monkeypatch.setattr("ark.ark_scheduler.sync_ark_matches_from_calendar", _auto_create)
+    monkeypatch.setattr("ark.ark_scheduler._run_match_reminder_dispatch", _run_match_dispatch)
+    monkeypatch.setattr("ark.ark_scheduler.asyncio.sleep", _sleep)
+
+    with pytest.raises(asyncio.CancelledError):
+        await schedule_ark_lifecycle(DummyClient(), poll_interval_seconds=1)
+
+    assert _task_key(20, "reg_post") not in scheduled
+    assert called["reg_post"] is False
+
+
+@pytest.mark.asyncio
+async def test_post_initial_registration_calls_ensure_with_announce_true(monkeypatch):
+    """_post_initial_registration calls ensure_registration_message with announce=True."""
+    import ark.ark_scheduler as sched
+
+    captured = {}
+
+    async def _get_match(_mid):
+        return {
+            "MatchId": 20,
+            "Alliance": "k98A",
+            "RegistrationMessageId": None,
+        }
+
+    async def _get_alliance(_alliance):
+        return {"RegistrationChannelId": 111}
+
+    class _Controller:
+        def __init__(self, *, match_id, config):
+            captured["match_id"] = match_id
+
+        async def ensure_registration_message(self, **kwargs):
+            captured["kwargs"] = kwargs
+            return type("Ref", (), {"channel_id": 111, "message_id": 999})()
+
+    monkeypatch.setattr(sched, "get_match", _get_match)
+    monkeypatch.setattr(sched, "get_alliance", _get_alliance)
+    monkeypatch.setattr(sched, "ArkRegistrationController", _Controller)
+
+    await _post_initial_registration(
+        client=DummyClient(),
+        match_id=20,
+        config={"PlayersCap": 30, "SubsCap": 15},
+    )
+
+    assert captured["kwargs"]["announce"] is True
+    assert captured["kwargs"]["force_announce"] is False
+    assert captured["kwargs"]["target_channel_id"] == 111
+
+
+@pytest.mark.asyncio
+async def test_post_initial_registration_skips_if_already_posted(monkeypatch):
+    """_post_initial_registration is a no-op when RegistrationMessageId is already set."""
+    import ark.ark_scheduler as sched
+
+    called = {"controller": False}
+
+    async def _get_match(_mid):
+        return {
+            "MatchId": 20,
+            "Alliance": "k98A",
+            "RegistrationMessageId": 88888,
+        }
+
+    class _Controller:
+        def __init__(self, **_kw):
+            called["controller"] = True
+
+    monkeypatch.setattr(sched, "get_match", _get_match)
+    monkeypatch.setattr(sched, "ArkRegistrationController", _Controller)
+
+    await _post_initial_registration(
+        client=DummyClient(),
+        match_id=20,
+        config={"PlayersCap": 30, "SubsCap": 15},
+    )
+
+    assert called["controller"] is False

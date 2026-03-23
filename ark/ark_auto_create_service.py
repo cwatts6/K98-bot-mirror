@@ -15,7 +15,6 @@ from ark.dal.ark_dal import (
     get_match_by_alliance_weekend,
 )
 from ark.datetime_utils import compute_signup_close
-from ark.registration_flow import ArkRegistrationController
 from utils import ensure_aware_utc
 
 logger = logging.getLogger(__name__)
@@ -87,7 +86,7 @@ async def sync_ark_matches_from_calendar(
     lookahead_days: int = _DEFAULT_LOOKAHEAD_DAYS,
     config: dict[str, Any] | None = None,
 ) -> ArkAutoCreateResult:
-    """Create missing Ark matches from EventInstances and trigger registration lifecycle."""
+    """Create missing Ark matches from EventInstances (no registration posting)."""
     now = ensure_aware_utc(now_utc or datetime.now(UTC))
     result = ArkAutoCreateResult()
     config = config or await get_config()
@@ -214,25 +213,6 @@ async def sync_ark_matches_from_calendar(
                     instance_id,
                     parsed.alliance,
                     ark_weekend_date.isoformat(),
-                )
-                continue
-
-            controller = ArkRegistrationController(match_id=match_id, config=config)
-            msg_ref = await controller.ensure_registration_message(
-                client=client,
-                announce=True,
-                force_announce=False,
-                force_repost=False,
-                target_channel_id=int(reg_channel_id),
-                update_refresh_timestamp=False,
-            )
-            if not msg_ref:
-                result.errors += 1
-                logger.warning(
-                    "ark_auto_create_registration_failed instance_id=%s match_id=%s alliance=%s",
-                    instance_id,
-                    match_id,
-                    parsed.alliance,
                 )
                 continue
 

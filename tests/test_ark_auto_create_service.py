@@ -43,23 +43,16 @@ async def test_sync_ark_matches_from_calendar_creates_missing_match(monkeypatch)
         captured["req"] = req
         return 77
 
-    class _Controller:
-        def __init__(self, *, match_id, config):
-            captured["controller_match_id"] = match_id
-            captured["controller_config"] = config
-
-        async def ensure_registration_message(self, **kwargs):
-            captured["ensure_kwargs"] = kwargs
-            return type("Ref", (), {"channel_id": 111, "message_id": 999})()
+    def _make_registration_controller(**_kw):
+        raise AssertionError("ArkRegistrationController must not be called from auto-create")
 
     monkeypatch.setattr(svc, "get_config", _get_config)
     monkeypatch.setattr(svc, "fetch_ark_calendar_candidates", _fetch_candidates)
     monkeypatch.setattr(svc, "get_alliance", _get_alliance)
     monkeypatch.setattr(svc, "get_match_by_alliance_weekend", _get_match_by_alliance_weekend)
     monkeypatch.setattr(svc, "create_match", _create_match)
-    monkeypatch.setattr(svc, "ArkRegistrationController", _Controller)
 
-    result = await svc.sync_ark_matches_from_calendar(client=DummyClient(), now_utc=now)
+    result = await svc.sync_ark_matches_from_calendar(client=None, now_utc=now)
 
     assert result.scanned == 1
     assert result.created == 1
@@ -69,8 +62,6 @@ async def test_sync_ark_matches_from_calendar_creates_missing_match(monkeypatch)
     assert captured["req"].match_time_utc == time(20, 0)
     assert captured["req"].calendar_instance_id == 16464
     assert captured["req"].created_source == "calendar_auto"
-    assert captured["ensure_kwargs"]["announce"] is True
-    assert captured["ensure_kwargs"]["target_channel_id"] == 111
 
 
 @pytest.mark.asyncio

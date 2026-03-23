@@ -14,7 +14,7 @@ from target_utils import _name_cache, refresh_name_cache_from_sql
 
 logger = logging.getLogger(__name__)
 _ALLOWED_TEAMS = {1, 2}
-_UTC = dt.UTC if hasattr(dt, "UTC") else dt.UTC
+_UTC = dt.UTC if hasattr(dt, "UTC") else dt.timezone.utc
 
 
 class ArkPreferenceError(ValueError):

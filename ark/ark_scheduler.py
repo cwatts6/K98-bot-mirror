@@ -266,6 +266,46 @@ async def _run_completion_update(*, client, match_id: int, config: dict[str, Any
     return ok
 
 
+async def _post_initial_registration(*, client, match_id: int, config: dict[str, Any]) -> None:
+    """Post the initial registration embed at event start time with a one-time @everyone ping."""
+    match = await get_match(match_id)
+    if not match:
+        logger.warning("[ARK_SCHED] reg_post: match not found match_id=%s", match_id)
+        return
+    if match.get("RegistrationMessageId"):
+        logger.info("[ARK_SCHED] reg_post: already posted, skipping match_id=%s", match_id)
+        return
+
+    alliance_row = await get_alliance((match.get("Alliance") or "").strip())
+    if not alliance_row:
+        logger.warning("[ARK_SCHED] reg_post: alliance not found match_id=%s", match_id)
+        return
+
+    reg_channel_id = alliance_row.get("RegistrationChannelId")
+    if not reg_channel_id:
+        logger.warning("[ARK_SCHED] reg_post: missing reg channel match_id=%s", match_id)
+        return
+
+    controller = ArkRegistrationController(match_id=match_id, config=config)
+    msg_ref = await controller.ensure_registration_message(
+        client=client,
+        announce=True,
+        force_announce=False,
+        force_repost=False,
+        target_channel_id=int(reg_channel_id),
+        update_refresh_timestamp=False,
+    )
+    if msg_ref:
+        logger.info(
+            "[ARK_SCHED] reg_post: posted registration match_id=%s channel=%s message=%s",
+            match_id,
+            msg_ref.channel_id,
+            msg_ref.message_id,
+        )
+    else:
+        logger.warning("[ARK_SCHED] reg_post: failed to post registration match_id=%s", match_id)
+
+
 async def _schedule_once(
     *, state: ArkSchedulerState, key: str, when: datetime, coro_factory
 ) -> None:
@@ -624,6 +664,21 @@ async def schedule_ark_lifecycle(client, poll_interval_seconds: int = 300) -> No
                 status = (match.get("Status") or "").lower()
 
                 if status == "scheduled":
+                    if not match.get("RegistrationMessageId"):
+                        if now >= match_dt:
+                            await _post_initial_registration(
+                                client=client, match_id=match_id, config=config
+                            )
+                        else:
+                            await _schedule_once(
+                                state=state,
+                                key=_task_key(match_id, "reg_post"),
+                                when=match_dt,
+                                coro_factory=lambda mid=match_id: _post_initial_registration(
+                                    client=client, match_id=mid, config=config
+                                ),
+                            )
+
                     if now >= signup_close:
                         await lock_match_and_post_confirmation(
                             client=client, match_id=match_id, config=config
