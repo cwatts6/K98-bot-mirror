@@ -24,20 +24,22 @@ logger = logging.getLogger(__name__)
 def _get_admin_role_ids_for_interaction(interaction: discord.Interaction) -> set[int]:
     """Return role IDs that the service layer should treat as admin/leadership.
 
-    Always includes the configured LEADERSHIP_ROLE_IDS.  When the interacting
+    Always includes the configured LEADERSHIP_ROLE_IDS. When the interacting
     user is the designated ADMIN_USER_ID their actual Discord role IDs are also
-    included so that the service-layer role-intersection check never produces an
-    empty set for them (even if they hold no leadership role in Discord).
+    included. If the admin cannot be resolved to a Member object, fall back to
+    the guild's default ``@everyone`` role so the service-layer intersection
+    check still has a guild-valid role ID to match against.
     """
     role_ids: set[int] = set(_LEADERSHIP_ROLE_IDS)
     if _decoraters_is_admin(interaction.user):
         member = interaction.user if isinstance(interaction.user, discord.Member) else None
-        if member is None:
-            guild = getattr(interaction, "guild", None)
-            if guild is not None:
-                member = guild.get_member(interaction.user.id)
+        guild = getattr(interaction, "guild", None)
+        if member is None and guild is not None:
+            member = guild.get_member(interaction.user.id)
         if member is not None:
             role_ids.update(int(r.id) for r in member.roles)
+        elif guild is not None:
+            role_ids.add(int(guild.default_role.id))
     return role_ids
 
 
