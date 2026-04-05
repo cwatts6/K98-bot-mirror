@@ -37,7 +37,7 @@ def _get_admin_role_ids_for_interaction(interaction: discord.Interaction) -> set
             if guild is not None:
                 member = guild.get_member(interaction.user.id)
         if member is not None:
-            role_ids.update(int(r.id) for r in getattr(member, "roles", []))
+            role_ids.update(int(r.id) for r in member.roles)
     return role_ids
 
 
