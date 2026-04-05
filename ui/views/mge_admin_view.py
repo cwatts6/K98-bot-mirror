@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import discord
 
@@ -18,6 +18,7 @@ from mge.mge_event_service import (
 class MGEAdminViewDeps:
     refresh_embed: Callable[[int], None]
     is_admin: Callable[[discord.Interaction], bool]
+    admin_role_ids: set[int] = field(default_factory=set)
 
 
 class ConfirmSwitchOpenView(discord.ui.View):
