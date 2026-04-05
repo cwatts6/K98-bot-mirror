@@ -264,3 +264,133 @@ async def test_move_roster_opens_selection_prompt(monkeypatch: pytest.MonkeyPatc
 
     # Should have sent an ephemeral selection prompt (not a modal directly)
     assert len(sent) > 0
+
+
+# ---------------------------------------------------------------------------
+# _get_admin_role_ids_for_interaction — unit tests
+# ---------------------------------------------------------------------------
+
+
+def _make_role(role_id: int):
+    class _Role:
+        id = role_id
+
+    return _Role()
+
+
+def _make_guild(default_role_id: int = 1, member=None):
+    class _Guild:
+        default_role = _make_role(default_role_id)
+
+        def get_member(self, user_id):
+            return member
+
+    return _Guild()
+
+
+def _make_member_plain(user_id: int, role_ids: list[int]):
+    """Plain (non-mock) fake member — does NOT satisfy isinstance(..., discord.Member)."""
+
+    class _Member:
+        id = user_id
+        roles = [_make_role(rid) for rid in role_ids]
+
+    return _Member()
+
+
+def _make_interaction_for_helper(user_id: int, member=None, guild=None):
+    class _User:
+        id = user_id
+
+    class _Interaction:
+        pass
+
+    interaction = _Interaction()
+    interaction.user = member if member is not None else _User()
+    interaction.guild = guild
+    return interaction
+
+
+def test_get_admin_role_ids_non_admin_returns_only_leadership_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-admin: result contains only LEADERSHIP_ROLE_IDS."""
+    monkeypatch.setattr(
+        "ui.views.mge_simplified_leadership_view._decoraters_is_admin",
+        lambda user: False,
+    )
+    monkeypatch.setattr(
+        "ui.views.mge_simplified_leadership_view._LEADERSHIP_ROLE_IDS",
+        [100, 200],
+    )
+
+    from ui.views.mge_simplified_leadership_view import _get_admin_role_ids_for_interaction
+
+    interaction = _make_interaction_for_helper(user_id=42)
+    result = _get_admin_role_ids_for_interaction(interaction)
+    assert result == {100, 200}
+
+
+def test_get_admin_role_ids_admin_resolved_via_guild_includes_member_roles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Admin resolved via guild.get_member(): result includes leadership IDs + member roles."""
+    monkeypatch.setattr(
+        "ui.views.mge_simplified_leadership_view._decoraters_is_admin",
+        lambda user: True,
+    )
+    monkeypatch.setattr(
+        "ui.views.mge_simplified_leadership_view._LEADERSHIP_ROLE_IDS",
+        [100, 200],
+    )
+
+    from ui.views.mge_simplified_leadership_view import _get_admin_role_ids_for_interaction
+
+    fake_member = _make_member_plain(user_id=99, role_ids=[300, 400])
+    guild = _make_guild(default_role_id=1, member=fake_member)
+    # interaction.user is a plain _User (not discord.Member), so guild resolution path is used
+    interaction = _make_interaction_for_helper(user_id=99, guild=guild)
+    result = _get_admin_role_ids_for_interaction(interaction)
+    assert result == {100, 200, 300, 400}
+
+
+def test_get_admin_role_ids_admin_unresolvable_falls_back_to_default_role(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Admin cannot be resolved to Member: falls back to guild.default_role.id."""
+    monkeypatch.setattr(
+        "ui.views.mge_simplified_leadership_view._decoraters_is_admin",
+        lambda user: True,
+    )
+    monkeypatch.setattr(
+        "ui.views.mge_simplified_leadership_view._LEADERSHIP_ROLE_IDS",
+        [100, 200],
+    )
+
+    from ui.views.mge_simplified_leadership_view import _get_admin_role_ids_for_interaction
+
+    guild = _make_guild(default_role_id=555, member=None)
+    interaction = _make_interaction_for_helper(user_id=99, guild=guild)
+    result = _get_admin_role_ids_for_interaction(interaction)
+    assert 555 in result
+    assert {100, 200}.issubset(result)
+
+
+def test_get_admin_role_ids_admin_no_guild_returns_only_leadership_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Admin with no guild: result contains only LEADERSHIP_ROLE_IDS."""
+    monkeypatch.setattr(
+        "ui.views.mge_simplified_leadership_view._decoraters_is_admin",
+        lambda user: True,
+    )
+    monkeypatch.setattr(
+        "ui.views.mge_simplified_leadership_view._LEADERSHIP_ROLE_IDS",
+        [100, 200],
+    )
+
+    from ui.views.mge_simplified_leadership_view import _get_admin_role_ids_for_interaction
+
+    interaction = _make_interaction_for_helper(user_id=99, guild=None)
+    result = _get_admin_role_ids_for_interaction(interaction)
+    assert result == {100, 200}
