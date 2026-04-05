@@ -8,6 +8,7 @@ import discord
 
 from core.interaction_safety import send_ephemeral
 from core.mge_permissions import is_admin_interaction, is_admin_or_leadership_interaction
+from bot_config import LEADERSHIP_ROLE_IDS as _LEADERSHIP_ROLE_IDS
 from mge import (
     mge_embed_manager,
     mge_publish_service,
@@ -45,7 +46,11 @@ def _build_leadership_admin_deps(
                 target_event_id,
             )
 
-    return MGEAdminViewDeps(refresh_embed=_refresh_embed, is_admin=is_admin_interaction)
+    return MGEAdminViewDeps(
+        refresh_embed=_refresh_embed,
+        is_admin=is_admin_interaction,
+        admin_role_ids=set(_LEADERSHIP_ROLE_IDS),
+    )
 
 
 def _simple_row_label(row: dict[str, Any]) -> str:
@@ -502,6 +507,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             deps = MGEAdminViewDeps(
                 refresh_embed=_refresh_embed,
                 is_admin=_is_admin_check,
+                admin_role_ids=set(_LEADERSHIP_ROLE_IDS),
             )
             temp_view = MGESignupView(event_id=self.event_id, admin_deps=deps, timeout=300)
             await temp_view._open_signup_modal(
