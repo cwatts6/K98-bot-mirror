@@ -8,6 +8,7 @@ import discord
 
 from core.interaction_safety import send_ephemeral
 from core.mge_permissions import is_admin_interaction, is_admin_or_leadership_interaction
+from decoraters import LEADERSHIP_ROLE_IDS as _LEADERSHIP_ROLE_IDS, _is_admin as _decoraters_is_admin
 from mge import (
     mge_embed_manager,
     mge_publish_service,
@@ -18,6 +19,28 @@ from mge.dal import mge_signup_dal
 from ui.views.mge_admin_view import ConfirmSwitchFixedView, ConfirmSwitchOpenView, MGEAdminViewDeps
 
 logger = logging.getLogger(__name__)
+
+
+def _get_admin_role_ids_for_interaction(interaction: discord.Interaction) -> set[int]:
+    """Return role IDs that the service layer should treat as admin/leadership.
+
+    Always includes the configured LEADERSHIP_ROLE_IDS. When the interacting
+    user is the designated ADMIN_USER_ID their actual Discord role IDs are also
+    included. If the admin cannot be resolved to a Member object, fall back to
+    the guild's default @everyone role so the service-layer intersection
+    check still has a guild-valid role ID to match against.
+    """
+    role_ids: set[int] = set(_LEADERSHIP_ROLE_IDS)
+    if _decoraters_is_admin(interaction.user):
+        member = interaction.user if isinstance(interaction.user, discord.Member) else None
+        guild = getattr(interaction, "guild", None)
+        if member is None and guild is not None:
+            member = guild.get_member(interaction.user.id)
+        if member is not None:
+            role_ids.update(int(r.id) for r in member.roles)
+        elif guild is not None:
+            role_ids.add(int(guild.default_role.id))
+    return role_ids
 
 
 def _build_leadership_admin_deps(
@@ -45,7 +68,11 @@ def _build_leadership_admin_deps(
                 target_event_id,
             )
 
-    return MGEAdminViewDeps(refresh_embed=_refresh_embed, is_admin=is_admin_interaction)
+    return MGEAdminViewDeps(
+        refresh_embed=_refresh_embed,
+        is_admin=is_admin_interaction,
+        admin_role_ids=_get_admin_role_ids_for_interaction(interaction),
+    )
 
 
 def _simple_row_label(row: dict[str, Any]) -> str:
@@ -502,6 +529,7 @@ class MGESimplifiedLeadershipView(discord.ui.View):
             deps = MGEAdminViewDeps(
                 refresh_embed=_refresh_embed,
                 is_admin=_is_admin_check,
+                admin_role_ids=_get_admin_role_ids_for_interaction(interaction),
             )
             temp_view = MGESignupView(event_id=self.event_id, admin_deps=deps, timeout=300)
             await temp_view._open_signup_modal(
