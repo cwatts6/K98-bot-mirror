@@ -5,8 +5,6 @@ from __future__ import annotations
 All tests are self-contained — no DB, no Discord, no bot needed.
 """
 
-import pytest
-
 from mge.mge_content_renderer import (
     is_structured_content,
     parse_mge_content_sections,
@@ -227,12 +225,9 @@ def test_render_empty_string():
 
 def test_render_malformed_input():
     """Completely unusual/malformed input does not raise."""
-    try:
-        fields = render_mge_content_to_embed_fields("##!!--\x00\xFF" * 100)
-        assert isinstance(fields, list)
-        assert len(fields) >= 1
-    except Exception as exc:  # pragma: no cover
-        pytest.fail(f"render_mge_content_to_embed_fields raised unexpectedly: {exc}")
+    fields = render_mge_content_to_embed_fields("##!!--\x00\xFF" * 100)
+    assert isinstance(fields, list)
+    assert len(fields) >= 1
 
 
 def test_render_structured_content_entry_point():

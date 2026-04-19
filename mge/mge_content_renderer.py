@@ -105,6 +105,9 @@ def parse_mge_content_sections(text: str) -> list[dict[str, Any]]:
 
             elif line.startswith("- ") or line == "-":
                 bullet = line[2:].strip() if line.startswith("- ") else ""
+                if not bullet:
+                    # Standalone "-" with no text — skip empty bullet
+                    continue
                 if current is None:
                     current = {"type": "section", "title": "", "lines": []}
                 current["lines"].append(f"• {bullet}")
@@ -228,7 +231,7 @@ def render_mge_sections_to_embed_fields(
             if sec_type == "warning":
                 # Warning: ⚠️ prefix on name, body is the warning text lines
                 name = f"⚠️ {title}" if title else "⚠️ Warning"
-                body = "\n".join(lines) if lines else title or "—"
+                body = "\n".join(lines) if lines else "—"
                 if not body.strip():
                     body = "—"
                 for idx, chunk in enumerate(split_field_value_safely(body, max_field_value)):
