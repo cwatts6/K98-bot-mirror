@@ -24,13 +24,13 @@ class _RulesEditModal(discord.ui.Modal):
         )
         self.parent_view = parent
         self.rules_text = discord.ui.InputText(
-            label=f"Rules Text (max {_EMBED_RULES_LIMIT})",
+            label=f"Rules Text — plain text, sections with # (max {_EMBED_RULES_LIMIT})",
             required=True,
             style=discord.InputTextStyle.long,
             value=current_rules_text,
             placeholder=(
-                "Discord embed field limit applies. "
-                f"Stay within {_EMBED_RULES_LIMIT} characters."
+                "Use plain text. Sections: '# Header', bullets: '- item', warnings: '! Warning'\n"
+                f"Stay within {_EMBED_RULES_LIMIT} characters. No Discord markdown needed."
             ),
             max_length=_EMBED_RULES_LIMIT,
         )

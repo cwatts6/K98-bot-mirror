@@ -30,6 +30,7 @@ from mge.dal.mge_publish_dal import (
     fetch_event_publish_context,
     update_award_embed_ids,
 )
+from mge.mge_content_renderer import render_mge_content_to_embed_fields
 from mge.mge_simplified_leadership_service import get_leadership_board_payload
 from ui.views.mge_admin_view import MGEAdminViewDeps
 
@@ -330,9 +331,12 @@ def build_mge_signup_embed(
     embed.add_field(name="Signup Count", value=str(len(names)), inline=True)
     embed.add_field(name="Signups (Public)", value=_render_public_signup_list(names), inline=False)
 
-    rules = str(event_row.get("RulesText") or "").strip()
-    if rules:
-        embed.add_field(name="Rules", value=rules[:1024], inline=False)
+    rules_raw = str(event_row.get("RulesText") or "").strip()
+    if rules_raw:
+        for field_name, field_value in render_mge_content_to_embed_fields(
+            rules_raw, fallback_name="Rules"
+        ):
+            embed.add_field(name=field_name, value=field_value, inline=False)
 
     embed.set_footer(text="MGE • Auto-created from calendar")
     return embed
@@ -376,6 +380,25 @@ def build_mge_awards_embed(
         color=0xF1C40F,
         timestamp=published_utc.astimezone(UTC),
     )
+
+    # Top 3 Spotlight
+    MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
+    top3 = [r for r in awarded_rows if _to_int(r.get("AwardedRank"), 99) <= 3]
+    top3.sort(key=lambda r: _to_int(r.get("AwardedRank"), 99))
+    if top3:
+        spotlight_lines = []
+        for row in top3:
+            rank = _to_int(row.get("AwardedRank"), 0)
+            medal = MEDALS.get(rank, f"#{rank}")
+            gov = _safe_text(row.get("GovernorNameSnapshot"))
+            cmd = _safe_text(row.get("RequestedCommanderName"))
+            target = _fmt_short_number(row.get("TargetScore"))
+            spotlight_lines.append(f"{medal} **{gov}** — {cmd} — Target: **{target}**")
+        embed.add_field(
+            name="🔥 Top 3",
+            value="\n".join(spotlight_lines),
+            inline=False,
+        )
 
     embed.add_field(
         name=f"Awarded ({len(awarded_rows)})",
@@ -421,12 +444,21 @@ def build_mge_award_reminders_embed(
     event_name = str(event_row.get("EventName") or f"MGE Event {event_row.get('EventId')}")
     variant = str(event_row.get("VariantName") or "Unknown")
     rule_mode = str(event_row.get("RuleMode") or "unknown").strip().lower() or "unknown"
+    reminders_str = str(reminders_text or "").strip()
     embed = discord.Embed(
         title="📣 MGE Award Reminders",
-        description=str(reminders_text or "").strip() or "No reminders configured.",
+        description="Review the reminders below before the event.",
         color=0xE67E22,
         timestamp=published_utc.astimezone(UTC),
     )
+    # Structured content fields
+    if reminders_str:
+        for field_name, field_value in render_mge_content_to_embed_fields(
+            reminders_str, fallback_name="Reminders"
+        ):
+            embed.add_field(name=field_name, value=field_value, inline=False)
+    else:
+        embed.add_field(name="Reminders", value="No reminders configured.", inline=False)
     embed.add_field(name="Event", value=event_name[:1024], inline=True)
     embed.add_field(name="Variant", value=variant[:1024], inline=True)
     embed.add_field(name="Rule Mode", value=rule_mode[:1024], inline=True)
