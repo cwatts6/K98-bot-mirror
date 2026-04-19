@@ -311,6 +311,7 @@ def build_mge_signup_embed(
         color=color,
         timestamp=datetime.now(UTC),
     )
+    embed.set_thumbnail(url="https://i.ibb.co/fz06sLMB/mge-signup-thumbnail.png")
     embed.add_field(
         name="Variant", value=str(event_row.get("VariantName") or "Unknown"), inline=True
     )
@@ -376,7 +377,7 @@ def build_mge_awards_embed(
         color=0xF1C40F,
         timestamp=published_utc.astimezone(UTC),
     )
-
+    embed.set_thumbnail(url="https://i.ibb.co/fVXfJRfB/mge-awards-thumbnail.png")
     embed.add_field(
         name=f"Awarded ({len(awarded_rows)})",
         value=_fit_lines_from_rows(
@@ -427,6 +428,7 @@ def build_mge_award_reminders_embed(
         color=0xE67E22,
         timestamp=published_utc.astimezone(UTC),
     )
+    embed.set_thumbnail(url="https://i.ibb.co/xKYp2FLg/mge-reminders-thumbnail.png")
     embed.add_field(name="Event", value=event_name[:1024], inline=True)
     embed.add_field(name="Variant", value=variant[:1024], inline=True)
     embed.add_field(name="Rule Mode", value=rule_mode[:1024], inline=True)
