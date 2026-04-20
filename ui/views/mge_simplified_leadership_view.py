@@ -200,7 +200,7 @@ class _GenerateTargetsModal(discord.ui.Modal):
         self.rank1 = discord.ui.InputText(
             label="Rank 1 Target (millions)",
             required=True,
-            placeholder="8",
+            placeholder="8 or 13.5",
             max_length=6,
         )
         self.add_item(self.rank1)
@@ -210,9 +210,13 @@ class _GenerateTargetsModal(discord.ui.Modal):
             await send_ephemeral(interaction, "❌ Leadership/admin only.")
             return
         try:
-            rank1_target = int(str(self.rank1.value).strip())
+            rank1_target = float(str(self.rank1.value).strip())
+            if rank1_target <= 0 or rank1_target % 0.5 != 0:
+                raise ValueError("out of range")
         except Exception:
-            await send_ephemeral(interaction, "❌ Invalid rank 1 target.")
+            await send_ephemeral(
+                interaction, "❌ Invalid rank 1 target. Use a whole number or .5 (e.g. 8 or 13.5)."
+            )
             return
 
         result = await asyncio.to_thread(

@@ -11,7 +11,7 @@ from typing import Any
 
 import discord
 
-from bot_config import MGE_AWARD_CHANNEL_ID, MGE_MAIL_DM_USER_ID
+from bot_config import MGE_AWARD_CHANNEL_ID, MGE_MAIL_DM_USER_IDS
 from mge.dal import mge_publish_dal
 from mge.mge_embed_manager import (
     build_award_notifications_content,
@@ -68,8 +68,8 @@ def _status(v: Any) -> str:
     return str(v or "").strip().lower()
 
 
-def _target_millions_to_score(value_millions: int) -> int:
-    return int(value_millions) * 1_000_000
+def _target_millions_to_score(value_millions: float) -> int:
+    return round(float(value_millions) * 1_000_000)
 
 
 def _maybe_await(result: Any) -> Any:
@@ -207,12 +207,19 @@ def _build_publish_sets(
 def generate_targets_from_rank1(
     *,
     event_id: int,
-    rank1_target_millions: int,
+    rank1_target_millions: int | float,
     actor_discord_id: int,
     now_utc: datetime | None = None,
 ) -> PublishResult:
-    if rank1_target_millions <= 0:
-        return PublishResult(False, "Rank 1 target must be > 0.")
+    try:
+        rank1_fval = float(rank1_target_millions)
+    except Exception:
+        return PublishResult(False, "Invalid rank 1 target.")
+    if rank1_fval <= 0 or rank1_fval % 0.5 != 0:
+        return PublishResult(
+            False,
+            "Rank 1 target must be a positive whole number or .5 value (e.g. 13 or 13.5).",
+        )
 
     now = _now_utc(now_utc)
     dataset = _current_award_dataset(event_id)
@@ -220,7 +227,7 @@ def generate_targets_from_rank1(
     if not roster_rows:
         return PublishResult(False, "No roster rows found for target generation.")
 
-    rank1 = _target_millions_to_score(rank1_target_millions)
+    rank1 = _target_millions_to_score(rank1_fval)
     roster_targets: dict[int, dict[str, Any]] = {}
     for row in roster_rows:
         award_id = _to_int(row.get("AwardId"), 0)
@@ -504,12 +511,12 @@ async def publish_event_awards(
     if maybe_refresh is not None:
         await maybe_refresh
 
-    # --- Award mail DM: send a single copy-friendly in-game mail to MGE_MAIL_DM_USER_ID ---
+    # --- Award mail DM: send a copy-friendly in-game mail to all MGE_MAIL_DM_USER_IDS recipients ---
     award_mail_dm_sent = False
     award_mail_dm_status: str | None = None
     try:
-        mail_user_id = _to_int(MGE_MAIL_DM_USER_ID, 0)
-        if mail_user_id <= 0:
+        mail_user_ids = [uid for uid in MGE_MAIL_DM_USER_IDS if uid > 0]
+        if not mail_user_ids:
             award_mail_dm_status = "skipped_no_recipient"
             logger.info(
                 "mge_publish_award_dm_skipped reason=MGE_MAIL_DM_USER_ID_not_set event_id=%s",
@@ -517,24 +524,34 @@ async def publish_event_awards(
             )
         else:
             dm_text = _build_award_mail_text(ctx, awarded)
-            try:
-                mail_user = await bot.fetch_user(mail_user_id)
-                await mail_user.send(dm_text)
+            sent_count = 0
+            fail_count = 0
+            for mail_user_id in mail_user_ids:
+                try:
+                    mail_user = await bot.fetch_user(mail_user_id)
+                    await mail_user.send(dm_text)
+                    sent_count += 1
+                    logger.info(
+                        "mge_publish_award_dm_sent event_id=%s recipient_discord_id=%s",
+                        event_id,
+                        mail_user_id,
+                    )
+                except Exception:
+                    fail_count += 1
+                    logger.exception(
+                        "mge_publish_award_dm_failed event_id=%s recipient_discord_id=%s",
+                        event_id,
+                        mail_user_id,
+                    )
+            if fail_count == 0:
                 award_mail_dm_sent = True
-                award_mail_dm_status = "sent"
-                logger.info(
-                    "mge_publish_award_dm_sent event_id=%s recipient_discord_id=%s",
-                    event_id,
-                    mail_user_id,
-                )
-            except Exception:
+                award_mail_dm_status = f"sent:{sent_count}"
+            elif sent_count > 0:
+                award_mail_dm_sent = True
+                award_mail_dm_status = f"partial:{sent_count}_ok_{fail_count}_failed"
+            else:
                 award_mail_dm_sent = False
-                award_mail_dm_status = "send_failed"
-                logger.exception(
-                    "mge_publish_award_dm_failed event_id=%s recipient_discord_id=%s",
-                    event_id,
-                    mail_user_id,
-                )
+                award_mail_dm_status = f"all_failed:{fail_count}"
     except Exception:
         award_mail_dm_sent = False
         award_mail_dm_status = "dm_error"

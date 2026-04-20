@@ -117,6 +117,50 @@ def test_generate_targets_from_rank1_uses_half_million_rank_ladder(
     assert captured["roster_targets"][104]["target_score"] == 10_500_000
 
 
+def test_generate_targets_accepts_half_million_rank1(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Rank 1 target of 13.5 (millions) must be accepted and produce correct scores."""
+    monkeypatch.setattr(
+        mge_publish_service,
+        "get_ordered_leadership_rows",
+        lambda event_id: {
+            "roster_rows": [
+                {"AwardId": 201, "ComputedAwardedRank": 1},
+                {"AwardId": 202, "ComputedAwardedRank": 2},
+            ],
+            "waitlist_rows": [],
+            "rejected_rows": [],
+            "unassigned_rows": [],
+        },
+    )
+    captured = {}
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal,
+        "apply_generated_targets",
+        lambda **kwargs: captured.update(kwargs) or 2,
+    )
+
+    res = mge_publish_service.generate_targets_from_rank1(
+        event_id=60, rank1_target_millions=13.5, actor_discord_id=1
+    )
+
+    assert res.success is True
+    assert captured["roster_targets"][201]["target_score"] == 13_500_000
+    assert captured["roster_targets"][202]["target_score"] == 13_000_000
+
+
+def test_generate_targets_rejects_non_half_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-.5-aligned values like 13.3 must be rejected."""
+    res = mge_publish_service.generate_targets_from_rank1(
+        event_id=61, rank1_target_millions=13.3, actor_discord_id=1
+    )
+    assert res.success is False
+
+
+
 def test_manual_override_persists_only_for_awarded_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
@@ -802,7 +846,7 @@ def _base_publish_monkeypatches(monkeypatch: pytest.MonkeyPatch, channel_id: str
 async def test_dm_failure_does_not_block_publish(monkeypatch: pytest.MonkeyPatch) -> None:
     """DM send failure must NOT set publish result success to False."""
     _base_publish_monkeypatches(monkeypatch)
-    monkeypatch.setattr(mge_publish_service, "MGE_MAIL_DM_USER_ID", 888999)
+    monkeypatch.setattr(mge_publish_service, "MGE_MAIL_DM_USER_IDS", [888999])
 
     class _FakeUser:
         async def send(self, text):
@@ -830,14 +874,14 @@ async def test_dm_failure_does_not_block_publish(monkeypatch: pytest.MonkeyPatch
 
     assert res.success is True, f"Publish must succeed despite DM failure, got: {res.message}"
     assert res.award_mail_dm_sent is False
-    assert res.award_mail_dm_status == "send_failed"
+    assert res.award_mail_dm_status == "all_failed:1"
 
 
 @pytest.mark.asyncio
 async def test_dm_sent_flag_true_when_dm_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
-    """award_mail_dm_sent is True when DM is sent successfully."""
+    """award_mail_dm_sent is True when DM is sent successfully to a single recipient."""
     _base_publish_monkeypatches(monkeypatch)
-    monkeypatch.setattr(mge_publish_service, "MGE_MAIL_DM_USER_ID", 888999)
+    monkeypatch.setattr(mge_publish_service, "MGE_MAIL_DM_USER_IDS", [888999])
 
     class _FakeUser:
         async def send(self, text):
@@ -865,14 +909,91 @@ async def test_dm_sent_flag_true_when_dm_succeeds(monkeypatch: pytest.MonkeyPatc
 
     assert res.success is True
     assert res.award_mail_dm_sent is True
-    assert res.award_mail_dm_status == "sent"
+    assert res.award_mail_dm_status == "sent:1"
+
+
+@pytest.mark.asyncio
+async def test_dm_sent_to_multiple_recipients(monkeypatch: pytest.MonkeyPatch) -> None:
+    """award_mail_dm_sent is True and status reflects count when two recipients are configured."""
+    _base_publish_monkeypatches(monkeypatch)
+    monkeypatch.setattr(mge_publish_service, "MGE_MAIL_DM_USER_IDS", [111111, 222222])
+
+    class _FakeUser:
+        async def send(self, text):
+            pass  # success
+
+    async def _fetch_user(uid):
+        return _FakeUser()
+
+    class _Msg:
+        id = 558
+
+    class _Channel:
+        id = 999
+
+        async def send(self, **kwargs):
+            return _Msg()
+
+    bot = SimpleNamespace(
+        get_channel=lambda x: _Channel(),
+        fetch_channel=lambda x: _Channel(),
+        fetch_user=_fetch_user,
+    )
+
+    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=13, actor_discord_id=2)
+
+    assert res.success is True
+    assert res.award_mail_dm_sent is True
+    assert res.award_mail_dm_status == "sent:2"
+
+
+@pytest.mark.asyncio
+async def test_dm_partial_failure_still_marks_sent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When one of two recipients fails, award_mail_dm_sent is True with partial status."""
+    _base_publish_monkeypatches(monkeypatch)
+    monkeypatch.setattr(mge_publish_service, "MGE_MAIL_DM_USER_IDS", [111111, 222222])
+
+    call_count = {"n": 0}
+
+    class _FakeUser:
+        def __init__(self, fail: bool):
+            self._fail = fail
+
+        async def send(self, text):
+            if self._fail:
+                raise RuntimeError("deliberate failure")
+
+    async def _fetch_user(uid):
+        call_count["n"] += 1
+        return _FakeUser(fail=(call_count["n"] == 1))
+
+    class _Msg:
+        id = 559
+
+    class _Channel:
+        id = 999
+
+        async def send(self, **kwargs):
+            return _Msg()
+
+    bot = SimpleNamespace(
+        get_channel=lambda x: _Channel(),
+        fetch_channel=lambda x: _Channel(),
+        fetch_user=_fetch_user,
+    )
+
+    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=14, actor_discord_id=2)
+
+    assert res.success is True
+    assert res.award_mail_dm_sent is True
+    assert res.award_mail_dm_status == "partial:1_ok_1_failed"
 
 
 @pytest.mark.asyncio
 async def test_dm_skipped_when_no_recipient_configured(monkeypatch: pytest.MonkeyPatch) -> None:
-    """When MGE_MAIL_DM_USER_ID is 0/unset, DM is skipped and publish still succeeds."""
+    """When MGE_MAIL_DM_USER_IDS is empty, DM is skipped and publish still succeeds."""
     _base_publish_monkeypatches(monkeypatch)
-    monkeypatch.setattr(mge_publish_service, "MGE_MAIL_DM_USER_ID", 0)
+    monkeypatch.setattr(mge_publish_service, "MGE_MAIL_DM_USER_IDS", [])
 
     class _Msg:
         id = 557

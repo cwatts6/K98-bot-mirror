@@ -140,7 +140,8 @@ class MgePublishView(discord.ui.View):
                 super().__init__(title="Generate Targets", timeout=300)
                 self.parent = parent
                 self.rank1 = discord.ui.InputText(
-                    label="Rank 1 Target (millions)", required=True, max_length=6
+                    label="Rank 1 Target (millions)", required=True, max_length=6,
+                    placeholder="8 or 13.5",
                 )
                 self.add_item(self.rank1)
 
@@ -148,9 +149,14 @@ class MgePublishView(discord.ui.View):
                 if not await self.parent._guard(modal_interaction):
                     return
                 try:
-                    rank1_m = int(str(self.rank1.value).strip())
+                    rank1_m = float(str(self.rank1.value).strip())
+                    if rank1_m <= 0 or rank1_m % 0.5 != 0:
+                        raise ValueError("out of range")
                 except Exception:
-                    await send_ephemeral(modal_interaction, "❌ Invalid rank 1 target.")
+                    await send_ephemeral(
+                        modal_interaction,
+                        "❌ Invalid rank 1 target. Use a whole number or .5 (e.g. 8 or 13.5).",
+                    )
                     return
 
                 res = await asyncio.to_thread(
