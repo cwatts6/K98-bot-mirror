@@ -49,6 +49,9 @@ class MgeSignupFinalModal(discord.ui.Modal):
         self.selected_commander_id = int(selected_commander_id)
 
         self.current_heads = discord.ui.InputText(
+            # RETIRED_FLOW: current_heads — collected by the old player flow.
+            # Retained for admin-add path and legacy signups.  Not used by the
+            # simplified v2 player flow (MgeSimplifiedSignupFormView).
             label="Current Heads (0-680)",
             required=True,
             max_length=4,
@@ -59,6 +62,8 @@ class MgeSignupFinalModal(discord.ui.Modal):
         )
 
         self.kingdom_role = discord.ui.InputText(
+            # RETIRED_FLOW: kingdom_role — retired from live player flow; retained
+            # for admin-add path.
             label="Kingdom Role (optional)",
             required=False,
             max_length=100,
@@ -66,6 +71,8 @@ class MgeSignupFinalModal(discord.ui.Modal):
         )
 
         self.gear_text = discord.ui.InputText(
+            # RETIRED_FLOW: gear_text — retired from live player flow; retained
+            # for admin-add path.
             label="Gear Text (optional)",
             required=False,
             max_length=1000,
@@ -74,6 +81,8 @@ class MgeSignupFinalModal(discord.ui.Modal):
         )
 
         self.armament_text = discord.ui.InputText(
+            # RETIRED_FLOW: armament_text — retired from live player flow; retained
+            # for admin-add path.
             label="Armament Text (optional)",
             required=False,
             max_length=1000,

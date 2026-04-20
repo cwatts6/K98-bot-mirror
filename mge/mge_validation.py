@@ -10,6 +10,18 @@ _ALLOWED_PRIORITIES = {"high", "medium", "low"}
 _ALLOWED_RANK_BANDS = {"1-5", "6-10", "11-15", "no_preference"}
 _BLOCK_STATUSES = {"published", "completed"}
 
+# Lazily resolved to avoid circular imports at module load time.
+_PRIORITY_RANK_VALUES: frozenset[str] | None = None
+
+
+def _get_priority_rank_values() -> frozenset[str]:
+    global _PRIORITY_RANK_VALUES
+    if _PRIORITY_RANK_VALUES is None:
+        from mge.mge_priority_rank_map import PRIORITY_RANK_OPTIONS  # noqa: PLC0415
+
+        _PRIORITY_RANK_VALUES = frozenset(o.value for o in PRIORITY_RANK_OPTIONS)
+    return _PRIORITY_RANK_VALUES
+
 
 @dataclass(slots=True)
 class ValidationResult:
@@ -50,6 +62,16 @@ def validate_rank_band(value: str | None) -> ValidationResult:
     if rb not in _ALLOWED_RANK_BANDS:
         return ValidationResult(False, "Preferred rank band is invalid.")
     return ValidationResult(True)
+
+
+def validate_priority_rank_value(value: str) -> ValidationResult:
+    """Validate a combined Priority (Rank) dropdown value against known options."""
+    if value in _get_priority_rank_values():
+        return ValidationResult(True)
+    return ValidationResult(
+        False,
+        f"Priority (Rank) value '{value}' is not a recognised option.",
+    )
 
 
 def validate_event_is_mutable_for_anyone(event_row: dict[str, Any]) -> ValidationResult:

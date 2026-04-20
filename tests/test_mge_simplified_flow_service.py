@@ -19,28 +19,34 @@ from mge import mge_simplified_flow_service as svc
 
 
 def test_sort_review_rows_orders_by_priority_then_kvk_rank_then_signup_identity() -> None:
+    # PreferredRankBand is required for correct sort_weight resolution.
+    # Rows without PreferredRankBand fall back to sort_weight=99 (legacy behaviour).
     rows = [
         {
             "SignupId": 30,
             "RequestPriority": "Medium",
+            "PreferredRankBand": "6-10",
             "LatestKVKRank": 5,
             "SignupCreatedUtc": datetime(2026, 3, 12, tzinfo=UTC),
         },
         {
             "SignupId": 10,
             "RequestPriority": "High",
+            "PreferredRankBand": "1-5",
             "LatestKVKRank": 8,
             "SignupCreatedUtc": datetime(2026, 3, 10, tzinfo=UTC),
         },
         {
             "SignupId": 11,
             "RequestPriority": "High",
+            "PreferredRankBand": "1-5",
             "LatestKVKRank": 3,
             "SignupCreatedUtc": datetime(2026, 3, 11, tzinfo=UTC),
         },
         {
             "SignupId": 31,
             "RequestPriority": "Low",
+            "PreferredRankBand": "11-15",
             "LatestKVKRank": 1,
             "SignupCreatedUtc": datetime(2026, 3, 9, tzinfo=UTC),
         },
@@ -443,3 +449,127 @@ def test_build_dataset_self_heals_16th_to_waitlist(monkeypatch: pytest.MonkeyPat
     assert dataset["counts"]["waitlist_count"] == 1
     assert dataset["counts"]["unassigned_count"] == 0
     assert inserted and inserted[0]["award_status"] == "waitlist"
+
+
+# --- New tests for sort_weight-based ordering (simplified v2) ---
+
+
+def test_sort_review_rows_uses_sort_weight_from_priority_rank_map() -> None:
+    """
+    Ordering should use sort_weight from PRIORITY_RANK_OPTIONS:
+      High (1-5)=1, Medium (6-10)=2, Low (11-15)=3, No-preference=4.
+    Within the same weight bucket, kvk_rank ascending is secondary.
+    """
+    rows = [
+        {
+            "SignupId": 40,
+            "RequestPriority": "Low",
+            "PreferredRankBand": "no_preference",
+            "LatestKVKRank": 1,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+        {
+            "SignupId": 30,
+            "RequestPriority": "Low",
+            "PreferredRankBand": "11-15",
+            "LatestKVKRank": 2,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+        {
+            "SignupId": 20,
+            "RequestPriority": "Medium",
+            "PreferredRankBand": "6-10",
+            "LatestKVKRank": 3,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+        {
+            "SignupId": 10,
+            "RequestPriority": "High",
+            "PreferredRankBand": "1-5",
+            "LatestKVKRank": 4,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+    ]
+
+    ordered = svc.sort_review_rows(rows)
+
+    # Expected: High(1-5) < Medium(6-10) < Low(11-15) < No-preference
+    assert [row["SignupId"] for row in ordered] == [10, 20, 30, 40]
+
+
+def test_sort_review_rows_secondary_sort_is_kvk_rank_ascending() -> None:
+    """Within the same sort_weight bucket, kvk_rank ascending is secondary."""
+    rows = [
+        {
+            "SignupId": 1,
+            "RequestPriority": "High",
+            "PreferredRankBand": "1-5",
+            "LatestKVKRank": 10,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+        {
+            "SignupId": 2,
+            "RequestPriority": "High",
+            "PreferredRankBand": "1-5",
+            "LatestKVKRank": 3,
+            "SignupCreatedUtc": datetime(2026, 4, 2, tzinfo=UTC),
+        },
+    ]
+
+    ordered = svc.sort_review_rows(rows)
+
+    # Lower kvk_rank (3) wins over higher (10) in same bucket
+    assert [row["SignupId"] for row in ordered] == [2, 1]
+
+
+def test_sort_review_rows_tertiary_sort_is_signup_id_ascending() -> None:
+    """With same weight and kvk_rank, SignupId ascending is the stable tie-break."""
+    rows = [
+        {
+            "SignupId": 99,
+            "RequestPriority": "Medium",
+            "PreferredRankBand": "6-10",
+            "LatestKVKRank": 5,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+        {
+            "SignupId": 11,
+            "RequestPriority": "Medium",
+            "PreferredRankBand": "6-10",
+            "LatestKVKRank": 5,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+    ]
+
+    ordered = svc.sort_review_rows(rows)
+
+    assert [row["SignupId"] for row in ordered] == [11, 99]
+
+
+def test_sort_review_rows_legacy_rows_with_unknown_band_sort_to_bottom() -> None:
+    """
+    Legacy signups with an unrecognised (RequestPriority, PreferredRankBand)
+    combination receive sort_weight=99 and drop below all known options.
+    """
+    rows = [
+        {
+            "SignupId": 1,
+            "RequestPriority": "UnknownLegacy",
+            "PreferredRankBand": "old_band",
+            "LatestKVKRank": 1,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+        {
+            "SignupId": 2,
+            "RequestPriority": "Low",
+            "PreferredRankBand": "no_preference",
+            "LatestKVKRank": 100,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+    ]
+
+    ordered = svc.sort_review_rows(rows)
+
+    # Known option (Low/no_preference, weight=4) beats unknown (weight=99)
+    assert ordered[0]["SignupId"] == 2
+    assert ordered[1]["SignupId"] == 1

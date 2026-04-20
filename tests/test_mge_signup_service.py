@@ -237,3 +237,86 @@ def test_member_role_ids_empty_when_no_member(monkeypatch):
     monkeypatch.setattr("discord.Member", _FakeMember)
     role_ids = _member_role_ids(interaction)
     assert role_ids == set()
+
+
+# --- Priority (Rank) ordering integration tests ---
+
+
+def test_signup_ordering_with_priority_rank_mapping_produces_correct_sort_weight_sequence(
+    monkeypatch,
+):
+    """
+    Create signups with each Priority(Rank) combination and verify that the sort_weight
+    sequence produced by signup_auto_sort_key matches the expected order:
+    High(1-5) < Medium(6-10) < Low(11-15) < Low(no_preference) < legacy/unknown.
+    """
+    from datetime import UTC, datetime
+
+    from mge.mge_simplified_flow_service import signup_auto_sort_key
+
+    rows = [
+        {
+            "SignupId": 5,
+            "RequestPriority": "OldLegacy",
+            "PreferredRankBand": "custom",
+            "LatestKVKRank": 1,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+        {
+            "SignupId": 4,
+            "RequestPriority": "Low",
+            "PreferredRankBand": "no_preference",
+            "LatestKVKRank": 1,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+        {
+            "SignupId": 3,
+            "RequestPriority": "Low",
+            "PreferredRankBand": "11-15",
+            "LatestKVKRank": 1,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+        {
+            "SignupId": 2,
+            "RequestPriority": "Medium",
+            "PreferredRankBand": "6-10",
+            "LatestKVKRank": 1,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+        {
+            "SignupId": 1,
+            "RequestPriority": "High",
+            "PreferredRankBand": "1-5",
+            "LatestKVKRank": 1,
+            "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+        },
+    ]
+
+    sorted_rows = sorted(rows, key=signup_auto_sort_key)
+    assert [r["SignupId"] for r in sorted_rows] == [1, 2, 3, 4, 5]
+
+
+def test_legacy_signup_row_with_old_fields_remains_readable(monkeypatch):
+    """
+    A legacy signup row containing CurrentHeads, KingdomRole, GearText etc.
+    must still be sortable and renderable without errors.
+    """
+    from datetime import UTC, datetime
+
+    from mge.mge_simplified_flow_service import signup_auto_sort_key
+
+    legacy_row = {
+        "SignupId": 7,
+        "RequestPriority": "High",
+        "PreferredRankBand": "1-5",
+        "CurrentHeads": 450,
+        "KingdomRole": "Knight",
+        "GearText": "T5 full",
+        "ArmamentText": "maxed",
+        "LatestKVKRank": 3,
+        "SignupCreatedUtc": datetime(2026, 4, 1, tzinfo=UTC),
+    }
+
+    key = signup_auto_sort_key(legacy_row)
+    # sort_weight for High/1-5 is 1
+    assert key[0] == 1

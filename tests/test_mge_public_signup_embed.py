@@ -18,9 +18,24 @@ def test_get_public_signup_rows_excludes_explicit_rejections(monkeypatch):
     monkeypatch.setattr(
         "mge.dal.mge_review_dal.fetch_signup_review_rows",
         lambda event_id: [
-            {"SignupId": 2, "GovernorNameSnapshot": "Bravo", "RequestPriority": "High"},
-            {"SignupId": 1, "GovernorNameSnapshot": "Alpha", "RequestPriority": "Medium"},
-            {"SignupId": 3, "GovernorNameSnapshot": "Charlie", "RequestPriority": "Low"},
+            {
+                "SignupId": 2,
+                "GovernorNameSnapshot": "Bravo",
+                "RequestPriority": "High",
+                "PreferredRankBand": "1-5",
+            },
+            {
+                "SignupId": 1,
+                "GovernorNameSnapshot": "Alpha",
+                "RequestPriority": "Medium",
+                "PreferredRankBand": "6-10",
+            },
+            {
+                "SignupId": 3,
+                "GovernorNameSnapshot": "Charlie",
+                "RequestPriority": "Low",
+                "PreferredRankBand": "11-15",
+            },
         ],
     )
     monkeypatch.setattr(

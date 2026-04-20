@@ -18,22 +18,27 @@ from mge import mge_review_service
 
 
 def test_get_signup_review_pool_sorts_as_required(monkeypatch):
+    # PreferredRankBand is required for correct sort_weight resolution.
+    # The sort key uses (RequestPriority, PreferredRankBand) -> sort_weight.
     rows = [
         {
             "SignupId": 3,
             "RequestPriority": "Low",
+            "PreferredRankBand": "11-15",
             "LatestKVKRank": 1,
             "SignupCreatedUtc": datetime(2026, 3, 10, tzinfo=UTC),
         },
         {
             "SignupId": 2,
             "RequestPriority": "High",
+            "PreferredRankBand": "1-5",
             "LatestKVKRank": 5,
             "SignupCreatedUtc": datetime(2026, 3, 9, tzinfo=UTC),
         },
         {
             "SignupId": 4,
             "RequestPriority": "High",
+            "PreferredRankBand": "1-5",
             "LatestKVKRank": None,
             "LastKVKRank": None,
             "SignupCreatedUtc": datetime(2026, 3, 8, tzinfo=UTC),
@@ -41,6 +46,7 @@ def test_get_signup_review_pool_sorts_as_required(monkeypatch):
         {
             "SignupId": 1,
             "RequestPriority": "High",
+            "PreferredRankBand": "1-5",
             "LatestKVKRank": 2,
             "SignupCreatedUtc": datetime(2026, 3, 12, tzinfo=UTC),
         },

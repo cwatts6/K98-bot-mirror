@@ -1,3 +1,8 @@
+"""Tests for mge_dm_followup.
+
+DM follow-up is retained for admin path; not triggered by simplified v2 player flow.
+"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

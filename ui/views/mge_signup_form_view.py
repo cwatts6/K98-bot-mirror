@@ -110,6 +110,10 @@ class _PrioritySelect(discord.ui.Select):
 
 
 class _RankBandSelect(discord.ui.Select):
+    # RETIRED_FLOW: Separate rank band selector — used only by the old player flow
+    # (MgeSignupFormView / admin path).  Retained for admin-add and legacy edit
+    # compatibility.  The simplified v2 player flow uses _PriorityRankSelect in
+    # mge_simplified_signup_form_view.py instead.
     def __init__(self, parent: MgeSignupFormView):
         self.parent_view = parent
         options: list[discord.SelectOption] = []

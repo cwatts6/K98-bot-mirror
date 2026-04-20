@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from mge.dal import mge_review_dal, mge_roster_dal
+from mge.mge_priority_rank_map import get_sort_weight
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +83,26 @@ def kvk_rank_value(row: dict[str, Any]) -> int | None:
 
 
 def signup_auto_sort_key(row: dict[str, Any]) -> tuple[int, int, int, datetime, int]:
-    """Build the simplified-flow auto ordering key for signup/review rows."""
+    """
+    Build the simplified-flow auto ordering key for signup/review rows.
+
+    Sort order (ascending):
+      1. sort_weight — derived from (RequestPriority, PreferredRankBand) via
+         PRIORITY_RANK_OPTIONS mapping.  High=1, Medium=2, Low=3, No-preference=4.
+         Unrecognised combinations (legacy rows) fall back to weight=99 and sort
+         to the bottom of the queue.
+      2. kvk_rank ascending (lower rank number = better performance; missing rank
+         sorts after any known rank within the same weight bucket).
+      3. SignupCreatedUtc ascending (earlier signup wins tie within same rank).
+      4. SignupId ascending (stable final tie-break for rows created at same instant).
+    """
     rank = kvk_rank_value(row)
+    weight = get_sort_weight(
+        str(row.get("RequestPriority") or ""),
+        str(row.get("PreferredRankBand") or "") or None,
+    )
     return (
-        _PRIORITY_ORDER.get(normalize_priority(row.get("RequestPriority")), 99),
+        weight,
         1 if rank is None else 0,
         rank if rank is not None else 999_999_999,
         _as_datetime_utc(row.get("SignupCreatedUtc")),
