@@ -4,23 +4,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import functools
 from typing import Any
 
 _ALLOWED_PRIORITIES = {"high", "medium", "low"}
 _ALLOWED_RANK_BANDS = {"1-5", "6-10", "11-15", "no_preference"}
 _BLOCK_STATUSES = {"published", "completed"}
 
-# Lazily resolved to avoid circular imports at module load time.
-_PRIORITY_RANK_VALUES: frozenset[str] | None = None
 
-
+@functools.lru_cache(maxsize=1)
 def _get_priority_rank_values() -> frozenset[str]:
-    global _PRIORITY_RANK_VALUES
-    if _PRIORITY_RANK_VALUES is None:
-        from mge.mge_priority_rank_map import PRIORITY_RANK_OPTIONS  # noqa: PLC0415
+    """Return the set of valid combined priority-rank dropdown values.
 
-        _PRIORITY_RANK_VALUES = frozenset(o.value for o in PRIORITY_RANK_OPTIONS)
-    return _PRIORITY_RANK_VALUES
+    Lazily imported to avoid circular imports at module load time.
+    lru_cache provides thread-safe single-initialisation semantics.
+    """
+    from mge.mge_priority_rank_map import PRIORITY_RANK_OPTIONS  # noqa: PLC0415
+
+    return frozenset(o.value for o in PRIORITY_RANK_OPTIONS)
 
 
 @dataclass(slots=True)

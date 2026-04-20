@@ -256,6 +256,7 @@ class _CommanderSelect(discord.ui.Select):
     def __init__(self, parent: MgeSimplifiedSignupFormView) -> None:
         self.parent_view = parent
         items = sorted(parent.commander_options.items(), key=lambda kv: kv[1].lower())[:25]
+        # Discord API limits Select options to 25 items maximum.
         selected = parent.selected_commander_id
         options = [
             discord.SelectOption(

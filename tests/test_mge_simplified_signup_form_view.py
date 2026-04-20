@@ -291,7 +291,7 @@ def test_edit_prefill_resolves_legacy_priority_and_rank_band() -> None:
     assert view.selected_commander_id == 2
 
 
-def test_edit_prefill_falls_back_for_unknown_legacy_combination() -> None:
+def test_edit_prefill_falls_back_to_no_preference_for_unknown_legacy_combination() -> None:
     """Unknown legacy priority+rank_band should fall back to no_preference."""
     existing_row = {
         "RequestPriority": "OldCustomPriority",
