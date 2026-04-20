@@ -802,10 +802,14 @@ def _base_publish_monkeypatches(monkeypatch: pytest.MonkeyPatch, channel_id: str
 async def test_dm_failure_does_not_block_publish(monkeypatch: pytest.MonkeyPatch) -> None:
     """DM send failure must NOT set publish result success to False."""
     _base_publish_monkeypatches(monkeypatch)
+    monkeypatch.setattr(mge_publish_service, "MGE_MAIL_DM_USER_ID", 888999)
 
     class _FakeUser:
         async def send(self, text):
             raise RuntimeError("DM send failed deliberately")
+
+    async def _fetch_user(uid):
+        return _FakeUser()
 
     class _Msg:
         id = 555
@@ -819,15 +823,6 @@ async def test_dm_failure_does_not_block_publish(monkeypatch: pytest.MonkeyPatch
     bot = SimpleNamespace(
         get_channel=lambda x: _Channel(),
         fetch_channel=lambda x: _Channel(),
-        fetch_user=lambda uid: _FakeUser(),
-    )
-    # Make fetch_user a coroutine
-    async def _fetch_user(uid):
-        return _FakeUser()
-
-    bot = SimpleNamespace(
-        get_channel=lambda x: _Channel(),
-        fetch_channel=lambda x: _Channel(),
         fetch_user=_fetch_user,
     )
 
@@ -835,12 +830,14 @@ async def test_dm_failure_does_not_block_publish(monkeypatch: pytest.MonkeyPatch
 
     assert res.success is True, f"Publish must succeed despite DM failure, got: {res.message}"
     assert res.award_mail_dm_sent is False
+    assert res.award_mail_dm_status == "send_failed"
 
 
 @pytest.mark.asyncio
 async def test_dm_sent_flag_true_when_dm_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
     """award_mail_dm_sent is True when DM is sent successfully."""
     _base_publish_monkeypatches(monkeypatch)
+    monkeypatch.setattr(mge_publish_service, "MGE_MAIL_DM_USER_ID", 888999)
 
     class _FakeUser:
         async def send(self, text):
@@ -868,4 +865,58 @@ async def test_dm_sent_flag_true_when_dm_succeeds(monkeypatch: pytest.MonkeyPatc
 
     assert res.success is True
     assert res.award_mail_dm_sent is True
+    assert res.award_mail_dm_status == "sent"
+
+
+@pytest.mark.asyncio
+async def test_dm_skipped_when_no_recipient_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When MGE_MAIL_DM_USER_ID is 0/unset, DM is skipped and publish still succeeds."""
+    _base_publish_monkeypatches(monkeypatch)
+    monkeypatch.setattr(mge_publish_service, "MGE_MAIL_DM_USER_ID", 0)
+
+    class _Msg:
+        id = 557
+
+    class _Channel:
+        id = 999
+
+        async def send(self, **kwargs):
+            return _Msg()
+
+    bot = SimpleNamespace(
+        get_channel=lambda x: _Channel(),
+        fetch_channel=lambda x: _Channel(),
+    )
+
+    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=12, actor_discord_id=2)
+
+    assert res.success is True
+    assert res.award_mail_dm_sent is False
+    assert res.award_mail_dm_status == "skipped_no_recipient"
+
+
+@pytest.mark.asyncio
+async def test_dm_body_contains_all_awarded_governors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The DM body must list all awarded governors with their targets."""
+    from mge.mge_publish_service import _build_award_mail_text
+
+    ctx = {
+        "EventName": "Test MGE",
+        "RuleMode": "fixed",
+        "PointCapMillions": 8,
+    }
+    rows = [
+        {"GovernorNameSnapshot": "Chrislos", "AwardedRank": 1, "TargetScore": 14_000_000},
+        {"GovernorNameSnapshot": "义Viper义", "AwardedRank": 2, "TargetScore": 13_500_000},
+    ]
+    text = _build_award_mail_text(ctx, rows)
+
+    assert "Chrislos - Target: 14.0M" in text
+    assert "义Viper义 - Target: 13.5M" in text
+    assert "8m points" in text
+    assert "Leadership" in text
+    # Must NOT contain commander names (not present in rows used here)
+    # Must be plain text (no bold/italic Discord markdown)
+    assert "**" not in text
+    assert "*" not in text
 
