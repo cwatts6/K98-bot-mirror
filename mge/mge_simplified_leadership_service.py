@@ -8,7 +8,7 @@ from typing import Any
 
 from embed_utils import fmt_short
 from mge import mge_roster_service
-from mge.dal import mge_roster_dal
+from mge.dal import mge_publish_dal, mge_roster_dal
 from mge.mge_simplified_flow_service import (
     evaluate_publish_readiness,
     get_ordered_leadership_rows,
@@ -18,6 +18,7 @@ from mge.mge_simplified_flow_service import (
 logger = logging.getLogger(__name__)
 
 _ROW_LIMIT = 30
+_TARGET_DECREMENT_SCORE = 500_000
 
 
 def _to_int(value: Any, default: int = 0) -> int:
@@ -122,8 +123,113 @@ def _chunk_lines(lines: list[str], limit: int = 1024) -> list[str]:
     return chunks
 
 
+def _maybe_regenerate_targets(
+    event_id: int,
+    actor_discord_id: int,
+    now: datetime,
+) -> bool:
+    """Auto-regenerate targets if any roster rows already have targets set.
+
+    Must be called AFTER rank/order changes are persisted.
+    Returns True if regen was attempted and succeeded, False otherwise.
+    Failures are logged as warnings and do NOT propagate.
+    """
+    try:
+        dataset = get_ordered_leadership_rows(event_id)
+        roster_rows = [
+            r for r in dataset.get("roster_rows", []) if _to_int(r.get("AwardId"), 0) > 0
+        ]
+        if not roster_rows:
+            return False
+
+        # Only regenerate if targets already exist for this event
+        has_targets = any(
+            r.get("TargetScore") is not None and _to_int(r.get("TargetScore"), -1) >= 0
+            for r in roster_rows
+        )
+        if not has_targets:
+            return False
+
+        # Find rank1 target from the current roster data
+        rank1_row = next(
+            (
+                r
+                for r in roster_rows
+                if _to_int(r.get("ComputedAwardedRank") or r.get("AwardedRank"), 0) == 1
+            ),
+            None,
+        )
+        if rank1_row is None or rank1_row.get("TargetScore") is None:
+            logger.warning(
+                "mge_target_regen_skipped reason=no_rank1_target event_id=%s",
+                event_id,
+            )
+            return False
+
+        rank1_score = _to_int(rank1_row.get("TargetScore"), 0)
+        if rank1_score <= 0:
+            logger.warning(
+                "mge_target_regen_skipped reason=rank1_target_zero event_id=%s",
+                event_id,
+            )
+            return False
+
+        roster_targets: dict[int, dict[str, Any]] = {}
+        for row in roster_rows:
+            award_id = _to_int(row.get("AwardId"), 0)
+            rank = _to_int(row.get("ComputedAwardedRank") or row.get("AwardedRank"), 0)
+            if award_id <= 0 or rank <= 0:
+                continue
+            target = max(rank1_score - ((rank - 1) * _TARGET_DECREMENT_SCORE), 0)
+            roster_targets[award_id] = {"target_score": target, "awarded_rank": rank}
+
+        if not roster_targets:
+            return False
+
+        # Non-roster award IDs to clear
+        clear_award_ids: list[int] = []
+        for key in ("waitlist_rows", "rejected_rows", "unassigned_rows"):
+            for row in dataset.get(key, []):
+                aid = _to_int(row.get("AwardId"), 0)
+                if aid > 0:
+                    clear_award_ids.append(aid)
+
+        count = mge_publish_dal.apply_generated_targets(
+            event_id=event_id,
+            roster_targets=roster_targets,
+            clear_award_ids=clear_award_ids,
+            actor_discord_id=actor_discord_id,
+            now_utc=now,
+        )
+        if count <= 0:
+            logger.warning(
+                "mge_target_regen_failed reason=apply_returned_zero event_id=%s",
+                event_id,
+            )
+            return False
+
+        logger.info(
+            "mge_target_regen_success event_id=%s actor_discord_id=%s rows_updated=%s",
+            event_id,
+            actor_discord_id,
+            count,
+        )
+        return True
+
+    except Exception:
+        logger.warning(
+            "Targets require manual regeneration event_id=%s",
+            event_id,
+        )
+        logger.exception(
+            "mge_target_regen_exception event_id=%s actor_discord_id=%s",
+            event_id,
+            actor_discord_id,
+        )
+        return False
+
+
 def get_leadership_board_payload(event_id: int) -> dict[str, Any]:
-    """Return leadership embed/view payload using simplified-flow service outputs."""
     dataset = get_ordered_leadership_rows(event_id)
     readiness = evaluate_publish_readiness(event_id)
     counts = dict(dataset.get("counts", {}))
@@ -331,6 +437,7 @@ def move_waitlist_to_roster_with_optional_demote(
             details={"demoted_award_id": int(demote_award_id)},
             now_utc=now,
         )
+        _maybe_regenerate_targets(int(event_id), actor_discord_id, now)
         return mge_roster_service.RosterResult(
             True,
             "Promoted selected waitlist player and demoted selected roster player to end of waitlist.",
@@ -341,6 +448,8 @@ def move_waitlist_to_roster_with_optional_demote(
         actor_discord_id=actor_discord_id,
         notes=notes,
     )
+    if result.success:
+        _maybe_regenerate_targets(int(event_id), actor_discord_id, datetime.now(UTC))
     return result
 
 
@@ -392,6 +501,7 @@ def reset_active_ranks(*, event_id: int, actor_discord_id: int) -> mge_roster_se
         actor_discord_id,
         affected,
     )
+    _maybe_regenerate_targets(event_id, actor_discord_id, now)
     return mge_roster_service.RosterResult(
         True,
         f"Reset ranks for {affected} active signup(s).",

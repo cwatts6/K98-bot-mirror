@@ -258,3 +258,51 @@ def test_render_fallback_name_applied():
     text = "Some plain text."
     fields = render_mge_content_to_embed_fields(text, fallback_name="Reminders")
     assert fields[0][0] == "Reminders"
+
+
+# ---------------------------------------------------------------------------
+# Part 6 — New tests: large content, field name cap, 25-field limit
+# ---------------------------------------------------------------------------
+
+
+def test_large_section_content_truncates_safely():
+    """Section body > 1024 chars produces multiple fields without raising."""
+    long_body = "X" * 2048
+    text = f"# Big Section\n{long_body}"
+    fields = render_mge_content_to_embed_fields(text, fallback_name="Rules")
+    assert isinstance(fields, list)
+    assert len(fields) >= 1
+    for _name, value in fields:
+        assert len(value) <= 1024, f"Field value exceeds 1024 chars: {len(value)}"
+
+
+def test_field_names_capped_at_256_chars():
+    """Field names generated from long section titles are truncated to 256 chars."""
+    long_title = "T" * 300
+    sections = [{"type": "section", "title": long_title, "lines": ["Some content."]}]
+    fields = render_mge_sections_to_embed_fields(sections)
+    for name, _ in fields:
+        assert len(name) <= 256, f"Field name exceeds 256 chars: {len(name)}"
+
+
+def test_25_field_limit_enforced():
+    """Content producing > 25 sections is truncated to exactly 25 fields."""
+    # Build 30 sections
+    lines = [f"# Section {i}\nContent for section {i}." for i in range(30)]
+    text = "\n\n".join(lines)
+    fields = render_mge_content_to_embed_fields(text, fallback_name="Rules")
+    assert len(fields) <= 25, f"Too many fields: {len(fields)}"
+    # Last field should be the overflow notice
+    last_name, last_value = fields[-1]
+    assert "overflow" in last_name.lower() or "overflow" in last_value.lower() or "truncated" in last_value.lower()
+
+
+def test_25_field_limit_does_not_raise():
+    """26+ sections do not raise; truncation is silent."""
+    sections = [{"type": "section", "title": f"S{i}", "lines": [f"Line {i}"]} for i in range(30)]
+    try:
+        fields = render_mge_sections_to_embed_fields(sections)
+    except Exception as exc:
+        pytest.fail(f"render_mge_sections_to_embed_fields raised unexpectedly: {exc}")
+    assert len(fields) <= 25
+

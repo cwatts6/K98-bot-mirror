@@ -133,7 +133,7 @@ def test_build_mge_awards_embed_sanitizes_user_text_fields() -> None:
     assert "<@everyone>" not in combined
 
 
-def test_build_mge_awards_embed_bolds_target_value_only() -> None:
+def test_build_mge_awards_embed_bolds_governor_and_italicises_commander() -> None:
     embed = build_mge_awards_embed(
         event_row={"EventName": "E1", "VariantName": "Infantry", "EventId": 1},
         awarded_rows=[
@@ -151,8 +151,12 @@ def test_build_mge_awards_embed_bolds_target_value_only() -> None:
     )
 
     awarded_field = next(f for f in embed.fields if f.name.startswith("Awarded ("))
-    assert "Target: **13.5M**" in awarded_field.value
-    assert "**Target:**" not in awarded_field.value
+    # Governor name must be bold
+    assert "**GovOne**" in awarded_field.value
+    # Commander name must be italic
+    assert "*Mathias*" in awarded_field.value
+    # Target shown without extra bold wrapper
+    assert "Target: 13.5M" in awarded_field.value
 
 
 # ---------------------------------------------------------------------------
@@ -311,3 +315,109 @@ async def test_refresh_mge_boards_uses_rollout_and_leadership_sync(monkeypatch):
     assert calls["public"]["signup_channel_id"] == 321
     assert calls["leadership"]["event_id"] == 55
     assert calls["awards"]["event_id"] == 55
+
+
+# ---------------------------------------------------------------------------
+# Part 6 — New tests: awards embed formatting and reminders cap injection
+# ---------------------------------------------------------------------------
+
+
+def test_awards_embed_rows_no_raw_mention() -> None:
+    """Awarded embed rows must NOT contain raw <@USER_ID> Discord mentions."""
+    embed = build_mge_awards_embed(
+        event_row={"EventName": "E", "VariantName": "Infantry", "EventId": 1},
+        awarded_rows=[
+            {
+                "AwardedRank": 4,
+                "DiscordUserId": 987654321,
+                "GovernorNameSnapshot": "SomeGov",
+                "RequestedCommanderName": "SomeCmdr",
+                "TargetScore": 7_000_000,
+            }
+        ],
+        waitlist_rows=[],
+        publish_version=1,
+        published_utc=datetime.now(UTC),
+    )
+    combined = "\n".join(f.value for f in embed.fields)
+    assert "<@987654321>" not in combined, "Raw Discord mention must not appear in embed rows"
+
+
+def test_awards_embed_rows_governor_is_bold() -> None:
+    """GovernorNameSnapshot must be wrapped in ** in the awarded field."""
+    embed = build_mge_awards_embed(
+        event_row={"EventName": "E", "VariantName": "Infantry", "EventId": 1},
+        awarded_rows=[
+            {
+                "AwardedRank": 5,
+                "DiscordUserId": 111,
+                "GovernorNameSnapshot": "ChrislosGov",
+                "RequestedCommanderName": "DavidIV",
+                "TargetScore": 8_000_000,
+            }
+        ],
+        waitlist_rows=[],
+        publish_version=1,
+        published_utc=datetime.now(UTC),
+    )
+    awarded_field = next(f for f in embed.fields if f.name.startswith("Awarded ("))
+    assert "**ChrislosGov**" in awarded_field.value
+
+
+def test_awards_embed_rows_commander_is_italic() -> None:
+    """RequestedCommanderName must be wrapped in * in the awarded field."""
+    embed = build_mge_awards_embed(
+        event_row={"EventName": "E", "VariantName": "Infantry", "EventId": 1},
+        awarded_rows=[
+            {
+                "AwardedRank": 5,
+                "DiscordUserId": 222,
+                "GovernorNameSnapshot": "SomeGov",
+                "RequestedCommanderName": "DavidIV",
+                "TargetScore": 8_000_000,
+            }
+        ],
+        waitlist_rows=[],
+        publish_version=1,
+        published_utc=datetime.now(UTC),
+    )
+    awarded_field = next(f for f in embed.fields if f.name.startswith("Awarded ("))
+    assert "*DavidIV*" in awarded_field.value
+
+
+def test_reminders_embed_bold_cap_uses_event_field() -> None:
+    """The points cap bold uses event_row PointCapMillions, not regex on text."""
+    from mge.mge_embed_manager import build_mge_award_reminders_embed
+
+    event_row = {
+        "EventName": "CappedEvent",
+        "VariantName": "Infantry",
+        "RuleMode": "fixed",
+        "PointCapMillions": 8,
+    }
+    embed = build_mge_award_reminders_embed(
+        event_row=event_row,
+        reminders_text="# Rules\nDo your best.",
+        published_utc=datetime.now(UTC),
+    )
+    combined = "\n".join(f.value for f in embed.fields)
+    assert "**8 million**" in combined, "Cap must appear bold using event-derived value"
+
+
+def test_reminders_embed_no_cap_field_when_no_event_cap() -> None:
+    """If PointCapMillions is absent, no points-cap field is injected."""
+    from mge.mge_embed_manager import build_mge_award_reminders_embed
+
+    event_row = {
+        "EventName": "NoCap",
+        "VariantName": "Infantry",
+        "RuleMode": "fixed",
+    }
+    embed = build_mge_award_reminders_embed(
+        event_row=event_row,
+        reminders_text="# Rules\nDo your best.",
+        published_utc=datetime.now(UTC),
+    )
+    field_names = [f.name for f in embed.fields]
+    assert "⚠️ Points Cap" not in field_names
+

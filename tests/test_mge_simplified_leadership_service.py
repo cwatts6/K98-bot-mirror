@@ -302,3 +302,192 @@ def test_move_waitlist_to_roster_requires_demote_when_roster_full(
     )
     assert result.success is False
     assert "Roster is full" in result.message
+
+
+# ---------------------------------------------------------------------------
+# Part 6 — New tests: auto-regen after rank change
+# ---------------------------------------------------------------------------
+
+
+def _make_dataset_with_targets():
+    return {
+        "roster_rows": [
+            {
+                "AwardId": 11,
+                "GovernorId": 1,
+                "AwardedRank": 1,
+                "ComputedAwardedRank": 1,
+                "AwardStatus": "awarded",
+                "AwardStatusRaw": "awarded",
+                "TargetScore": 8_000_000,
+            },
+            {
+                "AwardId": 12,
+                "GovernorId": 2,
+                "AwardedRank": 2,
+                "ComputedAwardedRank": 2,
+                "AwardStatus": "awarded",
+                "AwardStatusRaw": "awarded",
+                "TargetScore": 7_500_000,
+            },
+        ],
+        "waitlist_rows": [],
+        "unassigned_rows": [],
+        "rejected_rows": [],
+        "counts": {
+            "total_signups": 2,
+            "roster_count": 2,
+            "waitlist_count": 0,
+            "rejected_count": 0,
+        },
+    }
+
+
+def test_rank_change_triggers_regen_when_targets_exist(monkeypatch: pytest.MonkeyPatch) -> None:
+    """After a successful promote/demote swap, _maybe_regenerate_targets is called."""
+    regen_calls = []
+
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.get_ordered_leadership_rows",
+        lambda event_id: _make_dataset_with_targets(),
+    )
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.mge_roster_dal.update_award",
+        lambda **kwargs: True,
+    )
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.mge_roster_dal.insert_award_audit",
+        lambda **kwargs: True,
+    )
+
+    def _fake_apply_targets(**kwargs):
+        regen_calls.append(kwargs)
+        return 2
+
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.mge_publish_dal.apply_generated_targets",
+        _fake_apply_targets,
+    )
+
+    # Full roster (15), promote waitlist, demote roster
+    big_roster = [
+        {
+            "AwardId": 100 + i,
+            "GovernorId": 100 + i,
+            "AwardedRank": i,
+            "ComputedAwardedRank": i,
+            "AwardStatus": "awarded",
+            "TargetScore": 8_000_000 - (i - 1) * 500_000,
+        }
+        for i in range(1, 16)
+    ]
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.get_ordered_leadership_rows",
+        lambda event_id: {
+            "roster_rows": big_roster,
+            "waitlist_rows": [
+                {
+                    "AwardId": 201,
+                    "GovernorId": 50,
+                    "WaitlistOrder": 1,
+                    "AwardStatus": "waitlist",
+                }
+            ],
+            "unassigned_rows": [],
+            "rejected_rows": [],
+        },
+    )
+
+    result = svc.move_waitlist_to_roster_with_optional_demote(
+        event_id=88,
+        promote_award_id=201,
+        demote_award_id=115,
+        actor_discord_id=9001,
+    )
+    assert result.success is True
+    assert len(regen_calls) >= 1, "Target regen should have been called"
+
+
+def test_rank_change_no_targets_regen_not_triggered(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When no targets exist, _maybe_regenerate_targets does NOT call apply_generated_targets."""
+    regen_calls = []
+
+    dataset_no_targets = {
+        "roster_rows": [
+            {
+                "AwardId": 11,
+                "GovernorId": 1,
+                "AwardedRank": 1,
+                "ComputedAwardedRank": 1,
+                "AwardStatus": "awarded",
+                "AwardStatusRaw": "awarded",
+                "TargetScore": None,  # no target
+            },
+        ],
+        "waitlist_rows": [
+            {"AwardId": 21, "GovernorId": 2, "WaitlistOrder": 1, "AwardStatus": "waitlist"}
+        ],
+        "unassigned_rows": [],
+        "rejected_rows": [],
+        "counts": {"total_signups": 2, "roster_count": 1, "waitlist_count": 1, "rejected_count": 0},
+    }
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.get_ordered_leadership_rows",
+        lambda event_id: dataset_no_targets,
+    )
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.mge_roster_dal.update_award",
+        lambda **kwargs: True,
+    )
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.mge_roster_dal.insert_award_audit",
+        lambda **kwargs: True,
+    )
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.mge_publish_dal.apply_generated_targets",
+        lambda **kwargs: regen_calls.append(kwargs) or 1,
+    )
+
+    from mge import mge_roster_service as roster_svc
+
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.mge_roster_service.promote_waitlist_to_roster",
+        lambda **kwargs: roster_svc.RosterResult(True, "Promoted."),
+    )
+
+    result = svc.move_waitlist_to_roster_with_optional_demote(
+        event_id=99,
+        promote_award_id=21,
+        demote_award_id=None,
+        actor_discord_id=9001,
+    )
+    assert result.success is True
+    assert len(regen_calls) == 0, "Regen must NOT be called when no targets exist"
+
+
+def test_regen_failure_does_not_block_rank_update(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Target regen failure must NOT fail the rank change result."""
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.get_ordered_leadership_rows",
+        lambda event_id: _make_dataset_with_targets(),
+    )
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.mge_roster_dal.update_award",
+        lambda **kwargs: True,
+    )
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.mge_roster_dal.insert_award_audit",
+        lambda **kwargs: True,
+    )
+
+    def _regen_raises(**kwargs):
+        raise RuntimeError("DB exploded")
+
+    monkeypatch.setattr(
+        "mge.mge_simplified_leadership_service.mge_publish_dal.apply_generated_targets",
+        _regen_raises,
+    )
+
+    result = svc.reset_active_ranks(event_id=55, actor_discord_id=9002)
+    assert result.success is True, "Rank reset must succeed even when regen raises"
+

@@ -24,6 +24,13 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+MAX_EMBED_FIELDS = 25
+_MAX_FIELD_NAME_LEN = 256
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
@@ -235,7 +242,8 @@ def render_mge_sections_to_embed_fields(
                 if not body.strip():
                     body = "—"
                 for idx, chunk in enumerate(split_field_value_safely(body, max_field_value)):
-                    result.append((name if idx == 0 else f"{name} (cont.)", chunk or "—"))
+                    field_name = name if idx == 0 else f"{name} (cont.)"
+                    result.append((field_name[:_MAX_FIELD_NAME_LEN], chunk or "—"))
 
             elif sec_type == "section":
                 name = f"**{title}**" if title else "Rules"
@@ -243,7 +251,8 @@ def render_mge_sections_to_embed_fields(
                 if not body.strip():
                     body = "—"
                 for idx, chunk in enumerate(split_field_value_safely(body, max_field_value)):
-                    result.append((name if idx == 0 else f"{name} (cont.)", chunk or "—"))
+                    field_name = name if idx == 0 else f"{name} (cont.)"
+                    result.append((field_name[:_MAX_FIELD_NAME_LEN], chunk or "—"))
 
             else:
                 # plain
@@ -252,7 +261,14 @@ def render_mge_sections_to_embed_fields(
                 if not body.strip():
                     body = "—"
                 for idx, chunk in enumerate(split_field_value_safely(body, max_field_value)):
-                    result.append((name if idx == 0 else f"{name} (cont.)", chunk or "—"))
+                    field_name = name if idx == 0 else f"{name} (cont.)"
+                    result.append((field_name[:_MAX_FIELD_NAME_LEN], chunk or "—"))
+
+            # Enforce the 25-field Discord limit: truncate and add overflow notice
+            if len(result) >= MAX_EMBED_FIELDS - 1:
+                result = result[: MAX_EMBED_FIELDS - 1]
+                result.append(("⚠️ Overflow", "Content truncated — too many sections."))
+                return result
 
     except Exception:
         logger.exception("render_mge_sections_to_embed_fields failed — returning fallback")

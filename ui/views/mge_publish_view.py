@@ -296,7 +296,7 @@ class MgePublishView(discord.ui.View):
                     super().__init__(title="MGE Award Reminders", timeout=300)
                     self.parent = parent
                     self.reminders_text = discord.ui.InputText(
-                        label="Reminders — plain text, use # for sections, ! for warnings",
+                        label="Reminders (plain text, # sections, !warns)",
                         style=discord.InputTextStyle.long,
                         required=True,
                         max_length=MAX_REMINDERS_TEXT_LENGTH,

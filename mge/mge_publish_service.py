@@ -12,6 +12,7 @@ from typing import Any
 import discord
 
 from bot_config import MGE_AWARD_CHANNEL_ID
+from embed_utils import fmt_short
 from mge.dal import mge_publish_dal
 from mge.mge_embed_manager import (
     build_award_notifications_content,
@@ -35,6 +36,8 @@ class PublishResult:
     change_lines: list[str] | None = None
     reminders_embed_sent: bool | None = None
     reminders_embed_status: str | None = None
+    award_mail_dm_sent: bool | None = None
+    award_mail_dm_status: str | None = None
 
 
 @dataclass(slots=True)
@@ -450,6 +453,63 @@ async def publish_event_awards(
     if maybe_refresh is not None:
         await maybe_refresh
 
+    # --- Award mail DM: send after successful publish using persisted DB data ---
+    award_mail_dm_sent = False
+    award_mail_dm_status: str | None = None
+    try:
+        dm_rows = awarded  # already fetched from DB post-publish
+        dm_count = 0
+        dm_fail_count = 0
+        for row in dm_rows:
+            discord_user_id = _to_int(row.get("DiscordUserId"), 0)
+            if discord_user_id <= 0:
+                continue
+            gov_name = str(row.get("GovernorNameSnapshot") or "Unknown")
+            target_raw = row.get("TargetScore")
+            try:
+                target_fmt = fmt_short(int(target_raw)) if target_raw is not None else "—"
+            except Exception:
+                target_fmt = "—"
+            dm_text = (
+                f"🏅 **MGE Award Notification**\n"
+                f"Governor: **{gov_name}**\n"
+                f"Target Score: **{target_fmt}**\n\n"
+                "Please review your placement in the awards channel."
+            )
+            try:
+                user = await bot.fetch_user(discord_user_id)
+                await user.send(dm_text)
+                dm_count += 1
+            except Exception:
+                dm_fail_count += 1
+                logger.exception(
+                    "mge_publish_award_dm_failed event_id=%s discord_user_id=%s",
+                    event_id,
+                    discord_user_id,
+                )
+        if dm_fail_count == 0 and dm_count > 0:
+            award_mail_dm_sent = True
+            award_mail_dm_status = f"sent:{dm_count}"
+        elif dm_count > 0:
+            award_mail_dm_sent = True
+            award_mail_dm_status = f"partial:{dm_count}_ok_{dm_fail_count}_failed"
+        else:
+            award_mail_dm_sent = False
+            award_mail_dm_status = "no_dm_targets" if not dm_rows else f"all_failed:{dm_fail_count}"
+        logger.info(
+            "mge_publish_award_dm_complete event_id=%s sent=%s failed=%s",
+            event_id,
+            dm_count,
+            dm_fail_count,
+        )
+    except Exception:
+        award_mail_dm_sent = False
+        award_mail_dm_status = "dm_error"
+        logger.exception(
+            "mge_publish_award_dm_error event_id=%s",
+            event_id,
+        )
+
     logger.info(
         "mge_publish_success event_id=%s actor_discord_id=%s publish_version=%s awarded=%s waitlist=%s reminders_status=%s",
         event_id,
@@ -488,6 +548,8 @@ async def publish_event_awards(
         changes,
         reminders_embed_sent=reminders_embed_sent,
         reminders_embed_status=reminders_embed_status,
+        award_mail_dm_sent=award_mail_dm_sent,
+        award_mail_dm_status=award_mail_dm_status,
     )
 
 

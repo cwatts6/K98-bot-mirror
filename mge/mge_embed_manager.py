@@ -395,7 +395,7 @@ def build_mge_awards_embed(
             gov = _safe_text(row.get("GovernorNameSnapshot"))
             cmd = _safe_text(row.get("RequestedCommanderName"))
             target = _fmt_short_number(row.get("TargetScore"))
-            spotlight_lines.append(f"{medal} **{gov}** — {cmd} — Target: **{target}**")
+            spotlight_lines.append(f"{medal} **{gov}** — *{cmd}* — Target: {target}")
         embed.add_field(
             name="🔥 Top 3",
             value="\n".join(spotlight_lines),
@@ -408,10 +408,9 @@ def build_mge_awards_embed(
             awarded_rows,
             lambda row: (
                 f"#{row.get('AwardedRank')} • "
-                + (f"<@{int(row.get('DiscordUserId'))}> " if row.get("DiscordUserId") else "")
-                + f"{_safe_text(row.get('GovernorNameSnapshot'))} • "
-                + f"{_safe_text(row.get('RequestedCommanderName'))} • "
-                + f"Target: **{_fmt_short_number(row.get('TargetScore'))}**"
+                f"**{_safe_text(row.get('GovernorNameSnapshot'))}** • "
+                f"*{_safe_text(row.get('RequestedCommanderName'))}* • "
+                f"Target: {_fmt_short_number(row.get('TargetScore'))}"
             ),
             1024,
         ),
@@ -454,6 +453,19 @@ def build_mge_award_reminders_embed(
         timestamp=published_utc.astimezone(UTC),
     )
     embed.set_thumbnail(url="https://i.ibb.co/xKYp2FLg/mge-reminders-thumbnail.png")
+
+    # Inject bold points cap from event data (not via regex/text parsing)
+    try:
+        cap_millions = _to_int(event_row.get("PointCapMillions"), default=-1)
+    except Exception:
+        cap_millions = -1
+    if cap_millions > 0:
+        embed.add_field(
+            name="⚠️ Points Cap",
+            value=f"If you are not on the list you can NOT go over **{cap_millions} million** points",
+            inline=False,
+        )
+
     # Structured content fields
     if reminders_str:
         for field_name, field_value in render_mge_content_to_embed_fields(
