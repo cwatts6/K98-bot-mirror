@@ -230,6 +230,7 @@ def _maybe_regenerate_targets(
 
 
 def get_leadership_board_payload(event_id: int) -> dict[str, Any]:
+    """Return leadership embed/view payload using simplified-flow service outputs."""
     dataset = get_ordered_leadership_rows(event_id)
     readiness = evaluate_publish_readiness(event_id)
     counts = dict(dataset.get("counts", {}))
