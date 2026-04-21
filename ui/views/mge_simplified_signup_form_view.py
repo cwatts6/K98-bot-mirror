@@ -73,6 +73,7 @@ class MgeSimplifiedSignupFormView(discord.ui.View):
         label="Sign Up",
         style=discord.ButtonStyle.primary,
         custom_id="mge_simplified_signup_submit",
+        row=2,
     )
     async def submit_btn(
         self, button: discord.ui.Button, interaction: discord.Interaction
@@ -243,6 +244,7 @@ class _PriorityRankSelect(discord.ui.Select):
             max_values=1,
             options=options,
             custom_id="mge_simplified_priority_rank_select",
+            row=0,
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
@@ -272,6 +274,7 @@ class _CommanderSelect(discord.ui.Select):
             max_values=1,
             options=options,
             custom_id="mge_simplified_commander_select",
+            row=1,
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
