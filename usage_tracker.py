@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict, deque
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import logging
 import os
@@ -220,6 +220,95 @@ def start_usage_tracker() -> "AsyncUsageTracker":
 
 
 # -------------------------
+# JSONL retention / pruning
+# -------------------------
+
+# Filename prefixes that usage_tracker writes into DATA_DIR
+_JSONL_PREFIXES = ("command_usage_", "metrics_", "alerts_")
+
+
+def prune_usage_jsonl_files(
+    data_dir: str | None = None,
+    retention_days: int | None = None,
+) -> int:
+    """
+    Delete daily usage JSONL files (command_usage_, metrics_, alerts_) that are
+    older than *retention_days*.  Returns the number of files deleted.
+
+    *data_dir* defaults to ``DATA_DIR`` from constants.
+    *retention_days* defaults to ``USAGE_JSONL_RETENTION_DAYS`` from constants.
+    """
+    from constants import DATA_DIR as _DATA_DIR, USAGE_JSONL_RETENTION_DAYS
+
+    dir_path = data_dir or _DATA_DIR
+    days = retention_days if retention_days is not None else USAGE_JSONL_RETENTION_DAYS
+    cutoff_date = (utcnow() - timedelta(days=days)).date()
+
+    deleted = 0
+    try:
+        for fname in os.listdir(dir_path):
+            if not fname.endswith(".jsonl"):
+                continue
+            matching_prefix = next(
+                (p for p in _JSONL_PREFIXES if fname.startswith(p)), None
+            )
+            if matching_prefix is None:
+                continue
+            # Date is encoded as YYYYMMDD between the prefix and .jsonl
+            date_str = fname[len(matching_prefix) : -len(".jsonl")]
+            try:
+                file_date = datetime.strptime(date_str, "%Y%m%d").date()
+            except ValueError:
+                continue  # filename doesn't match expected pattern; leave it alone
+            if file_date < cutoff_date:
+                fpath = os.path.join(dir_path, fname)
+                try:
+                    os.remove(fpath)
+                    log.info("[USAGE][PRUNE] Deleted old JSONL: %s", fname)
+                    deleted += 1
+                except Exception:
+                    log.warning("[USAGE][PRUNE] Failed to delete %s", fpath, exc_info=True)
+    except Exception:
+        log.exception("[USAGE][PRUNE] Error scanning data dir %s", dir_path)
+
+    if deleted:
+        log.info(
+            "[USAGE][PRUNE] Pruned %d JSONL file(s) older than %d days from %s",
+            deleted,
+            days,
+            dir_path,
+        )
+    return deleted
+
+
+async def usage_jsonl_prune_loop(
+    data_dir: str | None = None,
+    retention_days: int | None = None,
+) -> None:
+    """
+    Long-running coroutine that prunes old usage JSONL files daily at 03:00 UTC.
+    Run an initial pass at startup (to catch any backlog), then loop.
+    Register via ``task_monitor.create("usage_jsonl_prune", usage_jsonl_prune_loop)``.
+    """
+    while True:
+        try:
+            await asyncio.to_thread(prune_usage_jsonl_files, data_dir, retention_days)
+        except Exception:
+            log.exception("[USAGE][PRUNE] Unexpected error in prune loop")
+
+        # Sleep until 03:00 UTC
+        now = utcnow()
+        target = now.replace(hour=3, minute=0, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        delay = max(60.0, (target - now).total_seconds())
+        log.info(
+            "[USAGE][PRUNE] Next JSONL prune at %s (in %.0fs)", target.isoformat(), delay
+        )
+        await asyncio.sleep(delay)
+
+
+# -------------------------
 # Metric counters and alerting
 # -------------------------
 # Sliding-window timestamps per metric name
@@ -427,8 +516,10 @@ def set_alert_thresholds(threshold: int, window_s: int, suppress_s: int = 300) -
 __all__ = [
     "AsyncUsageTracker",
     "metrics_window_count",
+    "prune_usage_jsonl_files",
     "set_alert_callback",
     "set_alert_thresholds",
     "start_usage_tracker",
     "usage_event",
+    "usage_jsonl_prune_loop",
 ]

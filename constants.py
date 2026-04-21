@@ -147,6 +147,8 @@ def _conn_trusted():
 
 
 USAGE_TABLE = "[dbo].[BotCommandUsage]"
+# Number of days to retain daily usage JSONL files before pruning (overridable via env)
+USAGE_JSONL_RETENTION_DAYS: int = _env_int("USAGE_JSONL_RETENTION_DAYS", 30)
 
 # ---------- Google Sheet IDs (mark required if truly mandatory at runtime) ----------
 SHEET_ID = _env_str("GOOGLE_KINGDOM_SUMMARY_ID")  # optional

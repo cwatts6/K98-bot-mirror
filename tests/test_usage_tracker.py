@@ -7,11 +7,13 @@ No live database or SQL is required.
 from __future__ import annotations
 
 import asyncio
+import os
+import tempfile
 from datetime import datetime, timezone
 
 import pytest
 
-from usage_tracker import AsyncUsageTracker, start_usage_tracker
+from usage_tracker import AsyncUsageTracker, prune_usage_jsonl_files, start_usage_tracker
 from telemetry.dal.command_usage_dal import _coerce_ts
 
 
@@ -95,3 +97,74 @@ def test_coerce_ts_passthrough_on_bad_input():
     """Non-parseable string must not raise and must be returned as-is."""
     result = _coerce_ts("not-a-date")
     assert result == "not-a-date"
+
+
+# ---------------------------------------------------------------------------
+# JSONL pruning tests
+# ---------------------------------------------------------------------------
+
+
+def _make_jsonl(directory: str, name: str) -> str:
+    """Create an empty JSONL file with the given name in directory."""
+    path = os.path.join(directory, name)
+    with open(path, "w") as f:
+        f.write("{}\n")
+    return path
+
+
+def test_prune_usage_jsonl_files_removes_old_files():
+    """Files older than retention_days must be deleted."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Old files (beyond retention window)
+        old_usage = _make_jsonl(tmpdir, "command_usage_20200101.jsonl")
+        old_metrics = _make_jsonl(tmpdir, "metrics_20200101.jsonl")
+        old_alerts = _make_jsonl(tmpdir, "alerts_20200101.jsonl")
+
+        deleted = prune_usage_jsonl_files(data_dir=tmpdir, retention_days=30)
+
+        assert deleted == 3
+        assert not os.path.exists(old_usage)
+        assert not os.path.exists(old_metrics)
+        assert not os.path.exists(old_alerts)
+
+
+def test_prune_usage_jsonl_files_keeps_recent_files():
+    """Files within retention_days must NOT be deleted."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        from utils import utcnow
+        from datetime import timedelta
+
+        recent_date = (utcnow() - timedelta(days=1)).strftime("%Y%m%d")
+        recent = _make_jsonl(tmpdir, f"command_usage_{recent_date}.jsonl")
+
+        deleted = prune_usage_jsonl_files(data_dir=tmpdir, retention_days=30)
+
+        assert deleted == 0
+        assert os.path.exists(recent)
+
+
+def test_prune_usage_jsonl_files_unknown_prefix_not_deleted():
+    """Files with an unrecognised prefix must never be touched."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        unrelated = _make_jsonl(tmpdir, "some_other_log_20200101.jsonl")
+
+        deleted = prune_usage_jsonl_files(data_dir=tmpdir, retention_days=30)
+
+        assert deleted == 0
+        assert os.path.exists(unrelated)
+
+
+def test_prune_usage_jsonl_files_boundary_day_excluded():
+    """A file dated exactly *retention_days* ago is NOT deleted (cutoff is strictly older)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        from utils import utcnow
+        from datetime import timedelta
+
+        boundary_date = (utcnow() - timedelta(days=30)).strftime("%Y%m%d")
+        boundary_file = _make_jsonl(tmpdir, f"command_usage_{boundary_date}.jsonl")
+
+        deleted = prune_usage_jsonl_files(data_dir=tmpdir, retention_days=30)
+
+        # file dated exactly 30 days ago is ON the cutoff boundary — not strictly older
+        assert deleted == 0
+        assert os.path.exists(boundary_file)

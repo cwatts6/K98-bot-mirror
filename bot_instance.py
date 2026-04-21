@@ -1871,9 +1871,11 @@ async def full_startup_sequence():
             logger.warning(f"🤖 Logged in as {bot.user} (ID: {bot.user.id})")
             logger.warning("✅ Bot is ready.")
 
-            from usage_tracker import start_usage_tracker
+            from usage_tracker import start_usage_tracker, usage_jsonl_prune_loop
             start_usage_tracker()
             logger.info("[STARTUP] Usage tracker started.")
+            task_monitor.create("usage_jsonl_prune", usage_jsonl_prune_loop)
+            logger.info("[STARTUP] Usage JSONL prune loop started (retention=%s days).", os.getenv("USAGE_JSONL_RETENTION_DAYS", "30"))
 
             notify_channel = bot.get_channel(NOTIFY_CHANNEL_ID)
             if not notify_channel:
