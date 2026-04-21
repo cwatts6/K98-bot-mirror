@@ -178,9 +178,9 @@ def test_prune_zero_retention_keeps_old_file(monkeypatch):
         _ut,
         "_JSONL_FAMILIES",
         (
-            ("command_usage_", "%Y%m%d", 0),
-            ("metrics_", "%Y%m%d", _ut.USAGE_METRICS_JSONL_RETENTION_DAYS),
-            ("alerts_", "%Y%m%d", _ut.USAGE_ALERTS_JSONL_RETENTION_DAYS),
+            ("command_usage_", 0),
+            ("metrics_", _ut.USAGE_METRICS_JSONL_RETENTION_DAYS),
+            ("alerts_", _ut.USAGE_ALERTS_JSONL_RETENTION_DAYS),
         ),
     )
     with tempfile.TemporaryDirectory() as d:

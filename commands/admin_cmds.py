@@ -1526,7 +1526,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
         description="View bot usage summary (admin/leadership)",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.02")
+    @versioned(
+        "v1.02"
+    )  # v1.02: added 'internal' context_filter; excludes metric pseudo-events from 'all' view
     @safe_command
     @is_admin_or_leadership()
     @track_usage()
@@ -1638,7 +1640,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
         description="Drill down into a specific command or user (admin/leadership)",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.02")
+    @versioned(
+        "v1.02"
+    )  # v1.02: added 'internal' context_filter; excludes metric pseudo-events from 'all' view
     @safe_command
     @is_admin_or_leadership()
     @track_usage()

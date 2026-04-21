@@ -598,14 +598,16 @@ def is_user_facing_event(event: dict) -> bool:
 # JSONL retention / pruning
 # -------------------------
 
-# Maps file prefix → retention days constant
-_JSONL_FAMILIES: tuple[tuple[str, str, int], ...] = (
-    ("command_usage_", "%Y%m%d", USAGE_JSONL_RETENTION_DAYS),
-    ("metrics_", "%Y%m%d", USAGE_METRICS_JSONL_RETENTION_DAYS),
-    ("alerts_", "%Y%m%d", USAGE_ALERTS_JSONL_RETENTION_DAYS),
+# (prefix, retention_days) pairs for the three managed daily-JSONL families.
+# retention_days is read from module globals so monkeypatching in tests works correctly.
+# The date format is always YYYYMMDD for all families.
+_JSONL_FAMILIES: tuple[tuple[str, int], ...] = (
+    ("command_usage_", USAGE_JSONL_RETENTION_DAYS),
+    ("metrics_", USAGE_METRICS_JSONL_RETENTION_DAYS),
+    ("alerts_", USAGE_ALERTS_JSONL_RETENTION_DAYS),
 )
 
-# Compiled patterns for safe filename parsing
+# Compiled pattern for safe filename parsing (matches all three known families)
 _JSONL_FILE_RE = re.compile(r"^(command_usage_|metrics_|alerts_)(\d{8})\.jsonl$")
 
 
@@ -642,12 +644,9 @@ def prune_usage_jsonl(
     if today is None:
         today = utcnow().date()
 
-    # Build a prefix → retention_days lookup
-    retention_map: dict[str, int] = {
-        "command_usage_": USAGE_JSONL_RETENTION_DAYS,
-        "metrics_": USAGE_METRICS_JSONL_RETENTION_DAYS,
-        "alerts_": USAGE_ALERTS_JSONL_RETENTION_DAYS,
-    }
+    # Build prefix → retention_days from the module-level families tuple so that
+    # tests can monkeypatch _JSONL_FAMILIES or the individual retention-day constants.
+    retention_map: dict[str, int] = {prefix: days for prefix, days in _JSONL_FAMILIES}
 
     try:
         entries = os.listdir(data_dir)
@@ -664,7 +663,9 @@ def prune_usage_jsonl(
         prefix = m.group(1)
         date_str = m.group(2)
 
-        retention_days = retention_map.get(prefix, 30)
+        # retention_map is keyed by known prefixes (same set as _JSONL_FILE_RE);
+        # the fallback should never be reached, but use -1 to force "keep" for safety.
+        retention_days = retention_map.get(prefix, -1)
         if retention_days <= 0:
             log.debug("[PRUNE] Retention disabled for %r; keeping %s", prefix, fname)
             result["kept"].append(fname)
