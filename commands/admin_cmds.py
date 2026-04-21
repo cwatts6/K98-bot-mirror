@@ -39,6 +39,7 @@ from commands.telemetry_cmds import (
     _session_refresh,
     _session_release,
     _usage_detail_value_ac,
+    _user_facing_filter_sql,
     start_bot_time,
 )
 
@@ -1525,7 +1526,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         description="View bot usage summary (admin/leadership)",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.01")
+    @versioned("v1.02")
     @safe_command
     @is_admin_or_leadership()
     @track_usage()
@@ -1538,7 +1539,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         context_filter: str = discord.Option(
             str,
             "Filter by context",
-            choices=["slash", "component", "autocomplete", "all"],
+            choices=["slash", "component", "autocomplete", "all", "internal"],
             default="slash",
         ),
         limit: int = discord.Option(int, "Max rows", default=10),
@@ -1550,6 +1551,13 @@ def register_admin(bot: ext_commands.Bot) -> None:
         # context WHERE clause
         ctx_sql, ctx_params = _ctx_filter_sql(context_filter)
 
+        # When context='all', exclude internal metric pseudo-events by default so they don't
+        # pollute command-usage rankings. Use context='internal' to inspect them explicitly.
+        extra_sql: str = ""
+        extra_params: tuple = tuple()
+        if context_filter == "all":
+            extra_sql, extra_params = _user_facing_filter_sql()
+
         try:
             if by == "user":
                 sql = f"""
@@ -1558,11 +1566,11 @@ def register_admin(bot: ext_commands.Bot) -> None:
                            COUNT(*) AS Uses,
                            COUNT(DISTINCT CommandName) AS UniqueCommands
                     FROM {USAGE_TABLE}
-                    WHERE ExecutedAtUtc >= ?{ctx_sql}
+                    WHERE ExecutedAtUtc >= ?{ctx_sql}{extra_sql}
                     GROUP BY UserId
                     ORDER BY Uses DESC, UserId ASC;
                 """
-                rows = await _fetch_rows(sql, (since, *ctx_params))
+                rows = await _fetch_rows(sql, (since, *ctx_params, *extra_params))
                 lines = [
                     f"<@{r['UserId']}> · uses **{r['Uses']}** · cmds **{r['UniqueCommands']}**"
                     for r in rows
@@ -1575,10 +1583,10 @@ def register_admin(bot: ext_commands.Bot) -> None:
                            COUNT(*) AS Total,
                            SUM(CASE WHEN Success=1 THEN 1 ELSE 0 END) AS Successes
                     FROM {USAGE_TABLE}
-                    WHERE ExecutedAtUtc >= ?{ctx_sql}
+                    WHERE ExecutedAtUtc >= ?{ctx_sql}{extra_sql}
                     GROUP BY CommandName
                 """
-                rows = await _fetch_rows(sql, (since, *ctx_params))
+                rows = await _fetch_rows(sql, (since, *ctx_params, *extra_params))
                 # compute success % in python and sort by worst
                 stats = []
                 for r in rows:
@@ -1601,11 +1609,11 @@ def register_admin(bot: ext_commands.Bot) -> None:
                            SUM(CASE WHEN Success=1 THEN 1 ELSE 0 END) AS Successes,
                            AVG(CAST(LatencyMs AS float)) AS AvgLatencyMs
                     FROM {USAGE_TABLE}
-                    WHERE ExecutedAtUtc >= ?{ctx_sql}
+                    WHERE ExecutedAtUtc >= ?{ctx_sql}{extra_sql}
                     GROUP BY CommandName
                     ORDER BY Uses DESC, CommandName ASC;
                 """
-                rows = await _fetch_rows(sql, (since, *ctx_params))
+                rows = await _fetch_rows(sql, (since, *ctx_params, *extra_params))
                 rows = rows[:limit]
                 lines = [
                     f"`/{r['CommandName']}` · uses **{r['Uses']}** · ok **{r['Successes']}** · avg {int(r['AvgLatencyMs'] or 0)}ms"
@@ -1630,7 +1638,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         description="Drill down into a specific command or user (admin/leadership)",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.01")
+    @versioned("v1.02")
     @safe_command
     @is_admin_or_leadership()
     @track_usage()
@@ -1646,13 +1654,19 @@ def register_admin(bot: ext_commands.Bot) -> None:
         context_filter: str = discord.Option(
             str,
             "Filter by context",
-            choices=["slash", "component", "autocomplete", "all"],
+            choices=["slash", "component", "autocomplete", "all", "internal"],
             default="slash",
         ),
     ):
         await safe_defer(ctx, ephemeral=True)
         since = utcnow() - (timedelta(days=7) if period == "week" else timedelta(days=1))
         ctx_sql, ctx_params = _ctx_filter_sql(context_filter)
+
+        # Exclude internal pseudo-events when context='all' to keep reports meaningful
+        extra_sql: str = ""
+        extra_params: tuple = tuple()
+        if context_filter == "all":
+            extra_sql, extra_params = _user_facing_filter_sql()
 
         try:
             if dimension == "command":
@@ -1661,7 +1675,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     WITH s AS (
                       SELECT LatencyMs, Success
                       FROM {USAGE_TABLE}
-                      WHERE ExecutedAtUtc >= ? AND CommandName = ?{ctx_sql}
+                      WHERE ExecutedAtUtc >= ? AND CommandName = ?{ctx_sql}{extra_sql}
                     )
                     SELECT
                       (SELECT COUNT(*) FROM s) AS Total,
@@ -1672,7 +1686,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                       (SELECT TOP 1 CAST(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY CAST(LatencyMs AS float)) OVER () AS int)
                          FROM s WHERE LatencyMs IS NOT NULL) AS P95;
                 """
-                rows = await _fetch_rows(sql_pct, (since, cmd, *ctx_params))
+                rows = await _fetch_rows(sql_pct, (since, cmd, *ctx_params, *extra_params))
                 row = rows[0] if rows else {}
                 total = int(row.get("Total") or 0)
                 successes = int(row.get("Successes") or 0)
@@ -1683,11 +1697,11 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 sql_errs = f"""
                     SELECT TOP 10 ErrorCode, COUNT(*) AS Cnt
                     FROM {USAGE_TABLE}
-                    WHERE ExecutedAtUtc >= ? AND CommandName = ? AND Success = 0{ctx_sql}
+                    WHERE ExecutedAtUtc >= ? AND CommandName = ? AND Success = 0{ctx_sql}{extra_sql}
                     GROUP BY ErrorCode
                     ORDER BY Cnt DESC, ErrorCode ASC;
                 """
-                errs = await _fetch_rows(sql_errs, (since, cmd, *ctx_params))
+                errs = await _fetch_rows(sql_errs, (since, cmd, *ctx_params, *extra_params))
                 err_lines = [f"`{e['ErrorCode']}` · {e['Cnt']}" for e in errs] or ["_No failures_"]
 
                 desc = (
@@ -1716,11 +1730,11 @@ def register_admin(bot: ext_commands.Bot) -> None:
                            SUM(CASE WHEN Success=1 THEN 1 ELSE 0 END) AS Successes,
                            AVG(CAST(LatencyMs AS float)) AS AvgLatencyMs
                     FROM {USAGE_TABLE}
-                    WHERE ExecutedAtUtc >= ? AND UserId = ?{ctx_sql}
+                    WHERE ExecutedAtUtc >= ? AND UserId = ?{ctx_sql}{extra_sql}
                     GROUP BY CommandName
                     ORDER BY Uses DESC, CommandName ASC;
                 """
-                rows = await _fetch_rows(sql, (since, uid, *ctx_params))
+                rows = await _fetch_rows(sql, (since, uid, *ctx_params, *extra_params))
                 lines = [
                     f"`/{r['CommandName']}` · uses **{r['Uses']}** · ok **{r['Successes']}** · avg {int(r['AvgLatencyMs'] or 0)}ms"
                     for r in rows

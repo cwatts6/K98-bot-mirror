@@ -322,6 +322,14 @@ EVENT_CALENDAR_REMINDER_LOOP_SECONDS = _env_int("EVENT_CALENDAR_REMINDER_LOOP_SE
 EVENT_CALENDAR_REMINDERS_DRY_RUN = _env_bool("EVENT_CALENDAR_REMINDERS_DRY_RUN", default=False)
 
 
+# ---------- Usage JSONL retention policy ----------
+# Number of days to retain daily JSONL files for command usage, metrics, and alerts.
+# Set to 0 to disable pruning for that family (files are kept forever).
+USAGE_JSONL_RETENTION_DAYS: int = _env_int("USAGE_JSONL_RETENTION_DAYS", 30)
+USAGE_METRICS_JSONL_RETENTION_DAYS: int = _env_int("USAGE_METRICS_JSONL_RETENTION_DAYS", 30)
+USAGE_ALERTS_JSONL_RETENTION_DAYS: int = _env_int("USAGE_ALERTS_JSONL_RETENTION_DAYS", 30)
+
+
 # ---- Task 7: centralized pipeline/anomaly policy validation ----
 def _require_gt_zero(name: str, value: int | float) -> None:
     if value <= 0:

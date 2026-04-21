@@ -8,16 +8,23 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter, defaultdict, deque
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import io
 import json
 import logging
 import os
+import re
 import threading
 import time
 from typing import Any, Callable, Dict, Optional
 
-from constants import BASE_DIR, _conn
+from constants import (
+    BASE_DIR,
+    USAGE_ALERTS_JSONL_RETENTION_DAYS,
+    USAGE_JSONL_RETENTION_DAYS,
+    USAGE_METRICS_JSONL_RETENTION_DAYS,
+    _conn,
+)
 from utils import ensure_aware_utc, utcnow
 
 log = logging.getLogger(__name__)
@@ -28,6 +35,9 @@ UsageEvent = dict[str, Any]
 
 # Explicit UTC alias for clarity
 UTC = timezone.utc
+
+# Prefixes that identify internal (non-user-facing) pseudo-events
+_INTERNAL_CMD_PREFIXES = ("metric:", "metric_alert:")
 
 
 # Daily JSONL paths
@@ -56,12 +66,15 @@ class AsyncUsageTracker:
 
     # ---------- lifecycle ----------
     def start(self) -> None:
-        if self._task is None:
-            try:
-                self._task = asyncio.create_task(self._run(), name="usage-tracker")
-            except RuntimeError:
-                # No running loop; leave it to caller to start the loop's task later.
-                log.debug("[USAGE] No running loop; tracker task not created")
+        if self._task is not None:
+            log.debug("[USAGE] start() called but tracker task is already running — no-op")
+            return
+        try:
+            self._task = asyncio.create_task(self._run(), name="usage-tracker")
+            log.debug("[USAGE] Tracker task created and started")
+        except RuntimeError:
+            # No running loop; leave it to caller to start the loop's task later.
+            log.debug("[USAGE] No running loop; tracker task not created")
 
     async def stop(self) -> None:
         self._stop.set()
@@ -246,18 +259,37 @@ class AsyncUsageTracker:
             )
 
         except Exception:
-            log.exception("[USAGE] Batch insert (safe) failed; attempting per-row.")
+            log.exception("[USAGE] Batch insert (safe) failed; attempting per-row salvage.")
+            salvaged = 0
+            failed = 0
             try:
                 conn = _conn()
                 cur = conn.cursor()
                 for r in rows:
-                    cur.execute(SQL_INSERT, r)
+                    try:
+                        cur.execute(SQL_INSERT, r)
+                        salvaged += 1
+                    except Exception:
+                        failed += 1
+                        log.warning(
+                            "[USAGE] Per-row salvage: skipping row cmd=%s err=%s",
+                            r[1] if len(r) > 1 else "?",
+                            r[9] if len(r) > 9 else "?",
+                            exc_info=True,
+                        )
                 conn.commit()
                 cur.close()
                 conn.close()
-                log.info("[USAGE] Per-row salvage OK (%d rows)", len(rows))
+                log.info(
+                    "[USAGE] Per-row salvage complete: %d inserted, %d skipped",
+                    salvaged,
+                    failed,
+                )
             except Exception:
-                log.exception("[USAGE] SQL flush failed even per-row; will retry later")
+                log.exception(
+                    "[USAGE] SQL flush failed even per-row (%d events lost); events are in JSONL",
+                    len(rows),
+                )
 
     async def _run(self) -> None:
         last_flush = time.monotonic()
@@ -281,13 +313,18 @@ class AsyncUsageTracker:
             except Exception:
                 log.exception("[USAGE] Flusher loop error")
 
+        # Final drain: flush all remaining queued events before returning
+        drained = 0
         try:
             while True:
                 buffer.append(self.queue.get_nowait())
+                drained += 1
         except asyncio.QueueEmpty:
             pass
         if buffer:
+            log.info("[USAGE] Final drain: flushing %d remaining events on stop", len(buffer))
             await self._flush(buffer)
+        log.debug("[USAGE] Tracker task exited cleanly (drained %d extra events)", drained)
 
 
 # -------------------------
@@ -298,15 +335,15 @@ _GLOBAL_LOCK = threading.Lock()
 
 
 def _ensure_global_tracker() -> AsyncUsageTracker:
+    """
+    Return the global tracker singleton, creating it if necessary.
+    Does NOT start the tracker — call start_usage_tracker() explicitly from bot startup.
+    """
     global _GLOBAL_TRACKER
     with _GLOBAL_LOCK:
         if _GLOBAL_TRACKER is None:
             _GLOBAL_TRACKER = AsyncUsageTracker()
-            try:
-                loop = asyncio.get_running_loop()
-                _GLOBAL_TRACKER.start()
-            except RuntimeError:
-                log.debug("[USAGE] No running event loop; global tracker created but not started")
+            log.debug("[USAGE] Global tracker instance created (not yet started)")
         return _GLOBAL_TRACKER
 
 
@@ -513,12 +550,193 @@ def set_alert_thresholds(threshold: int, window_s: int, suppress_s: int = 300) -
     USAGE_ALERT_SUPPRESS = int(suppress_s)
 
 
+# -------------------------
+# Public lifecycle API
+# -------------------------
+
+
+def get_usage_tracker() -> AsyncUsageTracker:
+    """Return the global tracker singleton. Does not start it."""
+    return _ensure_global_tracker()
+
+
+def start_usage_tracker() -> None:
+    """
+    Start the global usage tracker. Safe to call multiple times (idempotent).
+    Must be called from a running event loop (e.g. from on_ready).
+    """
+    _ensure_global_tracker().start()
+
+
+async def stop_usage_tracker() -> None:
+    """
+    Stop the global tracker and perform a final drain flush.
+    Should be called from the bot shutdown sequence.
+    """
+    tracker = _ensure_global_tracker()
+    await tracker.stop()
+    log.info("[USAGE] Global tracker stopped and drained.")
+
+
+# -------------------------
+# Event classification helpers
+# -------------------------
+
+
+def is_user_facing_event(event: dict) -> bool:
+    """
+    Return True if the event represents a user-initiated interaction (slash, button, select,
+    autocomplete) rather than an internal metric or alert pseudo-event.
+
+    Internal pseudo-events have command_name prefixed with 'metric:' or 'metric_alert:'.
+    """
+    cmd_name = (event.get("command_name") or "").strip()
+    return not any(cmd_name.startswith(p) for p in _INTERNAL_CMD_PREFIXES)
+
+
+# -------------------------
+# JSONL retention / pruning
+# -------------------------
+
+# Maps file prefix → retention days constant
+_JSONL_FAMILIES: tuple[tuple[str, str, int], ...] = (
+    ("command_usage_", "%Y%m%d", USAGE_JSONL_RETENTION_DAYS),
+    ("metrics_", "%Y%m%d", USAGE_METRICS_JSONL_RETENTION_DAYS),
+    ("alerts_", "%Y%m%d", USAGE_ALERTS_JSONL_RETENTION_DAYS),
+)
+
+# Compiled patterns for safe filename parsing
+_JSONL_FILE_RE = re.compile(r"^(command_usage_|metrics_|alerts_)(\d{8})\.jsonl$")
+
+
+def prune_usage_jsonl(
+    data_dir: str,
+    *,
+    dry_run: bool = False,
+    today: date | None = None,
+) -> dict:
+    """
+    Prune daily JSONL files older than their configured retention window.
+
+    Families pruned:
+      - ``command_usage_YYYYMMDD.jsonl``  (USAGE_JSONL_RETENTION_DAYS)
+      - ``metrics_YYYYMMDD.jsonl``        (USAGE_METRICS_JSONL_RETENTION_DAYS)
+      - ``alerts_YYYYMMDD.jsonl``         (USAGE_ALERTS_JSONL_RETENTION_DAYS)
+
+    Safety guarantees:
+      - Never deletes the current-day file.
+      - Skips files with malformed / non-parseable date suffixes.
+      - Only touches the three known file families — no other files are affected.
+      - Retention <= 0 means "keep forever" for that family (pruning is skipped).
+
+    Args:
+        data_dir: Directory containing the JSONL files (typically ``data/``).
+        dry_run:  If True, log what *would* be removed but do not delete anything.
+        today:    UTC date to use as "today" (defaults to ``utcnow().date()``).
+
+    Returns:
+        dict with keys ``kept``, ``removed``, ``skipped`` listing file names.
+    """
+    result: dict[str, list[str]] = {"kept": [], "removed": [], "skipped": []}
+
+    if today is None:
+        today = utcnow().date()
+
+    # Build a prefix → retention_days lookup
+    retention_map: dict[str, int] = {
+        "command_usage_": USAGE_JSONL_RETENTION_DAYS,
+        "metrics_": USAGE_METRICS_JSONL_RETENTION_DAYS,
+        "alerts_": USAGE_ALERTS_JSONL_RETENTION_DAYS,
+    }
+
+    try:
+        entries = os.listdir(data_dir)
+    except OSError:
+        log.warning("[PRUNE] Cannot list data_dir=%r; skipping pruning", data_dir)
+        return result
+
+    for fname in entries:
+        m = _JSONL_FILE_RE.match(fname)
+        if not m:
+            # Not a usage JSONL file — leave it alone
+            continue
+
+        prefix = m.group(1)
+        date_str = m.group(2)
+
+        retention_days = retention_map.get(prefix, 30)
+        if retention_days <= 0:
+            log.debug("[PRUNE] Retention disabled for %r; keeping %s", prefix, fname)
+            result["kept"].append(fname)
+            continue
+
+        try:
+            file_date = datetime.strptime(date_str, "%Y%m%d").date()
+        except ValueError:
+            log.warning("[PRUNE] Malformed date in filename %r; skipping", fname)
+            result["skipped"].append(fname)
+            continue
+
+        # Never delete the current-day file
+        if file_date >= today:
+            log.debug("[PRUNE] Keeping current/future file: %s", fname)
+            result["kept"].append(fname)
+            continue
+
+        age_days = (today - file_date).days
+        if age_days > retention_days:
+            full_path = os.path.join(data_dir, fname)
+            if dry_run:
+                log.info(
+                    "[PRUNE] dry_run=True — would remove %s (age=%d days, retention=%d days)",
+                    fname,
+                    age_days,
+                    retention_days,
+                )
+            else:
+                try:
+                    os.remove(full_path)
+                    log.info(
+                        "[PRUNE] Removed %s (age=%d days, retention=%d days)",
+                        fname,
+                        age_days,
+                        retention_days,
+                    )
+                except OSError:
+                    log.exception("[PRUNE] Failed to remove %s", fname)
+                    result["skipped"].append(fname)
+                    continue
+            result["removed"].append(fname)
+        else:
+            log.debug(
+                "[PRUNE] Keeping %s (age=%d days, retention=%d days)",
+                fname,
+                age_days,
+                retention_days,
+            )
+            result["kept"].append(fname)
+
+    log.info(
+        "[PRUNE] Usage JSONL pruning complete%s: kept=%d removed=%d skipped=%d",
+        " (dry_run)" if dry_run else "",
+        len(result["kept"]),
+        len(result["removed"]),
+        len(result["skipped"]),
+    )
+    return result
+
+
 # Provide a convenience name for external modules
 # so they can call usage_tracker.usage_event(...) to record metrics
 __all__ = [
     "AsyncUsageTracker",
+    "get_usage_tracker",
+    "is_user_facing_event",
     "metrics_window_count",
+    "prune_usage_jsonl",
     "set_alert_callback",
     "set_alert_thresholds",
+    "start_usage_tracker",
+    "stop_usage_tracker",
     "usage_event",
 ]

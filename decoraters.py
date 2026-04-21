@@ -18,7 +18,7 @@ from bot_config import (
     LEADERSHIP_ROLE_NAMES,
     NOTIFY_CHANNEL_ID,
 )
-from usage_tracker import AsyncUsageTracker
+from usage_tracker import AsyncUsageTracker, _ensure_global_tracker
 
 # Use timezone.utc for broad Python compatibility (works on Py 3.8+).
 UTC = UTC
@@ -310,20 +310,17 @@ def channel_only(
     return decorator
 
 
-# lazy singleton to avoid circular imports
-_tracker: AsyncUsageTracker | None = None
+# lazy singleton — delegates to the global tracker in usage_tracker.py
+# Construction is lightweight; starting happens explicitly from bot startup (on_ready).
 
 
 def usage_tracker() -> AsyncUsageTracker:
-    global _tracker
-    if _tracker is None:
-        # Flush every 5s or every 20 events while testing
-        _tracker = AsyncUsageTracker(flush_interval_sec=5, batch_size=20)
-        # Note: starting background tasks at import time can be fragile if
-        # the event loop or bot isn't fully initialized. Consider calling
-        # _tracker.start() from your bot startup (e.g., on_ready) instead.
-        _tracker.start()
-    return _tracker
+    """
+    Return the global usage tracker singleton.
+    Does NOT start the tracker — call usage_tracker().start() explicitly from bot startup.
+    Duplicate start() calls are safe (idempotent, logged at DEBUG).
+    """
+    return _ensure_global_tracker()
 
 
 # add near _safe_args_shape

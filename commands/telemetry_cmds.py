@@ -258,7 +258,24 @@ async def _fetch_rows(sql: str, params: tuple):
 def _ctx_filter_sql(context: str) -> tuple[str, tuple]:
     if context == "all":
         return "", tuple()
+    if context == "internal":
+        # Explicitly show only internal pseudo-events (metric: / metric_alert: prefixed commands)
+        return (
+            " AND (CommandName LIKE 'metric:%' OR CommandName LIKE 'metric_alert:%')",
+            tuple(),
+        )
     return " AND appcontext = ? ", (context,)
+
+
+def _user_facing_filter_sql() -> tuple[str, tuple]:
+    """
+    SQL fragment that excludes internal metric/alert pseudo-events from user-facing reports.
+    Apply this when context_filter='all' to avoid polluting command-usage rankings.
+    """
+    return (
+        " AND CommandName NOT LIKE 'metric:%' AND CommandName NOT LIKE 'metric_alert:%'",
+        tuple(),
+    )
 
 
 def _fmt_rate(numer: int, denom: int) -> str:

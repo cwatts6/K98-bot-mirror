@@ -1608,6 +1608,15 @@ async def on_ready():
     except Exception:
         logger.exception("[BOOT] Failed to start usage tracker.")
 
+    # Prune stale daily JSONL files according to configured retention policy
+    try:
+        from usage_tracker import prune_usage_jsonl
+        from constants import DATA_DIR as _DATA_DIR
+
+        prune_usage_jsonl(_DATA_DIR)
+    except Exception:
+        logger.exception("[BOOT] Usage JSONL pruning failed (non-fatal).")
+
     try:
         if not daily_summary.is_running():
             daily_summary.start()
