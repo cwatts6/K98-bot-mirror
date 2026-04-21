@@ -1,0 +1,128 @@
+[
+  {
+    "query": "SELECT * FROM KS",
+    "sheet": "Kingdom Summary",
+    "tab": "Sheet1",
+    "sort": null,
+    "order": null,
+    "dates": ["Last Update"],
+	"format_numbers": []
+  },
+  {
+    "query": "SELECT * FROM POWER_BY_MONTH",
+    "sheet": "Power by month",
+    "tab": "Sheet1",
+    "sort": null,
+    "order": null,
+    "dates": ["MONTH"],
+	"format_numbers": []
+  },
+  {
+    "query": "SELECT * FROM ALL_STATS_FOR_DASHBAORD",
+    "sheet": "Stats per KVK",
+    "tab": "Sheet1",
+    "sort": null,
+    "order": null,
+    "dates": [],
+	"format_numbers": []
+  },
+  {
+    "query": "SELECT * FROM STATS_FOR_UPLOAD",
+    "sheet": "Sept 24 KVK STATS",
+    "tab": "Stats",
+    "sort": 1,
+    "order": "ASCENDING",
+    "dates": ["LAST_REFRESH"],
+	"format_numbers": ["Rank", "KVK_RANK", "Governor ID", "Power", "Power Delta", "T4_Kills", "T5_Kills", "T4&T5_Kills", "OFF_SEASON_KILLS", "Kill Target", "Deads", "OFF_SEASON_DEADS", "T4_Deads", "T5_Deads", "Dead Target", "DKP_SCORE", "DKP Target", "Helps", "RSS_Assist", "RSS_Gathered", "Pass 4 Kills", "Pass 6 Kills", "Pass7 Kills", "Pass 8 Kills", "Pass 4 Deads", "Pass 6 Deads", "Pass 7 Deads", "Pass 8 Deads", "KVK_NO", "HealedTroops", "RangedPoints", "Civilization", "KvKPlayed", "MostKvKKill", "MostKvKDead", "MostKvKHeal", "Acclaim", "HighestAcclaim", "AOOJoined", "AOOWon", "AOOAvgKill", "AOOAvgDead", "AOOAvgHeal"]
+  },
+  {
+    "query": "SELECT * FROM RALLY_EXPORT",
+    "sheet": "Rally_data",
+    "tab": "Sheet1",
+    "sort": 3,
+    "order": "DESCENDING",
+    "dates": [],
+	"format_numbers": []
+  },
+  {
+    "query": "SELECT * FROM SUMMARY_CHANGE_EXPORT",
+    "sheet": "SummaryChange",
+    "tab": "Sheet1",
+    "sort": null,
+    "order": null,
+    "dates": [],
+	"format_numbers": []
+  },
+  {
+    "query": "SELECT * FROM ALL_GOVS",
+    "sheet": "Governors",
+    "tab": "Sheet1",
+    "sort": 0,
+    "order": "ASCENDING",
+    "dates": ["Last Scan", "Previous Scan", "First Scan"],
+	"format_numbers": []
+  },
+  {
+    "query": "SELECT * FROM ALL_GOVS_NAMES",
+    "sheet": "Governor Names",
+    "tab": "Names",
+    "sort": 0,
+    "order": "ASCENDING",
+    "dates": [],
+	"format_numbers": []
+  },
+  {
+    "query": "SELECT * FROM ALL_GOVS_ALLIANCES",
+    "sheet": "Governor Names",
+    "tab": "Alliances",
+    "sort": 0,
+    "order": "ASCENDING",
+    "dates": [],
+	"format_numbers": []
+  },
+  {
+    "query": "SELECT * FROM [dbo].[v_TARGETS_FOR_UPLOAD]",
+    "sheet": "KVK 14 Targets",
+    "tab": "Sheet1",
+    "sort": null,
+    "order": null,
+    "dates": [],
+	"format_numbers": []
+  },
+  {
+    "query": "SELECT * FROM INACTIVE_GOVERNORS",
+    "sheet": "Governors",
+    "tab": "Inactive_Migrated",
+    "sort": 3,
+    "order": "DESCENDING",
+    "dates": ["Inactive_Date"],
+	"format_numbers": []
+  },
+  {
+    "query": "SELECT * FROM SCAN_LIST",
+    "sheet": "KVK LIST",
+    "tab": "SCAN_Dates",
+    "sort": 0,
+    "order": "DESCENDING",
+    "dates": ["ScanDate"],
+	"format_numbers": ["SCANORDER"]
+  },
+  {
+    "query": "SELECT [GovernorID], LTRIM(RTRIM([GovernorName])) AS GovernorName FROM [ROK_TRACKER].[dbo].[ALL_GOVS]",
+    "sheet": "KVK LIST",
+    "tab": "ALL_COMMANDERS",
+    "sort": 0,
+    "order": "ASCENDING",
+    "dates": [],
+	"format_numbers": []
+  },
+  {
+    "query": "SELECT * FROM [ROK_TRACKER].[dbo].[v_PlayerAccounts_Migrate]",
+    "sheet": "Migrate List",
+    "tab": "Sheet1",
+    "sort": 0,
+    "order": "ASCENDING",
+    "dates": ["UpdatedAt"],
+	"format_numbers": ["GovernorID", "Power", "X", "Y"]
+  }
+]
