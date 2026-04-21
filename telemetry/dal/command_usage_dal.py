@@ -14,6 +14,7 @@ import logging
 from typing import Any
 
 from constants import USAGE_TABLE, _conn
+from utils import ensure_aware_utc
 
 logger = logging.getLogger(__name__)
 
@@ -218,8 +219,6 @@ def _coerce_ts(ts: Any) -> Any:
     """
     Coerce a timestamp value to a naive UTC datetime for SQL DATETIME/DATETIME2 parameters.
     """
-    from utils import ensure_aware_utc
-
     if isinstance(ts, str):
         try:
             if ts.endswith("Z"):
@@ -230,8 +229,6 @@ def _coerce_ts(ts: Any) -> Any:
         return ensure_aware_utc(dt).astimezone(UTC).replace(tzinfo=None)
 
     if isinstance(ts, datetime):
-        from utils import ensure_aware_utc
-
         return ensure_aware_utc(ts).astimezone(UTC).replace(tzinfo=None)
 
     return ts
