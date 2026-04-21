@@ -451,6 +451,9 @@ def _drop_console_handlers_once():
 
 
 # ---------------- Usage logging helpers for interactions -------------------
+# DEBT: _clip is also defined as a nested function inside track_usage() in decoraters.py.
+# Consolidating to a shared utility is deferred — low risk, low value until a shared
+# core string-utils module is warranted.
 def _clip(s: str | None, n: int) -> str | None:
     if s is None:
         return None
@@ -539,21 +542,7 @@ async def _log_interaction_usage(ir: discord.Interaction):
 
 
 # --- Heartbeat + Task Monitor ------------------------------------------------
-def _atomic_json_write(path: str, data: dict | list, *, mode="w", encoding="utf-8"):
-    d = os.path.dirname(path) or "."
-    fd, tmp = tempfile.mkstemp(dir=d, prefix=".hb.", suffix=".tmp")
-    try:
-        with os.fdopen(fd, mode, encoding=encoding) as f:
-            json.dump(data, f, indent=2, default=str)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, path)
-    finally:
-        try:
-            if os.path.exists(tmp):
-                os.remove(tmp)
-        except Exception:
-            pass
+from file_utils import atomic_json_write as _atomic_json_write
 
 
 class TaskMonitor:
@@ -1881,6 +1870,10 @@ async def full_startup_sequence():
         try:
             logger.warning(f"🤖 Logged in as {bot.user} (ID: {bot.user.id})")
             logger.warning("✅ Bot is ready.")
+
+            from usage_tracker import start_usage_tracker
+            start_usage_tracker()
+            logger.info("[STARTUP] Usage tracker started.")
 
             notify_channel = bot.get_channel(NOTIFY_CHANNEL_ID)
             if not notify_channel:

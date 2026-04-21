@@ -6,10 +6,8 @@ import asyncio
 import builtins as _bi
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
-import json
 import logging
 import os
-import tempfile
 
 # ——— Standard library ———
 import discord
@@ -112,12 +110,6 @@ def _pick_log_source(source: str):
     return FULL_LOG_PATH
 
 
-def _get_conn():
-    from file_utils import get_conn_with_retries
-
-    return get_conn_with_retries()
-
-
 ACCOUNT_ORDER = ["Main"] + [f"Alt {i}" for i in range(1, 6)] + [f"Farm {i}" for i in range(1, 11)]
 
 # --- SHADOW GUARD (temporary; remove after diagnosis) ---
@@ -215,56 +207,6 @@ def _resolve_kvk_no(c, kvk_no: int | None) -> int:
 async def async_load_registry():
     # run the blocking load off the event loop
     return await asyncio.to_thread(load_registry)
-
-
-def atomic_json_write(path: str, data: dict | list, *, mode="w", encoding="utf-8"):
-    d = os.path.dirname(path) or "."
-    fd, tmp = tempfile.mkstemp(dir=d, prefix=".cmdcache.", suffix=".tmp")
-    try:
-        with os.fdopen(fd, mode, encoding=encoding) as f:
-            json.dump(data, f, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, path)  # atomic on POSIX & Windows
-    finally:
-        try:
-            if os.path.exists(tmp):
-                os.remove(tmp)
-        except Exception:
-            pass
-
-
-def _period_cutoff(period: str) -> datetime:
-    # '24h', '7d', '30d'
-    now = utcnow()
-    if period == "24h":
-        return now - timedelta(days=1)
-    if period == "7d":
-        return now - timedelta(days=7)
-    return now - timedelta(days=30)
-
-
-async def _fetch_rows(sql: str, params: tuple):
-    def _run():
-        with _get_conn() as cn:
-            cur = cn.cursor()
-            cur.execute(sql, params)
-            cols = [d[0] for d in cur.description]
-            return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
-
-    return await asyncio.to_thread(_run)
-
-
-def _ctx_filter_sql(context: str) -> tuple[str, tuple]:
-    if context == "all":
-        return "", tuple()
-    return " AND appcontext = ? ", (context,)
-
-
-def _fmt_rate(numer: int, denom: int) -> str:
-    if denom <= 0:
-        return "0.0%"
-    return f"{(numer/denom)*100:.1f}%"
 
 
 # Autocomplete for "/usage_detail value" -> show command names when dimension=command

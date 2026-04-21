@@ -319,10 +319,7 @@ def usage_tracker() -> AsyncUsageTracker:
     if _tracker is None:
         # Flush every 5s or every 20 events while testing
         _tracker = AsyncUsageTracker(flush_interval_sec=5, batch_size=20)
-        # Note: starting background tasks at import time can be fragile if
-        # the event loop or bot isn't fully initialized. Consider calling
-        # _tracker.start() from your bot startup (e.g., on_ready) instead.
-        _tracker.start()
+        # .start() is called from bot_instance.full_startup_sequence() after the event loop is running.
     return _tracker
 
 
@@ -371,6 +368,9 @@ def _safe_args_shape(kwargs: dict[str, Any] | None) -> dict[str, str] | None:
 
 
 def track_usage(command_name: str | None = None, app_context: str = "slash"):
+    # DEBT: _clip is also defined as a nested function inside track_usage() in decoraters.py.
+    # Consolidating to a shared utility is deferred — low risk, low value until a shared
+    # core string-utils module is warranted.
     def _clip(s: str | None, n: int) -> str | None:
         if s is None:
             return None

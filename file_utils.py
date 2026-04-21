@@ -514,6 +514,27 @@ def atomic_write_json(
             raise
 
 
+def atomic_json_write(path: str, data: dict | list, *, mode: str = "w", encoding: str = "utf-8") -> None:
+    """
+    Atomically write *data* as JSON to *path* using a temp file + os.replace.
+    Safe on POSIX and Windows. Uses default=str to handle datetime serialisation.
+    """
+    d = os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".atomic.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, mode, encoding=encoding) as f:
+            json.dump(data, f, indent=2, default=str)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    finally:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+
+
 def read_json_safe(path: str, default: Any | None = None) -> Any:
     if not path:
         return default

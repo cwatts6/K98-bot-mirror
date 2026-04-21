@@ -12,7 +12,7 @@ import re
 import signal
 import sys
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from math import ceil
 
 import logging
@@ -31,8 +31,6 @@ from core.mge_permissions import is_admin_interaction
 from core.interaction_safety import get_operation_lock, safe_command, safe_defer
 from discord.ext import commands as ext_commands
 from commands.telemetry_cmds import (
-    _ctx_filter_sql,
-    _fetch_rows,
     _pick_log_source,
     _resolve_governor_label,
     _session_claim,
@@ -44,7 +42,7 @@ from commands.telemetry_cmds import (
 
 from embed_utils import FailuresView, HistoryView, generate_summary_embed
 from event_calendar.service import get_calendar_service
-from file_utils import append_csv_line, read_json_safe, read_summary_log_rows
+from file_utils import append_csv_line, atomic_json_write, read_json_safe, read_summary_log_rows
 from gsheet_module import check_basic_gsheets_access, run_all_exports
 from logging_setup import CRASH_LOG_PATH, ERROR_LOG_PATH, FULL_LOG_PATH, flush_logs
 from proc_config_import import run_proc_config_import_offload
@@ -78,9 +76,9 @@ from constants import (
     SERVER,
     SHEET_ID,
     SUMMARY_LOG,
-    USAGE_TABLE,
     USERNAME,
     EVENT_CALENDAR_SHEET_ID,
+    _conn,
 )
 
 UTC = getattr(datetime, "UTC", timezone.utc)
@@ -786,29 +784,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     if cached_version != version:
                         updated.append(f"/{name} → `{cached_version}` ➜ `{version}`")
 
-                # Atomic write helper (scoped here so this block is self-contained)
-                def _atomic_json_write(path: str, data):
-                    import json
-                    import os
-                    import tempfile
-
-                    d = os.path.dirname(path) or "."
-                    fd, tmp = tempfile.mkstemp(dir=d, prefix=".cmdcache.", suffix=".tmp")
-                    try:
-                        with os.fdopen(fd, "w", encoding="utf-8") as f:
-                            json.dump(data, f, indent=2)
-                            f.flush()
-                            os.fsync(f.fileno())
-                        os.replace(tmp, path)  # atomic on POSIX + Windows
-                    finally:
-                        try:
-                            if os.path.exists(tmp):
-                                os.remove(tmp)
-                        except Exception:
-                            pass
-
                 # Write atomically
-                _atomic_json_write("command_cache.json", new_cache)
+                atomic_json_write("command_cache.json", new_cache)
 
                 summary = "\n".join(updated) if updated else "✅ No changes to cached versions."
                 # Keep under embed description limit
@@ -1171,16 +1148,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
         # --- Check DB connection
         try:
-            conn_str = (
-                "DRIVER={ODBC Driver 17 for SQL Server};"
-                f"SERVER={SERVER};"
-                f"DATABASE={DATABASE};"
-                f"UID={USERNAME};"
-                f"PWD={PASSWORD};"
-            )
-            import pyodbc
-
-            with pyodbc.connect(conn_str, timeout=5) as conn:
+            with _conn() as conn:
                 conn.execute("SELECT 1")
             db_ok = True
             db_status = "🟢 SQL connected"
@@ -1545,68 +1513,27 @@ def register_admin(bot: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=True)
         limit = max(1, min(int(limit or 10), 50))
-        since = utcnow() - (timedelta(days=7) if period == "week" else timedelta(days=1))
-
-        # context WHERE clause
-        ctx_sql, ctx_params = _ctx_filter_sql(context_filter)
 
         try:
+            from telemetry import fetch_usage_summary
+
+            rows = await fetch_usage_summary(
+                by=by, period=period, context=context_filter, limit=limit
+            )
+
             if by == "user":
-                sql = f"""
-                    SELECT TOP {limit} UserId,
-                           MAX(UserDisplay) AS UserDisplay,
-                           COUNT(*) AS Uses,
-                           COUNT(DISTINCT CommandName) AS UniqueCommands
-                    FROM {USAGE_TABLE}
-                    WHERE ExecutedAtUtc >= ?{ctx_sql}
-                    GROUP BY UserId
-                    ORDER BY Uses DESC, UserId ASC;
-                """
-                rows = await _fetch_rows(sql, (since, *ctx_params))
                 lines = [
                     f"<@{r['UserId']}> · uses **{r['Uses']}** · cmds **{r['UniqueCommands']}**"
                     for r in rows
                 ]
                 title = f"Usage by user (last {period})"
-
             elif by == "reliability":
-                sql = f"""
-                    SELECT CommandName,
-                           COUNT(*) AS Total,
-                           SUM(CASE WHEN Success=1 THEN 1 ELSE 0 END) AS Successes
-                    FROM {USAGE_TABLE}
-                    WHERE ExecutedAtUtc >= ?{ctx_sql}
-                    GROUP BY CommandName
-                """
-                rows = await _fetch_rows(sql, (since, *ctx_params))
-                # compute success % in python and sort by worst
-                stats = []
-                for r in rows:
-                    total = int(r["Total"] or 0)
-                    ok = int(r["Successes"] or 0)
-                    rate = (ok / total * 100.0) if total else 0.0
-                    stats.append((r["CommandName"], total, ok, rate))
-                stats.sort(key=lambda t: (100.0 - t[3], -t[1]))
-                stats = stats[:limit]
                 lines = [
-                    f"`/{n}` · **{rate:.1f}%** success ({ok}/{tot})" for n, tot, ok, rate in stats
+                    f"`/{r['CommandName']}` · **{r['Rate']:.1f}%** success ({r['Successes']}/{r['Total']})"
+                    for r in rows
                 ]
                 title = f"Reliability by command (last {period})"
-
             else:
-                # by == command
-                sql = f"""
-                    SELECT CommandName,
-                           COUNT(*) AS Uses,
-                           SUM(CASE WHEN Success=1 THEN 1 ELSE 0 END) AS Successes,
-                           AVG(CAST(LatencyMs AS float)) AS AvgLatencyMs
-                    FROM {USAGE_TABLE}
-                    WHERE ExecutedAtUtc >= ?{ctx_sql}
-                    GROUP BY CommandName
-                    ORDER BY Uses DESC, CommandName ASC;
-                """
-                rows = await _fetch_rows(sql, (since, *ctx_params))
-                rows = rows[:limit]
                 lines = [
                     f"`/{r['CommandName']}` · uses **{r['Uses']}** · ok **{r['Successes']}** · avg {int(r['AvgLatencyMs'] or 0)}ms"
                     for r in rows
@@ -1651,43 +1578,23 @@ def register_admin(bot: ext_commands.Bot) -> None:
         ),
     ):
         await safe_defer(ctx, ephemeral=True)
-        since = utcnow() - (timedelta(days=7) if period == "week" else timedelta(days=1))
-        ctx_sql, ctx_params = _ctx_filter_sql(context_filter)
 
         try:
+            from telemetry import fetch_usage_detail
+
+            rows = await fetch_usage_detail(
+                dimension=dimension, value=value, period=period, context=context_filter, limit=10
+            )
+
             if dimension == "command":
                 cmd = value.lstrip("/").strip()
-                sql_pct = f"""
-                    WITH s AS (
-                      SELECT LatencyMs, Success
-                      FROM {USAGE_TABLE}
-                      WHERE ExecutedAtUtc >= ? AND CommandName = ?{ctx_sql}
-                    )
-                    SELECT
-                      (SELECT COUNT(*) FROM s) AS Total,
-                      (SELECT SUM(CASE WHEN Success=1 THEN 1 ELSE 0 END) FROM s) AS Successes,
-                      (SELECT SUM(CASE WHEN Success=0 THEN 1 ELSE 0 END) FROM s) AS Failures,
-                      (SELECT TOP 1 CAST(PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY CAST(LatencyMs AS float)) OVER () AS int)
-                         FROM s WHERE LatencyMs IS NOT NULL) AS P50,
-                      (SELECT TOP 1 CAST(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY CAST(LatencyMs AS float)) OVER () AS int)
-                         FROM s WHERE LatencyMs IS NOT NULL) AS P95;
-                """
-                rows = await _fetch_rows(sql_pct, (since, cmd, *ctx_params))
                 row = rows[0] if rows else {}
                 total = int(row.get("Total") or 0)
                 successes = int(row.get("Successes") or 0)
                 failures = int(row.get("Failures") or 0)
                 p50 = row.get("P50")
                 p95 = row.get("P95")
-
-                sql_errs = f"""
-                    SELECT TOP 10 ErrorCode, COUNT(*) AS Cnt
-                    FROM {USAGE_TABLE}
-                    WHERE ExecutedAtUtc >= ? AND CommandName = ? AND Success = 0{ctx_sql}
-                    GROUP BY ErrorCode
-                    ORDER BY Cnt DESC, ErrorCode ASC;
-                """
-                errs = await _fetch_rows(sql_errs, (since, cmd, *ctx_params))
+                errs = row.get("error_codes") or []
                 err_lines = [f"`{e['ErrorCode']}` · {e['Cnt']}" for e in errs] or ["_No failures_"]
 
                 desc = (
@@ -1706,21 +1613,10 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
             else:
                 # dimension == user
-                # accept mention or raw ID
+                import re
+
                 m = re.search(r"\d{15,22}", value or "")
                 uid = int(m.group(0)) if m else int(value)
-
-                sql = f"""
-                    SELECT CommandName,
-                           COUNT(*) AS Uses,
-                           SUM(CASE WHEN Success=1 THEN 1 ELSE 0 END) AS Successes,
-                           AVG(CAST(LatencyMs AS float)) AS AvgLatencyMs
-                    FROM {USAGE_TABLE}
-                    WHERE ExecutedAtUtc >= ? AND UserId = ?{ctx_sql}
-                    GROUP BY CommandName
-                    ORDER BY Uses DESC, CommandName ASC;
-                """
-                rows = await _fetch_rows(sql, (since, uid, *ctx_params))
                 lines = [
                     f"`/{r['CommandName']}` · uses **{r['Uses']}** · ok **{r['Successes']}** · avg {int(r['AvgLatencyMs'] or 0)}ms"
                     for r in rows

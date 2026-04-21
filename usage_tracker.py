@@ -7,9 +7,8 @@ Extended usage tracker with lightweight metrics recording and alerting hooks.
 from __future__ import annotations
 
 import asyncio
-from collections import Counter, defaultdict, deque
-from datetime import datetime, timezone
-import io
+from collections import defaultdict, deque
+from datetime import datetime
 import json
 import logging
 import os
@@ -17,7 +16,7 @@ import threading
 import time
 from typing import Any, Callable, Dict, Optional
 
-from constants import BASE_DIR, _conn
+from constants import BASE_DIR
 from utils import ensure_aware_utc, utcnow
 
 log = logging.getLogger(__name__)
@@ -25,9 +24,6 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 UsageEvent = dict[str, Any]
-
-# Explicit UTC alias for clarity
-UTC = timezone.utc
 
 
 # Daily JSONL paths
@@ -157,107 +153,13 @@ class AsyncUsageTracker:
             )
 
     # ---------- worker ----------
-    @staticmethod
-    def _coerce_ts(ts: Any) -> Any:
-        """
-        Coerce timestamp input into a naive UTC datetime for SQL DATETIME/DATETIME2 parameters.
-        """
-        if isinstance(ts, str):
-            try:
-                if ts.endswith("Z"):
-                    ts = ts[:-1] + "+00:00"
-                dt = datetime.fromisoformat(ts)
-            except Exception:
-                return ts
-            return ensure_aware_utc(dt).astimezone(UTC).replace(tzinfo=None)
-
-        if isinstance(ts, datetime):
-            return ensure_aware_utc(ts).astimezone(UTC).replace(tzinfo=None)
-
-        return ts
-
     async def _flush(self, events: list[UsageEvent]) -> None:
+        # Local import avoids circular imports: usage_tracker is imported by decoraters.py
+        from telemetry.dal.command_usage_dal import flush_events
+
         if not events:
             return
-
-        def clip(s, n):
-            return None if s is None else str(s)[:n]
-
-        def row_from(e: UsageEvent):
-            return (
-                self._coerce_ts(e.get("executed_at_utc")),
-                clip(e.get("command_name"), 64),
-                clip(e.get("version"), 16),
-                clip(e.get("app_context", "slash"), 16),
-                e.get("user_id"),
-                clip(e.get("user_display"), 128),
-                e.get("guild_id"),
-                e.get("channel_id"),
-                1 if e.get("success", True) else 0,
-                clip(e.get("error_code"), 64),
-                e.get("latency_ms"),
-                json.dumps(e.get("args_shape")) if e.get("args_shape") else None,
-                e.get("error_text"),
-            )
-
-        rows = [row_from(e) for e in events]
-
-        # Flush summary with command mix
-        cmd_counts = Counter(r[1] for r in rows)
-        log.info(
-            "[USAGE] Flushing %d events: %s",
-            len(rows),
-            ", ".join(f"{k}={v}" for k, v in cmd_counts.most_common()),
-        )
-
-        rows.sort(
-            key=lambda t: (
-                -(len(t[1]) if isinstance(t[1], str) else 0),
-                -(len(t[5]) if isinstance(t[5], str) else 0),
-                -(len(t[9]) if isinstance(t[9], str) else 0),
-                -(len(t[3]) if isinstance(t[3], str) else 0),
-            )
-        )
-
-        SQL_INSERT = """
-            INSERT INTO dbo.BotCommandUsage
-            (ExecutedAtUtc, CommandName, Version, AppContext,
-             UserId, UserDisplay, GuildId, ChannelId,
-             Success, ErrorCode, LatencyMs, ArgsShape, ErrorText)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS NVARCHAR(MAX)), CAST(? AS NVARCHAR(MAX)))
-        """
-
-        try:
-            conn = _conn()
-            cur = conn.cursor()
-
-            if hasattr(cur, "fast_executemany"):
-                try:
-                    cur.fast_executemany = False
-                except Exception:
-                    log.debug("[USAGE] Could not set fast_executemany on cursor; continuing safely")
-
-            cur.executemany(SQL_INSERT, rows)
-            conn.commit()
-            cur.close()
-            conn.close()
-            log.info(
-                "[USAGE] Flushed %d events to SQL (safe batch, no fast_executemany)", len(events)
-            )
-
-        except Exception:
-            log.exception("[USAGE] Batch insert (safe) failed; attempting per-row.")
-            try:
-                conn = _conn()
-                cur = conn.cursor()
-                for r in rows:
-                    cur.execute(SQL_INSERT, r)
-                conn.commit()
-                cur.close()
-                conn.close()
-                log.info("[USAGE] Per-row salvage OK (%d rows)", len(rows))
-            except Exception:
-                log.exception("[USAGE] SQL flush failed even per-row; will retry later")
+        await asyncio.to_thread(flush_events, events)
 
     async def _run(self) -> None:
         last_flush = time.monotonic()
@@ -298,16 +200,23 @@ _GLOBAL_LOCK = threading.Lock()
 
 
 def _ensure_global_tracker() -> AsyncUsageTracker:
+    # NOTE: caller must call start_usage_tracker() after the event loop is running.
     global _GLOBAL_TRACKER
     with _GLOBAL_LOCK:
         if _GLOBAL_TRACKER is None:
             _GLOBAL_TRACKER = AsyncUsageTracker()
-            try:
-                loop = asyncio.get_running_loop()
-                _GLOBAL_TRACKER.start()
-            except RuntimeError:
-                log.debug("[USAGE] No running event loop; global tracker created but not started")
+            log.debug("[USAGE] Global tracker created; awaiting start_usage_tracker() call")
         return _GLOBAL_TRACKER
+
+
+def start_usage_tracker() -> "AsyncUsageTracker":
+    """
+    Start the global usage tracker. Call this from bot startup (full_startup_sequence)
+    after the event loop is running. Safe to call multiple times.
+    """
+    tracker = _ensure_global_tracker()
+    tracker.start()
+    return tracker
 
 
 # -------------------------
@@ -520,5 +429,6 @@ __all__ = [
     "metrics_window_count",
     "set_alert_callback",
     "set_alert_thresholds",
+    "start_usage_tracker",
     "usage_event",
 ]
