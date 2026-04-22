@@ -1,9 +1,8 @@
-from datetime import datetime, timedelta
-import logging
+from __future__ import annotations
+
+from datetime import timedelta
 
 from utils import utcnow
-
-logger = logging.getLogger(__name__)
 
 
 def period_cutoff(period: str) -> datetime:

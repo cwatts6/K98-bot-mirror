@@ -18,8 +18,6 @@ from utils import ensure_aware_utc
 
 logger = logging.getLogger(__name__)
 
-UTC = UTC
-
 
 # --------------------------------------------------------------------------- #
 # Connection helper                                                             #
@@ -85,6 +83,7 @@ async def fetch_usage_summary(
     *by* is one of 'command', 'user', 'reliability'.
     *period* accepts '24h', '7d', '30d' or the command aliases 'day'/'week'.
     """
+    limit = max(1, min(int(limit), 200))
     since = _resolve_period_cutoff(period)
     ctx_sql, ctx_params = ctx_filter_sql(context)
 
@@ -157,6 +156,7 @@ async def fetch_usage_detail(
     'error_codes' key (list of {ErrorCode, Cnt} dicts).
     For dimension='user', returns a list of per-command usage dicts.
     """
+    limit = max(1, min(int(limit), 200))
     since = _resolve_period_cutoff(period)
     ctx_sql, ctx_params = ctx_filter_sql(context)
 
@@ -293,39 +293,53 @@ def flush_events(events: list[dict]) -> None:
     try:
         conn = _get_conn()
         cur = conn.cursor()
-
-        if hasattr(cur, "fast_executemany"):
+        try:
+            if hasattr(cur, "fast_executemany"):
+                try:
+                    cur.fast_executemany = False
+                except Exception:
+                    logger.debug("[USAGE] Could not set fast_executemany on cursor; continuing safely")
+            cur.executemany(SQL_INSERT, rows)
+            conn.commit()
+            logger.info(
+                "[USAGE] Flushed %d events to SQL (safe batch, no fast_executemany)", len(events)
+            )
+            return
+        finally:
             try:
-                cur.fast_executemany = False
+                cur.close()
             except Exception:
-                logger.debug("[USAGE] Could not set fast_executemany on cursor; continuing safely")
-
-        cur.executemany(SQL_INSERT, rows)
-        conn.commit()
-        cur.close()
-        conn.close()
-        logger.info(
-            "[USAGE] Flushed %d events to SQL (safe batch, no fast_executemany)", len(events)
-        )
-        return
-
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
     except Exception:
         logger.exception("[USAGE] Batch insert (safe) failed; attempting per-row.")
 
     try:
         conn = _get_conn()
         cur = conn.cursor()
-        for r in rows:
-            cur.execute(SQL_INSERT, r)
-        conn.commit()
-        cur.close()
-        conn.close()
-        logger.info("[USAGE] Per-row salvage OK (%d rows)", len(rows))
-
+        try:
+            for r in rows:
+                cur.execute(SQL_INSERT, r)
+            conn.commit()
+            logger.info("[USAGE] Per-row salvage OK (%d rows)", len(rows))
+        finally:
+            try:
+                cur.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
     except Exception:
-        dropped_cmds = ", ".join(str(e.get("command_name", "?")) for e in events)
-        logger.warning(
+        cmd_names = ", ".join(
+            str(r[1]) for r in rows if r[1] is not None  # r[1] is CommandName in SQL_INSERT order
+        )
+        logger.exception(
             "[USAGE] %d events dropped — SQL flush failed (batch and per-row both failed). Commands: %s",
-            len(events),
-            dropped_cmds,
+            len(rows),
+            cmd_names,
         )

@@ -242,6 +242,12 @@ def prune_usage_jsonl_files(
 
     dir_path = data_dir or _DATA_DIR
     days = retention_days if retention_days is not None else USAGE_JSONL_RETENTION_DAYS
+    if days < 0:
+        log.warning(
+            "[USAGE][PRUNE] Negative retention_days=%d is invalid; using 0 instead",
+            days,
+        )
+        days = 0
     cutoff_date = (utcnow() - timedelta(days=days)).date()
 
     deleted = 0
