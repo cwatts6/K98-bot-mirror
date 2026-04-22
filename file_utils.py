@@ -515,20 +515,51 @@ def atomic_write_json(
 
 
 def atomic_json_write(
-    path: str, data: dict | list, *, mode: str = "w", encoding: str = "utf-8"
+    path: str,
+    data: dict | list,
+    *,
+    mode: str = "w",
+    encoding: str = "utf-8",
 ) -> None:
     """
-    Atomically write *data* as JSON to *path*.
+    Atomically write *data* as JSON to *path* using a uniquely-named temp
+    file (via mkstemp) and os.replace.
 
-    Compatibility wrapper around ``atomic_write_json`` so callers inherit
-    parent-directory creation and Windows replace-retry handling.
-    ``default=str`` is preserved for datetime and similar values that are not
-    JSON-serialisable by default.
+    - Unique temp filename per call: concurrent writers to the same path
+      cannot collide on the temp file.
+    - mode and encoding are honoured.
+    - Uses default=str for datetime and similar non-serialisable values.
+    - Includes WinError 32 replace-retry for Windows file-locking edge cases.
     """
-    # mode and encoding are accepted for call-site compatibility (backwards compat)
-    # but atomic_write_json handles encoding internally; suppress unused-var warnings.
-    _ = (mode, encoding)
-    atomic_write_json(path, data, default=str)
+    import time
+
+    d = os.path.dirname(os.path.abspath(path))
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".atomic.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, mode, encoding=encoding) as f:
+            json.dump(data, f, indent=2, default=str)
+            f.flush()
+            os.fsync(f.fileno())
+        # Retry os.replace on Windows where the target may be briefly locked
+        for attempt in range(5):
+            try:
+                os.replace(tmp, path)
+                tmp = None  # mark as consumed so finally block skips removal
+                break
+            except OSError as exc:
+                # WinError 32: file in use by another process
+                if getattr(exc, "winerror", None) == 32 and attempt < 4:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                raise
+    finally:
+        if tmp is not None:
+            try:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
+            except Exception:
+                pass
 
 
 def read_json_safe(path: str, default: Any | None = None) -> Any:
