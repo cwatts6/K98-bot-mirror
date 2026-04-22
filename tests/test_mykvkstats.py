@@ -51,7 +51,7 @@ def _ensure_heavy_stubs():
                 setattr(m, attr, val)
             sys.modules[mod] = m
         else:
-            # Ensure required attrs are present even if module was pre-loaded
+            # ensure required attrs are present even if module was pre-loaded
             existing = sys.modules[mod]
             for attr, val in attrs.items():
                 if not hasattr(existing, attr):

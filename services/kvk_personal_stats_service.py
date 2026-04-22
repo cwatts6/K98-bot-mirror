@@ -145,7 +145,7 @@ async def load_stats_data(governor_id: str) -> dict:
 
 def decide_post_channel(guild, preferred_channel_ids: list) -> Any | None:
     """
-    Centralised channel fallback policy.
+    Centralized channel fallback policy.
     
     Args:
         guild: Discord guild object (or None)

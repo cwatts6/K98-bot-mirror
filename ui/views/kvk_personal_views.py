@@ -283,10 +283,9 @@ class PostLookupActions(discord.ui.View):
         from registry.governor_registry import load_registry
         from ui.views.registry_views import RegisterStartView
 
-        _ORDER = ["Main"] + [f"Alt {i}" for i in range(1, 6)] + [f"Farm {i}" for i in range(1, 11)]
         registry = load_registry() or {}
         accounts = (registry.get(str(self.author_id)) or {}).get("accounts", {}) or {}
-        free_slots = [s for s in _ORDER if s not in accounts]
+        free_slots = [s for s in ACCOUNT_ORDER if s not in accounts]
 
         if not free_slots:
             await interaction.response.send_message(
