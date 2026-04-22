@@ -1,10 +1,66 @@
 import asyncio
 import inspect
+import os
+import sys
 import types
 
 import pytest
 
 pytestmark = pytest.mark.asyncio
+
+os.environ.setdefault("OUR_KINGDOM", "1234")
+
+
+def _ensure_heavy_stubs():
+    """Ensure heavy/unavailable dependencies are stubbed in sys.modules."""
+    stubs = {
+        "gspread": {},
+        "gspread.exceptions": {"APIError": Exception, "SpreadsheetNotFound": Exception},
+        "pyodbc": {},
+        "google": {},
+        "google.auth": {},
+        "google.auth.transport": {},
+        "google.auth.transport.requests": {"AuthorizedSession": object},
+        "google.oauth2": {},
+        "google.oauth2.service_account": {"Credentials": object},
+        "googleapiclient": {},
+        "googleapiclient.discovery": {"build": lambda *a, **k: None},
+        "googleapiclient.errors": {"HttpError": Exception},
+        "rapidfuzz": {},
+        "rapidfuzz.fuzz": {"WRatio": lambda *a, **k: 0, "token_sort_ratio": lambda *a, **k: 0},
+        "rapidfuzz.process": {"extract": lambda *a, **k: []},
+        "unidecode": {"unidecode": lambda s: s},
+        "pandas": {"Series": object, "DataFrame": object, "isna": lambda *a, **k: False, "read_csv": lambda *a, **k: None},
+        "pandas.api": {},
+        "pandas.api.types": {"is_numeric_dtype": lambda *a, **k: False},
+        "sqlalchemy": {"create_engine": lambda *a, **k: None},
+        "tenacity": {
+            "retry": lambda *a, **k: (lambda f: f),
+            "stop_after_attempt": lambda n: None,
+            "wait_fixed": lambda n: None,
+            "retry_if_exception": lambda f: None,
+            "retry_if_exception_type": lambda t: None,
+            "TryAgain": Exception,
+            "RetryError": Exception,
+        },
+    }
+    for mod, attrs in stubs.items():
+        if mod not in sys.modules:
+            m = types.ModuleType(mod)
+            for attr, val in attrs.items():
+                setattr(m, attr, val)
+            sys.modules[mod] = m
+        else:
+            existing = sys.modules[mod]
+            for attr, val in attrs.items():
+                if not hasattr(existing, attr):
+                    try:
+                        setattr(existing, attr, val)
+                    except Exception:
+                        pass
+
+
+_ensure_heavy_stubs()
 
 
 class DummyUser:
@@ -70,7 +126,6 @@ def _get_registered_command_impl(module, command_name: str):
             nm = name or getattr(fn, "__name__", None) or "unnamed"
             fake_bot.registered[nm] = fn
             return fn
-
         return decorator
 
     fake_bot.add_listener = add_listener
@@ -91,7 +146,6 @@ def _get_registered_command_impl(module, command_name: str):
     except Exception:
         pass
 
-    # Use callable(...) check per B004 recommendation and inspect the object's __call__
     if (
         not inspect.iscoroutinefunction(fn)
         and callable(fn)
@@ -103,7 +157,8 @@ def _get_registered_command_impl(module, command_name: str):
 
 
 async def test_manual_governorid_triggers_run_target_lookup(monkeypatch):
-    import Commands as C
+    _ensure_heavy_stubs()
+    import commands.telemetry_cmds as tc
 
     async def fake_load_last_kvk_map():
         return {}
@@ -117,14 +172,14 @@ async def test_manual_governorid_triggers_run_target_lookup(monkeypatch):
             ephemeral,
         )
 
-    monkeypatch.setattr(C, "run_target_lookup", fake_run_target_lookup)
+    monkeypatch.setattr(tc, "run_target_lookup", fake_run_target_lookup)
     monkeypatch.setattr(
-        C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
+        tc, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
     )
-    monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
+    monkeypatch.setattr(tc, "load_last_kvk_map", fake_load_last_kvk_map)
 
     ctx = DummyCtx()
-    handler = _get_registered_command_impl(C, "mykvktargets")
+    handler = _get_registered_command_impl(tc, "mykvktargets")
     assert handler is not None
 
     await handler(ctx, governorid="123", only_me=False)
@@ -133,7 +188,8 @@ async def test_manual_governorid_triggers_run_target_lookup(monkeypatch):
 
 
 async def test_single_registered_account_auto_opens(monkeypatch):
-    import Commands as C
+    _ensure_heavy_stubs()
+    import commands.telemetry_cmds as tc
 
     async def fake_load_last_kvk_map():
         return {}
@@ -148,19 +204,19 @@ async def test_single_registered_account_auto_opens(monkeypatch):
         called["gid"] = gid
 
     monkeypatch.setattr(
-        C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
+        tc, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
     )
-    monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
+    monkeypatch.setattr(tc, "load_last_kvk_map", fake_load_last_kvk_map)
 
     async def fake_to_thread(fn, *a, **k):
         return fn(*a, **k)
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(C, "load_registry", fake_load_registry)
-    monkeypatch.setattr(C, "run_target_lookup", fake_run_target_lookup)
+    monkeypatch.setattr(tc, "load_registry", fake_load_registry)
+    monkeypatch.setattr(tc, "run_target_lookup", fake_run_target_lookup)
 
     ctx = DummyCtx(user_id=99)
-    handler = _get_registered_command_impl(C, "mykvktargets")
+    handler = _get_registered_command_impl(tc, "mykvktargets")
     assert handler is not None
 
     await handler(ctx, governorid=None, only_me=False)
@@ -169,7 +225,8 @@ async def test_single_registered_account_auto_opens(monkeypatch):
 
 
 async def test_multi_account_builds_selector(monkeypatch):
-    import Commands as C
+    _ensure_heavy_stubs()
+    import commands.telemetry_cmds as tc
 
     async def fake_load_last_kvk_map():
         return {}
@@ -188,10 +245,10 @@ async def test_multi_account_builds_selector(monkeypatch):
         return fn(*a, **k)
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(C, "load_registry", fake_load_registry)
-    monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
+    monkeypatch.setattr(tc, "load_registry", fake_load_registry)
+    monkeypatch.setattr(tc, "load_last_kvk_map", fake_load_last_kvk_map)
     monkeypatch.setattr(
-        C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
+        tc, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
     )
 
     created = {}
@@ -201,10 +258,10 @@ async def test_multi_account_builds_selector(monkeypatch):
         created["on_select_callable"] = on_select_governor
         return "fake_view"
 
-    monkeypatch.setattr(C, "make_kvk_targets_view", fake_make_kvk_targets_view)
+    monkeypatch.setattr(tc, "make_kvk_targets_view", fake_make_kvk_targets_view)
 
     ctx = DummyCtx(user_id=5)
-    handler = _get_registered_command_impl(C, "mykvktargets")
+    handler = _get_registered_command_impl(tc, "mykvktargets")
     assert handler is not None
 
     await handler(ctx, governorid=None, only_me=True)
@@ -215,7 +272,8 @@ async def test_multi_account_builds_selector(monkeypatch):
 
 
 async def test_no_registered_accounts_shows_hint_and_empty_picker(monkeypatch):
-    import Commands as C
+    _ensure_heavy_stubs()
+    import commands.telemetry_cmds as tc
 
     async def fake_load_last_kvk_map():
         return {}
@@ -227,10 +285,10 @@ async def test_no_registered_accounts_shows_hint_and_empty_picker(monkeypatch):
         return fn(*a, **k)
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(C, "load_registry", fake_load_registry)
-    monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
+    monkeypatch.setattr(tc, "load_registry", fake_load_registry)
+    monkeypatch.setattr(tc, "load_last_kvk_map", fake_load_last_kvk_map)
     monkeypatch.setattr(
-        C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
+        tc, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
     )
 
     captured = {}
@@ -239,10 +297,10 @@ async def test_no_registered_accounts_shows_hint_and_empty_picker(monkeypatch):
         captured["options"] = options
         return "empty_view"
 
-    monkeypatch.setattr(C, "make_kvk_targets_view", fake_make_kvk_targets_view)
+    monkeypatch.setattr(tc, "make_kvk_targets_view", fake_make_kvk_targets_view)
 
     ctx = DummyCtx(user_id=7)
-    handler = _get_registered_command_impl(C, "mykvktargets")
+    handler = _get_registered_command_impl(tc, "mykvktargets")
     assert handler is not None
 
     await handler(ctx, governorid=None, only_me=True)
