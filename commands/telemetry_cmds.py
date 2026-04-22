@@ -160,32 +160,6 @@ def _safe_build_unique_gov_options(accounts: dict) -> list[discord.SelectOption]
         return []
 
 
-async def _load_last_kvk_map() -> dict[str, dict] | None:
-    """
-    Best-effort: read PLAYER_STATS_LAST_CACHE (JSON) off the event loop and return
-    a map keyed by GovernorID (with '_meta' removed). Returns {} on any failure.
-    """
-    try:
-        from constants import PLAYER_STATS_LAST_CACHE
-        from file_utils import read_json_safe, run_blocking_in_thread
-    except Exception:
-        return {}
-
-    try:
-        # read_json_safe is sync; offload to thread
-        data = await run_blocking_in_thread(
-            lambda: read_json_safe(PLAYER_STATS_LAST_CACHE), name="read_last_kvk_cache", meta={}
-        )
-        if not isinstance(data, dict):
-            return {}
-        # copy minus _meta
-        out = dict(data)
-        out.pop("_meta", None)
-        return out
-    except Exception:
-        logger.exception("[CACHE] Failed to read PLAYER_STATS_LAST_CACHE")
-        return {}
-
 
 def _resolve_kvk_no(c, kvk_no: int | None) -> int:
     if kvk_no and kvk_no > 0:

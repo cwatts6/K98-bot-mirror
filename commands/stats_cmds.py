@@ -47,6 +47,7 @@ from stats_service import (
 )
 from ui.views.registry_views import GovNameModal, MyRegsActionView, RegisterStartView
 from ui.views.stats_views import KVKRankingView
+from stats_cache_helpers import load_last_kvk_map
 from utils import load_stat_cache, load_stat_row, normalize_governor_id
 from versioning import versioned
 
@@ -582,32 +583,13 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         accounts = user_data["accounts"]
 
         # Best-effort: load last-KVK cache once so we can attach it to any governor rows we fetch.
-        # This is offloaded to a thread to avoid blocking the event loop.
         last_kvk_map = {}
         try:
-            from constants import PLAYER_STATS_LAST_CACHE
-            from file_utils import read_json_safe, run_blocking_in_thread
-
-            try:
-                data = await run_blocking_in_thread(
-                    lambda: read_json_safe(PLAYER_STATS_LAST_CACHE),
-                    name="read_last_kvk_cache",
-                    meta={"cmd": "mykvkstats"},
-                )
-                if isinstance(data, dict):
-                    # normalize into a simple map keyed by GovernorID
-                    data.pop("_meta", None)
-                    last_kvk_map = {k: v for k, v in data.items() if k != "_meta"}
-                else:
-                    last_kvk_map = {}
-            except FileNotFoundError:
-                # not present yet — that's fine
-                last_kvk_map = {}
-            except Exception:
-                logger.exception("[/mykvkstats] reading PLAYER_STATS_LAST_CACHE failed")
+            last_kvk_map = await load_last_kvk_map()
+            if not isinstance(last_kvk_map, dict):
                 last_kvk_map = {}
         except Exception:
-            # If file_utils/constant import fails for any reason, continue without last-kvk data.
+            logger.exception("[/mykvkstats] load_last_kvk_map failed")
             last_kvk_map = {}
 
         # Single-account path → post PUBLIC embed immediately
