@@ -289,7 +289,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[/mykvkstats] resolve_governor_accounts failed")
             await ctx.interaction.edit_original_response(
-                content=f"\u274c Could not load registry: `{type(e).__name__}: {e}`"
+                content=f"❌ Could not load registry: `{type(e).__name__}: {e}`"
             )
             return
 
@@ -305,13 +305,13 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             view.set_message_ref(msg)
             return
 
-        # Single-account path \u2192 post PUBLIC embed immediately using service
+        # Single-account path → post PUBLIC embed immediately using service
         if mode == "single":
             ((_, info),) = accounts.items()
             gid = normalize_governor_id(info.get("GovernorID"))
             if not gid:
                 await ctx.interaction.edit_original_response(
-                    content="\u274c Your registration has no valid Governor ID."
+                    content="❌ Your registration has no valid Governor ID."
                 )
                 return
 
@@ -320,14 +320,14 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             except Exception as e:
                 logger.exception("[/mykvkstats] load_stats_data failed")
                 await ctx.interaction.edit_original_response(
-                    content=f"\u274c Could not load stats: `{type(e).__name__}: {e}`"
+                    content=f"❌ Could not load stats: `{type(e).__name__}: {e}`"
                 )
                 return
 
             row = stats.get("row")
             if not row:
                 await ctx.interaction.edit_original_response(
-                    content=f"\u274c Stats not found for Governor ID `{gid}`."
+                    content=f"❌ Stats not found for Governor ID `{gid}`."
                 )
                 return
 
@@ -342,7 +342,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             except Exception as e:
                 logger.exception("[/mykvkstats] build_stats_embed failed")
                 await ctx.interaction.edit_original_response(
-                    content=f"\u274c Failed to build stats: `{type(e).__name__}: {e}`"
+                    content=f"❌ Failed to build stats: `{type(e).__name__}: {e}`"
                 )
                 return
 
@@ -366,7 +366,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 pass
             return
 
-        # Multi-account path \u2192 ephemeral dropdown + helper buttons
+        # Multi-account path → ephemeral dropdown + helper buttons
         # View's _on_select uses load_stats_data from the service; no need to pre-load kvk map here.
         try:
             ordered_accounts = {slot: accounts[slot] for slot in ACCOUNT_ORDER if slot in accounts}
@@ -377,7 +377,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         except Exception as e:
             logger.exception("[/mykvkstats] MyKVKStatsSelectView init failed")
             await ctx.interaction.edit_original_response(
-                content=f"\u274c Failed to build account selector: `{type(e).__name__}: {e}`"
+                content=f"❌ Failed to build account selector: `{type(e).__name__}: {e}`"
             )
             return
 
