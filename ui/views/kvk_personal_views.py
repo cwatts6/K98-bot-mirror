@@ -22,9 +22,9 @@ ACCOUNT_ORDER = ["Main"] + [f"Alt {i}" for i in range(1, 6)] + [f"Farm {i}" for 
 class MyKVKStatsSelectView(discord.ui.View):
     """
     Ephemeral selector for /mykvkstats.
-    Dropdown of user's registered accounts with lookup/register buttons.
-    On select -> posts PUBLIC stats embed to the channel.
-    No business logic; delegates to service functions.
+    Provides a dropdown of the user's registered accounts plus lookup/register buttons.
+    On select, this view orchestrates the account stats response flow and posts the
+    resulting public stats embed to the channel.
     """
 
     def __init__(
