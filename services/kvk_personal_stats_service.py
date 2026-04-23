@@ -88,7 +88,7 @@ async def load_target_data(governor_id: str) -> dict | None:
 
     try:
         from target_utils import run_target_lookup
-        result = await run_target_lookup(None, gid)
+        result = await run_target_lookup(gid)
         elapsed_ms = (time.monotonic() - t0) * 1000
         status = result.get("status") if isinstance(result, dict) else "unknown"
         logger.info(
