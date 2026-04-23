@@ -147,10 +147,6 @@ async def test_load_stats_data_cache_hit(monkeypatch):
 async def test_load_stats_data_cache_miss(monkeypatch):
     from services import kvk_personal_stats_service as svc
 
-    fake_utils = types.ModuleType("utils")
-    fake_utils.load_stat_row = lambda gid: None
-    monkeypatch.setitem(sys.modules, "stats_cache_helpers", fake_utils)
-
     async def fake_load_last_kvk_map():
         return {}
 
