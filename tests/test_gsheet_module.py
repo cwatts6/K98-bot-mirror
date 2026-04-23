@@ -6,7 +6,6 @@ These tests monkeypatch internal builders so no network or credentials are requi
 
 import types
 
-import pytest
 from gspread.exceptions import SpreadsheetNotFound
 
 import gsheet_module as gm
