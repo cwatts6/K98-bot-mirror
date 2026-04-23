@@ -283,7 +283,17 @@ class PostLookupActions(discord.ui.View):
         from registry.governor_registry import load_registry
         from ui.views.registry_views import RegisterStartView
 
-        registry = load_registry() or {}
+        try:
+            registry = await asyncio.to_thread(load_registry)
+        except Exception:
+            logger.exception("Failed to load governor registry for registration.")
+            await interaction.response.send_message(
+                "❌ Failed to load registration data. Please try again later.",
+                ephemeral=True,
+            )
+            return
+
+        registry = registry or {}
         accounts = (registry.get(str(self.author_id)) or {}).get("accounts", {}) or {}
         free_slots = [s for s in ACCOUNT_ORDER if s not in accounts]
 
