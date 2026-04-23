@@ -96,13 +96,14 @@ def test_get_sheet_values_client_error_records_and_returns_none(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_is_retryable_spreadsheet_not_found_no_status_code():
-    """SpreadsheetNotFound with no HTTP status code (None) is a Drive pagination miss → retryable."""
+    """SpreadsheetNotFound with no HTTP status code (None) is a genuine missing-sheet
+    signal (e.g. first-time open→create flow) and must NOT be retried."""
     details = {
         "repr": "SpreadsheetNotFound: <Response [200]>",
         "status_code": None,
         "status": None,
     }
-    assert gm._is_retryable_gspread_details(details) is True
+    assert gm._is_retryable_gspread_details(details) is False
 
 
 def test_is_retryable_spreadsheet_not_found_200():
@@ -174,24 +175,27 @@ def test_retry_gspread_call_retries_spreadsheet_not_found_2xx(monkeypatch):
     assert call_count["n"] == 3
 
 
-def test_retry_gspread_call_retries_spreadsheet_not_found_no_response(monkeypatch):
+def test_retry_gspread_call_does_not_retry_spreadsheet_not_found_no_response(monkeypatch):
     """
-    _retry_gspread_call must retry SpreadsheetNotFound when there is no response
-    attribute at all (status_code=None), which also signals a pagination miss.
+    _retry_gspread_call must NOT retry SpreadsheetNotFound when there is no response
+    attached (status_code=None) — that signals a genuine missing sheet (e.g. the normal
+    open→create flow), not a Drive pagination miss.
     """
+    import pytest
+
     call_count = {"n": 0}
 
     monkeypatch.setattr(gm.time, "sleep", lambda s: None)
 
     exc = SpreadsheetNotFound()
-    # No response attribute set
+    # No response attribute set → status_code is None
 
     def flaky_fn():
         call_count["n"] += 1
-        if call_count["n"] < 2:
-            raise exc
-        return "success"
+        raise exc
 
-    result = gm._retry_gspread_call(flaky_fn, retries=5)
-    assert result == "success"
-    assert call_count["n"] == 2
+    with pytest.raises(SpreadsheetNotFound):
+        gm._retry_gspread_call(flaky_fn, retries=5)
+
+    # Should give up after the very first attempt (not retried)
+    assert call_count["n"] == 1

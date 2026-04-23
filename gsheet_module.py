@@ -258,18 +258,23 @@ def _extract_api_error_details(e: Exception) -> dict:
 
 def _is_spreadsheet_not_found_transient(exc: Exception) -> bool:
     """
-    Return True if *exc* is a SpreadsheetNotFound whose HTTP response is 2xx or absent.
+    Return True if *exc* is a SpreadsheetNotFound whose HTTP response is 2xx.
 
     gspread's ``client.open()`` uses a paginated Drive files listing and can miss a
     spreadsheet when it falls outside the first page returned, even though the request
     itself succeeds (HTTP 200).  This is a transient pagination miss — not a genuine
     permissions or missing-sheet problem — and should always be retried.
+
+    A ``None`` status (no HTTP response attached) is intentionally excluded: that is
+    the normal signal when a spreadsheet genuinely does not exist yet (e.g. first-time
+    open→create flows), and retrying it would add unnecessary delay before the caller's
+    ``SpreadsheetNotFound`` handler runs.
     """
     if not isinstance(exc, SpreadsheetNotFound):
         return False
     resp = getattr(exc, "response", None)
     sc = getattr(resp, "status_code", None)
-    return sc is None or (isinstance(sc, int) and 200 <= sc < 300)
+    return isinstance(sc, int) and 200 <= sc < 300
 
 
 def _pagination_miss_delay() -> float:
@@ -282,11 +287,12 @@ def _is_retryable_gspread_details(details: dict) -> bool:
     status = details.get("status")
     repr_str = str(details.get("repr", ""))
 
-    # SpreadsheetNotFound with a 2xx (or no HTTP error) response indicates a Drive
-    # listing pagination miss — the sheet exists but wasn't returned in the first page.
-    # This is transient and should always be retried.
+    # SpreadsheetNotFound with a 2xx response indicates a Drive listing pagination miss —
+    # the sheet exists but wasn't returned in the first page.  A None status_code is
+    # excluded because that is the normal case when the sheet genuinely does not exist
+    # (open→create flows), which should not be retried here.
     if "SpreadsheetNotFound" in repr_str:
-        if sc is None or (isinstance(sc, int) and 200 <= sc < 300):
+        if isinstance(sc, int) and 200 <= sc < 300:
             return True
 
     if status and str(status).upper() == "UNAVAILABLE":
