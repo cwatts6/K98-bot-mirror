@@ -1,7 +1,6 @@
 """Tests for services/kvk_personal_stats_service.py"""
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 import types
@@ -95,7 +94,7 @@ async def test_resolve_multi_account():
 async def test_load_target_data_success(monkeypatch):
     from services import kvk_personal_stats_service as svc
 
-    async def fake_run_target_lookup(interaction, gid):
+    async def fake_run_target_lookup(gid):
         return {"status": "found", "data": {"GovernorID": gid}}
 
     fake_target_utils = types.ModuleType("target_utils")
@@ -110,7 +109,7 @@ async def test_load_target_data_success(monkeypatch):
 async def test_load_target_data_failure(monkeypatch):
     from services import kvk_personal_stats_service as svc
 
-    async def bad_lookup(interaction, gid):
+    async def bad_lookup(gid):
         raise RuntimeError("DB down")
 
     fake_target_utils = types.ModuleType("target_utils")

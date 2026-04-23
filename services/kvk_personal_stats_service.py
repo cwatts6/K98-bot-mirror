@@ -61,20 +61,20 @@ async def resolve_governor_accounts(
             "[kvk_personal_stats_service] resolve user_id=%s mode=none elapsed_ms=%.1f",
             user_id, elapsed_ms,
         )
-        return {"mode": "none", "accounts": list(accounts.values()), "governor_id": None}
+        return {"mode": "none", "accounts": accounts, "governor_id": None}
 
     if len(accounts) == 1:
         logger.info(
             "[kvk_personal_stats_service] resolve user_id=%s mode=single elapsed_ms=%.1f",
             user_id, elapsed_ms,
         )
-        return {"mode": "single", "accounts": list(accounts.values()), "governor_id": None}
+        return {"mode": "single", "accounts": accounts, "governor_id": None}
 
     logger.info(
         "[kvk_personal_stats_service] resolve user_id=%s mode=multi count=%d elapsed_ms=%.1f",
         user_id, len(accounts), elapsed_ms,
     )
-    return {"mode": "multi", "accounts": list(accounts.values()), "governor_id": None}
+    return {"mode": "multi", "accounts": accounts, "governor_id": None}
 
 
 async def load_target_data(governor_id: str) -> dict | None:

@@ -86,17 +86,17 @@ class MyKVKStatsSelectView(discord.ui.View):
             )
 
         from embed_utils import build_stats_embed
-        from stats_cache_helpers import load_last_kvk_map
-        from utils import load_stat_row, normalize_governor_id
+        from services.kvk_personal_stats_service import load_stats_data
+        from utils import normalize_governor_id
 
         gid = normalize_governor_id(self.select.values[0])
         t0 = time.monotonic()
 
         try:
-            row = load_stat_row(gid)
+            stats = await load_stats_data(gid)
         except Exception:
             logger.exception(
-                "[MyKVKStatsSelectView] load_stat_row failed governor_id=%s", gid
+                "[MyKVKStatsSelectView] load_stats_data failed governor_id=%s", gid
             )
             if _is_admin(interaction.user):
                 await interaction.followup.send(
@@ -104,6 +104,7 @@ class MyKVKStatsSelectView(discord.ui.View):
                 )
             return
 
+        row = stats.get("row")
         if not row:
             if _is_admin(interaction.user):
                 await interaction.followup.send(
@@ -111,16 +112,11 @@ class MyKVKStatsSelectView(discord.ui.View):
                 )
             return
 
-        try:
-            lkmap = await load_last_kvk_map()
-            if lkmap:
-                lk = lkmap.get(str(gid))
-                if lk:
-                    row["last_kvk"] = lk
-        except Exception:
-            logger.exception(
-                "[MyKVKStatsSelectView] failed attaching last_kvk governor_id=%s", gid
-            )
+        lkmap = stats.get("last_kvk_map") or {}
+        if lkmap:
+            lk = lkmap.get(str(gid))
+            if lk:
+                row["last_kvk"] = lk
 
         try:
             embeds, file = build_stats_embed(row, interaction.user)

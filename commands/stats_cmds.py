@@ -47,8 +47,12 @@ from stats_service import (
 )
 from ui.views.registry_views import GovNameModal, MyRegsActionView, RegisterStartView
 from ui.views.stats_views import KVKRankingView
-from stats_cache_helpers import load_last_kvk_map
-from utils import load_stat_cache, load_stat_row, normalize_governor_id
+from ui.views.kvk_personal_views import MyKVKStatsSelectView
+from services.kvk_personal_stats_service import (
+    load_stats_data,
+    resolve_governor_accounts,
+)
+from utils import load_stat_cache, normalize_governor_id
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
@@ -74,282 +78,6 @@ def _resolve_kvk_no(c, kvk_no: int | None) -> int:
 
 async def async_load_registry():
     return await asyncio.to_thread(load_registry)
-
-
-class MyKVKStatsSelectView(discord.ui.View):
-    """
-    Ephemeral selector for /mykvkstats:
-    - Dropdown of user's registered accounts (ordered by ACCOUNT_ORDER)
-    - Buttons: Lookup Governor ID, Register New Account (reuses your existing flows)
-    - On select -> posts PUBLIC stats embed(s) to the channel
-    """
-
-    def __init__(
-        self, *, ctx: discord.ApplicationContext, accounts: dict, author_id: int, timeout: int = 120
-    ):
-        super().__init__(timeout=timeout)
-        self.ctx = ctx
-        self.author_id = author_id
-        self.accounts = accounts  # {slot: {GovernorID, GovernorName}}
-
-        # Build options in your canonical order
-        options: list[discord.SelectOption] = []
-        for slot in ACCOUNT_ORDER:
-            if slot in accounts:
-                info = accounts[slot] or {}
-                gid = str(info.get("GovernorID", "")).strip()
-                gname = str(info.get("GovernorName", "")).strip()
-                label = slot
-                desc = f"{gname} • ID {gid}" if (gname or gid) else slot
-                options.append(
-                    discord.SelectOption(label=label[:100], description=desc[:100], value=gid)
-                )
-
-        self.select = discord.ui.Select(
-            placeholder="Choose an account…", options=options[:25], min_values=1, max_values=1
-        )
-        self.select.callback = self._on_select
-        self.add_item(self.select)
-
-        # Reuse your existing flows
-        self.btn_lookup = discord.ui.Button(
-            label="🔎 Lookup Governor ID", style=discord.ButtonStyle.secondary
-        )
-        self.btn_lookup.callback = self._on_lookup
-        self.add_item(self.btn_lookup)
-
-        self.btn_register = discord.ui.Button(
-            label="➕ Register New Account", style=discord.ButtonStyle.success
-        )
-        self.btn_register.callback = self._on_register
-        self.add_item(self.btn_register)
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message("❌ This menu isn’t for you.", ephemeral=True)
-            return False
-        return True
-
-    async def _on_select(self, interaction: discord.Interaction):
-        from embed_utils import build_stats_embed
-        from utils import load_stat_row, normalize_governor_id
-
-        # ACK the interaction quickly so Discord doesn't show "This interaction failed".
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
-        except Exception:
-            # Best-effort; proceed even if defer fails
-            pass
-
-        gid = normalize_governor_id(self.select.values[0])
-        try:
-            row = load_stat_row(gid)
-        except Exception as e:
-            logger.exception("[MyKVKStatsSelectView] load_stat_row failed")
-            try:
-                # Only notify the invoker if they're an admin; regular users don't need extra text.
-                if _is_admin(interaction.user):
-                    await interaction.followup.send(
-                        f"❌ Couldn’t find stats for GovernorID `{gid}`: `{type(e).__name__}: {e}`",
-                        ephemeral=True,
-                    )
-            except Exception:
-                pass
-            return
-
-        if not row:
-            try:
-                if _is_admin(interaction.user):
-                    await interaction.followup.send(
-                        f"Couldn’t find stats for GovernorID `{gid}`.", ephemeral=True
-                    )
-            except Exception:
-                pass
-            return
-
-        # Attach last_kvk if the view was provided one at init time
-        try:
-            lkmap = getattr(self, "_last_kvk_map", None)
-            if lkmap:
-                lk = lkmap.get(str(gid))
-                if lk:
-                    row["last_kvk"] = lk
-        except Exception:
-            logger.exception("[MyKVKStatsSelectView] failed attaching last_kvk to row")
-
-        try:
-            embeds, file = build_stats_embed(row, interaction.user)
-            # build_stats_embed now returns (list[discord.Embed], discord.File)
-        except Exception as e:
-            logger.exception("[MyKVKStatsSelectView] build_stats_embed failed")
-            try:
-                if _is_admin(interaction.user):
-                    await interaction.followup.send(
-                        f"❌ Failed to build stats: `{type(e).__name__}: {e}`", ephemeral=True
-                    )
-            except Exception:
-                pass
-            return
-
-        async def _send_to_channel(ch: discord.abc.Messageable, *, embeds_list, file_obj):
-            """Attempt a single-channel send, returning True on success."""
-            try:
-                if file_obj is not None:
-                    await ch.send(embeds=embeds_list, files=[file_obj])
-                else:
-                    await ch.send(embeds=embeds_list)
-                return True
-            except discord.Forbidden:
-                logger.warning(
-                    "[MyKVKStatsSelectView] missing send permissions in channel %s",
-                    getattr(ch, "id", None),
-                )
-                return False
-            except Exception as ex:
-                logger.exception(
-                    "[MyKVKStatsSelectView] error sending to channel %s: %s",
-                    getattr(ch, "id", None),
-                    ex,
-                )
-                return False
-
-        def _bot_can_send_in_channel(ch: discord.abc.Messageable) -> bool:
-            try:
-                guild = getattr(ch, "guild", None)
-                if not guild:
-                    return True
-                me = guild.get_member(bot.user.id) if hasattr(guild, "get_member") else None
-                if me is None:
-                    return True
-                perms = ch.permissions_for(me)
-                return perms.send_messages
-            except Exception:
-                return True
-
-        # Try preferred original invoking channel first
-        posted = False
-        tried_channels = []
-        try:
-            orig_ch = getattr(self.ctx, "channel", None)
-            if orig_ch and _bot_can_send_in_channel(orig_ch):
-                tried_channels.append(("orig", getattr(orig_ch, "id", None)))
-                posted = await _send_to_channel(orig_ch, embeds_list=embeds, file_obj=file)
-        except Exception:
-            posted = False
-
-        # Fallbacks: KVK_PLAYER_STATS_CHANNEL_ID, NOTIFY_CHANNEL_ID
-        if not posted:
-            try:
-                kvk_ch = bot.get_channel(KVK_PLAYER_STATS_CHANNEL_ID)
-                if kvk_ch:
-                    tried_channels.append(("kvk_channel", KVK_PLAYER_STATS_CHANNEL_ID))
-                    if _bot_can_send_in_channel(kvk_ch):
-                        posted = await _send_to_channel(kvk_ch, embeds_list=embeds, file_obj=file)
-            except Exception:
-                posted = False
-
-        if not posted:
-            try:
-                notify_ch = bot.get_channel(NOTIFY_CHANNEL_ID)
-                if notify_ch:
-                    tried_channels.append(("notify_channel", NOTIFY_CHANNEL_ID))
-                    if _bot_can_send_in_channel(notify_ch):
-                        posted = await _send_to_channel(
-                            notify_ch, embeds_list=embeds, file_obj=file
-                        )
-            except Exception:
-                posted = False
-
-        # If posted publicly -> only notify admins; regular users don't need an extra ephemeral.
-        if posted:
-            try:
-                if _is_admin(interaction.user):
-                    await interaction.followup.send(
-                        "✅ Posted stats. If you can't see them in this channel, check the bot's send permissions.",
-                        ephemeral=True,
-                    )
-                # regular users: no followup required (they see the posted stats)
-            except Exception:
-                pass
-            return
-
-        # If none of the public targets worked, try DM as a last resort.
-        logger.warning(
-            "[MyKVKStatsSelectView] failed to post public stats; tried channels=%s", tried_channels
-        )
-
-        dm_ok = False
-        try:
-            user_dm = interaction.user
-            try:
-                if file is not None:
-                    await user_dm.send(embeds=embeds, files=[file])
-                else:
-                    await user_dm.send(embeds=embeds)
-                dm_ok = True
-            except discord.Forbidden:
-                logger.info("[MyKVKStatsSelectView] cannot DM user %s", interaction.user.id)
-            except Exception:
-                logger.exception("[MyKVKStatsSelectView] failed to DM user %s", interaction.user.id)
-        except Exception:
-            pass
-
-        # Only notify the invoker when they're an admin (actionable advice).
-        try:
-            if _is_admin(interaction.user):
-                if dm_ok:
-                    await interaction.followup.send(
-                        "⚠️ Couldn't post publicly; sent stats to you via DM. Admins: please check channel permissions.",
-                        ephemeral=True,
-                    )
-                else:
-                    await interaction.followup.send(
-                        "⚠️ Couldn't post publicly and couldn't DM the user. Admins: check bot/channel permissions.",
-                        ephemeral=True,
-                    )
-            # regular users: no followup — they either see the public post or received the DM
-        except Exception:
-            pass
-
-    async def _on_lookup(self, interaction: discord.Interaction):
-        # Reuse your existing modal
-        await interaction.response.send_modal(GovNameModal(author_id=self.author_id))
-
-    async def _on_register(self, interaction: discord.Interaction):
-        # Reuse your existing registration start view
-        try:
-            registry = await async_load_registry() or {}
-        except Exception as e:
-            await interaction.response.send_message(
-                f"⚠️ Registry unavailable: {type(e).__name__}: {e}", ephemeral=True
-            )
-            return
-
-        user_rec = registry.get(str(self.author_id)) or {}
-        current = user_rec.get("accounts") or {}
-        used = set(current.keys())
-        free_slots = [slot for slot in ACCOUNT_ORDER if slot not in used]
-        if not free_slots:
-            await interaction.response.send_message(
-                "All account slots are registered already. Use **/modify_registration** to change one.",
-                ephemeral=True,
-            )
-            return
-
-        await interaction.response.send_message(
-            "Pick an account slot to register:",
-            view=RegisterStartView(author_id=self.author_id, free_slots=free_slots),
-            ephemeral=True,
-        )
-
-    async def on_timeout(self):
-        for c in self.children:
-            c.disabled = True
-        try:
-            await self.ctx.edit_original_response(view=self)
-        except Exception:
-            pass
 
 
 def register_stats(bot_instance: ext_commands.Bot) -> None:
@@ -555,85 +283,66 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         # We always keep the selector private to the caller
         await safe_defer(ctx, ephemeral=True)
 
-        # Load registry (support str/int keys)
+        # Resolve accounts via service (loads registry in a thread, returns mode + accounts dict)
         try:
-            # Offload file/IO-bound registry load to a thread to avoid blocking the event loop
-            registry = await asyncio.to_thread(load_registry)
-            registry = registry or {}
+            resolved = await resolve_governor_accounts(user_id=ctx.user.id)
         except Exception as e:
-            logger.exception("[/mykvkstats] load_registry failed")
+            logger.exception("[/mykvkstats] resolve_governor_accounts failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Could not load registry: `{type(e).__name__}: {e}`"
+                content=f"\u274c Could not load registry: `{type(e).__name__}: {e}`"
             )
             return
 
-        uid_str, uid_int = str(ctx.user.id), ctx.user.id
-        user_data = registry.get(uid_str) or registry.get(uid_int)
+        accounts = resolved["accounts"]
+        mode = resolved["mode"]
 
-        if not user_data or not user_data.get("accounts"):
-            # Reuse your existing action view as a nice fallback
+        if mode == "none":
             view = MyRegsActionView(author_id=ctx.user.id, has_regs=False)
             msg = await ctx.interaction.edit_original_response(
-                content="You don’t have any Governor accounts registered yet. Use the options below:",
+                content="You don't have any Governor accounts registered yet. Use the options below:",
                 view=view,
             )
             view.set_message_ref(msg)
             return
 
-        accounts = user_data["accounts"]
-
-        # Best-effort: load last-KVK cache once so we can attach it to any governor rows we fetch.
-        last_kvk_map = {}
-        try:
-            last_kvk_map = await load_last_kvk_map()
-            if not isinstance(last_kvk_map, dict):
-                last_kvk_map = {}
-        except Exception:
-            logger.exception("[/mykvkstats] load_last_kvk_map failed")
-            last_kvk_map = {}
-
-        # Single-account path → post PUBLIC embed immediately
-        if len(accounts) == 1:
+        # Single-account path \u2192 post PUBLIC embed immediately using service
+        if mode == "single":
             ((_, info),) = accounts.items()
             gid = normalize_governor_id(info.get("GovernorID"))
             if not gid:
                 await ctx.interaction.edit_original_response(
-                    content="❌ Your registration has no valid Governor ID."
+                    content="\u274c Your registration has no valid Governor ID."
                 )
                 return
 
             try:
-                # Offload potential IO-bound stat row load
-                row = await asyncio.to_thread(load_stat_row, gid)
+                stats = await load_stats_data(gid)
             except Exception as e:
-                logger.exception("[/mykvkstats] load_stat_row failed")
+                logger.exception("[/mykvkstats] load_stats_data failed")
                 await ctx.interaction.edit_original_response(
-                    content=f"❌ Could not load stats: `{type(e).__name__}: {e}`"
+                    content=f"\u274c Could not load stats: `{type(e).__name__}: {e}`"
                 )
                 return
 
+            row = stats.get("row")
             if not row:
                 await ctx.interaction.edit_original_response(
-                    content=f"❌ Stats not found for Governor ID `{gid}`."
+                    content=f"\u274c Stats not found for Governor ID `{gid}`."
                 )
                 return
 
-            # Attach last-KVK row (if available) to the loaded stat row so embed builders can use it
-            try:
-                lk = last_kvk_map.get(str(gid))
+            lkmap = stats.get("last_kvk_map") or {}
+            if lkmap:
+                lk = lkmap.get(str(gid))
                 if lk:
-                    # shallow attach; embed builders expect governor_data['last_kvk']
                     row["last_kvk"] = lk
-            except Exception:
-                logger.exception("[/mykvkstats] Failed to attach last_kvk for %s", gid)
 
             try:
                 embeds, file = build_stats_embed(row, ctx.user)
-                # build_stats_embed returns (list[discord.Embed], discord.File)
             except Exception as e:
                 logger.exception("[/mykvkstats] build_stats_embed failed")
                 await ctx.interaction.edit_original_response(
-                    content=f"❌ Failed to build stats: `{type(e).__name__}: {e}`"
+                    content=f"\u274c Failed to build stats: `{type(e).__name__}: {e}`"
                 )
                 return
 
@@ -657,26 +366,18 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 pass
             return
 
-        # Multi-account path → ephemeral dropdown + helper buttons
+        # Multi-account path \u2192 ephemeral dropdown + helper buttons
+        # View's _on_select uses load_stats_data from the service; no need to pre-load kvk map here.
         try:
-            # Keep preferred ordering first, then append any remaining slots deterministically
             ordered_accounts = {slot: accounts[slot] for slot in ACCOUNT_ORDER if slot in accounts}
-            # append remaining keys not in ACCOUNT_ORDER in sorted order
             remaining = [s for s in sorted(accounts.keys()) if s not in ordered_accounts]
             for s in remaining:
                 ordered_accounts[s] = accounts[s]
             view = MyKVKStatsSelectView(ctx=ctx, accounts=ordered_accounts, author_id=ctx.user.id)
-            # Attach last_kvk_map to the view so callbacks can reuse it when they load stat rows.
-            # (The view callback should check for `self._last_kvk_map` and attach when building embeds.)
-            try:
-                view._last_kvk_map = last_kvk_map
-            except Exception:
-                # non-fatal; view may not accept new attrs in some contexts, but that's unlikely
-                pass
         except Exception as e:
             logger.exception("[/mykvkstats] MyKVKStatsSelectView init failed")
             await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to build account selector: `{type(e).__name__}: {e}`"
+                content=f"\u274c Failed to build account selector: `{type(e).__name__}: {e}`"
             )
             return
 
