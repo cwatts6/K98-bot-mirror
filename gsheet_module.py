@@ -441,7 +441,7 @@ def _retry_gspread_call(
             retry_after = details.get("retry_after")
             if retry_after and isinstance(retry_after, (int, float)):
                 sleep_s = float(retry_after)
-            elif isinstance(exc, SpreadsheetNotFound):
+            elif _is_spreadsheet_not_found_transient(exc):
                 # Give the Drive listing cache time to refresh (2–5 s with jitter)
                 sleep_s = _pagination_miss_delay()
             else:
