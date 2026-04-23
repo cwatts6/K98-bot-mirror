@@ -118,7 +118,7 @@ async def load_stats_data(governor_id: str) -> dict:
 
     try:
         from utils import load_stat_row
-        row = load_stat_row(gid)
+        row = await asyncio.to_thread(load_stat_row, gid)
         result["row"] = row
         cache_hit = row is not None
     except Exception:
