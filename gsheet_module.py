@@ -1273,7 +1273,7 @@ def run_all_exports(
                 retry_after = details.get("retry_after")
                 if retry_after and isinstance(retry_after, (int, float)):
                     delay = float(retry_after)
-                elif isinstance(e, SpreadsheetNotFound):
+                elif _is_spreadsheet_not_found_transient(e):
                     # Give the Drive listing cache time to refresh (2–5 s with jitter)
                     delay = _pagination_miss_delay()
                 else:
