@@ -49,7 +49,6 @@ from decoraters import (
 from embed_player_profile import build_player_profile_embed
 from embed_utils import (
     build_stats_embed,
-    build_target_embed,
 )
 from file_utils import fetch_one_dict
 from kvk_ui import make_kvk_targets_view
@@ -813,86 +812,12 @@ def register_commands(bot_instance):
     bot.add_listener(global_cmd_error_handler, "on_application_command_error")
 
     class TargetLookupView(View):
-        def __init__(self, matches):
-            super().__init__(timeout=60)
-            self.matches = matches
-            self.ctx = None
-            self.message = None
-            for match in matches:
-                label = f"🎯 View KVK Targets for {match['GovernorName'][:50]}"
-                button = discord.ui.Button(
-                    label=label,
-                    style=discord.ButtonStyle.primary,
-                    custom_id=f"target_{match['GovernorID']}",
-                )
-                button.callback = self.make_callback(match["GovernorID"])
-                self.add_item(button)
-
-        def make_callback(self, governor_id):
-            async def callback(interaction: discord.Interaction):
-                await run_target_lookup(interaction, str(governor_id), ephemeral=True)
-
-                from target_utils import get_cached_target_info, get_fallback_target_info
-
-                logger.info(f"[BUTTON] GovernorID {governor_id} clicked by {interaction.user}")
-
-                result = await get_cached_target_info(governor_id)
-
-                if not result:
-                    await interaction.edit_original_response(
-                        content="⏳ Checking the database for additional records...",
-                        embed=None,
-                        view=None,
-                    )
-                    result = await get_fallback_target_info(governor_id)
-
-                if result["status"] == "found":
-                    embed = build_target_embed(result["data"])
-                    await interaction.edit_original_response(embed=embed, view=None)
-                else:
-                    await interaction.edit_original_response(content=result["message"], view=None)
-
-            return callback
-
-        async def on_timeout(self):
-            for item in self.children:
-                item.disabled = True
-
-            try:
-                if self.message:
-                    await self.message.edit(view=self)
-            except discord.NotFound:
-                # Message was deleted or expired – silently ignore
-                pass
-            except Exception as e:
-                logger.exception(f"[VIEW TIMEOUT ERROR] {e}")
-
-        async def interaction_check(self, interaction: discord.Interaction) -> bool:
-            return interaction.user == self.ctx.user
-
-        async def on_error(self, error: Exception, item, interaction: discord.Interaction) -> None:
-            logger.error(f"[VIEW ERROR] {error}")
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    f"⚠️ An error occurred: {error}", ephemeral=True
-                )
-
-        async def send(self, interaction: discord.Interaction, embed: discord.Embed):
-            self.ctx = interaction
-            try:
-                if not interaction.response.is_done():
-                    # first reply: include the button
-                    self.message = await interaction.response.send_message(
-                        embed=embed, view=self, ephemeral=True
-                    )
-                else:
-                    # editing the deferred/initial reply
-                    self.message = await interaction.edit_original_response(embed=embed, view=self)
-            except Exception:
-                # last resort — a fresh ephemeral message with the button
-                self.message = await interaction.followup.send(
-                    embed=embed, view=self, ephemeral=True
-                )
+        """
+        Namespace class holding the inner views FuzzySelectView and PostLookupActions.
+        The outer class is never instantiated directly; all command paths delegate
+        directly to run_target_lookup (which uses build_kvk_targets_embed from
+        targets_embed as the canonical embed builder).
+        """
 
         # --- drop-in replacement ---
         class FuzzySelectView(View):
@@ -1142,106 +1067,6 @@ def register_commands(bot_instance):
                         await interaction.followup.send(
                             "Use **/mygovernorid** and start typing your governor name to find your Governor ID.",
                             ephemeral=True,
-                        )
-                except Exception:
-                    pass
-
-        # ---------------- Helper used when a governor is chosen ----------------
-        async def _handle_governor_display(
-            interaction: discord.Interaction | None, governor_id: str, ephemeral: bool
-        ):
-            """
-            Load the stat row, attach last_kvk if available, build the embed and send it.
-            Prefers run_target_lookup (canonical path) for consistent embed rendering.
-            This function does local imports of kvk helpers to avoid circular imports.
-            """
-            try:
-                if interaction:
-                    # Delegate to canonical helper that builds & sends the embed (keeps original formatting)
-                    await run_target_lookup(interaction, governor_id, ephemeral=ephemeral)
-                    return
-                # Non-interactive/manual path: call run_target_lookup without interaction to get data,
-                # then post results similarly to legacy behavior.
-                res = await run_target_lookup(governor_id)
-                if not isinstance(res, dict):
-                    # unexpected shape, bail with a message
-                    try:
-                        await ctx.followup.send("Could not load targets.", ephemeral=True)
-                    except Exception:
-                        pass
-                    return
-
-                # If non-interactive returns a dict result, try to show a simple message via followup
-                if res.get("status") == "found" and res.get("data"):
-                    tgt = res["data"]
-                    # Local imports to avoid circular references at module import time
-                    try:
-                        from kvk_state import get_kvk_context_today  # type: ignore
-                    except Exception:
-                        get_kvk_context_today = None
-
-                    try:
-                        from targets_embed import build_kvk_targets_embed  # type: ignore
-                    except Exception:
-                        build_kvk_targets_embed = None
-
-                    if callable(get_kvk_context_today):
-                        kvk_ctx = get_kvk_context_today() or {}
-                    else:
-                        kvk_ctx = {}
-
-                    kvk_name = kvk_ctx.get("kvk_name")
-                    gov_name = tgt.get("GovernorName") or "Governor"
-
-                    if callable(build_kvk_targets_embed):
-                        try:
-                            embed = build_kvk_targets_embed(
-                                gov_name=gov_name,
-                                governor_id=governor_id,
-                                targets=tgt,
-                                kvk_name=kvk_name,
-                            )
-                            if ephemeral:
-                                await ctx.followup.send(embed=embed, ephemeral=True)
-                            else:
-                                await ctx.channel.send(embed=embed)
-                        except Exception:
-                            logger.exception(
-                                "[/mykvktargets] build_kvk_targets_embed failed for %s", governor_id
-                            )
-                            try:
-                                await ctx.followup.send(
-                                    "Failed to build targets embed.", ephemeral=True
-                                )
-                            except Exception:
-                                pass
-                    else:
-                        # No embed builder available — provide a simple textual fallback
-                        try:
-                            body = f"Targets for Governor {gov_name} ({governor_id}):\n{tgt}"
-                            await ctx.followup.send(body, ephemeral=True)
-                        except Exception:
-                            pass
-                else:
-                    # No data found — forward user-facing message if present
-                    msg = res.get("message", "No targets found.")
-                    try:
-                        await ctx.followup.send(msg, ephemeral=True)
-                    except Exception:
-                        pass
-
-            except Exception:
-                logger.exception(
-                    "[/mykvktargets] _handle_governor_display failed for %s", governor_id
-                )
-                try:
-                    if interaction:
-                        await interaction.followup.send(
-                            "Failed to load targets for that governor.", ephemeral=True
-                        )
-                    else:
-                        await ctx.followup.send(
-                            "Failed to load targets for that governor.", ephemeral=True
                         )
                 except Exception:
                     pass
