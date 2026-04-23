@@ -80,7 +80,10 @@ class MyKVKStatsSelectView(discord.ui.View):
             if not interaction.response.is_done():
                 await interaction.response.defer(ephemeral=True)
         except Exception:
-            pass
+            logger.debug(
+                "[MyKVKStatsSelectView] interaction defer failed in _on_select",
+                exc_info=True,
+            )
 
         from embed_utils import build_stats_embed
         from stats_cache_helpers import load_last_kvk_map
