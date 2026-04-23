@@ -256,6 +256,27 @@ def _extract_api_error_details(e: Exception) -> dict:
     return out
 
 
+def _is_spreadsheet_not_found_transient(exc: Exception) -> bool:
+    """
+    Return True if *exc* is a SpreadsheetNotFound whose HTTP response is 2xx or absent.
+
+    gspread's ``client.open()`` uses a paginated Drive files listing and can miss a
+    spreadsheet when it falls outside the first page returned, even though the request
+    itself succeeds (HTTP 200).  This is a transient pagination miss — not a genuine
+    permissions or missing-sheet problem — and should always be retried.
+    """
+    if not isinstance(exc, SpreadsheetNotFound):
+        return False
+    resp = getattr(exc, "response", None)
+    sc = getattr(resp, "status_code", None)
+    return sc is None or (isinstance(sc, int) and 200 <= sc < 300)
+
+
+def _pagination_miss_delay() -> float:
+    """Return a random sleep (2–5 s) giving the Drive listing cache time to refresh."""
+    return 2.0 + random.random() * 3.0
+
+
 def _is_retryable_gspread_details(details: dict) -> bool:
     sc = details.get("status_code")
     status = details.get("status")
@@ -373,11 +394,8 @@ def _retry_gspread_call(
             # SpreadsheetNotFound with a 2xx or absent status_code is a Drive listing
             # pagination miss (the sheet exists but wasn't in the first page of results).
             # Override retryable to True so we don't give up immediately.
-            if isinstance(exc, SpreadsheetNotFound):
-                resp = getattr(exc, "response", None)
-                sc_override = getattr(resp, "status_code", None)
-                if sc_override is None or (isinstance(sc_override, int) and 200 <= sc_override < 300):
-                    retryable = True
+            if _is_spreadsheet_not_found_transient(exc):
+                retryable = True
 
             logger.warning(
                 "[%s] correlation=%s action=%s attempt=%d failed elapsed=%.3fs retryable=%s status=%s code=%s repr=%s",
@@ -425,7 +443,7 @@ def _retry_gspread_call(
                 sleep_s = float(retry_after)
             elif isinstance(exc, SpreadsheetNotFound):
                 # Give the Drive listing cache time to refresh (2–5 s with jitter)
-                sleep_s = 2.0 + random.random() * 3.0
+                sleep_s = _pagination_miss_delay()
             else:
                 sleep_s = _full_jitter_sleep(attempt, base_sleep, max_sleep)
 
@@ -1219,11 +1237,8 @@ def run_all_exports(
                 details = _extract_api_error_details(ex)
                 retryable = _is_retryable_gspread_details(details)
                 # SpreadsheetNotFound with 2xx/no status = Drive pagination miss → retryable
-                if isinstance(ex, SpreadsheetNotFound):
-                    _resp = getattr(ex, "response", None)
-                    _sc = getattr(_resp, "status_code", None)
-                    if _sc is None or (isinstance(_sc, int) and 200 <= _sc < 300):
-                        retryable = True
+                if _is_spreadsheet_not_found_transient(ex):
+                    retryable = True
                 msg = f"[⚠️ RETRY {attempt}] {sheet_name} > {tab_name}: APIError: {ex}"
                 logger.info(
                     "[wrapped_transfer] correlation=%s attempt=%d sheet=%s tab=%s exception=%s",
@@ -1239,11 +1254,8 @@ def run_all_exports(
                 details = _extract_api_error_details(ex)
                 retryable = _is_retryable_gspread_details(details)
                 # SpreadsheetNotFound with 2xx/no status = Drive pagination miss → retryable
-                if isinstance(ex, SpreadsheetNotFound):
-                    _resp = getattr(ex, "response", None)
-                    _sc = getattr(_resp, "status_code", None)
-                    if _sc is None or (isinstance(_sc, int) and 200 <= _sc < 300):
-                        retryable = True
+                if _is_spreadsheet_not_found_transient(ex):
+                    retryable = True
                 msg = f"[⚠️ RETRY {attempt}] {sheet_name} > {tab_name}: General error: {ex}"
                 logger.info(
                     "[wrapped_transfer] correlation=%s attempt=%d sheet=%s tab=%s exception=%s",
@@ -1263,7 +1275,7 @@ def run_all_exports(
                     delay = float(retry_after)
                 elif isinstance(e, SpreadsheetNotFound):
                     # Give the Drive listing cache time to refresh (2–5 s with jitter)
-                    delay = 2.0 + random.random() * 3.0
+                    delay = _pagination_miss_delay()
                 else:
                     delay = _full_jitter_sleep(attempt, base_delay, 60.0)
                 _append_log(f"[INFO] sleeping {delay:.2f}s before retry {attempt + 1}/{retries}")
