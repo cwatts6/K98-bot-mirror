@@ -411,10 +411,12 @@ class PostLookupActions(View):
 
     @discord.ui.button(label="View KVK Stats", style=discord.ButtonStyle.danger)
     async def btn_stats(self, button: discord.ui.Button, interaction: discord.Interaction):
-        # Defer non-ephemerally so the response posts as a new public message,
-        # matching the behaviour of "View KVK Targets".
+        # Acknowledge the interaction ephemerally so the button doesn't error.
+        # We then post directly via interaction.channel.send() which is completely
+        # outside the interaction response system and always creates a new public
+        # message, regardless of whether the button panel was originally ephemeral.
         try:
-            await interaction.response.defer(ephemeral=False)
+            await interaction.response.defer(ephemeral=True)
         except Exception:
             pass
 
@@ -440,10 +442,24 @@ class PostLookupActions(View):
                 logger.exception("[PostLookupActions] failed attaching last_kvk for %s", gid)
 
             embeds, file = build_stats_embed(row, interaction.user)
-            send_kwargs: dict = {"embeds": embeds}
+            # Send directly to the channel — this is always a brand-new public message
+            # and is unaffected by the ephemeral nature of the button's parent message.
+            channel = interaction.channel
+            if channel is not None:
+                try:
+                    if file is not None:
+                        await channel.send(embeds=embeds, files=[file])
+                    else:
+                        await channel.send(embeds=embeds)
+                    return
+                except Exception:
+                    logger.exception(
+                        "[PostLookupActions] channel.send failed governor_id=%s", gid
+                    )
+            # Fallback: if channel is unavailable post as ephemeral followup
+            send_kwargs: dict = {"embeds": embeds, "ephemeral": True}
             if file is not None:
                 send_kwargs["files"] = [file]
-            # followup.send() on a non-ephemeral defer creates a brand-new public message
             await interaction.followup.send(**send_kwargs)
         except Exception:
             logger.exception(
