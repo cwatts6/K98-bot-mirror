@@ -1196,8 +1196,6 @@ def register_registry(bot: ext_commands.Bot) -> None:
                 "[bulk_export_registrations] load_registry_as_dict returned empty dict — "
                 "possible SQL failure; aborting export."
             )
-                "possible SQL failure; aborting export."
-            )
             await ctx.interaction.edit_original_response(
                 content=(
                     "⚠️ The registry appears empty. This may indicate a SQL connectivity issue.\n"
