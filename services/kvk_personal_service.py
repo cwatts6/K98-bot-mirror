@@ -146,14 +146,28 @@ async def post_stats_embeds(
         bot:    The Discord bot instance (used for get_channel lookups).
         ctx:    The ApplicationContext (used to resolve the original channel).
         embeds: List of discord.Embed objects to post.
-        file:   A discord.File object (or None) to attach.
+        file:   A discord.File object (or None) to attach. If a fallback channel is tried,
+                the file's underlying stream is rewound to position 0 before each attempt
+                so the same file object can be used across multiple sends.
 
     Returns:
         (posted: bool, channel_used: str) — whether posting succeeded and which channel was used.
     """
     from bot_config import KVK_PLAYER_STATS_CHANNEL_ID, NOTIFY_CHANNEL_ID
 
+    def _rewind_file() -> None:
+        """Rewind a discord.File's fp to position 0 so it can be resent on fallback."""
+        if file is None:
+            return
+        fp = getattr(file, "fp", None)
+        if fp is not None and hasattr(fp, "seek"):
+            try:
+                fp.seek(0)
+            except Exception:
+                pass
+
     async def _send_to(ch: discord.abc.Messageable, *, label: str) -> bool:
+        _rewind_file()
         try:
             if file is not None:
                 await ch.send(embeds=embeds, files=[file])
