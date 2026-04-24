@@ -63,7 +63,6 @@ UTC = UTC
 from account_picker import (
     ACCOUNT_ORDER,
     AccountPickerView,  # canonical View class
-    build_unique_gov_options,  # canonical builder
     safe_build_unique_gov_options,
 )
 from core.interaction_safety import (
@@ -89,9 +88,9 @@ from target_utils import (
 from ui.views.location_views import ProfileLinksView
 from ui.views.kvk_personal_views import (
     FuzzySelectView,
-    MyKVKStatsSelectView,
+    MyKVKStatsSelectView,  # noqa: F401 — re-exported for Commands.py star-import consumers
     PostLookupActions,
-    TargetLookupView,
+    TargetLookupView,  # noqa: F401 — kept for external importers and smoke tests
 )
 from ui.views.registry_views import (
     GovernorSelectView,

@@ -48,7 +48,7 @@ class MyKVKStatsSelectView(discord.ui.View):
         self.ctx = ctx
         self.author_id = author_id
         self.accounts = accounts
-        self._bot = bot
+        self._bot = bot if bot is not None else getattr(ctx, "bot", None)
         self._last_kvk_map: dict = {}
 
         # Build options in canonical order
@@ -152,12 +152,12 @@ class MyKVKStatsSelectView(discord.ui.View):
         try:
             from services import kvk_personal_service
 
-            posted, channel_used = await kvk_personal_service.post_stats_embeds(
+            posted, _ = await kvk_personal_service.post_stats_embeds(
                 self._bot, self.ctx, embeds, file
             )
         except Exception:
             logger.exception("[MyKVKStatsSelectView] post_stats_embeds failed governor_id=%s", gid)
-            posted, channel_used = False, "error"
+            posted = False
 
         if posted:
             try:
@@ -340,7 +340,16 @@ class FuzzySelectView(View):
         from registry.governor_registry import load_registry
         from ui.views.registry_views import RegisterStartView
 
-        registry = load_registry() or {}
+        try:
+            registry = await asyncio.to_thread(load_registry) or {}
+        except Exception:
+            logger.exception("[FuzzySelectView] Failed to load registry during register-only flow")
+            await interaction.response.send_message(
+                "Sorry, I couldn't load your registrations right now. Please try again in a moment.",
+                ephemeral=True,
+            )
+            return
+
         user_key = str(self.author_id)
         accounts = (registry.get(user_key) or {}).get("accounts", {}) or {}
         used_slots = set(accounts.keys())
@@ -408,7 +417,19 @@ class PostLookupActions(View):
         from registry.governor_registry import load_registry
         from ui.views.registry_views import RegisterStartView
 
-        registry = load_registry() or {}
+        try:
+            registry = await asyncio.to_thread(load_registry)
+        except Exception:
+            logger.exception(
+                "[PostLookupActions] Failed to load governor registry during registration flow"
+            )
+            await interaction.response.send_message(
+                "Registration is temporarily unavailable because the registry could not be loaded.",
+                ephemeral=True,
+            )
+            return
+
+        registry = registry or {}
         user_key = str(self.author_id)
         accounts = (registry.get(user_key) or {}).get("accounts", {}) or {}
         used_slots = set(accounts.keys())
