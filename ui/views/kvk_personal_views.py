@@ -411,8 +411,10 @@ class PostLookupActions(View):
 
     @discord.ui.button(label="View KVK Stats", style=discord.ButtonStyle.danger)
     async def btn_stats(self, button: discord.ui.Button, interaction: discord.Interaction):
+        # Defer non-ephemerally so the response posts as a new public message,
+        # matching the behaviour of "View KVK Targets".
         try:
-            await interaction.response.defer(ephemeral=True)
+            await interaction.response.defer(ephemeral=False)
         except Exception:
             pass
 
@@ -438,13 +440,11 @@ class PostLookupActions(View):
                 logger.exception("[PostLookupActions] failed attaching last_kvk for %s", gid)
 
             embeds, file = build_stats_embed(row, interaction.user)
-            posted, _ = await kvk_personal_service.post_stats_embeds(
-                interaction.client, interaction, embeds, file
-            )
-            if not posted:
-                await interaction.followup.send(
-                    "⚠️ Couldn't post stats. Check bot/channel permissions.", ephemeral=True
-                )
+            send_kwargs: dict = {"embeds": embeds}
+            if file is not None:
+                send_kwargs["files"] = [file]
+            # followup.send() on a non-ephemeral defer creates a brand-new public message
+            await interaction.followup.send(**send_kwargs)
         except Exception:
             logger.exception(
                 "[PostLookupActions] btn_stats failed governor_id=%s", self.governor_id
