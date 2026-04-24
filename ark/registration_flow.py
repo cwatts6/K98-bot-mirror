@@ -296,7 +296,7 @@ class ArkRegistrationController:
                 force_repost=False,
                 update_refresh_timestamp=False,
             )
-        except Exception:
+        except discord.HTTPException:
             logger.exception("[ARK] Failed to refresh registration message for match_id=%s", self.match_id)
 
     async def _persist_registration_state(
@@ -513,7 +513,7 @@ class ArkRegistrationController:
         )
 
         if self._response_is_done(interaction):
-            await interaction.followup.send(heading, view=view, ephemeral=True)
+            view.message = await interaction.followup.send(heading, view=view, ephemeral=True)
         else:
             await interaction.response.send_message(heading, view=view, ephemeral=True)
 
@@ -741,7 +741,10 @@ class ArkRegistrationController:
         )
 
         await self.refresh_registration_message(interaction.client)
-        await interaction.followup.send("✅ You’re signed up!", ephemeral=True)
+        if self._response_is_done(interaction):
+            await interaction.followup.send("✅ You’re signed up!", ephemeral=True)
+        else:
+            await interaction.response.send_message("✅ You’re signed up!", ephemeral=True)
 
     async def leave(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
@@ -790,7 +793,10 @@ class ArkRegistrationController:
             )
 
             await self.refresh_registration_message(interaction.client)
-            await inter.followup.send("✅ You’ve left the match.", ephemeral=True)
+            if inter.response.is_done():
+                await inter.followup.send("✅ You’ve left the match.", ephemeral=True)
+            else:
+                await inter.response.send_message("✅ You’ve left the match.", ephemeral=True)
 
         await self._prompt_governor_selection(
             interaction,
@@ -974,7 +980,10 @@ class ArkRegistrationController:
         )
 
         await self.refresh_registration_message(interaction.client)
-        await interaction.followup.send("✅ Governor switched.", ephemeral=True)
+        if self._response_is_done(interaction):
+            await interaction.followup.send("✅ Governor switched.", ephemeral=True)
+        else:
+            await interaction.response.send_message("✅ Governor switched.", ephemeral=True)
 
     def _admin_override_sub_rule(self) -> bool:
         raw = self.config.get("AdminOverrideSubRule", 0) if self.config else 0
