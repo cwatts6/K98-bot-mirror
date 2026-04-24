@@ -26,6 +26,69 @@ from decoraters import _is_admin
 logger = logging.getLogger(__name__)
 
 
+async def _send_targets_to_channel(interaction: discord.Interaction, governor_id: str) -> None:
+    """
+    Fetch target data for a resolved numeric governor_id and post the embed
+    directly to interaction.channel, creating a new public message regardless
+    of whether the triggering button/select was inside an ephemeral message.
+
+    The caller must have already acknowledged the interaction (e.g. with
+    ``defer(ephemeral=True)``) before calling this helper.
+    """
+    try:
+        from kvk_state import get_kvk_context_today
+        from target_utils import run_target_lookup
+        from targets_embed import build_kvk_targets_embed
+
+        # Non-interactive call — returns a data dict without touching the interaction
+        result = await run_target_lookup(str(governor_id))
+        channel = interaction.channel
+
+        if result and result.get("status") == "found":
+            tgt = result["data"]
+            kvk_ctx = get_kvk_context_today() or {}
+            kvk_name = kvk_ctx.get("kvk_name")
+            gov_name = tgt.get("GovernorName") or str(governor_id)
+            embed = build_kvk_targets_embed(
+                gov_name=gov_name,
+                governor_id=int(governor_id),
+                targets=tgt,
+                kvk_name=kvk_name,
+            )
+            if channel is not None:
+                try:
+                    await channel.send(embed=embed)
+                    return
+                except Exception:
+                    logger.exception(
+                        "[kvk_personal_views] channel.send failed for governor_id=%s", governor_id
+                    )
+            # Fallback if channel unavailable
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            msg = (result or {}).get("message", "No targets found for this governor.")
+            if channel is not None:
+                try:
+                    await channel.send(content=msg)
+                    return
+                except Exception:
+                    logger.exception(
+                        "[kvk_personal_views] channel.send (error msg) failed for governor_id=%s",
+                        governor_id,
+                    )
+            await interaction.followup.send(content=msg, ephemeral=True)
+    except Exception:
+        logger.exception(
+            "[kvk_personal_views] _send_targets_to_channel failed governor_id=%s", governor_id
+        )
+        try:
+            await interaction.followup.send(
+                "⚠️ Something went wrong loading targets.", ephemeral=True
+            )
+        except Exception:
+            pass
+
+
 class MyKVKStatsSelectView(discord.ui.View):
     """
     Ephemeral selector for /mykvkstats.
@@ -244,9 +307,11 @@ class TargetLookupView(View):
 
     def make_callback(self, governor_id):
         async def callback(interaction: discord.Interaction):
-            from target_utils import run_target_lookup
-
-            await run_target_lookup(interaction, str(governor_id), ephemeral=True)
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except Exception:
+                pass
+            await _send_targets_to_channel(interaction, str(governor_id))
 
         return callback
 
@@ -474,9 +539,11 @@ class PostLookupActions(View):
 
     @discord.ui.button(label="View KVK Targets", style=discord.ButtonStyle.primary)
     async def btn_targets(self, button: discord.ui.Button, interaction: discord.Interaction):
-        from target_utils import run_target_lookup
-
-        await run_target_lookup(interaction, self.governor_id, ephemeral=False)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass
+        await _send_targets_to_channel(interaction, self.governor_id)
 
     @discord.ui.button(label="Register this Governor", style=discord.ButtonStyle.success)
     async def btn_register(self, button: discord.ui.Button, interaction: discord.Interaction):
