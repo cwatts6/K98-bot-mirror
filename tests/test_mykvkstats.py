@@ -74,9 +74,11 @@ def _get_registered_command_impl(module, command_name: str):
     fake_bot.tree = types.SimpleNamespace()
     fake_bot.tree.command = lambda **kw: lambda f: f
 
-    # Call register_commands to populate the fake bot
+    # Call the appropriate register function to populate the fake bot
     if hasattr(module, "register_commands"):
         module.register_commands(fake_bot)
+    elif hasattr(module, "register_stats"):
+        module.register_stats(fake_bot)
 
     fn = fake_bot.registered.get(command_name)
     if fn is None:
@@ -101,7 +103,7 @@ def _get_registered_command_impl(module, command_name: str):
 
 
 async def test_no_registered_accounts_shows_registration_prompt(monkeypatch):
-    import Commands as C
+    import commands.stats_cmds as C
 
     # Fake load_last_kvk_map as async (the real code awaits it)
     async def fake_load_last_kvk_map():
@@ -148,7 +150,7 @@ async def test_no_registered_accounts_shows_registration_prompt(monkeypatch):
 
 
 async def test_single_account_sends_public_embed(monkeypatch):
-    import Commands as C
+    import commands.stats_cmds as C
 
     async def fake_load_last_kvk_map():
         return {}
@@ -179,7 +181,7 @@ async def test_single_account_sends_public_embed(monkeypatch):
 
 
 async def test_multi_account_builds_selector(monkeypatch):
-    import Commands as C
+    import commands.stats_cmds as C
 
     async def fake_load_last_kvk_map():
         return {}

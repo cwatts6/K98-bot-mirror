@@ -43,6 +43,34 @@ def _read_last_kvk_sync() -> dict[str, Any]:
     return {}
 
 
+def get_last_kvk_for_governor_sync(governor_id: str) -> dict | None:
+    """
+    Return the last-KVK record for a single governor from the in-process cache.
+    Reads only from the in-process dict — no disk I/O.
+    Returns None on cache miss (cache may not yet be warmed).
+    """
+    try:
+        data = _last_kvk_cache.get("data")
+        if not isinstance(data, dict):
+            logger.debug(
+                "[STATS_CACHE_HELPERS] get_last_kvk_for_governor_sync: cache not warmed yet"
+            )
+            return None
+        result = data.get(str(governor_id))
+        if result is None:
+            logger.debug(
+                "[STATS_CACHE_HELPERS] get_last_kvk_for_governor_sync: cache miss governor_id=%s",
+                governor_id,
+            )
+        return result
+    except Exception:
+        logger.exception(
+            "[STATS_CACHE_HELPERS] get_last_kvk_for_governor_sync failed governor_id=%s",
+            governor_id,
+        )
+        return None
+
+
 async def load_last_kvk_map() -> dict[str, Any]:
     """
     Async loader that returns the cached last-KVK map (reads file if cache expired).

@@ -1178,133 +1178,28 @@ class FailuresView(discord.ui.View):
 
 def _load_last_kvk_for_governor(governor_id: str) -> dict | None:
     """
-    Try to load the separate last-KVK cache and return the record for governor_id (if present).
-    Uses PLAYER_STATS_LAST_CACHE from constants if available; otherwise derives a sibling file name.
-    This is intentionally lightweight and returns None on any failure.
+    Return the last-KVK record for governor_id from the in-process cache.
+    Delegates to stats_cache_helpers.get_last_kvk_for_governor_sync — no disk I/O.
     """
     try:
-        from constants import PLAYER_STATS_LAST_CACHE
+        from stats_cache_helpers import get_last_kvk_for_governor_sync
 
-        last_path = PLAYER_STATS_LAST_CACHE
+        result = get_last_kvk_for_governor_sync(str(governor_id))
+        if result is None:
+            logger.debug(
+                "[embed_utils] _load_last_kvk_for_governor cache miss governor_id=%s", governor_id
+            )
+        return result
     except Exception:
-        try:
-            from constants import PLAYER_STATS_CACHE
-
-            base, ext = os.path.splitext(PLAYER_STATS_CACHE)
-            if ext:
-                last_path = f"{base}.lastkvk{ext}"
-            else:
-                last_path = f"{PLAYER_STATS_CACHE}.lastkvk"
-        except Exception:
-            return None
-
-    try:
-        with open(last_path, encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
+        logger.exception(
+            "[embed_utils] _load_last_kvk_for_governor failed governor_id=%s", governor_id
+        )
         return None
 
-    # data format: { "_meta": {...}, "<GovernorID>": { ... }, ... }
-    try:
-        return data.get(str(governor_id))
-    except Exception:
-        return
 
-
-# Helpers to fetch per-governor Pre-KVK phase deltas and latest honor list
-def _fetch_prekvk_phase_list(kvk_no: int, phase: int) -> list[dict[str, Any]]:
-    """
-    Return list of dicts with keys GovernorID, Name, Points for the given KVK and phase.
-    Uses the same delta computation logic as stats_alerts/prekvk_stats._phase_top but returns all rows.
-    """
-    try:
-        conn = get_conn_with_retries()
-        with conn:
-            cur = conn.cursor()
-            cur.execute(
-                """
-                WITH W AS (
-                  SELECT StartUTC, EndUTC
-                  FROM dbo.PreKvk_Phases
-                  WHERE KVK_NO = ? AND Phase = ?
-                ),
-                B AS (
-                  SELECT sc.GovernorID,
-                         MAX(sc.Points) AS Baseline
-                  FROM dbo.PreKvk_Scores sc
-                  JOIN dbo.PreKvk_Scan s ON s.KVK_NO = sc.KVK_NO AND s.ScanID = sc.ScanID
-                  CROSS JOIN W
-                  WHERE sc.KVK_NO = ? AND s.ScanTimestampUTC < W.StartUTC
-                  GROUP BY sc.GovernorID
-                ),
-                P AS (
-                  SELECT sc.GovernorID,
-                         MAX(sc.Points) AS InWindow
-                  FROM dbo.PreKvk_Scores sc
-                  JOIN dbo.PreKvk_Scan s ON s.KVK_NO = sc.KVK_NO AND s.ScanID = sc.ScanID
-                  CROSS JOIN W
-                  WHERE sc.KVK_NO = ? AND s.ScanTimestampUTC BETWEEN W.StartUTC AND W.EndUTC
-                  GROUP BY sc.GovernorID
-                ),
-                Names AS (
-                  SELECT sc.GovernorID, MAX(sc.GovernorName) AS GovernorName
-                  FROM dbo.PreKvk_Scores sc
-                  JOIN dbo.PreKvk_Scan s ON s.KVK_NO = sc.KVK_NO AND s.ScanID = sc.ScanID
-                  WHERE sc.KVK_NO = ?
-                  GROUP BY sc.GovernorID
-                )
-                SELECT COALESCE(p.GovernorID, b.GovernorID) AS GovernorID,
-                       COALESCE(n.GovernorName, CONVERT(varchar(20), COALESCE(p.GovernorID, b.GovernorID))) AS Name,
-                       MAX(COALESCE(p.InWindow, b.Baseline, 0)) - MAX(COALESCE(b.Baseline, 0)) AS Points
-                FROM B b
-                FULL JOIN P p ON p.GovernorID = b.GovernorID
-                LEFT JOIN Names n ON n.GovernorID = COALESCE(p.GovernorID, b.GovernorID)
-                GROUP BY COALESCE(p.GovernorID, b.GovernorID), COALESCE(n.GovernorName, CONVERT(varchar(20), COALESCE(p.GovernorID, b.GovernorID)))
-                ORDER BY Points DESC, Name;
-                """,
-                (kvk_no, phase, kvk_no, kvk_no, kvk_no),
-            )
-            rows = cur.fetchall()
-            if not rows:
-                return []
-            return [cursor_row_to_dict(cur, r) for r in rows]
-    except Exception:
-        logger.exception("[PREKVK] Failed to fetch phase list for KVK %s phase %s", kvk_no, phase)
-        return []
-
-
-def _fetch_latest_honor_list() -> list[dict[str, Any]]:
-    """
-    Return the full latest honor list (GovernorName, GovernorID, HonorPoints) ordered desc.
-    """
-    try:
-        conn = get_conn_with_retries()
-        with conn:
-            cur = conn.cursor()
-            sql = """
-            ;WITH latest_kvk AS (
-                SELECT MAX(KVK_NO) AS KVK_NO
-                FROM dbo.KVK_Honor_Scan
-            ),
-            last_scan AS (
-                SELECT s.KVK_NO, MAX(s.ScanID) AS ScanID
-                FROM dbo.KVK_Honor_Scan s
-                JOIN latest_kvk k ON k.KVK_NO = s.KVK_NO
-                GROUP BY s.KVK_NO
-            )
-            SELECT a.GovernorName, a.GovernorID, a.HonorPoints
-            FROM dbo.KVK_Honor_AllPlayers_Raw a
-            JOIN last_scan l ON l.KVK_NO = a.KVK_NO AND l.ScanID = a.ScanID
-            ORDER BY a.HonorPoints DESC, a.GovernorID ASC;
-            """
-            cur.execute(sql)
-            rows = cur.fetchall()
-            if not rows:
-                return []
-            return [cursor_row_to_dict(cur, r) for r in rows]
-    except Exception:
-        logger.exception("[HONOR] Failed to fetch latest honor list")
-        return []
+# Helpers to fetch per-governor Pre-KVK phase deltas and latest honor list — SQL in DAL
+from kvk.dal.kvk_stats_dal import fetch_prekvk_phase_list as _fetch_prekvk_phase_list  # noqa: E402
+from kvk.dal.kvk_stats_dal import fetch_latest_honor_list as _fetch_latest_honor_list  # noqa: E402
 
 
 def build_target_embed(data):

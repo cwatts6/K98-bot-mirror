@@ -103,7 +103,7 @@ def _get_registered_command_impl(module, command_name: str):
 
 
 async def test_manual_governorid_triggers_run_target_lookup(monkeypatch):
-    import Commands as C
+    import commands.telemetry_cmds as C
 
     async def fake_load_last_kvk_map():
         return {}
@@ -133,7 +133,7 @@ async def test_manual_governorid_triggers_run_target_lookup(monkeypatch):
 
 
 async def test_single_registered_account_auto_opens(monkeypatch):
-    import Commands as C
+    import commands.telemetry_cmds as C
 
     async def fake_load_last_kvk_map():
         return {}
@@ -169,7 +169,7 @@ async def test_single_registered_account_auto_opens(monkeypatch):
 
 
 async def test_multi_account_builds_selector(monkeypatch):
-    import Commands as C
+    import commands.telemetry_cmds as C
 
     async def fake_load_last_kvk_map():
         return {}
@@ -215,7 +215,7 @@ async def test_multi_account_builds_selector(monkeypatch):
 
 
 async def test_no_registered_accounts_shows_hint_and_empty_picker(monkeypatch):
-    import Commands as C
+    import commands.telemetry_cmds as C
 
     async def fake_load_last_kvk_map():
         return {}

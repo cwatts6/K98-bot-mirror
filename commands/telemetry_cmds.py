@@ -61,8 +61,10 @@ UTC = UTC
 # ——— Local modules ———
 # Direct, canonical imports for account picker functionality
 from account_picker import (
+    ACCOUNT_ORDER,
     AccountPickerView,  # canonical View class
     build_unique_gov_options,  # canonical builder
+    safe_build_unique_gov_options,
 )
 from core.interaction_safety import (
     global_cmd_error_handler,
@@ -85,6 +87,12 @@ from target_utils import (
     run_target_lookup,
 )
 from ui.views.location_views import ProfileLinksView
+from ui.views.kvk_personal_views import (
+    FuzzySelectView,
+    MyKVKStatsSelectView,
+    PostLookupActions,
+    TargetLookupView,
+)
 from ui.views.registry_views import (
     GovernorSelectView,
     GovNameModal,
@@ -109,7 +117,8 @@ def _pick_log_source(source: str):
     return FULL_LOG_PATH
 
 
-ACCOUNT_ORDER = ["Main"] + [f"Alt {i}" for i in range(1, 6)] + [f"Farm {i}" for i in range(1, 11)]
+
+# ACCOUNT_ORDER imported from account_picker — single canonical definition.
 
 # --- SHADOW GUARD (temporary; remove after diagnosis) ---
 if os.getenv("DEBUG_SHADOW") == "1":
@@ -121,9 +130,6 @@ if os.getenv("DEBUG_SHADOW") == "1":
             logger.error("[SHADOW] %s is shadowed: type=%s value=%r", _n, type(_g), _g)
 # ---------------------------------------------------------
 
-# Factory set inside register_commands() to bridge inner TargetLookupView to module scope
-_TargetLookupView_factory = None  # set at runtime
-
 load_dotenv()
 
 # Safer construction (avoids int(None))
@@ -132,59 +138,6 @@ ALLOWED_CHANNEL_IDS = {
 }
 
 start_bot_time = datetime.now(UTC)
-
-
-def _safe_build_unique_gov_options(accounts: dict) -> list[discord.SelectOption]:
-    """
-    Use canonical account_picker.build_unique_gov_options; log and return an empty list on error.
-
-    This avoids referencing any removed legacy fallback and keeps behaviour robust in production.
-    """
-    try:
-        opts = build_unique_gov_options(accounts)
-        if isinstance(opts, list):
-            return opts
-        # If the canonical helper returned some other iterable (unexpected), coerce to list
-        logger.warning(
-            "[AccountPicker] build_unique_gov_options returned non-list; coercing to list"
-        )
-        try:
-            return list(opts) if opts is not None else []
-        except Exception:
-            logger.exception(
-                "[AccountPicker] failed to coerce build_unique_gov_options result to list"
-            )
-            return []
-    except Exception:
-        logger.exception("[AccountPicker] build_unique_gov_options failed; returning empty options")
-        return []
-
-
-async def _load_last_kvk_map() -> dict[str, dict] | None:
-    """
-    Best-effort: read PLAYER_STATS_LAST_CACHE (JSON) off the event loop and return
-    a map keyed by GovernorID (with '_meta' removed). Returns {} on any failure.
-    """
-    try:
-        from constants import PLAYER_STATS_LAST_CACHE
-        from file_utils import read_json_safe, run_blocking_in_thread
-    except Exception:
-        return {}
-
-    try:
-        # read_json_safe is sync; offload to thread
-        data = await run_blocking_in_thread(
-            lambda: read_json_safe(PLAYER_STATS_LAST_CACHE), name="read_last_kvk_cache", meta={}
-        )
-        if not isinstance(data, dict):
-            return {}
-        # copy minus _meta
-        out = dict(data)
-        out.pop("_meta", None)
-        return out
-    except Exception:
-        logger.exception("[CACHE] Failed to read PLAYER_STATS_LAST_CACHE")
-        return {}
 
 
 def _resolve_kvk_no(c, kvk_no: int | None) -> int:
@@ -444,8 +397,8 @@ async def send_profile_to_channel(
 configure_registry_views(
     async_load_registry=async_load_registry,
     lookup_governor_id=lookup_governor_id,
-    target_lookup_view_factory=lambda matches, author_id: (
-        _TargetLookupView_factory(matches, author_id) if _TargetLookupView_factory else None
+    target_lookup_view_factory=lambda matches, author_id: FuzzySelectView(
+        matches, author_id, show_targets=True
     ),
     name_cache_getter=lambda: _name_cache,
     send_profile_to_channel=send_profile_to_channel,
@@ -453,279 +406,8 @@ configure_registry_views(
 )
 
 
-class MyKVKStatsSelectView(discord.ui.View):
-    """
-    Ephemeral selector for /mykvkstats:
-    - Dropdown of user's registered accounts (ordered by ACCOUNT_ORDER)
-    - Buttons: Lookup Governor ID, Register New Account (reuses your existing flows)
-    - On select -> posts PUBLIC stats embed(s) to the channel
-    """
 
-    def __init__(
-        self, *, ctx: discord.ApplicationContext, accounts: dict, author_id: int, timeout: int = 120
-    ):
-        super().__init__(timeout=timeout)
-        self.ctx = ctx
-        self.author_id = author_id
-        self.accounts = accounts  # {slot: {GovernorID, GovernorName}}
-
-        # Build options in your canonical order
-        options: list[discord.SelectOption] = []
-        for slot in ACCOUNT_ORDER:
-            if slot in accounts:
-                info = accounts[slot] or {}
-                gid = str(info.get("GovernorID", "")).strip()
-                gname = str(info.get("GovernorName", "")).strip()
-                label = slot
-                desc = f"{gname} • ID {gid}" if (gname or gid) else slot
-                options.append(
-                    discord.SelectOption(label=label[:100], description=desc[:100], value=gid)
-                )
-
-        self.select = discord.ui.Select(
-            placeholder="Choose an account…", options=options[:25], min_values=1, max_values=1
-        )
-        self.select.callback = self._on_select
-        self.add_item(self.select)
-
-        # Reuse your existing flows
-        self.btn_lookup = discord.ui.Button(
-            label="🔎 Lookup Governor ID", style=discord.ButtonStyle.secondary
-        )
-        self.btn_lookup.callback = self._on_lookup
-        self.add_item(self.btn_lookup)
-
-        self.btn_register = discord.ui.Button(
-            label="➕ Register New Account", style=discord.ButtonStyle.success
-        )
-        self.btn_register.callback = self._on_register
-        self.add_item(self.btn_register)
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message("❌ This menu isn’t for you.", ephemeral=True)
-            return False
-        return True
-
-    async def _on_select(self, interaction: discord.Interaction):
-
-        # ACK the interaction quickly so Discord doesn't show "This interaction failed".
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
-        except Exception:
-            # Best-effort; proceed even if defer fails
-            pass
-
-        gid = normalize_governor_id(self.select.values[0])
-        try:
-            row = load_stat_row(gid)
-        except Exception as e:
-            logger.exception("[MyKVKStatsSelectView] load_stat_row failed")
-            try:
-                # Only notify the invoker if they're an admin; regular users don't need extra text.
-                if _is_admin(interaction.user):
-                    await interaction.followup.send(
-                        f"❌ Couldn’t find stats for GovernorID `{gid}`: `{type(e).__name__}: {e}`",
-                        ephemeral=True,
-                    )
-            except Exception:
-                pass
-            return
-
-        if not row:
-            try:
-                if _is_admin(interaction.user):
-                    await interaction.followup.send(
-                        f"Couldn’t find stats for GovernorID `{gid}`.", ephemeral=True
-                    )
-            except Exception:
-                pass
-            return
-
-        # Attach last_kvk if the view was provided one at init time
-        try:
-            lkmap = getattr(self, "_last_kvk_map", None)
-            if lkmap:
-                lk = lkmap.get(str(gid))
-                if lk:
-                    row["last_kvk"] = lk
-        except Exception:
-            logger.exception("[MyKVKStatsSelectView] failed attaching last_kvk to row")
-
-        try:
-            embeds, file = build_stats_embed(row, interaction.user)
-            # build_stats_embed now returns (list[discord.Embed], discord.File)
-        except Exception as e:
-            logger.exception("[MyKVKStatsSelectView] build_stats_embed failed")
-            try:
-                if _is_admin(interaction.user):
-                    await interaction.followup.send(
-                        f"❌ Failed to build stats: `{type(e).__name__}: {e}`", ephemeral=True
-                    )
-            except Exception:
-                pass
-            return
-
-        async def _send_to_channel(ch: discord.abc.Messageable, *, embeds_list, file_obj):
-            """Attempt a single-channel send, returning True on success."""
-            try:
-                if file_obj is not None:
-                    await ch.send(embeds=embeds_list, files=[file_obj])
-                else:
-                    await ch.send(embeds=embeds_list)
-                return True
-            except discord.Forbidden:
-                logger.warning(
-                    "[MyKVKStatsSelectView] missing send permissions in channel %s",
-                    getattr(ch, "id", None),
-                )
-                return False
-            except Exception as ex:
-                logger.exception(
-                    "[MyKVKStatsSelectView] error sending to channel %s: %s",
-                    getattr(ch, "id", None),
-                    ex,
-                )
-                return False
-
-        def _bot_can_send_in_channel(ch: discord.abc.Messageable) -> bool:
-            try:
-                guild = getattr(ch, "guild", None)
-                if not guild:
-                    return True
-                me = guild.get_member(bot.user.id) if hasattr(guild, "get_member") else None
-                if me is None:
-                    return True
-                perms = ch.permissions_for(me)
-                return perms.send_messages
-            except Exception:
-                return True
-
-        # Try preferred original invoking channel first
-        posted = False
-        tried_channels = []
-        try:
-            orig_ch = getattr(self.ctx, "channel", None)
-            if orig_ch and _bot_can_send_in_channel(orig_ch):
-                tried_channels.append(("orig", getattr(orig_ch, "id", None)))
-                posted = await _send_to_channel(orig_ch, embeds_list=embeds, file_obj=file)
-        except Exception:
-            posted = False
-
-        # Fallbacks: KVK_PLAYER_STATS_CHANNEL_ID, NOTIFY_CHANNEL_ID
-        if not posted:
-            try:
-                kvk_ch = bot.get_channel(KVK_PLAYER_STATS_CHANNEL_ID)
-                if kvk_ch:
-                    tried_channels.append(("kvk_channel", KVK_PLAYER_STATS_CHANNEL_ID))
-                    if _bot_can_send_in_channel(kvk_ch):
-                        posted = await _send_to_channel(kvk_ch, embeds_list=embeds, file_obj=file)
-            except Exception:
-                posted = False
-
-        if not posted:
-            try:
-                notify_ch = bot.get_channel(NOTIFY_CHANNEL_ID)
-                if notify_ch:
-                    tried_channels.append(("notify_channel", NOTIFY_CHANNEL_ID))
-                    if _bot_can_send_in_channel(notify_ch):
-                        posted = await _send_to_channel(
-                            notify_ch, embeds_list=embeds, file_obj=file
-                        )
-            except Exception:
-                posted = False
-
-        # If posted publicly -> only notify admins; regular users don't need an extra ephemeral.
-        if posted:
-            try:
-                if _is_admin(interaction.user):
-                    await interaction.followup.send(
-                        "✅ Posted stats. If you can't see them in this channel, check the bot's send permissions.",
-                        ephemeral=True,
-                    )
-                # regular users: no followup required (they see the posted stats)
-            except Exception:
-                pass
-            return
-
-        # If none of the public targets worked, try DM as a last resort.
-        logger.warning(
-            "[MyKVKStatsSelectView] failed to post public stats; tried channels=%s", tried_channels
-        )
-
-        dm_ok = False
-        try:
-            user_dm = interaction.user
-            try:
-                if file is not None:
-                    await user_dm.send(embeds=embeds, files=[file])
-                else:
-                    await user_dm.send(embeds=embeds)
-                dm_ok = True
-            except discord.Forbidden:
-                logger.info("[MyKVKStatsSelectView] cannot DM user %s", interaction.user.id)
-            except Exception:
-                logger.exception("[MyKVKStatsSelectView] failed to DM user %s", interaction.user.id)
-        except Exception:
-            pass
-
-        # Only notify the invoker when they're an admin (actionable advice).
-        try:
-            if _is_admin(interaction.user):
-                if dm_ok:
-                    await interaction.followup.send(
-                        "⚠️ Couldn't post publicly; sent stats to you via DM. Admins: please check channel permissions.",
-                        ephemeral=True,
-                    )
-                else:
-                    await interaction.followup.send(
-                        "⚠️ Couldn't post publicly and couldn't DM the user. Admins: check bot/channel permissions.",
-                        ephemeral=True,
-                    )
-            # regular users: no followup — they either see the public post or received the DM
-        except Exception:
-            pass
-
-    async def _on_lookup(self, interaction: discord.Interaction):
-        # Reuse your existing modal
-        await interaction.response.send_modal(GovNameModal(author_id=self.author_id))
-
-    async def _on_register(self, interaction: discord.Interaction):
-        # Reuse your existing registration start view
-        try:
-            registry = await async_load_registry() or {}
-        except Exception as e:
-            await interaction.response.send_message(
-                f"⚠️ Registry unavailable: {type(e).__name__}: {e}", ephemeral=True
-            )
-            return
-
-        user_rec = registry.get(str(self.author_id)) or {}
-        current = user_rec.get("accounts") or {}
-        used = set(current.keys())
-        free_slots = [slot for slot in ACCOUNT_ORDER if slot not in used]
-        if not free_slots:
-            await interaction.response.send_message(
-                "All account slots are registered already. Use **/modify_registration** to change one.",
-                ephemeral=True,
-            )
-            return
-
-        await interaction.response.send_message(
-            "Pick an account slot to register:",
-            view=RegisterStartView(author_id=self.author_id, free_slots=free_slots),
-            ephemeral=True,
-        )
-
-    async def on_timeout(self):
-        for c in self.children:
-            c.disabled = True
-        try:
-            await self.ctx.edit_original_response(view=self)
-        except Exception:
-            pass
-
+# MyKVKStatsSelectView is defined canonically in ui.views.kvk_personal_views and imported above.
 
 async def run_crystaltech_flow(interaction: discord.Interaction, governor_id: str, ephemeral: bool):
     """Open CrystalTech setup/progress flow for a governor."""
@@ -837,227 +519,6 @@ def register_commands(bot_instance):
     logger.info("[COMMANDS] Registering commands...")
     # Register global command error handler
     bot.add_listener(global_cmd_error_handler, "on_application_command_error")
-
-    class TargetLookupView(View):
-        def __init__(self, matches):
-            super().__init__(timeout=60)
-            self.matches = matches
-            self.ctx = None
-            self.message = None
-            for match in matches:
-                label = f"🎯 View KVK Targets for {match['GovernorName'][:50]}"
-                button = discord.ui.Button(
-                    label=label,
-                    style=discord.ButtonStyle.primary,
-                    custom_id=f"target_{match['GovernorID']}",
-                )
-                button.callback = self.make_callback(match["GovernorID"])
-                self.add_item(button)
-
-        def make_callback(self, governor_id):
-            async def callback(interaction: discord.Interaction):
-                await run_target_lookup(interaction, str(governor_id), ephemeral=True)
-
-                from target_utils import get_cached_target_info, get_fallback_target_info
-
-                logger.info(f"[BUTTON] GovernorID {governor_id} clicked by {interaction.user}")
-
-                result = await get_cached_target_info(governor_id)
-
-                if not result:
-                    await interaction.edit_original_response(
-                        content="⏳ Checking the database for additional records...",
-                        embed=None,
-                        view=None,
-                    )
-                    result = await get_fallback_target_info(governor_id)
-
-                if result["status"] == "found":
-                    embed = build_target_embed(result["data"])
-                    await interaction.edit_original_response(embed=embed, view=None)
-                else:
-                    await interaction.edit_original_response(content=result["message"], view=None)
-
-            return callback
-
-        async def on_timeout(self):
-            for item in self.children:
-                item.disabled = True
-
-            try:
-                if self.message:
-                    await self.message.edit(view=self)
-            except discord.NotFound:
-                # Message was deleted or expired – silently ignore
-                pass
-            except Exception as e:
-                logger.exception(f"[VIEW TIMEOUT ERROR] {e}")
-
-        async def interaction_check(self, interaction: discord.Interaction) -> bool:
-            return interaction.user == self.ctx.user
-
-        async def on_error(self, error: Exception, item, interaction: discord.Interaction) -> None:
-            logger.error(f"[VIEW ERROR] {error}")
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    f"⚠️ An error occurred: {error}", ephemeral=True
-                )
-
-        async def send(self, interaction: discord.Interaction, embed: discord.Embed):
-            self.ctx = interaction
-            try:
-                if not interaction.response.is_done():
-                    # first reply: include the button
-                    self.message = await interaction.response.send_message(
-                        embed=embed, view=self, ephemeral=True
-                    )
-                else:
-                    # editing the deferred/initial reply
-                    self.message = await interaction.edit_original_response(embed=embed, view=self)
-            except Exception:
-                # last resort — a fresh ephemeral message with the button
-                self.message = await interaction.followup.send(
-                    embed=embed, view=self, ephemeral=True
-                )
-
-        # --- drop-in replacement ---
-        class FuzzySelectView(View):
-            def __init__(
-                self, matches, author_id: int, *, show_targets: bool = False, timeout: float = 120
-            ):
-                super().__init__(timeout=timeout)
-                self.matches = matches
-                self.author_id = author_id
-                self.show_targets = show_targets
-                self.ctx = None
-                self.message = None
-
-                options = []
-                for m in matches[:25]:
-                    name = str(m.get("GovernorName") or "")[:75]
-                    gid = str(m.get("GovernorID") or "")
-                    desc = f"ID: {gid}"
-                    options.append(discord.SelectOption(label=name, description=desc, value=gid))
-
-                self.select = discord.ui.Select(
-                    placeholder="Choose a governor…", options=options, min_values=1, max_values=1
-                )
-                self.select.callback = self.on_select
-                self.add_item(self.select)
-
-            async def on_select(self, interaction: discord.Interaction):
-                if interaction.user.id != self.author_id:
-                    await interaction.response.send_message(
-                        "This selector isn’t for you.", ephemeral=True
-                    )
-                    return
-
-                gid = str(self.select.values[0])  # keep as string for downstream .isdigit() checks
-
-                if self.show_targets:
-                    # Offer both actions for /mygovernorid
-                    await interaction.response.send_message(
-                        f"Governor **{gid}** selected. What would you like to do?",
-                        view=TargetLookupView.PostLookupActions(
-                            author_id=self.author_id, governor_id=gid
-                        ),
-                        ephemeral=True,
-                    )
-                    return
-
-                # Register-only flow (used by My Registrations)
-                registry = load_registry() or {}
-                user_key = str(self.author_id)
-                accounts = (registry.get(user_key) or {}).get("accounts", {}) or {}
-                used_slots = set(accounts.keys())
-                free_slots = [slot for slot in ACCOUNT_ORDER if slot not in used_slots]
-
-                if not free_slots:
-                    await interaction.response.send_message(
-                        "All account slots are already registered. Use **Modify Registration** to change one.",
-                        ephemeral=True,
-                    )
-                    return
-
-                view = RegisterStartView(
-                    author_id=self.author_id, free_slots=free_slots, prefill_id=gid
-                )
-                await interaction.response.send_message(
-                    "Pick an account slot to register:", view=view, ephemeral=True
-                )
-
-            async def interaction_check(self, interaction: discord.Interaction) -> bool:
-                return interaction.user.id == self.author_id
-
-            async def on_timeout(self):
-                for item in self.children:
-                    item.disabled = True
-                try:
-                    if self.message:
-                        await self.message.edit(view=self)
-                except Exception:
-                    pass
-
-            async def on_error(self, error: Exception, item, interaction: discord.Interaction):
-                logger.error(f"[FUZZY SELECT VIEW ERROR] {error}")
-                if interaction and not interaction.response.is_done():
-                    await interaction.response.send_message(
-                        "⚠️ Something went wrong.", ephemeral=True
-                    )
-
-            async def send_followup(self, interaction: discord.Interaction, embed: discord.Embed):
-                self.ctx = interaction
-                if not interaction.response.is_done():
-                    await interaction.response.defer(ephemeral=True)
-                self.message = await interaction.followup.send(
-                    embed=embed, view=self, ephemeral=True
-                )
-
-        # --- new helper (place right after FuzzySelectView) ---
-        class PostLookupActions(View):
-            def __init__(self, *, author_id: int, governor_id: str, timeout: float = 120):
-                super().__init__(timeout=timeout)
-                self.author_id = author_id
-                self.governor_id = governor_id
-
-            async def interaction_check(self, interaction: discord.Interaction) -> bool:
-                return interaction.user.id == self.author_id
-
-            @discord.ui.button(label="View KVK Targets", style=discord.ButtonStyle.primary)
-            async def btn_targets(
-                self, button: discord.ui.Button, interaction: discord.Interaction
-            ):
-                # Keep passing a string to avoid `.isdigit()` errors inside run_target_lookup
-                await run_target_lookup(interaction, self.governor_id, ephemeral=True)
-
-            @discord.ui.button(label="Register this Governor", style=discord.ButtonStyle.success)
-            async def btn_register(
-                self, button: discord.ui.Button, interaction: discord.Interaction
-            ):
-                registry = load_registry() or {}
-                user_key = str(self.author_id)
-                accounts = (registry.get(user_key) or {}).get("accounts", {}) or {}
-                used_slots = set(accounts.keys())
-                free_slots = [slot for slot in ACCOUNT_ORDER if slot not in used_slots]
-
-                if not free_slots:
-                    await interaction.response.send_message(
-                        "All account slots are already registered. Use **Modify Registration** to change one.",
-                        ephemeral=True,
-                    )
-
-                    return
-
-                view = RegisterStartView(
-                    author_id=self.author_id, free_slots=free_slots, prefill_id=self.governor_id
-                )
-                await interaction.response.send_message(
-                    "Pick an account slot to register:", view=view, ephemeral=True
-                )
-
-    # -- expose inner class to module scope for modals & slash commands defined above --
-    global _TargetLookupView_factory
-    _TargetLookupView_factory = TargetLookupView.FuzzySelectView
 
     # === Slash Commands ===
 
@@ -1295,7 +756,7 @@ def register_commands(bot_instance):
             )
             return
 
-        options = _safe_build_unique_gov_options(accounts)
+        options = safe_build_unique_gov_options(accounts)
 
         # Single-account auto-open → use canonical helper
         if options and len(options) == 1:
@@ -1409,7 +870,7 @@ def register_commands(bot_instance):
                     ),
                     color=discord.Color.green(),
                 )
-                actions = TargetLookupView.PostLookupActions(
+                actions = PostLookupActions(
                     author_id=ctx.user.id, governor_id=str(result["data"]["GovernorID"])
                 )
                 await ctx.interaction.edit_original_response(
@@ -1434,7 +895,7 @@ def register_commands(bot_instance):
                     color=discord.Color.blue(),
                 )
                 # Restrict interactions to the invoker
-                view = TargetLookupView.FuzzySelectView(matches, ctx.user.id, show_targets=True)
+                view = FuzzySelectView(matches, ctx.user.id, show_targets=True)
                 await ctx.interaction.edit_original_response(content=None, embed=embed, view=view)
 
             else:
@@ -1584,7 +1045,7 @@ def register_commands(bot_instance):
             return
 
         # Use canonical builder (safe fallback included)
-        options = _safe_build_unique_gov_options(accounts)
+        options = safe_build_unique_gov_options(accounts)
 
         if options:
             if len(options) == 1:

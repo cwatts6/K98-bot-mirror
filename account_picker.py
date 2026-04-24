@@ -25,6 +25,13 @@ _PREFERRED_ORDER = (
     ["Main"] + [f"Alt {i}" for i in range(1, 11)] + [f"Farm {i}" for i in range(1, 21)]
 )
 
+# Public canonical ACCOUNT_ORDER — used by command files and the service layer.
+# Matches the same ordering as _PREFERRED_ORDER but scoped to the first 16 slots
+# (Main + Alt 1-5 + Farm 1-10) for backward compatibility with existing slot logic.
+ACCOUNT_ORDER: list[str] = (
+    ["Main"] + [f"Alt {i}" for i in range(1, 6)] + [f"Farm {i}" for i in range(1, 11)]
+)
+
 
 def _slot_rank(slot_name: str) -> int:
     """
@@ -78,6 +85,31 @@ def build_unique_gov_options(accounts: dict[str, dict]) -> list[discord.SelectOp
         options.append(opt)
 
     return options
+
+
+def safe_build_unique_gov_options(accounts: dict) -> list[discord.SelectOption]:
+    """
+    Error-handling wrapper around build_unique_gov_options.
+    Logs and returns an empty list on any failure. Use this in command/view code
+    where a crash from the options builder should never surface as an unhandled exception.
+    """
+    try:
+        opts = build_unique_gov_options(accounts)
+        if isinstance(opts, list):
+            return opts
+        logger.warning(
+            "[AccountPicker] build_unique_gov_options returned non-list; coercing to list"
+        )
+        try:
+            return list(opts) if opts is not None else []
+        except Exception:
+            logger.exception(
+                "[AccountPicker] failed to coerce build_unique_gov_options result to list"
+            )
+            return []
+    except Exception:
+        logger.exception("[AccountPicker] build_unique_gov_options failed; returning empty options")
+        return []
 
 
 # ----------------- AccountPickerView (reusable) -----------------
