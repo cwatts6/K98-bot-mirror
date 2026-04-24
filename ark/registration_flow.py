@@ -288,13 +288,16 @@ class ArkRegistrationController:
         return embed, view
 
     async def refresh_registration_message(self, client) -> None:
-        await self.ensure_registration_message(
-            client=client,
-            announce=False,
-            force_announce=False,
-            force_repost=False,
-            update_refresh_timestamp=False,
-        )
+        try:
+            await self.ensure_registration_message(
+                client=client,
+                announce=False,
+                force_announce=False,
+                force_repost=False,
+                update_refresh_timestamp=False,
+            )
+        except discord.HTTPException:
+            logger.exception("[ARK] Failed to refresh registration message for match_id=%s", self.match_id)
 
     async def _persist_registration_state(
         self,
@@ -510,7 +513,7 @@ class ArkRegistrationController:
         )
 
         if self._response_is_done(interaction):
-            await interaction.followup.send(heading, view=view, ephemeral=True)
+            view.message = await interaction.followup.send(heading, view=view, ephemeral=True)
         else:
             await interaction.response.send_message(heading, view=view, ephemeral=True)
 
@@ -738,17 +741,10 @@ class ArkRegistrationController:
         )
 
         await self.refresh_registration_message(interaction.client)
-        # Success response: replace the selector message and remove the view
         if self._response_is_done(interaction):
-            await interaction.edit_original_response(
-                content="✅ You’re signed up!",
-                view=None,
-            )
+            await interaction.followup.send("✅ You’re signed up!", ephemeral=True)
         else:
-            await interaction.response.edit_message(
-                content="✅ You’re signed up!",
-                view=None,
-            )
+            await interaction.response.send_message("✅ You’re signed up!", ephemeral=True)
 
     async def leave(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
@@ -797,17 +793,10 @@ class ArkRegistrationController:
             )
 
             await self.refresh_registration_message(interaction.client)
-
             if inter.response.is_done():
-                await inter.edit_original_response(
-                    content="✅ You’ve left the match.",
-                    view=None,
-                )
+                await inter.followup.send("✅ You’ve left the match.", ephemeral=True)
             else:
-                await inter.response.edit_message(
-                    content="✅ You’ve left the match.",
-                    view=None,
-                )
+                await inter.response.send_message("✅ You’ve left the match.", ephemeral=True)
 
         await self._prompt_governor_selection(
             interaction,
@@ -991,12 +980,10 @@ class ArkRegistrationController:
         )
 
         await self.refresh_registration_message(interaction.client)
-
-        # Close selector
         if self._response_is_done(interaction):
-            await interaction.edit_original_response(content="✅ Governor switched.", view=None)
+            await interaction.followup.send("✅ Governor switched.", ephemeral=True)
         else:
-            await interaction.response.edit_message(content="✅ Governor switched.", view=None)
+            await interaction.response.send_message("✅ Governor switched.", ephemeral=True)
 
     def _admin_override_sub_rule(self) -> bool:
         raw = self.config.get("AdminOverrideSubRule", 0) if self.config else 0

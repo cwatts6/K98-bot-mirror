@@ -604,6 +604,7 @@ class ArkGovernorSelectView(discord.ui.View):
         super().__init__(timeout=timeout)
         self.author_id = author_id
         self._on_select = on_select
+        self.message: discord.Message | None = None
 
         self.select = discord.ui.Select(
             placeholder="Select a governor",
@@ -613,6 +614,15 @@ class ArkGovernorSelectView(discord.ui.View):
         )
         self.select.callback = self._handle_select
         self.add_item(self.select)
+
+    async def on_timeout(self) -> None:
+        for item in self.children:
+            item.disabled = True
+        try:
+            if self.message:
+                await self.message.edit(view=self)
+        except Exception:
+            pass
 
     async def _handle_select(self, interaction: discord.Interaction):
         if interaction.user.id != self.author_id:
