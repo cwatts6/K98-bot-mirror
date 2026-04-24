@@ -409,7 +409,7 @@ class PostLookupActions(View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.author_id
 
-    @discord.ui.button(label="View KVK Stats", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="View KVK Stats", style=discord.ButtonStyle.danger)
     async def btn_stats(self, button: discord.ui.Button, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=True)
@@ -460,7 +460,7 @@ class PostLookupActions(View):
     async def btn_targets(self, button: discord.ui.Button, interaction: discord.Interaction):
         from target_utils import run_target_lookup
 
-        await run_target_lookup(interaction, self.governor_id, ephemeral=True)
+        await run_target_lookup(interaction, self.governor_id, ephemeral=False)
 
     @discord.ui.button(label="Register this Governor", style=discord.ButtonStyle.success)
     async def btn_register(self, button: discord.ui.Button, interaction: discord.Interaction):
