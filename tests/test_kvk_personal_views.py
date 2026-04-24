@@ -208,3 +208,74 @@ async def test_post_lookup_actions_interaction_check_allows_correct_user():
     interaction = DummyInteraction(user_id=1)
     result = await view.interaction_check(interaction)
     assert result is True
+
+
+# ---------------------------------------------------------------------------
+# PostLookupActions — btn_stats calls load_kvk_personal_stats + post_stats_embeds
+# ---------------------------------------------------------------------------
+
+
+async def test_post_lookup_actions_btn_stats_loads_and_posts(monkeypatch):
+    """btn_stats loads stats via the service and calls post_stats_embeds."""
+    import types
+
+    from ui.views.kvk_personal_views import PostLookupActions
+
+    # --- stubs ---
+    stats_called = {}
+    post_called = {}
+
+    async def fake_load_stats(gid):
+        stats_called["gid"] = gid
+        return {"GovernorID": gid, "GovernorName": "TestGov"}
+
+    async def fake_post_stats(bot, ctx, embeds, file):
+        post_called["bot"] = bot
+        return (True, "orig_channel")
+
+    def fake_normalize(gid):
+        return gid
+
+    def fake_build_embed(row, user):
+        return (["embed"], None)
+
+    def fake_get_last_kvk(gid):
+        return None
+
+    # Patch service helpers
+    import services.kvk_personal_service as svc
+
+    monkeypatch.setattr(svc, "load_kvk_personal_stats", fake_load_stats)
+    monkeypatch.setattr(svc, "post_stats_embeds", fake_post_stats)
+
+    import utils
+
+    monkeypatch.setattr(utils, "normalize_governor_id", fake_normalize, raising=False)
+
+    import embed_utils
+
+    monkeypatch.setattr(embed_utils, "build_stats_embed", fake_build_embed, raising=False)
+
+    import stats_cache_helpers
+
+    monkeypatch.setattr(
+        stats_cache_helpers, "get_last_kvk_for_governor_sync", fake_get_last_kvk, raising=False
+    )
+
+    view = PostLookupActions(author_id=1, governor_id="123")
+
+    dummy_client = types.SimpleNamespace()
+
+    class DummyInteractionWithClient(DummyInteraction):
+        client = dummy_client
+
+        async def _defer(self, **kwargs):
+            self.response._done = True
+
+    interaction = DummyInteractionWithClient(user_id=1)
+    interaction.response.defer = interaction._defer
+
+    await view.btn_stats.callback(interaction)
+
+    assert stats_called.get("gid") == "123", "load_kvk_personal_stats not called with correct gid"
+    assert post_called.get("bot") is dummy_client, "post_stats_embeds not called with interaction.client"

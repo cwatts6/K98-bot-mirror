@@ -393,8 +393,11 @@ class FuzzySelectView(View):
 
 class PostLookupActions(View):
     """
-    Two-button view shown after governor lookup in /mygovernorid:
-    - View KVK Targets
+    Action buttons shown after a governor lookup (fuzzy search or direct ID entry).
+
+    Buttons:
+    - View KVK Stats      — load and post stats for the selected governor
+    - View KVK Targets    — open the full target embed for the selected governor
     - Register this Governor
     """
 
@@ -405,6 +408,53 @@ class PostLookupActions(View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.author_id
+
+    @discord.ui.button(label="View KVK Stats", style=discord.ButtonStyle.secondary)
+    async def btn_stats(self, button: discord.ui.Button, interaction: discord.Interaction):
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass
+
+        try:
+            from embed_utils import build_stats_embed
+            from services import kvk_personal_service
+            from stats_cache_helpers import get_last_kvk_for_governor_sync
+            from utils import normalize_governor_id
+
+            gid = normalize_governor_id(self.governor_id)
+            row = await kvk_personal_service.load_kvk_personal_stats(gid)
+            if not row:
+                await interaction.followup.send(
+                    f"❌ Couldn't find stats for Governor ID `{gid}`.", ephemeral=True
+                )
+                return
+
+            try:
+                lk = get_last_kvk_for_governor_sync(str(gid))
+                if lk:
+                    row["last_kvk"] = lk
+            except Exception:
+                logger.exception("[PostLookupActions] failed attaching last_kvk for %s", gid)
+
+            embeds, file = build_stats_embed(row, interaction.user)
+            posted, _ = await kvk_personal_service.post_stats_embeds(
+                interaction.client, interaction, embeds, file
+            )
+            if not posted:
+                await interaction.followup.send(
+                    "⚠️ Couldn't post stats. Check bot/channel permissions.", ephemeral=True
+                )
+        except Exception:
+            logger.exception(
+                "[PostLookupActions] btn_stats failed governor_id=%s", self.governor_id
+            )
+            try:
+                await interaction.followup.send(
+                    "⚠️ Something went wrong loading stats.", ephemeral=True
+                )
+            except Exception:
+                pass
 
     @discord.ui.button(label="View KVK Targets", style=discord.ButtonStyle.primary)
     async def btn_targets(self, button: discord.ui.Button, interaction: discord.Interaction):
