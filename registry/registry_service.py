@@ -17,9 +17,11 @@ Not responsible for:
 
 from __future__ import annotations
 
+import copy
 import logging
 from typing import Any
 
+from registry import registry_cache
 from registry.dal import registry_dal
 
 logger = logging.getLogger(__name__)
@@ -86,6 +88,7 @@ def register_governor(
             provenance,
             created_by or "self",
         )
+        registry_cache.invalidate(reason="register_governor")
         return True, None
 
     if code == RC_DUPE_SLOT:
@@ -174,6 +177,7 @@ def modify_governor(
             new_governor_name,
             updated_by or "self",
         )
+        registry_cache.invalidate(reason="modify_governor")
         return True, None
 
     # Partial failure: old row superseded but new row not created.
@@ -219,6 +223,7 @@ def remove_governor(
             discord_user_id,
             removed_by or "self",
         )
+        registry_cache.invalidate(reason="remove_governor")
         return True, None
 
     if code == RC_NOT_FOUND:
@@ -313,6 +318,7 @@ def admin_register_or_replace(
             account_type,
             uid,
         )
+        registry_cache.invalidate(reason="admin_register_or_replace")
         return True, None
 
     if slot_exists:
@@ -411,7 +417,9 @@ def check_governor_claimed_by_other(governor_id: str | int, owner_discord_id: in
 # ---------------------------------------------------------------------------
 
 
-def load_registry_as_dict() -> dict[str, Any]:
+def load_registry_as_dict(
+    *, use_cache: bool = True, allow_stale_on_error: bool = True
+) -> dict[str, Any]:
     """
     Return all Active registrations in the legacy dict shape:
 
@@ -429,8 +437,41 @@ def load_registry_as_dict() -> dict[str, Any]:
 
     This is the SQL-backed replacement for the old governor_registry.load_registry().
     Called by governor_registry.load_registry() and registry_io audit/export paths.
+
+    Parameters
+    ----------
+    use_cache:
+        When True (default), return the cached dict if within TTL.
+        Pass False to bypass the cache and always hit SQL.
+    allow_stale_on_error:
+        When True (default), return a stale cache hit on SQL failure (with a
+        WARNING log).  When False, re-raise SQL exceptions even if stale data
+        is available — use this for audit/export commands where accuracy matters.
     """
-    rows = registry_dal.get_all_active()
+    if use_cache:
+        cached = registry_cache.get_cached_or_none()
+        if cached is not None:
+            return cached
+
+    logger.info("[registry_service] cache miss — loading registry from SQL")
+
+    # Grab the current stale snapshot before attempting SQL (for fallback).
+    # Access internal state directly to avoid TTL check blocking us.
+    import registry.registry_cache as _rc
+
+    with _rc._cache_lock:
+        stale = copy.deepcopy(_rc._cache_data) if _rc._cache_data is not None else None
+
+    try:
+        rows = registry_dal.get_all_active()
+    except Exception:
+        if stale is not None and allow_stale_on_error:
+            logger.warning(
+                "[registry_service] SQL failure loading registry — returning stale cache data"
+            )
+            return stale
+        raise
+
     result: dict[str, Any] = {}
     for row in rows:
         uid_str = str(row["DiscordUserID"])
@@ -444,4 +485,20 @@ def load_registry_as_dict() -> dict[str, Any]:
             "GovernorID": str(row["GovernorID"]),
             "GovernorName": str(row.get("GovernorName") or ""),
         }
-    return result
+
+    registry_cache.store_cache(result)
+    return copy.deepcopy(result)
+
+
+def invalidate_registry_cache(reason: str = "unspecified") -> None:
+    """Public entry point for external callers (imports, admin commands) to invalidate the registry cache."""
+    from registry.registry_cache import invalidate
+
+    invalidate(reason=reason)
+
+
+def get_registry_cache_info() -> dict[str, object]:
+    """Return diagnostic info about the registry cache state."""
+    from registry.registry_cache import get_info
+
+    return get_info()

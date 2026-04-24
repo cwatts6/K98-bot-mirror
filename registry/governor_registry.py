@@ -7,15 +7,13 @@ Persistence and business logic are now owned by:
   registry_service.py — validation, duplicate rules, orchestration
 
 This module is retained for:
-  1. Backward-compatible load_registry() / save_registry() signatures
-     called throughout the codebase during the transition period.
+  1. Backward-compatible load_registry() signature called throughout the codebase.
   2. register_account() called by RegisterGovernorView and ModifyGovernorView.
   3. get_discord_name_for_governor() called by stats/embed helpers.
   4. get_user_main_governor_id / get_user_main_governor_name dict-based helpers.
-  5. All Discord UI View classes (RegisterGovernorView, ModifyGovernorView,
-     ConfirmRemoveView, KVKStatsView, KVKAccountButton).
+  5. Discord UI View classes: RegisterGovernorView, ModifyGovernorView, ConfirmRemoveView.
 
-save_registry() is now a no-op.  All writes go through registry_service.
+KVKStatsView and KVKAccountButton have been moved to ui/views/stats_views.py.
 """
 
 from __future__ import annotations
@@ -23,9 +21,6 @@ from __future__ import annotations
 import logging
 
 import discord
-
-from embed_utils import build_stats_embed
-from utils import load_stat_row
 
 logger = logging.getLogger(__name__)
 
@@ -57,43 +52,13 @@ def load_registry() -> dict:
     try:
         from registry.registry_service import load_registry_as_dict
 
-        return load_registry_as_dict()
+        return load_registry_as_dict(use_cache=True, allow_stale_on_error=True)
     except Exception:
         logger.exception(
             "[governor_registry] load_registry FAILED — SQL unavailable or query error. "
             "Commands relying on registry read data will behave as if registry is empty."
         )
         return {}
-
-
-def save_registry(data: dict) -> None:
-    """
-    Deprecated no-op.
-
-    All writes now go through registry_service (register_governor,
-    modify_governor, remove_governor) which call the DAL directly.
-    Callers that relied on save_registry() have been updated to use
-    the service layer.  This stub is retained to prevent AttributeErrors
-    from any residual call sites during the transition period.
-    """
-    logger.warning(
-        "[governor_registry] save_registry() called — this is a no-op since Phase 3. "
-        "All writes must go through registry_service. "
-        "Caller: %s",
-        _caller_name(),
-    )
-
-
-def _caller_name() -> str:
-    """Return a best-effort caller description for the save_registry deprecation warning."""
-    import traceback
-
-    stack = traceback.extract_stack()
-    # Return the frame two levels above this helper (save_registry → _caller_name → here)
-    if len(stack) >= 3:
-        frame = stack[-3]
-        return f"{frame.filename}:{frame.lineno} in {frame.name}"
-    return "unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -337,148 +302,3 @@ class ConfirmRemoveView(discord.ui.View):
         if interaction.user.id == self.user.id:
             await interaction.response.edit_message(content="❌ Removal cancelled.", view=None)
         self.stop()
-
-
-class KVKStatsView(discord.ui.View):
-    def __init__(
-        self, user: discord.User, accounts: dict, *, ephemeral: bool = False, timeout: float = 120
-    ):
-        super().__init__(timeout=timeout)
-        self.user = user
-        self.author_id = user.id
-        self.accounts = accounts
-        self.ephemeral = ephemeral
-
-        def _sort_key(item):
-            label, _info = item
-            lc = label.lower().strip()
-            if lc == "main":
-                return (0, 0, lc)
-            if lc.startswith("alt"):
-                try:
-                    n = int("".join(c for c in lc if c.isdigit()) or 0)
-                except Exception:
-                    n = 0
-                return (1, n, lc)
-            if lc.startswith("farm"):
-                try:
-                    n = int("".join(c for c in lc if c.isdigit()) or 0)
-                except Exception:
-                    n = 0
-                return (2, n, lc)
-            return (3, 0, lc)
-
-        for idx, (label, info) in enumerate(sorted(accounts.items(), key=_sort_key)[:25]):
-            gov_id = str(info.get("GovernorID", "")).strip()
-            if not gov_id:
-                continue
-            btn = KVKAccountButton(
-                label=label,
-                governor_id=gov_id,
-                author_id=self.author_id,
-                ephemeral=self.ephemeral,
-            )
-            try:
-                btn.row = min(idx // 5, 4)
-            except Exception:
-                pass
-            self.add_item(btn)
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.author_id:
-            try:
-                await interaction.response.send_message(
-                    "❌ This selector isn't for you.", ephemeral=True
-                )
-            except Exception:
-                pass
-            return False
-        return True
-
-    async def on_timeout(self):
-        for c in self.children:
-            c.disabled = True
-
-
-class KVKAccountButton(discord.ui.Button):
-    def __init__(self, *, label: str, governor_id: str, author_id: int, ephemeral: bool):
-        super().__init__(label=label, style=discord.ButtonStyle.primary)
-        self._label = label
-        self.governor_id = str(governor_id)
-        self.author_id = author_id
-        self.ephemeral = ephemeral
-
-    async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message(
-                "❌ This selector isn't for you.", ephemeral=True
-            )
-            return
-
-        try:
-            await interaction.response.defer(ephemeral=self.ephemeral)
-        except Exception:
-            pass
-
-        gov_data = load_stat_row(self.governor_id)
-        if not gov_data:
-            await interaction.followup.send(
-                "❌ Stats not found for that Governor ID.", ephemeral=True
-            )
-            return
-
-        try:
-            result = build_stats_embed(gov_data, interaction.user)
-        except Exception as e:
-            await interaction.followup.send(
-                f"❌ Failed to build stats: `{type(e).__name__}: {e}`", ephemeral=True
-            )
-            return
-
-        embeds = None
-        file = None
-        try:
-            if isinstance(result, tuple) and isinstance(result[0], list):
-                embeds, file = result
-            elif isinstance(result, list):
-                embeds, file = result, None
-            else:
-                try:
-                    possible_embed, possible_file = result
-                    if isinstance(possible_embed, discord.Embed):
-                        embeds, file = [possible_embed], possible_file
-                    else:
-                        embeds, file = [possible_embed], possible_file
-                except Exception:
-                    embeds, file = (
-                        [result] if isinstance(result, discord.Embed) else [result]
-                    ), None
-        except Exception:
-            embeds, file = [result], None
-
-        try:
-            if file is not None:
-                await interaction.followup.send(
-                    content=f"📊 Showing stats for `{self._label}`:",
-                    embeds=embeds,
-                    files=[file],
-                    ephemeral=self.ephemeral,
-                )
-            else:
-                await interaction.followup.send(
-                    content=f"📊 Showing stats for `{self._label}`:",
-                    embeds=embeds,
-                    ephemeral=self.ephemeral,
-                )
-        except Exception as e:
-            logger.exception("[KVKAccountButton] failed to send embeds: %s", e)
-            try:
-                if embeds:
-                    await interaction.followup.send(
-                        content=f"📊 Showing stats for `{self._label}`:",
-                        embed=embeds[0],
-                        file=file,
-                        ephemeral=self.ephemeral,
-                    )
-            except Exception:
-                pass

@@ -1050,7 +1050,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     ):
         await ctx.defer(ephemeral=ephemeral)
 
-        registry = load_registry()
+        registry = await asyncio.to_thread(load_registry) or {}
         user_id = str(ctx.user.id)
         payload = registry.get(user_id) or {}
         account_map = payload.get("accounts") or {}  # {label: {GovernorID, GovernorName}}
