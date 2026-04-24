@@ -614,6 +614,13 @@ class ArkGovernorSelectView(discord.ui.View):
         self.select.callback = self._handle_select
         self.add_item(self.select)
 
+    async def on_timeout(self) -> None:
+        try:
+            self.select.disabled = True
+            self.stop()
+        except Exception:
+            pass
+
     async def _handle_select(self, interaction: discord.Interaction):
         if interaction.user.id != self.author_id:
             await interaction.response.send_message("❌ This menu isn’t for you.", ephemeral=True)
