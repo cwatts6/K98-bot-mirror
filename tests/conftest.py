@@ -70,7 +70,7 @@ def async_noop():
 def _clear_mge_undo_buffer():
     try:
         from mge import mge_roster_service
-    except ModuleNotFoundError:
+    except Exception:
         yield
         return
 
@@ -79,3 +79,18 @@ def _clear_mge_undo_buffer():
     yield
     with mge_roster_service._UNDO_LOCK:
         mge_roster_service._UNDO_BUFFER.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_registry_cache():
+    """Reset the in-process registry cache before every test to ensure isolation."""
+    try:
+        import registry.registry_cache as rc
+
+        with rc._cache_lock:
+            rc._cache_data = None
+            rc._cache_ts = 0.0
+            rc._last_invalidation_reason = "test_setup"
+    except Exception:
+        pass
+    yield

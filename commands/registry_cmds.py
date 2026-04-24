@@ -11,6 +11,7 @@ from typing import Any
 import discord
 from discord.ext import commands as ext_commands
 
+from account_picker import ACCOUNT_ORDER
 from bot_config import GUILD_ID
 from constants import _conn
 from core.interaction_safety import safe_command, safe_defer
@@ -33,15 +34,13 @@ from registry.registry_io import (
     rows_to_xlsx_bytes,
 )
 from registry.registry_service import VALID_ACCOUNT_TYPES
+import registry.registry_service as registry_service
 import target_utils
 from ui.views.admin_views import ConfirmImportView
 from ui.views.registry_views import MyRegsActionView
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
-
-ACCOUNT_ORDER = ["Main"] + [f"Alt {i}" for i in range(1, 6)] + [f"Farm {i}" for i in range(1, 11)]
-
 
 def register_registry(bot: ext_commands.Bot) -> None:
 
@@ -865,55 +864,11 @@ def register_registry(bot: ext_commands.Bot) -> None:
                     return str(v)
             return ""
 
-        # ---------- SQL (via your existing _conn helper) ----------
-        def _fetch_active_players():
-            sql = """
-            SELECT [PowerRank],
-                   [GovernorName],
-                   [GovernorID],
-                   [Alliance],
-                   [Power],
-                   [KillPoints],
-                   [Deads],
-                   [T1_Kills],
-                   [T2_Kills],
-                   [T3_Kills],
-                   [T4_Kills],
-                   [T5_Kills],
-                   [T4&T5_KILLS],
-                   [TOTAL_KILLS],
-                   [RSS_Gathered],
-                   [RSSAssistance],
-                   [Helps],
-                   [ScanDate],
-                   [Troops Power],
-                   [City Hall],
-                   [Tech Power],
-                   [Building Power],
-                   [Commander Power],
-                   [LOCATION]
-            FROM [ROK_TRACKER].[dbo].[v_Active_Players]
-            WITH (NOLOCK);
-            """
-            conn = _conn()
-            try:
-                cur = conn.cursor()
-                cur.execute(sql)
-                cols = [c[0] for c in cur.description]
-                rows = [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
-                return rows
-            finally:
-                try:
-                    cur.close()
-                except Exception:
-                    pass
-                try:
-                    conn.close()
-                except Exception:
-                    pass
+        # ---------- SQL via audit_dal ----------
+        from registry.dal.audit_dal import get_active_players
 
         try:
-            sql_rows = await asyncio.to_thread(_fetch_active_players)
+            sql_rows = await asyncio.to_thread(get_active_players)
         except Exception as e:
             logger.exception("[registration_audit] SQL fetch failed")
             await ctx.interaction.edit_original_response(
@@ -923,9 +878,9 @@ def register_registry(bot: ext_commands.Bot) -> None:
 
         # ---------- Registry & guild helpers ----------
         try:
-            registry = load_registry()
+            registry = registry_service.load_registry_as_dict(allow_stale_on_error=False)
         except Exception as e:
-            logger.exception("[registration_audit] load_registry failed")
+            logger.exception("[registration_audit] load_registry_as_dict failed")
             await ctx.interaction.edit_original_response(
                 content=(
                     "❌ Could not load the registry from SQL. "
@@ -935,10 +890,10 @@ def register_registry(bot: ext_commands.Bot) -> None:
             )
             return
         if not registry:
-            # load_registry() returns {} on SQL error — treat as failure
+            # load_registry_as_dict() returned empty — treat as failure
             # since an empty registry at audit time is almost certainly wrong.
             logger.error(
-                "[registration_audit] load_registry returned empty dict — "
+                "[registration_audit] load_registry_as_dict returned empty dict — "
                 "possible SQL failure; aborting audit to avoid misleading output."
             )
             await ctx.interaction.edit_original_response(
@@ -1225,9 +1180,9 @@ def register_registry(bot: ext_commands.Bot) -> None:
             return
 
         try:
-            registry = load_registry()
+            registry = registry_service.load_registry_as_dict(allow_stale_on_error=False)
         except Exception as e:
-            logger.exception("[bulk_export_registrations] load_registry failed")
+            logger.exception("[bulk_export_registrations] load_registry_as_dict failed")
             await ctx.interaction.edit_original_response(
                 content=(
                     "❌ Could not load the registry from SQL. "
@@ -1238,7 +1193,9 @@ def register_registry(bot: ext_commands.Bot) -> None:
             return
         if not registry:
             logger.error(
-                "[bulk_export_registrations] load_registry returned empty dict — "
+                "[bulk_export_registrations] load_registry_as_dict returned empty dict — "
+                "possible SQL failure; aborting export."
+            )
                 "possible SQL failure; aborting export."
             )
             await ctx.interaction.edit_original_response(

@@ -473,4 +473,159 @@ class KVKRankingView(discord.ui.View):
             logger.debug("Failed to update message on timeout: %r", exc)
 
 
-__all__ = ["KVKRankingView"]
+__all__ = ["KVKRankingView", "KVKStatsView", "KVKAccountButton"]
+
+
+class KVKStatsView(discord.ui.View):
+    """
+    View presenting per-account KVK stats buttons for a Discord user.
+
+    Buttons are sorted using account_picker._slot_rank for consistency with
+    the rest of the account-picker UI.  Author guard is enforced both in
+    interaction_check() and in each button callback.
+    """
+
+    def __init__(
+        self, user: discord.User, accounts: dict, *, ephemeral: bool = False, timeout: float = 120
+    ):
+        super().__init__(timeout=timeout)
+        self.user = user
+        self.author_id = user.id
+        self.accounts = accounts
+        self.ephemeral = ephemeral
+
+        from account_picker import _slot_rank
+
+        for idx, (label, info) in enumerate(
+            sorted(accounts.items(), key=lambda kv: (_slot_rank(kv[0]), kv[0]))[:25]
+        ):
+            gov_id = str(info.get("GovernorID", "")).strip()
+            if not gov_id:
+                continue
+            btn = KVKAccountButton(
+                label=label,
+                governor_id=gov_id,
+                author_id=self.author_id,
+                ephemeral=self.ephemeral,
+            )
+            try:
+                btn.row = min(idx // 5, 4)
+            except Exception:
+                pass
+            self.add_item(btn)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            try:
+                await interaction.response.send_message(
+                    "❌ This selector isn't for you.", ephemeral=True
+                )
+            except Exception:
+                pass
+            return False
+        return True
+
+    async def on_timeout(self) -> None:
+        for child in self.children:
+            child.disabled = True
+
+
+class KVKAccountButton(discord.ui.Button):
+    """
+    Button that fetches and displays KVK stats for a single governor account.
+
+    Error handling is linear (no nesting):
+      - Stats not found → WARNING + ephemeral reply
+      - Embed build failure → ERROR (logger.exception) + ephemeral reply
+      - Send failure → ERROR (logger.exception) + ephemeral reply
+    """
+
+    def __init__(self, *, label: str, governor_id: str, author_id: int, ephemeral: bool):
+        super().__init__(label=label, style=discord.ButtonStyle.primary)
+        self._label = label
+        self.governor_id = str(governor_id)
+        self.author_id = author_id
+        self.ephemeral = ephemeral
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "❌ This selector isn't for you.", ephemeral=True
+            )
+            return
+
+        try:
+            await interaction.response.defer(ephemeral=self.ephemeral)
+        except Exception:
+            pass
+
+        from embed_utils import build_stats_embed
+        from utils import load_stat_row
+
+        gov_data = load_stat_row(self.governor_id)
+        if not gov_data:
+            logger.warning(
+                "[KVKAccountButton] stats not found for GovernorID=%s label=%s",
+                self.governor_id,
+                self._label,
+            )
+            await interaction.followup.send(
+                "❌ Stats not found for that Governor ID.", ephemeral=True
+            )
+            return
+
+        try:
+            result = build_stats_embed(gov_data, interaction.user)
+        except Exception:
+            logger.exception(
+                "[KVKAccountButton] build_stats_embed failed for GovernorID=%s label=%s",
+                self.governor_id,
+                self._label,
+            )
+            await interaction.followup.send(
+                "❌ Failed to build stats embed. Please try again later.", ephemeral=True
+            )
+            return
+
+        # Unpack the result shape returned by build_stats_embed
+        embeds: list[discord.Embed]
+        file: discord.File | None
+
+        if isinstance(result, tuple) and len(result) == 2 and isinstance(result[0], list):
+            embeds, file = result
+        elif isinstance(result, list):
+            embeds, file = result, None
+        elif isinstance(result, tuple) and len(result) == 2:
+            embed_or_list, maybe_file = result
+            if isinstance(embed_or_list, list):
+                embeds = embed_or_list
+            elif isinstance(embed_or_list, discord.Embed):
+                embeds = [embed_or_list]
+            else:
+                embeds = [embed_or_list]
+            file = maybe_file if isinstance(maybe_file, discord.File) else None
+        elif isinstance(result, discord.Embed):
+            embeds, file = [result], None
+        else:
+            embeds, file = [result], None  # type: ignore[list-item]
+
+        try:
+            if file is not None:
+                await interaction.followup.send(
+                    content=f"📊 Showing stats for `{self._label}`:",
+                    embeds=embeds,
+                    files=[file],
+                    ephemeral=self.ephemeral,
+                )
+            else:
+                await interaction.followup.send(
+                    content=f"📊 Showing stats for `{self._label}`:",
+                    embeds=embeds,
+                    ephemeral=self.ephemeral,
+                )
+        except Exception:
+            logger.exception(
+                "[KVKAccountButton] failed to send embed for GovernorID=%s label=%s",
+                self.governor_id,
+                self._label,
+            )

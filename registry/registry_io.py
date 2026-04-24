@@ -683,8 +683,9 @@ def apply_import_plan(
     for e in errors:
         logger.warning("[IMPORT] %s", e)
 
-    from registry.registry_service import load_registry_as_dict
+    from registry.registry_service import invalidate_registry_cache, load_registry_as_dict
 
+    invalidate_registry_cache(reason="import_apply")
     return load_registry_as_dict(), summary, errors  # add errors as third element
 
 
