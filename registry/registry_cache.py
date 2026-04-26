@@ -24,7 +24,22 @@ _cache_ts: float = 0.0
 _cache_lock: threading.Lock = threading.Lock()
 _last_invalidation_reason: str = "never_populated"
 
-_CACHE_TTL: float = float(os.environ.get("REGISTRY_CACHE_TTL_SECONDS", "45"))
+
+def _parse_ttl() -> float:
+    """Parse REGISTRY_CACHE_TTL_SECONDS from env, falling back to 45.0 on any error."""
+    raw = os.environ.get("REGISTRY_CACHE_TTL_SECONDS", "")
+    if raw:
+        try:
+            return float(raw)
+        except ValueError:
+            logger.warning(
+                "[registry_cache] Invalid REGISTRY_CACHE_TTL_SECONDS=%r — using default 45s",
+                raw,
+            )
+    return 45.0
+
+
+_CACHE_TTL: float = _parse_ttl()
 
 
 # ---------------------------------------------------------------------------
@@ -69,6 +84,30 @@ def store_cache(data: dict) -> None:
     with _cache_lock:
         _cache_data = copy.deepcopy(data)
         _cache_ts = time.monotonic()
+
+
+def get_stale_or_none() -> dict | None:
+    """
+    Thread-safe stale-snapshot read for error-fallback paths.
+
+    Unlike get_cached_or_none(), this ignores TTL expiry — it returns data
+    that is beyond TTL but still safe to show.
+
+    Critically, it DOES respect the _cache_ts == 0.0 invalidation sentinel:
+    data that has been explicitly invalidated (e.g. after a successful write)
+    is NOT returned, so callers cannot see pre-write state after a mutation.
+
+    Returns None when:
+      - cache is unpopulated (_cache_data is None), or
+      - cache has been explicitly invalidated (_cache_ts == 0.0).
+    """
+    with _cache_lock:
+        if _cache_data is None:
+            return None
+        if _cache_ts == 0.0:
+            # Explicitly invalidated — do not return this snapshot.
+            return None
+        return copy.deepcopy(_cache_data)
 
 
 def invalidate(reason: str = "unspecified") -> None:

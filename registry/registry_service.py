@@ -453,14 +453,12 @@ def load_registry_as_dict(
         if cached is not None:
             return cached
 
-    logger.info("[registry_service] cache miss — loading registry from SQL")
+    logger.debug("[registry_service] cache miss — loading registry from SQL")
 
-    # Grab the current stale snapshot before attempting SQL (for fallback).
-    # Access internal state directly to avoid TTL check blocking us.
-    import registry.registry_cache as _rc
-
-    with _rc._cache_lock:
-        stale = copy.deepcopy(_rc._cache_data) if _rc._cache_data is not None else None
+    # Grab a stale snapshot via the public API before attempting SQL.
+    # get_stale_or_none() respects the invalidation sentinel (_cache_ts == 0.0),
+    # so data invalidated by a prior successful write will NOT be returned here.
+    stale = registry_cache.get_stale_or_none()
 
     try:
         rows = registry_dal.get_all_active()

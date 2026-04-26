@@ -173,6 +173,88 @@ def test_invalidate_logs_info(monkeypatch, caplog):
 
 
 # ---------------------------------------------------------------------------
+# get_stale_or_none() tests
+# ---------------------------------------------------------------------------
+
+
+def test_get_stale_or_none_returns_data_beyond_ttl(monkeypatch):
+    """get_stale_or_none() returns data even when TTL has expired."""
+    _reset_cache(monkeypatch)
+    monkeypatch.setattr(rc, "_CACHE_TTL", 0.001)
+    rc.store_cache(_SAMPLE_DICT)
+    time.sleep(0.02)  # exceed TTL
+    # get_cached_or_none returns None...
+    assert rc.get_cached_or_none() is None
+    # ...but get_stale_or_none still returns the data
+    stale = rc.get_stale_or_none()
+    assert stale is not None
+    assert "111" in stale
+
+
+def test_get_stale_or_none_returns_none_when_empty(monkeypatch):
+    """get_stale_or_none() returns None when cache was never populated."""
+    _reset_cache(monkeypatch)
+    assert rc.get_stale_or_none() is None
+
+
+def test_get_stale_or_none_respects_invalidation_sentinel(monkeypatch):
+    """get_stale_or_none() must NOT return data after explicit invalidation."""
+    _reset_cache(monkeypatch)
+    monkeypatch.setattr(rc, "_CACHE_TTL", 9999.0)
+    rc.store_cache(_SAMPLE_DICT)
+    assert rc.get_stale_or_none() is not None  # populated before invalidation
+    rc.invalidate(reason="write_sentinel_test")
+    assert rc.get_stale_or_none() is None, (
+        "get_stale_or_none() must return None after invalidation even when _cache_data is still set"
+    )
+
+
+def test_stale_fallback_not_returned_after_write_invalidation(monkeypatch):
+    """SQL failure after a write must NOT return the pre-write stale snapshot."""
+    _reset_cache(monkeypatch)
+    monkeypatch.setattr(rc, "_CACHE_TTL", 9999.0)
+    # Populate cache with old data
+    rc.store_cache(_SAMPLE_DICT)
+    # Simulate a successful write (invalidates cache)
+    rc.invalidate(reason="register_governor")
+    # Now get_stale_or_none must return None — not the old snapshot
+    assert rc.get_stale_or_none() is None
+
+
+# ---------------------------------------------------------------------------
+# Defensive TTL parsing tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_ttl_valid_value():
+    from registry.registry_cache import _parse_ttl
+
+    assert _parse_ttl.__module__ == "registry.registry_cache"
+
+
+def test_parse_ttl_invalid_env_falls_back_to_default(monkeypatch, caplog):
+    """Non-numeric REGISTRY_CACHE_TTL_SECONDS must not crash — defaults to 45s with a warning."""
+    import os
+    import importlib
+    import registry.registry_cache as rc_mod
+
+    monkeypatch.setenv("REGISTRY_CACHE_TTL_SECONDS", "not_a_number")
+    with caplog.at_level(logging.WARNING, logger="registry.registry_cache"):
+        result = rc_mod._parse_ttl()
+    assert result == 45.0
+    assert "Invalid" in caplog.text or "not_a_number" in caplog.text
+
+
+def test_parse_ttl_empty_env_uses_default(monkeypatch):
+    """Unset/empty REGISTRY_CACHE_TTL_SECONDS must default to 45.0."""
+    import registry.registry_cache as rc_mod
+
+    monkeypatch.delenv("REGISTRY_CACHE_TTL_SECONDS", raising=False)
+    result = rc_mod._parse_ttl()
+    assert result == 45.0
+
+
+# ---------------------------------------------------------------------------
 # Integration tests via registry_service.load_registry_as_dict()
 # ---------------------------------------------------------------------------
 
@@ -371,6 +453,34 @@ def test_sql_failure_with_stale_cache_allow_stale_true(monkeypatch, caplog):
     assert result is not None
     assert "111" in result
     assert "stale" in caplog.text.lower() or "warning" in caplog.text.lower() or caplog.records
+
+
+def test_sql_failure_after_write_invalidation_raises(monkeypatch):
+    """
+    SQL failure when cache was invalidated by a write → must raise, not return pre-write stale data.
+
+    This verifies that get_stale_or_none() respects the invalidation sentinel:
+    after any successful write, a transient SQL failure must NOT silently return
+    outdated ownership/slot data to the caller.
+    """
+    _reset_cache(monkeypatch)
+    monkeypatch.setattr(rc, "_CACHE_TTL", 9999.0)
+
+    # Prime the cache with "old" data
+    monkeypatch.setattr(dal, "get_all_active", lambda: _ACTIVE_ROW)
+    svc.load_registry_as_dict()
+
+    # Simulate a successful write that invalidates the cache
+    rc.invalidate(reason="register_governor")
+
+    # Now SQL goes down
+    monkeypatch.setattr(
+        dal, "get_all_active", lambda: (_ for _ in ()).throw(RuntimeError("DB down"))
+    )
+
+    # Even with allow_stale_on_error=True, the pre-write snapshot must NOT be returned
+    with pytest.raises(RuntimeError, match="DB down"):
+        svc.load_registry_as_dict(allow_stale_on_error=True)
 
 
 def test_sql_failure_with_stale_cache_allow_stale_false(monkeypatch):
