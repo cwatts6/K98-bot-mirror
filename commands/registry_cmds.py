@@ -13,7 +13,6 @@ from discord.ext import commands as ext_commands
 
 from account_picker import ACCOUNT_ORDER
 from bot_config import GUILD_ID
-from constants import _conn
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import is_admin_and_notify_channel, track_usage
 from registry.governor_registry import (
