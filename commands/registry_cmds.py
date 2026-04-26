@@ -32,8 +32,8 @@ from registry.registry_io import (
     prepare_import_plan,
     rows_to_xlsx_bytes,
 )
-from registry.registry_service import VALID_ACCOUNT_TYPES
 import registry.registry_service as registry_service
+from registry.registry_service import VALID_ACCOUNT_TYPES
 import target_utils
 from ui.views.admin_views import ConfirmImportView
 from ui.views.registry_views import MyRegsActionView
