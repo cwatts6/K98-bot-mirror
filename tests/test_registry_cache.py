@@ -226,10 +226,13 @@ def test_stale_fallback_not_returned_after_write_invalidation(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_parse_ttl_valid_value():
-    from registry.registry_cache import _parse_ttl
+def test_parse_ttl_valid_value(monkeypatch):
+    """Valid REGISTRY_CACHE_TTL_SECONDS env var is parsed correctly."""
+    import registry.registry_cache as rc_mod
 
-    assert _parse_ttl.__module__ == "registry.registry_cache"
+    monkeypatch.setenv("REGISTRY_CACHE_TTL_SECONDS", "120")
+    result = rc_mod._parse_ttl()
+    assert result == 120.0
 
 
 def test_parse_ttl_invalid_env_falls_back_to_default(monkeypatch, caplog):
