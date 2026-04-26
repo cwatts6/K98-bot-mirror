@@ -70,7 +70,7 @@ def async_noop():
 def _clear_mge_undo_buffer():
     try:
         from mge import mge_roster_service
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         yield
         return
 
