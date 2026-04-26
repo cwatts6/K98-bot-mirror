@@ -9,7 +9,6 @@ No SQL connection required.
 from __future__ import annotations
 
 import logging
-import time
 
 import pytest
 
@@ -29,6 +28,16 @@ def _reset_cache(monkeypatch):
     monkeypatch.setattr(rc, "_cache_ts", 0.0)
     monkeypatch.setattr(rc, "_last_invalidation_reason", "test_reset")
     monkeypatch.setattr(rc, "_CACHE_TTL", 45.0)
+
+
+def _make_fake_clock(monkeypatch, start: float = 1000.0) -> list[float]:
+    """Patch rc.time.monotonic to a controllable fake clock.
+
+    Returns a one-element list; advance time by mutating clock[0].
+    """
+    clock: list[float] = [start]
+    monkeypatch.setattr(rc.time, "monotonic", lambda: clock[0])
+    return clock
 
 
 def _patch_dal(
@@ -91,9 +100,9 @@ def test_store_and_retrieve_within_ttl(monkeypatch):
 
 def test_get_cached_or_none_returns_none_after_ttl(monkeypatch):
     _reset_cache(monkeypatch)
-    monkeypatch.setattr(rc, "_CACHE_TTL", 0.001)  # 1ms TTL
+    clock = _make_fake_clock(monkeypatch)
     rc.store_cache(_SAMPLE_DICT)
-    time.sleep(0.02)  # exceed TTL
+    clock[0] += 46.0  # advance past the 45s TTL
     assert rc.get_cached_or_none() is None
 
 
@@ -180,9 +189,9 @@ def test_invalidate_logs_info(monkeypatch, caplog):
 def test_get_stale_or_none_returns_data_beyond_ttl(monkeypatch):
     """get_stale_or_none() returns data even when TTL has expired."""
     _reset_cache(monkeypatch)
-    monkeypatch.setattr(rc, "_CACHE_TTL", 0.001)
+    clock = _make_fake_clock(monkeypatch)
     rc.store_cache(_SAMPLE_DICT)
-    time.sleep(0.02)  # exceed TTL
+    clock[0] += 46.0  # advance past the 45s TTL
     # get_cached_or_none returns None...
     assert rc.get_cached_or_none() is None
     # ...but get_stale_or_none still returns the data
@@ -296,7 +305,7 @@ def test_second_call_within_ttl_hits_cache(monkeypatch):
 def test_call_after_ttl_expiry_hits_sql(monkeypatch):
     """Call after TTL expiry must call the DAL again."""
     _reset_cache(monkeypatch)
-    monkeypatch.setattr(rc, "_CACHE_TTL", 0.001)  # 1ms
+    clock = _make_fake_clock(monkeypatch)
     call_count = []
 
     def _fake_all_active():
@@ -305,7 +314,7 @@ def test_call_after_ttl_expiry_hits_sql(monkeypatch):
 
     monkeypatch.setattr(dal, "get_all_active", _fake_all_active)
     svc.load_registry_as_dict()
-    time.sleep(0.02)  # exceed TTL
+    clock[0] += 46.0  # advance past the 45s TTL
     svc.load_registry_as_dict()
     assert len(call_count) == 2, f"Expected 2 DAL calls after TTL expiry, got {len(call_count)}"
 
@@ -435,15 +444,14 @@ def test_failed_write_rc_dupe_slot_does_not_invalidate_cache(monkeypatch):
 def test_sql_failure_with_stale_cache_allow_stale_true(monkeypatch, caplog):
     """SQL failure with populated cache + allow_stale_on_error=True → stale returned, WARNING logged."""
     _reset_cache(monkeypatch)
-    monkeypatch.setattr(rc, "_CACHE_TTL", 0.001)  # Let TTL expire to simulate stale state
+    clock = _make_fake_clock(monkeypatch)
 
     # First populate the cache
     monkeypatch.setattr(dal, "get_all_active", lambda: _ACTIVE_ROW)
     svc.load_registry_as_dict()
 
-    # Now force TTL to 0 so get_cached_or_none returns None (cache miss path)
-    # but _cache_data is still populated (stale)
-    time.sleep(0.02)
+    # Advance past TTL so get_cached_or_none returns None (stale state)
+    clock[0] += 46.0
 
     # Now make SQL fail
     monkeypatch.setattr(
@@ -489,11 +497,11 @@ def test_sql_failure_after_write_invalidation_raises(monkeypatch):
 def test_sql_failure_with_stale_cache_allow_stale_false(monkeypatch):
     """SQL failure with populated cache + allow_stale_on_error=False → raises."""
     _reset_cache(monkeypatch)
-    monkeypatch.setattr(rc, "_CACHE_TTL", 0.001)
+    clock = _make_fake_clock(monkeypatch)
 
     monkeypatch.setattr(dal, "get_all_active", lambda: _ACTIVE_ROW)
     svc.load_registry_as_dict()
-    time.sleep(0.02)
+    clock[0] += 46.0  # advance past the 45s TTL
 
     monkeypatch.setattr(
         dal, "get_all_active", lambda: (_ for _ in ()).throw(RuntimeError("DB down"))
