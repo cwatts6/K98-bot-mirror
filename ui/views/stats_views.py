@@ -629,3 +629,9 @@ class KVKAccountButton(discord.ui.Button):
                 self.governor_id,
                 self._label,
             )
+            try:
+                await interaction.followup.send(
+                    "❌ Failed to display stats. Please try again later.", ephemeral=True
+                )
+            except Exception:
+                pass
