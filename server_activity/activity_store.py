@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from server_activity.activity_models import ActivityEvent, ActivityUserSummary
-from stats_alerts.db import execute, run_query, run_query_async
+from stats_alerts.db import execute, execute_async, run_query, run_query_async
 
 logger = logging.getLogger(__name__)
 
@@ -81,33 +81,35 @@ def ensure_activity_schema() -> None:
         conn.close()
 
 
-def insert_activity_event(event: ActivityEvent) -> int:
+def _build_insert_params(event: ActivityEvent) -> tuple:
     metadata_json = None
     if event.metadata:
         metadata_json = json.dumps(event.metadata, ensure_ascii=False, separators=(",", ":"))
-
-    sql = f"""
-        INSERT INTO {ACTIVITY_TABLE}
-            (OccurredAtUtc, GuildId, ChannelId, UserId, EventType, MetadataJson)
-        VALUES (?, ?, ?, ?, ?, ?);
-    """
-    return execute(
-        sql,
-        (
-            _sql_datetime(event.occurred_at_utc),
-            int(event.guild_id),
-            int(event.channel_id) if event.channel_id is not None else None,
-            int(event.user_id),
-            str(event.event_type.value),
-            metadata_json,
-        ),
+    return (
+        _sql_datetime(event.occurred_at_utc),
+        int(event.guild_id),
+        int(event.channel_id) if event.channel_id is not None else None,
+        int(event.user_id),
+        str(event.event_type.value),
+        metadata_json,
     )
 
 
-async def insert_activity_event_async(event: ActivityEvent) -> int:
-    from asyncio import to_thread
+_INSERT_SQL = f"""
+    INSERT INTO {{table}}
+        (OccurredAtUtc, GuildId, ChannelId, UserId, EventType, MetadataJson)
+    VALUES (?, ?, ?, ?, ?, ?);
+"""
 
-    return await to_thread(insert_activity_event, event)
+
+def insert_activity_event(event: ActivityEvent) -> int:
+    sql = _INSERT_SQL.format(table=ACTIVITY_TABLE)
+    return execute(sql, _build_insert_params(event))
+
+
+async def insert_activity_event_async(event: ActivityEvent) -> int:
+    sql = _INSERT_SQL.format(table=ACTIVITY_TABLE)
+    return await execute_async(sql, _build_insert_params(event))
 
 
 def fetch_activity_top(

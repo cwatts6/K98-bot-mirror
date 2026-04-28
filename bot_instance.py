@@ -21,6 +21,7 @@ from discord.ext import tasks
 from ark.ark_scheduler import schedule_ark_lifecycle
 from boot_safety import apply_boot_safety
 from bot_config import (
+    ACTIVITY_TRACKING_ENABLED,
     ACTIVITY_UPLOAD_CHANNEL_ID,
     ADMIN_USER_ID,
     CALENDAR_PINNED_CHANNEL_ID,
@@ -28,6 +29,7 @@ from bot_config import (
     KVK_EVENT_CHANNEL_ID,
     KVK_NOTIFICATION_CHANNEL_ID,
     NOTIFY_CHANNEL_ID,
+    SERVER_STATUS_ENABLED,
     STATUS_CHANNEL_ID,
 )
 from bot_helpers import (
@@ -1606,34 +1608,36 @@ async def on_ready():
     except Exception:
         logger.exception("[BOOT] Failed to start daily_summary loop")
 
-    try:
-        await run_blocking(ensure_activity_schema)
-        register_activity_listeners(bot)
-        logger.info("[BOOT] Server activity tracking initialized")
-    except Exception:
-        logger.exception("[BOOT] Failed to initialize server activity tracking")
+    if ACTIVITY_TRACKING_ENABLED:
+        try:
+            await run_blocking(ensure_activity_schema)
+            register_activity_listeners(bot)
+            logger.info("[BOOT] Server activity tracking initialized")
+        except Exception:
+            logger.exception("[BOOT] Failed to initialize server activity tracking")
 
-    try:
-        if not task_monitor.is_running("utc_clock_channel"):
-            task_monitor.create(
-                "utc_clock_channel",
-                lambda: run_utc_clock_channel_loop(bot),
-                replace=False,
-            )
-            logger.info("[BOOT] UTC clock status channel loop started")
-    except Exception:
-        logger.exception("[BOOT] Failed to start UTC clock status channel loop")
+    if SERVER_STATUS_ENABLED:
+        try:
+            if not task_monitor.is_running("utc_clock_channel"):
+                task_monitor.create(
+                    "utc_clock_channel",
+                    lambda: run_utc_clock_channel_loop(bot),
+                    replace=False,
+                )
+                logger.info("[BOOT] UTC clock status channel loop started")
+        except Exception:
+            logger.exception("[BOOT] Failed to start UTC clock status channel loop")
 
-    try:
-        if not task_monitor.is_running("member_count_channel"):
-            task_monitor.create(
-                "member_count_channel",
-                lambda: run_member_count_channel_loop(bot),
-                replace=False,
-            )
-            logger.info("[BOOT] Member count status channel loop started")
-    except Exception:
-        logger.exception("[BOOT] Failed to start member count status channel loop")
+        try:
+            if not task_monitor.is_running("member_count_channel"):
+                task_monitor.create(
+                    "member_count_channel",
+                    lambda: run_member_count_channel_loop(bot),
+                    replace=False,
+                )
+                logger.info("[BOOT] Member count status channel loop started")
+        except Exception:
+            logger.exception("[BOOT] Failed to start member count status channel loop")
 
     try:
         logger.info(f"✅ Bot is ready – logged in as {bot.user} (ID: {bot.user.id})")

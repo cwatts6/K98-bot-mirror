@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import logging
-
 import discord
 from discord.ext import commands as ext_commands
 
@@ -10,8 +8,6 @@ from core.interaction_safety import safe_command, safe_defer
 from decoraters import is_admin_or_leadership_only, track_usage
 from server_activity.activity_service import get_top_users, resolve_window
 from versioning import versioned
-
-logger = logging.getLogger(__name__)
 
 
 def _render_activity_top(result) -> str:
