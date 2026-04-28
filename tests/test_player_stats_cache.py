@@ -23,12 +23,12 @@ def test_build_and_persist_success_writes_atomic_and_utc(monkeypatch, tmp_path):
     }
     monkeypatch.setattr(mod, "_build_cache_sync", lambda: fake_out)
 
-    # Track atomic_write_json usage
-    calls = {"n": 0, "path": None, "obj": None}
+    # Track atomic_write_json usage — use a list so multiple writes don't overwrite each other
+    calls = {"n": 0, "paths": [], "obj": None}
 
     def fake_atomic_write_json(path, obj, **kwargs):
         calls["n"] += 1
-        calls["path"] = str(path)
+        calls["paths"].append(str(path))
         calls["obj"] = obj
         # emulate write for test
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -40,7 +40,10 @@ def test_build_and_persist_success_writes_atomic_and_utc(monkeypatch, tmp_path):
     out = mod._build_and_persist_cache_sync()
     assert isinstance(out, dict)
     assert calls["n"] >= 1
-    assert calls["path"] == str(cache_path)
+    # The main cache_path must have been written (may not be the last write if last-KVK also writes)
+    assert str(cache_path) in calls["paths"], (
+        f"Expected main cache_path {cache_path} in written paths: {calls['paths']}"
+    )
 
     persisted = _read_json(cache_path)
     assert "_meta" in persisted
@@ -263,6 +266,8 @@ def test_build_emits_telemetry_ok(monkeypatch, tmp_path):
 
     monkeypatch.setattr("file_utils.acquire_lock", lambda *a, **k: DummyLock())
     monkeypatch.setattr("file_utils.atomic_write_json", lambda *a, **k: None)
+    # Stub last-KVK cache builder to avoid hitting DB in unit tests
+    monkeypatch.setattr(mod, "_build_last_kvk_cache_sync", lambda: None)
 
     events = []
     monkeypatch.setattr(

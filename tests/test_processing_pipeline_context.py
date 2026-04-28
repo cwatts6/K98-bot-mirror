@@ -27,9 +27,27 @@ async def test_execute_processing_pipeline_embeds_include_context(monkeypatch):
     # Patch the embed sender used by processing_pipeline (it was imported at module import time)
     monkeypatch.setattr(processing_pipeline, "send_embed_safe", mock_send_embed_safe)
 
+    # Also intercept send_status_embed — this is where Context is merged into the fields dict
+    # via {**context_field, **status_map}. Capture those calls so we can assert Context is present.
+    status_embed_calls = []
+
+    async def mock_send_status_embed(
+        title, status_map, ok, user, notify_channel, *, context_field=None, **kwargs
+    ):
+        status_embed_calls.append(
+            {
+                "title": title,
+                "status_map": dict(status_map),
+                "ok": ok,
+                "context_field": dict(context_field) if context_field else {},
+            }
+        )
+
+    monkeypatch.setattr(processing_pipeline, "send_status_embed", mock_send_status_embed)
+
     # Mock run_stats_copy_archive to return success quickly and include excel/archive/sql flags
     async def mock_run_stats_copy_archive(
-        rank, seed, source_filename=None, send_step_embed=None, meta=None
+        rank, seed, source_filename=None, send_step_embed=None
     ):
         await asyncio.sleep(0)  # yield control to event loop
         return None, "ARCHIVE_LOG", {"excel": True, "archive": True, "sql": True}
@@ -55,11 +73,16 @@ async def test_execute_processing_pipeline_embeds_include_context(monkeypatch):
         processing_pipeline, "run_maintenance_with_isolation", mock_run_maintenance_with_isolation
     )
 
-    # Mock run_step to handle run_all_exports and read_json_safe calls centrally
+    # Mock run_step to handle run_stats_copy_archive, run_all_exports, and read_json_safe centrally
     async def mock_run_step(
         func, *args, offload_sync_to_thread=False, name=None, **kwargs
     ):
-        # If func refers to run_all_exports, return a successful export
+        # run_stats_copy_archive → return canonical 3-tuple (success, log, steps)
+        if name == "run_stats_copy_archive" or getattr(func, "__name__", "").endswith(
+            "run_stats_copy_archive"
+        ):
+            return True, "ARCHIVE_LOG", {"excel": True, "archive": True, "sql": True}
+        # run_all_exports → success
         if (
             getattr(func, "__name__", "") == "run_all_exports"
             or func is processing_pipeline.run_all_exports
@@ -112,14 +135,16 @@ async def test_execute_processing_pipeline_embeds_include_context(monkeypatch):
     # At least one embed send should have occurred
     assert sent_calls, "No embeds were sent during pipeline run"
 
+    # Context is merged into fields by send_status_embed (via {**context_field, **status_map}).
+    # We verify those calls include a "Context" field with the expected filename, rank and seed.
     context_values = [
-        str(call["fields"]["Context"])
-        for call in sent_calls
-        if isinstance(call.get("fields"), dict) and "Context" in call["fields"]
+        str(call["context_field"].get("Context", ""))
+        for call in status_embed_calls
+        if call.get("context_field") and "Context" in call["context_field"]
     ]
-    assert context_values, 'No embed included the expected "Context" field'
+    assert context_values, 'No send_status_embed call included the expected "Context" field'
     assert any(
-        filename in context
+        (filename in context or filename.replace("_", r"\_") in context)
         and str(rank) in context
         and str(seed) in context
         for context in context_values
