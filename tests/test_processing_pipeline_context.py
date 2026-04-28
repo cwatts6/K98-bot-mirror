@@ -77,22 +77,16 @@ async def test_execute_processing_pipeline_embeds_include_context(monkeypatch):
     async def mock_run_step(
         func, *args, offload_sync_to_thread=False, name=None, **kwargs
     ):
-        # run_stats_copy_archive → return canonical 3-tuple (success, log, steps)
-        if name == "run_stats_copy_archive" or getattr(func, "__name__", "").endswith(
-            "run_stats_copy_archive"
-        ):
+        # run_stats_copy_archive → return canonical 3-tuple (success, log, steps).
+        # Check the explicit `name` kwarg first (most reliable), then fall back to func.__name__.
+        func_name = name or getattr(func, "__name__", "")
+        if func_name.endswith("run_stats_copy_archive"):
             return True, "ARCHIVE_LOG", {"excel": True, "archive": True, "sql": True}
         # run_all_exports → success
-        if (
-            getattr(func, "__name__", "") == "run_all_exports"
-            or func is processing_pipeline.run_all_exports
-        ):
+        if func_name == "run_all_exports" or func is processing_pipeline.run_all_exports:
             return True, "EXPORT_LOG"
         # read_json_safe -> return empty dict
-        if (
-            getattr(func, "__name__", "") == "read_json_safe"
-            or func is processing_pipeline.read_json_safe
-        ):
+        if func_name == "read_json_safe" or func is processing_pipeline.read_json_safe:
             return {}
         # preflight or other helpers: no-op
         return None
@@ -144,6 +138,8 @@ async def test_execute_processing_pipeline_embeds_include_context(monkeypatch):
     ]
     assert context_values, 'No send_status_embed call included the expected "Context" field'
     assert any(
+        # Discord/embed_utils may markdown-escape underscores in filenames (e.g. _ → \_),
+        # so accept either the original or the escaped form.
         (filename in context or filename.replace("_", r"\_") in context)
         and str(rank) in context
         and str(seed) in context
