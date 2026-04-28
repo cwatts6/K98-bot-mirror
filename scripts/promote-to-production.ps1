@@ -45,21 +45,6 @@ function Get-RequiredRemoteUrl {
   return $url.Trim()
 }
 
-function Get-RemoteRepositoryName {
-  param(
-    [Parameter(Mandatory = $true)]
-    [string]$RemoteUrl
-  )
-
-  $normalized = $RemoteUrl.Trim().TrimEnd("/")
-  if ($normalized.EndsWith(".git", [System.StringComparison]::OrdinalIgnoreCase)) {
-    $normalized = $normalized.Substring(0, $normalized.Length - 4)
-  }
-
-  $parts = $normalized -split "[:/\\]"
-  return $parts[$parts.Count - 1]
-}
-
 function Assert-RemoteRepositoryName {
   param(
     [Parameter(Mandatory = $true)]
@@ -69,12 +54,38 @@ function Assert-RemoteRepositoryName {
     [string]$RemoteUrl,
 
     [Parameter(Mandatory = $true)]
+    [string]$ExpectedOwner,
+
+    [Parameter(Mandatory = $true)]
     [string]$ExpectedRepositoryName
   )
 
-  $actualRepositoryName = Get-RemoteRepositoryName -RemoteUrl $RemoteUrl
-  if ($actualRepositoryName -ne $ExpectedRepositoryName) {
-    throw "Remote '$RemoteName' must point to '$ExpectedRepositoryName'. Current URL: $RemoteUrl"
+  # Validate that the remote points to exactly github.com (anchored to start of URL)
+  if ($RemoteUrl -notmatch "^(https?://github\.com[:/]|git@github\.com:)") {
+    throw "Remote '$RemoteName' must point to github.com. Current URL: $RemoteUrl"
+  }
+
+  # Extract the owner/repo path segment that follows github.com
+  $pathMatch = [regex]::Match($RemoteUrl, "(?:github\.com[:/])(.+)")
+  if (-not $pathMatch.Success) {
+    throw "Remote '$RemoteName' URL could not be parsed to extract owner and repository name. URL: $RemoteUrl"
+  }
+
+  $ownerRepo = $pathMatch.Groups[1].Value.TrimEnd("/")
+  if ($ownerRepo.EndsWith(".git", [System.StringComparison]::OrdinalIgnoreCase)) {
+    $ownerRepo = $ownerRepo.Substring(0, $ownerRepo.Length - 4)
+  }
+
+  $parts = $ownerRepo -split "[/\\]"
+  if ($parts.Count -lt 2 -or [string]::IsNullOrEmpty($parts[0]) -or [string]::IsNullOrEmpty($parts[1])) {
+    throw "Remote '$RemoteName' URL could not be parsed to extract owner and repository name. URL: $RemoteUrl"
+  }
+
+  $actualOwner = $parts[0]
+  $actualRepo = $parts[1]
+
+  if ($actualOwner -ne $ExpectedOwner -or $actualRepo -ne $ExpectedRepositoryName) {
+    throw "Remote '$RemoteName' must point to '$ExpectedOwner/$ExpectedRepositoryName'. Current URL: $RemoteUrl"
   }
 }
 
@@ -174,8 +185,8 @@ try {
   Write-Host "Checking git remotes..."
   $originUrl = Get-RequiredRemoteUrl -RemoteName "origin"
   $productionUrl = Get-RequiredRemoteUrl -RemoteName "production"
-  Assert-RemoteRepositoryName -RemoteName "origin" -RemoteUrl $originUrl -ExpectedRepositoryName "K98-bot-mirror"
-  Assert-RemoteRepositoryName -RemoteName "production" -RemoteUrl $productionUrl -ExpectedRepositoryName "K98-bot"
+  Assert-RemoteRepositoryName -RemoteName "origin" -RemoteUrl $originUrl -ExpectedOwner "cwatts6" -ExpectedRepositoryName "K98-bot-mirror"
+  Assert-RemoteRepositoryName -RemoteName "production" -RemoteUrl $productionUrl -ExpectedOwner "cwatts6" -ExpectedRepositoryName "K98-bot"
   Write-Host "origin:     $originUrl"
   Write-Host "production: $productionUrl"
 
@@ -208,22 +219,45 @@ try {
   }
 
   Write-Host "Creating production PR branch from production/main..."
-  Invoke-Native -FilePath "git" -Arguments @("switch", "-C", $ProductionBranch, "production/main")
+  Invoke-Native -FilePath "git" -Arguments @("switch", "-c", $ProductionBranch, "production/main")
 
   Write-Host "Applying mirror file delta onto production branch..."
   try {
     Invoke-Native -FilePath "git" -Arguments @("apply", "--index", $patchPath)
   }
   catch {
-    throw "Patch failed to apply cleanly to production/main. Resolve the file conflict in the mirror branch or production base, then rerun promotion. $($_.Exception.Message)"
+    $applyErrorMessage = $_.Exception.Message
+    try {
+      Write-Host "Patch apply failed. Resetting production branch to production/main..."
+      Invoke-Native -FilePath "git" -Arguments @("reset", "--hard", "production/main")
+    }
+    catch {
+      throw "Patch failed to apply cleanly to production/main, and cleanup failed while restoring the repository state. Resolve the file conflict in the mirror branch or production base, then rerun promotion.`nApply error: $applyErrorMessage`nCleanup error: $($_.Exception.Message)"
+    }
+
+    throw "Patch failed to apply cleanly to production/main. Repository state was reset to production/main. Resolve the file conflict in the mirror branch or production base, then rerun promotion. $applyErrorMessage"
+  }
+
+  $resolvedPython = Resolve-PythonExecutable -RequestedPythonExe $PythonExe -RepoRoot $repoRoot
+  Write-Host "Python: $resolvedPython"
+  try {
+    Invoke-ValidationAndEnsureClean -ResolvedPython $resolvedPython
+  }
+  catch {
+    $validationErrorMessage = $_.Exception.Message
+    try {
+      Write-Host "Validation failed. Resetting production branch to production/main..."
+      Invoke-Native -FilePath "git" -Arguments @("reset", "--hard", "production/main")
+    }
+    catch {
+      throw "Validation failed, and cleanup failed while restoring repository state.`nValidation error: $validationErrorMessage`nCleanup error: $($_.Exception.Message)"
+    }
+
+    throw "Validation failed. Repository state was reset to production/main. $validationErrorMessage"
   }
 
   Write-Host "Committing production promotion patch..."
   Invoke-Native -FilePath "git" -Arguments @("commit", "-m", "Promote $SourceBranch to production")
-
-  $resolvedPython = Resolve-PythonExecutable -RequestedPythonExe $PythonExe -RepoRoot $repoRoot
-  Write-Host "Python: $resolvedPython"
-  Invoke-ValidationAndEnsureClean -ResolvedPython $resolvedPython
 
   Write-Host "Pushing production branch..."
   Invoke-Native -FilePath "git" -Arguments @("push", "production", "${ProductionBranch}:refs/heads/${ProductionBranch}", "--force-with-lease")
