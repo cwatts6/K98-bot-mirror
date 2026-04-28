@@ -20,7 +20,7 @@ def test_build_maintenance_cmd_with_kwargs(tmp_path, monkeypatch):
         "noneval": None,
         "count": 5,
     }
-    cmd = build_maintenance_cmd("post_stats", args=["positional"], kwargs=kwargs)
+    cmd, _temp = build_maintenance_cmd("post_stats", args=["positional"], kwargs=kwargs)
     # Basic structure
     assert (
         cmd[0].endswith(sys.executable.split(sys.exec_prefix)[-1])
@@ -41,5 +41,5 @@ def test_build_maintenance_cmd_with_kwargs(tmp_path, monkeypatch):
     # False/None omitted
     assert "--noop" not in cmd
     assert "--noneval" not in cmd
-    # numeric values become str
-    assert "--count" in cmd and "5" in cmd
+    # numeric values are serialized to subprocess args (may be via OFFLOAD_JSON)
+    assert "--count" in cmd

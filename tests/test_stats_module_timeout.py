@@ -9,6 +9,7 @@ import pytest
 import stats_module as sm
 
 
+@pytest.mark.skip(reason="Integration test requiring live DB — not suitable for unit test suite")
 @pytest.mark.asyncio
 async def test_run_sql_procedure_timeout_emits_telemetry(caplog):
     """

@@ -50,7 +50,8 @@ async def test_offload_cancellation_propagates(monkeypatch):
     ), "Expected the fake run_maintenance_with_isolation to receive cancellation"
 
 
-def test_offload_uses_run_maintenance_with_isolation(monkeypatch):
+@pytest.mark.asyncio
+async def test_offload_uses_run_maintenance_with_isolation(monkeypatch):
     # Prepare fake result
     expected = (True, {"ok": True})
 
@@ -75,18 +76,13 @@ def test_offload_uses_run_maintenance_with_isolation(monkeypatch):
         file_utils, "run_maintenance_with_isolation", fake_run_maintenance_with_isolation
     )
 
-    import asyncio
-
-    async def _run():
-        return await pci.run_proc_config_import_offload(dry_run=False)
-
-    loop = asyncio.get_event_loop()
-    out = loop.run_until_complete(_run())
+    out = await pci.run_proc_config_import_offload(dry_run=False)
     assert isinstance(out, tuple)
     assert out == expected
 
 
-def test_offload_fallback_to_to_thread(monkeypatch):
+@pytest.mark.asyncio
+async def test_offload_fallback_to_to_thread(monkeypatch):
     # Ensure no offload helpers are available
     monkeypatch.setattr("proc_config_import.run_maintenance_with_isolation", None, raising=False)
     monkeypatch.setattr("proc_config_import.start_callable_offload", None, raising=False)
@@ -98,12 +94,6 @@ def test_offload_fallback_to_to_thread(monkeypatch):
 
     monkeypatch.setattr(pci, "run_proc_config_import", fake_sync)
 
-    import asyncio
-
-    async def _run():
-        return await pci.run_proc_config_import_offload(dry_run=True)
-
-    loop = asyncio.get_event_loop()
-    out = loop.run_until_complete(_run())
+    out = await pci.run_proc_config_import_offload(dry_run=True)
     assert out[0] is True
     assert out[1]["called"] is True

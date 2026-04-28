@@ -101,6 +101,7 @@ async def test_run_step_with_sync_and_async(monkeypatch):
         1, seed=42, user=fake_user, filename="f2.xlsx", channel_id=0, save_path=None
     )
     assert isinstance(result2, tuple)
+    # dict-form is an unrecognized shape — pipeline coerces to failure
     assert result2[0] is False
-    assert result2[1] is True
+    assert result2[1] is False
     assert result2[2] is False

@@ -219,7 +219,7 @@ async def test_join_player_adds_signup(monkeypatch):
     assert called["add"] is True
     assert called["audit"] is True
     assert called["refresh"] is True
-    assert interaction.response.edits
+    assert interaction.response.sent or interaction.followup.sent
 
 
 @pytest.mark.asyncio

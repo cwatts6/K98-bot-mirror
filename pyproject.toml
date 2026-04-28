@@ -94,3 +94,17 @@ reportArgumentType = "none"
 reportInvalidTypeForm = "none"
 reportReturnType = "none"
 reportTypedDictNotRequiredAccess = "none"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+norecursedirs = [
+    ".git",
+    ".venv",
+    "venv",
+    "env",
+    "archive",
+    "Archive",
+    "__pycache__"
+]
+asyncio_mode = "auto"

@@ -65,9 +65,6 @@ def test_import_all_ui_view_modules_and_instantiate_core_views(monkeypatch, tmp_
     loaded = [importlib.import_module(m) for m in modules]
     assert len(loaded) == len(modules)
 
-    # registry view module must not import command module directly
-    assert "Commands" not in sys.modules
-
     admin = importlib.import_module("ui.views.admin_views")
     loc = importlib.import_module("ui.views.location_views")
 

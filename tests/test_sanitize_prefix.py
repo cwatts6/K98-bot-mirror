@@ -1,7 +1,12 @@
 # tests/test_sanitize_prefix.py
+import os
 import random
 import re
 import string
+
+import pytest
+
+os.environ.setdefault("OUR_KINGDOM", "0")
 
 from embed_utils import LocalTimeToggleView, sanitize_view_prefix
 
@@ -31,7 +36,8 @@ def test_sanitize_truncation_and_hash_distinguish():
     assert o1 != o2
 
 
-def test_localtimebutton_custom_id_length():
+@pytest.mark.asyncio
+async def test_localtimebutton_custom_id_length():
     # create a crazy prefix and ensure LocalTimeToggleView produces a button custom_id <= 100 chars
     crazy_prefix = random_long_string(400)
     view = LocalTimeToggleView(

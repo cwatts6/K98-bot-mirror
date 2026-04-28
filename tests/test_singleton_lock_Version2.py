@@ -66,6 +66,9 @@ def test_conflict_detected_with_psutil_simulated(tmp_path, monkeypatch):
             return saved_created - 1
 
     class FakePsutil:
+        NoSuchProcess = Exception
+        AccessDenied = Exception
+
         @staticmethod
         def pid_exists(pid):
             return True
@@ -74,12 +77,12 @@ def test_conflict_detected_with_psutil_simulated(tmp_path, monkeypatch):
         def Process(pid):
             return FakeProc(pid)
 
-    # Replace module-level psutil with our fake
-    monkeypatch.setattr(singleton_lock, "psutil", FakePsutil)
+    import process_utils
+
+    # Replace module-level psutil in process_utils with our fake
+    monkeypatch.setattr(process_utils, "psutil", FakePsutil)
     with pytest.raises(RuntimeError):
         # We expect a RuntimeError because raise_on_conflict=True and process appears live
         singleton_lock.acquire_singleton_lock(
             str(lock_path), exit_on_conflict=False, raise_on_conflict=True
         )
-    # Clean up: restore psutil to None for other tests
-    monkeypatch.setattr(singleton_lock, "psutil", None)
