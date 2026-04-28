@@ -1,0 +1,90 @@
+# ---- Secrets & credentials (NEVER publish) ----
+.env
+.env*
+*.env
+.secrets*
+secrets.*
+*.secret
+*.secrets
+credentials/**
+**/*service_account*.json
+**/*token*.json
+**/*credentials*.json
+**/*apikey*
+**/*api_key*
+**/*auth*
+**/*private*
+**/*id_rsa*
+**/*.pem
+**/*.p12
+**/*.der
+**/*.cer
+**/*.key
+**/*.crt
+
+# ---- Virtual env / caches / build junk ----
+botenv/**
+.venv/**
+venv/**
+env/**
+__pycache__/**
+*.pyc
+*.pyo
+*.pyd
+*.log
+logs/**
+.tox/**
+.pytest_cache/**
+
+# ---- Runtime data & trackers (not source) ----
+data/**
+downloads/**
+Databook_Archive/**
+archive/**
+*.csv
+*.xlsx
+*.xls
+
+# ---- Build / packaging outputs ----
+build/**
+dist/**
+*.egg-info/**
+__pypackages__/**
+
+# ---- Big/binary artifacts you don't want mirrored ----
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.rar
+*.mp4
+*.mov
+*.avi
+*.ttf
+*.otf
+*.woff
+*.woff2
+
+# ---- Source images: keep public assets only ----
+assets/raw/**
+# keep your publishable images in assets/public/ so they are included
+# !assets/public/**   # (uncomment if you later add a broad assets/** exclude)
+
+# ---- Runtime JSON that can look like keys ----
+*cache.json
+live_queue_cache.json
+restart_flag.json
+WATCHDOG_LOCK.json
+BOT_LOCK.json
+*.lock
+statsupdate-*.json
+
+# ---- Editor / OS noise ----
+.DS_Store
+.vscode/**
+.idea/**
+*.swp
+*.swo
+
+# ---- Don't mirror GitHub Actions workflows to the public mirror ----
+.github/workflows/**
