@@ -21,7 +21,7 @@ BEGIN
     );
 
     CREATE INDEX IX_DiscordServerActivityEvents_Window
-        ON dbo.DiscordServerActivityEvents (OccurredAtUtc, GuildId, UserId, EventType)
+        ON dbo.DiscordServerActivityEvents (GuildId, OccurredAtUtc, UserId, EventType)
         INCLUDE (ChannelId);
 END;
 GO
