@@ -49,15 +49,22 @@ def ensure_activity_schema() -> None:
     from file_utils import get_conn_with_retries
 
     conn = get_conn_with_retries()
+    cur = None
     try:
-        with conn:
-            cur = conn.cursor()
-            cur.execute(SCHEMA_SQL)
-            conn.commit()
-        logger.info("activity_schema_ensured")
-    except Exception:
-        logger.exception("activity_schema_ensure_failed")
-        raise
+        try:
+            with conn:
+                cur = conn.cursor()
+                cur.execute(SCHEMA_SQL)
+                conn.commit()
+            logger.info("activity_schema_ensured")
+        except Exception:
+            logger.exception("activity_schema_ensure_failed")
+            raise
+        finally:
+            if cur is not None:
+                cur.close()
+    finally:
+        conn.close()
 
 
 def insert_activity_event(event: ActivityEvent) -> int:
