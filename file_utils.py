@@ -2307,6 +2307,28 @@ def _terminate_pid_with_escalation(pid: int, grace_period: float = 5.0) -> tuple
                 return True, "Killed after terminate"
             else:
                 return True, "Terminated gracefully"
+        elif os.name == "nt":
+            try:
+                completed = subprocess.run(
+                    ["taskkill", "/PID", str(int(pid)), "/T", "/F"],
+                    capture_output=True,
+                    text=True,
+                    timeout=max(float(grace_period), 1.0),
+                    check=False,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            except subprocess.TimeoutExpired:
+                return False, "taskkill timed out"
+            except Exception as exc:
+                return False, f"taskkill failed: {exc}"
+
+            if completed.returncode == 0 or not _pid_exists(pid):
+                return True, "Killed with taskkill"
+
+            details = (completed.stderr or completed.stdout or "").strip()
+            if details:
+                return False, f"taskkill failed: {details[:500]}"
+            return False, f"taskkill failed with returncode={completed.returncode}"
         else:
             try:
                 os.kill(pid, signal.SIGTERM)
