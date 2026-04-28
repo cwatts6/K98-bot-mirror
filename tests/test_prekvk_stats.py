@@ -34,7 +34,7 @@ def test_load_prekvk_top3_structured(monkeypatch):
         def __exit__(self, exc_type, exc, tb):
             return False
 
-    monkeypatch.setattr("file_utils.get_conn_with_retries", lambda: DummyConn())
+    monkeypatch.setattr(prekvk_stats, "get_conn_with_retries", lambda: DummyConn())
 
     out = prekvk_stats.load_prekvk_top3(14, limit=3)
     assert set(out.keys()) == {"overall", "p1", "p2", "p3"}
@@ -70,7 +70,7 @@ def test_load_prekvk_top3_limit_one(monkeypatch):
         def __exit__(self, exc_type, exc, tb):
             return False
 
-    monkeypatch.setattr("file_utils.get_conn_with_retries", lambda: DummyConn())
+    monkeypatch.setattr(prekvk_stats, "get_conn_with_retries", lambda: DummyConn())
 
     out = prekvk_stats.load_prekvk_top3(15, limit=1)
     assert len(out["overall"]) <= 1

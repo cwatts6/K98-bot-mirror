@@ -144,17 +144,27 @@ async def _fetch_proc(gov_ids: list[int], slices_csv: str, include_aggregate: bo
     except Exception:
         run_blocking_in_thread = None
 
-    if run_blocking_in_thread is not None:
-        result = await run_blocking_in_thread(
-            _fetch_proc_sync,
+    try:
+        if run_blocking_in_thread is not None:
+            result = await run_blocking_in_thread(
+                _fetch_proc_sync,
+                gov_ids,
+                slices_csv,
+                include_aggregate,
+                name="fetch_proc",
+                meta={"gov_ids": gov_ids, "slice": slices_csv},
+            )
+        else:
+            result = await asyncio.to_thread(
+                _fetch_proc_sync, gov_ids, slices_csv, include_aggregate
+            )
+    except Exception:
+        logger.exception(
+            "fetch_proc failed; returning empty rows. gov_ids=%s slice=%s",
             gov_ids,
             slices_csv,
-            include_aggregate,
-            name="fetch_proc",
-            meta={"gov_ids": gov_ids, "slice": slices_csv},
         )
-    else:
-        result = await asyncio.to_thread(_fetch_proc_sync, gov_ids, slices_csv, include_aggregate)
+        return []
 
     # Normalize result (run_blocking_in_thread may return tuple with worker metadata)
     if isinstance(result, tuple) and len(result) == 2:
@@ -556,26 +566,10 @@ async def get_stats_payload(
                 latest_utc = latest
             return {"daily": latest_utc}
 
-        # Prefer start_callable_offload for freshness/readers for process-level visibility,
-        # fall back to run_blocking_in_thread or asyncio.to_thread
         try:
-            from file_utils import start_callable_offload  # type: ignore
-        except Exception:
-            start_callable_offload = None
+            from file_utils import run_blocking_in_thread
 
-        try:
-            if start_callable_offload is not None:
-                res = await start_callable_offload(
-                    _fresh, name="fetch_freshness", prefer_process=True
-                )
-                if isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], dict):
-                    freshness = res[0]
-                else:
-                    freshness = res
-            else:
-                from file_utils import run_blocking_in_thread
-
-                freshness = await run_blocking_in_thread(_fresh, name="fetch_freshness")
+            freshness = await run_blocking_in_thread(_fresh, name="fetch_freshness")
         except Exception:
             # fallback to to_thread
             freshness = await asyncio.to_thread(_fresh)

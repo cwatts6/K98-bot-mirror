@@ -5,6 +5,19 @@
 import targets_sql_cache as tsc
 
 
+class FakeCursor:
+    def close(self):
+        return None
+
+
+class FakeConn:
+    def cursor(self):
+        return FakeCursor()
+
+    def close(self):
+        return None
+
+
 def make_sample_rows():
     # simulate two target rows returned from _fetch_targets_from_view
     return [
@@ -40,6 +53,7 @@ def test_refresh_targets_cache_returns_summary_in_subprocess(monkeypatch, tmp_pa
     monkeypatch.setattr(
         "targets_sql_cache._fetch_targets_from_view", lambda cur: make_sample_rows()
     )
+    monkeypatch.setattr("targets_sql_cache._conn", lambda: FakeConn())
     # stub _write_json to write to temp file (no exception)
     _captured_path = str(tmp_path / "targets.json")
     monkeypatch.setattr("targets_sql_cache._write_json", lambda path, data: None)
@@ -64,6 +78,7 @@ def test_refresh_targets_cache_returns_full_when_not_subprocess(monkeypatch, tmp
     monkeypatch.setattr(
         "targets_sql_cache._fetch_targets_from_view", lambda cur: make_sample_rows()
     )
+    monkeypatch.setattr("targets_sql_cache._conn", lambda: FakeConn())
     monkeypatch.setattr("targets_sql_cache._write_json", lambda path, data: None)
     res = tsc.refresh_targets_cache()
     assert "_meta" in res

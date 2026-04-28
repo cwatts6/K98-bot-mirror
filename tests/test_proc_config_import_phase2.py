@@ -45,11 +45,18 @@ def make_sample_df():
     return pd.DataFrame([{"KVK_NO": 1, "SomeCol": "A"}, {"KVK_NO": 2, "SomeCol": "B"}])
 
 
+def _patch_import_credentials(monkeypatch, tmp_path):
+    creds = tmp_path / "fake-creds.json"
+    creds.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(pci, "CREDENTIALS_FILE", str(creds))
+
+
 def test_transactional_success(monkeypatch, tmp_path):
     # Prepare environment and monkeypatches
     monkeypatch.setattr(pci, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(pci, "KVK_SHEET_ID", "sheet-id")
     monkeypatch.setattr(pci, "IMPORT_TRANSACTIONAL", True)
+    _patch_import_credentials(monkeypatch, tmp_path)
 
     # Mock sheet service / read
     monkeypatch.setattr(pci, "_get_sheet_service", lambda: SimpleNamespace())
@@ -92,6 +99,7 @@ def test_transactional_upsert_failure_triggers_rollback(monkeypatch, tmp_path):
     monkeypatch.setattr(pci, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(pci, "KVK_SHEET_ID", "sheet-id")
     monkeypatch.setattr(pci, "IMPORT_TRANSACTIONAL", True)
+    _patch_import_credentials(monkeypatch, tmp_path)
 
     monkeypatch.setattr(pci, "_get_sheet_service", lambda: SimpleNamespace())
     monkeypatch.setattr(
@@ -126,6 +134,7 @@ def test_non_transactional_calls_helper_and_commits(monkeypatch, tmp_path):
     monkeypatch.setattr(pci, "KVK_SHEET_ID", "sheet-id")
     # Set non-transactional mode
     monkeypatch.setattr(pci, "IMPORT_TRANSACTIONAL", False)
+    _patch_import_credentials(monkeypatch, tmp_path)
 
     monkeypatch.setattr(pci, "_get_sheet_service", lambda: SimpleNamespace())
     monkeypatch.setattr(

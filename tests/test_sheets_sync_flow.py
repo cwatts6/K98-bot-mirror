@@ -3,6 +3,20 @@ from __future__ import annotations
 from event_calendar import sheets_sync
 
 
+class FakeConn:
+    def cursor(self):
+        return object()
+
+    def commit(self):
+        return None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
 def test_sync_sheets_to_sql_fetch_fail_graceful(monkeypatch):
     monkeypatch.setattr(sheets_sync, "_insert_sync_log_start", lambda _src: 123)
 
@@ -28,6 +42,7 @@ def test_sync_sheets_to_sql_fetch_fail_graceful(monkeypatch):
 def test_sync_sheets_to_sql_happy_path(monkeypatch):
     monkeypatch.setattr(sheets_sync, "_insert_sync_log_start", lambda _src: 999)
     monkeypatch.setattr(sheets_sync, "_finish_sync_log", lambda *_a, **_k: None)
+    monkeypatch.setattr(sheets_sync, "get_conn_with_retries", lambda **_kwargs: FakeConn())
 
     def _fetch(_sheet, tab):
         if tab == "recurring_rules":

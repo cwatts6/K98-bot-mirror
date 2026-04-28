@@ -66,7 +66,7 @@ async def test_fetch_proc_handles_db_error_gracefully():
     """
     from stats_service import _fetch_proc
 
-    with patch("file_utils.get_conn_with_retries", side_effect=Exception("DB offline")):
+    with patch("stats_service.get_conn_with_retries", side_effect=Exception("DB offline")):
         # Should NOT raise; should fall back gracefully
         try:
             result = await _fetch_proc([123], "wtd", True)
@@ -220,7 +220,7 @@ async def test_get_stats_payload_basic_flow():
     with patch("stats_service._fetch_proc_sync", return_value=mock_proc_data):
         with patch("stats_service._fetch_trendlines_sync", return_value=mock_trend_rows):
             # Mock the freshness query
-            with patch("file_utils.get_conn_with_retries") as mock_conn:
+            with patch("stats_service.get_conn_with_retries") as mock_conn:
                 mock_cursor = MagicMock()
                 mock_cursor.fetchall.return_value = [("2025-02-03",)]
                 mock_cursor.description = [("AsOfDate",)]
@@ -493,7 +493,7 @@ async def test_my_stats_unchanged_after_schema_update():
 
     with patch("stats_service._fetch_proc_sync", return_value=mock_proc_data):
         with patch("stats_service._fetch_trendlines_sync", return_value=[]):
-            with patch("file_utils.get_conn_with_retries") as mock_conn:
+            with patch("stats_service.get_conn_with_retries") as mock_conn:
                 mock_cursor = MagicMock()
                 mock_cursor.fetchall.return_value = [("2026-02-05",)]
                 mock_cursor.description = [("AsOfDate",)]

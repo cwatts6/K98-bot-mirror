@@ -11,6 +11,12 @@ from gspread.exceptions import SpreadsheetNotFound
 import gsheet_module as gm
 
 
+class _FakeCredentials:
+    @staticmethod
+    def from_service_account_file(*_args, **_kwargs):
+        return object()
+
+
 def test_get_sheet_values_success(monkeypatch):
     """Should return the rows list when the Sheets client returns values."""
 
@@ -32,6 +38,11 @@ def test_get_sheet_values_success(monkeypatch):
     # monkeypatch the builder used by get_sheet_values
     monkeypatch.setattr(
         gm, "_build_sheets_with_timeout", lambda creds, timeout=None: FakeSheetsService()
+    )
+    monkeypatch.setattr(gm, "CREDENTIALS_FILE", "fake-creds.json")
+    monkeypatch.setattr(
+        "google.oauth2.service_account.Credentials.from_service_account_file",
+        _FakeCredentials.from_service_account_file,
     )
 
     rows = gm.get_sheet_values("FAKE_ID", "Sheet1!A1:B2", timeout=5)
@@ -56,6 +67,11 @@ def test_get_sheet_values_empty_range(monkeypatch):
 
     monkeypatch.setattr(
         gm, "_build_sheets_with_timeout", lambda creds, timeout=None: FakeSheetsService()
+    )
+    monkeypatch.setattr(gm, "CREDENTIALS_FILE", "fake-creds.json")
+    monkeypatch.setattr(
+        "google.oauth2.service_account.Credentials.from_service_account_file",
+        _FakeCredentials.from_service_account_file,
     )
 
     rows = gm.get_sheet_values("FAKE_ID", "Sheet1!A1:A", timeout=2)
