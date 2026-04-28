@@ -111,3 +111,19 @@ async def test_execute_processing_pipeline_embeds_include_context(monkeypatch):
 
     # At least one embed send should have occurred
     assert sent_calls, "No embeds were sent during pipeline run"
+
+    context_values = [
+        str(call["fields"]["Context"])
+        for call in sent_calls
+        if isinstance(call.get("fields"), dict) and "Context" in call["fields"]
+    ]
+    assert context_values, 'No embed included the expected "Context" field'
+    assert any(
+        filename in context
+        and str(rank) in context
+        and str(seed) in context
+        for context in context_values
+    ), (
+        'No embed "Context" field contained the expected filename, rank, and seed: '
+        f"{context_values}"
+    )
