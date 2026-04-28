@@ -66,10 +66,18 @@ logger.info(
 
 # --- Hard fail if not running under the project venv interpreter
 if os.name == "nt":
-    expected = (Path(LOG_DIR).parent / "venv" / "Scripts" / "python.exe").resolve()
+    expected_paths = {
+        (Path(LOG_DIR).parent / name / "Scripts" / "python.exe").resolve()
+        for name in ("venv", ".venv")
+    }
     actual = Path(sys.executable).resolve()
-    if actual != expected:
-        logger.critical("❌ Wrong interpreter: %s (expected %s). Exiting.", actual, expected)
+    if actual not in expected_paths:
+        expected_display = ", ".join(str(p) for p in sorted(expected_paths))
+        logger.critical(
+            "❌ Wrong interpreter: %s (expected one of: %s). Exiting.",
+            actual,
+            expected_display,
+        )
         flush_logs()
         sys.exit(1)
 
