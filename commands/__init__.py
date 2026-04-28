@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from discord.ext import commands as ext_commands
 
+from .activity_cmds import register_activity
 from .admin_cmds import register_admin
 from .ark_cmds import register_ark
 from .calendar_cmds import register_calendar
@@ -16,6 +17,7 @@ from .telemetry_cmds import register_telemetry
 
 
 def register_all(bot: ext_commands.Bot) -> None:
+    register_activity(bot)
     register_admin(bot)
     register_ark(bot)
     register_calendar(bot)

@@ -99,6 +99,9 @@ from player_stats_cache import (  # optional, see note
 from proc_config_import import run_proc_config_import, run_proc_config_import_offload
 from profile_cache import get_cache_stats, warm_cache as warm_profile_cache
 from rehydrate_views import rehydrate_tracked_views
+from server_activity import register_activity_listeners
+from server_activity.activity_store import ensure_activity_schema
+from server_status import run_member_count_channel_loop, run_utc_clock_channel_loop
 from subscription_tracker import load_subscriptions
 from target_utils import warm_name_cache
 from utils import ensure_aware_utc, load_live_queue, update_live_queue_embed, utcnow
@@ -1602,6 +1605,35 @@ async def on_ready():
             logger.info("[BOOT] daily_summary loop started")
     except Exception:
         logger.exception("[BOOT] Failed to start daily_summary loop")
+
+    try:
+        await run_blocking(ensure_activity_schema)
+        register_activity_listeners(bot)
+        logger.info("[BOOT] Server activity tracking initialized")
+    except Exception:
+        logger.exception("[BOOT] Failed to initialize server activity tracking")
+
+    try:
+        if not task_monitor.is_running("utc_clock_channel"):
+            task_monitor.create(
+                "utc_clock_channel",
+                lambda: run_utc_clock_channel_loop(bot),
+                replace=False,
+            )
+            logger.info("[BOOT] UTC clock status channel loop started")
+    except Exception:
+        logger.exception("[BOOT] Failed to start UTC clock status channel loop")
+
+    try:
+        if not task_monitor.is_running("member_count_channel"):
+            task_monitor.create(
+                "member_count_channel",
+                lambda: run_member_count_channel_loop(bot),
+                replace=False,
+            )
+            logger.info("[BOOT] Member count status channel loop started")
+    except Exception:
+        logger.exception("[BOOT] Failed to start member count status channel loop")
 
     try:
         logger.info(f"✅ Bot is ready – logged in as {bot.user} (ID: {bot.user.id})")

@@ -59,6 +59,11 @@ Recommended / Production variables
   - Where used: embeds and status messages when available.
 
 Useful optional / feature flags
+- UTC_CLOCK_CHANNEL_ID - existing voice channel renamed with UTC time every 10 minutes (integer)
+- MEMBER_COUNT_CHANNEL_ID - existing voice channel renamed with current member count (integer)
+- ACTIVITY_TRACKING_ENABLED - enables Discord server activity event tracking (boolean, default true)
+- SERVER_STATUS_ENABLED - enables status channel rename loops (boolean, default true)
+
 - LOG_TO_CONSOLE
   - Type: "1" | "0"
   - Default: 0

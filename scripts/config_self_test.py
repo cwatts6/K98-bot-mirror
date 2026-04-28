@@ -101,6 +101,8 @@ for key in [
     "PREKVK_CHANNEL_ID",
     "HONOR_CHANNEL_ID",
     "STATS_ALERT_CHANNEL_ID",
+    "UTC_CLOCK_CHANNEL_ID",
+    "MEMBER_COUNT_CHANNEL_ID",
     "KVK_EVENT_CHANNEL_ID",
     "KVK_NOTIFICATION_CHANNEL_ID",
     "OFFSEASON_STATS_CHANNEL_ID",
@@ -114,6 +116,8 @@ for key in [
         "OFFSEASON_STATS_CHANNEL_ID",
         "FORT_RALLY_CHANNEL_ID",
         "ACTIVITY_UPLOAD_CHANNEL_ID",
+        "UTC_CLOCK_CHANNEL_ID",
+        "MEMBER_COUNT_CHANNEL_ID",
         "PLAYER_LOCATION_CHANNEL_ID",
     }
     if env_exists(key):
@@ -128,6 +132,8 @@ check_list_int("MONITOR_CHANNEL_IDS")
 check_bool("SHOW_KVK_BANNER")
 check_bool("SHOW_PROFILE_AVATAR_IN_CARD")
 check_bool("KVK_AUTO_EXPORT")
+check_bool("ACTIVITY_TRACKING_ENABLED")
+check_bool("SERVER_STATUS_ENABLED")
 
 print("\n== Google credentials / IDs ==")
 check_path("GOOGLE_CREDENTIALS_FILE")
