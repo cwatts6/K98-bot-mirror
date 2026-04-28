@@ -115,7 +115,7 @@ if ($dirtyAfterPreCommit) {
 }
 
 Write-Host "Running pytest..."
-Invoke-Native -FilePath $resolvedPython -Arguments @("-m", "pytest", "-q")
+Invoke-Native -FilePath $resolvedPython -Arguments @("-m", "pytest tests", "-q")
 
 Write-Host "Pushing branch to mirror..."
 Invoke-Native -FilePath "git" -Arguments @("push", "-u", "origin", $BranchName)
