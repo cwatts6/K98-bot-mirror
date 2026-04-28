@@ -49,6 +49,8 @@ async def _on_raw_reaction_add_activity(payload: discord.RawReactionActionEvent)
         return
 
     member = getattr(payload, "member", None)
+    if member is None:
+        return
     if getattr(member, "bot", False):
         return
 
