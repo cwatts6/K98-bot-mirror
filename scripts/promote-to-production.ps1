@@ -121,7 +121,7 @@ Write-Host "Pushing branch to mirror..."
 Invoke-Native -FilePath "git" -Arguments @("push", "-u", "origin", $BranchName)
 
 Write-Host "Pushing branch to production..."
-Invoke-Native -FilePath "git" -Arguments @("push", "-u", "production", $BranchName)
+Invoke-Native -FilePath "git" -Arguments @("push", "production", $BranchName)
 
 Write-Host ""
 Write-Host "Done. Now open PRs:"
