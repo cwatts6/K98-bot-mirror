@@ -282,4 +282,6 @@ async def test_post_lookup_actions_btn_stats_loads_and_posts(monkeypatch):
     await view.btn_stats.callback(interaction)
 
     assert stats_called.get("gid") == "123", "load_kvk_personal_stats not called with correct gid"
-    # btn_stats posts to channel; verify no crash occurred and stats were loaded
+    assert interaction.channel.sends or interaction.followup.sent, (
+        "btn_stats did not post any message to the channel or followup"
+    )
