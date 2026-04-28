@@ -95,8 +95,8 @@ def _build_insert_params(event: ActivityEvent) -> tuple:
     )
 
 
-_INSERT_SQL = f"""
-    INSERT INTO {{table}}
+_INSERT_SQL = """
+    INSERT INTO {table}
         (OccurredAtUtc, GuildId, ChannelId, UserId, EventType, MetadataJson)
     VALUES (?, ?, ?, ?, ?, ?);
 """
