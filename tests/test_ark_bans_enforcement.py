@@ -56,9 +56,21 @@ async def test_admin_add_blocked_by_ban_when_override_off(monkeypatch):
     async def _active_ban(**_kwargs):
         return {"BanId": 900, "Reason": "Test reason"}
 
+    async def _empty_roster(*_a, **_k):
+        return []
+
+    async def _no_conflict(*_a, **_k):
+        return None
+
+    async def _noop(*_a, **_k):
+        return True
+
     monkeypatch.setattr(controller, "_is_admin_or_leadership", lambda *_a, **_k: True)
     monkeypatch.setattr("ark.registration_flow.get_match", _get_match)
+    monkeypatch.setattr("ark.registration_flow.get_roster", _empty_roster)
     monkeypatch.setattr("ark.registration_flow.get_active_ban_for", _active_ban)
+    monkeypatch.setattr("ark.registration_flow.find_active_signup_for_weekend", _no_conflict)
+    monkeypatch.setattr("ark.registration_flow.insert_audit_log", _noop)
 
     await controller._apply_admin_add(interaction, "12345", "Gov Name", slot_type="Player")
 
@@ -88,9 +100,17 @@ async def test_admin_add_allows_when_override_on(monkeypatch):
     async def _noop(*_a, **_k):
         return True
 
+    async def _empty_roster(*_a, **_k):
+        return []
+
+    async def _no_conflict(*_a, **_k):
+        return None
+
     monkeypatch.setattr(controller, "_is_admin_or_leadership", lambda *_a, **_k: True)
     monkeypatch.setattr("ark.registration_flow.get_match", _get_match)
+    monkeypatch.setattr("ark.registration_flow.get_roster", _empty_roster)
     monkeypatch.setattr("ark.registration_flow.get_active_ban_for", _active_ban)
+    monkeypatch.setattr("ark.registration_flow.find_active_signup_for_weekend", _no_conflict)
     monkeypatch.setattr("ark.registration_flow.add_signup", _noop)
     monkeypatch.setattr("ark.registration_flow.insert_audit_log", _noop)
     monkeypatch.setattr(controller, "refresh_registration_message", _noop)

@@ -32,7 +32,12 @@ class _Client:
 
 
 @pytest.mark.asyncio
-async def test_upsert_registration_no_everyone_by_default():
+async def test_upsert_registration_no_everyone_by_default(monkeypatch):
+    async def _get_match(_match_id):
+        return None
+
+    monkeypatch.setattr("ark.registration_messages.get_match", _get_match)
+
     state = ArkJsonState()
     client = _Client()
     moved, changed = await upsert_registration_message(
@@ -48,7 +53,12 @@ async def test_upsert_registration_no_everyone_by_default():
 
 
 @pytest.mark.asyncio
-async def test_upsert_registration_with_announce_sets_everyone():
+async def test_upsert_registration_with_announce_sets_everyone(monkeypatch):
+    async def _get_match(_match_id):
+        return None
+
+    monkeypatch.setattr("ark.registration_messages.get_match", _get_match)
+
     state = ArkJsonState()
     channel = _Chan()
 

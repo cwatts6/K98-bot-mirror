@@ -188,6 +188,9 @@ async def test_join_player_adds_signup(monkeypatch):
     async def _get_roster(match_id):
         return []
 
+    async def _no_conflict(*_a, **_k):
+        return None
+
     called = {"add": False, "audit": False, "refresh": False}
 
     async def _add_signup(**kwargs):
@@ -203,8 +206,11 @@ async def test_join_player_adds_signup(monkeypatch):
 
     monkeypatch.setattr(controller, "_prompt_governor_selection", _prompt)
     monkeypatch.setattr(controller, "_validate_governor", _validate)
+    monkeypatch.setattr(controller, "_check_active_ban", _no_conflict)
     monkeypatch.setattr("ark.registration_flow.get_match", _get_match)
     monkeypatch.setattr("ark.registration_flow.get_roster", _get_roster)
+    monkeypatch.setattr("ark.registration_flow.find_active_signup_for_weekend", _no_conflict)
+    monkeypatch.setattr("ark.registration_flow.get_signup", _no_conflict)
     monkeypatch.setattr("ark.registration_flow.add_signup", _add_signup)
     monkeypatch.setattr("ark.registration_flow.insert_audit_log", _audit)
     monkeypatch.setattr(controller, "refresh_registration_message", _refresh)
@@ -322,6 +328,9 @@ async def test_switch_updates_governor(monkeypatch):
     async def _no_conflict(*_a, **_k):
         return None
 
+    async def _get_signup_none(*_a, **_k):
+        return None
+
     called = {"switch": None, "audit": False, "refresh": False}
 
     async def _switch(
@@ -348,6 +357,7 @@ async def test_switch_updates_governor(monkeypatch):
     monkeypatch.setattr("ark.registration_flow.get_match", _get_match)
     monkeypatch.setattr("ark.registration_flow.get_roster", _get_roster)
     monkeypatch.setattr("ark.registration_flow.find_active_signup_for_weekend", _no_conflict)
+    monkeypatch.setattr("ark.registration_flow.get_signup", _get_signup_none)
     monkeypatch.setattr("ark.registration_flow.switch_signup_governor", _switch)
     monkeypatch.setattr("ark.registration_flow.insert_audit_log", _audit)
     monkeypatch.setattr(controller, "refresh_registration_message", _refresh)

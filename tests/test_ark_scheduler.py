@@ -141,6 +141,9 @@ async def test_scheduler_does_not_relock_locked_matches(monkeypatch):
     async def _open_pending(*_a, **_k):
         return None
 
+    async def _list_completed():
+        return []
+
     async def _auto_create(**_kwargs):
         called["auto_create"] = True
         return type(
@@ -164,6 +167,9 @@ async def test_scheduler_does_not_relock_locked_matches(monkeypatch):
     monkeypatch.setattr("ark.ark_scheduler.lock_match_and_post_confirmation", _lock)
     monkeypatch.setattr("ark.ark_scheduler.ensure_confirmation_message", _ensure)
     monkeypatch.setattr("ark.ark_scheduler.sync_ark_matches_from_calendar", _auto_create)
+    monkeypatch.setattr(
+        "ark.ark_scheduler.list_completed_matches_pending_completion", _list_completed
+    )
     monkeypatch.setattr("ark.ark_scheduler._open_pending_registrations", _open_pending)
     monkeypatch.setattr("ark.ark_scheduler._run_match_reminder_dispatch", _run_match_dispatch)
     monkeypatch.setattr("ark.ark_scheduler.asyncio.sleep", _sleep)
@@ -215,12 +221,31 @@ async def test_scheduler_updates_match_complete_immediately(monkeypatch):
     async def _open_pending(*_a, **_k):
         return None
 
+    async def _auto_create(**_kwargs):
+        return type(
+            "R",
+            (),
+            {
+                "scanned": 0,
+                "created": 0,
+                "existing": 0,
+                "skipped_cancelled_match": 0,
+                "invalid_title": 0,
+                "errors": 0,
+            },
+        )()
+
+    async def _get_match(_match_id):
+        return {"Status": "Completed"}
+
     monkeypatch.setattr("ark.ark_scheduler._utcnow", lambda: now)
     monkeypatch.setattr("ark.ark_scheduler.get_config", _get_config)
+    monkeypatch.setattr("ark.ark_scheduler.get_match", _get_match)
     monkeypatch.setattr("ark.ark_scheduler.list_open_matches", _list_open_matches)
     monkeypatch.setattr(
         "ark.ark_scheduler.list_completed_matches_pending_completion", _list_completed
     )
+    monkeypatch.setattr("ark.ark_scheduler.sync_ark_matches_from_calendar", _auto_create)
     monkeypatch.setattr("ark.ark_scheduler._open_pending_registrations", _open_pending)
     monkeypatch.setattr("ark.ark_scheduler.ensure_confirmation_message", _ensure)
     monkeypatch.setattr("ark.ark_scheduler.mark_match_completion_posted", _mark)
@@ -269,12 +294,27 @@ async def test_scheduler_schedules_match_complete(monkeypatch):
     async def _open_pending(*_a, **_k):
         return None
 
+    async def _auto_create(**_kwargs):
+        return type(
+            "R",
+            (),
+            {
+                "scanned": 0,
+                "created": 0,
+                "existing": 0,
+                "skipped_cancelled_match": 0,
+                "invalid_title": 0,
+                "errors": 0,
+            },
+        )()
+
     monkeypatch.setattr("ark.ark_scheduler._utcnow", lambda: now)
     monkeypatch.setattr("ark.ark_scheduler.get_config", _get_config)
     monkeypatch.setattr("ark.ark_scheduler.list_open_matches", _list_open_matches)
     monkeypatch.setattr(
         "ark.ark_scheduler.list_completed_matches_pending_completion", _list_completed
     )
+    monkeypatch.setattr("ark.ark_scheduler.sync_ark_matches_from_calendar", _auto_create)
     monkeypatch.setattr("ark.ark_scheduler._open_pending_registrations", _open_pending)
     monkeypatch.setattr("ark.ark_scheduler._schedule_once", _schedule_once)
     monkeypatch.setattr("ark.ark_scheduler.asyncio.sleep", _sleep)

@@ -94,6 +94,7 @@ async def test_close_1h_reminder_fires_in_window() -> None:
             new=AsyncMock(return_value={"PlayersCap": 15, "SubsCap": 5}),
         ),
         patch("ark.ark_scheduler.get_roster", new=AsyncMock(return_value=[])),
+        patch("ark.ark_scheduler.list_match_team_rows", new=AsyncMock(return_value=[])),
         patch("ark.ark_scheduler._utcnow", return_value=now),
     ):
         from ark.ark_scheduler import _run_match_reminder_dispatch
@@ -138,6 +139,7 @@ async def test_close_1h_reminder_does_not_fire_before_window() -> None:
         patch("ark.ark_scheduler.get_alliance", new=AsyncMock(return_value=_make_alliance_row())),
         patch("ark.ark_scheduler.get_config", new=AsyncMock(return_value={})),
         patch("ark.ark_scheduler.get_roster", new=AsyncMock(return_value=[])),
+        patch("ark.ark_scheduler.list_match_team_rows", new=AsyncMock(return_value=[])),
         patch("ark.ark_scheduler._utcnow", return_value=now),
     ):
         from ark.ark_scheduler import _run_match_reminder_dispatch
@@ -166,6 +168,7 @@ async def test_close_1h_reminder_does_not_fire_after_close() -> None:
         patch("ark.ark_scheduler.get_alliance", new=AsyncMock(return_value=_make_alliance_row())),
         patch("ark.ark_scheduler.get_config", new=AsyncMock(return_value={})),
         patch("ark.ark_scheduler.get_roster", new=AsyncMock(return_value=[])),
+        patch("ark.ark_scheduler.list_match_team_rows", new=AsyncMock(return_value=[])),
         patch("ark.ark_scheduler._utcnow", return_value=now),
     ):
         from ark.ark_scheduler import _run_match_reminder_dispatch
@@ -198,6 +201,7 @@ async def test_close_1h_includes_jump_link_when_ref_available() -> None:
         patch("ark.ark_scheduler.get_alliance", new=AsyncMock(return_value=_make_alliance_row())),
         patch("ark.ark_scheduler.get_config", new=AsyncMock(return_value={})),
         patch("ark.ark_scheduler.get_roster", new=AsyncMock(return_value=[])),
+        patch("ark.ark_scheduler.list_match_team_rows", new=AsyncMock(return_value=[])),
         patch("ark.ark_scheduler._utcnow", return_value=now),
     ):
         from ark.ark_scheduler import _run_match_reminder_dispatch
@@ -234,6 +238,7 @@ async def test_close_1h_omits_link_when_no_ref() -> None:
         patch("ark.ark_scheduler.get_alliance", new=AsyncMock(return_value=_make_alliance_row())),
         patch("ark.ark_scheduler.get_config", new=AsyncMock(return_value={})),
         patch("ark.ark_scheduler.get_roster", new=AsyncMock(return_value=[])),
+        patch("ark.ark_scheduler.list_match_team_rows", new=AsyncMock(return_value=[])),
         patch("ark.ark_scheduler._utcnow", return_value=now),
     ):
         from ark.ark_scheduler import _run_match_reminder_dispatch

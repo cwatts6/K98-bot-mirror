@@ -94,3 +94,36 @@ def _reset_registry_cache():
     except Exception:
         pass
     yield
+
+
+@pytest.fixture(autouse=True)
+def _block_live_ark_db_access_in_unit_tests(monkeypatch):
+    """Fail fast if a normal Ark unit test accidentally reaches the live SQL DB."""
+    if os.getenv("RUN_DB_TESTS", "0") == "1":
+        yield
+        return
+
+    def _raise_live_db_access(*_args, **_kwargs):
+        raise AssertionError(
+            "Unit test attempted live DB access. Patch the DAL/service boundary "
+            "or run with RUN_DB_TESTS=1 for explicit integration coverage."
+        )
+
+    async def _raise_live_db_access_async(*_args, **_kwargs):
+        _raise_live_db_access()
+
+    try:
+        import ark.dal.ark_dal as ark_dal
+
+        for name in (
+            "run_query_async",
+            "run_query_strict_async",
+            "run_one_async",
+            "run_one_strict_async",
+            "execute_async",
+        ):
+            monkeypatch.setattr(ark_dal, name, _raise_live_db_access_async, raising=False)
+    except Exception:
+        pass
+
+    yield
