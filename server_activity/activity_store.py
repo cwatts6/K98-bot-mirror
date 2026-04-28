@@ -30,9 +30,23 @@ BEGIN
             CONSTRAINT DF_DiscordServerActivityEvents_CreatedAtUtc
             DEFAULT SYSUTCDATETIME()
     );
+END;
+
+IF OBJECT_ID(N'dbo.DiscordServerActivityEvents', N'U') IS NOT NULL
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM sys.indexes
+        WHERE name = N'IX_DiscordServerActivityEvents_Window'
+          AND object_id = OBJECT_ID(N'dbo.DiscordServerActivityEvents')
+    )
+    BEGIN
+        DROP INDEX IX_DiscordServerActivityEvents_Window
+            ON dbo.DiscordServerActivityEvents;
+    END;
 
     CREATE INDEX IX_DiscordServerActivityEvents_Window
-        ON dbo.DiscordServerActivityEvents (OccurredAtUtc, GuildId, UserId, EventType)
+        ON dbo.DiscordServerActivityEvents (GuildId, OccurredAtUtc, UserId, EventType)
         INCLUDE (ChannelId);
 END;
 """
