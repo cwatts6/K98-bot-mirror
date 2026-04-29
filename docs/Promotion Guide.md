@@ -25,6 +25,9 @@ git switch <branch-name>
 git pull origin <branch-name>
 git status
 git log --oneline -5
+git log --oneline origin/main..HEAD
+git diff --name-status origin/main...HEAD
+git diff --stat origin/main...HEAD
 ```
 
 ### Step 2 - Run Local Validation
@@ -41,7 +44,7 @@ git status
 
 `pytest` should target `tests`, not the whole repository, so archived legacy tests are not included by accident.
 
-### Step 4 - Confirm Production Remote
+### Step 3 - Confirm Production Remote
 
 ```powershell
 git remote -v
@@ -77,10 +80,16 @@ The script:
 - creates `prod/<branch-name>` from `production/main`
 - applies the file delta from `origin/main..origin/<branch-name>`
 - commits the promoted file changes
-- runs `pre_commit`, `pytest -q tests`, and `git diff --check`
+- runs `pre_commit` against the promoted file list, then `pytest -q tests` and `git diff --check`
 - pushes `prod/<branch-name>` to `production`
 
-If validation modifies files, review the changes, commit the correct mirror fix, and rerun the promotion.
+The script automatically derives the promoted file list from:
+
+```powershell
+git diff --name-only origin/main..origin/<branch-name>
+```
+
+If validation modifies promoted files, review the changes, commit the correct mirror fix, and rerun the promotion. Unrelated production baseline formatting should not be mixed into the production promotion branch.
 
 ### Step 5 - Open Production PR
 

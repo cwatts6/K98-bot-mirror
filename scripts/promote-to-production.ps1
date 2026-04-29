@@ -151,11 +151,26 @@ function Resolve-PythonExecutable {
 function Invoke-ValidationAndEnsureClean {
   param(
     [Parameter(Mandatory = $true)]
-    [string]$ResolvedPython
+    [string]$ResolvedPython,
+
+    [Parameter(Mandatory = $true)]
+    [string[]]$PromotedFiles
   )
 
-  Write-Host "Running pre-commit validation..."
-  Invoke-Native -FilePath $ResolvedPython -Arguments @("-m", "pre_commit", "run", "-a")
+  $preCommitFiles = @(
+    $PromotedFiles |
+      Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+      Where-Object { Test-Path -LiteralPath $_ }
+  )
+
+  if ($preCommitFiles.Count -gt 0) {
+    Write-Host "Running pre-commit validation against promoted files..."
+    Write-Host ("Promoted file count: {0}" -f $preCommitFiles.Count)
+    Invoke-Native -FilePath $ResolvedPython -Arguments (@("-m", "pre_commit", "run", "--files") + $preCommitFiles)
+  }
+  else {
+    Write-Host "Skipping pre-commit validation because no promoted files exist after patch application."
+  }
   Assert-CleanWorkingTree -Context "after pre-commit validation"
 
   Write-Host "Running pytest validation against tests..."
@@ -202,7 +217,7 @@ try {
   Assert-GitRefExists -RefName $mirrorMainRef -ErrorMessage "Mirror base 'origin/main' does not exist."
   Assert-GitRefExists -RefName $productionMainRef -ErrorMessage "Production base 'production/main' does not exist. Fetch or configure the production remote."
 
-  $changedFiles = git diff --name-only "origin/main..origin/$SourceBranch"
+  $changedFiles = @(git diff --name-only "origin/main..origin/$SourceBranch")
   if ($LASTEXITCODE -ne 0) {
     throw "Could not list changed files for origin/main..origin/$SourceBranch."
   }
@@ -241,7 +256,7 @@ try {
   $resolvedPython = Resolve-PythonExecutable -RequestedPythonExe $PythonExe -RepoRoot $repoRoot
   Write-Host "Python: $resolvedPython"
   try {
-    Invoke-ValidationAndEnsureClean -ResolvedPython $resolvedPython
+    Invoke-ValidationAndEnsureClean -ResolvedPython $resolvedPython -PromotedFiles $changedFiles
   }
   catch {
     $validationErrorMessage = $_.Exception.Message
