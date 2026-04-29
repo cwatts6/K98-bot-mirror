@@ -305,9 +305,10 @@ class KVKHistoryView(discord.ui.View):
         for label, meta in self.account_map.items():
             gov_id = str(meta.get("GovernorID"))
             gname = str(meta.get("GovernorName") or label)
+            option_label = f"{label} • {gname}"[:100]
             options.append(
                 discord.SelectOption(
-                    label=f"{label} • {gname}",
+                    label=option_label,
                     value=gov_id,
                     default=(gov_id in sel_selected),
                 )
