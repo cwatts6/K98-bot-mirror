@@ -36,7 +36,7 @@ Use the local script with a sample resources or speedups screenshot:
 
 ```powershell
 cd C:\discord_file_downloader
-.\venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 python scripts\test_inventory_vision.py C:\path\to\resources_sample.png --type resources
 python scripts\test_inventory_vision.py C:\path\to\speedups_sample.png --type speedups
 ```
