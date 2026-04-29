@@ -161,7 +161,7 @@ async def test_non_dict_json_response_returns_structured_error():
 
     assert not result.ok
     assert result.error is not None
-    assert "not an object" in result.error
+    assert "not a dict" in result.error
     assert result.model == "gpt-4.1-mini"
 
 
@@ -173,7 +173,7 @@ async def test_fallback_lower_confidence_preserves_primary_result():
     payloads = [
         {
             "detected_image_type": "resources",
-            "confidence_score": 0.89,  # just below 0.90 threshold → fallback triggered
+            "confidence_score": 0.89,  # just below 0.90 threshold -> fallback triggered
             "warnings": [],
             "values": {"Food": 1000},
         },

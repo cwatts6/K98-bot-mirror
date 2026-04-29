@@ -148,7 +148,7 @@ def _parse_result_payload(
             model=model,
             prompt_version=prompt_version,
             fallback_used=fallback_used,
-            error=f"Vision response JSON was not an object (got {type(payload).__name__}).",
+            error=f"Vision response JSON was not a dict (got {type(payload).__name__}).",
         )
 
     detected = str(payload.get("detected_image_type") or "unknown")
