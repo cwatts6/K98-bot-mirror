@@ -187,28 +187,9 @@ def make_kvk_targets_view(
             registry = await asyncio.to_thread(load_registry)
             user_block = registry.get(str(ctx_inner.user.id)) or {}
             accounts = user_block.get("accounts") or {}
-            # Try to use centralized account_picker helper if present
-            try:
-                from account_picker import build_unique_gov_options  # type: ignore
-            except Exception:
-                # Fallback: minimal inline builder (keeps compatibility)
-                def build_unique_gov_options_fallback(accounts_map):
-                    opts = []
-                    seen = set()
-                    # deterministic order: sort by slot name
-                    for slot in sorted(accounts_map.keys()):
-                        a = accounts_map.get(slot) or {}
-                        gid = str(a.get("GovernorID") or "").strip()
-                        if not gid or gid in seen:
-                            continue
-                        seen.add(gid)
-                        label = str(a.get("GovernorName") or slot)[:100]
-                        opts.append(discord.SelectOption(label=label, value=gid, description=slot))
-                    return opts
+            from account_picker import safe_build_unique_gov_options
 
-                build_unique_gov_options = build_unique_gov_options_fallback
-
-            return build_unique_gov_options(accounts)
+            return safe_build_unique_gov_options(accounts)
         except Exception:
             logger.exception("[KVK_UI] _rebuild_options failed")
             return []

@@ -1,7 +1,6 @@
 # kvk_history_utils.py
 from __future__ import annotations
 
-from collections.abc import Iterable
 import io
 import logging
 
@@ -17,8 +16,7 @@ import matplotlib.ticker as mticker
 from matplotlib.ticker import FuncFormatter
 import pandas as pd
 
-# --- Project constants / helpers
-from file_utils import fetch_one_dict, get_conn_with_retries
+from services import kvk_history_service
 from utils import fmt_short  # centralised formatter used across project
 
 # Prioritize widely available families; adjust list if you know what’s on the host
@@ -85,164 +83,13 @@ def _safe_text(s: str) -> str:
 
 
 def get_started_kvks() -> list[int]:
-    """
-    Return a contiguous integer range of started KVKs from the earliest we track (>=3)
-    up to the latest actually started. Robust even if older rows are missing in KVK_Details.
-    """
-    with get_conn_with_retries() as cn:
-        with cn.cursor() as cur:
-            # Latest started KVK from KVK_Details (preferred)
-            cur.execute("""
-                SELECT MAX(KVK_NO)
-                FROM dbo.KVK_Details
-                WHERE KVK_START_DATE IS NOT NULL
-                  AND KVK_START_DATE <= SYSUTCDATETIME();
-            """)
-            r = fetch_one_dict(cur)
-            # prefer next(iter(...)) over single-element slice
-            if r:
-                max_started = int(next(iter(r.values())) or 0)
-            else:
-                max_started = 0
-
-            if max_started == 0:
-                # Fallback: anything present in EXCEL_FOR_KVK_* view/tables
-                cur.execute("SELECT ISNULL(MAX([KVK_NO]), 0) FROM dbo.v_EXCEL_FOR_KVK_All;")
-                r2 = fetch_one_dict(cur)
-                if r2:
-                    max_started = int(next(iter(r2.values())) or 0)
-                else:
-                    max_started = 0
-
-            # Earliest KVK present in physical tables; fallback to 3
-            cur.execute("""
-                SELECT MIN(TRY_CONVERT(int, REPLACE(name, 'EXCEL_FOR_KVK_', '')))
-                FROM sys.tables
-                WHERE name LIKE 'EXCEL_FOR_KVK[_]%';
-            """)
-            r3 = fetch_one_dict(cur)
-            if r3:
-                v3 = next(iter(r3.values()))
-                min_kvk = int(v3) if v3 is not None else 3
-            else:
-                min_kvk = 3
-            min_kvk = max(3, min_kvk)
-
-    if max_started < min_kvk:
-        return [min_kvk]
-    return list(range(min_kvk, max_started + 1))
+    """Compatibility wrapper for the KVK history service."""
+    return kvk_history_service.get_started_kvks()
 
 
-def fetch_history_for_governors(governor_ids: Iterable[int]) -> pd.DataFrame:
-    """
-    Returns one tidy DataFrame across ALL started KVKs for the given Gov_IDs.
-    Pulls from v_EXCEL_FOR_KVK_Started so future KVKs are auto-hidden.
-    """
-    ids = list({int(x) for x in governor_ids if x is not None})
-    if not ids:
-        return pd.DataFrame()
-
-    # Parameterize IN (...) safely by building ?,?,?
-    placeholders = ",".join(["?"] * len(ids))
-    sql = f"""
-        SELECT
-            CAST([Gov_ID] AS BIGINT)      AS Gov_ID,
-            [Governor_Name],
-            CAST([KVK_NO] AS INT)         AS KVK_NO,
-            CAST([T4_KILLS] AS BIGINT)    AS T4_KILLS,
-            CAST([T5_KILLS] AS BIGINT)    AS T5_KILLS,
-            CAST([T4&T5_Kills] AS BIGINT) AS T4T5_Kills,
-            CAST([% of Kill target] AS DECIMAL(9,2)) AS KillPct,
-            CAST([Deads] AS BIGINT)       AS Deads,
-            CAST([% of Dead_Target] AS DECIMAL(9,2)) AS DeadPct,
-            CAST([DKP_SCORE] AS BIGINT)   AS DKP_SCORE,
-            CAST([% of DKP Target] AS DECIMAL(9,2)) AS DKPPct,
-            CAST([Pass 4 Kills] AS BIGINT) AS P4_Kills,
-            CAST([Pass 6 Kills] AS BIGINT) AS P6_Kills,
-            CAST([Pass 7 Kills] AS BIGINT) AS P7_Kills,
-            CAST([Pass 8 Kills] AS BIGINT) AS P8_Kills,
-            CAST([Pass 4 Deads] AS BIGINT) AS P4_Deads,
-            CAST([Pass 6 Deads] AS BIGINT) AS P6_Deads,
-            CAST([Pass 7 Deads] AS BIGINT) AS P7_Deads,
-            CAST([Pass 8 Deads] AS BIGINT) AS P8_Deads
-        FROM dbo.v_EXCEL_FOR_KVK_Started
-        WHERE [Gov_ID] IN ({placeholders})
-    """
-    with get_conn_with_retries() as cn:
-        cur = cn.cursor()
-        cur.execute(sql, ids)
-        rows = cur.fetchall()
-        cols = [c[0] for c in cur.description]
-    df = pd.DataFrame.from_records(rows, columns=cols)
-
-    # Fill missing KVK rows per Gov_ID with zeros so charts & table show full range
-    started = get_started_kvks()
-    if df.empty:
-        # Return zero-frame with all KVKs for the first ID (or empty if none)
-        return pd.DataFrame(
-            {
-                "Gov_ID": [],
-                "Governor_Name": [],
-                "KVK_NO": [],
-                "T4_KILLS": [],
-                "T5_KILLS": [],
-                "T4T5_Kills": [],
-                "KillPct": [],
-                "Deads": [],
-                "DeadPct": [],
-                "DKP_SCORE": [],
-                "DKPPct": [],
-                "P4_Kills": [],
-                "P6_Kills": [],
-                "P7_Kills": [],
-                "P8_Kills": [],
-                "P4_Deads": [],
-                "P6_Deads": [],
-                "P7_Deads": [],
-                "P8_Deads": [],
-            }
-        )
-
-    frames = []
-    for gid, gdf in df.groupby("Gov_ID", dropna=False):
-        # Ensure Governor_Name preserved (take first non-null)
-        gname = (
-            gdf["Governor_Name"].dropna().iloc[0]
-            if not gdf["Governor_Name"].dropna().empty
-            else None
-        )
-        existing = set(int(x) for x in gdf["KVK_NO"].tolist())
-        missing = [k for k in started if k not in existing]
-        if missing:
-            zeros = pd.DataFrame(
-                {
-                    "Gov_ID": gid,
-                    "Governor_Name": gname,
-                    "KVK_NO": missing,
-                    "T4_KILLS": 0,
-                    "T5_KILLS": 0,
-                    "T4T5_Kills": 0,
-                    "KillPct": 0.0,
-                    "Deads": 0,
-                    "DeadPct": 0.0,
-                    "DKP_SCORE": 0,
-                    "DKPPct": 0.0,
-                    "P4_Kills": 0,
-                    "P6_Kills": 0,
-                    "P7_Kills": 0,
-                    "P8_Kills": 0,
-                    "P4_Deads": 0,
-                    "P6_Deads": 0,
-                    "P7_Deads": 0,
-                    "P8_Deads": 0,
-                }
-            )
-            gdf = pd.concat([gdf, zeros], ignore_index=True)
-
-        gdf = gdf.sort_values(["KVK_NO"])
-        frames.append(gdf)
-
-    return pd.concat(frames, ignore_index=True).sort_values(["Gov_ID", "KVK_NO"])
+def fetch_history_for_governors(governor_ids) -> pd.DataFrame:
+    """Compatibility wrapper for the KVK history service."""
+    return kvk_history_service.fetch_history_for_governors(governor_ids)
 
 
 # ---------- Metric dictionary & chart ----------
@@ -287,6 +134,8 @@ def build_dual_axis_chart(
     except Exception:
         if df is None:
             df = pd.DataFrame()
+    if df is None or "Gov_ID" not in df.columns:
+        df = kvk_history_service.empty_history_frame()
 
     if not left_metrics:
         left_metrics = DEFAULT_LEFT[:]
@@ -439,6 +288,8 @@ def build_history_table_image(
     except Exception:
         if df is None:
             df = pd.DataFrame()
+    if df is None or "Gov_ID" not in df.columns:
+        df = kvk_history_service.empty_history_frame()
 
     # Sanitize overlay once
     overlay_safe: dict[int, str] = {gid: _safe_text(lbl) for gid, lbl in (overlay or {}).items()}

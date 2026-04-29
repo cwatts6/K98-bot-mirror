@@ -32,9 +32,10 @@ from embed_utils import build_stats_embed
 from file_utils import fetch_one_dict
 from gsheet_module import run_kvk_export_test, run_kvk_proc_exports_with_alerts
 from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
-from kvk_history_view import KVKHistoryView
+from kvk.dal.kvk_history_dal import resolve_current_kvk_no_from_cursor
 from profile_cache import autocomplete_choices
 from registry.governor_registry import get_user_main_governor_name, load_registry
+from services import kvk_history_service
 from stats_alerts.embeds.kvk import send_kvk_embed
 from stats_alerts.honors import get_latest_honor_top, purge_latest_honor_scan
 from stats_alerts.interface import send_stats_update_embed
@@ -45,6 +46,7 @@ from stats_service import (
     get_registered_governor_names_for_discord,
     get_stats_payload,
 )
+from ui.views.kvk_history_view import KVKHistoryView
 from ui.views.kvk_personal_views import MyKVKStatsSelectView
 from ui.views.registry_views import MyRegsActionView
 from ui.views.stats_views import KVKRankingView
@@ -57,19 +59,7 @@ bot: ext_commands.Bot | None = None
 
 
 def _resolve_kvk_no(c, kvk_no: int | None) -> int:
-    if kvk_no and kvk_no > 0:
-        return int(kvk_no)
-    c.execute("""
-        SELECT TOP 1 KVK_NO
-        FROM dbo.KVK_Details             -- change to dbo.KVK_Details if your schema differs
-        WHERE GETUTCDATE() BETWEEN KVK_REGISTRATION_DATE AND KVK_END_DATE
-        ORDER BY KVK_NO DESC
-    """)
-    rowd = fetch_one_dict(c)
-    if not rowd:
-        raise ValueError("Could not resolve the current KVK window.")
-    # return the first column's value (KVK_NO) using next(iter(...)) to satisfy RUF015
-    return int(next(iter(rowd.values())))
+    return resolve_current_kvk_no_from_cursor(c, kvk_no)
 
 
 async def async_load_registry():
@@ -1053,7 +1043,9 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         registry = await asyncio.to_thread(load_registry) or {}
         user_id = str(ctx.user.id)
         payload = registry.get(user_id) or {}
-        account_map = payload.get("accounts") or {}  # {label: {GovernorID, GovernorName}}
+        account_map = kvk_history_service.build_ordered_account_map(
+            payload.get("accounts") or {}
+        )  # {label: {GovernorID, GovernorName}}
 
         # If a Governor ID is provided, build a minimal map for it (works even with no registry)
         if governor_id:
@@ -1078,14 +1070,18 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             )
             return
 
-        def pick_default_id(m: dict) -> str:
-            for label, meta in m.items():
-                if str(label).lower().startswith("main"):
-                    return str(meta["GovernorID"])
-            return str(next(iter(m.values()))["GovernorID"])
-
         # Start on the provided governor_id when present, else Main/first
-        default_id = str(governor_id) if governor_id else pick_default_id(account_map)
+        default_id = (
+            str(governor_id)
+            if governor_id
+            else kvk_history_service.pick_default_governor_id(account_map)
+        )
+        if not default_id:
+            await ctx.respond(
+                "âŒ I couldn't find a valid Governor ID in your registered accounts.",
+                ephemeral=True,
+            )
+            return
 
         view = KVKHistoryView(
             user=ctx.user,
@@ -1171,19 +1167,16 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         # Resolve current KVK if not provided
         if kvk_no == 0:
             with _conn() as cn, cn.cursor() as c:
-                c.execute("""
-                    SELECT TOP 1 KVK_NO
-                    FROM dbo.KVK_Details
-                    WHERE GETUTCDATE() BETWEEN KVK_REGISTRATION_DATE AND KVK_END_DATE
-                    ORDER BY KVK_NO DESC
-                """)
-                row = c.fetchone()
-            if not row:
+                try:
+                    kvk_no = _resolve_kvk_no(c, kvk_no)
+                except Exception:
+                    logger.exception("[/kvk_export_all] Could not resolve current KVK")
+                    kvk_no = 0
+            if kvk_no == 0:
                 await ctx.followup.send(
                     "❌ Could not resolve the current KVK window.", ephemeral=True
                 )
                 return
-            kvk_no = int(row[0])
 
         # Default sheet name from constants (allows slash arg override)
         sheet_name = (sheet_name or KVK_SHEET_NAME).strip() or KVK_SHEET_NAME

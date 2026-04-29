@@ -15,3 +15,12 @@
 - Impact: medium
 - Risk: medium
 - Dependencies: Local validation environment contract for venv naming and subprocess permissions.
+
+### Deferred Optimisation
+- Area: commands/stats_cmds.py
+- Type: architecture
+- Description: Some KVK admin commands still contain direct operational SQL beyond the current-KVK resolver.
+- Suggested Fix: Move scan/window/recompute SQL into a dedicated KVK admin DAL/service batch while preserving command output behaviour.
+- Impact: medium
+- Risk: medium
+- Dependencies: Review KVK admin command coverage and decide the target service/DAL split for scan, window, export, and recompute operations.

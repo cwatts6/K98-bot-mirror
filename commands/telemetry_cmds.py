@@ -45,7 +45,7 @@ from decoraters import (
     track_usage,
 )
 from embed_player_profile import build_player_profile_embed
-from file_utils import fetch_one_dict
+from kvk.dal.kvk_history_dal import resolve_current_kvk_no_from_cursor
 from kvk_ui import make_kvk_targets_view
 from stats_cache_helpers import load_last_kvk_map
 
@@ -129,19 +129,7 @@ start_bot_time = datetime.now(UTC)
 
 
 def _resolve_kvk_no(c, kvk_no: int | None) -> int:
-    if kvk_no and kvk_no > 0:
-        return int(kvk_no)
-    c.execute("""
-        SELECT TOP 1 KVK_NO
-        FROM dbo.KVK_Details             -- change to dbo.KVK_Details if your schema differs
-        WHERE GETUTCDATE() BETWEEN KVK_REGISTRATION_DATE AND KVK_END_DATE
-        ORDER BY KVK_NO DESC
-    """)
-    rowd = fetch_one_dict(c)
-    if not rowd:
-        raise ValueError("Could not resolve the current KVK window.")
-    # return the first column's value (KVK_NO) using next(iter(...)) to satisfy RUF015
-    return int(next(iter(rowd.values())))
+    return resolve_current_kvk_no_from_cursor(c, kvk_no)
 
 
 async def async_load_registry():

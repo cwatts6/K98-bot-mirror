@@ -123,6 +123,8 @@ async def test_kvk_view_uses_offload_runner_and_has_lock(monkeypatch):
     # Validate recorded calls include the three heavy-call targets (fetch, chart, table)
     called_names = [c[0] for c in calls]
     assert any("fetch" in n for n in called_names)
+    fetch_call = next(c for c in calls if "fetch" in c[0])
+    assert fetch_call[1][0] == [123]
     assert any("chart" in n for n in called_names) or any(
         "build_dual_axis_chart" in n for n in called_names
     )
@@ -132,3 +134,59 @@ async def test_kvk_view_uses_offload_runner_and_has_lock(monkeypatch):
 
     # payload structure
     assert "embeds" in payload and "files" in payload
+
+
+def test_fetch_history_normalizes_stringified_dict_keys(monkeypatch):
+    rows = [
+        {
+            "Gov_ID": 2441482,
+            "Governor_Name": "A",
+            "KVK_NO": 10,
+            "T4_KILLS": 5,
+            "T5_KILLS": 6,
+            "T4T5_Kills": 11,
+            "KillPct": 50.0,
+            "Deads": 1,
+            "DeadPct": 10.0,
+            "DKP_SCORE": 100,
+            "DKPPct": 20.0,
+            "P4_Kills": 0,
+            "P6_Kills": 0,
+            "P7_Kills": 0,
+            "P8_Kills": 0,
+            "P4_Deads": 0,
+            "P6_Deads": 0,
+            "P7_Deads": 0,
+            "P8_Deads": 0,
+        }
+    ]
+
+    from services import kvk_history_service
+
+    captured = {}
+
+    def fake_fetch(ids):
+        captured["ids"] = ids
+        return rows
+
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal, "fetch_history_rows_for_governors", fake_fetch
+    )
+    monkeypatch.setattr(kvk_history_service.kvk_history_dal, "get_started_kvks", lambda: [10])
+
+    df = khu.fetch_history_for_governors("dict_keys([2441482])")
+
+    assert captured["ids"] == [2441482]
+    assert list(df["Gov_ID"]) == [2441482]
+
+
+def test_chart_handles_malformed_empty_dataframe():
+    buf = khu.build_dual_axis_chart(
+        df=pd.DataFrame(),
+        overlay={2441482: "A"},
+        left_metrics=["T4&T5 Kills"],
+        right_metric="% of Kill target",
+        title="t",
+        show_point_labels="none",
+    )
+    assert isinstance(buf, io.BytesIO)
