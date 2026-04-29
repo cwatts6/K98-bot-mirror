@@ -119,6 +119,54 @@ function Assert-CleanWorkingTree {
   }
 }
 
+function Assert-NoUnstagedChanges {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Context
+  )
+
+  $unstaged = git diff --name-only
+  if ($LASTEXITCODE -ne 0) {
+    throw "Could not read unstaged git diff while checking $Context."
+  }
+  if ($unstaged) {
+    throw "Unexpected unstaged changes during $Context. Validation likely modified files. Review the changes, commit the correct mirror fix, and rerun promotion."
+  }
+}
+
+function Assert-StagedFilesWithinPromotedSet {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$PromotedFiles,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Context
+  )
+
+  $allowed = @{}
+  foreach ($path in $PromotedFiles) {
+    if (-not [string]::IsNullOrWhiteSpace($path)) {
+      $allowed[$path.Replace("\", "/")] = $true
+    }
+  }
+
+  $staged = @(git diff --cached --name-only)
+  if ($LASTEXITCODE -ne 0) {
+    throw "Could not read staged git diff while checking $Context."
+  }
+  if ($staged.Count -eq 0) {
+    throw "No staged promotion changes remain during $Context."
+  }
+
+  $unexpected = @(
+    $staged |
+      Where-Object { -not $allowed.ContainsKey($_.Replace("\", "/")) }
+  )
+  if ($unexpected.Count -gt 0) {
+    throw "Unexpected staged files during ${Context}: $($unexpected -join ', ')"
+  }
+}
+
 function Resolve-PythonExecutable {
   param(
     [string]$RequestedPythonExe,
@@ -171,15 +219,19 @@ function Invoke-ValidationAndEnsureClean {
   else {
     Write-Host "Skipping pre-commit validation because no promoted files exist after patch application."
   }
-  Assert-CleanWorkingTree -Context "after pre-commit validation"
+  Assert-NoUnstagedChanges -Context "after pre-commit validation"
+  Assert-StagedFilesWithinPromotedSet -PromotedFiles $PromotedFiles -Context "after pre-commit validation"
 
   Write-Host "Running pytest validation against tests..."
   Invoke-Native -FilePath $ResolvedPython -Arguments @("-m", "pytest", "-q", "tests")
-  Assert-CleanWorkingTree -Context "after pytest validation"
+  Assert-NoUnstagedChanges -Context "after pytest validation"
+  Assert-StagedFilesWithinPromotedSet -PromotedFiles $PromotedFiles -Context "after pytest validation"
 
   Write-Host "Running whitespace validation..."
   Invoke-Native -FilePath "git" -Arguments @("diff", "--check")
-  Assert-CleanWorkingTree -Context "after git diff --check"
+  Invoke-Native -FilePath "git" -Arguments @("diff", "--cached", "--check")
+  Assert-NoUnstagedChanges -Context "after git diff --check"
+  Assert-StagedFilesWithinPromotedSet -PromotedFiles $PromotedFiles -Context "after git diff --check"
 }
 
 $scriptDir = Split-Path -Parent $PSCommandPath

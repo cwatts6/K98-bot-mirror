@@ -80,7 +80,7 @@ The script:
 - creates `prod/<branch-name>` from `production/main`
 - applies the file delta from `origin/main..origin/<branch-name>`
 - commits the promoted file changes
-- runs `pre_commit` against the promoted file list, then `pytest -q tests` and `git diff --check`
+- runs `pre_commit` against the promoted file list, then `pytest -q tests`, `git diff --check`, and `git diff --cached --check`
 - pushes `prod/<branch-name>` to `production`
 
 The script automatically derives the promoted file list from:
@@ -88,6 +88,8 @@ The script automatically derives the promoted file list from:
 ```powershell
 git diff --name-only origin/main..origin/<branch-name>
 ```
+
+During promotion, the intended file delta is staged before validation. The script therefore checks for unexpected unstaged changes and unexpected staged files rather than requiring a completely clean working tree before the promotion commit.
 
 If validation modifies promoted files, review the changes, commit the correct mirror fix, and rerun the promotion. Unrelated production baseline formatting should not be mixed into the production promotion branch.
 
