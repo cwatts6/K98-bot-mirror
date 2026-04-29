@@ -32,7 +32,7 @@ try:
         run_maintenance_with_isolation,
         start_callable_offload,
     )
-except Exception:
+except ImportError:
     start_callable_offload = None
     run_maintenance_with_isolation = None
     run_blocking_in_thread = None
