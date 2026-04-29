@@ -90,10 +90,15 @@ def build_ordered_account_map(accounts: Mapping[str, Any] | None) -> dict[str, d
         if isinstance(info, Mapping):
             gid = info.get("GovernorID") or info.get("GovernorId") or info.get("GovernorIdStr")
             if gid:
-                ordered[slot] = {
-                    "GovernorID": int(gid),
-                    "GovernorName": info.get("GovernorName") or info.get("Governor") or slot,
-                }
+                try:
+                    ordered[slot] = {
+                        "GovernorID": int(gid),
+                        "GovernorName": info.get("GovernorName") or info.get("Governor") or slot,
+                    }
+                except (TypeError, ValueError):
+                    logger.warning(
+                        "Skipping account slot %r: GovernorID %r is not a valid integer", slot, gid
+                    )
 
     for slot in sorted(str(k) for k in accounts.keys() if k not in ordered):
         info = accounts.get(slot)
@@ -101,10 +106,15 @@ def build_ordered_account_map(accounts: Mapping[str, Any] | None) -> dict[str, d
             continue
         gid = info.get("GovernorID") or info.get("GovernorId") or info.get("GovernorIdStr")
         if gid:
-            ordered[slot] = {
-                "GovernorID": int(gid),
-                "GovernorName": info.get("GovernorName") or info.get("Governor") or slot,
-            }
+            try:
+                ordered[slot] = {
+                    "GovernorID": int(gid),
+                    "GovernorName": info.get("GovernorName") or info.get("Governor") or slot,
+                }
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Skipping account slot %r: GovernorID %r is not a valid integer", slot, gid
+                )
     return ordered
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import logging
 from typing import Any
 
 import discord
@@ -37,6 +38,8 @@ except ImportError:
     run_maintenance_with_isolation = None
     run_blocking_in_thread = None
 
+logger = logging.getLogger(__name__)
+
 MAX_OVERLAY = 3
 
 
@@ -62,8 +65,12 @@ async def _offload_callable(
                 fn, *args, name=name or getattr(fn, "__name__", None), meta=meta
             )
         except Exception:
-            # Fall through to next option
-            pass
+            logger.debug(
+                "run_blocking_in_thread failed for %r (name=%r); falling through to next runner",
+                getattr(fn, "__name__", fn),
+                name,
+                exc_info=True,
+            )
 
     # 2) start_callable_offload (prefer process isolation) - best-effort
     if start_callable_offload is not None:
@@ -76,7 +83,12 @@ async def _offload_callable(
                 meta=meta,
             )
         except Exception:
-            pass
+            logger.debug(
+                "start_callable_offload failed for %r (name=%r); falling through to next runner",
+                getattr(fn, "__name__", fn),
+                name,
+                exc_info=True,
+            )
 
     # 3) run_maintenance_with_isolation (best-effort)
     if run_maintenance_with_isolation is not None:
@@ -89,7 +101,12 @@ async def _offload_callable(
                 meta=meta,
             )
         except Exception:
-            pass
+            logger.debug(
+                "run_maintenance_with_isolation failed for %r (name=%r); falling through to asyncio.to_thread",
+                getattr(fn, "__name__", fn),
+                name,
+                exc_info=True,
+            )
 
     # 4) fallback: asyncio.to_thread
     return await asyncio.to_thread(fn, *args, **kwargs)
@@ -519,8 +536,11 @@ class KVKHistoryView(discord.ui.View):
             try:
                 await self._msg.edit(embeds=payload["embeds"], files=payload["files"], view=self)
             except Exception:
-                # Swallow edit exceptions to avoid breaking user interaction flow
-                pass
+                logger.warning(
+                    "Failed to edit message during _redraw (interaction=%r)",
+                    getattr(interaction, "id", None),
+                    exc_info=True,
+                )
 
     async def _redraw_table(self, interaction: discord.Interaction):
         """Re-render ONLY the Data (table) embed and controls."""
@@ -569,7 +589,11 @@ class KVKHistoryView(discord.ui.View):
             try:
                 await self._msg.edit(embeds=new_embeds, files=files, view=self)
             except Exception:
-                pass
+                logger.warning(
+                    "Failed to edit message during _redraw_table (interaction=%r)",
+                    getattr(interaction, "id", None),
+                    exc_info=True,
+                )
 
     # ---------- Data & rendering ----------
 
