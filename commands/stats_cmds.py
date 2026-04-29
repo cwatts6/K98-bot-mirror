@@ -1078,7 +1078,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         )
         if not default_id:
             await ctx.respond(
-                "âŒ I couldn't find a valid Governor ID in your registered accounts.",
+                "❌ I couldn't find a valid Governor ID in your registered accounts.",
                 ephemeral=True,
             )
             return
