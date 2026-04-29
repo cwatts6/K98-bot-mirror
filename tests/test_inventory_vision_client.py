@@ -134,6 +134,73 @@ async def test_api_failure_returns_structured_error():
     assert len(calls) == 2
 
 
+@pytest.mark.asyncio
+async def test_non_dict_json_response_returns_structured_error():
+    """If the model returns valid JSON that is not a dict (e.g. a list), parsing should
+    return a structured failure rather than raising AttributeError."""
+    calls = []
+
+    class _ListResponses:
+        def __init__(self):
+            self._calls = calls
+
+        def create(self, **kwargs):
+            self._calls.append(kwargs)
+            return {"output_text": "[1, 2, 3]"}
+
+    class _ListClient:
+        def __init__(self):
+            self.responses = _ListResponses()
+
+    client = InventoryVisionClient(
+        _config(fallback_model=None),
+        client_factory=lambda _: _ListClient(),
+    )
+
+    result = await client.analyse_image(b"fake image")
+
+    assert not result.ok
+    assert result.error is not None
+    assert "not an object" in result.error
+    assert result.model == "gpt-4.1-mini"
+
+
+@pytest.mark.asyncio
+async def test_fallback_lower_confidence_preserves_primary_result():
+    """When the fallback model returns a lower confidence score than the primary, the
+    primary result should be returned rather than the inferior fallback."""
+    calls = []
+    payloads = [
+        {
+            "detected_image_type": "resources",
+            "confidence_score": 0.89,  # just below 0.90 threshold → fallback triggered
+            "warnings": [],
+            "values": {"Food": 1000},
+        },
+        {
+            "detected_image_type": "resources",
+            "confidence_score": 0.30,  # fallback produces worse result
+            "warnings": ["very uncertain"],
+            "values": {"Food": 500},
+        },
+    ]
+
+    client = InventoryVisionClient(
+        _config(),
+        client_factory=lambda _api_key: FakeClient(payloads, calls),
+    )
+
+    result = await client.analyse_image(b"fake image", import_type_hint="resources")
+
+    # Primary (0.89) should be kept over the weaker fallback (0.30)
+    assert result.ok
+    assert result.confidence_score == 0.89
+    assert result.model == "gpt-4.1-mini"
+    assert not result.fallback_used
+    assert result.values["Food"] == 1000
+    assert [call["model"] for call in calls] == ["gpt-4.1-mini", "gpt-5.2"]
+
+
 def test_service_import_does_not_import_database_modules():
     code = (
         "import services.vision_client, sys; "

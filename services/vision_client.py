@@ -142,6 +142,15 @@ def _parse_result_payload(
             error=f"Vision response was not valid JSON: {exc.msg}",
         )
 
+    if not isinstance(payload, dict):
+        return InventoryVisionResult(
+            ok=False,
+            model=model,
+            prompt_version=prompt_version,
+            fallback_used=fallback_used,
+            error=f"Vision response JSON was not an object (got {type(payload).__name__}).",
+        )
+
     detected = str(payload.get("detected_image_type") or "unknown")
     confidence_raw = payload.get("confidence_score", 0)
     try:
@@ -234,7 +243,9 @@ class InventoryVisionClient:
             import_type_hint=import_type_hint,
             fallback_used=True,
         )
-        return fallback if fallback.ok else primary
+        if fallback.ok and fallback.confidence_score >= primary.confidence_score:
+            return fallback
+        return primary
 
     def _should_try_fallback(self, result: InventoryVisionResult) -> bool:
         if result.fallback_used:
