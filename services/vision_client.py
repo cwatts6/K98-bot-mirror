@@ -57,6 +57,49 @@ def default_config() -> InventoryVisionConfig:
 
 
 def build_inventory_vision_schema() -> dict[str, Any]:
+    nullable_number = {"type": ["number", "null"]}
+    nullable_integer = {"type": ["integer", "null"]}
+
+    resource_row = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["from_items_value", "total_resources_value"],
+        "properties": {
+            "from_items_value": nullable_integer,
+            "total_resources_value": nullable_integer,
+        },
+    }
+    speedup_row = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["total_minutes", "total_hours", "total_days_decimal"],
+        "properties": {
+            "total_minutes": nullable_integer,
+            "total_hours": nullable_number,
+            "total_days_decimal": nullable_number,
+        },
+    }
+    material_row = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "normal",
+            "advanced",
+            "elite",
+            "epic",
+            "legendary",
+            "legendary_equivalent",
+        ],
+        "properties": {
+            "normal": nullable_integer,
+            "advanced": nullable_integer,
+            "elite": nullable_integer,
+            "epic": nullable_integer,
+            "legendary": nullable_integer,
+            "legendary_equivalent": nullable_number,
+        },
+    }
+
     return {
         "type": "object",
         "additionalProperties": False,
@@ -70,7 +113,57 @@ def build_inventory_vision_schema() -> dict[str, Any]:
             "warnings": {"type": "array", "items": {"type": "string"}},
             "values": {
                 "type": "object",
-                "additionalProperties": True,
+                "additionalProperties": False,
+                "required": ["resources", "speedups", "materials"],
+                "properties": {
+                    "resources": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["food", "wood", "stone", "gold"],
+                        "properties": {
+                            "food": resource_row,
+                            "wood": resource_row,
+                            "stone": resource_row,
+                            "gold": resource_row,
+                        },
+                    },
+                    "speedups": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": [
+                            "building",
+                            "research",
+                            "training",
+                            "healing",
+                            "universal",
+                        ],
+                        "properties": {
+                            "building": speedup_row,
+                            "research": speedup_row,
+                            "training": speedup_row,
+                            "healing": speedup_row,
+                            "universal": speedup_row,
+                        },
+                    },
+                    "materials": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": [
+                            "choice_chests",
+                            "leather",
+                            "iron_ore",
+                            "ebony",
+                            "animal_bone",
+                        ],
+                        "properties": {
+                            "choice_chests": material_row,
+                            "leather": material_row,
+                            "iron_ore": material_row,
+                            "ebony": material_row,
+                            "animal_bone": material_row,
+                        },
+                    },
+                },
             },
         },
     }
@@ -84,10 +177,12 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         f"Expected import type hint: {hint}. "
         "Return only structured JSON matching the supplied schema. "
         "Classify the image as resources, speedups, materials, or unknown. "
-        "For resources, extract Food, Wood, Stone, Gold, From Items, and Total Resources "
-        "as integer quantities after expanding K/M/B suffixes. "
+        "Always include the resources, speedups, and materials objects required by the "
+        "schema. Use null for fields that do not apply to the detected image type or "
+        "cannot be read. For resources, extract food, wood, stone, and gold from-items "
+        "and total-resources values as integer quantities after expanding K/M/B suffixes. "
         "For speedups, extract Building, Research, Training, Healing, and Universal "
-        "speedups as total_minutes where possible. "
+        "speedups as total_minutes, total_hours, and total_days_decimal where possible. "
         "Use warnings for missing rows, unreadable values, low confidence, or mismatched "
         "image type. If the image is not readable, use detected_image_type unknown and "
         "a confidence_score below 0.70."
@@ -159,10 +254,7 @@ def _parse_result_payload(
             model=model,
             prompt_version=prompt_version,
             fallback_used=fallback_used,
-            error=(
-                "Vision response JSON missing required field(s): "
-                + ", ".join(missing_keys)
-            ),
+            error=("Vision response JSON missing required field(s): " + ", ".join(missing_keys)),
         )
 
     detected_raw = payload.get("detected_image_type")
@@ -172,13 +264,11 @@ def _parse_result_payload(
             model=model,
             prompt_version=prompt_version,
             fallback_used=fallback_used,
-            error=(
-                "Vision response field 'detected_image_type' must be a non-empty string."
-            ),
+            error=("Vision response field 'detected_image_type' must be a non-empty string."),
         )
 
     detected = detected_raw.strip().lower()
-    allowed_detected_types = {"unknown", "photo", "screenshot"}
+    allowed_detected_types = {"resources", "speedups", "materials", "unknown"}
     if detected not in allowed_detected_types:
         return InventoryVisionResult(
             ok=False,
@@ -215,8 +305,7 @@ def _parse_result_payload(
             prompt_version=prompt_version,
             fallback_used=fallback_used,
             error=(
-                "Vision response field 'values' must be a dict "
-                f"(got {type(values).__name__})."
+                "Vision response field 'values' must be a dict " f"(got {type(values).__name__})."
             ),
         )
 

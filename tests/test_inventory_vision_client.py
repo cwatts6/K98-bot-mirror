@@ -6,7 +6,11 @@ import sys
 
 import pytest
 
-from services.vision_client import InventoryVisionClient, InventoryVisionConfig
+from services.vision_client import (
+    InventoryVisionClient,
+    InventoryVisionConfig,
+    build_inventory_vision_schema,
+)
 
 
 class FakeResponses:
@@ -36,6 +40,28 @@ def _config(**overrides):
     }
     values.update(overrides)
     return InventoryVisionConfig(**values)
+
+
+def _walk_schema_objects(schema):
+    if isinstance(schema, dict):
+        schema_type = schema.get("type")
+        if schema_type == "object" or (isinstance(schema_type, list) and "object" in schema_type):
+            yield schema
+        for value in schema.values():
+            yield from _walk_schema_objects(value)
+    elif isinstance(schema, list):
+        for item in schema:
+            yield from _walk_schema_objects(item)
+
+
+def test_schema_is_strict_for_openai_structured_outputs():
+    schema = build_inventory_vision_schema()
+
+    object_schemas = list(_walk_schema_objects(schema))
+
+    assert object_schemas
+    assert all(item.get("additionalProperties") is False for item in object_schemas)
+    assert schema["properties"]["values"]["additionalProperties"] is False
 
 
 @pytest.mark.asyncio
