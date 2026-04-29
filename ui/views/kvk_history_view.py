@@ -539,13 +539,15 @@ class KVKHistoryView(discord.ui.View):
             self.add_item(self._make_export_csv_button())
             self._make_table_cols_row()
 
-            # Prepare overlay map and df (same selection)
+            # Prepare overlay map and reuse the same history df as the table when available.
             overlay_labels = self._selected_overlay_labels()
 
-            df_raw = await _offload_callable(
-                fetch_history_for_governors, list(overlay_labels.keys()), name="fetch_history"
-            )
-            df = _extract_dataframe(df_raw)
+            df = table_payload.get("df")
+            if df is None:
+                df_raw = await _offload_callable(
+                    fetch_history_for_governors, list(overlay_labels.keys()), name="fetch_history"
+                )
+                df = _extract_dataframe(df_raw)
             if not df.empty and "KVK_NO" in df.columns:
                 df["KVK_NO"] = pd.to_numeric(df["KVK_NO"], errors="coerce")
             chart_embed = self._build_chart_embed_only(df, overlay_labels)
