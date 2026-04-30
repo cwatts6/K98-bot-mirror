@@ -106,7 +106,8 @@ Development is split into:
 
 - Phase 0 - OpenAI Vision Integration Setup: complete and deployed.
 - Phase 1A - Foundation + Resources/Speedups Import: complete, tested, and deployed.
-- Phase 1B - Inventory reporting, export, and audit: next phase.
+- Phase 1B - Inventory reporting images and visibility preferences: next phase.
+- Phase 1C - Inventory export, admin audit, and interaction boundary hardening: planned follow-on.
 - Phase 2 - Materials Import: later phase.
 
 Work must proceed phase by phase. The next phase should begin with review/scope only per repository rules.
@@ -244,8 +245,8 @@ Add:
 
 - `/import_inventory` - complete in Phase 1A.
 - `/myinventory` - Phase 1B.
-- `/export_inventory` - Phase 1B.
-- `/inventory_import_audit` - Phase 1B.
+- `/export_inventory` - Phase 1C.
+- `/inventory_import_audit` - Phase 1C.
 
 Commands must live in the target architecture, likely `commands/inventory_cmds.py`, with business logic in service modules and data access in DAL/repository modules.
 
@@ -323,7 +324,7 @@ Discord cannot convert a public user message into an ephemeral/private message a
 
 Status: partially complete in Phase 1A.
 
-Phase 1A supports rejecting imports and admin debug retention. Phase 1B should review whether a richer same-session retry UX is still needed now that upload-first and command-led uploads share the inventory channel.
+Phase 1A supports rejecting imports and admin debug retention. Phase 1C should review whether a richer same-session retry UX is still needed now that upload-first and command-led uploads share the inventory channel.
 
 If user selects Reject Import:
 
@@ -568,7 +569,7 @@ Output behaviour:
 
 ### `/export_inventory`
 
-Status: Phase 1B.
+Status: Phase 1C.
 
 Purpose:
 
@@ -592,37 +593,147 @@ Architecture note:
 
 Status: Phase 1B.
 
+Shared output-image direction:
+
+- Images should be suitable for both mobile and desktop viewing.
+- Use a strong blue dashboard background.
+- Use readable high-contrast text and clear boxed KPI areas.
+- Top-left corner should show the output category logo:
+  - Resources: `assets/rss_logo.png`
+  - Speedups: `assets/speedup_logo.png`
+- Top-right corner should show the user's Discord avatar where available.
+- Range controls are Discord buttons below the image, not rendered as part of the static image.
+
 Resources output should show:
 
-- Food
-- Wood
-- Stone
-- Gold
-- Overall total RSS
-- Net change over selected range
-- Line graph by resource type
+- Use `TotalResourcesValue` for all displayed RSS totals, deltas, capacity calculations, velocity, forecast, and graph data.
+- First row: five summary boxes:
+  - Food
+  - Wood
+  - Stone
+  - Gold
+  - Total RSS
+- Each first-row box should show:
+  - RSS type title with the matching Rise of Kingdoms resource logo from `assets/RSS/`
+  - latest total value using compact K/M/B formatting with up to 1 decimal place
+  - delta over selected range using green `+` text for positive values and red `-` text for negative values
+- Delta rule:
+  - delta = latest approved value minus earliest approved value inside the selected range
+  - if no earlier approved point exists inside the selected range, show `N/A`
+- Second row: four insight boxes:
+  - RSS Velocity
+  - RSS Troop Training Capacity
+  - RSS Troop Healing Capacity
+  - RSS Forecast
+- RSS Velocity:
+  - total RSS increase per day based on the selected time range
+  - example: if total RSS increased by 600m over 90 days, velocity is `6.7m/day`
+  - value is always displayed as `m/day` with 1 decimal place
+  - green `+` text for positive velocity and red `-` text for negative velocity
+  - show `N/A` if range delta is unavailable
+- RSS Troop Training Capacity:
+  - display maximum mixed troops trainable from current available resources
+  - include the training logo from `assets/Training/Training.png`
+  - floor capacity to 1 decimal place
+  - identify the limiting resource
+  - show equivalent power/Zenith and MGE points
+  - training costs per 1,000,000 troops:
+    - Food: 533,000,000
+    - Wood: 533,000,000
+    - Stone: 400,000,000
+    - Gold: 400,000,000
+  - conversion: every 1m troops = 10m Power / Zenith Points and 100m MGE Points
+- RSS Troop Healing Capacity:
+  - display maximum mixed troops healable from current available resources
+  - include the healing logo from `assets/healing/healing.png`
+  - floor capacity to 1 decimal place
+  - identify the limiting resource
+  - show equivalent kills and kill points
+  - healing costs per 1,000,000 troops:
+    - Food: 213,300,000
+    - Wood: 213,300,000
+    - Stone: 160,000,000
+    - Gold: 160,000,000
+  - conversion: every 1m healed troops = 5m kills and 20m kill points
+- RSS Forecast:
+  - display expected total RSS value in 30 days based on current RSS velocity
+  - formula: latest total RSS + (`velocity_per_day` * 30)
+  - use compact K/M/B formatting with up to 1 decimal place
+  - show `N/A` if velocity is unavailable
+- Graph:
+  - area graph below the summary/insight rows
+  - use approved scan timestamps only
+  - overlay Food, Wood, Stone, and Gold
+  - include all approved data points within the selected range
+  - no trend graph when only one approved record exists
+  - show summary/insight boxes only when trend data is insufficient
 - Default range: 1M
-- Switchable: 1M / 3M / 6M / 12M
+- Switchable ranges/buttons: 1M / 3M / 6M / 12M
 
 Speedups output should show:
 
-- Universal total
-- Training total
-- Healing total
-- Building total
-- Research total
-- Net change over selected range
-- Line graph by speedup type
+- Use approved speedup records only.
+- Values display in whole days only, with comma separators and no decimals, e.g. `1,000d`.
+- Delta rule:
+  - delta = latest approved value minus earliest approved value inside the selected range
+  - if no earlier approved point exists inside the selected range, show `N/A`
+  - green `+` text for positive values and red `-` text for negative values
+- First row: three summary boxes:
+  - Universal
+  - Training
+  - Healing
+- Each first-row box should show:
+  - speedup type title with the matching Rise of Kingdoms logo
+  - latest total value in days
+  - delta over selected range
+- Second row: two capacity boxes:
+  - Total Speedup Training Capacity
+  - Total Healing Speedup Capacity
+- Total Speedup Training Capacity:
+  - source value = Training + Universal speedups
+  - include the training logo from `assets/Training/Training.png`
+  - display total days as whole days
+  - conversion baseline: `100 days = 136,000 troops / 1.36m Power (Zenith Points) / 13.6m MGE Points`
+  - scale linearly from the current Training + Universal total
+- Total Healing Speedup Capacity:
+  - source value = Healing + Universal speedups
+  - include the healing logo from `assets/healing/healing.png`
+  - display total days as whole days
+  - conversion baseline: `100 days = 6.1m T5 troops healed / 6.1m kills / 122m Kill Points`
+  - scale linearly from the current Healing + Universal total
+- Graph:
+  - area graph below the summary/capacity rows
+  - use approved scan timestamps only
+  - overlay Universal, Training, and Healing
+  - include all approved data points within the selected range
+  - no trend graph when only one approved record exists
+  - show summary/capacity boxes only when trend data is insufficient
+- Default range: 1M
+- Switchable ranges/buttons: 1M / 3M / 6M / 12M
 
-Conversions:
+## Phase 1C - Export, Audit, and Boundary Hardening
 
-Healing + Universal:
+Phase 1C should be a linked follow-on PR after Phase 1B, not an untracked deferred optimisation.
 
-- 700 days = 1B Kill Points and 55m kills
+Recommended scope:
 
-Training + Universal:
+- `/export_inventory`
+- `/inventory_import_audit`
+- raw inventory export using service/DAL boundaries
+- admin audit filtering and debug-message reference access
+- compare detected, corrected, and final JSON for retained admin review
+- inventory interaction boundary hardening from Phase 1A review
 
-- 731 days = 10m Power, 10m Zenith Points, 100m MGE Points
+Boundary hardening goals:
+
+- Keep new commands thin and service-led.
+- Avoid adding more orchestration to `ui/views/inventory_views.py`.
+- Move reusable admin debug-post/audit preparation logic out of the view layer where practical.
+- Prefer primitive service inputs such as `discord_user_id`, `governor_id`, and `is_admin` instead of passing Discord user objects deeper into service functions.
+- Preserve Phase 1A behaviour while tightening layer ownership.
+- Reassess whether same-session retry after reject needs richer UX or whether upload-first replacement is sufficient.
+
+Phase 1C should remain Materials-free. Materials belong to Phase 2.
 
 ## Phase 2 - Materials
 
@@ -737,7 +848,7 @@ Add:
 
 Admin only.
 
-Status: Phase 1B.
+Status: Phase 1C.
 
 Purpose:
 
@@ -778,16 +889,16 @@ Test:
 - unsupported Materials detection in Phase 1 - Phase 1A complete
 - one active session per governor - Phase 1A complete
 - one approved import per governor/type/day - Phase 1A complete
-- reject + one retry - reject complete in Phase 1A; retry UX should be reassessed in Phase 1B
+- reject + one retry - reject complete in Phase 1A; retry UX should be reassessed in Phase 1C
 - correction workflow - Phase 1A complete
-- large correction warning - review/extend in Phase 1B if additional comparison UX is needed
+- large correction warning - review/extend in Phase 1C if additional comparison/audit UX is needed
 - admin debug channel logging - Phase 1A complete
 - image output generation - Phase 1B
 - visibility preference persistence - Phase 1B
-- `/export_inventory` - Phase 1B
-- `/inventory_import_audit` - Phase 1B
+- `/export_inventory` - Phase 1C
+- `/inventory_import_audit` - Phase 1C
 - restart/persistence behaviour for active/imported state - Phase 1A complete for import batches; Phase 1B should cover reporting preferences
-- cache safety where applicable - continue in Phase 1B
+- cache safety where applicable - continue in Phase 1B and Phase 1C
 
 ### Phase 1B
 
@@ -796,24 +907,40 @@ Next phase.
 Recommended scope:
 
 - `/myinventory`
-- `/export_inventory`
-- `/inventory_import_audit`
 - latest inventory summary view
 - generated output image for Resources and Speedups
 - range buttons: 1M / 3M / 6M / 12M
 - no trend graph when only one approved record exists
 - trend graph when at least two approved records exist
 - persistent visibility preference
-- raw inventory export using service/DAL boundaries
-- admin audit filtering and debug-message reference access
 
 Recommended Phase 1B audit points:
 
 - Confirm live Phase 1A SQL schema is the source of truth before building read/report queries.
-- Verify command names remain canonical: `/myinventory`, `/export_inventory`, `/inventory_import_audit`.
-- Keep `/export_inventory` service/DAL-based and do not copy direct SQL from `/my_stats_export`.
+- Verify command name remains canonical: `/myinventory`.
 - Review image generation/output helpers before creating new graph/export helpers.
-- Confirm whether same-session retry after reject needs a richer UX or whether upload-first replacement is sufficient.
+- Define the SQL-backed persistent visibility preference contract.
+- Keep Materials out of all output/reporting paths until Phase 2.
+
+### Phase 1C
+
+Planned follow-on phase.
+
+Recommended scope:
+
+- `/export_inventory`
+- `/inventory_import_audit`
+- raw inventory export files using service/DAL boundaries
+- admin audit filtering and debug-message reference access
+- targeted cleanup of Phase 1A inventory view/service boundaries
+
+Recommended Phase 1C audit points:
+
+- Verify command names remain canonical: `/export_inventory`, `/inventory_import_audit`.
+- Keep `/export_inventory` service/DAL-based and do not copy direct SQL from `/my_stats_export`.
+- Confirm GitHub issue #46 remains the tracking item for the existing stats export direct-SQL refactor.
+- Do not expand into `/my_stats` integration.
+- Do not add Materials support before Phase 2.
 
 ### Phase 2
 
@@ -841,26 +968,42 @@ Do not include in Phase 1B:
 - `/my_stats` integration
 - Import Again button
 - Export button under image
+- `/export_inventory`
+- `/inventory_import_audit`
+- Further OCR/prompt tuning unless a Phase 1A production issue specifically requires it
+
+Do not include in Phase 1C:
+
+- Materials processing
+- `/my_stats` integration
+- Import Again button
+- Export button under image
 - Further OCR/prompt tuning unless a Phase 1A production issue specifically requires it
 
 Downstream task:
 
 - Integrate inventory summaries into existing `/my_stats` or future refactored `/my_stats` experience.
 
-## Deferred Optimisation Captured During Phase 0
+## Existing Deferred Optimisation Tracking
 
-### Deferred Optimisation
+### GitHub Issue Reference
 
 - Area: `commands/stats_cmds.py`
 - Type: architecture
-- Description: `/my_stats_export` contains direct SQL inside the command body. Phase 1 inventory export work should avoid copying that pattern.
-- Suggested Fix: Extract inventory export data access into a dedicated DAL/service. Consider a later stats export refactor separately.
+- GitHub issue: https://github.com/cwatts6/K98-bot-mirror/issues/46
+- Title: `Deferred: extract /my_stats_export SQL into service/DAL`
+- Description: `/my_stats_export` contains direct SQL inside the command body. Inventory export work should not copy this pattern, and stats export remains harder to test and maintain while command code owns DB access.
+- Suggested Fix: Extract stats export data access into a dedicated DAL/service in a later stats-export refactor. Keep the command responsible only for validation, permission/response handling, and service handoff.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 1 inventory export design
+- Scoring: Impact 3, Frequency 3, Risk Reduction 4, Effort 3, Priority Score 7
+- Recommendation: Good batch candidate
+- Dependencies: Separate stats export refactor task
+
+Do not create a duplicate issue for this item. Reference issue #46 whenever Phase 1C discusses avoiding the `/my_stats_export` direct-SQL pattern.
 
 ## Suggested Next Chat Opening Prompt
 
 ```text
-Start Phase 1B review/scope for the Inventory Image Import Module. Phase 0 and Phase 1A are complete, tested, and deployed. Use the updated in-repo task pack at C:\discord_file_downloader\docs\Codex Task Pack — Inventory Image Import Module.md. Phase 1A delivered /import_inventory, upload-first import in INVENTORY_UPLOAD_CHANNEL_ID, Vision-derived image type, Resources/Speedups SQL-backed imports, correction/reject/cancel flow, and admin debug channel retention. For Phase 1B, assess and scope /myinventory, /export_inventory, /inventory_import_audit, generated Resources/Speedups output images, range buttons, persistent visibility preference, export files, and admin audit access. Keep commands thin, use service/DAL boundaries, do not copy the direct SQL pattern from /my_stats_export, keep Materials out of scope until Phase 2, and begin with audit/scope only per repo rules.
+Start Phase 1B review/scope for the Inventory Image Import Module. Phase 0 and Phase 1A are complete, tested, and deployed. Use the updated in-repo task pack at C:\discord_file_downloader\docs\Codex Task Pack — Inventory Image Import Module.md. Phase 1A delivered /import_inventory, upload-first import in INVENTORY_UPLOAD_CHANNEL_ID, Vision-derived image type, Resources/Speedups SQL-backed imports, correction/reject/cancel flow, and admin debug channel retention. For Phase 1B, assess and scope /myinventory, generated Resources/Speedups output images, range buttons, and persistent visibility preference. Keep /export_inventory, /inventory_import_audit, export files, admin audit access, and Phase 1A inventory view/service boundary hardening for linked Phase 1C. Keep commands thin, use service/DAL boundaries, do not copy the direct SQL pattern from /my_stats_export, reference GitHub issue #46 for the existing stats export SQL refactor, keep Materials out of scope until Phase 2, and begin with audit/scope only per repo rules.
 ```
