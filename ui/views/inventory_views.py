@@ -66,7 +66,7 @@ def _analysis_embed(
     *, governor_id: int, summary: InventoryAnalysisSummary, corrected: bool = False
 ) -> discord.Embed:
     color = 0x2ECC71 if summary.ok else 0xE74C3C
-    if summary.confidence_score < 0.90:
+    if summary.ok and summary.confidence_score < 0.90:
         color = 0xF1C40F
     title = "Inventory Import Review"
     if corrected:
