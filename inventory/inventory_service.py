@@ -79,6 +79,7 @@ async def create_pending_command_session(
     ):
         raise PermissionError("You can only import inventory for governors registered to you.")
 
+    await asyncio.to_thread(inventory_dal.expire_stale_batches_for_governor, int(governor_id))
     active = await asyncio.to_thread(inventory_dal.fetch_active_batch_for_governor, governor_id)
     if active:
         raise ValueError("This governor already has an active inventory import session.")
@@ -114,6 +115,7 @@ async def create_upload_first_batch(
     ):
         raise PermissionError("You can only import inventory for governors registered to you.")
 
+    await asyncio.to_thread(inventory_dal.expire_stale_batches_for_governor, int(governor_id))
     active = await asyncio.to_thread(inventory_dal.fetch_active_batch_for_governor, governor_id)
     if active:
         raise ValueError("This governor already has an active inventory import session.")
@@ -256,6 +258,15 @@ async def reject_import(import_batch_id: int, *, error: str | None = None) -> No
         inventory_dal.mark_status,
         import_batch_id=int(import_batch_id),
         status=InventoryImportStatus.REJECTED,
+        error_json={"error": error} if error else None,
+    )
+
+
+async def fail_import(import_batch_id: int, *, error: str | None = None) -> None:
+    await asyncio.to_thread(
+        inventory_dal.mark_status,
+        import_batch_id=int(import_batch_id),
+        status=InventoryImportStatus.FAILED,
         error_json={"error": error} if error else None,
     )
 

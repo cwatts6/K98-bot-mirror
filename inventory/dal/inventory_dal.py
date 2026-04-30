@@ -94,6 +94,37 @@ def create_import_batch(
             pass
 
 
+def expire_stale_batches_for_governor(governor_id: int) -> None:
+    """Mark any expired awaiting_upload/analysed sessions as cancelled for the given governor."""
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            UPDATE dbo.InventoryImportBatch
+            SET Status = 'cancelled'
+            WHERE GovernorID = ?
+              AND Status IN ('awaiting_upload', 'analysed')
+              AND ExpiresAtUtc IS NOT NULL
+              AND ExpiresAtUtc <= SYSUTCDATETIME()
+            """,
+            (int(governor_id),),
+        )
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logger.exception("inventory_expire_stale_batches_failed governor_id=%s", governor_id)
+        raise
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def fetch_active_batch_for_governor(governor_id: int) -> dict[str, Any] | None:
     conn = _get_conn()
     try:
@@ -192,8 +223,7 @@ def update_batch_analysis(
                 DetectedJson = ?,
                 WarningJson = ?,
                 ErrorJson = ?,
-                ExpiresAtUtc = ?,
-                RetryCount = CASE WHEN SourceMessageID IS NULL THEN RetryCount ELSE RetryCount END
+                ExpiresAtUtc = ?
             WHERE ImportBatchID = ?
             """,
             (

@@ -369,9 +369,12 @@ class InventoryUploadGovernorSelectView(AccountPickerView):
 
     async def on_timeout(self) -> None:
         try:
-            await self.original_message.delete()
-        except Exception:
-            logger.debug("inventory_upload_timeout_delete_failed", exc_info=True)
+            await super().on_timeout()
+        finally:
+            try:
+                await self.original_message.delete()
+            except Exception:
+                logger.debug("inventory_upload_timeout_delete_failed", exc_info=True)
 
 
 async def _delete_original_upload(
@@ -419,7 +422,7 @@ async def _process_payload_for_governor(
             payload=payload,
         )
         if not summary.ok or summary.confidence_score < 0.70 or summary.import_type == InventoryImportType.UNKNOWN:
-            await inventory_service.reject_import(batch_id, error=summary.error or "Analysis failed.")
+            await inventory_service.fail_import(batch_id, error=summary.error or "Analysis failed.")
             await _post_admin_debug(
                 bot=bot,
                 batch_id=batch_id,

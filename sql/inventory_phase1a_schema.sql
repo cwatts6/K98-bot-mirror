@@ -9,6 +9,14 @@ Inventory Image Import - Phase 1A schema support
 Canonical SQL Server schema changes should be promoted through the SQL Server
 repository. This script is included with the bot PR so the app-side DAL contract
 is reviewable alongside the Python implementation.
+
+Note on UX_InventoryImportBatch_ActiveGovernor:
+SQL Server filtered indexes do not support non-deterministic functions such as
+SYSUTCDATETIME(), so expiry cannot be encoded directly in the index filter.
+Instead, the service layer calls expire_stale_batches_for_governor() before
+creating any new session, which transitions expired awaiting_upload/analysed rows
+to 'cancelled'. This ensures the unique index never blocks a new session for a
+governor whose previous session has lapsed.
 */
 
 IF OBJECT_ID(N'dbo.InventoryImportBatch', N'U') IS NULL
