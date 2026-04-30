@@ -122,6 +122,7 @@ from bot_config import (
     DISCORD_BOT_TOKEN as TOKEN,
     FORT_RALLY_CHANNEL_ID,
     HONOR_CHANNEL_ID,
+    INVENTORY_UPLOAD_CHANNEL_ID,
     MGE_DATA_CHANNEL_ID,
     NOTIFY_CHANNEL_ID,
     PLAYER_LOCATION_CHANNEL_ID,
@@ -553,6 +554,33 @@ async def on_message(message: discord.Message):
                 return
         except Exception:
             logger.exception("mge_dm_followup_route_unexpected_failed")
+
+    # === Fast-path: inventory image upload-first import ===
+    if (
+        INVENTORY_UPLOAD_CHANNEL_ID
+        and message.channel.id == INVENTORY_UPLOAD_CHANNEL_ID
+        and message.attachments
+    ):
+        try:
+            from ui.views.inventory_views import handle_inventory_upload_message
+
+            handled = await handle_inventory_upload_message(message, bot)
+            if handled:
+                return
+        except Exception:
+            logger.exception(
+                "inventory_upload_first_route_failed message_id=%s channel_id=%s",
+                getattr(message, "id", None),
+                getattr(getattr(message, "channel", None), "id", None),
+            )
+            try:
+                await message.channel.send(
+                    f"<@{message.author.id}> Inventory import failed unexpectedly. Please try again.",
+                    delete_after=120,
+                )
+            except Exception:
+                pass
+            return
 
     # === Fast-path: Player Location CSV auto-import ===
     if message.channel.id == PLAYER_LOCATION_CHANNEL_ID and message.attachments:

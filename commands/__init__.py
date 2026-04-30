@@ -8,6 +8,7 @@ from .admin_cmds import register_admin
 from .ark_cmds import register_ark
 from .calendar_cmds import register_calendar
 from .events_cmds import register_events
+from .inventory_cmds import register_inventory
 from .location_cmds import register_location
 from .mge_cmds import register_mge
 from .registry_cmds import register_registry
@@ -22,6 +23,7 @@ def register_all(bot: ext_commands.Bot) -> None:
     register_ark(bot)
     register_calendar(bot)
     register_events(bot)
+    register_inventory(bot)
     register_location(bot)
     register_mge(bot)
     register_registry(bot)
