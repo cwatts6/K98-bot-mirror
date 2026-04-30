@@ -26,6 +26,24 @@ class InventoryFlowType(StrEnum):
     UPLOAD_FIRST = "upload_first"
 
 
+class InventoryReportView(StrEnum):
+    RESOURCES = "resources"
+    SPEEDUPS = "speedups"
+    ALL = "all"
+
+
+class InventoryReportRange(StrEnum):
+    ONE_MONTH = "1M"
+    THREE_MONTHS = "3M"
+    SIX_MONTHS = "6M"
+    TWELVE_MONTHS = "12M"
+
+
+class InventoryReportVisibility(StrEnum):
+    ONLY_ME = "only_me"
+    PUBLIC = "public"
+
+
 @dataclass(frozen=True)
 class RegisteredGovernor:
     governor_id: int
@@ -63,3 +81,37 @@ class InventoryValidationResult:
     warnings: list[str] = field(default_factory=list)
     error: str | None = None
     extreme_change: bool = False
+
+
+@dataclass(frozen=True)
+class InventoryResourcePoint:
+    scan_utc: Any
+    food: int
+    wood: int
+    stone: int
+    gold: int
+
+    @property
+    def total(self) -> int:
+        return int(self.food) + int(self.wood) + int(self.stone) + int(self.gold)
+
+
+@dataclass(frozen=True)
+class InventorySpeedupPoint:
+    scan_utc: Any
+    building_days: float
+    research_days: float
+    training_days: float
+    healing_days: float
+    universal_days: float
+
+
+@dataclass(frozen=True)
+class InventoryReportPayload:
+    governor_id: int
+    governor_name: str
+    view: InventoryReportView
+    range_key: InventoryReportRange
+    resources: list[InventoryResourcePoint] = field(default_factory=list)
+    speedups: list[InventorySpeedupPoint] = field(default_factory=list)
+    generated_at_utc: Any | None = None
