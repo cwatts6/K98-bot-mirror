@@ -43,11 +43,7 @@ def _message_content(payload) -> str:
     if payload.speedups:
         categories.append("Speedups")
     if not categories:
-        view_label = (
-            "inventory"
-            if payload.view == InventoryReportView.ALL
-            else payload.view.value
-        )
+        view_label = "inventory" if payload.view == InventoryReportView.ALL else payload.view.value
         return (
             f"No approved {view_label} records found for GovernorID "
             f"`{payload.governor_id}` in range `{payload.range_key.value}`."
