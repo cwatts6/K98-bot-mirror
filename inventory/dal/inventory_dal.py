@@ -343,7 +343,11 @@ def mark_status(
 
 
 def insert_resource_records(
-    *, import_batch_id: int, governor_id: int, scan_utc: datetime, resources: dict[str, dict[str, int]]
+    *,
+    import_batch_id: int,
+    governor_id: int,
+    scan_utc: datetime,
+    resources: dict[str, dict[str, int]],
 ) -> None:
     conn = _get_conn()
     try:
@@ -419,4 +423,3 @@ def insert_speedup_records(
         raise
     finally:
         conn.close()
-

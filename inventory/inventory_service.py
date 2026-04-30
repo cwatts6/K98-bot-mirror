@@ -205,7 +205,9 @@ async def approve_import(
     corrected_values: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if summary.import_type in {InventoryImportType.MATERIALS, InventoryImportType.UNKNOWN}:
-        raise ValueError(f"{summary.import_type.value.title()} imports are not available in Phase 1A.")
+        raise ValueError(
+            f"{summary.import_type.value.title()} imports are not available in Phase 1A."
+        )
     if summary.confidence_score < LOW_CONFIDENCE_REJECT_THRESHOLD:
         raise ValueError("Image confidence is too low to approve.")
 
@@ -292,4 +294,3 @@ async def update_debug_reference(
         admin_debug_channel_id=int(admin_debug_channel_id),
         admin_debug_message_id=int(admin_debug_message_id),
     )
-

@@ -53,7 +53,9 @@ async def test_upload_first_single_governor_processes_and_deletes(monkeypatch):
         calls.update(kwargs)
 
     monkeypatch.setattr(inventory_views.inventory_service, "get_pending_command_session", _pending)
-    monkeypatch.setattr(inventory_views.inventory_service, "get_registered_governors_for_user", _governors)
+    monkeypatch.setattr(
+        inventory_views.inventory_service, "get_registered_governors_for_user", _governors
+    )
     monkeypatch.setattr(inventory_views, "_process_payload_for_governor", _process)
 
     handled = await inventory_views.handle_inventory_upload_message(message, bot=object())
@@ -74,10 +76,11 @@ async def test_upload_first_without_governors_sends_guidance(monkeypatch):
         return []
 
     monkeypatch.setattr(inventory_views.inventory_service, "get_pending_command_session", _pending)
-    monkeypatch.setattr(inventory_views.inventory_service, "get_registered_governors_for_user", _governors)
+    monkeypatch.setattr(
+        inventory_views.inventory_service, "get_registered_governors_for_user", _governors
+    )
 
     handled = await inventory_views.handle_inventory_upload_message(message, bot=object())
 
     assert handled is True
     assert "registered governor" in message.channel.sent[0][0][0]
-

@@ -152,4 +152,3 @@ def parse_corrected_json(
     except ValueError as exc:
         return {}, InventoryValidationResult(False, error=str(exc))
     return normalized, InventoryValidationResult(True)
-

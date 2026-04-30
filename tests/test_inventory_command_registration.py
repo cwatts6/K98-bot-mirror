@@ -18,4 +18,3 @@ def test_register_inventory_command_registers_import_inventory():
     mod.register_inventory(fake_bot)
 
     assert "import_inventory" in fake_bot.registered
-

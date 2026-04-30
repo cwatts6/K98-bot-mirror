@@ -44,4 +44,3 @@ def register_inventory(bot: ext_commands.Bot) -> None:
                 "Inventory import setup failed. Please try again or contact an admin.",
                 ephemeral=True,
             )
-

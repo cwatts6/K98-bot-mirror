@@ -89,7 +89,9 @@ def _analysis_embed(
         embed.add_field(name="Warnings", value="\n".join(summary.warnings)[:1024], inline=False)
     if summary.error:
         embed.add_field(name="Error", value=summary.error[:1024], inline=False)
-    embed.add_field(name="Detected Values", value=_format_values_for_display(summary)[:1024], inline=False)
+    embed.add_field(
+        name="Detected Values", value=_format_values_for_display(summary)[:1024], inline=False
+    )
     return embed
 
 
@@ -130,7 +132,9 @@ async def _post_admin_debug(
         embed.add_field(name="Confidence", value=f"`{summary.confidence_score:.2f}`", inline=True)
         embed.add_field(name="Model", value=f"`{summary.model}`", inline=True)
         embed.add_field(name="Prompt", value=f"`{summary.prompt_version}`", inline=True)
-        embed.add_field(name="Fallback", value="yes" if summary.fallback_used else "no", inline=True)
+        embed.add_field(
+            name="Fallback", value="yes" if summary.fallback_used else "no", inline=True
+        )
         if summary.warnings:
             embed.add_field(name="Warnings", value="\n".join(summary.warnings)[:1024], inline=False)
     debug_payload = {
@@ -181,7 +185,9 @@ class InventoryConfirmationView(discord.ui.View):
     async def _deny_if_not_actor(self, interaction: discord.Interaction) -> bool:
         if int(interaction.user.id) == self.actor_discord_id:
             return False
-        await _send_private(interaction, "Only the user who started this import can use these buttons.")
+        await _send_private(
+            interaction, "Only the user who started this import can use these buttons."
+        )
         return True
 
     @discord.ui.button(
@@ -421,7 +427,11 @@ async def _process_payload_for_governor(
             import_batch_id=batch_id,
             payload=payload,
         )
-        if not summary.ok or summary.confidence_score < 0.70 or summary.import_type == InventoryImportType.UNKNOWN:
+        if (
+            not summary.ok
+            or summary.confidence_score < 0.70
+            or summary.import_type == InventoryImportType.UNKNOWN
+        ):
             await inventory_service.fail_import(batch_id, error=summary.error or "Analysis failed.")
             await _post_admin_debug(
                 bot=bot,
@@ -440,7 +450,9 @@ async def _process_payload_for_governor(
             if interaction is not None:
                 await interaction.followup.send(message, ephemeral=True)
             elif original_message is not None:
-                await original_message.channel.send(f"<@{actor_discord_id}> {message}", delete_after=120)
+                await original_message.channel.send(
+                    f"<@{actor_discord_id}> {message}", delete_after=120
+                )
             return
 
         embed = _analysis_embed(governor_id=governor_id, summary=summary)
@@ -460,7 +472,9 @@ async def _process_payload_for_governor(
             if interaction is not None:
                 await interaction.followup.send(content, embed=embed, ephemeral=True)
             elif original_message is not None:
-                await original_message.channel.send(f"<@{actor_discord_id}> {content}", embed=embed, delete_after=120)
+                await original_message.channel.send(
+                    f"<@{actor_discord_id}> {content}", embed=embed, delete_after=120
+                )
             return
 
         view = InventoryConfirmationView(
@@ -529,7 +543,9 @@ async def start_import_command(ctx: discord.ApplicationContext, bot: Any) -> Non
 
     options = build_unique_gov_options(_governors_to_accounts(governors))
 
-    async def _on_select(interaction: discord.Interaction, governor_id: str, ephemeral: bool) -> None:
+    async def _on_select(
+        interaction: discord.Interaction, governor_id: str, ephemeral: bool
+    ) -> None:
         if int(interaction.user.id) != int(ctx.user.id):
             await interaction.followup.send("This selector is not for you.", ephemeral=True)
             return
@@ -644,4 +660,3 @@ async def handle_inventory_upload_message(message: discord.Message, bot: Any) ->
     )
     view.message = prompt
     return True
-

@@ -63,4 +63,3 @@ class InventoryValidationResult:
     warnings: list[str] = field(default_factory=list)
     error: str | None = None
     extreme_change: bool = False
-

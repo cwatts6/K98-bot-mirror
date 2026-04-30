@@ -31,7 +31,9 @@ class _VisionClient:
     def __init__(self):
         self.calls = []
 
-    async def analyse_image(self, image_bytes, *, filename=None, content_type=None, import_type_hint=None):
+    async def analyse_image(
+        self, image_bytes, *, filename=None, content_type=None, import_type_hint=None
+    ):
         self.calls.append(
             {
                 "image_bytes": image_bytes,
