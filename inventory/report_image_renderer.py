@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,7 @@ class RenderedInventoryImage:
     image_bytes: BytesIO
 
 
+@lru_cache(maxsize=32)
 def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     candidates = [
         "C:/Windows/Fonts/segoeuib.ttf" if bold else "C:/Windows/Fonts/segoeui.ttf",

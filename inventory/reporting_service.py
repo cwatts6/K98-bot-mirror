@@ -179,7 +179,7 @@ def _filter_points_for_range(points: list[Any], range_key: InventoryReportRange)
             scan = scan.replace(tzinfo=UTC)
         if scan >= cutoff:
             filtered.append(item)
-    return filtered or points[-1:]
+    return filtered
 
 
 async def build_inventory_report_payload(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -23,6 +24,8 @@ async def _avatar_bytes(user: Any) -> bytes | None:
         return None
     try:
         return await avatar.read()
+    except asyncio.CancelledError:
+        raise
     except Exception:
         logger.debug("inventory_report_avatar_read_failed user_id=%s", getattr(user, "id", None))
         return None
