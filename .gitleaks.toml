@@ -1,0 +1,38 @@
+title = "Local allowlist"
+
+[allowlist]
+description = "Known, intentional placeholders used in docs/examples"
+
+# Only whitelist specific files that contain examples/placeholders.
+files = [
+  "\\.env.example$",
+  "^README-DEV\\.md$",
+  "^docs/.*",
+]
+
+# Common placeholders and obvious fakes. Keep this tight.
+regexes = [
+  # Your existing dummy token
+  '''(?i)DUMMY(_|-)TOKEN_[A-Z0-9]{6,}''',
+
+  # Generic placeholders frequently used in docs
+  '''(?i)(YOUR|EXAMPLE|SAMPLE|DUMMY|PLACEHOLDER)[_-]?(API|ACCESS|SECRET|CLIENT|BEARER)?[_-]?KEY''',
+  '''(?i)(REDACTED|SANITIZED|MASKED)_?(TOKEN|KEY|SECRET)?''',
+
+  # Discord webhook placeholder style (example values only)
+  '''https://discord\.com/api/webhooks/0{5,}/PLACEHOLDER''',
+
+  # Fake IDs often used in examples (18+ digits and labelled example)
+  '''(?i)EXAMPLE[_-]?ID[:= ]*["']?\d{15,}["']?''',
+]
+
+# Words that, if present, make secrets unlikely (reduces false positives)
+stopwords = [
+  "example",
+  "sample",
+  "dummy",
+  "placeholder",
+  "localhost",
+  "127.0.0.1",
+  "0.0.0.0"
+]
