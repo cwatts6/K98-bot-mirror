@@ -71,6 +71,33 @@ async def test_resource_correction_modal_only_prompts_total_resources():
 
 
 @pytest.mark.asyncio
+async def test_resource_correction_modal_prefills_exact_integer_values():
+    """Pre-fill must use the raw integer string, not the abbreviated format.
+
+    format_resource_value(1_234_567) == "1.2M", which when re-parsed gives
+    1_200_000 — silently corrupting an unchanged field on modal submit.
+    Using str(int(value)) preserves full precision for round-trips.
+    """
+    summary = _summary(InventoryImportType.RESOURCES)
+    # Override food with a value that abbreviates with precision loss
+    summary.values["resources"]["food"]["total_resources_value"] = 1_234_567
+    modal = ResourceCorrectionModal(InventoryConfirmationView(
+        bot=object(),
+        actor_discord_id=42,
+        governor_id=111,
+        batch_id=7,
+        payload=object(),
+        summary=summary,
+    ))
+
+    values = {item.label: item.value for item in modal.children}
+
+    assert values["Food Total Resources"] == "1234567"
+    # Other fields also use exact integer strings
+    assert values["Wood Total Resources"] == "4000000"
+
+
+@pytest.mark.asyncio
 async def test_speedup_correction_modal_prompts_friendly_durations():
     modal = SpeedupCorrectionModal(_view(InventoryImportType.SPEEDUPS))
 

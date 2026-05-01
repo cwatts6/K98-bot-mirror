@@ -415,7 +415,7 @@ class ResourceCorrectionModal(discord.ui.Modal):
             value = row.get("total_resources_value")
             field = discord.ui.InputText(
                 label=f"{key.title()} Total Resources",
-                value=format_resource_value(value) if value is not None else "",
+                value=str(int(value)) if value is not None else "",
                 required=True,
             )
             self.inputs[key] = field
