@@ -100,6 +100,14 @@ async def _send_private(interaction: discord.Interaction, content: str, **kwargs
         await interaction.response.send_message(content, ephemeral=True, **kwargs)
 
 
+async def _send_followup_capture_message(interaction: discord.Interaction, **kwargs: Any) -> Any:
+    try:
+        return await interaction.followup.send(wait=True, **kwargs)
+    except TypeError:
+        await interaction.followup.send(**kwargs)
+        return None
+
+
 async def _post_admin_debug(
     *,
     bot: Any,
@@ -246,7 +254,14 @@ class InventoryConfirmationView(discord.ui.View):
                 view=self,
             )
         except Exception:
-            logger.debug("inventory_review_message_update_failed", exc_info=True)
+            try:
+                await interaction.edit_original_response(
+                    content=content or "Review the detected inventory values before approving.",
+                    embed=embed,
+                    view=self,
+                )
+            except Exception:
+                logger.debug("inventory_review_message_update_failed", exc_info=True)
 
     @discord.ui.button(
         label="Approve Import",
@@ -445,7 +460,7 @@ class ResourceCorrectionModal(discord.ui.Modal):
 
 class SpeedupCorrectionModal(discord.ui.Modal):
     def __init__(self, parent: InventoryConfirmationView) -> None:
-        super().__init__(title="Correct Speedup Durations")
+        super().__init__(title="Correct Speedup Days")
         self.parent_view = parent
         speedups = parent.summary.values.get("speedups") or {}
         self.inputs: dict[str, discord.ui.InputText] = {}
@@ -453,7 +468,7 @@ class SpeedupCorrectionModal(discord.ui.Modal):
             row = speedups.get(key) or {}
             value = row.get("total_minutes")
             field = discord.ui.InputText(
-                label=f"{key.title()} Speedup",
+                label=f"{key.title()} Speedup Days",
                 value=format_speedup_duration(value) if value is not None else "",
                 required=True,
             )
@@ -640,7 +655,14 @@ async def _process_payload_for_governor(
         if flow_from_pending_command:
             content = "Screenshot received. Review the detected inventory values before approving."
         if interaction is not None:
-            await interaction.followup.send(content, embed=embed, view=view, ephemeral=True)
+            sent = await _send_followup_capture_message(
+                interaction,
+                content=content,
+                embed=embed,
+                view=view,
+                ephemeral=True,
+            )
+            view.message = sent
         elif original_message is not None:
             sent = await original_message.channel.send(
                 f"<@{actor_discord_id}> {content}",

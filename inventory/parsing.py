@@ -11,6 +11,7 @@ SPEEDUP_TYPES = ("building", "research", "training", "healing", "universal")
 
 _RESOURCE_VALUE_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([kmb])?\s*$", re.IGNORECASE)
 _SPEEDUP_TOKEN_RE = re.compile(r"(\d+(?:\.\d+)?)\s*([dhm])", re.IGNORECASE)
+_SPEEDUP_DAY_PREFIX_RE = re.compile(r"^\s*(\d+)(?:\s*d\b)?", re.IGNORECASE)
 
 
 def parse_resource_value(value: Any) -> int:
@@ -81,6 +82,32 @@ def parse_speedup_minutes(value: Any) -> int:
     return int(round(total))
 
 
+def parse_speedup_days(value: Any) -> int:
+    if value is None:
+        raise ValueError("Value is required.")
+    if isinstance(value, bool):
+        raise ValueError("Boolean values are not valid speedup durations.")
+    if isinstance(value, int):
+        if value < 0:
+            raise ValueError("Negative values are not allowed.")
+        return value
+    if isinstance(value, float):
+        if value < 0:
+            raise ValueError("Negative values are not allowed.")
+        return int(value)
+
+    text = str(value).replace(",", "").strip().lower()
+    if text in {"", "0"}:
+        return 0
+    match = _SPEEDUP_DAY_PREFIX_RE.match(text)
+    if not match:
+        raise ValueError(f"Invalid speedup day value: {value!r}.")
+    days = int(match.group(1))
+    if days < 0:
+        raise ValueError("Negative values are not allowed.")
+    return days
+
+
 def speedup_row_from_minutes(total_minutes: int) -> dict[str, int | float]:
     if total_minutes < 0:
         raise ValueError("Negative values are not allowed.")
@@ -88,6 +115,17 @@ def speedup_row_from_minutes(total_minutes: int) -> dict[str, int | float]:
         "total_minutes": int(total_minutes),
         "total_hours": round(total_minutes / 60, 4),
         "total_days_decimal": round(total_minutes / 1440, 4),
+    }
+
+
+def speedup_row_from_days(total_days: int) -> dict[str, int | float]:
+    if total_days < 0:
+        raise ValueError("Negative values are not allowed.")
+    minutes = int(total_days) * 1440
+    return {
+        "total_minutes": minutes,
+        "total_hours": int(total_days) * 24,
+        "total_days_decimal": float(int(total_days)),
     }
 
 
@@ -110,16 +148,7 @@ def format_speedup_duration(total_minutes: Any) -> str:
         minutes = parse_speedup_minutes(total_minutes)
     except ValueError:
         return "unreadable"
-    days, rem = divmod(minutes, 1440)
-    hours, mins = divmod(rem, 60)
-    parts: list[str] = []
-    if days:
-        parts.append(f"{days}d")
-    if hours:
-        parts.append(f"{hours}h")
-    if mins or not parts:
-        parts.append(f"{mins}m")
-    return " ".join(parts)
+    return f"{minutes // 1440}d"
 
 
 def apply_resource_total_corrections(
@@ -157,13 +186,24 @@ def apply_speedup_duration_corrections(
         if not isinstance(row, dict):
             raise ValueError(f"Missing speedup row: {speedup_type}.")
 
-        raw_minutes = (
-            corrections[speedup_type] if speedup_type in corrections else row.get("total_minutes")
+        days = (
+            parse_speedup_days(corrections[speedup_type])
+            if speedup_type in corrections
+            else _speedup_days_from_row(row)
         )
-        normalized_speedups[speedup_type] = speedup_row_from_minutes(
-            parse_speedup_minutes(raw_minutes)
-        )
+        normalized_speedups[speedup_type] = speedup_row_from_days(days)
     return {"speedups": normalized_speedups}
+
+
+def _speedup_days_from_row(row: dict[str, Any]) -> int:
+    if row.get("total_days_decimal") is not None:
+        return parse_speedup_days(row.get("total_days_decimal"))
+    if row.get("duration") is not None:
+        return parse_speedup_days(row.get("duration"))
+    if row.get("value") is not None:
+        return parse_speedup_days(row.get("value"))
+    minutes = parse_speedup_minutes(row.get("total_minutes"))
+    return minutes // 1440
 
 
 def normalize_resource_values(values: dict[str, Any]) -> dict[str, dict[str, int]]:
@@ -195,11 +235,8 @@ def normalize_speedup_values(values: dict[str, Any]) -> dict[str, dict[str, int 
         row = speedups.get(speedup_type)
         if not isinstance(row, dict):
             raise ValueError(f"Missing speedup row: {speedup_type}.")
-        minutes_raw = row.get("total_minutes")
-        if minutes_raw is None:
-            minutes_raw = row.get("duration") or row.get("value")
-        minutes = parse_speedup_minutes(minutes_raw)
-        normalized[speedup_type] = speedup_row_from_minutes(minutes)
+        days = _speedup_days_from_row(row)
+        normalized[speedup_type] = speedup_row_from_days(days)
     return normalized
 
 

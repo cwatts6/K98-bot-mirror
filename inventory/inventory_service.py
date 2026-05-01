@@ -204,25 +204,13 @@ def _speedup_digit_loss_warnings(values: dict[str, Any]) -> list[str]:
         if not isinstance(row, dict):
             warnings.append(f"{speedup_type.title()} speedup row is missing.")
             continue
-        minutes = row.get("total_minutes")
         days = row.get("total_days_decimal")
-        hours = row.get("total_hours")
         try:
-            minutes_i = int(minutes)
             days_f = float(days)
-            hours_f = float(hours)
         except (TypeError, ValueError):
             warnings.append(f"{speedup_type.title()} speedup value could not be validated.")
             continue
         parsed_days[speedup_type] = days_f
-        if abs(minutes_i - round(days_f * 1440)) > 2:
-            warnings.append(
-                f"{speedup_type.title()} speedup days/minutes do not match; please verify."
-            )
-        if abs(hours_f - (minutes_i / 60)) > 0.1:
-            warnings.append(
-                f"{speedup_type.title()} speedup hours/minutes do not match; please verify."
-            )
 
     large_values = [
         value for value in parsed_days.values() if value >= SPEEDUP_DIGIT_LOSS_DAY_THRESHOLD

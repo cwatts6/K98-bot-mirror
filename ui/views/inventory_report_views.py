@@ -6,6 +6,7 @@ from typing import Any
 
 import discord
 
+from account_picker import AccountPickerView, build_unique_gov_options
 from inventory import export_service, reporting_service
 from inventory.models import (
     InventoryExportFormat,
@@ -17,6 +18,16 @@ from inventory.models import (
 from inventory.report_image_renderer import render_inventory_reports
 
 logger = logging.getLogger(__name__)
+
+
+def _governors_to_accounts(governors: list[RegisteredGovernor]) -> dict[str, dict[str, Any]]:
+    return {
+        item.account_type: {
+            "GovernorID": item.governor_id,
+            "GovernorName": item.governor_name,
+        }
+        for item in governors
+    }
 
 
 async def _avatar_bytes(user: Any) -> bytes | None:
@@ -210,6 +221,49 @@ class InventoryExportButton(discord.ui.Button):
             export_service.cleanup_export_file(export_file)
 
 
+async def _send_inventory_report_message(
+    *,
+    send: Any,
+    user: Any,
+    requester_id: int,
+    governor: RegisteredGovernor,
+    report_view: InventoryReportView,
+    range_key: InventoryReportRange,
+    visibility: InventoryReportVisibility,
+) -> None:
+    avatar = await _avatar_bytes(user)
+    payload = await reporting_service.build_inventory_report_payload(
+        discord_user_id=int(requester_id),
+        governor=governor,
+        view=report_view,
+        range_key=range_key,
+    )
+    ephemeral = visibility == InventoryReportVisibility.ONLY_ME
+    view_obj = InventoryRangeView(
+        requester_id=int(requester_id),
+        governor=governor,
+        report_view=report_view,
+        range_key=range_key,
+        avatar_bytes=avatar,
+        requester_name=getattr(user, "display_name", None) or getattr(user, "name", "user"),
+        ephemeral=ephemeral,
+    )
+    files = await _discord_files(payload, avatar)
+    if files:
+        await send(
+            content=_message_content(payload),
+            files=files,
+            view=view_obj,
+            ephemeral=ephemeral,
+        )
+    else:
+        await send(
+            content=_message_content(payload),
+            view=view_obj,
+            ephemeral=ephemeral,
+        )
+
+
 async def send_inventory_report(
     *,
     ctx: discord.ApplicationContext,
@@ -218,37 +272,15 @@ async def send_inventory_report(
     range_key: InventoryReportRange,
     visibility: InventoryReportVisibility,
 ) -> None:
-    avatar = await _avatar_bytes(ctx.user)
-    payload = await reporting_service.build_inventory_report_payload(
-        discord_user_id=int(ctx.user.id),
-        governor=governor,
-        view=report_view,
-        range_key=range_key,
-    )
-    ephemeral = visibility == InventoryReportVisibility.ONLY_ME
-    view_obj = InventoryRangeView(
+    await _send_inventory_report_message(
+        send=ctx.followup.send,
+        user=ctx.user,
         requester_id=int(ctx.user.id),
         governor=governor,
         report_view=report_view,
         range_key=range_key,
-        avatar_bytes=avatar,
-        requester_name=getattr(ctx.user, "display_name", None) or getattr(ctx.user, "name", "user"),
-        ephemeral=ephemeral,
+        visibility=visibility,
     )
-    files = await _discord_files(payload, avatar)
-    if files:
-        await ctx.followup.send(
-            content=_message_content(payload),
-            files=files,
-            view=view_obj,
-            ephemeral=ephemeral,
-        )
-    else:
-        await ctx.followup.send(
-            content=_message_content(payload),
-            view=view_obj,
-            ephemeral=ephemeral,
-        )
 
 
 async def start_myinventory_command(
@@ -272,10 +304,42 @@ async def start_myinventory_command(
                 ephemeral=True,
             )
             return
-        await ctx.followup.send(
-            "You have multiple registered governors. Use the `governor` option with `/myinventory`.",
+
+        options = build_unique_gov_options(_governors_to_accounts(governors))
+        governors_by_id = {item.governor_id: item for item in governors}
+
+        async def _on_select(
+            interaction: discord.Interaction, selected_governor_id: str, ephemeral: bool
+        ) -> None:
+            if int(interaction.user.id) != int(ctx.user.id):
+                await interaction.followup.send("This selector is not for you.", ephemeral=True)
+                return
+            selected = governors_by_id.get(int(selected_governor_id))
+            if selected is None:
+                await interaction.followup.send(
+                    "Selected governor is no longer available. Run `/myinventory` again.",
+                    ephemeral=True,
+                )
+                return
+            await _send_inventory_report_message(
+                send=interaction.followup.send,
+                user=interaction.user,
+                requester_id=int(ctx.user.id),
+                governor=selected,
+                report_view=report_view,
+                range_key=range_key,
+                visibility=visibility,
+            )
+
+        view = AccountPickerView(
+            ctx=ctx,
+            options=options,
+            on_select_governor=_on_select,
+            heading="Select which governor inventory report to view:",
+            show_register_btn=False,
             ephemeral=True,
         )
+        await ctx.followup.send(view.heading, view=view, ephemeral=True)
         return
 
     await send_inventory_report(

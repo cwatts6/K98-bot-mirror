@@ -103,6 +103,49 @@ async def test_resource_correction_modal_prefills_exact_integer_values():
 async def test_speedup_correction_modal_prompts_friendly_durations():
     modal = SpeedupCorrectionModal(_view(InventoryImportType.SPEEDUPS))
 
+    labels = [item.label for item in modal.children]
     values = [item.value for item in modal.children]
 
-    assert values[:3] == ["1h", "2h", "1d"]
+    assert labels[:3] == [
+        "Building Speedup Days",
+        "Research Speedup Days",
+        "Training Speedup Days",
+    ]
+    assert values[:3] == ["0d", "0d", "1d"]
+
+
+@pytest.mark.asyncio
+async def test_speedup_correction_updates_original_review_message():
+    parent = _view(InventoryImportType.SPEEDUPS)
+    edited = {}
+
+    class _Message:
+        async def edit(self, **kwargs):
+            edited.update(kwargs)
+
+    class _Response:
+        async def send_message(self, *args, **kwargs):
+            edited["response"] = (args, kwargs)
+
+    parent.message = _Message()
+    modal = SpeedupCorrectionModal(parent)
+    for item in modal.children:
+        if item.label == "Healing Speedup Days":
+            item.value = "505d"
+
+    interaction = type(
+        "_Interaction",
+        (),
+        {
+            "message": None,
+            "response": _Response(),
+        },
+    )()
+
+    await modal.callback(interaction)
+
+    assert "embed" in edited
+    corrected_field = next(
+        field for field in edited["embed"].fields if field.name == "Corrected Values"
+    )
+    assert "Healing: `505d`" in corrected_field.value

@@ -8,8 +8,9 @@ from inventory.parsing import (
     format_speedup_duration,
     normalize_final_values,
     parse_resource_value,
+    parse_speedup_days,
     parse_speedup_minutes,
-    speedup_row_from_minutes,
+    speedup_row_from_days,
 )
 
 
@@ -33,21 +34,27 @@ def test_parse_speedup_minutes_supports_day_hour_minute_tokens():
     assert parse_speedup_minutes("0") == 0
 
 
+def test_parse_speedup_days_uses_only_day_component():
+    assert parse_speedup_days("505d 3h 37m") == 505
+    assert parse_speedup_days("505") == 505
+    assert parse_speedup_days(505.9) == 505
+
+
 def test_normalize_final_values_for_speedups_calculates_derived_fields():
     normalized = normalize_final_values(
         InventoryImportType.SPEEDUPS,
         {
             "speedups": {
-                "building": {"total_minutes": 60},
-                "research": {"total_minutes": 120},
-                "training": {"total_minutes": 1440},
-                "healing": {"total_minutes": 0},
-                "universal": {"total_minutes": 2880},
+                "building": {"total_days_decimal": 0},
+                "research": {"total_days_decimal": 0},
+                "training": {"total_days_decimal": 1},
+                "healing": {"total_days_decimal": 0},
+                "universal": {"total_days_decimal": 2},
             }
         },
     )
 
-    assert normalized["speedups"]["building"] == speedup_row_from_minutes(60)
+    assert normalized["speedups"]["building"] == speedup_row_from_days(0)
     assert normalized["speedups"]["universal"]["total_days_decimal"] == 2.0
 
 
@@ -82,12 +89,12 @@ def test_speedup_duration_corrections_accept_friendly_text():
 
     corrected = apply_speedup_duration_corrections(values, {"healing": "505d 3h 37m"})
 
-    assert corrected["speedups"]["healing"]["total_minutes"] == (505 * 1440) + 180 + 37
+    assert corrected["speedups"]["healing"]["total_minutes"] == 505 * 1440
 
 
 def test_inventory_display_formatters_are_user_friendly():
     assert format_resource_value(1_200_000) == "1.2M"
-    assert format_speedup_duration((505 * 1440) + 180 + 37) == "505d 3h 37m"
+    assert format_speedup_duration((505 * 1440) + 180 + 37) == "505d"
 
 
 def test_format_resource_value_returns_unreadable_on_invalid_input():
