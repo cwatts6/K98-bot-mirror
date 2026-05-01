@@ -81,14 +81,16 @@ async def test_resource_correction_modal_prefills_exact_integer_values():
     summary = _summary(InventoryImportType.RESOURCES)
     # Override food with a value that abbreviates with precision loss
     summary.values["resources"]["food"]["total_resources_value"] = 1_234_567
-    modal = ResourceCorrectionModal(InventoryConfirmationView(
-        bot=object(),
-        actor_discord_id=42,
-        governor_id=111,
-        batch_id=7,
-        payload=object(),
-        summary=summary,
-    ))
+    modal = ResourceCorrectionModal(
+        InventoryConfirmationView(
+            bot=object(),
+            actor_discord_id=42,
+            governor_id=111,
+            batch_id=7,
+            payload=object(),
+            summary=summary,
+        )
+    )
 
     values = {item.label: item.value for item in modal.children}
 
