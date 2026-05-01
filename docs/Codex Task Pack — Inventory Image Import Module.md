@@ -783,6 +783,29 @@ Recommended scope:
   - random/unknown image
   - Materials-disabled image
   - export/audit access and empty-data handling
+- Fix production smoke-test UX issues from Phase 1C deployment:
+  - shared account picker dropdown placeholder says `Choose an account to view...`; change to a generic `Select Governor` so it fits inventory, stats, and targets flows.
+  - after a governor is selected, the old picker remains active and stale select/lookup/refresh interactions can fail; disable or update the picker after successful selection.
+  - user-facing Inventory Import Review embeds show model/fallback details that should remain admin-only.
+  - detected Resources/Speedups values need user-friendly formatting; speedups should show days/hours/minutes or rounded days only, not raw minute totals.
+  - raw JSON correction is too error-prone for normal users; replace it with typed correction fields for the detected import type.
+  - corrected data is currently shown in a separate message, making it unclear that the original import must still be approved; update the original review message and make the approval state explicit.
+  - Reject Import and Cancel Import are unclear as separate user actions; simplify or clearly distinguish them based on audit/debug retention needs.
+  - buttons can remain clickable after terminal actions and produce failed interactions; ensure controls are disabled/updated after approve, correct, reject, cancel, and timeout.
+- Fix OCR/prompt accuracy issues observed in Phase 1C smoke testing:
+  - speedup screenshots can return high confidence (`0.95`-`0.98`) while one or more rows are materially wrong.
+  - observed example: Healing Speedup should be read as `505d 3h 37m`, but was detected as about `50.52` days / `72,757` minutes.
+  - the same screenshot may fail or produce different results across attempts/model versions, so confidence alone is not sufficient as a correctness signal.
+  - add deterministic post-OCR validation and anomaly checks for speedup rows, especially missing hundreds/thousands digits and mismatches between days/hours/minutes and total minutes.
+- Fix same-day duplicate import enforcement:
+  - Phase 1 smoke testing allowed multiple approved imports for the same governor/import type/day.
+  - preserve an admin override for repeated same-day imports because it is useful for testing and correction workflows.
+  - normal users should be blocked from approving a second import of the same type for the same governor on the same UTC day.
+- Investigate `/myinventory` runtime failure:
+  - `/myinventory` should work after Phase 1B for Resources and Speedups reports.
+  - observed response: `Inventory reporting preferences are not available yet. Please contact an admin.`
+  - likely area to check first: `dbo.InventoryReportPreference` deployment/permissions and `inventory_reporting_dal.fetch_visibility_preference`.
+  - preserve the persistent visibility preference behaviour; if the preference table is unavailable, return a clearer admin-facing diagnostic in logs and a useful user-facing fallback where safe.
 - Confirm documentation and user-facing guidance are aligned with final Phase 1 behaviour.
 
 Out of scope for Phase 1D:
