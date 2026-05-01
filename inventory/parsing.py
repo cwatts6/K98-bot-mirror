@@ -92,7 +92,10 @@ def speedup_row_from_minutes(total_minutes: int) -> dict[str, int | float]:
 
 
 def format_resource_value(value: Any) -> str:
-    parsed = parse_resource_value(value)
+    try:
+        parsed = parse_resource_value(value)
+    except ValueError:
+        return "unreadable"
     if parsed >= 1_000_000_000:
         return f"{parsed / 1_000_000_000:.1f}".rstrip("0").rstrip(".") + "B"
     if parsed >= 1_000_000:
@@ -103,7 +106,10 @@ def format_resource_value(value: Any) -> str:
 
 
 def format_speedup_duration(total_minutes: Any) -> str:
-    minutes = parse_speedup_minutes(total_minutes)
+    try:
+        minutes = parse_speedup_minutes(total_minutes)
+    except ValueError:
+        return "unreadable"
     days, rem = divmod(minutes, 1440)
     hours, mins = divmod(rem, 60)
     parts: list[str] = []

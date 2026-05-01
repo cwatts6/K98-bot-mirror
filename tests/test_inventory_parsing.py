@@ -88,3 +88,16 @@ def test_speedup_duration_corrections_accept_friendly_text():
 def test_inventory_display_formatters_are_user_friendly():
     assert format_resource_value(1_200_000) == "1.2M"
     assert format_speedup_duration((505 * 1440) + 180 + 37) == "505d 3h 37m"
+
+
+def test_format_resource_value_returns_unreadable_on_invalid_input():
+    assert format_resource_value(None) == "unreadable"
+    assert format_resource_value(-1) == "unreadable"
+    assert format_resource_value("not_a_number") == "unreadable"
+    assert format_resource_value(1.5) == "unreadable"
+
+
+def test_format_speedup_duration_returns_unreadable_on_invalid_input():
+    assert format_speedup_duration(None) == "unreadable"
+    assert format_speedup_duration(-1) == "unreadable"
+    assert format_speedup_duration("bad input") == "unreadable"

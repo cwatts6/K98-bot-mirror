@@ -91,10 +91,11 @@ async def resolve_visibility(
             )
         except Exception:
             logger.exception(
-                "inventory_report_visibility_pref_write_failed user_id=%s selected=%s",
+                "inventory_report_visibility_pref_write_failed user_id=%s selected=%s — falling back to private",
                 discord_user_id,
                 selected_visibility.value,
             )
+            return InventoryReportVisibility.ONLY_ME
         return selected_visibility
     return await get_visibility_preference(discord_user_id)
 
