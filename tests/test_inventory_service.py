@@ -45,6 +45,18 @@ class _VisionClient:
         return _VisionResult()
 
 
+class _LowConfidenceVisionClient(_VisionClient):
+    async def analyse_image(
+        self, image_bytes, *, filename=None, content_type=None, import_type_hint=None
+    ):
+        result = _VisionResult()
+        result.ok = True
+        result.detected_image_type = "unknown"
+        result.confidence_score = 0.12
+        result.error = "not an inventory screenshot"
+        return result
+
+
 async def test_analyse_inventory_image_does_not_send_type_hint(monkeypatch):
     captured = {}
 
@@ -92,3 +104,41 @@ async def test_get_registered_governors_for_user_maps_registry(monkeypatch):
 
     assert [item.governor_id for item in governors] == [111, 222]
     assert governors[0].account_type == "Main"
+
+
+async def test_analyse_inventory_image_marks_random_image_failed(monkeypatch):
+    captured = {}
+
+    def _update(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(inventory_service.inventory_dal, "update_batch_analysis", _update)
+
+    summary = await inventory_service.analyse_inventory_image(
+        import_batch_id=42,
+        payload=InventoryImagePayload(
+            image_bytes=b"cat",
+            filename="cat.png",
+            content_type="image/png",
+        ),
+        vision_client=_LowConfidenceVisionClient(),
+    )
+
+    assert summary.import_type == InventoryImportType.UNKNOWN
+    assert captured["status"] == InventoryImportStatus.FAILED
+
+
+async def test_approve_import_blocks_duplicate_same_day_for_non_admin(monkeypatch):
+    monkeypatch.setattr(
+        inventory_service.inventory_dal,
+        "has_approved_import_today",
+        lambda governor_id, import_type: True,
+    )
+
+    summary = inventory_service._summary_from_vision_result(_VisionResult())
+    with pytest.raises(ValueError, match="already has an approved import"):
+        await inventory_service.approve_import(
+            import_batch_id=42,
+            governor_id=111,
+            summary=summary,
+        )

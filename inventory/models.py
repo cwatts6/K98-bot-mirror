@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 
@@ -42,6 +43,22 @@ class InventoryReportRange(StrEnum):
 class InventoryReportVisibility(StrEnum):
     ONLY_ME = "only_me"
     PUBLIC = "public"
+
+
+class InventoryExportFormat(StrEnum):
+    EXCEL = "excel"
+    CSV = "csv"
+    GOOGLE_SHEETS = "google_sheets"
+
+
+class InventoryAuditStatus(StrEnum):
+    ALL = "all"
+    AWAITING_UPLOAD = "awaiting_upload"
+    ANALYSED = "analysed"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+    FAILED = "failed"
 
 
 @dataclass(frozen=True)
@@ -115,3 +132,41 @@ class InventoryReportPayload:
     resources: list[InventoryResourcePoint] = field(default_factory=list)
     speedups: list[InventorySpeedupPoint] = field(default_factory=list)
     generated_at_utc: Any | None = None
+
+
+@dataclass(frozen=True)
+class InventoryExportFile:
+    path: Path
+    filename: str
+    format: InventoryExportFormat
+    row_count: int
+    governor_ids: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class InventoryAuditRecord:
+    import_batch_id: int
+    governor_id: int
+    discord_user_id: int
+    import_type: str | None
+    flow_type: str
+    status: str
+    created_at_utc: Any
+    approved_at_utc: Any | None = None
+    rejected_at_utc: Any | None = None
+    confidence_score: float | None = None
+    vision_model: str | None = None
+    fallback_used: bool = False
+    admin_debug_channel_id: int | None = None
+    admin_debug_message_id: int | None = None
+    warnings: list[str] = field(default_factory=list)
+    detected_json: dict[str, Any] | None = None
+    corrected_json: dict[str, Any] | None = None
+    final_json: dict[str, Any] | None = None
+    error_json: dict[str, Any] | None = None
+
+    @property
+    def debug_reference(self) -> str:
+        if self.admin_debug_channel_id and self.admin_debug_message_id:
+            return f"<#{self.admin_debug_channel_id}> / `{self.admin_debug_message_id}`"
+        return "none"

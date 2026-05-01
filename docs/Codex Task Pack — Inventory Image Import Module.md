@@ -6,6 +6,8 @@ Phase 0 is complete and deployed.
 
 Phase 1A is complete, tested, and deployed.
 
+Phase 1B is complete, tested, and deployed.
+
 Phase 0 delivered:
 
 - OpenAI Vision API setup documented in `docs/inventory_image_import_setup.md`.
@@ -62,6 +64,33 @@ Phase 1A validation:
 - Full test suite passed during promotion validation: `1056 passed, 8 skipped`.
 - Production deployment completed.
 
+Phase 1B delivered:
+
+- Canonical `/myinventory` command.
+- Latest Resources and Speedups inventory summary image.
+- Generated mobile/desktop-suitable report images using SQL-backed inventory data.
+- Range controls for 1M / 3M / 6M / 12M.
+- Summary-only output when only one approved record exists.
+- Summary plus trend graph when at least two approved records exist.
+- Persistent reporting visibility preference.
+- Materials kept disabled until Phase 2.
+
+Phase 1B implementation files:
+
+- `commands/inventory_cmds.py`
+- `inventory/reporting_service.py`
+- `inventory/report_image_renderer.py`
+- `inventory/dal/inventory_reporting_dal.py`
+- `ui/views/inventory_report_views.py`
+- `tests/test_inventory_reporting_service.py`
+- `tests/test_inventory_report_image_renderer.py`
+- `tests/test_inventory_report_views.py`
+
+Phase 1B validation:
+
+- Phase 1B has been tested and deployed.
+- Reporting service, image renderer, and report view test coverage added.
+
 Phase 0 sample validation:
 
 - `python scripts\test_inventory_vision.py C:\rok\rss_sample.png --type resources`
@@ -106,8 +135,9 @@ Development is split into:
 
 - Phase 0 - OpenAI Vision Integration Setup: complete and deployed.
 - Phase 1A - Foundation + Resources/Speedups Import: complete, tested, and deployed.
-- Phase 1B - Inventory reporting images and visibility preferences: next phase.
-- Phase 1C - Inventory export, admin audit, and interaction boundary hardening: planned follow-on.
+- Phase 1B - Inventory reporting images and visibility preferences: complete, tested, and deployed.
+- Phase 1C - Inventory export, admin audit, and interaction boundary hardening: next phase.
+- Phase 1D - Final Resources/Speedups completion polish: planned follow-on.
 - Phase 2 - Materials Import: later phase.
 
 Work must proceed phase by phase. The next phase should begin with review/scope only per repository rules.
@@ -244,7 +274,7 @@ Do not use `/inventory_import` for the user-facing command name.
 Add:
 
 - `/import_inventory` - complete in Phase 1A.
-- `/myinventory` - Phase 1B.
+- `/myinventory` - complete in Phase 1B.
 - `/export_inventory` - Phase 1C.
 - `/inventory_import_audit` - Phase 1C.
 
@@ -533,7 +563,7 @@ SQL schema changes belong in the SQL Server repository, not only in Python.
 
 ### `/myinventory`
 
-Status: Phase 1B.
+Status: complete in Phase 1B.
 
 Purpose:
 
@@ -591,7 +621,7 @@ Architecture note:
 
 ### Phase 1 Output Images
 
-Status: Phase 1B.
+Status: Resources and Speedups output images complete in Phase 1B.
 
 Shared output-image direction:
 
@@ -734,6 +764,37 @@ Boundary hardening goals:
 - Reassess whether same-session retry after reject needs richer UX or whether upload-first replacement is sufficient.
 
 Phase 1C should remain Materials-free. Materials belong to Phase 2.
+
+## Phase 1D - Final Resources/Speedups Completion Polish
+
+Phase 1D should be a small follow-on phase after Phase 1C to finish the remaining
+Resources and Speedups user-experience surface before declaring Phase 1 complete.
+
+Recommended scope:
+
+- Add export buttons under `/myinventory` report output where appropriate.
+- Reuse the `/export_inventory` service/DAL path rather than adding export SQL or file generation to views.
+- Perform targeted OCR/prompt tuning for Resources and Speedups only, based on production smoke-test failures or recurring admin-audit findings.
+- Review the Phase 1A/1B/1C scenario matrix end to end for Resources and Speedups:
+  - no registered governors
+  - governor selector timeout/no approval
+  - reject then repeat import
+  - same-day duplicate approved import
+  - random/unknown image
+  - Materials-disabled image
+  - export/audit access and empty-data handling
+- Confirm documentation and user-facing guidance are aligned with final Phase 1 behaviour.
+
+Out of scope for Phase 1D:
+
+- Materials processing or reporting.
+- `/my_stats` integration.
+- The stats export SQL refactor tracked by GitHub issue #46.
+- Broad OCR redesign beyond targeted Resources/Speedups tuning.
+
+Phase 1 for Resources and Speedups should be considered complete only after Phase 1D
+validates import, report, export, audit, retry/repeat, and targeted OCR/prompt behaviour
+against the documented scenario matrix.
 
 ## Phase 2 - Materials
 
@@ -893,18 +954,18 @@ Test:
 - correction workflow - Phase 1A complete
 - large correction warning - review/extend in Phase 1C if additional comparison/audit UX is needed
 - admin debug channel logging - Phase 1A complete
-- image output generation - Phase 1B
-- visibility preference persistence - Phase 1B
+- image output generation - Phase 1B complete for Resources and Speedups
+- visibility preference persistence - Phase 1B complete
 - `/export_inventory` - Phase 1C
 - `/inventory_import_audit` - Phase 1C
-- restart/persistence behaviour for active/imported state - Phase 1A complete for import batches; Phase 1B should cover reporting preferences
-- cache safety where applicable - continue in Phase 1B and Phase 1C
+- restart/persistence behaviour for active/imported state - Phase 1A complete for import batches; Phase 1B complete for reporting preferences
+- cache safety where applicable - continue in Phase 1C
 
 ### Phase 1B
 
-Next phase.
+Complete, tested, and deployed.
 
-Recommended scope:
+Delivered scope:
 
 - `/myinventory`
 - latest inventory summary view
@@ -914,7 +975,7 @@ Recommended scope:
 - trend graph when at least two approved records exist
 - persistent visibility preference
 
-Recommended Phase 1B audit points:
+Completed Phase 1B audit points:
 
 - Confirm live Phase 1A SQL schema is the source of truth before building read/report queries.
 - Verify command name remains canonical: `/myinventory`.
@@ -924,7 +985,7 @@ Recommended Phase 1B audit points:
 
 ### Phase 1C
 
-Planned follow-on phase.
+Next phase.
 
 Recommended scope:
 
@@ -941,6 +1002,22 @@ Recommended Phase 1C audit points:
 - Confirm GitHub issue #46 remains the tracking item for the existing stats export direct-SQL refactor.
 - Do not expand into `/my_stats` integration.
 - Do not add Materials support before Phase 2.
+
+### Phase 1D
+
+Planned follow-on phase.
+
+Recommended scope:
+
+- `/myinventory` export buttons wired to the Phase 1C export service/DAL path.
+- Targeted Resources/Speedups OCR and prompt tuning based on smoke-test/audit evidence.
+- Final Phase 1 Resources/Speedups scenario validation and documentation alignment.
+
+Do not include:
+
+- Materials processing.
+- `/my_stats` integration.
+- Stats export SQL refactor work tracked by GitHub issue #46.
 
 ### Phase 2
 
@@ -1005,5 +1082,5 @@ Do not create a duplicate issue for this item. Reference issue #46 whenever Phas
 ## Suggested Next Chat Opening Prompt
 
 ```text
-Start Phase 1B review/scope for the Inventory Image Import Module. Phase 0 and Phase 1A are complete, tested, and deployed. Use the updated in-repo task pack at C:\discord_file_downloader\docs\Codex Task Pack — Inventory Image Import Module.md. Phase 1A delivered /import_inventory, upload-first import in INVENTORY_UPLOAD_CHANNEL_ID, Vision-derived image type, Resources/Speedups SQL-backed imports, correction/reject/cancel flow, and admin debug channel retention. For Phase 1B, assess and scope /myinventory, generated Resources/Speedups output images, range buttons, and persistent visibility preference. Keep /export_inventory, /inventory_import_audit, export files, admin audit access, and Phase 1A inventory view/service boundary hardening for linked Phase 1C. Keep commands thin, use service/DAL boundaries, do not copy the direct SQL pattern from /my_stats_export, reference GitHub issue #46 for the existing stats export SQL refactor, keep Materials out of scope until Phase 2, and begin with audit/scope only per repo rules.
+Start Phase 1C review/scope for the Inventory Image Import Module. Phase 0, Phase 1A, and Phase 1B are complete, tested, and deployed. Use the updated in-repo task pack at C:\discord_file_downloader\docs\Codex Task Pack — Inventory Image Import Module.md. Phase 1A delivered /import_inventory, upload-first import in INVENTORY_UPLOAD_CHANNEL_ID, Vision-derived image type, Resources/Speedups SQL-backed imports, correction/reject/cancel flow, and admin debug channel retention. Phase 1B delivered /myinventory, generated Resources/Speedups report images, 1M/3M/6M/12M range controls, summary-only output for one approved record, trend graphs for two or more approved records, and persistent visibility preference. For Phase 1C, assess and scope /export_inventory, /inventory_import_audit, raw inventory export files, admin audit filtering/debug-message reference access, and targeted cleanup of Phase 1A inventory view/service boundaries. Keep commands thin, use service/DAL boundaries, do not copy the direct SQL pattern from /my_stats_export, reference GitHub issue #46 for the existing stats export SQL refactor, keep Materials out of scope until Phase 2, and begin with audit/scope only per repo rules.
 ```

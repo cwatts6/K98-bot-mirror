@@ -57,9 +57,13 @@ async def get_registered_governors_for_user(discord_user_id: int) -> list[Regist
 
 
 async def user_can_import_for_governor(
-    *, discord_user_id: int, governor_id: int, discord_user: Any | None = None
+    *,
+    discord_user_id: int,
+    governor_id: int,
+    discord_user: Any | None = None,
+    is_admin: bool = False,
 ) -> bool:
-    if discord_user is not None and _is_admin(discord_user):
+    if is_admin or (discord_user is not None and _is_admin(discord_user)):
         return True
     governors = await get_registered_governors_for_user(discord_user_id)
     return any(item.governor_id == int(governor_id) for item in governors)
@@ -70,12 +74,15 @@ async def create_pending_command_session(
     governor_id: int,
     discord_user_id: int,
     discord_user: Any | None = None,
+    is_admin: bool = False,
     timeout_minutes: int = 10,
 ) -> int:
+    admin = bool(is_admin or (discord_user is not None and _is_admin(discord_user)))
     if not await user_can_import_for_governor(
         discord_user_id=discord_user_id,
         governor_id=governor_id,
         discord_user=discord_user,
+        is_admin=admin,
     ):
         raise PermissionError("You can only import inventory for governors registered to you.")
 
@@ -85,14 +92,13 @@ async def create_pending_command_session(
         raise ValueError("This governor already has an active inventory import session.")
 
     expires = datetime.now(UTC) + timedelta(minutes=timeout_minutes)
-    is_admin = bool(discord_user is not None and _is_admin(discord_user))
     return await asyncio.to_thread(
         inventory_dal.create_import_batch,
         governor_id=int(governor_id),
         discord_user_id=int(discord_user_id),
         flow_type=InventoryFlowType.COMMAND,
         status=InventoryImportStatus.AWAITING_UPLOAD,
-        is_admin_import=is_admin,
+        is_admin_import=admin,
         expires_at_utc=expires,
     )
 
@@ -107,11 +113,14 @@ async def create_upload_first_batch(
     discord_user_id: int,
     payload: InventoryImagePayload,
     discord_user: Any | None = None,
+    is_admin: bool = False,
 ) -> int:
+    admin = bool(is_admin or (discord_user is not None and _is_admin(discord_user)))
     if not await user_can_import_for_governor(
         discord_user_id=discord_user_id,
         governor_id=governor_id,
         discord_user=discord_user,
+        is_admin=admin,
     ):
         raise PermissionError("You can only import inventory for governors registered to you.")
 
@@ -128,7 +137,7 @@ async def create_upload_first_batch(
         source_message_id=payload.source_message_id,
         source_channel_id=payload.source_channel_id,
         image_attachment_url=payload.image_attachment_url,
-        is_admin_import=bool(discord_user is not None and _is_admin(discord_user)),
+        is_admin_import=admin,
     )
 
 
@@ -206,7 +215,7 @@ async def approve_import(
 ) -> dict[str, Any]:
     if summary.import_type in {InventoryImportType.MATERIALS, InventoryImportType.UNKNOWN}:
         raise ValueError(
-            f"{summary.import_type.value.title()} imports are not available in Phase 1A."
+            f"{summary.import_type.value.title()} imports are not available in Phase 1."
         )
     if summary.confidence_score < LOW_CONFIDENCE_REJECT_THRESHOLD:
         raise ValueError("Image confidence is too low to approve.")
@@ -279,3 +288,18 @@ async def update_debug_reference(
         admin_debug_channel_id=int(admin_debug_channel_id),
         admin_debug_message_id=int(admin_debug_message_id),
     )
+
+
+def build_admin_debug_payload(
+    *,
+    summary: InventoryAnalysisSummary | None,
+    corrected_json: dict[str, Any] | None = None,
+    final_json: dict[str, Any] | None = None,
+    error_json: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "detected": summary.raw_json if summary else None,
+        "corrected": corrected_json,
+        "final": final_json,
+        "error": error_json,
+    }

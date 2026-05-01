@@ -146,12 +146,12 @@ async def _post_admin_debug(
         )
         if summary.warnings:
             embed.add_field(name="Warnings", value="\n".join(summary.warnings)[:1024], inline=False)
-    debug_payload = {
-        "detected": summary.raw_json if summary else None,
-        "corrected": corrected_json,
-        "final": final_json,
-        "error": error_json,
-    }
+    debug_payload = inventory_service.build_admin_debug_payload(
+        summary=summary,
+        corrected_json=corrected_json,
+        final_json=final_json,
+        error_json=error_json,
+    )
     embed.add_field(
         name="JSON",
         value=f"```json\n{json.dumps(debug_payload, ensure_ascii=False, sort_keys=True)[:900]}\n```",
@@ -231,6 +231,7 @@ class InventoryConfirmationView(discord.ui.View):
                     final_json=normalized,
                 )
             self.disable_all_items()
+            self.stop()
             await interaction.followup.send("Inventory import approved.", ephemeral=True)
             try:
                 await interaction.message.edit(view=self)
@@ -274,6 +275,7 @@ class InventoryConfirmationView(discord.ui.View):
             error_json={"error": "Rejected by user."},
         )
         self.disable_all_items()
+        self.stop()
         await interaction.followup.send(
             "Import rejected. You can upload one replacement screenshot if needed.\n\n"
             + SCREENSHOT_GUIDELINES,
@@ -294,11 +296,23 @@ class InventoryConfirmationView(discord.ui.View):
             return
         await inventory_service.cancel_import(self.batch_id)
         self.disable_all_items()
+        self.stop()
         await interaction.response.send_message("Import cancelled.", ephemeral=True)
         try:
             await interaction.message.edit(view=self)
         except Exception:
             logger.debug("inventory_cancel_message_edit_failed", exc_info=True)
+
+    async def on_timeout(self) -> None:
+        try:
+            await inventory_service.cancel_import(self.batch_id)
+        except Exception:
+            logger.debug(
+                "inventory_confirmation_timeout_cancel_failed batch_id=%s",
+                self.batch_id,
+                exc_info=True,
+            )
+        self.disable_all_items()
 
 
 class InventoryCorrectionModal(discord.ui.Modal):
@@ -432,7 +446,7 @@ async def _process_payload_for_governor(
                 governor_id=governor_id,
                 discord_user_id=actor_discord_id,
                 payload=payload,
-                discord_user=getattr(interaction, "user", None) if interaction else None,
+                is_admin=_is_admin(getattr(interaction, "user", None)) if interaction else False,
             )
         await _delete_original_upload(original_message=original_message, batch_id=batch_id)
         summary = await inventory_service.analyse_inventory_image(
@@ -469,7 +483,7 @@ async def _process_payload_for_governor(
 
         embed = _analysis_embed(governor_id=governor_id, summary=summary)
         if summary.import_type == InventoryImportType.MATERIALS:
-            await inventory_service.reject_import(batch_id, error="Materials disabled in Phase 1A.")
+            await inventory_service.reject_import(batch_id, error="Materials disabled in Phase 1.")
             await _post_admin_debug(
                 bot=bot,
                 batch_id=batch_id,
@@ -478,7 +492,7 @@ async def _process_payload_for_governor(
                 status="materials_disabled",
                 payload=payload,
                 summary=summary,
-                error_json={"error": "Materials disabled in Phase 1A."},
+                error_json={"error": "Materials disabled in Phase 1."},
             )
             content = "Materials import is not available yet. No values were saved."
             if interaction is not None:
@@ -537,6 +551,7 @@ async def start_import_command(ctx: discord.ApplicationContext, bot: Any) -> Non
             governor_id=governor_id,
             discord_user_id=int(ctx.user.id),
             discord_user=ctx.user,
+            is_admin=_is_admin(ctx.user),
         )
         await ctx.followup.send(
             (
@@ -568,6 +583,7 @@ async def start_import_command(ctx: discord.ApplicationContext, bot: Any) -> Non
             governor_id=int(governor_id),
             discord_user_id=int(ctx.user.id),
             discord_user=ctx.user,
+            is_admin=_is_admin(ctx.user),
         )
         await interaction.followup.send(
             (

@@ -55,8 +55,8 @@ def create_import_batch(
                 ImageAttachmentURL, Status, CreatedAtUtc, RetryCount, IsAdminImport,
                 ExpiresAtUtc
             )
+            OUTPUT INSERTED.ImportBatchID
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?);
-            SELECT CAST(SCOPE_IDENTITY() AS BIGINT) AS ImportBatchID;
             """,
             (
                 int(governor_id),

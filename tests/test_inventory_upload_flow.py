@@ -2,7 +2,12 @@ import types
 
 import pytest
 
-from inventory.models import RegisteredGovernor
+from inventory.models import (
+    InventoryAnalysisSummary,
+    InventoryImagePayload,
+    InventoryImportType,
+    RegisteredGovernor,
+)
 from ui.views import inventory_views
 
 pytestmark = pytest.mark.asyncio
@@ -84,3 +89,29 @@ async def test_upload_first_without_governors_sends_guidance(monkeypatch):
 
     assert handled is True
     assert "registered governor" in message.channel.sent[0][0][0]
+
+
+async def test_confirmation_view_timeout_cancels_active_batch(monkeypatch):
+    cancelled = []
+
+    async def _cancel(batch_id):
+        cancelled.append(batch_id)
+
+    monkeypatch.setattr(inventory_views.inventory_service, "cancel_import", _cancel)
+    view = inventory_views.InventoryConfirmationView(
+        bot=object(),
+        actor_discord_id=42,
+        governor_id=111,
+        batch_id=99,
+        payload=InventoryImagePayload(image_bytes=b"img", filename="inventory.png"),
+        summary=InventoryAnalysisSummary(
+            ok=True,
+            import_type=InventoryImportType.RESOURCES,
+            values={"resources": {}},
+            confidence_score=0.95,
+        ),
+    )
+
+    await view.on_timeout()
+
+    assert cancelled == [99]
