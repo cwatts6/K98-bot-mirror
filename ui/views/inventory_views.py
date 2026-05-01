@@ -185,6 +185,7 @@ class InventoryConfirmationView(discord.ui.View):
         self.payload = payload
         self.summary = summary
         self.corrected_values: dict[str, Any] | None = None
+        self._terminal = False
 
         if summary.import_type in {InventoryImportType.MATERIALS, InventoryImportType.UNKNOWN}:
             for child in self.children:
@@ -218,7 +219,18 @@ class InventoryConfirmationView(discord.ui.View):
                 corrected_values=self.corrected_values,
                 is_admin=_is_admin(interaction.user),
             )
-            if self.corrected_values:
+        except Exception:
+            logger.exception("inventory_import_approve_failed batch_id=%s", self.batch_id)
+            await interaction.followup.send(
+                f"Approval failed due to an internal error. Please try again or contact an admin with batch ID {self.batch_id}.",
+                ephemeral=True,
+            )
+            return
+        self._terminal = True
+        self.disable_all_items()
+        self.stop()
+        if self.corrected_values:
+            try:
                 await _post_admin_debug(
                     bot=self.bot,
                     batch_id=self.batch_id,
@@ -230,19 +242,15 @@ class InventoryConfirmationView(discord.ui.View):
                     corrected_json=self.corrected_values,
                     final_json=normalized,
                 )
-            self.disable_all_items()
-            self.stop()
-            await interaction.followup.send("Inventory import approved.", ephemeral=True)
-            try:
-                await interaction.message.edit(view=self)
             except Exception:
-                logger.debug("inventory_approve_message_edit_failed", exc_info=True)
+                logger.exception(
+                    "inventory_approve_debug_post_failed batch_id=%s", self.batch_id
+                )
+        await interaction.followup.send("Inventory import approved.", ephemeral=True)
+        try:
+            await interaction.message.edit(view=self)
         except Exception:
-            logger.exception("inventory_import_approve_failed batch_id=%s", self.batch_id)
-            await interaction.followup.send(
-                f"Approval failed due to an internal error. Please try again or contact an admin with batch ID {self.batch_id}.",
-                ephemeral=True,
-            )
+            logger.debug("inventory_approve_message_edit_failed", exc_info=True)
 
     @discord.ui.button(
         label="Correct Data",
@@ -263,19 +271,31 @@ class InventoryConfirmationView(discord.ui.View):
         if await self._deny_if_not_actor(interaction):
             return
         await interaction.response.defer(ephemeral=True)
-        await inventory_service.reject_import(self.batch_id, error="Rejected by user.")
-        await _post_admin_debug(
-            bot=self.bot,
-            batch_id=self.batch_id,
-            governor_id=self.governor_id,
-            discord_user_id=self.actor_discord_id,
-            status="rejected",
-            payload=self.payload,
-            summary=self.summary,
-            error_json={"error": "Rejected by user."},
-        )
+        try:
+            await inventory_service.reject_import(self.batch_id, error="Rejected by user.")
+        except Exception:
+            logger.exception("inventory_import_reject_failed batch_id=%s", self.batch_id)
+            await interaction.followup.send(
+                f"Rejection failed due to an internal error. Please try again or contact an admin with batch ID {self.batch_id}.",
+                ephemeral=True,
+            )
+            return
+        self._terminal = True
         self.disable_all_items()
         self.stop()
+        try:
+            await _post_admin_debug(
+                bot=self.bot,
+                batch_id=self.batch_id,
+                governor_id=self.governor_id,
+                discord_user_id=self.actor_discord_id,
+                status="rejected",
+                payload=self.payload,
+                summary=self.summary,
+                error_json={"error": "Rejected by user."},
+            )
+        except Exception:
+            logger.exception("inventory_reject_debug_post_failed batch_id=%s", self.batch_id)
         await interaction.followup.send(
             "Import rejected. You can upload one replacement screenshot if needed.\n\n"
             + SCREENSHOT_GUIDELINES,
@@ -295,6 +315,7 @@ class InventoryConfirmationView(discord.ui.View):
         if await self._deny_if_not_actor(interaction):
             return
         await inventory_service.cancel_import(self.batch_id)
+        self._terminal = True
         self.disable_all_items()
         self.stop()
         await interaction.response.send_message("Import cancelled.", ephemeral=True)
@@ -304,14 +325,15 @@ class InventoryConfirmationView(discord.ui.View):
             logger.debug("inventory_cancel_message_edit_failed", exc_info=True)
 
     async def on_timeout(self) -> None:
-        try:
-            await inventory_service.cancel_import(self.batch_id)
-        except Exception:
-            logger.debug(
-                "inventory_confirmation_timeout_cancel_failed batch_id=%s",
-                self.batch_id,
-                exc_info=True,
-            )
+        if not self._terminal:
+            try:
+                await inventory_service.cancel_import(self.batch_id)
+            except Exception:
+                logger.debug(
+                    "inventory_confirmation_timeout_cancel_failed batch_id=%s",
+                    self.batch_id,
+                    exc_info=True,
+                )
         self.disable_all_items()
 
 

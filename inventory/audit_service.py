@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def parse_audit_status(value: str | None) -> InventoryAuditStatus:
-    normalized = (value or InventoryAuditStatus.ALL.value).strip().lower()
+    normalized = (value or InventoryAuditStatus.ALL.value).strip().lower().replace(" ", "_")
     try:
         return InventoryAuditStatus(normalized)
     except ValueError as exc:
