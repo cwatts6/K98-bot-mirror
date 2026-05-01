@@ -6,8 +6,9 @@ from typing import Any
 
 import discord
 
-from inventory import reporting_service
+from inventory import export_service, reporting_service
 from inventory.models import (
+    InventoryExportFormat,
     InventoryReportRange,
     InventoryReportView,
     InventoryReportVisibility,
@@ -63,6 +64,7 @@ class InventoryRangeView(discord.ui.View):
         report_view: InventoryReportView,
         range_key: InventoryReportRange,
         avatar_bytes: bytes | None,
+        requester_name: str = "user",
         ephemeral: bool = False,
     ) -> None:
         super().__init__(timeout=900)
@@ -71,12 +73,19 @@ class InventoryRangeView(discord.ui.View):
         self.report_view = report_view
         self.range_key = range_key
         self.avatar_bytes = avatar_bytes
+        self.requester_name = requester_name
         self.ephemeral = ephemeral
         self._buttons: dict[InventoryReportRange, InventoryRangeButton] = {}
         for item in InventoryReportRange:
             button = InventoryRangeButton(parent=self, range_key=item)
             self._buttons[item] = button
             self.add_item(button)
+        for export_format in (
+            InventoryExportFormat.EXCEL,
+            InventoryExportFormat.CSV,
+            InventoryExportFormat.GOOGLE_SHEETS,
+        ):
+            self.add_item(InventoryExportButton(parent=self, export_format=export_format))
         self._sync_styles()
 
     def _sync_styles(self) -> None:
@@ -137,6 +146,70 @@ class InventoryRangeButton(discord.ui.Button):
         await self.parent_view.refresh(interaction)
 
 
+class InventoryExportButton(discord.ui.Button):
+    def __init__(self, *, parent: InventoryRangeView, export_format: InventoryExportFormat) -> None:
+        label = {
+            InventoryExportFormat.EXCEL: "Export Excel",
+            InventoryExportFormat.CSV: "Export CSV",
+            InventoryExportFormat.GOOGLE_SHEETS: "Export Sheets",
+        }[export_format]
+        super().__init__(
+            label=label,
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"inventory_report_export_{export_format.value}",
+            row=1,
+        )
+        self.parent_view = parent
+        self.export_format = export_format
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        parent = self.parent_view
+        if int(interaction.user.id) != parent.requester_id:
+            await interaction.response.send_message(
+                "This inventory report is not yours. Run `/myinventory` to export your own.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        export_file = None
+        try:
+            export_file = await export_service.build_inventory_export_file(
+                discord_user_id=parent.requester_id,
+                username=parent.requester_name,
+                export_format=self.export_format,
+                view=parent.report_view,
+                governor_id=parent.governor.governor_id,
+                lookback_days=reporting_service.REPORT_RANGE_DAYS[parent.range_key],
+                discord_user=interaction.user,
+            )
+            file_obj = discord.File(str(export_file.path), filename=export_file.filename)
+            await interaction.followup.send(
+                content=(
+                    "Inventory export ready. "
+                    f"`{export_file.row_count}` raw approved row(s), "
+                    f"`{len(export_file.governor_ids)}` governor(s)."
+                ),
+                file=file_obj,
+                ephemeral=True,
+            )
+        except PermissionError as exc:
+            await interaction.followup.send(str(exc), ephemeral=True)
+        except ValueError as exc:
+            await interaction.followup.send(str(exc), ephemeral=True)
+        except Exception:
+            logger.exception(
+                "inventory_report_export_button_failed user_id=%s governor_id=%s",
+                parent.requester_id,
+                parent.governor.governor_id,
+            )
+            await interaction.followup.send(
+                "Inventory export failed. Please try again or contact an admin.",
+                ephemeral=True,
+            )
+        finally:
+            export_service.cleanup_export_file(export_file)
+
+
 async def send_inventory_report(
     *,
     ctx: discord.ApplicationContext,
@@ -159,6 +232,7 @@ async def send_inventory_report(
         report_view=report_view,
         range_key=range_key,
         avatar_bytes=avatar,
+        requester_name=getattr(ctx.user, "display_name", None) or getattr(ctx.user, "name", "user"),
         ephemeral=ephemeral,
     )
     files = await _discord_files(payload, avatar)

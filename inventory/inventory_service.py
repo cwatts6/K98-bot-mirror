@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 SUPPORTED_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
 SUPPORTED_IMAGE_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp"}
 LOW_CONFIDENCE_REJECT_THRESHOLD = 0.70
+SPEEDUP_DIGIT_LOSS_DAY_THRESHOLD = 45.0
+SPEEDUP_DIGIT_LOSS_RATIO = 0.20
 
 
 def is_supported_image_attachment(filename: str | None, content_type: str | None) -> bool:
@@ -150,7 +152,7 @@ def _map_detected_type(raw: str | None) -> InventoryImportType:
 
 
 def _summary_from_vision_result(result: Any) -> InventoryAnalysisSummary:
-    return InventoryAnalysisSummary(
+    summary = InventoryAnalysisSummary(
         ok=bool(result.ok),
         import_type=_map_detected_type(getattr(result, "detected_image_type", None)),
         values=dict(getattr(result, "values", {}) or {}),
@@ -162,6 +164,100 @@ def _summary_from_vision_result(result: Any) -> InventoryAnalysisSummary:
         error=getattr(result, "error", None),
         raw_json=dict(getattr(result, "raw_json", {}) or {}),
     )
+    return with_inventory_anomaly_warnings(summary)
+
+
+def with_inventory_anomaly_warnings(
+    summary: InventoryAnalysisSummary,
+) -> InventoryAnalysisSummary:
+    warnings = list(summary.warnings)
+    if summary.import_type == InventoryImportType.SPEEDUPS:
+        warnings.extend(_speedup_digit_loss_warnings(summary.values))
+    if summary.import_type == InventoryImportType.RESOURCES:
+        warnings.extend(_resource_consistency_warnings(summary.values))
+    deduped = list(dict.fromkeys(item for item in warnings if item))
+    if deduped == summary.warnings:
+        return summary
+    return InventoryAnalysisSummary(
+        ok=summary.ok,
+        import_type=summary.import_type,
+        values=summary.values,
+        confidence_score=summary.confidence_score,
+        warnings=deduped,
+        model=summary.model,
+        prompt_version=summary.prompt_version,
+        fallback_used=summary.fallback_used,
+        error=summary.error,
+        raw_json=summary.raw_json,
+    )
+
+
+def _speedup_digit_loss_warnings(values: dict[str, Any]) -> list[str]:
+    speedups = values.get("speedups") if isinstance(values, dict) else None
+    if not isinstance(speedups, dict):
+        return ["Speedup rows are missing from the detected data."]
+
+    parsed_days: dict[str, float] = {}
+    warnings: list[str] = []
+    for speedup_type in ("building", "research", "training", "healing", "universal"):
+        row = speedups.get(speedup_type)
+        if not isinstance(row, dict):
+            warnings.append(f"{speedup_type.title()} speedup row is missing.")
+            continue
+        minutes = row.get("total_minutes")
+        days = row.get("total_days_decimal")
+        hours = row.get("total_hours")
+        try:
+            minutes_i = int(minutes)
+            days_f = float(days)
+            hours_f = float(hours)
+        except (TypeError, ValueError):
+            warnings.append(f"{speedup_type.title()} speedup value could not be validated.")
+            continue
+        parsed_days[speedup_type] = days_f
+        if abs(minutes_i - round(days_f * 1440)) > 2:
+            warnings.append(
+                f"{speedup_type.title()} speedup days/minutes do not match; please verify."
+            )
+        if abs(hours_f - (minutes_i / 60)) > 0.1:
+            warnings.append(
+                f"{speedup_type.title()} speedup hours/minutes do not match; please verify."
+            )
+
+    large_values = [
+        value for value in parsed_days.values() if value >= SPEEDUP_DIGIT_LOSS_DAY_THRESHOLD
+    ]
+    if large_values:
+        max_days = max(large_values)
+        for speedup_type, days in parsed_days.items():
+            if 0 < days <= max_days * SPEEDUP_DIGIT_LOSS_RATIO:
+                warnings.append(
+                    f"{speedup_type.title()} speedup is much lower than other rows; check for a missing digit."
+                )
+    return warnings
+
+
+def _resource_consistency_warnings(values: dict[str, Any]) -> list[str]:
+    resources = values.get("resources") if isinstance(values, dict) else None
+    if not isinstance(resources, dict):
+        return ["Resource rows are missing from the detected data."]
+    warnings: list[str] = []
+    for resource_type in ("food", "wood", "stone", "gold"):
+        row = resources.get(resource_type)
+        if not isinstance(row, dict):
+            warnings.append(f"{resource_type.title()} resource row is missing.")
+            continue
+        try:
+            from_items = int(row.get("from_items_value"))
+            total = int(row.get("total_resources_value"))
+        except (TypeError, ValueError):
+            warnings.append(f"{resource_type.title()} resource value could not be validated.")
+            continue
+        if total < from_items:
+            warnings.append(
+                f"{resource_type.title()} total resources are lower than from-items resources."
+            )
+    return warnings
 
 
 async def analyse_inventory_image(

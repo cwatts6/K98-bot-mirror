@@ -177,6 +177,7 @@ class AccountPickerView(discord.ui.View):
         self._lookup_cb = lookup_callback
         self._register_cb = register_callback
         self._show_register_btn = show_register_btn
+        self._completed = False
 
         if options:
             self.add_item(_AccountSelect(options, self, on_select_governor))
@@ -201,6 +202,21 @@ class AccountPickerView(discord.ui.View):
         except Exception:
             pass
 
+    async def mark_completed(
+        self, interaction: discord.Interaction, *, content: str | None = None
+    ) -> None:
+        self._completed = True
+        for item in self.children:
+            item.disabled = True
+        self.stop()
+        try:
+            await interaction.edit_original_response(
+                content=content or self.heading,
+                view=self,
+            )
+        except Exception:
+            logger.debug("[AccountPicker] failed to mark selector completed", exc_info=True)
+
 
 class _AccountSelect(discord.ui.Select):
     def __init__(
@@ -209,20 +225,28 @@ class _AccountSelect(discord.ui.Select):
         parent: AccountPickerView,
         on_select: OnSelectGovernor,
     ):
-        super().__init__(
-            placeholder="Choose an account to view…", min_values=1, max_values=1, options=choices
-        )
+        super().__init__(placeholder="Select Governor", min_values=1, max_values=1, options=choices)
         self.parent = parent
         self._on_select = on_select
 
     async def callback(self, interaction: discord.Interaction):
+        if getattr(self.parent, "_completed", False):
+            try:
+                await interaction.response.send_message(
+                    "This selector has already been used.", ephemeral=True
+                )
+            except Exception:
+                pass
+            return
         gid = self.values[0]
         try:
             await interaction.response.defer(ephemeral=self.parent.ephemeral)
         except Exception:
             pass
+        completed = False
         try:
             await self._on_select(interaction, gid, self.parent.ephemeral)
+            completed = True
         except Exception:
             logger.exception("[AccountPicker] on_select handler failed for %s", gid)
             try:
@@ -230,10 +254,11 @@ class _AccountSelect(discord.ui.Select):
             except Exception:
                 pass
         finally:
-            try:
-                self.parent.stop()
-            except Exception:
-                pass
+            if completed:
+                try:
+                    await self.parent.mark_completed(interaction, content="Governor selected.")
+                except Exception:
+                    pass
 
 
 class _LookupGovIDButton(discord.ui.Button):
@@ -313,11 +338,7 @@ class _RefreshSelectorButton(discord.ui.Button):
             # Attempt to edit the message where the view was attached. If that fails, send a fresh message.
             try:
                 await interaction.response.edit_message(
-                    content=(
-                        "Select an account to view its KVK targets:"
-                        if options2
-                        else "No registered accounts found."
-                    ),
+                    content=("Select Governor" if options2 else "No registered accounts found."),
                     view=new_view,
                 )
             except Exception:

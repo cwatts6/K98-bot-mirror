@@ -1,4 +1,6 @@
-from account_picker import build_unique_gov_options
+import pytest
+
+from account_picker import AccountPickerView, build_unique_gov_options
 
 
 def _mk_acc(slot, gid, name=None):
@@ -42,3 +44,17 @@ def test_build_unique_gov_options_labels_and_desc_limits():
     # label trimmed to 100 chars by implementation (defensive assumption)
     assert len(opts[0].label) <= 100
     assert opts[0].description == "Main"
+
+
+@pytest.mark.asyncio
+async def test_account_picker_uses_generic_governor_placeholder():
+    view = AccountPickerView(
+        ctx=object(),
+        options=build_unique_gov_options({"Main": {"GovernorID": 1, "GovernorName": "Gov"}}),
+        on_select_governor=lambda *_args: None,
+        show_register_btn=False,
+    )
+
+    select = view.children[0]
+
+    assert select.placeholder == "Select Governor"

@@ -17,7 +17,12 @@ from inventory.models import (
     InventoryImportType,
     RegisteredGovernor,
 )
-from inventory.parsing import parse_corrected_json
+from inventory.parsing import (
+    apply_resource_total_corrections,
+    apply_speedup_duration_corrections,
+    format_resource_value,
+    format_speedup_duration,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,18 +51,18 @@ def _format_values_for_display(summary: InventoryAnalysisSummary) -> str:
         lines = []
         for key in ("food", "wood", "stone", "gold"):
             row = resources.get(key) or {}
-            lines.append(
-                f"{key.title()}: items `{row.get('from_items_value')}` / total `{row.get('total_resources_value')}`"
-            )
+            total = row.get("total_resources_value")
+            total_text = format_resource_value(total) if total is not None else "unreadable"
+            lines.append(f"{key.title()}: `{total_text}`")
         return "\n".join(lines)
     if summary.import_type == InventoryImportType.SPEEDUPS:
         speedups = summary.values.get("speedups") or {}
         lines = []
         for key in ("building", "research", "training", "healing", "universal"):
             row = speedups.get(key) or {}
-            days = row.get("total_days_decimal")
             minutes = row.get("total_minutes")
-            lines.append(f"{key.title()}: `{days}` days (`{minutes}` minutes)")
+            duration = format_speedup_duration(minutes) if minutes is not None else "unreadable"
+            lines.append(f"{key.title()}: `{duration}`")
         return "\n".join(lines)
     return "No Phase 1A values detected."
 
@@ -74,17 +79,10 @@ def _analysis_embed(
     embed = discord.Embed(title=title, color=color)
     embed.add_field(name="GovernorID", value=f"`{governor_id}`", inline=True)
     embed.add_field(name="Detected Type", value=f"`{summary.import_type.value}`", inline=True)
-    embed.add_field(
-        name="Confidence",
-        value=f"`{summary.confidence_score:.2f}`",
-        inline=True,
-    )
-    embed.add_field(name="Model", value=f"`{summary.model or 'unknown'}`", inline=True)
-    embed.add_field(
-        name="Fallback Used",
-        value="yes" if summary.fallback_used else "no",
-        inline=True,
-    )
+    review_status = "Ready for approval"
+    if summary.confidence_score < 0.90 or summary.warnings:
+        review_status = "Needs careful review"
+    embed.add_field(name="Review Status", value=review_status, inline=True)
     if summary.warnings:
         embed.add_field(name="Warnings", value="\n".join(summary.warnings)[:1024], inline=False)
     if summary.error:
@@ -186,6 +184,7 @@ class InventoryConfirmationView(discord.ui.View):
         self.summary = summary
         self.corrected_values: dict[str, Any] | None = None
         self._terminal = False
+        self.message: discord.Message | None = None
 
         if summary.import_type in {InventoryImportType.MATERIALS, InventoryImportType.UNKNOWN}:
             for child in self.children:
@@ -193,12 +192,60 @@ class InventoryConfirmationView(discord.ui.View):
                     child.disabled = True
 
     async def _deny_if_not_actor(self, interaction: discord.Interaction) -> bool:
+        if self._terminal:
+            await _send_private(interaction, "This import has already been completed.")
+            return True
         if int(interaction.user.id) == self.actor_discord_id:
             return False
         await _send_private(
             interaction, "Only the user who started this import can use these buttons."
         )
         return True
+
+    async def _update_review_message(
+        self, interaction: discord.Interaction, *, content: str | None = None
+    ) -> None:
+        message = getattr(interaction, "message", None) or self.message
+        if message is None:
+            return
+        self.message = message
+        embed = _analysis_embed(
+            governor_id=self.governor_id,
+            summary=self.summary,
+            corrected=self.corrected_values is not None,
+        )
+        if self.corrected_values is not None:
+            corrected_summary = InventoryAnalysisSummary(
+                ok=self.summary.ok,
+                import_type=self.summary.import_type,
+                values=self.corrected_values,
+                confidence_score=self.summary.confidence_score,
+                warnings=self.summary.warnings,
+                model=self.summary.model,
+                prompt_version=self.summary.prompt_version,
+                fallback_used=self.summary.fallback_used,
+                error=self.summary.error,
+                raw_json=self.summary.raw_json,
+            )
+            embed.set_field_at(
+                len(embed.fields) - 1,
+                name="Corrected Values",
+                value=_format_values_for_display(corrected_summary)[:1024],
+                inline=False,
+            )
+            embed.add_field(
+                name="Approval Required",
+                value="Corrections are saved for this pending import. Press Approve Import to save them.",
+                inline=False,
+            )
+        try:
+            await message.edit(
+                content=content or "Review the detected inventory values before approving.",
+                embed=embed,
+                view=self,
+            )
+        except Exception:
+            logger.debug("inventory_review_message_update_failed", exc_info=True)
 
     @discord.ui.button(
         label="Approve Import",
@@ -208,6 +255,7 @@ class InventoryConfirmationView(discord.ui.View):
     async def approve(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         if await self._deny_if_not_actor(interaction):
             return
+        self.message = getattr(interaction, "message", None)
         await interaction.response.defer(ephemeral=True)
         try:
             final_values = self.corrected_values or self.summary.values
@@ -248,10 +296,7 @@ class InventoryConfirmationView(discord.ui.View):
             except Exception:
                 logger.exception("inventory_approve_debug_post_failed batch_id=%s", self.batch_id)
         await interaction.followup.send("Inventory import approved.", ephemeral=True)
-        try:
-            await interaction.message.edit(view=self)
-        except Exception:
-            logger.debug("inventory_approve_message_edit_failed", exc_info=True)
+        await self._update_review_message(interaction, content="Inventory import approved.")
 
     @discord.ui.button(
         label="Correct Data",
@@ -261,7 +306,17 @@ class InventoryConfirmationView(discord.ui.View):
     async def correct(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         if await self._deny_if_not_actor(interaction):
             return
-        await interaction.response.send_modal(InventoryCorrectionModal(self))
+        self.message = getattr(interaction, "message", None)
+        if self.summary.import_type == InventoryImportType.RESOURCES:
+            await interaction.response.send_modal(ResourceCorrectionModal(self))
+            return
+        if self.summary.import_type == InventoryImportType.SPEEDUPS:
+            await interaction.response.send_modal(SpeedupCorrectionModal(self))
+            return
+        await interaction.response.send_message(
+            "Corrections are only available for Resources and Speedups in Phase 1.",
+            ephemeral=True,
+        )
 
     @discord.ui.button(
         label="Reject Import",
@@ -271,6 +326,7 @@ class InventoryConfirmationView(discord.ui.View):
     async def reject(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         if await self._deny_if_not_actor(interaction):
             return
+        self.message = getattr(interaction, "message", None)
         await interaction.response.defer(ephemeral=True)
         try:
             await inventory_service.reject_import(self.batch_id, error="Rejected by user.")
@@ -302,10 +358,7 @@ class InventoryConfirmationView(discord.ui.View):
             + SCREENSHOT_GUIDELINES,
             ephemeral=True,
         )
-        try:
-            await interaction.message.edit(view=self)
-        except Exception:
-            logger.debug("inventory_reject_message_edit_failed", exc_info=True)
+        await self._update_review_message(interaction, content="Inventory import rejected.")
 
     @discord.ui.button(
         label="Cancel Import",
@@ -315,6 +368,7 @@ class InventoryConfirmationView(discord.ui.View):
     async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         if await self._deny_if_not_actor(interaction):
             return
+        self.message = getattr(interaction, "message", None)
         await interaction.response.defer(ephemeral=True)
         try:
             await inventory_service.cancel_import(self.batch_id)
@@ -329,10 +383,7 @@ class InventoryConfirmationView(discord.ui.View):
         self.disable_all_items()
         self.stop()
         await interaction.followup.send("Import cancelled.", ephemeral=True)
-        try:
-            await interaction.message.edit(view=self)
-        except Exception:
-            logger.debug("inventory_cancel_message_edit_failed", exc_info=True)
+        await self._update_review_message(interaction, content="Inventory import cancelled.")
 
     async def on_timeout(self) -> None:
         if not self._terminal:
@@ -353,45 +404,80 @@ class InventoryConfirmationView(discord.ui.View):
                 logger.debug("inventory_timeout_message_edit_failed", exc_info=True)
 
 
-class InventoryCorrectionModal(discord.ui.Modal):
+class ResourceCorrectionModal(discord.ui.Modal):
     def __init__(self, parent: InventoryConfirmationView) -> None:
-        super().__init__(title="Correct Inventory Data")
+        super().__init__(title="Correct Resource Totals")
         self.parent_view = parent
-        self.corrected_json = discord.ui.InputText(
-            label="Corrected JSON",
-            style=discord.InputTextStyle.long,
-            value=json.dumps(parent.summary.values, indent=2, sort_keys=True)[:3900],
-            required=True,
-        )
-        self.add_item(self.corrected_json)
+        resources = parent.summary.values.get("resources") or {}
+        self.inputs: dict[str, discord.ui.InputText] = {}
+        for key in ("food", "wood", "stone", "gold"):
+            row = resources.get(key) or {}
+            value = row.get("total_resources_value")
+            field = discord.ui.InputText(
+                label=f"{key.title()} Total Resources",
+                value=format_resource_value(value) if value is not None else "",
+                required=True,
+            )
+            self.inputs[key] = field
+            self.add_item(field)
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        corrected, validation = parse_corrected_json(
-            self.parent_view.summary.import_type,
-            str(self.corrected_json.value or ""),
-        )
-        if not validation.ok:
+        corrections = {key: str(field.value or "") for key, field in self.inputs.items()}
+        try:
+            corrected = apply_resource_total_corrections(
+                self.parent_view.summary.values,
+                corrections,
+            )
+        except ValueError as exc:
             await interaction.response.send_message(
-                f"Correction rejected: `{validation.error}`",
+                f"Correction rejected: `{exc}`",
                 ephemeral=True,
             )
             return
         self.parent_view.corrected_values = corrected
-        embed = _analysis_embed(
-            governor_id=self.parent_view.governor_id,
-            summary=self.parent_view.summary,
-            corrected=True,
-        )
-        embed.add_field(
-            name="Corrected JSON",
-            value=f"```json\n{json.dumps(corrected, sort_keys=True)[:900]}\n```",
-            inline=False,
-        )
         await interaction.response.send_message(
-            "Correction saved for this pending import. Approve when ready.",
-            embed=embed,
+            "Correction saved. Press Approve Import on the updated review to save it.",
             ephemeral=True,
         )
+        await self.parent_view._update_review_message(interaction)
+
+
+class SpeedupCorrectionModal(discord.ui.Modal):
+    def __init__(self, parent: InventoryConfirmationView) -> None:
+        super().__init__(title="Correct Speedup Durations")
+        self.parent_view = parent
+        speedups = parent.summary.values.get("speedups") or {}
+        self.inputs: dict[str, discord.ui.InputText] = {}
+        for key in ("building", "research", "training", "healing", "universal"):
+            row = speedups.get(key) or {}
+            value = row.get("total_minutes")
+            field = discord.ui.InputText(
+                label=f"{key.title()} Speedup",
+                value=format_speedup_duration(value) if value is not None else "",
+                required=True,
+            )
+            self.inputs[key] = field
+            self.add_item(field)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        corrections = {key: str(field.value or "") for key, field in self.inputs.items()}
+        try:
+            corrected = apply_speedup_duration_corrections(
+                self.parent_view.summary.values,
+                corrections,
+            )
+        except ValueError as exc:
+            await interaction.response.send_message(
+                f"Correction rejected: `{exc}`",
+                ephemeral=True,
+            )
+            return
+        self.parent_view.corrected_values = corrected
+        await interaction.response.send_message(
+            "Correction saved. Press Approve Import on the updated review to save it.",
+            ephemeral=True,
+        )
+        await self.parent_view._update_review_message(interaction)
 
 
 class InventoryUploadGovernorSelectView(AccountPickerView):
@@ -555,12 +641,13 @@ async def _process_payload_for_governor(
         if interaction is not None:
             await interaction.followup.send(content, embed=embed, view=view, ephemeral=True)
         elif original_message is not None:
-            await original_message.channel.send(
+            sent = await original_message.channel.send(
                 f"<@{actor_discord_id}> {content}",
                 embed=embed,
                 view=view,
                 delete_after=900,
             )
+            view.message = sent
     except Exception:
         logger.exception("inventory_process_payload_failed governor_id=%s", governor_id)
         if interaction is not None:

@@ -142,3 +142,61 @@ async def test_approve_import_blocks_duplicate_same_day_for_non_admin(monkeypatc
             governor_id=111,
             summary=summary,
         )
+
+
+async def test_approve_import_preserves_admin_same_day_override(monkeypatch):
+    monkeypatch.setattr(
+        inventory_service.inventory_dal,
+        "has_approved_import_today",
+        lambda governor_id, import_type: True,
+    )
+    captured = {}
+
+    def _approve_batch(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(inventory_service.inventory_dal, "approve_batch", _approve_batch)
+
+    summary = inventory_service._summary_from_vision_result(_VisionResult())
+    await inventory_service.approve_import(
+        import_batch_id=42,
+        governor_id=111,
+        summary=summary,
+        is_admin=True,
+    )
+
+    assert captured["import_batch_id"] == 42
+
+
+async def test_speedup_digit_loss_anomaly_adds_warning():
+    result = _VisionResult()
+    result.detected_image_type = "speedups"
+    result.values = {
+        "speedups": {
+            "building": {"total_minutes": 144_000, "total_hours": 2400, "total_days_decimal": 100},
+            "research": {
+                "total_minutes": 150_000,
+                "total_hours": 2500,
+                "total_days_decimal": 104.1667,
+            },
+            "training": {
+                "total_minutes": 160_000,
+                "total_hours": 2666.6667,
+                "total_days_decimal": 111.1111,
+            },
+            "healing": {
+                "total_minutes": 72_757,
+                "total_hours": 1212.6167,
+                "total_days_decimal": 50.5257,
+            },
+            "universal": {
+                "total_minutes": 500_000,
+                "total_hours": 8333.3333,
+                "total_days_decimal": 347.2222,
+            },
+        }
+    }
+
+    summary = inventory_service._summary_from_vision_result(result)
+
+    assert any("Healing" in warning and "missing digit" in warning for warning in summary.warnings)

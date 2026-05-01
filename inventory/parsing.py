@@ -91,6 +91,57 @@ def speedup_row_from_minutes(total_minutes: int) -> dict[str, int | float]:
     }
 
 
+def format_resource_value(value: Any) -> str:
+    parsed = parse_resource_value(value)
+    if parsed >= 1_000_000_000:
+        return f"{parsed / 1_000_000_000:.1f}".rstrip("0").rstrip(".") + "B"
+    if parsed >= 1_000_000:
+        return f"{parsed / 1_000_000:.1f}".rstrip("0").rstrip(".") + "M"
+    if parsed >= 1_000:
+        return f"{parsed / 1_000:.1f}".rstrip("0").rstrip(".") + "K"
+    return str(parsed)
+
+
+def format_speedup_duration(total_minutes: Any) -> str:
+    minutes = parse_speedup_minutes(total_minutes)
+    days, rem = divmod(minutes, 1440)
+    hours, mins = divmod(rem, 60)
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if mins or not parts:
+        parts.append(f"{mins}m")
+    return " ".join(parts)
+
+
+def apply_resource_total_corrections(
+    values: dict[str, Any], corrections: dict[str, Any]
+) -> dict[str, Any]:
+    normalized = normalize_final_values(InventoryImportType.RESOURCES, values)
+    resources = normalized["resources"]
+    for resource_type in RESOURCE_TYPES:
+        if resource_type in corrections:
+            resources[resource_type]["total_resources_value"] = parse_resource_value(
+                corrections[resource_type]
+            )
+    return {"resources": resources}
+
+
+def apply_speedup_duration_corrections(
+    values: dict[str, Any], corrections: dict[str, Any]
+) -> dict[str, Any]:
+    normalized = normalize_final_values(InventoryImportType.SPEEDUPS, values)
+    speedups = normalized["speedups"]
+    for speedup_type in SPEEDUP_TYPES:
+        if speedup_type in corrections:
+            speedups[speedup_type] = speedup_row_from_minutes(
+                parse_speedup_minutes(corrections[speedup_type])
+            )
+    return {"speedups": speedups}
+
+
 def normalize_resource_values(values: dict[str, Any]) -> dict[str, dict[str, int]]:
     resources = values.get("resources") if isinstance(values, dict) else None
     if not isinstance(resources, dict):

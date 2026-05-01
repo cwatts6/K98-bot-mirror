@@ -64,10 +64,18 @@ def parse_visibility(value: str | None) -> InventoryReportVisibility | None:
 
 
 async def get_visibility_preference(discord_user_id: int) -> InventoryReportVisibility:
-    pref = await asyncio.to_thread(
-        inventory_reporting_dal.fetch_visibility_preference,
-        int(discord_user_id),
-    )
+    try:
+        pref = await asyncio.to_thread(
+            inventory_reporting_dal.fetch_visibility_preference,
+            int(discord_user_id),
+        )
+    except Exception:
+        logger.exception(
+            "inventory_report_visibility_pref_read_failed user_id=%s defaulting=%s",
+            discord_user_id,
+            InventoryReportVisibility.ONLY_ME.value,
+        )
+        return InventoryReportVisibility.ONLY_ME
     return pref or InventoryReportVisibility.ONLY_ME
 
 
@@ -75,11 +83,18 @@ async def resolve_visibility(
     *, discord_user_id: int, selected_visibility: InventoryReportVisibility | None
 ) -> InventoryReportVisibility:
     if selected_visibility is not None:
-        await asyncio.to_thread(
-            inventory_reporting_dal.upsert_visibility_preference,
-            int(discord_user_id),
-            selected_visibility,
-        )
+        try:
+            await asyncio.to_thread(
+                inventory_reporting_dal.upsert_visibility_preference,
+                int(discord_user_id),
+                selected_visibility,
+            )
+        except Exception:
+            logger.exception(
+                "inventory_report_visibility_pref_write_failed user_id=%s selected=%s",
+                discord_user_id,
+                selected_visibility.value,
+            )
         return selected_visibility
     return await get_visibility_preference(discord_user_id)
 

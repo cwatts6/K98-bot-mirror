@@ -46,6 +46,25 @@ async def test_resolve_visibility_persists_selected_preference(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_resolve_visibility_defaults_private_when_preference_read_fails(monkeypatch):
+    def _fetch(_user_id):
+        raise RuntimeError("table missing")
+
+    monkeypatch.setattr(
+        reporting_service.inventory_reporting_dal,
+        "fetch_visibility_preference",
+        _fetch,
+    )
+
+    visibility = await reporting_service.resolve_visibility(
+        discord_user_id=123,
+        selected_visibility=None,
+    )
+
+    assert visibility == InventoryReportVisibility.ONLY_ME
+
+
+@pytest.mark.asyncio
 async def test_build_inventory_report_payload_groups_resources_and_speedups(monkeypatch):
     now = datetime.now(UTC)
 
