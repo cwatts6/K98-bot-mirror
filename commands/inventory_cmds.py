@@ -290,7 +290,9 @@ def register_inventory(bot: ext_commands.Bot) -> None:
     ) -> None:
         await safe_defer(ctx, ephemeral=True)
         if not _is_admin(ctx.user):
-            await ctx.followup.send("You do not have permission to use this command.", ephemeral=True)
+            await ctx.followup.send(
+                "You do not have permission to use this command.", ephemeral=True
+            )
             return
         try:
             parsed_status = audit_service.parse_audit_status(

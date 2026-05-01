@@ -15,7 +15,9 @@ def parse_audit_status(value: str | None) -> InventoryAuditStatus:
     try:
         return InventoryAuditStatus(normalized)
     except ValueError as exc:
-        raise ValueError("Audit status must be All, Awaiting Upload, Analysed, Approved, Rejected, Cancelled, or Failed.") from exc
+        raise ValueError(
+            "Audit status must be All, Awaiting Upload, Analysed, Approved, Rejected, Cancelled, or Failed."
+        ) from exc
 
 
 def parse_audit_import_type(value: str | None) -> InventoryImportType | None:
@@ -25,7 +27,9 @@ def parse_audit_import_type(value: str | None) -> InventoryImportType | None:
     try:
         return InventoryImportType(normalized)
     except ValueError as exc:
-        raise ValueError("Audit import type must be All, Resources, Speedups, Materials, or Unknown.") from exc
+        raise ValueError(
+            "Audit import type must be All, Resources, Speedups, Materials, or Unknown."
+        ) from exc
 
 
 def _json_dict(value: Any) -> dict[str, Any] | None:
