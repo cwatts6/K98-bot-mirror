@@ -243,9 +243,7 @@ class InventoryConfirmationView(discord.ui.View):
                     final_json=normalized,
                 )
             except Exception:
-                logger.exception(
-                    "inventory_approve_debug_post_failed batch_id=%s", self.batch_id
-                )
+                logger.exception("inventory_approve_debug_post_failed batch_id=%s", self.batch_id)
         await interaction.followup.send("Inventory import approved.", ephemeral=True)
         try:
             await interaction.message.edit(view=self)
