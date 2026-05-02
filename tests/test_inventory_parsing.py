@@ -36,6 +36,7 @@ def test_parse_speedup_minutes_supports_day_hour_minute_tokens():
 
 def test_parse_speedup_days_uses_only_day_component():
     assert parse_speedup_days("505d 3h 37m") == 505
+    assert parse_speedup_days("1,242d 3h 35m") == 1242
     assert parse_speedup_days("505") == 505
     assert parse_speedup_days(505.0) == 505
 
@@ -74,6 +75,37 @@ def test_normalize_final_values_for_speedups_calculates_derived_fields():
 
     assert normalized["speedups"]["building"] == speedup_row_from_days(0)
     assert normalized["speedups"]["universal"]["total_days_decimal"] == 2.0
+
+
+def test_normalize_speedups_prefers_raw_duration_text_over_bad_numeric_fields():
+    normalized = normalize_final_values(
+        InventoryImportType.SPEEDUPS,
+        {
+            "speedups": {
+                "building": {
+                    "raw_duration_text": "1,068d 11h 36m",
+                    "total_minutes": 742 * 1440,
+                    "total_hours": 742 * 24,
+                    "total_days_decimal": 742,
+                },
+                "research": {
+                    "raw_duration_text": "1,242d 3h 35m",
+                    "total_minutes": 123 * 1440,
+                    "total_hours": 123 * 24,
+                    "total_days_decimal": 123,
+                },
+                "training": {"raw_duration_text": "935d 0h 7m"},
+                "healing": {"raw_duration_text": "503d 20h 7m"},
+                "universal": {"raw_duration_text": "2,422d 17h 58m"},
+            }
+        },
+    )
+
+    assert normalized["speedups"]["building"]["total_days_decimal"] == 1068.0
+    assert normalized["speedups"]["research"]["total_days_decimal"] == 1242.0
+    assert normalized["speedups"]["training"]["total_days_decimal"] == 935.0
+    assert normalized["speedups"]["healing"]["total_days_decimal"] == 503.0
+    assert normalized["speedups"]["universal"]["total_days_decimal"] == 2422.0
 
 
 def test_resource_total_corrections_only_change_total_resources():

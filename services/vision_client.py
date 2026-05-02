@@ -72,8 +72,14 @@ def build_inventory_vision_schema() -> dict[str, Any]:
     speedup_row = {
         "type": "object",
         "additionalProperties": False,
-        "required": ["total_minutes", "total_hours", "total_days_decimal"],
+        "required": [
+            "raw_duration_text",
+            "total_minutes",
+            "total_hours",
+            "total_days_decimal",
+        ],
         "properties": {
+            "raw_duration_text": {"type": ["string", "null"]},
             "total_minutes": nullable_integer,
             "total_hours": nullable_number,
             "total_days_decimal": nullable_number,
@@ -181,10 +187,13 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         "schema. Use null for fields that do not apply to the detected image type or "
         "cannot be read. For resources, extract food, wood, stone, and gold from-items "
         "and total-resources values as integer quantities after expanding K/M/B suffixes. "
-        "For speedups, extract only the integer day count before the 'd' for Building, "
-        "Research, Training, Healing, and Universal rows. Ignore hours and minutes. "
-        "For example, '505d 3h 37m' must be stored as 505 days, with total_minutes "
-        "set to 727200, total_hours set to 12120, and total_days_decimal set to 505. "
+        "For speedups, first transcribe the exact visible Total Duration text for "
+        "Building, Research, Training, Healing, and Universal rows into raw_duration_text. "
+        "Preserve thousands separators and every leading digit, for example '1,242d 3h 35m'. "
+        "Then extract only the integer day count before the 'd'. Ignore hours and minutes "
+        "for calculations. For example, '1,242d 3h 35m' must be stored as 1242 days, "
+        "with total_minutes set to 1788480, total_hours set to 29808, and "
+        "total_days_decimal set to 1242. Do not drop the leading thousands digit. "
         "Use warnings for missing rows, unreadable values, low confidence, or mismatched "
         "image type. If the image is not readable, use detected_image_type unknown and "
         "a confidence_score below 0.70."

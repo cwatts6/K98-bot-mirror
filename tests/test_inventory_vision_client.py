@@ -47,7 +47,12 @@ def _null_resource_row() -> dict:
 
 
 def _null_speedup_row() -> dict:
-    return {"total_minutes": None, "total_hours": None, "total_days_decimal": None}
+    return {
+        "raw_duration_text": None,
+        "total_minutes": None,
+        "total_hours": None,
+        "total_days_decimal": None,
+    }
 
 
 def _null_material_row() -> dict:
@@ -163,12 +168,14 @@ async def test_low_confidence_escalates_to_fallback_model():
     calls = []
     speedups_primary = _null_values()
     speedups_primary["speedups"]["universal"] = {
+        "raw_duration_text": "1d 0h 0m",
         "total_minutes": 1440,
         "total_hours": 24.0,
         "total_days_decimal": 1.0,
     }
     speedups_fallback = _null_values()
     speedups_fallback["speedups"]["universal"] = {
+        "raw_duration_text": "2d 0h 0m",
         "total_minutes": 2880,
         "total_hours": 48.0,
         "total_days_decimal": 2.0,
@@ -200,6 +207,7 @@ async def test_low_confidence_escalates_to_fallback_model():
     assert result.fallback_used
     assert result.confidence_score == 0.94
     assert result.values["speedups"]["universal"]["total_minutes"] == 2880
+    assert result.values["speedups"]["universal"]["raw_duration_text"] == "2d 0h 0m"
     assert [call["model"] for call in calls] == ["gpt-4.1-mini", "gpt-5.2"]
 
 
