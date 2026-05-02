@@ -155,6 +155,72 @@ def test_normalize_speedups_prefers_day_digits_text_over_bad_duration_text():
     assert normalized["speedups"]["universal"]["raw_duration_text"] == "2,421d 17h 58m"
 
 
+def test_normalize_speedups_uses_candidate_consensus_for_ocr_drift():
+    normalized = normalize_final_values(
+        InventoryImportType.SPEEDUPS,
+        {
+            "speedups": {
+                "building": {
+                    "day_digits_text": "1065",
+                    "day_digits_verification_text": "1068",
+                    "raw_duration_text": "1,068d 11h 36m",
+                    "total_days_decimal": 1065,
+                },
+                "research": {
+                    "day_digits_text": "1242",
+                    "day_digits_verification_text": "1242",
+                    "raw_duration_text": "1,242d 3h 35m",
+                },
+                "training": {
+                    "day_digits_text": "935",
+                    "day_digits_verification_text": "935",
+                    "raw_duration_text": "935d 0h 7m",
+                },
+                "healing": {
+                    "day_digits_text": "503",
+                    "day_digits_verification_text": "503",
+                    "raw_duration_text": "503d 20h 7m",
+                },
+                "universal": {
+                    "day_digits_text": "2418",
+                    "day_digits_verification_text": "2422",
+                    "raw_duration_text": "2,422d 17h 58m",
+                    "total_days_decimal": 2418,
+                },
+            }
+        },
+    )
+
+    assert normalized["speedups"]["building"]["total_days_decimal"] == 1068.0
+    assert normalized["speedups"]["research"]["total_days_decimal"] == 1242.0
+    assert normalized["speedups"]["training"]["total_days_decimal"] == 935.0
+    assert normalized["speedups"]["healing"]["total_days_decimal"] == 503.0
+    assert normalized["speedups"]["universal"]["total_days_decimal"] == 2422.0
+
+
+def test_normalize_speedups_preserves_verification_field():
+    normalized = normalize_final_values(
+        InventoryImportType.SPEEDUPS,
+        {
+            "speedups": {
+                "building": {"total_days_decimal": 1},
+                "research": {"total_days_decimal": 2},
+                "training": {"total_days_decimal": 3},
+                "healing": {"total_days_decimal": 4},
+                "universal": {
+                    "day_digits_text": "863",
+                    "day_digits_verification_text": "862",
+                    "raw_duration_text": "862d 17h 58m",
+                    "total_days_decimal": 863,
+                },
+            }
+        },
+    )
+
+    assert normalized["speedups"]["universal"]["total_days_decimal"] == 862.0
+    assert normalized["speedups"]["universal"]["day_digits_verification_text"] == "862"
+
+
 def test_normalize_speedups_falls_back_when_raw_duration_text_is_unusable():
     """Empty or malformed raw_duration_text must not suppress valid numeric fields."""
     normalized = normalize_final_values(

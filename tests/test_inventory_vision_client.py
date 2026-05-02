@@ -50,6 +50,7 @@ def _null_speedup_row() -> dict:
     return {
         "raw_duration_text": None,
         "day_digits_text": None,
+        "day_digits_verification_text": None,
         "total_minutes": None,
         "total_hours": None,
         "total_days_decimal": None,
@@ -171,6 +172,7 @@ async def test_low_confidence_escalates_to_fallback_model():
     speedups_primary["speedups"]["universal"] = {
         "raw_duration_text": "1d 0h 0m",
         "day_digits_text": "1",
+        "day_digits_verification_text": "1",
         "total_minutes": 1440,
         "total_hours": 24.0,
         "total_days_decimal": 1.0,
@@ -179,6 +181,7 @@ async def test_low_confidence_escalates_to_fallback_model():
     speedups_fallback["speedups"]["universal"] = {
         "raw_duration_text": "2d 0h 0m",
         "day_digits_text": "2",
+        "day_digits_verification_text": "2",
         "total_minutes": 2880,
         "total_hours": 48.0,
         "total_days_decimal": 2.0,
@@ -212,6 +215,7 @@ async def test_low_confidence_escalates_to_fallback_model():
     assert result.values["speedups"]["universal"]["total_minutes"] == 2880
     assert result.values["speedups"]["universal"]["raw_duration_text"] == "2d 0h 0m"
     assert result.values["speedups"]["universal"]["day_digits_text"] == "2"
+    assert result.values["speedups"]["universal"]["day_digits_verification_text"] == "2"
     assert [call["model"] for call in calls] == ["gpt-4.1-mini", "gpt-5.2"]
 
 
@@ -235,7 +239,8 @@ async def test_speedup_prompt_requests_day_digits_text():
 
     prompt = calls[0]["input"][0]["content"][0]["text"]
     assert "day_digits_text" in prompt
-    assert "Read the day digits twice" in prompt
+    assert "day_digits_verification_text" in prompt
+    assert "confidence_score below 0.90" in prompt
 
 
 @pytest.mark.asyncio

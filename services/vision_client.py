@@ -75,6 +75,7 @@ def build_inventory_vision_schema() -> dict[str, Any]:
         "required": [
             "raw_duration_text",
             "day_digits_text",
+            "day_digits_verification_text",
             "total_minutes",
             "total_hours",
             "total_days_decimal",
@@ -82,6 +83,7 @@ def build_inventory_vision_schema() -> dict[str, Any]:
         "properties": {
             "raw_duration_text": {"type": ["string", "null"]},
             "day_digits_text": {"type": ["string", "null"]},
+            "day_digits_verification_text": {"type": ["string", "null"]},
             "total_minutes": nullable_integer,
             "total_hours": nullable_number,
             "total_days_decimal": nullable_number,
@@ -194,11 +196,16 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         "Preserve thousands separators and every leading digit, for example '1,242d 3h 35m'. "
         "Then copy only the visible day digits immediately before the 'd' into day_digits_text, "
         "preserving commas if shown. Ignore hours and minutes for day_digits_text and calculations. "
-        "Read the day digits twice before returning them: 8 can look like 7, 5 can look like 3, "
-        "and 2 can look like 1 in this UI. For example, '1,242d 3h 35m' must have "
-        "day_digits_text set to '1,242' and must be stored as 1242 days, with total_minutes "
-        "set to 1788480, total_hours set to 29808, and total_days_decimal set to 1242. "
-        "Do not drop the leading thousands digit or round down by one or two days. "
+        "After that, independently read only the same day digits again into "
+        "day_digits_verification_text; do not copy the first answer. Compare "
+        "raw_duration_text, day_digits_text, and day_digits_verification_text before returning. "
+        "8 can look like 7, 5 can look like 3, and 2 can look like 1 in this UI, so zoom in "
+        "mentally on the final digit of each day value. If the day reads disagree, add a warning "
+        "for that row and set confidence_score below 0.90 so the fallback model can retry. "
+        "For example, '1,242d 3h 35m' must have day_digits_text and "
+        "day_digits_verification_text set to '1,242' and must be stored as 1242 days, with "
+        "total_minutes set to 1788480, total_hours set to 29808, and total_days_decimal set "
+        "to 1242. Do not drop the leading thousands digit or round down by one or two days. "
         "Use warnings for missing rows, unreadable values, low confidence, or mismatched "
         "image type. If the image is not readable, use detected_image_type unknown and "
         "a confidence_score below 0.70."

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import json
 import re
 from typing import Any
@@ -126,6 +127,7 @@ def speedup_row_from_days(
     total_days: int,
     raw_duration_text: str | None = None,
     day_digits_text: str | None = None,
+    day_digits_verification_text: str | None = None,
 ) -> dict[str, int | float | str | None]:
     if total_days < 0:
         raise ValueError("Negative values are not allowed.")
@@ -133,6 +135,7 @@ def speedup_row_from_days(
     return {
         "raw_duration_text": raw_duration_text,
         "day_digits_text": day_digits_text,
+        "day_digits_verification_text": day_digits_verification_text,
         "total_minutes": minutes,
         "total_hours": int(total_days) * 24,
         "total_days_decimal": float(int(total_days)),
@@ -205,33 +208,65 @@ def apply_speedup_duration_corrections(
             days,
             raw_duration_text=row.get("raw_duration_text"),
             day_digits_text=row.get("day_digits_text"),
+            day_digits_verification_text=row.get("day_digits_verification_text"),
         )
     return {"speedups": normalized_speedups}
 
 
+def _parse_speedup_day_candidate(value: Any) -> int | None:
+    if isinstance(value, str) and value.strip() == "":
+        return None
+    if value is not None:
+        try:
+            return parse_speedup_days(value)
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
 def _speedup_days_from_row(row: dict[str, Any]) -> int:
-    day_digits = row.get("day_digits_text")
-    if day_digits:
-        try:
-            return parse_speedup_days(day_digits)
-        except (ValueError, TypeError):
-            pass
-    raw = row.get("raw_duration_text")
-    if raw:
-        try:
-            return parse_speedup_days(raw)
-        except (ValueError, TypeError):
-            pass
-    if row.get("total_days_decimal") is not None:
-        return parse_speedup_days(row.get("total_days_decimal"))
-    if row.get("duration") is not None:
-        return parse_speedup_days(row.get("duration"))
-    if row.get("value") is not None:
-        return parse_speedup_days(row.get("value"))
+    text_candidates: list[int] = []
+    for key in (
+        "day_digits_text",
+        "day_digits_verification_text",
+        "raw_duration_text",
+    ):
+        candidate = _parse_speedup_day_candidate(row.get(key))
+        if candidate is not None:
+            text_candidates.append(candidate)
+
+    if text_candidates:
+        counts = Counter(text_candidates)
+        day, count = counts.most_common(1)[0]
+        if count > 1:
+            return day
+        return text_candidates[0]
+
+    numeric_candidates: list[int] = []
+    for key in (
+        "total_days_decimal",
+        "duration",
+        "value",
+    ):
+        candidate = _parse_speedup_day_candidate(row.get(key))
+        if candidate is not None:
+            numeric_candidates.append(candidate)
+
     if row.get("total_minutes") is not None:
-        minutes = parse_speedup_minutes(row.get("total_minutes"))
-        return minutes // 1440
-    return 0
+        try:
+            minutes = parse_speedup_minutes(row.get("total_minutes"))
+            numeric_candidates.append(minutes // 1440)
+        except (ValueError, TypeError):
+            pass
+
+    if not numeric_candidates:
+        return 0
+
+    counts = Counter(numeric_candidates)
+    day, count = counts.most_common(1)[0]
+    if count > 1:
+        return day
+    return numeric_candidates[0]
 
 
 def normalize_resource_values(values: dict[str, Any]) -> dict[str, dict[str, int]]:
@@ -270,6 +305,7 @@ def normalize_speedup_values(
             days,
             raw_duration_text=row.get("raw_duration_text"),
             day_digits_text=row.get("day_digits_text"),
+            day_digits_verification_text=row.get("day_digits_verification_text"),
         )
     return normalized
 
