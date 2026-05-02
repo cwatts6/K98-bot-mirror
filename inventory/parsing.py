@@ -11,7 +11,9 @@ SPEEDUP_TYPES = ("building", "research", "training", "healing", "universal")
 
 _RESOURCE_VALUE_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([kmb])?\s*$", re.IGNORECASE)
 _SPEEDUP_TOKEN_RE = re.compile(r"(\d+(?:\.\d+)?)\s*([dhm])", re.IGNORECASE)
-_SPEEDUP_DAY_PREFIX_RE = re.compile(r"^\s*(\d+)(?:\s*d\b)?", re.IGNORECASE)
+_SPEEDUP_DAY_PREFIX_RE = re.compile(
+    r"^\s*(\d+)(?:\s*d\b(?:\s*\d+(?:\.\d+)?\s*[hm]\b)*\s*)?$", re.IGNORECASE
+)
 
 
 def parse_resource_value(value: Any) -> int:

@@ -40,6 +40,15 @@ def test_parse_speedup_days_uses_only_day_component():
     assert parse_speedup_days(505.9) == 505
 
 
+def test_parse_speedup_days_rejects_non_day_strings():
+    with pytest.raises(ValueError, match=r"Invalid speedup day value"):
+        parse_speedup_days("3h")
+    with pytest.raises(ValueError, match=r"Invalid speedup day value"):
+        parse_speedup_days("45m")
+    with pytest.raises(ValueError, match=r"Invalid speedup day value"):
+        parse_speedup_days("12x")
+
+
 def test_normalize_final_values_for_speedups_calculates_derived_fields():
     normalized = normalize_final_values(
         InventoryImportType.SPEEDUPS,

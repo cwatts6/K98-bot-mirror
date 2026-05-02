@@ -104,8 +104,7 @@ async def _send_followup_capture_message(interaction: discord.Interaction, **kwa
     try:
         return await interaction.followup.send(wait=True, **kwargs)
     except TypeError:
-        await interaction.followup.send(**kwargs)
-        return None
+        return await interaction.followup.send(**kwargs)
 
 
 async def _post_admin_debug(
