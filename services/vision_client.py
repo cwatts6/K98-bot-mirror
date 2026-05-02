@@ -197,9 +197,9 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         "For speedups, first transcribe the exact visible Total Duration text for "
         "Building, Research, Training, Healing, and Universal rows into raw_duration_text. "
         "For speedups, the request may include five separate labeled high-contrast OCR strip "
-        "images instead of the full screenshot. Each labeled strip intentionally shows only one "
-        "black-on-white day value ending in 'd' and omits hours/minutes. Use those labeled strip "
-        "images as the source of truth for speedup day digits. "
+        "images instead of the full screenshot. Each labeled strip shows one speedup row's "
+        "black-on-white duration text. Use those labeled strip images as the source of truth, "
+        "and read only the first duration token ending in 'd'. "
         "Preserve thousands separators and every leading digit, for example '1,242d 3h 35m'. "
         "Then copy only the visible day digits immediately before the 'd' into day_digits_text, "
         "preserving commas if shown. Ignore hours and minutes for day_digits_text and calculations. "
@@ -296,26 +296,22 @@ def _speedup_day_token_crop_images(image_bytes: bytes) -> list[tuple[str, Any]]:
         if width < 200 or height < 200:
             return []
 
-        row_specs = (
-            ("Building", 0.355),
-            ("Research", 0.470),
-            ("Training", 0.585),
-            ("Healing", 0.700),
-            ("Universal", 0.815),
-        )
-        duration_x1 = int(width * 0.61)
-        duration_x2 = int(width * 0.95)
-        row_half_height = max(28, int(height * 0.038))
+        labels = ("Building", "Research", "Training", "Healing", "Universal")
+        duration_x1 = int(width * 0.55)
+        duration_x2 = int(width * 0.98)
+        row_bounds = _detect_speedup_duration_row_bounds(image, duration_x1, duration_x2)
+        if len(row_bounds) < len(labels):
+            row_bounds = _fallback_speedup_duration_row_bounds(height)
         scale = 3
         row_images = []
-        for label, center_y_ratio in row_specs:
-            center_y = int(height * center_y_ratio)
+        for label, (row_top, row_bottom) in zip(labels, row_bounds, strict=False):
+            row_padding = max(24, int(height * 0.03))
             crop = image.crop(
                 (
                     duration_x1,
-                    max(0, center_y - row_half_height),
+                    max(0, row_top - row_padding),
                     duration_x2,
-                    min(height, center_y + row_half_height),
+                    min(height, row_bottom + row_padding),
                 )
             )
             crop = crop.resize(
@@ -324,10 +320,56 @@ def _speedup_day_token_crop_images(image_bytes: bytes) -> list[tuple[str, Any]]:
             )
             crop = ImageEnhance.Contrast(crop).enhance(1.25)
             crop = ImageEnhance.Sharpness(crop).enhance(1.6)
-            crop = _crop_first_bright_text_token(crop)
             crop = _to_high_contrast_ocr_strip(crop)
             row_images.append((label, crop))
     return row_images
+
+
+def _detect_speedup_duration_row_bounds(
+    image: Any, duration_x1: int, duration_x2: int
+) -> list[tuple[int, int]]:
+    gray = image.convert("L")
+    width, height = gray.size
+    pixels = gray.load()
+    min_row_pixels = max(3, int((duration_x2 - duration_x1) * 0.015))
+    bright_rows = []
+    for y in range(int(height * 0.10), int(height * 0.93)):
+        count = 0
+        for x in range(duration_x1, duration_x2):
+            if pixels[x, y] >= 150:
+                count += 1
+        if count >= min_row_pixels:
+            bright_rows.append(y)
+
+    if not bright_rows:
+        return []
+
+    row_groups: list[list[int]] = [[bright_rows[0], bright_rows[0]]]
+    max_row_gap = max(3, int(height * 0.01))
+    for y in bright_rows[1:]:
+        if y - row_groups[-1][1] <= max_row_gap:
+            row_groups[-1][1] = y
+        else:
+            row_groups.append([y, y])
+
+    min_group_height = max(10, int(height * 0.015))
+    candidates = [
+        (top, bottom)
+        for top, bottom in row_groups
+        if bottom - top >= min_group_height and ((top + bottom) / 2) >= height * 0.25
+    ]
+    return candidates[:5]
+
+
+def _fallback_speedup_duration_row_bounds(height: int) -> list[tuple[int, int]]:
+    row_half_height = max(28, int(height * 0.038))
+    return [
+        (
+            max(0, int(height * center_y_ratio) - row_half_height),
+            min(height, int(height * center_y_ratio) + row_half_height),
+        )
+        for center_y_ratio in (0.355, 0.470, 0.585, 0.700, 0.815)
+    ]
 
 
 def _to_high_contrast_ocr_strip(image: Any) -> Any:
