@@ -273,8 +273,35 @@ async def test_speedup_import_sends_labeled_zoom_sheet():
 
     content = calls[0]["input"][0]["content"]
     image_parts = [item for item in content if item["type"] == "input_image"]
-    assert len(image_parts) == 2
-    assert image_parts[1]["image_url"].startswith("data:image/png;base64,")
+    text_parts = [item["text"] for item in content if item["type"] == "input_text"]
+    assert len(image_parts) == 5
+    assert all(item["image_url"].startswith("data:image/png;base64,") for item in image_parts)
+    assert "Building day-token crop:" in text_parts
+    assert "Universal day-token crop:" in text_parts
+
+
+@pytest.mark.asyncio
+async def test_speedup_import_falls_back_to_original_image_when_crops_fail(monkeypatch):
+    calls = []
+    payloads = [
+        {
+            "detected_image_type": "unknown",
+            "confidence_score": 0.95,
+            "warnings": [],
+            "values": _null_values(),
+        }
+    ]
+    monkeypatch.setattr("services.vision_client._speedup_day_token_crop_data_urls", lambda _: [])
+    client = InventoryVisionClient(
+        _config(fallback_model=None),
+        client_factory=lambda _api_key: FakeClient(payloads, calls),
+    )
+
+    await client.analyse_image(b"fake image", content_type="image/png", import_type_hint="speedups")
+
+    content = calls[0]["input"][0]["content"]
+    image_parts = [item for item in content if item["type"] == "input_image"]
+    assert len(image_parts) == 1
 
 
 def test_speedup_duration_crop_rejects_invalid_image():

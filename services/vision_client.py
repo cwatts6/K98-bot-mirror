@@ -196,10 +196,10 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         "and total-resources values as integer quantities after expanding K/M/B suffixes. "
         "For speedups, first transcribe the exact visible Total Duration text for "
         "Building, Research, Training, Healing, and Universal rows into raw_duration_text. "
-        "When a second image is provided, it is a labeled zoom sheet with one enlarged day-token "
-        "crop per speedup row; each crop intentionally shows only the day value ending in 'd' "
-        "and omits hours/minutes. Use that zoom sheet as the primary source for speedup day "
-        "digits, and use the full screenshot only to confirm row order. "
+        "For speedups, the request may include five separate labeled day-token crop images "
+        "instead of the full screenshot. Each labeled crop intentionally shows only one day "
+        "value ending in 'd' and omits hours/minutes. Use those labeled crop images as the "
+        "source of truth for speedup day digits. "
         "Preserve thousands separators and every leading digit, for example '1,242d 3h 35m'. "
         "Then copy only the visible day digits immediately before the 'd' into day_digits_text, "
         "preserving commas if shown. Ignore hours and minutes for day_digits_text and calculations. "
@@ -231,75 +231,102 @@ def _is_speedup_hint(import_type_hint: str | None) -> bool:
 
 def _speedup_duration_crop_data_url(image_bytes: bytes) -> str | None:
     try:
-        from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+        from PIL import Image, ImageDraw, ImageFont
     except ImportError:
         return None
 
     try:
-        with Image.open(io.BytesIO(image_bytes)) as image:
-            image = image.convert("RGB")
-            width, height = image.size
-            if width < 200 or height < 200:
-                return None
+        row_images = _speedup_day_token_crop_images(image_bytes)
+        if not row_images:
+            return None
 
-            row_specs = (
-                ("Building", 0.355),
-                ("Research", 0.470),
-                ("Training", 0.585),
-                ("Healing", 0.700),
-                ("Universal", 0.815),
+        label_width = 260
+        row_gap = 18
+        row_height = max(crop.height for _, crop in row_images)
+        canvas_width = label_width + max(crop.width for _, crop in row_images) + 32
+        canvas_height = (row_height * len(row_images)) + (row_gap * (len(row_images) + 1))
+        canvas = Image.new("RGB", (canvas_width, canvas_height), (12, 18, 28))
+        draw = ImageDraw.Draw(canvas)
+        try:
+            font = ImageFont.truetype("arial.ttf", 38)
+        except OSError:
+            font = ImageFont.load_default()
+
+        y = row_gap
+        for label, crop in row_images:
+            draw.text(
+                (24, y + max(0, (row_height - 38) // 2)), label, fill=(255, 255, 255), font=font
             )
-            duration_x1 = int(width * 0.61)
-            duration_x2 = int(width * 0.95)
-            row_half_height = max(28, int(height * 0.038))
-            scale = 3
-            label_width = 260
-            row_gap = 18
-            row_images = []
-            for label, center_y_ratio in row_specs:
-                center_y = int(height * center_y_ratio)
-                crop = image.crop(
-                    (
-                        duration_x1,
-                        max(0, center_y - row_half_height),
-                        duration_x2,
-                        min(height, center_y + row_half_height),
-                    )
-                )
-                crop = crop.resize(
-                    (crop.width * scale, crop.height * scale),
-                    Image.Resampling.LANCZOS,
-                )
-                crop = ImageEnhance.Contrast(crop).enhance(1.25)
-                crop = ImageEnhance.Sharpness(crop).enhance(1.6)
-                crop = _crop_first_bright_text_token(crop)
-                row_images.append((label, crop))
+            canvas.paste(crop, (label_width, y + max(0, (row_height - crop.height) // 2)))
+            y += row_height + row_gap
 
-            row_height = max(crop.height for _, crop in row_images)
-            canvas_width = label_width + max(crop.width for _, crop in row_images) + 32
-            canvas_height = (row_height * len(row_images)) + (row_gap * (len(row_images) + 1))
-            canvas = Image.new("RGB", (canvas_width, canvas_height), (12, 18, 28))
-            draw = ImageDraw.Draw(canvas)
-            try:
-                font = ImageFont.truetype("arial.ttf", 38)
-            except OSError:
-                font = ImageFont.load_default()
-
-            y = row_gap
-            for label, crop in row_images:
-                draw.text(
-                    (24, y + max(0, (row_height - 38) // 2)), label, fill=(255, 255, 255), font=font
-                )
-                canvas.paste(crop, (label_width, y + max(0, (row_height - crop.height) // 2)))
-                y += row_height + row_gap
-
-            output = io.BytesIO()
-            canvas.save(output, format="PNG")
+        output = io.BytesIO()
+        canvas.save(output, format="PNG")
     except Exception:
         logger.debug("[inventory_vision] could not build speedup duration crop", exc_info=True)
         return None
 
     return _image_data_url(output.getvalue(), "image/png")
+
+
+def _speedup_day_token_crop_data_urls(image_bytes: bytes) -> list[tuple[str, str]]:
+    try:
+        row_images = _speedup_day_token_crop_images(image_bytes)
+    except Exception:
+        logger.debug("[inventory_vision] could not build speedup token crops", exc_info=True)
+        return []
+
+    data_urls: list[tuple[str, str]] = []
+    for label, crop in row_images:
+        output = io.BytesIO()
+        crop.save(output, format="PNG")
+        data_urls.append((label, _image_data_url(output.getvalue(), "image/png")))
+    return data_urls
+
+
+def _speedup_day_token_crop_images(image_bytes: bytes) -> list[tuple[str, Any]]:
+    try:
+        from PIL import Image, ImageEnhance
+    except ImportError:
+        return []
+
+    with Image.open(io.BytesIO(image_bytes)) as image:
+        image = image.convert("RGB")
+        width, height = image.size
+        if width < 200 or height < 200:
+            return []
+
+        row_specs = (
+            ("Building", 0.355),
+            ("Research", 0.470),
+            ("Training", 0.585),
+            ("Healing", 0.700),
+            ("Universal", 0.815),
+        )
+        duration_x1 = int(width * 0.61)
+        duration_x2 = int(width * 0.95)
+        row_half_height = max(28, int(height * 0.038))
+        scale = 3
+        row_images = []
+        for label, center_y_ratio in row_specs:
+            center_y = int(height * center_y_ratio)
+            crop = image.crop(
+                (
+                    duration_x1,
+                    max(0, center_y - row_half_height),
+                    duration_x2,
+                    min(height, center_y + row_half_height),
+                )
+            )
+            crop = crop.resize(
+                (crop.width * scale, crop.height * scale),
+                Image.Resampling.LANCZOS,
+            )
+            crop = ImageEnhance.Contrast(crop).enhance(1.25)
+            crop = ImageEnhance.Sharpness(crop).enhance(1.6)
+            crop = _crop_first_bright_text_token(crop)
+            row_images.append((label, crop))
+    return row_images
 
 
 def _crop_first_bright_text_token(image: Any) -> Any:
@@ -346,16 +373,22 @@ def _build_image_content(
         {
             "type": "input_text",
             "text": _build_prompt(import_type_hint, prompt_version),
-        },
+        }
+    ]
+    if _is_speedup_hint(import_type_hint):
+        crop_urls = _speedup_day_token_crop_data_urls(image_bytes)
+        if crop_urls:
+            for label, crop_url in crop_urls:
+                content.append({"type": "input_text", "text": f"{label} day-token crop:"})
+                content.append({"type": "input_image", "image_url": crop_url})
+            return content
+
+    content.append(
         {
             "type": "input_image",
             "image_url": _image_data_url(image_bytes, content_type),
-        },
-    ]
-    if _is_speedup_hint(import_type_hint):
-        crop_url = _speedup_duration_crop_data_url(image_bytes)
-        if crop_url:
-            content.append({"type": "input_image", "image_url": crop_url})
+        }
+    )
     return content
 
 
