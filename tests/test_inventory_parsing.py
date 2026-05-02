@@ -132,6 +132,12 @@ def test_normalize_speedups_falls_back_when_raw_duration_text_is_unusable():
     assert normalized["speedups"]["training"]["total_days_decimal"] == 300.0
     assert normalized["speedups"]["healing"]["total_days_decimal"] == 400.0
     assert normalized["speedups"]["universal"]["total_days_decimal"] == 500.0
+    # raw_duration_text is always preserved even when it couldn't be parsed
+    assert normalized["speedups"]["building"]["raw_duration_text"] == ""
+    assert normalized["speedups"]["research"]["raw_duration_text"] == "garbled"
+    assert normalized["speedups"]["training"]["raw_duration_text"] is None
+    assert normalized["speedups"]["healing"]["raw_duration_text"] is None
+    assert normalized["speedups"]["universal"]["raw_duration_text"] is None
 
 
 def test_resource_total_corrections_only_change_total_resources():
