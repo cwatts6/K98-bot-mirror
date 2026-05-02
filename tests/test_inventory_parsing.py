@@ -106,6 +106,32 @@ def test_normalize_speedups_prefers_raw_duration_text_over_bad_numeric_fields():
     assert normalized["speedups"]["training"]["total_days_decimal"] == 935.0
     assert normalized["speedups"]["healing"]["total_days_decimal"] == 503.0
     assert normalized["speedups"]["universal"]["total_days_decimal"] == 2422.0
+    # raw_duration_text must be preserved verbatim in the normalized payload
+    assert normalized["speedups"]["building"]["raw_duration_text"] == "1,068d 11h 36m"
+    assert normalized["speedups"]["research"]["raw_duration_text"] == "1,242d 3h 35m"
+    assert normalized["speedups"]["universal"]["raw_duration_text"] == "2,422d 17h 58m"
+
+
+def test_normalize_speedups_falls_back_when_raw_duration_text_is_unusable():
+    """Empty or malformed raw_duration_text must not suppress valid numeric fields."""
+    normalized = normalize_final_values(
+        InventoryImportType.SPEEDUPS,
+        {
+            "speedups": {
+                "building": {"raw_duration_text": "", "total_days_decimal": 100},
+                "research": {"raw_duration_text": "garbled", "total_days_decimal": 200},
+                "training": {"raw_duration_text": None, "total_days_decimal": 300},
+                "healing": {"total_days_decimal": 400},
+                "universal": {"total_minutes": 500 * 1440},
+            }
+        },
+    )
+
+    assert normalized["speedups"]["building"]["total_days_decimal"] == 100.0
+    assert normalized["speedups"]["research"]["total_days_decimal"] == 200.0
+    assert normalized["speedups"]["training"]["total_days_decimal"] == 300.0
+    assert normalized["speedups"]["healing"]["total_days_decimal"] == 400.0
+    assert normalized["speedups"]["universal"]["total_days_decimal"] == 500.0
 
 
 def test_resource_total_corrections_only_change_total_resources():
