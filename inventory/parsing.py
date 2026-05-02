@@ -242,7 +242,9 @@ def normalize_resource_values(values: dict[str, Any]) -> dict[str, dict[str, int
     return normalized
 
 
-def normalize_speedup_values(values: dict[str, Any]) -> dict[str, dict[str, int | float | str | None]]:
+def normalize_speedup_values(
+    values: dict[str, Any],
+) -> dict[str, dict[str, int | float | str | None]]:
     speedups = values.get("speedups") if isinstance(values, dict) else None
     if not isinstance(speedups, dict):
         raise ValueError("Missing speedups section.")
@@ -253,7 +255,9 @@ def normalize_speedup_values(values: dict[str, Any]) -> dict[str, dict[str, int 
         if not isinstance(row, dict):
             raise ValueError(f"Missing speedup row: {speedup_type}.")
         days = _speedup_days_from_row(row)
-        normalized[speedup_type] = speedup_row_from_days(days, raw_duration_text=row.get("raw_duration_text"))
+        normalized[speedup_type] = speedup_row_from_days(
+            days, raw_duration_text=row.get("raw_duration_text")
+        )
     return normalized
 
 
