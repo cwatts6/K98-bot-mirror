@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import subprocess
 import sys
 
@@ -9,6 +10,7 @@ import pytest
 from services.vision_client import (
     InventoryVisionClient,
     InventoryVisionConfig,
+    _speedup_duration_crop_data_url,
     build_inventory_vision_schema,
 )
 
@@ -241,6 +243,88 @@ async def test_speedup_prompt_requests_day_digits_text():
     assert "day_digits_text" in prompt
     assert "day_digits_verification_text" in prompt
     assert "confidence_score below 0.90" in prompt
+
+
+@pytest.mark.asyncio
+async def test_speedup_import_sends_zoomed_duration_crop():
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    calls = []
+    image_path = Path("downloads") / "test_speedup_crop.png"
+    image_path.parent.mkdir(exist_ok=True)
+    image = Image.new("RGB", (1200, 800), "navy")
+    image.save(image_path)
+    image_bytes = image_path.read_bytes()
+    payloads = [
+        {
+            "detected_image_type": "unknown",
+            "confidence_score": 0.95,
+            "warnings": [],
+            "values": _null_values(),
+        }
+    ]
+    client = InventoryVisionClient(
+        _config(fallback_model=None),
+        client_factory=lambda _api_key: FakeClient(payloads, calls),
+    )
+
+    await client.analyse_image(image_bytes, content_type="image/png", import_type_hint="speedups")
+
+    content = calls[0]["input"][0]["content"]
+    image_parts = [item for item in content if item["type"] == "input_image"]
+    assert len(image_parts) == 2
+
+
+def test_speedup_duration_crop_rejects_invalid_image():
+    assert _speedup_duration_crop_data_url(b"not an image") is None
+
+
+@pytest.mark.asyncio
+async def test_speedup_day_disagreement_triggers_fallback_even_with_high_confidence():
+    calls = []
+    primary_values = _null_values()
+    primary_values["speedups"]["building"] = {
+        "raw_duration_text": "1,068d 11h 36m",
+        "day_digits_text": "1067",
+        "day_digits_verification_text": "1067",
+        "total_minutes": 1067 * 1440,
+        "total_hours": 1067 * 24,
+        "total_days_decimal": 1067,
+    }
+    fallback_values = _null_values()
+    fallback_values["speedups"]["building"] = {
+        "raw_duration_text": "1,068d 11h 36m",
+        "day_digits_text": "1068",
+        "day_digits_verification_text": "1068",
+        "total_minutes": 1068 * 1440,
+        "total_hours": 1068 * 24,
+        "total_days_decimal": 1068,
+    }
+    payloads = [
+        {
+            "detected_image_type": "speedups",
+            "confidence_score": 0.97,
+            "warnings": [],
+            "values": primary_values,
+        },
+        {
+            "detected_image_type": "speedups",
+            "confidence_score": 0.93,
+            "warnings": [],
+            "values": fallback_values,
+        },
+    ]
+    client = InventoryVisionClient(
+        _config(),
+        client_factory=lambda _api_key: FakeClient(payloads, calls),
+    )
+
+    result = await client.analyse_image(b"fake image", import_type_hint="speedups")
+
+    assert result.fallback_used
+    assert result.values["speedups"]["building"]["day_digits_text"] == "1068"
+    assert [call["model"] for call in calls] == ["gpt-4.1-mini", "gpt-5.2"]
 
 
 @pytest.mark.asyncio

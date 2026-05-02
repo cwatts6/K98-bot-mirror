@@ -4,13 +4,16 @@ import base64
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from inspect import isawaitable
+import io
 import json
 import logging
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_FALLBACK_CONFIDENCE_THRESHOLD = 0.90
+_SPEEDUP_DAY_TEXT_RE = re.compile(r"^\s*(\d[\d,]*)(?:\s*d\b.*)?$", re.IGNORECASE)
 
 
 class VisionClientError(RuntimeError):
@@ -193,6 +196,9 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         "and total-resources values as integer quantities after expanding K/M/B suffixes. "
         "For speedups, first transcribe the exact visible Total Duration text for "
         "Building, Research, Training, Healing, and Universal rows into raw_duration_text. "
+        "When a second image is provided, it is a zoomed crop of the Total Duration column; "
+        "use that crop as the primary source for speedup day digits, and use the full screenshot "
+        "only to confirm row order. "
         "Preserve thousands separators and every leading digit, for example '1,242d 3h 35m'. "
         "Then copy only the visible day digits immediately before the 'd' into day_digits_text, "
         "preserving commas if shown. Ignore hours and minutes for day_digits_text and calculations. "
@@ -216,6 +222,109 @@ def _image_data_url(image_bytes: bytes, content_type: str | None) -> str:
     mime = (content_type or "image/png").strip() or "image/png"
     encoded = base64.b64encode(image_bytes).decode("ascii")
     return f"data:{mime};base64,{encoded}"
+
+
+def _is_speedup_hint(import_type_hint: str | None) -> bool:
+    return (import_type_hint or "").strip().lower() == "speedups"
+
+
+def _speedup_duration_crop_data_url(image_bytes: bytes) -> str | None:
+    try:
+        from PIL import Image, ImageEnhance
+    except ImportError:
+        return None
+
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as image:
+            image = image.convert("RGB")
+            width, height = image.size
+            if width < 200 or height < 200:
+                return None
+
+            crop_box = (
+                int(width * 0.55),
+                int(height * 0.23),
+                int(width * 0.96),
+                int(height * 0.88),
+            )
+            crop = image.crop(crop_box)
+            scale = max(2, min(4, 1800 // max(1, crop.width)))
+            if scale > 1:
+                crop = crop.resize(
+                    (crop.width * scale, crop.height * scale),
+                    Image.Resampling.LANCZOS,
+                )
+            crop = ImageEnhance.Contrast(crop).enhance(1.2)
+            crop = ImageEnhance.Sharpness(crop).enhance(1.4)
+
+            output = io.BytesIO()
+            crop.save(output, format="PNG")
+    except Exception:
+        logger.debug("[inventory_vision] could not build speedup duration crop", exc_info=True)
+        return None
+
+    return _image_data_url(output.getvalue(), "image/png")
+
+
+def _build_image_content(
+    image_bytes: bytes,
+    *,
+    content_type: str | None,
+    import_type_hint: str | None,
+    prompt_version: str,
+) -> list[dict[str, str]]:
+    content = [
+        {
+            "type": "input_text",
+            "text": _build_prompt(import_type_hint, prompt_version),
+        },
+        {
+            "type": "input_image",
+            "image_url": _image_data_url(image_bytes, content_type),
+        },
+    ]
+    if _is_speedup_hint(import_type_hint):
+        crop_url = _speedup_duration_crop_data_url(image_bytes)
+        if crop_url:
+            content.append({"type": "input_image", "image_url": crop_url})
+    return content
+
+
+def _parse_speedup_day_text(value: Any) -> int | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    match = _SPEEDUP_DAY_TEXT_RE.match(text)
+    if not match:
+        return None
+    return int(match.group(1).replace(",", ""))
+
+
+def _has_speedup_day_text_disagreement(result: InventoryVisionResult) -> bool:
+    if not result.ok or result.detected_image_type != "speedups":
+        return False
+
+    values = result.values.get("speedups") if isinstance(result.values, dict) else None
+    if not isinstance(values, dict):
+        return False
+
+    for row in values.values():
+        if not isinstance(row, dict):
+            continue
+        candidates = {
+            candidate
+            for candidate in (
+                _parse_speedup_day_text(row.get("raw_duration_text")),
+                _parse_speedup_day_text(row.get("day_digits_text")),
+                _parse_speedup_day_text(row.get("day_digits_verification_text")),
+            )
+            if candidate is not None
+        }
+        if len(candidates) > 1:
+            return True
+    return False
 
 
 def _extract_response_text(response: Any) -> str:
@@ -407,6 +516,7 @@ class InventoryVisionClient:
             import_type_hint=import_type_hint,
             fallback_used=False,
         )
+        primary_has_day_disagreement = _has_speedup_day_text_disagreement(primary)
         if not self._should_try_fallback(primary):
             return primary
 
@@ -430,6 +540,12 @@ class InventoryVisionClient:
             import_type_hint=import_type_hint,
             fallback_used=True,
         )
+        if (
+            primary_has_day_disagreement
+            and fallback.ok
+            and not _has_speedup_day_text_disagreement(fallback)
+        ):
+            return fallback
         if fallback.ok and fallback.confidence_score >= primary.confidence_score:
             return fallback
         return primary
@@ -438,6 +554,8 @@ class InventoryVisionClient:
         if result.fallback_used:
             return False
         if not result.ok:
+            return True
+        if _has_speedup_day_text_disagreement(result):
             return True
         return result.confidence_score < self.config.fallback_confidence_threshold
 
@@ -458,16 +576,12 @@ class InventoryVisionClient:
                 input=[
                     {
                         "role": "user",
-                        "content": [
-                            {
-                                "type": "input_text",
-                                "text": _build_prompt(import_type_hint, self.config.prompt_version),
-                            },
-                            {
-                                "type": "input_image",
-                                "image_url": _image_data_url(image_bytes, content_type),
-                            },
-                        ],
+                        "content": _build_image_content(
+                            image_bytes,
+                            content_type=content_type,
+                            import_type_hint=import_type_hint,
+                            prompt_version=self.config.prompt_version,
+                        ),
                     }
                 ],
                 text={
