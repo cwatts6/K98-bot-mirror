@@ -196,9 +196,9 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         "and total-resources values as integer quantities after expanding K/M/B suffixes. "
         "For speedups, first transcribe the exact visible Total Duration text for "
         "Building, Research, Training, Healing, and Universal rows into raw_duration_text. "
-        "When a second image is provided, it is a zoomed crop of the Total Duration column; "
-        "use that crop as the primary source for speedup day digits, and use the full screenshot "
-        "only to confirm row order. "
+        "When a second image is provided, it is a labeled zoom sheet with one enlarged crop per "
+        "speedup row; use that zoom sheet as the primary source for speedup day digits, and use "
+        "the full screenshot only to confirm row order. "
         "Preserve thousands separators and every leading digit, for example '1,242d 3h 35m'. "
         "Then copy only the visible day digits immediately before the 'd' into day_digits_text, "
         "preserving commas if shown. Ignore hours and minutes for day_digits_text and calculations. "
@@ -230,7 +230,7 @@ def _is_speedup_hint(import_type_hint: str | None) -> bool:
 
 def _speedup_duration_crop_data_url(image_bytes: bytes) -> str | None:
     try:
-        from PIL import Image, ImageEnhance
+        from PIL import Image, ImageDraw, ImageEnhance, ImageFont
     except ImportError:
         return None
 
@@ -241,24 +241,58 @@ def _speedup_duration_crop_data_url(image_bytes: bytes) -> str | None:
             if width < 200 or height < 200:
                 return None
 
-            crop_box = (
-                int(width * 0.55),
-                int(height * 0.23),
-                int(width * 0.96),
-                int(height * 0.88),
+            row_specs = (
+                ("Building", 0.355),
+                ("Research", 0.470),
+                ("Training", 0.585),
+                ("Healing", 0.700),
+                ("Universal", 0.815),
             )
-            crop = image.crop(crop_box)
-            scale = max(2, min(4, 1800 // max(1, crop.width)))
-            if scale > 1:
+            duration_x1 = int(width * 0.61)
+            duration_x2 = int(width * 0.95)
+            row_half_height = max(28, int(height * 0.038))
+            scale = 3
+            label_width = 260
+            row_gap = 18
+            row_images = []
+            for label, center_y_ratio in row_specs:
+                center_y = int(height * center_y_ratio)
+                crop = image.crop(
+                    (
+                        duration_x1,
+                        max(0, center_y - row_half_height),
+                        duration_x2,
+                        min(height, center_y + row_half_height),
+                    )
+                )
                 crop = crop.resize(
                     (crop.width * scale, crop.height * scale),
                     Image.Resampling.LANCZOS,
                 )
-            crop = ImageEnhance.Contrast(crop).enhance(1.2)
-            crop = ImageEnhance.Sharpness(crop).enhance(1.4)
+                crop = ImageEnhance.Contrast(crop).enhance(1.25)
+                crop = ImageEnhance.Sharpness(crop).enhance(1.6)
+                row_images.append((label, crop))
+
+            row_height = max(crop.height for _, crop in row_images)
+            canvas_width = label_width + max(crop.width for _, crop in row_images) + 32
+            canvas_height = (row_height * len(row_images)) + (row_gap * (len(row_images) + 1))
+            canvas = Image.new("RGB", (canvas_width, canvas_height), (12, 18, 28))
+            draw = ImageDraw.Draw(canvas)
+            try:
+                font = ImageFont.truetype("arial.ttf", 38)
+            except OSError:
+                font = ImageFont.load_default()
+
+            y = row_gap
+            for label, crop in row_images:
+                draw.text(
+                    (24, y + max(0, (row_height - 38) // 2)), label, fill=(255, 255, 255), font=font
+                )
+                canvas.paste(crop, (label_width, y + max(0, (row_height - crop.height) // 2)))
+                y += row_height + row_gap
 
             output = io.BytesIO()
-            crop.save(output, format="PNG")
+            canvas.save(output, format="PNG")
     except Exception:
         logger.debug("[inventory_vision] could not build speedup duration crop", exc_info=True)
         return None

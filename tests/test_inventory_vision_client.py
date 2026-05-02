@@ -246,7 +246,7 @@ async def test_speedup_prompt_requests_day_digits_text():
 
 
 @pytest.mark.asyncio
-async def test_speedup_import_sends_zoomed_duration_crop():
+async def test_speedup_import_sends_labeled_zoom_sheet():
     pytest.importorskip("PIL")
     from PIL import Image
 
@@ -274,6 +274,7 @@ async def test_speedup_import_sends_zoomed_duration_crop():
     content = calls[0]["input"][0]["content"]
     image_parts = [item for item in content if item["type"] == "input_image"]
     assert len(image_parts) == 2
+    assert image_parts[1]["image_url"].startswith("data:image/png;base64,")
 
 
 def test_speedup_duration_crop_rejects_invalid_image():
