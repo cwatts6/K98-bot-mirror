@@ -196,10 +196,10 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         "and total-resources values as integer quantities after expanding K/M/B suffixes. "
         "For speedups, first transcribe the exact visible Total Duration text for "
         "Building, Research, Training, Healing, and Universal rows into raw_duration_text. "
-        "For speedups, the request may include five separate labeled day-token crop images "
-        "instead of the full screenshot. Each labeled crop intentionally shows only one day "
-        "value ending in 'd' and omits hours/minutes. Use those labeled crop images as the "
-        "source of truth for speedup day digits. "
+        "For speedups, the request may include five separate labeled high-contrast OCR strip "
+        "images instead of the full screenshot. Each labeled strip intentionally shows only one "
+        "black-on-white day value ending in 'd' and omits hours/minutes. Use those labeled strip "
+        "images as the source of truth for speedup day digits. "
         "Preserve thousands separators and every leading digit, for example '1,242d 3h 35m'. "
         "Then copy only the visible day digits immediately before the 'd' into day_digits_text, "
         "preserving commas if shown. Ignore hours and minutes for day_digits_text and calculations. "
@@ -325,8 +325,63 @@ def _speedup_day_token_crop_images(image_bytes: bytes) -> list[tuple[str, Any]]:
             crop = ImageEnhance.Contrast(crop).enhance(1.25)
             crop = ImageEnhance.Sharpness(crop).enhance(1.6)
             crop = _crop_first_bright_text_token(crop)
+            crop = _to_high_contrast_ocr_strip(crop)
             row_images.append((label, crop))
     return row_images
+
+
+def _to_high_contrast_ocr_strip(image: Any) -> Any:
+    from PIL import Image
+
+    gray = image.convert("L")
+    width, height = gray.size
+    pixels = gray.load()
+    threshold = 138
+    bright_points: list[tuple[int, int]] = []
+    for y in range(height):
+        for x in range(width):
+            if pixels[x, y] >= threshold:
+                bright_points.append((x, y))
+    if not bright_points:
+        return image.convert("RGB")
+
+    min_row_pixels = max(2, int(width * 0.01))
+    bright_rows = []
+    for y in range(height):
+        count = 0
+        for x in range(width):
+            if pixels[x, y] >= threshold:
+                count += 1
+        if count >= min_row_pixels:
+            bright_rows.append(y)
+
+    if bright_rows:
+        row_groups: list[list[int]] = [[bright_rows[0], bright_rows[0]]]
+        max_row_gap = max(3, int(height * 0.025))
+        for y in bright_rows[1:]:
+            if y - row_groups[-1][1] <= max_row_gap:
+                row_groups[-1][1] = y
+            else:
+                row_groups.append([y, y])
+        main_group = max(row_groups, key=lambda group: group[1] - group[0])
+        bright_points = [(x, y) for x, y in bright_points if main_group[0] <= y <= main_group[1]]
+
+    min_x = max(0, min(x for x, _ in bright_points) - 18)
+    max_x = min(width - 1, max(x for x, _ in bright_points) + 18)
+    min_y = max(0, min(y for _, y in bright_points) - 18)
+    max_y = min(height - 1, max(y for _, y in bright_points) + 18)
+    gray = gray.crop((min_x, min_y, max_x + 1, max_y + 1))
+    width, height = gray.size
+    pixels = gray.load()
+    margin_x = 36
+    margin_y = 22
+    output = Image.new("RGB", (width + (margin_x * 2), height + (margin_y * 2)), "white")
+    output_pixels = output.load()
+    for y in range(height):
+        for x in range(width):
+            if pixels[x, y] >= threshold:
+                output_pixels[x + margin_x, y + margin_y] = (0, 0, 0)
+    return output
 
 
 def _crop_first_bright_text_token(image: Any) -> Any:
