@@ -665,6 +665,17 @@ class InventoryVisionClient:
                 error="No image bytes were provided.",
             )
 
+        if _is_speedup_hint(import_type_hint):
+            speedup_model = self.config.fallback_model or self.config.model
+            return await self._analyse_with_model(
+                speedup_model,
+                image_bytes,
+                filename=filename,
+                content_type=content_type,
+                import_type_hint=import_type_hint,
+                fallback_used=speedup_model != self.config.model,
+            )
+
         primary = await self._analyse_with_model(
             self.config.model,
             image_bytes,

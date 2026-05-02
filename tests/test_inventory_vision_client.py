@@ -168,17 +168,8 @@ async def test_primary_success_parses_structured_json_without_fallback():
 
 
 @pytest.mark.asyncio
-async def test_low_confidence_escalates_to_fallback_model():
+async def test_speedups_use_fallback_model_as_first_pass_when_configured():
     calls = []
-    speedups_primary = _null_values()
-    speedups_primary["speedups"]["universal"] = {
-        "raw_duration_text": "1d 0h 0m",
-        "day_digits_text": "1",
-        "day_digits_verification_text": "1",
-        "total_minutes": 1440,
-        "total_hours": 24.0,
-        "total_days_decimal": 1.0,
-    }
     speedups_fallback = _null_values()
     speedups_fallback["speedups"]["universal"] = {
         "raw_duration_text": "2d 0h 0m",
@@ -189,12 +180,6 @@ async def test_low_confidence_escalates_to_fallback_model():
         "total_days_decimal": 2.0,
     }
     payloads = [
-        {
-            "detected_image_type": "speedups",
-            "confidence_score": 0.72,
-            "warnings": ["Some values were hard to read."],
-            "values": speedups_primary,
-        },
         {
             "detected_image_type": "speedups",
             "confidence_score": 0.94,
@@ -218,7 +203,41 @@ async def test_low_confidence_escalates_to_fallback_model():
     assert result.values["speedups"]["universal"]["raw_duration_text"] == "2d 0h 0m"
     assert result.values["speedups"]["universal"]["day_digits_text"] == "2"
     assert result.values["speedups"]["universal"]["day_digits_verification_text"] == "2"
-    assert [call["model"] for call in calls] == ["gpt-4.1-mini", "gpt-5.2"]
+    assert [call["model"] for call in calls] == ["gpt-5.2"]
+
+
+@pytest.mark.asyncio
+async def test_speedups_use_primary_model_when_no_fallback_is_configured():
+    calls = []
+    speedups = _null_values()
+    speedups["speedups"]["universal"] = {
+        "raw_duration_text": "2d 0h 0m",
+        "day_digits_text": "2",
+        "day_digits_verification_text": "2",
+        "total_minutes": 2880,
+        "total_hours": 48.0,
+        "total_days_decimal": 2.0,
+    }
+    payloads = [
+        {
+            "detected_image_type": "speedups",
+            "confidence_score": 0.94,
+            "warnings": [],
+            "values": speedups,
+        },
+    ]
+
+    client = InventoryVisionClient(
+        _config(fallback_model=None),
+        client_factory=lambda _api_key: FakeClient(payloads, calls),
+    )
+
+    result = await client.analyse_image(b"fake image", import_type_hint="speedups")
+
+    assert result.ok
+    assert result.model == "gpt-4.1-mini"
+    assert not result.fallback_used
+    assert [call["model"] for call in calls] == ["gpt-4.1-mini"]
 
 
 @pytest.mark.asyncio
@@ -306,53 +325,6 @@ async def test_speedup_import_falls_back_to_original_image_when_crops_fail(monke
 
 def test_speedup_duration_crop_rejects_invalid_image():
     assert _speedup_duration_crop_data_url(b"not an image") is None
-
-
-@pytest.mark.asyncio
-async def test_speedup_day_disagreement_triggers_fallback_even_with_high_confidence():
-    calls = []
-    primary_values = _null_values()
-    primary_values["speedups"]["building"] = {
-        "raw_duration_text": "1,068d 11h 36m",
-        "day_digits_text": "1067",
-        "day_digits_verification_text": "1067",
-        "total_minutes": 1067 * 1440,
-        "total_hours": 1067 * 24,
-        "total_days_decimal": 1067,
-    }
-    fallback_values = _null_values()
-    fallback_values["speedups"]["building"] = {
-        "raw_duration_text": "1,068d 11h 36m",
-        "day_digits_text": "1068",
-        "day_digits_verification_text": "1068",
-        "total_minutes": 1068 * 1440,
-        "total_hours": 1068 * 24,
-        "total_days_decimal": 1068,
-    }
-    payloads = [
-        {
-            "detected_image_type": "speedups",
-            "confidence_score": 0.97,
-            "warnings": [],
-            "values": primary_values,
-        },
-        {
-            "detected_image_type": "speedups",
-            "confidence_score": 0.93,
-            "warnings": [],
-            "values": fallback_values,
-        },
-    ]
-    client = InventoryVisionClient(
-        _config(),
-        client_factory=lambda _api_key: FakeClient(payloads, calls),
-    )
-
-    result = await client.analyse_image(b"fake image", import_type_hint="speedups")
-
-    assert result.fallback_used
-    assert result.values["speedups"]["building"]["day_digits_text"] == "1068"
-    assert [call["model"] for call in calls] == ["gpt-4.1-mini", "gpt-5.2"]
 
 
 @pytest.mark.asyncio
