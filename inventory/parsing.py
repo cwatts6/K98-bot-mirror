@@ -123,13 +123,16 @@ def speedup_row_from_minutes(total_minutes: int) -> dict[str, int | float]:
 
 
 def speedup_row_from_days(
-    total_days: int, raw_duration_text: str | None = None
+    total_days: int,
+    raw_duration_text: str | None = None,
+    day_digits_text: str | None = None,
 ) -> dict[str, int | float | str | None]:
     if total_days < 0:
         raise ValueError("Negative values are not allowed.")
     minutes = int(total_days) * 1440
     return {
         "raw_duration_text": raw_duration_text,
+        "day_digits_text": day_digits_text,
         "total_minutes": minutes,
         "total_hours": int(total_days) * 24,
         "total_days_decimal": float(int(total_days)),
@@ -199,12 +202,20 @@ def apply_speedup_duration_corrections(
             else _speedup_days_from_row(row)
         )
         normalized_speedups[speedup_type] = speedup_row_from_days(
-            days, raw_duration_text=row.get("raw_duration_text")
+            days,
+            raw_duration_text=row.get("raw_duration_text"),
+            day_digits_text=row.get("day_digits_text"),
         )
     return {"speedups": normalized_speedups}
 
 
 def _speedup_days_from_row(row: dict[str, Any]) -> int:
+    day_digits = row.get("day_digits_text")
+    if day_digits:
+        try:
+            return parse_speedup_days(day_digits)
+        except (ValueError, TypeError):
+            pass
     raw = row.get("raw_duration_text")
     if raw:
         try:
@@ -256,7 +267,9 @@ def normalize_speedup_values(
             raise ValueError(f"Missing speedup row: {speedup_type}.")
         days = _speedup_days_from_row(row)
         normalized[speedup_type] = speedup_row_from_days(
-            days, raw_duration_text=row.get("raw_duration_text")
+            days,
+            raw_duration_text=row.get("raw_duration_text"),
+            day_digits_text=row.get("day_digits_text"),
         )
     return normalized
 

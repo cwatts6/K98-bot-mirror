@@ -112,6 +112,49 @@ def test_normalize_speedups_prefers_raw_duration_text_over_bad_numeric_fields():
     assert normalized["speedups"]["universal"]["raw_duration_text"] == "2,422d 17h 58m"
 
 
+def test_normalize_speedups_prefers_day_digits_text_over_bad_duration_text():
+    normalized = normalize_final_values(
+        InventoryImportType.SPEEDUPS,
+        {
+            "speedups": {
+                "building": {
+                    "raw_duration_text": "1,067d 11h 36m",
+                    "day_digits_text": "1,068",
+                    "total_days_decimal": 1067,
+                },
+                "research": {
+                    "raw_duration_text": "1,242d 3h 35m",
+                    "day_digits_text": "1,242",
+                    "total_days_decimal": 1242,
+                },
+                "training": {
+                    "raw_duration_text": "933d 0h 7m",
+                    "day_digits_text": "935",
+                    "total_days_decimal": 933,
+                },
+                "healing": {
+                    "raw_duration_text": "503d 20h 7m",
+                    "day_digits_text": "503",
+                    "total_days_decimal": 503,
+                },
+                "universal": {
+                    "raw_duration_text": "2,421d 17h 58m",
+                    "day_digits_text": "2,422",
+                    "total_days_decimal": 2421,
+                },
+            }
+        },
+    )
+
+    assert normalized["speedups"]["building"]["total_days_decimal"] == 1068.0
+    assert normalized["speedups"]["research"]["total_days_decimal"] == 1242.0
+    assert normalized["speedups"]["training"]["total_days_decimal"] == 935.0
+    assert normalized["speedups"]["healing"]["total_days_decimal"] == 503.0
+    assert normalized["speedups"]["universal"]["total_days_decimal"] == 2422.0
+    assert normalized["speedups"]["building"]["day_digits_text"] == "1,068"
+    assert normalized["speedups"]["universal"]["raw_duration_text"] == "2,421d 17h 58m"
+
+
 def test_normalize_speedups_falls_back_when_raw_duration_text_is_unusable():
     """Empty or malformed raw_duration_text must not suppress valid numeric fields."""
     normalized = normalize_final_values(
