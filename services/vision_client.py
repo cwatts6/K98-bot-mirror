@@ -196,9 +196,10 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         "and total-resources values as integer quantities after expanding K/M/B suffixes. "
         "For speedups, first transcribe the exact visible Total Duration text for "
         "Building, Research, Training, Healing, and Universal rows into raw_duration_text. "
-        "When a second image is provided, it is a labeled zoom sheet with one enlarged crop per "
-        "speedup row; use that zoom sheet as the primary source for speedup day digits, and use "
-        "the full screenshot only to confirm row order. "
+        "When a second image is provided, it is a labeled zoom sheet with one enlarged day-token "
+        "crop per speedup row; each crop intentionally shows only the day value ending in 'd' "
+        "and omits hours/minutes. Use that zoom sheet as the primary source for speedup day "
+        "digits, and use the full screenshot only to confirm row order. "
         "Preserve thousands separators and every leading digit, for example '1,242d 3h 35m'. "
         "Then copy only the visible day digits immediately before the 'd' into day_digits_text, "
         "preserving commas if shown. Ignore hours and minutes for day_digits_text and calculations. "
@@ -271,6 +272,7 @@ def _speedup_duration_crop_data_url(image_bytes: bytes) -> str | None:
                 )
                 crop = ImageEnhance.Contrast(crop).enhance(1.25)
                 crop = ImageEnhance.Sharpness(crop).enhance(1.6)
+                crop = _crop_first_bright_text_token(crop)
                 row_images.append((label, crop))
 
             row_height = max(crop.height for _, crop in row_images)
@@ -298,6 +300,39 @@ def _speedup_duration_crop_data_url(image_bytes: bytes) -> str | None:
         return None
 
     return _image_data_url(output.getvalue(), "image/png")
+
+
+def _crop_first_bright_text_token(image: Any) -> Any:
+    gray = image.convert("L")
+    width, height = gray.size
+    pixels = gray.load()
+    min_bright_pixels = max(2, int(height * 0.035))
+    bright_columns = []
+    for x in range(width):
+        count = 0
+        for y in range(height):
+            if pixels[x, y] >= 150:
+                count += 1
+        if count >= min_bright_pixels:
+            bright_columns.append(x)
+
+    if not bright_columns:
+        return image
+
+    max_character_gap = max(12, int(width * 0.018))
+    groups: list[list[int]] = [[bright_columns[0], bright_columns[0]]]
+    for x in bright_columns[1:]:
+        if x - groups[-1][1] <= max_character_gap:
+            groups[-1][1] = x
+        else:
+            groups.append([x, x])
+
+    min_token_width = max(30, int(width * 0.035))
+    token = next((group for group in groups if group[1] - group[0] >= min_token_width), groups[0])
+    padding = max(18, int(width * 0.012))
+    left = max(0, token[0] - padding)
+    right = min(width, token[1] + padding)
+    return image.crop((left, 0, right, height))
 
 
 def _build_image_content(
