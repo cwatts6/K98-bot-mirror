@@ -1,0 +1,45 @@
+[Unit]
+Description=K98 Discord Bot
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Change these to match your installation
+User=botuser
+Group=botuser
+WorkingDirectory=/opt/k98-bot
+
+# Use a virtualenv python and the project entrypoint
+# ExecStart should reference the absolute path to the venv python and the DL_bot.py file
+ExecStart=/opt/k98-bot/venv/bin/python /opt/k98-bot/DL_bot.py
+
+# EnvironmentFile pointing to a dot-env style file containing secrets and flags.
+# Example: /etc/k98-bot/.env (one KEY=VALUE per line; keep file mode 600 and owned by the service user)
+EnvironmentFile=/etc/k98-bot/.env
+
+# Keep the process supervised: restart on failure
+Restart=on-failure
+RestartSec=5s
+# Prevent crash loops: systemd will enforce StartLimitInterval/StartLimitBurst globally,
+# but we add mild local controls:
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Resource limits (adjust for your host)
+LimitNOFILE=65536
+# Optional: cap memory usage if desired
+# MemoryMax=1G
+
+# Safety: run under a non-privileged account; set private tmp dirs if desired
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+# Logging: systemd's journal will collect stdout/stderr from the process.
+# logging_setup already writes to files in LOG_DIR; keep stdout/stderr available for transient errors.
+StandardOutput=append:/var/log/k98-bot/syslog.out
+StandardError=append:/var/log/k98-bot/syslog.err
+
+[Install]
+WantedBy=multi-user.target
