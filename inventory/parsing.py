@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import json
 import re
 from typing import Any
@@ -122,11 +123,19 @@ def speedup_row_from_minutes(total_minutes: int) -> dict[str, int | float]:
     }
 
 
-def speedup_row_from_days(total_days: int) -> dict[str, int | float]:
+def speedup_row_from_days(
+    total_days: int,
+    raw_duration_text: str | None = None,
+    day_digits_text: str | None = None,
+    day_digits_verification_text: str | None = None,
+) -> dict[str, int | float | str | None]:
     if total_days < 0:
         raise ValueError("Negative values are not allowed.")
     minutes = int(total_days) * 1440
     return {
+        "raw_duration_text": raw_duration_text,
+        "day_digits_text": day_digits_text,
+        "day_digits_verification_text": day_digits_verification_text,
         "total_minutes": minutes,
         "total_hours": int(total_days) * 24,
         "total_days_decimal": float(int(total_days)),
@@ -184,7 +193,7 @@ def apply_speedup_duration_corrections(
     if not isinstance(speedup_values, dict):
         raise ValueError("Missing speedups section.")
 
-    normalized_speedups: dict[str, dict[str, int | float]] = {}
+    normalized_speedups: dict[str, dict[str, int | float | str | None]] = {}
     for speedup_type in SPEEDUP_TYPES:
         row = speedup_values.get(speedup_type)
         if not isinstance(row, dict):
@@ -195,21 +204,69 @@ def apply_speedup_duration_corrections(
             if speedup_type in corrections
             else _speedup_days_from_row(row)
         )
-        normalized_speedups[speedup_type] = speedup_row_from_days(days)
+        normalized_speedups[speedup_type] = speedup_row_from_days(
+            days,
+            raw_duration_text=row.get("raw_duration_text"),
+            day_digits_text=row.get("day_digits_text"),
+            day_digits_verification_text=row.get("day_digits_verification_text"),
+        )
     return {"speedups": normalized_speedups}
 
 
+def _parse_speedup_day_candidate(value: Any) -> int | None:
+    if isinstance(value, str) and value.strip() == "":
+        return None
+    if value is not None:
+        try:
+            return parse_speedup_days(value)
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
 def _speedup_days_from_row(row: dict[str, Any]) -> int:
+    text_candidates: list[int] = []
+    for key in (
+        "day_digits_text",
+        "day_digits_verification_text",
+        "raw_duration_text",
+    ):
+        candidate = _parse_speedup_day_candidate(row.get(key))
+        if candidate is not None:
+            text_candidates.append(candidate)
+
+    if text_candidates:
+        counts = Counter(text_candidates)
+        day, count = counts.most_common(1)[0]
+        if count > 1:
+            return day
+        return text_candidates[0]
+
+    numeric_candidates: list[int] = []
+    for key in (
+        "total_days_decimal",
+        "duration",
+        "value",
+    ):
+        candidate = _parse_speedup_day_candidate(row.get(key))
+        if candidate is not None:
+            numeric_candidates.append(candidate)
+
     if row.get("total_minutes") is not None:
-        minutes = parse_speedup_minutes(row.get("total_minutes"))
-        return minutes // 1440
-    if row.get("total_days_decimal") is not None:
-        return parse_speedup_days(row.get("total_days_decimal"))
-    if row.get("duration") is not None:
-        return parse_speedup_days(row.get("duration"))
-    if row.get("value") is not None:
-        return parse_speedup_days(row.get("value"))
-    return 0
+        try:
+            minutes = parse_speedup_minutes(row.get("total_minutes"))
+            numeric_candidates.append(minutes // 1440)
+        except (ValueError, TypeError):
+            pass
+
+    if not numeric_candidates:
+        return 0
+
+    counts = Counter(numeric_candidates)
+    day, count = counts.most_common(1)[0]
+    if count > 1:
+        return day
+    return numeric_candidates[0]
 
 
 def normalize_resource_values(values: dict[str, Any]) -> dict[str, dict[str, int]]:
@@ -231,18 +288,25 @@ def normalize_resource_values(values: dict[str, Any]) -> dict[str, dict[str, int
     return normalized
 
 
-def normalize_speedup_values(values: dict[str, Any]) -> dict[str, dict[str, int | float]]:
+def normalize_speedup_values(
+    values: dict[str, Any],
+) -> dict[str, dict[str, int | float | str | None]]:
     speedups = values.get("speedups") if isinstance(values, dict) else None
     if not isinstance(speedups, dict):
         raise ValueError("Missing speedups section.")
 
-    normalized: dict[str, dict[str, int | float]] = {}
+    normalized: dict[str, dict[str, int | float | str | None]] = {}
     for speedup_type in SPEEDUP_TYPES:
         row = speedups.get(speedup_type)
         if not isinstance(row, dict):
             raise ValueError(f"Missing speedup row: {speedup_type}.")
         days = _speedup_days_from_row(row)
-        normalized[speedup_type] = speedup_row_from_days(days)
+        normalized[speedup_type] = speedup_row_from_days(
+            days,
+            raw_duration_text=row.get("raw_duration_text"),
+            day_digits_text=row.get("day_digits_text"),
+            day_digits_verification_text=row.get("day_digits_verification_text"),
+        )
     return normalized
 
 
