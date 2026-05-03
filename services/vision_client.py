@@ -353,11 +353,21 @@ def _detect_speedup_duration_row_bounds(
             row_groups.append([y, y])
 
     min_group_height = max(10, int(height * 0.015))
-    candidates = [
-        (top, bottom)
-        for top, bottom in row_groups
-        if bottom - top >= min_group_height and ((top + bottom) / 2) >= height * 0.25
-    ]
+    candidates = []
+    min_value_x = int(width * 0.60)
+    for top, bottom in row_groups:
+        if bottom - top < min_group_height or ((top + bottom) / 2) < height * 0.20:
+            continue
+
+        bright_x_values = [
+            x
+            for y in range(top, bottom + 1)
+            for x in range(duration_x1, duration_x2)
+            if pixels[x, y] >= 150
+        ]
+        if not bright_x_values or min(bright_x_values) < min_value_x:
+            continue
+        candidates.append((top, bottom))
     return candidates[:5]
 
 

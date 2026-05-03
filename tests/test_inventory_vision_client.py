@@ -10,6 +10,7 @@ import pytest
 from services.vision_client import (
     InventoryVisionClient,
     InventoryVisionConfig,
+    _detect_speedup_duration_row_bounds,
     _speedup_duration_crop_data_url,
     build_inventory_vision_schema,
 )
@@ -325,6 +326,23 @@ async def test_speedup_import_falls_back_to_original_image_when_crops_fail(monke
 
 def test_speedup_duration_crop_rejects_invalid_image():
     assert _speedup_duration_crop_data_url(b"not an image") is None
+
+
+def test_speedup_duration_row_detection_ignores_header_text():
+    pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw
+
+    image = Image.new("L", (1000, 800), 0)
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((550, 150, 650, 170), fill=255)
+    expected_rows = []
+    for y in (260, 350, 440, 530, 620):
+        draw.rectangle((700, y, 880, y + 22), fill=255)
+        expected_rows.append((y, y + 22))
+
+    rows = _detect_speedup_duration_row_bounds(image.convert("RGB"), 550, 980)
+
+    assert rows == expected_rows
 
 
 @pytest.mark.asyncio
