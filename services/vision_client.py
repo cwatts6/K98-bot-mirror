@@ -194,13 +194,12 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         "schema. Use null for fields that do not apply to the detected image type or "
         "cannot be read. For resources, extract food, wood, stone, and gold from-items "
         "and total-resources values as integer quantities after expanding K/M/B suffixes. "
-        "For speedups, first transcribe the exact visible Total Duration text for "
-        "Building, Research, Training, Healing, and Universal rows into raw_duration_text. "
+        "For speedups, transcribe only the visible day token for Building, Research, "
+        "Training, Healing, and Universal rows into raw_duration_text. "
         "For speedups, the request may include five separate labeled high-contrast OCR strip "
-        "images instead of the full screenshot. Each labeled strip shows one speedup row's "
-        "black-on-white duration text. Use those labeled strip images as the source of truth, "
-        "and read only the first duration token ending in 'd'. "
-        "Preserve thousands separators and every leading digit, for example '1,242d 3h 35m'. "
+        "images instead of the full screenshot. Each labeled strip shows only one speedup "
+        "row's black-on-white day token, such as '1,242d'. Use those labeled strip images "
+        "as the source of truth. Preserve thousands separators and every leading digit. "
         "Then copy only the visible day digits immediately before the 'd' into day_digits_text, "
         "preserving commas if shown. Ignore hours and minutes for day_digits_text and calculations. "
         "After that, independently read only the same day digits again into "
@@ -321,6 +320,7 @@ def _speedup_day_token_crop_images(image_bytes: bytes) -> list[tuple[str, Any]]:
             crop = ImageEnhance.Contrast(crop).enhance(1.25)
             crop = ImageEnhance.Sharpness(crop).enhance(1.6)
             crop = _to_high_contrast_ocr_strip(crop)
+            crop = _crop_first_dark_text_token(crop)
             row_images.append((label, crop))
     return row_images
 
@@ -436,33 +436,32 @@ def _to_high_contrast_ocr_strip(image: Any) -> Any:
     return output
 
 
-def _crop_first_bright_text_token(image: Any) -> Any:
+def _crop_first_dark_text_token(image: Any) -> Any:
     gray = image.convert("L")
     width, height = gray.size
     pixels = gray.load()
-    min_bright_pixels = max(2, int(height * 0.035))
-    bright_columns = []
+    min_dark_pixels = max(2, int(height * 0.05))
+    dark_columns = []
     for x in range(width):
         count = 0
         for y in range(height):
-            if pixels[x, y] >= 150:
+            if pixels[x, y] <= 80:
                 count += 1
-        if count >= min_bright_pixels:
-            bright_columns.append(x)
+        if count >= min_dark_pixels:
+            dark_columns.append(x)
 
-    if not bright_columns:
+    if not dark_columns:
         return image
 
-    max_character_gap = max(12, int(width * 0.018))
-    groups: list[list[int]] = [[bright_columns[0], bright_columns[0]]]
-    for x in bright_columns[1:]:
+    max_character_gap = max(20, int(width * 0.02))
+    groups: list[list[int]] = [[dark_columns[0], dark_columns[0]]]
+    for x in dark_columns[1:]:
         if x - groups[-1][1] <= max_character_gap:
             groups[-1][1] = x
         else:
             groups.append([x, x])
 
-    min_token_width = max(30, int(width * 0.035))
-    token = next((group for group in groups if group[1] - group[0] >= min_token_width), groups[0])
+    token = groups[0]
     padding = max(18, int(width * 0.012))
     left = max(0, token[0] - padding)
     right = min(width, token[1] + padding)
@@ -486,7 +485,7 @@ def _build_image_content(
         crop_urls = _speedup_day_token_crop_data_urls(image_bytes)
         if crop_urls:
             for label, crop_url in crop_urls:
-                content.append({"type": "input_text", "text": f"{label} day-token crop:"})
+                content.append({"type": "input_text", "text": f"{label} days-only crop:"})
                 content.append({"type": "input_image", "image_url": crop_url})
             return content
 

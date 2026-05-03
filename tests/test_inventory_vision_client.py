@@ -10,6 +10,7 @@ import pytest
 from services.vision_client import (
     InventoryVisionClient,
     InventoryVisionConfig,
+    _crop_first_dark_text_token,
     _detect_speedup_duration_row_bounds,
     _speedup_duration_crop_data_url,
     build_inventory_vision_schema,
@@ -296,8 +297,8 @@ async def test_speedup_import_sends_labeled_zoom_sheet():
     text_parts = [item["text"] for item in content if item["type"] == "input_text"]
     assert len(image_parts) == 5
     assert all(item["image_url"].startswith("data:image/png;base64,") for item in image_parts)
-    assert "Building day-token crop:" in text_parts
-    assert "Universal day-token crop:" in text_parts
+    assert "Building days-only crop:" in text_parts
+    assert "Universal days-only crop:" in text_parts
 
 
 @pytest.mark.asyncio
@@ -343,6 +344,19 @@ def test_speedup_duration_row_detection_ignores_header_text():
     rows = _detect_speedup_duration_row_bounds(image.convert("RGB"), 550, 980)
 
     assert rows == expected_rows
+
+
+def test_speedup_day_token_crop_keeps_only_first_duration_token():
+    pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGB", (760, 150), "white")
+    draw = ImageDraw.Draw(image)
+    draw.text((20, 40), "1,068d 11h 36m", fill="black")
+
+    token = _crop_first_dark_text_token(image)
+
+    assert token.width < image.width * 0.55
 
 
 @pytest.mark.asyncio
