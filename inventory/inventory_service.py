@@ -446,8 +446,10 @@ def _significant_change_warning(
     ratio = _change_ratio(previous, current)
     if ratio <= SIGNIFICANT_CHANGE_RATIO:
         return None
+    pct = int(SIGNIFICANT_CHANGE_RATIO * 100)
     return (
-        f"{label} changed by more than 50% " f"({previous:,.0f}{suffix} -> {current:,.0f}{suffix})."
+        f"{label} changed by more than {pct}% "
+        f"({previous:,.0f}{suffix} -> {current:,.0f}{suffix})."
     )
 
 

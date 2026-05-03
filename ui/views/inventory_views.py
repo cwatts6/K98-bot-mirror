@@ -256,9 +256,26 @@ class InventoryConfirmationView(discord.ui.View):
         return True
 
     async def _deny_if_modal_unusable(self, interaction: discord.Interaction) -> bool:
-        if not self._is_locally_unusable():
+        if self._is_locally_unusable():
+            await _send_private(interaction, self._terminal_message())
+            return True
+        try:
+            state = await inventory_service.get_review_action_state(self.batch_id)
+        except Exception:
+            logger.exception("inventory_review_state_check_failed batch_id=%s", self.batch_id)
+            await _send_private(
+                interaction,
+                f"Could not verify this import state. Please try again or contact an admin with batch ID {self.batch_id}.",
+            )
+            return True
+        if state.active:
             return False
-        await _send_private(interaction, self._terminal_message())
+        await self._mark_unusable(
+            interaction,
+            expired=state.expired,
+            content=state.message or self._terminal_message(),
+        )
+        await _send_private(interaction, state.message or self._terminal_message())
         return True
 
     async def _requires_second_approve(self, interaction: discord.Interaction) -> bool:
@@ -273,7 +290,12 @@ class InventoryConfirmationView(discord.ui.View):
             )
         except Exception:
             logger.exception("inventory_significant_change_check_failed batch_id=%s", self.batch_id)
-            return False
+            await _send_private(
+                interaction,
+                f"Could not assess whether this import is significantly different from the latest approved import. "
+                f"Please try again or contact an admin with batch ID {self.batch_id}.",
+            )
+            return True
         if not assessment.requires_confirmation:
             return False
         self._significant_change_confirmed = True
