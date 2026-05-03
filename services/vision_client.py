@@ -614,11 +614,15 @@ def _apply_speedup_day_ocr_values(
     image_bytes: bytes,
     import_type_hint: str | None,
 ) -> InventoryVisionResult:
-    if not _is_speedup_hint(import_type_hint) or not result.ok:
+    if not result.ok:
         return result
 
     day_values = _speedup_day_values_from_image(image_bytes)
     if not day_values:
+        return result
+
+    is_speedup = _is_speedup_hint(import_type_hint) or len(day_values) == len(_SPEEDUP_DAY_KEYS)
+    if not is_speedup:
         return result
 
     values = dict(result.values)

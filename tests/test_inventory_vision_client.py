@@ -255,6 +255,50 @@ async def test_speedup_import_overrides_model_values_with_local_day_ocr(monkeypa
 
 
 @pytest.mark.asyncio
+async def test_speedup_import_applies_local_day_ocr_without_hint(monkeypatch):
+    calls = []
+    speedups_fallback = _null_values()
+    speedups_fallback["speedups"]["universal"] = {
+        "raw_duration_text": "864d",
+        "day_digits_text": "864",
+        "day_digits_verification_text": "864",
+        "total_minutes": 864 * 1440,
+        "total_hours": 864 * 24,
+        "total_days_decimal": 864.0,
+    }
+    payloads = [
+        {
+            "detected_image_type": "speedups",
+            "confidence_score": 0.94,
+            "warnings": [],
+            "values": speedups_fallback,
+        },
+    ]
+    monkeypatch.setattr(
+        "services.vision_client._speedup_day_values_from_image",
+        lambda _: {
+            "building": 155,
+            "research": 319,
+            "training": 329,
+            "healing": 225,
+            "universal": 862,
+        },
+    )
+
+    client = InventoryVisionClient(
+        _config(),
+        client_factory=lambda _api_key: FakeClient(payloads, calls),
+    )
+
+    result = await client.analyse_image(b"fake image", import_type_hint=None)
+
+    assert result.ok
+    assert result.detected_image_type == "speedups"
+    assert result.values["speedups"]["universal"]["raw_duration_text"] == "862d"
+    assert result.values["speedups"]["universal"]["total_days_decimal"] == 862.0
+
+
+@pytest.mark.asyncio
 async def test_speedups_use_primary_model_when_no_fallback_is_configured():
     calls = []
     speedups = _null_values()
