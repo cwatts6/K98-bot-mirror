@@ -270,12 +270,13 @@ class InventoryConfirmationView(discord.ui.View):
             return True
         if state.active:
             return False
+        terminal_msg = state.message or self._terminal_message()
         await self._mark_unusable(
             interaction,
             expired=state.expired,
-            content=state.message or self._terminal_message(),
+            content=terminal_msg,
         )
-        await _send_private(interaction, state.message or self._terminal_message())
+        await _send_private(interaction, terminal_msg)
         return True
 
     async def _requires_second_approve(self, interaction: discord.Interaction) -> bool:
