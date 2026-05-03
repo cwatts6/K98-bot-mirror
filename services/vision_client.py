@@ -14,6 +14,25 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_FALLBACK_CONFIDENCE_THRESHOLD = 0.90
 _SPEEDUP_DAY_TEXT_RE = re.compile(r"^\s*(\d[\d,]*)(?:\s*d\b.*)?$", re.IGNORECASE)
+_SPEEDUP_DAY_LABELS = ("Building", "Research", "Training", "Healing", "Universal")
+_SPEEDUP_DAY_KEYS = ("building", "research", "training", "healing", "universal")
+_SPEEDUP_OCR_TEMPLATE_WIDTH = 8
+_SPEEDUP_OCR_TEMPLATE_HEIGHT = 12
+_SPEEDUP_OCR_MAX_DISTANCE = 24
+_SPEEDUP_OCR_TEMPLATES = {
+    "0": "3c7ee6c3c3c3c3c3c3c27e3c",
+    "1": "387818181818181818187eff",
+    "2": "7cfe060206060c1c1830feff",
+    "3": "7c7e0303063c1e030303fe7c",
+    "4": "0c0e1e1e366646ffff060606",
+    "5": "7e7e60607c7e03030303fe7c",
+    "6": "3e7e60c0c8fee3c3c3637e3c",
+    "7": "ff7f06040c08181818181010",
+    "8": "3c664343663c6ec3c3c3e63c",
+    "9": "3c7ec6c3c3c77f130306fe78",
+    "d": "0303031b7f63c3c3c3c37f3f",
+}
+_DECODED_SPEEDUP_OCR_TEMPLATES: dict[str, tuple[tuple[int, ...], ...]] | None = None
 
 
 class VisionClientError(RuntimeError):
@@ -295,15 +314,14 @@ def _speedup_day_token_crop_images(image_bytes: bytes) -> list[tuple[str, Any]]:
         if width < 200 or height < 200:
             return []
 
-        labels = ("Building", "Research", "Training", "Healing", "Universal")
         duration_x1 = int(width * 0.55)
         duration_x2 = int(width * 0.98)
         row_bounds = _detect_speedup_duration_row_bounds(image, duration_x1, duration_x2)
-        if len(row_bounds) < len(labels):
+        if len(row_bounds) < len(_SPEEDUP_DAY_LABELS):
             row_bounds = _fallback_speedup_duration_row_bounds(height)
         scale = 3
         row_images = []
-        for label, (row_top, row_bottom) in zip(labels, row_bounds, strict=False):
+        for label, (row_top, row_bottom) in zip(_SPEEDUP_DAY_LABELS, row_bounds, strict=False):
             row_padding = max(24, int(height * 0.03))
             crop = image.crop(
                 (
@@ -323,6 +341,23 @@ def _speedup_day_token_crop_images(image_bytes: bytes) -> list[tuple[str, Any]]:
             crop = _crop_first_dark_text_token(crop)
             row_images.append((label, crop))
     return row_images
+
+
+def _speedup_day_values_from_image(image_bytes: bytes) -> dict[str, int]:
+    values: dict[str, int] = {}
+    try:
+        row_images = _speedup_day_token_crop_images(image_bytes)
+    except Exception:
+        logger.debug("[inventory_vision] could not OCR speedup day values", exc_info=True)
+        return values
+
+    for key, (label, crop) in zip(_SPEEDUP_DAY_KEYS, row_images, strict=False):
+        days = _ocr_speedup_day_token(crop)
+        if days is None:
+            logger.debug("[inventory_vision] could not OCR speedup day token for %s", label)
+            continue
+        values[key] = days
+    return values
 
 
 def _detect_speedup_duration_row_bounds(
@@ -466,6 +501,164 @@ def _crop_first_dark_text_token(image: Any) -> Any:
     left = max(0, token[0] - padding)
     right = min(width, token[1] + padding)
     return image.crop((left, 0, right, height))
+
+
+def _ocr_speedup_day_token(image: Any) -> int | None:
+    characters = []
+    for box in _dark_text_character_bounds(image):
+        if box[1] - box[0] < max(12, int(image.height * 0.14)):
+            continue
+        normalized = _normalize_dark_character(image, box)
+        if normalized is None:
+            continue
+        character = _classify_speedup_ocr_character(normalized)
+        if character is None:
+            return None
+        characters.append(character)
+
+    if not characters or characters[-1].lower() != "d":
+        return None
+    digit_text = "".join(char for char in characters[:-1] if char.isdigit())
+    if not digit_text:
+        return None
+    return int(digit_text)
+
+
+def _dark_text_character_bounds(image: Any) -> list[tuple[int, int]]:
+    gray = image.convert("L")
+    width, height = gray.size
+    pixels = gray.load()
+    dark_columns = [x for x in range(width) if any(pixels[x, y] <= 80 for y in range(height))]
+    if not dark_columns:
+        return []
+
+    groups: list[list[int]] = [[dark_columns[0], dark_columns[0]]]
+    for x in dark_columns[1:]:
+        if x - groups[-1][1] <= 3:
+            groups[-1][1] = x
+        else:
+            groups.append([x, x])
+    return [(left, right) for left, right in groups]
+
+
+def _normalize_dark_character(
+    image: Any, box: tuple[int, int]
+) -> tuple[tuple[int, ...], ...] | None:
+    from PIL import Image
+
+    gray = image.convert("L")
+    left, right = box
+    crop = gray.crop((left, 0, right + 1, gray.height))
+    pixels = crop.load()
+    width, height = crop.size
+    dark_points = [(x, y) for y in range(height) for x in range(width) if pixels[x, y] <= 80]
+    if not dark_points:
+        return None
+
+    min_x = min(x for x, _ in dark_points)
+    max_x = max(x for x, _ in dark_points)
+    min_y = min(y for _, y in dark_points)
+    max_y = max(y for _, y in dark_points)
+    crop = crop.crop((min_x, min_y, max_x + 1, max_y + 1)).resize(
+        (_SPEEDUP_OCR_TEMPLATE_WIDTH, _SPEEDUP_OCR_TEMPLATE_HEIGHT),
+        resample=Image.Resampling.LANCZOS,
+    )
+    pixels = crop.load()
+    return tuple(
+        tuple(1 if pixels[x, y] <= 128 else 0 for x in range(_SPEEDUP_OCR_TEMPLATE_WIDTH))
+        for y in range(_SPEEDUP_OCR_TEMPLATE_HEIGHT)
+    )
+
+
+def _classify_speedup_ocr_character(character: tuple[tuple[int, ...], ...]) -> str | None:
+    templates = _decoded_speedup_ocr_templates()
+    best_character = None
+    best_distance: int | None = None
+    for template_character, template in templates.items():
+        distance = sum(
+            1
+            for y in range(_SPEEDUP_OCR_TEMPLATE_HEIGHT)
+            for x in range(_SPEEDUP_OCR_TEMPLATE_WIDTH)
+            if character[y][x] != template[y][x]
+        )
+        if best_distance is None or distance < best_distance:
+            best_character = template_character
+            best_distance = distance
+
+    if best_distance is None or best_distance > _SPEEDUP_OCR_MAX_DISTANCE:
+        return None
+    return best_character
+
+
+def _decoded_speedup_ocr_templates() -> dict[str, tuple[tuple[int, ...], ...]]:
+    global _DECODED_SPEEDUP_OCR_TEMPLATES
+    if _DECODED_SPEEDUP_OCR_TEMPLATES is None:
+        decoded = {}
+        for character, encoded in _SPEEDUP_OCR_TEMPLATES.items():
+            rows = []
+            for index in range(0, len(encoded), 2):
+                value = int(encoded[index : index + 2], 16)
+                rows.append(
+                    tuple(
+                        (value >> (_SPEEDUP_OCR_TEMPLATE_WIDTH - 1 - bit)) & 1
+                        for bit in range(_SPEEDUP_OCR_TEMPLATE_WIDTH)
+                    )
+                )
+            decoded[character] = tuple(rows)
+        _DECODED_SPEEDUP_OCR_TEMPLATES = decoded
+    return _DECODED_SPEEDUP_OCR_TEMPLATES
+
+
+def _apply_speedup_day_ocr_values(
+    result: InventoryVisionResult,
+    image_bytes: bytes,
+    import_type_hint: str | None,
+) -> InventoryVisionResult:
+    if not _is_speedup_hint(import_type_hint) or not result.ok:
+        return result
+
+    day_values = _speedup_day_values_from_image(image_bytes)
+    if not day_values:
+        return result
+
+    values = dict(result.values)
+    speedups = values.get("speedups")
+    if not isinstance(speedups, dict):
+        return result
+
+    merged_speedups = dict(speedups)
+    for speedup_type, days in day_values.items():
+        row = merged_speedups.get(speedup_type)
+        if not isinstance(row, dict):
+            row = {}
+        day_text = f"{days:,}"
+        merged_speedups[speedup_type] = {
+            **row,
+            "raw_duration_text": f"{day_text}d",
+            "day_digits_text": day_text,
+            "day_digits_verification_text": day_text,
+            "total_minutes": days * 1440,
+            "total_hours": days * 24,
+            "total_days_decimal": float(days),
+        }
+    values["speedups"] = merged_speedups
+
+    detected_image_type = (
+        "speedups" if len(day_values) == len(_SPEEDUP_DAY_KEYS) else result.detected_image_type
+    )
+
+    return InventoryVisionResult(
+        ok=result.ok,
+        detected_image_type=detected_image_type,
+        values=values,
+        confidence_score=result.confidence_score,
+        warnings=result.warnings,
+        prompt_version=result.prompt_version,
+        model=result.model,
+        fallback_used=result.fallback_used,
+        error=result.error,
+        raw_json=result.raw_json,
+    )
 
 
 def _build_image_content(
@@ -836,12 +1029,13 @@ class InventoryVisionClient:
                 fallback_used=fallback_used,
                 error="OpenAI vision response did not include output text.",
             )
-        return _parse_result_payload(
+        result = _parse_result_payload(
             text,
             model=model,
             prompt_version=self.config.prompt_version,
             fallback_used=fallback_used,
         )
+        return _apply_speedup_day_ocr_values(result, image_bytes, import_type_hint)
 
     def _create_client(self) -> Any:
         if self._client_factory is not None:

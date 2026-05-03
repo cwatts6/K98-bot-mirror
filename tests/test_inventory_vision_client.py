@@ -183,7 +183,7 @@ async def test_speedups_use_fallback_model_as_first_pass_when_configured():
     }
     payloads = [
         {
-            "detected_image_type": "speedups",
+            "detected_image_type": "unknown",
             "confidence_score": 0.94,
             "warnings": [],
             "values": speedups_fallback,
@@ -206,6 +206,52 @@ async def test_speedups_use_fallback_model_as_first_pass_when_configured():
     assert result.values["speedups"]["universal"]["day_digits_text"] == "2"
     assert result.values["speedups"]["universal"]["day_digits_verification_text"] == "2"
     assert [call["model"] for call in calls] == ["gpt-5.2"]
+
+
+@pytest.mark.asyncio
+async def test_speedup_import_overrides_model_values_with_local_day_ocr(monkeypatch):
+    calls = []
+    speedups_fallback = _null_values()
+    speedups_fallback["speedups"]["training"] = {
+        "raw_duration_text": "938d",
+        "day_digits_text": "938",
+        "day_digits_verification_text": "938",
+        "total_minutes": 938 * 1440,
+        "total_hours": 938 * 24,
+        "total_days_decimal": 938.0,
+    }
+    payloads = [
+        {
+            "detected_image_type": "speedups",
+            "confidence_score": 0.94,
+            "warnings": [],
+            "values": speedups_fallback,
+        },
+    ]
+    monkeypatch.setattr(
+        "services.vision_client._speedup_day_values_from_image",
+        lambda _: {
+            "building": 1072,
+            "research": 1246,
+            "training": 940,
+            "healing": 505,
+            "universal": 2436,
+        },
+    )
+
+    client = InventoryVisionClient(
+        _config(),
+        client_factory=lambda _api_key: FakeClient(payloads, calls),
+    )
+
+    result = await client.analyse_image(b"fake image", import_type_hint="speedups")
+
+    assert result.ok
+    assert result.detected_image_type == "speedups"
+    assert result.values["speedups"]["training"]["raw_duration_text"] == "940d"
+    assert result.values["speedups"]["training"]["day_digits_text"] == "940"
+    assert result.values["speedups"]["training"]["total_minutes"] == 940 * 1440
+    assert result.values["speedups"]["training"]["total_days_decimal"] == 940.0
 
 
 @pytest.mark.asyncio
