@@ -157,15 +157,23 @@ async def test_speedup_correction_modal_prompts_friendly_durations():
 
 
 @pytest.mark.asyncio
-async def test_speedup_correction_updates_original_review_message():
+async def test_speedup_correction_updates_original_review_message(monkeypatch):
     parent = _view(InventoryImportType.SPEEDUPS)
     edited = {}
+
+    async def _state(_batch_id):
+        return inventory_service.InventoryReviewActionState(active=True)
+
+    monkeypatch.setattr(inventory_views.inventory_service, "get_review_action_state", _state)
 
     class _Message:
         async def edit(self, **kwargs):
             edited.update(kwargs)
 
     class _Response:
+        def is_done(self):
+            return False
+
         async def send_message(self, *args, **kwargs):
             edited["response"] = (args, kwargs)
 

@@ -94,7 +94,8 @@ def _analysis_embed(
 
 
 async def _send_private(interaction: discord.Interaction, content: str, **kwargs: Any) -> None:
-    if interaction.response.is_done():
+    response_done = getattr(interaction.response, "is_done", None)
+    if callable(response_done) and response_done():
         await interaction.followup.send(content, ephemeral=True, **kwargs)
     else:
         await interaction.response.send_message(content, ephemeral=True, **kwargs)
