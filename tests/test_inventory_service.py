@@ -128,6 +128,20 @@ async def test_analyse_inventory_image_marks_random_image_failed(monkeypatch):
     assert captured["status"] == InventoryImportStatus.FAILED
 
 
+async def test_decide_analysis_outcome_keeps_materials_disabled_in_service():
+    result = _VisionResult()
+    result.detected_image_type = "materials"
+    result.values = {"materials": {}}
+
+    decision = inventory_service.decide_analysis_outcome(
+        inventory_service._summary_from_vision_result(result)
+    )
+
+    assert decision.action == "reject"
+    assert decision.debug_status == "materials_disabled"
+    assert decision.error == "Materials disabled in Phase 1."
+
+
 async def test_approve_import_blocks_duplicate_same_day_for_non_admin(monkeypatch):
     monkeypatch.setattr(
         inventory_service.inventory_dal,
@@ -200,3 +214,140 @@ async def test_speedup_digit_loss_anomaly_adds_warning():
     summary = inventory_service._summary_from_vision_result(result)
 
     assert any("Healing" in warning and "missing digit" in warning for warning in summary.warnings)
+
+
+async def test_resource_significant_change_requires_confirmation(monkeypatch):
+    monkeypatch.setattr(
+        inventory_service.inventory_dal,
+        "fetch_latest_approved_resource_values",
+        lambda governor_id: {
+            "food": {"from_items_value": 0, "total_resources_value": 100},
+            "wood": {"from_items_value": 0, "total_resources_value": 100},
+            "stone": {"from_items_value": 0, "total_resources_value": 100},
+            "gold": {"from_items_value": 0, "total_resources_value": 100},
+        },
+    )
+    values = {
+        "resources": {
+            "food": {"from_items_value": 0, "total_resources_value": 175},
+            "wood": {"from_items_value": 0, "total_resources_value": 101},
+            "stone": {"from_items_value": 0, "total_resources_value": 99},
+            "gold": {"from_items_value": 0, "total_resources_value": 100},
+        }
+    }
+
+    assessment = await inventory_service.assess_significant_change(
+        governor_id=111,
+        import_type=InventoryImportType.RESOURCES,
+        values=values,
+    )
+
+    assert assessment.requires_confirmation is True
+    assert any("Food" in warning for warning in assessment.warnings)
+
+
+async def test_speedup_significant_change_requires_confirmation(monkeypatch):
+    monkeypatch.setattr(
+        inventory_service.inventory_dal,
+        "fetch_latest_approved_speedup_values",
+        lambda governor_id: {
+            "building": {
+                "total_minutes": 100 * 1440,
+                "total_hours": 2400,
+                "total_days_decimal": 100,
+            },
+            "research": {
+                "total_minutes": 100 * 1440,
+                "total_hours": 2400,
+                "total_days_decimal": 100,
+            },
+            "training": {
+                "total_minutes": 100 * 1440,
+                "total_hours": 2400,
+                "total_days_decimal": 100,
+            },
+            "healing": {
+                "total_minutes": 100 * 1440,
+                "total_hours": 2400,
+                "total_days_decimal": 100,
+            },
+            "universal": {
+                "total_minutes": 100 * 1440,
+                "total_hours": 2400,
+                "total_days_decimal": 100,
+            },
+        },
+    )
+    values = {
+        "speedups": {
+            "building": {"total_minutes": 100 * 1440},
+            "research": {"total_minutes": 100 * 1440},
+            "training": {"total_minutes": 151 * 1440},
+            "healing": {"total_minutes": 100 * 1440},
+            "universal": {"total_minutes": 100 * 1440},
+        }
+    }
+
+    assessment = await inventory_service.assess_significant_change(
+        governor_id=111,
+        import_type=InventoryImportType.SPEEDUPS,
+        values=values,
+    )
+
+    assert assessment.requires_confirmation is True
+    assert any("Training" in warning for warning in assessment.warnings)
+
+
+async def test_significant_change_allows_small_delta(monkeypatch):
+    monkeypatch.setattr(
+        inventory_service.inventory_dal,
+        "fetch_latest_approved_resource_values",
+        lambda governor_id: {
+            "food": {"from_items_value": 0, "total_resources_value": 100},
+            "wood": {"from_items_value": 0, "total_resources_value": 100},
+            "stone": {"from_items_value": 0, "total_resources_value": 100},
+            "gold": {"from_items_value": 0, "total_resources_value": 100},
+        },
+    )
+    values = {
+        "resources": {
+            "food": {"from_items_value": 0, "total_resources_value": 125},
+            "wood": {"from_items_value": 0, "total_resources_value": 100},
+            "stone": {"from_items_value": 0, "total_resources_value": 100},
+            "gold": {"from_items_value": 0, "total_resources_value": 100},
+        }
+    }
+
+    assessment = await inventory_service.assess_significant_change(
+        governor_id=111,
+        import_type=InventoryImportType.RESOURCES,
+        values=values,
+    )
+
+    assert assessment.requires_confirmation is False
+    assert assessment.warnings == []
+
+
+async def test_significant_change_skips_when_no_previous_import(monkeypatch):
+    monkeypatch.setattr(
+        inventory_service.inventory_dal,
+        "fetch_latest_approved_speedup_values",
+        lambda governor_id: {},
+    )
+    values = {
+        "speedups": {
+            "building": {"total_minutes": 100 * 1440},
+            "research": {"total_minutes": 100 * 1440},
+            "training": {"total_minutes": 100 * 1440},
+            "healing": {"total_minutes": 100 * 1440},
+            "universal": {"total_minutes": 100 * 1440},
+        }
+    }
+
+    assessment = await inventory_service.assess_significant_change(
+        governor_id=111,
+        import_type=InventoryImportType.SPEEDUPS,
+        values=values,
+    )
+
+    assert assessment.requires_confirmation is False

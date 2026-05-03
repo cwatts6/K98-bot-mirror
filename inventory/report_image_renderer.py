@@ -27,6 +27,14 @@ MUTED = (174, 205, 232)
 GREEN = (73, 222, 128)
 RED = (248, 113, 113)
 GOLD = (250, 204, 21)
+GRID = (31, 83, 139)
+AXIS = (122, 168, 210)
+RESOURCE_CHART_COLORS = {
+    "Food": (82, 196, 113),
+    "Wood": (181, 116, 62),
+    "Stone": (156, 163, 175),
+    "Gold": (245, 180, 52),
+}
 
 
 @dataclass(frozen=True)
@@ -116,6 +124,55 @@ def _panel(draw: ImageDraw.ImageDraw, xy: tuple[int, int, int, int], fill=PANEL)
     draw.rounded_rectangle(xy, radius=14, fill=fill, outline=(71, 139, 202), width=2)
 
 
+def _text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:
+    box = draw.textbbox((0, 0), text, font=font)
+    return int(box[2] - box[0])
+
+
+def _fit_font(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    *,
+    max_width: int,
+    size: int,
+    min_size: int,
+    bold: bool = False,
+) -> ImageFont.ImageFont:
+    font = _font(size, bold=bold)
+    while size > min_size and _text_width(draw, text, font) > max_width:
+        size -= 1
+        font = _font(size, bold=bold)
+    return font
+
+
+def _wrap_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    *,
+    font: ImageFont.ImageFont,
+    max_width: int,
+    max_lines: int = 2,
+) -> list[str]:
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if not current or _text_width(draw, candidate, font) <= max_width:
+            current = candidate
+            continue
+        lines.append(current)
+        current = word
+        if len(lines) >= max_lines:
+            break
+    if current and len(lines) < max_lines:
+        lines.append(current)
+    if len(lines) == max_lines and words:
+        while _text_width(draw, lines[-1], font) > max_width and len(lines[-1]) > 1:
+            lines[-1] = lines[-1][:-2].rstrip() + "."
+    return lines or [text]
+
+
 def _draw_kpi(
     canvas: Image.Image,
     draw: ImageDraw.ImageDraw,
@@ -128,16 +185,48 @@ def _draw_kpi(
     icon: Path | None = None,
 ) -> None:
     _panel(draw, xy)
-    x1, y1, x2, _ = xy
+    x1, y1, x2, y2 = xy
+    content_w = x2 - x1 - 40
     if icon:
         _paste_icon(canvas, icon, (x1 + 16, y1 + 18, x1 + 62, y1 + 64))
         title_x = x1 + 72
+        title_w = x2 - title_x - 18
     else:
         title_x = x1 + 20
-    draw.text((title_x, y1 + 20), title, fill=MUTED, font=_font(18, bold=True))
-    draw.text((x1 + 20, y1 + 68), value, fill=TEXT, font=_font(34, bold=True))
-    draw.text((x1 + 20, y1 + 112), delta, fill=delta_color, font=_font(20, bold=True))
-    draw.line((x1 + 18, y1 + 104, x2 - 18, y1 + 104), fill=(65, 127, 187), width=1)
+        title_w = content_w
+    title_font = _fit_font(draw, title, max_width=title_w, size=18, min_size=13, bold=True)
+    value_font = _fit_font(draw, value, max_width=content_w, size=34, min_size=24, bold=True)
+    delta_font = _fit_font(draw, delta, max_width=content_w, size=20, min_size=14, bold=True)
+    draw.text((title_x, y1 + 20), title, fill=MUTED, font=title_font)
+    draw.text((x1 + 20, y1 + 68), value, fill=TEXT, font=value_font)
+    separator_y = min(y1 + 112, y2 - 48)
+    draw.line((x1 + 18, separator_y, x2 - 18, separator_y), fill=(65, 127, 187), width=1)
+    for idx, line in enumerate(
+        _wrap_text(draw, delta, font=delta_font, max_width=content_w, max_lines=2)
+    ):
+        draw.text((x1 + 20, separator_y + 10 + (idx * 22)), line, fill=delta_color, font=delta_font)
+
+
+def _chart_ticks(min_v: float, max_v: float, *, count: int = 5) -> list[float]:
+    if count <= 1:
+        return [max_v]
+    if max_v == min_v:
+        step = max(abs(max_v) * 0.25, 1.0)
+        min_v -= step * 2
+        max_v += step * 2
+    span = max_v - min_v
+    return [min_v + (span * idx / (count - 1)) for idx in range(count)]
+
+
+def _axis_label(value: float, *, suffix: str = "") -> str:
+    return _compact(value, suffix=suffix)
+
+
+def _date_axis_label(label: str) -> str:
+    text = str(label)
+    if len(text) >= 10 and text[4:5] == "-" and text[7:8] == "-":
+        return text[5:10]
+    return text[:10]
 
 
 def _line_chart(
@@ -146,6 +235,8 @@ def _line_chart(
     series: dict[str, list[float]],
     labels: list[str],
     colors: list[tuple[int, int, int]],
+    *,
+    y_suffix: str = "",
 ) -> None:
     _panel(draw, xy, fill=(9, 36, 78))
     x1, y1, x2, y2 = xy
@@ -156,11 +247,26 @@ def _line_chart(
 
     min_v = min(all_values)
     max_v = max(all_values)
+    if min_v == max_v:
+        pad = max(abs(max_v) * 0.25, 1.0)
+        min_v -= pad
+        max_v += pad
     span = max(max_v - min_v, 1)
-    plot = (x1 + 70, y1 + 42, x2 - 42, y2 - 62)
-    for i in range(5):
-        y = plot[3] - (plot[3] - plot[1]) * i / 4
-        draw.line((plot[0], y, plot[2], y), fill=(31, 83, 139), width=1)
+    plot = (x1 + 96, y1 + 42, x2 - 42, y2 - 78)
+    ticks = _chart_ticks(min_v, max_v)
+    for tick in ticks:
+        y = plot[3] - ((tick - min_v) / span) * (plot[3] - plot[1])
+        draw.line((plot[0], y, plot[2], y), fill=GRID, width=1)
+        label = _axis_label(tick, suffix=y_suffix)
+        draw.text((x1 + 20, y - 9), label, fill=AXIS, font=_font(15))
+    draw.line((plot[0], plot[1], plot[0], plot[3]), fill=AXIS, width=2)
+    draw.line((plot[0], plot[3], plot[2], plot[3]), fill=AXIS, width=2)
+
+    axis_indices = sorted({0, len(labels) // 2, len(labels) - 1})
+    for idx in axis_indices:
+        x = plot[0] + (plot[2] - plot[0]) * idx / max(len(labels) - 1, 1)
+        draw.line((x, plot[3], x, plot[3] + 6), fill=AXIS, width=1)
+        draw.text((x - 24, plot[3] + 12), _date_axis_label(labels[idx]), fill=AXIS, font=_font(15))
 
     for (name, values), color in zip(series.items(), colors, strict=False):
         pts = []
@@ -297,17 +403,18 @@ def render_resources_report(
         )
 
     if len(payload.resources) >= 2:
+        resource_series = {
+            "Food": [float(p.food) for p in payload.resources],
+            "Wood": [float(p.wood) for p in payload.resources],
+            "Stone": [float(p.stone) for p in payload.resources],
+            "Gold": [float(p.gold) for p in payload.resources],
+        }
         _line_chart(
             draw,
             (44, 510, 1356, 924),
-            {
-                "Food": [float(p.food) for p in payload.resources],
-                "Wood": [float(p.wood) for p in payload.resources],
-                "Stone": [float(p.stone) for p in payload.resources],
-                "Gold": [float(p.gold) for p in payload.resources],
-            },
+            resource_series,
             [str(p.scan_utc) for p in payload.resources],
-            [(74, 222, 128), (250, 204, 21), (148, 163, 184), (251, 191, 36)],
+            [RESOURCE_CHART_COLORS[name] for name in resource_series],
         )
     else:
         draw.text(
@@ -400,6 +507,7 @@ def render_speedups_report(
             },
             [str(p.scan_utc) for p in payload.speedups],
             [(250, 204, 21), (96, 165, 250), (248, 113, 113)],
+            y_suffix="d",
         )
     else:
         draw.text(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
@@ -26,6 +27,28 @@ SUPPORTED_IMAGE_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp"}
 LOW_CONFIDENCE_REJECT_THRESHOLD = 0.70
 SPEEDUP_DIGIT_LOSS_DAY_THRESHOLD = 45.0
 SPEEDUP_DIGIT_LOSS_RATIO = 0.20
+SIGNIFICANT_CHANGE_RATIO = 0.50
+
+
+@dataclass(frozen=True)
+class InventoryReviewActionState:
+    active: bool
+    status: InventoryImportStatus | None = None
+    expired: bool = False
+    message: str = ""
+
+
+@dataclass(frozen=True)
+class InventorySignificantChangeAssessment:
+    requires_confirmation: bool = False
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class InventoryAnalysisDecision:
+    action: str
+    debug_status: str | None = None
+    error: str | None = None
 
 
 def is_supported_image_attachment(filename: str | None, content_type: str | None) -> bool:
@@ -141,6 +164,50 @@ async def create_upload_first_batch(
         image_attachment_url=payload.image_attachment_url,
         is_admin_import=admin,
     )
+
+
+def _coerce_utc(value: Any) -> datetime | None:
+    if value is None or not hasattr(value, "replace"):
+        return None
+    if getattr(value, "tzinfo", None) is None:
+        return value.replace(tzinfo=UTC)
+    return value
+
+
+def _parse_status(value: Any) -> InventoryImportStatus | None:
+    try:
+        return InventoryImportStatus(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+async def get_review_action_state(import_batch_id: int) -> InventoryReviewActionState:
+    row = await asyncio.to_thread(inventory_dal.fetch_import_batch, int(import_batch_id))
+    if not row:
+        return InventoryReviewActionState(
+            active=False,
+            message="This import review is no longer available. Please upload the screenshot again.",
+        )
+
+    status = _parse_status(row.get("Status"))
+    if status not in {InventoryImportStatus.AWAITING_UPLOAD, InventoryImportStatus.ANALYSED}:
+        return InventoryReviewActionState(
+            active=False,
+            status=status,
+            message="This import has already been completed.",
+        )
+
+    expires_at = _coerce_utc(row.get("ExpiresAtUtc"))
+    if expires_at is not None and expires_at <= datetime.now(UTC):
+        await cancel_import(int(import_batch_id))
+        return InventoryReviewActionState(
+            active=False,
+            status=InventoryImportStatus.CANCELLED,
+            expired=True,
+            message="This import review expired. Please upload the screenshot again.",
+        )
+
+    return InventoryReviewActionState(active=True, status=status)
 
 
 def _map_detected_type(raw: str | None) -> InventoryImportType:
@@ -300,6 +367,28 @@ async def analyse_inventory_image(
     return summary
 
 
+def decide_analysis_outcome(summary: InventoryAnalysisSummary) -> InventoryAnalysisDecision:
+    if (
+        not summary.ok
+        or summary.confidence_score < LOW_CONFIDENCE_REJECT_THRESHOLD
+        or summary.import_type == InventoryImportType.UNKNOWN
+    ):
+        return InventoryAnalysisDecision(
+            action="fail",
+            debug_status="failed",
+            error=summary.error or "Analysis failed.",
+        )
+
+    if summary.import_type == InventoryImportType.MATERIALS:
+        return InventoryAnalysisDecision(
+            action="reject",
+            debug_status="materials_disabled",
+            error="Materials disabled in Phase 1.",
+        )
+
+    return InventoryAnalysisDecision(action="review")
+
+
 async def approve_import(
     *,
     import_batch_id: int,
@@ -343,6 +432,81 @@ async def approve_import(
         summary.import_type.value,
     )
     return normalized
+
+
+def _change_ratio(previous: float, current: float) -> float:
+    if previous == 0:
+        return 1.0 if current != 0 else 0.0
+    return abs(current - previous) / abs(previous)
+
+
+def _significant_change_warning(
+    *, label: str, previous: float, current: float, suffix: str = ""
+) -> str | None:
+    ratio = _change_ratio(previous, current)
+    if ratio <= SIGNIFICANT_CHANGE_RATIO:
+        return None
+    return (
+        f"{label} changed by more than 50% " f"({previous:,.0f}{suffix} -> {current:,.0f}{suffix})."
+    )
+
+
+async def assess_significant_change(
+    *,
+    governor_id: int,
+    import_type: InventoryImportType,
+    values: dict[str, Any],
+) -> InventorySignificantChangeAssessment:
+    if import_type == InventoryImportType.RESOURCES:
+        normalized = normalize_final_values(import_type, values)
+        previous = await asyncio.to_thread(
+            inventory_dal.fetch_latest_approved_resource_values,
+            int(governor_id),
+        )
+        if not previous:
+            return InventorySignificantChangeAssessment()
+        warnings: list[str] = []
+        for resource_type, row in normalized["resources"].items():
+            prior = previous.get(resource_type)
+            if not prior:
+                continue
+            current_value = float(row["total_resources_value"])
+            previous_value = float(prior["total_resources_value"])
+            warning = _significant_change_warning(
+                label=resource_type.title(),
+                previous=previous_value,
+                current=current_value,
+            )
+            if warning:
+                warnings.append(warning)
+        return InventorySignificantChangeAssessment(bool(warnings), warnings)
+
+    if import_type == InventoryImportType.SPEEDUPS:
+        normalized = normalize_final_values(import_type, values)
+        previous = await asyncio.to_thread(
+            inventory_dal.fetch_latest_approved_speedup_values,
+            int(governor_id),
+        )
+        if not previous:
+            return InventorySignificantChangeAssessment()
+        warnings = []
+        for speedup_type, row in normalized["speedups"].items():
+            prior = previous.get(speedup_type)
+            if not prior:
+                continue
+            current_days = float(row["total_days_decimal"])
+            previous_days = float(prior["total_days_decimal"])
+            warning = _significant_change_warning(
+                label=f"{speedup_type.title()} speedups",
+                previous=previous_days,
+                current=current_days,
+                suffix="d",
+            )
+            if warning:
+                warnings.append(warning)
+        return InventorySignificantChangeAssessment(bool(warnings), warnings)
+
+    return InventorySignificantChangeAssessment()
 
 
 async def reject_import(import_batch_id: int, *, error: str | None = None) -> None:

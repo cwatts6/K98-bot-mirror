@@ -8,6 +8,10 @@ Phase 1A is complete, tested, and deployed.
 
 Phase 1B is complete, tested, and deployed.
 
+Phase 1C is complete, tested, and deployed.
+
+Phase 1D is complete, tested, and deployed.
+
 Phase 0 delivered:
 
 - OpenAI Vision API setup documented in `docs/inventory_image_import_setup.md`.
@@ -91,6 +95,28 @@ Phase 1B validation:
 - Phase 1B has been tested and deployed.
 - Reporting service, image renderer, and report view test coverage added.
 
+Phase 1C delivered:
+
+- `/export_inventory` raw inventory exports.
+- `/inventory_import_audit` admin audit tooling.
+- Export and audit logic kept behind service/DAL boundaries.
+- Admin audit/debug reference access for import review.
+- Interaction boundary hardening follow-up.
+- Materials kept disabled until Phase 2.
+
+Phase 1D delivered:
+
+- Account picker wording and stale interaction cleanup.
+- User-safe typed correction modals for Resources and Speedups.
+- Inventory Import Review embed cleanup.
+- Corrected-review update clarity.
+- Reject/cancel simplification.
+- Terminal button state updates after approve, correct, reject, cancel, and timeout paths where covered.
+- `/myinventory` reporting preference runtime issue fixed.
+- Same-day duplicate import enforcement with admin override preserved.
+- Speedup import OCR accuracy hardened with deterministic days-only OCR from generated row crops.
+- Six saved speedup smoke-test images validated successfully after the deterministic OCR fix.
+
 Phase 0 sample validation:
 
 - `python scripts\test_inventory_vision.py C:\rok\rss_sample.png --type resources`
@@ -136,8 +162,9 @@ Development is split into:
 - Phase 0 - OpenAI Vision Integration Setup: complete and deployed.
 - Phase 1A - Foundation + Resources/Speedups Import: complete, tested, and deployed.
 - Phase 1B - Inventory reporting images and visibility preferences: complete, tested, and deployed.
-- Phase 1C - Inventory export, admin audit, and interaction boundary hardening: next phase.
-- Phase 1D - Final Resources/Speedups completion polish: planned follow-on.
+- Phase 1C - Inventory export, admin audit, and interaction boundary hardening: complete, tested, and deployed.
+- Phase 1D - Final Resources/Speedups completion polish: complete, tested, and deployed.
+- Phase 1E - Final Phase 1 smoke testing and report polish: next phase.
 - Phase 2 - Materials Import: later phase.
 
 Work must proceed phase by phase. The next phase should begin with review/scope only per repository rules.
@@ -275,8 +302,8 @@ Add:
 
 - `/import_inventory` - complete in Phase 1A.
 - `/myinventory` - complete in Phase 1B.
-- `/export_inventory` - Phase 1C.
-- `/inventory_import_audit` - Phase 1C.
+- `/export_inventory` - complete in Phase 1C.
+- `/inventory_import_audit` - complete in Phase 1C.
 
 Commands must live in the target architecture, likely `commands/inventory_cmds.py`, with business logic in service modules and data access in DAL/repository modules.
 
@@ -354,7 +381,7 @@ Discord cannot convert a public user message into an ephemeral/private message a
 
 Status: partially complete in Phase 1A.
 
-Phase 1A supports rejecting imports and admin debug retention. Phase 1C should review whether a richer same-session retry UX is still needed now that upload-first and command-led uploads share the inventory channel.
+Phase 1A supports rejecting imports and admin debug retention. Phase 1C reviewed the export/audit boundaries. Phase 1E should smoke test reject, cancel, timeout, and repeat-upload behaviour end to end.
 
 If user selects Reject Import:
 
@@ -599,7 +626,7 @@ Output behaviour:
 
 ### `/export_inventory`
 
-Status: Phase 1C.
+Status: complete in Phase 1C.
 
 Purpose:
 
@@ -743,9 +770,9 @@ Speedups output should show:
 
 ## Phase 1C - Export, Audit, and Boundary Hardening
 
-Phase 1C should be a linked follow-on PR after Phase 1B, not an untracked deferred optimisation.
+Phase 1C is complete, tested, and deployed.
 
-Recommended scope:
+Delivered scope:
 
 - `/export_inventory`
 - `/inventory_import_audit`
@@ -763,61 +790,103 @@ Boundary hardening goals:
 - Preserve Phase 1A behaviour while tightening layer ownership.
 - Reassess whether same-session retry after reject needs richer UX or whether upload-first replacement is sufficient.
 
-Phase 1C should remain Materials-free. Materials belong to Phase 2.
+Phase 1C remained Materials-free. Materials belong to Phase 2.
 
 ## Phase 1D - Final Resources/Speedups Completion Polish
 
-Phase 1D should be a small follow-on phase after Phase 1C to finish the remaining
-Resources and Speedups user-experience surface before declaring Phase 1 complete.
+Phase 1D is complete, tested, and deployed.
 
-Recommended scope:
+Delivered scope:
 
-- Add export buttons under `/myinventory` report output where appropriate.
-- Reuse the `/export_inventory` service/DAL path rather than adding export SQL or file generation to views.
-- Perform targeted OCR/prompt tuning for Resources and Speedups only, based on production smoke-test failures or recurring admin-audit findings.
-- Review the Phase 1A/1B/1C scenario matrix end to end for Resources and Speedups:
-  - no registered governors
-  - governor selector timeout/no approval
-  - reject then repeat import
-  - same-day duplicate approved import
-  - random/unknown image
-  - Materials-disabled image
-  - export/audit access and empty-data handling
-- Fix production smoke-test UX issues from Phase 1C deployment:
-  - shared account picker dropdown placeholder says `Choose an account to view...`; change to a generic `Select Governor` so it fits inventory, stats, and targets flows.
-  - after a governor is selected, the old picker remains active and stale select/lookup/refresh interactions can fail; disable or update the picker after successful selection.
-  - user-facing Inventory Import Review embeds show model/fallback details that should remain admin-only.
-  - detected Resources/Speedups values need user-friendly formatting; speedups should show days/hours/minutes or rounded days only, not raw minute totals.
-  - raw JSON correction is too error-prone for normal users; replace it with typed correction fields for the detected import type.
-  - corrected data is currently shown in a separate message, making it unclear that the original import must still be approved; update the original review message and make the approval state explicit.
-  - Reject Import and Cancel Import are unclear as separate user actions; simplify or clearly distinguish them based on audit/debug retention needs.
-  - buttons can remain clickable after terminal actions and produce failed interactions; ensure controls are disabled/updated after approve, correct, reject, cancel, and timeout.
-- Fix OCR/prompt accuracy issues observed in Phase 1C smoke testing:
-  - speedup screenshots can return high confidence (`0.95`-`0.98`) while one or more rows are materially wrong.
-  - observed example: Healing Speedup should be read as `505d 3h 37m`, but was detected as about `50.52` days / `72,757` minutes.
-  - the same screenshot may fail or produce different results across attempts/model versions, so confidence alone is not sufficient as a correctness signal.
-  - add deterministic post-OCR validation and anomaly checks for speedup rows, especially missing hundreds/thousands digits and mismatches between days/hours/minutes and total minutes.
-- Fix same-day duplicate import enforcement:
-  - Phase 1 smoke testing allowed multiple approved imports for the same governor/import type/day.
-  - preserve an admin override for repeated same-day imports because it is useful for testing and correction workflows.
-  - normal users should be blocked from approving a second import of the same type for the same governor on the same UTC day.
-- Investigate `/myinventory` runtime failure:
-  - `/myinventory` should work after Phase 1B for Resources and Speedups reports.
-  - observed response: `Inventory reporting preferences are not available yet. Please contact an admin.`
-  - likely area to check first: `dbo.InventoryReportPreference` deployment/permissions and `inventory_reporting_dal.fetch_visibility_preference`.
-  - preserve the persistent visibility preference behaviour; if the preference table is unavailable, return a clearer admin-facing diagnostic in logs and a useful user-facing fallback where safe.
-- Confirm documentation and user-facing guidance are aligned with final Phase 1 behaviour.
+- Account picker placeholder wording changed to fit inventory, stats, and target flows.
+- Account picker stale interactions cleaned up after governor selection.
+- Inventory Import Review embed simplified for user-facing review.
+- Resource correction moved from raw JSON to typed total-resource correction fields.
+- Speedup correction moved from raw JSON to typed days-only correction fields.
+- Corrected review updates now edit the original review and keep approval state clear.
+- Reject/cancel interaction was simplified for normal users.
+- Terminal import button states were updated for approve/correct/reject/cancel paths where covered.
+- Same-day duplicate import enforcement was fixed for normal users, with admin override preserved.
+- `/myinventory` reporting preference runtime failure was fixed.
+- Speedup OCR was made deterministic for the Phase 1 speedup screen:
+  - row crops are generated from the value column
+  - only the day token is sent for model review
+  - a local deterministic OCR pass reads the generated day-token crops
+  - the local OCR pass is applied even when upload-first detection did not pass a speedup type hint
+- Six saved speedup smoke-test images passed final validation:
+  - test image 1: `1068 / 1242 / 935 / 503 / 2422`
+  - test image 2: `1072 / 1246 / 940 / 505 / 2436`
+  - test image 3: `155 / 319 / 329 / 225 / 862`
+  - test image 4: `1072 / 1246 / 940 / 505 / 2436`
+  - test image 5: `1075 / 1249 / 946 / 507 / 2448`
+  - test image 6: `122 / 193 / 324 / 87 / 370`
 
-Out of scope for Phase 1D:
+Phase 1D deferred/carry-forward items:
+
+- Final end-to-end smoke testing across Resources and Speedups should move to Phase 1E.
+- A timeout bug remains where the Inventory Import Review buttons can stay active after expiry and lead to `Interaction failed`; the active upload session can then strand the user with no approve/correct/reject/cancel path.
+- The "significantly different from previous import" double-check does not appear to trigger for Speedups and needs review.
+- `/myinventory` report image polish remains:
+  - add x/y axis scales to Resources and Speedups graphs
+  - ensure Resources graph uses distinct colours for Food, Wood, Stone, and Gold
+  - fix text fitting in RSS Troop Training Capacity and RSS Troop Healing Capacity boxes
+  - align separator lines so they do not cut through value/delta text
+
+Out of scope for Phase 1D and Phase 1E:
 
 - Materials processing or reporting.
 - `/my_stats` integration.
 - The stats export SQL refactor tracked by GitHub issue #46.
-- Broad OCR redesign beyond targeted Resources/Speedups tuning.
+- Broad OCR redesign beyond targeted Resources/Speedups tuning unless Phase 1E smoke tests reveal a concrete regression.
 
-Phase 1 for Resources and Speedups should be considered complete only after Phase 1D
-validates import, report, export, audit, retry/repeat, and targeted OCR/prompt behaviour
-against the documented scenario matrix.
+## Phase 1E - Final Phase 1 Smoke Testing and Report Polish
+
+Phase 1E should be a small final follow-on phase before declaring Phase 1 fully complete.
+
+Primary goal:
+
+- Smoke test the complete Resources and Speedups import/report/export/audit flow after Phase 1D.
+- Re-test Resources import because it has not been exercised recently.
+- Fix the remaining small bugs and report-image presentation issues found during final smoke testing.
+
+Recommended scope:
+
+- Begin with audit/scope only per repository rules.
+- Re-run the final Resources and Speedups scenario matrix:
+  - upload-first single-governor flow
+  - upload-first multi-governor account picker
+  - `/import_inventory` command-led flow
+  - correction modal flow
+  - approve flow
+  - reject/cancel flow
+  - timeout/no-response flow
+  - same-day duplicate approved import
+  - admin duplicate override
+  - random/unknown image
+  - Materials-disabled image
+  - `/myinventory` Resources output
+  - `/myinventory` Speedups output
+  - `/export_inventory`
+  - `/inventory_import_audit`
+- Fix Inventory Import Review timeout handling:
+  - disable or expire review buttons when the interaction times out
+  - ensure stale button clicks return a clear message instead of `Interaction failed`
+  - ensure expired active upload sessions are cleaned up so users can retry without admin intervention
+- Recheck the significant-change double-confirmation logic:
+  - verify Resources and Speedups compare against the latest approved values
+  - ensure materially different Speedup values trigger the intended warning/confirmation
+  - keep normal small deltas frictionless
+- Improve `/myinventory` report readability:
+  - add x-axis and y-axis scale labels/ticks to Resources and Speedups graphs
+  - use clearly distinct Resources graph colours for Food, Wood, Stone, and Gold
+  - fix RSS Troop Training Capacity text wrapping/fitting
+  - fix RSS Troop Healing Capacity text wrapping/fitting
+  - align value/delta separator lines so they do not cut through text
+- Confirm final documentation and user-facing guidance are aligned with Phase 1 behaviour.
+
+Phase 1 should be considered fully complete only after Phase 1E validates import,
+report, export, audit, retry/repeat, timeout, duplicate, and targeted OCR behaviour
+against the documented Resources/Speedups scenario matrix.
 
 ## Phase 2 - Materials
 
@@ -932,7 +1001,7 @@ Add:
 
 Admin only.
 
-Status: Phase 1C.
+Status: complete in Phase 1C.
 
 Purpose:
 
@@ -1008,9 +1077,9 @@ Completed Phase 1B audit points:
 
 ### Phase 1C
 
-Next phase.
+Complete, tested, and deployed.
 
-Recommended scope:
+Delivered scope:
 
 - `/export_inventory`
 - `/inventory_import_audit`
@@ -1028,13 +1097,39 @@ Recommended Phase 1C audit points:
 
 ### Phase 1D
 
-Planned follow-on phase.
+Complete, tested, and deployed.
+
+Delivered scope:
+
+- Account picker wording/stale interaction cleanup.
+- Typed correction modals for Resources and Speedups.
+- Inventory Import Review embed cleanup and corrected-review clarity.
+- Reject/cancel simplification.
+- Same-day duplicate import enforcement fix with admin override preserved.
+- `/myinventory` reporting preference runtime fix.
+- Deterministic Speedup day OCR based on generated days-only crops.
+
+Do not include:
+
+- Materials processing.
+- `/my_stats` integration.
+- Stats export SQL refactor work tracked by GitHub issue #46.
+
+### Phase 1E
+
+Next phase.
 
 Recommended scope:
 
-- `/myinventory` export buttons wired to the Phase 1C export service/DAL path.
-- Targeted Resources/Speedups OCR and prompt tuning based on smoke-test/audit evidence.
-- Final Phase 1 Resources/Speedups scenario validation and documentation alignment.
+- Final Resources and Speedups smoke testing.
+- Re-test Resources import accuracy and correction flow.
+- Fix Inventory Import Review timeout/stale button handling.
+- Recheck significant-change double-confirmation behaviour.
+- Polish `/myinventory` Resources and Speedups report image readability:
+  - graph x/y axis scales
+  - distinct Resources colours
+  - capacity-box text fitting
+  - separator-line alignment
 
 Do not include:
 
@@ -1080,6 +1175,13 @@ Do not include in Phase 1C:
 - Export button under image
 - Further OCR/prompt tuning unless a Phase 1A production issue specifically requires it
 
+Do not include in Phase 1E:
+
+- Materials processing
+- `/my_stats` integration
+- Stats export SQL refactor work tracked by GitHub issue #46
+- Broad OCR redesign unless final smoke testing finds a concrete Resources/Speedups regression
+
 Downstream task:
 
 - Integrate inventory summaries into existing `/my_stats` or future refactored `/my_stats` experience.
@@ -1105,5 +1207,5 @@ Do not create a duplicate issue for this item. Reference issue #46 whenever Phas
 ## Suggested Next Chat Opening Prompt
 
 ```text
-Start Phase 1C review/scope for the Inventory Image Import Module. Phase 0, Phase 1A, and Phase 1B are complete, tested, and deployed. Use the updated in-repo task pack at C:\discord_file_downloader\docs\Codex Task Pack — Inventory Image Import Module.md. Phase 1A delivered /import_inventory, upload-first import in INVENTORY_UPLOAD_CHANNEL_ID, Vision-derived image type, Resources/Speedups SQL-backed imports, correction/reject/cancel flow, and admin debug channel retention. Phase 1B delivered /myinventory, generated Resources/Speedups report images, 1M/3M/6M/12M range controls, summary-only output for one approved record, trend graphs for two or more approved records, and persistent visibility preference. For Phase 1C, assess and scope /export_inventory, /inventory_import_audit, raw inventory export files, admin audit filtering/debug-message reference access, and targeted cleanup of Phase 1A inventory view/service boundaries. Keep commands thin, use service/DAL boundaries, do not copy the direct SQL pattern from /my_stats_export, reference GitHub issue #46 for the existing stats export SQL refactor, keep Materials out of scope until Phase 2, and begin with audit/scope only per repo rules.
+Start Phase 1E review/scope for the Inventory Image Import Module. Phase 0, Phase 1A, Phase 1B, Phase 1C, and Phase 1D are complete, tested, and deployed. Use the updated in-repo task pack at C:\discord_file_downloader\docs\Codex Task Pack — Inventory Image Import Module.md. Phase 1D completed final Resources/Speedups import polish, including account picker wording/stale interaction cleanup, typed correction modals, Inventory Import Review embed cleanup, corrected-review clarity, reject/cancel simplification, same-day duplicate import enforcement with admin override preserved, /myinventory reporting preference repair, and deterministic days-only Speedup OCR validated against six saved smoke-test images. Phase 1E should focus on final Resources/Speedups smoke testing and report polish before declaring Phase 1 complete. Re-test Resources import because it has not been exercised recently. Carry forward these known issues: Inventory Import Review timeout leaves active buttons and can strand an active upload session; significant-change double-confirmation for Speedups does not appear to trigger; /myinventory graphs need x/y axis scales; Resources graph colours need clearer Food/Wood/Stone/Gold separation; RSS Troop Training Capacity and RSS Troop Healing Capacity text needs to fit cleanly; value/delta separator lines need alignment so they do not cut through text. Keep Materials out of scope until Phase 2. Keep /my_stats integration out of scope. Keep the stats export SQL refactor out of scope and continue referencing GitHub issue #46 for that existing debt. Begin with audit/scope only per repo rules, then stop for architecture validation before coding.
 ```

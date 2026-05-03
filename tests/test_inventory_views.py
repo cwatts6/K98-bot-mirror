@@ -1,6 +1,8 @@
 import pytest
 
+from inventory import inventory_service
 from inventory.models import InventoryAnalysisSummary, InventoryImportType
+from ui.views import inventory_views
 from ui.views.inventory_views import (
     InventoryConfirmationView,
     ResourceCorrectionModal,
@@ -44,6 +46,46 @@ def _view(import_type):
         payload=object(),
         summary=_summary(import_type),
     )
+
+
+class _DoneResponse:
+    def __init__(self):
+        self.messages = []
+        self.deferred = False
+
+    def is_done(self):
+        return self.deferred
+
+    async def defer(self, **_kwargs):
+        self.deferred = True
+
+    async def send_message(self, content=None, **kwargs):
+        self.messages.append((content, kwargs))
+        self.deferred = True
+
+
+class _Followup:
+    def __init__(self):
+        self.sent = []
+
+    async def send(self, content=None, **kwargs):
+        self.sent.append((content, kwargs))
+
+
+class _Message:
+    def __init__(self):
+        self.edits = []
+
+    async def edit(self, **kwargs):
+        self.edits.append(kwargs)
+
+
+class _Interaction:
+    def __init__(self, user_id=42):
+        self.user = type("_User", (), {"id": user_id})()
+        self.response = _DoneResponse()
+        self.followup = _Followup()
+        self.message = _Message()
 
 
 def test_inventory_review_embed_hides_model_and_fallback_details():
@@ -149,3 +191,62 @@ async def test_speedup_correction_updates_original_review_message():
         field for field in edited["embed"].fields if field.name == "Corrected Values"
     )
     assert "Healing: `505d`" in corrected_field.value
+
+
+@pytest.mark.asyncio
+async def test_approve_requires_second_click_for_significant_change(monkeypatch):
+    parent = _view(InventoryImportType.RESOURCES)
+    interaction = _Interaction()
+
+    async def _state(_batch_id):
+        return inventory_service.InventoryReviewActionState(active=True)
+
+    async def _assessment(**_kwargs):
+        return inventory_service.InventorySignificantChangeAssessment(
+            requires_confirmation=True,
+            warnings=["Food changed by more than 50% (100 -> 200)."],
+        )
+
+    async def _approve(**_kwargs):
+        raise AssertionError("approval should wait for the second confirmation")
+
+    monkeypatch.setattr(inventory_views.inventory_service, "get_review_action_state", _state)
+    monkeypatch.setattr(inventory_views.inventory_service, "assess_significant_change", _assessment)
+    monkeypatch.setattr(inventory_views.inventory_service, "approve_import", _approve)
+
+    await parent.approve.callback(interaction)
+
+    assert parent._significant_change_confirmed is True
+    assert "significantly different" in interaction.followup.sent[0][0]
+    assert interaction.message.edits
+
+
+@pytest.mark.asyncio
+async def test_stale_click_after_timeout_returns_expired_message(monkeypatch):
+    parent = _view(InventoryImportType.RESOURCES)
+    parent._expired = True
+    parent._terminal = True
+    interaction = _Interaction()
+
+    async def _state(_batch_id):
+        raise AssertionError("local expired state should short-circuit")
+
+    monkeypatch.setattr(inventory_views.inventory_service, "get_review_action_state", _state)
+
+    denied = await parent._deny_if_not_actor(interaction)
+
+    assert denied is True
+    assert "expired" in interaction.response.messages[0][0]
+
+
+@pytest.mark.asyncio
+async def test_correction_modal_rejects_expired_parent():
+    parent = _view(InventoryImportType.SPEEDUPS)
+    parent._expired = True
+    parent._terminal = True
+    modal = SpeedupCorrectionModal(parent)
+    interaction = _Interaction()
+
+    await modal.callback(interaction)
+
+    assert "expired" in interaction.response.messages[0][0]

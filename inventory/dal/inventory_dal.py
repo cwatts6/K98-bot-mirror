@@ -146,6 +146,34 @@ def fetch_active_batch_for_governor(governor_id: int) -> dict[str, Any] | None:
         conn.close()
 
 
+def fetch_import_batch(import_batch_id: int) -> dict[str, Any] | None:
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT TOP 1
+                   ImportBatchID,
+                   GovernorID,
+                   DiscordUserID,
+                   ImportType,
+                   FlowType,
+                   Status,
+                   CreatedAtUtc,
+                   ApprovedAtUtc,
+                   RejectedAtUtc,
+                   ExpiresAtUtc
+            FROM dbo.InventoryImportBatch
+            WHERE ImportBatchID = ?
+            """,
+            (int(import_batch_id),),
+        )
+        rows = _rows_to_dicts(cur)
+        return rows[0] if rows else None
+    finally:
+        conn.close()
+
+
 def fetch_pending_upload_for_user(discord_user_id: int) -> dict[str, Any] | None:
     conn = _get_conn()
     try:
@@ -164,6 +192,82 @@ def fetch_pending_upload_for_user(discord_user_id: int) -> dict[str, Any] | None
         )
         rows = _rows_to_dicts(cur)
         return rows[0] if rows else None
+    finally:
+        conn.close()
+
+
+def fetch_latest_approved_resource_values(governor_id: int) -> dict[str, dict[str, int]]:
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            WITH LatestBatch AS (
+                SELECT TOP 1 ImportBatchID
+                FROM dbo.InventoryImportBatch
+                WHERE GovernorID = ?
+                  AND ImportType = N'resources'
+                  AND Status = N'approved'
+                ORDER BY ApprovedAtUtc DESC, ImportBatchID DESC
+            )
+            SELECT r.ResourceType,
+                   r.FromItemsValue,
+                   r.TotalResourcesValue
+            FROM dbo.GovernorResourceInventory AS r
+            INNER JOIN LatestBatch AS b
+                ON b.ImportBatchID = r.ImportBatchID
+            ORDER BY r.ResourceType ASC
+            """,
+            (int(governor_id),),
+        )
+        rows = _rows_to_dicts(cur)
+        return {
+            str(row["ResourceType"]).lower(): {
+                "from_items_value": int(row.get("FromItemsValue") or 0),
+                "total_resources_value": int(row.get("TotalResourcesValue") or 0),
+            }
+            for row in rows
+        }
+    finally:
+        conn.close()
+
+
+def fetch_latest_approved_speedup_values(
+    governor_id: int,
+) -> dict[str, dict[str, int | float]]:
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            WITH LatestBatch AS (
+                SELECT TOP 1 ImportBatchID
+                FROM dbo.InventoryImportBatch
+                WHERE GovernorID = ?
+                  AND ImportType = N'speedups'
+                  AND Status = N'approved'
+                ORDER BY ApprovedAtUtc DESC, ImportBatchID DESC
+            )
+            SELECT s.SpeedupType,
+                   s.TotalMinutes,
+                   s.TotalHours,
+                   s.TotalDaysDecimal
+            FROM dbo.GovernorSpeedupInventory AS s
+            INNER JOIN LatestBatch AS b
+                ON b.ImportBatchID = s.ImportBatchID
+            ORDER BY s.SpeedupType ASC
+            """,
+            (int(governor_id),),
+        )
+        rows = _rows_to_dicts(cur)
+        return {
+            str(row["SpeedupType"]).lower(): {
+                "total_minutes": int(row.get("TotalMinutes") or 0),
+                "total_hours": float(row.get("TotalHours") or 0.0),
+                "total_days_decimal": float(row.get("TotalDaysDecimal") or 0.0),
+            }
+            for row in rows
+        }
     finally:
         conn.close()
 

@@ -115,3 +115,39 @@ async def test_confirmation_view_timeout_cancels_active_batch(monkeypatch):
     await view.on_timeout()
 
     assert cancelled == [99]
+    assert view._expired is True
+    assert all(getattr(item, "disabled", False) for item in view.children)
+
+
+async def test_confirmation_view_timeout_edits_message(monkeypatch):
+    async def _cancel(_batch_id):
+        return None
+
+    class _ReviewMessage:
+        def __init__(self):
+            self.edits = []
+
+        async def edit(self, **kwargs):
+            self.edits.append(kwargs)
+
+    monkeypatch.setattr(inventory_views.inventory_service, "cancel_import", _cancel)
+    view = inventory_views.InventoryConfirmationView(
+        bot=object(),
+        actor_discord_id=42,
+        governor_id=111,
+        batch_id=99,
+        payload=InventoryImagePayload(image_bytes=b"img", filename="inventory.png"),
+        summary=InventoryAnalysisSummary(
+            ok=True,
+            import_type=InventoryImportType.RESOURCES,
+            values={"resources": {}},
+            confidence_score=0.95,
+        ),
+    )
+    message = _ReviewMessage()
+    view.message = message
+
+    await view.on_timeout()
+
+    assert message.edits
+    assert "expired" in message.edits[0]["content"]

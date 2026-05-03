@@ -191,6 +191,9 @@ class InventoryConfirmationView(discord.ui.View):
         self.summary = summary
         self.corrected_values: dict[str, Any] | None = None
         self._terminal = False
+        self._expired = False
+        self._significant_change_confirmed = False
+        self._significant_change_warnings: list[str] = []
         self.message: discord.Message | None = None
 
         if summary.import_type in {InventoryImportType.MATERIALS, InventoryImportType.UNKNOWN}:
@@ -198,14 +201,94 @@ class InventoryConfirmationView(discord.ui.View):
                 if getattr(child, "custom_id", "") == "inventory_import_approve":
                     child.disabled = True
 
+    async def _mark_unusable(
+        self, interaction: discord.Interaction | None, *, expired: bool, content: str
+    ) -> None:
+        self._terminal = True
+        self._expired = expired
+        self.disable_all_items()
+        self.stop()
+        message = getattr(interaction, "message", None) if interaction is not None else None
+        message = message or self.message
+        if message is None:
+            return
+        self.message = message
+        try:
+            await message.edit(content=content, view=self)
+        except Exception:
+            logger.debug("inventory_review_unusable_message_edit_failed", exc_info=True)
+
+    def _terminal_message(self) -> str:
+        if self._expired:
+            return "This import review expired. Please upload the screenshot again."
+        return "This import has already been completed."
+
+    def _is_locally_unusable(self) -> bool:
+        return self._terminal or self._expired
+
     async def _deny_if_not_actor(self, interaction: discord.Interaction) -> bool:
-        if self._terminal:
-            await _send_private(interaction, "This import has already been completed.")
+        actor = getattr(interaction, "user", None)
+        if actor is not None and int(actor.id) != self.actor_discord_id:
+            await _send_private(
+                interaction, "Only the user who started this import can use these buttons."
+            )
             return True
-        if int(interaction.user.id) == self.actor_discord_id:
+        if self._is_locally_unusable():
+            await _send_private(interaction, self._terminal_message())
+            return True
+        try:
+            state = await inventory_service.get_review_action_state(self.batch_id)
+        except Exception:
+            logger.exception("inventory_review_state_check_failed batch_id=%s", self.batch_id)
+            await _send_private(
+                interaction,
+                f"Could not verify this import state. Please try again or contact an admin with batch ID {self.batch_id}.",
+            )
+            return True
+        if state.active:
             return False
+        await self._mark_unusable(
+            interaction,
+            expired=state.expired,
+            content=state.message or self._terminal_message(),
+        )
+        await _send_private(interaction, state.message or self._terminal_message())
+        return True
+
+    async def _deny_if_modal_unusable(self, interaction: discord.Interaction) -> bool:
+        if not self._is_locally_unusable():
+            return False
+        await _send_private(interaction, self._terminal_message())
+        return True
+
+    async def _requires_second_approve(self, interaction: discord.Interaction) -> bool:
+        if self._significant_change_confirmed:
+            return False
+        final_values = self.corrected_values or self.summary.values
+        try:
+            assessment = await inventory_service.assess_significant_change(
+                governor_id=self.governor_id,
+                import_type=self.summary.import_type,
+                values=final_values,
+            )
+        except Exception:
+            logger.exception("inventory_significant_change_check_failed batch_id=%s", self.batch_id)
+            return False
+        if not assessment.requires_confirmation:
+            return False
+        self._significant_change_confirmed = True
+        self._significant_change_warnings = assessment.warnings
+        warning_text = "\n".join(f"- {item}" for item in assessment.warnings[:5])
         await _send_private(
-            interaction, "Only the user who started this import can use these buttons."
+            interaction,
+            (
+                "This import is significantly different from the latest approved import for this governor.\n"
+                f"{warning_text}\n\nPress Approve Import again to confirm these values."
+            ),
+        )
+        await self._update_review_message(
+            interaction,
+            content="Significant change detected. Press Approve Import again to confirm.",
         )
         return True
 
@@ -246,6 +329,15 @@ class InventoryConfirmationView(discord.ui.View):
                     value="Corrections are saved for this pending import. Press Approve Import to save them.",
                     inline=False,
                 )
+        if self._significant_change_warnings and not self._terminal:
+            embed.add_field(
+                name="Significant Change Check",
+                value=(
+                    "\n".join(self._significant_change_warnings[:5])
+                    + "\nPress Approve Import again to confirm."
+                )[:1024],
+                inline=False,
+            )
         try:
             await message.edit(
                 content=content or "Review the detected inventory values before approving.",
@@ -274,6 +366,8 @@ class InventoryConfirmationView(discord.ui.View):
         await interaction.response.defer(ephemeral=True)
         try:
             final_values = self.corrected_values or self.summary.values
+            if await self._requires_second_approve(interaction):
+                return
             normalized = await inventory_service.approve_import(
                 import_batch_id=self.batch_id,
                 governor_id=self.governor_id,
@@ -410,13 +504,11 @@ class InventoryConfirmationView(discord.ui.View):
                     self.batch_id,
                     exc_info=True,
                 )
-        self.disable_all_items()
-        message = getattr(self, "message", None)
-        if message is not None:
-            try:
-                await message.edit(view=self)
-            except Exception:
-                logger.debug("inventory_timeout_message_edit_failed", exc_info=True)
+        await self._mark_unusable(
+            None,
+            expired=True,
+            content="Inventory import review expired. Please upload the screenshot again.",
+        )
 
 
 class ResourceCorrectionModal(discord.ui.Modal):
@@ -437,6 +529,8 @@ class ResourceCorrectionModal(discord.ui.Modal):
             self.add_item(field)
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        if await self.parent_view._deny_if_modal_unusable(interaction):
+            return
         corrections = {key: str(field.value or "") for key, field in self.inputs.items()}
         try:
             corrected = apply_resource_total_corrections(
@@ -450,6 +544,8 @@ class ResourceCorrectionModal(discord.ui.Modal):
             )
             return
         self.parent_view.corrected_values = corrected
+        self.parent_view._significant_change_confirmed = False
+        self.parent_view._significant_change_warnings = []
         await interaction.response.send_message(
             "Correction saved. Press Approve Import on the updated review to save it.",
             ephemeral=True,
@@ -475,6 +571,8 @@ class SpeedupCorrectionModal(discord.ui.Modal):
             self.add_item(field)
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        if await self.parent_view._deny_if_modal_unusable(interaction):
+            return
         corrections = {key: str(field.value or "") for key, field in self.inputs.items()}
         try:
             corrected = apply_speedup_duration_corrections(
@@ -488,6 +586,8 @@ class SpeedupCorrectionModal(discord.ui.Modal):
             )
             return
         self.parent_view.corrected_values = corrected
+        self.parent_view._significant_change_confirmed = False
+        self.parent_view._significant_change_warnings = []
         await interaction.response.send_message(
             "Correction saved. Press Approve Import on the updated review to save it.",
             ephemeral=True,
@@ -592,21 +692,18 @@ async def _process_payload_for_governor(
             import_batch_id=batch_id,
             payload=payload,
         )
-        if (
-            not summary.ok
-            or summary.confidence_score < 0.70
-            or summary.import_type == InventoryImportType.UNKNOWN
-        ):
-            await inventory_service.fail_import(batch_id, error=summary.error or "Analysis failed.")
+        decision = inventory_service.decide_analysis_outcome(summary)
+        if decision.action == "fail":
+            await inventory_service.fail_import(batch_id, error=decision.error)
             await _post_admin_debug(
                 bot=bot,
                 batch_id=batch_id,
                 governor_id=governor_id,
                 discord_user_id=actor_discord_id,
-                status="failed",
+                status=decision.debug_status or "failed",
                 payload=payload,
                 summary=summary,
-                error_json={"error": summary.error or "Analysis failed."},
+                error_json={"error": decision.error},
             )
             message = (
                 "I could not read this inventory screenshot clearly enough. No values were saved.\n\n"
@@ -621,17 +718,17 @@ async def _process_payload_for_governor(
             return
 
         embed = _analysis_embed(governor_id=governor_id, summary=summary)
-        if summary.import_type == InventoryImportType.MATERIALS:
-            await inventory_service.reject_import(batch_id, error="Materials disabled in Phase 1.")
+        if decision.action == "reject":
+            await inventory_service.reject_import(batch_id, error=decision.error)
             await _post_admin_debug(
                 bot=bot,
                 batch_id=batch_id,
                 governor_id=governor_id,
                 discord_user_id=actor_discord_id,
-                status="materials_disabled",
+                status=decision.debug_status or "rejected",
                 payload=payload,
                 summary=summary,
-                error_json={"error": "Materials disabled in Phase 1."},
+                error_json={"error": decision.error},
             )
             content = "Materials import is not available yet. No values were saved."
             if interaction is not None:
