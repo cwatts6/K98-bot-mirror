@@ -29,6 +29,7 @@ RED = (248, 113, 113)
 GOLD = (250, 204, 21)
 GRID = (31, 83, 139)
 AXIS = (122, 168, 210)
+CHART_FILL_ALPHA = 14
 RESOURCE_CHART_COLORS = {
     "Food": (82, 196, 113),
     "Wood": (181, 116, 62),
@@ -232,18 +233,14 @@ def _date_axis_label(label: str) -> str:
     return text[:10]
 
 
-def _stacked_totals(series: dict[str, list[float]]) -> list[float]:
+def _series_values(series: dict[str, list[float]]) -> list[float]:
     if not series:
         return []
-    length = max(len(values) for values in series.values())
-    totals = [0.0] * length
-    for values in series.values():
-        for idx, value in enumerate(values):
-            totals[idx] += max(float(value), 0.0)
-    return totals
+    return [max(float(value), 0.0) for values in series.values() for value in values]
 
 
 def _line_chart(
+    canvas: Image.Image,
     draw: ImageDraw.ImageDraw,
     xy: tuple[int, int, int, int],
     series: dict[str, list[float]],
@@ -254,13 +251,13 @@ def _line_chart(
 ) -> None:
     _panel(draw, xy, fill=(9, 36, 78))
     x1, y1, x2, y2 = xy
-    stacked_totals = _stacked_totals(series)
-    if len(labels) < 2 or not stacked_totals:
+    visible_values = _series_values(series)
+    if len(labels) < 2 or not visible_values:
         draw.text((x1 + 24, y1 + 26), "Trend graph unavailable", fill=MUTED, font=_font(22))
         return
 
     min_v = 0.0
-    max_v = max(stacked_totals)
+    max_v = max(visible_values)
     if max_v <= 0:
         max_v = 1.0
     span = max_v
@@ -280,23 +277,31 @@ def _line_chart(
         draw.line((x, plot[3], x, plot[3] + 6), fill=AXIS, width=1)
         draw.text((x - 24, plot[3] + 12), _date_axis_label(labels[idx]), fill=AXIS, font=_font(15))
 
-    cumulative = [0.0] * len(labels)
-    for (_name, values), color in zip(series.items(), colors, strict=False):
-        upper_pts = []
-        lower_pts = []
+    series_with_colors = list(zip(series.items(), colors, strict=False))
+    fill_layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    fill_draw = ImageDraw.Draw(fill_layer, "RGBA")
+    for (_name, values), color in sorted(
+        series_with_colors,
+        key=lambda item: max(item[0][1]) if item[0][1] else 0,
+        reverse=True,
+    ):
+        pts = []
         for idx, val in enumerate(values):
             x = plot[0] + (plot[2] - plot[0]) * idx / max(len(values) - 1, 1)
-            lower_value = cumulative[idx]
-            upper_value = lower_value + max(float(val), 0.0)
-            cumulative[idx] = upper_value
-            lower_y = plot[3] - (lower_value / span) * (plot[3] - plot[1])
-            upper_y = plot[3] - (upper_value / span) * (plot[3] - plot[1])
-            lower_pts.append((x, lower_y))
-            upper_pts.append((x, upper_y))
-        if len(upper_pts) >= 2:
-            area = [*upper_pts, *reversed(lower_pts)]
-            draw.polygon(area, fill=(*color[:3], 190))
-            draw.line(upper_pts, fill=color, width=3)
+            y = plot[3] - (max(float(val), 0.0) / span) * (plot[3] - plot[1])
+            pts.append((x, y))
+        if len(pts) >= 2:
+            area = [(pts[0][0], plot[3]), *pts, (pts[-1][0], plot[3])]
+            fill_draw.polygon(area, fill=(*color[:3], CHART_FILL_ALPHA))
+    canvas.alpha_composite(fill_layer)
+    for (_name, values), color in series_with_colors:
+        pts = []
+        for idx, val in enumerate(values):
+            x = plot[0] + (plot[2] - plot[0]) * idx / max(len(values) - 1, 1)
+            y = plot[3] - (max(float(val), 0.0) / span) * (plot[3] - plot[1])
+            pts.append((x, y))
+        if len(pts) >= 2:
+            draw.line(pts, fill=color, width=4)
     legend_x = plot[0]
     for name, color in zip(series.keys(), colors, strict=False):
         draw.rounded_rectangle((legend_x, y2 - 42, legend_x + 22, y2 - 22), radius=4, fill=color)
@@ -429,6 +434,7 @@ def render_resources_report(
             "Gold": [float(p.gold) for p in payload.resources],
         }
         _line_chart(
+            canvas,
             draw,
             (44, 510, 1356, 924),
             resource_series,
@@ -517,6 +523,7 @@ def render_speedups_report(
 
     if len(payload.speedups) >= 2:
         _line_chart(
+            canvas,
             draw,
             (44, 540, 1356, 924),
             {

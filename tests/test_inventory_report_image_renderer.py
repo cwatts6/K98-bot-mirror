@@ -54,8 +54,8 @@ def test_chart_ticks_start_at_zero_for_report_domain():
     assert ticks[-1] == 100
 
 
-def test_stacked_totals_sum_visible_series():
-    totals = report_image_renderer._stacked_totals(
+def test_series_values_flattens_visible_series_for_y_scale():
+    values = report_image_renderer._series_values(
         {
             "Food": [10, 20],
             "Wood": [5, 7],
@@ -63,7 +63,7 @@ def test_stacked_totals_sum_visible_series():
         }
     )
 
-    assert totals == [16, 29]
+    assert values == [10, 20, 5, 7, 1, 2]
 
 
 def test_resource_chart_colours_are_distinct():

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import logging
@@ -33,6 +34,7 @@ SCREENSHOT_GUIDELINES = (
     "Use English game language if possible.\n"
     "Do not upload edited or compressed screenshots."
 )
+INVENTORY_REVIEW_TIMEOUT_SECONDS = 900
 
 
 def governors_to_accounts(governors: list[RegisteredGovernor]) -> dict[str, dict[str, Any]]:
@@ -183,7 +185,7 @@ class InventoryConfirmationView(discord.ui.View):
         payload: InventoryImagePayload,
         summary: InventoryAnalysisSummary,
     ) -> None:
-        super().__init__(timeout=900)
+        super().__init__(timeout=INVENTORY_REVIEW_TIMEOUT_SECONDS)
         self.bot = bot
         self.actor_discord_id = int(actor_discord_id)
         self.governor_id = int(governor_id)
@@ -196,11 +198,32 @@ class InventoryConfirmationView(discord.ui.View):
         self._significant_change_confirmed = False
         self._significant_change_warnings: list[str] = []
         self.message: discord.Message | None = None
+        self._timeout_task: asyncio.Task[None] | None = None
 
         if summary.import_type in {InventoryImportType.MATERIALS, InventoryImportType.UNKNOWN}:
             for child in self.children:
                 if getattr(child, "custom_id", "") == "inventory_import_approve":
                     child.disabled = True
+
+    def start_timeout_watch(self, *, timeout_seconds: float | None = None) -> None:
+        if self._timeout_task is not None and not self._timeout_task.done():
+            return
+        delay = float(timeout_seconds or INVENTORY_REVIEW_TIMEOUT_SECONDS)
+        self._timeout_task = asyncio.create_task(self._timeout_watch(delay))
+
+    async def _timeout_watch(self, delay: float) -> None:
+        try:
+            await asyncio.sleep(delay)
+            if not self._terminal:
+                await self.on_timeout()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug(
+                "inventory_review_timeout_watch_failed batch_id=%s",
+                self.batch_id,
+                exc_info=True,
+            )
 
     async def _mark_unusable(
         self, interaction: discord.Interaction | None, *, expired: bool, content: str
@@ -209,6 +232,13 @@ class InventoryConfirmationView(discord.ui.View):
         self._expired = expired
         self.disable_all_items()
         self.stop()
+        current_task = asyncio.current_task()
+        if (
+            self._timeout_task is not None
+            and self._timeout_task is not current_task
+            and not self._timeout_task.done()
+        ):
+            self._timeout_task.cancel()
         message = getattr(interaction, "message", None) if interaction is not None else None
         message = message or self.message
         if message is None:
@@ -783,14 +813,15 @@ async def _process_payload_for_governor(
                 ephemeral=True,
             )
             view.message = sent
+            view.start_timeout_watch()
         elif original_message is not None:
             sent = await original_message.channel.send(
                 f"<@{actor_discord_id}> {content}",
                 embed=embed,
                 view=view,
-                delete_after=900,
             )
             view.message = sent
+            view.start_timeout_watch()
     except Exception:
         logger.exception("inventory_process_payload_failed governor_id=%s", governor_id)
         if interaction is not None:
