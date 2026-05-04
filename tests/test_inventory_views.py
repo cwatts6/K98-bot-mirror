@@ -248,6 +248,22 @@ async def test_stale_click_after_timeout_returns_expired_message(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_review_buttons_reject_non_initiating_user(monkeypatch):
+    parent = _view(InventoryImportType.RESOURCES)
+    interaction = _Interaction(user_id=999)
+
+    async def _state(_batch_id):
+        raise AssertionError("actor check should run before state lookup")
+
+    monkeypatch.setattr(inventory_views.inventory_service, "get_review_action_state", _state)
+
+    denied = await parent._deny_if_not_actor(interaction)
+
+    assert denied is True
+    assert "Only the user who started this import" in interaction.response.messages[0][0]
+
+
+@pytest.mark.asyncio
 async def test_correction_modal_rejects_expired_parent():
     parent = _view(InventoryImportType.SPEEDUPS)
     parent._expired = True

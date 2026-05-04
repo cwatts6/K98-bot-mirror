@@ -35,6 +35,7 @@ SCREENSHOT_GUIDELINES = (
     "Do not upload edited or compressed screenshots."
 )
 INVENTORY_REVIEW_TIMEOUT_SECONDS = 900
+INVENTORY_REVIEW_UI_TIMEOUT_SECONDS = 870
 
 
 def governors_to_accounts(governors: list[RegisteredGovernor]) -> dict[str, dict[str, Any]]:
@@ -185,7 +186,7 @@ class InventoryConfirmationView(discord.ui.View):
         payload: InventoryImagePayload,
         summary: InventoryAnalysisSummary,
     ) -> None:
-        super().__init__(timeout=INVENTORY_REVIEW_TIMEOUT_SECONDS)
+        super().__init__(timeout=INVENTORY_REVIEW_UI_TIMEOUT_SECONDS)
         self.bot = bot
         self.actor_discord_id = int(actor_discord_id)
         self.governor_id = int(governor_id)
@@ -208,7 +209,7 @@ class InventoryConfirmationView(discord.ui.View):
     def start_timeout_watch(self, *, timeout_seconds: float | None = None) -> None:
         if self._timeout_task is not None and not self._timeout_task.done():
             return
-        delay = float(timeout_seconds or INVENTORY_REVIEW_TIMEOUT_SECONDS)
+        delay = float(timeout_seconds or INVENTORY_REVIEW_UI_TIMEOUT_SECONDS)
         self._timeout_task = asyncio.create_task(self._timeout_watch(delay))
 
     async def _timeout_watch(self, delay: float) -> None:
@@ -811,6 +812,7 @@ async def _process_payload_for_governor(
                 embed=embed,
                 view=view,
                 ephemeral=True,
+                delete_after=INVENTORY_REVIEW_UI_TIMEOUT_SECONDS,
             )
             view.message = sent
             view.start_timeout_watch()
@@ -819,6 +821,7 @@ async def _process_payload_for_governor(
                 f"<@{actor_discord_id}> {content}",
                 embed=embed,
                 view=view,
+                delete_after=INVENTORY_REVIEW_TIMEOUT_SECONDS,
             )
             view.message = sent
             view.start_timeout_watch()

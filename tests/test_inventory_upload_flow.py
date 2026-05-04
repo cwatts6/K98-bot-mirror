@@ -188,3 +188,71 @@ async def test_confirmation_view_timeout_watch_disables_message(monkeypatch):
     assert view._expired is True
     assert message.edits
     assert all(getattr(item, "disabled", False) for item in view.children)
+
+
+async def test_interaction_review_followup_gets_ephemeral_delete_after(monkeypatch):
+    message = _Message()
+    sent = {}
+
+    class _Response:
+        def __init__(self):
+            self.done = False
+
+        def is_done(self):
+            return self.done
+
+        async def defer(self, **_kwargs):
+            self.done = True
+
+    class _Followup:
+        async def send(self, **kwargs):
+            sent.update(kwargs)
+            return types.SimpleNamespace(edit=lambda **_k: None)
+
+    interaction = types.SimpleNamespace(
+        user=types.SimpleNamespace(id=42),
+        response=_Response(),
+        followup=_Followup(),
+    )
+    summary = InventoryAnalysisSummary(
+        ok=True,
+        import_type=InventoryImportType.SPEEDUPS,
+        values={"speedups": {}},
+        confidence_score=0.95,
+    )
+
+    async def _create_upload_first_batch(**_kwargs):
+        return 99
+
+    async def _analyse_inventory_image(**_kwargs):
+        return summary
+
+    monkeypatch.setattr(
+        inventory_views.inventory_service,
+        "create_upload_first_batch",
+        _create_upload_first_batch,
+    )
+    monkeypatch.setattr(
+        inventory_views.inventory_service,
+        "analyse_inventory_image",
+        _analyse_inventory_image,
+    )
+    monkeypatch.setattr(
+        inventory_views.InventoryConfirmationView,
+        "start_timeout_watch",
+        lambda self: None,
+    )
+
+    await inventory_views._process_payload_for_governor(
+        bot=object(),
+        interaction=interaction,
+        governor_id=111,
+        actor_discord_id=42,
+        payload=InventoryImagePayload(image_bytes=b"img", filename="inventory.png"),
+        original_message=message,
+        batch_id=None,
+        flow_from_pending_command=False,
+    )
+
+    assert sent["ephemeral"] is True
+    assert sent["delete_after"] == inventory_views.INVENTORY_REVIEW_UI_TIMEOUT_SECONDS
