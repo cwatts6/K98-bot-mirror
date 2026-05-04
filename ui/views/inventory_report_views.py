@@ -300,7 +300,8 @@ class InventoryPreferenceView(discord.ui.View):
             item.disabled = True
         self.stop()
         await interaction.followup.send(
-            "Inventory report preference saved. Run `/myinventory` again to view your report.",
+            "Inventory report preference saved. Run `/myinventory` again to view your report. "
+            "You can change this later with `/inventory_preferences`.",
             ephemeral=True,
         )
         try:
@@ -327,7 +328,8 @@ class InventoryPreferenceView(discord.ui.View):
 
 async def send_inventory_preference_prompt(ctx: discord.ApplicationContext) -> None:
     await ctx.followup.send(
-        "Choose how `/myinventory` should post your reports.",
+        "Choose how `/myinventory` should post your reports. "
+        "You can change this later with `/inventory_preferences`.",
         view=InventoryPreferenceView(requester_id=int(ctx.user.id)),
         ephemeral=True,
     )
@@ -348,6 +350,7 @@ class InventoryReportSelectionView(discord.ui.View):
         self.selected_governor_id = governors[0].governor_id if len(governors) == 1 else None
         self.selected_view = InventoryReportView.ALL
         self.visibility = visibility
+        self._completed = False
         if len(governors) > 1:
             self.add_item(InventoryGovernorSelect(governors))
         self.add_item(InventoryOutputSelect())
@@ -356,6 +359,12 @@ class InventoryReportSelectionView(discord.ui.View):
         if int(interaction.user.id) != self.requester_id:
             await interaction.response.send_message(
                 "This inventory selector is not for you. Run `/myinventory` to get your own.",
+                ephemeral=True,
+            )
+            return
+        if self._completed:
+            await interaction.response.send_message(
+                "This inventory selector has already been used. Run `/myinventory` again to choose another report.",
                 ephemeral=True,
             )
             return
@@ -372,6 +381,17 @@ class InventoryReportSelectionView(discord.ui.View):
         await interaction.response.defer(
             ephemeral=self.visibility == InventoryReportVisibility.ONLY_ME
         )
+        self._completed = True
+        for item in self.children:
+            item.disabled = True
+        self.stop()
+        try:
+            await interaction.edit_original_response(
+                content="Inventory report selected.",
+                view=self,
+            )
+        except Exception:
+            logger.debug("inventory_report_selector_complete_update_failed", exc_info=True)
         await _send_inventory_report_message(
             send=interaction.followup.send,
             user=interaction.user,
@@ -416,6 +436,11 @@ class InventoryGovernorSelect(discord.ui.Select):
         view = self.view
         if not isinstance(view, InventoryReportSelectionView):
             return
+        if getattr(view, "_completed", False):
+            await interaction.response.send_message(
+                "This inventory selector has already been used.", ephemeral=True
+            )
+            return
         if int(interaction.user.id) != view.requester_id:
             await interaction.response.send_message("This selector is not for you.", ephemeral=True)
             return
@@ -440,6 +465,11 @@ class InventoryOutputSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
         if not isinstance(view, InventoryReportSelectionView):
+            return
+        if getattr(view, "_completed", False):
+            await interaction.response.send_message(
+                "This inventory selector has already been used.", ephemeral=True
+            )
             return
         if int(interaction.user.id) != view.requester_id:
             await interaction.response.send_message("This selector is not for you.", ephemeral=True)

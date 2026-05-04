@@ -187,11 +187,45 @@ async def test_show_report_sends_report_for_selected_governor_and_output(monkeyp
         },
     )()
 
+    async def _edit_original_response(**kwargs):
+        captured["selector_edit"] = kwargs
+
+    valid_interaction.edit_original_response = _edit_original_response
+
     await picker_view.send_report(valid_interaction)
 
     assert captured["governor"].governor_id == 222
     assert captured["requester_id"] == 42
     assert captured["report_view"] == InventoryReportView.SPEEDUPS
+    assert picker_view._completed is True
+    assert all(getattr(item, "disabled", False) for item in picker_view.children)
+    assert captured["selector_edit"]["content"] == "Inventory report selected."
+
+
+@pytest.mark.asyncio
+async def test_show_report_rejects_reused_selector(monkeypatch):
+    _ctx, _followup, picker_view = await _start_and_get_picker(monkeypatch, user_id=42)
+    picker_view._completed = True
+    response = {}
+
+    class _Response:
+        async def send_message(self, content=None, **kwargs):
+            response["content"] = content
+            response.update(kwargs)
+
+    interaction = type(
+        "_Interaction",
+        (),
+        {
+            "user": type("_User", (), {"id": 42, "display_name": "Tester"})(),
+            "response": _Response(),
+        },
+    )()
+
+    await picker_view.send_report(interaction)
+
+    assert "already been used" in response["content"]
+    assert response["ephemeral"] is True
 
 
 @pytest.mark.asyncio
@@ -232,6 +266,7 @@ async def test_preference_view_saves_visibility(monkeypatch):
 
     assert saved["discord_user_id"] == 42
     assert saved["selected_visibility"] == InventoryReportVisibility.PUBLIC
+    assert "/inventory_preferences" in saved["content"]
 
 
 @pytest.mark.asyncio
