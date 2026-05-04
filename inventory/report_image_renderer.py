@@ -196,13 +196,16 @@ def _draw_kpi(
         title_w = content_w
     title_font = _fit_font(draw, title, max_width=title_w, size=18, min_size=13, bold=True)
     value_font = _fit_font(draw, value, max_width=content_w, size=34, min_size=24, bold=True)
-    delta_font = _fit_font(draw, delta, max_width=content_w, size=20, min_size=14, bold=True)
+    delta_font = _fit_font(draw, delta, max_width=content_w, size=20, min_size=11, bold=True)
     draw.text((title_x, y1 + 20), title, fill=MUTED, font=title_font)
-    draw.text((x1 + 20, y1 + 68), value, fill=TEXT, font=value_font)
-    separator_y = min(y1 + 112, y2 - 48)
+    value_xy = (x1 + 20, y1 + 68)
+    draw.text(value_xy, value, fill=TEXT, font=value_font)
+    value_box = draw.textbbox(value_xy, value, font=value_font)
+    separator_y = min(max(value_box[3] + 14, y1 + 108), y2 - 36)
     draw.line((x1 + 18, separator_y, x2 - 18, separator_y), fill=(65, 127, 187), width=1)
+    max_delta_lines = 1 if _text_width(draw, delta, delta_font) <= content_w else 2
     for idx, line in enumerate(
-        _wrap_text(draw, delta, font=delta_font, max_width=content_w, max_lines=2)
+        _wrap_text(draw, delta, font=delta_font, max_width=content_w, max_lines=max_delta_lines)
     ):
         draw.text((x1 + 20, separator_y + 10 + (idx * 22)), line, fill=delta_color, font=delta_font)
 
@@ -229,6 +232,17 @@ def _date_axis_label(label: str) -> str:
     return text[:10]
 
 
+def _stacked_totals(series: dict[str, list[float]]) -> list[float]:
+    if not series:
+        return []
+    length = max(len(values) for values in series.values())
+    totals = [0.0] * length
+    for values in series.values():
+        for idx, value in enumerate(values):
+            totals[idx] += max(float(value), 0.0)
+    return totals
+
+
 def _line_chart(
     draw: ImageDraw.ImageDraw,
     xy: tuple[int, int, int, int],
@@ -240,18 +254,16 @@ def _line_chart(
 ) -> None:
     _panel(draw, xy, fill=(9, 36, 78))
     x1, y1, x2, y2 = xy
-    all_values = [v for values in series.values() for v in values]
-    if len(labels) < 2 or not all_values:
+    stacked_totals = _stacked_totals(series)
+    if len(labels) < 2 or not stacked_totals:
         draw.text((x1 + 24, y1 + 26), "Trend graph unavailable", fill=MUTED, font=_font(22))
         return
 
-    min_v = min(all_values)
-    max_v = max(all_values)
-    if min_v == max_v:
-        pad = max(abs(max_v) * 0.25, 1.0)
-        min_v -= pad
-        max_v += pad
-    span = max(max_v - min_v, 1)
+    min_v = 0.0
+    max_v = max(stacked_totals)
+    if max_v <= 0:
+        max_v = 1.0
+    span = max_v
     plot = (x1 + 96, y1 + 42, x2 - 42, y2 - 78)
     ticks = _chart_ticks(min_v, max_v)
     for tick in ticks:
@@ -268,16 +280,23 @@ def _line_chart(
         draw.line((x, plot[3], x, plot[3] + 6), fill=AXIS, width=1)
         draw.text((x - 24, plot[3] + 12), _date_axis_label(labels[idx]), fill=AXIS, font=_font(15))
 
-    for (name, values), color in zip(series.items(), colors, strict=False):
-        pts = []
+    cumulative = [0.0] * len(labels)
+    for (_name, values), color in zip(series.items(), colors, strict=False):
+        upper_pts = []
+        lower_pts = []
         for idx, val in enumerate(values):
             x = plot[0] + (plot[2] - plot[0]) * idx / max(len(values) - 1, 1)
-            y = plot[3] - ((val - min_v) / span) * (plot[3] - plot[1])
-            pts.append((x, y))
-        if len(pts) >= 2:
-            area = [(pts[0][0], plot[3]), *pts, (pts[-1][0], plot[3])]
-            draw.polygon(area, fill=(*color[:3], 58))
-            draw.line(pts, fill=color, width=4)
+            lower_value = cumulative[idx]
+            upper_value = lower_value + max(float(val), 0.0)
+            cumulative[idx] = upper_value
+            lower_y = plot[3] - (lower_value / span) * (plot[3] - plot[1])
+            upper_y = plot[3] - (upper_value / span) * (plot[3] - plot[1])
+            lower_pts.append((x, lower_y))
+            upper_pts.append((x, upper_y))
+        if len(upper_pts) >= 2:
+            area = [*upper_pts, *reversed(lower_pts)]
+            draw.polygon(area, fill=(*color[:3], 190))
+            draw.line(upper_pts, fill=color, width=3)
     legend_x = plot[0]
     for name, color in zip(series.keys(), colors, strict=False):
         draw.rounded_rectangle((legend_x, y2 - 42, legend_x + 22, y2 - 22), radius=4, fill=color)

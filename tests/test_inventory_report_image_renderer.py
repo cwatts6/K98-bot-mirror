@@ -47,6 +47,25 @@ def test_chart_ticks_expand_flat_values():
     assert ticks[-1] > 100
 
 
+def test_chart_ticks_start_at_zero_for_report_domain():
+    ticks = report_image_renderer._chart_ticks(0, 100)
+
+    assert ticks[0] == 0
+    assert ticks[-1] == 100
+
+
+def test_stacked_totals_sum_visible_series():
+    totals = report_image_renderer._stacked_totals(
+        {
+            "Food": [10, 20],
+            "Wood": [5, 7],
+            "Stone": [1, 2],
+        }
+    )
+
+    assert totals == [16, 29]
+
+
 def test_resource_chart_colours_are_distinct():
     colours = list(report_image_renderer.RESOURCE_CHART_COLORS.values())
 
