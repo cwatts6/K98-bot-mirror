@@ -6,7 +6,6 @@ from typing import Any
 
 import discord
 
-from account_picker import AccountPickerView, build_unique_gov_options
 from inventory import export_service, reporting_service
 from inventory.models import (
     InventoryExportFormat,
@@ -16,9 +15,14 @@ from inventory.models import (
     RegisteredGovernor,
 )
 from inventory.report_image_renderer import render_inventory_reports
-from ui.views.inventory_views import governors_to_accounts
 
 logger = logging.getLogger(__name__)
+
+REPORT_VIEW_OPTIONS = {
+    "All": InventoryReportView.ALL,
+    "RSS": InventoryReportView.RESOURCES,
+    "Speedups": InventoryReportView.SPEEDUPS,
+}
 
 
 async def _avatar_bytes(user: Any) -> bytes | None:
@@ -274,69 +278,190 @@ async def send_inventory_report(
     )
 
 
-async def start_myinventory_command(
-    *,
-    ctx: discord.ApplicationContext,
-    governor_id: int | None,
-    report_view: InventoryReportView,
-    range_key: InventoryReportRange,
-    visibility: InventoryReportVisibility,
-) -> None:
-    governor = await reporting_service.resolve_governor_for_report(
-        discord_user_id=int(ctx.user.id),
-        governor_id=governor_id,
-        discord_user=ctx.user,
+class InventoryPreferenceView(discord.ui.View):
+    def __init__(self, *, requester_id: int) -> None:
+        super().__init__(timeout=300)
+        self.requester_id = int(requester_id)
+
+    async def _save(
+        self, interaction: discord.Interaction, visibility: InventoryReportVisibility
+    ) -> None:
+        if int(interaction.user.id) != self.requester_id:
+            await interaction.response.send_message(
+                "This preference prompt is not for you.", ephemeral=True
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        await reporting_service.resolve_visibility(
+            discord_user_id=self.requester_id,
+            selected_visibility=visibility,
+        )
+        for item in self.children:
+            item.disabled = True
+        self.stop()
+        await interaction.followup.send(
+            "Inventory report preference saved. Run `/myinventory` again to view your report.",
+            ephemeral=True,
+        )
+        try:
+            await interaction.edit_original_response(view=self)
+        except Exception:
+            logger.debug("inventory_preference_prompt_update_failed", exc_info=True)
+
+    @discord.ui.button(
+        label="Only Me",
+        style=discord.ButtonStyle.primary,
+        custom_id="inventory_pref_only_me",
     )
-    if governor is None:
-        governors = await reporting_service.get_registered_governors_for_user(int(ctx.user.id))
-        if not governors:
-            await ctx.followup.send(
-                "I do not see any governors registered to you. Use `/register_governor` first.",
+    async def only_me(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+        await self._save(interaction, InventoryReportVisibility.ONLY_ME)
+
+    @discord.ui.button(
+        label="Public",
+        style=discord.ButtonStyle.secondary,
+        custom_id="inventory_pref_public",
+    )
+    async def public(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+        await self._save(interaction, InventoryReportVisibility.PUBLIC)
+
+
+async def send_inventory_preference_prompt(ctx: discord.ApplicationContext) -> None:
+    await ctx.followup.send(
+        "Choose how `/myinventory` should post your reports.",
+        view=InventoryPreferenceView(requester_id=int(ctx.user.id)),
+        ephemeral=True,
+    )
+
+
+class InventoryReportSelectionView(discord.ui.View):
+    def __init__(
+        self,
+        *,
+        ctx: discord.ApplicationContext,
+        governors: list[RegisteredGovernor],
+        visibility: InventoryReportVisibility,
+    ) -> None:
+        super().__init__(timeout=300)
+        self.ctx = ctx
+        self.requester_id = int(ctx.user.id)
+        self.governors_by_id = {item.governor_id: item for item in governors}
+        self.selected_governor_id = governors[0].governor_id if len(governors) == 1 else None
+        self.selected_view = InventoryReportView.ALL
+        self.visibility = visibility
+        if len(governors) > 1:
+            self.add_item(InventoryGovernorSelect(governors))
+        self.add_item(InventoryOutputSelect())
+
+    async def send_report(self, interaction: discord.Interaction) -> None:
+        if int(interaction.user.id) != self.requester_id:
+            await interaction.response.send_message(
+                "This inventory selector is not for you. Run `/myinventory` to get your own.",
                 ephemeral=True,
             )
             return
-
-        options = build_unique_gov_options(governors_to_accounts(governors))
-        governors_by_id = {item.governor_id: item for item in governors}
-
-        async def _on_select(
-            interaction: discord.Interaction, selected_governor_id: str, ephemeral: bool
-        ) -> None:
-            if int(interaction.user.id) != int(ctx.user.id):
-                await interaction.followup.send("This selector is not for you.", ephemeral=True)
-                return
-            selected = governors_by_id.get(int(selected_governor_id))
-            if selected is None:
-                await interaction.followup.send(
-                    "Selected governor is no longer available. Run `/myinventory` again.",
-                    ephemeral=True,
-                )
-                return
-            await _send_inventory_report_message(
-                send=interaction.followup.send,
-                user=interaction.user,
-                requester_id=int(ctx.user.id),
-                governor=selected,
-                report_view=report_view,
-                range_key=range_key,
-                visibility=visibility,
+        if self.selected_governor_id is None:
+            await interaction.response.send_message("Choose a governor first.", ephemeral=True)
+            return
+        governor = self.governors_by_id.get(int(self.selected_governor_id))
+        if governor is None:
+            await interaction.response.send_message(
+                "Selected governor is no longer available. Run `/myinventory` again.",
+                ephemeral=True,
             )
+            return
+        await interaction.response.defer(
+            ephemeral=self.visibility == InventoryReportVisibility.ONLY_ME
+        )
+        await _send_inventory_report_message(
+            send=interaction.followup.send,
+            user=interaction.user,
+            requester_id=self.requester_id,
+            governor=governor,
+            report_view=self.selected_view,
+            range_key=InventoryReportRange.ONE_MONTH,
+            visibility=self.visibility,
+        )
 
-        view = AccountPickerView(
-            ctx=ctx,
+    @discord.ui.button(
+        label="Show Report",
+        style=discord.ButtonStyle.primary,
+        custom_id="inventory_report_show",
+        row=2,
+    )
+    async def show_report(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
+        await self.send_report(interaction)
+
+
+class InventoryGovernorSelect(discord.ui.Select):
+    def __init__(self, governors: list[RegisteredGovernor]) -> None:
+        options = [
+            discord.SelectOption(
+                label=item.governor_name[:100],
+                value=str(item.governor_id),
+                description=item.account_type[:100],
+            )
+            for item in governors
+        ]
+        super().__init__(
+            placeholder="Select Governor",
+            min_values=1,
+            max_values=1,
             options=options,
-            on_select_governor=_on_select,
-            heading="Select which governor inventory report to view:",
-            show_register_btn=False,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        view = self.view
+        if not isinstance(view, InventoryReportSelectionView):
+            return
+        if int(interaction.user.id) != view.requester_id:
+            await interaction.response.send_message("This selector is not for you.", ephemeral=True)
+            return
+        view.selected_governor_id = int(self.values[0])
+        await interaction.response.defer(ephemeral=True)
+
+
+class InventoryOutputSelect(discord.ui.Select):
+    def __init__(self) -> None:
+        options = [
+            discord.SelectOption(label=label, value=view.value)
+            for label, view in REPORT_VIEW_OPTIONS.items()
+        ]
+        super().__init__(
+            placeholder="Select Output",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        view = self.view
+        if not isinstance(view, InventoryReportSelectionView):
+            return
+        if int(interaction.user.id) != view.requester_id:
+            await interaction.response.send_message("This selector is not for you.", ephemeral=True)
+            return
+        view.selected_view = InventoryReportView(self.values[0])
+        await interaction.response.defer(ephemeral=True)
+
+
+async def start_myinventory_command(
+    *,
+    ctx: discord.ApplicationContext,
+    visibility: InventoryReportVisibility,
+) -> None:
+    governors = await reporting_service.get_registered_governors_for_user(int(ctx.user.id))
+    if not governors:
+        await ctx.followup.send(
+            "I do not see any governors registered to you. Use `/register_governor` first.",
             ephemeral=True,
         )
-        await ctx.followup.send(view.heading, view=view, ephemeral=True)
         return
-
-    await send_inventory_report(
-        ctx=ctx,
-        governor=governor,
-        report_view=report_view,
-        range_key=range_key,
-        visibility=visibility,
+    await ctx.followup.send(
+        "Choose the inventory report to view:",
+        view=InventoryReportSelectionView(ctx=ctx, governors=governors, visibility=visibility),
+        ephemeral=True,
     )

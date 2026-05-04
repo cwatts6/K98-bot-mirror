@@ -63,7 +63,9 @@ def parse_visibility(value: str | None) -> InventoryReportVisibility | None:
     return aliases[normalized]
 
 
-async def get_visibility_preference(discord_user_id: int) -> InventoryReportVisibility:
+async def get_visibility_preference_or_none(
+    discord_user_id: int,
+) -> InventoryReportVisibility | None:
     try:
         pref = await asyncio.to_thread(
             inventory_reporting_dal.fetch_visibility_preference,
@@ -77,6 +79,13 @@ async def get_visibility_preference(discord_user_id: int) -> InventoryReportVisi
             discord_user_id,
             InventoryReportVisibility.ONLY_ME.value,
         )
+        return None
+    return pref
+
+
+async def get_visibility_preference(discord_user_id: int) -> InventoryReportVisibility:
+    pref = await get_visibility_preference_or_none(discord_user_id)
+    if pref is None:
         return InventoryReportVisibility.ONLY_ME
     return pref or InventoryReportVisibility.ONLY_ME
 

@@ -19,5 +19,6 @@ def test_register_inventory_command_registers_import_inventory():
 
     assert "import_inventory" in fake_bot.registered
     assert "myinventory" in fake_bot.registered
+    assert "inventory_preferences" in fake_bot.registered
     assert "export_inventory" in fake_bot.registered
     assert "inventory_import_audit" in fake_bot.registered

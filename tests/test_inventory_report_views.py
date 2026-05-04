@@ -1,8 +1,17 @@
 import pytest
 
-from inventory.models import InventoryReportRange, InventoryReportView, RegisteredGovernor
+from inventory.models import (
+    InventoryReportRange,
+    InventoryReportView,
+    InventoryReportVisibility,
+    RegisteredGovernor,
+)
 from ui.views import inventory_report_views
-from ui.views.inventory_report_views import InventoryRangeView
+from ui.views.inventory_report_views import (
+    InventoryPreferenceView,
+    InventoryRangeView,
+    InventoryReportSelectionView,
+)
 
 
 @pytest.mark.asyncio
@@ -61,17 +70,9 @@ def _two_governors():
 async def _start_and_get_picker(monkeypatch, user_id=42):
     ctx, followup = _make_ctx(user_id=user_id)
 
-    async def _resolve(**_kwargs):
-        return None
-
     async def _get_governors(_user_id):
         return _two_governors()
 
-    monkeypatch.setattr(
-        inventory_report_views.reporting_service,
-        "resolve_governor_for_report",
-        _resolve,
-    )
     monkeypatch.setattr(
         inventory_report_views.reporting_service,
         "get_registered_governors_for_user",
@@ -80,10 +81,7 @@ async def _start_and_get_picker(monkeypatch, user_id=42):
 
     await inventory_report_views.start_myinventory_command(
         ctx=ctx,
-        governor_id=None,
-        report_view=InventoryReportView.ALL,
-        range_key=InventoryReportRange.ONE_MONTH,
-        visibility=inventory_report_views.InventoryReportVisibility.ONLY_ME,
+        visibility=InventoryReportVisibility.ONLY_ME,
     )
 
     return ctx, followup, followup.sent["view"]
@@ -93,21 +91,21 @@ async def _start_and_get_picker(monkeypatch, user_id=42):
 async def test_myinventory_uses_picker_for_multiple_governors(monkeypatch):
     _ctx, followup, view = await _start_and_get_picker(monkeypatch)
 
-    assert followup.sent["content"] == "Select which governor inventory report to view:"
+    assert followup.sent["content"] == "Choose the inventory report to view:"
     assert followup.sent["ephemeral"] is True
-    assert view.children[0].placeholder == "Select Governor"
+    placeholders = [getattr(item, "placeholder", None) for item in view.children]
+    assert "Select Governor" in placeholders
+    assert "Select Output" in placeholders
 
 
 @pytest.mark.asyncio
 async def test_on_select_rejects_wrong_user(monkeypatch):
     """_on_select must refuse interactions from users other than the command invoker."""
     _ctx, _followup, picker_view = await _start_and_get_picker(monkeypatch, user_id=42)
-    on_select = picker_view._on_select_governor
-
     rejected = {}
 
-    class _Followup2:
-        async def send(self, content=None, **kwargs):
+    class _Response:
+        async def send_message(self, content=None, **kwargs):
             rejected["content"] = content
             rejected.update(kwargs)
 
@@ -116,55 +114,54 @@ async def test_on_select_rejects_wrong_user(monkeypatch):
         (),
         {
             "user": type("_User", (), {"id": 999})(),
-            "followup": _Followup2(),
+            "response": _Response(),
         },
     )()
 
-    await on_select(intruder_interaction, "111", True)  # ephemeral=True (picker is ephemeral)
+    await picker_view.send_report(intruder_interaction)
 
     assert "not for you" in rejected.get("content", "")
     assert rejected.get("ephemeral") is True
 
 
 @pytest.mark.asyncio
-async def test_on_select_rejects_stale_governor(monkeypatch):
-    """_on_select must handle a governor_id that was removed after the picker was shown."""
+async def test_show_report_requires_governor_selection(monkeypatch):
     _ctx, _followup, picker_view = await _start_and_get_picker(monkeypatch, user_id=42)
-    on_select = picker_view._on_select_governor
+    picker_view.selected_governor_id = None
 
-    stale_response = {}
+    response = {}
 
-    class _Followup3:
-        async def send(self, content=None, **kwargs):
-            stale_response["content"] = content
-            stale_response.update(kwargs)
+    class _Response:
+        async def send_message(self, content=None, **kwargs):
+            response["content"] = content
+            response.update(kwargs)
 
     valid_interaction = type(
         "_Interaction",
         (),
         {
             "user": type("_User", (), {"id": 42})(),
-            "followup": _Followup3(),
+            "response": _Response(),
         },
     )()
 
-    await on_select(valid_interaction, "9999", True)  # ephemeral=True (picker is ephemeral)
+    await picker_view.send_report(valid_interaction)
 
-    assert "no longer available" in stale_response.get("content", "")
-    assert stale_response.get("ephemeral") is True
+    assert "Choose a governor" in response.get("content", "")
+    assert response.get("ephemeral") is True
 
 
 @pytest.mark.asyncio
-async def test_on_select_sends_report_for_valid_governor(monkeypatch):
-    """_on_select must hand off to _send_inventory_report_message with the selected governor."""
+async def test_show_report_sends_report_for_selected_governor_and_output(monkeypatch):
     _ctx, _followup, picker_view = await _start_and_get_picker(monkeypatch, user_id=42)
-    on_select = picker_view._on_select_governor
-
+    picker_view.selected_governor_id = 222
+    picker_view.selected_view = InventoryReportView.SPEEDUPS
     captured = {}
 
     async def _mock_send_report(*, send, user, requester_id, governor, **kwargs):
         captured["governor"] = governor
         captured["requester_id"] = requester_id
+        captured.update(kwargs)
 
     monkeypatch.setattr(
         inventory_report_views,
@@ -172,7 +169,11 @@ async def test_on_select_sends_report_for_valid_governor(monkeypatch):
         _mock_send_report,
     )
 
-    class _Followup4:
+    class _Response:
+        async def defer(self, **kwargs):
+            captured["defer"] = kwargs
+
+    class _Followup:
         async def send(self, content=None, **kwargs):
             pass
 
@@ -181,11 +182,68 @@ async def test_on_select_sends_report_for_valid_governor(monkeypatch):
         (),
         {
             "user": type("_User", (), {"id": 42, "display_name": "Tester"})(),
-            "followup": _Followup4(),
+            "response": _Response(),
+            "followup": _Followup(),
         },
     )()
 
-    await on_select(valid_interaction, "222", True)  # ephemeral=True (picker is ephemeral)
+    await picker_view.send_report(valid_interaction)
 
     assert captured["governor"].governor_id == 222
     assert captured["requester_id"] == 42
+    assert captured["report_view"] == InventoryReportView.SPEEDUPS
+
+
+@pytest.mark.asyncio
+async def test_preference_view_saves_visibility(monkeypatch):
+    saved = {}
+
+    async def _resolve_visibility(**kwargs):
+        saved.update(kwargs)
+
+    monkeypatch.setattr(
+        inventory_report_views.reporting_service,
+        "resolve_visibility",
+        _resolve_visibility,
+    )
+    view = InventoryPreferenceView(requester_id=42)
+
+    class _Response:
+        async def defer(self, **_kwargs):
+            return None
+
+    class _Followup:
+        async def send(self, content=None, **kwargs):
+            saved["content"] = content
+            saved.update(kwargs)
+
+    interaction = type(
+        "_Interaction",
+        (),
+        {
+            "user": type("_User", (), {"id": 42})(),
+            "response": _Response(),
+            "followup": _Followup(),
+            "edit_original_response": lambda self, **_kwargs: None,
+        },
+    )()
+
+    await view._save(interaction, InventoryReportVisibility.PUBLIC)
+
+    assert saved["discord_user_id"] == 42
+    assert saved["selected_visibility"] == InventoryReportVisibility.PUBLIC
+
+
+@pytest.mark.asyncio
+async def test_report_selection_view_single_governor_only_shows_output_select():
+    ctx, _followup = _make_ctx()
+    view = InventoryReportSelectionView(
+        ctx=ctx,
+        governors=[RegisteredGovernor(111, "MainGov", "Main")],
+        visibility=InventoryReportVisibility.ONLY_ME,
+    )
+
+    placeholders = [getattr(item, "placeholder", None) for item in view.children]
+
+    assert "Select Governor" not in placeholders
+    assert "Select Output" in placeholders

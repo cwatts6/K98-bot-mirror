@@ -99,6 +99,15 @@ def test_inventory_review_embed_hides_model_and_fallback_details():
 
 
 @pytest.mark.asyncio
+async def test_inventory_review_uses_single_cancel_button():
+    view = _view(InventoryImportType.SPEEDUPS)
+    custom_ids = [item.custom_id for item in view.children]
+
+    assert "inventory_import_cancel" in custom_ids
+    assert "inventory_import_reject" not in custom_ids
+
+
+@pytest.mark.asyncio
 async def test_resource_correction_modal_only_prompts_total_resources():
     modal = ResourceCorrectionModal(_view(InventoryImportType.RESOURCES))
 

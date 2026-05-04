@@ -190,9 +190,8 @@ async def test_confirmation_view_timeout_watch_disables_message(monkeypatch):
     assert all(getattr(item, "disabled", False) for item in view.children)
 
 
-async def test_interaction_review_followup_gets_ephemeral_delete_after(monkeypatch):
+async def test_interaction_review_prefers_channel_message_when_upload_message_exists(monkeypatch):
     message = _Message()
-    sent = {}
 
     class _Response:
         def __init__(self):
@@ -204,15 +203,10 @@ async def test_interaction_review_followup_gets_ephemeral_delete_after(monkeypat
         async def defer(self, **_kwargs):
             self.done = True
 
-    class _Followup:
-        async def send(self, **kwargs):
-            sent.update(kwargs)
-            return types.SimpleNamespace(edit=lambda **_k: None)
-
     interaction = types.SimpleNamespace(
         user=types.SimpleNamespace(id=42),
         response=_Response(),
-        followup=_Followup(),
+        followup=types.SimpleNamespace(send=None),
     )
     summary = InventoryAnalysisSummary(
         ok=True,
@@ -254,5 +248,63 @@ async def test_interaction_review_followup_gets_ephemeral_delete_after(monkeypat
         flow_from_pending_command=False,
     )
 
-    assert sent["ephemeral"] is True
-    assert sent["delete_after"] == inventory_views.INVENTORY_REVIEW_UI_TIMEOUT_SECONDS
+    assert message.deleted is False
+    assert message.channel.sent
+    assert message.channel.sent[-1][1]["view"] is not None
+    assert (
+        message.channel.sent[-1][1]["delete_after"]
+        == inventory_views.INVENTORY_REVIEW_TIMEOUT_SECONDS
+    )
+
+
+async def test_approve_deletes_original_upload_after_success(monkeypatch):
+    async def _state(_batch_id):
+        return inventory_views.inventory_service.InventoryReviewActionState(active=True)
+
+    async def _assessment(**_kwargs):
+        return inventory_views.inventory_service.InventorySignificantChangeAssessment()
+
+    async def _approve(**_kwargs):
+        return {"resources": {}}
+
+    monkeypatch.setattr(inventory_views.inventory_service, "get_review_action_state", _state)
+    monkeypatch.setattr(inventory_views.inventory_service, "assess_significant_change", _assessment)
+    monkeypatch.setattr(inventory_views.inventory_service, "approve_import", _approve)
+    monkeypatch.setattr(
+        inventory_views.inventory_service, "mark_original_upload_deleted", lambda _id: None
+    )
+
+    original = _Message()
+    view = inventory_views.InventoryConfirmationView(
+        bot=object(),
+        actor_discord_id=42,
+        governor_id=111,
+        batch_id=99,
+        payload=InventoryImagePayload(image_bytes=b"img", filename="inventory.png"),
+        summary=InventoryAnalysisSummary(
+            ok=True,
+            import_type=InventoryImportType.RESOURCES,
+            values={"resources": {}},
+            confidence_score=0.95,
+        ),
+        original_message=original,
+    )
+
+    class _Response:
+        async def defer(self, **_kwargs):
+            return None
+
+    class _Followup:
+        async def send(self, *_args, **_kwargs):
+            return None
+
+    interaction = types.SimpleNamespace(
+        user=types.SimpleNamespace(id=42),
+        response=_Response(),
+        followup=_Followup(),
+        message=None,
+    )
+
+    await view.approve.callback(interaction)
+
+    assert original.deleted is True

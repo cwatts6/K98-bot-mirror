@@ -111,6 +111,50 @@ async def _send_followup_capture_message(interaction: discord.Interaction, **kwa
         return await interaction.followup.send(**kwargs)
 
 
+async def _safe_followup_send(interaction: discord.Interaction, **kwargs: Any) -> Any:
+    try:
+        return await interaction.followup.send(**kwargs)
+    except discord.NotFound:
+        logger.debug("inventory_followup_webhook_expired", exc_info=True)
+        return None
+
+
+async def _send_review_message(
+    *,
+    interaction: discord.Interaction | None,
+    original_message: discord.Message | None,
+    actor_discord_id: int,
+    content: str,
+    embed: discord.Embed,
+    view: discord.ui.View,
+) -> discord.Message | None:
+    if original_message is not None:
+        return await original_message.channel.send(
+            f"<@{actor_discord_id}> {content}",
+            embed=embed,
+            view=view,
+            delete_after=INVENTORY_REVIEW_TIMEOUT_SECONDS,
+        )
+    if interaction is None:
+        return None
+    try:
+        return await _send_followup_capture_message(
+            interaction,
+            content=content,
+            embed=embed,
+            view=view,
+            ephemeral=True,
+            delete_after=INVENTORY_REVIEW_UI_TIMEOUT_SECONDS,
+        )
+    except discord.NotFound:
+        logger.warning(
+            "inventory_review_followup_expired actor=%s",
+            actor_discord_id,
+            exc_info=True,
+        )
+        return None
+
+
 async def _post_admin_debug(
     *,
     bot: Any,
@@ -185,6 +229,7 @@ class InventoryConfirmationView(discord.ui.View):
         batch_id: int,
         payload: InventoryImagePayload,
         summary: InventoryAnalysisSummary,
+        original_message: discord.Message | None = None,
     ) -> None:
         super().__init__(timeout=INVENTORY_REVIEW_UI_TIMEOUT_SECONDS)
         self.bot = bot
@@ -193,6 +238,7 @@ class InventoryConfirmationView(discord.ui.View):
         self.batch_id = int(batch_id)
         self.payload = payload
         self.summary = summary
+        self.original_message = original_message
         self.corrected_values: dict[str, Any] | None = None
         self._terminal = False
         self._expired = False
@@ -459,6 +505,10 @@ class InventoryConfirmationView(discord.ui.View):
                 )
             except Exception:
                 logger.exception("inventory_approve_debug_post_failed batch_id=%s", self.batch_id)
+        await _delete_original_upload(
+            original_message=self.original_message,
+            batch_id=self.batch_id,
+        )
         await interaction.followup.send("Inventory import approved.", ephemeral=True)
         await self._update_review_message(interaction, content="Inventory import approved.")
 
@@ -483,48 +533,6 @@ class InventoryConfirmationView(discord.ui.View):
         )
 
     @discord.ui.button(
-        label="Reject Import",
-        style=discord.ButtonStyle.danger,
-        custom_id="inventory_import_reject",
-    )
-    async def reject(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
-        if await self._deny_if_not_actor(interaction):
-            return
-        self.message = getattr(interaction, "message", None)
-        await interaction.response.defer(ephemeral=True)
-        try:
-            await inventory_service.reject_import(self.batch_id, error="Rejected by user.")
-        except Exception:
-            logger.exception("inventory_import_reject_failed batch_id=%s", self.batch_id)
-            await interaction.followup.send(
-                f"Rejection failed due to an internal error. Please try again or contact an admin with batch ID {self.batch_id}.",
-                ephemeral=True,
-            )
-            return
-        self._terminal = True
-        self.disable_all_items()
-        self.stop()
-        try:
-            await _post_admin_debug(
-                bot=self.bot,
-                batch_id=self.batch_id,
-                governor_id=self.governor_id,
-                discord_user_id=self.actor_discord_id,
-                status="rejected",
-                payload=self.payload,
-                summary=self.summary,
-                error_json={"error": "Rejected by user."},
-            )
-        except Exception:
-            logger.exception("inventory_reject_debug_post_failed batch_id=%s", self.batch_id)
-        await interaction.followup.send(
-            "Import rejected. You can upload one replacement screenshot if needed.\n\n"
-            + SCREENSHOT_GUIDELINES,
-            ephemeral=True,
-        )
-        await self._update_review_message(interaction, content="Inventory import rejected.")
-
-    @discord.ui.button(
         label="Cancel Import",
         style=discord.ButtonStyle.secondary,
         custom_id="inventory_import_cancel",
@@ -546,7 +554,28 @@ class InventoryConfirmationView(discord.ui.View):
         self._terminal = True
         self.disable_all_items()
         self.stop()
-        await interaction.followup.send("Import cancelled.", ephemeral=True)
+        await _delete_original_upload(
+            original_message=self.original_message,
+            batch_id=self.batch_id,
+        )
+        try:
+            await _post_admin_debug(
+                bot=self.bot,
+                batch_id=self.batch_id,
+                governor_id=self.governor_id,
+                discord_user_id=self.actor_discord_id,
+                status="cancelled",
+                payload=self.payload,
+                summary=self.summary,
+                error_json={"error": "Cancelled by user."},
+            )
+        except Exception:
+            logger.exception("inventory_cancel_debug_post_failed batch_id=%s", self.batch_id)
+        await interaction.followup.send(
+            "Import cancelled. You can upload a replacement screenshot if needed.\n\n"
+            + SCREENSHOT_GUIDELINES,
+            ephemeral=True,
+        )
         await self._update_review_message(interaction, content="Inventory import cancelled.")
 
     async def on_timeout(self) -> None:
@@ -742,7 +771,6 @@ async def _process_payload_for_governor(
                 payload=payload,
                 is_admin=_is_admin(getattr(interaction, "user", None)) if interaction else False,
             )
-        await _delete_original_upload(original_message=original_message, batch_id=batch_id)
         summary = await inventory_service.analyse_inventory_image(
             import_batch_id=batch_id,
             payload=payload,
@@ -765,7 +793,11 @@ async def _process_payload_for_governor(
                 + SCREENSHOT_GUIDELINES
             )
             if interaction is not None:
-                await interaction.followup.send(message, ephemeral=True)
+                sent = await _safe_followup_send(interaction, content=message, ephemeral=True)
+                if sent is None and original_message is not None:
+                    await original_message.channel.send(
+                        f"<@{actor_discord_id}> {message}", delete_after=120
+                    )
             elif original_message is not None:
                 await original_message.channel.send(
                     f"<@{actor_discord_id}> {message}", delete_after=120
@@ -787,7 +819,16 @@ async def _process_payload_for_governor(
             )
             content = "Materials import is not available yet. No values were saved."
             if interaction is not None:
-                await interaction.followup.send(content, embed=embed, ephemeral=True)
+                sent = await _safe_followup_send(
+                    interaction,
+                    content=content,
+                    embed=embed,
+                    ephemeral=True,
+                )
+                if sent is None and original_message is not None:
+                    await original_message.channel.send(
+                        f"<@{actor_discord_id}> {content}", embed=embed, delete_after=120
+                    )
             elif original_message is not None:
                 await original_message.channel.send(
                     f"<@{actor_discord_id}> {content}", embed=embed, delete_after=120
@@ -805,33 +846,33 @@ async def _process_payload_for_governor(
         content = "Review the detected inventory values before approving."
         if flow_from_pending_command:
             content = "Screenshot received. Review the detected inventory values before approving."
-        if interaction is not None:
-            sent = await _send_followup_capture_message(
-                interaction,
-                content=content,
-                embed=embed,
-                view=view,
-                ephemeral=True,
-                delete_after=INVENTORY_REVIEW_UI_TIMEOUT_SECONDS,
-            )
-            view.message = sent
-            view.start_timeout_watch()
-        elif original_message is not None:
-            sent = await original_message.channel.send(
-                f"<@{actor_discord_id}> {content}",
-                embed=embed,
-                view=view,
-                delete_after=INVENTORY_REVIEW_TIMEOUT_SECONDS,
-            )
-            view.message = sent
-            view.start_timeout_watch()
+        view.original_message = original_message
+        sent = await _send_review_message(
+            interaction=interaction,
+            original_message=original_message,
+            actor_discord_id=actor_discord_id,
+            content=content,
+            embed=embed,
+            view=view,
+        )
+        view.message = sent
+        view.start_timeout_watch()
     except Exception:
         logger.exception("inventory_process_payload_failed governor_id=%s", governor_id)
         if interaction is not None:
-            await interaction.followup.send(
-                "Inventory import failed due to an internal error. Please try again or contact an admin.",
+            sent = await _safe_followup_send(
+                interaction,
+                content=(
+                    "Inventory import failed due to an internal error. "
+                    "Please try again or contact an admin."
+                ),
                 ephemeral=True,
             )
+            if sent is None and original_message is not None:
+                await original_message.channel.send(
+                    f"<@{actor_discord_id}> Inventory import failed. Please try again or contact an admin.",
+                    delete_after=120,
+                )
         elif original_message is not None:
             await original_message.channel.send(
                 f"<@{actor_discord_id}> Inventory import failed. Please try again or contact an admin.",
