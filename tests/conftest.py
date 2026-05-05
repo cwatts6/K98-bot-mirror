@@ -9,6 +9,12 @@ import types
 import pytest
 
 os.environ.setdefault("OUR_KINGDOM", "98")
+os.environ.setdefault("DISCORD_BOT_TOKEN", "test-token")
+os.environ.setdefault("TIMELINE_SHEET_ID", "test-timeline-sheet")
+os.environ.setdefault("SQL_SERVER", "test-sql-server")
+os.environ.setdefault("SQL_DATABASE", "test-db")
+os.environ.setdefault("IMPORT_SQL_USERNAME", "test-user")
+os.environ.setdefault("IMPORT_SQL_PASSWORD", "test-password")
 
 # Determine repository root (one directory up from tests/)
 _THIS_DIR = os.path.dirname(__file__)
