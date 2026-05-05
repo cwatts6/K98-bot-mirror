@@ -55,3 +55,6 @@ Write-Host "[dev] TEMP/TMP:        $tempDir"
 if ($venv)  { Write-Host "[dev] VENV:            $venv" }
 if ($python){ Write-Host "[dev] python.exe:      $python" }
 Write-Host "[dev] UTF-8 enabled"
+
+#rg
+$env:PATH = "C:\discord_file_downloader\tools;" + $env:PATH
