@@ -42,6 +42,8 @@ async def test_build_inventory_export_file_writes_csv_and_cleans_up(monkeypatch)
                 "ResourceType": "food",
                 "FromItemsValue": 100,
                 "TotalResourcesValue": 200,
+                "VipLevelCode": "VIP_15",
+                "VipLevelLabel": "VIP 15",
             }
         ]
 
@@ -65,6 +67,8 @@ async def test_build_inventory_export_file_writes_csv_and_cleans_up(monkeypatch)
             rows = list(csv.DictReader(handle))
         assert rows[0]["RecordKind"] == "resource"
         assert rows[0]["TotalResourcesValue"] == "200"
+        assert rows[0]["VipLevelCode"] == "VIP_15"
+        assert rows[0]["VipLevelLabel"] == "VIP 15"
         assert export_file.row_count == 1
     finally:
         parent = export_file.path.parent
@@ -91,6 +95,8 @@ async def test_build_inventory_export_file_writes_xlsx_smoke(monkeypatch):
                 "ResourceType": "food",
                 "FromItemsValue": 100,
                 "TotalResourcesValue": 200,
+                "VipLevelCode": "VIP_16",
+                "VipLevelLabel": "VIP 16",
             }
         ]
 
@@ -123,6 +129,8 @@ async def test_build_inventory_export_file_writes_xlsx_smoke(monkeypatch):
         assert len(xlsx_write_calls) == 1
         rows_written, path_written = xlsx_write_calls[0]
         assert len(rows_written) == 1
+        assert rows_written[0]["VipLevelCode"] == "VIP_16"
+        assert rows_written[0]["VipLevelLabel"] == "VIP 16"
         assert path_written == export_file.path
     finally:
         export_service.cleanup_export_file(export_file)

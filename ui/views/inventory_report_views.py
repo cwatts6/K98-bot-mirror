@@ -9,6 +9,7 @@ import discord
 from inventory import export_service, profile_service, reporting_service
 from inventory.models import (
     InventoryExportFormat,
+    InventoryGovernorProfile,
     InventoryReportRange,
     InventoryReportView,
     InventoryReportVisibility,
@@ -358,27 +359,58 @@ class InventoryPreferenceView(discord.ui.View):
                 ephemeral=True,
             )
             return
+        profiles = await asyncio.gather(
+            *(profile_service.fetch_inventory_profile(g.governor_id) for g in governors)
+        )
+        profiles_by_governor_id = {p.governor_id: p for p in profiles}
         await interaction.followup.send(
             "Choose a governor and VIP level:",
             view=InventoryVipPreferenceView(
                 requester_id=self.requester_id,
                 governors=governors,
+                profiles_by_governor_id=profiles_by_governor_id,
             ),
             ephemeral=True,
         )
 
 
 class InventoryVipPreferenceView(discord.ui.View):
-    def __init__(self, *, requester_id: int, governors: list[RegisteredGovernor]) -> None:
+    def __init__(
+        self,
+        *,
+        requester_id: int,
+        governors: list[RegisteredGovernor],
+        profiles_by_governor_id: dict[int, InventoryGovernorProfile] | None = None,
+    ) -> None:
         super().__init__(timeout=300)
         self.requester_id = int(requester_id)
         self.governors_by_id = {item.governor_id: item for item in governors}
-        self.selected_governor_id = governors[0].governor_id if len(governors) == 1 else None
-        self.selected_vip_level = InventoryVipLevel.UNKNOWN
+        self.profiles_by_governor_id: dict[int, InventoryGovernorProfile] = (
+            profiles_by_governor_id or {}
+        )
+        initial_governor_id = governors[0].governor_id if len(governors) == 1 else None
+        self.selected_governor_id = initial_governor_id
+        initial_profile = (
+            self.profiles_by_governor_id.get(initial_governor_id)
+            if initial_governor_id is not None
+            else None
+        )
+        self.selected_vip_level = normalize_vip_level(
+            initial_profile.vip_level_code if initial_profile else None
+        )
         self._completed = False
         if len(governors) > 1:
             self.add_item(InventoryVipGovernorSelect(governors))
-        self.add_item(InventoryVipLevelSelect())
+        self.add_item(InventoryVipLevelSelect(initial_level=self.selected_vip_level))
+
+    async def on_timeout(self) -> None:
+        for item in self.children:
+            item.disabled = True
+        try:
+            if self.message:
+                await self.message.edit(view=self)
+        except Exception:
+            pass
 
     async def save(self, interaction: discord.Interaction) -> None:
         if int(interaction.user.id) != self.requester_id:
@@ -485,16 +517,20 @@ class InventoryVipGovernorSelect(discord.ui.Select):
             await interaction.response.send_message("This selector is not for you.", ephemeral=True)
             return
         view.selected_governor_id = int(self.values[0])
+        profile = view.profiles_by_governor_id.get(view.selected_governor_id)
+        view.selected_vip_level = normalize_vip_level(
+            profile.vip_level_code if profile else None
+        )
         await interaction.response.defer(ephemeral=True)
 
 
 class InventoryVipLevelSelect(discord.ui.Select):
-    def __init__(self) -> None:
+    def __init__(self, initial_level: InventoryVipLevel = InventoryVipLevel.UNKNOWN) -> None:
         options = [
             discord.SelectOption(
                 label=VIP_LABELS[level],
                 value=level.value,
-                default=level == InventoryVipLevel.UNKNOWN,
+                default=level == initial_level,
             )
             for level in VIP_SELECT_OPTIONS
         ]
