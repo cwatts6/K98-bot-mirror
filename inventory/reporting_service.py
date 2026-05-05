@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from decoraters import _is_admin
+from inventory import profile_service
 from inventory.dal import inventory_reporting_dal
 from inventory.inventory_service import (
     get_registered_governors_for_user,
@@ -220,6 +221,7 @@ async def build_inventory_report_payload(
 ) -> InventoryReportPayload:
     resources: list[InventoryResourcePoint] = []
     speedups: list[InventorySpeedupPoint] = []
+    governor_profile = await profile_service.fetch_inventory_profile(int(governor.governor_id))
 
     if view in {InventoryReportView.RESOURCES, InventoryReportView.ALL}:
         resource_rows = await asyncio.to_thread(
@@ -249,6 +251,7 @@ async def build_inventory_report_payload(
         governor_name=governor.governor_name,
         view=view,
         range_key=range_key,
+        governor_profile=governor_profile,
         resources=resources,
         speedups=speedups,
         generated_at_utc=datetime.now(UTC),

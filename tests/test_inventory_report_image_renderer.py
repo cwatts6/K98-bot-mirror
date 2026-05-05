@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from inventory import report_image_renderer
 from inventory.models import (
+    InventoryGovernorProfile,
     InventoryReportPayload,
     InventoryReportRange,
     InventoryReportView,
@@ -75,3 +76,36 @@ def test_resource_chart_colours_are_distinct():
         report_image_renderer.RESOURCE_CHART_COLORS["Wood"]
         != report_image_renderer.RESOURCE_CHART_COLORS["Gold"]
     )
+
+
+def test_render_inventory_reports_supports_stored_vip_profile():
+    now = datetime.now(UTC)
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name="Gov",
+        view=InventoryReportView.ALL,
+        range_key=InventoryReportRange.ONE_MONTH,
+        governor_profile=InventoryGovernorProfile(
+            governor_id=111,
+            vip_level_code="VIP_18",
+            vip_level_label="VIP 18",
+        ),
+        resources=[
+            InventoryResourcePoint(
+                now,
+                1_000_000_000,
+                1_000_000_000,
+                800_000_000,
+                800_000_000,
+            )
+        ],
+        speedups=[InventorySpeedupPoint(now, 1, 2, 3, 4, 5)],
+        generated_at_utc=now,
+    )
+
+    rendered = render_inventory_reports(payload)
+
+    assert [item.filename for item in rendered] == [
+        "inventory_resources_111_1M.png",
+        "inventory_speedups_111_1M.png",
+    ]

@@ -9,9 +9,14 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
+from inventory.capacity_calculations import (
+    rss_healing_capacity,
+    rss_training_capacity,
+    speedup_healing_capacity,
+    speedup_training_capacity,
+)
 from inventory.models import (
     InventoryReportPayload,
-    InventoryResourcePoint,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -324,17 +329,6 @@ def _aware(value: Any) -> Any:
     return value
 
 
-def _capacity(point: InventoryResourcePoint, costs: dict[str, int]) -> tuple[float, str]:
-    capacities = {
-        "Food": point.food / costs["food"],
-        "Wood": point.wood / costs["wood"],
-        "Stone": point.stone / costs["stone"],
-        "Gold": point.gold / costs["gold"],
-    }
-    limiting = min(capacities, key=capacities.get)
-    return int(capacities[limiting] * 10) / 10, limiting
-
-
 def render_resources_report(
     payload: InventoryReportPayload, *, avatar_bytes: bytes | None = None
 ) -> RenderedInventoryImage | None:
@@ -387,28 +381,32 @@ def render_resources_report(
     velocity_text = "N/A" if velocity is None else f"{velocity / 1_000_000:+.1f}m/day"
     velocity_color = MUTED if velocity is None else (GREEN if velocity >= 0 else RED)
 
-    train_cap, train_limit = _capacity(
-        latest,
-        {"food": 533_000_000, "wood": 533_000_000, "stone": 400_000_000, "gold": 400_000_000},
-    )
-    heal_cap, heal_limit = _capacity(
-        latest,
-        {"food": 213_300_000, "wood": 213_300_000, "stone": 160_000_000, "gold": 160_000_000},
-    )
+    vip_code = payload.governor_profile.vip_level_code if payload.governor_profile else None
+    train_capacity = rss_training_capacity(latest)
+    heal_capacity = rss_healing_capacity(latest, vip_code)
     forecast = None if velocity is None else total_latest + (velocity * 30)
     insight_boxes = [
         ("RSS Velocity", velocity_text, "range delta", None, velocity_color),
         (
             "RSS Troop Training Capacity",
-            f"{train_cap:,.1f}m troops",
-            f"Limit {train_limit} | {train_cap * 10:,.1f}m Power | {train_cap * 100:,.1f}m MGE",
+            f"{train_capacity.troops_millions:,.1f}m troops",
+            (
+                f"Limit {train_capacity.limiting_resource} | "
+                f"{train_capacity.power_millions:,.1f}m Power | "
+                f"{train_capacity.mge_points_millions:,.1f}m MGE"
+            ),
             ASSET_DIR / "Training" / "Training.png",
             TEXT,
         ),
         (
             "RSS Troop Healing Capacity",
-            f"{heal_cap:,.1f}m troops",
-            f"Limit {heal_limit} | {heal_cap * 5:,.1f}m kills | {heal_cap * 20:,.1f}m KP",
+            f"{heal_capacity.troops_millions:,.1f}m troops",
+            (
+                f"Limit {heal_capacity.limiting_resource} | "
+                f"{heal_capacity.kills_millions or 0:,.1f}m kills | "
+                f"{heal_capacity.kill_points_millions or 0:,.1f}m KP | "
+                f"{heal_capacity.vip_note}"
+            ),
             ASSET_DIR / "healing" / "healing.png",
             TEXT,
         ),
@@ -491,21 +489,30 @@ def render_speedups_report(
         )
 
     latest = payload.speedups[-1]
-    training_total = latest.training_days + latest.universal_days
-    healing_total = latest.healing_days + latest.universal_days
-    train_scale = training_total / 100
-    heal_scale = healing_total / 100
+    vip_code = payload.governor_profile.vip_level_code if payload.governor_profile else None
+    train_capacity = speedup_training_capacity(latest, vip_code)
+    heal_capacity = speedup_healing_capacity(latest, vip_code)
     capacity_boxes = [
         (
             "Total Speedup Training Capacity",
-            f"{int(round(training_total)):,}d",
-            f"{train_scale * 136_000:,.0f} troops | {train_scale * 1.36:,.1f}m Power | {train_scale * 13.6:,.1f}m MGE",
+            f"{int(round(train_capacity.source_days)):,}d",
+            (
+                f"{train_capacity.troops or 0:,.0f} troops | "
+                f"{train_capacity.power_millions or 0:,.1f}m Power | "
+                f"{train_capacity.mge_points_millions or 0:,.1f}m MGE | "
+                f"{train_capacity.vip_note}"
+            ),
             ASSET_DIR / "Training" / "Training.png",
         ),
         (
             "Total Healing Speedup Capacity",
-            f"{int(round(healing_total)):,}d",
-            f"{heal_scale * 6.1:,.1f}m healed | {heal_scale * 6.1:,.1f}m kills | {heal_scale * 122:,.1f}m KP",
+            f"{int(round(heal_capacity.source_days)):,}d",
+            (
+                f"{heal_capacity.healed_millions or 0:,.1f}m healed | "
+                f"{heal_capacity.kills_millions or 0:,.1f}m kills | "
+                f"{heal_capacity.kill_points_millions or 0:,.1f}m KP | "
+                f"{heal_capacity.vip_note}"
+            ),
             ASSET_DIR / "healing" / "healing.png",
         ),
     ]

@@ -60,3 +60,30 @@ def test_inventory_phase1b_schema_defines_visibility_preference_contract():
 
     for token in required_tokens:
         assert token in sql
+
+
+def test_inventory_phase1f_schema_defines_governor_profile_contract():
+    sql = Path("sql/inventory_phase1f_schema.sql").read_text(encoding="utf-8")
+
+    required_tokens = [
+        "SET ANSI_NULLS ON",
+        "SET QUOTED_IDENTIFIER ON",
+        "CREATE TABLE dbo.GovernorInventoryProfile",
+        "GovernorID BIGINT NOT NULL",
+        "VipLevelCode NVARCHAR(32) NULL",
+        "VipLevelLabel NVARCHAR(64) NULL",
+        "UpdatedByDiscordUserID BIGINT NULL",
+        "CreatedAtUtc DATETIME2(3) NOT NULL",
+        "UpdatedAtUtc DATETIME2(3) NOT NULL",
+        "CK_GovernorInventoryProfile_VipLevelCode",
+        "N'VIP_14_OR_LESS'",
+        "N'VIP_15'",
+        "N'VIP_16'",
+        "N'VIP_17'",
+        "N'VIP_18'",
+        "N'VIP_19'",
+        "N'SVIP'",
+    ]
+
+    for token in required_tokens:
+        assert token in sql

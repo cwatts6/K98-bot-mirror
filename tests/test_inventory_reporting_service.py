@@ -5,6 +5,7 @@ import pytest
 
 from inventory import reporting_service
 from inventory.models import (
+    InventoryGovernorProfile,
     InventoryReportRange,
     InventoryReportView,
     InventoryReportVisibility,
@@ -133,6 +134,11 @@ async def test_build_inventory_report_payload_groups_resources_and_speedups(monk
         _speedup_rows,
     )
 
+    async def _profile(governor_id):
+        return InventoryGovernorProfile.default(governor_id)
+
+    monkeypatch.setattr(reporting_service.profile_service, "fetch_inventory_profile", _profile)
+
     payload = await reporting_service.build_inventory_report_payload(
         discord_user_id=42,
         governor=RegisteredGovernor(111, "Gov", "Main"),
@@ -143,6 +149,43 @@ async def test_build_inventory_report_payload_groups_resources_and_speedups(monk
     assert payload.resources[0].total == 1000
     assert payload.speedups[0].training_days == 3
     assert payload.speedups[0].universal_days == 5
+    assert payload.governor_profile is not None
+    assert payload.governor_profile.uses_default_vip is True
+
+
+@pytest.mark.asyncio
+async def test_build_inventory_report_payload_includes_stored_vip(monkeypatch):
+    now = datetime.now(UTC)
+
+    monkeypatch.setattr(
+        reporting_service.inventory_reporting_dal,
+        "fetch_resource_rows",
+        lambda _governor_id: [
+            {"ScanUtc": now, "ResourceType": "food", "TotalResourcesValue": 100},
+            {"ScanUtc": now, "ResourceType": "wood", "TotalResourcesValue": 100},
+            {"ScanUtc": now, "ResourceType": "stone", "TotalResourcesValue": 100},
+            {"ScanUtc": now, "ResourceType": "gold", "TotalResourcesValue": 100},
+        ],
+    )
+
+    async def _profile(governor_id):
+        return InventoryGovernorProfile(
+            governor_id=governor_id,
+            vip_level_code="VIP_18",
+            vip_level_label="VIP 18",
+        )
+
+    monkeypatch.setattr(reporting_service.profile_service, "fetch_inventory_profile", _profile)
+
+    payload = await reporting_service.build_inventory_report_payload(
+        discord_user_id=42,
+        governor=RegisteredGovernor(111, "Gov", "Main"),
+        view=InventoryReportView.RESOURCES,
+        range_key=InventoryReportRange.ONE_MONTH,
+    )
+
+    assert payload.governor_profile is not None
+    assert payload.governor_profile.vip_level_code == "VIP_18"
 
 
 @pytest.mark.asyncio

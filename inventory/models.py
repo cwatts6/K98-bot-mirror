@@ -69,6 +69,24 @@ class RegisteredGovernor:
 
 
 @dataclass(frozen=True)
+class InventoryGovernorProfile:
+    governor_id: int
+    vip_level_code: str | None = None
+    vip_level_label: str = "Unknown / not set"
+    updated_by_discord_user_id: int | None = None
+    created_at_utc: Any | None = None
+    updated_at_utc: Any | None = None
+
+    @classmethod
+    def default(cls, governor_id: int) -> InventoryGovernorProfile:
+        return cls(governor_id=int(governor_id))
+
+    @property
+    def uses_default_vip(self) -> bool:
+        return self.vip_level_code is None
+
+
+@dataclass(frozen=True)
 class InventoryImagePayload:
     image_bytes: bytes
     filename: str
@@ -129,6 +147,7 @@ class InventoryReportPayload:
     governor_name: str
     view: InventoryReportView
     range_key: InventoryReportRange
+    governor_profile: InventoryGovernorProfile | None = None
     resources: list[InventoryResourcePoint] = field(default_factory=list)
     speedups: list[InventorySpeedupPoint] = field(default_factory=list)
     generated_at_utc: Any | None = None

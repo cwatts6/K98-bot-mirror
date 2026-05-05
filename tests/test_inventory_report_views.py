@@ -11,6 +11,7 @@ from ui.views.inventory_report_views import (
     InventoryPreferenceView,
     InventoryRangeView,
     InventoryReportSelectionView,
+    InventoryVipPreferenceView,
 )
 
 
@@ -267,6 +268,130 @@ async def test_preference_view_saves_visibility(monkeypatch):
     assert saved["discord_user_id"] == 42
     assert saved["selected_visibility"] == InventoryReportVisibility.PUBLIC
     assert "/inventory_preferences" in saved["content"]
+
+
+@pytest.mark.asyncio
+async def test_preference_view_opens_vip_update_flow(monkeypatch):
+    sent = {}
+
+    async def _get_governors(_user_id):
+        return [RegisteredGovernor(111, "MainGov", "Main")]
+
+    monkeypatch.setattr(
+        inventory_report_views.reporting_service,
+        "get_registered_governors_for_user",
+        _get_governors,
+    )
+    view = InventoryPreferenceView(requester_id=42)
+
+    class _Response:
+        async def defer(self, **_kwargs):
+            return None
+
+    class _Followup:
+        async def send(self, content=None, **kwargs):
+            sent["content"] = content
+            sent.update(kwargs)
+
+    interaction = type(
+        "_Interaction",
+        (),
+        {
+            "user": type("_User", (), {"id": 42})(),
+            "response": _Response(),
+            "followup": _Followup(),
+        },
+    )()
+
+    await view.update_vip.callback(interaction)
+
+    assert sent["content"] == "Choose a governor and VIP level:"
+    assert isinstance(sent["view"], InventoryVipPreferenceView)
+    assert sent["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+async def test_vip_preference_view_saves_selected_vip(monkeypatch):
+    saved = {}
+    view = InventoryVipPreferenceView(
+        requester_id=42,
+        governors=[RegisteredGovernor(111, "MainGov", "Main")],
+    )
+    view.selected_vip_level = inventory_report_views.InventoryVipLevel.VIP_17
+
+    async def _update_inventory_vip(**kwargs):
+        saved.update(kwargs)
+        return type(
+            "_Profile",
+            (),
+            {"vip_level_label": "VIP 17"},
+        )()
+
+    monkeypatch.setattr(
+        inventory_report_views.profile_service,
+        "update_inventory_vip",
+        _update_inventory_vip,
+    )
+
+    class _Response:
+        async def defer(self, **_kwargs):
+            return None
+
+    class _Followup:
+        async def send(self, content=None, **kwargs):
+            saved["content"] = content
+            saved.update(kwargs)
+
+    async def _edit_original_response(**kwargs):
+        saved["edit"] = kwargs
+
+    interaction = type(
+        "_Interaction",
+        (),
+        {
+            "user": type("_User", (), {"id": 42})(),
+            "response": _Response(),
+            "followup": _Followup(),
+            "edit_original_response": _edit_original_response,
+        },
+    )()
+
+    await view.save(interaction)
+
+    assert saved["discord_user_id"] == 42
+    assert saved["governor_id"] == 111
+    assert saved["vip_level_code"] == "VIP_17"
+    assert "VIP 17" in saved["content"]
+    assert view._completed is True
+    assert all(getattr(item, "disabled", False) for item in view.children)
+
+
+@pytest.mark.asyncio
+async def test_vip_preference_view_rejects_wrong_user():
+    view = InventoryVipPreferenceView(
+        requester_id=42,
+        governors=[RegisteredGovernor(111, "MainGov", "Main")],
+    )
+    response = {}
+
+    class _Response:
+        async def send_message(self, content=None, **kwargs):
+            response["content"] = content
+            response.update(kwargs)
+
+    interaction = type(
+        "_Interaction",
+        (),
+        {
+            "user": type("_User", (), {"id": 999})(),
+            "response": _Response(),
+        },
+    )()
+
+    await view.save(interaction)
+
+    assert "not for you" in response["content"]
+    assert response["ephemeral"] is True
 
 
 @pytest.mark.asyncio

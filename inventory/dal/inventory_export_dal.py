@@ -35,6 +35,8 @@ def fetch_resource_export_rows(
             f"""
             SELECT b.ImportBatchID,
                    b.GovernorID,
+                   p.VipLevelCode,
+                   p.VipLevelLabel,
                    b.DiscordUserID,
                    b.FlowType,
                    b.ApprovedAtUtc,
@@ -46,6 +48,8 @@ def fetch_resource_export_rows(
             FROM dbo.GovernorResourceInventory AS r
             INNER JOIN dbo.InventoryImportBatch AS b
                 ON b.ImportBatchID = r.ImportBatchID
+            LEFT JOIN dbo.GovernorInventoryProfile AS p
+                ON p.GovernorID = b.GovernorID
             WHERE r.GovernorID IN ({placeholders})
               AND b.Status = N'approved'
               AND b.ImportType = N'resources'
@@ -73,6 +77,8 @@ def fetch_speedup_export_rows(
             f"""
             SELECT b.ImportBatchID,
                    b.GovernorID,
+                   p.VipLevelCode,
+                   p.VipLevelLabel,
                    b.DiscordUserID,
                    b.FlowType,
                    b.ApprovedAtUtc,
@@ -85,6 +91,8 @@ def fetch_speedup_export_rows(
             FROM dbo.GovernorSpeedupInventory AS s
             INNER JOIN dbo.InventoryImportBatch AS b
                 ON b.ImportBatchID = s.ImportBatchID
+            LEFT JOIN dbo.GovernorInventoryProfile AS p
+                ON p.GovernorID = b.GovernorID
             WHERE s.GovernorID IN ({placeholders})
               AND b.Status = N'approved'
               AND b.ImportType = N'speedups'

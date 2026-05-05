@@ -14,11 +14,14 @@ Phase 1D is complete, tested, and deployed.
 
 Phase 1E is complete and ready for full user launch.
 
+Phase 1F is newly added from first-batch user feedback and should be delivered before Materials.
+
 Plan after Phase 1:
 
-- Launch Phase 1 fully to users before starting Phase 2.
+- Launch Phase 1 fully to users, then deliver Phase 1F as a focused feedback/change phase before Materials.
 - Use the live launch/soak period to capture any Resources or Speedups import/report/audit issues.
-- Start Phase 2 after the launch soak with Materials as a separately scoped phase.
+- Phase 1F must correct VIP-sensitive capacity calculations and add governor-level VIP storage/update support.
+- Start Phase 2 after Phase 1F and the launch soak with Materials as a separately scoped phase.
 - Add Phase 3 for Action Points (AP) as a separately scoped phase after Materials planning is clear.
 
 Phase 0 delivered:
@@ -192,10 +195,11 @@ Development is split into:
 - Phase 1C - Inventory export, admin audit, and interaction boundary hardening: complete, tested, and deployed.
 - Phase 1D - Final Resources/Speedups completion polish: complete, tested, and deployed.
 - Phase 1E - Final Phase 1 smoke testing and report polish: complete and ready for full user launch.
-- Phase 2 - Materials Import: next build phase after Phase 1 launch/soak.
+- Phase 1F - First-batch user feedback: VIP-aware capacity calculations and per-governor VIP settings.
+- Phase 2 - Materials Import: next build phase after Phase 1F and launch/soak.
 - Phase 3 - Action Points (AP) Import: later phase after Materials scope is validated.
 
-Work must proceed phase by phase. Phase 1 should launch fully to users before Phase 2 begins. The next build phase should begin with review/scope only per repository rules.
+Work must proceed phase by phase. Phase 1 should launch fully to users, then Phase 1F should be delivered before Phase 2 begins. The next build phase should begin with review/scope only per repository rules.
 
 ## Phase 0 - OpenAI Vision Integration Setup
 
@@ -741,11 +745,8 @@ Resources output should show:
   - floor capacity to 1 decimal place
   - identify the limiting resource
   - show equivalent kills and kill points
-  - healing costs per 1,000,000 troops:
-    - Food: 213,300,000
-    - Wood: 213,300,000
-    - Stone: 160,000,000
-    - Gold: 160,000,000
+  - healing costs per 1,000,000 troops are VIP-sensitive and must use the Phase 1F VIP calculation rules.
+  - default when VIP is unknown: VIP 15 or less costs.
   - conversion: every 1m healed troops = 5m kills and 20m kill points
 - RSS Forecast:
   - display expected total RSS value in 30 days based on current RSS velocity
@@ -785,13 +786,15 @@ Speedups output should show:
   - source value = Training + Universal speedups
   - include the training logo from `assets/Training/Training.png`
   - display total days as whole days
-  - conversion baseline: `100 days = 136,000 troops / 1.36m Power (Zenith Points) / 13.6m MGE Points`
+  - conversion baseline is VIP-sensitive and must use the Phase 1F VIP calculation rules.
+  - default when VIP is unknown: VIP 14 or less baseline.
   - scale linearly from the current Training + Universal total
 - Total Healing Speedup Capacity:
   - source value = Healing + Universal speedups
   - include the healing logo from `assets/healing/healing.png`
   - display total days as whole days
-  - conversion baseline: `100 days = 6.1m T5 troops healed / 6.1m kills / 122m Kill Points`
+  - conversion baseline is VIP-sensitive and must use the Phase 1F VIP calculation rules.
+  - default when VIP is unknown: VIP 14 or less baseline.
   - scale linearly from the current Healing + Universal total
 - Graph:
   - area graph below the summary/capacity rows
@@ -911,11 +914,334 @@ Phase 1 launch decision:
 - Use the post-launch soak period to capture any real-world Resources/Speedups issues.
 - Keep Materials out of launch fixes unless a production issue requires defensive handling.
 
+## Phase 1F - First-Batch User Feedback: VIP-Aware Capacity Calculations
+
+Phase 1F is newly added and should be delivered before Phase 2 Materials.
+
+Purpose:
+
+Correct the Resources and Speedups calculated capacity values based on first-batch user feedback, and add governor-level VIP storage so calculations can be personalised per registered governor.
+
+Phase 1F is a focused feedback/change phase. Do not include Materials, AP, `/my_stats` integration, broad inventory redesign, or unrelated reporting refactors.
+
+### Key Product Decision
+
+VIP level is a per-governor parameter, not a per-Discord-user preference.
+
+Do not store VIP level in the existing inventory visibility/preference setting because that preference is per Discord user and does not fit users with multiple registered governors.
+
+If a governor's VIP level is unknown, use the documented default calculation tier. Unknown VIP must not block report generation.
+
+### VIP Values Supported
+
+The bot must support these user-facing VIP options:
+
+- Unknown / not set
+- VIP 14 or less
+- VIP 15
+- VIP 16
+- VIP 17
+- VIP 18
+- VIP 19
+- SVIP
+
+Implementation may store these as a normalized code/value, but user-facing labels must remain clear.
+
+Recommended grouping helper outputs:
+
+- `UNKNOWN`
+- `VIP_14_OR_LESS`
+- `VIP_15`
+- `VIP_16`
+- `VIP_17`
+- `VIP_18`
+- `VIP_19`
+- `SVIP`
+
+### SQL Requirements
+
+Add SQL support in the SQL Server repository.
+
+Preferred approach:
+
+- Add a governor-level profile/settings table if one does not already exist.
+- Store one row per GovernorID.
+- Include VIP level and audit timestamps.
+- Keep the design extensible for future per-governor inventory/reporting parameters.
+
+Recommended table:
+
+`GovernorInventoryProfile`
+
+- `GovernorID`
+- `VipLevelCode`
+- `VipLevelLabel`
+- `UpdatedByDiscordUserID`
+- `UpdatedAtUtc`
+- `CreatedAtUtc`
+
+Rules:
+
+- `GovernorID` is the stable key.
+- `VipLevelCode` may be nullable to represent unknown/not set.
+- Store enough audit detail to know who last updated the VIP value.
+- Do not duplicate inventory visibility preference in this table unless architecture review identifies a strong reason.
+- Queries used for `/myinventory` must retrieve the governor VIP level with the latest approved inventory data.
+
+### User Command / Interaction Requirements
+
+Users need a simple way to submit or update VIP level for each governor account they have registered.
+
+Add one of the following, based on architecture review:
+
+- Extend `/inventory_preferences` with a governor selector and VIP selector; or
+- Add a focused command such as `/inventory_vip` or `/set_inventory_vip`.
+
+Preferred UX if extending `/inventory_preferences`:
+
+1. User runs `/inventory_preferences`.
+2. User can manage report visibility as currently implemented.
+3. User can choose `Update Governor VIP`.
+4. If multiple governors are registered, show the standard governor selector.
+5. Show a VIP dropdown with supported values.
+6. Save the selected VIP level for that GovernorID.
+7. Confirm the saved setting and explain that unknown/not set uses defaults.
+
+Rules:
+
+- Normal users may only update VIP for governors registered to them.
+- Admins may update VIP for any governor where existing admin-governor tooling supports that pattern.
+- VIP update interactions must be owner-guarded and should follow existing view timeout/stale interaction conventions.
+- The setting must be persisted in SQL, not just JSON/cache.
+- If a user has one registered governor, the UX may skip the governor selector.
+
+### Calculation Rules - RSS Output
+
+RSS output totals remain fixed regardless of VIP.
+
+RSS Troop Training Capacity remains fixed regardless of VIP.
+
+Use the existing RSS Troop Training Capacity requirements:
+
+- training costs per 1,000,000 mixed troops:
+  - Food: 533,000,000
+  - Wood: 533,000,000
+  - Stone: 400,000,000
+  - Gold: 400,000,000
+- conversion: every 1m troops = 10m Power / Zenith Points and 100m MGE Points
+
+### Calculation Rules - RSS Troop Healing Capacity
+
+RSS Troop Healing Capacity is VIP-sensitive.
+
+Use the governor's stored VIP level when available.
+
+If VIP level is unknown/not set, default to VIP 15 or less.
+
+Healing costs per 1,000,000 mixed troops:
+
+VIP 15 or less, and unknown/default:
+
+- Food: 213,300,000
+- Wood: 213,300,000
+- Stone: 160,000,000
+- Gold: 160,000,000
+
+VIP 16 or VIP 17:
+
+- Food: 192,000,000
+- Wood: 192,000,000
+- Stone: 144,000,000
+- Gold: 144,000,000
+
+VIP 18, VIP 19, or SVIP:
+
+- Food: 181,300,000
+- Wood: 181,300,000
+- Stone: 136,000,000
+- Gold: 136,000,000
+
+Display requirements:
+
+- Continue to show maximum mixed troops healable from current available resources.
+- Continue to identify the limiting resource.
+- Continue to show equivalent kills and kill points.
+- Include a compact VIP/default note in the capacity box if space allows, for example `VIP: 17` or `VIP: default`.
+- If the visual layout cannot fit the note cleanly, include the VIP/default note in the report footer or accompanying message.
+
+### Calculation Rules - Total Speedup Training Capacity
+
+Total Speedup Training Capacity is VIP-sensitive.
+
+Source value remains Training + Universal speedups.
+
+Use the governor's stored VIP level when available.
+
+If VIP level is unknown/not set, default to VIP 14 or less.
+
+Conversion baselines:
+
+VIP 14 or less, and unknown/default:
+
+- 100 days = 133,000 troops
+- 100 days = 1.33m Power / Zenith Points
+- 100 days = 13.3m MGE Points
+
+VIP 15:
+
+- 100 days = 136,000 troops
+- 100 days = 1.36m Power / Zenith Points
+- 100 days = 13.6m MGE Points
+
+VIP 16 or VIP 17:
+
+- 100 days = 140,000 troops
+- 100 days = 1.4m Power / Zenith Points
+- 100 days = 14.0m MGE Points
+
+VIP 18, VIP 19, or SVIP:
+
+- 100 days = 144,000 troops
+- 100 days = 1.44m Power / Zenith Points
+- 100 days = 14.4m MGE Points
+
+Scale linearly from the current Training + Universal total.
+
+### Calculation Rules - Total Healing Speedup Capacity
+
+Total Healing Speedup Capacity is VIP-sensitive.
+
+Source value remains Healing + Universal speedups.
+
+Use the governor's stored VIP level when available.
+
+If VIP level is unknown/not set, default to VIP 14 or less.
+
+Conversion baselines:
+
+VIP 14 or less, and unknown/default:
+
+- 100 days = 4.1m T5 troops healed
+- 100 days = 4.1m kills
+- 100 days = 82m Kill Points
+
+VIP 15 or VIP 16:
+
+- 100 days = 5.6m T5 troops healed
+- 100 days = 5.6m kills
+- 100 days = 112m Kill Points
+
+VIP 17, VIP 18, VIP 19, or SVIP:
+
+- 100 days = 5.7m T5 troops healed
+- 100 days = 5.7m kills
+- 100 days = 114m Kill Points
+
+Scale linearly from the current Healing + Universal total.
+
+### Architecture Requirements
+
+Codex must begin with audit/scope only and stop for architecture validation before coding, following the Standard Development Initiation Statement.
+
+Specific audit points:
+
+- Locate current capacity calculation helpers.
+- Identify whether calculations are embedded in `inventory/report_image_renderer.py`, `inventory/reporting_service.py`, or another helper.
+- Extract VIP-sensitive calculation logic into testable helpers if it is currently embedded in rendering code.
+- Keep Discord commands/views thin.
+- Keep SQL access in DAL/repository modules.
+- Avoid passing Discord objects into service/DAL layers where primitive IDs are sufficient.
+- Check whether an existing Governor profile/settings table can be reused before creating a new table.
+
+Recommended helper/module shape:
+
+- `inventory/capacity_calculations.py`
+- `inventory/vip_levels.py`
+- `inventory/dal/inventory_profile_dal.py`
+- service methods in `inventory/inventory_service.py` or a focused profile/settings service
+
+Exact file names may differ if architecture review finds existing better homes.
+
+### Output / Reporting Requirements
+
+`/myinventory` must use the governor's stored VIP setting when rendering:
+
+- RSS Troop Healing Capacity
+- Total Speedup Training Capacity
+- Total Healing Speedup Capacity
+
+`/myinventory` must continue to work when VIP is unknown.
+
+`/myinventory` must not require the user to set VIP before seeing a report.
+
+The report should make defaults transparent without adding clutter.
+
+Suggested message when VIP is unknown:
+
+```text
+VIP level is not set for this governor, so default capacity assumptions were used. You can update VIP from /inventory_preferences.
+```
+
+Only show this message when useful and not noisy. Prefer a concise note in the image/footer if the layout supports it.
+
+### Export / Audit Requirements
+
+Inventory export should include governor VIP level where practical once the setting exists, especially for rows/reports where calculated capacity outputs are included.
+
+Admin audit does not need a full VIP history view in Phase 1F unless the implementation naturally stores historical audit rows. A current value plus updated timestamp is sufficient.
+
+### Testing Requirements
+
+Add focused tests for VIP calculation tiers.
+
+Minimum test coverage:
+
+- RSS Troop Training Capacity does not change by VIP.
+- RSS Troop Healing Capacity defaults to VIP 15-or-less when VIP is unknown.
+- RSS Troop Healing Capacity uses VIP 16/17 reduced costs.
+- RSS Troop Healing Capacity uses VIP 18/19/SVIP reduced costs.
+- Speedup Training Capacity defaults to VIP 14-or-less when VIP is unknown.
+- Speedup Training Capacity uses VIP 15 baseline.
+- Speedup Training Capacity uses VIP 16/17 baseline.
+- Speedup Training Capacity uses VIP 18/19/SVIP baseline.
+- Healing Speedup Capacity defaults to VIP 14-or-less when VIP is unknown.
+- Healing Speedup Capacity uses VIP 15/16 baseline.
+- Healing Speedup Capacity uses VIP 17/18/19/SVIP baseline.
+- Normal user cannot update VIP for an unregistered governor.
+- Normal user can update VIP for their registered governor.
+- Admin path works if included.
+- `/myinventory` still renders when VIP is unknown.
+- `/myinventory` uses stored VIP when present.
+
+Regression tests:
+
+- Existing report visibility preference still works.
+- Existing `/myinventory` governor/output selector flow still works.
+- Existing Resources and Speedups reports still render with no VIP rows present.
+- Existing export/audit commands are not broken by profile table joins.
+
+### Acceptance Criteria
+
+Phase 1F is complete when:
+
+- Governor-level VIP can be saved and updated through a user-safe Discord flow.
+- VIP is stored in SQL keyed by GovernorID.
+- Unknown VIP uses documented defaults and does not block reports.
+- RSS output and RSS Troop Training Capacity remain unchanged by VIP.
+- RSS Troop Healing Capacity uses VIP-sensitive resource costs.
+- Total Speedup Training Capacity uses VIP-sensitive baselines.
+- Total Healing Speedup Capacity uses VIP-sensitive baselines.
+- `/myinventory` uses the stored governor VIP setting in capacity calculations.
+- Tests cover the new tiered calculation helpers and user permission behaviour.
+- Commands/views remain thin and service/DAL boundaries are preserved.
+- SQL changes are documented in the SQL Server repository.
+- Codex performs the mandatory read-only review pass after implementation and testing.
+
 ## Phase 2 - Materials
 
 Materials remain disabled in Phase 1.
 
-Phase 2 should begin only after Phase 1 is fully launched to users and has had a short production soak period.
+Phase 2 should begin only after Phase 1F is delivered and Phase 1 has had a short production soak period.
 
 Phase 2 should begin with review/scope only per repository rules, then stop for architecture validation before coding.
 
@@ -1186,9 +1512,22 @@ Do not include:
 - `/my_stats` integration.
 - Stats export SQL refactor work tracked by GitHub issue #46.
 
+### Phase 1F
+
+Test:
+
+- governor-level VIP save/update flow
+- normal-user registered-governor permission checks
+- unknown VIP default behaviour
+- VIP-sensitive RSS healing capacity calculations
+- VIP-sensitive speedup training capacity calculations
+- VIP-sensitive healing speedup capacity calculations
+- `/myinventory` rendering with and without stored VIP
+- regression coverage for existing visibility preferences and inventory output selectors
+
 ### Phase 2
 
-Next build phase after Phase 1 launch/soak.
+Next build phase after Phase 1F and Phase 1 launch/soak.
 
 Test:
 
@@ -1245,6 +1584,14 @@ Do not include in Phase 1E:
 - Stats export SQL refactor work tracked by GitHub issue #46
 - Broad OCR redesign unless final smoke testing finds a concrete Resources/Speedups regression
 
+Do not include in Phase 1F:
+
+- Materials processing
+- Action Points (AP)
+- `/my_stats` integration
+- Broad inventory redesign
+- Stats export SQL refactor work tracked by GitHub issue #46
+
 Do not include in Phase 2:
 
 - Action Points (AP), unless explicitly re-scoped during architecture validation
@@ -1282,5 +1629,5 @@ Do not create a duplicate issue for this item. Reference issue #46 whenever Phas
 ## Suggested Next Chat Opening Prompt
 
 ```text
-Start Phase 2 review/scope for the Inventory Image Import Module. Phase 0, Phase 1A, Phase 1B, Phase 1C, Phase 1D, and Phase 1E are complete. Phase 1 is ready for full user launch before Phase 2 coding begins. Use the updated in-repo task pack at C:\discord_file_downloader\docs\Codex Task Pack — Inventory Image Import Module.md. Phase 2 should focus on Materials import/reporting after a Phase 1 launch/soak period. Keep Action Points (AP) out of Phase 2 unless explicitly re-scoped; AP is planned as Phase 3. Keep /my_stats integration out of scope. Keep the stats export SQL refactor out of scope and continue referencing GitHub issue #46 for that existing debt. Begin with audit/scope only per repo rules, then stop for architecture validation before coding.
+Start Phase 1F review/scope for the Inventory Image Import Module. Phase 0, Phase 1A, Phase 1B, Phase 1C, Phase 1D, and Phase 1E are complete. Phase 1F was added from first-batch user feedback and must be delivered before Phase 2 Materials. Use the updated in-repo task pack at C:\discord_file_downloader\docs\Codex Task Pack — Inventory Image Import Module.md. Phase 1F should focus on VIP-aware capacity calculations and per-governor VIP SQL storage/update support. Keep Materials and Action Points (AP) out of Phase 1F; Materials remains Phase 2 and AP remains Phase 3. Keep /my_stats integration out of scope. Keep the stats export SQL refactor out of scope and continue referencing GitHub issue #46 for that existing debt. Begin with audit/scope only per repo rules, then stop for architecture validation before coding.
 ```

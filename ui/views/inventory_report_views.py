@@ -6,7 +6,7 @@ from typing import Any
 
 import discord
 
-from inventory import export_service, reporting_service
+from inventory import export_service, profile_service, reporting_service
 from inventory.models import (
     InventoryExportFormat,
     InventoryReportRange,
@@ -15,6 +15,7 @@ from inventory.models import (
     RegisteredGovernor,
 )
 from inventory.report_image_renderer import render_inventory_reports
+from inventory.vip_levels import VIP_LABELS, InventoryVipLevel, normalize_vip_level
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,17 @@ REPORT_VIEW_OPTIONS = {
     "RSS": InventoryReportView.RESOURCES,
     "Speedups": InventoryReportView.SPEEDUPS,
 }
+
+VIP_SELECT_OPTIONS = [
+    InventoryVipLevel.UNKNOWN,
+    InventoryVipLevel.VIP_14_OR_LESS,
+    InventoryVipLevel.VIP_15,
+    InventoryVipLevel.VIP_16,
+    InventoryVipLevel.VIP_17,
+    InventoryVipLevel.VIP_18,
+    InventoryVipLevel.VIP_19,
+    InventoryVipLevel.SVIP,
+]
 
 
 async def _avatar_bytes(user: Any) -> bytes | None:
@@ -325,11 +337,176 @@ class InventoryPreferenceView(discord.ui.View):
     async def public(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         await self._save(interaction, InventoryReportVisibility.PUBLIC)
 
+    @discord.ui.button(
+        label="Update Governor VIP",
+        style=discord.ButtonStyle.secondary,
+        custom_id="inventory_pref_vip",
+    )
+    async def update_vip(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
+        if int(interaction.user.id) != self.requester_id:
+            await interaction.response.send_message(
+                "This preference prompt is not for you.", ephemeral=True
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        governors = await reporting_service.get_registered_governors_for_user(self.requester_id)
+        if not governors:
+            await interaction.followup.send(
+                "I do not see any governors registered to you. Use `/register_governor` first.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send(
+            "Choose a governor and VIP level:",
+            view=InventoryVipPreferenceView(
+                requester_id=self.requester_id,
+                governors=governors,
+            ),
+            ephemeral=True,
+        )
+
+
+class InventoryVipPreferenceView(discord.ui.View):
+    def __init__(self, *, requester_id: int, governors: list[RegisteredGovernor]) -> None:
+        super().__init__(timeout=300)
+        self.requester_id = int(requester_id)
+        self.governors_by_id = {item.governor_id: item for item in governors}
+        self.selected_governor_id = governors[0].governor_id if len(governors) == 1 else None
+        self.selected_vip_level = InventoryVipLevel.UNKNOWN
+        self._completed = False
+        if len(governors) > 1:
+            self.add_item(InventoryVipGovernorSelect(governors))
+        self.add_item(InventoryVipLevelSelect())
+
+    async def save(self, interaction: discord.Interaction) -> None:
+        if int(interaction.user.id) != self.requester_id:
+            await interaction.response.send_message(
+                "This VIP preference prompt is not for you.", ephemeral=True
+            )
+            return
+        if self._completed:
+            await interaction.response.send_message(
+                "This VIP preference prompt has already been used. Run `/inventory_preferences` again to update another governor.",
+                ephemeral=True,
+            )
+            return
+        if self.selected_governor_id is None:
+            await interaction.response.send_message("Choose a governor first.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        profile = await profile_service.update_inventory_vip(
+            discord_user_id=self.requester_id,
+            governor_id=int(self.selected_governor_id),
+            vip_level_code=self.selected_vip_level.value,
+            discord_user=interaction.user,
+        )
+        self._completed = True
+        for item in self.children:
+            item.disabled = True
+        self.stop()
+        governor = self.governors_by_id.get(int(self.selected_governor_id))
+        governor_label = (
+            f"{governor.governor_name} (`{governor.governor_id}`)"
+            if governor
+            else f"`{self.selected_governor_id}`"
+        )
+        await interaction.followup.send(
+            f"VIP saved for {governor_label}: **{profile.vip_level_label}**. "
+            "Unknown/not set uses the default capacity assumptions.",
+            ephemeral=True,
+        )
+        try:
+            await interaction.edit_original_response(view=self)
+        except Exception:
+            logger.debug("inventory_vip_preference_prompt_update_failed", exc_info=True)
+
+    @discord.ui.button(
+        label="Save VIP",
+        style=discord.ButtonStyle.primary,
+        custom_id="inventory_vip_save",
+        row=2,
+    )
+    async def save_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
+        await self.save(interaction)
+
+
+class InventoryVipGovernorSelect(discord.ui.Select):
+    def __init__(self, governors: list[RegisteredGovernor]) -> None:
+        options = [
+            discord.SelectOption(
+                label=item.governor_name[:100],
+                value=str(item.governor_id),
+                description=item.account_type[:100],
+            )
+            for item in governors
+        ]
+        super().__init__(
+            placeholder="Select Governor",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        view = self.view
+        if not isinstance(view, InventoryVipPreferenceView):
+            return
+        if view._completed:
+            await interaction.response.send_message(
+                "This VIP preference prompt has already been used.", ephemeral=True
+            )
+            return
+        if int(interaction.user.id) != view.requester_id:
+            await interaction.response.send_message("This selector is not for you.", ephemeral=True)
+            return
+        view.selected_governor_id = int(self.values[0])
+        await interaction.response.defer(ephemeral=True)
+
+
+class InventoryVipLevelSelect(discord.ui.Select):
+    def __init__(self) -> None:
+        options = [
+            discord.SelectOption(
+                label=VIP_LABELS[level],
+                value=level.value,
+                default=level == InventoryVipLevel.UNKNOWN,
+            )
+            for level in VIP_SELECT_OPTIONS
+        ]
+        super().__init__(
+            placeholder="Select VIP Level",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        view = self.view
+        if not isinstance(view, InventoryVipPreferenceView):
+            return
+        if view._completed:
+            await interaction.response.send_message(
+                "This VIP preference prompt has already been used.", ephemeral=True
+            )
+            return
+        if int(interaction.user.id) != view.requester_id:
+            await interaction.response.send_message("This selector is not for you.", ephemeral=True)
+            return
+        view.selected_vip_level = normalize_vip_level(self.values[0])
+        for option in self.options:
+            option.default = option.value == view.selected_vip_level.value
+        await interaction.response.defer(ephemeral=True)
+
 
 async def send_inventory_preference_prompt(ctx: discord.ApplicationContext) -> None:
     await ctx.followup.send(
-        "Choose how `/myinventory` should post your reports. "
-        "You can change this later with `/inventory_preferences`.",
+        "Choose how `/myinventory` should post your reports, or update a governor VIP level.",
         view=InventoryPreferenceView(requester_id=int(ctx.user.id)),
         ephemeral=True,
     )
