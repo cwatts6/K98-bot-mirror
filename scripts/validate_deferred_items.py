@@ -99,10 +99,16 @@ def validate_file(root: Path, path: Path) -> list[Finding]:
     findings: list[Finding] = []
 
     for index, line in enumerate(lines):
-        if line.strip().startswith("-") and _line_is_deferred_field(line.strip()):
-            continue
+        stripped = line.strip()
+        if stripped.startswith("-") and _line_is_deferred_field(stripped):
+            # Check only the value portion after the first ":" so that vague
+            # phrases in field values are still caught.
+            colon_pos = stripped.find(":")
+            check_text = stripped[colon_pos + 1 :] if colon_pos != -1 else line
+        else:
+            check_text = line
         for pattern in VAGUE_PATTERNS:
-            if pattern.search(line):
+            if pattern.search(check_text):
                 findings.append(Finding(rel, index + 1, "vague deferred-work phrase found"))
                 break
 

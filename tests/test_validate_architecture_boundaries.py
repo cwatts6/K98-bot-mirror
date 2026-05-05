@@ -41,6 +41,19 @@ def test_allow_override_suppresses_architecture_findings(tmp_path: Path) -> None
     assert validate_files(tmp_path, [command]) == []
 
 
+def test_allow_marker_does_not_suppress_distant_violations(tmp_path: Path) -> None:
+    """A single allow marker at the top must not suppress violations elsewhere."""
+    command = _write(
+        tmp_path,
+        "commands/admin_cmds.py",
+        '# architecture-check: allow\n\n\nquery = "SELECT 1"\n',
+    )
+
+    findings = validate_files(tmp_path, [command])
+    assert len(findings) == 1
+    assert findings[0].message == "SQL keyword found in command layer"
+
+
 def test_dal_import_in_view_fails(tmp_path: Path) -> None:
     view = _write(
         tmp_path,
@@ -67,3 +80,19 @@ def test_discord_reference_in_service_fails(tmp_path: Path) -> None:
     assert {finding.message for finding in findings} == {
         "Discord type/reference found in service layer"
     }
+
+
+def test_discord_reference_in_root_level_service_fails(tmp_path: Path) -> None:
+    """Root-level service files must be validated even though they're not in a sub-directory."""
+    service = _write(
+        tmp_path,
+        "stats_service.py",
+        "import discord\n\ndef build_embed() -> discord.Embed:\n    ...\n",
+    )
+
+    findings = validate_files(tmp_path, [service])
+
+    assert len(findings) >= 1
+    assert all(
+        finding.message == "Discord type/reference found in service layer" for finding in findings
+    )

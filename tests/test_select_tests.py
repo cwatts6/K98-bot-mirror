@@ -18,6 +18,21 @@ def test_select_tests_maps_stats_commands() -> None:
     assert "python scripts/validate_command_registration.py" in commands
 
 
+def test_select_tests_stats_service_triggers_stats_tests() -> None:
+    commands = select_tests(["stats_service.py"])
+
+    assert "python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py" in commands
+
+
+def test_stats_alerts_excludes_stats_service_tests() -> None:
+    """stats_alerts/ is a separate subsystem and must not pull in stats service tests."""
+    commands = select_tests(["stats_alerts/some_module.py"])
+
+    assert (
+        "python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py" not in commands
+    )
+
+
 def test_select_tests_maps_subsystems_and_deduplicates() -> None:
     commands = select_tests(
         ["ark/draft_service.py", "ark/ark_scheduler.py", "ui/views/ark_views.py"]

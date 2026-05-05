@@ -71,7 +71,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 pytokens==0.1.10
 pytz==2025.2
-pywin32==311
+pywin32==311; platform_system=="Windows"
 PyYAML==6.0.3
 RapidFuzz==3.13.0
 requests==2.32.5

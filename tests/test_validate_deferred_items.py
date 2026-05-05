@@ -56,3 +56,16 @@ def test_vague_deferred_phrase_fails(tmp_path: Path) -> None:
 
     assert len(findings) == 1
     assert findings[0].message == "vague deferred-work phrase found"
+
+
+def test_vague_phrase_in_deferred_field_value_fails(tmp_path: Path) -> None:
+    """Vague phrases inside a structured deferred field value must still be caught."""
+    path = tmp_path / "notes.md"
+    path.write_text(
+        "### Deferred Optimisation\n- Description: improve later\n",
+        encoding="utf-8",
+    )
+
+    findings = validate_file(tmp_path, path)
+
+    assert any(f.message == "vague deferred-work phrase found" for f in findings)

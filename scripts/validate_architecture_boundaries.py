@@ -24,16 +24,6 @@ DISCORD_TYPE_PATTERN = re.compile(
     r"(?:^\s*(?:import|from)\s+discord\b|\bdiscord\.(?:Interaction|ApplicationContext|Context)\b|\bdiscord\.)"
 )
 ROOT_LEVEL_TARGETS = {".py", ".ps1", ".md", ".toml", ".yaml", ".yml", ".json"}
-SERVICE_PARTS = {
-    "services",
-    "ark",
-    "mge",
-    "event_calendar",
-    "registry",
-    "stats_alerts",
-    "telemetry",
-    "inventory",
-}
 
 
 @dataclass(frozen=True)
@@ -109,10 +99,7 @@ def validate_files(root: Path, files: Iterable[Path]) -> list[Finding]:
     findings: list[Finding] = []
     for path in files:
         rel = _relative_path(root, path)
-        parts = set(Path(rel).parts)
         text = path.read_text(encoding="utf-8-sig", errors="ignore")
-        if ALLOW_MARKER in text:
-            continue
         lines = text.splitlines()
 
         if rel.startswith("commands/"):
@@ -129,7 +116,7 @@ def validate_files(root: Path, files: Iterable[Path]) -> list[Finding]:
                         Finding("FAIL", rel, index + 1, "DAL/repository import found in view layer")
                     )
 
-        if parts & SERVICE_PARTS and not rel.startswith(("commands/", "ui/views/")):
+        if not rel.startswith(("commands/", "ui/views/")):
             service_like = (
                 rel.startswith("services/")
                 or rel.endswith("_service.py")

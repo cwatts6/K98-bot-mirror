@@ -17,7 +17,7 @@ RULES = [
         "commands/stats",
         ["python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py"],
     ),
-    ("stats", ["python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py"]),
+    ("stats_service", ["python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py"]),
     ("ark/", ["python -m pytest -q tests/test_ark_*.py"]),
     ("mge/", ["python -m pytest -q tests/test_mge_*.py"]),
     ("event_calendar/", ["python -m pytest -q tests/test_calendar_*.py"]),
