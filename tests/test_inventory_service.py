@@ -276,6 +276,48 @@ async def test_resource_significant_change_triggers_at_exactly_50_percent(monkey
     assert any("Gold changed by 50% or more" in warning for warning in assessment.warnings)
 
 
+async def test_resource_correction_significant_change_checks_detected_values(monkeypatch):
+    monkeypatch.setattr(
+        inventory_service.inventory_dal,
+        "fetch_latest_approved_resource_values",
+        lambda governor_id: {
+            "food": {"from_items_value": 0, "total_resources_value": 3_900_000_000},
+            "wood": {"from_items_value": 0, "total_resources_value": 4_000_000_000},
+            "stone": {"from_items_value": 0, "total_resources_value": 3_200_000_000},
+            "gold": {"from_items_value": 0, "total_resources_value": 4_200_000_000},
+        },
+    )
+    detected_values = {
+        "resources": {
+            "food": {"from_items_value": 2_900_000_000, "total_resources_value": 3_900_000_000},
+            "wood": {"from_items_value": 3_000_000_000, "total_resources_value": 4_000_000_000},
+            "stone": {"from_items_value": 1_900_000_000, "total_resources_value": 3_200_000_000},
+            "gold": {"from_items_value": 769_200_000, "total_resources_value": 2_200_000_000},
+        }
+    }
+    corrected_values = {
+        "resources": {
+            "food": {"from_items_value": 2_900_000_000, "total_resources_value": 3_900_000_000},
+            "wood": {"from_items_value": 3_000_000_000, "total_resources_value": 4_000_000_000},
+            "stone": {"from_items_value": 1_900_000_000, "total_resources_value": 3_200_000_000},
+            "gold": {"from_items_value": 769_200_000, "total_resources_value": 6_200_000_000},
+        }
+    }
+
+    assessment = await inventory_service.assess_significant_change(
+        governor_id=111,
+        import_type=InventoryImportType.RESOURCES,
+        values=corrected_values,
+        baseline_values=detected_values,
+    )
+
+    assert assessment.requires_confirmation is True
+    assert any(
+        "Gold correction from detected value changed by 50% or more" in warning
+        for warning in assessment.warnings
+    )
+
+
 async def test_speedup_significant_change_triggers_at_exactly_50_percent(monkeypatch):
     monkeypatch.setattr(
         inventory_service.inventory_dal,

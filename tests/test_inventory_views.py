@@ -244,6 +244,31 @@ async def test_approve_requires_second_click_for_significant_change(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_corrected_approve_checks_detected_values_as_baseline(monkeypatch):
+    parent = _view(InventoryImportType.RESOURCES)
+    parent.corrected_values = {
+        "resources": {
+            **parent.summary.values["resources"],
+            "gold": {"from_items_value": 7, "total_resources_value": 6_200_000_000},
+        }
+    }
+    interaction = _Interaction()
+    captured = {}
+
+    async def _assessment(**kwargs):
+        captured.update(kwargs)
+        return inventory_service.InventorySignificantChangeAssessment()
+
+    monkeypatch.setattr(inventory_views.inventory_service, "assess_significant_change", _assessment)
+
+    requires_second = await parent._requires_second_approve(interaction)
+
+    assert requires_second is False
+    assert captured["values"] is parent.corrected_values
+    assert captured["baseline_values"] is parent.summary.values
+
+
+@pytest.mark.asyncio
 async def test_stale_click_after_timeout_returns_expired_message(monkeypatch):
     parent = _view(InventoryImportType.RESOURCES)
     parent._expired = True

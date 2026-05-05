@@ -458,16 +458,32 @@ async def assess_significant_change(
     governor_id: int,
     import_type: InventoryImportType,
     values: dict[str, Any],
+    baseline_values: dict[str, Any] | None = None,
 ) -> InventorySignificantChangeAssessment:
     if import_type == InventoryImportType.RESOURCES:
         normalized = normalize_final_values(import_type, values)
+        warnings: list[str] = []
+        if baseline_values is not None:
+            baseline = normalize_final_values(import_type, baseline_values)
+            for resource_type, row in normalized["resources"].items():
+                prior = baseline["resources"].get(resource_type)
+                if not prior:
+                    continue
+                current_value = float(row["total_resources_value"])
+                baseline_value = float(prior["total_resources_value"])
+                warning = _significant_change_warning(
+                    label=f"{resource_type.title()} correction from detected value",
+                    previous=baseline_value,
+                    current=current_value,
+                )
+                if warning:
+                    warnings.append(warning)
         previous = await asyncio.to_thread(
             inventory_dal.fetch_latest_approved_resource_values,
             int(governor_id),
         )
         if not previous:
-            return InventorySignificantChangeAssessment()
-        warnings: list[str] = []
+            return InventorySignificantChangeAssessment(bool(warnings), warnings)
         for resource_type, row in normalized["resources"].items():
             prior = previous.get(resource_type)
             if not prior:
@@ -485,13 +501,29 @@ async def assess_significant_change(
 
     if import_type == InventoryImportType.SPEEDUPS:
         normalized = normalize_final_values(import_type, values)
+        warnings = []
+        if baseline_values is not None:
+            baseline = normalize_final_values(import_type, baseline_values)
+            for speedup_type, row in normalized["speedups"].items():
+                prior = baseline["speedups"].get(speedup_type)
+                if not prior:
+                    continue
+                current_days = float(row["total_days_decimal"])
+                baseline_days = float(prior["total_days_decimal"])
+                warning = _significant_change_warning(
+                    label=f"{speedup_type.title()} speedup correction from detected value",
+                    previous=baseline_days,
+                    current=current_days,
+                    suffix="d",
+                )
+                if warning:
+                    warnings.append(warning)
         previous = await asyncio.to_thread(
             inventory_dal.fetch_latest_approved_speedup_values,
             int(governor_id),
         )
         if not previous:
-            return InventorySignificantChangeAssessment()
-        warnings = []
+            return InventorySignificantChangeAssessment(bool(warnings), warnings)
         for speedup_type, row in normalized["speedups"].items():
             prior = previous.get(speedup_type)
             if not prior:

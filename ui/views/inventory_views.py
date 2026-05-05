@@ -394,6 +394,7 @@ class InventoryConfirmationView(discord.ui.View):
                 governor_id=self.governor_id,
                 import_type=self.summary.import_type,
                 values=final_values,
+                baseline_values=self.summary.values if self.corrected_values is not None else None,
             )
         except Exception:
             logger.exception("inventory_significant_change_check_failed batch_id=%s", self.batch_id)
