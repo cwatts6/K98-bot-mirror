@@ -1,4 +1,4 @@
-# dev.ps1 — repo-local/dev shell setup for Windows
+# dev.ps1 â€” repo-local/dev shell setup for Windows
 # Usage:
 #   . .\dev.ps1             # global pre-commit home in %LOCALAPPDATA% (recommended)
 #   . .\dev.ps1 -LocalCache # use repo-local .pre-commit-home (optional)
@@ -57,4 +57,5 @@ if ($python){ Write-Host "[dev] python.exe:      $python" }
 Write-Host "[dev] UTF-8 enabled"
 
 #rg
-$env:PATH = "C:\discord_file_downloader\tools;" + $env:PATH
+$toolsPath = Join-Path $repo "tools"
+$env:PATH = $toolsPath + ";" + $env:PATH
