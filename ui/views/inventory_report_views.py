@@ -530,9 +530,7 @@ class InventoryVipGovernorSelect(discord.ui.Select):
         for child in view.children:
             if isinstance(child, InventoryVipLevelSelect):
                 child.sync_default(
-                    view.selected_vip_level
-                    if profile and profile.vip_level_code
-                    else None
+                    view.selected_vip_level if profile and profile.vip_level_code else None
                 )
         await _refresh_select_message(interaction, view)
 
@@ -576,9 +574,7 @@ class InventoryVipLevelSelect(discord.ui.Select):
         await _refresh_select_message(interaction, view)
 
 
-async def _refresh_select_message(
-    interaction: discord.Interaction, view: discord.ui.View
-) -> None:
+async def _refresh_select_message(interaction: discord.Interaction, view: discord.ui.View) -> None:
     try:
         await interaction.response.edit_message(view=view)
     except Exception:
