@@ -35,6 +35,7 @@ def normalize_vip_level(value: str | InventoryVipLevel | None) -> InventoryVipLe
         "UNKNOWN": InventoryVipLevel.UNKNOWN,
         "NONE": InventoryVipLevel.UNKNOWN,
         "NOT_SET": InventoryVipLevel.UNKNOWN,
+        "UNKNOWN_/_NOT_SET": InventoryVipLevel.UNKNOWN,
         "VIP14": InventoryVipLevel.VIP_14_OR_LESS,
         "VIP_14": InventoryVipLevel.VIP_14_OR_LESS,
         "VIP_14_OR_LESS": InventoryVipLevel.VIP_14_OR_LESS,
