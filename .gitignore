@@ -185,3 +185,6 @@ data/offload_tmp
 data/offload_tmp/
 data/imports
 data/imports/
+
+# Optional local tooling
+tools/rg.exe

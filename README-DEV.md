@@ -13,6 +13,9 @@ pre-commit run -a
 pytest -q tests
 ```
 
+Optional: for fast local searches, place `rg.exe` at `C:\discord_file_downloader\tools\rg.exe`.
+`dev.ps1` adds `tools\` to `PATH` when that binary exists.
+
 ## Windows Setup (per new PowerShell session)
 ```powershell
 cd C:\discord_file_downloader

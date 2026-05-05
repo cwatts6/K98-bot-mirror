@@ -56,6 +56,8 @@ if ($venv)  { Write-Host "[dev] VENV:            $venv" }
 if ($python){ Write-Host "[dev] python.exe:      $python" }
 Write-Host "[dev] UTF-8 enabled"
 
-#rg
+# Optional local ripgrep binary for fast repo searches.
 $toolsPath = Join-Path $repo "tools"
-$env:PATH = $toolsPath + ";" + $env:PATH
+if (Test-Path (Join-Path $toolsPath "rg.exe")) {
+  $env:PATH = $toolsPath + ";" + $env:PATH
+}
