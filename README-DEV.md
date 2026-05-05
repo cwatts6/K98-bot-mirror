@@ -1,5 +1,18 @@
 # Developer Quickstart
 
+## Quality Automation
+
+Run before committing:
+
+```powershell
+python scripts/validate_architecture_boundaries.py
+python scripts/validate_deferred_items.py
+python scripts/select_tests.py
+
+pre-commit run -a
+pytest -q tests
+```
+
 ## Windows Setup (per new PowerShell session)
 ```powershell
 cd C:\discord_file_downloader

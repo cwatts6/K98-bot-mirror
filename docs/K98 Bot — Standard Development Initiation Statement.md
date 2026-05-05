@@ -119,6 +119,39 @@ If not implemented:
 
 explicitly justify
 capture as deferred optimisation if appropriate
+Step 7 - Codex Review Pass (MANDATORY)
+
+After implementation and testing:
+
+Perform a read-only audit.
+
+MUST validate:
+Architecture compliance
+Refactor triggers
+Test coverage correctness
+Restart/state safety
+Logging quality
+
+MUST NOT:
+Expand scope
+Add features
+Perform large refactors
+
+Required Output
+
+## Codex Review Summary
+
+### What is correct
+
+### Issues found (fix now)
+
+### Deferred Optimisations
+
+### Test Gaps
+
+### Restart / State Risks
+
+### Overall Assessment
 📦 Required Delivery Format
 
 You MUST include:

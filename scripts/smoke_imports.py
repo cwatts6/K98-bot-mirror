@@ -15,6 +15,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+ORIGINAL_STDOUT = sys.stdout
+ORIGINAL_STDERR = sys.stderr
 
 # --- Environment flags to appease guards & skip side-effects ---
 # Satisfy watchdog/run guards and block runtime tasks
@@ -37,8 +39,11 @@ class _NullHandler(logging.Handler):
         pass
 
 
-# Force root logger to a no-op handler to prevent basicConfig/rollovers
-logger.basicConfig(handlers=[_NullHandler()], level=logging.CRITICAL, force=True)
+# Force root logger to a no-op handler to prevent basicConfig/rollovers.
+root_logger = logging.getLogger()
+root_logger.handlers.clear()
+root_logger.addHandler(_NullHandler())
+root_logger.setLevel(logging.CRITICAL)
 
 
 # Replace file-based handlers with no-op versions
@@ -47,9 +52,9 @@ class _DummyFileHandler(_NullHandler):
         super().__init__()
 
 
-logger.FileHandler = _DummyFileHandler  # type: ignore[attr-defined]
-logger.handlers.RotatingFileHandler = _DummyFileHandler  # type: ignore[attr-defined]
-logger.handlers.TimedRotatingFileHandler = _DummyFileHandler  # type: ignore[attr-defined]
+logging.FileHandler = _DummyFileHandler  # type: ignore[assignment]
+logging.handlers.RotatingFileHandler = _DummyFileHandler  # type: ignore[assignment]
+logging.handlers.TimedRotatingFileHandler = _DummyFileHandler  # type: ignore[assignment]
 
 # --- Now do the imports ---
 import importlib
@@ -66,7 +71,7 @@ MODULES = [
     "event_scheduler",
     "event_embed_manager",
     "target_utils",
-    "stats_alert_utils",
+    "stats_alerts.interface",
     "Commands",
 ]
 
@@ -76,8 +81,11 @@ def main() -> int:
     for name in MODULES:
         try:
             importlib.import_module(name)
-        except Exception as e:
+        except BaseException as e:
             failed.append(f"{name}: {type(e).__name__}: {e}")
+        finally:
+            sys.stdout = ORIGINAL_STDOUT
+            sys.stderr = ORIGINAL_STDERR
     if failed:
         print("❌ Import smoke failed:\n" + "\n".join(f"- {x}" for x in failed))
         return 1

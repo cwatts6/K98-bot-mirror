@@ -24,6 +24,16 @@ Before beginning repo work, read the current versions of:
 - Run targeted tests and lint where practical.
 - Capture deferred optimisation items clearly.
 
+### Review & Validation Rules
+
+- When tests fail:
+  - Fix only if related to the task.
+  - Otherwise document the failure and do not expand scope.
+- Before PR:
+  - `python scripts/validate_architecture_boundaries.py`
+  - `python scripts/validate_deferred_items.py`
+  - `python scripts/select_tests.py`
+
 ## Repository / Promotion Model
 
 - `origin` is the scrubbed Codex mirror: `K98-bot-mirror`.
