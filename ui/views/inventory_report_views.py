@@ -396,12 +396,32 @@ class InventoryVipPreferenceView(discord.ui.View):
             await interaction.response.send_message("Choose a governor first.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
-        profile = await profile_service.update_inventory_vip(
-            discord_user_id=self.requester_id,
-            governor_id=int(self.selected_governor_id),
-            vip_level_code=self.selected_vip_level.value,
-            discord_user=interaction.user,
-        )
+        try:
+            profile = await profile_service.update_inventory_vip(
+                discord_user_id=self.requester_id,
+                governor_id=int(self.selected_governor_id),
+                vip_level_code=self.selected_vip_level.value,
+                discord_user=interaction.user,
+            )
+        except PermissionError as exc:
+            await interaction.followup.send(
+                str(exc) or "You do not have permission to update this governor's VIP preference.",
+                ephemeral=True,
+            )
+            return
+        except ValueError as exc:
+            await interaction.followup.send(
+                str(exc) or "The selected VIP preference is invalid.",
+                ephemeral=True,
+            )
+            return
+        except Exception:
+            logger.exception("inventory_vip_preference_save_failed")
+            await interaction.followup.send(
+                "Unable to save the VIP preference right now. Please try again later.",
+                ephemeral=True,
+            )
+            return
         self._completed = True
         for item in self.children:
             item.disabled = True
