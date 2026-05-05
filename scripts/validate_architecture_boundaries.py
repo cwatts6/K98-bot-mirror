@@ -21,7 +21,7 @@ DAL_IMPORT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 DISCORD_TYPE_PATTERN = re.compile(
-    r"\b(import\s+discord|from\s+discord|discord\.|Interaction|ApplicationContext|Context)\b"
+    r"(?:^\s*(?:import|from)\s+discord\b|\bdiscord\.(?:Interaction|ApplicationContext|Context)\b|\bdiscord\.)"
 )
 ROOT_LEVEL_TARGETS = {".py", ".ps1", ".md", ".toml", ".yaml", ".yml", ".json"}
 SERVICE_PARTS = {
