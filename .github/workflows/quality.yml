@@ -10,6 +10,7 @@ jobs:
     env:
         OUR_KINGDOM: "98"
         DISCORD_BOT_TOKEN: "test-token"
+        GOOGLE_TIMELINE_ID: "test-timeline-sheet"
         TIMELINE_SHEET_ID: "test-timeline-sheet"
         SQL_SERVER: "test-sql-server"
         SQL_DATABASE: "test-db"
