@@ -1,0 +1,301 @@
+import pytest
+
+from inventory.models import InventoryImportType
+from inventory.parsing import (
+    apply_resource_total_corrections,
+    apply_speedup_duration_corrections,
+    format_resource_value,
+    format_speedup_duration,
+    normalize_final_values,
+    parse_resource_value,
+    parse_speedup_days,
+    parse_speedup_minutes,
+    speedup_row_from_days,
+)
+
+
+def test_parse_resource_value_expands_suffixes():
+    assert parse_resource_value("7.0B") == 7_000_000_000
+    assert parse_resource_value("122.2M") == 122_200_000
+    assert parse_resource_value("30K") == 30_000
+    assert parse_resource_value("30000") == 30_000
+    assert parse_resource_value(0) == 0
+
+
+def test_parse_resource_value_rejects_negative_values():
+    with pytest.raises(ValueError, match=r"Invalid resource value|Negative"):
+        parse_resource_value("-1")
+
+
+def test_parse_speedup_minutes_supports_day_hour_minute_tokens():
+    assert parse_speedup_minutes("122d 2h 42m") == (122 * 1440) + 120 + 42
+    assert parse_speedup_minutes("239d") == 239 * 1440
+    assert parse_speedup_minutes("2h 42m") == 162
+    assert parse_speedup_minutes("0") == 0
+
+
+def test_parse_speedup_days_uses_only_day_component():
+    assert parse_speedup_days("505d 3h 37m") == 505
+    assert parse_speedup_days("1,242d 3h 35m") == 1242
+    assert parse_speedup_days("505") == 505
+    assert parse_speedup_days(505.0) == 505
+
+
+def test_parse_speedup_days_rejects_non_integer_float():
+    with pytest.raises(ValueError, match=r"whole numbers"):
+        parse_speedup_days(505.9)
+    with pytest.raises(ValueError, match=r"whole numbers"):
+        parse_speedup_days(1.5)
+    with pytest.raises(ValueError, match=r"whole numbers"):
+        parse_speedup_days(50.5257)
+
+
+def test_parse_speedup_days_rejects_non_day_strings():
+    with pytest.raises(ValueError, match=r"Invalid speedup day value"):
+        parse_speedup_days("3h")
+    with pytest.raises(ValueError, match=r"Invalid speedup day value"):
+        parse_speedup_days("45m")
+    with pytest.raises(ValueError, match=r"Invalid speedup day value"):
+        parse_speedup_days("12x")
+
+
+def test_normalize_final_values_for_speedups_calculates_derived_fields():
+    normalized = normalize_final_values(
+        InventoryImportType.SPEEDUPS,
+        {
+            "speedups": {
+                "building": {"total_days_decimal": 0},
+                "research": {"total_days_decimal": 0},
+                "training": {"total_days_decimal": 1},
+                "healing": {"total_days_decimal": 0},
+                "universal": {"total_days_decimal": 2},
+            }
+        },
+    )
+
+    assert normalized["speedups"]["building"] == speedup_row_from_days(0)
+    assert normalized["speedups"]["universal"]["total_days_decimal"] == 2.0
+
+
+def test_normalize_speedups_prefers_raw_duration_text_over_bad_numeric_fields():
+    normalized = normalize_final_values(
+        InventoryImportType.SPEEDUPS,
+        {
+            "speedups": {
+                "building": {
+                    "raw_duration_text": "1,068d 11h 36m",
+                    "total_minutes": 742 * 1440,
+                    "total_hours": 742 * 24,
+                    "total_days_decimal": 742,
+                },
+                "research": {
+                    "raw_duration_text": "1,242d 3h 35m",
+                    "total_minutes": 123 * 1440,
+                    "total_hours": 123 * 24,
+                    "total_days_decimal": 123,
+                },
+                "training": {"raw_duration_text": "935d 0h 7m"},
+                "healing": {"raw_duration_text": "503d 20h 7m"},
+                "universal": {"raw_duration_text": "2,422d 17h 58m"},
+            }
+        },
+    )
+
+    assert normalized["speedups"]["building"]["total_days_decimal"] == 1068.0
+    assert normalized["speedups"]["research"]["total_days_decimal"] == 1242.0
+    assert normalized["speedups"]["training"]["total_days_decimal"] == 935.0
+    assert normalized["speedups"]["healing"]["total_days_decimal"] == 503.0
+    assert normalized["speedups"]["universal"]["total_days_decimal"] == 2422.0
+    # raw_duration_text must be preserved verbatim in the normalized payload
+    assert normalized["speedups"]["building"]["raw_duration_text"] == "1,068d 11h 36m"
+    assert normalized["speedups"]["research"]["raw_duration_text"] == "1,242d 3h 35m"
+    assert normalized["speedups"]["universal"]["raw_duration_text"] == "2,422d 17h 58m"
+
+
+def test_normalize_speedups_prefers_day_digits_text_over_bad_duration_text():
+    normalized = normalize_final_values(
+        InventoryImportType.SPEEDUPS,
+        {
+            "speedups": {
+                "building": {
+                    "raw_duration_text": "1,067d 11h 36m",
+                    "day_digits_text": "1,068",
+                    "total_days_decimal": 1067,
+                },
+                "research": {
+                    "raw_duration_text": "1,242d 3h 35m",
+                    "day_digits_text": "1,242",
+                    "total_days_decimal": 1242,
+                },
+                "training": {
+                    "raw_duration_text": "933d 0h 7m",
+                    "day_digits_text": "935",
+                    "total_days_decimal": 933,
+                },
+                "healing": {
+                    "raw_duration_text": "503d 20h 7m",
+                    "day_digits_text": "503",
+                    "total_days_decimal": 503,
+                },
+                "universal": {
+                    "raw_duration_text": "2,421d 17h 58m",
+                    "day_digits_text": "2,422",
+                    "total_days_decimal": 2421,
+                },
+            }
+        },
+    )
+
+    assert normalized["speedups"]["building"]["total_days_decimal"] == 1068.0
+    assert normalized["speedups"]["research"]["total_days_decimal"] == 1242.0
+    assert normalized["speedups"]["training"]["total_days_decimal"] == 935.0
+    assert normalized["speedups"]["healing"]["total_days_decimal"] == 503.0
+    assert normalized["speedups"]["universal"]["total_days_decimal"] == 2422.0
+    assert normalized["speedups"]["building"]["day_digits_text"] == "1,068"
+    assert normalized["speedups"]["universal"]["raw_duration_text"] == "2,421d 17h 58m"
+
+
+def test_normalize_speedups_uses_candidate_consensus_for_ocr_drift():
+    normalized = normalize_final_values(
+        InventoryImportType.SPEEDUPS,
+        {
+            "speedups": {
+                "building": {
+                    "day_digits_text": "1065",
+                    "day_digits_verification_text": "1068",
+                    "raw_duration_text": "1,068d 11h 36m",
+                    "total_days_decimal": 1065,
+                },
+                "research": {
+                    "day_digits_text": "1242",
+                    "day_digits_verification_text": "1242",
+                    "raw_duration_text": "1,242d 3h 35m",
+                },
+                "training": {
+                    "day_digits_text": "935",
+                    "day_digits_verification_text": "935",
+                    "raw_duration_text": "935d 0h 7m",
+                },
+                "healing": {
+                    "day_digits_text": "503",
+                    "day_digits_verification_text": "503",
+                    "raw_duration_text": "503d 20h 7m",
+                },
+                "universal": {
+                    "day_digits_text": "2418",
+                    "day_digits_verification_text": "2422",
+                    "raw_duration_text": "2,422d 17h 58m",
+                    "total_days_decimal": 2418,
+                },
+            }
+        },
+    )
+
+    assert normalized["speedups"]["building"]["total_days_decimal"] == 1068.0
+    assert normalized["speedups"]["research"]["total_days_decimal"] == 1242.0
+    assert normalized["speedups"]["training"]["total_days_decimal"] == 935.0
+    assert normalized["speedups"]["healing"]["total_days_decimal"] == 503.0
+    assert normalized["speedups"]["universal"]["total_days_decimal"] == 2422.0
+
+
+def test_normalize_speedups_preserves_verification_field():
+    normalized = normalize_final_values(
+        InventoryImportType.SPEEDUPS,
+        {
+            "speedups": {
+                "building": {"total_days_decimal": 1},
+                "research": {"total_days_decimal": 2},
+                "training": {"total_days_decimal": 3},
+                "healing": {"total_days_decimal": 4},
+                "universal": {
+                    "day_digits_text": "863",
+                    "day_digits_verification_text": "862",
+                    "raw_duration_text": "862d 17h 58m",
+                    "total_days_decimal": 863,
+                },
+            }
+        },
+    )
+
+    assert normalized["speedups"]["universal"]["total_days_decimal"] == 862.0
+    assert normalized["speedups"]["universal"]["day_digits_verification_text"] == "862"
+
+
+def test_normalize_speedups_falls_back_when_raw_duration_text_is_unusable():
+    """Empty or malformed raw_duration_text must not suppress valid numeric fields."""
+    normalized = normalize_final_values(
+        InventoryImportType.SPEEDUPS,
+        {
+            "speedups": {
+                "building": {"raw_duration_text": "", "total_days_decimal": 100},
+                "research": {"raw_duration_text": "garbled", "total_days_decimal": 200},
+                "training": {"raw_duration_text": None, "total_days_decimal": 300},
+                "healing": {"total_days_decimal": 400},
+                "universal": {"total_minutes": 500 * 1440},
+            }
+        },
+    )
+
+    assert normalized["speedups"]["building"]["total_days_decimal"] == 100.0
+    assert normalized["speedups"]["research"]["total_days_decimal"] == 200.0
+    assert normalized["speedups"]["training"]["total_days_decimal"] == 300.0
+    assert normalized["speedups"]["healing"]["total_days_decimal"] == 400.0
+    assert normalized["speedups"]["universal"]["total_days_decimal"] == 500.0
+    # raw_duration_text is always preserved even when it couldn't be parsed
+    assert normalized["speedups"]["building"]["raw_duration_text"] == ""
+    assert normalized["speedups"]["research"]["raw_duration_text"] == "garbled"
+    assert normalized["speedups"]["training"]["raw_duration_text"] is None
+    assert normalized["speedups"]["healing"]["raw_duration_text"] is None
+    assert normalized["speedups"]["universal"]["raw_duration_text"] is None
+
+
+def test_resource_total_corrections_only_change_total_resources():
+    values = {
+        "resources": {
+            "food": {"from_items_value": 10, "total_resources_value": 20},
+            "wood": {"from_items_value": 30, "total_resources_value": 40},
+            "stone": {"from_items_value": 50, "total_resources_value": 60},
+            "gold": {"from_items_value": 70, "total_resources_value": 80},
+        }
+    }
+
+    corrected = apply_resource_total_corrections(values, {"food": "1.2M", "gold": "90"})
+
+    assert corrected["resources"]["food"]["from_items_value"] == 10
+    assert corrected["resources"]["food"]["total_resources_value"] == 1_200_000
+    assert corrected["resources"]["gold"]["from_items_value"] == 70
+    assert corrected["resources"]["gold"]["total_resources_value"] == 90
+
+
+def test_speedup_duration_corrections_accept_friendly_text():
+    values = {
+        "speedups": {
+            "building": {"total_minutes": 1},
+            "research": {"total_minutes": 2},
+            "training": {"total_minutes": 3},
+            "healing": {"total_minutes": 4},
+            "universal": {"total_minutes": 5},
+        }
+    }
+
+    corrected = apply_speedup_duration_corrections(values, {"healing": "505d 3h 37m"})
+
+    assert corrected["speedups"]["healing"]["total_minutes"] == 505 * 1440
+
+
+def test_inventory_display_formatters_are_user_friendly():
+    assert format_resource_value(1_200_000) == "1.2M"
+    assert format_speedup_duration((505 * 1440) + 180 + 37) == "505d"
+
+
+def test_format_resource_value_returns_unreadable_on_invalid_input():
+    assert format_resource_value(None) == "unreadable"
+    assert format_resource_value(-1) == "unreadable"
+    assert format_resource_value("not_a_number") == "unreadable"
+    assert format_resource_value(1.5) == "unreadable"
+
+
+def test_format_speedup_duration_returns_unreadable_on_invalid_input():
+    assert format_speedup_duration(None) == "unreadable"
+    assert format_speedup_duration(-1) == "unreadable"
+    assert format_speedup_duration("bad input") == "unreadable"
