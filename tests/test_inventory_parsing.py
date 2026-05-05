@@ -283,6 +283,48 @@ def test_speedup_duration_corrections_accept_friendly_text():
     assert corrected["speedups"]["healing"]["total_minutes"] == 505 * 1440
 
 
+def test_speedup_duration_corrections_survive_approval_renormalization():
+    values = {
+        "speedups": {
+            "building": {
+                "raw_duration_text": "155d",
+                "total_minutes": 155 * 1440,
+                "total_days_decimal": 155,
+            },
+            "research": {
+                "raw_duration_text": "319d",
+                "total_minutes": 319 * 1440,
+                "total_days_decimal": 319,
+            },
+            "training": {
+                "raw_duration_text": "329d",
+                "total_minutes": 329 * 1440,
+                "total_days_decimal": 329,
+            },
+            "healing": {
+                "raw_duration_text": "225d",
+                "total_minutes": 225 * 1440,
+                "total_days_decimal": 225,
+            },
+            "universal": {
+                "raw_duration_text": "862d",
+                "total_minutes": 862 * 1440,
+                "total_days_decimal": 862,
+            },
+        }
+    }
+
+    corrected = apply_speedup_duration_corrections(
+        values,
+        {"building": "165d", "healing": "235d"},
+    )
+    normalized = normalize_final_values(InventoryImportType.SPEEDUPS, corrected)
+
+    assert normalized["speedups"]["building"]["total_days_decimal"] == 165.0
+    assert normalized["speedups"]["healing"]["total_days_decimal"] == 235.0
+    assert normalized["speedups"]["research"]["total_days_decimal"] == 319.0
+
+
 def test_inventory_display_formatters_are_user_friendly():
     assert format_resource_value(1_200_000) == "1.2M"
     assert format_speedup_duration((505 * 1440) + 180 + 37) == "505d"

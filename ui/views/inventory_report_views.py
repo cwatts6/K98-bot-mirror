@@ -386,6 +386,7 @@ class InventoryVipPreferenceView(discord.ui.View):
         self.profiles_by_governor_id: dict[int, InventoryGovernorProfile] = (
             profiles_by_governor_id or {}
         )
+        self.message: discord.Message | None = None
         initial_governor_id = governors[0].governor_id if len(governors) == 1 else None
         self.selected_governor_id = initial_governor_id
         initial_profile = (
@@ -399,7 +400,15 @@ class InventoryVipPreferenceView(discord.ui.View):
         self._completed = False
         if len(governors) > 1:
             self.add_item(InventoryVipGovernorSelect(governors))
-        self.add_item(InventoryVipLevelSelect(initial_level=self.selected_vip_level))
+        self.add_item(
+            InventoryVipLevelSelect(
+                initial_level=(
+                    self.selected_vip_level
+                    if initial_profile and initial_profile.vip_level_code
+                    else None
+                )
+            )
+        )
 
     async def on_timeout(self) -> None:
         for item in self.children:
@@ -463,8 +472,7 @@ class InventoryVipPreferenceView(discord.ui.View):
             else f"`{self.selected_governor_id}`"
         )
         await interaction.followup.send(
-            f"VIP saved for {governor_label}: **{profile.vip_level_label}**. "
-            "Unknown/not set uses the default capacity assumptions.",
+            _vip_saved_message(governor_label, profile.vip_level_label),
             ephemeral=True,
         )
         try:
@@ -517,26 +525,39 @@ class InventoryVipGovernorSelect(discord.ui.Select):
         view.selected_governor_id = int(self.values[0])
         profile = view.profiles_by_governor_id.get(view.selected_governor_id)
         view.selected_vip_level = normalize_vip_level(profile.vip_level_code if profile else None)
-        await interaction.response.defer(ephemeral=True)
+        for option in self.options:
+            option.default = option.value == self.values[0]
+        for child in view.children:
+            if isinstance(child, InventoryVipLevelSelect):
+                child.sync_default(
+                    view.selected_vip_level
+                    if profile and profile.vip_level_code
+                    else None
+                )
+        await _refresh_select_message(interaction, view)
 
 
 class InventoryVipLevelSelect(discord.ui.Select):
-    def __init__(self, initial_level: InventoryVipLevel = InventoryVipLevel.UNKNOWN) -> None:
+    def __init__(self, initial_level: InventoryVipLevel | None = None) -> None:
         options = [
             discord.SelectOption(
                 label=VIP_LABELS[level],
                 value=level.value,
-                default=level == initial_level,
+                default=initial_level is not None and level == initial_level,
             )
             for level in VIP_SELECT_OPTIONS
         ]
         super().__init__(
-            placeholder="Select VIP Level",
+            placeholder="Select VIP",
             min_values=1,
             max_values=1,
             options=options,
             row=1,
         )
+
+    def sync_default(self, selected_level: InventoryVipLevel | None) -> None:
+        for option in self.options:
+            option.default = selected_level is not None and option.value == selected_level.value
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view = self.view
@@ -551,9 +572,28 @@ class InventoryVipLevelSelect(discord.ui.Select):
             await interaction.response.send_message("This selector is not for you.", ephemeral=True)
             return
         view.selected_vip_level = normalize_vip_level(self.values[0])
-        for option in self.options:
-            option.default = option.value == view.selected_vip_level.value
-        await interaction.response.defer(ephemeral=True)
+        self.sync_default(view.selected_vip_level)
+        await _refresh_select_message(interaction, view)
+
+
+async def _refresh_select_message(
+    interaction: discord.Interaction, view: discord.ui.View
+) -> None:
+    try:
+        await interaction.response.edit_message(view=view)
+    except Exception:
+        logger.debug("inventory_select_message_refresh_failed", exc_info=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass
+
+
+def _vip_saved_message(governor_label: str, vip_level_label: str) -> str:
+    message = f"VIP saved for {governor_label}: **{vip_level_label}**."
+    if vip_level_label == VIP_LABELS[InventoryVipLevel.UNKNOWN]:
+        return f"{message} Default capacity assumptions will be used."
+    return message
 
 
 async def send_inventory_preference_prompt(ctx: discord.ApplicationContext) -> None:

@@ -204,12 +204,7 @@ def apply_speedup_duration_corrections(
             if speedup_type in corrections
             else _speedup_days_from_row(row)
         )
-        normalized_speedups[speedup_type] = speedup_row_from_days(
-            days,
-            raw_duration_text=row.get("raw_duration_text"),
-            day_digits_text=row.get("day_digits_text"),
-            day_digits_verification_text=row.get("day_digits_verification_text"),
-        )
+        normalized_speedups[speedup_type] = speedup_row_from_days(days)
     return {"speedups": normalized_speedups}
 
 
