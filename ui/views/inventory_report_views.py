@@ -343,9 +343,7 @@ class InventoryPreferenceView(discord.ui.View):
         style=discord.ButtonStyle.secondary,
         custom_id="inventory_pref_vip",
     )
-    async def update_vip(
-        self, button: discord.ui.Button, interaction: discord.Interaction
-    ) -> None:
+    async def update_vip(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         if int(interaction.user.id) != self.requester_id:
             await interaction.response.send_message(
                 "This preference prompt is not for you.", ephemeral=True
@@ -518,9 +516,7 @@ class InventoryVipGovernorSelect(discord.ui.Select):
             return
         view.selected_governor_id = int(self.values[0])
         profile = view.profiles_by_governor_id.get(view.selected_governor_id)
-        view.selected_vip_level = normalize_vip_level(
-            profile.vip_level_code if profile else None
-        )
+        view.selected_vip_level = normalize_vip_level(profile.vip_level_code if profile else None)
         await interaction.response.defer(ephemeral=True)
 
 

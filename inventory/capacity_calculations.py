@@ -58,9 +58,7 @@ HEALING_RESOURCE_COSTS_VIP_18_PLUS = {
 }
 
 
-def _capacity_from_costs(
-    point: InventoryResourcePoint, costs: dict[str, int]
-) -> tuple[float, str]:
+def _capacity_from_costs(point: InventoryResourcePoint, costs: dict[str, int]) -> tuple[float, str]:
     capacities = {
         "Food": point.food / costs["food"],
         "Wood": point.wood / costs["wood"],

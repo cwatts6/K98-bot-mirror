@@ -36,6 +36,7 @@ def fetch_inventory_profile(governor_id: int) -> dict[str, Any] | None:
     finally:
         conn.close()
 
+
 def upsert_inventory_vip(
     *, governor_id: int, vip_level_code: str | None, updated_by_discord_user_id: int
 ) -> None:

@@ -87,9 +87,7 @@ def _changed_files(root: Path) -> list[Path]:
     return paths
 
 
-def iter_markdown_files(
-    root: Path, paths: Iterable[Path] | None, all_files: bool
-) -> list[Path]:
+def iter_markdown_files(root: Path, paths: Iterable[Path] | None, all_files: bool) -> list[Path]:
     # When neither --all nor explicit paths are given, auto-detect changed files
     # and exclude the source-of-truth doc that defines the schema itself.
     auto_detect = not all_files and paths is None
