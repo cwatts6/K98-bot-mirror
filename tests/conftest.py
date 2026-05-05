@@ -1,5 +1,4 @@
 # tests/conftest.py
-os.environ.setdefault("OUR_KINGDOM", "98")
 # Ensure the repository root is on sys.path during pytest collection so tests can `import event_utils` etc.
 # This is a small, safe helper used only for the test environment.
 import asyncio
@@ -8,6 +7,8 @@ import sys
 import types
 
 import pytest
+
+os.environ.setdefault("OUR_KINGDOM", "98")
 
 # Determine repository root (one directory up from tests/)
 _THIS_DIR = os.path.dirname(__file__)
