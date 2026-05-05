@@ -23,6 +23,7 @@ from inventory.parsing import (
     apply_speedup_duration_corrections,
     format_resource_value,
     format_speedup_duration,
+    parse_resource_value,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,20 @@ def _format_values_for_display(summary: InventoryAnalysisSummary) -> str:
             lines.append(f"{key.title()}: `{duration}`")
         return "\n".join(lines)
     return "No Phase 1A values detected."
+
+
+def _resource_modal_value(value: Any) -> str:
+    try:
+        parsed = parse_resource_value(value)
+    except ValueError:
+        return ""
+    compact = format_resource_value(parsed)
+    try:
+        if parse_resource_value(compact) == parsed:
+            return compact
+    except ValueError:
+        pass
+    return str(parsed)
 
 
 def _analysis_embed(
@@ -619,7 +634,7 @@ class ResourceCorrectionModal(discord.ui.Modal):
             value = row.get("total_resources_value")
             field = discord.ui.InputText(
                 label=f"{key.title()} Total Resources",
-                value=str(int(value)) if value is not None else "",
+                value=_resource_modal_value(value),
                 required=True,
             )
             self.inputs[key] = field

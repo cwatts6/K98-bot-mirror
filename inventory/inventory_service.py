@@ -444,11 +444,11 @@ def _significant_change_warning(
     *, label: str, previous: float, current: float, suffix: str = ""
 ) -> str | None:
     ratio = _change_ratio(previous, current)
-    if ratio <= SIGNIFICANT_CHANGE_RATIO:
+    if ratio < SIGNIFICANT_CHANGE_RATIO:
         return None
     pct = int(SIGNIFICANT_CHANGE_RATIO * 100)
     return (
-        f"{label} changed by more than {pct}% "
+        f"{label} changed by {pct}% or more "
         f"({previous:,.0f}{suffix} -> {current:,.0f}{suffix})."
     )
 

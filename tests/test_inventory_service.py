@@ -246,6 +246,71 @@ async def test_resource_significant_change_requires_confirmation(monkeypatch):
     assert any("Food" in warning for warning in assessment.warnings)
 
 
+async def test_resource_significant_change_triggers_at_exactly_50_percent(monkeypatch):
+    monkeypatch.setattr(
+        inventory_service.inventory_dal,
+        "fetch_latest_approved_resource_values",
+        lambda governor_id: {
+            "food": {"from_items_value": 0, "total_resources_value": 100},
+            "wood": {"from_items_value": 0, "total_resources_value": 100},
+            "stone": {"from_items_value": 0, "total_resources_value": 100},
+            "gold": {"from_items_value": 0, "total_resources_value": 100},
+        },
+    )
+    values = {
+        "resources": {
+            "food": {"from_items_value": 0, "total_resources_value": 100},
+            "wood": {"from_items_value": 0, "total_resources_value": 100},
+            "stone": {"from_items_value": 0, "total_resources_value": 100},
+            "gold": {"from_items_value": 0, "total_resources_value": 150},
+        }
+    }
+
+    assessment = await inventory_service.assess_significant_change(
+        governor_id=111,
+        import_type=InventoryImportType.RESOURCES,
+        values=values,
+    )
+
+    assert assessment.requires_confirmation is True
+    assert any("Gold changed by 50% or more" in warning for warning in assessment.warnings)
+
+
+async def test_speedup_significant_change_triggers_at_exactly_50_percent(monkeypatch):
+    monkeypatch.setattr(
+        inventory_service.inventory_dal,
+        "fetch_latest_approved_speedup_values",
+        lambda governor_id: {
+            speedup_type: {
+                "total_minutes": 100 * 1440,
+                "total_hours": 2400,
+                "total_days_decimal": 100,
+            }
+            for speedup_type in ("building", "research", "training", "healing", "universal")
+        },
+    )
+    values = {
+        "speedups": {
+            "building": {"total_days_decimal": 100},
+            "research": {"total_days_decimal": 100},
+            "training": {"total_days_decimal": 150},
+            "healing": {"total_days_decimal": 100},
+            "universal": {"total_days_decimal": 100},
+        }
+    }
+
+    assessment = await inventory_service.assess_significant_change(
+        governor_id=111,
+        import_type=InventoryImportType.SPEEDUPS,
+        values=values,
+    )
+
+    assert assessment.requires_confirmation is True
+    assert any(
+        "Training speedups changed by 50% or more" in warning for warning in assessment.warnings
+    )
+
+
 async def test_speedup_significant_change_requires_confirmation(monkeypatch):
     monkeypatch.setattr(
         inventory_service.inventory_dal,
