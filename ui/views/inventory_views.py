@@ -11,7 +11,8 @@ import discord
 from account_picker import AccountPickerView, build_unique_gov_options
 from bot_config import INVENTORY_ADMIN_DEBUG_CHANNEL_ID
 from decoraters import _is_admin
-from inventory import inventory_service
+from inventory import inventory_service, material_service
+from inventory.material_calculations import MATERIAL_RARITIES, normalize_material_values
 from inventory.models import (
     InventoryAnalysisSummary,
     InventoryImagePayload,
@@ -68,6 +69,12 @@ def _format_values_for_display(summary: InventoryAnalysisSummary) -> str:
             duration = format_speedup_duration(minutes) if minutes is not None else "unreadable"
             lines.append(f"{key.title()}: `{duration}`")
         return "\n".join(lines)
+    if summary.import_type == InventoryImportType.MATERIALS:
+        try:
+            materials = normalize_material_values(summary.values)
+        except ValueError:
+            return "No readable Materials values detected."
+        return "\n".join(material_service.format_material_review_lines(materials))
     return "No Phase 1A values detected."
 
 
@@ -275,7 +282,7 @@ class InventoryConfirmationView(discord.ui.View):
         self.message: discord.Message | None = None
         self._timeout_task: asyncio.Task[None] | None = None
 
-        if summary.import_type in {InventoryImportType.MATERIALS, InventoryImportType.UNKNOWN}:
+        if summary.import_type == InventoryImportType.UNKNOWN:
             for child in self.children:
                 if getattr(child, "custom_id", "") == "inventory_import_approve":
                     child.disabled = True
@@ -556,8 +563,36 @@ class InventoryConfirmationView(discord.ui.View):
         if self.summary.import_type == InventoryImportType.SPEEDUPS:
             await interaction.response.send_modal(SpeedupCorrectionModal(self))
             return
+        if self.summary.import_type == InventoryImportType.MATERIALS:
+            await interaction.response.send_message(
+                "Choose the Materials section to correct:",
+                view=MaterialCorrectionSectionView(parent=self),
+                ephemeral=True,
+            )
+            return
         await interaction.response.send_message(
-            "Corrections are only available for Resources and Speedups in Phase 1.",
+            "Corrections are not available for this import type.",
+            ephemeral=True,
+        )
+
+    @discord.ui.button(
+        label="Add Another Image",
+        style=discord.ButtonStyle.secondary,
+        custom_id="inventory_import_add_material_image",
+    )
+    async def add_material_image(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
+        if await self._deny_if_not_actor(interaction):
+            return
+        if self.summary.import_type != InventoryImportType.MATERIALS:
+            await interaction.response.send_message(
+                "Additional screenshots are only supported for Materials imports.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.send_message(
+            "Upload the next Materials screenshot in this channel. I will merge it into this pending Materials import.",
             ephemeral=True,
         )
 
@@ -708,6 +743,88 @@ class SpeedupCorrectionModal(discord.ui.Modal):
         await self.parent_view._update_review_message(interaction)
 
 
+class MaterialCorrectionSectionView(discord.ui.View):
+    def __init__(self, *, parent: InventoryConfirmationView) -> None:
+        super().__init__(timeout=180)
+        self.parent_view = parent
+        self.add_item(MaterialCorrectionSectionSelect())
+
+
+class MaterialCorrectionSectionSelect(discord.ui.Select):
+    def __init__(self) -> None:
+        options = [
+            discord.SelectOption(label="Choice Chests", value="choice_chests"),
+            discord.SelectOption(label="Animal Bone", value="animal_bone"),
+            discord.SelectOption(label="Leather", value="leather"),
+            discord.SelectOption(label="Ebony", value="ebony"),
+            discord.SelectOption(label="Iron Ore", value="iron_ore"),
+        ]
+        super().__init__(placeholder="Select Materials section", options=options)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        view = self.view
+        if not isinstance(view, MaterialCorrectionSectionView):
+            return
+        if await view.parent_view._deny_if_modal_unusable(interaction):
+            return
+        await interaction.response.send_modal(
+            MaterialCorrectionModal(view.parent_view, self.values[0])
+        )
+
+
+class MaterialCorrectionModal(discord.ui.Modal):
+    def __init__(self, parent: InventoryConfirmationView, material_kind: str) -> None:
+        self.parent_view = parent
+        self.material_kind = material_kind
+        labels = {
+            "choice_chests": "Choice Chests",
+            "animal_bone": "Animal Bone",
+            "leather": "Leather",
+            "ebony": "Ebony",
+            "iron_ore": "Iron Ore",
+        }
+        super().__init__(title=f"Correct {labels.get(material_kind, material_kind)}")
+        try:
+            materials = normalize_material_values(parent.corrected_values or parent.summary.values)
+        except ValueError:
+            materials = {}
+        self.inputs: dict[str, discord.ui.InputText] = {}
+        row = materials.get(material_kind) or {}
+        for rarity in MATERIAL_RARITIES:
+            field = discord.ui.InputText(
+                label=rarity.title(),
+                value=str(int(row.get(rarity) or 0)),
+                required=True,
+            )
+            self.inputs[rarity] = field
+            self.add_item(field)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if await self.parent_view._deny_if_modal_unusable(interaction):
+            return
+        corrections = {key: str(field.value or "") for key, field in self.inputs.items()}
+        try:
+            corrected = material_service.apply_material_corrections(
+                self.parent_view.corrected_values or self.parent_view.summary.values,
+                self.material_kind,
+                corrections,
+            )
+        except ValueError as exc:
+            await interaction.response.send_message(
+                f"Correction rejected: `{exc}`",
+                ephemeral=True,
+            )
+            return
+        self.parent_view.corrected_values = corrected
+        self.parent_view._significant_change_confirmed = False
+        self.parent_view._significant_change_warnings = []
+        await interaction.response.send_message(
+            "Correction saved. Press Approve Import on the updated review to save it.",
+            ephemeral=True,
+        )
+        await self.parent_view._update_review_message(interaction)
+
+
 class InventoryUploadGovernorSelectView(AccountPickerView):
     def __init__(
         self,
@@ -784,6 +901,7 @@ async def _process_payload_for_governor(
     original_message: discord.Message | None,
     batch_id: int | None,
     flow_from_pending_command: bool,
+    existing_detected_json: dict[str, Any] | None = None,
 ) -> None:
     if interaction is not None:
         try:
@@ -800,13 +918,21 @@ async def _process_payload_for_governor(
                 payload=payload,
                 is_admin=_is_admin(getattr(interaction, "user", None)) if interaction else False,
             )
-        summary = await inventory_service.analyse_inventory_image(
-            import_batch_id=batch_id,
-            payload=payload,
-        )
+        if existing_detected_json is not None:
+            summary = await inventory_service.analyse_additional_material_image(
+                import_batch_id=batch_id,
+                existing_detected_json=existing_detected_json,
+                payload=payload,
+            )
+        else:
+            summary = await inventory_service.analyse_inventory_image(
+                import_batch_id=batch_id,
+                payload=payload,
+            )
         decision = inventory_service.decide_analysis_outcome(summary)
         if decision.action == "fail":
-            await inventory_service.fail_import(batch_id, error=decision.error)
+            if existing_detected_json is None:
+                await inventory_service.fail_import(batch_id, error=decision.error)
             await _post_admin_debug(
                 bot=bot,
                 batch_id=batch_id,
@@ -821,6 +947,11 @@ async def _process_payload_for_governor(
                 "I could not read this inventory screenshot clearly enough. No values were saved.\n\n"
                 + SCREENSHOT_GUIDELINES
             )
+            if existing_detected_json is not None:
+                message = (
+                    "I could not read this additional Materials screenshot clearly enough. "
+                    "Your pending Materials import is still active.\n\n" + SCREENSHOT_GUIDELINES
+                )
             if interaction is not None:
                 sent = await _safe_followup_send(interaction, content=message, ephemeral=True)
                 if sent is None and original_message is not None:
@@ -846,7 +977,7 @@ async def _process_payload_for_governor(
                 summary=summary,
                 error_json={"error": decision.error},
             )
-            content = "Materials import is not available yet. No values were saved."
+            content = decision.error or "No values were saved."
             if interaction is not None:
                 sent = await _safe_followup_send(
                     interaction,
@@ -928,7 +1059,7 @@ async def start_import_command(ctx: discord.ApplicationContext, bot: Any) -> Non
         await ctx.followup.send(
             (
                 f"Inventory import started for GovernorID `{governor_id}`.\n"
-                "Upload one resources or speedups screenshot in this channel within 10 minutes."
+                "Upload one resources, speedups, or materials screenshot in this channel within 10 minutes."
             ),
             ephemeral=True,
         )
@@ -960,7 +1091,7 @@ async def start_import_command(ctx: discord.ApplicationContext, bot: Any) -> Non
         await interaction.followup.send(
             (
                 f"Inventory import started for GovernorID `{governor_id}`.\n"
-                "Upload one resources or speedups screenshot in this channel within 10 minutes."
+                "Upload one resources, speedups, or materials screenshot in this channel within 10 minutes."
             ),
             ephemeral=True,
         )
@@ -1022,6 +1153,36 @@ async def handle_inventory_upload_message(message: discord.Message, bot: Any) ->
             original_message=message,
             batch_id=int(pending["ImportBatchID"]),
             flow_from_pending_command=True,
+        )
+        return True
+
+    active_material = await inventory_service.get_active_material_session_for_user(
+        int(message.author.id)
+    )
+    if active_material:
+        detected_json = active_material.get("DetectedJson")
+        screenshot_count = 1
+        if isinstance(detected_json, dict):
+            try:
+                screenshot_count = int(detected_json.get("screenshot_count") or 1)
+            except (TypeError, ValueError):
+                screenshot_count = 1
+        if screenshot_count >= 4:
+            await message.channel.send(
+                f"<@{message.author.id}> This pending Materials import already has 4 screenshots. Review, correct, approve, or cancel it before adding more.",
+                delete_after=120,
+            )
+            return True
+        await _process_payload_for_governor(
+            bot=bot,
+            interaction=None,
+            governor_id=int(active_material["GovernorID"]),
+            actor_discord_id=int(message.author.id),
+            payload=payload,
+            original_message=message,
+            batch_id=int(active_material["ImportBatchID"]),
+            flow_from_pending_command=False,
+            existing_detected_json=detected_json if isinstance(detected_json, dict) else None,
         )
         return True
 

@@ -87,3 +87,26 @@ def test_inventory_phase1f_schema_defines_governor_profile_contract():
 
     for token in required_tokens:
         assert token in sql
+
+
+def test_inventory_phase2_materials_schema_defines_material_contract():
+    sql = Path("sql/inventory_phase2_materials_schema.sql").read_text(encoding="utf-8")
+
+    required_tokens = [
+        "SET ANSI_NULLS ON",
+        "SET QUOTED_IDENTIFIER ON",
+        "CREATE TABLE dbo.GovernorMaterialInventory",
+        "MaterialKind NVARCHAR(32) NOT NULL",
+        "Rarity NVARCHAR(32) NOT NULL",
+        "Quantity BIGINT NOT NULL",
+        "LegendaryEquivalent DECIMAL(18,4) NOT NULL",
+        "FK_GovernorMaterialInventory_ImportBatch",
+        "CK_GovernorMaterialInventory_MaterialKind",
+        "CK_GovernorMaterialInventory_Rarity",
+        "IX_GovernorMaterialInventory_Governor_ScanUtc",
+        "IX_GovernorMaterialInventory_Governor_Kind_Rarity_ScanUtc",
+        "UX_GovernorMaterialInventory_Batch_Kind_Rarity",
+    ]
+
+    for token in required_tokens:
+        assert token in sql

@@ -24,6 +24,7 @@ REPORT_VIEW_OPTIONS = {
     "All": InventoryReportView.ALL,
     "RSS": InventoryReportView.RESOURCES,
     "Speedups": InventoryReportView.SPEEDUPS,
+    "Materials": InventoryReportView.MATERIALS,
 }
 
 VIP_SELECT_OPTIONS = [
@@ -62,6 +63,8 @@ def _message_content(payload) -> str:
         categories.append("Resources")
     if payload.speedups:
         categories.append("Speedups")
+    if payload.materials:
+        categories.append("Materials")
     if not categories:
         view_label = "inventory" if payload.view == InventoryReportView.ALL else payload.view.value
         return (

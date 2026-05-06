@@ -30,6 +30,17 @@ def _rows_to_dicts(cursor) -> list[dict[str, Any]]:
     return [dict(zip(cols, row, strict=True)) for row in rows]
 
 
+def _loads_json(value: Any) -> Any:
+    if value in (None, ""):
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+    try:
+        return json.loads(str(value))
+    except Exception:
+        return None
+
+
 def create_import_batch(
     *,
     governor_id: int,
@@ -142,6 +153,33 @@ def fetch_active_batch_for_governor(governor_id: int) -> dict[str, Any] | None:
         )
         rows = _rows_to_dicts(cur)
         return rows[0] if rows else None
+    finally:
+        conn.close()
+
+
+def fetch_active_material_batch_for_user(discord_user_id: int) -> dict[str, Any] | None:
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT TOP 1 *
+            FROM dbo.InventoryImportBatch
+            WHERE DiscordUserID = ?
+              AND ImportType = N'materials'
+              AND Status = N'analysed'
+              AND (ExpiresAtUtc IS NULL OR ExpiresAtUtc > SYSUTCDATETIME())
+            ORDER BY CreatedAtUtc DESC
+            """,
+            (int(discord_user_id),),
+        )
+        rows = _rows_to_dicts(cur)
+        if not rows:
+            return None
+        row = rows[0]
+        for key in ("DetectedJson", "WarningJson", "ErrorJson"):
+            row[key] = _loads_json(row.get(key))
+        return row
     finally:
         conn.close()
 

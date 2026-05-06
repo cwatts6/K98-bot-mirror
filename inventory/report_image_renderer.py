@@ -41,6 +41,13 @@ RESOURCE_CHART_COLORS = {
     "Stone": (156, 163, 175),
     "Gold": (245, 180, 52),
 }
+MATERIAL_CHART_COLORS = {
+    "Bone": (205, 213, 223),
+    "Leather": (255, 104, 48),
+    "Ebony": (224, 96, 221),
+    "Iron": (27, 173, 224),
+    "Choice Chests": (255, 207, 0),
+}
 
 
 @dataclass(frozen=True)
@@ -554,12 +561,112 @@ def render_speedups_report(
     )
 
 
+def render_materials_report(
+    payload: InventoryReportPayload, *, avatar_bytes: bytes | None = None
+) -> RenderedInventoryImage | None:
+    if not payload.materials:
+        return None
+    canvas = Image.new("RGBA", (WIDTH, HEIGHT), BG)
+    draw = ImageDraw.Draw(canvas, "RGBA")
+    _draw_header(
+        canvas,
+        draw,
+        title="Materials Inventory",
+        logo=ASSET_DIR / "K98_Logo.png",
+        governor_name=payload.governor_name,
+        governor_id=payload.governor_id,
+        range_key=payload.range_key.value,
+        avatar_bytes=avatar_bytes,
+    )
+    latest = payload.materials[-1]
+    kpis = [
+        ("Bone", latest.animal_bone_legendary),
+        ("Leather", latest.leather_legendary),
+        ("Ebony", latest.ebony_legendary),
+        ("Iron", latest.iron_ore_legendary),
+        ("Choice Chests", latest.choice_chest_legendary),
+    ]
+    box_w = 246
+    for idx, (title, value) in enumerate(kpis):
+        attr = {
+            "Bone": "animal_bone_legendary",
+            "Leather": "leather_legendary",
+            "Ebony": "ebony_legendary",
+            "Iron": "iron_ore_legendary",
+            "Choice Chests": "choice_chest_legendary",
+        }[title]
+        _value, delta = _latest_delta(payload.materials, attr)
+        delta_label, color = _delta_text(delta)
+        _draw_kpi(
+            canvas,
+            draw,
+            (44 + idx * (box_w + 16), 144, 44 + idx * (box_w + 16) + box_w, 286),
+            title=title,
+            value=f"{value:,.1f}",
+            delta=delta_label,
+            color=color,
+        )
+
+    total_delta = (
+        latest.total_legendary - payload.materials[0].total_legendary
+        if len(payload.materials) >= 2
+        else None
+    )
+    total_delta_label, total_delta_color = _delta_text(total_delta)
+    _draw_kpi(
+        canvas,
+        draw,
+        (72, 326, 650, 474),
+        title="Total Legendary Materials",
+        value=f"{latest.total_legendary:,.2f}",
+        delta=total_delta_label,
+        color=total_delta_color,
+    )
+    _draw_kpi(
+        canvas,
+        draw,
+        (750, 326, 1328, 474),
+        title=f"Net Change ({payload.range_key.value})",
+        value=total_delta_label,
+        delta="range delta",
+        color=total_delta_color,
+    )
+
+    if len(payload.materials) >= 2:
+        series = {
+            "Bone": [p.animal_bone_legendary for p in payload.materials],
+            "Leather": [p.leather_legendary for p in payload.materials],
+            "Ebony": [p.ebony_legendary for p in payload.materials],
+            "Iron": [p.iron_ore_legendary for p in payload.materials],
+            "Choice Chests": [p.choice_chest_legendary for p in payload.materials],
+        }
+        _line_chart(
+            canvas,
+            draw,
+            (44, 520, 1356, 924),
+            series,
+            [str(p.scan_utc) for p in payload.materials],
+            [MATERIAL_CHART_COLORS[name] for name in series],
+        )
+    else:
+        draw.text(
+            (56, 548),
+            "Only one approved Materials import is available. Add another approved import to show trends.",
+            fill=MUTED,
+            font=_font(24),
+        )
+    return _export(
+        canvas, f"inventory_materials_{payload.governor_id}_{payload.range_key.value}.png"
+    )
+
+
 def render_inventory_reports(
     payload: InventoryReportPayload, *, avatar_bytes: bytes | None = None
 ) -> list[RenderedInventoryImage]:
     rendered = [
         render_resources_report(payload, avatar_bytes=avatar_bytes),
         render_speedups_report(payload, avatar_bytes=avatar_bytes),
+        render_materials_report(payload, avatar_bytes=avatar_bytes),
     ]
     return [item for item in rendered if item is not None]
 

@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from decoraters import _is_admin
+from inventory import material_service
 from inventory.dal import inventory_dal
 from inventory.models import (
     InventoryAnalysisSummary,
@@ -130,6 +131,12 @@ async def create_pending_command_session(
 
 async def get_pending_command_session(discord_user_id: int) -> dict[str, Any] | None:
     return await asyncio.to_thread(inventory_dal.fetch_pending_upload_for_user, discord_user_id)
+
+
+async def get_active_material_session_for_user(discord_user_id: int) -> dict[str, Any] | None:
+    return await asyncio.to_thread(
+        inventory_dal.fetch_active_material_batch_for_user, discord_user_id
+    )
 
 
 async def create_upload_first_batch(
@@ -367,6 +374,93 @@ async def analyse_inventory_image(
     return summary
 
 
+def _summary_from_material_detected_json(
+    payload: dict[str, Any] | None,
+) -> InventoryAnalysisSummary | None:
+    if not isinstance(payload, dict):
+        return None
+    values = payload.get("values") if isinstance(payload.get("values"), dict) else payload
+    if "materials" not in values:
+        values = {"materials": values.get("materials", values)}
+    return InventoryAnalysisSummary(
+        ok=True,
+        import_type=InventoryImportType.MATERIALS,
+        values=values,
+        confidence_score=float(payload.get("confidence_score") or 1.0),
+        warnings=list(payload.get("warnings") or []),
+        model=str(payload.get("model") or ""),
+        prompt_version=str(payload.get("prompt_version") or ""),
+        fallback_used=bool(payload.get("fallback_used") or False),
+        raw_json=payload,
+    )
+
+
+async def analyse_additional_material_image(
+    *,
+    import_batch_id: int,
+    existing_detected_json: dict[str, Any] | None,
+    payload: InventoryImagePayload,
+    vision_client: InventoryVisionClient | None = None,
+) -> InventoryAnalysisSummary:
+    client = vision_client or InventoryVisionClient()
+    result = await client.analyse_image(
+        payload.image_bytes,
+        filename=payload.filename,
+        content_type=payload.content_type,
+        import_type_hint="materials",
+    )
+    new_summary = _summary_from_vision_result(result)
+    if new_summary.import_type != InventoryImportType.MATERIALS:
+        return new_summary
+
+    summaries = [new_summary]
+    existing_summary = _summary_from_material_detected_json(existing_detected_json)
+    if existing_summary is not None:
+        summaries.insert(0, existing_summary)
+    review = material_service.build_material_review_from_summaries(summaries)
+    merged_values = {"materials": review.values}
+    merged_warnings = list(dict.fromkeys([*review.warnings, *review.conflicts]))
+    merged_raw = {
+        "detected_image_type": "materials",
+        "confidence_score": new_summary.confidence_score,
+        "warnings": merged_warnings,
+        "values": merged_values,
+        "model": new_summary.model,
+        "prompt_version": new_summary.prompt_version,
+        "fallback_used": new_summary.fallback_used,
+        "screenshot_count": review.screenshot_count,
+    }
+    merged_summary = InventoryAnalysisSummary(
+        ok=new_summary.ok,
+        import_type=InventoryImportType.MATERIALS,
+        values=merged_values,
+        confidence_score=new_summary.confidence_score,
+        warnings=merged_warnings,
+        model=new_summary.model,
+        prompt_version=new_summary.prompt_version,
+        fallback_used=new_summary.fallback_used,
+        error=new_summary.error,
+        raw_json=merged_raw,
+    )
+    await asyncio.to_thread(
+        inventory_dal.update_batch_analysis,
+        import_batch_id=int(import_batch_id),
+        import_type=InventoryImportType.MATERIALS,
+        vision_model=merged_summary.model,
+        vision_prompt_version=merged_summary.prompt_version,
+        fallback_used=merged_summary.fallback_used,
+        confidence_score=merged_summary.confidence_score,
+        detected_json=merged_summary.raw_json,
+        warning_json=merged_summary.warnings,
+        error_json=None,
+        status=InventoryImportStatus.ANALYSED,
+        source_message_id=payload.source_message_id,
+        source_channel_id=payload.source_channel_id,
+        image_attachment_url=payload.image_attachment_url,
+    )
+    return merged_summary
+
+
 def decide_analysis_outcome(summary: InventoryAnalysisSummary) -> InventoryAnalysisDecision:
     if (
         not summary.ok
@@ -377,13 +471,6 @@ def decide_analysis_outcome(summary: InventoryAnalysisSummary) -> InventoryAnaly
             action="fail",
             debug_status="failed",
             error=summary.error or "Analysis failed.",
-        )
-
-    if summary.import_type == InventoryImportType.MATERIALS:
-        return InventoryAnalysisDecision(
-            action="reject",
-            debug_status="materials_disabled",
-            error="Materials disabled in Phase 1.",
         )
 
     return InventoryAnalysisDecision(action="review")
@@ -398,10 +485,8 @@ async def approve_import(
     is_admin: bool = False,
     corrected_values: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    if summary.import_type in {InventoryImportType.MATERIALS, InventoryImportType.UNKNOWN}:
-        raise ValueError(
-            f"{summary.import_type.value.title()} imports are not available in Phase 1."
-        )
+    if summary.import_type == InventoryImportType.UNKNOWN:
+        raise ValueError(f"{summary.import_type.value.title()} imports are not available.")
     if summary.confidence_score < LOW_CONFIDENCE_REJECT_THRESHOLD:
         raise ValueError("Image confidence is too low to approve.")
 
@@ -413,6 +498,21 @@ async def approve_import(
         )
         if already_imported:
             raise ValueError("This governor already has an approved import of this type today.")
+
+    if summary.import_type == InventoryImportType.MATERIALS:
+        normalized = await material_service.approve_material_import(
+            import_batch_id=int(import_batch_id),
+            governor_id=int(governor_id),
+            values=final_values or summary.values,
+            corrected_values=corrected_values,
+        )
+        logger.info(
+            "inventory_import_approved batch_id=%s governor_id=%s import_type=%s",
+            import_batch_id,
+            governor_id,
+            summary.import_type.value,
+        )
+        return normalized
 
     normalized = normalize_final_values(summary.import_type, final_values or summary.values)
     scan_utc = datetime.now(UTC)

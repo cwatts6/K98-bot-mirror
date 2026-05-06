@@ -30,6 +30,7 @@ class InventoryFlowType(StrEnum):
 class InventoryReportView(StrEnum):
     RESOURCES = "resources"
     SPEEDUPS = "speedups"
+    MATERIALS = "materials"
     ALL = "all"
 
 
@@ -142,6 +143,29 @@ class InventorySpeedupPoint:
 
 
 @dataclass(frozen=True)
+class InventoryMaterialPoint:
+    scan_utc: Any
+    animal_bone_legendary: float
+    leather_legendary: float
+    ebony_legendary: float
+    iron_ore_legendary: float
+    choice_chest_legendary: float
+
+    @property
+    def fixed_total_legendary(self) -> float:
+        return (
+            float(self.animal_bone_legendary)
+            + float(self.leather_legendary)
+            + float(self.ebony_legendary)
+            + float(self.iron_ore_legendary)
+        )
+
+    @property
+    def total_legendary(self) -> float:
+        return float(self.fixed_total_legendary) + float(self.choice_chest_legendary)
+
+
+@dataclass(frozen=True)
 class InventoryReportPayload:
     governor_id: int
     governor_name: str
@@ -150,6 +174,7 @@ class InventoryReportPayload:
     governor_profile: InventoryGovernorProfile | None = None
     resources: list[InventoryResourcePoint] = field(default_factory=list)
     speedups: list[InventorySpeedupPoint] = field(default_factory=list)
+    materials: list[InventoryMaterialPoint] = field(default_factory=list)
     generated_at_utc: Any | None = None
 
 

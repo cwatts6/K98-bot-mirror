@@ -133,6 +133,11 @@ async def test_build_inventory_report_payload_groups_resources_and_speedups(monk
         "fetch_speedup_rows",
         _speedup_rows,
     )
+    monkeypatch.setattr(
+        reporting_service.inventory_material_dal,
+        "fetch_material_rows",
+        lambda _governor_id: [],
+    )
 
     async def _profile(governor_id):
         return InventoryGovernorProfile.default(governor_id)
@@ -149,6 +154,7 @@ async def test_build_inventory_report_payload_groups_resources_and_speedups(monk
     assert payload.resources[0].total == 1000
     assert payload.speedups[0].training_days == 3
     assert payload.speedups[0].universal_days == 5
+    assert payload.materials == []
     assert payload.governor_profile is not None
     assert payload.governor_profile.uses_default_vip is True
 
@@ -166,6 +172,11 @@ async def test_build_inventory_report_payload_includes_stored_vip(monkeypatch):
             {"ScanUtc": now, "ResourceType": "stone", "TotalResourcesValue": 100},
             {"ScanUtc": now, "ResourceType": "gold", "TotalResourcesValue": 100},
         ],
+    )
+    monkeypatch.setattr(
+        reporting_service.inventory_material_dal,
+        "fetch_material_rows",
+        lambda _governor_id: [],
     )
 
     async def _profile(governor_id):

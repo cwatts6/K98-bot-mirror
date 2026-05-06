@@ -7,12 +7,18 @@ from typing import Any
 
 from decoraters import _is_admin
 from inventory import profile_service
-from inventory.dal import inventory_reporting_dal
+from inventory.dal import inventory_material_dal, inventory_reporting_dal
 from inventory.inventory_service import (
     get_registered_governors_for_user,
     user_can_import_for_governor,
 )
+from inventory.material_calculations import (
+    choice_chest_total,
+    empty_material_values,
+    material_totals,
+)
 from inventory.models import (
+    InventoryMaterialPoint,
     InventoryReportPayload,
     InventoryReportRange,
     InventoryReportView,
@@ -45,7 +51,7 @@ def parse_report_view(value: str | None) -> InventoryReportView:
     try:
         return InventoryReportView(normalized)
     except ValueError as exc:
-        raise ValueError("Inventory view must be Resources, Speedups, or All.") from exc
+        raise ValueError("Inventory view must be Resources, Speedups, Materials, or All.") from exc
 
 
 def parse_visibility(value: str | None) -> InventoryReportVisibility | None:
@@ -198,6 +204,32 @@ def _group_speedup_points(rows: list[dict[str, Any]]) -> list[InventorySpeedupPo
     return sorted(points, key=lambda item: item.scan_utc)
 
 
+def _group_material_points(rows: list[dict[str, Any]]) -> list[InventoryMaterialPoint]:
+    grouped: dict[Any, dict[str, Any]] = {}
+    for row in rows:
+        scan = row.get("ScanUtc")
+        bucket = grouped.setdefault(scan, empty_material_values())
+        kind = str(row.get("MaterialKind") or "").lower()
+        rarity = str(row.get("Rarity") or "").lower()
+        if kind in bucket and rarity in bucket[kind]:
+            bucket[kind][rarity] = int(row.get("Quantity") or 0)
+
+    points: list[InventoryMaterialPoint] = []
+    for scan, values in grouped.items():
+        totals = material_totals(values)
+        points.append(
+            InventoryMaterialPoint(
+                scan_utc=scan,
+                animal_bone_legendary=totals["animal_bone"],
+                leather_legendary=totals["leather"],
+                ebony_legendary=totals["ebony"],
+                iron_ore_legendary=totals["iron_ore"],
+                choice_chest_legendary=choice_chest_total(values),
+            )
+        )
+    return sorted(points, key=lambda item: item.scan_utc)
+
+
 def _filter_points_for_range(points: list[Any], range_key: InventoryReportRange) -> list[Any]:
     cutoff = datetime.now(UTC) - timedelta(days=REPORT_RANGE_DAYS[range_key])
     filtered = []
@@ -221,6 +253,7 @@ async def build_inventory_report_payload(
 ) -> InventoryReportPayload:
     resources: list[InventoryResourcePoint] = []
     speedups: list[InventorySpeedupPoint] = []
+    materials: list[InventoryMaterialPoint] = []
     governor_profile = await profile_service.fetch_inventory_profile(int(governor.governor_id))
 
     if view in {InventoryReportView.RESOURCES, InventoryReportView.ALL}:
@@ -237,14 +270,22 @@ async def build_inventory_report_payload(
         )
         speedups = _filter_points_for_range(_group_speedup_points(speedup_rows), range_key)
 
+    if view in {InventoryReportView.MATERIALS, InventoryReportView.ALL}:
+        material_rows = await asyncio.to_thread(
+            inventory_material_dal.fetch_material_rows,
+            int(governor.governor_id),
+        )
+        materials = _filter_points_for_range(_group_material_points(material_rows), range_key)
+
     logger.info(
-        "inventory_report_payload_built user_id=%s governor_id=%s view=%s range=%s resources=%s speedups=%s",
+        "inventory_report_payload_built user_id=%s governor_id=%s view=%s range=%s resources=%s speedups=%s materials=%s",
         discord_user_id,
         governor.governor_id,
         view.value,
         range_key.value,
         len(resources),
         len(speedups),
+        len(materials),
     )
     return InventoryReportPayload(
         governor_id=int(governor.governor_id),
@@ -254,5 +295,6 @@ async def build_inventory_report_payload(
         governor_profile=governor_profile,
         resources=resources,
         speedups=speedups,
+        materials=materials,
         generated_at_utc=datetime.now(UTC),
     )

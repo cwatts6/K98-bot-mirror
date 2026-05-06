@@ -151,6 +151,11 @@ async def test_build_inventory_export_file_rejects_no_records(monkeypatch):
         "fetch_speedup_export_rows",
         lambda *_args, **_kwargs: [],
     )
+    monkeypatch.setattr(
+        export_service.inventory_material_dal,
+        "fetch_material_export_rows",
+        lambda *_args, **_kwargs: [],
+    )
 
     with pytest.raises(ValueError, match="No approved inventory records"):
         await export_service.build_inventory_export_file(

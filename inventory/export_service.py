@@ -9,7 +9,7 @@ import tempfile
 from typing import Any
 
 from decoraters import _is_admin
-from inventory.dal import inventory_export_dal
+from inventory.dal import inventory_export_dal, inventory_material_dal
 from inventory.inventory_service import (
     get_registered_governors_for_user,
     user_can_import_for_governor,
@@ -34,6 +34,11 @@ EXPORT_COLUMNS = [
     "TotalMinutes",
     "TotalHours",
     "TotalDaysDecimal",
+    "MaterialKind",
+    "Rarity",
+    "Quantity",
+    "LegendaryEquivalent",
+    "SourceImageIndex",
 ]
 
 
@@ -57,7 +62,9 @@ def _parse_export_view(value: str | None) -> InventoryReportView:
     try:
         return InventoryReportView(normalized)
     except ValueError as exc:
-        raise ValueError("Inventory export view must be Resources, Speedups, or All.") from exc
+        raise ValueError(
+            "Inventory export view must be Resources, Speedups, Materials, or All."
+        ) from exc
 
 
 async def resolve_export_governor_ids(
@@ -109,6 +116,11 @@ def _resource_export_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "TotalMinutes": "",
             "TotalHours": "",
             "TotalDaysDecimal": "",
+            "MaterialKind": "",
+            "Rarity": "",
+            "Quantity": "",
+            "LegendaryEquivalent": "",
+            "SourceImageIndex": "",
         }
         for row in rows
     ]
@@ -132,6 +144,39 @@ def _speedup_export_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "TotalMinutes": row.get("TotalMinutes"),
             "TotalHours": row.get("TotalHours"),
             "TotalDaysDecimal": row.get("TotalDaysDecimal"),
+            "MaterialKind": "",
+            "Rarity": "",
+            "Quantity": "",
+            "LegendaryEquivalent": "",
+            "SourceImageIndex": "",
+        }
+        for row in rows
+    ]
+
+
+def _material_export_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "RecordKind": "material",
+            "ImportBatchID": row.get("ImportBatchID"),
+            "GovernorID": row.get("GovernorID"),
+            "VipLevelCode": row.get("VipLevelCode") or "",
+            "VipLevelLabel": row.get("VipLevelLabel") or "",
+            "DiscordUserID": row.get("DiscordUserID"),
+            "FlowType": row.get("FlowType"),
+            "ApprovedAtUtc": _dt(row.get("ApprovedAtUtc")),
+            "ScanUtc": _dt(row.get("ScanUtc")),
+            "ItemType": row.get("MaterialKind"),
+            "FromItemsValue": "",
+            "TotalResourcesValue": "",
+            "TotalMinutes": "",
+            "TotalHours": "",
+            "TotalDaysDecimal": "",
+            "MaterialKind": row.get("MaterialKind"),
+            "Rarity": row.get("Rarity"),
+            "Quantity": row.get("Quantity"),
+            "LegendaryEquivalent": row.get("LegendaryEquivalent"),
+            "SourceImageIndex": row.get("SourceImageIndex") or "",
         }
         for row in rows
     ]
@@ -153,8 +198,8 @@ def _write_xlsx(rows: list[dict[str, Any]], path: Path) -> None:
             {
                 "Info": [
                     "Inventory Export",
-                    "Approved Resources and Speedups only.",
-                    "Materials are not included in Phase 1.",
+                    "Approved Resources, Speedups, and Materials only.",
+                    "Image/debug references are available through admin audit where retained.",
                 ]
             }
         ).to_excel(writer, index=False, sheet_name="README")
@@ -181,6 +226,7 @@ async def build_inventory_export_file(
 
     resources: list[dict[str, Any]] = []
     speedups: list[dict[str, Any]] = []
+    materials: list[dict[str, Any]] = []
     if view in {InventoryReportView.RESOURCES, InventoryReportView.ALL}:
         resources = await asyncio.to_thread(
             inventory_export_dal.fetch_resource_export_rows,
@@ -193,8 +239,18 @@ async def build_inventory_export_file(
             governor_ids,
             lookback_days=lookback_days,
         )
+    if view in {InventoryReportView.MATERIALS, InventoryReportView.ALL}:
+        materials = await asyncio.to_thread(
+            inventory_material_dal.fetch_material_export_rows,
+            governor_ids,
+            lookback_days=lookback_days,
+        )
 
-    export_rows = _resource_export_rows(resources) + _speedup_export_rows(speedups)
+    export_rows = (
+        _resource_export_rows(resources)
+        + _speedup_export_rows(speedups)
+        + _material_export_rows(materials)
+    )
     if not export_rows:
         raise ValueError("No approved inventory records found for the selected export.")
 

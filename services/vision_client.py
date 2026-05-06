@@ -131,6 +131,29 @@ def build_inventory_vision_schema() -> dict[str, Any]:
             "legendary_equivalent": nullable_number,
         },
     }
+    material_item_reference = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["material_kind", "rarity", "reason"],
+        "properties": {
+            "material_kind": {
+                "type": ["string", "null"],
+                "enum": [
+                    "choice_chests",
+                    "animal_bone",
+                    "leather",
+                    "ebony",
+                    "iron_ore",
+                    None,
+                ],
+            },
+            "rarity": {
+                "type": ["string", "null"],
+                "enum": ["normal", "advanced", "elite", "epic", "legendary", None],
+            },
+            "reason": {"type": "string"},
+        },
+    }
 
     return {
         "type": "object",
@@ -181,18 +204,38 @@ def build_inventory_vision_schema() -> dict[str, Any]:
                         "type": "object",
                         "additionalProperties": False,
                         "required": [
+                            "material_screen_type",
                             "choice_chests",
                             "leather",
                             "iron_ore",
                             "ebony",
                             "animal_bone",
+                            "unreadable_items",
+                            "duplicate_candidates",
                         ],
                         "properties": {
+                            "material_screen_type": {
+                                "type": "string",
+                                "enum": [
+                                    "choice_chests",
+                                    "individual_materials",
+                                    "mixed_materials",
+                                    "unknown_materials",
+                                ],
+                            },
                             "choice_chests": material_row,
                             "leather": material_row,
                             "iron_ore": material_row,
                             "ebony": material_row,
                             "animal_bone": material_row,
+                            "unreadable_items": {
+                                "type": "array",
+                                "items": material_item_reference,
+                            },
+                            "duplicate_candidates": {
+                                "type": "array",
+                                "items": material_item_reference,
+                            },
                         },
                     },
                 },
@@ -231,6 +274,15 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         "day_digits_verification_text set to '1,242' and must be stored as 1242 days, with "
         "total_minutes set to 1788480, total_hours set to 29808, and total_days_decimal set "
         "to 1242. Do not drop the leading thousands digit or round down by one or two days. "
+        "For materials, identify whether the screenshot is choice_chests, "
+        "individual_materials, mixed_materials, or unknown_materials. Extract Equipment "
+        "Material Choice Chest quantities separately from fixed material quantities. Fixed "
+        "materials are animal_bone, leather, ebony, and iron_ore. For every material kind, "
+        "return integer quantities for normal, advanced, elite, epic, and legendary rarities; "
+        "use 0 when a rarity is not visible and null only when a visible value is unreadable. "
+        "List unreadable visible material items in unreadable_items. List repeated same kind "
+        "and rarity candidates in duplicate_candidates instead of silently choosing between "
+        "conflicting values. "
         "Use warnings for missing rows, unreadable values, low confidence, or mismatched "
         "image type. If the image is not readable, use detected_image_type unknown and "
         "a confidence_score below 0.70."

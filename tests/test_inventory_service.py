@@ -57,6 +57,35 @@ class _LowConfidenceVisionClient(_VisionClient):
         return result
 
 
+class _MaterialVisionClient(_VisionClient):
+    async def analyse_image(
+        self, image_bytes, *, filename=None, content_type=None, import_type_hint=None
+    ):
+        result = _VisionResult()
+        result.detected_image_type = "materials"
+        result.values = {
+            "materials": {
+                "choice_chests": {
+                    "normal": 0,
+                    "advanced": 0,
+                    "elite": 0,
+                    "epic": 4,
+                    "legendary": 1,
+                },
+                "animal_bone": {},
+                "leather": {},
+                "ebony": {},
+                "iron_ore": {},
+            }
+        }
+        result.raw_json = {
+            "detected_image_type": "materials",
+            "values": result.values,
+            "warnings": [],
+        }
+        return result
+
+
 async def test_analyse_inventory_image_does_not_send_type_hint(monkeypatch):
     captured = {}
 
@@ -128,7 +157,48 @@ async def test_analyse_inventory_image_marks_random_image_failed(monkeypatch):
     assert captured["status"] == InventoryImportStatus.FAILED
 
 
-async def test_decide_analysis_outcome_keeps_materials_disabled_in_service():
+async def test_additional_material_image_does_not_update_batch_when_not_material(monkeypatch):
+    def _update(**_kwargs):
+        raise AssertionError("non-material additional screenshots must not overwrite the batch")
+
+    monkeypatch.setattr(inventory_service.inventory_dal, "update_batch_analysis", _update)
+
+    summary = await inventory_service.analyse_additional_material_image(
+        import_batch_id=42,
+        existing_detected_json={"values": {"materials": {"choice_chests": {"legendary": 1}}}},
+        payload=InventoryImagePayload(image_bytes=b"cat", filename="cat.png"),
+        vision_client=_LowConfidenceVisionClient(),
+    )
+
+    assert summary.import_type == InventoryImportType.UNKNOWN
+
+
+async def test_additional_material_image_merges_and_persists_materials(monkeypatch):
+    captured = {}
+
+    def _update(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(inventory_service.inventory_dal, "update_batch_analysis", _update)
+
+    summary = await inventory_service.analyse_additional_material_image(
+        import_batch_id=42,
+        existing_detected_json={
+            "detected_image_type": "materials",
+            "values": {"materials": {"animal_bone": {"epic": 4}}},
+            "warnings": [],
+        },
+        payload=InventoryImagePayload(image_bytes=b"materials", filename="materials.png"),
+        vision_client=_MaterialVisionClient(),
+    )
+
+    assert summary.import_type == InventoryImportType.MATERIALS
+    assert summary.values["materials"]["animal_bone"]["epic"] == 4
+    assert summary.values["materials"]["choice_chests"]["legendary"] == 1
+    assert captured["status"] == InventoryImportStatus.ANALYSED
+
+
+async def test_decide_analysis_outcome_allows_materials_review():
     result = _VisionResult()
     result.detected_image_type = "materials"
     result.values = {"materials": {}}
@@ -137,9 +207,9 @@ async def test_decide_analysis_outcome_keeps_materials_disabled_in_service():
         inventory_service._summary_from_vision_result(result)
     )
 
-    assert decision.action == "reject"
-    assert decision.debug_status == "materials_disabled"
-    assert decision.error == "Materials disabled in Phase 1."
+    assert decision.action == "review"
+    assert decision.debug_status is None
+    assert decision.error is None
 
 
 async def test_approve_import_blocks_duplicate_same_day_for_non_admin(monkeypatch):

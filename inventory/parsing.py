@@ -5,6 +5,7 @@ import json
 import re
 from typing import Any
 
+from inventory.material_calculations import normalize_material_values
 from inventory.models import InventoryImportType, InventoryValidationResult
 
 RESOURCE_TYPES = ("food", "wood", "stone", "gold")
@@ -312,7 +313,9 @@ def normalize_final_values(
         return {"resources": normalize_resource_values(values)}
     if import_type == InventoryImportType.SPEEDUPS:
         return {"speedups": normalize_speedup_values(values)}
-    raise ValueError(f"Unsupported import type for Phase 1A: {import_type}.")
+    if import_type == InventoryImportType.MATERIALS:
+        return {"materials": normalize_material_values(values)}
+    raise ValueError(f"Unsupported import type: {import_type}.")
 
 
 def parse_corrected_json(

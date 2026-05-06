@@ -60,6 +60,11 @@ async def test_upload_first_single_governor_processes_and_deletes(monkeypatch):
 
     monkeypatch.setattr(inventory_views.inventory_service, "get_pending_command_session", _pending)
     monkeypatch.setattr(
+        inventory_views.inventory_service,
+        "get_active_material_session_for_user",
+        _pending,
+    )
+    monkeypatch.setattr(
         inventory_views.inventory_service, "get_registered_governors_for_user", _governors
     )
     monkeypatch.setattr(inventory_views, "_process_payload_for_governor", _process)
@@ -82,6 +87,11 @@ async def test_upload_first_without_governors_sends_guidance(monkeypatch):
         return []
 
     monkeypatch.setattr(inventory_views.inventory_service, "get_pending_command_session", _pending)
+    monkeypatch.setattr(
+        inventory_views.inventory_service,
+        "get_active_material_session_for_user",
+        _pending,
+    )
     monkeypatch.setattr(
         inventory_views.inventory_service, "get_registered_governors_for_user", _governors
     )

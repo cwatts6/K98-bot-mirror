@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 def register_inventory(bot: ext_commands.Bot) -> None:
     @bot.slash_command(
         name="import_inventory",
-        description="Import a resources or speedups inventory screenshot",
+        description="Import a resources, speedups, or materials inventory screenshot",
         guild_ids=[GUILD_ID],
     )
     @versioned("v1.00")
@@ -69,7 +69,7 @@ def register_inventory(bot: ext_commands.Bot) -> None:
 
     @bot.slash_command(
         name="myinventory",
-        description="View your latest resources or speedups inventory report",
+        description="View your latest inventory report",
         guild_ids=[GUILD_ID],
     )
     @versioned("v1.00")
@@ -128,7 +128,7 @@ def register_inventory(bot: ext_commands.Bot) -> None:
 
     @bot.slash_command(
         name="export_inventory",
-        description="Export your approved resources and speedups inventory records",
+        description="Export your approved inventory records",
         guild_ids=[GUILD_ID],
     )
     @versioned("v1.00")
@@ -146,7 +146,7 @@ def register_inventory(bot: ext_commands.Bot) -> None:
         view: str = discord.Option(
             str,
             "Inventory records to export",
-            choices=["Resources", "Speedups", "All"],
+            choices=["Resources", "Speedups", "Materials", "All"],
             required=False,
             default="All",
         ),
