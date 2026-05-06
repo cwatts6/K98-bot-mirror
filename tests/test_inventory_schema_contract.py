@@ -110,3 +110,19 @@ def test_inventory_phase2_materials_schema_defines_material_contract():
 
     for token in required_tokens:
         assert token in sql
+
+
+def test_inventory_phase2_materials_status_schema_adds_awaiting_more_material():
+    sql = Path("sql/inventory_phase2_materials_status_schema.sql").read_text(encoding="utf-8")
+
+    required_tokens = [
+        "SET ANSI_NULLS ON",
+        "SET QUOTED_IDENTIFIER ON",
+        "CK_InventoryImportBatch_Status",
+        "N'awaiting_more_material'",
+        "UX_InventoryImportBatch_ActiveGovernor",
+        "awaiting_more_material",
+    ]
+
+    for token in required_tokens:
+        assert token in sql

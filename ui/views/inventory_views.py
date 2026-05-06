@@ -591,6 +591,17 @@ class InventoryConfirmationView(discord.ui.View):
                 ephemeral=True,
             )
             return
+        try:
+            await inventory_service.set_batch_awaiting_more_material(self.batch_id)
+        except Exception:
+            logger.exception(
+                "inventory_set_awaiting_more_material_failed batch_id=%s", self.batch_id
+            )
+            await interaction.response.send_message(
+                "Could not prepare this import for an additional screenshot. Please try again.",
+                ephemeral=True,
+            )
+            return
         await interaction.response.send_message(
             "Upload the next Materials screenshot in this channel. I will merge it into this pending Materials import.",
             ephemeral=True,
@@ -933,6 +944,13 @@ async def _process_payload_for_governor(
         if decision.action == "fail":
             if existing_detected_json is None:
                 await inventory_service.fail_import(batch_id, error=decision.error)
+            else:
+                try:
+                    await inventory_service.revert_additional_material_upload(batch_id)
+                except Exception:
+                    logger.exception(
+                        "inventory_revert_additional_material_failed batch_id=%s", batch_id
+                    )
             await _post_admin_debug(
                 bot=bot,
                 batch_id=batch_id,

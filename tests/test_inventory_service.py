@@ -171,6 +171,38 @@ async def test_additional_material_image_does_not_update_batch_when_not_material
     )
 
     assert summary.import_type == InventoryImportType.UNKNOWN
+    assert summary.ok is False
+    assert summary.error is not None
+
+
+async def test_additional_material_image_rejects_high_confidence_non_material(monkeypatch):
+    """High-confidence Resources/Speedups image must not be merged into a materials batch."""
+
+    class _ResourcesVisionClient(_VisionClient):
+        async def analyse_image(
+            self, image_bytes, *, filename=None, content_type=None, import_type_hint=None
+        ):
+            result = _VisionResult()
+            result.detected_image_type = "resources"
+            result.confidence_score = 0.95
+            result.ok = True
+            return result
+
+    def _update(**_kwargs):
+        raise AssertionError("non-material additional screenshots must not overwrite the batch")
+
+    monkeypatch.setattr(inventory_service.inventory_dal, "update_batch_analysis", _update)
+
+    summary = await inventory_service.analyse_additional_material_image(
+        import_batch_id=42,
+        existing_detected_json={"values": {"materials": {"choice_chests": {"legendary": 1}}}},
+        payload=InventoryImagePayload(image_bytes=b"resources", filename="resources.png"),
+        vision_client=_ResourcesVisionClient(),
+    )
+
+    assert summary.ok is False
+    assert summary.import_type == InventoryImportType.RESOURCES
+    assert summary.error is not None
 
 
 async def test_additional_material_image_merges_and_persists_materials(monkeypatch):

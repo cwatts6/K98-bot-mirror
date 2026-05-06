@@ -106,7 +106,7 @@ def create_import_batch(
 
 
 def expire_stale_batches_for_governor(governor_id: int) -> None:
-    """Mark any expired awaiting_upload/analysed sessions as cancelled for the given governor."""
+    """Mark any expired awaiting_upload/analysed/awaiting_more_material sessions as cancelled for the given governor."""
     conn = _get_conn()
     try:
         cur = conn.cursor()
@@ -115,7 +115,7 @@ def expire_stale_batches_for_governor(governor_id: int) -> None:
             UPDATE dbo.InventoryImportBatch
             SET Status = 'cancelled'
             WHERE GovernorID = ?
-              AND Status IN ('awaiting_upload', 'analysed')
+              AND Status IN ('awaiting_upload', 'analysed', 'awaiting_more_material')
               AND ExpiresAtUtc IS NOT NULL
               AND ExpiresAtUtc <= SYSUTCDATETIME()
             """,
@@ -145,7 +145,7 @@ def fetch_active_batch_for_governor(governor_id: int) -> dict[str, Any] | None:
             SELECT TOP 1 *
             FROM dbo.InventoryImportBatch
             WHERE GovernorID = ?
-              AND Status IN ('awaiting_upload', 'analysed')
+              AND Status IN ('awaiting_upload', 'analysed', 'awaiting_more_material')
               AND (ExpiresAtUtc IS NULL OR ExpiresAtUtc > SYSUTCDATETIME())
             ORDER BY CreatedAtUtc DESC
             """,
@@ -167,7 +167,7 @@ def fetch_active_material_batch_for_user(discord_user_id: int) -> dict[str, Any]
             FROM dbo.InventoryImportBatch
             WHERE DiscordUserID = ?
               AND ImportType = N'materials'
-              AND Status = N'analysed'
+              AND Status = N'awaiting_more_material'
               AND (ExpiresAtUtc IS NULL OR ExpiresAtUtc > SYSUTCDATETIME())
             ORDER BY CreatedAtUtc DESC
             """,
@@ -182,6 +182,69 @@ def fetch_active_material_batch_for_user(discord_user_id: int) -> dict[str, Any]
         return row
     finally:
         conn.close()
+
+
+def set_batch_awaiting_more_material(import_batch_id: int) -> None:
+    """Transition a materials batch from analysed to awaiting_more_material (explicit user intent)."""
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            UPDATE dbo.InventoryImportBatch
+            SET Status = N'awaiting_more_material'
+            WHERE ImportBatchID = ?
+              AND Status = N'analysed'
+              AND ImportType = N'materials'
+            """,
+            (int(import_batch_id),),
+        )
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logger.exception(
+            "inventory_set_awaiting_more_material_failed batch_id=%s", import_batch_id
+        )
+        raise
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def revert_additional_material_upload(import_batch_id: int) -> None:
+    """Revert a materials batch from awaiting_more_material back to analysed when the additional upload fails."""
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            UPDATE dbo.InventoryImportBatch
+            SET Status = N'analysed'
+            WHERE ImportBatchID = ?
+              AND Status = N'awaiting_more_material'
+            """,
+            (int(import_batch_id),),
+        )
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logger.exception(
+            "inventory_revert_additional_material_failed batch_id=%s", import_batch_id
+        )
+        raise
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def fetch_import_batch(import_batch_id: int) -> dict[str, Any] | None:

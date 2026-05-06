@@ -16,6 +16,7 @@ class InventoryImportType(StrEnum):
 class InventoryImportStatus(StrEnum):
     AWAITING_UPLOAD = "awaiting_upload"
     ANALYSED = "analysed"
+    AWAITING_MORE_MATERIAL = "awaiting_more_material"
     APPROVED = "approved"
     REJECTED = "rejected"
     CANCELLED = "cancelled"
@@ -56,6 +57,7 @@ class InventoryAuditStatus(StrEnum):
     ALL = "all"
     AWAITING_UPLOAD = "awaiting_upload"
     ANALYSED = "analysed"
+    AWAITING_MORE_MATERIAL = "awaiting_more_material"
     APPROVED = "approved"
     REJECTED = "rejected"
     CANCELLED = "cancelled"

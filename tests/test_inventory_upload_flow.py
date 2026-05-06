@@ -318,3 +318,43 @@ async def test_approve_deletes_original_upload_after_success(monkeypatch):
     await view.approve.callback(interaction)
 
     assert original.deleted is True
+
+
+async def test_upload_message_does_not_route_to_active_material_session_when_not_awaiting(
+    monkeypatch,
+):
+    """Images uploaded without clicking 'Add Another Image' must not be merged into a materials batch.
+
+    get_active_material_session_for_user now only returns a row when Status='awaiting_more_material',
+    so returning None here simulates a session that is 'analysed' but not explicitly waiting.
+    """
+    message = _Message()
+    calls = {}
+
+    async def _pending(_user_id):
+        return None
+
+    async def _governors(_user_id):
+        return [RegisteredGovernor(111, "Gov", "Main")]
+
+    async def _process(**kwargs):
+        calls.update(kwargs)
+
+    monkeypatch.setattr(inventory_views.inventory_service, "get_pending_command_session", _pending)
+    # Simulates an analysed batch that has NOT been set to awaiting_more_material
+    monkeypatch.setattr(
+        inventory_views.inventory_service,
+        "get_active_material_session_for_user",
+        _pending,
+    )
+    monkeypatch.setattr(
+        inventory_views.inventory_service, "get_registered_governors_for_user", _governors
+    )
+    monkeypatch.setattr(inventory_views, "_process_payload_for_governor", _process)
+
+    handled = await inventory_views.handle_inventory_upload_message(message, bot=object())
+
+    assert handled is True
+    # Must proceed via normal single-governor path, not materials merge path
+    assert calls.get("existing_detected_json") is None
+

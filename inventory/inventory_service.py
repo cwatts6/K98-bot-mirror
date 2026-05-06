@@ -139,6 +139,18 @@ async def get_active_material_session_for_user(discord_user_id: int) -> dict[str
     )
 
 
+async def set_batch_awaiting_more_material(import_batch_id: int) -> None:
+    await asyncio.to_thread(
+        inventory_dal.set_batch_awaiting_more_material, int(import_batch_id)
+    )
+
+
+async def revert_additional_material_upload(import_batch_id: int) -> None:
+    await asyncio.to_thread(
+        inventory_dal.revert_additional_material_upload, int(import_batch_id)
+    )
+
+
 async def create_upload_first_batch(
     *,
     governor_id: int,
@@ -197,7 +209,11 @@ async def get_review_action_state(import_batch_id: int) -> InventoryReviewAction
         )
 
     status = _parse_status(row.get("Status"))
-    if status not in {InventoryImportStatus.AWAITING_UPLOAD, InventoryImportStatus.ANALYSED}:
+    if status not in {
+        InventoryImportStatus.AWAITING_UPLOAD,
+        InventoryImportStatus.ANALYSED,
+        InventoryImportStatus.AWAITING_MORE_MATERIAL,
+    }:
         return InventoryReviewActionState(
             active=False,
             status=status,
@@ -411,7 +427,16 @@ async def analyse_additional_material_image(
     )
     new_summary = _summary_from_vision_result(result)
     if new_summary.import_type != InventoryImportType.MATERIALS:
-        return new_summary
+        return InventoryAnalysisSummary(
+            ok=False,
+            import_type=new_summary.import_type,
+            confidence_score=new_summary.confidence_score,
+            model=new_summary.model,
+            prompt_version=new_summary.prompt_version,
+            fallback_used=new_summary.fallback_used,
+            error="This image was not detected as a Materials screenshot. Your pending Materials import is unchanged.",
+            raw_json=new_summary.raw_json,
+        )
 
     summaries = [new_summary]
     existing_summary = _summary_from_material_detected_json(existing_detected_json)
