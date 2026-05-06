@@ -29,6 +29,11 @@ LOW_CONFIDENCE_REJECT_THRESHOLD = 0.70
 SPEEDUP_DIGIT_LOSS_DAY_THRESHOLD = 45.0
 SPEEDUP_DIGIT_LOSS_RATIO = 0.20
 SIGNIFICANT_CHANGE_RATIO = 0.50
+REVIEWABLE_STATUSES = frozenset({
+    InventoryImportStatus.AWAITING_UPLOAD,
+    InventoryImportStatus.ANALYSED,
+    InventoryImportStatus.AWAITING_MORE_MATERIAL,
+})
 
 
 @dataclass(frozen=True)
@@ -209,11 +214,7 @@ async def get_review_action_state(import_batch_id: int) -> InventoryReviewAction
         )
 
     status = _parse_status(row.get("Status"))
-    if status not in {
-        InventoryImportStatus.AWAITING_UPLOAD,
-        InventoryImportStatus.ANALYSED,
-        InventoryImportStatus.AWAITING_MORE_MATERIAL,
-    }:
+    if status not in REVIEWABLE_STATUSES:
         return InventoryReviewActionState(
             active=False,
             status=status,
