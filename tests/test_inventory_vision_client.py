@@ -357,6 +357,89 @@ async def test_speedup_prompt_requests_day_digits_text():
 
 
 @pytest.mark.asyncio
+async def test_material_prompt_defines_rarity_by_icon_background():
+    calls = []
+    payloads = [
+        {
+            "detected_image_type": "unknown",
+            "confidence_score": 0.95,
+            "warnings": [],
+            "values": _null_values(),
+        }
+    ]
+    client = InventoryVisionClient(
+        _config(fallback_model=None),
+        client_factory=lambda _api_key: FakeClient(payloads, calls),
+    )
+
+    await client.analyse_image(b"fake image", import_type_hint="materials")
+
+    prompt = calls[0]["input"][0]["content"][0]["text"]
+    assert "grey or silver background means normal" in prompt
+    assert "blue/cyan/teal means elite" in prompt
+    assert "purple means epic" in prompt
+    assert "orange or gold means legendary" in prompt
+    assert "gold/yellow outer frame" in prompt
+    assert "Advanced ebony can look like a dark red-brown folded bundle" in prompt
+    assert "leather only when the object is tan/yellow hide" in prompt
+    assert "single cropped icon" in prompt
+
+
+@pytest.mark.asyncio
+async def test_materials_use_fallback_model_as_first_pass_when_configured():
+    calls = []
+    payloads = [
+        {
+            "detected_image_type": "materials",
+            "confidence_score": 0.95,
+            "warnings": [],
+            "values": _null_values(),
+        },
+    ]
+
+    client = InventoryVisionClient(
+        _config(),
+        client_factory=lambda _api_key: FakeClient(payloads, calls),
+    )
+
+    result = await client.analyse_image(b"fake image", import_type_hint="materials")
+
+    assert result.ok
+    assert result.model == "gpt-5.2"
+    assert result.fallback_used
+    assert [call["model"] for call in calls] == ["gpt-5.2"]
+
+
+@pytest.mark.asyncio
+async def test_material_import_sends_reference_sheet_when_available():
+    calls = []
+    payloads = [
+        {
+            "detected_image_type": "materials",
+            "confidence_score": 0.95,
+            "warnings": [],
+            "values": _null_values(),
+        },
+    ]
+    client = InventoryVisionClient(
+        _config(fallback_model=None),
+        client_factory=lambda _api_key: FakeClient(payloads, calls),
+    )
+
+    await client.analyse_image(
+        b"fake image", content_type="image/png", import_type_hint="materials"
+    )
+
+    content = calls[0]["input"][0]["content"]
+    image_parts = [item for item in content if item["type"] == "input_image"]
+    text_parts = [item["text"] for item in content if item["type"] == "input_text"]
+    assert len(image_parts) == 2
+    assert all(item["image_url"].startswith("data:image/png;base64,") for item in image_parts)
+    assert any("Material reference sheet" in text for text in text_parts)
+    assert "Target materials screenshot:" in text_parts
+
+
+@pytest.mark.asyncio
 async def test_speedup_import_sends_labeled_zoom_sheet():
     pytest.importorskip("PIL")
     from PIL import Image

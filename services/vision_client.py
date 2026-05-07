@@ -7,6 +7,7 @@ from inspect import isawaitable
 import io
 import json
 import logging
+from pathlib import Path
 import re
 from typing import Any
 
@@ -33,6 +34,9 @@ _SPEEDUP_OCR_TEMPLATES = {
     "d": "0303031b7f63c3c3c3c37f3f",
 }
 _DECODED_SPEEDUP_OCR_TEMPLATES: dict[str, tuple[tuple[int, ...], ...]] | None = None
+_MATERIAL_REFERENCE_SHEET = (
+    Path(__file__).resolve().parents[1] / "assets" / "material_reference_sheet.png"
+)
 
 
 class VisionClientError(RuntimeError):
@@ -280,6 +284,22 @@ def _build_prompt(import_type_hint: str | None, prompt_version: str) -> str:
         "materials are animal_bone, leather, ebony, and iron_ore. For every material kind, "
         "return integer quantities for normal, advanced, elite, epic, and legendary rarities; "
         "use 0 when a rarity is not visible and null only when a visible value is unreadable. "
+        "For material rarity, use the icon tile background color, not nearby description text: "
+        "grey or silver background means normal, green means advanced, blue/cyan/teal means "
+        "elite, purple means epic, and orange or gold means legendary. The gold/yellow outer frame is "
+        "common to many items and is not the rarity. Ignore detail-panel phrases such as "
+        "'needed to forge a normal piece of equipment' when deciding rarity; those describe "
+        "equipment crafting text, not the selected inventory item's rarity. For material kind, "
+        "use the icon object: choice_chests are chest/box icons and must always be stored under "
+        "choice_chests, animal_bone icons are ivory bones, leather icons are tan hides or rolled "
+        "leather sheets, ebony icons are dark red-brown logs or timber stacks, and iron_ore icons "
+        "are grey/silver rocks or ore chunks. Advanced ebony can look like a dark red-brown folded "
+        "bundle; classify it as ebony when the object is wood grain, planks, or a timber stack, "
+        "and classify leather only when the object is tan/yellow hide or rolled sheet. Read the "
+        "quantity from the white number printed "
+        "inside the lower-right of that same icon tile. If a screenshot is a single cropped icon, "
+        "return exactly that one material kind/rarity quantity and leave all other material "
+        "quantities as 0. "
         "List unreadable visible material items in unreadable_items. List repeated same kind "
         "and rarity candidates in duplicate_candidates instead of silently choosing between "
         "conflicting values. "
@@ -295,8 +315,22 @@ def _image_data_url(image_bytes: bytes, content_type: str | None) -> str:
     return f"data:{mime};base64,{encoded}"
 
 
+def _material_reference_data_url() -> str | None:
+    try:
+        if not _MATERIAL_REFERENCE_SHEET.exists():
+            return None
+        return _image_data_url(_MATERIAL_REFERENCE_SHEET.read_bytes(), "image/png")
+    except Exception:
+        logger.debug("[inventory_vision] could not load material reference sheet", exc_info=True)
+        return None
+
+
 def _is_speedup_hint(import_type_hint: str | None) -> bool:
     return (import_type_hint or "").strip().lower() == "speedups"
+
+
+def _is_material_hint(import_type_hint: str | None) -> bool:
+    return (import_type_hint or "").strip().lower() == "materials"
 
 
 def _speedup_duration_crop_data_url(image_bytes: bytes) -> str | None:
@@ -737,6 +771,20 @@ def _build_image_content(
                 content.append({"type": "input_text", "text": f"{label} days-only crop:"})
                 content.append({"type": "input_image", "image_url": crop_url})
             return content
+    if _is_material_hint(import_type_hint):
+        reference_url = _material_reference_data_url()
+        if reference_url:
+            content.append(
+                {
+                    "type": "input_text",
+                    "text": (
+                        "Material reference sheet. Use this only as a visual legend for "
+                        "material kind and rarity; extract quantities from the target screenshot."
+                    ),
+                }
+            )
+            content.append({"type": "input_image", "image_url": reference_url})
+            content.append({"type": "input_text", "text": "Target materials screenshot:"})
 
     content.append(
         {
@@ -976,6 +1024,17 @@ class InventoryVisionClient:
                 fallback_used=speedup_model != self.config.model,
             )
 
+        if _is_material_hint(import_type_hint):
+            material_model = self.config.fallback_model or self.config.model
+            return await self._analyse_with_model(
+                material_model,
+                image_bytes,
+                filename=filename,
+                content_type=content_type,
+                import_type_hint=import_type_hint,
+                fallback_used=material_model != self.config.model,
+            )
+
         primary = await self._analyse_with_model(
             self.config.model,
             image_bytes,
@@ -1005,13 +1064,21 @@ class InventoryVisionClient:
             image_bytes,
             filename=filename,
             content_type=content_type,
-            import_type_hint=import_type_hint,
+            import_type_hint=(
+                "materials" if primary.detected_image_type == "materials" else import_type_hint
+            ),
             fallback_used=True,
         )
         if (
             primary_has_day_disagreement
             and fallback.ok
             and not _has_speedup_day_text_disagreement(fallback)
+        ):
+            return fallback
+        if (
+            primary.detected_image_type == "materials"
+            and fallback.ok
+            and fallback.detected_image_type == "materials"
         ):
             return fallback
         if fallback.ok and fallback.confidence_score >= primary.confidence_score:
@@ -1024,6 +1091,8 @@ class InventoryVisionClient:
         if not result.ok:
             return True
         if _has_speedup_day_text_disagreement(result):
+            return True
+        if result.detected_image_type == "materials":
             return True
         return result.confidence_score < self.config.fallback_confidence_threshold
 
