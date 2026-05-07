@@ -66,6 +66,9 @@ def test_merge_material_value_sets_warns_for_duplicates_and_blocks_conflicts():
     conflict_result = merge_material_value_sets([first, conflict])
 
     assert duplicate_result.conflicts == []
-    assert duplicate_result.warnings
+    assert duplicate_result.warnings == ["Duplicate animal_bone/epic value detected; kept 4."]
     assert conflict_result.conflicts
+    assert conflict_result.conflicts == [
+        "Conflicting animal_bone/epic values detected; kept 4 and ignored 8."
+    ]
     assert conflict_result.can_approve is False

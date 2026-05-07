@@ -174,7 +174,7 @@ def merge_material_value_sets(
                         warnings.append(f"Duplicate {label} value detected; kept {quantity:,}.")
                     else:
                         conflicts.append(
-                            f"Conflicting {label} values detected: {previous:,} and {quantity:,}."
+                            f"Conflicting {label} values detected; kept {previous:,} and ignored {quantity:,}."
                         )
                     continue
                 seen[key] = quantity

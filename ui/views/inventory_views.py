@@ -602,6 +602,16 @@ class InventoryConfirmationView(discord.ui.View):
                 ephemeral=True,
             )
             return
+        self._terminal = True
+        self.disable_all_items()
+        self.stop()
+        await self._update_review_message(
+            interaction,
+            content=(
+                "Additional Materials screenshot requested. "
+                "Upload the next image; use the newest review message for approval."
+            ),
+        )
         await interaction.response.send_message(
             "Upload the next Materials screenshot in this channel. I will merge it into this pending Materials import.",
             ephemeral=True,

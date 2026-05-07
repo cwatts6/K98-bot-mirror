@@ -320,6 +320,74 @@ async def test_approve_deletes_original_upload_after_success(monkeypatch):
     assert original.deleted is True
 
 
+async def test_add_another_material_image_disables_current_review(monkeypatch):
+    async def _state(_batch_id):
+        return inventory_views.inventory_service.InventoryReviewActionState(active=True)
+
+    awaiting_more = []
+
+    async def _set_awaiting_more(batch_id):
+        awaiting_more.append(batch_id)
+
+    class _ReviewMessage:
+        def __init__(self):
+            self.edits = []
+
+        async def edit(self, **kwargs):
+            self.edits.append(kwargs)
+
+    class _Response:
+        def __init__(self):
+            self.messages = []
+
+        async def send_message(self, content, **kwargs):
+            self.messages.append((content, kwargs))
+
+    monkeypatch.setattr(inventory_views.inventory_service, "get_review_action_state", _state)
+    monkeypatch.setattr(
+        inventory_views.inventory_service,
+        "set_batch_awaiting_more_material",
+        _set_awaiting_more,
+    )
+    view = inventory_views.InventoryConfirmationView(
+        bot=object(),
+        actor_discord_id=42,
+        governor_id=111,
+        batch_id=99,
+        payload=InventoryImagePayload(image_bytes=b"img", filename="inventory.png"),
+        summary=InventoryAnalysisSummary(
+            ok=True,
+            import_type=InventoryImportType.MATERIALS,
+            values={
+                "materials": {
+                    "choice_chests": {"legendary": 1},
+                    "animal_bone": {},
+                    "leather": {},
+                    "ebony": {},
+                    "iron_ore": {},
+                }
+            },
+            confidence_score=0.95,
+        ),
+    )
+    message = _ReviewMessage()
+    view.message = message
+    interaction = types.SimpleNamespace(
+        user=types.SimpleNamespace(id=42),
+        response=_Response(),
+        message=message,
+    )
+
+    await view.add_material_image.callback(interaction)
+
+    assert awaiting_more == [99]
+    assert view._terminal is True
+    assert all(getattr(item, "disabled", False) for item in view.children)
+    assert message.edits
+    assert "Additional Materials screenshot requested" in message.edits[-1]["content"]
+    assert "Upload the next Materials screenshot" in interaction.response.messages[-1][0]
+
+
 async def test_upload_message_does_not_route_to_active_material_session_when_not_awaiting(
     monkeypatch,
 ):
