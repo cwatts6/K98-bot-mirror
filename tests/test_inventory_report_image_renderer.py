@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from inventory import report_image_renderer
 from inventory.models import (
     InventoryGovernorProfile,
+    InventoryMaterialPoint,
     InventoryReportPayload,
     InventoryReportRange,
     InventoryReportView,
@@ -109,3 +110,23 @@ def test_render_inventory_reports_supports_stored_vip_profile():
         "inventory_resources_111_1M.png",
         "inventory_speedups_111_1M.png",
     ]
+
+
+def test_render_inventory_reports_returns_materials_png():
+    now = datetime.now(UTC)
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name="Gov",
+        view=InventoryReportView.MATERIALS,
+        range_key=InventoryReportRange.ONE_MONTH,
+        materials=[
+            InventoryMaterialPoint(now - timedelta(days=7), 10, 20, 30, 40, 50),
+            InventoryMaterialPoint(now, 20, 30, 40, 50, 60),
+        ],
+        generated_at_utc=now,
+    )
+
+    rendered = render_inventory_reports(payload)
+
+    assert [item.filename for item in rendered] == ["inventory_materials_111_1M.png"]
+    assert rendered[0].image_bytes.getvalue().startswith(b"\x89PNG")

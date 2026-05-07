@@ -8,7 +8,12 @@ from typing import Any
 
 from decoraters import _is_admin
 from inventory import material_service
-from inventory.dal import inventory_dal
+from inventory.dal import inventory_dal, inventory_material_dal
+from inventory.material_calculations import (
+    MATERIAL_KINDS,
+    material_totals,
+    normalize_material_values,
+)
 from inventory.models import (
     InventoryAnalysisSummary,
     InventoryFlowType,
@@ -29,6 +34,7 @@ LOW_CONFIDENCE_REJECT_THRESHOLD = 0.70
 SPEEDUP_DIGIT_LOSS_DAY_THRESHOLD = 45.0
 SPEEDUP_DIGIT_LOSS_RATIO = 0.20
 SIGNIFICANT_CHANGE_RATIO = 0.50
+MATERIAL_SIGNIFICANT_CHANGE_RATIO = SIGNIFICANT_CHANGE_RATIO
 REVIEWABLE_STATUSES = frozenset(
     {
         InventoryImportStatus.AWAITING_UPLOAD,
@@ -565,12 +571,17 @@ def _change_ratio(previous: float, current: float) -> float:
 
 
 def _significant_change_warning(
-    *, label: str, previous: float, current: float, suffix: str = ""
+    *,
+    label: str,
+    previous: float,
+    current: float,
+    suffix: str = "",
+    ratio_threshold: float = SIGNIFICANT_CHANGE_RATIO,
 ) -> str | None:
     ratio = _change_ratio(previous, current)
-    if ratio < SIGNIFICANT_CHANGE_RATIO:
+    if ratio < ratio_threshold:
         return None
-    pct = int(SIGNIFICANT_CHANGE_RATIO * 100)
+    pct = int(ratio_threshold * 100)
     return (
         f"{label} changed by {pct}% or more "
         f"({previous:,.0f}{suffix} -> {current:,.0f}{suffix})."
@@ -662,6 +673,63 @@ async def assess_significant_change(
             )
             if warning:
                 warnings.append(warning)
+        return InventorySignificantChangeAssessment(bool(warnings), warnings)
+
+    if import_type == InventoryImportType.MATERIALS:
+        normalized = normalize_material_values(values)
+        warnings = []
+
+        def _append_material_warnings(
+            *,
+            current: dict[str, dict[str, int]],
+            prior: dict[str, dict[str, int]],
+            label_prefix: str,
+        ) -> None:
+            current_totals = material_totals(current)
+            prior_totals = material_totals(prior)
+            labels = {
+                "choice_chests": "Choice Chests",
+                "animal_bone": "Bone",
+                "leather": "Leather",
+                "ebony": "Ebony",
+                "iron_ore": "Iron",
+            }
+            for kind in MATERIAL_KINDS:
+                warning = _significant_change_warning(
+                    label=f"{label_prefix}{labels[kind]} materials",
+                    previous=float(prior_totals[kind]),
+                    current=float(current_totals[kind]),
+                    suffix=" legendary",
+                    ratio_threshold=MATERIAL_SIGNIFICANT_CHANGE_RATIO,
+                )
+                if warning:
+                    warnings.append(warning)
+            warning = _significant_change_warning(
+                label=f"{label_prefix}Total materials",
+                previous=float(material_service.summarize_material_values(prior)["total"]),
+                current=float(material_service.summarize_material_values(current)["total"]),
+                suffix=" legendary",
+                ratio_threshold=MATERIAL_SIGNIFICANT_CHANGE_RATIO,
+            )
+            if warning:
+                warnings.append(warning)
+
+        if baseline_values is not None:
+            baseline = normalize_material_values(baseline_values)
+            _append_material_warnings(
+                current=normalized,
+                prior=baseline,
+                label_prefix="Materials correction from detected value: ",
+            )
+
+        previous = await asyncio.to_thread(
+            inventory_material_dal.fetch_latest_approved_material_values,
+            int(governor_id),
+        )
+        if not previous:
+            return InventorySignificantChangeAssessment(bool(warnings), warnings)
+        prior = normalize_material_values({"materials": previous})
+        _append_material_warnings(current=normalized, prior=prior, label_prefix="")
         return InventorySignificantChangeAssessment(bool(warnings), warnings)
 
     return InventorySignificantChangeAssessment()

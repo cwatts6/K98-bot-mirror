@@ -604,7 +604,7 @@ def render_materials_report(
             title=title,
             value=f"{value:,.1f}",
             delta=delta_label,
-            color=color,
+            delta_color=color,
         )
 
     total_delta = (
@@ -620,7 +620,7 @@ def render_materials_report(
         title="Total Legendary Materials",
         value=f"{latest.total_legendary:,.2f}",
         delta=total_delta_label,
-        color=total_delta_color,
+        delta_color=total_delta_color,
     )
     _draw_kpi(
         canvas,
@@ -629,7 +629,7 @@ def render_materials_report(
         title=f"Net Change ({payload.range_key.value})",
         value=total_delta_label,
         delta="range delta",
-        color=total_delta_color,
+        delta_color=total_delta_color,
     )
 
     if len(payload.materials) >= 2:

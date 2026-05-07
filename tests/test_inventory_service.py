@@ -507,6 +507,83 @@ async def test_speedup_significant_change_requires_confirmation(monkeypatch):
     assert any("Training" in warning for warning in assessment.warnings)
 
 
+async def test_material_significant_change_checks_each_element_and_total(monkeypatch):
+    monkeypatch.setattr(
+        inventory_service.inventory_material_dal,
+        "fetch_latest_approved_material_values",
+        lambda governor_id: {
+            "choice_chests": {"legendary": 100},
+            "animal_bone": {"legendary": 20},
+            "leather": {"legendary": 20},
+            "ebony": {"legendary": 20},
+            "iron_ore": {"legendary": 20},
+        },
+    )
+    values = {
+        "materials": {
+            "choice_chests": {"legendary": 400},
+            "animal_bone": {"legendary": 20},
+            "leather": {"legendary": 20},
+            "ebony": {"legendary": 20},
+            "iron_ore": {"legendary": 20},
+        }
+    }
+
+    assessment = await inventory_service.assess_significant_change(
+        governor_id=111,
+        import_type=InventoryImportType.MATERIALS,
+        values=values,
+    )
+
+    assert assessment.requires_confirmation is True
+    assert any(
+        "Choice Chests materials changed by 50% or more" in warning
+        for warning in assessment.warnings
+    )
+    assert any(
+        "Total materials changed by 50% or more" in warning for warning in assessment.warnings
+    )
+
+
+async def test_material_correction_significant_change_checks_detected_values(monkeypatch):
+    monkeypatch.setattr(
+        inventory_service.inventory_material_dal,
+        "fetch_latest_approved_material_values",
+        lambda governor_id: {},
+    )
+    detected_values = {
+        "materials": {
+            "choice_chests": {"legendary": 100},
+            "animal_bone": {"legendary": 1},
+            "leather": {"legendary": 1},
+            "ebony": {"legendary": 1},
+            "iron_ore": {"legendary": 1},
+        }
+    }
+    corrected_values = {
+        "materials": {
+            "choice_chests": {"legendary": 100},
+            "animal_bone": {"legendary": 3},
+            "leather": {"legendary": 1},
+            "ebony": {"legendary": 1},
+            "iron_ore": {"legendary": 1},
+        }
+    }
+
+    assessment = await inventory_service.assess_significant_change(
+        governor_id=111,
+        import_type=InventoryImportType.MATERIALS,
+        values=corrected_values,
+        baseline_values=detected_values,
+    )
+
+    assert assessment.requires_confirmation is True
+    assert any(
+        "Materials correction from detected value: Bone materials changed by 50% or more" in warning
+        for warning in assessment.warnings
+    )
+
+
 async def test_significant_change_allows_small_delta(monkeypatch):
     monkeypatch.setattr(
         inventory_service.inventory_dal,
