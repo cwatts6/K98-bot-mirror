@@ -591,13 +591,14 @@ class InventoryConfirmationView(discord.ui.View):
                 ephemeral=True,
             )
             return
+        await interaction.response.defer(ephemeral=True)
         try:
             await inventory_service.set_batch_awaiting_more_material(self.batch_id)
         except Exception:
             logger.exception(
                 "inventory_set_awaiting_more_material_failed batch_id=%s", self.batch_id
             )
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Could not prepare this import for an additional screenshot. Please try again.",
                 ephemeral=True,
             )
@@ -612,7 +613,7 @@ class InventoryConfirmationView(discord.ui.View):
                 "Upload the next image; use the newest review message for approval."
             ),
         )
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "Upload the next Materials screenshot in this channel. I will merge it into this pending Materials import.",
             ephemeral=True,
         )

@@ -338,9 +338,16 @@ async def test_add_another_material_image_disables_current_review(monkeypatch):
 
     class _Response:
         def __init__(self):
+            self.deferred = False
+
+        async def defer(self, **kwargs):
+            self.deferred = True
+
+    class _Followup:
+        def __init__(self):
             self.messages = []
 
-        async def send_message(self, content, **kwargs):
+        async def send(self, content, **kwargs):
             self.messages.append((content, kwargs))
 
     monkeypatch.setattr(inventory_views.inventory_service, "get_review_action_state", _state)
@@ -375,17 +382,19 @@ async def test_add_another_material_image_disables_current_review(monkeypatch):
     interaction = types.SimpleNamespace(
         user=types.SimpleNamespace(id=42),
         response=_Response(),
+        followup=_Followup(),
         message=message,
     )
 
     await view.add_material_image.callback(interaction)
 
+    assert interaction.response.deferred is True
     assert awaiting_more == [99]
     assert view._terminal is True
     assert all(getattr(item, "disabled", False) for item in view.children)
     assert message.edits
     assert "Additional Materials screenshot requested" in message.edits[-1]["content"]
-    assert "Upload the next Materials screenshot" in interaction.response.messages[-1][0]
+    assert "Upload the next Materials screenshot" in interaction.followup.messages[-1][0]
 
 
 async def test_upload_message_does_not_route_to_active_material_session_when_not_awaiting(
