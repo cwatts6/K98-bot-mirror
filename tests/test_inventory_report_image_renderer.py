@@ -113,6 +113,7 @@ def test_render_inventory_reports_supports_stored_vip_profile():
 
 
 def test_render_inventory_reports_returns_materials_png():
+    assert (report_image_renderer.ASSET_DIR / "materials_logo.png").exists()
     now = datetime.now(UTC)
     payload = InventoryReportPayload(
         governor_id=111,

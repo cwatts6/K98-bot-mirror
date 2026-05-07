@@ -572,7 +572,7 @@ def render_materials_report(
         canvas,
         draw,
         title="Materials Inventory",
-        logo=ASSET_DIR / "K98_Logo.png",
+        logo=ASSET_DIR / "materials_logo.png",
         governor_name=payload.governor_name,
         governor_id=payload.governor_id,
         range_key=payload.range_key.value,
