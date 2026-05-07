@@ -100,10 +100,7 @@ def parse_material_quantity(value: Any) -> int:
 
 
 def empty_material_values() -> dict[str, dict[str, int]]:
-    return {
-        kind: {rarity: 0 for rarity in MATERIAL_RARITIES}
-        for kind in MATERIAL_KINDS
-    }
+    return {kind: {rarity: 0 for rarity in MATERIAL_RARITIES} for kind in MATERIAL_KINDS}
 
 
 def legendary_equivalent(quantity: Any, rarity: Any) -> float:
@@ -188,4 +185,3 @@ def merge_material_value_sets(
         warnings=list(dict.fromkeys(warnings)),
         conflicts=list(dict.fromkeys(conflicts)),
     )
-

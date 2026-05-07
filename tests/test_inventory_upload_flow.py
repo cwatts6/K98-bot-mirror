@@ -357,4 +357,3 @@ async def test_upload_message_does_not_route_to_active_material_session_when_not
     assert handled is True
     # Must proceed via normal single-governor path, not materials merge path
     assert calls.get("existing_detected_json") is None
-

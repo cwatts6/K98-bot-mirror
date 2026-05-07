@@ -57,7 +57,8 @@ if ($python){ Write-Host "[dev] python.exe:      $python" }
 Write-Host "[dev] UTF-8 enabled"
 
 # Optional local ripgrep binary for fast repo searches.
-$toolsPath = Join-Path $repo "tools"
-if (Test-Path (Join-Path $toolsPath "rg.exe")) {
-  $env:PATH = $toolsPath + ";" + $env:PATH
+$preferredRgPath = "C:\Users\cwatt\AppData\Local\Microsoft\WinGet\Links"
+
+if (Test-Path "$preferredRgPath\rg.exe") {
+    $env:PATH = "$preferredRgPath;$env:PATH"
 }

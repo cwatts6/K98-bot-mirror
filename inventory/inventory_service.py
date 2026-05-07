@@ -29,11 +29,13 @@ LOW_CONFIDENCE_REJECT_THRESHOLD = 0.70
 SPEEDUP_DIGIT_LOSS_DAY_THRESHOLD = 45.0
 SPEEDUP_DIGIT_LOSS_RATIO = 0.20
 SIGNIFICANT_CHANGE_RATIO = 0.50
-REVIEWABLE_STATUSES = frozenset({
-    InventoryImportStatus.AWAITING_UPLOAD,
-    InventoryImportStatus.ANALYSED,
-    InventoryImportStatus.AWAITING_MORE_MATERIAL,
-})
+REVIEWABLE_STATUSES = frozenset(
+    {
+        InventoryImportStatus.AWAITING_UPLOAD,
+        InventoryImportStatus.ANALYSED,
+        InventoryImportStatus.AWAITING_MORE_MATERIAL,
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -145,15 +147,11 @@ async def get_active_material_session_for_user(discord_user_id: int) -> dict[str
 
 
 async def set_batch_awaiting_more_material(import_batch_id: int) -> None:
-    await asyncio.to_thread(
-        inventory_dal.set_batch_awaiting_more_material, int(import_batch_id)
-    )
+    await asyncio.to_thread(inventory_dal.set_batch_awaiting_more_material, int(import_batch_id))
 
 
 async def revert_additional_material_upload(import_batch_id: int) -> None:
-    await asyncio.to_thread(
-        inventory_dal.revert_additional_material_upload, int(import_batch_id)
-    )
+    await asyncio.to_thread(inventory_dal.revert_additional_material_upload, int(import_batch_id))
 
 
 async def create_upload_first_batch(

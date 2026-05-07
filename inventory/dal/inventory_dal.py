@@ -205,9 +205,7 @@ def set_batch_awaiting_more_material(import_batch_id: int) -> None:
             conn.rollback()
         except Exception:
             pass
-        logger.exception(
-            "inventory_set_awaiting_more_material_failed batch_id=%s", import_batch_id
-        )
+        logger.exception("inventory_set_awaiting_more_material_failed batch_id=%s", import_batch_id)
         raise
     finally:
         try:
@@ -236,9 +234,7 @@ def revert_additional_material_upload(import_batch_id: int) -> None:
             conn.rollback()
         except Exception:
             pass
-        logger.exception(
-            "inventory_revert_additional_material_failed batch_id=%s", import_batch_id
-        )
+        logger.exception("inventory_revert_additional_material_failed batch_id=%s", import_batch_id)
         raise
     finally:
         try:
