@@ -264,6 +264,99 @@ def test_governor_name_nan_becomes_empty_string(monkeypatch):
     assert inserted_rows[1][3] == ""
 
 
+def test_new_schema_import_maps_stage_columns(monkeypatch):
+    df = _fake_df_with_columns(
+        [
+            "Rank",
+            "Name",
+            "Governor ID",
+            "KD",
+            "Stage I Points",
+            "Stage II Points",
+            "Stage III Points",
+            "Total Points",
+        ],
+        [
+            {
+                "Rank": 1,
+                "Name": " Alice ",
+                "Governor ID": 123,
+                "KD": 1198,
+                "Stage I Points": 10,
+                "Stage II Points": 20,
+                "Stage III Points": 30,
+                "Total Points": 60,
+            }
+        ],
+    )
+    _patch_read_excel(monkeypatch, df, sheet_name_required=False)
+
+    cur = MockCursor()
+    conn = MockConn(cur)
+    _patch_conn(monkeypatch, cur, conn)
+    cur.queue_fetchone(None, columns=("x",))
+    cur.queue_fetchone((99,), columns=("ScanID",))
+
+    ok, msg, rows = pki.import_prekvk_bytes(
+        b"content-bytes",
+        "PreKvK_Rankings_C13164_2026-05-08.xlsx",
+        kvk_no=13,
+    )
+
+    assert ok is True
+    assert rows == 1
+    assert "scan 99" in msg
+
+    insert_sql, inserted_rows = cur.executemany_calls[0]
+    assert "KingdomID" in insert_sql
+    assert "Stage1Points" in insert_sql
+    assert inserted_rows[0] == (13, 99, 123, "Alice", 60, 1198, 1, 10, 20, 30, 60)
+
+
+def test_new_schema_non_numeric_points_are_rejected_before_db(monkeypatch):
+    df = _fake_df_with_columns(
+        [
+            "Rank",
+            "Name",
+            "Governor ID",
+            "KD",
+            "Stage I Points",
+            "Stage II Points",
+            "Stage III Points",
+            "Total Points",
+        ],
+        [
+            {
+                "Rank": 1,
+                "Name": "A",
+                "Governor ID": 123,
+                "KD": 1198,
+                "Stage I Points": "oops",
+                "Stage II Points": 20,
+                "Stage III Points": 30,
+                "Total Points": 60,
+            }
+        ],
+    )
+    _patch_read_excel(monkeypatch, df, sheet_name_required=False)
+
+    def fail_conn():
+        raise AssertionError("_conn() should not be called for invalid point values")
+
+    monkeypatch.setattr(pki, "_conn", fail_conn)
+
+    ok, msg, rows = pki.import_prekvk_bytes(
+        b"bytes",
+        "PreKvK_Rankings_C13164_2026-05-08.xlsx",
+        kvk_no=13,
+    )
+
+    assert ok is False
+    assert rows == 0
+    assert "Non-numeric value" in msg
+    assert "Stage1Points" in msg
+
+
 def test_duplicate_hash_skips_import(monkeypatch):
     """
     If SELECT 1 finds an existing hash, importer should skip without inserting.

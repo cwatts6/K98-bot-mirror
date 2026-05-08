@@ -42,3 +42,33 @@ Before beginning repo work, read the current versions of:
 - Production promotion happens only after local validation.
 - Production changes are promoted by pushing the same branch to the `production` remote and opening a PR into `K98-bot/main`.
 - The bot machine must deploy only from `K98-bot/main`, never from `K98-bot-mirror`.
+
+
+## SQL Validation Source
+
+The authoritative SQL schema and stored procedures are stored in:
+
+C:\K98-bot-SQL-Server
+
+Codex must validate all:
+- table names
+- column names
+- stored procedures
+- indexes
+- views
+- ProcConfig usage
+- staging/output table structure
+
+against the SQL repo before implementation.
+
+Do not infer schema purely from Python usage if SQL definitions exist in the SQL repo.
+
+If schema ambiguity exists:
+1. Search the SQL repo first
+2. Report missing objects explicitly
+3. Do not guess column names
+
+rg "CREATE TABLE.*STAGING_STATS" C:\K98-bot-SQL-Server
+rg "ProcConfig" C:\K98-bot-SQL-Server
+rg "EXCEL_FOR_KVK" C:\K98-bot-SQL-Server
+rg "GovernorID" C:\K98-bot-SQL-Server

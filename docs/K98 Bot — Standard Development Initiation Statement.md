@@ -184,3 +184,22 @@ restart-safe
 test-backed
 explicit about refactor decisions
 structured for future optimisation batching
+
+If the task include SQL changes then:
+## Required SQL Validation
+
+Before implementation:
+
+1. Search the SQL repo:
+   C:\K98-bot-SQL-Server
+
+2. Validate:
+   - procedure dependencies
+   - table schemas
+   - expected output columns
+   - dynamic SQL targets
+   - ProcConfig usage
+
+3. If live SQL access fails:
+   - use the SQL repo as the authoritative source
+   - do NOT fall back to guessed schema

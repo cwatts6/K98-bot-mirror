@@ -762,9 +762,12 @@ async def on_message(message: discord.Message):
     if message.channel.id == PREKVK_CHANNEL_ID and message.attachments:
         notify_ch = await _get_notify_channel() or message.channel
 
-        # Only accept the canonical filename
+        prekvk_name_rx = re.compile(
+            r"^(?:1198_prekvk|PreKvK_Rankings_[^\\/:*?\"<>|]+)\.xlsx$",
+            re.IGNORECASE,
+        )
         target = next(
-            (a for a in message.attachments if a.filename.lower().strip() == "1198_prekvk.xlsx"),
+            (a for a in message.attachments if prekvk_name_rx.match(a.filename.strip())),
             None,
         )
 
@@ -774,7 +777,7 @@ async def on_message(message: discord.Message):
                 "Pre-KVK Import ⚠️",
                 {
                     "Info": "No matching file found.",
-                    "Expected": "1198_prekvk.xlsx",
+                    "Expected": "1198_prekvk.xlsx or PreKvK_Rankings_*.xlsx",
                     "Channel": f"#{message.channel.name} ({message.channel.id})",
                     "Uploader": f"{message.author} ({message.author.id})",
                 },

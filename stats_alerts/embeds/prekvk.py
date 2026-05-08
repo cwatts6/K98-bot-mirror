@@ -247,12 +247,12 @@ async def send_prekvk_embed(
             )
             embed.add_field(
                 name="Marauder Forts - last kvk:",
-                value=_fmt_top_simple(prev_tops.get("p3", []), "pts", limit=1),
+                value=_fmt_top_simple(prev_tops.get("p2", []), "pts", limit=1),
                 inline=True,
             )
             embed.add_field(
                 name="Training -last kvk:",
-                value=_fmt_top_simple(prev_tops.get("p2", []), "pts", limit=1),
+                value=_fmt_top_simple(prev_tops.get("p3", []), "pts", limit=1),
                 inline=True,
             )
     except Exception:
