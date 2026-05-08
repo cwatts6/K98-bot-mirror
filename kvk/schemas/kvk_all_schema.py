@@ -149,8 +149,7 @@ def validate_full_data_columns(
         raise KvkAllSchemaValidationError(
             code="missing_required_full_data_columns",
             message=(
-                "KVK_ALL Full Data sheet is missing required column(s): "
-                + ", ".join(missing)
+                "KVK_ALL Full Data sheet is missing required column(s): " + ", ".join(missing)
             ),
             missing_columns=missing,
             unknown_columns=unknown,
