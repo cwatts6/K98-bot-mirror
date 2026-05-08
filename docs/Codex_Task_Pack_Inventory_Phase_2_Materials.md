@@ -8,6 +8,88 @@ Phase 2 must extend the existing Inventory Image Import Module to support Rise o
 
 Use the existing task pack and Standard Development Initiation Statement as mandatory working context.
 
+## Implementation Wrap-Up
+
+Phase 2 Materials was implemented and validated in PR #57 against the mirror repository.
+
+Implemented capability:
+
+- Materials import is enabled for upload-first inventory flow.
+- Materials sessions support explicit multi-image upload via `Add Another Image`, up to 4 screenshots.
+- Materials import recognises choice chests and individual material icons for Animal Bone, Leather, Ebony, and Iron Ore.
+- Raw values are stored by material kind and rarity in `GovernorMaterialInventory`.
+- Legendary-equivalent calculations are implemented and used for review, reporting, and export.
+- Choice chests remain separate from fixed materials while contributing to the clearly labelled total.
+- Typed correction flow is implemented through Materials section selection and five-rarity modals.
+- Approval writes one logical import batch with material child rows.
+- `/myinventory` supports Materials output with KPI cards, trend graph, range controls, and `assets/materials_logo.png`.
+- `/export_inventory` includes Materials rows.
+- `/inventory_import_audit` supports Materials imports and Materials-related debug metadata.
+- Admin debug captures failed, rejected, cancelled, corrected, and low-confidence Materials paths.
+- Existing Resources and Speedups behaviour was preserved.
+
+Implementation files of note:
+
+- `inventory/material_calculations.py`
+- `inventory/material_service.py`
+- `inventory/dal/inventory_material_dal.py`
+- `inventory/inventory_service.py`
+- `inventory/reporting_service.py`
+- `inventory/report_image_renderer.py`
+- `inventory/export_service.py`
+- `services/vision_client.py`
+- `ui/views/inventory_views.py`
+- `ui/views/inventory_report_views.py`
+- `commands/inventory_cmds.py`
+- `sql/inventory_phase2_materials_schema.sql`
+- `sql/inventory_phase2_materials_status_schema.sql`
+- `assets/material_reference_sheet.png`
+- `assets/materials_logo.png`
+
+Issues found and resolved during smoke testing:
+
+- Initial Materials vision recognition needed heavy correction. The fix was to use the stronger fallback model first for Materials-hinted scans and include a Materials-only visual reference sheet generated from labelled training images.
+- Rarity detection was clarified to use icon tile background colour rather than detail-panel text or gold/yellow outer frame.
+- Advanced ebony was occasionally misclassified as leather; prompt guidance now distinguishes dark wood grain/plank bundles from tan/yellow hide or rolled sheets.
+- Duplicate values now report which duplicate was kept.
+- Conflicting values now report exactly which value was kept and which was ignored.
+- Older review messages are retired and disabled after `Add Another Image`, preventing stale approvals and duplicate/confusing import actions.
+- `Add Another Image` now defers the interaction immediately and sends follow-up guidance, fixing `Unknown interaction` failures after correction flows.
+- Materials significant-change checks were added. The gate now checks Choice Chests, Bone, Leather, Ebony, Iron, and Total Materials using the same 50% threshold as Resources and Speedups.
+- `/myinventory Materials` initially failed because the renderer passed `color=` to `_draw_kpi`; this was corrected to `delta_color=`.
+- `/myinventory Materials` now uses `assets/materials_logo.png` rather than the generic K98 logo.
+
+Manual OpenAI vision smoke results:
+
+- Prompt-only Materials training pass was insufficient.
+- Stronger model plus prompt improvements improved results but still left rarity/kind misses.
+- Materials reference sheet plus model/prompt changes produced 25 / 25 labelled training image matches for expected kind and rarity.
+- Full Materials import smoke over the supplied import screenshots returned valid Materials detections with nonzero rows.
+
+Validated commands during implementation:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests\test_inventory_vision_client.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_inventory_material_calculations.py tests\test_inventory_upload_flow.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_inventory_service.py tests\test_inventory_report_image_renderer.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_ui_imports.py <expanded tests\test_inventory_*.py list>
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pytest -q tests
+.\.venv\Scripts\python.exe -m pre_commit run -a
+```
+
+Final local validation snapshot:
+
+- Full suite passed: 1196 passed, 8 skipped.
+- Targeted inventory/UI suite passed: 146 passed.
+- Pre-commit passed.
+- Architecture and deferred optimisation validators passed.
+- User smoke testing confirmed correction, add-another-image, approval, significant-change, and `/myinventory Materials` output flows.
+
 ## Scope Control
 
 ### In scope
