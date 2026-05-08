@@ -8,6 +8,19 @@ from prekvk.dal.import_history_dal import fetch_recent_import_history, record_im
 logger = logging.getLogger(__name__)
 
 
+def _plain_text_safe(value: Any, *, max_len: int | None = None) -> str:
+    text = str(value or "").strip()
+    text = text.replace("\r", " ").replace("\n", " ")
+    text = text.replace("<", "‹").replace(">", "›")
+    text = text.replace("@", "@\u200b")
+    text = text.replace("*", "＊").replace("_", "＿")
+    text = text.replace("`", "｀").replace("~", "～")
+    text = text.replace("|", "｜")
+    if max_len is not None:
+        return text[:max_len]
+    return text
+
+
 def record_import_outcome(**kwargs: Any) -> int | None:
     """Best-effort durable audit record for a PreKvK import attempt."""
     try:
@@ -42,14 +55,14 @@ def format_history_rows(rows: list[dict[str, Any]]) -> str:
 
     lines = []
     for row in rows:
-        created = row.get("CreatedUTC") or "unknown"
-        status = str(row.get("ImportStatus") or "unknown")
-        kvk_no = row.get("KVK_NO") or "?"
-        filename = row.get("Filename") or "unknown file"
+        created = _plain_text_safe(row.get("CreatedUTC") or "unknown", max_len=64)
+        status = _plain_text_safe(row.get("ImportStatus") or "unknown", max_len=32)
+        kvk_no = _plain_text_safe(row.get("KVK_NO") or "?", max_len=32)
+        filename = _plain_text_safe(row.get("Filename") or "unknown file", max_len=255)
         row_count = row.get("RowCount")
         scan_id = row.get("ScanID")
-        phase = row.get("Phase")
-        err = row.get("ErrorType") or row.get("ErrorText")
+        phase = _plain_text_safe(row.get("Phase"), max_len=64)
+        err = _plain_text_safe(row.get("ErrorType") or row.get("ErrorText"), max_len=80)
 
         bits = [f"`{created}`", f"KVK `{kvk_no}`", f"**{status}**", f"`{filename}`"]
         if row_count is not None:
@@ -59,7 +72,7 @@ def format_history_rows(rows: list[dict[str, Any]]) -> str:
         if phase:
             bits.append(f"phase `{phase}`")
         if err:
-            bits.append(f"error `{str(err)[:80]}`")
+            bits.append(f"error `{err}`")
         lines.append(" - ".join(bits))
 
     body = "\n".join(lines)

@@ -260,6 +260,29 @@ def test_format_history_rows_for_admin_output():
     assert "InvalidWorkbook" in body
 
 
+def test_format_history_rows_sanitizes_markdown_and_mentions():
+    body = diagnostics_service.format_history_rows(
+        [
+            {
+                "CreatedUTC": "2026-05-08 10:00",
+                "KVK_NO": 13,
+                "Filename": "bad`name\n<@123>",
+                "ImportStatus": "fa*iled",
+                "Phase": "in`sert\nphase",
+                "ErrorText": "oops @everyone\nwith newline",
+            }
+        ]
+    )
+
+    assert "bad`name" not in body
+    assert "\n<@123>" not in body
+    assert "@everyone" not in body
+    assert "bad｀name ‹@\u200b123›" in body
+    assert "**fa＊iled**" in body
+    assert "phase `in｀sert phase`" in body
+    assert "error `oops @\u200beveryone with newline`" in body
+
+
 def test_prekvk_import_history_command_has_admin_gate():
     source = inspect.getsource(register_prekvk_admin)
 

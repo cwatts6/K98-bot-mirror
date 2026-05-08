@@ -208,7 +208,7 @@ def import_prekvk_bytes(
 
     try:
         filehash = hashlib.sha256(xlsx_bytes).digest()
-        filehash_hex = hashlib.sha256(xlsx_bytes).hexdigest()
+        filehash_hex = filehash.hex()
         hash_prefix = filehash_hex[:8]
     except Exception:
         filehash = b""
