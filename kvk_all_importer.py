@@ -25,6 +25,12 @@ from constants import (
 )
 from file_utils import fetch_one_dict
 from gsheet_module import run_kvk_proc_exports_with_alerts
+from kvk.schemas.kvk_all_schema import (
+    SCHEMA_VERSION as KVK_ALL_SCHEMA_VERSION,
+    KvkAllSchemaValidationError,
+    select_full_data_sheet,
+    validate_full_data_columns,
+)
 from utils import ensure_aware_utc
 
 COLUMN_ALIASES = {
@@ -125,7 +131,7 @@ def _get_negatives_count(cn, kvk_no: int, scan_id: int) -> int:
             (kvk_no, scan_id),
         )
         rd = fetch_one_dict(c)
-        # return first column value, or 0 if missing — use next(iter(...)) instead of single-element slice
+        # return first column value, or 0 if missing - use next(iter(...)) instead of single-element slice
         if not rd:
             return 0
         val = next(iter(rd.values()))
@@ -179,35 +185,24 @@ def _enable_fast_executemany(cur) -> bool:
         return False
 
 
-def _read_excel(content: bytes, source_filename: str | None = None) -> tuple[pd.DataFrame, str]:
+def _read_excel(
+    content: bytes, source_filename: str | None = None
+) -> tuple[pd.DataFrame, str, dict[str, Any]]:
     """
-    Read an uploaded file into a DataFrame and return the DataFrame plus the sheet name used.
+    Read a KVK_ALL workbook and return the DataFrame, sheet name, and schema metadata.
 
-    Behavior:
-    - If source_filename ends with .csv (case-insensitive), use pd.read_csv and return sheet_name "CSV".
-    - Otherwise treat as an Excel workbook:
-      * Prefer a sheet named "Full Data" (case/space/underscore-insensitive).
-      * If not found, fall back to the second sheet (index 1) if present.
-      * If only one sheet present, use the first sheet.
-    Raises ValueError if no usable data/sheets are present.
+    KVK_ALL imports now require the authoritative "Full Data" tab. Basic Data and
+    fallback sheet selection are intentionally rejected before legacy field coercion.
     """
     if not content:
         raise ValueError("Empty file content")
 
-    # If the filename explicitly indicates CSV, parse as CSV
+    # KVK_ALL phase 1 accepts only the authoritative workbook schema.
     if source_filename and source_filename.lower().endswith(".csv"):
-        try:
-            df = pd.read_csv(BytesIO(content))
-        except Exception as e:
-            raise ValueError(f"Failed to parse CSV: {e}")
-        df.columns = [str(c).strip() for c in df.columns]
-        df = _apply_aliases(df)
-        sheet_name = "CSV"
-        try:
-            logger.info("[KVK] Read CSV file %s", source_filename)
-        except Exception:
-            pass
-        return df, sheet_name
+        raise KvkAllSchemaValidationError(
+            code="unsupported_kvk_all_file_type",
+            message="KVK_ALL imports require an Excel workbook containing the 'Full Data' sheet.",
+        )
 
     # Otherwise handle Excel workbooks and try to pick the "Full Data" sheet
     try:
@@ -219,24 +214,9 @@ def _read_excel(content: bytes, source_filename: str | None = None) -> tuple[pd.
     if not sheet_names:
         raise ValueError("Excel file contains no sheets")
 
-    def _norm_sheet(s: str) -> str:
-        return "".join(str(s).strip().lower().replace("_", " ").split())
+    chosen_sheet = select_full_data_sheet(sheet_names)
 
-    # Preferred normalized target
-    preferred_norm = "fulldata"
-    chosen_sheet = None
-    for name in sheet_names:
-        if _norm_sheet(name) == preferred_norm or name.strip().lower() == "full data":
-            chosen_sheet = name
-            break
-
-    # Fallback to the second sheet if present
-    if chosen_sheet is None:
-        if len(sheet_names) >= 2:
-            chosen_sheet = sheet_names[1]
-        else:
-            # Only one sheet — use it
-            chosen_sheet = sheet_names[0]
+    # Full Data is mandatory; select_full_data_sheet raises if it is absent.
 
     try:
         df = xl.parse(chosen_sheet)
@@ -247,12 +227,13 @@ def _read_excel(content: bytes, source_filename: str | None = None) -> tuple[pd.
         raise ValueError("Parsed sheet is empty or invalid")
 
     df.columns = [str(c).strip() for c in df.columns]
+    schema_result = validate_full_data_columns(df.columns, sheet_name=chosen_sheet)
     df = _apply_aliases(df)
     try:
         logger.info("[KVK] Read sheet '%s' from uploaded file %s", chosen_sheet, source_filename)
     except Exception:
         pass
-    return df, chosen_sheet
+    return df, chosen_sheet, schema_result.to_dict()
 
 
 def _coerce(df: pd.DataFrame) -> pd.DataFrame:
@@ -430,9 +411,17 @@ def ingest_kvk_all_excel(
     """
     t0 = time.perf_counter()
     try:
-        df_raw, sheet_name = _read_excel(content, source_filename)
+        df_raw, sheet_name, schema_metadata = _read_excel(content, source_filename)
+    except KvkAllSchemaValidationError as e:
+        logger.info("[KVK] Import schema validation failed for %s: %s", source_filename, e)
+        return {
+            "success": False,
+            "error": str(e),
+            "sheet": e.expected_sheet,
+            "schema_version": e.schema_version,
+            "validation_error": e.to_dict(),
+        }
     except Exception:
-        # if read fails for unexpected reasons, let caller see traceback
         raise
 
     # Catch known validation errors from coercion and surface as structured failure
@@ -440,11 +429,23 @@ def ingest_kvk_all_excel(
         df = _coerce(df_raw)
     except ValueError as e:
         logger.info("[KVK] Import failed for %s: %s", source_filename, e)
-        return {"success": False, "error": str(e), "sheet": sheet_name}
+        return {
+            "success": False,
+            "error": str(e),
+            "sheet": sheet_name,
+            "schema_version": KVK_ALL_SCHEMA_VERSION,
+            "schema": schema_metadata,
+        }
 
     if df.empty:
         logger.info("[KVK] Import failed for %s: No rows found in uploaded file.", source_filename)
-        return {"success": False, "error": "No rows found in uploaded file.", "sheet": sheet_name}
+        return {
+            "success": False,
+            "error": "No rows found in uploaded file.",
+            "sheet": sheet_name,
+            "schema_version": KVK_ALL_SCHEMA_VERSION,
+            "schema": schema_metadata,
+        }
 
     staged_rows = int(df.shape[0])  # <= count AFTER coercion/cleanup
 
@@ -523,7 +524,7 @@ def ingest_kvk_all_excel(
         kvk_no, scan_id, row_count = res[0]
         con.commit()
 
-        # Recompute windows (current KVK only) — TIMED
+        # Recompute windows (current KVK only) - TIMED
         cur = con.cursor()
         t_recompute0 = time.perf_counter()
         cur.execute(RECOMPUTE_SQL, kvk_no)
@@ -554,6 +555,8 @@ def ingest_kvk_all_excel(
             "recompute_ms": recompute_ms,
             "proc_ms": ingest_ms,  # alias to keep existing callers happy
             "sheet": sheet_name,
+            "schema_version": KVK_ALL_SCHEMA_VERSION,
+            "schema": schema_metadata,
             "success": True,
         }
     finally:
