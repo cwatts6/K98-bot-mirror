@@ -20,6 +20,26 @@ Full Data
 
 Basic Data is out of scope and must not be used for ingestion, validation, or fallback behaviour. The additional rows in Basic Data are not required for the modernised pipeline.
 
+Programme Status
+Phase 1 is complete and deployed.
+
+Completed Phase 1 scope:
+
+strict Full Data workbook detection
+Full Data tab is required
+Basic Data is ignored and never used as fallback
+fallback-to-second-sheet behaviour removed for KVK_ALL imports
+all expected Full Data columns are validated before legacy coercion
+schema version kvk_all_full_data_v2 is returned in import results
+structured validation errors are returned for schema failures
+focused tests cover valid schema, missing Full Data, missing required columns, and Basic Data ignored
+
+Phase 1 changed Python-side workbook validation only. No SQL schema, stored procedure, recompute, export, Google Sheets, or Discord reporting behaviour was changed.
+
+Next phase:
+
+Phase 2 — Additive SQL Schema Migration
+
 Completion Rule
 This work is not complete until all items previously identified as deferred optimisations are implemented or explicitly resolved inside this programme.
 
@@ -109,12 +129,12 @@ DL_bot.py
       -> optional gsheet_module.run_kvk_proc_exports_with_alerts
 Current importer:
 
-prefers Full Data
-accepts fallback sheets
+requires Full Data
+rejects fallback sheets
 maps only legacy/stage columns
 drops new contribution fields
 drops raw min/max metric families
-does not persist schema version
+returns schema version in the import result
 does not persist source sheet metadata
 does not warn on ignored known columns
 Current SQL Pipeline
@@ -290,6 +310,9 @@ Reporting SQL should move out of stats_alerts/allkingdoms.py into DAL/service co
 
 Implementation Phases
 Phase 1 — Schema Detection & Validation
+Status
+Complete and deployed.
+
 Goal
 Introduce strict Full Data schema detection before changing SQL behaviour.
 
@@ -319,6 +342,23 @@ Importer only accepts Full Data.
 Basic Data is never used.
 Schema validation returns clear errors.
 Tests cover valid full schema, missing sheet, missing required columns, and ignored basic data.
+
+Completion Notes
+Implemented in Python only:
+
+kvk/schemas/kvk_all_schema.py
+kvk_all_importer.py
+tests/test_kvk_all_schema.py
+
+Validation completed:
+
+targeted schema tests passed
+import smoke passed
+command registration validation passed
+architecture boundary validation passed
+deferred item validation passed
+
+No SQL, export, recompute, or reporting changes were made in Phase 1.
 Phase 2 — Additive SQL Schema Migration
 Goal
 Add SQL capacity for the full workbook schema without breaking existing ingest/export behaviour.

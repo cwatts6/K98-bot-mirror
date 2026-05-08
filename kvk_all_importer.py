@@ -67,11 +67,57 @@ COLUMN_ALIASES = {
 }
 
 # 1) Define the exact stage order ONCE (top of file, near STAGE_INSERT_SQL)
+FULL_DATA_NUMERIC_COLUMN_MAP = {
+    "rank": "rank",
+    "minkill_points": "min_kill_points",
+    "maxkill_points": "max_kill_points",
+    "minpower": "min_power_raw",
+    "maxpower": "max_power_raw",
+    "mindead": "min_dead",
+    "maxdead": "max_dead",
+    "mintroop_power": "min_troop_power",
+    "maxtroop_power": "max_troop_power",
+    "minmax_units_healed": "min_units_healed",
+    "maxmax_units_healed": "max_units_healed",
+    "minkills_iv": "min_kills_iv",
+    "maxkills_iv": "max_kills_iv",
+    "minkills_v": "min_kills_v",
+    "maxkills_v": "max_kills_v",
+    "max_contribute_min": "min_max_contribute",
+    "max_contribute_max": "max_max_contribute",
+    "cur_contribute_min": "min_cur_contribute",
+    "cur_contribute_max": "max_cur_contribute",
+    "max_contribute_diff": "max_contribute_diff",
+    "cur_contribute_diff": "cur_contribute_diff",
+}
+
+# 1) Define the exact stage order ONCE (top of file, near STAGE_INSERT_SQL)
 STAGE_COL_ORDER = [
     "governor_id",
     "name",
     "kingdom",
     "campid",
+    "rank",
+    "min_kill_points",
+    "max_kill_points",
+    "min_power_raw",
+    "max_power_raw",
+    "min_dead",
+    "max_dead",
+    "min_troop_power",
+    "max_troop_power",
+    "min_units_healed",
+    "max_units_healed",
+    "min_kills_iv",
+    "max_kills_iv",
+    "min_kills_v",
+    "max_kills_v",
+    "min_max_contribute",
+    "max_max_contribute",
+    "min_cur_contribute",
+    "max_cur_contribute",
+    "max_contribute_diff",
+    "cur_contribute_diff",
     "min_points",
     "max_points",
     "points_difference",
@@ -90,6 +136,11 @@ STAGE_COL_ORDER = [
     "kills_iv_diff",
     "kills_v_diff",
     "subscription_level",
+    "schema_version",
+    "source_sheet_name",
+    "source_column_hash",
+    "source_column_count",
+    "source_row_count",
 ]
 
 
@@ -138,14 +189,12 @@ def _get_negatives_count(cn, kvk_no: int, scan_id: int) -> int:
         return int(val) if val is not None else 0
 
 
-STAGE_INSERT_SQL = """
+STAGE_INSERT_COLUMNS = ["IngestToken", *STAGE_COL_ORDER]
+
+STAGE_INSERT_SQL = f"""
  INSERT INTO KVK.KVK_AllPlayers_Stage (
-   IngestToken, governor_id, name, kingdom, campid,
-   min_points, max_points, points_difference, min_power, max_power, power_difference,
-   first_updateUTC, last_updateUTC,
-   latest_power, kill_points_diff, power_diff, dead_diff, troop_power_diff,
-   max_units_healed_diff, healed_troops, kills_iv_diff, kills_v_diff, subscription_level
- ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+   {", ".join(f"[{column}]" for column in STAGE_INSERT_COLUMNS)}
+ ) VALUES ({",".join("?" for _ in STAGE_INSERT_COLUMNS)})
  """
 
 CALL_INGEST_SQL = """
@@ -156,6 +205,11 @@ CALL_INGEST_SQL = """
    @SourceFileName=?,
    @FileHash=?,
    @UploaderDiscordID=?,
+   @SchemaVersion=?,
+   @SourceSheetName=?,
+   @SourceColumnHash=?,
+   @SourceColumnCount=?,
+   @SourceRowCount=?,
    @OutKVK_NO=@kvk OUTPUT,
    @OutScanID=@scan OUTPUT,
    @OutRowCount=@rows OUTPUT;
@@ -269,6 +323,12 @@ def _coerce(df: pd.DataFrame) -> pd.DataFrame:
     out["kingdom"] = df["kingdom"].map(as_int)
     out["campid"] = df.get("campid").map(as_int) if "campid" in df.columns else None
 
+    for source_col, target_col in FULL_DATA_NUMERIC_COLUMN_MAP.items():
+        if source_col in df.columns:
+            out[target_col] = df[source_col].map(as_int)
+        else:
+            out[target_col] = None
+
     # Numerics (optional if missing)
     for c in [
         "min_points",
@@ -301,6 +361,23 @@ def _coerce(df: pd.DataFrame) -> pd.DataFrame:
     if out["governor_id"].isna().any() or out["kingdom"].isna().any():
         raise ValueError("One or more rows missing governor_id or kingdom after coercion.")
     return out
+
+
+def _with_source_metadata(
+    df: pd.DataFrame,
+    *,
+    sheet_name: str,
+    schema_metadata: dict[str, Any],
+) -> pd.DataFrame:
+    df = df.copy()
+    df["schema_version"] = str(schema_metadata.get("schema_version") or KVK_ALL_SCHEMA_VERSION)[:64]
+    df["source_sheet_name"] = str(sheet_name)[:128]
+    column_hash = schema_metadata.get("column_hash")
+    df["source_column_hash"] = str(column_hash)[:64] if column_hash else None
+    column_count = schema_metadata.get("column_count")
+    df["source_column_count"] = int(column_count) if column_count is not None else None
+    df["source_row_count"] = int(df.shape[0])
+    return df
 
 
 # 2) Replace _rows_for_stage with an order-safe version
@@ -436,6 +513,7 @@ def ingest_kvk_all_excel(
             "schema_version": KVK_ALL_SCHEMA_VERSION,
             "schema": schema_metadata,
         }
+    df = _with_source_metadata(df, sheet_name=sheet_name, schema_metadata=schema_metadata)
 
     if df.empty:
         logger.info("[KVK] Import failed for %s: No rows found in uploaded file.", source_filename)
@@ -515,7 +593,19 @@ def ingest_kvk_all_excel(
         cur = con.cursor()
         t_ingest0 = time.perf_counter()
         cur.execute(
-            CALL_INGEST_SQL, (token, scan_ts_naive, source_filename, file_hash, int(uploader_id))
+            CALL_INGEST_SQL,
+            (
+                token,
+                scan_ts_naive,
+                source_filename,
+                file_hash,
+                int(uploader_id),
+                schema_metadata.get("schema_version") or KVK_ALL_SCHEMA_VERSION,
+                sheet_name,
+                schema_metadata.get("column_hash"),
+                schema_metadata.get("column_count"),
+                staged_rows,
+            ),
         )
         res = cur.fetchall()
         ingest_ms = (time.perf_counter() - t_ingest0) * 1000.0

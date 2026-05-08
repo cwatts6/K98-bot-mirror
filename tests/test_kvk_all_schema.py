@@ -24,7 +24,7 @@ def _xlsx_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:
 
 
 def _full_data_df() -> pd.DataFrame:
-    row = {column: 1 for column in EXPECTED_FULL_DATA_COLUMNS}
+    row: dict[str, object] = {column: 1 for column in EXPECTED_FULL_DATA_COLUMNS}
     row.update(
         {
             "name": "Test Governor",
@@ -82,6 +82,100 @@ def test_read_excel_uses_full_data_and_ignores_basic_data() -> None:
     assert schema["column_count"] == len(EXPECTED_FULL_DATA_COLUMNS)
     assert df.loc[0, "name"] == "Test Governor"
     assert "first_updateUTC" in df.columns
+
+
+def test_coerce_maps_full_data_v2_columns_to_additive_stage_columns() -> None:
+    full_data = _full_data_df()
+    full_data.loc[0, "rank"] = 7
+    full_data.loc[0, "minkill_points"] = 111
+    full_data.loc[0, "maxkill_points"] = 222
+    full_data.loc[0, "minpower"] = 333
+    full_data.loc[0, "maxpower"] = 444
+    full_data.loc[0, "max_contribute_min"] = 555
+    full_data.loc[0, "max_contribute_max"] = 666
+    full_data.loc[0, "cur_contribute_min"] = 777
+    full_data.loc[0, "cur_contribute_max"] = 888
+    full_data.loc[0, "max_contribute_diff"] = 999
+    full_data.loc[0, "cur_contribute_diff"] = 1000
+
+    coerced = importer._coerce(full_data)
+
+    assert coerced.loc[0, "rank"] == 7
+    assert coerced.loc[0, "min_kill_points"] == 111
+    assert coerced.loc[0, "max_kill_points"] == 222
+    assert coerced.loc[0, "min_power_raw"] == 333
+    assert coerced.loc[0, "max_power_raw"] == 444
+    assert coerced.loc[0, "min_max_contribute"] == 555
+    assert coerced.loc[0, "max_max_contribute"] == 666
+    assert coerced.loc[0, "min_cur_contribute"] == 777
+    assert coerced.loc[0, "max_cur_contribute"] == 888
+    assert coerced.loc[0, "max_contribute_diff"] == 999
+    assert coerced.loc[0, "cur_contribute_diff"] == 1000
+
+
+def test_stage_insert_contract_includes_phase2_columns_and_metadata() -> None:
+    required = {
+        "rank",
+        "min_kill_points",
+        "max_kill_points",
+        "min_power_raw",
+        "max_power_raw",
+        "min_dead",
+        "max_dead",
+        "min_troop_power",
+        "max_troop_power",
+        "min_units_healed",
+        "max_units_healed",
+        "min_kills_iv",
+        "max_kills_iv",
+        "min_kills_v",
+        "max_kills_v",
+        "min_max_contribute",
+        "max_max_contribute",
+        "min_cur_contribute",
+        "max_cur_contribute",
+        "max_contribute_diff",
+        "cur_contribute_diff",
+        "schema_version",
+        "source_sheet_name",
+        "source_column_hash",
+        "source_column_count",
+        "source_row_count",
+    }
+
+    assert required.issubset(set(importer.STAGE_COL_ORDER))
+    assert importer.STAGE_INSERT_SQL.count("?") == len(importer.STAGE_INSERT_COLUMNS)
+
+
+def test_rows_for_stage_include_source_metadata_values() -> None:
+    schema = validate_full_data_columns(EXPECTED_FULL_DATA_COLUMNS, sheet_name=FULL_DATA_SHEET_NAME)
+    coerced = importer._coerce(_full_data_df())
+    enriched = importer._with_source_metadata(
+        coerced,
+        sheet_name=FULL_DATA_SHEET_NAME,
+        schema_metadata=schema.to_dict(),
+    )
+
+    row = importer._rows_for_stage("token-1", enriched)[0]
+    values = dict(zip(["IngestToken", *importer.STAGE_COL_ORDER], row, strict=True))
+
+    assert values["IngestToken"] == "token-1"
+    assert values["schema_version"] == SCHEMA_VERSION
+    assert values["source_sheet_name"] == FULL_DATA_SHEET_NAME
+    assert values["source_column_hash"] == schema.column_hash
+    assert values["source_column_count"] == len(EXPECTED_FULL_DATA_COLUMNS)
+    assert values["source_row_count"] == 1
+
+
+def test_ingest_call_contract_passes_phase2_metadata_parameters() -> None:
+    for parameter_name in [
+        "@SchemaVersion=?",
+        "@SourceSheetName=?",
+        "@SourceColumnHash=?",
+        "@SourceColumnCount=?",
+        "@SourceRowCount=?",
+    ]:
+        assert parameter_name in importer.CALL_INGEST_SQL
 
 
 def test_read_excel_rejects_missing_full_data_without_sheet_fallback() -> None:
