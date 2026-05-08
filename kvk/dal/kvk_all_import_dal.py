@@ -257,17 +257,24 @@ def ingest_prepared_import(
     scan_ts_naive = scan_ts_utc.replace(tzinfo=None)
 
     if not scan_ts_within_kvk_details(con, scan_ts_naive):
+        cleanup_failed = False
+        cleanup_error: str | None = None
         try:
             cur.execute(DELETE_STAGED_TOKEN_SQL, token)
             con.commit()
-        except Exception:
+        except Exception as exc:
+            cleanup_failed = True
+            cleanup_error = f"{type(exc).__name__}: {exc}"
             logger.exception("[KVK] Failed to clean staged rows for token %s after pre-check failure.", token)
         context: dict[str, Any] = {
             "scan_ts_naive": str(scan_ts_naive),
             "source_filename": source_filename,
             "staged_rows": staged_rows,
             "sample_row": {},
+            "cleanup_failed": cleanup_failed,
         }
+        if cleanup_error:
+            context["cleanup_error"] = cleanup_error
         try:
             sample = df.iloc[0].to_dict()
             context["sample_row"] = {key: str(value) for key, value in sample.items()}
@@ -284,6 +291,8 @@ def ingest_prepared_import(
             "error": message,
             "sheet": sheet_name,
             "offending_scan_ts": str(scan_ts_naive),
+            "cleanup_failed": cleanup_failed,
+            "cleanup_error": cleanup_error,
         }
 
     cur = con.cursor()

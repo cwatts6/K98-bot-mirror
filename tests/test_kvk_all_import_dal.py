@@ -151,4 +151,6 @@ def test_ingest_prepared_import_cleans_stage_rows_when_precheck_fails(monkeypatc
     assert stage_cursor.executemany_calls[0][0] == dal.STAGE_INSERT_SQL
     assert (dal.DELETE_STAGED_TOKEN_SQL, "token-2") in stage_cursor.executed
     assert result["success"] is False
+    assert result["cleanup_failed"] is False
+    assert result["cleanup_error"] is None
     assert connection.commit_calls == 2
