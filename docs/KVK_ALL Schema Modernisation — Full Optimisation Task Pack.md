@@ -23,6 +23,8 @@ Basic Data is out of scope and must not be used for ingestion, validation, or fa
 Programme Status
 Phase 1 is complete and deployed.
 
+Phase 2 is complete and deployed.
+
 Completed Phase 1 scope:
 
 strict Full Data workbook detection
@@ -36,9 +38,25 @@ focused tests cover valid schema, missing Full Data, missing required columns, a
 
 Phase 1 changed Python-side workbook validation only. No SQL schema, stored procedure, recompute, export, Google Sheets, or Discord reporting behaviour was changed.
 
+Completed Phase 2 scope:
+
+additive SQL capacity added for Full Data v2 fields
+nullable Full Data columns added to KVK.KVK_AllPlayers_Stage
+nullable Full Data columns added to KVK.KVK_AllPlayers_Raw
+schema/source metadata added to KVK.KVK_Scan
+KVK.sp_KVK_AllPlayers_Ingest updated additively with optional metadata parameters
+Full Data v2 fields are staged from Python without changing recompute/export/reporting contracts
+source metadata is staged and passed into ingest
+KVK_Ingest_Negatives can capture negative contribution deltas
+production deployment SQL script added under sql/
+focused schema/import contract tests added
+deployment smoke confirmed DB columns and ingest metadata parameters exist
+
+Phase 2 did not change recompute formula behaviour, export result-set order, Google Sheets tabs, Discord reporting display, admin command SQL ownership, or reporting DAL ownership.
+
 Next phase:
 
-Phase 2 — Additive SQL Schema Migration
+Phase 3 — Importer Service/DAL Refactor
 
 Completion Rule
 This work is not complete until all items previously identified as deferred optimisations are implemented or explicitly resolved inside this programme.
@@ -131,11 +149,10 @@ Current importer:
 
 requires Full Data
 rejects fallback sheets
-maps only legacy/stage columns
-drops new contribution fields
-drops raw min/max metric families
+maps legacy fields and Phase 2 Full Data capacity fields into stage rows
+stages rank, raw min/max metric families, and contribution fields
 returns schema version in the import result
-does not persist source sheet metadata
+persists schema/source metadata through the SQL ingest flow
 does not warn on ignored known columns
 Current SQL Pipeline
 Reviewed SQL objects:
@@ -159,7 +176,7 @@ dbo.fn_KVK_Player_Aggregated
 dbo.fn_KVK_Kingdom_Aggregated
 dbo.fn_KVK_Camp_Aggregated
 KVK.vw_FightingDataset
-Current SQL supports legacy fields only:
+Current SQL supports legacy fields plus Phase 2 Full Data capacity fields:
 
 points_difference
 kill_points_diff
@@ -171,19 +188,35 @@ healed_troops
 kills_iv_diff
 kills_v_diff
 latest_power
+rank
+min_kill_points
+max_kill_points
+min_power_raw
+max_power_raw
+min_dead
+max_dead
+min_troop_power
+max_troop_power
+min_units_healed
+max_units_healed
+min_kills_iv
+max_kills_iv
+min_kills_v
+max_kills_v
+min_max_contribute
+max_max_contribute
+min_cur_contribute
+max_cur_contribute
+max_contribute_diff
+cur_contribute_diff
+schema_version
+source_sheet_name
+source_column_hash
+source_column_count
+source_row_count
+
 It does not support:
 
-rank
-raw min/max kill points
-raw min/max power
-raw min/max dead
-raw min/max troop power
-raw min/max healed
-max contribution metrics
-current contribution metrics
-schema version metadata
-source workbook metadata
-source sheet metadata
 summary tab reconciliation
 Current Export/Reporting Coupling
 gsheet_module.py currently assumes:
@@ -360,6 +393,9 @@ deferred item validation passed
 
 No SQL, export, recompute, or reporting changes were made in Phase 1.
 Phase 2 — Additive SQL Schema Migration
+Status
+Complete and deployed.
+
 Goal
 Add SQL capacity for the full workbook schema without breaking existing ingest/export behaviour.
 
@@ -409,6 +445,44 @@ Existing legacy import still works if required by compatibility tests.
 New Full Data fields are persisted.
 Ingest metadata is queryable.
 SQL scripts are additive and rollback-safe.
+
+Completion Notes
+Implemented:
+
+sql/kvk_all_phase2_full_data_capacity.sql
+kvk_all_importer.py
+tests/test_kvk_all_schema.py
+docs/KVK_ALL Schema Modernisation — Phase 2 Initiation Statement.md
+
+SQL deployment delivered:
+
+nullable Full Data capacity columns on KVK.KVK_AllPlayers_Stage
+nullable Full Data capacity columns on KVK.KVK_AllPlayers_Raw
+schema_version, source_sheet_name, source_column_hash, source_column_count, and source_row_count on KVK.KVK_Scan
+backward-compatible optional metadata parameters on KVK.sp_KVK_AllPlayers_Ingest
+raw persistence of rank, min/max metrics, contribution metrics, and source metadata
+negative diagnostics extended to max_contribute_diff and cur_contribute_diff
+
+Python delivery:
+
+Full Data v2 workbook columns are mapped into canonical stage column names.
+schema/source metadata is added to staged rows.
+ingest call passes schema/source metadata to SQL.
+legacy import return fields and user-facing import behaviour are preserved.
+
+Validation completed:
+
+python -m pytest -q tests\test_kvk_all_schema.py
+python scripts\validate_architecture_boundaries.py
+python scripts\validate_deferred_items.py
+python scripts\smoke_imports.py
+python scripts\validate_command_registration.py
+python -m black --check kvk_all_importer.py tests\test_kvk_all_schema.py
+python -m pyright kvk_all_importer.py tests\test_kvk_all_schema.py
+non-mutating workbook/importer smoke against downloads/kvk_all_sample_file/1086045_05_08_2026,_02_21_38_AM.xlsx
+read-only SQL metadata smoke confirming deployed columns and ingest metadata parameters
+
+No recompute, export, Google Sheets, Discord reporting display, admin command SQL extraction, or reporting DAL refactor changes were made in Phase 2.
 Phase 3 — Importer Service/DAL Refactor
 Goal
 Resolve importer architecture debt and support the full schema cleanly.
