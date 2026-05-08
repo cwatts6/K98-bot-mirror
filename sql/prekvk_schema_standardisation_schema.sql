@@ -19,22 +19,28 @@ ALTER TABLE [dbo].[PreKvk_Scores] ADD [Stage3Points] [int] NULL
 IF COL_LENGTH(N'dbo.PreKvk_Scores', N'TotalPoints') IS NULL
 ALTER TABLE [dbo].[PreKvk_Scores] ADD [TotalPoints] [int] NULL
 
-IF COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage1Points') IS NULL
+IF OBJECT_ID(N'dbo.PreKvk_Scores_Ranked', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage1Points') IS NULL
 ALTER TABLE [dbo].[PreKvk_Scores_Ranked] ADD [Stage1Points] [bigint] NULL
 
-IF COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage1Rank') IS NULL
+IF OBJECT_ID(N'dbo.PreKvk_Scores_Ranked', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage1Rank') IS NULL
 ALTER TABLE [dbo].[PreKvk_Scores_Ranked] ADD [Stage1Rank] [bigint] NULL
 
-IF COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage2Points') IS NULL
+IF OBJECT_ID(N'dbo.PreKvk_Scores_Ranked', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage2Points') IS NULL
 ALTER TABLE [dbo].[PreKvk_Scores_Ranked] ADD [Stage2Points] [bigint] NULL
 
-IF COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage2Rank') IS NULL
+IF OBJECT_ID(N'dbo.PreKvk_Scores_Ranked', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage2Rank') IS NULL
 ALTER TABLE [dbo].[PreKvk_Scores_Ranked] ADD [Stage2Rank] [bigint] NULL
 
-IF COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage3Points') IS NULL
+IF OBJECT_ID(N'dbo.PreKvk_Scores_Ranked', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage3Points') IS NULL
 ALTER TABLE [dbo].[PreKvk_Scores_Ranked] ADD [Stage3Points] [bigint] NULL
 
-IF COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage3Rank') IS NULL
+IF OBJECT_ID(N'dbo.PreKvk_Scores_Ranked', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.PreKvk_Scores_Ranked', N'Stage3Rank') IS NULL
 ALTER TABLE [dbo].[PreKvk_Scores_Ranked] ADD [Stage3Rank] [bigint] NULL
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[PreKvk_Scores]') AND name = N'IX_PreKvk_Scores_KVK_Scan_Total')
