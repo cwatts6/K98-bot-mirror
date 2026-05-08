@@ -148,37 +148,48 @@ BEGIN
         IF @KVK_NO IS NULL
             THROW 50005, 'Scan timestamp does not fall within any KVK_Details range.', 1;
 
-        IF EXISTS (
-            SELECT 1
-            FROM KVK.KVK_Scan WITH (UPDLOCK, HOLDLOCK)
-            WHERE KVK_NO = @KVK_NO
-              AND ScanTimestampUTC = @ScanTimestampUTC
-              AND FileHash = @FileHash
-        )
-        BEGIN
-            THROW 50006, 'Duplicate ingest: same KVK, ScanTimestamp, and FileHash already exists.', 1;
-        END
-
         DECLARE @ScanID INT;
 
-        SELECT @ScanID = ISNULL(MAX(ScanID), 0) + 1
-        FROM KVK.KVK_Scan WITH (UPDLOCK, HOLDLOCK)
-        WHERE KVK_NO = @KVK_NO;
+        BEGIN TRY
+            BEGIN TRANSACTION;
 
-        INSERT INTO KVK.KVK_Scan
-        (
-            KVK_NO, ScanID, ScanTimestampUTC, SourceFileName, FileHash,
-            Row_Count, ImportedAtUTC, UploaderDiscordID,
-            schema_version, source_sheet_name, source_column_hash,
-            source_column_count, source_row_count
-        )
-        VALUES
-        (
-            @KVK_NO, @ScanID, @ScanTimestampUTC, @SourceFileName, @FileHash,
-            @OutRowCount, SYSUTCDATETIME(), @UploaderDiscordID,
-            @SchemaVersion, @SourceSheetName, @SourceColumnHash,
-            @SourceColumnCount, @SourceRowCount
-        );
+            IF EXISTS (
+                SELECT 1
+                FROM KVK.KVK_Scan WITH (UPDLOCK, HOLDLOCK)
+                WHERE KVK_NO = @KVK_NO
+                  AND ScanTimestampUTC = @ScanTimestampUTC
+                  AND FileHash = @FileHash
+            )
+            BEGIN
+                THROW 50006, 'Duplicate ingest: same KVK, ScanTimestamp, and FileHash already exists.', 1;
+            END
+
+            SELECT @ScanID = ISNULL(MAX(ScanID), 0) + 1
+            FROM KVK.KVK_Scan WITH (UPDLOCK, HOLDLOCK)
+            WHERE KVK_NO = @KVK_NO;
+
+            INSERT INTO KVK.KVK_Scan
+            (
+                KVK_NO, ScanID, ScanTimestampUTC, SourceFileName, FileHash,
+                Row_Count, ImportedAtUTC, UploaderDiscordID,
+                schema_version, source_sheet_name, source_column_hash,
+                source_column_count, source_row_count
+            )
+            VALUES
+            (
+                @KVK_NO, @ScanID, @ScanTimestampUTC, @SourceFileName, @FileHash,
+                @OutRowCount, SYSUTCDATETIME(), @UploaderDiscordID,
+                @SchemaVersion, @SourceSheetName, @SourceColumnHash,
+                @SourceColumnCount, @SourceRowCount
+            );
+
+            COMMIT TRANSACTION;
+        END TRY
+        BEGIN CATCH
+            IF @@TRANCOUNT > 0
+                ROLLBACK TRANSACTION;
+            THROW;
+        END CATCH;
 
         INSERT INTO KVK.KVK_AllPlayers_Raw
         (
