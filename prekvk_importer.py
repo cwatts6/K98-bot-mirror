@@ -198,6 +198,9 @@ def import_prekvk_bytes(
     filename: str,
     *,
     kvk_no: int,
+    uploader_discord_id: int | None = None,
+    channel_id: int | None = None,
+    message_id: int | None = None,
 ) -> tuple[bool, str, int]:
     phase = "start"
     scan_id: int | None = None
@@ -205,12 +208,45 @@ def import_prekvk_bytes(
 
     try:
         filehash = hashlib.sha256(xlsx_bytes).digest()
-        hash_prefix = hashlib.sha256(xlsx_bytes).hexdigest()[:8]
+        filehash_hex = hashlib.sha256(xlsx_bytes).hexdigest()
+        hash_prefix = filehash_hex[:8]
     except Exception:
         filehash = b""
+        filehash_hex = None
         hash_prefix = "unknown"
 
     bytes_len = len(xlsx_bytes) if xlsx_bytes is not None else 0
+
+    def _record_history(
+        status: str,
+        *,
+        phase_name: str | None = None,
+        row_count: int | None = None,
+        error_type: str | None = None,
+        error_text: str | None = None,
+    ) -> None:
+        if os.getenv("PREKVK_IMPORT_HISTORY_DISABLED", "").strip() == "1":
+            return
+        try:
+            from prekvk.diagnostics_service import record_import_outcome
+
+            record_import_outcome(
+                kvk_no=kvk_no,
+                filename=filename,
+                status=status,
+                hash_prefix=hash_prefix,
+                file_hash_sha256=filehash_hex,
+                phase=phase_name or phase,
+                row_count=row_count,
+                scan_id=scan_id,
+                error_type=error_type,
+                error_text=error_text,
+                uploader_discord_id=uploader_discord_id,
+                channel_id=channel_id,
+                message_id=message_id,
+            )
+        except Exception:
+            logger.exception("[PREKVK] import history hook failed")
 
     logger.info("[PREKVK] import start kvk_no=%s file=%s bytes=%s", kvk_no, filename, bytes_len)
     _emit_telemetry(
@@ -247,6 +283,13 @@ def import_prekvk_bytes(
                     "error_text": str(e),
                 }
             )
+            _record_history(
+                "rejected",
+                phase_name=phase,
+                row_count=0,
+                error_type="NoSheets",
+                error_text=str(e),
+            )
             return (False, f"{e}.", 0)
         except InvalidWorkbookError as e:
             logger.warning(
@@ -267,6 +310,13 @@ def import_prekvk_bytes(
                     "error_type": "InvalidWorkbook",
                     "error_text": str(e),
                 }
+            )
+            _record_history(
+                "rejected",
+                phase_name=phase,
+                row_count=0,
+                error_type="InvalidWorkbook",
+                error_text=str(e),
             )
             return (False, str(e), 0)
 
@@ -295,6 +345,13 @@ def import_prekvk_bytes(
                     "error_text": msg,
                 }
             )
+            _record_history(
+                "rejected",
+                phase_name=phase,
+                row_count=0,
+                error_type="MissingColumns",
+                error_text=msg,
+            )
             return (False, msg, 0)
         except ValueError as e:
             msg = str(e)
@@ -317,6 +374,13 @@ def import_prekvk_bytes(
                     "error_text": msg,
                 }
             )
+            _record_history(
+                "rejected",
+                phase_name=phase,
+                row_count=0,
+                error_type="InvalidNumericValue",
+                error_text=msg,
+            )
             return (False, msg, 0)
 
         out = out.dropna(subset=["GovernorID"])
@@ -338,6 +402,13 @@ def import_prekvk_bytes(
                     "error_type": "NoValidRows",
                     "error_text": "No valid governor rows after cleaning",
                 }
+            )
+            _record_history(
+                "rejected",
+                phase_name=phase,
+                row_count=0,
+                error_type="NoValidRows",
+                error_text="No valid governor rows after cleaning",
             )
             return (False, "No valid governor rows after cleaning.", 0)
 
@@ -375,6 +446,13 @@ def import_prekvk_bytes(
                     "duplicate_count": len(uniq),
                 }
             )
+            _record_history(
+                "rejected",
+                phase_name="validate_duplicates",
+                row_count=0,
+                error_type="DuplicateGovernorIDs",
+                error_text=msg,
+            )
             return (False, msg, 0)
 
         phase = "db"
@@ -404,6 +482,7 @@ def import_prekvk_bytes(
                             "rows": 0,
                         }
                     )
+                    _record_history("duplicate", phase_name=phase, row_count=0)
                     return (True, "Duplicate file skipped (hash match).", 0)
 
                 phase = "db_insert_header"
@@ -497,6 +576,7 @@ def import_prekvk_bytes(
                         "rows": rows_imported,
                     }
                 )
+                _record_history("accepted", phase_name=phase, row_count=rows_imported)
 
             except Exception:
                 try:
@@ -527,6 +607,7 @@ def import_prekvk_bytes(
                     "dedupe": "unique_constraint",
                 }
             )
+            _record_history("duplicate", phase_name=phase, row_count=0)
             return (True, "Duplicate file skipped (unique constraint).", 0)
 
         logger.warning(
@@ -548,6 +629,13 @@ def import_prekvk_bytes(
                 "error_text": str(e),
             }
         )
+        _record_history(
+            "failed",
+            phase_name=phase,
+            row_count=0,
+            error_type="IntegrityError",
+            error_text=str(e),
+        )
         return (False, f"IntegrityError: {e}", 0)
 
     except Exception as e:
@@ -565,5 +653,12 @@ def import_prekvk_bytes(
                 "error_type": type(e).__name__,
                 "error_text": str(e),
             }
+        )
+        _record_history(
+            "failed",
+            phase_name=phase,
+            row_count=0,
+            error_type=type(e).__name__,
+            error_text=str(e),
         )
         return (False, f"{type(e).__name__}: {e}", 0)

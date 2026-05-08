@@ -24,3 +24,21 @@
 - Impact: medium
 - Risk: medium
 - Dependencies: Review KVK admin command coverage and decide the target service/DAL split for scan, window, export, and recompute operations.
+
+### Deferred Optimisation
+- Area: `DL_bot.py` PreKvK upload routing
+- Type: architecture
+- Description: PreKvK upload routing still lives in the legacy root bot listener with filename matching, current-KVK lookup, offload dispatch, and Discord response rendering mixed together.
+- Suggested Fix: Move PreKvK upload routing into a dedicated route/service module and leave `DL_bot.py` responsible only for delegating the Discord event.
+- Impact: medium
+- Risk: medium
+- Dependencies: PreKvK diagnostics result model should remain stable after the import-history rollout.
+
+### Deferred Optimisation
+- Area: SQL repo legacy PreKvK phase objects
+- Type: cleanup
+- Description: `dbo.PreKvk_Phases`, `dbo.fn_PreKvkPhaseDelta`, and KVK-specific phase views still represent the old scan-window delta model even though Python reporting now uses direct stage columns.
+- Suggested Fix: Audit production SQL/report dependencies, then replace with direct-stage equivalents or retire the legacy objects in a separate SQL cleanup task.
+- Impact: medium
+- Risk: medium
+- Dependencies: Confirm no production reports or manual SQL workflows still depend on scan-window phase objects.

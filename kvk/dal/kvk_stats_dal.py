@@ -22,8 +22,14 @@ def _get_conn():
 def fetch_prekvk_phase_list(kvk_no: int, phase: int) -> list[dict[str, Any]]:
     """
     Return list of dicts with keys GovernorID, Name, Points for the given KVK and phase.
-    Uses the same delta computation logic as stats_alerts/prekvk_stats._phase_top but returns all rows.
+    Uses direct PreKvK stage columns from the latest scan.
     """
+    stage_columns = {1: "Stage1Points", 2: "Stage2Points", 3: "Stage3Points"}
+    stage_column = stage_columns.get(int(phase or 0))
+    if stage_column is None:
+        logger.warning("[PREKVK] Unsupported phase requested for KVK %s phase %s", kvk_no, phase)
+        return []
+
     try:
         from file_utils import cursor_row_to_dict
 
@@ -31,47 +37,25 @@ def fetch_prekvk_phase_list(kvk_no: int, phase: int) -> list[dict[str, Any]]:
         with conn:
             cur = conn.cursor()
             cur.execute(
-                """
-                WITH W AS (
-                  SELECT StartUTC, EndUTC
-                  FROM dbo.PreKvk_Phases
-                  WHERE KVK_NO = ? AND Phase = ?
-                ),
-                B AS (
-                  SELECT sc.GovernorID,
-                         MAX(sc.Points) AS Baseline
-                  FROM dbo.PreKvk_Scores sc
-                  JOIN dbo.PreKvk_Scan s ON s.KVK_NO = sc.KVK_NO AND s.ScanID = sc.ScanID
-                  CROSS JOIN W
-                  WHERE sc.KVK_NO = ? AND s.ScanTimestampUTC < W.StartUTC
-                  GROUP BY sc.GovernorID
-                ),
-                P AS (
-                  SELECT sc.GovernorID,
-                         MAX(sc.Points) AS InWindow
-                  FROM dbo.PreKvk_Scores sc
-                  JOIN dbo.PreKvk_Scan s ON s.KVK_NO = sc.KVK_NO AND s.ScanID = sc.ScanID
-                  CROSS JOIN W
-                  WHERE sc.KVK_NO = ? AND s.ScanTimestampUTC BETWEEN W.StartUTC AND W.EndUTC
-                  GROUP BY sc.GovernorID
-                ),
-                Names AS (
-                  SELECT sc.GovernorID, MAX(sc.GovernorName) AS GovernorName
-                  FROM dbo.PreKvk_Scores sc
-                  JOIN dbo.PreKvk_Scan s ON s.KVK_NO = sc.KVK_NO AND s.ScanID = sc.ScanID
-                  WHERE sc.KVK_NO = ?
-                  GROUP BY sc.GovernorID
+                f"""
+                WITH Latest AS (
+                  SELECT TOP (1) ScanID
+                  FROM dbo.PreKvk_Scan
+                  WHERE KVK_NO = ?
+                  ORDER BY ScanID DESC
                 )
-                SELECT COALESCE(p.GovernorID, b.GovernorID) AS GovernorID,
-                       COALESCE(n.GovernorName, CONVERT(varchar(20), COALESCE(p.GovernorID, b.GovernorID))) AS Name,
-                       MAX(COALESCE(p.InWindow, b.Baseline, 0)) - MAX(COALESCE(b.Baseline, 0)) AS Points
-                FROM B b
-                FULL JOIN P p ON p.GovernorID = b.GovernorID
-                LEFT JOIN Names n ON n.GovernorID = COALESCE(p.GovernorID, b.GovernorID)
-                GROUP BY COALESCE(p.GovernorID, b.GovernorID), COALESCE(n.GovernorName, CONVERT(varchar(20), COALESCE(p.GovernorID, b.GovernorID)))
-                ORDER BY Points DESC, Name;
+                SELECT
+                    sc.GovernorID,
+                    COALESCE(MAX(sc.GovernorName), CONVERT(varchar(20), sc.GovernorID)) AS Name,
+                    MAX(sc.{stage_column}) AS Points
+                FROM dbo.PreKvk_Scores sc
+                JOIN Latest l ON l.ScanID = sc.ScanID
+                WHERE sc.KVK_NO = ?
+                  AND sc.{stage_column} IS NOT NULL
+                GROUP BY sc.GovernorID
+                ORDER BY MAX(sc.{stage_column}) DESC, sc.GovernorID ASC;
                 """,
-                (kvk_no, phase, kvk_no, kvk_no, kvk_no),
+                (kvk_no, kvk_no),
             )
             rows = cur.fetchall()
             if not rows:

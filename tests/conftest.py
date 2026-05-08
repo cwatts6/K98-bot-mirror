@@ -16,6 +16,7 @@ os.environ.setdefault("SQL_SERVER", "test-sql-server")
 os.environ.setdefault("SQL_DATABASE", "test-db")
 os.environ.setdefault("IMPORT_SQL_USERNAME", "test-user")
 os.environ.setdefault("IMPORT_SQL_PASSWORD", "test-password")
+os.environ.setdefault("PREKVK_IMPORT_HISTORY_DISABLED", "1")
 
 # Determine repository root (one directory up from tests/)
 _THIS_DIR = os.path.dirname(__file__)
