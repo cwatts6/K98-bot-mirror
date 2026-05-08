@@ -845,9 +845,13 @@ async def on_message(message: discord.Message):
                 file_bytes,
                 target.filename,
                 kvk_no=detected_kvk_no,
-                uploader_discord_id=int(getattr(message.author, "id", 0) or 0),
-                channel_id=int(getattr(message.channel, "id", 0) or 0),
-                message_id=int(getattr(message, "id", 0) or 0),
+                uploader_discord_id=(
+                    int(message.author.id) if getattr(message.author, "id", None) is not None else None
+                ),
+                channel_id=(
+                    int(message.channel.id) if getattr(message.channel, "id", None) is not None else None
+                ),
+                message_id=int(message.id) if getattr(message, "id", None) is not None else None,
                 name="import_prekvk_bytes",
                 prefer_process=True,
                 meta={"filename": target.filename, "kvk_no": detected_kvk_no},
