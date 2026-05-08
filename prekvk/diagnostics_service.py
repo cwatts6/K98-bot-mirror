@@ -8,10 +8,12 @@ from prekvk.dal.import_history_dal import fetch_recent_import_history, record_im
 logger = logging.getLogger(__name__)
 
 
-def _plain_text_safe(value: Any, *, max_len: int | None = None) -> str:
+def _sanitize_for_discord_inline(value: Any, *, max_len: int | None = None) -> str:
+    """Sanitize user-controlled text for inline Discord markdown usage."""
     text = str(value or "").strip()
     text = text.replace("\r", " ").replace("\n", " ")
     text = text.replace("<", "‹").replace(">", "›")
+    # Break mention tokens (e.g. @everyone / <@123>) so output cannot ping users.
     text = text.replace("@", "@\u200b")
     text = text.replace("*", "＊").replace("_", "＿")
     text = text.replace("`", "｀").replace("~", "～")
@@ -55,14 +57,14 @@ def format_history_rows(rows: list[dict[str, Any]]) -> str:
 
     lines = []
     for row in rows:
-        created = _plain_text_safe(row.get("CreatedUTC") or "unknown", max_len=64)
-        status = _plain_text_safe(row.get("ImportStatus") or "unknown", max_len=32)
-        kvk_no = _plain_text_safe(row.get("KVK_NO") or "?", max_len=32)
-        filename = _plain_text_safe(row.get("Filename") or "unknown file", max_len=255)
+        created = _sanitize_for_discord_inline(row.get("CreatedUTC") or "unknown", max_len=64)
+        status = _sanitize_for_discord_inline(row.get("ImportStatus") or "unknown", max_len=32)
+        kvk_no = _sanitize_for_discord_inline(row.get("KVK_NO") or "?", max_len=32)
+        filename = _sanitize_for_discord_inline(row.get("Filename") or "unknown file", max_len=255)
         row_count = row.get("RowCount")
         scan_id = row.get("ScanID")
-        phase = _plain_text_safe(row.get("Phase"), max_len=64)
-        err = _plain_text_safe(row.get("ErrorType") or row.get("ErrorText"), max_len=80)
+        phase = _sanitize_for_discord_inline(row.get("Phase"), max_len=64)
+        err = _sanitize_for_discord_inline(row.get("ErrorType") or row.get("ErrorText"), max_len=80)
 
         bits = [f"`{created}`", f"KVK `{kvk_no}`", f"**{status}**", f"`{filename}`"]
         if row_count is not None:
