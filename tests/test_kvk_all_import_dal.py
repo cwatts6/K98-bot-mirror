@@ -131,3 +131,24 @@ def test_ingest_prepared_import_call_shape(monkeypatch) -> None:
     assert result["negatives"] == 3
     assert result["success"] is True
     assert connection.commit_calls == 3
+
+
+def test_ingest_prepared_import_cleans_stage_rows_when_precheck_fails(monkeypatch) -> None:
+    connection = MockConnection()
+    monkeypatch.setattr(dal, "scan_ts_within_kvk_details", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(dal.uuid, "uuid4", lambda: "token-2")
+
+    result = dal.ingest_prepared_import(
+        con=connection,
+        prepared=_prepared_frame(),
+        content=b"abc",
+        source_filename="kvk.xlsx",
+        uploader_id=999,
+        scan_ts_utc=dt.datetime(2026, 5, 8, 1, 0, tzinfo=dt.UTC),
+    )
+
+    stage_cursor = connection.cursors[0]
+    assert stage_cursor.executemany_calls[0][0] == dal.STAGE_INSERT_SQL
+    assert (dal.DELETE_STAGED_TOKEN_SQL, "token-2") in stage_cursor.executed
+    assert result["success"] is False
+    assert connection.commit_calls == 2

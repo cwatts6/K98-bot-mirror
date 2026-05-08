@@ -116,6 +116,7 @@ CALL_INGEST_SQL = """
 
 RECOMPUTE_SQL = "EXEC KVK.sp_KVK_Recompute_Windows @KVK_NO=?;"
 NEGATIVE_COUNT_SQL = "SELECT COUNT(*) FROM KVK.KVK_Ingest_Negatives WHERE KVK_NO=? AND ScanID=?;"
+DELETE_STAGED_TOKEN_SQL = "DELETE FROM KVK.KVK_AllPlayers_Stage WHERE IngestToken=?;"
 
 
 def connect_sql_server(
@@ -256,6 +257,11 @@ def ingest_prepared_import(
     scan_ts_naive = scan_ts_utc.replace(tzinfo=None)
 
     if not scan_ts_within_kvk_details(con, scan_ts_naive):
+        try:
+            cur.execute(DELETE_STAGED_TOKEN_SQL, token)
+            con.commit()
+        except Exception:
+            logger.exception("[KVK] Failed to clean staged rows for token %s after pre-check failure.", token)
         context: dict[str, Any] = {
             "scan_ts_naive": str(scan_ts_naive),
             "source_filename": source_filename,
