@@ -264,7 +264,7 @@ def ingest_prepared_import(
             con.commit()
         except Exception as exc:
             cleanup_failed = True
-            cleanup_error = f"{type(exc).__name__}: {exc}"
+            cleanup_error = f"token={token} {type(exc).__name__}: {exc}"
             logger.exception("[KVK] Failed to clean staged rows for token %s after pre-check failure.", token)
         context: dict[str, Any] = {
             "scan_ts_naive": str(scan_ts_naive),
