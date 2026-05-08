@@ -41,6 +41,71 @@ class _FakeMessage:
 
 
 @pytest.mark.asyncio
+async def test_prekvk_duplicate_skip_uses_skipped_embed(monkeypatch):
+    monkeypatch.setenv("WATCHDOG_RUN", "1")
+    import DL_bot
+    import file_utils
+    import stats_alerts.interface
+    import stats_alerts.kvk_meta
+
+    prekvk_channel_id = 999003
+    monkeypatch.setattr(DL_bot, "PREKVK_CHANNEL_ID", prekvk_channel_id, raising=True)
+    monkeypatch.setattr(DL_bot, "_get_notify_channel", AsyncMock(return_value=None), raising=True)
+
+    sent = []
+
+    async def _fake_send_embed(ch, title, fields, color, mention=None):
+        sent.append((title, fields, color))
+
+    async def _fake_offload(*args, **kwargs):
+        return True, "Duplicate file skipped (hash match).", 0
+
+    async def _fake_run_blocking(func, *args, **kwargs):
+        return func(*args)
+
+    async def _async_noop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(DL_bot, "send_embed", _fake_send_embed, raising=True)
+    monkeypatch.setattr(DL_bot, "_offload_callable", _fake_offload, raising=True)
+    monkeypatch.setattr(DL_bot, "trigger_log_backup_background", _async_noop, raising=True)
+    monkeypatch.setattr(
+        DL_bot, "ensure_sql_headroom_or_notify", AsyncMock(return_value=True), raising=True
+    )
+    monkeypatch.setattr(file_utils, "run_blocking_in_thread", _fake_run_blocking, raising=True)
+    monkeypatch.setattr(
+        stats_alerts.kvk_meta,
+        "get_latest_kvk_metadata_sql",
+        lambda: {"kvk_no": 15},
+        raising=True,
+    )
+    monkeypatch.setattr(
+        stats_alerts.interface, "send_stats_update_embed", _async_noop, raising=True
+    )
+    monkeypatch.setattr(
+        type(DL_bot.bot),
+        "user",
+        property(lambda self: SimpleNamespace(id=987654321)),
+        raising=True,
+    )
+
+    msg = _FakeMessage(
+        prekvk_channel_id,
+        [_FakeAttachment("PreKvK_Rankings_C13164_2026-05-08.xlsx", b"xlsx-bytes")],
+    )
+    msg.channel.name = "pre-kvk"
+
+    await DL_bot.on_message(msg)
+
+    assert sent
+    title, fields, color = sent[-1]
+    assert title == "Pre-KVK Snapshot Skipped"
+    assert color == 0xF1C40F
+    assert fields["Rows"] == "0"
+    assert fields["Note"] == "Duplicate file skipped (hash match)."
+
+
+@pytest.mark.asyncio
 async def test_mge_auto_import_success(monkeypatch):
     monkeypatch.setenv("WATCHDOG_RUN", "1")
     import DL_bot

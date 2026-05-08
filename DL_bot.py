@@ -862,9 +862,14 @@ async def on_message(message: discord.Message):
             )
 
             if ok:
+                duplicate_skip = "duplicate file skipped" in (note or "").lower()
                 await send_embed(
                     notify_ch,
-                    "Pre-KVK Snapshot Imported ✅",
+                    (
+                        "Pre-KVK Snapshot Skipped"
+                        if duplicate_skip
+                        else "Pre-KVK Snapshot Imported ✅"
+                    ),
                     {
                         "KVK": str(detected_kvk_no),
                         "Rows": str(rows),
@@ -873,7 +878,7 @@ async def on_message(message: discord.Message):
                         "Uploader": f"{message.author} ({message.author.id})",
                         "Note": note,
                     },
-                    0x2ECC71,
+                    0xF1C40F if duplicate_skip else 0x2ECC71,
                 )
 
                 # schedule a background log-backup trigger (best-effort)
