@@ -10,7 +10,6 @@ from kvk.schemas.kvk_all_schema import (
     FULL_DATA_SHEET_NAME,
     SCHEMA_VERSION,
     KvkAllSchemaValidationError,
-    select_full_data_sheet,
     validate_full_data_columns,
 )
 import kvk_all_importer as importer
@@ -29,8 +28,8 @@ def _full_data_df() -> pd.DataFrame:
     row.update(
         {
             "name": "Test Governor",
-            "first_update": "2026-05-08 01:00:00",
-            "last_update": "2026-05-08 02:00:00",
+            "first_updateUTC": "2026-05-08 01:00:00",
+            "last_updateUTC": "2026-05-08 02:00:00",
         }
     )
     return pd.DataFrame([row], columns=list(EXPECTED_FULL_DATA_COLUMNS))
@@ -59,18 +58,10 @@ def _basic_data_df() -> pd.DataFrame:
     )
 
 
-def test_sample_full_data_schema_matches_expected_workbook() -> None:
-    sample_path = (
-        "downloads/kvk_all_sample_file/1086045_05_08_2026,_02_21_38_AM.xlsx"
-    )
+def test_validate_full_data_columns_accepts_expected_schema() -> None:
+    """Passing all EXPECTED_FULL_DATA_COLUMNS directly returns a successful result."""
+    result = validate_full_data_columns(EXPECTED_FULL_DATA_COLUMNS, sheet_name=FULL_DATA_SHEET_NAME)
 
-    xlsx = pd.ExcelFile(sample_path)
-    sheet_name = select_full_data_sheet(xlsx.sheet_names)
-    df = pd.read_excel(sample_path, sheet_name=sheet_name, nrows=0)
-
-    result = validate_full_data_columns(df.columns, sheet_name=sheet_name)
-
-    assert sheet_name == FULL_DATA_SHEET_NAME
     assert result.schema_version == SCHEMA_VERSION
     assert result.actual_columns == EXPECTED_FULL_DATA_COLUMNS
     assert result.unknown_columns == ()

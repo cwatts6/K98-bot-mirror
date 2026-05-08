@@ -227,8 +227,8 @@ def _read_excel(
         raise ValueError("Parsed sheet is empty or invalid")
 
     df.columns = [str(c).strip() for c in df.columns]
-    schema_result = validate_full_data_columns(df.columns, sheet_name=chosen_sheet)
     df = _apply_aliases(df)
+    schema_result = validate_full_data_columns(df.columns, sheet_name=chosen_sheet)
     try:
         logger.info("[KVK] Read sheet '%s' from uploaded file %s", chosen_sheet, source_filename)
     except Exception:
