@@ -1,9 +1,12 @@
-﻿SET ANSI_NULLS ON
+SET ANSI_NULLS ON
+GO
 SET QUOTED_IDENTIFIER ON
+GO
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[sp_Build_Prekvk_And_Honor_Rankings]') AND type in (N'P', N'PC'))
 BEGIN
 EXEC dbo.sp_executesql @statement = N'CREATE PROCEDURE [dbo].[sp_Build_Prekvk_And_Honor_Rankings] AS'
 END
+GO
 ALTER PROCEDURE [dbo].[sp_Build_Prekvk_And_Honor_Rankings]
 WITH EXECUTE AS CALLER
 AS
