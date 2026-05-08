@@ -61,8 +61,8 @@ def record_import_history(
                 MessageID,
                 CreatedUTC
             )
+            OUTPUT INSERTED.HistoryID
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-            SELECT CAST(SCOPE_IDENTITY() AS BIGINT) AS HistoryID;
             """,
             (
                 int(kvk_no) if kvk_no is not None else None,
