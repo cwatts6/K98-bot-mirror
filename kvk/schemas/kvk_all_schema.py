@@ -56,6 +56,92 @@ EXPECTED_FULL_DATA_COLUMNS = (
     "healed_troops",
 )
 
+FULL_DATA_NUMERIC_COLUMN_MAP = {
+    "rank": "rank",
+    "minkill_points": "min_kill_points",
+    "maxkill_points": "max_kill_points",
+    "minpower": "min_power_raw",
+    "maxpower": "max_power_raw",
+    "mindead": "min_dead",
+    "maxdead": "max_dead",
+    "mintroop_power": "min_troop_power",
+    "maxtroop_power": "max_troop_power",
+    "minmax_units_healed": "min_units_healed",
+    "maxmax_units_healed": "max_units_healed",
+    "minkills_iv": "min_kills_iv",
+    "maxkills_iv": "max_kills_iv",
+    "minkills_v": "min_kills_v",
+    "maxkills_v": "max_kills_v",
+    "max_contribute_min": "min_max_contribute",
+    "max_contribute_max": "max_max_contribute",
+    "cur_contribute_min": "min_cur_contribute",
+    "cur_contribute_max": "max_cur_contribute",
+    "max_contribute_diff": "max_contribute_diff",
+    "cur_contribute_diff": "cur_contribute_diff",
+}
+
+LEGACY_STAGE_NUMERIC_COLUMNS = (
+    "min_points",
+    "max_points",
+    "points_difference",
+    "min_power",
+    "max_power",
+    "power_difference",
+    "latest_power",
+    "kill_points_diff",
+    "power_diff",
+    "dead_diff",
+    "troop_power_diff",
+    "max_units_healed_diff",
+    "healed_troops",
+    "kills_iv_diff",
+    "kills_v_diff",
+    "subscription_level",
+)
+
+REQUIRED_MIN_COLUMNS = (
+    "governor_id",
+    "kingdom",
+    "max_power",
+    "points_difference",
+    "kills_iv_diff",
+    "kills_v_diff",
+    "dead_diff",
+    "max_units_healed_diff",
+)
+
+COLUMN_ALIASES = {
+    "first_updateUTC": (
+        "first_updateutc",
+        "first_update",
+        "first update",
+        "firstupdated",
+        "first_updated",
+    ),
+    "last_updateUTC": (
+        "last_updateutc",
+        "last_update",
+        "last update",
+        "lastupdated",
+        "last_updated",
+    ),
+    "kills_iv_diff": ("kills_iv_diff", "kills iv diff", "t4_kills", "t4 kills", "t4"),
+    "kills_v_diff": ("kills_v_diff", "kills v diff", "t5_kills", "t5 kills", "t5"),
+    "max_units_healed_diff": (
+        "max_units_healed_diff",
+        "max units healed diff",
+        "healed_units_diff",
+        "healed units",
+    ),
+    "dead_diff": ("dead_diff", "deads", "dead", "deads_diff"),
+    "points_difference": (
+        "points_difference",
+        "kill_points_diff",
+        "kill points difference",
+        "kp_diff",
+    ),
+}
+
 
 def normalize_sheet_name(value: str) -> str:
     return "".join(str(value).strip().lower().replace("_", " ").split())

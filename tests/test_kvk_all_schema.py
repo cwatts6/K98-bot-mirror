@@ -5,6 +5,7 @@ from io import BytesIO
 import pandas as pd
 import pytest
 
+from kvk.dal import kvk_all_import_dal
 from kvk.schemas.kvk_all_schema import (
     EXPECTED_FULL_DATA_COLUMNS,
     FULL_DATA_SHEET_NAME,
@@ -287,7 +288,7 @@ def test_ingest_returns_migration_order_error_when_stage_schema_is_outdated(
             self.closed = True
 
     connection = MockConnection()
-    monkeypatch.setattr(importer.pyodbc, "connect", lambda *_args, **_kwargs: connection)
+    monkeypatch.setattr(kvk_all_import_dal.pyodbc, "connect", lambda *_args, **_kwargs: connection)
 
     result = importer.ingest_kvk_all_excel(
         content=content,
