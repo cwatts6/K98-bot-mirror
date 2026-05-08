@@ -127,6 +127,29 @@ def _normalize_prekvk_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             ]
         ]
 
+    new_schema_markers = {
+        "kd",
+        "stageipoints",
+        "stageiipoints",
+        "stageiiipoints",
+        "totalpoints",
+    }
+    if any(key in cols for key in new_schema_markers):
+        source_labels = {
+            "rank": "Rank",
+            "name": "Name",
+            "governorid": "Governor ID",
+            "kd": "KD",
+            "stageipoints": "Stage I Points",
+            "stageiipoints": "Stage II Points",
+            "stageiiipoints": "Stage III Points",
+            "totalpoints": "Total Points",
+        }
+        missing = [source_labels[key] for key in new_schema if key not in cols]
+        found = ", ".join(str(c) for c in list(df.columns))
+        miss = ", ".join(missing)
+        raise KeyError(f"Missing required column(s): {miss}. Found columns: {found}")
+
     gid_col = cols.get("governorid") or cols.get("governor_id") or "GovernorID"
     name_col = cols.get("name") or "Name"
     pts_col = None

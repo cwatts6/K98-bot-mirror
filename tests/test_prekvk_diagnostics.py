@@ -169,6 +169,48 @@ def test_import_records_validation_rejection_history(monkeypatch):
     assert captured[-1]["error_type"] == "MissingColumns"
 
 
+def test_new_schema_missing_kd_reports_new_schema_column(monkeypatch):
+    captured = _capture_history(monkeypatch)
+    _patch_excel(
+        monkeypatch,
+        _df(
+            [
+                "Rank",
+                "Name",
+                "Governor ID",
+                "Stage I Points",
+                "Stage II Points",
+                "Stage III Points",
+                "Total Points",
+            ],
+            [
+                {
+                    "Rank": 1,
+                    "Name": "A",
+                    "Governor ID": 1,
+                    "Stage I Points": 1,
+                    "Stage II Points": 2,
+                    "Stage III Points": 3,
+                    "Total Points": 6,
+                }
+            ],
+        ),
+    )
+    monkeypatch.setattr(
+        pki,
+        "_conn",
+        lambda: (_ for _ in ()).throw(AssertionError("validation should not import rows")),
+    )
+
+    ok, msg, rows = pki.import_prekvk_bytes(b"bad", "PreKvK_Rankings_bad.xlsx", kvk_no=15)
+
+    assert ok is False
+    assert rows == 0
+    assert "Missing required column(s): KD" in msg
+    assert "Prekvk Points" not in msg
+    assert captured[-1]["status"] == "rejected"
+
+
 def test_import_records_database_failure_history(monkeypatch):
     captured = _capture_history(monkeypatch)
     _patch_excel(
@@ -222,6 +264,8 @@ def test_record_import_history_uses_sql_backed_state(monkeypatch):
     assert calls["params"][0] == 13
     assert calls["params"][4] == "accepted"
     assert calls["params"][6] == 2
+    assert "[RowCount]" in calls["sql"]
+    assert " RowCount," not in calls["sql"]
 
 
 def test_fetch_recent_import_history_filters(monkeypatch):
