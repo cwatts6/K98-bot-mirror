@@ -48,7 +48,7 @@ def _alias_key(value: str) -> str:
 
 def apply_column_aliases(df: pd.DataFrame) -> pd.DataFrame:
     """Apply legacy-compatible aliases before strict Full Data schema validation."""
-    if df is None or df.empty:
+    if df is None:
         return df
 
     lookup = {_alias_key(column): column for column in df.columns}
