@@ -1,2 +1,1 @@
 """KVK service-layer modules."""
-
