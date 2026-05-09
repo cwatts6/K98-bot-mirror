@@ -597,6 +597,9 @@ Recompute performance risk is measured.
 Indexing plan is implemented or documented.
 Tests cover recompute formulas using representative fixture data.
 Phase 5 — Export Contract Decoupling
+Status
+Complete and dev-validated.
+
 Goal
 Remove fragile coupling between SQL result-set order and Google Sheets output.
 
@@ -619,6 +622,50 @@ Export does not fail solely because a new result set is added.
 Existing tabs still export.
 New contribution columns export where applicable.
 Tests cover result-set name binding and backward compatibility.
+
+Completion Notes
+Implemented:
+
+kvk/services/kvk_export_service.py
+gsheet_module.py
+tests/test_kvk_export_service.py
+tests/test_gsheet_module.py
+tests/test_kvk_all_recompute_sql_contract.py
+sql/kvk_all_phase5_export_contract_decoupling.sql
+docs/KVK_ALL Schema Modernisation — Phase 5 Initiation Statement.md
+
+SQL delivery:
+
+KVK.sp_KVK_Get_Exports keeps the existing 10 result sets and existing section order.
+Existing player, kingdom, and camp windowed/full result sets now include max_contribute_gain and cur_contribute_gain.
+No new export result sets or Google Sheets tab names were introduced.
+The local deployment script mirrors the SQL repo procedure change.
+
+Python delivery:
+
+KVK export result sets are bound to stable named sections before Google Sheets writing.
+The current positional result-set contract remains supported as a compatibility path.
+Compatible extra result sets can be ignored when all required named sections are present.
+Primary KVK export tabs, PASS/ALTAR additional spreadsheets, and ALL_WINDOW_COMPARISON continue to use established spreadsheet and tab names.
+Contribution metrics are exported through existing player, kingdom, and camp detail/full sections only.
+No Discord reporting display changes were made.
+
+Validation completed:
+
+python -m pytest -q tests/test_kvk_export_service.py tests/test_gsheet_module.py tests/test_kvk_all_recompute_sql_contract.py
+python -m black --check gsheet_module.py kvk/services/kvk_export_service.py tests/test_gsheet_module.py tests/test_kvk_export_service.py tests/test_kvk_all_recompute_sql_contract.py
+python -m ruff check gsheet_module.py kvk/services/kvk_export_service.py tests/test_gsheet_module.py tests/test_kvk_export_service.py tests/test_kvk_all_recompute_sql_contract.py
+python -m py_compile gsheet_module.py kvk/services/kvk_export_service.py
+python scripts/validate_architecture_boundaries.py
+python scripts/validate_deferred_items.py
+python scripts/select_tests.py
+python scripts/smoke_imports.py
+python scripts/validate_command_registration.py
+python -m pyright gsheet_module.py kvk/services/kvk_export_service.py tests/test_gsheet_module.py tests/test_kvk_export_service.py tests/test_kvk_all_recompute_sql_contract.py
+
+Pyright completed with 0 errors and local dependency-resolution warnings for optional/runtime dependencies in the sandboxed invocation.
+
+No live production export run, Discord reporting change, admin command SQL extraction, reporting DAL refactor, Basic Data ingestion, or summary-tab ingestion was included in Phase 5.
 Phase 6 — Reporting DAL & Discord Integration
 Goal
 Move reporting SQL into DAL/service and expose new metrics cleanly.

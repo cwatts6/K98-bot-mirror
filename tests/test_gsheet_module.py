@@ -7,6 +7,7 @@ These tests monkeypatch internal builders so no network or credentials are requi
 import types
 
 from gspread.exceptions import SpreadsheetNotFound
+import pandas as pd
 
 import gsheet_module as gm
 
@@ -15,6 +16,25 @@ class _FakeCredentials:
     @staticmethod
     def from_service_account_file(*_args, **_kwargs):
         return object()
+
+
+class _FakeSpreadsheet:
+    id = "fake-sheet-id"
+    url = "https://example.invalid/fake-sheet"
+
+    def worksheets(self):
+        return []
+
+
+class _FakeClient:
+    def open(self, _name):
+        return _FakeSpreadsheet()
+
+    def create(self, _name):
+        return _FakeSpreadsheet()
+
+    def open_by_key(self, _key):
+        return _FakeSpreadsheet()
 
 
 def test_get_sheet_values_success(monkeypatch):
@@ -217,3 +237,68 @@ def test_retry_gspread_call_does_not_retry_spreadsheet_not_found_no_response(mon
 
     # Should give up after the very first attempt (not retried)
     assert call_count["n"] == 1
+
+
+def test_create_additional_kvk_spreadsheets_accepts_named_export_sections(monkeypatch):
+    written_tabs = []
+
+    monkeypatch.setattr(gm, "_retry_gspread_call", lambda fn, **_kwargs: fn())
+    monkeypatch.setattr(
+        gm,
+        "_get_or_create_ws",
+        lambda _ss, title, cols=26: types.SimpleNamespace(title=title, id=1),
+    )
+    monkeypatch.setattr(
+        gm,
+        "export_dataframe_to_sheet",
+        lambda ws, _df, service=None, format_columns=None: written_tabs.append(ws.title),
+    )
+    monkeypatch.setattr(gm, "_sort_kvk_export_sheet", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(gm, "_reorder_sheet_tabs", lambda *_args, **_kwargs: None)
+
+    sections = {
+        "KVK_Scan_Log": pd.DataFrame({"KVK_NO": [1], "ScanID": [1]}),
+        "KVK_Windows": pd.DataFrame({"KVK_NO": [1], "WindowName": ["Pass 4"]}),
+        "KVK_DKP_Weights": pd.DataFrame({"KVK_NO": [1], "WeightT4X": [1]}),
+        "KVK_Player_Windowed": pd.DataFrame(
+            {
+                "KVK_NO": [1],
+                "WindowName": ["Pass 4"],
+                "governor_id": [123],
+                "name": ["Player"],
+                "kingdom": [98],
+                "campid": [1],
+                "kp_gain": [10],
+                "max_contribute_gain": [5],
+                "cur_contribute_gain": [3],
+                "dkp": [1.0],
+            }
+        ),
+        "KVK_Kingdom_Windowed": pd.DataFrame(
+            {
+                "KVK_NO": [1],
+                "WindowName": ["Pass 4"],
+                "kingdom": [98],
+                "campid": [1],
+                "camp_name": ["A"],
+                "kp_gain": [10],
+                "dkp": [1.0],
+            }
+        ),
+        "KVK_Camp_Windowed": pd.DataFrame(
+            {
+                "KVK_NO": [1],
+                "WindowName": ["Pass 4"],
+                "campid": [1],
+                "camp_name": ["A"],
+                "kp_gain": [10],
+                "dkp": [1.0],
+            }
+        ),
+    }
+
+    result = gm.create_additional_kvk_spreadsheets(sections, _FakeClient(), object(), 1)
+
+    assert result["KVK_PASS4_ALL_PLAYER_OUTPUT"]["created"] is True
+    assert "PASS4_PLAYER" in written_tabs
+    assert "KVK_Scan_Log" in written_tabs

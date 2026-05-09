@@ -121,8 +121,11 @@ def test_export_contract_keeps_ten_result_sets_and_no_full_select_star() -> None
     assert "SELECT * FROM KVK.KVK_Player_Windowed" not in compact
     assert "SELECT * FROM KVK.KVK_Kingdom_Windowed" not in compact
     assert "SELECT * FROM KVK.KVK_Camp_Windowed" not in compact
+    assert compact.count("max_contribute_gain,cur_contribute_gain") >= 6
 
-    tabs = Path("gsheet_module.py").read_text(encoding="utf-8")
+    tabs = Path("gsheet_module.py").read_text(encoding="utf-8") + Path(
+        "kvk/services/kvk_export_service.py"
+    ).read_text(encoding="utf-8")
     for tab in (
         "KVK_Scan_Log",
         "KVK_Windows",
@@ -156,6 +159,24 @@ def test_phase4_prod_sql_script_contains_all_changed_sql_objects() -> None:
         "COL_LENGTH('KVK.KVK_Kingdom_Windowed', 'max_contribute_gain')",
         "COL_LENGTH('KVK.KVK_Camp_Windowed', 'max_contribute_gain')",
         "WITH VALUES",
+        "GO",
+    ]
+
+    for token in required_tokens:
+        assert token in script
+
+
+def test_phase5_prod_sql_script_contains_export_contract_changes() -> None:
+    script = Path("sql/kvk_all_phase5_export_contract_decoupling.sql").read_text(
+        encoding="utf-8-sig"
+    )
+
+    required_tokens = [
+        "KVK_ALL Schema Modernisation - Phase 5 Export Contract Decoupling",
+        "ALTER PROCEDURE [KVK].[sp_KVK_Get_Exports]",
+        "max_contribute_gain",
+        "cur_contribute_gain",
+        "-- 10) Negative Corrections",
         "GO",
     ]
 

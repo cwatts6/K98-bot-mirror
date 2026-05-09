@@ -37,6 +37,13 @@ from sqlalchemy import create_engine
 from urllib3.util.retry import Retry
 
 from constants import CONFIG_FILE, CREDENTIALS_FILE
+from kvk.services.kvk_export_service import (
+    KVK_EXPORT_SECTION_NAMES,
+    KvkExportBindingError,
+    bind_kvk_export_sections,
+    get_kvk_export_section_by_legacy_index,
+    section_ref_to_name,
+)
 from sheet_importer import detect_transient_error
 
 logger = logging.getLogger(__name__)
@@ -1648,8 +1655,10 @@ def run_kvk_export_test(
 
     # Run proc once and reuse dfs for everything (avoid double proc)
     dfs = _dfs_from_proc(engine, "EXEC KVK.sp_KVK_Get_Exports @KVK_NO = ?", (kvk_no,))
-    if len(dfs) != len(_KVK_TABS_IN_ORDER):
-        raise RuntimeError(f"Expected {len(_KVK_TABS_IN_ORDER)} result sets, got {len(dfs)}")
+    try:
+        export_sections = bind_kvk_export_sections(dfs)
+    except KvkExportBindingError as exc:
+        raise RuntimeError(str(exc)) from exc
 
     meta = {"kvk_no": kvk_no, "primary": None, "additional": {}}
 
@@ -1665,7 +1674,8 @@ def run_kvk_export_test(
             )
         written_tabs = []
         skipped_tabs = []
-        for df, tab in zip(dfs, _KVK_TABS_IN_ORDER, strict=False):
+        for tab in _KVK_TABS_IN_ORDER:
+            df = export_sections[tab]
             df_local = df.copy()
             df_local.replace([float("inf"), float("-inf")], pd.NA, inplace=True)
             _stringify_datetimes_inplace(df_local)
@@ -1703,7 +1713,7 @@ def run_kvk_export_test(
     client = get_gsheet_client(credentials_file)  # refresh client
     service = get_sort_service(credentials_file)
     additional_results = create_additional_kvk_spreadsheets(
-        dfs, client, service, kvk_no, notify_channel=None, bot_loop=None
+        export_sections, client, service, kvk_no, notify_channel=None, bot_loop=None
     )
 
     # Optionally remove results for PASS4/ALTAR/PASS7 if the caller disabled them
@@ -1720,16 +1730,7 @@ def run_kvk_export_test(
 
 # --- NEW: KVK proc export (10 result sets) ---
 _KVK_TABS_IN_ORDER = [
-    "KVK_Scan_Log",
-    "KVK_Windows",
-    "KVK_DKP_Weights",
-    "KVK_Player_Windowed",
-    "KVK_Kingdom_Windowed",
-    "KVK_Camp_Windowed",
-    "KVK_Player_Full",
-    "KVK_Kingdom_Full",
-    "KVK_Camp_Full",
-    "KVK_Ingest_Negatives",
+    *KVK_EXPORT_SECTION_NAMES,
 ]
 
 # Optional: light formatting hints per tab (column names must exist to apply)
@@ -1745,6 +1746,8 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
+        "max_contribute_gain",
+        "cur_contribute_gain",
         "last_scan_id",
     ],
     "KVK_Player_Full": [
@@ -1757,6 +1760,8 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
+        "max_contribute_gain",
+        "cur_contribute_gain",
         "last_scan_id",
     ],
     "KVK_Kingdom_Windowed": [
@@ -1769,6 +1774,8 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
+        "max_contribute_gain",
+        "cur_contribute_gain",
         "last_scan_id",
     ],
     "KVK_Kingdom_Full": [
@@ -1781,6 +1788,8 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
+        "max_contribute_gain",
+        "cur_contribute_gain",
         "last_scan_id",
     ],
     "KVK_Camp_Windowed": [
@@ -1792,6 +1801,8 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
+        "max_contribute_gain",
+        "cur_contribute_gain",
         "last_scan_id",
     ],
     "KVK_Camp_Full": [
@@ -1803,6 +1814,8 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
+        "max_contribute_gain",
+        "cur_contribute_gain",
         "last_scan_id",
     ],
 }
@@ -1834,15 +1847,18 @@ def run_kvk_proc_exports(
 
     # 1) Run proc and capture all result sets in order
     dfs = _dfs_from_proc(engine, "EXEC KVK.sp_KVK_Get_Exports @KVK_NO = ?", (kvk_no,))
-    if len(dfs) != len(_KVK_TABS_IN_ORDER):
-        raise RuntimeError(f"Expected {len(_KVK_TABS_IN_ORDER)} result sets, got {len(dfs)}")
+    try:
+        export_sections = bind_kvk_export_sections(dfs)
+    except KvkExportBindingError as exc:
+        raise RuntimeError(str(exc)) from exc
 
     # 2) Push each DF to its tab
     # wrap client.open in retry
     ss = _retry_gspread_call(
         lambda: client.open(sheet_name), action_desc=f"open_spreadsheet:{sheet_name}"
     )
-    for df, tab in zip(dfs, _KVK_TABS_IN_ORDER, strict=False):
+    for tab in _KVK_TABS_IN_ORDER:
+        df = export_sections[tab]
         df.replace([float("inf"), float("-inf")], pd.NA, inplace=True)
         _stringify_datetimes_inplace(df)
 
@@ -1858,7 +1874,10 @@ def run_kvk_proc_exports(
 
 
 def _aggregate_windowed_dfs(
-    dfs: list[pd.DataFrame], window_names: list[str], src_idx: int, agg_type: str
+    dfs: list[pd.DataFrame] | dict[str, pd.DataFrame],
+    window_names: list[str],
+    src_idx: int | str,
+    agg_type: str,
 ):
     """
     Aggregate (sum) numeric columns across a list of dfs filtered by specific WindowName values.
@@ -1868,10 +1887,19 @@ def _aggregate_windowed_dfs(
     - agg_type: 'player'|'kingdom'|'camp' - used to select grouping keys
     Returns aggregated DataFrame (may be empty).
     """
-    if src_idx >= len(dfs):
+    try:
+        if isinstance(dfs, dict):
+            section_name = section_ref_to_name(src_idx)
+            if section_name is None:
+                return pd.DataFrame()
+            df_src = dfs[section_name].copy()
+        else:
+            if not isinstance(src_idx, int) or src_idx >= len(dfs):
+                return pd.DataFrame()
+            df_src = get_kvk_export_section_by_legacy_index(dfs, src_idx).copy()
+    except KvkExportBindingError:
         return pd.DataFrame()
 
-    df_src = dfs[src_idx].copy()
     if df_src.empty:
         return pd.DataFrame()
 
@@ -2009,7 +2037,7 @@ def _safe_send_embed_with_buttons(
 
 
 def create_additional_kvk_spreadsheets(
-    dfs: list[pd.DataFrame],
+    dfs: list[pd.DataFrame] | dict[str, pd.DataFrame],
     client: gspread.Client,
     service,
     kvk_no: int,
@@ -2029,6 +2057,13 @@ def create_additional_kvk_spreadsheets(
     it will still return metadata so callers (or tests) can assert on results.
     """
     results = {}
+    export_sections = dfs if isinstance(dfs, dict) else bind_kvk_export_sections(dfs)
+
+    def _section_df(section_ref: str | int | None) -> pd.DataFrame:
+        section_name = section_ref_to_name(section_ref)
+        if section_name is None:
+            return pd.DataFrame()
+        return export_sections.get(section_name, pd.DataFrame()).copy()
 
     def _create_and_write(target_ss_name: str, tabs_to_write: list[dict]):
         """
@@ -2047,30 +2082,24 @@ def create_additional_kvk_spreadsheets(
         # Pre-evaluate which specs would produce data
         to_write_results = []
         for spec in tabs_to_write:
-            src_idx = spec.get("src_idx")
+            section_ref = spec.get("section", spec.get("src_idx"))
             df_candidate = pd.DataFrame()
             try:
                 if spec["type"] == "raw":
-                    if src_idx is not None and src_idx < len(dfs):
-                        df_candidate = dfs[src_idx].copy()
-                    else:
-                        df_candidate = pd.DataFrame()
+                    df_candidate = _section_df(section_ref)
                 elif spec["type"] == "filtered":
-                    if src_idx is not None and src_idx < len(dfs):
-                        df_src = dfs[src_idx].copy()
-                        if "WindowName" in df_src.columns and spec.get("filter_window"):
-                            df_candidate = df_src.loc[
-                                df_src["WindowName"] == spec["filter_window"]
-                            ].copy()
-                        else:
-                            df_candidate = pd.DataFrame()
+                    df_src = _section_df(section_ref)
+                    if "WindowName" in df_src.columns and spec.get("filter_window"):
+                        df_candidate = df_src.loc[
+                            df_src["WindowName"] == spec["filter_window"]
+                        ].copy()
                     else:
                         df_candidate = pd.DataFrame()
                 elif spec["type"] == "aggregate":
                     agg_windows = spec.get("agg_windows", [])
                     agg_type = spec.get("agg_type", "player")
                     df_candidate = _aggregate_windowed_dfs(
-                        dfs, agg_windows, spec.get("src_idx"), agg_type
+                        export_sections, agg_windows, section_ref, agg_type
                     )
                 else:
                     df_candidate = pd.DataFrame()
@@ -2171,11 +2200,14 @@ def create_additional_kvk_spreadsheets(
                     )
                     # Determine format columns from original mappings where relevant
                     format_cols = []
-                    if spec.get("agg_type") == "player" or spec.get("src_idx") == 3:
+                    section_name = section_ref_to_name(spec.get("section", spec.get("src_idx")))
+                    if spec.get("agg_type") == "player" or section_name == "KVK_Player_Windowed":
                         format_cols = _KVK_FORMAT_NUMBERS.get("KVK_Player_Windowed", [])
-                    elif spec.get("agg_type") == "kingdom" or spec.get("src_idx") == 4:
+                    elif (
+                        spec.get("agg_type") == "kingdom" or section_name == "KVK_Kingdom_Windowed"
+                    ):
                         format_cols = _KVK_FORMAT_NUMBERS.get("KVK_Kingdom_Windowed", [])
-                    elif spec.get("agg_type") == "camp" or spec.get("src_idx") == 5:
+                    elif spec.get("agg_type") == "camp" or section_name == "KVK_Camp_Windowed":
                         format_cols = _KVK_FORMAT_NUMBERS.get("KVK_Camp_Windowed", [])
                     else:
                         format_cols = []
@@ -2260,12 +2292,9 @@ def create_additional_kvk_spreadsheets(
     # Quick, cheap pre-check: produce PASS4 spreadsheet only if PASS4_PLAYER (src_idx=3 filtered by "Pass 4") has data.
     try:
         has_pass4_player = False
-        if len(dfs) > 3:
-            df3 = dfs[3]
-            if "WindowName" in df3.columns:
-                has_pass4_player = not df3[df3["WindowName"] == "Pass 4"].empty
-            else:
-                has_pass4_player = False
+        df3 = _section_df("KVK_Player_Windowed")
+        if "WindowName" in df3.columns:
+            has_pass4_player = not df3[df3["WindowName"] == "Pass 4"].empty
     except Exception:
         has_pass4_player = False
 
@@ -2333,12 +2362,9 @@ def create_additional_kvk_spreadsheets(
     # Produce 1st Altar spreadsheet only if 1ST_ALTAR_PLAYER (src_idx=3 filtered by "1st Altar") has data.
     try:
         has_altar_player = False
-        if len(dfs) > 3:
-            df3 = dfs[3]
-            if "WindowName" in df3.columns:
-                has_altar_player = not df3[df3["WindowName"] == "1st Altar"].empty
-            else:
-                has_altar_player = False
+        df3 = _section_df("KVK_Player_Windowed")
+        if "WindowName" in df3.columns:
+            has_altar_player = not df3[df3["WindowName"] == "1st Altar"].empty
     except Exception:
         has_altar_player = False
 
@@ -2402,12 +2428,9 @@ def create_additional_kvk_spreadsheets(
 
     try:
         has_2nd_altar_player = False
-        if len(dfs) > 3:
-            df3 = dfs[3]
-            if "WindowName" in df3.columns:
-                has_2nd_altar_player = not df3[df3["WindowName"] == "2nd Altar"].empty
-            else:
-                has_2nd_altar_player = False
+        df3 = _section_df("KVK_Player_Windowed")
+        if "WindowName" in df3.columns:
+            has_2nd_altar_player = not df3[df3["WindowName"] == "2nd Altar"].empty
     except Exception:
         has_2nd_altar_player = False
 
@@ -2473,12 +2496,9 @@ def create_additional_kvk_spreadsheets(
 
     try:
         has_3rd_altar_player = False
-        if len(dfs) > 3:
-            df3 = dfs[3]
-            if "WindowName" in df3.columns:
-                has_3rd_altar_player = not df3[df3["WindowName"] == "3rd Altar"].empty
-            else:
-                has_3rd_altar_player = False
+        df3 = _section_df("KVK_Player_Windowed")
+        if "WindowName" in df3.columns:
+            has_3rd_altar_player = not df3[df3["WindowName"] == "3rd Altar"].empty
     except Exception:
         has_3rd_altar_player = False
 
@@ -2536,12 +2556,9 @@ def create_additional_kvk_spreadsheets(
     # Produce PASS7 spreadsheet only if PASS7_PLAYER (src_idx=3 filtered by "Pass 7") has data.
     try:
         has_pass7_player = False
-        if len(dfs) > 3:
-            df3 = dfs[3]
-            if "WindowName" in df3.columns:
-                has_pass7_player = not df3[df3["WindowName"] == "Pass 7"].empty
-            else:
-                has_pass7_player = False
+        df3 = _section_df("KVK_Player_Windowed")
+        if "WindowName" in df3.columns:
+            has_pass7_player = not df3[df3["WindowName"] == "Pass 7"].empty
     except Exception:
         has_pass7_player = False
 
@@ -2597,12 +2614,9 @@ def create_additional_kvk_spreadsheets(
     # Produce PASS8 spreadsheet only if PASS8_PLAYER (src_idx=3 filtered by "Pass 8") has data.
     try:
         has_pass8_player = False
-        if len(dfs) > 3:
-            df3 = dfs[3]
-            if "WindowName" in df3.columns:
-                has_pass8_player = not df3[df3["WindowName"] == "Pass 8"].empty
-            else:
-                has_pass8_player = False
+        df3 = _section_df("KVK_Player_Windowed")
+        if "WindowName" in df3.columns:
+            has_pass8_player = not df3[df3["WindowName"] == "Pass 8"].empty
     except Exception:
         has_pass8_player = False
 
@@ -2692,12 +2706,9 @@ def create_additional_kvk_spreadsheets(
     # Produce GREATZIG spreadsheet only if GREATZIG_PLAYER (src_idx=3 filtered by "Great Zig") has data.
     try:
         has_greatzig_player = False
-        if len(dfs) > 3:
-            df3 = dfs[3]
-            if "WindowName" in df3.columns:
-                has_greatzig_player = not df3[df3["WindowName"] == "Great Zig"].empty
-            else:
-                has_greatzig_player = False
+        df3 = _section_df("KVK_Player_Windowed")
+        if "WindowName" in df3.columns:
+            has_greatzig_player = not df3[df3["WindowName"] == "Great Zig"].empty
     except Exception:
         has_greatzig_player = False
 
@@ -2780,12 +2791,9 @@ def create_additional_kvk_spreadsheets(
     # Produce PASS9 spreadsheet only if PASS9_PLAYER (src_idx=3 filtered by "Pass 9") has data.
     try:
         has_pass9_player = False
-        if len(dfs) > 3:
-            df3 = dfs[3]
-            if "WindowName" in df3.columns:
-                has_pass9_player = not df3[df3["WindowName"] == "Pass 9"].empty
-            else:
-                has_pass9_player = False
+        df3 = _section_df("KVK_Player_Windowed")
+        if "WindowName" in df3.columns:
+            has_pass9_player = not df3[df3["WindowName"] == "Pass 9"].empty
     except Exception:
         has_pass9_player = False
 
@@ -2817,16 +2825,14 @@ def create_additional_kvk_spreadsheets(
         "Pass 9",
     ]
 
-    def _build_comparison_df(src_idx: int, agg_type: str, metric: str) -> pd.DataFrame:
+    def _build_comparison_df(src_idx: int | str, agg_type: str, metric: str) -> pd.DataFrame:
         """
         Build a comparison DataFrame for a given src_idx (3=player,4=kingdom,5=camp),
         agg_type matching "player"|"kingdom"|"camp", and metric column name.
         Returns a DataFrame with KVK_NO and grouping keys, one column per window (named '<Window> <metric>')
         in windows_order and an 'Overall <metric>' column aggregated across windows via _aggregate_windowed_dfs.
         """
-        if src_idx >= len(dfs):
-            return pd.DataFrame()
-        df_src = dfs[src_idx].copy()
+        df_src = _section_df(src_idx)
         if df_src.empty or "WindowName" not in df_src.columns:
             return pd.DataFrame()
 
@@ -2856,7 +2862,7 @@ def create_additional_kvk_spreadsheets(
         if df_filtered.empty:
             # no per-window rows
             # still try to get Overall via aggregation
-            agg_df = _aggregate_windowed_dfs(dfs, windows_order, src_idx, agg_type)
+            agg_df = _aggregate_windowed_dfs(export_sections, windows_order, src_idx, agg_type)
             if agg_df.empty:
                 return pd.DataFrame()
             # select only group keys + metric if available
@@ -2895,7 +2901,7 @@ def create_additional_kvk_spreadsheets(
         pivot_reset = pivot.reset_index()
 
         # Compute overall aggregate via existing helper (aggregates numeric sums across windows)
-        agg_df = _aggregate_windowed_dfs(dfs, windows_order, src_idx, agg_type)
+        agg_df = _aggregate_windowed_dfs(export_sections, windows_order, src_idx, agg_type)
         # select only group_keys + metric
         if not agg_df.empty and metric in agg_df.columns:
             # agg_df may have group_keys + metric
