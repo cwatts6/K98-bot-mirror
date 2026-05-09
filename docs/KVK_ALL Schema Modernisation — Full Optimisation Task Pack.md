@@ -25,6 +25,8 @@ Phase 1 is complete and deployed.
 
 Phase 2 is complete and deployed.
 
+Phase 3 is complete and deployed.
+
 Completed Phase 1 scope:
 
 strict Full Data workbook detection
@@ -54,9 +56,24 @@ deployment smoke confirmed DB columns and ingest metadata parameters exist
 
 Phase 2 did not change recompute formula behaviour, export result-set order, Google Sheets tabs, Discord reporting display, admin command SQL ownership, or reporting DAL ownership.
 
+Completed Phase 3 scope:
+
+kvk_all_importer.py reduced to a compatibility wrapper around service and DAL layers
+workbook parsing, Full Data selection, aliasing, schema validation, canonical mapping, coercion, and source metadata moved into kvk/services/kvk_all_import_service.py
+stage column ordering, SQL staging, stage schema preflight, ingest procedure call, recompute call, KVK timestamp precheck, diagnostic writing, and negative count reads moved into kvk/dal/kvk_all_import_dal.py
+Full Data v2 canonical mapping constants moved into kvk/schemas/kvk_all_schema.py
+structured schema and coercion failures preserved
+legacy import return dictionary shape preserved for DL_bot.py
+Phase 2 schema/source metadata staging and ingest parameters preserved
+unknown column reporting retained in schema metadata without changing Discord output
+focused tests added for service mapping/validation, DAL call shape, wrapper compatibility, and existing schema behaviours
+non-mutating workbook/service smoke validation completed against the uploaded sample workbook
+
+Phase 3 did not change SQL schema, recompute formulas, export result-set order, Google Sheets tab names, Discord reporting display, admin command SQL ownership, or reporting DAL ownership.
+
 Next phase:
 
-Phase 3 — Importer Service/DAL Refactor
+Phase 4 — Recompute Modernisation
 
 Completion Rule
 This work is not complete until all items previously identified as deferred optimisations are implemented or explicitly resolved inside this programme.
@@ -484,6 +501,9 @@ read-only SQL metadata smoke confirming deployed columns and ingest metadata par
 
 No recompute, export, Google Sheets, Discord reporting display, admin command SQL extraction, or reporting DAL refactor changes were made in Phase 2.
 Phase 3 — Importer Service/DAL Refactor
+Status
+Complete and deployed.
+
 Goal
 Resolve importer architecture debt and support the full schema cleanly.
 
@@ -502,6 +522,48 @@ kvk_all_importer.py becomes a compatibility wrapper or thin entrypoint.
 SQL write logic lives in DAL.
 Schema mapping is metadata-driven.
 Tests cover mapping, coercion, validation, and DAL call shape.
+
+Completion Notes
+Implemented:
+
+kvk_all_importer.py
+kvk/schemas/kvk_all_schema.py
+kvk/services/kvk_all_import_service.py
+kvk/dal/kvk_all_import_dal.py
+tests/test_kvk_all_schema.py
+tests/test_kvk_all_import_service.py
+tests/test_kvk_all_import_dal.py
+tests/test_kvk_all_importer.py
+
+Python delivery:
+
+kvk_all_importer.ingest_kvk_all_excel remains the compatibility entrypoint.
+Services and DAL do not depend on Discord types.
+Workbook schema validation and mapping are testable outside the Discord/upload path.
+SQL writes and stored procedure calls live in DAL code.
+Phase 1 strict Full Data validation remains intact.
+Basic Data remains intentionally ignored and is not used as fallback.
+Phase 2 SQL metadata and Full Data capacity fields continue to be staged and passed through.
+Existing legacy import return keys used by DL_bot.py remain compatible.
+Unknown column reporting is available in schema metadata without changing user-facing Discord output.
+
+Validation completed:
+
+python -m pytest -q tests\test_kvk_all_schema.py tests\test_kvk_all_import_service.py tests\test_kvk_all_import_dal.py tests\test_kvk_all_importer.py
+python -m black --check kvk_all_importer.py kvk\schemas\kvk_all_schema.py kvk\services\kvk_all_import_service.py kvk\dal\kvk_all_import_dal.py tests\test_kvk_all_schema.py tests\test_kvk_all_import_service.py tests\test_kvk_all_import_dal.py tests\test_kvk_all_importer.py
+python -m ruff check kvk_all_importer.py kvk\schemas\kvk_all_schema.py kvk\services\kvk_all_import_service.py kvk\dal\kvk_all_import_dal.py tests\test_kvk_all_schema.py tests\test_kvk_all_import_service.py tests\test_kvk_all_import_dal.py tests\test_kvk_all_importer.py
+python -m py_compile kvk_all_importer.py kvk\schemas\kvk_all_schema.py kvk\services\kvk_all_import_service.py kvk\dal\kvk_all_import_dal.py
+python scripts\validate_architecture_boundaries.py
+python scripts\validate_deferred_items.py
+python scripts\smoke_imports.py
+python scripts\validate_command_registration.py
+python -m pyright kvk_all_importer.py kvk\schemas\kvk_all_schema.py kvk\services\kvk_all_import_service.py kvk\dal\kvk_all_import_dal.py tests\test_kvk_all_schema.py tests\test_kvk_all_import_service.py tests\test_kvk_all_import_dal.py tests\test_kvk_all_importer.py
+non-mutating workbook/service smoke against downloads/kvk_all_sample_file/1086045_05_08_2026,_02_21_38_AM.xlsx
+
+Pyright completed with 0 errors and local dependency-resolution warnings for pandas, pytest, pyodbc, and numpy in the sandboxed invocation.
+
+No SQL, recompute formula, export, Google Sheets, Discord reporting display, admin command SQL extraction, or reporting DAL refactor changes were made in Phase 3.
+
 Phase 4 — Recompute Modernisation
 Goal
 Modernise recompute to support new metrics and reduce performance risk.
