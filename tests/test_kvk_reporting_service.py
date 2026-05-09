@@ -60,8 +60,9 @@ def test_allkingdoms_wrapper_delegates_to_reporting_service(monkeypatch) -> None
 
 
 def test_reporting_sql_lives_in_dal_not_allkingdoms_wrapper() -> None:
-    wrapper_text = Path("stats_alerts/allkingdoms.py").read_text(encoding="utf-8")
-    dal_text = Path("kvk/dal/kvk_reporting_dal.py").read_text(encoding="utf-8")
+    repo_root = Path(__file__).resolve().parents[1]
+    wrapper_text = (repo_root / "stats_alerts/allkingdoms.py").read_text(encoding="utf-8")
+    dal_text = (repo_root / "kvk/dal/kvk_reporting_dal.py").read_text(encoding="utf-8")
 
     assert "SELECT TOP" not in wrapper_text
     assert "dbo.fn_KVK_Player_Aggregated" not in wrapper_text
