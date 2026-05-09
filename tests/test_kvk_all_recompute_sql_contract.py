@@ -13,8 +13,7 @@ SQL_SCHEMA = SQL_REPO / "sql_schema"
 
 def _running_in_ci() -> bool:
     return any(
-        os.environ.get(name)
-        for name in ("CI", "GITHUB_ACTIONS", "BUILD_BUILDID", "TF_BUILD")
+        os.environ.get(name) for name in ("CI", "GITHUB_ACTIONS", "BUILD_BUILDID", "TF_BUILD")
     )
 
 
@@ -79,8 +78,6 @@ def test_windowed_tables_add_contribution_columns_additively() -> None:
         sql = _sql_file(file_name)
         assert "[max_contribute_gain] [bigint] NOT NULL" in sql
         assert "[cur_contribute_gain] [bigint] NOT NULL" in sql
-        assert "COL_LENGTH" in sql
-        assert "WITH VALUES" in sql
 
 
 def test_recompute_uses_documented_full_data_v2_source_precedence() -> None:
@@ -155,6 +152,10 @@ def test_phase4_prod_sql_script_contains_all_changed_sql_objects() -> None:
         "ALTER PROCEDURE [KVK].[sp_KVK_Get_Exports]",
         "max_contribute_gain",
         "cur_contribute_gain",
+        "COL_LENGTH('KVK.KVK_Player_Windowed', 'max_contribute_gain')",
+        "COL_LENGTH('KVK.KVK_Kingdom_Windowed', 'max_contribute_gain')",
+        "COL_LENGTH('KVK.KVK_Camp_Windowed', 'max_contribute_gain')",
+        "WITH VALUES",
         "GO",
     ]
 
