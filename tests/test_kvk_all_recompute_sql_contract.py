@@ -33,7 +33,21 @@ def _sql_file(name: str) -> str:
 
 
 def _compact(sql: str) -> str:
-    return re.sub(r"\s+", " ", sql)
+    """Collapse whitespace and normalise spacing around SQL operators/punctuation.
+
+    * Collapses all whitespace runs to a single space.
+    * Strips spaces around ``-``, ``+``, and ``,`` (arithmetic operators / argument
+      separators), so ``a - b`` and ``a-b`` are treated identically.
+    * Strips the space *after* ``(`` and *before* ``)`` so that
+      ``COALESCE( x, y )`` normalises to ``COALESCE(x,y)`` while
+      ``func(…) AS alias`` is unaffected (space after ``)`` is preserved).
+    * ``*`` is intentionally excluded so that ``SELECT *`` detection still works.
+    """
+    sql = re.sub(r"\s+", " ", sql)
+    sql = re.sub(r" *([-+,]) *", r"\1", sql)
+    sql = re.sub(r"\( *", "(", sql)
+    sql = re.sub(r" *\)", ")", sql)
+    return sql.strip()
 
 
 def test_phase4_metric_source_rules_are_documented() -> None:
@@ -80,7 +94,7 @@ def test_recompute_uses_documented_full_data_v2_source_precedence() -> None:
     ]
 
     for expression in expected_source_expressions:
-        assert expression in sql
+        assert _compact(expression) in sql
 
 
 def test_recompute_populates_contribution_outputs_and_rollups() -> None:
@@ -97,7 +111,7 @@ def test_recompute_populates_contribution_outputs_and_rollups() -> None:
     ]
 
     for token in required_tokens:
-        assert token in sql
+        assert _compact(token) in sql
 
 
 def test_export_contract_keeps_ten_result_sets_and_no_full_select_star() -> None:
