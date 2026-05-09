@@ -144,7 +144,41 @@ def test_bind_kvk_export_sections_ignores_extra_compatible_result_set() -> None:
 
 def test_bind_kvk_export_sections_reports_missing_required_section() -> None:
     result_sets = _legacy_result_sets()
-    del result_sets[3]
+    # Remove both player result sets so the binder cannot satisfy either player section.
+    # Delete the higher index first to avoid shifting the lower index.
+    del result_sets[6]  # KVK_Player_Full
+    del result_sets[3]  # KVK_Player_Windowed
 
-    with pytest.raises(KvkExportBindingError, match="KVK_Player_Windowed"):
+    with pytest.raises(KvkExportBindingError, match="KVK_Player"):
         bind_kvk_export_sections(result_sets)
+
+
+def test_bind_kvk_export_sections_accepts_full_only_windowed_result_set() -> None:
+    """Full-only KVKs emit _Windowed result sets with only 'Full' WindowName rows.
+
+    The binder must accept and bind these rather than hard-rejecting them, so
+    that primary export paths don't fail before any Pass/Altar windows exist.
+    """
+    player_full_only = _df(PLAYER_COLS, [{"WindowName": "Full", "governor_id": 1}])
+    kingdom_full_only = _df(KINGDOM_COLS, [{"WindowName": "Full", "kingdom": 1}])
+    camp_full_only = _df(CAMP_COLS, [{"WindowName": "Full", "campid": 1}])
+
+    result_sets = [
+        _df(SCAN_COLS),
+        _df(WINDOW_COLS),
+        _df(WEIGHT_COLS),
+        player_full_only,  # index 3 – Windowed position, Full-only content
+        kingdom_full_only,  # index 4
+        camp_full_only,  # index 5
+        player_full_only,  # index 6 – Full position
+        kingdom_full_only,  # index 7
+        camp_full_only,  # index 8
+        _df(NEGATIVE_COLS),
+    ]
+
+    sections = bind_kvk_export_sections(result_sets)
+
+    assert set(sections) == set(KVK_EXPORT_SECTION_NAMES)
+    # Windowed sections are bound even though window values are all "Full"
+    assert "KVK_Player_Windowed" in sections
+    assert "KVK_Player_Full" in sections

@@ -69,6 +69,8 @@ KVK_EXPORT_SECTION_SPECS: tuple[KvkExportSectionSpec, ...] = (
                 "kp_loss",
                 "healed_troops",
                 "deads",
+                "max_contribute_gain",
+                "cur_contribute_gain",
                 "starting_power",
                 "dkp",
                 "last_scan_id",
@@ -92,6 +94,8 @@ KVK_EXPORT_SECTION_SPECS: tuple[KvkExportSectionSpec, ...] = (
                 "kp_loss",
                 "healed_troops",
                 "deads",
+                "max_contribute_gain",
+                "cur_contribute_gain",
                 "dkp",
                 "last_scan_id",
                 "computed_at_utc",
@@ -113,6 +117,8 @@ KVK_EXPORT_SECTION_SPECS: tuple[KvkExportSectionSpec, ...] = (
                 "kp_loss",
                 "healed_troops",
                 "deads",
+                "max_contribute_gain",
+                "cur_contribute_gain",
                 "dkp",
                 "last_scan_id",
                 "computed_at_utc",
@@ -137,6 +143,8 @@ KVK_EXPORT_SECTION_SPECS: tuple[KvkExportSectionSpec, ...] = (
                 "kp_loss",
                 "healed_troops",
                 "deads",
+                "max_contribute_gain",
+                "cur_contribute_gain",
                 "starting_power",
                 "dkp",
                 "last_scan_id",
@@ -160,6 +168,8 @@ KVK_EXPORT_SECTION_SPECS: tuple[KvkExportSectionSpec, ...] = (
                 "kp_loss",
                 "healed_troops",
                 "deads",
+                "max_contribute_gain",
+                "cur_contribute_gain",
                 "dkp",
                 "last_scan_id",
                 "computed_at_utc",
@@ -181,6 +191,8 @@ KVK_EXPORT_SECTION_SPECS: tuple[KvkExportSectionSpec, ...] = (
                 "kp_loss",
                 "healed_troops",
                 "deads",
+                "max_contribute_gain",
+                "cur_contribute_gain",
                 "dkp",
                 "last_scan_id",
                 "computed_at_utc",
@@ -253,8 +265,9 @@ def _section_score(df: pd.DataFrame, spec: KvkExportSectionSpec) -> int:
     windows = _window_name_values(df)
     if spec.name.endswith("_Full") and windows and windows != {"full"}:
         return -1
-    if spec.name.endswith("_Windowed") and windows == {"full"}:
-        return -1
+    # Three-way scoring: _Full with full-only windows = +100 (preferred),
+    # _Windowed with pass/altar windows = +50, _Windowed with full-only windows = +0
+    # (accepted but lowest priority — supports Full-only KVKs before any windows exist).
     if spec.name.endswith("_Full") and windows == {"full"}:
         score += 100
     if spec.name.endswith("_Windowed") and (not windows or windows != {"full"}):
