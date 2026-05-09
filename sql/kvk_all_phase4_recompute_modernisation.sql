@@ -176,11 +176,27 @@ IF COL_LENGTH('KVK.KVK_Kingdom_Windowed', 'cur_contribute_gain') IS NULL
 BEGIN
 ALTER TABLE [KVK].[KVK_Kingdom_Windowed] ADD [cur_contribute_gain] [bigint] NOT NULL CONSTRAINT [DF_KingdomWin_CurContrib] DEFAULT ((0)) WITH VALUES
 END
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[KVK].[DF_KingdomWin_MaxContrib]') AND type = 'D')
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID(N'[KVK].[KVK_Kingdom_Windowed]')
+      AND c.name = N'max_contribute_gain'
+)
 BEGIN
 ALTER TABLE [KVK].[KVK_Kingdom_Windowed] ADD CONSTRAINT [DF_KingdomWin_MaxContrib] DEFAULT ((0)) FOR [max_contribute_gain]
 END
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[KVK].[DF_KingdomWin_CurContrib]') AND type = 'D')
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID(N'[KVK].[KVK_Kingdom_Windowed]')
+      AND c.name = N'cur_contribute_gain'
+)
 BEGIN
 ALTER TABLE [KVK].[KVK_Kingdom_Windowed] ADD CONSTRAINT [DF_KingdomWin_CurContrib] DEFAULT ((0)) FOR [cur_contribute_gain]
 END
