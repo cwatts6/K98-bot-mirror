@@ -598,7 +598,7 @@ Indexing plan is implemented or documented.
 Tests cover recompute formulas using representative fixture data.
 Phase 5 — Export Contract Decoupling
 Status
-Complete and dev-validated.
+Complete and deployed.
 
 Goal
 Remove fragile coupling between SQL result-set order and Google Sheets output.
@@ -665,7 +665,18 @@ python -m pyright gsheet_module.py kvk/services/kvk_export_service.py tests/test
 
 Pyright completed with 0 errors and local dependency-resolution warnings for optional/runtime dependencies in the sandboxed invocation.
 
-No live production export run, Discord reporting change, admin command SQL extraction, reporting DAL refactor, Basic Data ingestion, or summary-tab ingestion was included in Phase 5.
+Post-deployment smoke completed:
+
+KVK.sp_KVK_Get_Exports SQL script was applied.
+Read-only SQL smoke confirmed the export procedure returns the expected 10 result sets.
+Existing result-set order and section meaning were preserved.
+Player, kingdom, and camp windowed/full export result sets include max_contribute_gain and cur_contribute_gain.
+No 11th result set was introduced.
+Google Sheets smoke confirmed existing primary tabs, additional PASS/ALTAR spreadsheets, and comparison tab names remain stable.
+ALL_WINDOW_COMPARISON did not gain new contribution tabs.
+Production promotion completed after local validation and smoke testing.
+
+No Discord reporting change, admin command SQL extraction, reporting DAL refactor, Basic Data ingestion, or summary-tab ingestion was included in Phase 5.
 Phase 6 — Reporting DAL & Discord Integration
 Goal
 Move reporting SQL into DAL/service and expose new metrics cleanly.
