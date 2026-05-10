@@ -90,9 +90,14 @@ CREATE TABLE [KVK].[KVK_Ingest_Diagnostics](
 END
 
 IF NOT EXISTS (
-    SELECT 1 FROM sys.objects
-    WHERE object_id = OBJECT_ID(N'[KVK].[DF_KVK_IngestDiag_CreatedUTC]')
-      AND type = 'D'
+    SELECT 1
+    FROM sys.columns c
+    LEFT JOIN sys.default_constraints dc
+        ON dc.parent_object_id = c.object_id
+       AND dc.parent_column_id = c.column_id
+    WHERE c.object_id = OBJECT_ID(N'[KVK].[KVK_Ingest_Diagnostics]')
+      AND c.name = N'CreatedUTC'
+      AND dc.object_id IS NOT NULL
 )
 BEGIN
     ALTER TABLE [KVK].[KVK_Ingest_Diagnostics]
