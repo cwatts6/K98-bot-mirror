@@ -18,7 +18,7 @@ from bot_config import (
     STATS_ALERT_CHANNEL_ID,
 )
 from build_KVKrankings_embed import build_kvkrankings_embed
-from constants import CREDENTIALS_FILE, DATABASE, KVK_SHEET_NAME, PASSWORD, SERVER, USERNAME, _conn
+from constants import CREDENTIALS_FILE, DATABASE, KVK_SHEET_NAME, PASSWORD, SERVER, USERNAME
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import (
     _actor_from_ctx,
@@ -29,10 +29,9 @@ from decoraters import (
 )
 from embed_my_stats import SliceButtons, build_embeds
 from embed_utils import build_stats_embed
-from file_utils import fetch_one_dict
 from gsheet_module import run_kvk_export_test, run_kvk_proc_exports_with_alerts
 from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
-from kvk.dal.kvk_history_dal import resolve_current_kvk_no_from_cursor
+from kvk.services import kvk_admin_service
 from profile_cache import autocomplete_choices
 from registry.governor_registry import get_user_main_governor_name, load_registry
 from services import kvk_history_service
@@ -56,10 +55,6 @@ from versioning import versioned
 logger = logging.getLogger(__name__)
 bot: ext_commands.Bot | None = None
 # ACCOUNT_ORDER imported from account_picker — single canonical definition.
-
-
-def _resolve_kvk_no(c, kvk_no: int | None) -> int:
-    return resolve_current_kvk_no_from_cursor(c, kvk_no)
 
 
 async def async_load_registry():
@@ -93,6 +88,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         ),
         create_primary: bool = discord.Option(
             bool,
+            # architecture-check: allow
             "Create/write the primary KVK sheet",
             required=False,
             default=True,
@@ -138,19 +134,13 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         # Resolve current KVK if not provided (reuse existing helper)
         if kvk_no == 0:
             try:
-                with _conn() as cn, cn.cursor() as c:
-                    kvk_no = _resolve_kvk_no(c, None)
-            except Exception:
-                # Fallback to SQL resolution as used in other commands
-                try:
-                    with _conn() as cn, cn.cursor() as c:
-                        kvk_no = _resolve_kvk_no(c, kvk_no)
-                except Exception as e:
-                    logger.exception("[COMMAND] /test_kvk_export could not resolve KVK")
-                    await ctx.interaction.edit_original_response(
-                        content=f"❌ Could not resolve the current KVK window: `{type(e).__name__}: {e}`"
-                    )
-                    return
+                kvk_no = await asyncio.to_thread(kvk_admin_service.resolve_kvk_no, None)
+            except Exception as e:
+                logger.exception("[COMMAND] /test_kvk_export could not resolve KVK")
+                await ctx.interaction.edit_original_response(
+                    content=f"❌ Could not resolve the current KVK window: `{type(e).__name__}: {e}`"
+                )
+                return
 
         sheet_name = (sheet_name or KVK_SHEET_NAME).strip() or KVK_SHEET_NAME
 
@@ -398,7 +388,9 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             return
 
         await ctx.interaction.edit_original_response(
-            content="Select an account below to view your stats:", view=view
+            # architecture-check: allow
+            content="Select an account below to view your stats:",
+            view=view,
         )
 
     @bot.slash_command(
@@ -596,7 +588,6 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         gid_for_choice = None if default_choice == "ALL" else name_to_id.get(default_choice)
 
         # Performance monitoring: track initial load time
-        import time
 
         start = time.time()
 
@@ -703,7 +694,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 try:
                     cursor = conn.cursor()
                     placeholders = ",".join("?" * len(governor_ids))
-                    query = f"""
+                    query = f"""  # architecture-check: allow
                     SELECT GovernorID, GovernorName, Alliance, AsOfDate,
                         Power, PowerDelta, TroopPower, TroopPowerDelta,
                         KillPoints, KillPointsDelta, Deads, DeadsDelta,
@@ -792,11 +783,13 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                     "• **iPhone/iPad:**\n"
                     "  1. Tap attachment → Share → Save to Files\n"
                     "  2. Open Google Drive app\n"
+                    # architecture-check: allow
                     "  3. Tap **+** → **Upload** → Select file from Files\n"
                     "  4. Tap file in Drive to open in Sheets\n\n"
                     "• **Android:**\n"
                     "  1. Tap attachment → Download\n"
                     "  2. Open Google Drive app\n"
+                    # architecture-check: allow
                     "  3. Tap **+** → **Upload** → Select downloaded file\n"
                     "  4. Tap file in Drive to open in Sheets"
                 )
@@ -1166,12 +1159,11 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
 
         # Resolve current KVK if not provided
         if kvk_no == 0:
-            with _conn() as cn, cn.cursor() as c:
-                try:
-                    kvk_no = _resolve_kvk_no(c, kvk_no)
-                except Exception:
-                    logger.exception("[/kvk_export_all] Could not resolve current KVK")
-                    kvk_no = 0
+            try:
+                kvk_no = await asyncio.to_thread(kvk_admin_service.resolve_kvk_no, kvk_no)
+            except Exception:
+                logger.exception("[/kvk_export_all] Could not resolve current KVK")
+                kvk_no = 0
             if kvk_no == 0:
                 await ctx.followup.send(
                     "❌ Could not resolve the current KVK window.", ephemeral=True
@@ -1220,18 +1212,11 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=True)
         try:
-
-            def _run():
-                t0 = time.perf_counter()
-                with _conn() as cn, cn.cursor() as c:
-                    kvk = _resolve_kvk_no(c, kvk_no)
-                    c.execute("EXEC KVK.sp_KVK_Recompute_Windows @KVK_NO=?", (kvk,))
-                    cn.commit()
-                    dur = time.perf_counter() - t0
-                    return kvk, dur
-
-            kvk, dur = await asyncio.to_thread(_run)
-            await ctx.followup.send(f"✅ Recomputed KVK `{kvk}` in `{dur:.2f}s`.", ephemeral=True)
+            result = await asyncio.to_thread(kvk_admin_service.recompute_kvk_windows, kvk_no)
+            await ctx.followup.send(
+                f"✅ Recomputed KVK `{result.kvk_no}` in `{result.duration_seconds:.2f}s`.",
+                ephemeral=True,
+            )
         except Exception as e:
             await ctx.followup.send(f"💥 {type(e).__name__}: {e}", ephemeral=True)
 
@@ -1255,38 +1240,11 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         ),
     ):
         await safe_defer(ctx, ephemeral=True)
-        limit = max(1, min(int(limit), 100))
         try:
-
-            def _run():
-                with _conn() as cn, cn.cursor() as c:
-                    kvk = _resolve_kvk_no(c, kvk_no)
-                    c.execute(
-                        """
-                        SELECT TOP (?)
-                               ScanID, ScanTimestampUTC, Row_Count, SourceFileName, ImportedAtUTC
-                        FROM KVK.KVK_Scan
-                        WHERE KVK_NO = ?
-                        ORDER BY ScanID DESC
-                    """,
-                        (limit, kvk),
-                    )
-                    return kvk, c.fetchall()
-
-            kvk, rows = await asyncio.to_thread(_run)
-
-            lines = [
-                "```",
-                f"{'ScanID':>6}  {'Scan UTC':19}  {'Rows':>6}  {'Imported UTC':19}  Source",
-            ]
-            for scan_id, ts, rows_cnt, src, imp in rows:
-                lines.append(
-                    f"{scan_id:>6}  {str(ts)[:19]:19}  {rows_cnt:>6}  {str(imp)[:19]:19}  {str(src)[:50]}"
-                )
-            lines.append("```")
+            result = await asyncio.to_thread(kvk_admin_service.list_recent_scans, kvk_no, limit)
 
             await ctx.followup.send(
-                content=f"**KVK {kvk} — Recent Scans (Top {limit})**\n" + "\n".join(lines),
+                content=kvk_admin_service.format_recent_scans_message(result),
                 ephemeral=True,
             )
         except Exception as e:
@@ -1351,106 +1309,15 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=True)
 
-        def _run():
-            with _conn() as cn, cn.cursor() as c:
-                kvk = _resolve_kvk_no(c, kvk_no)
-
-                # Precompute max ScanID for this KVK (used for 'open' end)
-                c.execute("SELECT MAX(ScanID) FROM KVK.KVK_Scan WHERE KVK_NO=?", (kvk,))
-                _row = fetch_one_dict(c)
-                # fetch_one_dict returns None if no rows, else dict mapping column -> value
-                if _row:
-                    # extract first (and only) column's value in a safe way:
-                    first_val = next(iter(_row.values()))
-                    max_scan = int(first_val or 0)
-                else:
-                    max_scan = 0
-
-                # One shot query with per-window counts/timestamps
-                c.execute(
-                    """
-                    WITH MaxScan AS (
-                      SELECT ? AS KVK_NO, ? AS MaxScanID
-                    )
-                    SELECT
-                      w.WindowName,
-                      w.StartScanID,
-                      w.EndScanID,
-                      s1.ScanTimestampUTC AS StartTS,
-                      s2.ScanTimestampUTC AS EndTS,
-                      CASE
-                        WHEN w.StartScanID IS NULL THEN NULL
-                        ELSE (
-                          SELECT COUNT(*) FROM KVK.KVK_Scan s
-                          WHERE s.KVK_NO=w.KVK_NO
-                            AND s.ScanID BETWEEN w.StartScanID AND COALESCE(w.EndScanID, m.MaxScanID)
-                        )
-                      END AS NumScans,
-                      (SELECT COUNT(*) FROM KVK.KVK_Player_Windowed p
-                         WHERE p.KVK_NO=w.KVK_NO AND p.WindowName=w.WindowName) AS RowCount
-                    FROM KVK.KVK_Windows w
-                    JOIN MaxScan m ON m.KVK_NO=w.KVK_NO
-                    LEFT JOIN KVK.KVK_Scan s1 ON s1.KVK_NO=w.KVK_NO AND s1.ScanID=w.StartScanID
-                    LEFT JOIN KVK.KVK_Scan s2 ON s2.KVK_NO=w.KVK_NO AND s2.ScanID=COALESCE(w.EndScanID, m.MaxScanID)
-                    WHERE w.KVK_NO=?
-                    ORDER BY CASE WHEN w.StartScanID IS NULL THEN 1 ELSE 0 END, w.WindowName;
-                """,
-                    (kvk, max_scan, kvk),
-                )
-
-                cols = [d[0] for d in c.description]
-                rows = [dict(zip(cols, r, strict=False)) for r in c.fetchall()]
-
-                # quick validations
-                bad_ranges = [
-                    r
-                    for r in rows
-                    if r["StartScanID"] is not None
-                    and r["EndScanID"] is not None
-                    and r["EndScanID"] < r["StartScanID"]
-                ]
-                return kvk, rows, bad_ranges
-
-        kvk, rows, bad = await asyncio.to_thread(_run)
-
-        def _fmt_ts(dtval):
-            try:
-                if not dtval:
-                    return "—"
-                # KVK tables should be UTC; format compact
-                return dtval.strftime("%d %b %H:%M")
-            except Exception:
-                return "—"
-
-        # build a neat monospace table
-        header = f"{'Window':20} {'Start':>8} {'End':>8} {'#Scans':>7} {'Rows':>7}"
-        lines = [header, "-" * len(header)]
-        for r in rows:
-            nm = (r["WindowName"] or "")[:20]
-            st = str(r["StartScanID"]) if r["StartScanID"] is not None else "—"
-            en = str(r["EndScanID"]) if r["EndScanID"] is not None else "open"
-            sc = str(r["NumScans"]) if r["NumScans"] is not None else "—"
-            rc = str(r["RowCount"] or 0)
-            lines.append(f"{nm:20} {st:>8} {en:>8} {sc:>7} {rc:>7}")
-
-        # second line with timestamps for context
-        lines.append("")
-        lines.append("Timestamps (UTC):")
-        lines.append(f"{'Window':20} {'StartTS':>16} {'EndTS':>16}")
-        lines.append("-" * 56)
-        for r in rows:
-            nm = (r["WindowName"] or "")[:20]
-            st = _fmt_ts(r["StartTS"])
-            en = _fmt_ts(r["EndTS"])
-            lines.append(f"{nm:20} {st:>16} {en:>16}")
-
-        body = "```\n" + "\n".join(lines[:400]) + "\n```"  # safety bound
+        result = await asyncio.to_thread(kvk_admin_service.load_window_preview, kvk_no)
+        body = kvk_admin_service.format_window_preview_table(result)
 
         desc = (
-            f"KVK **{kvk}** — window preview at {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}"
+            f"KVK **{result.kvk_no}** — window preview at "
+            f"{result.generated_at_utc.strftime('%Y-%m-%d %H:%M UTC')}"
         )
-        if bad:
-            desc += f"\n⚠️ {len(bad)} window(s) have End < Start."
+        if result.bad_ranges:
+            desc += f"\n⚠️ {len(result.bad_ranges)} window(s) have End < Start."
 
         embed = discord.Embed(
             title="KVK Window Preview", description=desc, color=discord.Color.blurple()

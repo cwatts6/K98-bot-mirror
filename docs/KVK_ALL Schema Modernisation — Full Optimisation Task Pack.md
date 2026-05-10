@@ -27,6 +27,12 @@ Phase 2 is complete and deployed.
 
 Phase 3 is complete and deployed.
 
+Phase 4 is complete and deployed.
+
+Phase 5 is complete and deployed.
+
+Phase 6 is complete and deployed.
+
 Completed Phase 1 scope:
 
 strict Full Data workbook detection
@@ -73,7 +79,7 @@ Phase 3 did not change SQL schema, recompute formulas, export result-set order, 
 
 Next phase:
 
-Phase 4 — Recompute Modernisation
+Phase 7 — Admin Command SQL Extraction
 
 Completion Rule
 This work is not complete until all items previously identified as deferred optimisations are implemented or explicitly resolved inside this programme.
@@ -565,6 +571,9 @@ Pyright completed with 0 errors and local dependency-resolution warnings for pan
 No SQL, recompute formula, export, Google Sheets, Discord reporting display, admin command SQL extraction, or reporting DAL refactor changes were made in Phase 3.
 
 Phase 4 — Recompute Modernisation
+Status
+Complete and deployed.
+
 Goal
 Modernise recompute to support new metrics and reduce performance risk.
 
@@ -596,6 +605,24 @@ Existing KP/kills/deads/healed outputs remain stable.
 Recompute performance risk is measured.
 Indexing plan is implemented or documented.
 Tests cover recompute formulas using representative fixture data.
+
+Completion Notes
+Implemented:
+
+docs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md
+sql/kvk_all_phase4_recompute_modernisation.sql
+tests/test_kvk_all_recompute_sql_contract.py
+
+SQL delivery:
+
+Full Data v2 recompute precedence uses kill_points_diff for kill points with legacy/raw fallback.
+Full Data v2 recompute precedence uses healed_troops for healed troops with legacy/raw fallback.
+Raw min/max fields are retained as validation, reconciliation, and fallback inputs.
+KVK.KVK_Player_Windowed, KVK.KVK_Kingdom_Windowed, and KVK.KVK_Camp_Windowed include max_contribute_gain and cur_contribute_gain.
+KVK.sp_KVK_Recompute_Windows populates contribution gains while preserving existing KP, kills, deads, healed, DKP, baseline, kingdom, and camp output semantics.
+KVK.sp_KVK_Get_Exports remained at 10 result sets.
+
+No Google Sheets tab changes, Discord reporting display changes, admin command SQL extraction, reporting DAL refactor, Basic Data ingestion, or summary-tab ingestion were included in Phase 4.
 Phase 5 — Export Contract Decoupling
 Status
 Complete and deployed.
@@ -678,6 +705,9 @@ Production promotion completed after local validation and smoke testing.
 
 No Discord reporting change, admin command SQL extraction, reporting DAL refactor, Basic Data ingestion, or summary-tab ingestion was included in Phase 5.
 Phase 6 — Reporting DAL & Discord Integration
+Status
+Complete and deployed.
+
 Goal
 Move reporting SQL into DAL/service and expose new metrics cleanly.
 
@@ -700,6 +730,48 @@ No direct SQL remains in reporting presentation module.
 Existing KVK embed still works.
 Contribution metrics are available in structured rows.
 Tests cover formatting and truncation.
+
+Completion Notes
+Implemented:
+
+stats_alerts/allkingdoms.py
+kvk/dal/kvk_reporting_dal.py
+kvk/services/kvk_reporting_service.py
+tests/test_kvk_reporting_service.py
+tests/test_kvk_embed.py
+docs/KVK_ALL Schema Modernisation — Phase 6 Initiation Statement.md
+
+Python delivery:
+
+KVK all-kingdom reporting SQL was moved out of stats_alerts/allkingdoms.py.
+Reporting data access now lives in kvk/dal/kvk_reporting_dal.py.
+Reporting block orchestration and row shaping now live in kvk/services/kvk_reporting_service.py.
+stats_alerts/allkingdoms.py remains as a thin compatibility wrapper around load_allkingdom_blocks(kvk_no).
+Existing Discord embed display, field names, links, titles, Top 5 layout, and truncation behaviour were preserved.
+max_contribute_gain and cur_contribute_gain are available in structured reporting rows where SQL supports them.
+Contribution metrics are not displayed in Discord embeds.
+
+Validation completed:
+
+python -m pytest -q tests/test_kvk_reporting_service.py tests/test_kvk_embed.py
+python -m py_compile kvk/dal/kvk_reporting_dal.py kvk/services/kvk_reporting_service.py stats_alerts/allkingdoms.py tests/test_kvk_reporting_service.py tests/test_kvk_embed.py
+python -m black --check kvk/dal/kvk_reporting_dal.py kvk/services/kvk_reporting_service.py stats_alerts/allkingdoms.py tests/test_kvk_reporting_service.py tests/test_kvk_embed.py
+python -m ruff check kvk/dal/kvk_reporting_dal.py kvk/services/kvk_reporting_service.py stats_alerts/allkingdoms.py tests/test_kvk_reporting_service.py tests/test_kvk_embed.py
+python -m pyright kvk/dal/kvk_reporting_dal.py kvk/services/kvk_reporting_service.py tests/test_kvk_reporting_service.py tests/test_kvk_embed.py
+python scripts/validate_architecture_boundaries.py
+python scripts/validate_deferred_items.py
+python scripts/select_tests.py
+python scripts/smoke_imports.py
+python scripts/validate_command_registration.py
+
+Post-deployment smoke completed:
+
+Read-only SQL smoke confirmed the service can load all expected reporting blocks for a known KVK.
+Structured player, kingdom, camp, own kingdom, and own camp rows include max_contribute_gain and cur_contribute_gain.
+Discord test embed smoke confirmed the existing display remains stable and contribution metrics are not rendered.
+Production deployment completed after local validation and smoke testing.
+
+No SQL schema changes, Google Sheets export contract changes, admin command SQL extraction, Basic Data ingestion, summary-tab ingestion, or unrelated rankings/history/personal KVK redesign were included in Phase 6.
 Phase 7 — Admin Command SQL Extraction
 Goal
 Remove KVK admin SQL from command modules.

@@ -17,15 +17,6 @@
 - Dependencies: Local validation environment contract for venv naming and subprocess permissions.
 
 ### Deferred Optimisation
-- Area: commands/stats_cmds.py
-- Type: architecture
-- Description: Some KVK admin commands still contain direct operational SQL beyond the current-KVK resolver.
-- Suggested Fix: Move scan/window/recompute SQL into a dedicated KVK admin DAL/service batch while preserving command output behaviour.
-- Impact: medium
-- Risk: medium
-- Dependencies: Review KVK admin command coverage and decide the target service/DAL split for scan, window, export, and recompute operations.
-
-### Deferred Optimisation
 - Area: `DL_bot.py` PreKvK upload routing
 - Type: architecture
 - Description: PreKvK upload routing still lives in the legacy root bot listener with filename matching, current-KVK lookup, offload dispatch, and Discord response rendering mixed together.
@@ -42,3 +33,12 @@
 - Impact: medium
 - Risk: medium
 - Dependencies: Confirm no production reports or manual SQL workflows still depend on scan-window phase objects.
+
+### Deferred Optimisation
+- Area: `commands/stats_cmds.py` `/my_stats_export`
+- Type: architecture
+- Description: The non-KVK `/my_stats_export` path still contains direct SQL for `vDaily_PlayerExport` inside the command handler.
+- Suggested Fix: Extract daily stats export data access into a stats export DAL/service and leave the command responsible only for permission, defer, file-send, and response flow.
+- Impact: medium
+- Risk: medium
+- Dependencies: Future stats command cleanup; preserve existing Excel/CSV/Google Sheets-compatible output copy and file workflow.
