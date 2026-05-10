@@ -9,6 +9,8 @@ from typing import Any
 
 from kvk.dal import kvk_admin_dal
 
+DISCORD_EMBED_FIELD_VALUE_LIMIT = 1024
+
 
 @dataclass(frozen=True)
 class KvkRecomputeResult:
@@ -105,7 +107,7 @@ def format_window_preview_table(result: KvkWindowPreviewResult) -> str:
         end = _format_timestamp(row.get("EndTS"))
         lines.append(f"{name:20} {start:>16} {end:>16}")
 
-    return "```\n" + "\n".join(lines[:400]) + "\n```"
+    return _bounded_code_block(lines, max_chars=DISCORD_EMBED_FIELD_VALUE_LIMIT)
 
 
 def _format_timestamp(value: Any) -> str:
@@ -115,3 +117,31 @@ def _format_timestamp(value: Any) -> str:
         return value.strftime("%d %b %H:%M")
     except Exception:
         return "—"
+
+
+def _bounded_code_block(lines: list[str], *, max_chars: int) -> str:
+    prefix = "```\n"
+    suffix = "\n```"
+    truncation_line = "... truncated ..."
+    body_limit = max_chars - len(prefix) - len(suffix)
+
+    body = "\n".join(lines)
+    if len(body) <= body_limit:
+        return prefix + body + suffix
+
+    selected: list[str] = []
+    for index, line in enumerate(lines):
+        has_more = index < len(lines) - 1
+        candidate_lines = [*selected, line]
+        if has_more:
+            candidate_lines.append(truncation_line)
+        if len("\n".join(candidate_lines)) > body_limit:
+            break
+        selected.append(line)
+
+    if not selected:
+        selected = [truncation_line[:body_limit]]
+    elif len(selected) < len(lines):
+        selected.append(truncation_line)
+
+    return prefix + "\n".join(selected) + suffix
