@@ -123,7 +123,12 @@ def _bounded_code_block(lines: list[str], *, max_chars: int) -> str:
     prefix = "```\n"
     suffix = "\n```"
     truncation_line = "... truncated ..."
-    body_limit = max_chars - len(prefix) - len(suffix)
+    overhead = len(prefix) + len(suffix)
+    if max_chars < overhead:
+        raise ValueError(
+            f"max_chars must be at least {overhead} to fit the code block fences"
+        )
+    body_limit = max_chars - overhead
 
     body = "\n".join(lines)
     if len(body) <= body_limit:
