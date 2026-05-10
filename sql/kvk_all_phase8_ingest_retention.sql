@@ -35,9 +35,12 @@ END
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.objects
-    WHERE object_id = OBJECT_ID(N'[KVK].[DF_KVK_AllPlayers_Stage_StagedAtUTC]')
-      AND type = 'D'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID(N'[KVK].[KVK_AllPlayers_Stage]')
+      AND c.name = N'staged_at_utc'
 )
 BEGIN
     ALTER TABLE [KVK].[KVK_AllPlayers_Stage]
