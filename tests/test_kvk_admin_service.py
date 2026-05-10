@@ -113,7 +113,7 @@ def test_window_preview_table_respects_discord_field_limit() -> None:
 
     table = kvk_admin_service.format_window_preview_table(result)
 
-    assert len(table) <= 1024
+    assert len(table) <= kvk_admin_service.DISCORD_EMBED_FIELD_VALUE_LIMIT
     assert table.startswith("```\n")
     assert table.endswith("\n```")
     assert "... truncated ..." in table
