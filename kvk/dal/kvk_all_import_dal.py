@@ -117,6 +117,18 @@ CALL_INGEST_SQL = """
 RECOMPUTE_SQL = "EXEC KVK.sp_KVK_Recompute_Windows @KVK_NO=?;"
 NEGATIVE_COUNT_SQL = "SELECT COUNT(*) FROM KVK.KVK_Ingest_Negatives WHERE KVK_NO=? AND ScanID=?;"
 DELETE_STAGED_TOKEN_SQL = "DELETE FROM KVK.KVK_AllPlayers_Stage WHERE IngestToken=?;"
+INSERT_INGEST_DIAGNOSTIC_SQL = """
+ INSERT INTO KVK.KVK_Ingest_Diagnostics
+ (
+   DiagnosticStatus, DiagnosticType, IngestToken, KVK_NO, ScanID,
+   SourceFileName, FileHashSha256, UploaderDiscordID,
+   SchemaVersion, SourceSheetName, SourceColumnHash,
+   SourceColumnCount, SourceRowCount, StagedRowCount,
+   ErrorText, ContextJson
+ )
+ OUTPUT INSERTED.DiagnosticID
+ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+ """
 
 
 def connect_sql_server(
@@ -177,6 +189,76 @@ def write_ingest_diag(token: str, note: str, context: dict[str, Any]) -> str | N
         return filename
     except Exception:
         logger.exception("Failed to write ingest diagnostic file")
+        return None
+
+
+def record_ingest_diagnostic(
+    con: pyodbc.Connection,
+    *,
+    status: str,
+    diagnostic_type: str,
+    ingest_token: str | None = None,
+    kvk_no: int | None = None,
+    scan_id: int | None = None,
+    source_filename: str | None = None,
+    file_hash_hex: str | None = None,
+    uploader_id: int | None = None,
+    schema_metadata: dict[str, Any] | None = None,
+    sheet_name: str | None = None,
+    staged_rows: int | None = None,
+    error_text: str | None = None,
+    context: dict[str, Any] | None = None,
+) -> int | None:
+    """Best-effort durable KVK ingest diagnostic write.
+
+    Phase 8 SQL may not be deployed everywhere at the same time as Python, so
+    diagnostic write failures are intentionally logged and suppressed.
+    """
+    metadata = schema_metadata or {}
+    context_payload = json.dumps(context or {}, ensure_ascii=False, default=str)
+    try:
+        cur = con.cursor()
+        cur.execute(
+            INSERT_INGEST_DIAGNOSTIC_SQL,
+            (
+                status,
+                diagnostic_type[:64],
+                ingest_token,
+                kvk_no,
+                scan_id,
+                source_filename[:255] if source_filename else None,
+                file_hash_hex[:64] if file_hash_hex else None,
+                int(uploader_id) if uploader_id is not None else None,
+                str(metadata.get("schema_version") or SCHEMA_VERSION)[:64],
+                str(sheet_name or metadata.get("sheet_name") or "")[:128] or None,
+                str(metadata.get("column_hash") or "")[:64] or None,
+                metadata.get("column_count"),
+                metadata.get("row_count") or metadata.get("source_row_count") or staged_rows,
+                staged_rows,
+                str(error_text or "")[:1000] or None,
+                context_payload,
+            ),
+        )
+        row = cur.fetchone()
+        con.commit()
+        diagnostic_id = int(row[0]) if row and row[0] is not None else None
+        logger.info(
+            "[KVK] ingest diagnostic recorded id=%s status=%s type=%s token=%s file=%s",
+            diagnostic_id,
+            status,
+            diagnostic_type,
+            ingest_token,
+            source_filename,
+        )
+        return diagnostic_id
+    except Exception:
+        logger.exception(
+            "[KVK] failed to record ingest diagnostic status=%s type=%s token=%s file=%s",
+            status,
+            diagnostic_type,
+            ingest_token,
+            source_filename,
+        )
         return None
 
 
@@ -253,6 +335,7 @@ def ingest_prepared_import(
     logger.info("[KVK] DF col order now: %s", list(df.columns))
 
     file_hash = hashlib.sha256(content).digest()
+    file_hash_hex = hashlib.sha256(content).hexdigest()
     scan_ts_utc = ensure_aware_utc(scan_ts_utc)
     scan_ts_naive = scan_ts_utc.replace(tzinfo=None)
 
@@ -272,6 +355,7 @@ def ingest_prepared_import(
             "scan_ts_naive": str(scan_ts_naive),
             "source_filename": source_filename,
             "staged_rows": staged_rows,
+            "schema": schema_metadata,
             "sample_row": {},
             "cleanup_failed": cleanup_failed,
         }
@@ -283,6 +367,20 @@ def ingest_prepared_import(
         except Exception:
             pass
         diag = write_ingest_diag(token, "scan timestamp outside KVK_Details ranges", context)
+        diagnostic_id = record_ingest_diagnostic(
+            con,
+            status="rejected",
+            diagnostic_type="scan_timestamp_outside_kvk_details",
+            ingest_token=token,
+            source_filename=source_filename,
+            file_hash_hex=file_hash_hex,
+            uploader_id=uploader_id,
+            schema_metadata=schema_metadata,
+            sheet_name=sheet_name,
+            staged_rows=staged_rows,
+            error_text="Scan timestamp outside KVK_Details ranges.",
+            context=context,
+        )
         message = (
             f"Scan timestamp {scan_ts_naive!s} does not fall within any configured "
             f"KVK_Details range. Diagnostic: {diag}"
@@ -295,29 +393,56 @@ def ingest_prepared_import(
             "offending_scan_ts": str(scan_ts_naive),
             "cleanup_failed": cleanup_failed,
             "cleanup_error": cleanup_error,
+            "diagnostic_id": diagnostic_id,
         }
 
     cur = con.cursor()
     ingest_started = time.perf_counter()
-    cur.execute(
-        CALL_INGEST_SQL,
-        (
-            token,
-            scan_ts_naive,
-            source_filename,
-            file_hash,
-            int(uploader_id),
-            schema_metadata.get("schema_version") or SCHEMA_VERSION,
-            sheet_name,
-            schema_metadata.get("column_hash"),
-            schema_metadata.get("column_count"),
-            staged_rows,
-        ),
-    )
-    rows = cur.fetchall()
-    ingest_ms = (time.perf_counter() - ingest_started) * 1000.0
-    if not rows:
-        raise RuntimeError("Ingest returned no outputs.")
+    try:
+        cur.execute(
+            CALL_INGEST_SQL,
+            (
+                token,
+                scan_ts_naive,
+                source_filename,
+                file_hash,
+                int(uploader_id),
+                schema_metadata.get("schema_version") or SCHEMA_VERSION,
+                sheet_name,
+                schema_metadata.get("column_hash"),
+                schema_metadata.get("column_count"),
+                staged_rows,
+            ),
+        )
+        rows = cur.fetchall()
+        ingest_ms = (time.perf_counter() - ingest_started) * 1000.0
+        if not rows:
+            raise RuntimeError("Ingest returned no outputs.")
+    except Exception as exc:
+        ingest_ms = (time.perf_counter() - ingest_started) * 1000.0
+        context = {
+            "scan_ts_naive": str(scan_ts_naive),
+            "source_filename": source_filename,
+            "staged_rows": staged_rows,
+            "ingest_ms": ingest_ms,
+            "schema": schema_metadata,
+            "stage_retention": "staged rows are retained for inspection until Phase 8 cleanup",
+        }
+        record_ingest_diagnostic(
+            con,
+            status="failed",
+            diagnostic_type="ingest_procedure_failed",
+            ingest_token=token,
+            source_filename=source_filename,
+            file_hash_hex=file_hash_hex,
+            uploader_id=uploader_id,
+            schema_metadata=schema_metadata,
+            sheet_name=sheet_name,
+            staged_rows=staged_rows,
+            error_text=f"{type(exc).__name__}: {exc}",
+            context=context,
+        )
+        raise
     kvk_no, scan_id, row_count = rows[0]
     con.commit()
 

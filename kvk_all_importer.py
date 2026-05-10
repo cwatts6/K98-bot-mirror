@@ -76,6 +76,13 @@ def ingest_kvk_all_excel(
             "sheet": exc.sheet_name,
             "schema_version": SCHEMA_VERSION,
             "schema": exc.schema_metadata,
+            "validation_error": {
+                "code": "full_data_coercion_failed",
+                "message": str(exc),
+                "schema_version": SCHEMA_VERSION,
+                "sheet_name": exc.sheet_name,
+                "schema": exc.schema_metadata,
+            },
         }
     except ValueError as exc:
         logger.info("[KVK] Import failed for %s: %s", source_filename, exc)

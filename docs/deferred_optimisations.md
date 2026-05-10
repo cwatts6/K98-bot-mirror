@@ -42,3 +42,12 @@
 - Impact: medium
 - Risk: medium
 - Dependencies: Future stats command cleanup; preserve existing Excel/CSV/Google Sheets-compatible output copy and file workflow.
+
+### Deferred Optimisation
+- Area: `DL_bot.py` KVK_ALL upload routing
+- Type: architecture
+- Description: KVK_ALL upload routing still lives in the legacy root bot listener with attachment filtering, offload dispatch, import result handling, Discord rendering, and export scheduling mixed together.
+- Suggested Fix: Move KVK_ALL upload orchestration into a dedicated service or route module in a later phase, leaving `DL_bot.py` responsible for event delegation and Discord response plumbing.
+- Impact: medium
+- Risk: medium
+- Dependencies: Preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to Phase 9.

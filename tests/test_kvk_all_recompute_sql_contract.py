@@ -182,3 +182,74 @@ def test_phase5_prod_sql_script_contains_export_contract_changes() -> None:
 
     for token in required_tokens:
         assert token in script
+
+
+def test_phase8_sql_repo_contains_diagnostic_and_cleanup_contract() -> None:
+    stage_sql = _sql_file("KVK.KVK_AllPlayers_Stage.Table.sql")
+    diagnostics_sql = _sql_file("KVK.KVK_Ingest_Diagnostics.Table.sql")
+    cleanup_sql = _sql_file("KVK.sp_KVK_Ingest_Cleanup.StoredProcedure.sql")
+
+    assert "[staged_at_utc] [datetime2](0) NOT NULL" in stage_sql
+    assert "DF_KVK_AllPlayers_Stage_StagedAtUTC" in stage_sql
+    assert "IX_KVK_AllPlayers_Stage_StagedAt" in stage_sql
+    assert "INCLUDE([IngestToken])" in stage_sql
+
+    for token in (
+        "CREATE TABLE [KVK].[KVK_Ingest_Diagnostics]",
+        "[DiagnosticStatus] [varchar](20)",
+        "[DiagnosticType] [nvarchar](64)",
+        "[IngestToken] [uniqueidentifier] NULL",
+        "[SchemaVersion] [nvarchar](64)",
+        "[SourceSheetName] [nvarchar](128)",
+        "[SourceColumnHash] [char](64)",
+        "[ContextJson] [nvarchar](max)",
+        "CK_KVK_IngestDiag_Status",
+        "IX_KVK_IngestDiag_Status_Created",
+        "IX_KVK_IngestDiag_Token",
+    ):
+        assert token in diagnostics_sql
+
+    compact_cleanup = _compact(cleanup_sql)
+    for token in (
+        "ALTER PROCEDURE [KVK].[sp_KVK_Ingest_Cleanup]",
+        "@StageRetentionHours [int] = 24",
+        "@DiagnosticRetentionDays [int] = 90",
+        "@NegativeRetentionDays [int] = 365",
+        "@DryRun [bit] = 1",
+        "THROW 51010, 'Stage retention must be at least 1 hour.', 1",
+        "WHERE staged_at_utc < @StageCutoff",
+        "WHERE CreatedUTC < @DiagnosticCutoff",
+        "WHERE recorded_at_utc < @NegativeCutoff",
+        "DiagnosticStatus, DiagnosticType, ErrorText, ContextJson",
+        "StaleStageRows",
+        "StaleDiagnosticRows",
+        "StaleNegativeRows",
+    ):
+        assert _compact(token) in compact_cleanup
+
+
+def test_phase8_prod_sql_script_contains_retention_objects_and_policy() -> None:
+    script = Path("sql/kvk_all_phase8_ingest_retention.sql").read_text(encoding="utf-8-sig")
+    compact = _compact(script)
+
+    required_tokens = [
+        "KVK_ALL Schema Modernisation - Phase 8 Ingest Diagnostics & Retention",
+        "IF OBJECT_ID(N'[KVK].[KVK_AllPlayers_Stage]', N'U') IS NULL",
+        "COL_LENGTH('KVK.KVK_AllPlayers_Stage', 'staged_at_utc')",
+        "CREATE TABLE [KVK].[KVK_Ingest_Diagnostics]",
+        "CK_KVK_IngestDiag_Status",
+        "IX_KVK_IngestDiag_Status_Created",
+        "IX_KVK_IngestDiag_Token",
+        "ALTER PROCEDURE [KVK].[sp_KVK_Ingest_Cleanup]",
+        "@StageRetentionHours [int] = 24",
+        "@DiagnosticRetentionDays [int] = 90",
+        "@NegativeRetentionDays [int] = 365",
+        "@DryRun [bit] = 1",
+        "WHERE staged_at_utc < @StageCutoff",
+        "WHERE CreatedUTC < @DiagnosticCutoff",
+        "WHERE recorded_at_utc < @NegativeCutoff",
+        "GO",
+    ]
+
+    for token in required_tokens:
+        assert _compact(token) in compact

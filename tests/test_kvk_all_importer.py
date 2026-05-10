@@ -95,3 +95,25 @@ def test_wrapper_preserves_success_return_shape(monkeypatch) -> None:
     assert result["proc_ms"] == 12.0
     assert result["duration_s"] >= 0
     assert connection.closed is True
+
+
+def test_wrapper_returns_coercion_validation_context_without_db_connection() -> None:
+    full_data = _full_data_df()
+    full_data.loc[0, "governor_id"] = None
+
+    result = importer.ingest_kvk_all_excel(
+        content=_xlsx_bytes({"Full Data": full_data}),
+        source_filename="kvk.xlsx",
+        uploader_id=123,
+        scan_ts_utc=dt.datetime(2026, 5, 8, tzinfo=dt.UTC),
+        server="unused",
+        database="unused",
+        username="unused",
+        password="unused",
+    )
+
+    assert result["success"] is False
+    assert result["sheet"] == "Full Data"
+    assert result["schema_version"] == SCHEMA_VERSION
+    assert result["validation_error"]["code"] == "full_data_coercion_failed"
+    assert result["validation_error"]["schema"]["schema_version"] == SCHEMA_VERSION

@@ -33,6 +33,8 @@ Phase 5 is complete and deployed.
 
 Phase 6 is complete and deployed.
 
+Phase 7 is complete and deployed.
+
 Completed Phase 1 scope:
 
 strict Full Data workbook detection
@@ -77,9 +79,28 @@ non-mutating workbook/service smoke validation completed against the uploaded sa
 
 Phase 3 did not change SQL schema, recompute formulas, export result-set order, Google Sheets tab names, Discord reporting display, admin command SQL ownership, or reporting DAL ownership.
 
+Completed Phase 7 scope:
+
+KVK admin SQL moved out of commands/stats_cmds.py for the Phase 7 in-scope admin workflows
+KVK admin data access added in kvk/dal/kvk_admin_dal.py
+KVK admin orchestration and command-facing result shaping added in kvk/services/kvk_admin_service.py
+/kvk_recompute delegates recompute execution through the KVK admin service and DAL
+/kvk_list_scans delegates recent scan loading and response table formatting through the KVK admin service and DAL
+/kvk_window_preview delegates window preview loading through the KVK admin service and DAL
+/kvk_export_all current-KVK resolution delegates through the KVK admin service and preserves existing Google Sheets export execution
+command names, permissions, defer/followup behaviour, output copy, and operator workflow were preserved
+SQL Server RowCount alias compatibility was fixed with [RowCount]
+window preview embed output was capped to Discord's 1024-character field limit with a truncation marker
+focused tests added for DAL/service result shape, command boundary handoff, SQL alias coverage, and window preview embed field limit
+local smoke confirmed /kvk_export_all completes successfully
+/kvk_window_preview smoke issues found during validation were fixed in follow-up PRs
+the unrelated /my_stats_export direct SQL finding was captured structurally in docs/deferred_optimisations.md
+
+Phase 7 did not change SQL schema, import behaviour, recompute semantics, export result-set contracts, Google Sheets tab names, Discord reporting display, Basic Data ingestion, summary tab ingestion, or Phase 5/6 service boundaries.
+
 Next phase:
 
-Phase 7 — Admin Command SQL Extraction
+Phase 8 — Operational Cleanup & Retention
 
 Completion Rule
 This work is not complete until all items previously identified as deferred optimisations are implemented or explicitly resolved inside this programme.
@@ -773,6 +794,9 @@ Production deployment completed after local validation and smoke testing.
 
 No SQL schema changes, Google Sheets export contract changes, admin command SQL extraction, Basic Data ingestion, summary-tab ingestion, or unrelated rankings/history/personal KVK redesign were included in Phase 6.
 Phase 7 — Admin Command SQL Extraction
+Status
+Complete and deployed.
+
 Goal
 Remove KVK admin SQL from command modules.
 
@@ -795,6 +819,51 @@ Commands are thin.
 Direct SQL is removed from command handlers.
 Permission/defer/response behaviour remains unchanged.
 Tests cover service handoff and core service logic.
+
+Completion Notes
+Implemented:
+
+commands/stats_cmds.py
+kvk/dal/kvk_admin_dal.py
+kvk/services/kvk_admin_service.py
+tests/test_kvk_admin_service.py
+tests/test_stats_cmds.py
+docs/KVK_ALL Schema Modernisation — Phase 7 Initiation Statement.md
+
+Python delivery:
+
+KVK admin command SQL for recompute, recent scan listing, and window preview was moved out of commands/stats_cmds.py.
+KVK admin data access now lives in kvk/dal/kvk_admin_dal.py.
+KVK admin orchestration and command-facing result shaping now lives in kvk/services/kvk_admin_service.py.
+commands/stats_cmds.py remains responsible for Discord permissions, safe defer/followup flow, command inputs, and response rendering.
+/kvk_export_all keeps the existing Google Sheets export execution path and delegates current-KVK resolution through the KVK admin service.
+/kvk_export_all now reports export exceptions back to the operator instead of failing silently.
+/kvk_window_preview preserves the existing embed/table shape and caps the field value to Discord's 1024-character embed field limit, appending a truncation marker when needed.
+SQL Server compatibility for the window preview row-count alias was fixed by bracketing [RowCount].
+
+Validation completed:
+
+python -m pytest -q tests/test_kvk_admin_service.py tests/test_stats_cmds.py
+python -m pytest -q tests/test_kvk_admin_service.py tests/test_stats_cmds.py tests/test_stats_service.py tests/test_mykvkstats.py
+python -m black --check commands/stats_cmds.py kvk/dal/kvk_admin_dal.py kvk/services/kvk_admin_service.py tests/test_kvk_admin_service.py tests/test_stats_cmds.py
+python -m ruff check commands/stats_cmds.py kvk/dal/kvk_admin_dal.py kvk/services/kvk_admin_service.py tests/test_kvk_admin_service.py tests/test_stats_cmds.py
+python -m py_compile commands/stats_cmds.py kvk/dal/kvk_admin_dal.py kvk/services/kvk_admin_service.py tests/test_kvk_admin_service.py tests/test_stats_cmds.py
+python -m pyright kvk/dal/kvk_admin_dal.py kvk/services/kvk_admin_service.py tests/test_kvk_admin_service.py tests/test_stats_cmds.py
+python scripts/validate_architecture_boundaries.py
+python scripts/validate_deferred_items.py
+python scripts/select_tests.py
+python scripts/smoke_imports.py
+python scripts/validate_command_registration.py
+git diff --check
+
+Smoke validation completed:
+
+/kvk_export_all completed successfully after Phase 7 deployment.
+/kvk_window_preview initially surfaced a SQL Server RowCount alias issue; fixed in the Phase 7 follow-up hotfix.
+/kvk_window_preview then surfaced a Discord 1024-character embed field limit issue; fixed in the Phase 7 follow-up hotfix.
+
+No SQL schema changes, Google Sheets export contract changes, KVK export result-set changes, Discord reporting display changes, Basic Data ingestion, summary tab ingestion, operational retention cleanup, or end-to-end performance/restart hardening were included in Phase 7.
+
 Phase 8 — Operational Cleanup & Retention
 Goal
 Make ingest diagnostics and failed stage rows operationally safe.

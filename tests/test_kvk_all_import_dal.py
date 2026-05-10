@@ -57,6 +57,8 @@ class MockCursor:
             self.description = [("COUNT",)]
             self._fetchall = []
             self._fetchone = (3,)
+        elif sql == dal.INSERT_INGEST_DIAGNOSTIC_SQL:
+            self._fetchone = (42,)
         return self
 
     def executemany(self, sql: str, rows):
@@ -153,4 +155,86 @@ def test_ingest_prepared_import_cleans_stage_rows_when_precheck_fails(monkeypatc
     assert result["success"] is False
     assert result["cleanup_failed"] is False
     assert result["cleanup_error"] is None
-    assert connection.commit_calls == 2
+    diagnostic_cursor = connection.cursors[1]
+    assert diagnostic_cursor.executed[0][0] == dal.INSERT_INGEST_DIAGNOSTIC_SQL
+    diagnostic_params = cast(tuple[Any, ...], diagnostic_cursor.executed[0][1])
+    assert diagnostic_params[0] == "rejected"
+    assert diagnostic_params[1] == "scan_timestamp_outside_kvk_details"
+    assert diagnostic_params[2] == "token-2"
+    assert diagnostic_params[5] == "kvk.xlsx"
+    assert diagnostic_params[8] == SCHEMA_VERSION
+    assert diagnostic_params[9] == "Full Data"
+    assert diagnostic_params[12] == 1
+    assert diagnostic_params[13] == 1
+    assert result["diagnostic_id"] == 42
+    assert connection.commit_calls == 3
+
+
+def test_record_ingest_diagnostic_is_best_effort() -> None:
+    class FailingConnection:
+        def cursor(self):
+            raise RuntimeError("diagnostic table missing")
+
+    result = dal.record_ingest_diagnostic(
+        FailingConnection(),  # type: ignore[arg-type]
+        status="failed",
+        diagnostic_type="unit_test",
+        source_filename="kvk.xlsx",
+        error_text="boom",
+    )
+
+    assert result is None
+
+
+def test_ingest_prepared_import_records_proc_failure_and_keeps_stage_rows(
+    monkeypatch,
+) -> None:
+    class FailingIngestCursor(MockCursor):
+        def execute(self, sql: str, params=None):
+            if sql == dal.CALL_INGEST_SQL:
+                self.executed.append((sql, params))
+                raise RuntimeError("stored procedure failed")
+            return super().execute(sql, params)
+
+    class FailureConnection(MockConnection):
+        def cursor(self) -> MockCursor:
+            if len(self.cursors) == 1:
+                cursor: MockCursor = FailingIngestCursor()
+            else:
+                cursor = MockCursor()
+            self.cursors.append(cursor)
+            return cursor
+
+    connection = FailureConnection()
+    monkeypatch.setattr(dal, "scan_ts_within_kvk_details", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(dal.uuid, "uuid4", lambda: "token-3")
+
+    try:
+        dal.ingest_prepared_import(
+            con=connection,
+            prepared=_prepared_frame(),
+            content=b"abc",
+            source_filename="kvk.xlsx",
+            uploader_id=999,
+            scan_ts_utc=dt.datetime(2026, 5, 8, 1, 0, tzinfo=dt.UTC),
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "stored procedure failed"
+    else:  # pragma: no cover - defensive guard
+        raise AssertionError("expected ingest failure")
+
+    stage_cursor = connection.cursors[0]
+    ingest_cursor = connection.cursors[1]
+    diagnostic_cursor = connection.cursors[2]
+
+    assert stage_cursor.executemany_calls[0][0] == dal.STAGE_INSERT_SQL
+    assert ingest_cursor.executed[0][0] == dal.CALL_INGEST_SQL
+    assert (dal.DELETE_STAGED_TOKEN_SQL, "token-3") not in stage_cursor.executed
+    assert diagnostic_cursor.executed[0][0] == dal.INSERT_INGEST_DIAGNOSTIC_SQL
+    diagnostic_params = cast(tuple[Any, ...], diagnostic_cursor.executed[0][1])
+    assert diagnostic_params[0] == "failed"
+    assert diagnostic_params[1] == "ingest_procedure_failed"
+    assert diagnostic_params[2] == "token-3"
+    assert diagnostic_params[12] == 1
+    assert diagnostic_params[13] == 1
+    assert "RuntimeError: stored procedure failed" in str(diagnostic_params[14])
