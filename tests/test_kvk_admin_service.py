@@ -89,3 +89,31 @@ def test_load_window_preview_detects_bad_ranges_and_formats_table(monkeypatch) -
     assert "Pass 4" in table
     assert "Full" in table
     assert "open" in table
+
+
+def test_window_preview_table_respects_discord_field_limit() -> None:
+    rows = [
+        {
+            "WindowName": f"Window {index:03d}",
+            "StartScanID": index,
+            "EndScanID": index + 1,
+            "StartTS": datetime(2026, 5, 1, 1, 0),
+            "EndTS": datetime(2026, 5, 1, 2, 0),
+            "NumScans": 2,
+            "RowCount": 1000 + index,
+        }
+        for index in range(80)
+    ]
+    result = kvk_admin_service.KvkWindowPreviewResult(
+        kvk_no=13,
+        rows=rows,
+        bad_ranges=[],
+        generated_at_utc=datetime(2026, 5, 1, tzinfo=UTC),
+    )
+
+    table = kvk_admin_service.format_window_preview_table(result)
+
+    assert len(table) <= 1024
+    assert table.startswith("```\n")
+    assert table.endswith("\n```")
+    assert "... truncated ..." in table
