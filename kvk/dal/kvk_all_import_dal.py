@@ -334,8 +334,9 @@ def ingest_prepared_import(
     logger.info("[KVK] Final stage col order: %s", STAGE_COL_ORDER)
     logger.info("[KVK] DF col order now: %s", list(df.columns))
 
-    file_hash = hashlib.sha256(content).digest()
-    file_hash_hex = hashlib.sha256(content).hexdigest()
+    file_hash_obj = hashlib.sha256(content)
+    file_hash = file_hash_obj.digest()
+    file_hash_hex = file_hash_obj.hexdigest()
     scan_ts_utc = ensure_aware_utc(scan_ts_utc)
     scan_ts_naive = scan_ts_utc.replace(tzinfo=None)
 
