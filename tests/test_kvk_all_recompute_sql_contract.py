@@ -9,6 +9,8 @@ import pytest
 K98_SQL_REPO_ENV = os.environ.get("K98_SQL_REPO")
 SQL_REPO = Path(K98_SQL_REPO_ENV) if K98_SQL_REPO_ENV else Path(r"C:\K98-bot-SQL-Server")
 SQL_SCHEMA = SQL_REPO / "sql_schema"
+# Phase 10 recompute switched configured-window KP gain to endpoint delta logic and
+# introduced this alias in both canonical and deployment-script definitions.
 PHASE10_RECOMPUTE_SENTINEL = "r.max_kill_points AS kp_endpoint_s"
 
 
