@@ -410,7 +410,8 @@ def apply_open_mode_switch_atomic(
 ) -> int:
     """
     Atomically:
-      - hard delete awards for this event (written to MGE_AwardAudit first)
+      - write MGE_AwardAudit rows for awards in this event
+      - hard delete awards for this event
       - hard delete signups for this event (written to MGE_SignupAudit)
       - switch event mode/rule mode/rules text
       - write MGE_RuleAudit
@@ -439,30 +440,57 @@ def apply_open_mode_switch_atomic(
 
         cur.execute(
             """
+            SET NOCOUNT ON;
+
+            DECLARE @DeletedAwards TABLE
+            (
+                AwardId BIGINT NOT NULL,
+                EventId BIGINT NOT NULL,
+                GovernorId BIGINT NOT NULL,
+                AwardedRank INT NULL,
+                AwardStatus VARCHAR(20) NULL,
+                TargetScore BIGINT NULL
+            );
+
             DELETE FROM dbo.MGE_Awards
             OUTPUT
                 DELETED.AwardId,
                 DELETED.EventId,
                 DELETED.GovernorId,
-                'bulk_delete_open_switch',
-                ?,
                 DELETED.AwardedRank,
-                NULL,
                 DELETED.AwardStatus,
-                'removed',
-                DELETED.TargetScore,
-                DELETED.TargetScore,
-                ?,
-                SYSUTCDATETIME()
-            INTO dbo.MGE_AwardAudit
+                DELETED.TargetScore
+            INTO @DeletedAwards
+                (AwardId, EventId, GovernorId, AwardedRank, AwardStatus, TargetScore)
+            WHERE EventId = ?;
+
+            INSERT INTO dbo.MGE_AwardAudit
                 (AwardId, EventId, GovernorId, ActionType, ActorDiscordId,
                  OldRank, NewRank, OldStatus, NewStatus, OldTargetScore, NewTargetScore,
                  DetailsJson, CreatedUtc)
-            WHERE EventId = ?;
+            SELECT
+                AwardId,
+                EventId,
+                GovernorId,
+                'bulk_delete_open_switch',
+                ?,
+                AwardedRank,
+                NULL,
+                AwardStatus,
+                'removed',
+                TargetScore,
+                TargetScore,
+                ?,
+                SYSUTCDATETIME()
+            FROM @DeletedAwards;
+
+            SELECT COUNT_BIG(1) AS DeletedAwardCount
+            FROM @DeletedAwards;
             """,
-            (actor_discord_id, award_details_json, event_id),
+            (event_id, actor_discord_id, award_details_json),
         )
-        deleted_award_count = int(cur.rowcount or 0)
+        row = cur.fetchone()
+        deleted_award_count = int(row[0]) if row else 0
 
         cur.execute(
             """

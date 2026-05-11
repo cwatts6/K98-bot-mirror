@@ -166,6 +166,13 @@ def _build_signup_view(
         return None
 
 
+def _should_attach_signup_view(event_row: dict[str, Any], lifecycle_state: str) -> bool:
+    event_mode = str(event_row.get("EventMode") or "").strip().lower()
+    if event_mode == "open":
+        return False
+    return lifecycle_state == "open"
+
+
 def _render_public_signup_list(names: list[str], limit: int = 1024) -> str:
     if not names:
         return "No signups yet."
@@ -592,12 +599,21 @@ async def sync_event_signup_embed(
     msg_id = row.get("SignupEmbedMessageId")
     message = None
 
-    view = _build_signup_view(
-        bot=bot,
-        event_id=event_id,
-        signup_channel_id=signup_channel_id,
-        lifecycle_state=lifecycle_state,
-    )
+    view = None
+    if _should_attach_signup_view(row, lifecycle_state):
+        view = _build_signup_view(
+            bot=bot,
+            event_id=event_id,
+            signup_channel_id=signup_channel_id,
+            lifecycle_state=lifecycle_state,
+        )
+    else:
+        logger.info(
+            "mge_embed_signup_view_suppressed event_id=%s lifecycle_state=%s event_mode=%s reason=mode_or_lifecycle",
+            event_id,
+            lifecycle_state,
+            row.get("EventMode"),
+        )
 
     # Determine if @everyone mention should be sent on first post
     should_mention = False

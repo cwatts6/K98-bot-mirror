@@ -185,6 +185,8 @@ class _OpenSwitchCursor:
     def fetchone(self) -> tuple[int] | None:
         if self._last_sql.startswith("SELECT EventId FROM dbo.MGE_Events"):
             return (563,)
+        if "SELECT COUNT_BIG(1) AS DeletedAwardCount" in self._last_sql:
+            return (2,)
         return None
 
 
@@ -220,13 +222,16 @@ def test_apply_open_switch_deletes_only_target_event_awards_before_signups(monke
     award_delete_sql, award_delete_params = cursor.calls[award_delete_idx]
     signup_delete_sql, signup_delete_params = cursor.calls[signup_delete_idx]
 
-    assert "INTO dbo.MGE_AwardAudit" in award_delete_sql
+    assert "OUTPUT" in award_delete_sql
+    assert "INTO @DeletedAwards" in award_delete_sql
+    assert "INSERT INTO dbo.MGE_AwardAudit" in award_delete_sql
+    assert "SELECT COUNT_BIG(1) AS DeletedAwardCount" in award_delete_sql
     assert "WHERE EventId = ?" in award_delete_sql
     assert "WHERE EventId = ?" in signup_delete_sql
-    assert award_delete_params[0] == actor_discord_id
-    award_details = json.loads(award_delete_params[1])
+    assert award_delete_params[0] == 563
+    assert award_delete_params[1] == actor_discord_id
+    award_details = json.loads(award_delete_params[2])
     assert award_details == {"action": "bulk_delete_open_switch"}
-    assert award_delete_params[-1] == 563
     assert signup_delete_params == (563,)
 
     signup_audit_sql, signup_audit_params = next(

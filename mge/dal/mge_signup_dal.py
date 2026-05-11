@@ -219,6 +219,18 @@ def insert_signup(
     def _callback(cur):
         cur.execute(
             """
+            SELECT EventMode
+            FROM dbo.MGE_Events WITH (UPDLOCK, HOLDLOCK)
+            WHERE EventId = ?;
+            """,
+            (event_id,),
+        )
+        row = cur.fetchone()
+        if row is None or str(row[0] or "").strip().lower() != "controlled":
+            return None
+
+        cur.execute(
+            """
             INSERT INTO dbo.MGE_Signups
             (
                 EventId,

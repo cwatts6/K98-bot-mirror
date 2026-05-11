@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from mge.mge_embed_manager import (
+    _should_attach_signup_view,
     build_mge_awards_embed,
     build_mge_leadership_embed,
     build_mge_main_embed,
@@ -92,6 +93,24 @@ def test_signup_embed_finished_state():
     # finished lifecycle sets colour to grey: 0x95A5A6
     assert embed.color.value == 0x95A5A6
     assert any(f.name == "Status" for f in embed.fields)
+
+
+def test_signup_view_hidden_when_event_mode_open():
+    event = _event("open")
+
+    assert _should_attach_signup_view(event, lifecycle_state="open") is False
+
+
+def test_signup_view_returns_when_switched_back_to_controlled():
+    event = _event("controlled")
+
+    assert _should_attach_signup_view(event, lifecycle_state="open") is True
+
+
+def test_signup_view_hidden_when_controlled_but_lifecycle_closed():
+    event = _event("controlled")
+
+    assert _should_attach_signup_view(event, lifecycle_state="closed") is False
 
 
 # ---------------------------------------------------------------------------
