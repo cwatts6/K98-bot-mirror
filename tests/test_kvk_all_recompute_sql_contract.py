@@ -11,7 +11,7 @@ SQL_REPO = Path(K98_SQL_REPO_ENV) if K98_SQL_REPO_ENV else Path(r"C:\K98-bot-SQL
 SQL_SCHEMA = SQL_REPO / "sql_schema"
 # Phase 10 recompute switched configured-window KP gain to endpoint delta logic and
 # introduced this alias in both canonical and deployment-script definitions.
-PHASE10_RECOMPUTE_SENTINEL = "r.max_kill_points AS kp_endpoint_s"
+PHASE_10_RECOMPUTE_SENTINEL = "r.max_kill_points AS kp_endpoint_s"
 
 
 def _running_in_ci() -> bool:
@@ -56,8 +56,11 @@ def _phase10_recompute_sql_contract_source() -> str:
     canonical = _compact(_sql_file("KVK.sp_KVK_Recompute_Windows.StoredProcedure.sql"))
     # Canonical SQL repo may lag deployment scripts; fall back to the PR deployment
     # script when this Phase 10 endpoint-source token is absent.
-    if PHASE10_RECOMPUTE_SENTINEL in canonical:
+    if PHASE_10_RECOMPUTE_SENTINEL in canonical:
         return canonical
+    phase10_sql_repo_script = SQL_SCHEMA / "kvk_all_phase10_recompute_correctness.sql"
+    if phase10_sql_repo_script.exists():
+        return _compact(phase10_sql_repo_script.read_text(encoding="utf-8-sig"))
     return _compact(
         Path("sql/kvk_all_phase10_recompute_correctness.sql").read_text(encoding="utf-8-sig")
     )
