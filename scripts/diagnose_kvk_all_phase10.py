@@ -37,6 +37,26 @@ def _int_series(df: pd.DataFrame, column: str) -> pd.Series:
     return pd.to_numeric(df[column], errors="coerce").fillna(0).astype("Int64")
 
 
+def _single_row_int(df: pd.DataFrame, column: str) -> int:
+    value = _int_series(df, column).iloc[0]
+    if pd.isna(value):
+        return 0
+    return int(value)
+
+
+def _single_row_str(df: pd.DataFrame, column: str) -> str:
+    if column not in df.columns:
+        return ""
+    value = df[column].iloc[0]
+    if pd.isna(value):
+        return ""
+    return str(value)
+
+
+def _window_delta(end_df: pd.DataFrame, start_df: pd.DataFrame, column: str) -> int:
+    return _single_row_int(end_df, column) - _single_row_int(start_df, column)
+
+
 def _load_prepared_samples(paths: list[Path]) -> pd.DataFrame:
     frames: list[pd.DataFrame] = []
     for scan_id, path in enumerate(paths, start=1):
@@ -102,17 +122,13 @@ def _governor_window(
     expected: dict[str, int] = {}
     legacy_diff_delta: dict[str, int] = {}
     for name, endpoint_col, diff_col in METRICS:
-        expected[name] = int(
-            (_int_series(end, endpoint_col) - _int_series(start, endpoint_col)).iloc[0]
-        )
-        legacy_diff_delta[name] = int(
-            (_int_series(end, diff_col) - _int_series(start, diff_col)).iloc[0]
-        )
+        expected[name] = _window_delta(end, start, endpoint_col)
+        legacy_diff_delta[name] = _window_delta(end, start, diff_col)
 
     return {
         "governor_id": governor_id,
-        "name": str(end["name"].iloc[0] if "name" in end.columns else ""),
-        "kingdom": int(_int_series(end, "kingdom").iloc[0]),
+        "name": _single_row_str(end, "name"),
+        "kingdom": _single_row_int(end, "kingdom"),
         "start_scan": start_scan,
         "end_scan": end_scan,
         "expected_endpoint_delta": expected,
