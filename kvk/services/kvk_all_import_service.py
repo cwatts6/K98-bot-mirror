@@ -138,7 +138,21 @@ def _as_dt(value: Any) -> Any:
 def _numeric_series(df: pd.DataFrame, column: str) -> pd.Series:
     if column not in df.columns:
         return pd.Series([None] * len(df), index=df.index, dtype=object)
-    return pd.to_numeric(df[column], errors="coerce").astype(object)
+
+    source = df[column]
+    numeric = pd.to_numeric(source, errors="coerce")
+
+    string_mask = source.map(lambda value: isinstance(value, str))
+    integer_literal_mask = source.astype(str).str.strip().str.fullmatch(r"[+-]?\d+")
+    invalid_string_mask = string_mask & source.notna() & ~integer_literal_mask.fillna(False)
+
+    numeric = numeric.mask(invalid_string_mask)
+    numeric = numeric.mask(numeric.notna() & (numeric % 1 != 0))
+
+    result = pd.Series([None] * len(df), index=df.index, dtype=object)
+    valid_mask = numeric.notna()
+    result.loc[valid_mask] = numeric.loc[valid_mask].astype("Int64").astype(object)
+    return result
 
 
 def _datetime_series(df: pd.DataFrame, column: str) -> pd.Series:
