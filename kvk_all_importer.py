@@ -58,7 +58,9 @@ def ingest_kvk_all_excel(
     """
     started = time.perf_counter()
     try:
+        prepare_started = time.perf_counter()
         prepared = prepare_kvk_all_import(content, source_filename)
+        prepare_ms = (time.perf_counter() - prepare_started) * 1000.0
     except KvkAllSchemaValidationError as exc:
         logger.info("[KVK] Import schema validation failed for %s: %s", source_filename, exc)
         return {
@@ -124,6 +126,7 @@ def ingest_kvk_all_excel(
         except Exception:
             pass
 
+    result.setdefault("prepare_ms", prepare_ms)
     result.setdefault("duration_s", round(time.perf_counter() - started, 2))
     return result
 

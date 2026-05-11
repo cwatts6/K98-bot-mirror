@@ -295,10 +295,13 @@ def ingest_prepared_import(
     uploader_id: int,
     scan_ts_utc: dt.datetime,
 ) -> dict[str, Any]:
+    stage_rows_started = time.perf_counter()
     df = prepared.dataframe
     staged_rows = prepared.staged_rows
     sheet_name = prepared.sheet_name
     schema_metadata = prepared.schema_metadata
+    stage_rows = rows_for_stage("", df)
+    stage_rows_ms = (time.perf_counter() - stage_rows_started) * 1000.0
 
     cur = con.cursor()
     enable_fast_executemany(cur)
@@ -327,8 +330,11 @@ def ingest_prepared_import(
             }
 
     token = str(uuid.uuid4())
-    cur.executemany(STAGE_INSERT_SQL, rows_for_stage(token, df))
+    stage_insert_rows = [(token, *row[1:]) for row in stage_rows]
+    stage_insert_started = time.perf_counter()
+    cur.executemany(STAGE_INSERT_SQL, stage_insert_rows)
     con.commit()
+    stage_insert_ms = (time.perf_counter() - stage_insert_started) * 1000.0
 
     logger.info("[KVK] Final stage col order: %s", STAGE_COL_ORDER)
     logger.info("[KVK] DF col order now: %s", list(df.columns))
@@ -339,7 +345,9 @@ def ingest_prepared_import(
     scan_ts_utc = ensure_aware_utc(scan_ts_utc)
     scan_ts_naive = scan_ts_utc.replace(tzinfo=None)
 
+    precheck_started = time.perf_counter()
     if not scan_ts_within_kvk_details(con, scan_ts_naive):
+        precheck_ms = (time.perf_counter() - precheck_started) * 1000.0
         cleanup_failed = False
         cleanup_error: str | None = None
         try:
@@ -355,6 +363,9 @@ def ingest_prepared_import(
             "scan_ts_naive": str(scan_ts_naive),
             "source_filename": source_filename,
             "staged_rows": staged_rows,
+            "stage_rows_ms": stage_rows_ms,
+            "stage_insert_ms": stage_insert_ms,
+            "precheck_ms": precheck_ms,
             "schema": schema_metadata,
             "sample_row": {},
             "cleanup_failed": cleanup_failed,
@@ -402,7 +413,11 @@ def ingest_prepared_import(
             "cleanup_failed": cleanup_failed,
             "cleanup_error": cleanup_error,
             "diagnostic_id": diagnostic_id,
+            "stage_rows_ms": stage_rows_ms,
+            "stage_insert_ms": stage_insert_ms,
+            "precheck_ms": precheck_ms,
         }
+    precheck_ms = (time.perf_counter() - precheck_started) * 1000.0
 
     cur = con.cursor()
     ingest_started = time.perf_counter()
@@ -432,6 +447,9 @@ def ingest_prepared_import(
             "scan_ts_naive": str(scan_ts_naive),
             "source_filename": source_filename,
             "staged_rows": staged_rows,
+            "stage_rows_ms": stage_rows_ms,
+            "stage_insert_ms": stage_insert_ms,
+            "precheck_ms": precheck_ms,
             "ingest_ms": ingest_ms,
             "schema": schema_metadata,
             "stage_retention": "staged rows are retained for inspection until Phase 8 cleanup",
@@ -469,8 +487,10 @@ def ingest_prepared_import(
     recompute_ms = (time.perf_counter() - recompute_started) * 1000.0
 
     cur = con.cursor()
+    negative_count_started = time.perf_counter()
     cur.execute(NEGATIVE_COUNT_SQL, (kvk_no, scan_id))
     negative_value = _first_scalar(cur)
+    negative_count_ms = (time.perf_counter() - negative_count_started) * 1000.0
     negatives = int(negative_value) if negative_value is not None else 0
 
     return {
@@ -479,8 +499,12 @@ def ingest_prepared_import(
         "row_count": int(row_count),
         "negatives": negatives,
         "staged_rows": staged_rows,
+        "stage_rows_ms": stage_rows_ms,
+        "stage_insert_ms": stage_insert_ms,
+        "precheck_ms": precheck_ms,
         "ingest_ms": ingest_ms,
         "recompute_ms": recompute_ms,
+        "negative_count_ms": negative_count_ms,
         "proc_ms": ingest_ms,
         "sheet": sheet_name,
         "schema_version": SCHEMA_VERSION,

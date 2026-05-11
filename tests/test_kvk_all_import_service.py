@@ -53,6 +53,36 @@ def test_prepare_maps_full_data_columns_and_metadata() -> None:
     assert prepared.schema_metadata["unknown_columns"] == []
 
 
+def test_coerce_full_data_frame_vectorised_path_preserves_invalid_row_detection() -> None:
+    full_data = _full_data_df()
+    full_data["governor_id"] = full_data["governor_id"].astype(object)
+    full_data.loc[0, "governor_id"] = "not-a-number"
+
+    with pytest.raises(ValueError) as exc:
+        service.coerce_full_data_frame(full_data)
+
+    assert str(exc.value) == "One or more rows missing governor_id or kingdom after coercion."
+
+
+def test_coerce_full_data_frame_vectorised_path_preserves_numeric_and_datetime_values() -> None:
+    full_data = _full_data_df()
+    full_data["governor_id"] = full_data["governor_id"].astype(object)
+    full_data["kingdom"] = full_data["kingdom"].astype(object)
+    full_data["rank"] = full_data["rank"].astype(object)
+    full_data.loc[0, "governor_id"] = "123"
+    full_data.loc[0, "kingdom"] = "1198"
+    full_data.loc[0, "rank"] = "7"
+    full_data.loc[0, "first_updateUTC"] = "2026-05-08 01:00:00"
+
+    coerced = service.coerce_full_data_frame(full_data)
+    row = coerced.iloc[0]
+
+    assert int(row["governor_id"]) == 123
+    assert int(row["kingdom"]) == 1198
+    assert int(row["rank"]) == 7
+    assert row["first_updateUTC"].tzinfo is not None
+
+
 def test_read_full_data_workbook_preserves_unknown_column_reporting() -> None:
     full_data = _full_data_df()
     full_data["future_metric"] = 99

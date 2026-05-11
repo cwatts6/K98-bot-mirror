@@ -132,6 +132,12 @@ def test_ingest_prepared_import_call_shape(monkeypatch) -> None:
     assert result["scan_id"] == 2
     assert result["negatives"] == 3
     assert result["success"] is True
+    assert result["stage_rows_ms"] >= 0
+    assert result["stage_insert_ms"] >= 0
+    assert result["precheck_ms"] >= 0
+    assert result["ingest_ms"] >= 0
+    assert result["recompute_ms"] >= 0
+    assert result["negative_count_ms"] >= 0
     assert connection.commit_calls == 3
 
 
@@ -155,6 +161,9 @@ def test_ingest_prepared_import_cleans_stage_rows_when_precheck_fails(monkeypatc
     assert result["success"] is False
     assert result["cleanup_failed"] is False
     assert result["cleanup_error"] is None
+    assert result["stage_rows_ms"] >= 0
+    assert result["stage_insert_ms"] >= 0
+    assert result["precheck_ms"] >= 0
     diagnostic_cursor = connection.cursors[1]
     assert diagnostic_cursor.executed[0][0] == dal.INSERT_INGEST_DIAGNOSTIC_SQL
     diagnostic_params = cast(tuple[Any, ...], diagnostic_cursor.executed[0][1])

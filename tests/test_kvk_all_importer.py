@@ -53,8 +53,12 @@ def test_wrapper_preserves_success_return_shape(monkeypatch) -> None:
         "row_count": 1,
         "negatives": 0,
         "staged_rows": 1,
+        "stage_rows_ms": 2.0,
+        "stage_insert_ms": 4.0,
+        "precheck_ms": 1.0,
         "ingest_ms": 12.0,
         "recompute_ms": 3.0,
+        "negative_count_ms": 1.0,
         "proc_ms": 12.0,
         "sheet": "Full Data",
         "schema_version": SCHEMA_VERSION,
@@ -93,6 +97,8 @@ def test_wrapper_preserves_success_return_shape(monkeypatch) -> None:
     assert result["success"] is True
     assert result["kvk_no"] == 13
     assert result["proc_ms"] == 12.0
+    assert result["prepare_ms"] >= 0
+    assert result["stage_insert_ms"] == 4.0
     assert result["duration_s"] >= 0
     assert connection.closed is True
 

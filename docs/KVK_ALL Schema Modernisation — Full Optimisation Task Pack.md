@@ -35,6 +35,8 @@ Phase 6 is complete and deployed.
 
 Phase 7 is complete and deployed.
 
+Phase 8 is complete and deployed.
+
 Completed Phase 1 scope:
 
 strict Full Data workbook detection
@@ -98,9 +100,28 @@ the unrelated /my_stats_export direct SQL finding was captured structurally in d
 
 Phase 7 did not change SQL schema, import behaviour, recompute semantics, export result-set contracts, Google Sheets tab names, Discord reporting display, Basic Data ingestion, summary tab ingestion, or Phase 5/6 service boundaries.
 
+Completed Phase 8 scope:
+
+KVK.KVK_AllPlayers_Stage gained an additive staged_at_utc retention marker for failed/stale stage row cleanup
+KVK.KVK_Ingest_Diagnostics was introduced for durable ingest diagnostic visibility
+KVK.sp_KVK_Ingest_Cleanup was introduced with dry-run default cleanup for stale stage rows, old ingest diagnostics, and old negative diagnostics
+default retention policy documented and implemented as 24 hours for staged rows, 90 days for ingest diagnostics, and 365 days for negative diagnostics
+cleanup refuses unsafe sub-1-hour or sub-1-day retention settings
+cleanup does not run automatically during deployment or import
+Python KVK_ALL ingest now records best-effort durable diagnostics for timestamp precheck rejections and ingest procedure failures where Phase 8 SQL is deployed
+diagnostic context includes schema/source metadata, source filename, file hash, uploader ID, staged row count, and error/context payload where available
+failed ingest procedure paths intentionally retain staged rows for inspection until explicit retention cleanup
+coercion validation failures include structured validation context without changing Discord-facing import output
+focused DAL/importer/SQL contract tests were added for diagnostic shape, best-effort diagnostic writes, retained failed stage rows, and cleanup SQL policy
+production deployment script added under sql/kvk_all_phase8_ingest_retention.sql
+production SQL smoke confirmed stage marker, diagnostics table, cleanup procedure, dry-run cleanup, and diagnostic insert visibility
+the KVK_ALL upload routing follow-up was captured structurally in docs/deferred_optimisations.md
+
+Phase 8 did not introduce Basic Data ingestion, summary tab ingestion, Discord reporting display changes, Google Sheets export contract changes, KVK export result-set changes, admin command redesign, automatic cleanup execution, or Phase 9 performance/restart hardening.
+
 Next phase:
 
-Phase 8 — Operational Cleanup & Retention
+Phase 9 — End-to-End Performance & Restart Safety Hardening
 
 Completion Rule
 This work is not complete until all items previously identified as deferred optimisations are implemented or explicitly resolved inside this programme.
@@ -865,6 +886,9 @@ Smoke validation completed:
 No SQL schema changes, Google Sheets export contract changes, KVK export result-set changes, Discord reporting display changes, Basic Data ingestion, summary tab ingestion, operational retention cleanup, or end-to-end performance/restart hardening were included in Phase 7.
 
 Phase 8 — Operational Cleanup & Retention
+Status
+Complete and deployed.
+
 Goal
 Make ingest diagnostics and failed stage rows operationally safe.
 
@@ -884,6 +908,59 @@ Failed ingest diagnostics are inspectable.
 Old diagnostics can be cleaned safely.
 Cleanup does not remove active ingest tokens.
 Runbook notes exist.
+
+Completion Notes
+Implemented:
+
+sql/kvk_all_phase8_ingest_retention.sql
+kvk/dal/kvk_all_import_dal.py
+kvk_all_importer.py
+tests/test_kvk_all_import_dal.py
+tests/test_kvk_all_importer.py
+tests/test_kvk_all_recompute_sql_contract.py
+docs/KVK_ALL Schema Modernisation — Phase 8 Initiation Statement.md
+
+SQL delivery:
+
+KVK.KVK_AllPlayers_Stage gained staged_at_utc with a sysutcdatetime() default and supporting age-based index.
+KVK.KVK_Ingest_Diagnostics was added for durable ingest diagnostic visibility.
+KVK.sp_KVK_Ingest_Cleanup was added with dry-run default cleanup.
+Default retention policy is 24 hours for staged rows, 90 days for ingest diagnostics, and 365 days for negative diagnostics.
+Cleanup validates retention values before deleting and does not run automatically during deployment.
+
+Python delivery:
+
+KVK_ALL timestamp precheck rejections record best-effort durable diagnostics where Phase 8 SQL is deployed.
+KVK_ALL ingest procedure failures record best-effort durable diagnostics while retaining staged rows for operator inspection.
+Diagnostic payloads include schema/source metadata, source filename, file hash, uploader ID, staged row count, error text, and context JSON where available.
+Coercion validation failures include structured validation context without changing Discord-facing import output.
+Diagnostic writes are best-effort and do not make imports fail harder if the Phase 8 SQL table is unavailable.
+
+Validation completed:
+
+python -m pytest -q tests
+python -m pytest -q tests/test_kvk_all_import_dal.py tests/test_kvk_all_importer.py tests/test_kvk_all_schema.py tests/test_kvk_all_import_service.py tests/test_kvk_all_recompute_sql_contract.py
+python -m black --check kvk/dal/kvk_all_import_dal.py kvk_all_importer.py tests/test_kvk_all_import_dal.py tests/test_kvk_all_importer.py tests/test_kvk_all_recompute_sql_contract.py
+python -m ruff check kvk/dal/kvk_all_import_dal.py kvk_all_importer.py tests/test_kvk_all_import_dal.py tests/test_kvk_all_importer.py tests/test_kvk_all_recompute_sql_contract.py
+python -m py_compile kvk/dal/kvk_all_import_dal.py kvk_all_importer.py tests/test_kvk_all_import_dal.py tests/test_kvk_all_importer.py tests/test_kvk_all_recompute_sql_contract.py
+python -m pyright kvk/dal/kvk_all_import_dal.py kvk_all_importer.py tests/test_kvk_all_import_dal.py tests/test_kvk_all_importer.py tests/test_kvk_all_recompute_sql_contract.py
+python scripts/validate_architecture_boundaries.py
+python scripts/validate_deferred_items.py
+python scripts/select_tests.py
+python scripts/smoke_imports.py
+python scripts/validate_command_registration.py
+git diff --check
+
+Production smoke completed:
+
+staged_at_utc column exists on KVK.KVK_AllPlayers_Stage.
+KVK.KVK_Ingest_Diagnostics exists and accepts insert smoke rows.
+KVK.sp_KVK_Ingest_Cleanup exists.
+Dry-run cleanup returned stale counts without deleting rows.
+Diagnostic audit visibility was confirmed with a phase8_smoke row.
+
+No Discord reporting display changes, Google Sheets export contract changes, KVK export result-set changes, Basic Data ingestion, summary tab ingestion, automatic cleanup execution, or Phase 9 restart/performance hardening were included in Phase 8.
+
 Phase 9 — End-to-End Performance & Restart Safety Hardening
 Goal
 Final optimisation and validation pass.
@@ -956,3 +1033,69 @@ Deferred Optimisations
 For this programme, Deferred Optimisations should usually be:
 
 None. Required optimisation item completed in this phase.
+
+Completion Notes
+
+Implemented:
+
+kvk/services/kvk_all_import_service.py
+kvk/dal/kvk_all_import_dal.py
+kvk_all_importer.py
+scripts/benchmark_kvk_all_phase9.py
+tests/test_kvk_all_import_service.py
+tests/test_kvk_all_import_dal.py
+tests/test_kvk_all_importer.py
+docs/KVK_ALL Schema Modernisation — Phase 9 Initiation Statement.md
+
+Python delivery:
+
+KVK_ALL Full Data numeric and timestamp coercion was vectorised while preserving strict Full Data validation, Basic Data rejection, canonical staging columns, schema metadata, and legacy import return compatibility.
+Granular local timing fields were added for prepare, stage row preparation, stage insert, KVK_Details precheck, ingest procedure execution, recompute execution, and negative diagnostic counting.
+The existing Discord-facing import output was not changed; added timing fields are returned for diagnostics and future operator analysis.
+A read-only Phase 9 benchmark script was added under scripts/ for repeatable workbook parsing, coercion, metadata, full preparation, and stage-row preparation timing against local workbook samples.
+
+Performance baseline:
+
+Sample workbook:
+downloads/kvk_all_sample_file/1086045_05_08_2026,_02_21_38_AM.xlsx
+
+Workbook shape:
+Full Data, 5,000 rows, 43 columns, schema hash f885b1c7c5e36516697b05acbb0499a8969bb7571d3fc67546f7f9358124c7b8.
+
+Pre-change local baseline from Phase 9 audit:
+read_full_data_workbook median 1552.25ms
+coerce_full_data_frame median 1967.53ms
+attach_source_metadata median 1.44ms
+prepare_kvk_all_import total median 3642.55ms
+rows_for_stage median 79.91ms
+
+Post-change local baseline:
+read_full_data_workbook median 1637.91ms
+coerce_full_data_frame median 24.87ms
+attach_source_metadata median 6.30ms
+prepare_kvk_all_import total median 1616.97ms
+rows_for_stage median 72.25ms
+
+Live SQL timing notes:
+
+KVK.sp_KVK_AllPlayers_Ingest live timing was not run during local validation because it mutates KVK.KVK_Scan, KVK.KVK_AllPlayers_Raw, KVK.KVK_Player_Baseline, KVK.KVK_Ingest_Negatives, and clears staged rows.
+KVK.sp_KVK_Recompute_Windows live timing was not run during local validation because it deletes and rebuilds KVK windowed output tables for the target KVK.
+KVK.sp_KVK_Get_Exports / Google Sheets export posting was not run during local validation to avoid unintended live spreadsheet writes.
+The Python path now returns timing fields for the live ingest/recompute/export-adjacent phases when normal operator workflows run them.
+
+Restart and state assessment:
+
+Before stage insert, no critical KVK_ALL state exists only in process memory; retrying the upload is safe.
+After stage insert and before ingest procedure execution, staged rows are durable by IngestToken and inspectable until explicit Phase 8 retention cleanup.
+If KVK_Details timestamp precheck rejects an upload, the importer attempts targeted staged-row cleanup and records a best-effort durable diagnostic where Phase 8 SQL is deployed.
+If KVK.sp_KVK_AllPlayers_Ingest fails, SQL transaction rollback preserves staged rows for inspection and the Python DAL records a best-effort durable diagnostic.
+After ingest succeeds and before recompute completes, KVK.KVK_Scan and KVK.KVK_AllPlayers_Raw are durable and /kvk_recompute can rebuild windowed outputs.
+After recompute succeeds and before Google Sheets export completes, SQL outputs are durable and /kvk_export_all can be rerun.
+Automatic Google Sheets export remains an in-process convenience task; the recovery contract is the existing admin export command. Broader durable upload/export route extraction remains outside Phase 9 scope.
+Phase 8 cleanup remains dry-run by default and no staged rows or diagnostics are deleted automatically by the import path.
+
+Validation completed:
+
+python -m pytest -q tests/test_kvk_all_import_service.py tests/test_kvk_all_import_dal.py tests/test_kvk_all_importer.py tests/test_kvk_all_schema.py tests/test_kvk_all_recompute_sql_contract.py tests/test_kvk_export_service.py tests/test_gsheet_module.py tests/test_kvk_admin_service.py tests/test_kvk_reporting_service.py
+
+No SQL schema changes, Discord reporting display changes, Google Sheets tab/spreadsheet changes, KVK export result-set changes, Basic Data ingestion, summary tab ingestion, automatic cleanup execution, live production import, live recompute, or live export posting were included in Phase 9.

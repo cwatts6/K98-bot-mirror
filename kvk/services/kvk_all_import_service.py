@@ -135,6 +135,24 @@ def _as_dt(value: Any) -> Any:
         return None
 
 
+def _numeric_series(df: pd.DataFrame, column: str) -> pd.Series:
+    if column not in df.columns:
+        return pd.Series([None] * len(df), index=df.index, dtype=object)
+    return pd.to_numeric(df[column], errors="coerce").astype(object)
+
+
+def _datetime_series(df: pd.DataFrame, column: str) -> pd.Series:
+    if column not in df.columns:
+        return pd.Series([None] * len(df), index=df.index, dtype=object)
+
+    values = pd.to_datetime(df[column], errors="coerce", utc=True)
+    return pd.Series(
+        [None if pd.isna(value) else ensure_aware_utc(value.to_pydatetime()) for value in values],
+        index=df.index,
+        dtype=object,
+    )
+
+
 def coerce_full_data_frame(df: pd.DataFrame) -> pd.DataFrame:
     """Map Full Data v2 workbook columns into the canonical stage contract."""
     missing = [column for column in REQUIRED_MIN_COLUMNS if column not in df.columns]
@@ -142,19 +160,19 @@ def coerce_full_data_frame(df: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"Missing required column(s): {', '.join(missing)}")
 
     out = pd.DataFrame()
-    out["governor_id"] = df["governor_id"].map(_as_int)
+    out["governor_id"] = _numeric_series(df, "governor_id")
     out["name"] = df["name"].map(_as_str) if "name" in df.columns else None
-    out["kingdom"] = df["kingdom"].map(_as_int)
-    out["campid"] = df.get("campid").map(_as_int) if "campid" in df.columns else None
+    out["kingdom"] = _numeric_series(df, "kingdom")
+    out["campid"] = _numeric_series(df, "campid")
 
     for source_col, target_col in FULL_DATA_NUMERIC_COLUMN_MAP.items():
-        out[target_col] = df[source_col].map(_as_int) if source_col in df.columns else None
+        out[target_col] = _numeric_series(df, source_col)
 
     for column in LEGACY_STAGE_NUMERIC_COLUMNS:
-        out[column] = df[column].map(_as_int) if column in df.columns else None
+        out[column] = _numeric_series(df, column)
 
-    out["first_updateUTC"] = df.get("first_updateUTC", pd.Series([None] * len(df))).map(_as_dt)
-    out["last_updateUTC"] = df.get("last_updateUTC", pd.Series([None] * len(df))).map(_as_dt)
+    out["first_updateUTC"] = _datetime_series(df, "first_updateUTC")
+    out["last_updateUTC"] = _datetime_series(df, "last_updateUTC")
 
     if out["governor_id"].isna().any() or out["kingdom"].isna().any():
         raise ValueError("One or more rows missing governor_id or kingdom after coercion.")
