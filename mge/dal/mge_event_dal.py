@@ -410,13 +410,14 @@ def apply_open_mode_switch_atomic(
 ) -> int:
     """
     Atomically:
-      - hard delete awards for this event
-      - hard delete signups
+      - hard delete awards for this event (written to MGE_AwardAudit first)
+      - hard delete signups for this event (written to MGE_SignupAudit)
       - switch event mode/rule mode/rules text
-      - write MGE_AwardAudit for deleted awards
       - write MGE_RuleAudit
-      - write MGE_SignupAudit (bulk_delete_open_switch)
-    Returns deleted row count.
+
+    Returns the number of signup rows deleted (not total rows deleted across
+    all tables).  Award deletions are captured in MGE_AwardAudit and their
+    count is embedded in the MGE_SignupAudit DetailsJson payload.
     """
 
     def _callback(cur):
@@ -478,7 +479,7 @@ def apply_open_mode_switch_atomic(
             """,
             (event_id,),
         )
-        deleted_count = int(cur.rowcount or 0)
+        deleted_signup_count = int(cur.rowcount or 0)
 
         cur.execute(
             """
@@ -505,7 +506,7 @@ def apply_open_mode_switch_atomic(
         details_json = json.dumps(
             {
                 "action": "bulk_delete_open_switch",
-                "deleted_signup_count": deleted_count,
+                "deleted_signup_count": deleted_signup_count,
                 "deleted_award_count": deleted_award_count,
             },
             ensure_ascii=False,
@@ -520,7 +521,7 @@ def apply_open_mode_switch_atomic(
             """,
             (event_id, actor_discord_id, details_json),
         )
-        return deleted_count
+        return deleted_signup_count
 
     result = exec_with_cursor(_callback)
     if result is None:
