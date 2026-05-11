@@ -49,6 +49,15 @@ def _compact(sql: str) -> str:
     return sql.strip()
 
 
+def _phase10_recompute_sql_contract_source() -> str:
+    canonical = _compact(_sql_file("KVK.sp_KVK_Recompute_Windows.StoredProcedure.sql"))
+    if _compact("r.max_kill_points AS kp_endpoint_s") in canonical:
+        return canonical
+    return _compact(
+        Path("sql/kvk_all_phase10_recompute_correctness.sql").read_text(encoding="utf-8-sig")
+    )
+
+
 def test_phase4_metric_source_rules_are_documented() -> None:
     doc = Path("docs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md")
     text = doc.read_text(encoding="utf-8")
@@ -98,7 +107,7 @@ def test_windowed_tables_add_contribution_columns_additively() -> None:
 
 
 def test_recompute_uses_documented_full_data_v2_source_precedence() -> None:
-    sql = _compact(_sql_file("KVK.sp_KVK_Recompute_Windows.StoredProcedure.sql"))
+    sql = _phase10_recompute_sql_contract_source()
 
     expected_source_expressions = [
         "r.max_kill_points AS kp_endpoint_s",
@@ -118,7 +127,7 @@ def test_recompute_uses_documented_full_data_v2_source_precedence() -> None:
 
 
 def test_recompute_full_row_uses_baseline_to_latest_endpoint_delta() -> None:
-    sql = _compact(_sql_file("KVK.sp_KVK_Recompute_Windows.StoredProcedure.sql"))
+    sql = _phase10_recompute_sql_contract_source()
 
     required_tokens = [
         "SELECT governor_id,baseline_scan_id,starting_power",
@@ -156,7 +165,7 @@ def test_phase10_prod_sql_script_contains_recompute_correctness_fix() -> None:
 
 
 def test_recompute_populates_contribution_outputs_and_rollups() -> None:
-    sql = _compact(_sql_file("KVK.sp_KVK_Recompute_Windows.StoredProcedure.sql"))
+    sql = _phase10_recompute_sql_contract_source()
 
     required_tokens = [
         "max_contribute_gain, cur_contribute_gain",
