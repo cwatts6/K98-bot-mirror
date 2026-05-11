@@ -58,9 +58,9 @@ def _phase10_recompute_sql_contract_source() -> str:
     # script when this Phase 10 endpoint-source token is absent.
     if PHASE_10_RECOMPUTE_SENTINEL in canonical:
         return canonical
-    phase10_sql_repo_script = SQL_SCHEMA / "kvk_all_phase10_recompute_correctness.sql"
-    if phase10_sql_repo_script.exists():
-        return _compact(phase10_sql_repo_script.read_text(encoding="utf-8-sig"))
+    sql_repo_script = SQL_SCHEMA / "kvk_all_phase10_recompute_correctness.sql"
+    if sql_repo_script.exists():
+        return _compact(sql_repo_script.read_text(encoding="utf-8-sig"))
     return _compact(
         Path("sql/kvk_all_phase10_recompute_correctness.sql").read_text(encoding="utf-8-sig")
     )
