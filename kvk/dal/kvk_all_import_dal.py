@@ -295,13 +295,10 @@ def ingest_prepared_import(
     uploader_id: int,
     scan_ts_utc: dt.datetime,
 ) -> dict[str, Any]:
-    stage_rows_started = time.perf_counter()
     df = prepared.dataframe
     staged_rows = prepared.staged_rows
     sheet_name = prepared.sheet_name
     schema_metadata = prepared.schema_metadata
-    stage_rows = rows_for_stage("", df)
-    stage_rows_ms = (time.perf_counter() - stage_rows_started) * 1000.0
 
     cur = con.cursor()
     enable_fast_executemany(cur)
@@ -330,9 +327,11 @@ def ingest_prepared_import(
             }
 
     token = str(uuid.uuid4())
-    stage_insert_rows = [(token, *row[1:]) for row in stage_rows]
+    stage_rows_started = time.perf_counter()
+    stage_rows = rows_for_stage(token, df)
+    stage_rows_ms = (time.perf_counter() - stage_rows_started) * 1000.0
     stage_insert_started = time.perf_counter()
-    cur.executemany(STAGE_INSERT_SQL, stage_insert_rows)
+    cur.executemany(STAGE_INSERT_SQL, stage_rows)
     con.commit()
     stage_insert_ms = (time.perf_counter() - stage_insert_started) * 1000.0
 
