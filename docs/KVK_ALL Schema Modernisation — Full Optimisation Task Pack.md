@@ -37,6 +37,8 @@ Phase 7 is complete and deployed.
 
 Phase 8 is complete and deployed.
 
+Phase 9 is complete and deployed.
+
 Completed Phase 1 scope:
 
 strict Full Data workbook detection
@@ -121,7 +123,7 @@ Phase 8 did not introduce Basic Data ingestion, summary tab ingestion, Discord r
 
 Next phase:
 
-Phase 9 — End-to-End Performance & Restart Safety Hardening
+Phase 10 — Full Run Diagnostics, Output Correctness & Recompute Bug Fixing
 
 Completion Rule
 This work is not complete until all items previously identified as deferred optimisations are implemented or explicitly resolved inside this programme.
@@ -962,6 +964,9 @@ Diagnostic audit visibility was confirmed with a phase8_smoke row.
 No Discord reporting display changes, Google Sheets export contract changes, KVK export result-set changes, Basic Data ingestion, summary tab ingestion, automatic cleanup execution, or Phase 9 restart/performance hardening were included in Phase 8.
 
 Phase 9 — End-to-End Performance & Restart Safety Hardening
+Status
+Complete and deployed.
+
 Goal
 Final optimisation and validation pass.
 
@@ -1099,3 +1104,68 @@ Validation completed:
 python -m pytest -q tests/test_kvk_all_import_service.py tests/test_kvk_all_import_dal.py tests/test_kvk_all_importer.py tests/test_kvk_all_schema.py tests/test_kvk_all_recompute_sql_contract.py tests/test_kvk_export_service.py tests/test_gsheet_module.py tests/test_kvk_admin_service.py tests/test_kvk_reporting_service.py
 
 No SQL schema changes, Discord reporting display changes, Google Sheets tab/spreadsheet changes, KVK export result-set changes, Basic Data ingestion, summary tab ingestion, automatic cleanup execution, live production import, live recompute, or live export posting were included in Phase 9.
+
+Production smoke completed after deployment:
+
+Four KVK_ALL Full Data workbooks were uploaded and ingested for KVK 15:
+
+Scan 1: 1086045_05_08_2026_02_21_38_AM.xlsx, 5,000 rows.
+Scan 2: 1086045_05_09_2026_02_13_52_PM.xlsx, 5,000 rows.
+Scan 3: 1086045_05_10_2026_10_06_04_PM.xlsx, 5,000 rows.
+Scan 4: 1086045_05_11_2026_10_00_41_AM.xlsx, 5,000 rows.
+
+KVK.KVK_Scan confirmed all four scans with schema_version kvk_all_full_data_v2 and source_sheet_name Full Data.
+KVK.KVK_AllPlayers_Raw confirmed 20,000 rows for KVK 15, matching 4 scans x 5,000 rows.
+KVK.KVK_Ingest_Diagnostics contained only the prior phase8_smoke diagnostic and no failed/rejected diagnostics from these uploads.
+SQL log headroom checks passed before each ingest with reuse_wait=NOTHING and low log usage.
+Google Sheets auto-export completed and updated PASS4 and ALL_WINDOW_COMPARISON outputs without changing established tab names.
+
+Phase 9 deployment smoke also surfaced a Phase 10 correctness finding:
+
+Full Data v2 recompute window calculations can incorrectly return zero gains when diff fields such as kill_points_diff and points_difference are present but zero while raw cumulative endpoint fields change across scans. Example: governor_id 45227155 has max_kill_points increasing from 3,380,153,250 at Scan 2 to 3,478,156,090 at Scan 3, so Pass 4 kp_gain should be 98,002,840, but current KVK.sp_KVK_Recompute_Windows output shows zero. This is assigned to Phase 10.
+
+Phase 10 — Full Run Diagnostics, Output Correctness & Recompute Bug Fixing
+Goal
+Run a full end-to-end diagnostic correctness pass using consecutive real workbook samples, validate all SQL outputs and spreadsheet/export calculations, and fix discovered recompute/window correctness bugs while preserving the established Phase 1-9 import, export, Google Sheets, Discord reporting, admin command, and diagnostic contracts.
+
+In Scope
+Use the deployed KVK 15 sample scans from 8 May, 9 May, 10 May, and 11 May 2026 as the primary diagnostic dataset.
+Validate KVK.KVK_Scan, KVK.KVK_AllPlayers_Raw, KVK.KVK_Windows, KVK.KVK_Player_Windowed, KVK.KVK_Kingdom_Windowed, KVK.KVK_Camp_Windowed, KVK.KVK_Player_Baseline, KVK.KVK_Ingest_Negatives, KVK.KVK_Ingest_Diagnostics, and KVK export result sets against expected sample-derived calculations.
+Validate source-of-truth semantics for Full Data v2 cumulative endpoint columns versus diff columns.
+Fix KVK.sp_KVK_Recompute_Windows so Full Data v2 window calculations use the correct endpoint deltas when diff columns are zero or non-authoritative.
+Validate player, kingdom, and camp rollups after recompute.
+Validate Baseline, Full, Pass 4, and any configured future windows using sample-derived expected values.
+Validate KVK.sp_KVK_Get_Exports result-set shape and values after recompute fixes.
+Validate Google Sheets output values where practical without changing spreadsheet names, tab names, or result-set contracts.
+Add diagnostic SQL scripts or Python scripts where useful for repeatable comparison of raw scans to recompute outputs.
+Add SQL contract tests and/or fixture-style tests for the discovered zero-diff/nonzero-endpoint bug.
+Capture any larger analytics or redesign findings structurally.
+
+Known Phase 10 Bug In Scope
+Area: KVK.sp_KVK_Recompute_Windows
+Description: Full Data v2 scans can persist diff fields as zero while raw cumulative endpoint fields such as max_kill_points, max_kills_iv, max_kills_v, max_dead, max_units_healed, and contribution endpoint fields move between scans. Current recompute precedence can select the zero diff value before using raw endpoint fields, producing zero window gains.
+Expected Fix: For schema_version kvk_all_full_data_v2, compute window deltas from raw cumulative endpoint fields across StartScanID and EndScanID where those fields are available. Preserve legacy compatibility for older rows that depend on diff fields.
+Example: KVK 15, governor_id 45227155, Pass 4 window StartScanID=2 and EndScanID=3 should produce kp_gain 98,002,840 from max_kill_points delta.
+
+Out of Scope
+Basic Data ingestion.
+Summary tab ingestion.
+Discord reporting display changes unless explicitly approved as a bug fix.
+New contribution fields in Discord embeds.
+Google Sheets spreadsheet or tab name changes.
+KVK export result-set count/order changes unless explicitly approved.
+Unrelated stats, rankings, history, reporting, personal KVK, or admin command redesign.
+Large upload-route extraction from DL_bot.py unless separately approved.
+Automatic diagnostic cleanup deletes without explicit dry-run review.
+Production promotion before local validation.
+
+Acceptance Criteria
+Full Data v2 ingest remains stable for the sample workbooks.
+Expected sample-derived player window values match KVK.KVK_Player_Windowed for representative players, including the known governor_id 45227155 Pass 4 kp_gain case.
+Kingdom and camp rollups match player-windowed sums.
+Baseline and Full outputs have documented and validated semantics.
+Export result sets remain at 10 and preserve existing section meanings.
+Google Sheets tab names and spreadsheet names remain stable.
+No Basic Data or summary tab ingestion is introduced.
+Tests or repeatable diagnostic scripts cover changed recompute behaviour.
+Any remaining correctness blocker is explicitly documented with owner, risk, and next action.

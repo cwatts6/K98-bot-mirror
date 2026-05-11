@@ -67,6 +67,23 @@ def test_phase4_metric_source_rules_are_documented() -> None:
         assert token in text
 
 
+def test_phase10_metric_source_correction_is_documented() -> None:
+    doc = Path("docs/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md")
+    text = doc.read_text(encoding="utf-8")
+
+    required_tokens = [
+        "configured windows such as Pass 4 use cumulative\nendpoint deltas",
+        "`End.max_kill_points - Start.max_kill_points`",
+        "Legacy diff fields remain fallback inputs",
+        "Zero diff fields are not authoritative for Full Data v2 configured windows",
+        "`Full` output rows represent baseline-to-latest values",
+        "Older 22-column Full Data workbooks do not contain raw endpoint families",
+    ]
+
+    for token in required_tokens:
+        assert token in text
+
+
 def test_windowed_tables_add_contribution_columns_additively() -> None:
     table_files = [
         "KVK.KVK_Player_Windowed.Table.sql",
@@ -84,14 +101,57 @@ def test_recompute_uses_documented_full_data_v2_source_precedence() -> None:
     sql = _compact(_sql_file("KVK.sp_KVK_Recompute_Windows.StoredProcedure.sql"))
 
     expected_source_expressions = [
-        "COALESCE(r.kill_points_diff, r.points_difference, r.max_kill_points - r.min_kill_points, 0)",
-        "COALESCE(r.healed_troops, r.max_units_healed_diff, r.max_units_healed - r.min_units_healed, 0)",
-        "COALESCE(r.max_contribute_diff, r.max_max_contribute - r.min_max_contribute, 0)",
-        "COALESCE(r.cur_contribute_diff, r.max_cur_contribute - r.min_cur_contribute, 0)",
+        "r.max_kill_points AS kp_endpoint_s",
+        "r.max_kill_points AS kp_endpoint_e",
+        "COALESCE(r.kill_points_diff, r.points_difference, 0) AS kp_legacy_s",
+        "COALESCE(r.kill_points_diff, r.points_difference, 0) AS kp_legacy_e",
+        "r.max_units_healed AS heals_endpoint_s",
+        "r.max_units_healed AS heals_endpoint_e",
+        "COALESCE(r.healed_troops, r.max_units_healed_diff, 0) AS heals_legacy_s",
+        "COALESCE(r.healed_troops, r.max_units_healed_diff, 0) AS heals_legacy_e",
+        "CASE WHEN E.kp_endpoint_e IS NOT NULL AND S.kp_endpoint_s IS NOT NULL THEN E.kp_endpoint_e - S.kp_endpoint_s ELSE ISNULL(E.kp_legacy_e,0) - ISNULL(S.kp_legacy_s,0) END AS kp_gain",
+        "CASE WHEN E.max_contrib_endpoint_e IS NOT NULL AND S.max_contrib_endpoint_s IS NOT NULL THEN E.max_contrib_endpoint_e - S.max_contrib_endpoint_s ELSE ISNULL(E.max_contrib_legacy_e,0) - ISNULL(S.max_contrib_legacy_s,0) END AS max_contribute_gain",
     ]
 
     for expression in expected_source_expressions:
         assert _compact(expression) in sql
+
+
+def test_recompute_full_row_uses_baseline_to_latest_endpoint_delta() -> None:
+    sql = _compact(_sql_file("KVK.sp_KVK_Recompute_Windows.StoredProcedure.sql"))
+
+    required_tokens = [
+        "SELECT governor_id,baseline_scan_id,starting_power",
+        "AND r.ScanID = B.baseline_scan_id",
+        "CASE WHEN E.max_kill_points IS NOT NULL AND S.max_kill_points IS NOT NULL THEN E.max_kill_points-S.max_kill_points ELSE E.legacy_kp END AS kp",
+        "CASE WHEN E.max_kills_iv IS NOT NULL AND S.max_kills_iv IS NOT NULL THEN E.max_kills_iv-S.max_kills_iv ELSE E.legacy_t4 END AS t4",
+        "CASE WHEN E.max_kills_v IS NOT NULL AND S.max_kills_v IS NOT NULL THEN E.max_kills_v-S.max_kills_v ELSE E.legacy_t5 END AS t5",
+        "CASE WHEN E.max_dead IS NOT NULL AND S.max_dead IS NOT NULL THEN E.max_dead-S.max_dead ELSE E.legacy_deads END AS deads",
+        "CASE WHEN E.max_units_healed IS NOT NULL AND S.max_units_healed IS NOT NULL THEN E.max_units_healed-S.max_units_healed ELSE E.legacy_heals END AS heals",
+    ]
+
+    for token in required_tokens:
+        assert _compact(token) in sql
+
+
+def test_phase10_prod_sql_script_contains_recompute_correctness_fix() -> None:
+    script = Path("sql/kvk_all_phase10_recompute_correctness.sql").read_text(encoding="utf-8-sig")
+    compact = _compact(script)
+
+    required_tokens = [
+        "KVK_ALL Schema Modernisation - Phase 10 Recompute Correctness",
+        "ALTER PROCEDURE [KVK].[sp_KVK_Recompute_Windows]",
+        "r.max_kill_points AS kp_endpoint_s",
+        "COALESCE(r.kill_points_diff, r.points_difference, 0) AS kp_legacy_s",
+        "THEN E.kp_endpoint_e - S.kp_endpoint_s",
+        "ELSE E.legacy_kp END AS kp",
+        "max_contribute_gain",
+        "cur_contribute_gain",
+        "GO",
+    ]
+
+    for token in required_tokens:
+        assert _compact(token) in compact
 
 
 def test_recompute_populates_contribution_outputs_and_rollups() -> None:
@@ -99,8 +159,10 @@ def test_recompute_populates_contribution_outputs_and_rollups() -> None:
 
     required_tokens = [
         "max_contribute_gain, cur_contribute_gain",
-        "ISNULL(E.max_contrib_e,0)- ISNULL(S.max_contrib_s,0) AS max_contribute_gain",
-        "ISNULL(E.cur_contrib_e,0)- ISNULL(S.cur_contrib_s,0) AS cur_contribute_gain",
+        "THEN E.max_contrib_endpoint_e-S.max_contrib_endpoint_s",
+        "ELSE ISNULL(E.max_contrib_legacy_e,0)-ISNULL(S.max_contrib_legacy_s,0) END AS max_contribute_gain",
+        "THEN E.cur_contrib_endpoint_e-S.cur_contrib_endpoint_s",
+        "ELSE ISNULL(E.cur_contrib_legacy_e,0)-ISNULL(S.cur_contrib_legacy_s,0) END AS cur_contribute_gain",
         "SUM(p.max_contribute_gain) AS max_contribute_gain",
         "SUM(p.cur_contribute_gain) AS cur_contribute_gain",
         "K.max_contribute_gain, K.cur_contribute_gain",
