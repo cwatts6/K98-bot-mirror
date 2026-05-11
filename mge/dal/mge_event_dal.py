@@ -132,7 +132,7 @@ WHERE EventId = ?;
 """
 
 SQL_SELECT_EVENT_SWITCH_CONTEXT = """
-SELECT EventId, Status, RuleMode, RulesText
+SELECT EventId, EventMode, Status, RuleMode, RulesText
 FROM dbo.MGE_Events
 WHERE EventId = ?;
 """
@@ -410,14 +410,67 @@ def apply_open_mode_switch_atomic(
 ) -> int:
     """
     Atomically:
+      - hard delete awards for this event
       - hard delete signups
       - switch event mode/rule mode/rules text
+      - write MGE_AwardAudit for deleted awards
       - write MGE_RuleAudit
       - write MGE_SignupAudit (bulk_delete_open_switch)
     Returns deleted row count.
     """
 
     def _callback(cur):
+        cur.execute(
+            """
+            SELECT EventId
+            FROM dbo.MGE_Events WITH (UPDLOCK, HOLDLOCK)
+            WHERE EventId = ?;
+            """,
+            (event_id,),
+        )
+        if cur.fetchone() is None:
+            return None
+
+        award_details_json = json.dumps(
+            {"action": "bulk_delete_open_switch"},
+            ensure_ascii=False,
+        )
+
+        cur.execute(
+            """
+            INSERT INTO dbo.MGE_AwardAudit
+                (AwardId, EventId, GovernorId, ActionType, ActorDiscordId,
+                 OldRank, NewRank, OldStatus, NewStatus, OldTargetScore, NewTargetScore,
+                 DetailsJson, CreatedUtc)
+            SELECT
+                AwardId,
+                EventId,
+                GovernorId,
+                'bulk_delete_open_switch',
+                ?,
+                AwardedRank,
+                NULL,
+                AwardStatus,
+                'removed',
+                TargetScore,
+                TargetScore,
+                ?,
+                SYSUTCDATETIME()
+            FROM dbo.MGE_Awards
+            WHERE EventId = ?;
+            """,
+            (actor_discord_id, award_details_json, event_id),
+        )
+        deleted_award_count = int(cur.rowcount or 0)
+
+        cur.execute(
+            """
+            DELETE FROM dbo.MGE_Awards
+            WHERE EventId = ?;
+            """,
+            (event_id,),
+        )
+
         cur.execute(
             """
             DELETE FROM dbo.MGE_Signups
@@ -453,6 +506,7 @@ def apply_open_mode_switch_atomic(
             {
                 "action": "bulk_delete_open_switch",
                 "deleted_signup_count": deleted_count,
+                "deleted_award_count": deleted_award_count,
             },
             ensure_ascii=False,
         )
