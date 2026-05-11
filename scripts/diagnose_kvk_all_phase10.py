@@ -97,22 +97,22 @@ def _governor_window(
             "error": "Governor missing from start or end scan",
         }
 
-    start = rows.loc[start_scan]
-    end = rows.loc[end_scan]
+    start = rows.loc[[start_scan]]
+    end = rows.loc[[end_scan]]
     expected: dict[str, int] = {}
     legacy_diff_delta: dict[str, int] = {}
     for name, endpoint_col, diff_col in METRICS:
-        expected[name] = int(pd.to_numeric(end[endpoint_col], errors="coerce")) - int(
-            pd.to_numeric(start[endpoint_col], errors="coerce")
+        expected[name] = int(
+            (_int_series(end, endpoint_col) - _int_series(start, endpoint_col)).iloc[0]
         )
-        legacy_diff_delta[name] = int(pd.to_numeric(end[diff_col], errors="coerce")) - int(
-            pd.to_numeric(start[diff_col], errors="coerce")
+        legacy_diff_delta[name] = int(
+            (_int_series(end, diff_col) - _int_series(start, diff_col)).iloc[0]
         )
 
     return {
         "governor_id": governor_id,
-        "name": str(end.get("name", "")),
-        "kingdom": int(end.get("kingdom", 0)),
+        "name": str(end["name"].iloc[0] if "name" in end.columns else ""),
+        "kingdom": int(_int_series(end, "kingdom").iloc[0]),
         "start_scan": start_scan,
         "end_scan": end_scan,
         "expected_endpoint_delta": expected,
