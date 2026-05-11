@@ -17,7 +17,7 @@ SET QUOTED_IDENTIFIER ON
 GO
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[KVK].[sp_KVK_Recompute_Windows]') AND type in (N'P', N'PC'))
 BEGIN
-EXEC dbo.sp_executesql @statement = N'CREATE PROCEDURE [KVK].[sp_KVK_Recompute_Windows] AS' 
+EXEC dbo.sp_executesql @statement = N'CREATE PROCEDURE [KVK].[sp_KVK_Recompute_Windows] AS'
 END
 GO
 ALTER PROCEDURE [KVK].[sp_KVK_Recompute_Windows]
@@ -129,12 +129,12 @@ BEGIN
 				WHEN w.EndScanID > @MaxScanID THEN @MaxScanID  -- ← NEW: Safety cap
 				ELSE w.EndScanID
 			END AS EndScanID
- 		FROM KVK.KVK_Windows w WITH (READCOMMITTEDLOCK)
- 		WHERE w.KVK_NO = @KVK_NO
- 		  AND w.StartScanID IS NOT NULL
+		FROM KVK.KVK_Windows w WITH (READCOMMITTEDLOCK)
+		WHERE w.KVK_NO = @KVK_NO
+		  AND w.StartScanID IS NOT NULL
 		  AND w.StartScanID <= @MaxScanID
- 		  AND w.WindowName <> N'Baseline'
- 	),
+		  AND w.WindowName <> N'Baseline'
+	),
     S AS (
         SELECT
             W.WindowName, W.StartScanID, W.EndScanID,
@@ -493,10 +493,4 @@ BEGIN
 
     RETURN 0;
 END
-
-
-
-
-
 GO
-
