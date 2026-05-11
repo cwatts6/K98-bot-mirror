@@ -60,7 +60,7 @@ def load_allkingdom_reporting_blocks(
     """Return structured KVK all-kingdom reporting blocks.
 
     Acclaim gain is included in each row for downstream structured use,
-    but the Discord embed phase intentionally does not render them.
+    but the Discord embed phase intentionally does not render it.
     """
     resolved_kingdom = _resolve_our_kingdom(our_kingdom)
     raw_blocks = kvk_reporting_dal.fetch_allkingdom_reporting_rows(
