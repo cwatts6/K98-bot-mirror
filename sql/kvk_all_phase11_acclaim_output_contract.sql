@@ -61,7 +61,10 @@ BEGIN
         WindowSeq,
         StartScanID,
         EndScanID,
-        COALESCE(EndScanID, @MaxScanID) AS EffectiveEndScanID,
+        CASE
+            WHEN EndScanID IS NULL OR EndScanID > @MaxScanID THEN @MaxScanID
+            ELSE EndScanID
+        END AS EffectiveEndScanID,
         Notes,
         UpdatedAtUTC
     FROM KVK.KVK_Windows
