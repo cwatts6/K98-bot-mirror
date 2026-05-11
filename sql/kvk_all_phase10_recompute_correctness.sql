@@ -129,11 +129,12 @@ BEGIN
 				WHEN w.EndScanID > @MaxScanID THEN @MaxScanID  -- ← NEW: Safety cap
 				ELSE w.EndScanID
 			END AS EndScanID
-		FROM KVK.KVK_Windows w WITH (READCOMMITTEDLOCK)
-		WHERE w.KVK_NO = @KVK_NO
-		  AND w.StartScanID IS NOT NULL
-		  AND w.WindowName <> N'Baseline'
-	),
+ 		FROM KVK.KVK_Windows w WITH (READCOMMITTEDLOCK)
+ 		WHERE w.KVK_NO = @KVK_NO
+ 		  AND w.StartScanID IS NOT NULL
+		  AND w.StartScanID <= @MaxScanID
+ 		  AND w.WindowName <> N'Baseline'
+ 	),
     S AS (
         SELECT
             W.WindowName, W.StartScanID, W.EndScanID,
@@ -498,5 +499,4 @@ END
 
 
 GO
-
 

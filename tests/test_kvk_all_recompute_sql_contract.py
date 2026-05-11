@@ -141,6 +141,7 @@ def test_phase10_prod_sql_script_contains_recompute_correctness_fix() -> None:
     required_tokens = [
         "KVK_ALL Schema Modernisation - Phase 10 Recompute Correctness",
         "ALTER PROCEDURE [KVK].[sp_KVK_Recompute_Windows]",
+        "AND w.StartScanID <= @MaxScanID",
         "r.max_kill_points AS kp_endpoint_s",
         "COALESCE(r.kill_points_diff, r.points_difference, 0) AS kp_legacy_s",
         "THEN E.kp_endpoint_e - S.kp_endpoint_s",
