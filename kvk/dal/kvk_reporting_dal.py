@@ -78,12 +78,10 @@ def fetch_top_players(
                p.healed_troops,
                p.KP AS kp_gain,
                (p.t4*w.X + p.t5*w.Y + p.deads*w.Z) AS dkp,
-               ISNULL(contrib.max_contribute_gain, 0) AS max_contribute_gain,
-               ISNULL(contrib.cur_contribute_gain, 0) AS cur_contribute_gain
+               ISNULL(contrib.acclaim_gain, 0) AS acclaim_gain
         FROM dbo.fn_KVK_Player_Aggregated(?) p
         OUTER APPLY (
-            SELECT SUM(ISNULL(pw.max_contribute_gain, 0)) AS max_contribute_gain,
-                   SUM(ISNULL(pw.cur_contribute_gain, 0)) AS cur_contribute_gain
+            SELECT SUM(ISNULL(pw.cur_contribute_gain, 0)) AS acclaim_gain
             FROM KVK.KVK_Player_Windowed pw
             JOIN KVK.KVK_Windows ww
               ON ww.KVK_NO = pw.KVK_NO
@@ -114,12 +112,10 @@ def fetch_top_kingdoms(cursor: Any, kvk_no: int, *, sort_by: TopSort) -> list[di
                a.KP AS kp_gain,
                a.healed_troops,
                (a.t4*w.X + a.t5*w.Y + a.deads*w.Z) AS dkp,
-               ISNULL(contrib.max_contribute_gain, 0) AS max_contribute_gain,
-               ISNULL(contrib.cur_contribute_gain, 0) AS cur_contribute_gain
+               ISNULL(contrib.acclaim_gain, 0) AS acclaim_gain
         FROM dbo.fn_KVK_Kingdom_Aggregated(?) a
         OUTER APPLY (
-            SELECT SUM(ISNULL(kw.max_contribute_gain, 0)) AS max_contribute_gain,
-                   SUM(ISNULL(kw.cur_contribute_gain, 0)) AS cur_contribute_gain
+            SELECT SUM(ISNULL(kw.cur_contribute_gain, 0)) AS acclaim_gain
             FROM KVK.KVK_Kingdom_Windowed kw
             JOIN KVK.KVK_Windows ww
               ON ww.KVK_NO = kw.KVK_NO
@@ -148,12 +144,10 @@ def fetch_top_camps(cursor: Any, kvk_no: int, *, sort_by: TopSort) -> list[dict[
                a.KP AS kp_gain,
                a.healed_troops,
                (a.t4*w.X + a.t5*w.Y + a.deads*w.Z) AS dkp,
-               ISNULL(contrib.max_contribute_gain, 0) AS max_contribute_gain,
-               ISNULL(contrib.cur_contribute_gain, 0) AS cur_contribute_gain
+               ISNULL(contrib.acclaim_gain, 0) AS acclaim_gain
         FROM dbo.fn_KVK_Camp_Aggregated(?) a
         OUTER APPLY (
-            SELECT SUM(ISNULL(cw.max_contribute_gain, 0)) AS max_contribute_gain,
-                   SUM(ISNULL(cw.cur_contribute_gain, 0)) AS cur_contribute_gain
+            SELECT SUM(ISNULL(cw.cur_contribute_gain, 0)) AS acclaim_gain
             FROM KVK.KVK_Camp_Windowed cw
             JOIN KVK.KVK_Windows ww
               ON ww.KVK_NO = cw.KVK_NO
@@ -182,8 +176,7 @@ def fetch_kingdom_summary(cursor: Any, kvk_no: int, kingdom: int) -> list[dict[s
                SELECT SUM(ISNULL(t4_kills,0)) AS t4, SUM(ISNULL(t5_kills,0)) AS t5, SUM(ISNULL(deads,0)) AS deads,
                       SUM(ISNULL(healed_troops,0)) AS healed_troops,
                       SUM(ISNULL(kp_gain,0)) AS kp_gain,
-                      SUM(ISNULL(max_contribute_gain,0)) AS max_contribute_gain,
-                      SUM(ISNULL(cur_contribute_gain,0)) AS cur_contribute_gain
+                      SUM(ISNULL(cur_contribute_gain,0)) AS acclaim_gain
                FROM KVK.KVK_Kingdom_Windowed kw
                JOIN W ON W.WindowName = kw.WindowName
                WHERE kw.KVK_NO=? AND kw.kingdom=?
@@ -194,8 +187,7 @@ def fetch_kingdom_summary(cursor: Any, kvk_no: int, kingdom: int) -> list[dict[s
              )
         SELECT (a.t4+a.t5) AS kills_gain, a.deads, a.healed_troops, a.kp_gain,
                (a.t4*X + a.t5*Y + a.deads*Z) AS dkp,
-               a.max_contribute_gain,
-               a.cur_contribute_gain
+               a.acclaim_gain
         FROM Agg a CROSS JOIN Wt;
         """,
         (kvk_no, kvk_no, kingdom, kvk_no),
@@ -220,8 +212,7 @@ def fetch_camp_summary(cursor: Any, kvk_no: int, camp_id: int) -> list[dict[str,
                SELECT SUM(ISNULL(t4_kills,0)) AS t4, SUM(ISNULL(t5_kills,0)) AS t5, SUM(ISNULL(deads,0)) AS deads,
                       SUM(ISNULL(healed_troops,0)) AS healed_troops,
                       SUM(ISNULL(kp_gain,0)) AS kp_gain,
-                      SUM(ISNULL(max_contribute_gain,0)) AS max_contribute_gain,
-                      SUM(ISNULL(cur_contribute_gain,0)) AS cur_contribute_gain
+                      SUM(ISNULL(cur_contribute_gain,0)) AS acclaim_gain
                FROM KVK.KVK_Camp_Windowed cw
                JOIN W ON W.WindowName = cw.WindowName
                WHERE cw.KVK_NO=? AND cw.campid=?
@@ -232,8 +223,7 @@ def fetch_camp_summary(cursor: Any, kvk_no: int, camp_id: int) -> list[dict[str,
              )
         SELECT (a.t4+a.t5) AS kills_gain, a.deads, a.healed_troops, a.kp_gain,
                (a.t4*X + a.t5*Y + a.deads*Z) AS dkp,
-               a.max_contribute_gain,
-               a.cur_contribute_gain
+               a.acclaim_gain
         FROM Agg a CROSS JOIN Wt;
         """,
         (kvk_no, kvk_no, camp_id, kvk_no),

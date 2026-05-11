@@ -1746,8 +1746,7 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
-        "max_contribute_gain",
-        "cur_contribute_gain",
+        "acclaim_gain",
         "last_scan_id",
     ],
     "KVK_Player_Full": [
@@ -1760,8 +1759,7 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
-        "max_contribute_gain",
-        "cur_contribute_gain",
+        "acclaim_gain",
         "last_scan_id",
     ],
     "KVK_Kingdom_Windowed": [
@@ -1774,8 +1772,7 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
-        "max_contribute_gain",
-        "cur_contribute_gain",
+        "acclaim_gain",
         "last_scan_id",
     ],
     "KVK_Kingdom_Full": [
@@ -1788,8 +1785,7 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
-        "max_contribute_gain",
-        "cur_contribute_gain",
+        "acclaim_gain",
         "last_scan_id",
     ],
     "KVK_Camp_Windowed": [
@@ -1801,8 +1797,7 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
-        "max_contribute_gain",
-        "cur_contribute_gain",
+        "acclaim_gain",
         "last_scan_id",
     ],
     "KVK_Camp_Full": [
@@ -1814,8 +1809,7 @@ _KVK_FORMAT_NUMBERS = {
         "kp_loss",
         "healed_troops",
         "deads",
-        "max_contribute_gain",
-        "cur_contribute_gain",
+        "acclaim_gain",
         "last_scan_id",
     ],
 }

@@ -24,7 +24,7 @@ REPORTING_BLOCK_KEYS: tuple[str, ...] = (
     "our_camp",
 )
 
-CONTRIBUTION_FIELDS: tuple[str, str] = ("max_contribute_gain", "cur_contribute_gain")
+CONTRIBUTION_FIELDS: tuple[str, ...] = ("acclaim_gain",)
 
 
 def _resolve_our_kingdom(our_kingdom: int | None) -> int:
@@ -59,7 +59,7 @@ def load_allkingdom_reporting_blocks(
 ) -> dict[str, list[dict[str, Any]]]:
     """Return structured KVK all-kingdom reporting blocks.
 
-    Contribution metrics are included in each row for downstream structured use,
+    Acclaim gain is included in each row for downstream structured use,
     but the Discord embed phase intentionally does not render them.
     """
     resolved_kingdom = _resolve_our_kingdom(our_kingdom)

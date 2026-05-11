@@ -269,8 +269,7 @@ def test_create_additional_kvk_spreadsheets_accepts_named_export_sections(monkey
                 "kingdom": [98],
                 "campid": [1],
                 "kp_gain": [10],
-                "max_contribute_gain": [5],
-                "cur_contribute_gain": [3],
+                "acclaim_gain": [3],
                 "dkp": [1.0],
             }
         ),

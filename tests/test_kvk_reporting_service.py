@@ -15,8 +15,7 @@ def test_reporting_service_preserves_block_keys_and_adds_contribution_fields(mon
                 "deads": 3,
                 "dkp": 42,
                 "healed_troops": 50,
-                "max_contribute_gain": 7,
-                "cur_contribute_gain": 8,
+                "acclaim_gain": 8,
             }
         ],
         "kingdoms_by_kills": [{"kingdom": 1198, "kills_gain": 1000}],
@@ -38,10 +37,11 @@ def test_reporting_service_preserves_block_keys_and_adds_contribution_fields(mon
 
     assert captured["args"] == (12, 1198)
     assert tuple(blocks) == kvk_reporting_service.REPORTING_BLOCK_KEYS
-    assert blocks["players_by_kills"][0]["max_contribute_gain"] == 7
-    assert blocks["players_by_kills"][0]["cur_contribute_gain"] == 8
-    assert blocks["kingdoms_by_kills"][0]["max_contribute_gain"] == 0
-    assert blocks["camps_by_kills"][0]["cur_contribute_gain"] == 0
+    assert blocks["players_by_kills"][0]["acclaim_gain"] == 8
+    assert "max_contribute_gain" not in blocks["players_by_kills"][0]
+    assert "cur_contribute_gain" not in blocks["players_by_kills"][0]
+    assert blocks["kingdoms_by_kills"][0]["acclaim_gain"] == 0
+    assert blocks["camps_by_kills"][0]["acclaim_gain"] == 0
     assert blocks["players_by_deads"] == []
     assert blocks["our_camp"] == []
 

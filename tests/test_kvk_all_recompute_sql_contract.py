@@ -201,7 +201,8 @@ def test_export_contract_keeps_ten_result_sets_and_no_full_select_star() -> None
     assert "SELECT * FROM KVK.KVK_Player_Windowed" not in compact
     assert "SELECT * FROM KVK.KVK_Kingdom_Windowed" not in compact
     assert "SELECT * FROM KVK.KVK_Camp_Windowed" not in compact
-    assert compact.count("max_contribute_gain,cur_contribute_gain") >= 6
+    assert compact.count("cur_contribute_gain AS acclaim_gain") >= 6
+    assert "max_contribute_gain" not in compact
 
     tabs = Path("gsheet_module.py").read_text(encoding="utf-8") + Path(
         "kvk/services/kvk_export_service.py"
@@ -262,6 +263,35 @@ def test_phase5_prod_sql_script_contains_export_contract_changes() -> None:
 
     for token in required_tokens:
         assert token in script
+
+
+def test_phase11_export_and_fighting_dataset_use_player_facing_acclaim_contract() -> None:
+    export_sql = _sql_file("KVK.sp_KVK_Get_Exports.StoredProcedure.sql")
+    export_compact = _compact(export_sql)
+    view_sql = _sql_file("KVK.vw_FightingDataset.View.sql")
+    view_compact = _compact(view_sql)
+    script = Path("sql/kvk_all_phase11_acclaim_output_contract.sql").read_text(encoding="utf-8-sig")
+    script_compact = _compact(script)
+
+    for section in range(1, 11):
+        assert f"-- {section})" in export_sql
+    assert "-- 11)" not in export_sql
+
+    for sql in (export_compact, script_compact):
+        assert sql.count("cur_contribute_gain AS acclaim_gain") >= 6
+        assert "max_contribute_gain" not in sql
+
+    assert "SELECT p.*" not in view_compact
+    assert "cur_contribute_gain AS acclaim_gain" in view_compact
+    assert "max_contribute_gain" not in view_compact
+    assert "ALTER VIEW [KVK].[vw_FightingDataset]" in view_sql
+
+    tabs = Path("gsheet_module.py").read_text(encoding="utf-8") + Path(
+        "kvk/services/kvk_export_service.py"
+    ).read_text(encoding="utf-8")
+    assert '"acclaim_gain"' in tabs
+    assert '"cur_contribute_gain"' not in tabs
+    assert '"max_contribute_gain"' not in tabs
 
 
 def test_phase8_sql_repo_contains_diagnostic_and_cleanup_contract() -> None:

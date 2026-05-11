@@ -15,8 +15,7 @@ def test_kvk_top_list_ignores_structured_contribution_fields() -> None:
                 "deads": 9,
                 "dkp": 42,
                 "healed_troops": 100,
-                "max_contribute_gain": 999,
-                "cur_contribute_gain": 888,
+                "acclaim_gain": 888,
             }
         ],
         name_key="name",
@@ -31,6 +30,7 @@ def test_kvk_top_list_ignores_structured_contribution_fields() -> None:
     assert "dkp:" in text
     assert "healed:" in text
     assert "contribute" not in text.lower()
+    assert "acclaim" not in text.lower()
     assert "999" not in text
     assert "888" not in text
 

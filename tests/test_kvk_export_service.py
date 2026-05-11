@@ -49,8 +49,7 @@ PLAYER_COLS = [
     "kp_loss",
     "healed_troops",
     "deads",
-    "max_contribute_gain",
-    "cur_contribute_gain",
+    "acclaim_gain",
     "starting_power",
     "dkp",
     "last_scan_id",
@@ -69,8 +68,7 @@ KINGDOM_COLS = [
     "kp_loss",
     "healed_troops",
     "deads",
-    "max_contribute_gain",
-    "cur_contribute_gain",
+    "acclaim_gain",
     "dkp",
     "last_scan_id",
     "computed_at_utc",
@@ -87,8 +85,7 @@ CAMP_COLS = [
     "kp_loss",
     "healed_troops",
     "deads",
-    "max_contribute_gain",
-    "cur_contribute_gain",
+    "acclaim_gain",
     "dkp",
     "last_scan_id",
     "computed_at_utc",
@@ -108,8 +105,8 @@ NEGATIVE_COLS = [
 
 def _legacy_result_sets() -> list[pd.DataFrame]:
     player_rows = [
-        {"WindowName": "Pass 4", "governor_id": 1, "max_contribute_gain": 10},
-        {"WindowName": "Full", "governor_id": 1, "max_contribute_gain": 20},
+        {"WindowName": "Pass 4", "governor_id": 1, "acclaim_gain": 10},
+        {"WindowName": "Full", "governor_id": 1, "acclaim_gain": 20},
     ]
     return [
         _df(SCAN_COLS),
@@ -139,7 +136,9 @@ def test_bind_kvk_export_sections_ignores_extra_compatible_result_set() -> None:
     sections = bind_kvk_export_sections(result_sets)
 
     assert set(sections) == set(KVK_EXPORT_SECTION_NAMES)
-    assert "max_contribute_gain" in sections["KVK_Player_Windowed"].columns
+    assert "max_contribute_gain" not in sections["KVK_Player_Windowed"].columns
+    assert "cur_contribute_gain" not in sections["KVK_Player_Windowed"].columns
+    assert "acclaim_gain" in sections["KVK_Player_Windowed"].columns
 
 
 def test_bind_kvk_export_sections_reports_missing_required_section() -> None:

@@ -39,6 +39,8 @@ Phase 8 is complete and deployed.
 
 Phase 9 is complete and deployed.
 
+Phase 10 is complete and smoke-tested.
+
 Completed Phase 1 scope:
 
 strict Full Data workbook detection
@@ -123,7 +125,7 @@ Phase 8 did not introduce Basic Data ingestion, summary tab ingestion, Discord r
 
 Next phase:
 
-Phase 10 — Full Run Diagnostics, Output Correctness & Recompute Bug Fixing
+Phase 11 — Acclaim Output Contract Polish
 
 Completion Rule
 This work is not complete until all items previously identified as deferred optimisations are implemented or explicitly resolved inside this programme.
@@ -1169,3 +1171,100 @@ Google Sheets tab names and spreadsheet names remain stable.
 No Basic Data or summary tab ingestion is introduced.
 Tests or repeatable diagnostic scripts cover changed recompute behaviour.
 Any remaining correctness blocker is explicitly documented with owner, risk, and next action.
+
+Completion Notes
+
+Implemented:
+
+C:\K98-bot-SQL-Server\sql_schema\KVK.sp_KVK_Recompute_Windows.StoredProcedure.sql
+sql/kvk_all_phase10_recompute_correctness.sql
+scripts/diagnose_kvk_all_phase10.py
+tests/test_kvk_all_recompute_sql_contract.py
+docs/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md
+docs/KVK_ALL Schema Modernisation — Phase 10 Initiation Statement.md
+
+SQL delivery:
+
+KVK.sp_KVK_Recompute_Windows was corrected so Full Data v2 configured windows use cumulative endpoint deltas when start and end endpoint values are available.
+Legacy diff-field compatibility was preserved for older 22-column Full Data rows that do not contain endpoint families.
+Baseline rows remain zero-gain validation rows.
+Full rows now use baseline-to-latest endpoint deltas when Full Data v2 endpoint values are available, with legacy latest-snapshot diff fallback when endpoints are unavailable.
+The production deployment script was added under sql/kvk_all_phase10_recompute_correctness.sql using the same GO-batched procedure deployment pattern as prior KVK SQL scripts.
+
+Diagnostic delivery:
+
+scripts/diagnose_kvk_all_phase10.py was added for repeatable, read-only derivation of expected endpoint deltas from the four KVK 15 sample workbooks.
+The diagnostic confirmed the known Pass 4 case for governor_id 45227155 should produce kp_gain 98,002,840 for Scan 2 to Scan 3.
+Post-deployment smoke confirmed the output now shows 98,002,840 for that case.
+
+Validation completed:
+
+python scripts/diagnose_kvk_all_phase10.py
+python -m pytest -q tests/test_kvk_all_recompute_sql_contract.py
+python -m pytest -q tests/test_kvk_all_import_service.py tests/test_kvk_all_import_dal.py tests/test_kvk_all_importer.py tests/test_kvk_all_schema.py tests/test_kvk_all_recompute_sql_contract.py tests/test_kvk_export_service.py tests/test_gsheet_module.py tests/test_kvk_admin_service.py tests/test_kvk_reporting_service.py
+python scripts/validate_architecture_boundaries.py
+python scripts/validate_deferred_items.py
+python scripts/select_tests.py
+python scripts/smoke_imports.py
+python scripts/validate_command_registration.py
+python -m ruff check scripts/diagnose_kvk_all_phase10.py tests/test_kvk_all_recompute_sql_contract.py
+python -m black --check scripts/diagnose_kvk_all_phase10.py tests/test_kvk_all_recompute_sql_contract.py
+git diff --check
+
+No Basic Data ingestion, summary tab ingestion, Discord reporting display changes, Google Sheets spreadsheet or tab name changes, KVK export result-set count/order changes, automatic cleanup execution, unrelated admin command redesign, or unrelated analytics features were introduced in Phase 10.
+
+Phase 11 — Acclaim Output Contract Polish
+Goal
+Polish KVK contribution/acclaim output semantics by removing low-value Highest Acclaim gain output while exposing current Acclaim gain using player-facing terminology, without changing internal storage, import behaviour, recompute correctness, Discord reporting display, or established spreadsheet/tab names unless explicitly approved.
+
+In Scope
+Keep max_contribute_gain stored internally for diagnostic and future analysis purposes.
+Remove max_contribute_gain from player, kingdom, and camp export/Google Sheets outputs where it is currently surfaced as an output metric.
+Preserve max_contribute_gain in SQL windowed tables unless a separate explicit schema-removal decision is approved.
+Expose cur_contribute_gain in outputs as acclaim_gain, matching the in-game player-facing name Acclaim.
+Validate whether the alias applies to KVK.sp_KVK_Get_Exports result-set column names, Google Sheets outputs, comparison outputs, and structured reporting rows.
+Convert KVK.vw_FightingDataset from SELECT * to an explicit player-facing projection that exposes acclaim_gain and does not expose max_contribute_gain.
+Preserve current KVK export result-set count and order unless explicitly approved.
+Preserve existing Google Sheets spreadsheet names and tab names.
+Preserve Discord reporting display; do not add Acclaim to Discord embeds unless explicitly approved.
+Update named export-section binding and tests for the new output contract.
+Add focused tests for removed Highest Acclaim output, Acclaim aliasing, Sheets tab-name stability, and export section shape.
+
+Source Deferred Items
+
+### Deferred Optimisation
+- Area: KVK exports / Google Sheets output
+- Type: consistency
+- Description: max_contribute_gain is technically stored correctly but has low player-facing value because Highest Acclaim is an all-time peak; the gain is not a meaningful performance signal.
+- Suggested Fix: Keep storing max_contribute_gain internally, but remove it from player/kingdom/camp export and Sheets outputs.
+- Impact: medium
+- Risk: low
+
+### Deferred Optimisation
+- Area: KVK exports / Google Sheets output
+- Type: consistency
+- Description: cur_contribute_gain is valuable but player-facing terminology is Acclaim.
+- Suggested Fix: Expose cur_contribute_gain as acclaim_gain in outputs while preserving internal storage/SQL semantics.
+- Impact: medium
+- Risk: low
+- Dependencies: confirm whether aliasing applies to SQL export result sets, Google Sheets tabs, comparison outputs, and structured reporting rows.
+
+Out of Scope
+Removing max_contribute_gain from internal SQL storage.
+Changing KVK import behaviour or return shape.
+Changing recompute formulas beyond output alias/removal needs.
+Discord reporting display changes or new contribution fields in Discord embeds.
+Google Sheets spreadsheet or tab name changes unless explicitly approved.
+KVK export result-set count/order changes unless explicitly approved.
+Basic Data ingestion.
+Summary tab ingestion.
+Unrelated stats, rankings, history, reporting, personal KVK, admin command, or upload-route redesign.
+
+Acceptance Criteria
+max_contribute_gain remains stored internally but is no longer surfaced in the in-scope export/Sheets outputs.
+cur_contribute_gain is surfaced as acclaim_gain in the in-scope outputs.
+Existing spreadsheet names and tab names remain stable.
+KVK.sp_KVK_Get_Exports remains at 10 result sets unless an explicit contract change is approved.
+Existing Discord reporting display remains unchanged.
+No Basic Data or summary tab ingestion is introduced.
+Focused tests cover the output removal/aliasing contract and tab/result-set stability.
