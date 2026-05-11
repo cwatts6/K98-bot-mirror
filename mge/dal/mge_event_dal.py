@@ -410,8 +410,8 @@ def apply_open_mode_switch_atomic(
 ) -> int:
     """
     Atomically:
-      - write MGE_AwardAudit rows for awards in this event
-      - hard delete awards for this event
+      - hard delete awards for this event while capturing rows for MGE_AwardAudit
+      - write captured award rows to MGE_AwardAudit
       - hard delete signups for this event (written to MGE_SignupAudit)
       - switch event mode/rule mode/rules text
       - write MGE_RuleAudit
@@ -486,6 +486,8 @@ def apply_open_mode_switch_atomic(
 
             SELECT COUNT_BIG(1) AS DeletedAwardCount
             FROM @DeletedAwards;
+
+            SET NOCOUNT OFF;
             """,
             (event_id, actor_discord_id, award_details_json),
         )
