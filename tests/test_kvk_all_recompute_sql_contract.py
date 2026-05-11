@@ -12,6 +12,7 @@ SQL_SCHEMA = SQL_REPO / "sql_schema"
 # Phase 10 recompute switched configured-window KP gain to endpoint delta logic and
 # introduced this alias in both canonical and deployment-script definitions.
 PHASE_10_RECOMPUTE_SENTINEL = "r.max_kill_points AS kp_endpoint_s"
+PHASE_11_EXPORT_SENTINEL = "cur_contribute_gain AS acclaim_gain"
 
 
 def _running_in_ci() -> bool:
@@ -64,6 +65,34 @@ def _phase10_recompute_sql_contract_source() -> str:
     return _compact(
         Path("sql/kvk_all_phase10_recompute_correctness.sql").read_text(encoding="utf-8-sig")
     )
+
+
+def _phase11_export_sql_contract_source() -> str:
+    canonical = _sql_file("KVK.sp_KVK_Get_Exports.StoredProcedure.sql")
+    # Canonical SQL repo may lag deployment scripts; fall back to the PR deployment
+    # script when this Phase 11 player-facing Acclaim token is absent.
+    if PHASE_11_EXPORT_SENTINEL in _compact(canonical):
+        return canonical
+    sql_repo_script = SQL_SCHEMA / "kvk_all_phase11_acclaim_output_contract.sql"
+    if sql_repo_script.exists():
+        return sql_repo_script.read_text(encoding="utf-8-sig")
+    return Path("sql/kvk_all_phase11_acclaim_output_contract.sql").read_text(encoding="utf-8-sig")
+
+
+def _phase11_fighting_dataset_sql_contract_source() -> str:
+    canonical = _sql_file("KVK.vw_FightingDataset.View.sql")
+    canonical_compact = _compact(canonical)
+    # Canonical SQL repo may lag deployment scripts; fall back to the PR deployment
+    # script when the view has not yet been converted to ALTER VIEW projection form.
+    if (
+        PHASE_11_EXPORT_SENTINEL in canonical_compact
+        and "ALTER VIEW [KVK].[vw_FightingDataset]" in canonical_compact
+    ):
+        return canonical
+    sql_repo_script = SQL_SCHEMA / "kvk_all_phase11_acclaim_output_contract.sql"
+    if sql_repo_script.exists():
+        return sql_repo_script.read_text(encoding="utf-8-sig")
+    return Path("sql/kvk_all_phase11_acclaim_output_contract.sql").read_text(encoding="utf-8-sig")
 
 
 def test_phase4_metric_source_rules_are_documented() -> None:
@@ -192,7 +221,7 @@ def test_recompute_populates_contribution_outputs_and_rollups() -> None:
 
 
 def test_export_contract_keeps_ten_result_sets_and_no_full_select_star() -> None:
-    sql = _sql_file("KVK.sp_KVK_Get_Exports.StoredProcedure.sql")
+    sql = _phase11_export_sql_contract_source()
     compact = _compact(sql)
 
     for section in range(1, 11):
@@ -266,9 +295,9 @@ def test_phase5_prod_sql_script_contains_export_contract_changes() -> None:
 
 
 def test_phase11_export_and_fighting_dataset_use_player_facing_acclaim_contract() -> None:
-    export_sql = _sql_file("KVK.sp_KVK_Get_Exports.StoredProcedure.sql")
+    export_sql = _phase11_export_sql_contract_source()
     export_compact = _compact(export_sql)
-    view_sql = _sql_file("KVK.vw_FightingDataset.View.sql")
+    view_sql = _phase11_fighting_dataset_sql_contract_source()
     view_compact = _compact(view_sql)
     script = Path("sql/kvk_all_phase11_acclaim_output_contract.sql").read_text(encoding="utf-8-sig")
     script_compact = _compact(script)
