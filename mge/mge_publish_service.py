@@ -752,12 +752,19 @@ async def refresh_award_reminders(
         )
 
     if reminders_text != str(ctx.get("AwardRemindersText") or "").strip():
-        await asyncio.to_thread(
+        updated = await asyncio.to_thread(
             mge_publish_dal.update_event_award_reminders_text,
             event_id=resolved_event_id,
             reminders_text=reminders_text,
             now_utc=now,
         )
+        if not updated:
+            return RefreshAwardRemindersResult(
+                False,
+                "Failed to persist award reminders text before refreshing the reminder message.",
+                event_id=resolved_event_id,
+                status="db_update_failed",
+            )
 
     channel = await _resolve_messageable_channel(bot, channel_id)
     if channel is None:
