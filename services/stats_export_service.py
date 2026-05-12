@@ -56,7 +56,7 @@ def cleanup_export_file(export_file: StatsExportFile | None) -> None:
             )
     if export_file.temp_dir and os.path.exists(export_file.temp_dir):
         try:
-            shutil.rmtree(export_file.temp_dir, ignore_errors=True)
+            shutil.rmtree(export_file.temp_dir)
             logger.debug("stats_export_temp_dir_cleaned path=%s", export_file.temp_dir)
         except Exception:
             logger.warning(
@@ -204,7 +204,7 @@ async def _build_export_file(
 
 
 def _build_export_target(*, export_format: str, safe_name: str, timestamp: str, temp_dir: str) -> tuple[str, str]:
-    """Build the export filename and absolute path for the selected format."""
+    """Build export target and return (filename, absolute_path)."""
     extension = ".csv" if export_format == "CSV" else ".xlsx"
     filename = f"stats_{safe_name}_{timestamp}{extension}"
     return filename, os.path.join(temp_dir, filename)
