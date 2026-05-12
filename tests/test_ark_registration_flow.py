@@ -215,9 +215,12 @@ async def test_join_player_adds_signup(monkeypatch):
     monkeypatch.setattr("ark.registration_flow.insert_audit_log", _audit)
     monkeypatch.setattr(controller, "refresh_registration_message", _refresh)
 
+    async def _get_user_accounts_stub(_user_id):
+        return {"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}}
+
     monkeypatch.setattr(
         "ark.registration_flow._get_user_accounts",
-        lambda _user_id: {"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}},
+        _get_user_accounts_stub,
     )
 
     await controller.join_player(interaction)
@@ -238,9 +241,12 @@ async def test_leave_marks_withdrawn(monkeypatch):
 
     monkeypatch.setattr(controller, "_prompt_governor_selection", _prompt)
 
+    async def _get_user_accounts_stub(_user_id):
+        return {"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}}
+
     monkeypatch.setattr(
         "ark.registration_flow._get_user_accounts",
-        lambda _user_id: {"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}},
+        _get_user_accounts_stub,
     )
 
     async def _get_match(match_id):
@@ -362,12 +368,15 @@ async def test_switch_updates_governor(monkeypatch):
     monkeypatch.setattr("ark.registration_flow.insert_audit_log", _audit)
     monkeypatch.setattr(controller, "refresh_registration_message", _refresh)
 
-    monkeypatch.setattr(
-        "ark.registration_flow._get_user_accounts",
-        lambda _user_id: {
+    async def _get_user_accounts_stub(_user_id):
+        return {
             "Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"},
             "Alt 2": {"GovernorID": "2510418", "GovernorName": "Scrooge M"},
-        },
+        }
+
+    monkeypatch.setattr(
+        "ark.registration_flow._get_user_accounts",
+        _get_user_accounts_stub,
     )
 
     await controller.switch(interaction)
@@ -535,9 +544,12 @@ async def test_join_player_blocks_duplicate_weekend_governor(monkeypatch):
     monkeypatch.setattr("ark.registration_flow.find_active_signup_for_weekend", _conflict)
     monkeypatch.setattr("ark.registration_flow.add_signup", _add_signup)
 
+    async def _get_user_accounts_stub(_user_id):
+        return {"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}}
+
     monkeypatch.setattr(
         "ark.registration_flow._get_user_accounts",
-        lambda _user_id: {"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}},
+        _get_user_accounts_stub,
     )
 
     await controller.join_player(interaction)
