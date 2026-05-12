@@ -1,7 +1,6 @@
 # kvk_ui.py
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 import logging
 
@@ -182,11 +181,10 @@ def make_kvk_targets_view(
 
     async def _rebuild_options(ctx_inner: discord.ApplicationContext):
         try:
-            from utils import load_registry  # lazy import to reuse existing registry loader
+            from services.governor_account_service import get_accounts_for_user
 
-            registry = await asyncio.to_thread(load_registry)
-            user_block = registry.get(str(ctx_inner.user.id)) or {}
-            accounts = user_block.get("accounts") or {}
+            lookup = await get_accounts_for_user(ctx_inner.user.id)
+            accounts = lookup.accounts if lookup.ok else {}
             from account_picker import safe_build_unique_gov_options
 
             return safe_build_unique_gov_options(accounts)

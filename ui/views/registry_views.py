@@ -128,12 +128,10 @@ class MyRegsActionView(discord.ui.View):
         except Exception:
             pass
         try:
-            registry = await _async_load_registry() or {}
-            user_key_str = str(self.author_id)
-            user_key_int = self.author_id
-            accounts = (registry.get(user_key_str) or registry.get(user_key_int) or {}).get(
-                "accounts", {}
-            ) or {}
+            from services.governor_account_service import get_accounts_for_user
+
+            lookup = await get_accounts_for_user(self.author_id)
+            accounts = lookup.accounts if lookup.ok else {}
             if not accounts:
                 await interaction.followup.send(
                     "You don’t have any accounts to modify. Use **Register New Account** instead.",
@@ -165,14 +163,11 @@ class MyRegsActionView(discord.ui.View):
         except Exception:
             pass
         try:
-            registry = await _async_load_registry() or {}
-            user_key_str = str(self.author_id)
-            user_key_int = self.author_id
-            accounts = (registry.get(user_key_str) or registry.get(user_key_int) or {}).get(
-                "accounts", {}
-            ) or {}
-            used_slots = set(accounts.keys())
-            free_slots = [slot for slot in _account_order_getter() if slot not in used_slots]
+            from services.governor_account_service import free_account_slots, get_accounts_for_user
+
+            lookup = await get_accounts_for_user(self.author_id)
+            accounts = lookup.accounts if lookup.ok else {}
+            free_slots = free_account_slots(accounts)
             if not free_slots:
                 await interaction.followup.send(
                     "All account slots are registered already. Use **Modify Registration** to change one.",
@@ -425,14 +420,6 @@ class EnterGovernorIDModal(discord.ui.Modal):
             )
             return
 
-        try:
-            registry = await _async_load_registry() or {}
-        except Exception as e:
-            await interaction.followup.send(
-                f"❌ Could not load registry: `{type(e).__name__}: {e}`", ephemeral=True
-            )
-            return
-
         name_cache = _name_cache_getter()
         all_rows = (name_cache or {}).get("rows", []) if isinstance(name_cache, dict) else []
         matched_row = next(
@@ -445,17 +432,14 @@ class EnterGovernorIDModal(discord.ui.Modal):
             )
             return
 
-        for uid, data in registry.items():
-            if self.mode == "modify" and str(uid) == str(self.author_id):
-                continue
-            for acc_type, details in (data.get("accounts") or {}).items():
-                if str(details.get("GovernorID", "")).strip() == governor_id:
-                    existing_user = data.get("discord_name", f"<@{uid}>")
-                    await interaction.followup.send(
-                        f"❌ This Governor ID `{governor_id}` is already registered to **{existing_user}** ({acc_type}).",
-                        ephemeral=True,
-                    )
-                    return
+        from registry.registry_service import check_governor_claimed_by_other
+
+        if check_governor_claimed_by_other(governor_id, self.author_id):
+            await interaction.followup.send(
+                f"This Governor ID `{governor_id}` is already registered to another user.",
+                ephemeral=True,
+            )
+            return
 
         gov_name = matched_row.get("GovernorName", "Unknown")
         if self.mode == "modify":

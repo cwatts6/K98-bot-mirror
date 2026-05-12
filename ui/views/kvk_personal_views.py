@@ -247,21 +247,20 @@ class MyKVKStatsSelectView(discord.ui.View):
         await interaction.response.send_modal(GovNameModal(author_id=self.author_id))
 
     async def _on_register(self, interaction: discord.Interaction):
-        from registry.governor_registry import load_registry
+        from services.governor_account_service import free_account_slots, get_accounts_for_user
         from ui.views.registry_views import RegisterStartView
 
         try:
-            registry = await asyncio.to_thread(load_registry) or {}
+            lookup = await get_accounts_for_user(self.author_id)
+            if not lookup.ok:
+                raise RuntimeError(lookup.error or "registry unavailable")
         except Exception as e:
             await interaction.response.send_message(
                 f"⚠️ Registry unavailable: {type(e).__name__}: {e}", ephemeral=True
             )
             return
 
-        user_rec = registry.get(str(self.author_id)) or {}
-        current = user_rec.get("accounts") or {}
-        used = set(current.keys())
-        free_slots = [slot for slot in ACCOUNT_ORDER if slot not in used]
+        free_slots = free_account_slots(lookup.accounts)
         if not free_slots:
             await interaction.response.send_message(
                 "All account slots are registered already. Use **/modify_registration** to change one.",
@@ -400,11 +399,13 @@ class FuzzySelectView(View):
             return
 
         # Register-only flow
-        from registry.governor_registry import load_registry
+        from services.governor_account_service import free_account_slots, get_accounts_for_user
         from ui.views.registry_views import RegisterStartView
 
         try:
-            registry = await asyncio.to_thread(load_registry) or {}
+            lookup = await get_accounts_for_user(self.author_id)
+            if not lookup.ok:
+                raise RuntimeError(lookup.error or "registry unavailable")
         except Exception:
             logger.exception("[FuzzySelectView] Failed to load registry during register-only flow")
             await interaction.response.send_message(
@@ -413,10 +414,7 @@ class FuzzySelectView(View):
             )
             return
 
-        user_key = str(self.author_id)
-        accounts = (registry.get(user_key) or {}).get("accounts", {}) or {}
-        used_slots = set(accounts.keys())
-        free_slots = [slot for slot in ACCOUNT_ORDER if slot not in used_slots]
+        free_slots = free_account_slots(lookup.accounts)
 
         if not free_slots:
             await interaction.response.send_message(
@@ -543,11 +541,13 @@ class PostLookupActions(View):
 
     @discord.ui.button(label="Register this Governor", style=discord.ButtonStyle.success)
     async def btn_register(self, button: discord.ui.Button, interaction: discord.Interaction):
-        from registry.governor_registry import load_registry
+        from services.governor_account_service import free_account_slots, get_accounts_for_user
         from ui.views.registry_views import RegisterStartView
 
         try:
-            registry = await asyncio.to_thread(load_registry)
+            lookup = await get_accounts_for_user(self.author_id)
+            if not lookup.ok:
+                raise RuntimeError(lookup.error or "registry unavailable")
         except Exception:
             logger.exception(
                 "[PostLookupActions] Failed to load governor registry during registration flow"
@@ -558,11 +558,7 @@ class PostLookupActions(View):
             )
             return
 
-        registry = registry or {}
-        user_key = str(self.author_id)
-        accounts = (registry.get(user_key) or {}).get("accounts", {}) or {}
-        used_slots = set(accounts.keys())
-        free_slots = [slot for slot in ACCOUNT_ORDER if slot not in used_slots]
+        free_slots = free_account_slots(lookup.accounts)
 
         if not free_slots:
             await interaction.response.send_message(

@@ -80,6 +80,43 @@ async def send_ephemeral(
         logger.exception("interaction_send_ephemeral_failed")
 
 
+def response_is_done(interaction: discord.Interaction) -> bool:
+    """Return whether an interaction has already received its first response."""
+    try:
+        responder = getattr(interaction, "response", None)
+        return bool(responder and responder.is_done())
+    except Exception:
+        return False
+
+
+async def send_or_followup(
+    interaction: discord.Interaction,
+    content: str | None = None,
+    *,
+    ephemeral: bool = True,
+    **kwargs: Any,
+) -> Any:
+    """Send the first response when possible, otherwise send a followup."""
+    if response_is_done(interaction):
+        return await interaction.followup.send(content, ephemeral=ephemeral, **kwargs)
+    return await interaction.response.send_message(content, ephemeral=ephemeral, **kwargs)
+
+
+async def edit_or_followup(
+    interaction: discord.Interaction,
+    content: str | None = None,
+    *,
+    ephemeral: bool = True,
+    **kwargs: Any,
+) -> Any:
+    """Edit the original response when possible, otherwise fall back to a followup."""
+    try:
+        return await interaction.edit_original_response(content=content, **kwargs)
+    except Exception:
+        logger.debug("interaction_edit_original_failed_falling_back", exc_info=True)
+        return await interaction.followup.send(content, ephemeral=ephemeral, **kwargs)
+
+
 async def safe_defer(ctx, *, ephemeral: bool = True) -> bool:
     """Best-effort defer that won't crash on unknown/expired interaction."""
     try:

@@ -12,7 +12,6 @@ Exports:
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 import logging
 
@@ -126,11 +125,10 @@ async def _rebuild_options_from_registry(
     behaviour used in kvk_ui._rebuild_options. Returns empty list on error.
     """
     try:
-        from utils import load_registry  # late import to avoid circulars
+        from services.governor_account_service import get_accounts_for_user
 
-        registry = await asyncio.to_thread(load_registry)
-        user_block = registry.get(str(ctx.user.id)) or {}
-        accounts = user_block.get("accounts") or {}
+        lookup = await get_accounts_for_user(ctx.user.id)
+        accounts = lookup.accounts if lookup.ok else {}
         # Use the canonical builder in this module
         return build_unique_gov_options(accounts)
     except Exception:

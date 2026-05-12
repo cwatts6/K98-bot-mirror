@@ -52,20 +52,16 @@
 - Risk: medium
 - Dependencies: Preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to Phase 9.
 
-### Deferred Optimisation
-- Area: `mge/mge_signup_service.py`
-- Type: consistency
-- Description: Resolved in MGE Process Polish Phase 2. MGE self-signup account resolution now uses `registry_service.get_user_accounts()` instead of the legacy registry dict shape, while admin-add reverse owner lookup remains on `get_discord_user_for_governor()`.
-- Suggested Fix: Closed for MGE. Remaining registry-service consolidation work belongs to the broader stats/service alignment tracked by GitHub issues #29 and #32.
-- Impact: medium
-- Risk: medium
-- Dependencies: Coordinate with the broader Service Layer Consolidation Pack so stats and MGE registry-service alignment are handled together. Selected for MGE Process Polish Phase 2; see `docs/MGE Process Polish — Phase 2 Initiation Statement.md`.
+## Recently Resolved
 
-### Deferred Optimisation
-- Area: `mge/mge_publish_service.py`
-- Type: architecture
-- Description: Narrowed in MGE Process Polish Phase 2. Publish, republish, reminder refresh, unpublish, award DM, and board refresh calls now go through a Discord IO adapter instead of direct Discord message operations in `mge_publish_service.py`.
-- Suggested Fix: Remaining follow-up, if desired, is to move Discord embed construction out of service-adjacent renderer calls and into a fully UI-owned publish orchestration model. This is lower priority because direct fetch/edit/send/delete/DM IO has been extracted from the service boundary.
-- Impact: high
-- Risk: medium
-- Dependencies: Requires careful regression coverage for publish, republish, reminder refresh, unpublish, award DM, and board refresh behaviours. Selected for MGE Process Polish Phase 2; see `docs/MGE Process Polish — Phase 2 Initiation Statement.md`.
+- Telemetry Commands Full Optimisation phase resolved the telemetry portions of GitHub issues #26, #33, and #47:
+  - `commands/telemetry_cmds.py` no longer imports the KVK DAL current-KVK resolver.
+  - `/mykvktargets` and `/mykvkcrystaltech` resolve linked accounts through `services/governor_account_service.py`, which delegates to `registry_service.get_user_accounts()`.
+  - CrystalTech governor session locking now routes through `services/governor_session_lock_service.py` and `registry/dal/governor_session_lock_dal.py` with UTC expiry and cleanup support.
+  - Player profile posting and CrystalTech interaction orchestration were moved behind command-adjacent helper modules.
+  - `account_picker.py`, `kvk_ui.py`, selected KVK personal views, selected registry views, and Ark registration account lookup were aligned away from direct registry dict traversal where touched.
+- Remaining related GitHub issues intentionally stay open for separate batches: #28 legacy registry view removal, #29/#32 stats-service registry alignment, #42 KVK admin SQL extraction, #46 stats export SQL extraction, and the broader untouched portions of #27/#31 outside telemetry-adjacent paths.
+- MGE Process Polish Phase 2 was implemented, production deployed, and smoke-tested via PR #75.
+- `mge/mge_signup_service.py` self-signup account resolution now uses `registry_service.get_user_accounts()` instead of the legacy registry dict shape. Admin-add reverse owner lookup remains on `get_discord_user_for_governor()`.
+- `mge/mge_publish_service.py` no longer performs direct Discord message fetch/send/edit/delete/DM IO. Publish, republish, reminder refresh, unpublish, award DM, and board refresh paths now route Discord operations through `mge/mge_publish_discord_adapter.py`.
+- The remaining open service-consolidation scope from GitHub issues #29 and #32 is stats-service registry alignment, not MGE.

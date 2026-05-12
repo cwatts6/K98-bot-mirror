@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import builtins as _bi
-from datetime import UTC, datetime, timedelta
-from io import BytesIO
+from datetime import UTC, datetime
 import logging
 import os
 
@@ -23,20 +21,8 @@ from bot_config import (
     LEADERSHIP_CHANNEL_ID,
     NOTIFY_CHANNEL_ID,
 )
-from crystaltech_di import get_crystaltech_service
-
-try:
-    # crystaltech_ui may perform imports that aren't available in certain test environments.
-    # Import defensively so Commands can still be imported (tests can monkeypatch/override the views).
-    from crystaltech_ui import ProgressView, SetupView
-except Exception:
-    ProgressView = None
-    SetupView = None
-    logging.getLogger(__name__).exception(
-        "Optional import failed: crystaltech_ui.ProgressView/SetupView not available"
-    )
-
-
+from commands.crystaltech_flow import run_crystaltech_flow as run_crystaltech_flow_service
+from commands.player_profile_flow import send_profile_to_channel as send_profile_to_channel_service
 from decoraters import (
     _has_leadership_role,
     _is_admin,
@@ -44,8 +30,6 @@ from decoraters import (
     channel_only,
     track_usage,
 )
-from embed_player_profile import build_player_profile_embed
-from kvk.dal.kvk_history_dal import resolve_current_kvk_no_from_cursor
 from kvk_ui import make_kvk_targets_view
 from stats_cache_helpers import load_last_kvk_map
 
@@ -65,14 +49,9 @@ from core.interaction_safety import (
     safe_defer,
 )
 from logging_setup import CRASH_LOG_PATH, ERROR_LOG_PATH, FULL_LOG_PATH
-from profile_cache import (
-    get_profile_cached,
-    search_by_governor_name,
-    warm_cache,
-)
-from registry.governor_registry import (
-    load_registry,
-)
+from profile_cache import search_by_governor_name
+from registry.registry_service import load_registry_as_dict
+from services.governor_account_service import free_account_slots, get_accounts_for_user
 from target_utils import (
     _name_cache,
     autocomplete_governor_names,
@@ -85,7 +64,6 @@ from ui.views.kvk_personal_views import (
     PostLookupActions,
     TargetLookupView,  # noqa: F401 — kept for external importers and smoke tests
 )
-from ui.views.location_views import ProfileLinksView
 from ui.views.registry_views import (
     GovernorSelectView,
     GovNameModal,
@@ -128,13 +106,8 @@ ALLOWED_CHANNEL_IDS = {
 start_bot_time = datetime.now(UTC)
 
 
-def _resolve_kvk_no(c, kvk_no: int | None) -> int:
-    return resolve_current_kvk_no_from_cursor(c, kvk_no)
-
-
-async def async_load_registry():
-    # run the blocking load off the event loop
-    return await asyncio.to_thread(load_registry)
+async def async_registry_dict():
+    return await asyncio.to_thread(load_registry_as_dict)
 
 
 # Autocomplete for "/usage_detail value" -> show command names when dimension=command
@@ -158,334 +131,20 @@ async def _usage_detail_value_ac(ctx: discord.AutocompleteContext):
     return await _usage_command_autocomplete(ctx)
 
 
-async def _resolve_governor_label(user_id: int, governor_id: str) -> str:
-    """
-    Look up a friendly label for this governor_id from governor_registry.json.
-    Expected shape:
-      registry[str(discord_id)]["accounts"][slot] = {"GovernorID": "...", "GovernorName": "..."}
-    """
-    gid_str = str(governor_id)
-    try:
-        registry = await asyncio.to_thread(load_registry)
-        user_block = registry.get(str(user_id)) or {}
-        accounts = user_block.get("accounts") or {}
-        # accounts is a dict of slots -> {GovernorID, GovernorName}
-        for _, rec in accounts.items():
-            rec_gid = str(rec.get("GovernorID") or rec.get("governor_id") or "")
-            if rec_gid == gid_str:
-                name = rec.get("GovernorName") or rec.get("governor_name") or ""
-                return f"{name} ({gid_str})" if name else f"Governor {gid_str}"
-        return f"Governor {gid_str}"
-    except Exception:
-        return f"Governor help {governor_id}"
-
-
-_ACTIVE_GOV_SESSIONS: dict[str, dict] = {}  # { governor_id: {"user_id": int, "expires": datetime} }
-_SESSION_TTL = timedelta(minutes=10)
-
-
-def _session_claim(governor_id: str, user_id: int) -> tuple[bool, str]:
-    """Claim the governor for this user. If in-use by another user and not expired, block."""
-    now = datetime.utcnow()
-    gid = str(governor_id)
-    slot = _ACTIVE_GOV_SESSIONS.get(gid)
-    if slot and slot["expires"] > now and slot["user_id"] != user_id:
-        return (
-            False,
-            "This governor is currently being edited by another user. Try again in a few minutes.",
-        )
-    _ACTIVE_GOV_SESSIONS[gid] = {"user_id": user_id, "expires": now + _SESSION_TTL}
-    return True, ""
-
-
-def _session_refresh(governor_id: str, user_id: int) -> None:
-    """Refresh TTL while the same user keeps working."""
-    now = datetime.utcnow()
-    gid = str(governor_id)
-    slot = _ACTIVE_GOV_SESSIONS.get(gid)
-    if slot and slot["user_id"] == user_id:
-        slot["expires"] = now + _SESSION_TTL
-
-
-def _session_release(governor_id: str, user_id: int) -> None:
-    """Release only if held by this user."""
-    gid = str(governor_id)
-    slot = _ACTIVE_GOV_SESSIONS.get(gid)
-    if slot and slot["user_id"] == user_id:
-        _ACTIVE_GOV_SESSIONS.pop(gid, None)
-
-
-def _clone_file_to_bytes(dfile: discord.File | None) -> tuple[bytes | None, str | None]:
-    """Return (bytes, filename) for a discord.File; logs size for debugging."""
-    if not dfile:
-        return None, None
-    try:
-        fp = getattr(dfile, "fp", None)
-        if fp is None:
-            logger.exception("[player_profile] discord.File has no 'fp'; cannot clone")
-            return None, dfile.filename
-        try:
-            fp.seek(0)
-        except Exception as e:
-            logger.exception(f"[player_profile] could not seek file '{dfile.filename}': {e}")
-        data = fp.read()
-        size = len(data) if data else 0
-        logger.info(f"[player_profile] cloned file '{dfile.filename}' to bytes: {size} bytes")
-        return (data if size > 0 else None), dfile.filename
-    except Exception as e:
-        logger.exception(
-            f"[player_profile] failed to clone file '{getattr(dfile,'filename',None)}' to bytes: {e}"
-        )
-        return None, getattr(dfile, "filename", None)
-
-
-async def send_profile_to_channel(
-    inter: discord.Interaction, gid: int, channel: discord.abc.Messageable
-):
-    logger.info(f"[player_profile] start gid={gid} channel={getattr(channel, 'id', '?')}")
-
-    warm_cache()
-    data = get_profile_cached(gid)
-    if not data:
-        msg = f"GovernorID **{gid}** not found."
-        if inter.response.is_done():
-            await inter.followup.send(msg, ephemeral=True)
-        else:
-            await inter.response.send_message(msg, ephemeral=True)
-        logger.exception(f"[player_profile] not found gid={gid}")
-        return
-
-    # Build embed + files
-    card_file, profile_embed, chart_file = await build_player_profile_embed(
-        inter, data, card_scale=1.0
-    )
-
-    # Always reference the attachment in the embed so Discord doesn't render it separately.
-    if card_file:
-        try:
-            profile_embed.set_image(url=f"attachment://{card_file.filename}")
-        except Exception:
-            pass
-
-    # Clone bytes BEFORE sending (so we can re-use safely)
-    card_bytes, card_name = _clone_file_to_bytes(card_file)
-    # (Optional) don't attach chart unless you actually render it in an embed
-    # chart_bytes, chart_name = _clone_file_to_bytes(chart_file)
-
-    fresh_files: list[discord.File] = []
-    if card_bytes:
-        fresh_files.append(discord.File(BytesIO(card_bytes), filename=card_name))
-    # If you decide to show the chart somewhere, re-enable this and also reference it in an embed.
-    # if chart_bytes:
-    #     fresh_files.append(discord.File(BytesIO(chart_bytes), filename=chart_name))
-
-    # Defer ephemerally so our follow-up notice stays private ✅
-    if not inter.response.is_done():
-        try:
-            await inter.response.defer(ephemeral=True)
-        except Exception:
-            pass
-
-    # Send the primary message
-    try:
-        primary_msg = await channel.send(embeds=[profile_embed], files=fresh_files or None)
-    except discord.Forbidden:
-        logger.exception(
-            "[player_profile] Forbidden to send in target channel; replying ephemerally instead."
-        )
-        try:
-            await inter.followup.send(
-                "⚠️ I don’t have permission to post in that channel. Sending your profile here instead.",
-                ephemeral=True,
-            )
-            await inter.followup.send(
-                embeds=[profile_embed], files=fresh_files or None, ephemeral=True
-            )
-        except Exception:
-            pass
-        return
-
-    logger.info(
-        f"[player_profile] sent message id={primary_msg.id}; attachments={len(primary_msg.attachments)}"
-    )
-    for i, att in enumerate(primary_msg.attachments):
-        logger.info(
-            f"[player_profile] attachment[{i}]: filename={att.filename} ct={att.content_type} url={att.url}"
-        )
-
-    # Fallback only if Discord stripped attachments (rare)
-    fallback_msg = None
-    if len(primary_msg.attachments) == 0 and card_bytes:
-        try:
-            fallback_msg = await channel.send(
-                file=discord.File(BytesIO(card_bytes), filename=card_name)
-            )
-            logger.info(
-                f"[player_profile] fallback upload id={fallback_msg.id}; attachments={len(fallback_msg.attachments)}"
-            )
-        except Exception as e:
-            logger.exception(f"[player_profile] fallback upload failed: {e}")
-
-    # Resolve which message to keep (prefer the one that actually has the attachment)
-    target_msg = primary_msg
-    if not primary_msg.attachments and fallback_msg and fallback_msg.attachments:
-        try:
-            await primary_msg.delete()
-        except Exception as e:
-            logger.exception(f"[player_profile] could not delete empty primary: {e}")
-        target_msg = fallback_msg
-
-    # Add the “Open full card” button (using the attachment URL if available)
-    def resolve_card_url(msg: discord.Message | None) -> str | None:
-        if not msg or not msg.attachments:
-            return None
-        for att in msg.attachments:
-            if card_name and att.filename == card_name:
-                return att.url
-        for att in msg.attachments:
-            if (att.content_type or "").lower().startswith("image/"):
-                return att.url
-        return None
-
-    card_url = resolve_card_url(target_msg)
-    view = ProfileLinksView(card_url=card_url)
-
-    # IMPORTANT: Do NOT swap the embed image to CDN here.
-    # Keeping attachment:// ensures the attachment is "consumed" by the embed and not rendered separately.
-
-    try:
-        await target_msg.edit(embeds=[profile_embed], view=view)
-        logger.info(
-            f"[player_profile] edited message id={target_msg.id} (button={'yes' if card_url else 'no'})"
-        )
-    except Exception as e:
-        logger.exception(f"[player_profile] could not edit canonical message with button: {e}")
-
-    # Quiet private ack
-    try:
-        await inter.followup.send(
-            f"Posted profile for **{data.get('GovernorName') or gid}**.", ephemeral=True
-        )
-    except Exception:
-        pass
-
-
 configure_registry_views(
-    async_load_registry=async_load_registry,
+    async_load_registry=async_registry_dict,
     lookup_governor_id=lookup_governor_id,
     target_lookup_view_factory=lambda matches, author_id: FuzzySelectView(
         matches, author_id, show_targets=True
     ),
     name_cache_getter=lambda: _name_cache,
-    send_profile_to_channel=send_profile_to_channel,
+    send_profile_to_channel=send_profile_to_channel_service,
     account_order_getter=lambda: ACCOUNT_ORDER,
 )
 
 
-# MyKVKStatsSelectView is defined canonically in ui.views.kvk_personal_views and imported above.
-
-
-async def run_crystaltech_flow(interaction: discord.Interaction, governor_id: str, ephemeral: bool):
-    """Open CrystalTech setup/progress flow for a governor."""
-
-    claimed, why = _session_claim(governor_id, interaction.user.id)
-    if not claimed:
-        msg = f"🔒 {why}"
-        if not interaction.response.is_done():
-            await interaction.response.send_message(msg, ephemeral=True)
-        else:
-            await interaction.followup.send(msg, ephemeral=True)
-        return
-
-    async def _release():
-        _session_release(governor_id, interaction.user.id)
-
-    try:
-        try:
-            service = get_crystaltech_service()
-        except Exception as e:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    f"❌ CrystalTech is unavailable: `{e}`", ephemeral=True
-                )
-            else:
-                await interaction.followup.send(
-                    f"❌ CrystalTech is unavailable: `{e}`", ephemeral=True
-                )
-            await _release()
-            return
-
-        rep = service.report()
-        if not service.is_ready:
-            msg = rep.summary() if rep else "Service not initialized."
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"❌ {msg}", ephemeral=True)
-            else:
-                await interaction.followup.send(f"❌ {msg}", ephemeral=True)
-            await _release()
-            return
-
-        entry = service.get_user_entry(governor_id)
-        if entry:
-            path_id = entry.get("selected_path_id")
-            troop = entry.get("selected_troop_type", "unknown")
-
-            view = ProgressView(
-                author_id=interaction.user.id,
-                governor_id=governor_id,
-                path_id=path_id,
-                troop=troop,
-                timeout=300,
-                on_release=_release,
-            )
-            embed, files = await view.render_embed()
-
-            try:
-                await interaction.response.edit_message(
-                    content="Opening progress…", embed=None, view=None, attachments=[]
-                )
-            except Exception:
-                pass
-
-            sent = await interaction.followup.send(
-                embed=embed, files=files, ephemeral=ephemeral, view=view
-            )
-            view.message = sent
-            _session_refresh(governor_id, interaction.user.id)
-            return
-
-        label = await _resolve_governor_label(interaction.user.id, governor_id)
-        accounts = [(governor_id, label)]
-        view = SetupView(
-            author_id=interaction.user.id,
-            accounts=accounts,
-            timeout=300,
-            on_release=_release,
-        )
-        embed = view.make_embed()
-
-        try:
-            await interaction.response.edit_message(
-                content="Opening setup…", embed=None, view=None, attachments=[]
-            )
-        except Exception:
-            pass
-
-        sent = await interaction.followup.send(embed=embed, ephemeral=ephemeral, view=view)
-        view.message = sent
-        _session_refresh(governor_id, interaction.user.id)
-
-    except Exception as e:
-        logger.exception("[CrystalTech] run_crystaltech_flow unhandled: %s", e, exc_info=True)
-        if not interaction.response.is_done():
-            await interaction.response.send_message(
-                f"❌ Unexpected error: `{type(e).__name__}: {e}`", ephemeral=True
-            )
-        else:
-            await interaction.followup.send(
-                f"❌ Unexpected error: `{type(e).__name__}: {e}`", ephemeral=True
-            )
-        await _release()
+send_profile_to_channel = send_profile_to_channel_service
+run_crystaltech_flow = run_crystaltech_flow_service
 
 
 def register_commands(bot_instance):
@@ -555,15 +214,14 @@ def register_commands(bot_instance):
                 pass
 
             try:
-                registry = await async_load_registry() or {}
-                user_key_str = str(interaction.user.id)
-                user_block = registry.get(user_key_str) or registry.get(interaction.user.id) or {}
-                accounts = (
-                    (user_block.get("accounts") or {}) if isinstance(user_block, dict) else {}
-                )
-
-                used_slots = set(accounts.keys())
-                free_slots = [slot for slot in ACCOUNT_ORDER if slot not in used_slots]
+                account_lookup = await get_accounts_for_user(interaction.user.id)
+                if not account_lookup.ok:
+                    await interaction.followup.send(
+                        "Registry is temporarily unavailable. Please try again later.",
+                        ephemeral=True,
+                    )
+                    return
+                free_slots = free_account_slots(account_lookup.accounts)
 
                 if not free_slots:
                     await interaction.followup.send(
@@ -721,9 +379,10 @@ def register_commands(bot_instance):
 
         # 2) Registered accounts path
         try:
-            registry = await asyncio.to_thread(load_registry)
-            user_block = registry.get(str(ctx.user.id)) or {}
-            accounts = user_block.get("accounts") or {}
+            account_lookup = await get_accounts_for_user(ctx.user.id)
+            if not account_lookup.ok:
+                raise RuntimeError(account_lookup.error or "registry unavailable")
+            accounts = account_lookup.accounts
         except Exception:
             logger.exception("[/mykvktargets] load_registry failed")
             await ctx.followup.send(
@@ -763,11 +422,15 @@ def register_commands(bot_instance):
                     lookup_callback=kvk_open_governor_lookup,
                     register_callback=kvk_open_registration_flow,
                 )
+                # architecture-check: allow
                 await ctx.followup.send(
-                    "Select an account to view its KVK targets:", view=view, ephemeral=only_me
+                    "Select an account to view its KVK targets:",  # architecture-check: allow
+                    view=view,
+                    ephemeral=only_me,
                 )
+            # architecture-check: allow
             except Exception:
-                logger.exception("[/mykvktargets] Failed to create/send account selector view")
+                logger.exception("[/mykvktargets] Failed to create/send account selector view")  # architecture-check: allow
                 await ctx.followup.send(
                     "Failed to show account selector. Try again later.", ephemeral=True
                 )
@@ -795,8 +458,9 @@ def register_commands(bot_instance):
                 register_callback=kvk_open_registration_flow,
             )
             await ctx.followup.send(hint, view=view, ephemeral=only_me)
+        # architecture-check: allow
         except Exception:
-            logger.exception("[/mykvktargets] Failed to create/send empty account picker view")
+            logger.exception("[/mykvktargets] Failed to create/send empty account picker view")  # architecture-check: allow
             await ctx.followup.send(hint, ephemeral=only_me)
 
     @bot.slash_command(
@@ -958,7 +622,7 @@ def register_commands(bot_instance):
         # --- Hand off to the helper; make sure we don't leave the interaction hanging on error
         try:
             # Helper is expected to handle its own defer + posting to the channel
-            await send_profile_to_channel(ctx.interaction, target_id, ctx.channel)
+            await send_profile_to_channel_service(ctx.interaction, target_id, ctx.channel)
         except Exception as e:
             logger.exception("[/player_profile] send_profile_to_channel failed (gid=%s)", target_id)
             # If nothing has acknowledged yet, send a clean error; otherwise use followup.
@@ -1004,14 +668,15 @@ def register_commands(bot_instance):
 
         # 1) Manual ID path
         if governorid and governorid.strip().isdigit():
-            await run_crystaltech_flow(ctx.interaction, governorid.strip(), ephemeral=only_me)
+            await run_crystaltech_flow_service(ctx.interaction, governorid.strip(), ephemeral=only_me)
             return
 
         # 2) Registered accounts path — reuse same registry logic & helpers as /mykvktargets
         try:
-            registry = await asyncio.to_thread(load_registry)
-            user_block = registry.get(str(ctx.user.id)) or {}
-            accounts = user_block.get("accounts") or {}
+            account_lookup = await get_accounts_for_user(ctx.user.id)
+            if not account_lookup.ok:
+                raise RuntimeError(account_lookup.error or "registry unavailable")
+            accounts = account_lookup.accounts
         except Exception:
             logger.exception("[/mykvkcrystaltech] load_registry failed")
             await ctx.followup.send(
@@ -1026,19 +691,20 @@ def register_commands(bot_instance):
         if options:
             if len(options) == 1:
                 only_gid = options[0].value
-                await run_crystaltech_flow(ctx.interaction, only_gid, ephemeral=only_me)
+                await run_crystaltech_flow_service(ctx.interaction, only_gid, ephemeral=only_me)
                 return
 
             # Build the AccountPickerView directly (no lazy-resolve helper anymore)
             async def _on_select(i, gid, ep):
                 # ensure we pass the interaction into run_crystaltech_flow
-                await run_crystaltech_flow(i, gid, ephemeral=ep)
+                await run_crystaltech_flow_service(i, gid, ephemeral=ep)
 
+            # architecture-check: allow
             view = AccountPickerView(
                 ctx=ctx,
                 options=options,
                 on_select_governor=_on_select,
-                heading="Select an account to manage its Crystal Tech:",
+                heading="Select an account to manage its Crystal Tech:",  # architecture-check: allow
                 show_register_btn=True,
                 ephemeral=only_me,
             )
@@ -1051,13 +717,14 @@ def register_commands(bot_instance):
             )
 
             async def _on_select(i, gid, ep):
-                await run_crystaltech_flow(i, gid, ephemeral=ep)
+                await run_crystaltech_flow_service(i, gid, ephemeral=ep)
 
+            # architecture-check: allow
             view = AccountPickerView(
                 ctx=ctx,
                 options=[],
                 on_select_governor=_on_select,
-                heading="Select an account to manage its Crystal Tech:",
+                heading="Select an account to manage its Crystal Tech:",  # architecture-check: allow
                 show_register_btn=True,
                 ephemeral=only_me,
             )

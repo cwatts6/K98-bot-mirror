@@ -33,8 +33,7 @@ from ark.registration_messages import upsert_registration_message
 from ark.state.ark_state import ArkJsonState, ArkMessageRef, ArkMessageState
 from decoraters import _has_leadership_role, _is_admin
 from profile_cache import get_profile_cached
-from registry.governor_registry import load_registry
-from registry.registry_service import get_discord_user_for_governor
+from registry.registry_service import get_discord_user_for_governor, get_user_accounts
 from target_utils import (
     _name_cache,
     get_name_cache_status,
@@ -174,9 +173,11 @@ async def _ensure_name_cache_ready() -> None:
 
 
 def _get_user_accounts(user_id: int) -> dict[str, dict]:
-    registry = load_registry() or {}
-    user_block = registry.get(str(user_id)) or registry.get(user_id) or {}
-    return user_block.get("accounts") or {}
+    try:
+        return dict(get_user_accounts(int(user_id)) or {})
+    except Exception:
+        logger.exception("ark_registration_user_accounts_lookup_failed user_id=%s", user_id)
+        return {}
 
 
 def _get_governor_name(accounts: dict[str, dict], governor_id: str) -> str:
