@@ -105,6 +105,10 @@ class MgePublishDiscordAdapter:
             MessageRef(message_id=int(message.id), channel_id=int(channel.id)),
         )
 
+    async def check_award_channel_available(self, channel_id: int) -> bool:
+        channel = await self._resolve_messageable_channel(channel_id)
+        return channel is not None
+
     async def send_republish_change_log(
         self,
         *,

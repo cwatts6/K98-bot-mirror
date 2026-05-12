@@ -113,6 +113,8 @@ class MgePublishIoAdapter(Protocol):
 
     async def delete_message(self, *, channel_id: int, message_id: int) -> _MessageIoResult: ...
 
+    async def check_award_channel_available(self, channel_id: int) -> bool: ...
+
     async def refresh_boards(
         self,
         *,
@@ -433,6 +435,9 @@ async def publish_event_awards(
         if old_version > 0
         else []
     )
+
+    if not await adapter.check_award_channel_available(channel_id):
+        return PublishResult(False, "Award channel unavailable.")
 
     new_version = await asyncio.to_thread(
         mge_publish_dal.apply_publish_atomic,

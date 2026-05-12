@@ -68,6 +68,9 @@ class _PublishAdapter:
     async def delete_message(self, *, channel_id: int, message_id: int):
         return _IoResult("deleted")
 
+    async def check_award_channel_available(self, channel_id: int) -> bool:
+        return self._channel(channel_id) is not None
+
     async def refresh_boards(self, **kwargs):
         self.refresh_calls.append(kwargs)
         return {"public": True, "leadership": True, "awards": True}
@@ -279,7 +282,6 @@ def test_manual_override_persists_only_for_awarded_rows(monkeypatch: pytest.Monk
 async def test_publish_increments_version_and_refreshes_all_boards(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(mge_publish_service, "MGE_AWARD_CHANNEL_ID", "999")
     monkeypatch.setattr(
         mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
     )
@@ -367,10 +369,56 @@ async def test_publish_blocked_when_readiness_fails(monkeypatch: pytest.MonkeyPa
 
 
 @pytest.mark.asyncio
+async def test_publish_channel_unavailable_before_persist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unavailable award channel must abort before apply_publish_atomic is called."""
+    persist_called = {"value": False}
+
+    def _apply_publish_atomic(**kwargs):
+        persist_called["value"] = True
+        return 1
+
+    monkeypatch.setattr(
+        mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
+    )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal,
+        "fetch_event_publish_context",
+        lambda event_id: {
+            "EventId": event_id,
+            "EventName": "E0",
+            "VariantName": "Infantry",
+            "PublishVersion": 0,
+        },
+    )
+    monkeypatch.setattr(
+        mge_publish_service,
+        "_build_publish_sets",
+        lambda event_id: (
+            [{"AwardId": 1, "FinalAwardedRank": 1, "TargetScore": 8_000_000}],
+            [],
+            [],
+        ),
+    )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal, "apply_publish_atomic", _apply_publish_atomic
+    )
+
+    bot = SimpleNamespace(get_channel=lambda _x: None, fetch_channel=lambda _x: None)
+    res = await mge_publish_service.publish_event_awards(
+        adapter=_PublishAdapter(bot), event_id=1, actor_discord_id=2
+    )
+
+    assert res.success is False
+    assert "channel unavailable" in res.message.lower()
+    assert persist_called["value"] is False
+
+
+@pytest.mark.asyncio
 async def test_publish_excludes_unassigned_rows_from_final_publish_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(mge_publish_service, "MGE_AWARD_CHANNEL_ID", "654")
     monkeypatch.setattr(
         mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
     )
@@ -444,7 +492,7 @@ async def test_publish_excludes_unassigned_rows_from_final_publish_set(
 
     bot = SimpleNamespace(get_channel=lambda x: _Channel(), fetch_channel=lambda x: _Channel())
     res = await mge_publish_service.publish_event_awards(
-        adapter=_PublishAdapter(bot), event_id=5, actor_discord_id=9
+        adapter=_PublishAdapter(bot, default_award_channel_id=654), event_id=5, actor_discord_id=9
     )
 
     assert res.success is True
@@ -456,7 +504,6 @@ async def test_publish_excludes_unassigned_rows_from_final_publish_set(
 async def test_publish_sends_reminders_once_and_marks_sent(monkeypatch: pytest.MonkeyPatch) -> None:
     sent_payloads = []
     marked = {}
-    monkeypatch.setattr(mge_publish_service, "MGE_AWARD_CHANNEL_ID", "999")
     monkeypatch.setattr(
         mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
     )
@@ -552,7 +599,6 @@ async def test_publish_sends_reminders_once_and_marks_sent(monkeypatch: pytest.M
 async def test_republish_skips_reminders_when_already_sent(monkeypatch: pytest.MonkeyPatch) -> None:
     sent_payloads = []
     mark_called = {"value": False}
-    monkeypatch.setattr(mge_publish_service, "MGE_AWARD_CHANNEL_ID", "999")
     monkeypatch.setattr(
         mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
     )
@@ -633,7 +679,6 @@ async def test_publish_reminders_persist_failure_skips_second_embed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sent_payloads = []
-    monkeypatch.setattr(mge_publish_service, "MGE_AWARD_CHANNEL_ID", "999")
     monkeypatch.setattr(
         mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
     )
@@ -716,7 +761,6 @@ async def test_publish_reminders_mark_sent_failure_reports_status(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sent_payloads = []
-    monkeypatch.setattr(mge_publish_service, "MGE_AWARD_CHANNEL_ID", "999")
     monkeypatch.setattr(
         mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
     )
@@ -810,7 +854,6 @@ async def test_publish_reminders_message_id_persist_failure_reports_status(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sent_payloads = []
-    monkeypatch.setattr(mge_publish_service, "MGE_AWARD_CHANNEL_ID", "999")
     monkeypatch.setattr(
         mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
     )
@@ -904,7 +947,6 @@ async def test_publish_reminders_id_and_mark_failure_reports_status(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sent_payloads = []
-    monkeypatch.setattr(mge_publish_service, "MGE_AWARD_CHANNEL_ID", "999")
     monkeypatch.setattr(
         mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
     )
@@ -1068,9 +1110,8 @@ def test_republish_generates_change_summary() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _base_publish_monkeypatches(monkeypatch: pytest.MonkeyPatch, channel_id: str = "999") -> None:
+def _base_publish_monkeypatches(monkeypatch: pytest.MonkeyPatch) -> None:
     """Apply the standard publish-flow monkeypatches shared by DM tests."""
-    monkeypatch.setattr(mge_publish_service, "MGE_AWARD_CHANNEL_ID", channel_id)
     monkeypatch.setattr(
         mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
     )
