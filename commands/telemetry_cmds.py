@@ -430,7 +430,9 @@ def register_commands(bot_instance):
                 )
             # architecture-check: allow
             except Exception:
-                logger.exception("[/mykvktargets] Failed to create/send account selector view")  # architecture-check: allow
+                logger.exception(
+                    "[/mykvktargets] Failed to create/send account selector view"
+                )  # architecture-check: allow
                 await ctx.followup.send(
                     "Failed to show account selector. Try again later.", ephemeral=True
                 )
@@ -460,7 +462,9 @@ def register_commands(bot_instance):
             await ctx.followup.send(hint, view=view, ephemeral=only_me)
         # architecture-check: allow
         except Exception:
-            logger.exception("[/mykvktargets] Failed to create/send empty account picker view")  # architecture-check: allow
+            logger.exception(
+                "[/mykvktargets] Failed to create/send empty account picker view"
+            )  # architecture-check: allow
             await ctx.followup.send(hint, ephemeral=only_me)
 
     @bot.slash_command(
@@ -668,7 +672,9 @@ def register_commands(bot_instance):
 
         # 1) Manual ID path
         if governorid and governorid.strip().isdigit():
-            await run_crystaltech_flow_service(ctx.interaction, governorid.strip(), ephemeral=only_me)
+            await run_crystaltech_flow_service(
+                ctx.interaction, governorid.strip(), ephemeral=only_me
+            )
             return
 
         # 2) Registered accounts path — reuse same registry logic & helpers as /mykvktargets

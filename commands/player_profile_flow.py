@@ -113,7 +113,9 @@ async def send_profile_to_channel(
         try:
             await primary_msg.delete()  # architecture-check: allow
         except Exception:
-            logger.exception("[player_profile] could not delete empty primary")  # architecture-check: allow
+            logger.exception(
+                "[player_profile] could not delete empty primary"
+            )  # architecture-check: allow
         target_msg = fallback_msg
 
     def resolve_card_url(msg: discord.Message | None) -> str | None:

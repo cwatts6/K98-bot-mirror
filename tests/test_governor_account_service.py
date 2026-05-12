@@ -40,9 +40,10 @@ def test_account_classification_and_free_slots():
 
     assert svc.classify_accounts({}) == ("none", None)
     assert svc.classify_accounts({"Main": {"GovernorID": "1"}}) == ("single", "1")
-    assert svc.classify_accounts(
-        {"Main": {"GovernorID": "1"}, "Alt 1": {"GovernorID": "2"}}
-    ) == ("multi", None)
+    assert svc.classify_accounts({"Main": {"GovernorID": "1"}, "Alt 1": {"GovernorID": "2"}}) == (
+        "multi",
+        None,
+    )
 
     free = svc.free_account_slots({"Main": {"GovernorID": "1"}})
     assert "Main" not in free
