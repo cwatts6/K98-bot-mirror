@@ -234,14 +234,11 @@ def test_refresh_award_reminders_command_uses_admin_decorator(monkeypatch):
     mge_cmds.register_mge(bot)
 
     refresh_commands = [
-        command
-        for command in bot.tree.commands
-        if command.name == "mge_refresh_award_reminders"
+        command for command in bot.tree.commands if command.name == "mge_refresh_award_reminders"
     ]
 
     assert captured["allow_leadership"] is True
     assert refresh_commands
     assert any(
-        getattr(command.callback, "_admin_check_applied", False)
-        for command in refresh_commands
+        getattr(command.callback, "_admin_check_applied", False) for command in refresh_commands
     )
