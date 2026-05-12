@@ -7,6 +7,93 @@ import pytest
 from mge import mge_embed_manager, mge_publish_service
 
 
+class _MessageRef:
+    def __init__(self, message_id: int, channel_id: int) -> None:
+        self.message_id = int(message_id)
+        self.channel_id = int(channel_id)
+
+
+class _IoResult:
+    def __init__(self, status: str, message_ref: _MessageRef | None = None) -> None:
+        self.status = status
+        self.message_ref = message_ref
+
+
+class _MailResult:
+    def __init__(self, sent: bool, status: str) -> None:
+        self.sent = sent
+        self.status = status
+
+
+class _PublishAdapter:
+    def __init__(
+        self,
+        bot,
+        *,
+        default_award_channel_id: int = 999,
+        mail_user_ids: list[int] | None = None,
+    ) -> None:
+        self.bot = bot
+        self._default_award_channel_id = int(default_award_channel_id)
+        self.mail_user_ids = list(mail_user_ids or [])
+        self.refresh_calls = []
+
+    @property
+    def default_award_channel_id(self) -> int:
+        return self._default_award_channel_id
+
+    def _channel(self, channel_id: int):
+        return self.bot.get_channel(channel_id)
+
+    async def send_awards_embed(self, *, channel_id: int, **kwargs):
+        channel = self._channel(channel_id)
+        if channel is None:
+            return _IoResult("channel_unavailable")
+        msg = await channel.send(content=None, embed=object(), allowed_mentions=object())
+        return _IoResult("sent", _MessageRef(msg.id, channel.id))
+
+    async def send_republish_change_log(self, *, channel_id: int, change_lines: list[str]):
+        return _IoResult("sent")
+
+    async def send_award_reminders_embed(self, *, channel_id: int, **kwargs):
+        channel = self._channel(channel_id)
+        if channel is None:
+            return _IoResult("channel_unavailable")
+        msg = await channel.send(content="@everyone", embed=object(), allowed_mentions=object())
+        return _IoResult("sent", _MessageRef(msg.id, channel.id))
+
+    async def update_award_reminders_embed(self, *, channel_id: int, message_id: int, **kwargs):
+        return _IoResult("not_found")
+
+    async def delete_message(self, *, channel_id: int, message_id: int):
+        return _IoResult("deleted")
+
+    async def refresh_boards(self, **kwargs):
+        self.refresh_calls.append(kwargs)
+        return {"public": True, "leadership": True, "awards": True}
+
+    async def send_award_mail(self, *, event_id: int, dm_text: str):
+        if not self.mail_user_ids:
+            return _MailResult(False, "skipped_no_recipient")
+        sent_count = 0
+        fail_count = 0
+        for uid in self.mail_user_ids:
+            try:
+                user = await self.bot.fetch_user(uid)
+                await user.send(
+                    dm_text,
+                    allowed_mentions=SimpleNamespace(everyone=False, users=False, roles=False),
+                )
+                sent_count += 1
+            except Exception:
+                fail_count += 1
+        if fail_count == 0:
+            return _MailResult(True, f"sent:{sent_count}")
+        if sent_count > 0:
+            return _MailResult(True, f"partial:{sent_count}_ok_{fail_count}_failed")
+        return _MailResult(False, f"all_failed:{fail_count}")
+
+
 def _ready_payload():
     return {
         "total_signups": 1,
@@ -192,7 +279,6 @@ def test_manual_override_persists_only_for_awarded_rows(monkeypatch: pytest.Monk
 async def test_publish_increments_version_and_refreshes_all_boards(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    refresh_calls = []
     monkeypatch.setattr(mge_publish_service, "MGE_AWARD_CHANNEL_ID", "999")
     monkeypatch.setattr(
         mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
@@ -240,11 +326,6 @@ async def test_publish_increments_version_and_refreshes_all_boards(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
     )
 
-    async def _refresh(**kwargs):
-        refresh_calls.append(kwargs)
-
-    monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", _refresh)
-
     class _Msg:
         id = 123
 
@@ -255,10 +336,13 @@ async def test_publish_increments_version_and_refreshes_all_boards(
             return _Msg()
 
     bot = SimpleNamespace(get_channel=lambda x: _Channel(), fetch_channel=lambda x: _Channel())
-    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=1, actor_discord_id=2)
+    adapter = _PublishAdapter(bot)
+    res = await mge_publish_service.publish_event_awards(
+        adapter=adapter, event_id=1, actor_discord_id=2
+    )
     assert res.success is True
     assert res.publish_version == 1
-    assert refresh_calls[0]["refresh_awards"] is True
+    assert adapter.refresh_calls[0]["refresh_awards"] is True
 
 
 @pytest.mark.asyncio
@@ -274,7 +358,9 @@ async def test_publish_blocked_when_readiness_fails(monkeypatch: pytest.MonkeyPa
     )
 
     bot = SimpleNamespace(get_channel=lambda _x: None, fetch_channel=lambda _x: None)
-    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=1, actor_discord_id=2)
+    res = await mge_publish_service.publish_event_awards(
+        adapter=_PublishAdapter(bot), event_id=1, actor_discord_id=2
+    )
 
     assert res.success is False
     assert "publish blocked" in res.message.lower()
@@ -347,8 +433,6 @@ async def test_publish_excludes_unassigned_rows_from_final_publish_set(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
     )
 
-    monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", lambda **kwargs: None)
-
     class _Msg:
         id = 321
 
@@ -359,7 +443,9 @@ async def test_publish_excludes_unassigned_rows_from_final_publish_set(
             return _Msg()
 
     bot = SimpleNamespace(get_channel=lambda x: _Channel(), fetch_channel=lambda x: _Channel())
-    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=5, actor_discord_id=9)
+    res = await mge_publish_service.publish_event_awards(
+        adapter=_PublishAdapter(bot), event_id=5, actor_discord_id=9
+    )
 
     assert res.success is True
     assert [row["AwardId"] for row in captured["publish_rows"]] == [10]
@@ -424,7 +510,6 @@ async def test_publish_sends_reminders_once_and_marks_sent(monkeypatch: pytest.M
         "update_award_reminder_message_ids",
         lambda **kwargs: True,
     )
-    monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", lambda **kwargs: None)
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "update_event_award_reminders_text",
@@ -449,7 +534,7 @@ async def test_publish_sends_reminders_once_and_marks_sent(monkeypatch: pytest.M
     bot = SimpleNamespace(get_channel=lambda x: _Channel(), fetch_channel=lambda x: _Channel())
 
     res = await mge_publish_service.publish_event_awards(
-        bot=bot,
+        adapter=_PublishAdapter(bot),
         event_id=2,
         actor_discord_id=42,
         reminders_text_override="event-specific reminders",
@@ -521,7 +606,6 @@ async def test_republish_skips_reminders_when_already_sent(monkeypatch: pytest.M
         "mark_award_reminders_sent",
         lambda **kwargs: mark_called.update(value=True) or True,
     )
-    monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", lambda **kwargs: None)
 
     class _Msg:
         id = 888
@@ -534,7 +618,9 @@ async def test_republish_skips_reminders_when_already_sent(monkeypatch: pytest.M
             return _Msg()
 
     bot = SimpleNamespace(get_channel=lambda x: _Channel(), fetch_channel=lambda x: _Channel())
-    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=3, actor_discord_id=9)
+    res = await mge_publish_service.publish_event_awards(
+        adapter=_PublishAdapter(bot), event_id=3, actor_discord_id=9
+    )
 
     assert res.success is True
     assert res.reminders_embed_status == "already_sent"
@@ -601,7 +687,6 @@ async def test_publish_reminders_persist_failure_skips_second_embed(
         "update_event_award_reminders_text",
         lambda **kwargs: False,
     )
-    monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", lambda **kwargs: None)
 
     class _Msg:
         id = 1001
@@ -615,7 +700,7 @@ async def test_publish_reminders_persist_failure_skips_second_embed(
 
     bot = SimpleNamespace(get_channel=lambda x: _Channel(), fetch_channel=lambda x: _Channel())
     res = await mge_publish_service.publish_event_awards(
-        bot=bot,
+        adapter=_PublishAdapter(bot),
         event_id=4,
         actor_discord_id=9,
         reminders_text_override="custom text",
@@ -695,7 +780,6 @@ async def test_publish_reminders_mark_sent_failure_reports_status(
         "mark_award_reminders_sent",
         lambda **kwargs: False,
     )
-    monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", lambda **kwargs: None)
 
     class _Msg:
         id = 1002
@@ -709,7 +793,7 @@ async def test_publish_reminders_mark_sent_failure_reports_status(
 
     bot = SimpleNamespace(get_channel=lambda x: _Channel(), fetch_channel=lambda x: _Channel())
     res = await mge_publish_service.publish_event_awards(
-        bot=bot,
+        adapter=_PublishAdapter(bot),
         event_id=5,
         actor_discord_id=9,
         reminders_text_override="custom text",
@@ -790,7 +874,6 @@ async def test_publish_reminders_message_id_persist_failure_reports_status(
         "mark_award_reminders_sent",
         lambda **kwargs: True,
     )
-    monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", lambda **kwargs: None)
 
     class _Msg:
         id = 1003
@@ -804,7 +887,7 @@ async def test_publish_reminders_message_id_persist_failure_reports_status(
 
     bot = SimpleNamespace(get_channel=lambda x: _Channel(), fetch_channel=lambda x: _Channel())
     res = await mge_publish_service.publish_event_awards(
-        bot=bot,
+        adapter=_PublishAdapter(bot),
         event_id=6,
         actor_discord_id=9,
         reminders_text_override="custom text",
@@ -885,7 +968,6 @@ async def test_publish_reminders_id_and_mark_failure_reports_status(
         "mark_award_reminders_sent",
         lambda **kwargs: False,
     )
-    monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", lambda **kwargs: None)
 
     class _Msg:
         id = 1004
@@ -899,7 +981,7 @@ async def test_publish_reminders_id_and_mark_failure_reports_status(
 
     bot = SimpleNamespace(get_channel=lambda x: _Channel(), fetch_channel=lambda x: _Channel())
     res = await mge_publish_service.publish_event_awards(
-        bot=bot,
+        adapter=_PublishAdapter(bot),
         event_id=7,
         actor_discord_id=9,
         reminders_text_override="custom text",
@@ -913,7 +995,6 @@ async def test_publish_reminders_id_and_mark_failure_reports_status(
 
 @pytest.mark.asyncio
 async def test_unpublish_preserves_state_and_refreshes(monkeypatch: pytest.MonkeyPatch) -> None:
-    refresh_calls = []
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
@@ -933,16 +1014,14 @@ async def test_unpublish_preserves_state_and_refreshes(monkeypatch: pytest.Monke
         },
     )
 
-    async def _refresh(**kwargs):
-        refresh_calls.append(kwargs)
-
-    monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", _refresh)
-
     bot = SimpleNamespace(get_channel=lambda _x: None, fetch_channel=lambda _x: None)
-    res = await mge_publish_service.unpublish_event_awards(bot=bot, event_id=1, actor_discord_id=2)
+    adapter = _PublishAdapter(bot)
+    res = await mge_publish_service.unpublish_event_awards(
+        adapter=adapter, event_id=1, actor_discord_id=2
+    )
 
     assert res.success is True
-    assert refresh_calls[0]["refresh_awards"] is True
+    assert adapter.refresh_calls[0]["refresh_awards"] is True
     assert "rolled back" in res.message.lower()
 
 
@@ -1038,7 +1117,6 @@ def _base_publish_monkeypatches(monkeypatch: pytest.MonkeyPatch, channel_id: str
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
     )
-    monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", lambda **kwargs: None)
 
 
 @pytest.mark.asyncio
@@ -1069,7 +1147,11 @@ async def test_dm_failure_does_not_block_publish(monkeypatch: pytest.MonkeyPatch
         fetch_user=_fetch_user,
     )
 
-    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=10, actor_discord_id=2)
+    res = await mge_publish_service.publish_event_awards(
+        adapter=_PublishAdapter(bot, mail_user_ids=[888999]),
+        event_id=10,
+        actor_discord_id=2,
+    )
 
     assert res.success is True, f"Publish must succeed despite DM failure, got: {res.message}"
     assert res.award_mail_dm_sent is False
@@ -1104,7 +1186,11 @@ async def test_dm_sent_flag_true_when_dm_succeeds(monkeypatch: pytest.MonkeyPatc
         fetch_user=_fetch_user,
     )
 
-    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=11, actor_discord_id=2)
+    res = await mge_publish_service.publish_event_awards(
+        adapter=_PublishAdapter(bot, mail_user_ids=[888999]),
+        event_id=11,
+        actor_discord_id=2,
+    )
 
     assert res.success is True
     assert res.award_mail_dm_sent is True
@@ -1139,7 +1225,11 @@ async def test_dm_sent_to_multiple_recipients(monkeypatch: pytest.MonkeyPatch) -
         fetch_user=_fetch_user,
     )
 
-    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=13, actor_discord_id=2)
+    res = await mge_publish_service.publish_event_awards(
+        adapter=_PublishAdapter(bot, mail_user_ids=[111111, 222222]),
+        event_id=13,
+        actor_discord_id=2,
+    )
 
     assert res.success is True
     assert res.award_mail_dm_sent is True
@@ -1185,7 +1275,11 @@ async def test_dm_partial_failure_still_marks_sent(monkeypatch: pytest.MonkeyPat
         fetch_user=_fetch_user,
     )
 
-    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=14, actor_discord_id=2)
+    res = await mge_publish_service.publish_event_awards(
+        adapter=_PublishAdapter(bot, mail_user_ids=[111111, 222222]),
+        event_id=14,
+        actor_discord_id=2,
+    )
 
     assert res.success is True
     assert res.award_mail_dm_sent is True
@@ -1212,7 +1306,9 @@ async def test_dm_skipped_when_no_recipient_configured(monkeypatch: pytest.Monke
         fetch_channel=lambda x: _Channel(),
     )
 
-    res = await mge_publish_service.publish_event_awards(bot=bot, event_id=12, actor_discord_id=2)
+    res = await mge_publish_service.publish_event_awards(
+        adapter=_PublishAdapter(bot), event_id=12, actor_discord_id=2
+    )
 
     assert res.success is True
     assert res.award_mail_dm_sent is False

@@ -16,6 +16,7 @@ from decoraters import (
 )
 from mge import mge_commander_service, mge_publish_service
 from mge.mge_embed_manager import sync_event_leadership_embed
+from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
 from mge.mge_results_import import OverwriteConfirmationRequired, import_results_manual
 from mge.mge_review_service import get_review_pool_with_summary
 from ui.views.mge_commander_admin_view import MgeCommanderAdminView
@@ -322,7 +323,7 @@ def register_mge(bot: ext_commands.Bot) -> None:
         )
         await safe_defer(ctx, ephemeral=True)
         result = await mge_publish_service.refresh_award_reminders(
-            bot=ctx.bot,
+            adapter=MgePublishDiscordAdapter(ctx.bot),
             event_id=event_id,
             actor_discord_id=int(ctx.user.id),
             allow_completed=event_id is not None,

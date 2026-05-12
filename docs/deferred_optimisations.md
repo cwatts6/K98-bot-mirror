@@ -55,17 +55,17 @@
 ### Deferred Optimisation
 - Area: `mge/mge_signup_service.py`
 - Type: consistency
-- Description: MGE signup governor lookup still reads the registry through the legacy registry shape instead of the newer `registry_service.get_user_accounts()` service boundary. This remains aligned with GitHub issues #29 and #32 and is not required for MGE reminder refresh or commander administration.
-- Suggested Fix: Move MGE signup account resolution onto `registry_service.get_user_accounts()` in a focused service-consolidation pass, preserving existing self-service/admin-add behaviour and tests.
+- Description: Resolved in MGE Process Polish Phase 2. MGE self-signup account resolution now uses `registry_service.get_user_accounts()` instead of the legacy registry dict shape, while admin-add reverse owner lookup remains on `get_discord_user_for_governor()`.
+- Suggested Fix: Closed for MGE. Remaining registry-service consolidation work belongs to the broader stats/service alignment tracked by GitHub issues #29 and #32.
 - Impact: medium
 - Risk: medium
-- Dependencies: Coordinate with the broader Service Layer Consolidation Pack so stats and MGE registry-service alignment are handled together.
+- Dependencies: Coordinate with the broader Service Layer Consolidation Pack so stats and MGE registry-service alignment are handled together. Selected for MGE Process Polish Phase 2; see `docs/MGE Process Polish — Phase 2 Initiation Statement.md`.
 
 ### Deferred Optimisation
 - Area: `mge/mge_publish_service.py`
 - Type: architecture
-- Description: MGE publish orchestration still mixes domain publish state transitions with Discord message IO. The current task reused that existing boundary for award reminder refresh to avoid splitting publish/repost behaviour mid-feature, with explicit architecture-check allowances on the pre-existing Discord-aware service surface.
-- Suggested Fix: Extract Discord message fetch/edit/send operations into a dedicated interaction adapter or UI orchestration module, leaving `mge_publish_service.py` to produce publish/reminder intents and persist outcomes through DAL calls.
+- Description: Narrowed in MGE Process Polish Phase 2. Publish, republish, reminder refresh, unpublish, award DM, and board refresh calls now go through a Discord IO adapter instead of direct Discord message operations in `mge_publish_service.py`.
+- Suggested Fix: Remaining follow-up, if desired, is to move Discord embed construction out of service-adjacent renderer calls and into a fully UI-owned publish orchestration model. This is lower priority because direct fetch/edit/send/delete/DM IO has been extracted from the service boundary.
 - Impact: high
 - Risk: medium
-- Dependencies: Requires careful regression coverage for publish, republish, reminder refresh, unpublish, award DM, and board refresh behaviours.
+- Dependencies: Requires careful regression coverage for publish, republish, reminder refresh, unpublish, award DM, and board refresh behaviours. Selected for MGE Process Polish Phase 2; see `docs/MGE Process Polish — Phase 2 Initiation Statement.md`.

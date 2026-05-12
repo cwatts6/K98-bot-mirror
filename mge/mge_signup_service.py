@@ -19,8 +19,7 @@ from mge.mge_validation import (
     validate_rank_band,
     validate_self_service_window,
 )
-from registry.governor_registry import load_registry
-from registry.registry_service import get_discord_user_for_governor
+from registry.registry_service import get_discord_user_for_governor, get_user_accounts
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +44,15 @@ def _is_admin_or_leadership(actor_roles: set[int], admin_role_ids: set[int]) -> 
 
 
 def get_linked_governors_for_user(discord_user_id: int) -> list[dict[str, str]]:
-    registry = load_registry() or {}
-    block = registry.get(str(discord_user_id)) or registry.get(discord_user_id) or {}
-    accounts = block.get("accounts") or {}
+    try:
+        accounts = get_user_accounts(int(discord_user_id))
+    except Exception:
+        logger.exception(
+            "mge_signup_registry_accounts_lookup_failed discord_user_id=%s",
+            discord_user_id,
+        )
+        return []
+
     rows: list[dict[str, str]] = []
     seen: set[str] = set()
 

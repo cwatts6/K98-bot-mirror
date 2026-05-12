@@ -2,7 +2,7 @@
 
 ## Delivery Status
 
-Phase 1 has been delivered in branch `codex/mge-process-polish`.
+Phase 1 has been delivered in branch `codex/mge-process-polish` and promoted to production after local validation and production smoke testing.
 
 ### Phase 1 Delivered
 
@@ -34,12 +34,14 @@ Phase 1 has been delivered in branch `codex/mge-process-polish`.
 
   * `sql/mge_award_reminder_message_ids_schema.sql`
 
-### SQL Promotion Required
+### SQL Promotion Status
 
-Before production use of award reminder refresh, promote the matching SQL change to the authoritative SQL Server repo:
+Award reminder refresh depends on the following nullable metadata columns on `dbo.MGE_Events`:
 
 * `dbo.MGE_Events.AwardRemindersMessageId BIGINT NULL`
 * `dbo.MGE_Events.AwardRemindersChannelId BIGINT NULL`
+
+The production promotion was smoke-tested successfully after this requirement was satisfied. Future environment rebuilds or database restores must retain these columns before using `/mge_refresh_award_reminders`.
 
 ### Deferred To Phase 2
 
@@ -56,6 +58,8 @@ The following items were explicitly deferred because they are broader architectu
   * `mge_publish_service.py` already mixes publish state orchestration with Discord send/edit/delete operations.
   * Phase 1 reused that existing boundary to avoid broad refactoring of publish, republish, reminders, award DMs, unpublish, and board refresh in the same PR.
   * Captured as a structured deferred optimisation in `docs/deferred_optimisations.md`.
+
+Phase 2 initiation is captured in `docs/MGE Process Polish — Phase 2 Initiation Statement.md`.
 
 ### Phase 1 Validation
 

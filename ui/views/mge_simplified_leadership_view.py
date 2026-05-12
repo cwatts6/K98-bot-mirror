@@ -18,7 +18,10 @@ from mge import (
     mge_roster_service,
     mge_simplified_leadership_service,
 )
+
+# architecture-check: allow - existing leadership view reads signup DAL for admin-add gating.
 from mge.dal import mge_signup_dal
+from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
 from ui.views.mge_admin_view import ConfirmSwitchFixedView, ConfirmSwitchOpenView, MGEAdminViewDeps
 
 logger = logging.getLogger(__name__)
@@ -251,7 +254,7 @@ class _PublishConfirmView(_SingleActionConfirmView):
             return
         await interaction.response.defer(ephemeral=True)
         result = await mge_publish_service.publish_event_awards(
-            bot=interaction.client,
+            adapter=MgePublishDiscordAdapter(interaction.client),
             event_id=self.event_id,
             actor_discord_id=int(interaction.user.id),
         )
@@ -277,7 +280,7 @@ class _UnpublishConfirmView(_SingleActionConfirmView):
             return
         await interaction.response.defer(ephemeral=True)
         result = await mge_publish_service.unpublish_event_awards(
-            bot=interaction.client,
+            adapter=MgePublishDiscordAdapter(interaction.client),
             event_id=self.event_id,
             actor_discord_id=int(interaction.user.id),
         )

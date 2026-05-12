@@ -1,10 +1,60 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 
 from mge import mge_publish_service
+
+
+class _MessageRef:
+    def __init__(self, message_id: int, channel_id: int) -> None:
+        self.message_id = int(message_id)
+        self.channel_id = int(channel_id)
+
+
+class _IoResult:
+    def __init__(self, status: str, message_ref: _MessageRef | None = None) -> None:
+        self.status = status
+        self.message_ref = message_ref
+
+
+class _RefreshAdapter:
+    default_award_channel_id = 999
+
+    def __init__(self, channel: _Channel | None) -> None:
+        self.channel = channel
+
+    async def send_awards_embed(self, **kwargs):
+        return _IoResult("sent", _MessageRef(1, 999))
+
+    async def send_republish_change_log(self, **kwargs):
+        return _IoResult("sent")
+
+    async def send_award_reminders_embed(self, *, channel_id: int, **kwargs):
+        if self.channel is None:
+            return _IoResult("channel_unavailable")
+        msg = await self.channel.send(
+            content="@everyone", embed=object(), allowed_mentions=object()
+        )
+        return _IoResult("sent", _MessageRef(msg.id, self.channel.id))
+
+    async def update_award_reminders_embed(self, *, channel_id: int, message_id: int, **kwargs):
+        if self.channel is None:
+            return _IoResult("channel_unavailable")
+        try:
+            message = await self.channel.fetch_message(message_id)
+        except Exception:
+            return _IoResult("not_found")
+        await message.edit(content="@everyone", embed=object(), allowed_mentions=object())
+        return _IoResult("updated", _MessageRef(message_id, self.channel.id))
+
+    async def delete_message(self, **kwargs):
+        return _IoResult("deleted")
+
+    async def refresh_boards(self, **kwargs):
+        return {"public": True, "leadership": True, "awards": True}
+
+    async def send_award_mail(self, **kwargs):
+        return type("_MailResult", (), {"sent": False, "status": "skipped_no_recipient"})()
 
 
 def _ctx(**overrides):
@@ -44,7 +94,7 @@ class _Channel:
 
     async def fetch_message(self, message_id: int):
         if self.missing:
-            raise mge_publish_service.discord.NotFound()
+            raise LookupError("missing")
         return self.message
 
     async def send(self, **kwargs):
@@ -71,10 +121,9 @@ async def test_refresh_updates_existing_reminder_message(monkeypatch):
         "update_event_award_reminders_text",
         lambda **kwargs: updates.append(kwargs) or True,
     )
-    bot = SimpleNamespace(get_channel=lambda _cid: channel, fetch_channel=lambda _cid: channel)
 
     result = await mge_publish_service.refresh_award_reminders(
-        bot=bot,
+        adapter=_RefreshAdapter(channel),
         event_id=10,
         actor_discord_id=1,
     )
@@ -88,12 +137,8 @@ async def test_refresh_updates_existing_reminder_message(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_refresh_reposts_missing_message_and_persists_ids(monkeypatch):
-    class _NotFound(Exception):
-        pass
-
     channel = _Channel(missing=True)
     ids = {}
-    monkeypatch.setattr(mge_publish_service.discord, "NotFound", _NotFound)
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
@@ -119,10 +164,8 @@ async def test_refresh_reposts_missing_message_and_persists_ids(monkeypatch):
         "mark_award_reminders_sent",
         lambda **kwargs: True,
     )
-    bot = SimpleNamespace(get_channel=lambda _cid: channel, fetch_channel=lambda _cid: channel)
-
     result = await mge_publish_service.refresh_award_reminders(
-        bot=bot,
+        adapter=_RefreshAdapter(channel),
         event_id=10,
         actor_discord_id=1,
     )
@@ -153,10 +196,9 @@ async def test_refresh_persists_default_text_only_after_successful_discord_updat
         "update_event_award_reminders_text",
         lambda **kwargs: updates.append(kwargs) or True,
     )
-    bot = SimpleNamespace(get_channel=lambda _cid: channel, fetch_channel=lambda _cid: channel)
 
     result = await mge_publish_service.refresh_award_reminders(
-        bot=bot,
+        adapter=_RefreshAdapter(channel),
         event_id=10,
         actor_discord_id=1,
     )
@@ -169,6 +211,7 @@ async def test_refresh_persists_default_text_only_after_successful_discord_updat
 
 @pytest.mark.asyncio
 async def test_refresh_does_not_persist_default_text_when_discord_update_fails(monkeypatch):
+    channel = None
     updates = []
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
@@ -185,10 +228,8 @@ async def test_refresh_does_not_persist_default_text_when_discord_update_fails(m
         "update_event_award_reminders_text",
         lambda **kwargs: updates.append(kwargs) or True,
     )
-    bot = SimpleNamespace(get_channel=lambda _cid: None, fetch_channel=lambda _cid: None)
-
     result = await mge_publish_service.refresh_award_reminders(
-        bot=bot,
+        adapter=_RefreshAdapter(channel),
         event_id=10,
         actor_discord_id=1,
     )
@@ -211,10 +252,9 @@ async def test_refresh_does_not_duplicate_when_message_exists(monkeypatch):
         "fetch_default_award_reminders_text",
         lambda mode: "latest reminders",
     )
-    bot = SimpleNamespace(get_channel=lambda _cid: channel, fetch_channel=lambda _cid: channel)
 
     result = await mge_publish_service.refresh_award_reminders(
-        bot=bot,
+        adapter=_RefreshAdapter(channel),
         event_id=10,
         actor_discord_id=1,
     )
@@ -226,15 +266,14 @@ async def test_refresh_does_not_duplicate_when_message_exists(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_refresh_refuses_when_awards_not_published(monkeypatch):
+    channel = None
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
         "fetch_event_publish_context",
         lambda event_id: _ctx(PublishVersion=0),
     )
-    bot = SimpleNamespace(get_channel=lambda _cid: None, fetch_channel=lambda _cid: None)
-
     result = await mge_publish_service.refresh_award_reminders(
-        bot=bot,
+        adapter=_RefreshAdapter(channel),
         event_id=10,
         actor_discord_id=1,
     )

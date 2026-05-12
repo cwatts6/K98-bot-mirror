@@ -7,24 +7,19 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 import inspect
 import logging
-from typing import Any
+from typing import Any, Protocol
 
-# architecture-check: allow - existing publish orchestration owns Discord message IO.
-import discord
-
-from bot_config import MGE_AWARD_CHANNEL_ID, MGE_MAIL_DM_USER_IDS
 from mge.dal import mge_publish_dal
 from mge.mge_constants import DEFAULT_TARGET_DECREMENT_SCORE
-from mge.mge_embed_manager import (
-    build_award_notifications_content,
-    build_mge_award_reminders_embed,
-    build_mge_awards_embed,
-    build_publish_change_summary_lines,
-    refresh_mge_boards,
-)
+from mge.mge_embed_manager import build_publish_change_summary_lines
 from mge.mge_simplified_flow_service import evaluate_publish_readiness, get_ordered_leadership_rows
 
 logger = logging.getLogger(__name__)
+
+# Retained only so older tests or downstream monkeypatches fail softly after
+# Discord IO moved behind MgePublishIoAdapter.
+MGE_AWARD_CHANNEL_ID: str | int = 0
+MGE_MAIL_DM_USER_IDS: list[int] = []
 
 
 @dataclass(slots=True)
@@ -58,6 +53,81 @@ class RefreshAwardRemindersResult:
     updated_existing: bool = False
     reposted_missing: bool = False
     skipped_no_awards: bool = False
+
+
+class _MessageRef(Protocol):
+    message_id: int
+    channel_id: int
+
+
+class _MessageIoResult(Protocol):
+    status: str
+    message_ref: _MessageRef | None
+
+
+class _AwardMailResult(Protocol):
+    sent: bool
+    status: str
+
+
+class MgePublishIoAdapter(Protocol):
+    @property
+    def default_award_channel_id(self) -> int: ...
+
+    async def send_awards_embed(
+        self,
+        *,
+        channel_id: int,
+        event_row: dict[str, Any],
+        awarded_rows: list[dict[str, Any]],
+        waitlist_rows: list[dict[str, Any]],
+        publish_version: int,
+        published_utc: datetime,
+    ) -> _MessageIoResult: ...
+
+    async def send_republish_change_log(
+        self,
+        *,
+        channel_id: int,
+        change_lines: list[str],
+    ) -> _MessageIoResult: ...
+
+    async def send_award_reminders_embed(
+        self,
+        *,
+        channel_id: int,
+        event_row: dict[str, Any],
+        reminders_text: str,
+        published_utc: datetime,
+    ) -> _MessageIoResult: ...
+
+    async def update_award_reminders_embed(
+        self,
+        *,
+        channel_id: int,
+        message_id: int,
+        event_row: dict[str, Any],
+        reminders_text: str,
+        published_utc: datetime,
+    ) -> _MessageIoResult: ...
+
+    async def delete_message(self, *, channel_id: int, message_id: int) -> _MessageIoResult: ...
+
+    async def refresh_boards(
+        self,
+        *,
+        event_id: int,
+        refresh_public: bool = True,
+        refresh_leadership: bool = True,
+        refresh_awards: bool = False,
+    ) -> dict[str, bool]: ...
+
+    async def send_award_mail(
+        self,
+        *,
+        event_id: int,
+        dm_text: str,
+    ) -> _AwardMailResult: ...
 
 
 def _now_utc(now_utc: datetime | None = None) -> datetime:
@@ -152,39 +222,6 @@ def _build_award_mail_text(
 
 def _current_award_dataset(event_id: int) -> dict[str, Any]:
     return get_ordered_leadership_rows(event_id)
-
-
-async def _resolve_messageable_channel(
-    bot: discord.Client,  # architecture-check: allow
-    channel_id: int,
-) -> discord.abc.Messageable | None:  # architecture-check: allow
-    channel = bot.get_channel(channel_id)
-    if channel is None:
-        try:
-            channel = await bot.fetch_channel(channel_id)
-        except Exception:
-            logger.exception("mge_channel_fetch_failed channel_id=%s", channel_id)
-            return None
-    if not hasattr(channel, "send"):
-        logger.error("mge_channel_not_messageable channel_id=%s", channel_id)
-        return None
-    return channel
-
-
-async def _send_award_reminders_embed(
-    *,
-    channel: discord.abc.Messageable,  # architecture-check: allow
-    embed: discord.Embed,  # architecture-check: allow
-) -> discord.Message:  # architecture-check: allow
-    return await channel.send(
-        content="@everyone",
-        embed=embed,
-        allowed_mentions=discord.AllowedMentions(  # architecture-check: allow
-            everyone=True,
-            roles=False,
-            users=False,
-        ),
-    )
 
 
 def _current_roster_rows_from_dataset(dataset: dict[str, Any]) -> list[dict[str, Any]]:
@@ -351,7 +388,7 @@ def override_target_score(
 
 async def publish_event_awards(
     *,
-    bot: discord.Client,  # architecture-check: allow
+    adapter: MgePublishIoAdapter,
     event_id: int,
     actor_discord_id: int,
     reminders_text_override: str | None = None,
@@ -378,7 +415,7 @@ async def publish_event_awards(
     if not publish_rows and not waitlist_rows:
         return PublishResult(False, "No awarded or waitlist rows available to publish.")
 
-    channel_id = int(MGE_AWARD_CHANNEL_ID)
+    channel_id = int(adapter.default_award_channel_id)
     if channel_id <= 0:
         return PublishResult(False, "MGE_AWARD_CHANNEL_ID is not configured.")
 
@@ -397,17 +434,6 @@ async def publish_event_awards(
         else []
     )
 
-    channel = bot.get_channel(channel_id)
-    if channel is None:
-        try:
-            channel = await bot.fetch_channel(channel_id)
-        except Exception:
-            logger.exception("mge_publish_channel_fetch_failed channel_id=%s", channel_id)
-            return PublishResult(False, "Award channel unavailable.")
-
-    if not hasattr(channel, "send"):
-        return PublishResult(False, "Award channel is not messageable.")
-
     new_version = await asyncio.to_thread(
         mge_publish_dal.apply_publish_atomic,
         event_id=event_id,
@@ -424,32 +450,17 @@ async def publish_event_awards(
     awarded = [r for r in posted_rows if _status(r.get("AwardStatus")) == "awarded"]
     waitlist = [r for r in posted_rows if _status(r.get("AwardStatus")) == "waitlist"]
 
-    embed = build_mge_awards_embed(
+    awards_send = await adapter.send_awards_embed(
+        channel_id=channel_id,
         event_row=ctx,
         awarded_rows=awarded,
         waitlist_rows=waitlist,
         publish_version=new_version,
         published_utc=now,
     )
-
-    allowed_mentions = discord.AllowedMentions(  # architecture-check: allow
-        everyone=False, roles=False, users=True
-    )
-
-    try:
-        mention_content = build_award_notifications_content(awarded + waitlist)
-        message = await channel.send(
-            content=mention_content if mention_content else None,
-            embed=embed,
-            allowed_mentions=allowed_mentions,
-        )
-    except Exception:
-        logger.exception(
-            "mge_publish_embed_send_failed event_id=%s channel_id=%s version=%s",
-            event_id,
-            channel_id,
-            new_version,
-        )
+    if awards_send.status == "channel_unavailable":
+        return PublishResult(False, "Award channel unavailable.", publish_version=new_version)
+    if awards_send.status != "sent" or awards_send.message_ref is None:
         return PublishResult(
             False,
             "Publish persisted in DB, but posting the Discord embed failed. "
@@ -460,8 +471,8 @@ async def publish_event_awards(
     await asyncio.to_thread(
         mge_publish_dal.update_award_embed_ids,
         event_id=event_id,
-        message_id=int(message.id),
-        channel_id=int(channel.id),
+        message_id=int(awards_send.message_ref.message_id),
+        channel_id=int(awards_send.message_ref.channel_id),
         now_utc=now,
     )
 
@@ -471,9 +482,9 @@ async def publish_event_awards(
     changes = build_publish_change_summary_lines(previous_rows, latest_rows)
 
     if new_version > 1 and changes:
-        await channel.send(
-            "📌 **MGE Republish Change Log**\n" + "\n".join(f"- {line}" for line in changes[:50]),
-            allowed_mentions=discord.AllowedMentions.none(),  # architecture-check: allow
+        await adapter.send_republish_change_log(
+            channel_id=channel_id,
+            change_lines=changes,
         )
 
     reminders_embed_sent = False
@@ -512,22 +523,19 @@ async def publish_event_awards(
                     new_version,
                 )
             else:
-                reminders_embed = build_mge_award_reminders_embed(
+                reminder_send = await adapter.send_award_reminders_embed(
+                    channel_id=channel_id,
                     event_row=ctx,
                     reminders_text=final_reminders_text,
                     published_utc=now,
                 )
-                try:
-                    reminders_message = await _send_award_reminders_embed(
-                        channel=channel,
-                        embed=reminders_embed,
-                    )
+                if reminder_send.status == "sent" and reminder_send.message_ref is not None:
                     reminders_embed_sent = True
                     reminder_ids_updated = await asyncio.to_thread(
                         mge_publish_dal.update_award_reminder_message_ids,
                         event_id=event_id,
-                        message_id=int(reminders_message.id),
-                        channel_id=int(channel.id),
+                        message_id=int(reminder_send.message_ref.message_id),
+                        channel_id=int(reminder_send.message_ref.channel_id),
                         now_utc=now,
                     )
                     reminders_marked_sent = await asyncio.to_thread(
@@ -565,9 +573,9 @@ async def publish_event_awards(
                             channel_id,
                             new_version,
                         )
-                except Exception:
-                    reminders_embed_status = "send_failed"
-                    logger.exception(
+                else:
+                    reminders_embed_status = reminder_send.status or "send_failed"
+                    logger.warning(
                         "mge_publish_reminders_send_failed event_id=%s actor_discord_id=%s channel_id=%s version=%s",
                         event_id,
                         actor_discord_id,
@@ -575,8 +583,7 @@ async def publish_event_awards(
                         new_version,
                     )
 
-    refresh_result = refresh_mge_boards(
-        bot=bot,
+    refresh_result = adapter.refresh_boards(
         event_id=event_id,
         refresh_public=True,
         refresh_leadership=True,
@@ -586,50 +593,13 @@ async def publish_event_awards(
     if maybe_refresh is not None:
         await maybe_refresh
 
-    # --- Award mail DM: send a copy-friendly in-game mail to all MGE_MAIL_DM_USER_IDS recipients ---
     award_mail_dm_sent = False
     award_mail_dm_status: str | None = None
     try:
-        mail_user_ids = [uid for uid in MGE_MAIL_DM_USER_IDS if uid > 0]
-        if not mail_user_ids:
-            award_mail_dm_status = "skipped_no_recipient"
-            logger.info(
-                "mge_publish_award_dm_skipped reason=MGE_MAIL_DM_USER_ID_not_set event_id=%s",
-                event_id,
-            )
-        else:
-            dm_text = _build_award_mail_text(ctx, awarded)
-            sent_count = 0
-            fail_count = 0
-            for mail_user_id in mail_user_ids:
-                try:
-                    mail_user = await bot.fetch_user(mail_user_id)
-                    await mail_user.send(
-                        dm_text,
-                        allowed_mentions=discord.AllowedMentions.none(),  # architecture-check: allow
-                    )
-                    sent_count += 1
-                    logger.info(
-                        "mge_publish_award_dm_sent event_id=%s recipient_discord_id=%s",
-                        event_id,
-                        mail_user_id,
-                    )
-                except Exception:
-                    fail_count += 1
-                    logger.exception(
-                        "mge_publish_award_dm_failed event_id=%s recipient_discord_id=%s",
-                        event_id,
-                        mail_user_id,
-                    )
-            if fail_count == 0:
-                award_mail_dm_sent = True
-                award_mail_dm_status = f"sent:{sent_count}"
-            elif sent_count > 0:
-                award_mail_dm_sent = True
-                award_mail_dm_status = f"partial:{sent_count}_ok_{fail_count}_failed"
-            else:
-                award_mail_dm_sent = False
-                award_mail_dm_status = f"all_failed:{fail_count}"
+        dm_text = _build_award_mail_text(ctx, awarded)
+        dm_result = await adapter.send_award_mail(event_id=event_id, dm_text=dm_text)
+        award_mail_dm_sent = bool(dm_result.sent)
+        award_mail_dm_status = str(dm_result.status)
     except Exception:
         award_mail_dm_sent = False
         award_mail_dm_status = "dm_error"
@@ -683,7 +653,7 @@ async def publish_event_awards(
 
 async def refresh_award_reminders(
     *,
-    bot: discord.Client,  # architecture-check: allow
+    adapter: MgePublishIoAdapter,
     event_id: int | None,
     actor_discord_id: int,
     allow_completed: bool = False,
@@ -740,7 +710,7 @@ async def refresh_award_reminders(
     if channel_id <= 0:
         channel_id = _to_int(ctx.get("AwardEmbedChannelId"), 0)
     if channel_id <= 0:
-        channel_id = int(MGE_AWARD_CHANNEL_ID)
+        channel_id = int(adapter.default_award_channel_id)
     if channel_id <= 0:
         return RefreshAwardRemindersResult(
             False,
@@ -797,30 +767,17 @@ async def refresh_award_reminders(
             reposted_missing=reposted_missing,
         )
 
-    channel = await _resolve_messageable_channel(bot, channel_id)
-    if channel is None:
-        return RefreshAwardRemindersResult(
-            False,
-            "Award reminders channel is unavailable or not messageable.",
-            event_id=resolved_event_id,
-            status="channel_unavailable",
-        )
-
-    embed = build_mge_award_reminders_embed(
-        event_row=ctx,
-        reminders_text=reminders_text,
-        published_utc=now,
-    )
     old_message_id = _to_int(ctx.get("AwardRemindersMessageId"), 0)
 
-    if old_message_id > 0 and hasattr(channel, "fetch_message"):
-        try:
-            message = await channel.fetch_message(old_message_id)
-            await message.edit(
-                content="@everyone",
-                embed=embed,
-                allowed_mentions=discord.AllowedMentions.none(),  # architecture-check: allow
-            )
+    if old_message_id > 0:
+        update_result = await adapter.update_award_reminders_embed(
+            channel_id=channel_id,
+            message_id=old_message_id,
+            event_row=ctx,
+            reminders_text=reminders_text,
+            published_utc=now,
+        )
+        if update_result.status == "updated":
             logger.info(
                 "mge_refresh_award_reminders_updated event_id=%s actor_discord_id=%s message_id=%s channel_id=%s",
                 resolved_event_id,
@@ -842,32 +799,27 @@ async def refresh_award_reminders(
                 status="updated",
                 updated_existing=True,
             )
-        except discord.NotFound:  # architecture-check: allow
+        if update_result.status in {"not_found", "message_fetch_unavailable"}:
             logger.info(
                 "mge_refresh_award_reminders_missing_message event_id=%s message_id=%s",
                 resolved_event_id,
                 old_message_id,
             )
-        except discord.Forbidden:  # architecture-check: allow
-            logger.exception(
-                "mge_refresh_award_reminders_forbidden event_id=%s message_id=%s channel_id=%s",
-                resolved_event_id,
-                old_message_id,
-                channel_id,
-            )
+        elif update_result.status == "permission_failed":
             return RefreshAwardRemindersResult(
                 False,
                 "Missing permission to update the existing award reminders message.",
                 event_id=resolved_event_id,
                 status="permission_failed",
             )
-        except Exception:
-            logger.exception(
-                "mge_refresh_award_reminders_edit_failed event_id=%s message_id=%s channel_id=%s",
-                resolved_event_id,
-                old_message_id,
-                channel_id,
+        elif update_result.status == "channel_unavailable":
+            return RefreshAwardRemindersResult(
+                False,
+                "Award reminders channel is unavailable or not messageable.",
+                event_id=resolved_event_id,
+                status="channel_unavailable",
             )
+        elif update_result.status == "edit_failed":
             return RefreshAwardRemindersResult(
                 False,
                 "Failed to update the existing award reminders message.",
@@ -875,26 +827,27 @@ async def refresh_award_reminders(
                 status="edit_failed",
             )
 
-    try:
-        message = await _send_award_reminders_embed(channel=channel, embed=embed)
-    except discord.Forbidden:  # architecture-check: allow
-        logger.exception(
-            "mge_refresh_award_reminders_post_forbidden event_id=%s channel_id=%s",
-            resolved_event_id,
-            channel_id,
-        )
+    post_result = await adapter.send_award_reminders_embed(
+        channel_id=channel_id,
+        event_row=ctx,
+        reminders_text=reminders_text,
+        published_utc=now,
+    )
+    if post_result.status == "permission_failed":
         return RefreshAwardRemindersResult(
             False,
             "Missing permission to post award reminders.",
             event_id=resolved_event_id,
             status="permission_failed",
         )
-    except Exception:
-        logger.exception(
-            "mge_refresh_award_reminders_post_failed event_id=%s channel_id=%s",
-            resolved_event_id,
-            channel_id,
+    if post_result.status == "channel_unavailable":
+        return RefreshAwardRemindersResult(
+            False,
+            "Award reminders channel is unavailable or not messageable.",
+            event_id=resolved_event_id,
+            status="channel_unavailable",
         )
+    if post_result.status != "sent" or post_result.message_ref is None:
         return RefreshAwardRemindersResult(
             False,
             "Failed to post award reminders.",
@@ -913,8 +866,8 @@ async def refresh_award_reminders(
     message_ids_updated = await asyncio.to_thread(
         mge_publish_dal.update_award_reminder_message_ids,
         event_id=resolved_event_id,
-        message_id=int(message.id),
-        channel_id=int(channel.id),
+        message_id=int(post_result.message_ref.message_id),
+        channel_id=int(post_result.message_ref.channel_id),
         now_utc=now,
     )
     reminders_marked_sent = await asyncio.to_thread(
@@ -928,8 +881,8 @@ async def refresh_award_reminders(
             "mge_refresh_award_reminders_reposted_persist_and_mark_failed event_id=%s actor_discord_id=%s message_id=%s channel_id=%s",
             resolved_event_id,
             actor_discord_id,
-            int(message.id),
-            int(channel.id),
+            int(post_result.message_ref.message_id),
+            int(post_result.message_ref.channel_id),
         )
         return RefreshAwardRemindersResult(
             False,
@@ -943,8 +896,8 @@ async def refresh_award_reminders(
             "mge_refresh_award_reminders_reposted_persist_failed event_id=%s actor_discord_id=%s message_id=%s channel_id=%s",
             resolved_event_id,
             actor_discord_id,
-            int(message.id),
-            int(channel.id),
+            int(post_result.message_ref.message_id),
+            int(post_result.message_ref.channel_id),
         )
         return RefreshAwardRemindersResult(
             False,
@@ -958,8 +911,8 @@ async def refresh_award_reminders(
             "mge_refresh_award_reminders_reposted_mark_sent_failed event_id=%s actor_discord_id=%s message_id=%s channel_id=%s",
             resolved_event_id,
             actor_discord_id,
-            int(message.id),
-            int(channel.id),
+            int(post_result.message_ref.message_id),
+            int(post_result.message_ref.channel_id),
         )
         return RefreshAwardRemindersResult(
             False,
@@ -972,8 +925,8 @@ async def refresh_award_reminders(
         "mge_refresh_award_reminders_reposted event_id=%s actor_discord_id=%s message_id=%s channel_id=%s",
         resolved_event_id,
         actor_discord_id,
-        int(message.id),
-        int(channel.id),
+        int(post_result.message_ref.message_id),
+        int(post_result.message_ref.channel_id),
     )
     return RefreshAwardRemindersResult(
         True,
@@ -986,7 +939,7 @@ async def refresh_award_reminders(
 
 async def unpublish_event_awards(
     *,
-    bot: discord.Client,  # architecture-check: allow
+    adapter: MgePublishIoAdapter,
     event_id: int,
     actor_discord_id: int,
     now_utc: datetime | None = None,
@@ -1018,28 +971,10 @@ async def unpublish_event_awards(
     message_id = _to_int(result.get("embed_message_id"), 0)
 
     if channel_id > 0 and message_id > 0:
-        try:
-            channel = bot.get_channel(channel_id)
-            if channel is None:
-                channel = await bot.fetch_channel(channel_id)
-            if hasattr(channel, "fetch_message"):
-                message = await channel.fetch_message(message_id)
-                await message.delete()
-                embed_deleted = True
-        except discord.NotFound:  # architecture-check: allow
-            embed_deleted = False
-        except discord.Forbidden:  # architecture-check: allow
-            embed_deleted = False
-        except Exception:
-            logger.exception(
-                "mge_publish_unpublish_embed_delete_failed event_id=%s channel_id=%s message_id=%s",
-                event_id,
-                channel_id,
-                message_id,
-            )
+        delete_result = await adapter.delete_message(channel_id=channel_id, message_id=message_id)
+        embed_deleted = delete_result.status == "deleted"
 
-    refresh_result = refresh_mge_boards(
-        bot=bot,
+    refresh_result = adapter.refresh_boards(
         event_id=event_id,
         refresh_public=True,
         refresh_leadership=True,

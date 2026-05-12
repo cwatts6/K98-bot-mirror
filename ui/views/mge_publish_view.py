@@ -8,7 +8,10 @@ import discord
 from core.interaction_safety import send_ephemeral
 from core.mge_permissions import is_admin_or_leadership_interaction
 from mge import mge_publish_service
+
+# architecture-check: allow - existing publish view reads DAL state for UI prompts.
 from mge.dal import mge_publish_dal
+from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
 
 MAX_REMINDERS_TEXT_LENGTH = 4000
 
@@ -82,7 +85,7 @@ class _ConfirmUnpublishView(discord.ui.View):
 
         await interaction.response.defer(ephemeral=True)
         res = await mge_publish_service.unpublish_event_awards(
-            bot=interaction.client,
+            adapter=MgePublishDiscordAdapter(interaction.client),
             event_id=self.event_id,
             actor_discord_id=int(interaction.user.id),
         )
@@ -349,7 +352,7 @@ class MgePublishView(discord.ui.View):
         reminders_text_override: str | None,
     ) -> None:
         res = await mge_publish_service.publish_event_awards(
-            bot=interaction.client,
+            adapter=MgePublishDiscordAdapter(interaction.client),
             event_id=self.event_id,
             actor_discord_id=int(interaction.user.id),
             reminders_text_override=reminders_text_override,

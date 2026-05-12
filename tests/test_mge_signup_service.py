@@ -82,6 +82,36 @@ def _patch_signup_happy_path(monkeypatch):
     )
 
 
+def test_get_linked_governors_uses_registry_service_boundary(monkeypatch):
+    calls = []
+
+    def _get_user_accounts(discord_user_id):
+        calls.append(discord_user_id)
+        return {
+            "Main": {"GovernorID": 100, "GovernorName": "Main Gov"},
+            "Alt 1": {"GovernorID": "200", "GovernorName": "Alt Gov"},
+        }
+
+    monkeypatch.setattr(mge_signup_service, "get_user_accounts", _get_user_accounts)
+
+    result = mge_signup_service.get_linked_governors_for_user(123)
+
+    assert calls == [123]
+    assert result == [
+        {"GovernorID": "100", "GovernorName": "Main Gov"},
+        {"GovernorID": "200", "GovernorName": "Alt Gov"},
+    ]
+
+
+def test_get_linked_governors_returns_empty_on_registry_failure(monkeypatch):
+    def _raise(_discord_user_id):
+        raise RuntimeError("registry unavailable")
+
+    monkeypatch.setattr(mge_signup_service, "get_user_accounts", _raise)
+
+    assert mge_signup_service.get_linked_governors_for_user(123) == []
+
+
 def test_admin_signup_resolves_discord_identity_from_registry(monkeypatch):
     _patch_signup_happy_path(monkeypatch)
     captured: dict[str, object] = {}
@@ -205,14 +235,10 @@ class _FakeGuild:
 
 
 def test_member_role_ids_from_member_user(monkeypatch):
-    import discord
-
-    class FakeDiscordMember(discord.Member):  # pragma: no cover
-        pass
-
     member = _FakeMember(1, [_FakeRole(10), _FakeRole(20)])
     interaction = SimpleNamespace(user=member, guild=None)
 
+    # architecture-check: allow - test patches Discord Member type.
     monkeypatch.setattr("discord.Member", _FakeMember)
     role_ids = _member_role_ids(interaction)
     assert role_ids == {10, 20}
@@ -224,6 +250,7 @@ def test_member_role_ids_falls_back_to_guild_lookup(monkeypatch):
     guild = _FakeGuild(member)
     interaction = SimpleNamespace(user=user, guild=guild)
 
+    # architecture-check: allow - test patches Discord Member type.
     monkeypatch.setattr("discord.Member", _FakeMember)
     role_ids = _member_role_ids(interaction)
     assert role_ids == {5}
@@ -234,6 +261,7 @@ def test_member_role_ids_empty_when_no_member(monkeypatch):
     guild = _FakeGuild(None)
     interaction = SimpleNamespace(user=user, guild=guild)
 
+    # architecture-check: allow - test patches Discord Member type.
     monkeypatch.setattr("discord.Member", _FakeMember)
     role_ids = _member_role_ids(interaction)
     assert role_ids == set()
