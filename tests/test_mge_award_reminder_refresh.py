@@ -180,11 +180,83 @@ async def test_refresh_refuses_when_awards_not_published(monkeypatch):
     assert result.status == "no_awards_published"
 
 
-def test_refresh_award_reminders_command_uses_admin_decorator():
-    import inspect
-
+def test_refresh_award_reminders_command_uses_admin_decorator(monkeypatch):
     from commands import mge_cmds
 
-    source = inspect.getsource(mge_cmds.register_mge)
-    assert 'name="mge_refresh_award_reminders"' in source
-    assert "@is_admin_and_notify_channel(allow_leadership=True)" in source
+    captured = {"allow_leadership": None}
+
+    class _RecordedCommand:
+        def __init__(self, callback, *, name=None, **kwargs):
+            self.callback = callback
+            self.name = name
+            self.kwargs = kwargs
+
+    class _RecordedRegistrar:
+        def __init__(self):
+            self.commands = []
+            self.added_commands = []
+
+        def command(self, *args, **kwargs):
+            def decorator(func):
+                self.commands.append(
+                    _RecordedCommand(
+                        func,
+                        name=kwargs.get("name"),
+                        **{k: v for k, v in kwargs.items() if k != "name"},
+                    )
+                )
+                return func
+
+            return decorator
+
+        def add_command(self, command):
+            self.added_commands.append(command)
+
+    class _RecordedGroup(_RecordedRegistrar):
+        def __init__(self, *args, **kwargs):
+            super().__init__()
+            self.args = args
+            self.kwargs = kwargs
+
+    class _RecordedBot:
+        def __init__(self):
+            self.tree = _RecordedRegistrar()
+
+        def command(self, *args, **kwargs):
+            return self.tree.command(*args, **kwargs)
+
+    def _fake_is_admin_and_notify_channel(*, allow_leadership=False):
+        captured["allow_leadership"] = allow_leadership
+
+        def decorator(func):
+            func._admin_check_applied = True
+            return func
+
+        return decorator
+
+    monkeypatch.setattr(
+        mge_cmds,
+        "is_admin_and_notify_channel",
+        _fake_is_admin_and_notify_channel,
+    )
+    monkeypatch.setattr(mge_cmds.app_commands, "Group", _RecordedGroup)
+
+    bot = _RecordedBot()
+    mge_cmds.register_mge(bot)
+
+    registered_commands = list(bot.tree.commands)
+    for command_group in bot.tree.added_commands:
+        registered_commands.extend(getattr(command_group, "commands", []))
+
+    refresh_commands = [
+        command
+        for command in registered_commands
+        if command.name == "mge_refresh_award_reminders"
+    ]
+
+    assert captured["allow_leadership"] is True
+    assert refresh_commands
+    assert any(
+        getattr(command.callback, "_admin_check_applied", False)
+        for command in refresh_commands
+    )
