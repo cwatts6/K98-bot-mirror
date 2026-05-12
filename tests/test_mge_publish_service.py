@@ -373,10 +373,10 @@ async def test_publish_channel_unavailable_before_persist(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Unavailable award channel must abort before apply_publish_atomic is called."""
-    persist_called = {"value": False}
+    persist_called = SimpleNamespace(value=False)
 
     def _apply_publish_atomic(**kwargs):
-        persist_called["value"] = True
+        persist_called.value = True
         return 1
 
     monkeypatch.setattr(
@@ -412,7 +412,7 @@ async def test_publish_channel_unavailable_before_persist(
 
     assert res.success is False
     assert "channel unavailable" in res.message.lower()
-    assert persist_called["value"] is False
+    assert persist_called.value is False
 
 
 @pytest.mark.asyncio
