@@ -82,34 +82,26 @@ class DummyBot:
 @pytest.mark.asyncio
 async def test_resolve_user_accounts_happy_path(monkeypatch):
     """Returns the accounts dict for a known user."""
-    fake_registry = {"42": {"accounts": {"Main": {"GovernorID": "999", "GovernorName": "X"}}}}
 
-    def fake_load_registry():
-        return fake_registry
+    def fake_get_user_accounts(discord_user_id):
+        assert discord_user_id == 42
+        return {"Main": {"GovernorID": "999", "GovernorName": "X"}}
 
     async def fake_to_thread(fn, *a, **kw):
         return fn(*a, **kw)
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
 
-    import sys
+    from services import kvk_personal_service
 
-    # Ensure fresh import for module-level patching
-    mod_name = "registry.governor_registry"
-    orig = sys.modules.get(mod_name)
-    stub = types.ModuleType(mod_name)
-    stub.load_registry = fake_load_registry
-    sys.modules[mod_name] = stub
-    try:
-        from services import kvk_personal_service
+    monkeypatch.setattr(
+        kvk_personal_service.registry_service,
+        "get_user_accounts",
+        fake_get_user_accounts,
+    )
 
-        result = await kvk_personal_service.resolve_user_accounts(42)
-        assert result == {"Main": {"GovernorID": "999", "GovernorName": "X"}}
-    finally:
-        if orig is not None:
-            sys.modules[mod_name] = orig
-        else:
-            del sys.modules[mod_name]
+    result = await kvk_personal_service.resolve_user_accounts(42)
+    assert result == {"Main": {"GovernorID": "999", "GovernorName": "X"}}
 
 
 @pytest.mark.asyncio

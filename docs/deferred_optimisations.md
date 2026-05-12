@@ -35,15 +35,6 @@
 - Dependencies: Confirm no production reports or manual SQL workflows still depend on scan-window phase objects.
 
 ### Deferred Optimisation
-- Area: `commands/stats_cmds.py` `/my_stats_export`
-- Type: architecture
-- Description: The non-KVK `/my_stats_export` path still contains direct SQL for `vDaily_PlayerExport` inside the command handler.
-- Suggested Fix: Extract daily stats export data access into a stats export DAL/service and leave the command responsible only for permission, defer, file-send, and response flow.
-- Impact: medium
-- Risk: medium
-- Dependencies: Future stats command cleanup; preserve existing Excel/CSV/Google Sheets-compatible output copy and file workflow.
-
-### Deferred Optimisation
 - Area: `DL_bot.py` KVK_ALL upload routing
 - Type: architecture
 - Description: KVK_ALL upload routing still lives in the legacy root bot listener with attachment filtering, offload dispatch, import result handling, Discord rendering, and export scheduling mixed together.
@@ -54,6 +45,7 @@
 
 ## Recently Resolved
 
+- Stats Commands Full Optimisation & Standardisation extracted `/my_stats_export` SQL into `stats/dal/stats_export_dal.py` and `services/stats_export_service.py`, aligned stats account resolution through the SQL-backed registry service boundary, and added the missing SQL source contract for `dbo.IntList`.
 - Telemetry Commands Full Optimisation & Standardisation was implemented, merged, production promoted, and smoke-tested via PR #76.
 - The following telemetry deferred items are closed and complete:
   - `commands/telemetry_cmds.py` no longer imports or wraps the KVK DAL current-KVK resolver, resolving GitHub issue #26.

@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 import logging
-import os
 import time
 
 import discord
@@ -33,18 +32,13 @@ from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
 from kvk.services import kvk_admin_service
 from profile_cache import autocomplete_choices
 from registry.account_slots import ACCOUNT_ORDER
-from registry.governor_registry import get_user_main_governor_name, load_registry
-from services import kvk_history_service
+from services import kvk_history_service, stats_account_service, stats_export_service
 from stats_alerts.embeds.kvk import send_kvk_embed
 from stats_alerts.honors import get_latest_honor_top, purge_latest_honor_scan
 from stats_alerts.interface import send_stats_update_embed
 from stats_alerts.kvk_meta import is_currently_kvk
 from stats_cache_helpers import load_last_kvk_map
-from stats_service import (
-    get_registered_governor_ids_for_discord,
-    get_registered_governor_names_for_discord,
-    get_stats_payload,
-)
+from stats_service import get_stats_payload
 from ui.views.kvk_history_view import KVKHistoryView
 from ui.views.kvk_personal_views import MyKVKStatsSelectView
 from ui.views.registry_views import MyRegsActionView
@@ -55,10 +49,6 @@ from versioning import versioned
 logger = logging.getLogger(__name__)
 bot: ext_commands.Bot | None = None
 # ACCOUNT_ORDER imported from account_picker — single canonical definition.
-
-
-async def async_load_registry():
-    return await asyncio.to_thread(load_registry)
 
 
 # MyKVKStatsSelectView is defined canonically in ui.views.kvk_personal_views and imported above.
@@ -262,22 +252,14 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         # We always keep the selector private to the caller
         await safe_defer(ctx, ephemeral=True)
 
-        # Load registry (support str/int keys)
-        try:
-            # Offload file/IO-bound registry load to a thread to avoid blocking the event loop
-            registry = await asyncio.to_thread(load_registry)
-            registry = registry or {}
-        except Exception as e:
-            logger.exception("[/mykvkstats] load_registry failed")
+        account_summary = await stats_account_service.get_account_summary_for_user(ctx.user.id)
+        if not account_summary.ok:
             await ctx.interaction.edit_original_response(
-                content=f"❌ Could not load registry: `{type(e).__name__}: {e}`"
+                content=f"❌ Could not load registry: `{account_summary.error}`"
             )
             return
 
-        uid_str, uid_int = str(ctx.user.id), ctx.user.id
-        user_data = registry.get(uid_str) or registry.get(uid_int)
-
-        if not user_data or not user_data.get("accounts"):
+        if not account_summary.governor_ids:
             # Reuse your existing action view as a nice fallback
             view = MyRegsActionView(author_id=ctx.user.id, has_regs=False)
             msg = await ctx.interaction.edit_original_response(
@@ -287,7 +269,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             view.set_message_ref(msg)
             return
 
-        accounts = user_data["accounts"]
+        accounts = account_summary.ordered_accounts
 
         # Best-effort: load last-KVK cache via the TTL-backed in-process cache helper.
         last_kvk_map = {}
@@ -512,7 +494,15 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         user_obj, guild_obj = _actor_from_ctx(ctx)
         user_id = user_obj.id
 
-        gov_ids = await get_registered_governor_ids_for_discord(user_id)
+        account_summary = await stats_account_service.get_account_summary_for_user(user_id)
+        if not account_summary.ok:
+            await ctx.followup.send(
+                f"Registry is temporarily unavailable: `{account_summary.error}`",
+                ephemeral=True,
+            )
+            return
+
+        gov_ids = account_summary.governor_ids
         if not gov_ids:
             await ctx.followup.send(
                 "I don’t see any governor accounts linked to you. Use `/link_account` first.",
@@ -521,31 +511,14 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             return
 
         # Friendly account names for the dropdown
-        account_names = await get_registered_governor_names_for_discord(user_id)
-
-        # Build name -> id map from the same registry
-        reg = await asyncio.to_thread(load_registry)
-        block = reg.get(str(user_id)) or {}
-        name_to_id: dict[str, int] = {}
-        for slot, acc in (block.get("accounts") or {}).items():
-            if not acc:
-                continue
-            gname = str(acc.get("GovernorName") or "").strip()
-            gid = acc.get("GovernorID")
-            if gname and gid:
-                name_to_id[gname] = int(gid)
+        account_names = account_summary.account_names
+        name_to_id = account_summary.name_to_id
 
         # Initial slice & payload
         slice_key = "wtd"
 
         # Find the user's Main from the same registry block
-        main_name = get_user_main_governor_name(reg, user_id)
-        if main_name and main_name in name_to_id:
-            default_choice = main_name
-        elif account_names:
-            default_choice = account_names[0]
-        else:
-            default_choice = "ALL"
+        default_choice = account_summary.default_choice
 
         # Governor IDs to load for the initial render
         if default_choice == "ALL":
@@ -660,228 +633,73 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         """
         await safe_defer(ctx, ephemeral=True)
 
-        # Track temp files for cleanup
-        temp_dir = None
-        file_path = None
+        export_file = None
 
         try:
-            from datetime import datetime
-            import tempfile
-
-            import pandas as pd
-
-            from file_utils import emit_telemetry_event, get_conn_with_retries
-            from stats_exporter import build_user_stats_excel
-            from stats_exporter_csv import build_user_stats_csv
-            from stats_service import get_registered_governor_ids_for_discord
-
             user_id = ctx.author.id
             username = ctx.author.display_name or ctx.author.name
 
-            # Use existing stats_service function
-            governor_ids = await get_registered_governor_ids_for_discord(user_id)
-
-            if not governor_ids:
-                await ctx.respond(
-                    "❌ You have no registered accounts. Use `/register_governor` first.",
+            outcome = await stats_export_service.build_personal_stats_export(
+                discord_user_id=user_id,
+                display_name=username,
+                requested_format=format,
+                days=days,
+            )
+            if outcome.status != "ok" or outcome.export_file is None:
+                await ctx.followup.send(
+                    f"Error: {outcome.message or 'Export could not be prepared.'}",
                     ephemeral=True,
                 )
                 return
 
-            # Fetch daily stats from DB
-            def _fetch_daily():
-                conn = get_conn_with_retries()
-                try:
-                    cursor = conn.cursor()
-                    placeholders = ",".join("?" * len(governor_ids))
-                    query = f"""  # architecture-check: allow
-                    SELECT GovernorID, GovernorName, Alliance, AsOfDate,
-                        Power, PowerDelta, TroopPower, TroopPowerDelta,
-                        KillPoints, KillPointsDelta, Deads, DeadsDelta,
-                        RSS_Gathered, RSS_GatheredDelta, RSSAssist, RSSAssistDelta,
-                        Helps, HelpsDelta, BuildingMinutes, TechDonations,
-                        FortsTotal, FortsLaunched, FortsJoined,
-                        AOOJoined, AOOJoinedDelta, AOOWon, AOOWonDelta,
-                        AOOAvgKill, AOOAvgKillDelta, AOOAvgDead, AOOAvgDeadDelta,
-                        AOOAvgHeal, AOOAvgHealDelta,
-                        T4_Kills, T4_KillsDelta, T5_Kills, T5_KillsDelta,
-                        T4T5_Kills, T4T5_KillsDelta,
-                        HealedTroops, HealedTroopsDelta,
-                        RangedPoints, RangedPointsDelta,
-                        HighestAcclaim, HighestAcclaimDelta,
-                        AutarchTimes, AutarchTimesDelta
-                    FROM vDaily_PlayerExport
-                    WHERE GovernorID IN ({placeholders})
-                    ORDER BY GovernorID, AsOfDate DESC
-                    """
-                    cursor.execute(query, governor_ids)
+            export_file = outcome.export_file
+            file_obj = discord.File(export_file.file_path, filename=export_file.filename)
 
-                    columns = [desc[0] for desc in cursor.description]
-                    rows = cursor.fetchall()
-
-                    return pd.DataFrame.from_records(rows, columns=columns)
-                finally:
-                    conn.close()
-
-            # Offload to thread
-            df_daily = await asyncio.to_thread(_fetch_daily)
-
-            if df_daily.empty:
-                await ctx.respond("❌ No stats data found for your accounts.", ephemeral=True)
-                return
-
-            # Generate temp directory and filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            temp_dir = tempfile.mkdtemp()
-
-            # Build file based on format
-            if format == "CSV":
-                file_path = os.path.join(temp_dir, f"stats_{username}_{timestamp}.csv")
-                await asyncio.to_thread(
-                    build_user_stats_csv,
-                    df_daily,
-                    None,  # df_targets (not used)
-                    out_path=file_path,
-                    days_for_daily_table=days,
-                )
-                file_obj = discord.File(file_path, filename=f"stats_{username}_{timestamp}.csv")
-                format_emoji = "📄"
-                format_name = "CSV"
-                description = "**Lightweight text-based format**\nOpen with any spreadsheet app."
-                instructions = (
-                    "**💻 Desktop:**\n"
-                    "1. Download the attached file\n"
-                    "2. Open with Excel, Google Sheets, or any spreadsheet app\n\n"
-                    "**📱 Mobile:**\n"
-                    "• **iPhone/iPad:** Tap attachment → Share → Save to Files → Open with Numbers or Google Sheets\n"
-                    "• **Android:** Tap attachment → Download → Open with Google Sheets or Excel"
-                )
-
-            elif format == "GoogleSheets":
-                # Generate Excel file (Google Sheets natively imports .xlsx)
-                file_path = os.path.join(temp_dir, f"stats_{username}_{timestamp}.xlsx")
-                await asyncio.to_thread(
-                    build_user_stats_excel,
-                    df_daily,
-                    None,  # df_targets (not used)
-                    out_path=file_path,
-                    days_for_daily_table=days,
-                )
-                file_obj = discord.File(file_path, filename=f"stats_{username}_{timestamp}.xlsx")
-                format_emoji = "📊"
-                format_name = "Google Sheets"
-                description = (
-                    "**Google Sheets-compatible format**\nUpload to Google Drive to open in Sheets."
-                )
-                instructions = (
-                    "**💻 Desktop:**\n"
-                    "1. Download the attached file\n"
-                    "2. Go to [drive.google.com](https://drive.google.com)\n"
-                    "3. Click **New** → **File upload**\n"
-                    "4. Upload this file → Double-click to open in Google Sheets\n\n"
-                    "**📱 Mobile:**\n"
-                    "• **iPhone/iPad:**\n"
-                    "  1. Tap attachment → Share → Save to Files\n"
-                    "  2. Open Google Drive app\n"
-                    # architecture-check: allow
-                    "  3. Tap **+** → **Upload** → Select file from Files\n"
-                    "  4. Tap file in Drive to open in Sheets\n\n"
-                    "• **Android:**\n"
-                    "  1. Tap attachment → Download\n"
-                    "  2. Open Google Drive app\n"
-                    # architecture-check: allow
-                    "  3. Tap **+** → **Upload** → Select downloaded file\n"
-                    "  4. Tap file in Drive to open in Sheets"
-                )
-
-            else:  # Excel (default)
-                file_path = os.path.join(temp_dir, f"stats_{username}_{timestamp}.xlsx")
-                await asyncio.to_thread(
-                    build_user_stats_excel,
-                    df_daily,
-                    None,  # df_targets (not used)
-                    out_path=file_path,
-                    days_for_daily_table=days,
-                )
-                file_obj = discord.File(file_path, filename=f"stats_{username}_{timestamp}.xlsx")
-                format_emoji = "📗"
-                format_name = "Excel"
-                description = "**Full-featured Excel workbook**\nIncludes charts, formatting, and multiple sheets."
-                instructions = (
-                    "**💻 Desktop:**\n"
-                    "1. Download the attached file\n"
-                    "2. Open with Microsoft Excel, LibreOffice, or Numbers\n\n"
-                    "**📱 Mobile:**\n"
-                    "• **iPhone/iPad:** Tap attachment → Share → Open in Excel or Numbers\n"
-                    "• **Android:** Tap attachment → Open with Excel or Google Sheets"
-                )
-
-            # Build response embed
             embed = discord.Embed(
-                title=f"{format_emoji} Stats Export ({format_name})",
-                description=description,
+                title=f"{export_file.format_emoji} Stats Export ({export_file.format_name})",
+                description=export_file.description,
                 color=0x2ECC71,
             )
             embed.add_field(
-                name="📂 File Info",
+                name="File Info",
                 value=(
-                    f"**Accounts:** {len(governor_ids)}\n"
-                    f"**Daily Records:** {len(df_daily):,}\n"
-                    f"**Date Range:** {days} days"
+                    f"**Accounts:** {len(export_file.governor_ids)}\n"
+                    f"**Daily Records:** {export_file.row_count:,}\n"
+                    f"**Date Range:** {export_file.days} days"
                 ),
                 inline=False,
             )
             embed.add_field(
-                name="📖 How to Open",
-                value=instructions,
+                name="How to Open",
+                value=export_file.instructions,
                 inline=False,
             )
             embed.set_footer(
                 text=(
-                    f"Exported {len(df_daily):,} records for {len(governor_ids)} account(s) • "
-                    f"Data refreshed daily at ~06:00 UTC"
+                    f"Exported {export_file.row_count:,} records for "
+                    f"{len(export_file.governor_ids)} account(s) - "
+                    "Data refreshed daily at ~06:00 UTC"
                 )
             )
 
-            await ctx.respond(embed=embed, file=file_obj, ephemeral=True)
+            await ctx.followup.send(embed=embed, file=file_obj, ephemeral=True)
 
-            # Emit telemetry
             try:
-                emit_telemetry_event(
-                    {
-                        "event": "my_stats_export",
-                        "user_id": user_id,
-                        "format": format,
-                        "days": days,
-                        "num_governors": len(governor_ids),
-                        "num_rows": len(df_daily),
-                    }
-                )
+                from file_utils import emit_telemetry_event
+
+                emit_telemetry_event(export_file.telemetry)
             except Exception:
                 pass
 
         except Exception as exc:
             logger.exception("Failed to export stats for user %s", ctx.author.id)
-            await ctx.respond(
-                f"❌ Export failed: {type(exc).__name__}\n\nPlease try again or contact support.",
+            await ctx.followup.send(
+                f"Export failed: {type(exc).__name__}\n\nPlease try again or contact support.",
                 ephemeral=True,
             )
 
         finally:
-            # CRITICAL: Always cleanup temp files, even on error
-            if file_path and os.path.exists(file_path):
-                try:
-                    os.unlink(file_path)
-                    logger.debug("Cleaned up temp file: %s", file_path)
-                except Exception as e:
-                    logger.warning("Failed to cleanup temp file %s: %s", file_path, e)
-
-            if temp_dir and os.path.exists(temp_dir):
-                try:
-                    os.rmdir(temp_dir)
-                    logger.debug("Cleaned up temp directory: %s", temp_dir)
-                except Exception as e:
-                    logger.warning("Failed to cleanup temp directory %s: %s", temp_dir, e)
+            stats_export_service.cleanup_export_file(export_file)
 
     @bot.slash_command(
         name="player_stats",
@@ -1031,13 +849,17 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             int, "Governor ID (optional)", required=False, default=None
         ),
     ):
-        await ctx.defer(ephemeral=ephemeral)
+        await safe_defer(ctx, ephemeral=ephemeral)
 
-        registry = await asyncio.to_thread(load_registry) or {}
-        user_id = str(ctx.user.id)
-        payload = registry.get(user_id) or {}
+        account_summary = await stats_account_service.get_account_summary_for_user(ctx.user.id)
+        if not account_summary.ok and not governor_id:
+            await ctx.followup.send(
+                f"Registry is temporarily unavailable: `{account_summary.error}`",
+                ephemeral=True,
+            )
+            return
         account_map = kvk_history_service.build_ordered_account_map(
-            payload.get("accounts") or {}
+            account_summary.ordered_accounts
         )  # {label: {GovernorID, GovernorName}}
 
         # If a Governor ID is provided, build a minimal map for it (works even with no registry)
@@ -1057,7 +879,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 gov_name = str(governor_id)
             account_map = {"Lookup": {"GovernorID": int(governor_id), "GovernorName": gov_name}}
         elif not account_map:
-            await ctx.respond(
+            await ctx.followup.send(
                 "❌ You haven't registered any accounts yet. Use `/register_governor` or pass a Governor ID here.",
                 ephemeral=True,
             )
@@ -1070,7 +892,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             else kvk_history_service.pick_default_governor_id(account_map)
         )
         if not default_id:
-            await ctx.respond(
+            await ctx.followup.send(
                 "❌ I couldn't find a valid Governor ID in your registered accounts.",
                 ephemeral=True,
             )
@@ -1108,12 +930,12 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
 
         Users can change sort metric and limit via dropdown/buttons.
         """
-        await ctx.defer()
+        await safe_defer(ctx, ephemeral=False)
 
         cache = load_stat_cache()
         rows = [r for k, r in cache.items() if k != "_meta"]
         if not rows:
-            await ctx.respond(
+            await ctx.followup.send(
                 "⚠️ No stats cache available yet. Try again after the next scan/export."
             )
             return
@@ -1127,7 +949,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             last_ref = cache.get("_meta", {}).get("generated_at") or "unknown"
             embed.set_footer(text=f"Last refreshed: {last_ref}")
 
-        resp = await ctx.respond(embed=embed, view=view)
+        resp = await ctx.followup.send(embed=embed, view=view)
         try:
             view.message = await ctx.interaction.original_response()
         except Exception:
@@ -1390,12 +1212,12 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
 
         if not rows:
             # graceful response if DB has no honor data
-            await ctx.respond("No honor data found for the latest KVK.", ephemeral=False)
+            await ctx.followup.send("No honor data found for the latest KVK.", ephemeral=False)
             return
 
         embed = build_honor_rankings_embed(rows, limit=initial_limit)
         view = HonorRankingView()
-        await ctx.respond(embed=embed, view=view, ephemeral=False)
+        await ctx.followup.send(embed=embed, view=view, ephemeral=False)
 
     @bot.slash_command(
         name="honor_purge_last",
@@ -1407,7 +1229,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     @safe_command
     @track_usage()
     async def honor_purge_last(ctx: discord.ApplicationContext):
-        await ctx.defer(ephemeral=True)
+        await safe_defer(ctx, ephemeral=True)
 
         deleted = await asyncio.to_thread(purge_latest_honor_scan)
 
@@ -1421,4 +1243,4 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             color = discord.Color.dark_grey()
 
         embed = discord.Embed(title=title, description=desc, color=color)
-        await ctx.respond(embed=embed, ephemeral=True)
+        await ctx.followup.send(embed=embed, ephemeral=True)

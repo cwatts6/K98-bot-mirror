@@ -109,16 +109,19 @@ async def test_no_registered_accounts_shows_registration_prompt(monkeypatch):
     async def fake_load_last_kvk_map():
         return {}
 
-    # Fake load_registry as synchronous but invoked through asyncio.to_thread below
-    def fake_load_registry():
-        return {str(10): {"accounts": {}}}
+    async def fake_get_account_summary_for_user(_user_id):
+        return C.stats_account_service.summarize_accounts({})
 
     # Provide an async-to-thread shim so `await asyncio.to_thread(load_registry)` works
     async def fake_to_thread(fn, *a, **k):
         return fn(*a, **k)
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(C, "load_registry", fake_load_registry)
+    monkeypatch.setattr(
+        C.stats_account_service,
+        "get_account_summary_for_user",
+        fake_get_account_summary_for_user,
+    )
     monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
     monkeypatch.setattr(
         C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
@@ -155,14 +158,20 @@ async def test_single_account_sends_public_embed(monkeypatch):
     async def fake_load_last_kvk_map():
         return {}
 
-    def fake_load_registry():
-        return {str(11): {"accounts": {"Main": {"GovernorID": "123", "GovernorName": "X"}}}}
+    async def fake_get_account_summary_for_user(_user_id):
+        return C.stats_account_service.summarize_accounts(
+            {"Main": {"GovernorID": "123", "GovernorName": "X"}}
+        )
 
     async def fake_to_thread(fn, *a, **k):
         return fn(*a, **k)
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(C, "load_registry", fake_load_registry)
+    monkeypatch.setattr(
+        C.stats_account_service,
+        "get_account_summary_for_user",
+        fake_get_account_summary_for_user,
+    )
     monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
     monkeypatch.setattr(C, "normalize_governor_id", lambda v: str(v))
     # Make load_stat_row sync but called via await asyncio.to_thread inside handler
@@ -186,21 +195,23 @@ async def test_multi_account_builds_selector(monkeypatch):
     async def fake_load_last_kvk_map():
         return {}
 
-    def fake_load_registry():
-        return {
-            str(12): {
-                "accounts": {
-                    "Main": {"GovernorID": 1, "GovernorName": "A"},
-                    "Alt 1": {"GovernorID": 2, "GovernorName": "B"},
-                }
+    async def fake_get_account_summary_for_user(_user_id):
+        return C.stats_account_service.summarize_accounts(
+            {
+                "Main": {"GovernorID": 1, "GovernorName": "A"},
+                "Alt 1": {"GovernorID": 2, "GovernorName": "B"},
             }
-        }
+        )
 
     async def fake_to_thread(fn, *a, **k):
         return fn(*a, **k)
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(C, "load_registry", fake_load_registry)
+    monkeypatch.setattr(
+        C.stats_account_service,
+        "get_account_summary_for_user",
+        fake_get_account_summary_for_user,
+    )
     monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
     monkeypatch.setattr(
         C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False

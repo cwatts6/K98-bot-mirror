@@ -12,7 +12,7 @@ from file_utils import (
     fetch_one_dict,
     get_conn_with_retries,
 )
-from registry.governor_registry import load_registry
+from services import stats_account_service
 from stats_helpers import is_single_day_slice
 from utils import csv_from_ids, ensure_aware_utc, to_ints
 
@@ -35,60 +35,15 @@ def _key(discord_id: int, slice_key: str, gov_ids: list[int]) -> tuple[int, str,
 
 
 async def get_registered_governor_ids_for_discord(discord_id: int) -> list[int]:
-    """Read accounts from governor_registry.JSON (not SQL)."""
-    try:
-        from file_utils import run_blocking_in_thread
-    except Exception:
-        run_blocking_in_thread = None
-
-    if run_blocking_in_thread is not None:
-        reg = await run_blocking_in_thread(
-            load_registry,
-            name="load_registry_for_ids",
-            meta={"discord_id": discord_id},
-        )
-    else:
-        reg = await asyncio.to_thread(load_registry)
-    reg = reg or {}
-    block = reg.get(str(discord_id)) or reg.get(discord_id) or {}
-    accounts = block.get("accounts") or {}
-    raw_ids = [acc.get("GovernorID") for acc in accounts.values() if acc]
-    return to_ints(raw_ids)
+    """Read registered account IDs through the SQL-backed registry service boundary."""
+    summary = await stats_account_service.get_account_summary_for_user(discord_id)
+    return to_ints(summary.governor_ids)
 
 
 async def get_registered_governor_names_for_discord(discord_id: int) -> list[str]:
-    """Handy for the dropdown labels (GovernorName)."""
-    try:
-        from file_utils import run_blocking_in_thread
-    except Exception:
-        run_blocking_in_thread = None
-
-    if run_blocking_in_thread is not None:
-        reg = await run_blocking_in_thread(
-            load_registry,
-            name="load_registry_for_names",
-            meta={"discord_id": discord_id},
-        )
-    else:
-        reg = await asyncio.to_thread(load_registry)
-    reg = reg or {}
-    block = reg.get(str(discord_id)) or reg.get(discord_id) or {}
-    accounts = block.get("accounts") or {}
-    names = []
-    for slot, acc in accounts.items():
-        gname = (acc or {}).get("GovernorName")
-        if gname:
-            names.append(str(gname))
-    # Keep a stable order: Main, Alt 1..n, Farm 1..n, then the rest
-    preferred = ["Main"] + [f"Alt {i}" for i in range(1, 10)] + [f"Farm {i}" for i in range(1, 20)]
-
-    def slot_rank(item):
-        for i, s in enumerate(preferred):
-            if s in accounts and accounts[s].get("GovernorName") == item:
-                return i
-        return 10_000
-
-    return sorted(set(names), key=slot_rank)
+    """Return registered account names in canonical slot order."""
+    summary = await stats_account_service.get_account_summary_for_user(discord_id)
+    return summary.account_names
 
 
 def _fetch_proc_sync(gov_ids: list[int], slices_csv: str, include_aggregate: bool) -> list[dict]:

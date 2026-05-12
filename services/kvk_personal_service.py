@@ -14,6 +14,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
+from registry import registry_service
 import stats_cache_helpers
 
 if TYPE_CHECKING:
@@ -32,12 +33,8 @@ async def resolve_user_accounts(user_id: int) -> dict:
     Logs the outcome with user_id.
     """
     try:
-        from registry.governor_registry import load_registry
-
-        registry = await asyncio.to_thread(load_registry)
-        registry = registry or {}
-        user_block = registry.get(str(user_id)) or registry.get(user_id) or {}
-        accounts = user_block.get("accounts") or {}
+        accounts = await asyncio.to_thread(registry_service.get_user_accounts, int(user_id))
+        accounts = accounts or {}
         logger.debug(
             "[kvk_personal_service] resolve_user_accounts user_id=%s accounts_count=%s",
             user_id,
