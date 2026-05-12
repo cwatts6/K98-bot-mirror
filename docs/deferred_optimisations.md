@@ -54,13 +54,18 @@
 
 ## Recently Resolved
 
-- Telemetry Commands Full Optimisation phase resolved the telemetry portions of GitHub issues #26, #33, and #47:
-  - `commands/telemetry_cmds.py` no longer imports the KVK DAL current-KVK resolver.
+- Telemetry Commands Full Optimisation & Standardisation was implemented, merged, production promoted, and smoke-tested via PR #76.
+- The following telemetry deferred items are closed and complete:
+  - `commands/telemetry_cmds.py` no longer imports or wraps the KVK DAL current-KVK resolver, resolving GitHub issue #26.
+  - The telemetry scope of command-layer SQL separation is complete, resolving GitHub issue #33.
+  - CrystalTech governor session locking is now restart-safe and service/DAL-backed, resolving GitHub issue #47.
   - `/mykvktargets` and `/mykvkcrystaltech` resolve linked accounts through `services/governor_account_service.py`, which delegates to `registry_service.get_user_accounts()`.
-  - CrystalTech governor session locking now routes through `services/governor_session_lock_service.py` and `registry/dal/governor_session_lock_dal.py` with UTC expiry and cleanup support.
-  - Player profile posting and CrystalTech interaction orchestration were moved behind command-adjacent helper modules.
+  - CrystalTech governor session locking now routes through `services/governor_session_lock_service.py` and `registry/dal/governor_session_lock_dal.py` with UTC expiry, release, refresh, contention, and cleanup support.
+  - Player profile posting moved to `commands/player_profile_flow.py`.
+  - CrystalTech interaction orchestration moved to `commands/crystaltech_flow.py`.
   - `account_picker.py`, `kvk_ui.py`, selected KVK personal views, selected registry views, and Ark registration account lookup were aligned away from direct registry dict traversal where touched.
-- Remaining related GitHub issues intentionally stay open for separate batches: #28 legacy registry view removal, #29/#32 stats-service registry alignment, #42 KVK admin SQL extraction, #46 stats export SQL extraction, and the broader untouched portions of #27/#31 outside telemetry-adjacent paths.
+  - Final deployed validation: `python -m pytest -q tests` reported 1306 passed and 8 skipped; command registration and import smoke validation passed; post-deploy Discord smoke testing was completed.
+- Related issues intentionally remain open for separate non-telemetry batches: #27 broader dict-style registry access, #28 legacy registry view removal, #29/#32 stats-service registry alignment, #31 broader governor registry architecture refactor, #42 KVK admin SQL extraction, and #46 stats export SQL extraction.
 - MGE Process Polish Phase 2 was implemented, production deployed, and smoke-tested via PR #75.
 - `mge/mge_signup_service.py` self-signup account resolution now uses `registry_service.get_user_accounts()` instead of the legacy registry dict shape. Admin-add reverse owner lookup remains on `get_discord_user_for_governor()`.
 - `mge/mge_publish_service.py` no longer performs direct Discord message fetch/send/edit/delete/DM IO. Publish, republish, reminder refresh, unpublish, award DM, and board refresh paths now route Discord operations through `mge/mge_publish_discord_adapter.py`.

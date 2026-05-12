@@ -1,5 +1,53 @@
 # Telemetry Commands Full Optimisation & Standardisation — Codex Task Pack
 
+## Deployment Closure
+
+Status: complete and deployed.
+
+Final delivery:
+
+* PR: `cwatts6/K98-bot-mirror#76`
+* Mirror merge: `e474962e7f2664738726cb0dbf1fba04c49f2ea6`
+* Production main: `a0ec587c1651e9383f3ed428ad2d7419dc0fbad3`
+* Mirror sync commit: `fbc259415cc30eb98faf56e4d469d32c9f062bc4`
+* Deployment smoke test: completed after merge and production promotion.
+
+Delivered architecture:
+
+* `commands/telemetry_cmds.py` is now a thinner command registration and command-flow wrapper.
+* Player profile posting moved to `commands/player_profile_flow.py`.
+* CrystalTech interaction orchestration moved to `commands/crystaltech_flow.py`.
+* Registry account selection now routes through `services/governor_account_service.py`, backed by `registry.registry_service.get_user_accounts()`.
+* CrystalTech governor session locking now routes through `services/governor_session_lock_service.py` and `registry/dal/governor_session_lock_dal.py`.
+* Restart-safe lock persistence is represented by `sql/governor_session_locks_schema.sql` and the deployed `dbo.GovernorSessionLocks` table.
+* Adjacent account-selection paths in `account_picker.py`, `kvk_ui.py`, selected KVK personal views, selected registry views, and Ark registration were aligned away from telemetry-local registry parsing.
+
+Resolved GitHub issues:
+
+* #26 — telemetry command SQL usage.
+* #33 — telemetry scope of command-layer SQL separation.
+* #47 — restart-safe governor session locking pattern.
+
+Related issues intentionally left open:
+
+* #27 — broader dict-style registry access outside the delivered telemetry-adjacent paths.
+* #28 — full legacy registry view removal.
+* #29 and #32 — stats-service registry/service consolidation.
+* #31 — broader governor registry architecture refactor pack.
+* #42 — KVK admin SQL extraction.
+* #46 — stats export SQL extraction.
+
+Validation completed on the final deployed version:
+
+* `python -m pytest -q tests` — 1306 passed, 8 skipped.
+* `python scripts/validate_command_registration.py` — no duplicates.
+* `python scripts/smoke_imports.py` — passed.
+* Focused telemetry/registry/Ark test subset — 42 passed.
+
+This document is retained as the task pack plus final completion record.
+
+---
+
 ## Objective
 
 Perform a full audit, optimisation, standardisation, and architectural cleanup of the telemetry command subsystem centred around:
