@@ -113,3 +113,44 @@ async def test_build_personal_stats_export_selects_csv_builder(monkeypatch, tmp_
 
     stats_export_service.cleanup_export_file(outcome.export_file)
     assert not Path(outcome.export_file.temp_dir).exists()
+
+
+@pytest.mark.asyncio
+async def test_build_personal_stats_export_cleans_partial_file_on_builder_failure(
+    monkeypatch, tmp_path
+) -> None:
+    async def fake_summary(_discord_user_id: int):
+        return stats_export_service.stats_account_service.summarize_accounts(
+            {"Main": {"GovernorID": "123", "GovernorName": "Player"}}
+        )
+
+    async def fake_fetch_daily(_governor_ids: list[int]):
+        return _daily_frame()
+
+    def fake_mkdtemp():
+        export_dir = tmp_path / "failed_export"
+        export_dir.mkdir()
+        return str(export_dir)
+
+    def fake_csv_builder(_df_daily, _df_targets, *, out_path: str, days_for_daily_table: int):
+        Path(out_path).write_text("partial", encoding="utf-8")
+        raise RuntimeError("writer failed")
+
+    monkeypatch.setattr(
+        stats_export_service.stats_account_service,
+        "get_account_summary_for_user",
+        fake_summary,
+    )
+    monkeypatch.setattr(stats_export_service, "_fetch_daily", fake_fetch_daily)
+    monkeypatch.setattr(stats_export_service.tempfile, "mkdtemp", fake_mkdtemp)
+    monkeypatch.setattr(stats_export_service, "build_user_stats_csv", fake_csv_builder)
+
+    with pytest.raises(RuntimeError, match="writer failed"):
+        await stats_export_service.build_personal_stats_export(
+            discord_user_id=1,
+            display_name="Test User",
+            requested_format="CSV",
+            days=30,
+        )
+
+    assert not (tmp_path / "failed_export").exists()

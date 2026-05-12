@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 import logging
 import os
+import shutil
 import tempfile
 
 import pandas as pd
@@ -55,7 +56,7 @@ def cleanup_export_file(export_file: StatsExportFile | None) -> None:
             )
     if export_file.temp_dir and os.path.exists(export_file.temp_dir):
         try:
-            os.rmdir(export_file.temp_dir)
+            shutil.rmtree(export_file.temp_dir, ignore_errors=True)
             logger.debug("stats_export_temp_dir_cleaned path=%s", export_file.temp_dir)
         except Exception:
             logger.warning(
@@ -95,13 +96,18 @@ async def build_personal_stats_export(
     timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     safe_name = _safe_filename_part(display_name) or "user"
     temp_dir = tempfile.mkdtemp()
+    filename, file_path = _build_export_target(
+        export_format=export_format,
+        safe_name=safe_name,
+        timestamp=timestamp,
+        temp_dir=temp_dir,
+    )
 
     try:
         export_file = await _build_export_file(
             df_daily=df_daily,
-            temp_dir=temp_dir,
-            safe_name=safe_name,
-            timestamp=timestamp,
+            file_path=file_path,
+            filename=filename,
             export_format=export_format,
             days=days,
             governor_ids=account_summary.governor_ids,
@@ -110,9 +116,9 @@ async def build_personal_stats_export(
     except Exception:
         cleanup_export_file(
             StatsExportFile(
-                file_path="",
+                file_path=file_path,
                 temp_dir=temp_dir,
-                filename="",
+                filename=filename,
                 format_name=export_format,
                 format_emoji="",
                 description="",
@@ -145,9 +151,8 @@ async def _fetch_daily(governor_ids: list[int]) -> pd.DataFrame:
 async def _build_export_file(
     *,
     df_daily: pd.DataFrame,
-    temp_dir: str,
-    safe_name: str,
-    timestamp: str,
+    file_path: str,
+    filename: str,
     export_format: str,
     days: int,
     governor_ids: list[int],
@@ -156,8 +161,6 @@ async def _build_export_file(
     import asyncio
 
     if export_format == "CSV":
-        filename = f"stats_{safe_name}_{timestamp}.csv"
-        file_path = os.path.join(temp_dir, filename)
         await asyncio.to_thread(
             build_user_stats_csv,
             df_daily,
@@ -166,8 +169,6 @@ async def _build_export_file(
             days_for_daily_table=days,
         )
     else:
-        filename = f"stats_{safe_name}_{timestamp}.xlsx"
-        file_path = os.path.join(temp_dir, filename)
         await asyncio.to_thread(
             build_user_stats_excel,
             df_daily,
@@ -187,7 +188,7 @@ async def _build_export_file(
     }
     return StatsExportFile(
         file_path=file_path,
-        temp_dir=temp_dir,
+        temp_dir=os.path.dirname(file_path),
         filename=filename,
         format_name=meta["name"],
         format_emoji=meta["emoji"],
@@ -198,6 +199,12 @@ async def _build_export_file(
         days=days,
         telemetry=telemetry,
     )
+
+
+def _build_export_target(*, export_format: str, safe_name: str, timestamp: str, temp_dir: str) -> tuple[str, str]:
+    extension = ".csv" if export_format == "CSV" else ".xlsx"
+    filename = f"stats_{safe_name}_{timestamp}{extension}"
+    return filename, os.path.join(temp_dir, filename)
 
 
 def _normalize_format(value: str) -> str:

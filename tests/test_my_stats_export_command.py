@@ -4,27 +4,11 @@ tests/test_my_stats_export_command.py
 Focused tests for /my_stats_export command/service handoff.
 """
 
-import os
-import tempfile
 import types
 
 import pytest
 
 from services import stats_export_service
-
-
-@pytest.fixture
-def mock_temp_dir():
-    """Fixture to create and cleanup temp directory."""
-    temp_dir = tempfile.mkdtemp()
-    yield temp_dir
-    # Cleanup
-    try:
-        for file in os.listdir(temp_dir):
-            os.unlink(os.path.join(temp_dir, file))
-        os.rmdir(temp_dir)
-    except Exception:
-        pass
 
 
 class DummyAuthor:
