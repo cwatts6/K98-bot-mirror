@@ -523,7 +523,7 @@ async def publish_event_awards(
                         embed=reminders_embed,
                     )
                     reminders_embed_sent = True
-                    await asyncio.to_thread(
+                    reminder_ids_updated = await asyncio.to_thread(
                         mge_publish_dal.update_award_reminder_message_ids,
                         event_id=event_id,
                         message_id=int(reminders_message.id),
@@ -536,7 +536,25 @@ async def publish_event_awards(
                         actor_discord_id=actor_discord_id,
                         now_utc=now,
                     )
-                    if reminders_marked_sent:
+                    if not reminder_ids_updated and not reminders_marked_sent:
+                        reminders_embed_status = "ids_and_mark_failed"
+                        logger.warning(
+                            "mge_publish_reminders_id_and_mark_failed event_id=%s actor_discord_id=%s channel_id=%s version=%s",
+                            event_id,
+                            actor_discord_id,
+                            channel_id,
+                            new_version,
+                        )
+                    elif not reminder_ids_updated:
+                        reminders_embed_status = "ids_persist_failed"
+                        logger.warning(
+                            "mge_publish_reminders_id_persist_failed event_id=%s actor_discord_id=%s channel_id=%s version=%s",
+                            event_id,
+                            actor_discord_id,
+                            channel_id,
+                            new_version,
+                        )
+                    elif reminders_marked_sent:
                         reminders_embed_status = "sent"
                     else:
                         reminders_embed_status = "mark_failed"

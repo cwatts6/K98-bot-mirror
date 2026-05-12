@@ -62,15 +62,15 @@ def save_commander_assignment(
     if int(variant_id or 0) <= 0:
         return CommanderServiceResult(False, "A linked variant is required.")
 
+    resolved_commander_id = int(commander_id or 0)
     existing_by_name = mge_commander_dal.fetch_commander_by_name(name)
-    if existing_by_name and int(existing_by_name["CommanderId"]) != int(commander_id or 0):
-        return CommanderServiceResult(
-            False,
-            "A commander with that name already exists.",
-        )
+    if existing_by_name:
+        existing_id = int(existing_by_name["CommanderId"])
+        if resolved_commander_id <= 0 or resolved_commander_id != existing_id:
+            resolved_commander_id = existing_id
 
     row = mge_commander_dal.upsert_commander_assignment(
-        commander_id=commander_id,
+        commander_id=resolved_commander_id if resolved_commander_id > 0 else None,
         commander_name=name,
         variant_id=int(variant_id),
         is_active=bool(is_active),
@@ -79,7 +79,19 @@ def save_commander_assignment(
     if not row:
         return CommanderServiceResult(False, "Failed to save commander.")
 
-    refresh = mge_cache.refresh_mge_caches()
+    try:
+        refresh = mge_cache.refresh_mge_caches()
+    except Exception:
+        logger.exception(
+            "mge_commander_save_cache_refresh_failed commander_id=%s",
+            row.get("CommanderId"),
+        )
+        return CommanderServiceResult(
+            False,
+            "Commander saved, but cache refresh failed.",
+            commander_id=int(row["CommanderId"]),
+            variant_id=int(row["VariantId"]),
+        )
     if not all(refresh.values()):
         logger.warning(
             "mge_commander_save_cache_refresh_partial commander_id=%s results=%s",

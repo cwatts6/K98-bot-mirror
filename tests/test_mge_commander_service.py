@@ -123,7 +123,8 @@ def test_move_variant_is_service_level_assignment(monkeypatch):
     assert captured["variant_id"] == 8
 
 
-def test_duplicate_active_commander_name_rejected(monkeypatch):
+def test_duplicate_commander_name_reuses_existing_commander_id(monkeypatch):
+    captured = {}
     monkeypatch.setattr(
         mge_commander_service.mge_commander_dal,
         "fetch_commander_by_name",
@@ -131,8 +132,19 @@ def test_duplicate_active_commander_name_rejected(monkeypatch):
     )
     monkeypatch.setattr(
         mge_commander_service.mge_commander_dal,
-        "fetch_commanders_for_variant",
-        lambda variant_id, include_inactive=False: [{"CommanderId": 5}],
+        "upsert_commander_assignment",
+        lambda **kwargs: captured.update(kwargs)
+        or {
+            "CommanderId": kwargs["commander_id"],
+            "CommanderName": kwargs["commander_name"],
+            "VariantId": kwargs["variant_id"],
+            "IsActive": kwargs["is_active"],
+        },
+    )
+    monkeypatch.setattr(
+        mge_commander_service.mge_cache,
+        "refresh_mge_caches",
+        lambda: {"commanders": True, "variant_commanders": True},
     )
 
     result = mge_commander_service.save_commander_assignment(
@@ -142,8 +154,41 @@ def test_duplicate_active_commander_name_rejected(monkeypatch):
         is_active=True,
     )
 
+    assert result.success is True
+    assert captured["commander_id"] == 5
+
+
+def test_cache_refresh_exception_returns_failure(monkeypatch):
+    monkeypatch.setattr(
+        mge_commander_service.mge_commander_dal,
+        "fetch_commander_by_name",
+        lambda name: None,
+    )
+    monkeypatch.setattr(
+        mge_commander_service.mge_commander_dal,
+        "upsert_commander_assignment",
+        lambda **kwargs: {
+            "CommanderId": 9,
+            "CommanderName": kwargs["commander_name"],
+            "VariantId": kwargs["variant_id"],
+            "IsActive": kwargs["is_active"],
+        },
+    )
+
+    def _raise_refresh():
+        raise OSError("disk full")
+
+    monkeypatch.setattr(mge_commander_service.mge_cache, "refresh_mge_caches", _raise_refresh)
+
+    result = mge_commander_service.save_commander_assignment(
+        commander_id=None,
+        commander_name="Commander",
+        variant_id=2,
+        is_active=True,
+    )
+
     assert result.success is False
-    assert "already exists" in result.message
+    assert "cache refresh failed" in result.message.lower()
 
 
 def test_inactive_commanders_excluded_from_signup_cache(monkeypatch):

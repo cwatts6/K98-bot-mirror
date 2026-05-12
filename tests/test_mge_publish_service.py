@@ -419,6 +419,11 @@ async def test_publish_sends_reminders_once_and_marks_sent(monkeypatch: pytest.M
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
     )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal,
+        "update_award_reminder_message_ids",
+        lambda **kwargs: True,
+    )
     monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", lambda **kwargs: None)
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
@@ -677,6 +682,11 @@ async def test_publish_reminders_mark_sent_failure_reports_status(
     )
     monkeypatch.setattr(
         mge_publish_service.mge_publish_dal,
+        "update_award_reminder_message_ids",
+        lambda **kwargs: True,
+    )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal,
         "update_event_award_reminders_text",
         lambda **kwargs: True,
     )
@@ -707,6 +717,101 @@ async def test_publish_reminders_mark_sent_failure_reports_status(
 
     assert res.success is True
     assert res.reminders_embed_status == "mark_failed"
+    assert res.reminders_embed_sent is True
+    assert len(sent_payloads) == 2
+
+
+@pytest.mark.asyncio
+async def test_publish_reminders_message_id_persist_failure_reports_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sent_payloads = []
+    monkeypatch.setattr(mge_publish_service, "MGE_AWARD_CHANNEL_ID", "999")
+    monkeypatch.setattr(
+        mge_publish_service, "evaluate_publish_readiness", lambda event_id: _ready_payload()
+    )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal,
+        "fetch_event_publish_context",
+        lambda event_id: {
+            "EventId": event_id,
+            "EventName": "E6",
+            "VariantName": "Infantry",
+            "RuleMode": "fixed",
+            "PublishVersion": 0,
+            "AwardRemindersText": None,
+            "AwardRemindersSentUtc": None,
+        },
+    )
+    monkeypatch.setattr(
+        mge_publish_service,
+        "_build_publish_sets",
+        lambda event_id: (
+            [{"AwardId": 1, "FinalAwardedRank": 1, "TargetScore": 8_000_000}],
+            [],
+            [],
+        ),
+    )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal, "apply_publish_atomic", lambda **kwargs: 1
+    )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal, "fetch_published_snapshot", lambda *args, **kwargs: []
+    )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal,
+        "fetch_awards_with_signup_user",
+        lambda event_id: [
+            {
+                "AwardId": 1,
+                "AwardStatus": "awarded",
+                "AwardedRank": 1,
+                "GovernorNameSnapshot": "Gov1",
+                "RequestedCommanderName": "Cmd1",
+                "TargetScore": 8_000_000,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal, "update_award_embed_ids", lambda **kwargs: True
+    )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal,
+        "update_event_award_reminders_text",
+        lambda **kwargs: True,
+    )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal,
+        "update_award_reminder_message_ids",
+        lambda **kwargs: False,
+    )
+    monkeypatch.setattr(
+        mge_publish_service.mge_publish_dal,
+        "mark_award_reminders_sent",
+        lambda **kwargs: True,
+    )
+    monkeypatch.setattr(mge_publish_service, "refresh_mge_boards", lambda **kwargs: None)
+
+    class _Msg:
+        id = 1003
+
+    class _Channel:
+        id = 999
+
+        async def send(self, **kwargs):
+            sent_payloads.append(kwargs)
+            return _Msg()
+
+    bot = SimpleNamespace(get_channel=lambda x: _Channel(), fetch_channel=lambda x: _Channel())
+    res = await mge_publish_service.publish_event_awards(
+        bot=bot,
+        event_id=6,
+        actor_discord_id=9,
+        reminders_text_override="custom text",
+    )
+
+    assert res.success is True
+    assert res.reminders_embed_status == "ids_persist_failed"
     assert res.reminders_embed_sent is True
     assert len(sent_payloads) == 2
 

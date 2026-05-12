@@ -126,7 +126,7 @@ def upsert_commander_assignment(
     is_active: bool,
     now_utc: datetime,
 ) -> dict[str, Any] | None:
-    """Create/update a commander and make exactly one active variant mapping."""
+    """Create/update a commander and upsert the requested variant mapping."""
 
     def _op(cur: Any) -> dict[str, Any] | None:
         effective_commander_id = int(commander_id or 0)
@@ -176,16 +176,6 @@ def upsert_commander_assignment(
                 _naive_utc(now_utc),
                 effective_commander_id,
             ),
-        )
-
-        cur.execute(
-            """
-            UPDATE dbo.MGE_VariantCommanders
-            SET IsActive = 0
-            WHERE CommanderId = ?
-              AND VariantId <> ?;
-            """,
-            (effective_commander_id, int(variant_id)),
         )
 
         cur.execute(

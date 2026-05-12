@@ -194,9 +194,8 @@ def test_refresh_award_reminders_command_uses_admin_decorator(monkeypatch):
     class _RecordedRegistrar:
         def __init__(self):
             self.commands = []
-            self.added_commands = []
 
-        def command(self, *args, **kwargs):
+        def slash_command(self, *args, **kwargs):
             def decorator(func):
                 self.commands.append(
                     _RecordedCommand(
@@ -209,21 +208,12 @@ def test_refresh_award_reminders_command_uses_admin_decorator(monkeypatch):
 
             return decorator
 
-        def add_command(self, command):
-            self.added_commands.append(command)
-
-    class _RecordedGroup(_RecordedRegistrar):
-        def __init__(self, *args, **kwargs):
-            super().__init__()
-            self.args = args
-            self.kwargs = kwargs
-
     class _RecordedBot:
         def __init__(self):
             self.tree = _RecordedRegistrar()
 
-        def command(self, *args, **kwargs):
-            return self.tree.command(*args, **kwargs)
+        def slash_command(self, *args, **kwargs):
+            return self.tree.slash_command(*args, **kwargs)
 
     def _fake_is_admin_and_notify_channel(*, allow_leadership=False):
         captured["allow_leadership"] = allow_leadership
@@ -239,18 +229,13 @@ def test_refresh_award_reminders_command_uses_admin_decorator(monkeypatch):
         "is_admin_and_notify_channel",
         _fake_is_admin_and_notify_channel,
     )
-    monkeypatch.setattr(mge_cmds.app_commands, "Group", _RecordedGroup)
 
     bot = _RecordedBot()
     mge_cmds.register_mge(bot)
 
-    registered_commands = list(bot.tree.commands)
-    for command_group in bot.tree.added_commands:
-        registered_commands.extend(getattr(command_group, "commands", []))
-
     refresh_commands = [
         command
-        for command in registered_commands
+        for command in bot.tree.commands
         if command.name == "mge_refresh_award_reminders"
     ]
 
