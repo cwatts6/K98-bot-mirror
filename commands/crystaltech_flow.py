@@ -48,7 +48,10 @@ async def run_crystaltech_flow(
         return
 
     async def _release() -> None:
-        await release_governor_session(governor_id, interaction.user.id)
+        try:
+            await release_governor_session(governor_id, interaction.user.id)
+        except Exception:
+            logger.exception("[CrystalTech] _release failed for governor_id=%s", governor_id)
 
     try:
         if ProgressView is None or SetupView is None:

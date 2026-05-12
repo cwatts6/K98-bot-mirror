@@ -6,8 +6,15 @@ import asyncio
 from dataclasses import dataclass
 import logging
 
-from account_picker import ACCOUNT_ORDER
 from registry import registry_service
+
+# Preferred stable ordering for account slots (mirrors account_picker.ACCOUNT_ORDER).
+# Defined locally to avoid importing account_picker, which transitively imports discord
+# and would break non-bot contexts (unit tests, maintenance scripts, etc.).
+# NOTE: Keep in sync with account_picker.ACCOUNT_ORDER if that constant changes.
+_ACCOUNT_ORDER: list[str] = (
+    ["Main"] + [f"Alt {i}" for i in range(1, 6)] + [f"Farm {i}" for i in range(1, 11)]
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +46,11 @@ def classify_accounts(accounts: dict[str, dict[str, str]]) -> tuple[str, str | N
         if gid and gid not in seen:
             seen.append(gid)
 
-    for slot in ACCOUNT_ORDER:
+    for slot in _ACCOUNT_ORDER:
         if slot in accounts:
             visit(slot, accounts[slot])
     for slot, info in accounts.items():
-        if slot not in ACCOUNT_ORDER:
+        if slot not in _ACCOUNT_ORDER:
             visit(slot, info)
 
     if not seen:
@@ -68,4 +75,4 @@ async def resolve_governor_label(discord_user_id: int, governor_id: str) -> str:
 
 def free_account_slots(accounts: dict[str, dict[str, str]]) -> list[str]:
     used = set(accounts.keys())
-    return [slot for slot in ACCOUNT_ORDER if slot not in used]
+    return [slot for slot in _ACCOUNT_ORDER if slot not in used]

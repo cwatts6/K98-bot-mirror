@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 import logging
 
@@ -434,7 +435,18 @@ class EnterGovernorIDModal(discord.ui.Modal):
 
         from registry.registry_service import check_governor_claimed_by_other
 
-        if check_governor_claimed_by_other(governor_id, self.author_id):
+        try:
+            claimed_by_other = await asyncio.to_thread(
+                check_governor_claimed_by_other, governor_id, self.author_id
+            )
+        except Exception:
+            logger.exception("registry_claimed_check_failed governor_id=%s", governor_id)
+            await interaction.followup.send(
+                "Registry is temporarily unavailable. Please try again.",
+                ephemeral=True,
+            )
+            return
+        if claimed_by_other:
             await interaction.followup.send(
                 f"This Governor ID `{governor_id}` is already registered to another user.",
                 ephemeral=True,

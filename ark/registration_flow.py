@@ -172,9 +172,9 @@ async def _ensure_name_cache_ready() -> None:
         logger.exception("[ARK] Failed ensuring name cache is ready")
 
 
-def _get_user_accounts(user_id: int) -> dict[str, dict]:
+async def _get_user_accounts(user_id: int) -> dict[str, dict]:
     try:
-        return dict(get_user_accounts(int(user_id)) or {})
+        return dict(await asyncio.to_thread(get_user_accounts, int(user_id)) or {})
     except Exception:
         logger.exception("ark_registration_user_accounts_lookup_failed user_id=%s", user_id)
         return {}
@@ -584,7 +584,7 @@ class ArkRegistrationController:
 
         # NOTE: Removed user-level block. Governor-level duplicate check happens in _apply_join.
 
-        accounts = _get_user_accounts(interaction.user.id)
+        accounts = await _get_user_accounts(interaction.user.id)
 
         async def _apply(inter: discord.Interaction, governor_id: str) -> None:
             await self._apply_join(inter, match, roster, accounts, governor_id, slot_type="Player")
@@ -617,7 +617,7 @@ class ArkRegistrationController:
             await interaction.followup.send("❌ Sub slots are full.", ephemeral=True)
             return
 
-        accounts = _get_user_accounts(interaction.user.id)
+        accounts = await _get_user_accounts(interaction.user.id)
 
         async def _apply(inter: discord.Interaction, governor_id: str) -> None:
             await self._apply_join(inter, match, roster, accounts, governor_id, slot_type="Sub")
@@ -756,7 +756,7 @@ class ArkRegistrationController:
             return
 
         roster = await get_roster(self.match_id)
-        accounts = _get_user_accounts(interaction.user.id)
+        accounts = await _get_user_accounts(interaction.user.id)
 
         account_gov_ids = {
             str(info.get("GovernorID")).strip()
@@ -823,7 +823,7 @@ class ArkRegistrationController:
             return
 
         roster = await get_roster(self.match_id)
-        accounts = _get_user_accounts(interaction.user.id)
+        accounts = await _get_user_accounts(interaction.user.id)
 
         # Governor IDs linked to this Discord user
         account_gov_ids = {
