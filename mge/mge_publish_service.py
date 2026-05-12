@@ -864,19 +864,64 @@ async def refresh_award_reminders(
             status="post_failed",
         )
 
-    await asyncio.to_thread(
+    message_ids_updated = await asyncio.to_thread(
         mge_publish_dal.update_award_reminder_message_ids,
         event_id=resolved_event_id,
         message_id=int(message.id),
         channel_id=int(channel.id),
         now_utc=now,
     )
-    await asyncio.to_thread(
+    reminders_marked_sent = await asyncio.to_thread(
         mge_publish_dal.mark_award_reminders_sent,
         event_id=resolved_event_id,
         actor_discord_id=actor_discord_id,
         now_utc=now,
     )
+    if not message_ids_updated and not reminders_marked_sent:
+        logger.warning(
+            "mge_refresh_award_reminders_reposted_persist_and_mark_failed event_id=%s actor_discord_id=%s message_id=%s channel_id=%s",
+            resolved_event_id,
+            actor_discord_id,
+            int(message.id),
+            int(channel.id),
+        )
+        return RefreshAwardRemindersResult(
+            False,
+            "Award reminders reposted, but failed to save reminder message details and mark reminders sent.",
+            event_id=resolved_event_id,
+            status="reposted_persist_and_mark_failed",
+            reposted_missing=True,
+        )
+    if not message_ids_updated:
+        logger.warning(
+            "mge_refresh_award_reminders_reposted_persist_failed event_id=%s actor_discord_id=%s message_id=%s channel_id=%s",
+            resolved_event_id,
+            actor_discord_id,
+            int(message.id),
+            int(channel.id),
+        )
+        return RefreshAwardRemindersResult(
+            False,
+            "Award reminders reposted, but failed to save reminder message details.",
+            event_id=resolved_event_id,
+            status="reposted_persist_failed",
+            reposted_missing=True,
+        )
+    if not reminders_marked_sent:
+        logger.warning(
+            "mge_refresh_award_reminders_reposted_mark_sent_failed event_id=%s actor_discord_id=%s message_id=%s channel_id=%s",
+            resolved_event_id,
+            actor_discord_id,
+            int(message.id),
+            int(channel.id),
+        )
+        return RefreshAwardRemindersResult(
+            False,
+            "Award reminders reposted, but failed to mark reminders sent.",
+            event_id=resolved_event_id,
+            status="reposted_mark_sent_failed",
+            reposted_missing=True,
+        )
     logger.info(
         "mge_refresh_award_reminders_reposted event_id=%s actor_discord_id=%s message_id=%s channel_id=%s",
         resolved_event_id,
