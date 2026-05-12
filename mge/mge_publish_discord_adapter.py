@@ -257,7 +257,7 @@ class MgePublishDiscordAdapter:
         mail_user_ids = [uid for uid in MGE_MAIL_DM_USER_IDS if uid > 0]
         if not mail_user_ids:
             logger.info(
-                "mge_publish_award_dm_skipped reason=MGE_MAIL_DM_USER_ID_not_set event_id=%s",
+                "mge_publish_award_dm_skipped reason=MGE_MAIL_DM_USER_IDS_not_set event_id=%s",
                 event_id,
             )
             return AwardMailResult(sent=False, status="skipped_no_recipient")
