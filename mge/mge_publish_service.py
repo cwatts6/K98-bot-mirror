@@ -537,7 +537,7 @@ async def publish_event_awards(
                         now_utc=now,
                     )
                     if not reminder_ids_updated and not reminders_marked_sent:
-                        reminders_embed_status = "ids_and_mark_failed"
+                        reminders_embed_status = "ids_persist_and_mark_failed"
                         logger.warning(
                             "mge_publish_reminders_id_and_mark_failed event_id=%s actor_discord_id=%s channel_id=%s version=%s",
                             event_id,

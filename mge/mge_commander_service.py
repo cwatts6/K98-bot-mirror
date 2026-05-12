@@ -66,7 +66,14 @@ def save_commander_assignment(
     existing_by_name = mge_commander_dal.fetch_commander_by_name(name)
     if existing_by_name:
         existing_id = int(existing_by_name["CommanderId"])
-        if resolved_commander_id <= 0 or resolved_commander_id != existing_id:
+        if resolved_commander_id != existing_id:
+            logger.info(
+                "mge_commander_save_reusing_existing_name requested_commander_id=%s existing_commander_id=%s commander_name=%s variant_id=%s",
+                commander_id,
+                existing_id,
+                name,
+                variant_id,
+            )
             resolved_commander_id = existing_id
 
     row = mge_commander_dal.upsert_commander_assignment(
