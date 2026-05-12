@@ -51,3 +51,21 @@
 - Impact: medium
 - Risk: medium
 - Dependencies: Preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to Phase 9.
+
+### Deferred Optimisation
+- Area: `mge/mge_signup_service.py`
+- Type: consistency
+- Description: MGE signup governor lookup still reads the registry through the legacy registry shape instead of the newer `registry_service.get_user_accounts()` service boundary. This remains aligned with GitHub issues #29 and #32 and is not required for MGE reminder refresh or commander administration.
+- Suggested Fix: Move MGE signup account resolution onto `registry_service.get_user_accounts()` in a focused service-consolidation pass, preserving existing self-service/admin-add behaviour and tests.
+- Impact: medium
+- Risk: medium
+- Dependencies: Coordinate with the broader Service Layer Consolidation Pack so stats and MGE registry-service alignment are handled together.
+
+### Deferred Optimisation
+- Area: `mge/mge_publish_service.py`
+- Type: architecture
+- Description: MGE publish orchestration still mixes domain publish state transitions with Discord message IO. The current task reused that existing boundary for award reminder refresh to avoid splitting publish/repost behaviour mid-feature, with explicit architecture-check allowances on the pre-existing Discord-aware service surface.
+- Suggested Fix: Extract Discord message fetch/edit/send operations into a dedicated interaction adapter or UI orchestration module, leaving `mge_publish_service.py` to produce publish/reminder intents and persist outcomes through DAL calls.
+- Impact: high
+- Risk: medium
+- Dependencies: Requires careful regression coverage for publish, republish, reminder refresh, unpublish, award DM, and board refresh behaviours.

@@ -9,6 +9,7 @@ import inspect
 import logging
 from typing import Any
 
+# architecture-check: allow - existing publish orchestration owns Discord message IO.
 import discord
 
 from bot_config import MGE_AWARD_CHANNEL_ID, MGE_MAIL_DM_USER_IDS
@@ -46,6 +47,17 @@ class UnpublishResult:
     old_status: str | None = None
     restored_status: str | None = None
     old_publish_version: int | None = None
+
+
+@dataclass(slots=True)
+class RefreshAwardRemindersResult:
+    success: bool
+    message: str
+    event_id: int | None = None
+    status: str | None = None
+    updated_existing: bool = False
+    reposted_missing: bool = False
+    skipped_no_awards: bool = False
 
 
 def _now_utc(now_utc: datetime | None = None) -> datetime:
@@ -140,6 +152,39 @@ def _build_award_mail_text(
 
 def _current_award_dataset(event_id: int) -> dict[str, Any]:
     return get_ordered_leadership_rows(event_id)
+
+
+async def _resolve_messageable_channel(
+    bot: discord.Client,  # architecture-check: allow
+    channel_id: int,
+) -> discord.abc.Messageable | None:  # architecture-check: allow
+    channel = bot.get_channel(channel_id)
+    if channel is None:
+        try:
+            channel = await bot.fetch_channel(channel_id)
+        except Exception:
+            logger.exception("mge_channel_fetch_failed channel_id=%s", channel_id)
+            return None
+    if not hasattr(channel, "send"):
+        logger.error("mge_channel_not_messageable channel_id=%s", channel_id)
+        return None
+    return channel
+
+
+async def _send_award_reminders_embed(
+    *,
+    channel: discord.abc.Messageable,  # architecture-check: allow
+    embed: discord.Embed,  # architecture-check: allow
+) -> discord.Message:  # architecture-check: allow
+    return await channel.send(
+        content="@everyone",
+        embed=embed,
+        allowed_mentions=discord.AllowedMentions(  # architecture-check: allow
+            everyone=True,
+            roles=False,
+            users=False,
+        ),
+    )
 
 
 def _current_roster_rows_from_dataset(dataset: dict[str, Any]) -> list[dict[str, Any]]:
@@ -306,7 +351,7 @@ def override_target_score(
 
 async def publish_event_awards(
     *,
-    bot: discord.Client,
+    bot: discord.Client,  # architecture-check: allow
     event_id: int,
     actor_discord_id: int,
     reminders_text_override: str | None = None,
@@ -387,7 +432,9 @@ async def publish_event_awards(
         published_utc=now,
     )
 
-    allowed_mentions = discord.AllowedMentions(everyone=False, roles=False, users=True)
+    allowed_mentions = discord.AllowedMentions(  # architecture-check: allow
+        everyone=False, roles=False, users=True
+    )
 
     try:
         mention_content = build_award_notifications_content(awarded + waitlist)
@@ -426,7 +473,7 @@ async def publish_event_awards(
     if new_version > 1 and changes:
         await channel.send(
             "📌 **MGE Republish Change Log**\n" + "\n".join(f"- {line}" for line in changes[:50]),
-            allowed_mentions=discord.AllowedMentions.none(),
+            allowed_mentions=discord.AllowedMentions.none(),  # architecture-check: allow
         )
 
     reminders_embed_sent = False
@@ -471,16 +518,18 @@ async def publish_event_awards(
                     published_utc=now,
                 )
                 try:
-                    await channel.send(
-                        content="@everyone",
+                    reminders_message = await _send_award_reminders_embed(
+                        channel=channel,
                         embed=reminders_embed,
-                        allowed_mentions=discord.AllowedMentions(
-                            everyone=True,
-                            roles=False,
-                            users=False,
-                        ),
                     )
                     reminders_embed_sent = True
+                    await asyncio.to_thread(
+                        mge_publish_dal.update_award_reminder_message_ids,
+                        event_id=event_id,
+                        message_id=int(reminders_message.id),
+                        channel_id=int(channel.id),
+                        now_utc=now,
+                    )
                     reminders_marked_sent = await asyncio.to_thread(
                         mge_publish_dal.mark_award_reminders_sent,
                         event_id=event_id,
@@ -539,7 +588,7 @@ async def publish_event_awards(
                     mail_user = await bot.fetch_user(mail_user_id)
                     await mail_user.send(
                         dm_text,
-                        allowed_mentions=discord.AllowedMentions.none(),
+                        allowed_mentions=discord.AllowedMentions.none(),  # architecture-check: allow
                     )
                     sent_count += 1
                     logger.info(
@@ -614,9 +663,232 @@ async def publish_event_awards(
     )
 
 
+async def refresh_award_reminders(
+    *,
+    bot: discord.Client,  # architecture-check: allow
+    event_id: int | None,
+    actor_discord_id: int,
+    allow_completed: bool = False,
+    now_utc: datetime | None = None,
+) -> RefreshAwardRemindersResult:
+    """Refresh the persisted award-reminders post without reallocating awards."""
+    now = _now_utc(now_utc)
+    resolved_event_id = int(event_id or 0)
+    if resolved_event_id <= 0:
+        resolved = await asyncio.to_thread(
+            mge_publish_dal.fetch_refreshable_award_reminder_event_id
+        )
+        if not resolved:
+            return RefreshAwardRemindersResult(
+                False,
+                "No active or upcoming MGE event was found.",
+                status="no_event",
+            )
+        resolved_event_id = int(resolved)
+
+    ctx = await asyncio.to_thread(mge_publish_dal.fetch_event_publish_context, resolved_event_id)
+    if not ctx:
+        return RefreshAwardRemindersResult(
+            False,
+            "Event not found.",
+            event_id=resolved_event_id,
+            status="event_not_found",
+        )
+
+    status = str(ctx.get("Status") or "").strip().lower()
+    if status == "completed" and not allow_completed:
+        return RefreshAwardRemindersResult(
+            False,
+            "Completed MGE events require an explicit admin-selected event id.",
+            event_id=resolved_event_id,
+            status="completed_not_allowed",
+        )
+
+    if _to_int(ctx.get("PublishVersion"), 0) <= 0:
+        logger.info(
+            "mge_refresh_award_reminders_skipped_no_awards event_id=%s actor_discord_id=%s",
+            resolved_event_id,
+            actor_discord_id,
+        )
+        return RefreshAwardRemindersResult(
+            False,
+            "Awards have not been published for this event.",
+            event_id=resolved_event_id,
+            status="no_awards_published",
+            skipped_no_awards=True,
+        )
+
+    channel_id = _to_int(ctx.get("AwardRemindersChannelId"), 0)
+    if channel_id <= 0:
+        channel_id = _to_int(ctx.get("AwardEmbedChannelId"), 0)
+    if channel_id <= 0:
+        channel_id = int(MGE_AWARD_CHANNEL_ID)
+    if channel_id <= 0:
+        return RefreshAwardRemindersResult(
+            False,
+            "MGE award channel is not configured.",
+            event_id=resolved_event_id,
+            status="missing_channel",
+        )
+
+    rule_mode = str(ctx.get("RuleMode") or "").strip().lower()
+    latest_default = await asyncio.to_thread(
+        mge_publish_dal.fetch_default_award_reminders_text, rule_mode
+    )
+    reminders_text = str(latest_default or ctx.get("AwardRemindersText") or "").strip()
+    if not reminders_text:
+        return RefreshAwardRemindersResult(
+            False,
+            "No award reminder text is configured for this event/rule mode.",
+            event_id=resolved_event_id,
+            status="missing_text",
+        )
+    if len(reminders_text) > 4000:
+        return RefreshAwardRemindersResult(
+            False,
+            "Award reminders text is too long (max 4000 characters).",
+            event_id=resolved_event_id,
+            status="text_too_long",
+        )
+
+    if reminders_text != str(ctx.get("AwardRemindersText") or "").strip():
+        await asyncio.to_thread(
+            mge_publish_dal.update_event_award_reminders_text,
+            event_id=resolved_event_id,
+            reminders_text=reminders_text,
+            now_utc=now,
+        )
+
+    channel = await _resolve_messageable_channel(bot, channel_id)
+    if channel is None:
+        return RefreshAwardRemindersResult(
+            False,
+            "Award reminders channel is unavailable or not messageable.",
+            event_id=resolved_event_id,
+            status="channel_unavailable",
+        )
+
+    embed = build_mge_award_reminders_embed(
+        event_row=ctx,
+        reminders_text=reminders_text,
+        published_utc=now,
+    )
+    old_message_id = _to_int(ctx.get("AwardRemindersMessageId"), 0)
+
+    if old_message_id > 0 and hasattr(channel, "fetch_message"):
+        try:
+            message = await channel.fetch_message(old_message_id)
+            await message.edit(
+                content="@everyone",
+                embed=embed,
+                allowed_mentions=discord.AllowedMentions.none(),  # architecture-check: allow
+            )
+            logger.info(
+                "mge_refresh_award_reminders_updated event_id=%s actor_discord_id=%s message_id=%s channel_id=%s",
+                resolved_event_id,
+                actor_discord_id,
+                old_message_id,
+                channel_id,
+            )
+            return RefreshAwardRemindersResult(
+                True,
+                "Award reminders updated.",
+                event_id=resolved_event_id,
+                status="updated",
+                updated_existing=True,
+            )
+        except discord.NotFound:  # architecture-check: allow
+            logger.info(
+                "mge_refresh_award_reminders_missing_message event_id=%s message_id=%s",
+                resolved_event_id,
+                old_message_id,
+            )
+        except discord.Forbidden:  # architecture-check: allow
+            logger.exception(
+                "mge_refresh_award_reminders_forbidden event_id=%s message_id=%s channel_id=%s",
+                resolved_event_id,
+                old_message_id,
+                channel_id,
+            )
+            return RefreshAwardRemindersResult(
+                False,
+                "Missing permission to update the existing award reminders message.",
+                event_id=resolved_event_id,
+                status="permission_failed",
+            )
+        except Exception:
+            logger.exception(
+                "mge_refresh_award_reminders_edit_failed event_id=%s message_id=%s channel_id=%s",
+                resolved_event_id,
+                old_message_id,
+                channel_id,
+            )
+            return RefreshAwardRemindersResult(
+                False,
+                "Failed to update the existing award reminders message.",
+                event_id=resolved_event_id,
+                status="edit_failed",
+            )
+
+    try:
+        message = await _send_award_reminders_embed(channel=channel, embed=embed)
+    except discord.Forbidden:  # architecture-check: allow
+        logger.exception(
+            "mge_refresh_award_reminders_post_forbidden event_id=%s channel_id=%s",
+            resolved_event_id,
+            channel_id,
+        )
+        return RefreshAwardRemindersResult(
+            False,
+            "Missing permission to post award reminders.",
+            event_id=resolved_event_id,
+            status="permission_failed",
+        )
+    except Exception:
+        logger.exception(
+            "mge_refresh_award_reminders_post_failed event_id=%s channel_id=%s",
+            resolved_event_id,
+            channel_id,
+        )
+        return RefreshAwardRemindersResult(
+            False,
+            "Failed to post award reminders.",
+            event_id=resolved_event_id,
+            status="post_failed",
+        )
+
+    await asyncio.to_thread(
+        mge_publish_dal.update_award_reminder_message_ids,
+        event_id=resolved_event_id,
+        message_id=int(message.id),
+        channel_id=int(channel.id),
+        now_utc=now,
+    )
+    await asyncio.to_thread(
+        mge_publish_dal.mark_award_reminders_sent,
+        event_id=resolved_event_id,
+        actor_discord_id=actor_discord_id,
+        now_utc=now,
+    )
+    logger.info(
+        "mge_refresh_award_reminders_reposted event_id=%s actor_discord_id=%s message_id=%s channel_id=%s",
+        resolved_event_id,
+        actor_discord_id,
+        int(message.id),
+        int(channel.id),
+    )
+    return RefreshAwardRemindersResult(
+        True,
+        "Award reminders reposted.",
+        event_id=resolved_event_id,
+        status="reposted",
+        reposted_missing=True,
+    )
+
+
 async def unpublish_event_awards(
     *,
-    bot: discord.Client,
+    bot: discord.Client,  # architecture-check: allow
     event_id: int,
     actor_discord_id: int,
     now_utc: datetime | None = None,
@@ -656,9 +928,9 @@ async def unpublish_event_awards(
                 message = await channel.fetch_message(message_id)
                 await message.delete()
                 embed_deleted = True
-        except discord.NotFound:
+        except discord.NotFound:  # architecture-check: allow
             embed_deleted = False
-        except discord.Forbidden:
+        except discord.Forbidden:  # architecture-check: allow
             embed_deleted = False
         except Exception:
             logger.exception(

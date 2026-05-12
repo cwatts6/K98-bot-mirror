@@ -30,10 +30,22 @@ SELECT
     e.AwardRemindersText,
     e.AwardRemindersSentUtc,
     e.AwardRemindersSentByDiscordId,
+    e.AwardRemindersMessageId,
+    e.AwardRemindersChannelId,
     v.VariantName
 FROM dbo.MGE_Events e
 JOIN dbo.MGE_Variants v ON e.VariantId = v.VariantId
 WHERE e.EventId = ?;
+"""
+
+SQL_SELECT_REFRESHABLE_EVENT_ID = """
+SELECT TOP (1) EventId
+FROM dbo.MGE_Events
+WHERE Status IN ('published', 'signup_closed', 'signup_open', 'reopened')
+ORDER BY
+    CASE WHEN Status = 'published' THEN 0 ELSE 1 END,
+    StartUtc ASC,
+    EventId ASC;
 """
 
 SQL_SELECT_AWARDS_WITH_SIGNUP_USER = """
@@ -112,6 +124,18 @@ def fetch_event_publish_context(event_id: int) -> dict[str, Any] | None:
         return rows[0] if rows else None
     except Exception:
         logger.exception("mge_publish_dal_fetch_event_publish_context_failed event_id=%s", event_id)
+        return None
+
+
+def fetch_refreshable_award_reminder_event_id() -> int | None:
+    """Return the preferred non-completed MGE event for reminder refresh."""
+    try:
+        rows = run_query(SQL_SELECT_REFRESHABLE_EVENT_ID)
+        if not rows:
+            return None
+        return int(rows[0]["EventId"])
+    except Exception:
+        logger.exception("mge_publish_dal_fetch_refreshable_event_id_failed")
         return None
 
 
@@ -804,6 +828,33 @@ def update_event_award_reminders_text(
     except Exception:
         logger.exception(
             "mge_publish_dal_update_event_award_reminders_text_failed event_id=%s",
+            event_id,
+        )
+        return False
+
+
+def update_award_reminder_message_ids(
+    *,
+    event_id: int,
+    message_id: int,
+    channel_id: int,
+    now_utc: datetime,
+) -> bool:
+    try:
+        updated = execute(
+            """
+            UPDATE dbo.MGE_Events
+            SET AwardRemindersMessageId = ?,
+                AwardRemindersChannelId = ?,
+                UpdatedUtc = ?
+            WHERE EventId = ?;
+            """,
+            (int(message_id), int(channel_id), _naive_utc(now_utc), int(event_id)),
+        )
+        return int(updated or 0) > 0
+    except Exception:
+        logger.exception(
+            "mge_publish_dal_update_award_reminder_message_ids_failed event_id=%s",
             event_id,
         )
         return False

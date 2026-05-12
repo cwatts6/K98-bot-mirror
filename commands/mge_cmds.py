@@ -10,12 +10,15 @@ from bot_config import GUILD_ID, MGE_LEADERSHIP_CHANNEL_ID, MGE_SIMPLIFIED_FLOW_
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import (
     channel_only,
+    is_admin_and_notify_channel,
     is_admin_or_leadership_only,
     track_usage,
 )
+from mge import mge_commander_service, mge_publish_service
 from mge.mge_embed_manager import sync_event_leadership_embed
 from mge.mge_results_import import OverwriteConfirmationRequired, import_results_manual
 from mge.mge_review_service import get_review_pool_with_summary
+from ui.views.mge_commander_admin_view import MgeCommanderAdminView
 from ui.views.mge_leadership_board_view import MgeLeadershipBoardView
 from ui.views.mge_results_overwrite_confirm_view import MgeResultsOverwriteConfirmView
 from versioning import versioned
@@ -292,3 +295,64 @@ def register_mge(bot: ext_commands.Bot) -> None:
                 "❌ Cache refresh failed. Check logs for details.",
                 ephemeral=True,
             )
+
+    @bot.slash_command(
+        name="mge_refresh_award_reminders",
+        description="Refresh or repost MGE award reminders for a published event",
+        guild_ids=[GUILD_ID],
+    )
+    @versioned("v1.0")
+    @safe_command
+    @is_admin_and_notify_channel(allow_leadership=True)
+    @track_usage()
+    async def mge_refresh_award_reminders(
+        ctx: discord.ApplicationContext,
+        event_id: int | None = discord.Option(
+            int,
+            "Published MGE event id; omit to use the active/upcoming event",
+            min_value=1,
+            required=False,
+            default=None,
+        ),
+    ) -> None:
+        logger.info(
+            "mge_refresh_award_reminders_command_used actor_discord_id=%s event_id=%s",
+            ctx.user.id,
+            event_id,
+        )
+        await safe_defer(ctx, ephemeral=True)
+        result = await mge_publish_service.refresh_award_reminders(
+            bot=ctx.bot,
+            event_id=event_id,
+            actor_discord_id=int(ctx.user.id),
+            allow_completed=event_id is not None,
+        )
+        text = ("OK: " if result.success else "Error: ") + result.message
+        if result.event_id is not None:
+            text += f"\nEventId: `{result.event_id}`"
+        if result.status:
+            text += f"\nStatus: `{result.status}`"
+        await ctx.followup.send(text, ephemeral=True)
+
+    @bot.slash_command(
+        name="mge_commanders",
+        description="Manage MGE commanders and variant assignment (admin only)",
+        guild_ids=[GUILD_ID],
+    )
+    @versioned("v1.0")
+    @safe_command
+    @is_admin_and_notify_channel(allow_leadership=True)
+    @track_usage()
+    async def mge_commanders(ctx: discord.ApplicationContext) -> None:
+        logger.info(
+            "mge_commanders_command_used actor_discord_id=%s",
+            ctx.user.id,
+        )
+        await safe_defer(ctx, ephemeral=True)
+        variants = await asyncio.to_thread(mge_commander_service.list_variants)
+        await ctx.followup.send(
+            # architecture-check: allow - user-facing copy, not SQL.
+            "Select a variant to add, edit, activate, deactivate, or reassign commanders.",
+            view=MgeCommanderAdminView(variants=variants),
+            ephemeral=True,
+        )
