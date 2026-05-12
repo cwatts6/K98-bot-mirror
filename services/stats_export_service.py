@@ -106,6 +106,7 @@ async def build_personal_stats_export(
     try:
         export_file = await _build_export_file(
             df_daily=df_daily,
+            temp_dir=temp_dir,
             file_path=file_path,
             filename=filename,
             export_format=export_format,
@@ -151,6 +152,7 @@ async def _fetch_daily(governor_ids: list[int]) -> pd.DataFrame:
 async def _build_export_file(
     *,
     df_daily: pd.DataFrame,
+    temp_dir: str,
     file_path: str,
     filename: str,
     export_format: str,
@@ -188,7 +190,7 @@ async def _build_export_file(
     }
     return StatsExportFile(
         file_path=file_path,
-        temp_dir=os.path.dirname(file_path),
+        temp_dir=temp_dir,
         filename=filename,
         format_name=meta["name"],
         format_emoji=meta["emoji"],
@@ -202,6 +204,7 @@ async def _build_export_file(
 
 
 def _build_export_target(*, export_format: str, safe_name: str, timestamp: str, temp_dir: str) -> tuple[str, str]:
+    """Build the export filename and absolute path for the selected format."""
     extension = ".csv" if export_format == "CSV" else ".xlsx"
     filename = f"stats_{safe_name}_{timestamp}{extension}"
     return filename, os.path.join(temp_dir, filename)
