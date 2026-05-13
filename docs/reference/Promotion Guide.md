@@ -75,11 +75,11 @@ Use targeted validation for small changes and full validation before production 
 
 ```powershell
 cd C:\discord_file_downloader
-python scripts/validate_architecture_boundaries.py
-python scripts/validate_deferred_items.py
-python scripts/select_tests.py
-python scripts/smoke_imports.py
-python scripts/validate_command_registration.py
+.\.venv\Scripts\python.exe scripts/validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts/validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts/select_tests.py
+.\.venv\Scripts\python.exe scripts/smoke_imports.py
+.\.venv\Scripts\python.exe scripts/validate_command_registration.py
 .\.venv\Scripts\python.exe -m pre_commit run -a
 .\.venv\Scripts\python.exe -m pytest -q tests
 git diff --check
