@@ -139,12 +139,12 @@ Before implementation, read:
 - `README-DEV.md`
 - `docs/Promotion Guide.md`
 - `docs/inventory_image_import_setup.md`
-- `docs/Codex Task Pack - Inventory Image Import Module.md`
-- `docs/K98 Bot - Project Engineering Standards.md`
-- `docs/K98 Bot - Coding Execution Guidelines.md`
-- `docs/K98 Bot - Testing Standards.md`
-- `docs/K98 Bot - Skills & Refactor Triggers.md`
-- `docs/k98 Bot - Deferred Optimisation Framework.md`
+- `docs/inventory/Codex Task Pack - Inventory Image Import Module.md`
+- `docs/reference/K98 Bot - Project Engineering Standards.md`
+- `docs/reference/K98 Bot - Coding Execution Guidelines.md`
+- `docs/reference/K98 Bot - Testing Standards.md`
+- `docs/reference/K98 Bot - Skills & Refactor Triggers.md`
+- `docs/reference/k98 Bot - Deferred Optimisation Framework.md`
 - `commands/inventory_cmds.py`
 - `inventory/models.py`
 - `inventory/parsing.py`
