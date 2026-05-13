@@ -66,7 +66,34 @@ does not apply.
 - Dependencies:
 ```
 
-## 7. Mandatory Workflow
+## 7. Codex Skills To Use
+
+Use these local Codex skills when they apply to the task. List `not applicable` with a short reason
+instead of deleting a skill silently.
+
+| Skill | Use when |
+|---|---|
+| `k98-architecture-scope` | Always before implementation, unless one-pass execution has already been explicitly approved. Use it to identify affected layers, SQL/persistence implications, refactor triggers, conditional docs, tests, and approval checkpoints. |
+| `k98-discord-command-feature` | The task changes slash commands, Discord views/modals, embeds, buttons, selects, interaction callbacks, command registration, permissions, or user-facing bot flows. |
+| `k98-sql-validation` | The task touches or depends on SQL schema, stored procedures, views, indexes, UDTs, `ProcConfig`, staging/output tables, DAL queries, imports, exports, reports, or SQL-backed caches. |
+| `k98-test-selection` | Always before validation. Use it to combine `scripts/select_tests.py` with risk-based test coverage decisions and skip justifications. |
+| `k98-deferred-optimisation-capture` | Audit or implementation finds out-of-scope debt, refactor triggers, duplicate helpers, direct SQL in commands/views, restart-safety gaps, or cleanup candidates. |
+| `k98-pr-review` | Before merge or PR handoff, to check architecture, SQL alignment, tests, deferred items, Discord safety, and promotion readiness. |
+| `k98-promotion-check` | Before production promotion, production PR creation, production merge, SQL deployment sequencing, or bot-machine deployment. |
+
+### Skill Decisions
+
+| Skill | Decision | Notes |
+|---|---|---|
+| `k98-architecture-scope` | `<use | not applicable>` | `<why>` |
+| `k98-discord-command-feature` | `<use | not applicable>` | `<why>` |
+| `k98-sql-validation` | `<use | not applicable>` | `<why>` |
+| `k98-test-selection` | `<use | not applicable>` | `<why>` |
+| `k98-deferred-optimisation-capture` | `<use | not applicable>` | `<why>` |
+| `k98-pr-review` | `<use | not applicable>` | `<why>` |
+| `k98-promotion-check` | `<use | not applicable>` | `<why>` |
+
+## 8. Mandatory Workflow
 
 Default workflow:
 
@@ -78,7 +105,7 @@ Default workflow:
 
 Proceed in one pass only when the user explicitly approves it.
 
-## 8. Audit Requirements
+## 9. Audit Requirements
 
 Review the touched area for:
 
@@ -102,7 +129,7 @@ Map the likely:
 - restart implications
 - conditional reference docs
 
-## 9. Architecture Targets
+## 10. Architecture Targets
 
 | Concern | Target |
 |---|---|
@@ -116,7 +143,7 @@ Map the likely:
 | SQL schema | SQL repo `sql_schema/<schema>.<Object>.<Type>.sql` |
 | Tests | `tests/` |
 
-## 10. Likely Files
+## 11. Likely Files
 
 ### Review
 
@@ -130,7 +157,7 @@ Map the likely:
 
 - `<path or none>`
 
-## 11. Implementation Requirements
+## 12. Implementation Requirements
 
 - Keep commands and views thin.
 - Move business logic into services.
@@ -142,7 +169,7 @@ Map the likely:
 - Add or update tests unless the change is documentation-only or tooling-only.
 - Capture new out-of-scope findings as deferred optimisations.
 
-## 12. Refactor Decisions
+## 13. Refactor Decisions
 
 Classify each issue found during audit:
 
@@ -153,7 +180,7 @@ Classify each issue found during audit:
 Deferred items must use the structured format from
 `docs/reference/K98 Bot - Deferred Optimisation Framework.md`.
 
-## 13. Testing Requirements
+## 14. Testing Requirements
 
 Consider each category and either cover it or explain why it does not apply:
 
@@ -183,7 +210,7 @@ consider:
 .\.venv\Scripts\python.exe scripts\validate_command_registration.py
 ```
 
-## 14. Acceptance Criteria
+## 15. Acceptance Criteria
 
 - [ ] Scope is complete and no out-of-scope work was mixed in.
 - [ ] Correct architecture/layer ownership is preserved.
@@ -195,7 +222,7 @@ consider:
 - [ ] Quality gates were run or documented.
 - [ ] Deferred optimisations are captured structurally.
 
-## 15. Required Delivery Output
+## 16. Required Delivery Output
 
 Use this delivery shape:
 
@@ -213,7 +240,7 @@ Use this delivery shape:
 For documentation-only work, state that no runtime code, SQL, helper reuse, or restart behaviour
 changed.
 
-## 16. PR Summary Template
+## 17. PR Summary Template
 
 ```md
 ## Summary

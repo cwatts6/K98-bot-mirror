@@ -17,9 +17,27 @@ git push production <mirror-feature-branch>
 
 Use the patch-based promotion script instead.
 
+## Codex Skills
+
+Use the local Codex skills as promotion guardrails:
+
+- `k98-pr-review`: use before merge to confirm the mirror change is ready for handoff.
+- `k98-test-selection`: use before promotion to verify the focused and broad validation plan.
+- `k98-sql-validation`: use when SQL-facing bot changes, SQL repo changes, `ProcConfig`, DAL
+  assumptions, staging/output tables, imports, exports, or SQL-backed caches are involved.
+- `k98-promotion-check`: use before creating the production branch or PR, and again before bot
+  machine deployment when SQL, config, dependency, startup, scheduler, persistence, or cache risks
+  exist.
+- `k98-deferred-optimisation-capture`: use when promotion review finds out-of-scope cleanup or
+  follow-up work that should not be mixed into the active promotion.
+
 ## Standard Process
 
 ### 1. Validate Mirror Branch
+
+Before running the branch checks, use `k98-pr-review` for merge readiness and `k98-test-selection`
+to confirm the validation plan. If SQL-facing work is present, use `k98-sql-validation` and keep the
+SQL repo evidence with the promotion notes.
 
 ```powershell
 cd C:\discord_file_downloader
@@ -46,6 +64,9 @@ git log --oneline -5
 ```
 
 ### 2. Run Local Validation
+
+Use `k98-test-selection` to choose focused tests in addition to the baseline gates below. Document
+any skipped validation with a reason before promotion.
 
 Use targeted validation for small changes and full validation before production promotion:
 
@@ -82,6 +103,10 @@ git fetch production
 
 ### 4. Promote Branch
 
+Before creating the production branch, use `k98-promotion-check` to verify remotes, branch state,
+validation evidence, SQL/config sequencing, bot-machine readiness, and rollback notes. Do not
+promote if it reports blocking issues.
+
 ```powershell
 .\scripts\promote-to-production.ps1 `
   -SourceBranch codex/<branch-name> `
@@ -102,6 +127,9 @@ and rerun promotion.
 
 ### 5. Open Production PR
 
+Include the `k98-promotion-check` verdict, validation summary, SQL/config notes, and rollback notes
+in the production PR body.
+
 Open:
 
 ```text
@@ -109,6 +137,9 @@ K98-bot: prod/<branch-name> -> main
 ```
 
 ### 6. Merge And Deploy
+
+Before bot-machine deployment, rerun or refresh `k98-promotion-check` when the change includes SQL,
+config, dependency, startup, scheduler, persistence, rehydration, or cache implications.
 
 1. Merge the mirror PR into `K98-bot-mirror/main`.
 2. Merge the production PR into `K98-bot/main`.
