@@ -168,13 +168,13 @@ GitHub should allow a normal comparison because the branch is based on `K98-bot/
 
 #### If needed to push again
 
-1. 
+1.
 ```powershell
 git switch main
 git branch -D prod/<branch-name>
 ```
 
-2. 
+2.
 ```powershell
 cd C:\discord_file_downloader
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
@@ -222,7 +222,7 @@ git pull origin main
 git status
 ```
 
-2. Merge the production PR into `K98-bot/main`. 
+2. Merge the production PR into `K98-bot/main`.
 3. Deploy only from `K98-bot/main` on the bot machine.
 
 Deployment machine:
