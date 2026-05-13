@@ -1,6 +1,6 @@
 # Helper Files Review Guide
 
-Note: the filename typo is intentional and documented in the engineering standards.
+Note: some helper filenames in this codebase intentionally retain legacy naming quirks (for example, `decoraters.py`); treat those names as canonical unless the change explicitly renames them.
 
 Purpose: make reviews of shared helper modules repeatable and prevent duplicate utility code.
 
