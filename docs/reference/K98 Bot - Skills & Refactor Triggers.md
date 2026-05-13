@@ -174,7 +174,7 @@ Before completion:
 
 When a refactor trigger cannot be addressed within the current task:
 
-- Capture the item using `k98 Bot - Deferred Optimisation Framework.md`.
+- Capture the item using `K98 Bot - Deferred Optimisation Framework.md`.
 - Do not silently defer.
 - Ensure the item is suitable for later batching.
 - Include it in task output under deferred debt.

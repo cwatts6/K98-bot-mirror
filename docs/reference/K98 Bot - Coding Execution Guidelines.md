@@ -29,7 +29,7 @@ Before implementation, read in this order:
 5. `docs/reference/K98 Bot - Coding Execution Guidelines.md`.
 6. `docs/reference/K98 Bot - Testing Standards.md`.
 7. `docs/reference/K98 Bot - Skills & Refactor Triggers.md`.
-8. `docs/reference/k98 Bot - Deferred Optimisation Framework.md`.
+8. `docs/reference/K98 Bot - Deferred Optimisation Framework.md`.
 9. Conditional references from `docs/reference/README.md` when relevant.
 
 Do not read every reference document by default. Use the reference index to choose domain,

@@ -1,6 +1,6 @@
 # K98 Bot - Deferred Optimisation Framework
 
-> Canonical repo copy: `docs/reference/k98 Bot - Deferred Optimisation Framework.md`.
+> Canonical repo copy: `docs/reference/K98 Bot - Deferred Optimisation Framework.md`.
 
 ## 1. Purpose
 

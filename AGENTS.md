@@ -10,7 +10,7 @@ Before beginning repo work, read the current versions of these core documents:
 - `docs/reference/K98 Bot - Coding Execution Guidelines.md`
 - `docs/reference/K98 Bot - Testing Standards.md`
 - `docs/reference/K98 Bot - Skills & Refactor Triggers.md`
-- `docs/reference/k98 Bot - Deferred Optimisation Framework.md`
+- `docs/reference/K98 Bot - Deferred Optimisation Framework.md`
 
 Read additional reference docs only when they apply to the task. The index in
 `docs/reference/README.md` defines which references are always required and which are

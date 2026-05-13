@@ -18,7 +18,7 @@ Use this document with:
 2. `K98 Bot - Coding Execution Guidelines.md`
 3. `K98 Bot - Testing Standards.md`
 4. `K98 Bot - Skills & Refactor Triggers.md`
-5. `k98 Bot - Deferred Optimisation Framework.md`
+5. `K98 Bot - Deferred Optimisation Framework.md`
 
 When documents conflict, follow the priority chain in the execution guidelines.
 

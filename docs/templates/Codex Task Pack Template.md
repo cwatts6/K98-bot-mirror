@@ -9,15 +9,15 @@
 Read and follow the current versions of:
 
 - `README-DEV.md`
-- `docs/K98 Bot - Project Engineering Standards.md`
-- `docs/K98 Bot - Coding Execution Guidelines.md`
+- `docs/reference/K98 Bot - Project Engineering Standards.md`
+- `docs/reference/K98 Bot - Coding Execution Guidelines.md`
 - `docs/templates/K98 Bot Standard Development Initiation Statement.md`
-- `docs/K98 Bot - Testing Standards.md`
-- `docs/K98 Bot - Skills & Refactor Triggers.md`
-- `docs/k98 Bot - Deferred Optimisation Framework.md`
-- `docs/K98 Bot Deferred Optimisation Scoring Model.md`
-- `docs/K98 Bot Codex Task Pack Generator.md`
-- `docs/K98 Code Prompt.md`
+- `docs/reference/K98 Bot - Testing Standards.md`
+- `docs/reference/K98 Bot - Skills & Refactor Triggers.md`
+- `docs/reference/K98 Bot - Deferred Optimisation Framework.md`
+- `docs/reference/K98 Bot Deferred Optimisation Scoring Model.md`
+- `docs/templates/K98 Bot Codex Task Pack Generator.md`
+- `docs/templates/K98 Code Prompt.md`
 
 ## Objective
 
@@ -56,7 +56,7 @@ Use this section when the task pack comes from deferred optimisation capture. De
 
 ## Mandatory Workflow
 
-Follow `docs/K98 Code Prompt.md`.
+Follow `docs/templates/K98 Code Prompt.md`.
 
 Stop for approval after:
 
