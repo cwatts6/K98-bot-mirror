@@ -150,7 +150,7 @@ Required output behaviour:
 - state when a new helper was necessary
 - state if a duplicate or near-duplicate helper was discovered and what happened to it
 
-For helper-heavy work, consult `docs/reference/REVEIW_HELPERS.md`.
+For helper-heavy work, consult `docs/reference/REVIEW_HELPERS.md`.
 
 ## 6. Feature Implementation Order
 

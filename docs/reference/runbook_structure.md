@@ -1,44 +1,48 @@
-# 🧭 Repository Structure — Where things live and why
+# Repository Structure
 
-File: `docs/runbook_structure.md`  
-Audience: New developers and maintainers  
-Last Updated: 2025-10-19
+Purpose: quick navigation map. Architecture rules live in
+`K98 Bot - Project Engineering Standards.md`.
 
----
+## Root Entrypoints And Legacy Modules
 
-Purpose
-- Map the repo layout and describe responsibilities of top-level modules to speed onboarding and reduce navigation time.
+- `DL_bot.py` - process entrypoint, startup guards, signal wiring, upload fast paths
+- `bot_instance.py` - bot object, on-ready lifecycle, background tasks
+- `Commands.py` - legacy command registration bridge
+- `command_regenerate.py` - command registration support
+- `constants.py` - paths, SQL connection constants, runtime file locations
+- `bot_config.py` - environment parsing and exported config values
+- `logging_setup.py` - logging and telemetry setup
+- `file_utils.py`, `utils.py`, `process_utils.py`, `bot_helpers.py` - shared helpers
 
-Top-level (important files & directories)
-- DL_bot.py — process entrypoint, signal wiring, singleton lock and PID management, some on_message fast-paths.
-- bot_instance.py — bot object, on_ready lifecycle, full_startup_sequence, TaskMonitor orchestration, client teardown.
-- logging_setup.py — queue-based logging initialization and helpers (flush/shutdown), log file paths.
-- boot_safety.py — headless mode patches for matplotlib/PIL and stale-lock detection.
-- bot_config.py — environment loader, typed env helpers, default config and __all__ exports.
-- Commands.py / — slash commands and command registration.
-- event_cache.py / event_scheduler.py / event_embed_manager.py — event & reminder pipelines.
-- docs/ — textual runbooks (startup, shutdown, devops, diagnostics, structure, honor_scan).
-- scripts/ — utility scripts such as smoke_imports.py and config_self_test.py.
-- constants.py — paths & filenames (LOG_DIR, DATA_DIR, QUEUE_CACHE_FILE, COMMAND_CACHE_FILE, BOT_LOCK_PATH, etc.)
+## Target Architecture Directories
 
-Module guide (short)
-- logging_setup.py
-  - Creates LOG_DIR and sets up SafeRotatingFileHandler handlers.
-  - Starts a QueueListener; provides flush_logs() and shutdown_logging() helpers.
-- bot_instance.py
-  - Creates the Bot instance, registers commands, and defines on_ready and shutdown handlers.
-  - Manages TaskMonitor and background loops.
-- DL_bot.py
-  - Process-level tasks: preflight checks, lock acquisition, pid write, wiring signals, final logging shutdown.
+- `commands/` - slash command modules
+- `services/` - cross-domain service modules
+- `core/` - low-level cross-cutting helpers
+- `ui/views/` - Discord views/modals
+- `ark/` - Ark domain logic
+- `event_calendar/` - event calendar sync, cache, reminders
+- `mge/` - MGE services, DAL, cache, views support
+- `registry/` - governor/account registry
+- `stats/`, `stats_alerts/` - stats data access, embeds, alert/report helpers
+- `prekvk/`, `kvk/`, `inventory/` - domain packages
+- `scripts/` - validation, diagnostics, maintenance tooling
+- `tests/` - pytest suite
+- `docs/` - standards, references, task packs, runbooks
 
-Where to look for specific behaviors
-- Command sync and signature persistence: Commands.py and constants.COMMAND_CACHE_FILE.
-- Per-channel ingestion logic: DL_bot.py (on_message fast-paths and queue enqueuing).
-- Event rehydration: event_cache.py, event_embed_manager.py, and event_scheduler.py.
+## SQL Repo
 
-Developer onboarding checklist
-1. Clone repo and create virtualenv: python -m venv venv && . venv/bin/activate
-2. Install dev requirements: pip install -r requirements.txt
-3. Run smoke imports locally: python scripts/smoke_imports.py
-4. Set WATCHDOG_RUN=1 and DISCORD_BOT_TOKEN for local integration or use NO_DISCORD_LOGIN env for offline tests.
-5. Read docs/runbook_startup.md and runbook_shutdown.md for lifecycle expectations.
+SQL schema and stored procedures are authoritative in:
+
+`C:\K98-bot-SQL-Server`
+
+Use the SQL repo to validate table names, columns, stored procedures, views, indexes, and
+`ProcConfig` usage before SQL-facing Python changes.
+
+## Onboarding Checks
+
+```powershell
+python scripts/smoke_imports.py
+python scripts/validate_command_registration.py
+python scripts/select_tests.py
+```

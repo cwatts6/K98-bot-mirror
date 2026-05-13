@@ -183,7 +183,7 @@ Duplicate helpers are a review blocker unless the existing helper is clearly uns
 replacement is part of an intentional consolidation. If a better helper exists but is awkwardly
 placed, reuse first and capture relocation or cleanup as deferred work.
 
-For helper-heavy changes, also consult `REVEIW_HELPERS.md`.
+For helper-heavy changes, also consult `REVIEW_HELPERS.md`.
 
 ## 7. Refactor Review When Touching Code
 
@@ -260,7 +260,7 @@ See `K98 Bot - Testing Standards.md` for the full policy.
 Use these exact names unless doing a coordinated migration:
 
 - `decoraters.py`
-- `docs/reference/REVEIW_HELPERS.md`
+- `docs/reference/REVIEW_HELPERS.md`
 - `dbo.ALL_STATS_FOR_DASHBAORD`
 
 Do not "fix" these by accident in isolated task work.

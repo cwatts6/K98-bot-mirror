@@ -109,6 +109,8 @@ htmlcov/
 downloads/
 Databook_Archive/
 archive/
+!docs/reference/archive/
+!docs/reference/archive/**
 restart_log.csv
 download_log.csv
 input_log.csv

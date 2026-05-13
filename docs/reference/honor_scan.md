@@ -1,53 +1,56 @@
-# 🏅 KVK Honour Ingestion & Reporting Pipeline
+# Honor Ingestion And Reporting
 
-File: `docs/honor_scan.md`  
-Audience: Developers & feature maintainers  
-Last Updated: 2025-10-19
+Purpose: describe the KVK honor upload/import path and reporting surfaces.
 
----
+## Main Files
 
-Purpose
-- Describe the honour ingestion pipeline and the expected input formats, file naming patterns, processing steps, and embed output behavior.
+- `DL_bot.py` handles uploads in `HONOR_CHANNEL_ID`.
+- `honor_importer.py` parses and ingests honor workbooks.
+- `stats_alerts/honors.py` reads latest honor rankings for embeds/commands.
+- `honor_rankings_view.py` builds interactive ranking views.
+- `commands/stats_cmds.py` exposes `/honor_rankings` and `/honor_purge_last`.
 
-Overview
-- The KVK Honour pipeline ingests per-KVK honour snapshots and refreshes leaderboard embeds in Discord.
-- It complements Pre-KVK and All-Kingdom flows and supports multiple input channels depending on the data type.
+## Accepted Upload Names
 
-Accepted inputs & filename patterns
-- Typical accepted filename (exact match semantics):
-  - 1198_databook.xlsx
-- Allowed prefixes:
-  - TEST_1198_databook.xlsx
-  - DEMO_1198_databook.xlsx
-  - SAMPLE_1198_databook.xlsx
-- Any file starting with "1198_databook" and ending with ".xlsx" is accepted.
+The current upload handler accepts `.xlsx` files matching:
 
-Processing flow (high level)
-1. DL_bot.py on_message fast-path or processing_pipeline.py file handling accepts the upload and enqueues processing.
-2. processing_pipeline.py orchestrates:
-   - Archive/copy of the original file (download folder),
-   - Verification that the latest sheet exists and can be parsed (pandas/openpyxl),
-   - Convert to canonical stats.xlsx in DOWNLOAD_FOLDER for downstream embed generation.
-3. Stats sheet is parsed; additional transforms build leaderboard slices and compute deltas for embeds.
+```text
+1198_honor*.xlsx
+TEST_1198_honor*.xlsx
+DEMO_1198_honor*.xlsx
+SAMPLE_1198_honor*.xlsx
+```
 
-Common validation checks
-- Required sheet presence: the code expects at least one sheet; the last sheet is used by default.
-- Columns: required columns should match the stats schema. If key columns are absent, processing logs an error and the job is moved to FAILED_LOG.
+Separators around `1198` and `honor` may be underscore, space, or hyphen.
 
-Embed & reporting
-- After successful processing, the bot builds an embed (or set of embeds) with:
-  - Top N players, honour deltas, and relevant metadata (KVK number, source uploader, timestamp).
-  - A downloadable XLSX attachment (stats.xlsx) may be attached when requested or when the embed consumer needs the source.
-- The embed footer contains freshness metadata, and the bot uses CUSTOM_AVATAR_URL where provided.
+## Processing Flow
 
-Troubleshooting
-- "Source file does not exist" error: file path mismatch or race in moving the uploaded file. Check download folder and input log entries.
-- Missing "updated_on" column: code injects a timestamp column if absent.
-- Excel write or read errors: confirm openpyxl is installed and not in a conflicting version. Reproduce locally with pandas/openpyxl.
+1. `DL_bot.py` receives an attachment in `HONOR_CHANNEL_ID`.
+2. The attachment filename is validated.
+3. The workbook is read and parsed by `parse_honor_xlsx`.
+4. Blocking parse/ingest work is offloaded through the common offload helper.
+5. `ingest_honor_snapshot` writes SQL-backed snapshot rows and emits telemetry.
+6. Ranking commands/views read the latest scan through `stats_alerts/honors.py`.
 
-Operational notes
-- Keep DOWNLOAD_FOLDER and LOG_DIR backed up if running critical archival processes.
-- When changing the parsing logic, add unit tests that cover:
-  - Missing columns,
-  - Sheet name variations,
-  - Large file sizes and memory usage.
+## Validation And Tests
+
+Relevant tests:
+
+- `tests/test_honor_importer.py`
+- `tests/test_honor_rankings_view.py`
+
+When changing this pipeline, cover:
+
+- missing required workbook columns
+- blank/NaN names
+- rollback on ingest failure
+- telemetry on success/failure
+- empty latest-ranking output
+- ranking view formatting
+
+## Operational Notes
+
+- SQL table/view names must be validated against `C:\K98-bot-SQL-Server`.
+- Keep parsing and database work out of the Discord event loop.
+- Preserve user-safe upload error messages in `DL_bot.py`.
+- Do not infer schema from Python if SQL definitions exist.

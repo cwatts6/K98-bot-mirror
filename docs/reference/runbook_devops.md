@@ -1,94 +1,98 @@
-# ⚙️ DevOps Runbook — Deployment, Configuration, and Maintenance
+# DevOps Runbook
 
-File: `docs/runbook_devops.md`  
-Audience: Operators and CI/CD engineers  
-Last Updated: 2025-10-19
+Purpose: summarize deployment, promotion, configuration, and maintenance guidance.
 
----
+## Repository Model
 
-Purpose
-- Describe recommended deployment patterns, environment variables, configuration layout, and maintenance procedures for the bot.
+- `origin` points to `K98-bot-mirror`, the scrubbed Codex mirror.
+- `production` points to `K98-bot`, the private production repo.
+- Codex branches and PRs should target the mirror first.
+- Production deployment must come from `K98-bot/main`, not the mirror.
 
-Environments
-- DEV: local development with test credentials and a dedicated test guild.
-- STAGING: pre-prod environment to smoke test updates.
-- PROD: production with full watchers and backups.
+Use `Promotion Guide.md` for the detailed mirror-to-production process.
 
-Recommended deployment approaches
-1) Systemd (recommended for Linux)
-- Minimal service example (replace placeholders):
+## Local Setup
 
-```ini
-[Unit]
-Description=K98 Bot
-After=network.target
-
-[Service]
-Type=simple
-User=botuser
-WorkingDirectory=/opt/k98-bot
-ExecStart=/opt/k98-bot/venv/bin/python DL_bot.py
-Restart=on-failure
-Environment=WATCHDOG_RUN=1
-Environment=DISCORD_BOT_TOKEN=your_token_here
-
-[Install]
-WantedBy=multi-user.target
+```powershell
+cd C:\discord_file_downloader
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\venv\Scripts\Activate.ps1
+.\dev.ps1
 ```
 
-- Ensure the service runs under a dedicated user with limited permissions. Use a virtualenv in the project folder.
+Install or update dependencies when needed:
 
-2) Docker (optional)
-- If containerizing, ensure:
-  - LOG_DIR and DATA_DIR are mounted as volumes.
-  - The container exits with RESTART_EXIT_CODE when a supervised restart is desired.
-  - Use healthcheck endpoints to let orchestrators decide restarts.
+```powershell
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+```
 
-Environment variables (high-level)
-- Required: DISCORD_BOT_TOKEN
-- Recommended: WATCHDOG_RUN=1 for production; ADMIN_USER_ID; GUILD_ID for local command sync.
-- Logging: LOG_TO_CONSOLE=1 (optional)
-- See bot_config.py for the full set of env var names and their types.
+## Quality Gates
 
-Configuration & secrets
-- Keep secrets out of the repo. Use a secrets manager or environment variables injected by CI.
-- GOOGLE credentials: store in a file referenced by GOOGLE_CREDENTIALS_FILE and ensure file permissions are restricted.
+For normal PR work:
 
-Backups & persistence
-- DATA_DIR holds persistent JSON caches (QUEUE_CACHE_FILE, REMINDER_TRACKING_FILE). Regularly back up DATA_DIR to durable storage.
-- Log rotation: logging_setup handles file rotation. Keep copies of crash.log for at least 30 days.
+```powershell
+python scripts/validate_architecture_boundaries.py
+python scripts/validate_deferred_items.py
+python scripts/select_tests.py
+python scripts/smoke_imports.py
+python scripts/validate_command_registration.py
+```
 
-CI/CD recommendations
-- Use a branch-per-feature flow with PR reviews.
-- Before merging to main:
-  - Run unit tests and scripts/smoke_imports.py (import smoke).
-  - Run static checks and linting.
-- Tag releases and maintain a CHANGELOG.md.
+Run focused pytest commands for the touched subsystem. Use full `pytest -q tests` before
+promotion or when the blast radius is broad.
 
-Operational runbook snippets
-- Restarting:
-  - systemctl restart k98-bot
-  - After restart, check LOG_DIR/log.txt for heartbeat and admin DM confirmation.
-- Releasing:
-  - Merge to main
-  - Tag release and deploy using CI job that runs smoke imports then restarts service.
+## Runtime Configuration
 
-Monitoring & alerts
-- Monitor:
-  - Process uptime & restarts (systemd or orchestrator).
-  - crash.log increases in rate.
-  - Heartbeat freshness (LOG_DIR/heartbeat.json).
-- Alerts:
-  - If heartbeat hasn't updated in N minutes, send PagerDuty/alert.
-  - On repeated restarts within a short window, prevent restart loop (watchdog should implement backoff).
+Use `ENV_REFERENCE.md` for variable details. Common required/important values:
 
-Security
-- Limit admin command access to ADMIN_USER_ID (the code already checks for admin-only modifiers in commands).
-- Rotate DISCORD_BOT_TOKEN on suspicion of exposure.
-- If using ODBC/DB credentials, follow least privilege patterns.
+- `DISCORD_BOT_TOKEN`
+- `WATCHDOG_RUN=1`
+- `GUILD_ID`
+- channel IDs from `bot_config.py`
+- SQL/ODBC settings from `constants.py`
 
-Suggested additions (missing docs that would help ops)
-- sample systemd unit (expand and include restart policies)
-- docker-compose example (with volumes for logs and data)
-- backup & restore instructions for DATA_DIR and LOG_DIR
-- observability playbook (what counts as healthy, thresholds, and alert runbooks)
+## Logs And State
+
+Important runtime locations are configured in `constants.py` and `logging_setup.py`:
+
+- `LOG_DIR`
+- `DATA_DIR`
+- `logs/log.txt`
+- `logs/error_log.txt`
+- `logs/crash.log`
+- `logs/telemetry_log.jsonl`
+- `QUEUE_CACHE_FILE`
+- `LAST_SHUTDOWN_INFO`
+- `BOT_LOCK_PATH`
+
+Back up `DATA_DIR` and operational logs before risky deployment or migration work.
+
+## Maintenance And Offloads
+
+Operational scripts:
+
+- `scripts/collect_diagnostics.py`
+- `scripts/offload_admin.py`
+- `scripts/offload_monitor.py`
+- `scripts/maintenance_telemetry_audit.py`
+
+Use offload tooling to inspect or cancel long-running isolated work when the registry has enough
+context to do so safely.
+
+## Production Promotion
+
+Use the patch-based promotion flow in `Promotion Guide.md`. Do not push mirror branch history
+directly to production.
+
+Before promotion:
+
+- mirror PR validation is clean
+- SQL repo changes are committed/reviewed when applicable
+- targeted tests and quality gates pass
+- migration/deployment order is documented
+
+After promotion:
+
+- open production PR from the promoted branch
+- merge mirror and production PRs in the intended order
+- deploy only from `K98-bot/main`
