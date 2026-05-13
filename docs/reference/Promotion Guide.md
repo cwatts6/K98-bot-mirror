@@ -166,7 +166,7 @@ git pull
 
 GitHub should allow a normal comparison because the branch is based on `K98-bot/main`.
 
-# If needed to push again 
+#### If needed to push again
 
 1. 
 ```powershell
