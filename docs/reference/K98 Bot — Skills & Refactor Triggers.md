@@ -1,24 +1,22 @@
-# K98 Bot — Skills & Refactor Triggers
+# K98 Bot - Skills & Refactor Triggers
 
-> **Purpose:** Give AI coding agents and reviewers a compact guide to the skills expected during task execution, plus the refactor triggers that should cause broader cleanup in the touched area.
-
----
+> Canonical repo copy: `docs/reference/K98 Bot — Skills & Refactor Triggers.md`.
 
 ## 1. Core Skills Expected
 
-A strong implementation in this project usually requires several of these skills at once:
+A strong implementation in this project usually requires several of these skills at once.
 
-### 1.1 Architecture judgement
+### Architecture Judgement
 
 Ability to:
 
 - place code in the correct layer
 - keep commands and views thin
 - move business logic into services
-- move data access into repositories
+- move data access into repositories or DAL modules
 - avoid expanding legacy monoliths
 
-### 1.2 Refactor awareness
+### Refactor Awareness
 
 Ability to notice when the touched area still contains:
 
@@ -29,16 +27,16 @@ Ability to notice when the touched area still contains:
 - weak restart safety
 - inconsistent logging and validation
 
-### 1.3 SQL / persistence discipline
+### SQL / Persistence Discipline
 
 Ability to:
 
-- respect SQL as the source of truth
+- treat the SQL repo as the source of truth for schema objects
 - separate schema changes from Python changes
 - avoid hidden schema assumptions in Python
 - recognize when JSON-only state is insufficient
 
-### 1.4 Testing judgement
+### Testing Judgement
 
 Ability to decide what needs:
 
@@ -48,7 +46,7 @@ Ability to decide what needs:
 - restart/persistence testing
 - cache safety testing
 
-### 1.5 Operational awareness
+### Operational Awareness
 
 Ability to consider:
 
@@ -56,29 +54,29 @@ Ability to consider:
 - rehydration
 - duplicate-post prevention
 - structured logging
-- local-first deployment and migration order
-
----
+- local validation
+- production promotion and migration order
 
 ## 2. Refactor Triggers
 
-These are the main triggers that should prompt cleanup in the touched area.
+These triggers should prompt cleanup in the touched area or a structured deferred item.
 
-### Trigger A — Direct SQL found in commands or views
+### Trigger A - Direct SQL Found In Commands Or Views
 
 Expected response:
 
 - move it into repository/DAL or service-owned data-access code
-- if not fixed now, explicitly state why it is deferred and capture it using the Deferred Optimisation Framework
+- if not fixed now, explicitly state why it is deferred and capture it using the Deferred
+  Optimisation Framework
 
-### Trigger B — Business logic found in commands or views
+### Trigger B - Business Logic Found In Commands Or Views
 
 Expected response:
 
 - extract to a service
 - leave commands/views responsible only for interaction flow and rendering
 
-### Trigger C — Duplicate helper or near-duplicate found
+### Trigger C - Duplicate Helper Or Near-Duplicate Found
 
 Expected response:
 
@@ -86,37 +84,37 @@ Expected response:
 - or consolidate and replace duplication
 - do not add another helper without justification
 
-### Trigger D — Dead code from prior iterations
+### Trigger D - Dead Code From Prior Iterations
 
 Expected response:
 
 - remove it if clearly unused and safe
 - or capture it using the Deferred Optimisation Framework if not addressed now
 
-### Trigger E — Critical state stored only in memory or fragile JSON
+### Trigger E - Critical State Stored Only In Memory Or Fragile JSON
 
 Expected response:
 
 - assess whether SQL-backed persistence is required
 - improve restart safety where the feature depends on state continuity
+- defer structurally if the fix is larger than the approved task
 
-### Trigger F — Logging is insufficient to explain failures
-
-Expected response:
-
-- add meaningful logs at the decision and outcome points
-- not just generic exception logging
-
-### Trigger G — Tests exist but no longer match the architecture
+### Trigger F - Logging Is Insufficient To Explain Failures
 
 Expected response:
 
-- update the tests as part of the refactor
-- do not leave tests describing the old layer boundaries
+- add meaningful logs at decision and outcome points
+- avoid generic exception-only logging
+- keep sensitive values out of logs
 
----
+### Trigger G - Tests Exist But No Longer Match The Architecture
 
-## 3. Review Questions to Ask Before Coding
+Expected response:
+
+- update tests as part of the refactor
+- do not leave tests describing old layer boundaries
+
+## 3. Review Questions Before Coding
 
 1. Which layer should own this behaviour?
 2. Is any direct SQL present in the command or view path?
@@ -125,11 +123,11 @@ Expected response:
 5. Is there dead code in the touched area from previous versions?
 6. What state must survive restart?
 7. What test types are required?
-8. What technical debt is obvious enough that leaving it untouched would likely repeat the problem later?
+8. Which conditional reference docs apply?
+9. What technical debt is obvious enough that leaving it untouched would likely repeat the
+   problem later?
 
----
-
-## 4. Review Questions to Ask Before Marking Complete
+## 4. Review Questions Before Marking Complete
 
 1. Did this change improve the touched area, or only patch it?
 2. Did I leave direct SQL in a place it should not live?
@@ -139,19 +137,16 @@ Expected response:
 6. Would another engineer understand the flow from logs if it failed in production?
 7. Would the feature still behave correctly after a restart?
 
----
-
-## 5. Practical Use in Task Packs
+## 5. Practical Use In Task Packs
 
 When writing or using a task pack, include a short section like:
 
-- **Skills needed:** architecture judgement, service extraction, SQL review, test updates
-- **Refactor triggers to check:** direct SQL in commands, duplicate helpers, dead flow from old signup versions
-- **Expected cleanup:** extract SQL from command, remove dead legacy branch, update nearby tests
+- Skills needed: architecture judgement, service extraction, SQL review, test updates
+- Refactor triggers to check: direct SQL in commands, duplicate helpers, dead flow from old signup versions
+- Expected cleanup: extract SQL from command, remove dead legacy branch, update nearby tests
 
-This makes the task pack more consistent and raises the chance that obvious improvements are addressed during the work rather than deferred by default.
-
----
+This makes task packs more consistent and raises the chance that obvious improvements are addressed
+during the work rather than deferred by default.
 
 ## 6. Compact Checklist
 
@@ -163,22 +158,23 @@ Before implementation:
 - [ ] persistence implications reviewed
 - [ ] test implications reviewed
 - [ ] refactor triggers reviewed
+- [ ] conditional reference docs selected
 
 Before completion:
 
 - [ ] direct SQL in touched command/view path addressed or explicitly deferred
 - [ ] duplicate helpers addressed or explicitly deferred
 - [ ] dead code addressed or explicitly deferred
-- [ ] tests added or updated
+- [ ] tests added, updated, or explicitly ruled out
 - [ ] logging adequate
 - [ ] restart safety preserved
 - [ ] follow-on debt listed if still present
 
-## 7. Deferred Optimisation Handling (NEW)
+## 7. Deferred Optimisation Handling
 
 When a refactor trigger cannot be addressed within the current task:
 
-Capture the item using the Deferred Optimisation Framework
-Do not silently defer
-Ensure the item is suitable for later batching
-Include it in task output under deferred debt
+- Capture the item using `k98 Bot — Deferred Optimisation Framework.md`.
+- Do not silently defer.
+- Ensure the item is suitable for later batching.
+- Include it in task output under deferred debt.

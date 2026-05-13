@@ -1,5 +1,12 @@
 # Developer Quickstart
 
+## Core Reference Contract
+
+Before repo work, read `AGENTS.md` and the indexed core docs in
+`docs/reference/README.md`. That index separates must-read standards from background,
+domain, promotion, and operations references so routine work does not require reading the
+entire `docs/reference` folder.
+
 ## Quality Automation
 
 Run before committing:

@@ -1,29 +1,33 @@
-🧠 K98 Bot — Deferred Optimisation Framework
-🎯 Purpose
+# K98 Bot - Deferred Optimisation Framework
 
-This framework defines how deferred optimisations, tech debt, and refactor opportunities are captured, grouped, prioritised, and executed.
+> Canonical repo copy: `docs/reference/k98 Bot — Deferred Optimisation Framework.md`.
+
+## 1. Purpose
+
+This framework defines how deferred optimisations, tech debt, and refactor opportunities are
+captured, grouped, prioritised, and executed.
 
 It ensures:
 
-Clean separation between delivery scope and improvements
-No loss of valuable observations during refactors
-Efficient batching of related work into high-value optimisation packs
-Consistent conversion into Codex-ready tasks
-🧩 Core Principles
-Capture everything, execute selectively
-Log all observations
-Execute only grouped, validated work
-Never expand scope mid-task
-Deferred items must NOT be added to active PRs unless critical
-Optimisations are delivered in batches, not fragments
-Avoid “death by 1000 micro-PRs”
-Promote before execution
-Raw observations → grouped → validated → Codex task
-🔄 Lifecycle
-1. Capture (During Refactor)
+- clear separation between delivery scope and improvements
+- no loss of valuable observations during refactors
+- efficient batching of related work into high-value optimisation packs
+- consistent conversion into Codex-ready tasks
 
-All deferred items MUST follow this format:
+## 2. Core Principles
 
+- Capture everything, execute selectively.
+- Log observations when they are relevant and actionable.
+- Do not expand scope mid-task without user approval.
+- Deferred items must not be added to active PRs unless they are critical and approved.
+- Optimisations should be delivered in meaningful batches, not scattered fragments.
+- Raw observations become grouped, validated, Codex-ready tasks before implementation.
+
+## 3. Required Deferred Item Format
+
+All deferred items must follow this structure:
+
+```markdown
 ### Deferred Optimisation
 - Area: <module/file>
 - Type: performance | architecture | cleanup | refactor | consistency
@@ -32,139 +36,116 @@ All deferred items MUST follow this format:
 - Impact: low | medium | high
 - Risk: low | medium | high
 - Dependencies: <optional>
-2. Log Storage (Staging Layer)
+```
 
-All captured items go into:
+Do not replace this with vague notes such as "todo", "future work", or "improve later".
 
-/docs/deferred_optimisations.md
+## 4. Staging Location
 
-This acts as:
+Repo-level captured items are staged in:
 
-Temporary holding area
-Bulk review source
-Pre-GitHub staging
-3. Promotion to GitHub Issues
+`docs/reference/deferred_optimisations.md`
 
-Only promote when:
+This file is a temporary holding area and bulk review source. It may contain recently captured
+items and resolved history until Phase 2 of the reference-doc cleanup separates active backlog
+from archive/history.
 
-Item is clear and actionable
-OR part of a logical group
-Issue Types
-🔹 Micro Issue (Raw Capture)
+## 5. Lifecycle
 
-Small, isolated observation.
+### 1. Capture
 
-Labels:
+During audit, implementation, or review, capture out-of-scope issues that are:
 
-deferred
-micro
-🔹 Consolidation Issue (Batch Candidate)
+- clear enough to act on later
+- relevant to the touched area
+- not safe or appropriate to fix in the current task
 
-Grouped set of related improvements.
+### 2. Review And Group
 
-Labels:
+Group items when they share:
 
-optimisation-batch
-batch-candidate
+- the same module
+- the same subsystem
+- the same architecture concern
+- the same service/repository boundary
+- the same UI/view layer
+- the same cache or persistence pattern
 
+Do not group unrelated high-risk items just because they are nearby.
 
-relevant type labels
-🔹 Execution Task (Codex Ready)
+### 3. Score When Preparing A Batch
 
-Fully defined, ready for implementation.
+Use `K98 Bot Deferred Optimisation Scoring Model.md` when preparing a deferred optimisation
+batch or task pack. Scoring is not required for a normal implementation PR unless the task is
+specifically about prioritising deferred work.
 
-Labels:
+### 4. Promote To GitHub Issues Or Task Packs
 
-codex-task
-ready
-🏷️ Label System
-Core Labels
-deferred → captured but not actioned
-micro → small standalone item
-tech-debt
-performance
-architecture
-cleanup
-refactor
-consistency
-Pipeline Labels
-batch-candidate → suitable for grouping
-needs-design
-ready
-in-progress
-blocked
-🧠 Batching Rules
-Group items when:
-Same module (e.g. governor_registry.py)
-Same pattern (e.g. caching, repeated I/O)
-Same architectural concern
-Do NOT group when:
-Requires major redesign
-High uncertainty
-Cross-cutting unrelated systems
-🗂️ Example (From Current Task)
-Raw Deferred Items
-Item	Reason
-telemetry_cmds._resolve_kvk_no() SQL in command module	Separate domain
-Remove legacy registry views	Requires command updates
-Remove dict-style registry access	Broad scope
-mge_signup_service → registry_service	Targeted improvement
-stats_service → get_user_accounts	Pending stats refactor
-kvk_ui.py rationalisation	Broader UI scope
-Resulting Batches
-🧩 Batch 1 — Registry Architecture Cleanup
-Remove legacy dict-style access
-Standardise registry service usage
-Replace legacy views
-🧩 Batch 2 — Service Consolidation
-mge_signup_service alignment
-stats_service alignment
-🧩 Batch 3 — Command Layer SQL Separation
-Remove SQL from telemetry_cmds
-🧩 Batch 4 — UI Rationalisation
-kvk_ui.py vs AccountPickerView
-📊 GitHub Project Board
+Promote only when an item is:
 
-Use GitHub Projects with the following columns:
+- clear and actionable, or
+- part of a logical group, or
+- ready to become a Codex task pack
 
-🧠 Captured
-Raw micro issues
-🔍 Needs Review
-Items awaiting grouping
-🧩 Grouped
-Consolidation issues
-🧪 Ready for Codex
-Fully defined execution tasks
-🚀 In Progress
-Active implementation
-✅ Done
-Completed work
-🔁 Review Process
-Weekly / Phase-End Review
-Pull all deferred issues
-Group into themes
-Create consolidation issues
-Identify high-value batches
-Promote to Codex tasks
-⚙️ Execution Pattern
-Select batch
-Perform full audit (not spot fix)
-Design target state
-Build Codex task pack
-Implement
-Close all linked issues
-🚫 Anti-Patterns
-❌ One issue per tiny fix (no grouping)
-❌ Mixing deferred work into active PRs
-❌ No review cadence
-❌ Unstructured capture
-✅ Success Criteria
-Deferred items are never lost
-Optimisations are delivered in meaningful batches
-Codebase improves systematically, not randomly
-Refactors remain focused and controlled
-🚀 Future Enhancements
-Auto-generate deferred items during PR reviews
-Add /log_deferred admin command in bot
-Link deferred items to telemetry for prioritisation
-Introduce scoring model (Impact × Frequency × Risk)
+## 6. Issue Types And Labels
+
+Suggested issue types:
+
+| Issue type | Purpose | Labels |
+|------------|---------|--------|
+| Micro issue | Small isolated observation | `deferred`, `micro` |
+| Consolidation issue | Grouped batch candidate | `optimisation-batch`, `batch-candidate` |
+| Execution task | Fully scoped Codex-ready task | `codex-task`, `ready` |
+
+Useful labels:
+
+- `tech-debt`
+- `performance`
+- `architecture`
+- `cleanup`
+- `refactor`
+- `consistency`
+- `needs-design`
+- `blocked`
+
+## 7. Review Cadence
+
+At weekly or phase-end review:
+
+1. Pull active deferred items.
+2. Remove or archive resolved items.
+3. Group related items.
+4. Create consolidation issues when useful.
+5. Identify high-value batches.
+6. Promote ready batches into Codex task packs.
+
+## 8. Execution Pattern
+
+For a deferred optimisation batch:
+
+1. Select a coherent batch.
+2. Perform a full audit of the relevant subsystem.
+3. Design the target state.
+4. Build or update the Codex task pack.
+5. Implement only after approval.
+6. Close or update linked deferred items.
+
+## 9. Anti-Patterns
+
+Avoid:
+
+- one issue per tiny fix when related items should be grouped
+- mixing deferred work into active PRs without approval
+- unstructured debt notes
+- using deferred capture to avoid fixing an in-scope low-risk issue
+- treating scoring as a substitute for engineering judgement
+
+## 10. Success Criteria
+
+Deferred items are successful when:
+
+- important observations are not lost
+- active delivery scope remains controlled
+- optimisation work is batched meaningfully
+- later agents can understand and execute the item without rediscovery
+- completed items are removed from active backlog or moved to history

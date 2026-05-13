@@ -1,28 +1,23 @@
-# K98 Bot — Testing Standards
+# K98 Bot - Testing Standards
 
-> **Purpose:** Define the minimum testing expectations for AI-generated and human-authored changes in the K98 bot project.
-
----
+> Canonical repo copy: `docs/reference/K98 Bot — Testing Standards.md`.
 
 ## 1. Principles
 
-Testing in this project is not only about proving the happy path.
-
-A good test strategy should:
+Testing in this project is not only about proving the happy path. A good test strategy should:
 
 - confirm the intended behaviour
 - prevent regressions in the exact area changed
-- cover failure modes that matter operationally
+- cover operationally important failure modes
 - protect permission boundaries
 - protect restart/persistence behaviour where state is involved
 
-Tests should be proportionate to change size, but every meaningful production change requires a deliberate test decision.
+Tests should be proportionate to change size, but every meaningful production change requires a
+deliberate test decision.
 
----
+## 2. Minimum Expectations By Change Type
 
-## 2. Minimum Test Expectations by Change Type
-
-### 2.1 Bug fix
+### Bug Fix
 
 Expected:
 
@@ -30,7 +25,7 @@ Expected:
 - one happy path test showing the corrected behaviour
 - one negative-path test if validation or failure handling is involved
 
-### 2.2 New service logic
+### New Service Logic
 
 Expected:
 
@@ -39,7 +34,7 @@ Expected:
 - edge case coverage
 - repository interaction behaviour where relevant
 
-### 2.3 New or changed command
+### New Or Changed Command
 
 Expected:
 
@@ -48,7 +43,7 @@ Expected:
 - service handoff or command output behaviour
 - at least one negative path
 
-### 2.4 New or changed view/modal flow
+### New Or Changed View/Modal Flow
 
 Expected:
 
@@ -57,7 +52,7 @@ Expected:
 - negative-path or rejection behaviour
 - rehydration or persistence coverage if the view is persistent
 
-### 2.5 Scheduler, reminders, or restart-sensitive state
+### Scheduler, Reminders, Or Restart-Sensitive State
 
 Expected:
 
@@ -66,7 +61,7 @@ Expected:
 - cancellation or recovery behaviour where applicable
 - negative path for missing or stale persisted state
 
-### 2.6 SQL-backed cache or JSON cache refresh logic
+### SQL-Backed Cache Or JSON Cache Refresh Logic
 
 Expected:
 
@@ -75,32 +70,29 @@ Expected:
 - atomic write / replace behaviour where applicable
 - stale cache fallback or protection path where applicable
 
----
-
 ## 3. Required Test Categories
 
 For most non-trivial changes, consider these categories explicitly:
 
-- **happy path**
-- **negative path**
-- **regression**
-- **permission boundary**
-- **restart/persistence**
-- **cache safety**
-- **format/output shape**
-- **logging-critical behaviour** when a bug depended on observability
+- happy path
+- negative path
+- regression
+- permission boundary
+- restart/persistence
+- cache safety
+- format/output shape
+- logging-critical behaviour when a bug depended on observability
 
-Not every category applies every time, but each should be considered and either covered or explicitly ruled out.
-
----
+Not every category applies every time, but each should be considered and either covered or
+explicitly ruled out.
 
 ## 4. Test Placement
 
-- place tests in `tests/`
-- use `test_<module_or_feature>.py`
-- keep tests close to the subsystem naming where practical
-- extend existing subsystem test files when it improves discoverability
-- create a new test file when the feature is distinct enough to justify it
+- Place tests in `tests/`.
+- Use `test_<module_or_feature>.py`.
+- Keep tests close to subsystem naming where practical.
+- Extend existing subsystem test files when that improves discoverability.
+- Create a new test file when the feature is distinct enough to justify it.
 
 Examples:
 
@@ -108,11 +100,9 @@ Examples:
 - `tests/test_mge_awards_service.py`
 - `tests/test_command_usage_cmds.py`
 
----
-
 ## 5. What Must Be Updated When Refactoring
 
-If a refactor changes:
+If a refactor changes any of these, existing tests must be reviewed and updated:
 
 - file boundaries
 - service ownership
@@ -121,62 +111,57 @@ If a refactor changes:
 - persistence contracts
 - output formatting that tests assert against
 
-then existing tests must be reviewed and updated, not simply left to fail or bypassed.
+Refactor work is incomplete if tests still describe the previous architecture.
 
-Refactor work is incomplete if the tests still describe the previous architecture.
+## 6. Testing Rules For AI-Generated Changes
 
----
-
-## 6. Testing Rules for AI-Generated Changes
-
-When an AI coding agent produces code, it must also produce or update tests unless one of these is true:
+When an AI coding agent produces code, it must also produce or update tests unless one of these is
+true:
 
 - the change is documentation-only
 - the change is purely comment-only
-- the environment makes the specific automated test impossible and that limitation is stated explicitly
+- the environment makes the specific automated test impossible and that limitation is stated
+  explicitly
 
-“Too small to test” should be rare.
-
----
+"Too small to test" should be rare.
 
 ## 7. Suggested Test Matrix
 
-Use this as a default checklist.
-
 | Change type | Happy path | Negative path | Regression | Permission | Restart/Persistence |
-|------------|------------|---------------|-----------|------------|---------------------|
+|------------|------------|---------------|------------|------------|---------------------|
 | Bug fix | Yes | Usually | Yes | If relevant | If relevant |
 | Service change | Yes | Yes | Usually | If relevant | If relevant |
 | Command change | Yes | Yes | Usually | Yes if relevant | Sometimes |
 | View change | Yes | Yes | Usually | Sometimes | Yes if persistent |
 | Scheduler/reminder | Yes | Yes | Yes | Sometimes | Yes |
 | Cache refresh | Yes | Yes | Usually | No | Often |
-
----
+| Documentation-only | No runtime test required | No runtime test required | No runtime test required | No | No |
 
 ## 8. Quality Gates
 
 Run or recommend these from repo root:
 
-```bash
-python -m black --check .
-python -m ruff check .
-python -m pyright
-python -m pytest -q
+```powershell
+python scripts/validate_architecture_boundaries.py
+python scripts/validate_deferred_items.py
+python scripts/select_tests.py
+python -m pytest -q tests
 python scripts/smoke_imports.py
 python scripts/validate_command_registration.py
 ```
 
 For targeted work, also run the most relevant focused test commands where practical, for example:
 
-```bash
+```powershell
 python -m pytest tests/test_registry_service.py -q
 python -m pytest tests/test_command_usage_cmds.py -q
 ```
 
----
+For documentation-only changes, the architecture/deferred/test-selector scripts are usually the
+minimum useful gate. Runtime pytest may be skipped when no code or test files changed, but the skip
+must be stated.
 
-## 9. Assertions to Prefer
+## 9. Assertions To Prefer
 
 Prefer tests that assert:
 
@@ -188,22 +173,19 @@ Prefer tests that assert:
 - user-visible outcomes
 - protection against invalid or empty data
 
-Avoid over-coupling tests to incidental implementation details unless the architecture contract itself is what matters.
+Avoid over-coupling tests to incidental implementation details unless the architecture contract
+itself is what matters.
 
----
-
-## 10. Common Gaps to Avoid
+## 10. Common Gaps To Avoid
 
 Do not ship changes with only:
 
-- smoke import coverage
+- smoke import coverage for behavioural changes
 - manual testing claims
 - happy path tests only
 - no regression test for a known bug
 - no test update after moving logic between layers
 - no restart-safe test for persistent workflows
-
----
 
 ## 11. Delivery Expectations
 
@@ -215,9 +197,7 @@ When presenting a task pack or implementation, include a short test plan listing
 - any manual verification still required
 - any area not automatically testable and why
 
----
-
-## 12. Definition of Test-Ready
+## 12. Definition Of Test-Ready
 
 A change is test-ready when:
 
@@ -227,3 +207,4 @@ A change is test-ready when:
 - [ ] permission or restart concerns are covered when relevant
 - [ ] existing related tests were reviewed
 - [ ] focused and general validation commands are identified
+- [ ] documentation-only skips are explicitly justified
