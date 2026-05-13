@@ -42,7 +42,7 @@ SQL repo evidence with the promotion notes.
 ```powershell
 cd C:\discord_file_downloader
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 .\dev.ps1
 
 git fetch origin
@@ -52,15 +52,18 @@ git status
 git log --oneline origin/main..HEAD
 git diff --name-status origin/main...HEAD
 git diff --stat origin/main...HEAD
-```
 
-If SQL changes are involved:
-
-```powershell
 cd C:\K98-bot-SQL-Server
 git pull
 git status
 git log --oneline -5
+```
+
+or if required as there are SQL differences use:
+```powershell
+cd C:\K98-bot-SQL-Server
+git restore .
+git pull
 ```
 
 ### 2. Run Local Validation
@@ -71,14 +74,22 @@ any skipped validation with a reason before promotion.
 Use targeted validation for small changes and full validation before production promotion:
 
 ```powershell
+cd C:\discord_file_downloader
 python scripts/validate_architecture_boundaries.py
 python scripts/validate_deferred_items.py
 python scripts/select_tests.py
 python scripts/smoke_imports.py
 python scripts/validate_command_registration.py
-python -m pytest -q tests
+.\.venv\Scripts\python.exe -m pre_commit run -a
+.\.venv\Scripts\python.exe -m pytest -q tests
 git diff --check
 git status
+```
+
+if pre-commit triggers files reformat or changes:
+```powershell
+git commit -a
+git push
 ```
 
 ### 3. Confirm Remotes
@@ -108,6 +119,9 @@ validation evidence, SQL/config sequencing, bot-machine readiness, and rollback 
 promote if it reports blocking issues.
 
 ```powershell
+cd C:\discord_file_downloader
+git config core.quotePath false
+
 .\scripts\promote-to-production.ps1 `
   -SourceBranch codex/<branch-name> `
   -ProductionBranch prod/<branch-name>
@@ -136,13 +150,79 @@ Open:
 K98-bot: prod/<branch-name> -> main
 ```
 
-### 6. Merge And Deploy
+### 6. Test on local BOT Machine before merge
+
+```powershell
+cd C:\discord_file_downloader
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\venv\Scripts\Activate.ps1
+.\dev.ps1
+git merge --quit
+git switch main
+git fetch
+git switch prod/<branch-name>
+git pull
+```
+
+GitHub should allow a normal comparison because the branch is based on `K98-bot/main`.
+
+# If needed to push again 
+
+1. 
+```powershell
+git switch main
+git branch -D prod/<branch-name>
+```
+
+2. 
+```powershell
+cd C:\discord_file_downloader
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+.\dev.ps1
+
+git fetch origin
+git switch codex/<branch-name>
+git pull origin codex/<branch-name>
+
+.\scripts\promote-to-production.ps1 `
+  -SourceBranch codex/<branch-name> `
+  -ProductionBranch prod/<branch-name>
+```
+
+3. (on the bot machine)
+```powershell
+cd C:\discord_file_downloader
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\venv\Scripts\Activate.ps1
+.\dev.ps1
+
+git merge --abort 2>$null
+git fetch origin
+git switch prod/<branch-name>
+git reset --hard origin/prod/<branch-name>
+git clean -fd
+git status
+git log --oneline -5
+```
+
+
+
+
+### 7. Merge And Deploy
 
 Before bot-machine deployment, rerun or refresh `k98-promotion-check` when the change includes SQL,
 config, dependency, startup, scheduler, persistence, rehydration, or cache implications.
 
 1. Merge the mirror PR into `K98-bot-mirror/main`.
-2. Merge the production PR into `K98-bot/main`.
+Then update local mirror main:
+```powershell
+git switch main
+git pull origin main
+git status
+```
+
+2. Merge the production PR into `K98-bot/main`. 
 3. Deploy only from `K98-bot/main` on the bot machine.
 
 Deployment machine:
@@ -162,6 +242,44 @@ pytest -q tests
 
 If validation changes files on the production branch, commit and push those intended changes before
 deploying.
+
+```powershell
+git commit -a
+git push
+```
+
+### 8. Post-Production Sync & Alignment (NEW)
+
+```powershell
+cd C:\discord_file_downloader
+git fetch origin
+git fetch production
+git switch main
+git reset --hard origin/main
+git clean -fd
+
+cd C:\K98-bot-SQL-Server
+git pull
+```
+
+
+### 9. Cleanup
+
+```powershell
+cd C:\discord_file_downloader
+git switch main
+git pull origin main
+git branch --delete codex/<branch-name>
+git branch --delete prod/<branch-name>
+git fetch origin --prune
+git fetch production --prune
+
+cd C:\K98-bot-SQL-Server
+git switch main
+git pull
+git status
+git fetch origin --prune
+```
 
 ## Troubleshooting
 
