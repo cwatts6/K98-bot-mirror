@@ -1,6 +1,39 @@
 
 # Codex Task Pack — Stats Commands Full Optimisation & Standardisation
 
+## Delivery Status
+
+Status: Complete
+
+Delivered by: `cwatts6/K98-bot-mirror` PR #78
+
+Production outcome:
+
+* Stats command cleanup was merged, promoted to production, and confirmed working.
+* Automated validation completed successfully before promotion.
+* Manual Discord command smoke testing completed successfully after deployment.
+* The SQL repo now receives user-defined table type definitions from the production DB export process, so the temporary `dbo.IntList` companion PR was retired.
+
+Resolved GitHub issues:
+
+* #27 dict-style registry access, stats-related scope
+* #28 legacy registry views, stats-touched scope
+* #29 stats-service registry alignment
+* #31 governor registry architecture refactor, stats-related scope
+* #32 service layer consolidation, stats-related scope
+* #42 remaining KVK admin SQL/service extraction, stats command batch scope
+* #46 extract `/my_stats_export` SQL into service/DAL
+
+Delivery summary:
+
+* `/my_stats_export` direct SQL was extracted into a DAL/service boundary.
+* Stats account resolution was centralised behind a shared account service using the registry-service boundary.
+* Stats command handlers were reduced to Discord interaction plumbing, service calls, and response presentation.
+* Stats-focused regression tests were added or updated.
+* Deferred optimisation tracking was updated with the completed stats batch.
+
+---
+
 ## Goal
 
 Perform a full standards-alignment, optimisation, architecture review, and cleanup pass over `commands/stats_cmds.py` and all directly associated stats command files.
