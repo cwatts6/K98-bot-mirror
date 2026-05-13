@@ -19,12 +19,12 @@ Before changing code, review:
 
 * `AGENTS.md`
 * `README-DEV.md`
-* `docs/K98 Bot — Coding Execution Guidelines.md`
-* `docs/K98 Bot — Project Engineering Standards.md`
-* `docs/K98 Bot — Testing Standards.md`
-* `docs/k98 Bot — Deferred Optimisation Framework.md`
+* `docs/K98 Bot - Coding Execution Guidelines.md`
+* `docs/K98 Bot - Project Engineering Standards.md`
+* `docs/K98 Bot - Testing Standards.md`
+* `docs/k98 Bot - Deferred Optimisation Framework.md`
 * `docs/deferred_optimisations.md`
-* `docs/Codex Task Pack — MGE Process Audit + Polish.md`
+* `docs/Codex Task Pack - MGE Process Audit + Polish.md`
 * Recent MGE PRs, especially PR #74 and the earlier PRs #71 and #72
 * GitHub issues #29 and #32
 

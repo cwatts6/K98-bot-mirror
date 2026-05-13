@@ -1,11 +1,11 @@
 # K98 Bot - Coding Execution Guidelines
 
-> Version 2.1. Canonical repo copy: `docs/reference/K98 Bot — Coding Execution Guidelines.md`.
+> Version 2.1. Canonical repo copy: `docs/reference/K98 Bot - Coding Execution Guidelines.md`.
 
 ## 1. Purpose
 
 This document tells AI coding agents how to execute work safely and consistently in the K98 bot
-ecosystem. It governs agent behaviour. `K98 Bot — Project Engineering Standards.md` governs
+ecosystem. It governs agent behaviour. `K98 Bot - Project Engineering Standards.md` governs
 system architecture.
 
 It covers:
@@ -25,11 +25,11 @@ Before implementation, read in this order:
 1. Feature specification, issue, user request, or task pack.
 2. `README-DEV.md`.
 3. `docs/reference/README.md`.
-4. `docs/reference/K98 Bot — Project Engineering Standards.md`.
-5. `docs/reference/K98 Bot — Coding Execution Guidelines.md`.
-6. `docs/reference/K98 Bot — Testing Standards.md`.
-7. `docs/reference/K98 Bot — Skills & Refactor Triggers.md`.
-8. `docs/reference/k98 Bot — Deferred Optimisation Framework.md`.
+4. `docs/reference/K98 Bot - Project Engineering Standards.md`.
+5. `docs/reference/K98 Bot - Coding Execution Guidelines.md`.
+6. `docs/reference/K98 Bot - Testing Standards.md`.
+7. `docs/reference/K98 Bot - Skills & Refactor Triggers.md`.
+8. `docs/reference/k98 Bot - Deferred Optimisation Framework.md`.
 9. Conditional references from `docs/reference/README.md` when relevant.
 
 Do not read every reference document by default. Use the reference index to choose domain,
@@ -302,7 +302,7 @@ Additional rules:
 - If no tests are added, explicitly justify why.
 - Do not rely solely on smoke imports for behavioural coverage.
 
-See `K98 Bot — Testing Standards.md` for the fuller matrix.
+See `K98 Bot - Testing Standards.md` for the fuller matrix.
 
 ## 15. Output Format For Delivered Work
 

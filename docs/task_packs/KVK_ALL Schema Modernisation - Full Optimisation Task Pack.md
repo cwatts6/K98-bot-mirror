@@ -136,12 +136,12 @@ Required Reading
 Before starting any phase, read:
 
 README-DEV.md
-docs/K98 Bot — Standard Development Initiation Statement.md
-docs/K98 Bot — Project Engineering Standards.md
-docs/K98 Bot — Coding Execution Guidelines.md
-docs/K98 Bot — Testing Standards.md
-docs/K98 Bot — Skills & Refactor Triggers.md
-docs/k98 Bot — Deferred Optimisation Framework.md
+docs/templates/K98 Bot Standard Development Initiation Statement.md
+docs/K98 Bot - Project Engineering Standards.md
+docs/K98 Bot - Coding Execution Guidelines.md
+docs/K98 Bot - Testing Standards.md
+docs/K98 Bot - Skills & Refactor Triggers.md
+docs/k98 Bot - Deferred Optimisation Framework.md
 docs/K98 Bot Deferred Optimisation Scoring Model.md
 This task pack
 The uploaded workbook sample:
@@ -521,7 +521,7 @@ Implemented:
 sql/kvk_all_phase2_full_data_capacity.sql
 kvk_all_importer.py
 tests/test_kvk_all_schema.py
-docs/KVK_ALL Schema Modernisation — Phase 2 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 2 Initiation Statement.md
 
 SQL deployment delivered:
 
@@ -705,7 +705,7 @@ tests/test_kvk_export_service.py
 tests/test_gsheet_module.py
 tests/test_kvk_all_recompute_sql_contract.py
 sql/kvk_all_phase5_export_contract_decoupling.sql
-docs/KVK_ALL Schema Modernisation — Phase 5 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 5 Initiation Statement.md
 
 SQL delivery:
 
@@ -785,7 +785,7 @@ kvk/dal/kvk_reporting_dal.py
 kvk/services/kvk_reporting_service.py
 tests/test_kvk_reporting_service.py
 tests/test_kvk_embed.py
-docs/KVK_ALL Schema Modernisation — Phase 6 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 6 Initiation Statement.md
 
 Python delivery:
 
@@ -853,7 +853,7 @@ kvk/dal/kvk_admin_dal.py
 kvk/services/kvk_admin_service.py
 tests/test_kvk_admin_service.py
 tests/test_stats_cmds.py
-docs/KVK_ALL Schema Modernisation — Phase 7 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 7 Initiation Statement.md
 
 Python delivery:
 
@@ -922,7 +922,7 @@ kvk_all_importer.py
 tests/test_kvk_all_import_dal.py
 tests/test_kvk_all_importer.py
 tests/test_kvk_all_recompute_sql_contract.py
-docs/KVK_ALL Schema Modernisation — Phase 8 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 8 Initiation Statement.md
 
 SQL delivery:
 
@@ -1052,7 +1052,7 @@ scripts/benchmark_kvk_all_phase9.py
 tests/test_kvk_all_import_service.py
 tests/test_kvk_all_import_dal.py
 tests/test_kvk_all_importer.py
-docs/KVK_ALL Schema Modernisation — Phase 9 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 9 Initiation Statement.md
 
 Python delivery:
 
@@ -1181,7 +1181,7 @@ sql/kvk_all_phase10_recompute_correctness.sql
 scripts/diagnose_kvk_all_phase10.py
 tests/test_kvk_all_recompute_sql_contract.py
 docs/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md
-docs/KVK_ALL Schema Modernisation — Phase 10 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 10 Initiation Statement.md
 
 SQL delivery:
 
@@ -1239,6 +1239,7 @@ Source Deferred Items
 - Suggested Fix: Keep storing max_contribute_gain internally, but remove it from player/kingdom/camp export and Sheets outputs.
 - Impact: medium
 - Risk: low
+- Dependencies: none
 
 ### Deferred Optimisation
 - Area: KVK exports / Google Sheets output

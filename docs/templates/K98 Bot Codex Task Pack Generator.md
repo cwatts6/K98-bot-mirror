@@ -67,11 +67,11 @@ Required Reading
 Read and follow:
 
 Feature / optimisation batch overview
-K98 Bot — Project Engineering Standards.md
-K98 Bot — Coding Execution Guidelines.md
-K98 Bot — Testing Standards.md
-K98 Bot — Skills & Refactor Triggers.md
-K98 Bot — Deferred Optimisation Framework.md
+K98 Bot - Project Engineering Standards.md
+K98 Bot - Coding Execution Guidelines.md
+K98 Bot - Testing Standards.md
+K98 Bot - Skills & Refactor Triggers.md
+k98 Bot - Deferred Optimisation Framework.md
 K98 Code Prompt v3.md
 Objective
 <Batch goal>

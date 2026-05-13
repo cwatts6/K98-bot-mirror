@@ -4,7 +4,7 @@ We are starting Phase 11 of the KVK_ALL Schema Modernisation programme.
 
 Important local documentation note:
 
-The Phase 10 completion update to docs/KVK_ALL Schema Modernisation — Full Optimisation Task Pack.md and this Phase 11 initiation statement were created locally after Phase 10 was completed and smoke-tested.
+The Phase 10 completion update to docs/KVK_ALL Schema Modernisation - Full Optimisation Task Pack.md and this Phase 11 initiation statement were created locally after Phase 10 was completed and smoke-tested.
 
 Do not amend the Phase 10 PR for these documentation updates.
 
@@ -13,26 +13,26 @@ These local documentation changes must be included in the next PR opened for Pha
 Before implementation, read all required repository documents and the full task pack:
 
 README-DEV.md
-docs/K98 Bot — Standard Development Initiation Statement.md
-docs/K98 Bot — Project Engineering Standards.md
-docs/K98 Bot — Coding Execution Guidelines.md
-docs/K98 Bot — Testing Standards.md
-docs/K98 Bot — Skills & Refactor Triggers.md
-docs/k98 Bot — Deferred Optimisation Framework.md
+docs/templates/K98 Bot Standard Development Initiation Statement.md
+docs/K98 Bot - Project Engineering Standards.md
+docs/K98 Bot - Coding Execution Guidelines.md
+docs/K98 Bot - Testing Standards.md
+docs/K98 Bot - Skills & Refactor Triggers.md
+docs/k98 Bot - Deferred Optimisation Framework.md
 docs/K98 Bot Deferred Optimisation Scoring Model.md
 docs/K98 Bot Codex Task Pack Generator.md
-docs/KVK_ALL Schema Modernisation — Full Optimisation Task Pack.md
-docs/KVK_ALL Schema Modernisation — Audit & Migration Planning Task Pack.md
-docs/KVK_ALL Schema Modernisation — Phase 2 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 3 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 4 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Full Optimisation Task Pack.md
+docs/KVK_ALL Schema Modernisation - Audit & Migration Planning Task Pack.md
+docs/KVK_ALL Schema Modernisation - Phase 2 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 3 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 4 Initiation Statement.md
 docs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md
-docs/KVK_ALL Schema Modernisation — Phase 5 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 6 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 7 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 8 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 9 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 10 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 5 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 6 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 7 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 8 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 9 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 10 Initiation Statement.md
 docs/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md
 
 Authoritative SQL repository:

@@ -146,7 +146,7 @@ No further core implementation work is expected for Task 3.
 
 ---
 
-## 8) Key risk notes for future work
+## 8) Key risk notes for follow-up work
 
 ### A) Do not reintroduce JSON runtime ownership
 JSON remains fallback-only in Ark registration state paths.

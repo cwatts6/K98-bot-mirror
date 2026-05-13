@@ -1,6 +1,6 @@
 # K98 Bot - Deferred Optimisation Framework
 
-> Canonical repo copy: `docs/reference/k98 Bot — Deferred Optimisation Framework.md`.
+> Canonical repo copy: `docs/reference/k98 Bot - Deferred Optimisation Framework.md`.
 
 ## 1. Purpose
 
@@ -38,7 +38,7 @@ All deferred items must follow this structure:
 - Dependencies: <optional>
 ```
 
-Do not replace this with vague notes such as "todo", "future work", or "improve later".
+Do not replace this with unstructured placeholders or generic backlog text.
 
 ## 4. Staging Location
 

@@ -17,12 +17,12 @@ The new workbook provides separate Stage I, Stage II, Stage III, and Total PreKv
 
 Read these before making changes:
 
-1. `K98 Bot — Standard Development Initiation Statement.md`
-2. `K98 Bot — Project Engineering Standards.md`
-3. `K98 Bot — Coding Execution Guidelines.md`
-4. `K98 Bot — Testing Standards.md`
-5. `K98 Bot — Skills & Refactor Triggers.md`
-6. `K98 Bot — Deferred Optimisation Framework.md`
+1. `K98 Bot Standard Development Initiation Statement.md`
+2. `K98 Bot - Project Engineering Standards.md`
+3. `K98 Bot - Coding Execution Guidelines.md`
+4. `K98 Bot - Testing Standards.md`
+5. `K98 Bot - Skills & Refactor Triggers.md`
+6. `k98 Bot - Deferred Optimisation Framework.md`
 7. Current implementation files:
    - `prekvk_importer.py`
    - `stats_alerts/prekvk_stats.py`

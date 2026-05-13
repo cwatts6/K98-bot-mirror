@@ -1,6 +1,6 @@
 # K98 Bot - Project Engineering Standards
 
-> Living document. Canonical repo copy: `docs/reference/K98 Bot — Project Engineering Standards.md`.
+> Living document. Canonical repo copy: `docs/reference/K98 Bot - Project Engineering Standards.md`.
 
 ## 1. Purpose
 
@@ -15,10 +15,10 @@ This is the architecture and engineering contract for the K98 bot ecosystem. It 
 Use this document with:
 
 1. the task or feature specification
-2. `K98 Bot — Coding Execution Guidelines.md`
-3. `K98 Bot — Testing Standards.md`
-4. `K98 Bot — Skills & Refactor Triggers.md`
-5. `k98 Bot — Deferred Optimisation Framework.md`
+2. `K98 Bot - Coding Execution Guidelines.md`
+3. `K98 Bot - Testing Standards.md`
+4. `K98 Bot - Skills & Refactor Triggers.md`
+5. `k98 Bot - Deferred Optimisation Framework.md`
 
 When documents conflict, follow the priority chain in the execution guidelines.
 
@@ -253,7 +253,7 @@ Every production change requires a testing decision. Minimum expectation for cha
 - permission boundary test when applicable
 - restart/persistence test when applicable
 
-See `K98 Bot — Testing Standards.md` for the full policy.
+See `K98 Bot - Testing Standards.md` for the full policy.
 
 ## 11. Known Filename And Schema Quirks
 

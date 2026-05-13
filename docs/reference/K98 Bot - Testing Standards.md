@@ -1,6 +1,6 @@
 # K98 Bot - Testing Standards
 
-> Canonical repo copy: `docs/reference/K98 Bot — Testing Standards.md`.
+> Canonical repo copy: `docs/reference/K98 Bot - Testing Standards.md`.
 
 ## 1. Principles
 

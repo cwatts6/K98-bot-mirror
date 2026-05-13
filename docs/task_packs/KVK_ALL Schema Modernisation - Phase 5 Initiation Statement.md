@@ -5,19 +5,19 @@ We are starting Phase 5 of the KVK_ALL Schema Modernisation programme.
 Before implementation, read all required repository documents and the full task pack:
 
 README-DEV.md
-docs/K98 Bot — Standard Development Initiation Statement.md
-docs/K98 Bot — Project Engineering Standards.md
-docs/K98 Bot — Coding Execution Guidelines.md
-docs/K98 Bot — Testing Standards.md
-docs/K98 Bot — Skills & Refactor Triggers.md
-docs/k98 Bot — Deferred Optimisation Framework.md
+docs/templates/K98 Bot Standard Development Initiation Statement.md
+docs/K98 Bot - Project Engineering Standards.md
+docs/K98 Bot - Coding Execution Guidelines.md
+docs/K98 Bot - Testing Standards.md
+docs/K98 Bot - Skills & Refactor Triggers.md
+docs/k98 Bot - Deferred Optimisation Framework.md
 docs/K98 Bot Deferred Optimisation Scoring Model.md
 docs/K98 Bot Codex Task Pack Generator.md
-docs/KVK_ALL Schema Modernisation — Full Optimisation Task Pack.md
-docs/KVK_ALL Schema Modernisation — Audit & Migration Planning Task Pack.md
-docs/KVK_ALL Schema Modernisation — Phase 2 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 3 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 4 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Full Optimisation Task Pack.md
+docs/KVK_ALL Schema Modernisation - Audit & Migration Planning Task Pack.md
+docs/KVK_ALL Schema Modernisation - Phase 2 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 3 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 4 Initiation Statement.md
 docs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md
 
 Also read the uploaded workbook sample:

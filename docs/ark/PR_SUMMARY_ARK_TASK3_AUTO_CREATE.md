@@ -102,7 +102,7 @@ This means:
 - `sql_schema/dbo.ArkMatches.Alter.CalendarLineage.sql`
 - `tests/test_ark_auto_create_service.py`
 - `docs/ark/PR_SUMMARY_ARK_TASK3_AUTO_CREATE.md`
-- `docs/ark/TASK PACK — Ark Auto-Creation from Calendar handover notes.md`
+- `docs/ark/TASK PACK - Ark Auto-Creation from Calendar handover notes.md`
 
 ### Modified
 - `ark/dal/ark_dal.py`

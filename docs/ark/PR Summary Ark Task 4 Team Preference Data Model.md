@@ -103,7 +103,7 @@ Added focused tests covering:
 - `tests/test_ark_preference_service.py`
 - `tests/test_ark_preference_commands.py`
 - `docs/ark/PR_SUMMARY_ARK_TASK4_TEAM_PREFERENCES.md`
-- `docs/ark/TASK PACK — Ark Team Preference Data Model handover notes.md`
+- `docs/ark/TASK PACK - Ark Team Preference Data Model handover notes.md`
 
 ### Modified
 - `ark/dal/ark_dal.py`

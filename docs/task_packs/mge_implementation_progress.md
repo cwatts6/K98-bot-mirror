@@ -11,7 +11,7 @@
 When starting a new chat session for MGE tasks, provide these files in order:
 
 1. `MGE Sign-Up Tool.md` — full task pack (feature spec)
-2. `K98 Bot — Project Engineering Standards.md` — architecture rules
+2. `K98 Bot - Project Engineering Standards.md` — architecture rules
 3. `coding execution guidelines.md` — agent workflow rules
 4. `docs/mge_implementation_progress.md` — **this file** (confirmed state)
 5. `docs/mge_reference_model.md` — data model reference

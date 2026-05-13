@@ -17,10 +17,10 @@ Read in this order:
 
 README-DEV.md
 AGENTS.md
-K98 Bot — Project Engineering Standards.md
-K98 Bot — Coding Execution Guidelines.md
-K98 Bot — Testing Standards.md
-K98 Bot — Deferred Optimisation Framework.md
+K98 Bot - Project Engineering Standards.md
+K98 Bot - Coding Execution Guidelines.md
+K98 Bot - Testing Standards.md
+k98 Bot - Deferred Optimisation Framework.md
 ⚠️ Critical Rules
 DO NOT expand scope
 DO NOT refactor unrelated systems
@@ -37,7 +37,7 @@ scripts/validate_architecture_boundaries.py
 scripts/validate_deferred_items.py
 scripts/select_tests.py
 
-docs/K98 Bot — Standard Development Initiation Statement.md
+docs/templates/K98 Bot Standard Development Initiation Statement.md
 AGENTS.md
 README-DEV.md
 

@@ -30,12 +30,12 @@ DL_bot.py
 allkingdoms.py
 gsheet_module.py
 Engineering standards:
-K98 Bot — Standard Development Initiation Statement.md
-K98 Bot — Project Engineering Standards.md
-K98 Bot — Coding Execution Guidelines.md
-K98 Bot — Testing Standards.md
-K98 Bot — Skills & Refactor Triggers.md
-K98 Bot — Deferred Optimisation Framework.md
+K98 Bot Standard Development Initiation Statement.md
+K98 Bot - Project Engineering Standards.md
+K98 Bot - Coding Execution Guidelines.md
+K98 Bot - Testing Standards.md
+K98 Bot - Skills & Refactor Triggers.md
+k98 Bot - Deferred Optimisation Framework.md
 SQL repository:
 cwatts6/K98-bot-SQL-Server
 Critical Scope Rules

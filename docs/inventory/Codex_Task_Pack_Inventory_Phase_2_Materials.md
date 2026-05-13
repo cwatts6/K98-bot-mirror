@@ -139,12 +139,12 @@ Before implementation, read:
 - `README-DEV.md`
 - `docs/Promotion Guide.md`
 - `docs/inventory_image_import_setup.md`
-- `docs/Codex Task Pack — Inventory Image Import Module.md`
-- `docs/K98 Bot — Project Engineering Standards.md`
-- `docs/K98 Bot — Coding Execution Guidelines.md`
-- `docs/K98 Bot — Testing Standards.md`
-- `docs/K98 Bot — Skills & Refactor Triggers.md`
-- `docs/K98 Bot — Deferred Optimisation Framework.md`
+- `docs/Codex Task Pack - Inventory Image Import Module.md`
+- `docs/K98 Bot - Project Engineering Standards.md`
+- `docs/K98 Bot - Coding Execution Guidelines.md`
+- `docs/K98 Bot - Testing Standards.md`
+- `docs/K98 Bot - Skills & Refactor Triggers.md`
+- `docs/k98 Bot - Deferred Optimisation Framework.md`
 - `commands/inventory_cmds.py`
 - `inventory/models.py`
 - `inventory/parsing.py`
@@ -695,5 +695,5 @@ Codex must return:
 ## Suggested Opening Prompt for Codex
 
 ```text
-Start Phase 2 review/scope for the Inventory Image Import Module: Materials Import. Phase 0 and Phase 1A–1F are complete. Use the updated task pack at docs/Codex Task Pack — Inventory Image Import Module.md and the Phase 2 Materials task pack. Scope is Materials only: up to 4 screenshots per governor/day, choice chests, individual materials, raw SQL storage, legendary-equivalent calculations, typed correction flow, /myinventory Materials output, export, and audit. Keep AP, /my_stats integration, export button under images, import-again button, and broad Resources/Speedups redesign out of scope. Begin with audit/scope only and STOP for architecture validation before coding.
+Start Phase 2 review/scope for the Inventory Image Import Module: Materials Import. Phase 0 and Phase 1A–1F are complete. Use the updated task pack at docs/Codex Task Pack - Inventory Image Import Module.md and the Phase 2 Materials task pack. Scope is Materials only: up to 4 screenshots per governor/day, choice chests, individual materials, raw SQL storage, legendary-equivalent calculations, typed correction flow, /myinventory Materials output, export, and audit. Keep AP, /my_stats integration, export button under images, import-again button, and broad Resources/Speedups redesign out of scope. Begin with audit/scope only and STOP for architecture validation before coding.
 ```

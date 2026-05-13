@@ -8,11 +8,11 @@ It enforces architecture, scope control, and deferred optimisation handling.
 Read in this order before making changes:
 
 Feature specification / task overview
-K98 Bot — Project Engineering Standards.md
-K98 Bot — Coding Execution Guidelines.md
-K98 Bot — Testing Standards.md
-K98 Bot — Skills & Refactor Triggers.md
-K98 Bot — Deferred Optimisation Framework.md
+K98 Bot - Project Engineering Standards.md
+K98 Bot - Coding Execution Guidelines.md
+K98 Bot - Testing Standards.md
+K98 Bot - Skills & Refactor Triggers.md
+k98 Bot - Deferred Optimisation Framework.md
 ⚠️ Critical Rules (NON-NEGOTIABLE)
 Scope Control
 Do NOT expand scope beyond the requested task
@@ -66,7 +66,7 @@ For ALL out-of-scope issues:
 - Dependencies: <optional>
 Rules:
 No unstructured notes
-No vague “improve later” statements
+No vague improvement statements
 Group related items where possible
 Items must be suitable for future batching
 Step 3 — Architecture Validation (STOP AFTER)

@@ -59,7 +59,7 @@ The following items were explicitly deferred because they are broader architectu
   * Phase 1 reused that existing boundary to avoid broad refactoring of publish, republish, reminders, award DMs, unpublish, and board refresh in the same PR.
   * Captured as a structured deferred optimisation in `docs/deferred_optimisations.md`.
 
-Phase 2 initiation is captured in `docs/MGE Process Polish — Phase 2 Initiation Statement.md`.
+Phase 2 initiation is captured in `docs/MGE Process Polish - Phase 2 Initiation Statement.md`.
 
 ### Phase 1 Validation
 
@@ -101,7 +101,7 @@ Before changing code, review:
 
 * `AGENTS.md`
 * `docs/codex_execution_guidelines.md`
-* `docs/K98 Bot — Project Engineering Standards.md`
+* `docs/K98 Bot - Project Engineering Standards.md`
 * `docs/deferred_optimisations.md`
 * MGE modules under:
 

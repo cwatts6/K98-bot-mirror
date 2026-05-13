@@ -9,12 +9,12 @@
 Read and follow the current versions of:
 
 - `README-DEV.md`
-- `docs/K98 Bot — Project Engineering Standards.md`
-- `docs/K98 Bot — Coding Execution Guidelines.md`
-- `docs/K98 Bot — Standard Development Initiation Statement.md`
-- `docs/K98 Bot — Testing Standards.md`
-- `docs/K98 Bot — Skills & Refactor Triggers.md`
-- `docs/k98 Bot — Deferred Optimisation Framework.md`
+- `docs/K98 Bot - Project Engineering Standards.md`
+- `docs/K98 Bot - Coding Execution Guidelines.md`
+- `docs/templates/K98 Bot Standard Development Initiation Statement.md`
+- `docs/K98 Bot - Testing Standards.md`
+- `docs/K98 Bot - Skills & Refactor Triggers.md`
+- `docs/k98 Bot - Deferred Optimisation Framework.md`
 - `docs/K98 Bot Deferred Optimisation Scoring Model.md`
 - `docs/K98 Bot Codex Task Pack Generator.md`
 - `docs/K98 Code Prompt.md`

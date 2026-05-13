@@ -71,9 +71,9 @@ This task must:
 
 Before starting, read and follow:
 
-* `docs/K98 Bot — Deferred Optimisation Framework.md`
+* `docs/k98 Bot - Deferred Optimisation Framework.md`
 * `docs/deferred_optimisations.md`
-* `docs/K98 Bot — Testing Standards.md`
+* `docs/K98 Bot - Testing Standards.md`
 * `README-DEV.md`
 
 Also review:

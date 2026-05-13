@@ -60,11 +60,11 @@ This project uses two repositories:
 Before implementation, review in this order:
 AGENTS.md
 1. feature specification or task overview
-2. `K98 Bot — Project Engineering Standards.md`
-3. `K98 Bot — Coding Execution Guidelines.md`
-4. `K98 Bot — Testing Standards.md`
-5. `K98 Bot — Skills & Refactor Triggers.md`
-6. `K98 Bot — Deferred Optimisation Framework.md`
+2. `K98 Bot - Project Engineering Standards.md`
+3. `K98 Bot - Coding Execution Guidelines.md`
+4. `K98 Bot - Testing Standards.md`
+5. `K98 Bot - Skills & Refactor Triggers.md`
+6. `k98 Bot - Deferred Optimisation Framework.md`
 7. `docs/deferred_optimisations.md`
 8. `commands/stats_cmds.py`
 

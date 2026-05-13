@@ -1,34 +1,25 @@
-KVK_ALL Schema Modernisation — Phase 7 Initiation Statement
+KVK_ALL Schema Modernisation — Phase 6 Initiation Statement
 
-We are starting Phase 7 of the KVK_ALL Schema Modernisation programme.
-
-Important local documentation note:
-
-The Phase 6 completion update to docs/KVK_ALL Schema Modernisation — Full Optimisation Task Pack.md and this Phase 7 initiation statement were created locally after Phase 6 was completed and deployed.
-
-Do not amend the Phase 6 PR for these documentation updates.
-
-These local documentation changes must be included in the next PR opened for Phase 7.
+We are starting Phase 6 of the KVK_ALL Schema Modernisation programme.
 
 Before implementation, read all required repository documents and the full task pack:
 
 README-DEV.md
-docs/K98 Bot — Standard Development Initiation Statement.md
-docs/K98 Bot — Project Engineering Standards.md
-docs/K98 Bot — Coding Execution Guidelines.md
-docs/K98 Bot — Testing Standards.md
-docs/K98 Bot — Skills & Refactor Triggers.md
-docs/k98 Bot — Deferred Optimisation Framework.md
+docs/templates/K98 Bot Standard Development Initiation Statement.md
+docs/K98 Bot - Project Engineering Standards.md
+docs/K98 Bot - Coding Execution Guidelines.md
+docs/K98 Bot - Testing Standards.md
+docs/K98 Bot - Skills & Refactor Triggers.md
+docs/k98 Bot - Deferred Optimisation Framework.md
 docs/K98 Bot Deferred Optimisation Scoring Model.md
 docs/K98 Bot Codex Task Pack Generator.md
-docs/KVK_ALL Schema Modernisation — Full Optimisation Task Pack.md
-docs/KVK_ALL Schema Modernisation — Audit & Migration Planning Task Pack.md
-docs/KVK_ALL Schema Modernisation — Phase 2 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 3 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 4 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Full Optimisation Task Pack.md
+docs/KVK_ALL Schema Modernisation - Audit & Migration Planning Task Pack.md
+docs/KVK_ALL Schema Modernisation - Phase 2 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 3 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 4 Initiation Statement.md
 docs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md
-docs/KVK_ALL Schema Modernisation — Phase 5 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation — Phase 6 Initiation Statement.md
+docs/KVK_ALL Schema Modernisation - Phase 5 Initiation Statement.md
 
 Also read the uploaded workbook sample:
 
@@ -118,27 +109,11 @@ read-only SQL smoke confirmed the applied procedure contract
 Google Sheets smoke confirmed stable primary/additional/comparison tab behaviour
 production promotion completed after validation
 
-Phase 6 is complete and deployed.
+Phases 1 through 5 did not introduce Basic Data ingestion, summary tab ingestion, Discord reporting display changes, reporting DAL ownership changes, admin command SQL extraction, or incompatible Google Sheets tab/spreadsheet changes.
 
-Phase 6 delivered:
+Phase 6 objective:
 
-KVK all-kingdom reporting SQL moved out of stats_alerts/allkingdoms.py
-reporting data access moved into kvk/dal/kvk_reporting_dal.py
-reporting block orchestration and row shaping moved into kvk/services/kvk_reporting_service.py
-stats_alerts/allkingdoms.py preserved as a thin compatibility wrapper around load_allkingdom_blocks(kvk_no)
-existing Discord embed display, field names, links, titles, Top 5 layout, and truncation behaviour preserved
-max_contribute_gain and cur_contribute_gain made available in structured reporting rows where SQL supports them
-contribution metrics intentionally not displayed in Discord embeds
-focused tests added for reporting block shape, SQL placement, contribution availability, embed compatibility, and truncation stability
-read-only SQL smoke confirmed structured reporting block availability
-Discord test embed smoke confirmed existing display remained stable
-production deployment completed after validation
-
-Phases 1 through 6 did not introduce Basic Data ingestion, summary tab ingestion, Discord contribution display, incompatible Google Sheets tab/spreadsheet changes, KVK export result-set changes, or admin command SQL extraction.
-
-Phase 7 objective:
-
-Move KVK admin command SQL out of commands/stats_cmds.py into clear DAL/service boundaries while preserving existing command permissions, defer/response behaviour, output copy, export behaviour, and operator workflow.
+Move KVK all-kingdom reporting SQL out of presentation modules into clear DAL/service boundaries and expose Phase 4/5 contribution metrics in structured reporting rows while preserving the existing Discord reporting display.
 
 Authoritative workbook tab:
 
@@ -148,63 +123,59 @@ Do not use Basic Data as fallback. Basic Data remains out of scope and intention
 
 In scope:
 
-review current KVK admin commands and embedded SQL before implementation
-validate all referenced SQL objects against the SQL repo
-move KVK admin SQL out of commands/stats_cmds.py into a KVK DAL module
-add a KVK admin service for orchestration and command-facing results
-keep command handlers thin and focused on permission/defer/input/response flow
-preserve existing command names, permissions, response copy, and user-facing output where practical
-preserve existing import, recompute, export, Google Sheets, and reporting behaviour
-preserve Phase 5 named export binding and Phase 6 reporting service boundaries
-add focused tests for service/DAL result shape and command handoff where practical
+review current reporting SQL and embed dependencies before implementation
+validate aggregate functions and windowed table columns against the SQL repo
+move KVK reporting SQL out of stats_alerts/allkingdoms.py into a KVK DAL module
+add a reporting service that returns structured rows/blocks for existing KVK all-kingdom reporting
+preserve existing stats_alerts.embeds.kvk Discord display and field layout
+preserve existing daily KVK embed behaviour, links, titles, field names, and truncation behaviour unless a bug fix is required
+make max_contribute_gain and cur_contribute_gain available in structured reporting rows where SQL already supports them
+do not display contribution metrics in Discord embeds in this phase unless explicitly approved
+keep all Discord-facing copy unchanged where practical
+add focused tests for DAL/service row shape, embed compatibility, contribution-field availability, and formatting/truncation stability
 capture new out-of-scope findings structurally
-include the local Phase 6 task-pack update and this Phase 7 initiation statement in the next PR
 
 Likely SQL objects to review:
 
-dbo.KVK_Details
-KVK.KVK_Scan
-KVK.KVK_Windows
+dbo.fn_KVK_Player_Aggregated
+dbo.fn_KVK_Kingdom_Aggregated
+dbo.fn_KVK_Camp_Aggregated
+KVK.KVK_Player_Windowed
+KVK.KVK_Kingdom_Windowed
+KVK.KVK_Camp_Windowed
 KVK.KVK_DKPWeights
+KVK.KVK_Windows
 KVK.KVK_CampMap
-KVK.sp_KVK_Recompute_Windows
-KVK.sp_KVK_Get_Exports
-KVK.KVK_AllPlayers_Stage
-KVK.KVK_AllPlayers_Raw
 
 Likely Python modules to review and possibly update:
 
-commands/stats_cmds.py
-kvk/dal/kvk_admin_dal.py
-kvk/services/kvk_admin_service.py
-kvk/dal/kvk_all_import_dal.py
-kvk/services/kvk_export_service.py
-gsheet_module.py
-tests/test_kvk_admin_service.py
-tests/test_stats_cmds.py
+stats_alerts/allkingdoms.py
+stats_alerts/embeds/kvk.py
+kvk/dal/kvk_reporting_dal.py
+kvk/services/kvk_reporting_service.py
+tests/test_kvk_reporting_service.py
+tests/test_kvk_embed.py
 
 Likely modules to review for downstream contract awareness, but not redesign unless required:
 
-kvk/dal/kvk_reporting_dal.py
-kvk/services/kvk_reporting_service.py
-stats_alerts/allkingdoms.py
-stats_alerts/embeds/kvk.py
-DL_bot.py
-kvk_all_importer.py
+commands/stats_cmds.py
+gsheet_module.py
+kvk/services/kvk_export_service.py
+build_KVKrankings_embed.py
+ui/views/kvk_personal_views.py
 
-Out of scope for Phase 7:
+Out of scope for Phase 6:
 
-Discord reporting display changes
+Discord reporting display changes unless explicitly approved
 new contribution fields in Discord embeds
+admin command SQL extraction
 Google Sheets export contract changes
 KVK export result-set changes
 Basic Data ingestion
 summary tab ingestion
-new live production imports, recomputes, exports, or reporting posts unless explicitly requested
+new live production reporting posts unless explicitly requested
 production promotion before local validation
-rewriting unrelated stats, rankings, history, reporting, or personal KVK flows
-operational cleanup and retention work assigned to Phase 8
-end-to-end performance and restart hardening assigned to Phase 9
+rewriting unrelated stats, rankings, history, or personal KVK flows
 
 Important constraints:
 
@@ -212,7 +183,7 @@ Keep changes PR-sized and focused.
 Preserve existing import behaviour and return shape.
 Preserve existing Google Sheets export behaviour.
 Preserve existing Discord embed/reporting output.
-Do not silently change command response copy or admin workflow semantics.
+Do not silently change reporting metric semantics.
 Avoid embedded SQL in command/view/presentation layers.
 Prefer service and DAL boundaries.
 Use additive, rollback-safe SQL changes only if SQL changes become necessary.
@@ -222,21 +193,20 @@ Expected workflow:
 
 Step 1 must be review/scope only unless explicitly told otherwise.
 Search and validate SQL repo definitions first.
-Identify exact admin command SQL dependencies and response contracts.
+Identify exact reporting SQL dependencies and Discord embed contracts.
 Present an implementation plan before code if not explicitly asked to implement in one pass.
-Implement only Phase 7 admin command SQL extraction and service/DAL boundary cleanup.
+Implement only Phase 6 reporting DAL/service extraction and structured contribution availability.
 Run targeted validation.
-Stop after Phase 7 implementation, tests, and report.
+Stop after Phase 6 implementation, tests, and report.
 
 Acceptance criteria:
 
-KVK admin SQL no longer lives in commands/stats_cmds.py for the in-scope commands.
-KVK admin data access lives in a DAL module.
-KVK admin orchestration lives in a service module.
-commands/stats_cmds.py remains thin and preserves existing user-facing behaviour.
-Existing recompute, scan listing, window preview, and export command workflows remain stable.
+KVK all-kingdom reporting SQL no longer lives in stats_alerts/allkingdoms.py.
+Reporting data access lives in a DAL module.
+Reporting orchestration and row/block shaping live in a service module.
+stats_alerts/embeds/kvk.py keeps the existing Discord display contract.
+Existing top player, kingdom, camp, own kingdom, and own camp reporting blocks remain stable.
+Contribution metrics are available in structured reporting rows or explicitly excluded by documented rule.
 No Discord reporting display changes are made.
-No Google Sheets export contract changes are made.
-Tests cover service/DAL result shape and command handoff where practical.
-The local Phase 6 task-pack update and this Phase 7 initiation statement are included in the Phase 7 PR.
-New deferred findings are captured structurally, but all known KVK_ALL work remains assigned to later programme phases rather than left as final deferred debt.
+Tests cover reporting row shape, service block shape, embed compatibility, and truncation/formatting stability where practical.
+New deferred findings are captured structurally, but all known KVK_ALL/all-kingdom work remains assigned to later programme phases rather than left as final deferred debt.

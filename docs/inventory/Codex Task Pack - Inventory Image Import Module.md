@@ -1,4 +1,4 @@
-﻿# Codex Task Pack - Inventory Image Import Module
+# Codex Task Pack - Inventory Image Import Module
 
 ## Status Summary
 
@@ -1629,5 +1629,5 @@ Do not create a duplicate issue for this item. Reference issue #46 whenever Phas
 ## Suggested Next Chat Opening Prompt
 
 ```text
-Start Phase 1F review/scope for the Inventory Image Import Module. Phase 0, Phase 1A, Phase 1B, Phase 1C, Phase 1D, and Phase 1E are complete. Phase 1F was added from first-batch user feedback and must be delivered before Phase 2 Materials. Use the updated in-repo task pack at C:\discord_file_downloader\docs\Codex Task Pack — Inventory Image Import Module.md. Phase 1F should focus on VIP-aware capacity calculations and per-governor VIP SQL storage/update support. Keep Materials and Action Points (AP) out of Phase 1F; Materials remains Phase 2 and AP remains Phase 3. Keep /my_stats integration out of scope. Keep the stats export SQL refactor out of scope and continue referencing GitHub issue #46 for that existing debt. Begin with audit/scope only per repo rules, then stop for architecture validation before coding.
+Start Phase 1F review/scope for the Inventory Image Import Module. Phase 0, Phase 1A, Phase 1B, Phase 1C, Phase 1D, and Phase 1E are complete. Phase 1F was added from first-batch user feedback and must be delivered before Phase 2 Materials. Use the updated in-repo task pack at C:\discord_file_downloader\docs\Codex Task Pack - Inventory Image Import Module.md. Phase 1F should focus on VIP-aware capacity calculations and per-governor VIP SQL storage/update support. Keep Materials and Action Points (AP) out of Phase 1F; Materials remains Phase 2 and AP remains Phase 3. Keep /my_stats integration out of scope. Keep the stats export SQL refactor out of scope and continue referencing GitHub issue #46 for that existing debt. Begin with audit/scope only per repo rules, then stop for architecture validation before coding.
 ```
