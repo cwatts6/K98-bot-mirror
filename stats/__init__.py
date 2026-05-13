@@ -1,2 +1,1 @@
 """Stats subsystem package."""
-

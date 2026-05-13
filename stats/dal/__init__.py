@@ -1,2 +1,1 @@
 """Stats data-access layer."""
-
