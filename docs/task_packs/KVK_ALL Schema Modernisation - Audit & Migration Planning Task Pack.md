@@ -30,7 +30,7 @@ DL_bot.py
 allkingdoms.py
 gsheet_module.py
 Engineering standards:
-K98 Bot Standard Development Initiation Statement.md
+docs/templates/Codex Task Pack Template.md
 K98 Bot - Project Engineering Standards.md
 K98 Bot - Coding Execution Guidelines.md
 K98 Bot - Testing Standards.md

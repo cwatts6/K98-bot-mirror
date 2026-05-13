@@ -136,7 +136,7 @@ Required Reading
 Before starting any phase, read:
 
 README-DEV.md
-docs/templates/K98 Bot Standard Development Initiation Statement.md
+docs/templates/Codex Task Pack Template.md
 docs/K98 Bot - Project Engineering Standards.md
 docs/K98 Bot - Coding Execution Guidelines.md
 docs/K98 Bot - Testing Standards.md

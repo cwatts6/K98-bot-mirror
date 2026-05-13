@@ -17,7 +17,7 @@ The new workbook provides separate Stage I, Stage II, Stage III, and Total PreKv
 
 Read these before making changes:
 
-1. `docs/templates/K98 Bot Standard Development Initiation Statement.md`
+1. `docs/templates/Codex Task Pack Template.md`
 2. `docs/reference/K98 Bot - Project Engineering Standards.md`
 3. `docs/reference/K98 Bot - Coding Execution Guidelines.md`
 4. `docs/reference/K98 Bot - Testing Standards.md`

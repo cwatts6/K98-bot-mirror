@@ -111,6 +111,8 @@ Databook_Archive/
 archive/
 !docs/reference/archive/
 !docs/reference/archive/**
+!docs/templates/archive/
+!docs/templates/archive/**
 restart_log.csv
 download_log.csv
 input_log.csv
