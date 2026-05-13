@@ -12,7 +12,6 @@ docs/K98 Bot - Testing Standards.md
 docs/K98 Bot - Skills & Refactor Triggers.md
 docs/k98 Bot - Deferred Optimisation Framework.md
 docs/K98 Bot Deferred Optimisation Scoring Model.md
-docs/templates/Codex Task Pack Template.md
 docs/KVK_ALL Schema Modernisation - Full Optimisation Task Pack.md
 docs/KVK_ALL Schema Modernisation - Audit & Migration Planning Task Pack.md
 docs/KVK_ALL Schema Modernisation - Phase 2 Initiation Statement.md
