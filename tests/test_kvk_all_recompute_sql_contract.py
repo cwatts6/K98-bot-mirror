@@ -96,7 +96,7 @@ def _phase11_fighting_dataset_sql_contract_source() -> str:
 
 
 def test_phase4_metric_source_rules_are_documented() -> None:
-    doc = Path("docs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md")
+    doc = Path("docs/task_packs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md")
     text = doc.read_text(encoding="utf-8")
 
     required_tokens = [
@@ -114,7 +114,7 @@ def test_phase4_metric_source_rules_are_documented() -> None:
 
 
 def test_phase10_metric_source_correction_is_documented() -> None:
-    doc = Path("docs/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md")
+    doc = Path("docs/task_packs/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md")
     text = doc.read_text(encoding="utf-8")
 
     required_tokens = [
