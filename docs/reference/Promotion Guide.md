@@ -59,7 +59,7 @@ git status
 git log --oneline -5
 ```
 
-or if required as there are SQL differences use:
+If there are SQL differences, run:
 ```powershell
 cd C:\K98-bot-SQL-Server
 git restore .
