@@ -67,4 +67,3 @@
 - MGE Process Polish Phase 2 was implemented, production deployed, and smoke-tested via PR #75.
 - `mge/mge_signup_service.py` self-signup account resolution now uses `registry_service.get_user_accounts()` instead of the legacy registry dict shape. Admin-add reverse owner lookup remains on `get_discord_user_for_governor()`.
 - `mge/mge_publish_service.py` no longer performs direct Discord message fetch/send/edit/delete/DM IO. Publish, republish, reminder refresh, unpublish, award DM, and board refresh paths now route Discord operations through `mge/mge_publish_discord_adapter.py`.
-- The remaining open service-consolidation scope from GitHub issues #29 and #32 is stats-service registry alignment, not MGE.
