@@ -26,14 +26,12 @@ import registry.registry_service as registry_service
 from registry.registry_service import (
     VALID_ACCOUNT_TYPES,
     admin_register_or_replace,
-    get_user_accounts,
     remove_governor,
 )
 from services.governor_account_service import (
     filter_account_slots,
-    get_accounts_for_user as get_user_accounts_async,
+    get_account_summary_for_user,
     parse_discord_user_id,
-    registered_account_slots,
 )
 import target_utils
 from ui.views.admin_views import ConfirmImportView
@@ -63,12 +61,18 @@ def register_registry(bot: ext_commands.Bot) -> None:
                 target_id = parse_discord_user_id(ctx.options.get("user_id"))
 
             if not target_id:
-                return filter_account_slots(ctx.value)
+                command_name = getattr(getattr(ctx, "command", None), "name", None)
+                if command_name != "modify_registration":
+                    return filter_account_slots(ctx.value)
+                invoking_user = getattr(getattr(ctx, "interaction", None), "user", None)
+                target_id = getattr(invoking_user, "id", None)
+                if not target_id:
+                    return filter_account_slots(ctx.value)
 
-            lookup = await get_user_accounts_async(target_id)
-            if not lookup.ok:
+            summary = await get_account_summary_for_user(target_id)
+            if not summary.ok:
                 return []
-            return registered_account_slots(lookup.accounts, ctx.value)
+            return summary.registered_slots(ctx.value)
         except Exception:
             return filter_account_slots(ctx.value)
 
@@ -166,9 +170,9 @@ def register_registry(bot: ext_commands.Bot) -> None:
 
         # --- Load registry account state safely
         try:
-            accounts_lookup = await get_user_accounts_async(ctx.user.id)
-            if not accounts_lookup.ok:
-                raise RuntimeError(accounts_lookup.error or "registry unavailable")
+            account_summary = await get_account_summary_for_user(ctx.user.id)
+            if not account_summary.ok:
+                raise RuntimeError(account_summary.error or "registry unavailable")
         except Exception as e:
             logger.exception("[modify_registration] get_user_accounts failed")
             await ctx.interaction.edit_original_response(
@@ -178,10 +182,8 @@ def register_registry(bot: ext_commands.Bot) -> None:
             )
             return
 
-        user_accounts = accounts_lookup.accounts
-
         # Ensure this slot exists
-        if account_type not in user_accounts:
+        if account_type not in account_summary.ordered_accounts:
             await ctx.interaction.edit_original_response(
                 content=f"❌ You haven't registered `{account_type}` yet. Use `/register_governor` instead.",
                 embed=None,
@@ -293,15 +295,21 @@ def register_registry(bot: ext_commands.Bot) -> None:
         )
 
         # Pre-check: confirm slot exists so we can give a clear message before acting
-        accounts = await asyncio.to_thread(get_user_accounts, target_user_id)
-        if account_type not in accounts:
+        account_summary = await get_account_summary_for_user(target_user_id)
+        if not account_summary.ok:
+            await ctx.interaction.edit_original_response(
+                content=f"❌ Could not load registrations for {target_display}."
+            )
+            return
+        if account_type not in account_summary.ordered_accounts:
             await ctx.interaction.edit_original_response(
                 content=f"⚠️ `{account_type}` is not registered for {target_display}."
             )
             return
 
-        gov_name = accounts[account_type].get("GovernorName", "Unknown")
-        gov_id = accounts[account_type].get("GovernorID", "Unknown")
+        account_info = account_summary.ordered_accounts[account_type]
+        gov_name = account_info.get("GovernorName", "Unknown")
+        gov_id = account_info.get("GovernorID", "Unknown")
 
         ok, err = remove_governor(
             discord_user_id=target_user_id,
@@ -355,21 +363,27 @@ def register_registry(bot: ext_commands.Bot) -> None:
             )
             return
 
-        accounts = await asyncio.to_thread(get_user_accounts, target_id)
-        if not accounts:
+        account_summary = await get_account_summary_for_user(target_id)
+        if not account_summary.ok:
+            await ctx.interaction.edit_original_response(
+                content=f"❌ Could not load registrations for ID `{target_id}`."
+            )
+            return
+        if not account_summary.ordered_accounts:
             await ctx.interaction.edit_original_response(
                 content=f"⚠️ No registry entry found for ID `{target_id}`."
             )
             return
 
-        if account_type not in accounts:
+        if account_type not in account_summary.ordered_accounts:
             await ctx.interaction.edit_original_response(
                 content=f"⚠️ `{account_type}` is not registered for ID `{target_id}`."
             )
             return
 
-        gov_name = accounts[account_type].get("GovernorName", "Unknown")
-        gov_id = accounts[account_type].get("GovernorID", "Unknown")
+        account_info = account_summary.ordered_accounts[account_type]
+        gov_name = account_info.get("GovernorName", "Unknown")
+        gov_id = account_info.get("GovernorID", "Unknown")
 
         ok, err = remove_governor(
             discord_user_id=target_id,

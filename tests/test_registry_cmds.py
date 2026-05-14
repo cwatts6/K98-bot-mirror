@@ -16,8 +16,25 @@ def test_registry_cmds_uses_shared_account_helpers() -> None:
 
     assert "parse_discord_user_id" in source
     assert "filter_account_slots" in source
-    assert "registered_account_slots" in source
+    assert "get_account_summary_for_user" in source
+    assert "summary.registered_slots" in source
     assert "def _parse_user_id" not in source
+
+
+def test_registry_cmds_uses_account_summary_directly_for_registry_selection() -> None:
+    source = Path("commands/registry_cmds.py").read_text(encoding="utf-8")
+
+    assert "get_accounts_for_user as get_user_accounts_async" not in source
+    assert "await asyncio.to_thread(get_user_accounts" not in source
+    assert "account_summary.ordered_accounts" in source
+
+
+def test_registry_autocomplete_falls_back_to_invoking_user_for_self_service() -> None:
+    source = Path("commands/registry_cmds.py").read_text(encoding="utf-8")
+
+    assert 'command_name != "modify_registration"' in source
+    assert 'getattr(getattr(ctx, "interaction", None), "user", None)' in source
+    assert 'getattr(ctx, "user", None)' not in source
 
 
 def test_my_registrations_uses_service_loader_not_removed_facade_import() -> None:

@@ -66,6 +66,9 @@ class AccountResolutionSummary:
     def free_slots(self) -> list[str]:
         return free_account_slots(self.accounts)
 
+    def registered_slots(self, prefix: str | None = None, *, limit: int = 25) -> list[str]:
+        return registered_account_slots(self.ordered_accounts, prefix, limit=limit)
+
 
 def _normalize_governor_id_str(value: Any) -> str:
     try:

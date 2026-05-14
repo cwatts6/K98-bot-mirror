@@ -51,28 +51,19 @@ Resolved historical notes were moved to `archive/deferred_optimisations_resolved
 - Dependencies: Preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to the KVK_ALL modernisation programme.
 
 ### Deferred Optimisation
-- Area: `commands/registry_cmds.py`, `ui/views/registry_views.py`, `services/governor_account_service.py`
-- Type: consistency
-- Description: After the telemetry/KVK target/CrystalTech picker slice, registry command and view account-selection flows still rely on `AccountLookup`-style account dictionaries and local option/free-slot shaping rather than consuming `AccountResolutionSummary` directly. This path is write-sensitive because it includes registration, modification, removal confirmation views, duplicate-claim checks, and player-facing error copy.
-- Suggested Fix: Migrate registry command autocomplete and `MyRegsActionView` registration/modify entry points to `AccountResolutionSummary`, preserving account slot ordering, command names, permissions, ephemeral/admin behaviour, registration confirmation/cancel behaviour, and SQL-backed duplicate ownership checks. Add focused command/view tests before retiring any registry-facing compatibility pathways.
-- Impact: medium
-- Risk: medium
-- Dependencies: Telemetry/KVK picker migration complete; preserve `/my_registrations`, `/register_governor`, `/modify_registration`, `/remove_registration`, and admin registration behaviour.
-
-### Deferred Optimisation
 - Area: `ark/registration_flow.py`, `account_picker.py`, `services/governor_account_service.py`
 - Type: consistency
-- Description: Ark registration flows still load raw registry account dictionaries, build governor select options through the legacy account picker path, and resolve governor names from local account dictionaries. The flow also has Ark-specific signup, ban, roster, active-match, and persistent-message behaviour, so it should not be migrated opportunistically with registry command/view work.
+- Description: Ark registration flows still load raw registry account dictionaries, build governor select options through the legacy account picker path, and resolve governor names from local account dictionaries. The flow also has Ark-specific signup, ban, roster, active-match, and persistent-message behaviour, so it should not be migrated opportunistically with registry command/view work even after the registry command/view summary migration.
 - Suggested Fix: Audit Ark self-service join/sub/leave/switch account lookup and governor-name resolution for safe reuse of `AccountResolutionSummary`. Migrate only after confirming Ark signup behaviour, ban enforcement, roster filtering, active signup detection, and persistent registration-message refresh remain unchanged.
 - Impact: medium
 - Risk: medium
-- Dependencies: Registry command/view direct migration should land first or be explicitly skipped; preserve Ark signup behaviour and focused Ark regression coverage.
+- Dependencies: Registry command/view direct migration complete; preserve Ark signup behaviour and focused Ark regression coverage.
 
 ### Deferred Optimisation
-- Area: `services/governor_account_service.py`, `services/stats_account_service.py`, `inventory/inventory_service.py`, `mge/mge_signup_service.py`, `commands/registry_cmds.py`, `ui/views/registry_views.py`, `ark/registration_flow.py`
+- Area: `services/governor_account_service.py`, `services/stats_account_service.py`, `inventory/inventory_service.py`, `mge/mge_signup_service.py`, `ark/registration_flow.py`, `account_picker.py`
 - Type: cleanup
-- Description: Compatibility adapters and duplicate local account classification/linked-governor/registered-governor shaping remain necessary while direct command/view and Ark consumers are still being migrated. Removing them now would risk breaking public shapes used by stats, inventory, MGE, registry, telemetry, and Ark tests.
-- Suggested Fix: After telemetry/KVK, registry command/view, and Ark account-resolution migrations all have focused regression coverage, remove obsolete `AccountLookup`-only pathways and any duplicate local classification or option-shaping helpers that no longer have external callers.
+- Description: Compatibility adapters and duplicate local account classification/linked-governor/registered-governor shaping remain necessary while Ark consumers are still pending migration. Removing them now would risk breaking public shapes used by stats, inventory, MGE, telemetry, registry compatibility imports, and Ark tests.
+- Suggested Fix: After Ark account-resolution migration has focused regression coverage, remove obsolete `AccountLookup`-only pathways and any duplicate local classification or option-shaping helpers that no longer have external callers.
 - Impact: medium
 - Risk: medium
-- Dependencies: All direct command/view surfaces migrated to `AccountResolutionSummary`; focused regression coverage exists for stats export, inventory permissions, MGE signup, telemetry/KVK pickers, registry flows, and Ark signup.
+- Dependencies: Telemetry/KVK and registry command/view surfaces migrated to `AccountResolutionSummary`; Ark migration and focused regression coverage still pending. Preserve coverage for stats export, inventory permissions, MGE signup, telemetry/KVK pickers, registry flows, and Ark signup before cleanup.

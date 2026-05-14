@@ -62,9 +62,32 @@ def test_registry_views_instantiate(monkeypatch):
         )
         v1 = rv.MyRegsActionView(author_id=1, has_regs=True)
         m1 = rv.GovNameModal(author_id=1)
-        v2 = rv.RegisterStartView(author_id=1, free_slots=["Main"])
+        summary = rv.AccountResolutionSummary(
+            ok=True,
+            accounts={"Main": {"GovernorID": "1", "GovernorName": "A"}},
+            ordered_accounts={"Main": {"GovernorID": "1", "GovernorName": "A"}},
+            resolved_accounts=(),
+            governor_ids=(),
+            governor_id_strings=(),
+            account_names=(),
+            name_to_id={},
+            default_choice="ALL",
+        )
+        empty_summary = rv.AccountResolutionSummary(
+            ok=True,
+            accounts={},
+            ordered_accounts={},
+            resolved_accounts=(),
+            governor_ids=(),
+            governor_id_strings=(),
+            account_names=(),
+            name_to_id={},
+            default_choice="ALL",
+        )
+        v2 = rv.RegisterStartView(author_id=1, account_summary=empty_summary)
         v3 = rv.ModifyStartView(
-            author_id=1, accounts={"Main": {"GovernorID": "1", "GovernorName": "A"}}
+            author_id=1,
+            account_summary=summary,
         )
         m2 = rv.EnterGovernorIDModal(author_id=1, mode="register", account_type="Main")
         v4 = rv.GovernorSelectView([("A", 1)], author_id=1)
@@ -80,6 +103,110 @@ def test_registry_views_instantiate(monkeypatch):
         assert v5.governor_id == "1"
         assert v6.new_gov_id == "2"
         assert v7.account_type == "Main"
+
+    asyncio.run(_run())
+
+
+def test_my_regs_action_view_register_and_modify_use_account_summary(monkeypatch):
+    rv = _load_registry_views(monkeypatch)
+    calls = []
+
+    async def _get_account_summary_for_user(user_id):
+        calls.append(user_id)
+        return rv.AccountResolutionSummary(
+            ok=True,
+            accounts={
+                "Main": {"GovernorID": "1", "GovernorName": "A"},
+                "Alt 1": {"GovernorID": "2", "GovernorName": "B"},
+            },
+            ordered_accounts={
+                "Main": {"GovernorID": "1", "GovernorName": "A"},
+                "Alt 1": {"GovernorID": "2", "GovernorName": "B"},
+            },
+            resolved_accounts=(),
+            governor_ids=(),
+            governor_id_strings=(),
+            account_names=(),
+            name_to_id={},
+            default_choice="ALL",
+        )
+
+    monkeypatch.setattr(rv, "get_account_summary_for_user", _get_account_summary_for_user)
+
+    async def _run():
+        view = rv.MyRegsActionView(author_id=1, has_regs=True)
+
+        modify_interaction = _FakeInteraction(_User(1))
+        await _button_contains(view, "Modify Registration").callback(modify_interaction)
+
+        register_interaction = _FakeInteraction(_User(1))
+        await _button_contains(view, "Register New Account").callback(register_interaction)
+
+        assert calls == [1, 1]
+        modify_view = modify_interaction.followup.messages[-1]["view"]
+        register_view = register_interaction.followup.messages[-1]["view"]
+        assert isinstance(modify_view, rv.ModifyStartView)
+        assert isinstance(register_view, rv.RegisterStartView)
+
+    asyncio.run(_run())
+
+
+def test_my_regs_action_view_register_reports_summary_failure(monkeypatch):
+    rv = _load_registry_views(monkeypatch)
+
+    async def _get_account_summary_for_user(_user_id):
+        return rv.AccountResolutionSummary(
+            ok=False,
+            accounts={},
+            ordered_accounts={},
+            resolved_accounts=(),
+            governor_ids=(),
+            governor_id_strings=(),
+            account_names=(),
+            name_to_id={},
+            default_choice="ALL",
+            error="db down",
+        )
+
+    monkeypatch.setattr(rv, "get_account_summary_for_user", _get_account_summary_for_user)
+
+    async def _run():
+        view = rv.MyRegsActionView(author_id=1, has_regs=False)
+        interaction = _FakeInteraction(_User(1))
+
+        await _button_contains(view, "Register New Account").callback(interaction)
+
+        assert "Registry temporarily unavailable" in interaction.followup.messages[-1]["content"]
+
+    asyncio.run(_run())
+
+
+def test_my_regs_action_view_modify_reports_summary_failure(monkeypatch):
+    rv = _load_registry_views(monkeypatch)
+
+    async def _get_account_summary_for_user(_user_id):
+        return rv.AccountResolutionSummary(
+            ok=False,
+            accounts={},
+            ordered_accounts={},
+            resolved_accounts=(),
+            governor_ids=(),
+            governor_id_strings=(),
+            account_names=(),
+            name_to_id={},
+            default_choice="ALL",
+            error="db down",
+        )
+
+    monkeypatch.setattr(rv, "get_account_summary_for_user", _get_account_summary_for_user)
+
+    async def _run():
+        view = rv.MyRegsActionView(author_id=1, has_regs=True)
+        interaction = _FakeInteraction(_User(1))
+
+        await _button_contains(view, "Modify Registration").callback(interaction)
+
+        assert "Registry temporarily unavailable" in interaction.followup.messages[-1]["content"]
 
     asyncio.run(_run())
 
@@ -195,6 +322,10 @@ def test_confirmation_cancel_callbacks_clear_prompt(monkeypatch):
 
 def _button(view, label: str):
     return next(child for child in view.children if getattr(child, "label", "") == label)
+
+
+def _button_contains(view, label: str):
+    return next(child for child in view.children if label in getattr(child, "label", ""))
 
 
 class _User:

@@ -72,6 +72,8 @@ def test_account_resolution_summary_orders_deduplicates_and_defaults_to_main():
     assert summary.default_choice == "Main"
     assert summary.classification == ("multi", None)
     assert summary.contains_governor_id("100")
+    assert summary.registered_slots() == ["Main", "Alt 1", "Alt 2", "Farm 1"]
+    assert summary.registered_slots("alt") == ["Alt 1", "Alt 2"]
 
 
 def test_account_resolution_summary_single_classification_handles_unknown_slots():

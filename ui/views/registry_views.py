@@ -11,6 +11,7 @@ from discord import Embed
 
 from registry.governor_registry import register_account
 from registry.registry_service import check_governor_claimed_by_other, remove_governor
+from services.governor_account_service import AccountResolutionSummary, get_account_summary_for_user
 from utils import normalize_governor_id
 
 logger = logging.getLogger(__name__)
@@ -288,10 +289,14 @@ class MyRegsActionView(discord.ui.View):
         except Exception:
             pass
         try:
-            from services.governor_account_service import get_accounts_for_user
-
-            lookup = await get_accounts_for_user(self.author_id)
-            accounts = lookup.accounts if lookup.ok else {}
+            summary = await get_account_summary_for_user(self.author_id)
+            if not summary.ok:
+                await interaction.followup.send(
+                    "⚠️ Registry temporarily unavailable. Please try again in a moment.",
+                    ephemeral=True,
+                )
+                return
+            accounts = summary.ordered_accounts
             if not accounts:
                 await interaction.followup.send(
                     "You don’t have any accounts to modify. Use **Register New Account** instead.",
@@ -300,7 +305,7 @@ class MyRegsActionView(discord.ui.View):
                 return
             await interaction.followup.send(
                 "Select which registered account you want to modify:",
-                view=ModifyStartView(author_id=self.author_id, accounts=accounts),
+                view=ModifyStartView(author_id=self.author_id, account_summary=summary),
                 ephemeral=True,
             )
         except Exception as e:
@@ -323,17 +328,14 @@ class MyRegsActionView(discord.ui.View):
         except Exception:
             pass
         try:
-            from services.governor_account_service import free_account_slots, get_accounts_for_user
-
-            lookup = await get_accounts_for_user(self.author_id)
-            if not lookup.ok:
+            summary = await get_account_summary_for_user(self.author_id)
+            if not summary.ok:
                 await interaction.followup.send(
                     "⚠️ Registry temporarily unavailable. Please try again in a moment.",
                     ephemeral=True,
                 )
                 return
-            accounts = lookup.accounts
-            free_slots = free_account_slots(accounts)
+            free_slots = summary.free_slots()
             if not free_slots:
                 await interaction.followup.send(
                     "All account slots are registered already. Use **Modify Registration** to change one.",
@@ -342,7 +344,7 @@ class MyRegsActionView(discord.ui.View):
                 return
             await interaction.followup.send(
                 "Pick an account slot to register:",
-                view=RegisterStartView(author_id=self.author_id, free_slots=free_slots),
+                view=RegisterStartView(author_id=self.author_id, account_summary=summary),
                 ephemeral=True,
             )
         except Exception as e:
@@ -427,17 +429,21 @@ class GovNameModal(discord.ui.Modal):
 
 
 class ModifyStartView(discord.ui.View):
-    def __init__(self, *, author_id: int, accounts: dict, timeout: float = 180):
+    def __init__(
+        self,
+        *,
+        author_id: int,
+        account_summary: AccountResolutionSummary,
+        timeout: float = 180,
+    ):
         super().__init__(timeout=timeout)
         self.author_id = author_id
         options = []
-        for slot in _account_order_getter():
-            if slot in accounts:
-                info = accounts.get(slot) or {}
-                gid = str(info.get("GovernorID", "")).strip()
-                gname = str(info.get("GovernorName", "")).strip()
-                label = f"{slot} — {gname} ({gid})" if (gname or gid) else f"{slot}"
-                options.append(discord.SelectOption(label=label[:100], value=slot))
+        for slot, info in account_summary.ordered_accounts.items():
+            gid = str(info.get("GovernorID", "")).strip()
+            gname = str(info.get("GovernorName", "")).strip()
+            label = f"{slot} — {gname} ({gid})" if (gname or gid) else f"{slot}"
+            options.append(discord.SelectOption(label=label[:100], value=slot))
         select = discord.ui.Select(
             placeholder="Choose an account to modify",
             options=options[:25],
@@ -484,13 +490,17 @@ class RegisterStartView(discord.ui.View):
         self,
         *,
         author_id: int,
-        free_slots: list,
+        account_summary: AccountResolutionSummary | None = None,
+        free_slots: list | None = None,
         timeout: float = 180,
         prefill_id: str | None = None,
     ):
         super().__init__(timeout=timeout)
         self.author_id = author_id
         self.prefill_id = prefill_id
+        if account_summary is not None:
+            free_slots = account_summary.free_slots()
+        free_slots = free_slots or []
         options = [discord.SelectOption(label=slot, value=slot) for slot in free_slots[:25]]
         select = discord.ui.Select(
             placeholder="Choose a slot to register", options=options, min_values=1, max_values=1
