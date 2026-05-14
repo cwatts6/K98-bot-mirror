@@ -33,7 +33,7 @@ Also review:
 - `ui/views/admin_views.py`
 - `target_utils.py`
 - `tests/` registry-related coverage
-- `docs/deferred_optimisations.md`
+- `docs/reference/deferred_optimisations.md`
 - GitHub issues relating to registry, registration, governor lookup, import/export, audit, or command architecture
 
 ## 3. Objective
