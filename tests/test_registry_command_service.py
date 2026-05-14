@@ -88,7 +88,7 @@ def test_build_import_preview_shapes_success_preview_lines() -> None:
     preview = svc.build_import_preview(rows, {})
 
     assert preview.ok
-    assert preview.preview_lines == ["Row 2: 123 | Main -> 100001"]
+    assert preview.preview_lines == ["Row 2: 123 | Main → 100001"]
     assert preview.changes[0]["governor_name"] == "Alpha"
 
 
@@ -101,5 +101,6 @@ def test_build_import_summary_text_includes_apply_errors_and_warnings() -> None:
     text = svc.build_import_summary_text(result, ["Row 2: formula"])
 
     assert "1 change(s) made" in text
-    assert "1 row(s) failed" in text
+    assert "⚠️ 1 row(s) failed" in text
+    assert "⚠️ Warnings" in text
     assert "Row 2: formula" in text

@@ -703,6 +703,23 @@ def register_registry(bot: ext_commands.Bot) -> None:
                 "roles": roles_str,
                 "top_role": top_role,
             }
+        missing_registered_uids = {
+            str(uid).strip()
+            for uid in (registry or {}).keys()
+            if str(uid).strip() and str(uid).strip() not in members_info
+        }
+        for uid in missing_registered_uids:
+            try:
+                member = await guild.fetch_member(int(uid))
+            except Exception:
+                members_info[uid] = {"discord_user": uid, "roles": "", "top_role": ""}
+                continue
+            roles_str, top_role = role_names(member)
+            members_info[uid] = {
+                "discord_user": str(member),
+                "roles": roles_str,
+                "top_role": top_role,
+            }
 
         audit_payload = build_registration_audit_payload(registry, members_info, sql_rows)
 

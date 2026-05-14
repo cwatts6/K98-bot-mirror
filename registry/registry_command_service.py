@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import csv
+from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 import io
 import logging
 import re
@@ -212,7 +212,7 @@ def build_registration_audit_payload(
         files=files,
         xlsx_bytes=xlsx_bytes,
         registered_accounts_total=registered_accounts_total,
-        unregistered_current_governors_count=len(sorted(current_ids - registered_ids)),
+        unregistered_current_governors_count=len(current_ids - registered_ids),
         members_without_registration_count=members_without_registration_count,
     )
 
@@ -289,7 +289,7 @@ def build_import_preview(
 
     preview_lines = [
         f"Row {change.get('source_row')}: {change['discord_id']} | "
-        f"{change['account_type']} -> {change['governor_id']}"
+        f"{change['account_type']} → {change['governor_id']}"
         for change in changes[:20]
     ]
     return RegistryImportPreview(
@@ -318,11 +318,11 @@ def build_import_summary_text(
         result.summary[:50]
     )
     if include_apply_errors and result.errors:
-        text += f"\n\n{len(result.errors)} row(s) failed:\n" + "\n".join(
+        text += f"\n\n⚠️ {len(result.errors)} row(s) failed:\n" + "\n".join(
             f"- {error}" for error in result.errors[:20]
         )
     if warnings:
-        text += "\n\nWarnings:\n" + "\n".join(f"- {warning}" for warning in warnings[:20])
+        text += "\n\n⚠️ Warnings:\n" + "\n".join(f"- {warning}" for warning in warnings[:20])
     return text
 
 

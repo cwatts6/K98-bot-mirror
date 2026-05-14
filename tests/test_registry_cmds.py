@@ -25,3 +25,11 @@ def test_my_registrations_uses_service_loader_not_removed_facade_import() -> Non
 
     assert "asyncio.to_thread(load_registry)" not in source
     assert "registry_service.load_registry_as_dict" in source
+
+
+def test_registration_audit_fetches_missing_registered_members_before_payload() -> None:
+    source = Path("commands/registry_cmds.py").read_text(encoding="utf-8")
+
+    assert "missing_registered_uids" in source
+    assert "guild.fetch_member" in source
+    assert "build_registration_audit_payload(registry, members_info, sql_rows)" in source
