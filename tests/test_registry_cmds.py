@@ -18,3 +18,10 @@ def test_registry_cmds_uses_shared_account_helpers() -> None:
     assert "filter_account_slots" in source
     assert "registered_account_slots" in source
     assert "def _parse_user_id" not in source
+
+
+def test_my_registrations_uses_service_loader_not_removed_facade_import() -> None:
+    source = Path("commands/registry_cmds.py").read_text(encoding="utf-8")
+
+    assert "asyncio.to_thread(load_registry)" not in source
+    assert "registry_service.load_registry_as_dict" in source
