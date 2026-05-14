@@ -25,7 +25,7 @@ def parse_discord_user_id(text: str | int | None) -> int | None:
     if text is None:
         return None
     try:
-        match = re.search(r"\d{15,22}", str(text))
+        match = re.search(r"(?<!\d)\d{15,22}(?!\d)", str(text))
         return int(match.group(0)) if match else None
     except Exception:
         return None
