@@ -75,10 +75,15 @@ async def get_registered_governors_for_user(discord_user_id: int) -> list[Regist
     summary = await governor_account_service.get_account_summary_for_user(discord_user_id)
     governors: list[RegisteredGovernor] = []
     for account in summary.resolved_accounts:
+        governor_name = str(
+            account.raw.get("GovernorName")
+            or account.raw.get("Governor")
+            or account.governor_id_str
+        )
         governors.append(
             RegisteredGovernor(
                 governor_id=account.governor_id,
-                governor_name=account.governor_name,
+                governor_name=governor_name,
                 account_type=account.slot,
             )
         )

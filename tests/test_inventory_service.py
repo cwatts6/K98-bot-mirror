@@ -136,6 +136,27 @@ async def test_get_registered_governors_for_user_maps_registry(monkeypatch):
     assert governors[0].account_type == "Main"
 
 
+async def test_get_registered_governors_preserves_legacy_name_fallbacks(monkeypatch):
+    async def _summary(_discord_user_id):
+        return inventory_service.governor_account_service.summarize_accounts(
+            {
+                "Main": {"GovernorID": "111", "Governor": "LegacyGov"},
+                "Alt 1": {"GovernorID": "222", "GovernorName": ""},
+            }
+        )
+
+    monkeypatch.setattr(
+        inventory_service.governor_account_service,
+        "get_account_summary_for_user",
+        _summary,
+    )
+
+    governors = await inventory_service.get_registered_governors_for_user(123)
+
+    assert governors[0].governor_name == "LegacyGov"
+    assert governors[1].governor_name == "222"
+
+
 async def test_user_can_import_for_governor_uses_shared_registered_governors(monkeypatch):
     async def _summary(_discord_user_id):
         return inventory_service.governor_account_service.summarize_accounts(
