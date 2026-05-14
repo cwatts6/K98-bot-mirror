@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 import logging
+import re
 
 from registry import registry_service
 from registry.account_slots import ACCOUNT_ORDER as _ACCOUNT_ORDER
@@ -17,6 +18,45 @@ class AccountLookup:
     ok: bool
     accounts: dict[str, dict[str, str]]
     error: str | None = None
+
+
+def parse_discord_user_id(text: str | int | None) -> int | None:
+    """Extract a Discord user id from raw text or a mention-like value."""
+    if text is None:
+        return None
+    try:
+        match = re.search(r"\d{15,22}", str(text))
+        return int(match.group(0)) if match else None
+    except Exception:
+        return None
+
+
+def all_account_slots() -> list[str]:
+    """Return the canonical account slots in display/autocomplete order."""
+    return list(_ACCOUNT_ORDER)
+
+
+def filter_account_slots(prefix: str | None = None, *, limit: int = 25) -> list[str]:
+    """Return canonical account slots filtered by an optional autocomplete prefix."""
+    value = (prefix or "").strip().casefold()
+    slots = all_account_slots()
+    if value:
+        slots = [slot for slot in slots if slot.casefold().startswith(value)]
+    return slots[:limit]
+
+
+def registered_account_slots(
+    accounts: dict[str, dict[str, str]], prefix: str | None = None, *, limit: int = 25
+) -> list[str]:
+    """Return registered slots in canonical order, preserving unknown slots after known ones."""
+    if not accounts:
+        return []
+    ordered = [slot for slot in _ACCOUNT_ORDER if slot in accounts]
+    ordered.extend(slot for slot in sorted(accounts) if slot not in set(ordered))
+    value = (prefix or "").strip().casefold()
+    if value:
+        ordered = [slot for slot in ordered if slot.casefold().startswith(value)]
+    return ordered[:limit]
 
 
 async def get_accounts_for_user(discord_user_id: int) -> AccountLookup:

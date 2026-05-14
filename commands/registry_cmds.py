@@ -19,7 +19,6 @@ from registry.governor_registry import (
     ConfirmRemoveView,
     ModifyGovernorView,
     RegisterGovernorView,
-    load_registry,
 )
 from registry.registry_io import (
     apply_import_plan,
@@ -34,6 +33,12 @@ from registry.registry_io import (
 )
 import registry.registry_service as registry_service
 from registry.registry_service import VALID_ACCOUNT_TYPES
+from services.governor_account_service import (
+    filter_account_slots,
+    get_accounts_for_user as get_user_accounts_async,
+    parse_discord_user_id,
+    registered_account_slots,
+)
 import target_utils
 from ui.views.admin_views import ConfirmImportView
 from ui.views.registry_views import MyRegsActionView
@@ -45,26 +50,6 @@ logger = logging.getLogger(__name__)
 def register_registry(bot: ext_commands.Bot) -> None:
 
     # --- helpers (reuse if already present) ---
-    def _get_user_key(registry: dict, user_id: int) -> str | None:
-        if not registry:
-            return None
-        s = str(user_id)
-        if s in registry:
-            return s
-        if user_id in registry:
-            registry[s] = registry.pop(user_id)
-            return s
-        return None
-
-    def _parse_user_id(text: str | None) -> int | None:
-        if not text:
-            return None
-        try:
-            m = re.search(r"\d{15,22}", str(text))
-            return int(m.group(0)) if m else None
-        except Exception:
-            return None
-
     # --- shared attachment parser ---
     def _parse_attachment(raw: bytes, ftype: str) -> list[dict]:
         """Parse CSV or XLSX bytes to rows. Returns empty list on failure."""
@@ -94,93 +79,20 @@ def register_registry(bot: ext_commands.Bot) -> None:
                 target_id = opt_user.id
             else:
                 # Fall back to the pasted ID field (works for both commands)
-                target_id = _parse_user_id(ctx.options.get("user_id"))
+                target_id = parse_discord_user_id(ctx.options.get("user_id"))
 
-            fallback = [
-                "Main",
-                "Alt 1",
-                "Alt 2",
-                "Alt 3",
-                "Alt 4",
-                "Alt 5",
-                "Farm 1",
-                "Farm 2",
-                "Farm 3",
-                "Farm 4",
-                "Farm 5",
-                "Farm 6",
-                "Farm 7",
-                "Farm 8",
-                "Farm 9",
-                "Farm 10",
-            ]
             if not target_id:
-                return fallback
+                return filter_account_slots(ctx.value)
 
-            registry = load_registry() or {}
-            user_key = _get_user_key(registry, target_id)
-            accounts = (registry.get(user_key) or {}).get("accounts", {})
-            if not accounts:
+            lookup = await get_user_accounts_async(target_id)
+            if not lookup.ok:
                 return []
-
-            existing = list(accounts.keys())
-            prefix = (ctx.value or "").lower()
-            if prefix:
-                existing = [x for x in existing if x.lower().startswith(prefix)]
-            return existing[:25]
+            return registered_account_slots(lookup.accounts, ctx.value)
         except Exception:
-            return [
-                "Main",
-                "Alt 1",
-                "Alt 2",
-                "Alt 3",
-                "Alt 4",
-                "Alt 5",
-                "Farm 1",
-                "Farm 2",
-                "Farm 3",
-                "Farm 4",
-                "Farm 5",
-                "Farm 6",
-                "Farm 7",
-                "Farm 8",
-                "Farm 9",
-                "Farm 10",
-            ]
+            return filter_account_slots(ctx.value)
 
     async def _account_type_all_ac(ctx: discord.AutocompleteContext):
-        all_types = [
-            "Main",
-            "Alt 1",
-            "Alt 2",
-            "Alt 3",
-            "Alt 4",
-            "Alt 5",
-            "Farm 1",
-            "Farm 2",
-            "Farm 3",
-            "Farm 4",
-            "Farm 5",
-            "Farm 6",
-            "Farm 7",
-            "Farm 8",
-            "Farm 9",
-            "Farm 10",
-            "Farm 11",
-            "Farm 12",
-            "Farm 13",
-            "Farm 14",
-            "Farm 15",
-            "Farm 16",
-            "Farm 17",
-            "Farm 18",
-            "Farm 19",
-            "Farm 20",
-        ]
-        prefix = (ctx.value or "").lower()
-        if prefix:
-            return [t for t in all_types if t.lower().startswith(prefix)][:25]
-        return all_types[:25]
+        return filter_account_slots(ctx.value)
 
     @bot.slash_command(
         name="register_governor",
@@ -227,32 +139,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
             return
         gid = gid_raw
 
-        # Match against cached roster — read through module to survive cache refreshes
-        # Warm the cache if empty — guards against cold start or failed background refresh
-        _cache_rows = (
-            (target_utils._name_cache or {}).get("rows", [])
-            if isinstance(target_utils._name_cache, dict)
-            else []
-        )
-        if not _cache_rows:
-            try:
-                await target_utils.refresh_name_cache_from_sql()
-            except Exception:
-                logger.exception("[register_governor] name cache warm failed")
-
-        all_rows = (
-            (target_utils._name_cache or {}).get("rows", [])
-            if isinstance(target_utils._name_cache, dict)
-            else []
-        )
-        logger.info(
-            "[DEBUG] name_cache rows=%d last_updated=%s",
-            len(all_rows),
-            target_utils._name_cache.get("last_updated", 0),
-        )
-        matched_row = next(
-            (r for r in all_rows if str(r.get("GovernorID", "")).strip() == gid), None
-        )
+        matched_row = await target_utils.lookup_governor_row_by_id(gid)
         if not matched_row:
             await ctx.interaction.edit_original_response(
                 content=(
@@ -296,11 +183,13 @@ def register_registry(bot: ext_commands.Bot) -> None:
 
         await safe_defer(ctx, ephemeral=True)
 
-        # --- Load registry + cache safely
+        # --- Load registry account state safely
         try:
-            registry = load_registry() or {}
+            accounts_lookup = await get_user_accounts_async(ctx.user.id)
+            if not accounts_lookup.ok:
+                raise RuntimeError(accounts_lookup.error or "registry unavailable")
         except Exception as e:
-            logger.exception("[modify_registration] load_registry failed")
+            logger.exception("[modify_registration] get_user_accounts failed")
             await ctx.interaction.edit_original_response(
                 content=f"❌ Could not load your registrations: `{type(e).__name__}: {e}`",
                 embed=None,
@@ -308,15 +197,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
             )
             return
 
-        from target_utils import _name_cache
-
-        all_rows = (_name_cache or {}).get("rows", []) if isinstance(_name_cache, dict) else []
-
-        # Registry keys may be str or int; support both
-        uid_str = str(ctx.user.id)
-        uid_int = ctx.user.id
-        user_rec = registry.get(uid_str) or registry.get(uid_int) or {}
-        user_accounts = user_rec.get("accounts") or {}
+        user_accounts = accounts_lookup.accounts
 
         # Ensure this slot exists
         if account_type not in user_accounts:
@@ -350,10 +231,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
             return
         gid = raw
 
-        # Look up in roster cache
-        matched_row = next(
-            (r for r in all_rows if str(r.get("GovernorID", "")).strip() == gid), None
-        )
+        matched_row = await target_utils.lookup_governor_row_by_id(gid)
         if not matched_row:
             await ctx.interaction.edit_original_response(
                 content=(
@@ -366,21 +244,25 @@ def register_registry(bot: ext_commands.Bot) -> None:
             return
 
         # Prevent duplicate registration across other users
-        for other_uid, data in registry.items():
-            if str(other_uid) == uid_str:
-                continue
-            for acc_type, details in (data.get("accounts") or {}).items():
-                if str(details.get("GovernorID", "")).strip() == gid:
-                    existing_user = data.get("discord_name", f"<@{other_uid}>")
-                    await ctx.interaction.edit_original_response(
-                        content=(
-                            f"❌ This Governor ID `{gid}` is already registered to "
-                            f"**{existing_user}** ({acc_type})."
-                        ),
-                        embed=None,
-                        view=None,
-                    )
-                    return
+        try:
+            claimed_by_other = await asyncio.to_thread(
+                registry_service.check_governor_claimed_by_other, gid, ctx.user.id
+            )
+        except Exception as e:
+            logger.exception("[modify_registration] claimed check failed")
+            await ctx.interaction.edit_original_response(
+                content=f"❌ Could not validate Governor ID ownership: `{type(e).__name__}: {e}`",
+                embed=None,
+                view=None,
+            )
+            return
+        if claimed_by_other:
+            await ctx.interaction.edit_original_response(
+                content=f"❌ This Governor ID `{gid}` is already registered to another user.",
+                embed=None,
+                view=None,
+            )
+            return
 
         gov_name = matched_row.get("GovernorName", "Unknown")
         view = ModifyGovernorView(ctx.user, account_type, gid, gov_name)
@@ -413,7 +295,9 @@ def register_registry(bot: ext_commands.Bot) -> None:
         await safe_defer(ctx, ephemeral=True)
 
         target_user_id = (
-            discord_user.id if isinstance(discord_user, discord.User) else _parse_user_id(user_id)
+            discord_user.id
+            if isinstance(discord_user, discord.User)
+            else parse_discord_user_id(user_id)
         )
         if not target_user_id:
             await ctx.interaction.edit_original_response(
@@ -430,7 +314,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
         from registry.registry_service import get_user_accounts, remove_governor
 
         # Pre-check: confirm slot exists so we can give a clear message before acting
-        accounts = get_user_accounts(target_user_id)
+        accounts = await asyncio.to_thread(get_user_accounts, target_user_id)
         if account_type not in accounts:
             await ctx.interaction.edit_original_response(
                 content=f"⚠️ `{account_type}` is not registered for {target_display}."
@@ -485,7 +369,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=True)
 
-        target_id = _parse_user_id(user_id)
+        target_id = parse_discord_user_id(user_id)
         if not target_id:
             await ctx.interaction.edit_original_response(
                 content="❌ Please paste a valid Discord user ID (15–22 digits) or a mention."
@@ -494,7 +378,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
 
         from registry.registry_service import get_user_accounts, remove_governor
 
-        accounts = get_user_accounts(target_id)
+        accounts = await asyncio.to_thread(get_user_accounts, target_id)
         if not accounts:
             await ctx.interaction.edit_original_response(
                 content=f"⚠️ No registry entry found for ID `{target_id}`."
@@ -701,13 +585,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
             )
             return
 
-        # Validate governor exists in cache — read through module to survive cache refreshes
-        all_rows = (
-            (target_utils._name_cache or {}).get("rows", [])
-            if isinstance(target_utils._name_cache, dict)
-            else []
-        )
-        row = next((r for r in all_rows if str(r.get("GovernorID", "")).strip() == gid), None)
+        row = await target_utils.lookup_governor_row_by_id(gid)
         if not row:
             await ctx.interaction.edit_original_response(
                 content=(
@@ -1526,13 +1404,9 @@ def register_registry(bot: ext_commands.Bot) -> None:
         embed.set_footer(text="Click Confirm to apply, or Cancel to abort.")
 
         async def _apply_import(interaction: discord.Interaction):
-            # Reload existing registry fresh at confirm time — avoids stale
-            # dict from dry-run phase, though SQL constraints protect integrity
-            # regardless.
-            fresh_existing = load_registry()
             try:
                 _new_registry, summary, apply_errors = apply_import_plan(
-                    changes, fresh_existing, dry_run=False
+                    changes, None, dry_run=False
                 )
                 if apply_errors:
                     logger.warning(

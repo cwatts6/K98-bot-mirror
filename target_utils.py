@@ -211,6 +211,31 @@ async def refresh_name_cache_from_sql() -> None:
         logger.warning("[TARGET_UTILS] refresh_name_cache_from_sql failed; keeping existing cache")
 
 
+async def lookup_governor_row_by_id(governor_id: str | int) -> dict[str, Any] | None:
+    """
+    Return the cached governor row for a numeric GovernorID, warming the cache if needed.
+
+    Command and view code should use this public helper instead of reading the
+    private _name_cache structure directly.
+    """
+    gid = str(governor_id or "").strip()
+    if not gid or not gid.isdigit():
+        return None
+
+    rows = _name_cache.get("rows", []) if isinstance(_name_cache, dict) else []
+    if not rows:
+        try:
+            await refresh_name_cache_from_sql()
+        except Exception:
+            logger.exception("[TARGET_UTILS] lookup_governor_row_by_id cache warm failed")
+
+    rows = _name_cache.get("rows", []) if isinstance(_name_cache, dict) else []
+    for row in rows:
+        if str(row.get("GovernorID", "")).strip() == gid:
+            return dict(row)
+    return None
+
+
 # Small diagnostic helper to inspect cache state (useful in logs / REPL)
 def get_name_cache_status() -> dict[str, Any]:
     return {

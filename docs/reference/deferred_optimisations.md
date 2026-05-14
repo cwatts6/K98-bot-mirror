@@ -49,3 +49,21 @@ Resolved historical notes were moved to `archive/deferred_optimisations_resolved
 - Impact: medium
 - Risk: medium
 - Dependencies: Preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to the KVK_ALL modernisation programme.
+
+### Deferred Optimisation
+- Area: `commands/registry_cmds.py` registration audit and bulk import/export flows
+- Type: architecture
+- Description: The registry command module still owns substantial audit, bulk export, and bulk import response/report orchestration after the account-slot and GovernorID lookup helpers were centralised.
+- Suggested Fix: Move audit summary construction, export row shaping, import preview/error-response construction, and confirmation apply orchestration into a dedicated registry command service while leaving `registry_cmds.py` responsible for Discord defer/respond/file-send plumbing.
+- Impact: medium
+- Risk: medium
+- Dependencies: Preserve CSV/XLSX compatibility, ephemeral admin responses, and current overwrite confirmation behaviour.
+
+### Deferred Optimisation
+- Area: `registry/governor_registry.py`
+- Type: architecture
+- Description: The legacy registry facade still contains Discord UI view classes alongside backward-compatible persistence helpers, mixing service facade responsibilities with interaction-layer code.
+- Suggested Fix: Move `RegisterGovernorView`, `ModifyGovernorView`, and `ConfirmRemoveView` into `ui/views/registry_views.py` or a focused registry view module, then keep `registry/governor_registry.py` as a compatibility facade over registry services only.
+- Impact: medium
+- Risk: medium
+- Dependencies: Confirm all imports from registry command, telemetry, stats, and UI flows are updated without breaking registration confirmation behavior.
