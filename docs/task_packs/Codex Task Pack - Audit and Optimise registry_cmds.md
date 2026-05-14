@@ -337,3 +337,92 @@ Deferred Optimisations
 - Medium risk because registry commands affect player account linking and admin import/export workflows.
 - Rollback by reverting this PR and redeploying the previous bot version.
 - No SQL deployment expected unless audit finds a contract mismatch.
+
+## 18. PR 84 Completion Update
+
+Status: tested successfully and deployed to production.
+
+PR 84 completed the first registry command standardisation pass:
+
+- `commands/registry_cmds.py` now reuses shared account-slot and Discord user-id parsing helpers from `services/governor_account_service.py`.
+- Registry account ordering now uses the canonical `registry/account_slots.py` list, expanded through Farm 20.
+- User-facing GovernorID roster lookups no longer read `target_utils._name_cache` directly from command handlers; they use `target_utils.lookup_governor_row_by_id()`.
+- `/my_registrations` now loads through `registry_service.load_registry_as_dict` instead of the removed legacy `load_registry` facade path.
+- The import-confirm apply path no longer reloads the old facade registry before applying an import plan.
+- Focused tests were added for registry command helper usage, GovernorID lookup, account slots, and the `/my_registrations` loader regression.
+- The task pack was added to the PR and later cleaned for trailing whitespace so production promotion validation passes.
+
+Validation completed during PR 84:
+
+- `.\.venv\Scripts\python.exe -m py_compile commands/registry_cmds.py services/governor_account_service.py target_utils.py registry/account_slots.py`
+- `.\.venv\Scripts\python.exe scripts\select_tests.py`
+- `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
+- `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
+- `.\.venv\Scripts\python.exe scripts\smoke_imports.py`
+- `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests/test_registry_cmds.py tests/test_governor_account_service.py tests/test_target_utils_governor_lookup.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests -k "registry or registration or governor"`
+- Full suite result reported during the PR: `1323 passed, 2 skipped`.
+
+## 19. Refactor Decision Outcomes
+
+Issue	Decision	Reason
+Duplicate account type lists	complete in PR 84	Canonical account slots now come from `registry/account_slots.py` and command autocomplete uses `services/governor_account_service.py`.
+Direct _name_cache access	complete in PR 84	Command handlers now call `target_utils.lookup_governor_row_by_id()` instead of reading `target_utils._name_cache`.
+Duplicate GovernorID normalisation	partially complete / defer	User-facing registration lookup paths were standardised, but audit/import/export still contain local GovernorID extraction and normalisation logic.
+Duplicate Excel-safe helpers	defer	Excel-safe export formatting remains inside the command-heavy audit/export flows and should move with the next registry command service extraction.
+Heavy audit logic in command	defer	Captured in `docs/reference/deferred_optimisations.md` as the registry audit and bulk import/export service extraction item.
+Heavy import dry-run/apply logic in command	defer	Captured in `docs/reference/deferred_optimisations.md`; preserve CSV/XLSX and overwrite-confirm behaviour during extraction.
+Mixed registry load methods	complete in PR 84 for registry commands	`/my_registrations` and touched import-confirm paths no longer rely on the old `load_registry` facade reference.
+Inline imports inside command functions	defer	Some admin remove paths still import registry service functions inline; clean this up during the next command-service extraction.
+Response/defer inconsistency	defer	PR 84 preserved player-facing behaviour; a full response sequencing pass should happen with the command-service extraction.
+Test gaps	partially complete / defer	Focused helper and regression coverage was added; broader audit/import/export behavioural coverage remains part of the next phase.
+
+## 20. Deferred To Next Phase
+
+Carry these items into the next registry/account-resolution optimisation PR:
+
+- Extract registry audit, bulk export, bulk import preview/error-response construction, and import apply orchestration into a dedicated registry command service.
+- Move `RegisterGovernorView`, `ModifyGovernorView`, and `ConfirmRemoveView` out of `registry/governor_registry.py` into the UI layer, keeping the facade persistence-only.
+- Consolidate richer account resolution across registry, stats, telemetry, MGE, and inventory into one shared summary object. PR 84 introduced basic helpers, but `StatsAccountSummary`, `AccountLookup`, inventory `RegisteredGovernor` resolution, and any MGE/telemetry account lookup paths are still separate shapes.
+- Remove remaining inline imports in `commands/registry_cmds.py` once service ownership is clearer.
+- Move local GovernorID extraction/normalisation and Excel-safe formatting out of command handlers as part of the audit/export/import extraction.
+- Add focused tests for audit summary construction, export row shaping, import dry-run validation, import error-file generation, and confirmation apply orchestration.
+
+## 21. Next Phase Chat Starter
+
+Use this in a fresh Codex chat:
+
+```text
+Codex, start the next phase after PR 84 (`registry-cmds-audit-and-optimisation`) was tested and deployed to production.
+
+Use the K98 repo workflow and required docs. Read `docs/task_packs/Codex Task Pack - Audit and Optimise registry_cmds.md` and `docs/reference/deferred_optimisations.md` first.
+
+Goal: implement the deferred phase from PR 84. Focus on extracting registry audit, bulk export, and bulk import dry-run/apply orchestration out of `commands/registry_cmds.py` into a service/helper layer, and design the shared richer account-resolution summary object for registry/stats/telemetry/MGE/inventory. Keep the work PR-sized: if both themes are too large, scope and propose the split before coding.
+
+Important context:
+- PR 84 already centralised basic account slots, Discord user-id parsing, and public GovernorID roster lookup.
+- Do not regress `/my_registrations`; it must use `registry_service.load_registry_as_dict`.
+- Preserve command names, permissions, ephemeral/admin behaviour, CSV/XLSX compatibility, and overwrite confirmation behaviour.
+- Check whether `StatsAccountSummary`, `AccountLookup`, inventory `RegisteredGovernor` resolution, and any MGE/telemetry account lookup paths can share one richer summary object.
+- Update deferred items as completed/deferred and run the K98 validation gates selected by `scripts/select_tests.py`.
+```
+
+## 22. PR 85A Scope Update
+
+Split decision: the next phase is divided into two PR-sized changes.
+
+PR 85A implements the registry command-service extraction only:
+
+- Extract registration audit summary/file construction into a Discord-free registry command service.
+- Extract bulk registration export row/file construction into the same service.
+- Extract bulk import dry-run preview/error-file construction and apply summary shaping into the same service.
+- Keep `commands/registry_cmds.py` responsible for slash command registration, permissions, safe defer/respond/followup handling, attachment waiting/reading, embeds, Discord files, and confirmation views.
+- Preserve `/my_registrations` loading through `registry_service.load_registry_as_dict`.
+- Preserve command names, admin-only restrictions, ephemeral/admin behavior, CSV/XLSX compatibility, and overwrite confirmation behavior.
+- Remove the matching active deferred item from `docs/reference/deferred_optimisations.md` once implemented.
+
+PR 85B remains deferred:
+
+- Design and migrate the richer shared account-resolution summary object across registry, stats, telemetry, MGE, and inventory.
+- Preserve `StatsAccountSummary`, `AccountLookup`, and inventory `RegisteredGovernor` behavior until each command surface has focused migration tests.

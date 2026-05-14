@@ -2,10 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-from decimal import Decimal, InvalidOperation
-import io
 import logging
-import re
 from typing import Any
 
 import discord
@@ -15,24 +12,28 @@ from bot_config import GUILD_ID
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import is_admin_and_notify_channel, track_usage
 from registry.account_slots import ACCOUNT_ORDER
+from registry.dal.audit_dal import get_active_players
 from registry.governor_registry import (
     ConfirmRemoveView,
     ModifyGovernorView,
     RegisterGovernorView,
 )
-from registry.registry_io import (
-    apply_import_plan,
-    build_error_csv_bytes,
-    build_error_xlsx_bytes,
-    export_registration_audit_files,
-    export_registration_audit_xlsx_bytes,
-    parse_csv_bytes,
-    parse_xlsx_bytes,
-    prepare_import_plan,
-    rows_to_xlsx_bytes,
+from registry.registry_command_service import (
+    apply_import_changes,
+    build_import_preview,
+    build_import_summary_file_bytes,
+    build_import_summary_text,
+    build_registration_audit_payload,
+    build_registration_export_payload,
+    parse_attachment_bytes,
 )
 import registry.registry_service as registry_service
-from registry.registry_service import VALID_ACCOUNT_TYPES
+from registry.registry_service import (
+    VALID_ACCOUNT_TYPES,
+    admin_register_or_replace,
+    get_user_accounts,
+    remove_governor,
+)
 from services.governor_account_service import (
     filter_account_slots,
     get_accounts_for_user as get_user_accounts_async,
@@ -50,26 +51,6 @@ logger = logging.getLogger(__name__)
 def register_registry(bot: ext_commands.Bot) -> None:
 
     # --- helpers (reuse if already present) ---
-    # --- shared attachment parser ---
-    def _parse_attachment(raw: bytes, ftype: str) -> list[dict]:
-        """Parse CSV or XLSX bytes to rows. Returns empty list on failure."""
-        if ftype == "csv":
-            return parse_csv_bytes(raw)
-        if ftype == "xlsx":
-            try:
-                return parse_xlsx_bytes(raw)
-            except Exception:
-                logger.exception("[IMPORT] XLSX parse failed, attempting CSV fallback")
-                return parse_csv_bytes(raw)
-        # unknown: try CSV first, then XLSX
-        rows = parse_csv_bytes(raw)
-        if not rows:
-            try:
-                rows = parse_xlsx_bytes(raw)
-            except Exception:
-                rows = []
-        return rows
-
     # --- UNIFIED autocomplete for account_type (works with both commands) ---
     async def _account_type_ac(ctx: discord.AutocompleteContext):
         try:
@@ -310,8 +291,6 @@ def register_registry(bot: ext_commands.Bot) -> None:
             if isinstance(discord_user, discord.User)
             else f"`{target_user_id}`"
         )
-
-        from registry.registry_service import get_user_accounts, remove_governor
 
         # Pre-check: confirm slot exists so we can give a clear message before acting
         accounts = await asyncio.to_thread(get_user_accounts, target_user_id)
@@ -600,7 +579,6 @@ def register_registry(bot: ext_commands.Bot) -> None:
         # Write via service layer.
         # admin_register_or_replace overwrites an existing slot if present,
         # rather than rejecting with RC_DUPE_SLOT.
-        from registry.registry_service import admin_register_or_replace
 
         ok, err = admin_register_or_replace(
             target_discord_user_id=discord_user.id,
@@ -664,8 +642,6 @@ def register_registry(bot: ext_commands.Bot) -> None:
           2) unregistered_current_governors.csv – CURRENT (SQL view) governors missing from registry
           3) members_without_registration.csv – guild members without any registration
         """
-        from decimal import ROUND_HALF_UP
-
         await safe_defer(ctx, ephemeral=True)
 
         guild: discord.Guild | None = ctx.guild
@@ -674,74 +650,6 @@ def register_registry(bot: ext_commands.Bot) -> None:
                 content="❌ This command must be used in a server."
             )
             return
-
-        # ---------- GovernorID normalizer & extractor ----------
-        def _norm_gid(val) -> str:
-            """
-            Normalize GovernorID to a canonical string:
-            - safe on None
-            - unwrap Excel-safe form ="12345"
-            - if numeric (int/float/Decimal or numeric-looking string), convert via Decimal(...).to_integral_value()
-            - strip leading zeros
-            """
-            if val is None:
-                return ""
-            # numeric types first
-            if isinstance(val, int):
-                s = str(val)
-            elif isinstance(val, float):
-                try:
-                    s = str(Decimal(str(val)).to_integral_value(rounding=ROUND_HALF_UP))
-                except Exception:
-                    s = str(int(val))
-            elif isinstance(val, Decimal):
-                s = str(val.to_integral_value(rounding=ROUND_HALF_UP))
-            else:
-                s = str(val).strip()
-                if s.startswith('="') and s.endswith('"') and len(s) >= 3:
-                    s = s[2:-1]
-                s = s.replace(",", "")  # strip thousands separators if any
-                # numeric-looking string? handle decimals/scientific
-                if re.fullmatch(r"[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?", s):
-                    try:
-                        s = str(Decimal(s).to_integral_value(rounding=ROUND_HALF_UP))
-                    except (InvalidOperation, ValueError):
-                        pass
-            # finally, ensure digits & remove leading zeros
-            digits = re.findall(r"\d+", s)
-            if digits:
-                s = "".join(digits)
-            return s.lstrip("0") or ("0" if s else "")
-
-        def _extract_gov_id(details: dict) -> str:
-            """
-            Pull a GovernorID out of a registry account dict.
-            Accepts many key spellings: 'GovernorID', 'Governor ID', 'GovernorId', 'gov_id', 'govid', etc.
-            """
-            if not isinstance(details, dict):
-                return ""
-            for k in (
-                "GovernorID",
-                "Governor Id",
-                "GovernorId",
-                "gov_id",
-                "govid",
-                "GovID",
-                "Gov Id",
-            ):
-                if details.get(k):
-                    return str(details[k])
-            for k, v in details.items():
-                nk = re.sub(r"[^a-z0-9]", "", str(k).lower())
-                if (
-                    ("governor" in nk and "id" in nk)
-                    or nk in ("govid", "govidnumber", "governorid")
-                ) and v:
-                    return str(v)
-            return ""
-
-        # ---------- SQL via audit_dal ----------
-        from registry.dal.audit_dal import get_active_players
 
         try:
             sql_rows = await asyncio.to_thread(get_active_players)
@@ -787,210 +695,41 @@ def register_registry(bot: ext_commands.Bot) -> None:
             names = [r.name for r in member.roles if r.name != "@everyone"]
             return ";".join(names), (member.top_role.name if names else "")
 
-        def excel_safe_formula(value: str) -> str:
-            v = (value or "").strip()
-            return f'="{v}"' if v else ""
+        members_info: dict[str, dict] = {}
+        for member in (m for m in guild.members if not getattr(m, "bot", False)):
+            roles_str, top_role = role_names(member)
+            members_info[str(member.id)] = {
+                "discord_user": str(member),
+                "roles": roles_str,
+                "top_role": top_role,
+            }
 
-        cached_members: dict[str, discord.Member] = (
-            {str(m.id): m for m in guild.members} if guild.members else {}
-        )
-        fetch_cache: dict[str, discord.Member | None] = {}
-
-        async def get_member(uid_str: str):
-            m = cached_members.get(uid_str)
-            if m is not None:
-                return m
-            if uid_str in fetch_cache:
-                return fetch_cache[uid_str]
-            try:
-                m = await guild.fetch_member(int(uid_str))
-            except Exception:
-                m = None
-            fetch_cache[uid_str] = m
-            return m
-
-        # ---------- Build REGISTERED rows + set of normalized registered GovernorIDs ----------
-        registered_ids: set[str] = set()
-        registered_rows: list[dict] = []
-        registered_rows_with_id = 0  # diagnostics
-
-        for uid, data in registry.items():
-            uid_str = str(uid).strip()
-            accounts = data.get("accounts", {})
-            if not isinstance(accounts, dict):
-                continue
-            for acc_type, details in accounts.items():
-                gov_id_raw = _extract_gov_id(details)
-                gov_id_norm = _norm_gid(gov_id_raw)
-                gov_name = str(details.get("GovernorName") or "Unknown").strip()
-
-                if gov_id_norm:
-                    registered_ids.add(gov_id_norm)
-                    registered_rows_with_id += 1
-
-                registered_rows.append(
-                    {
-                        "discord_id": uid_str,
-                        "discord_id_excel": excel_safe_formula(uid_str),
-                        "discord_user": str(data.get("discord_name", uid_str)).strip(),
-                        "account_type": str(acc_type).strip(),
-                        "governor_id": str(gov_id_raw or "").strip(),  # raw for humans
-                        "governor_id_excel": excel_safe_formula(str(gov_id_raw or "")),
-                        "governor_name": gov_name,
-                        "_member": None,
-                        "roles": "",
-                        "top_role": "",
-                    }
-                )
-
-        # Resolve member objects for registered rows (roles/top_role)
-        for row in registered_rows:
-            uid = row["discord_id"]
-            member = cached_members.get(uid) or await get_member(uid)
-            row["_member"] = member
-        for row in registered_rows:
-            roles_str, top = role_names(row["_member"])
-            row["roles"], row["top_role"] = roles_str, top
-            row.pop("_member", None)
-
-        # ---------- CURRENT governors from SQL → normalized sets & lookup ----------
-        # SQL now returns BIGINT for GovernorID, so just stringify it.
-        current_ids: set[str] = set()
-        row_by_id: dict[str, dict] = {}
-
-        for r in sql_rows:
-            gid_val = r.get("GovernorID")
-            if gid_val is None:
-                continue
-            gid_sql = str(int(gid_val))  # bigint -> "123456"
-            current_ids.add(gid_sql)
-            if gid_sql not in row_by_id:
-                row_by_id[gid_sql] = r
-
-        unregistered_ids = sorted(current_ids - registered_ids)
+        audit_payload = build_registration_audit_payload(registry, members_info, sql_rows)
 
         logger.info(
-            "[registration_audit] SQL current=%d, registry=%d (with_gov_id=%d), unmatched=%d",
-            len(current_ids),
-            len(registry),
-            len(registered_ids),
-            len(unregistered_ids),
+            "[registration_audit] registered_accounts=%d unregistered_current=%d members_without_registration=%d",
+            audit_payload.registered_accounts_total,
+            audit_payload.unregistered_current_governors_count,
+            audit_payload.members_without_registration_count,
         )
-        if registered_ids and len(unregistered_ids) == len(current_ids):
-            sample_sql = list(sorted(current_ids))[:5]
-            sample_reg = list(sorted(registered_ids))[:5]
-            logger.exception(
-                "[registration_audit] All current appear unregistered. Sample SQL: %s | Sample REG: %s",
-                sample_sql,
-                sample_reg,
-            )
-
-        # ---------- Guild members without any registration ----------
-        try:
-            members = [m for m in guild.members if not m.bot]
-        except Exception:
-            members = []
-        registered_user_ids = set(str(k).strip() for k in registry.keys())
-        members_without_reg = [m for m in members if str(m.id) not in registered_user_ids]
-
-        # ---------- Build members_info mapping and files via registry_io (CSV + XLSX) ----------
-        members_info: dict[str, dict] = {}
-        all_members_source = {str(m.id): m for m in guild.members} if guild.members else {}
-        for uid in set(list(all_members_source.keys()) + [str(m.id) for m in members_without_reg]):
-            mem = all_members_source.get(uid)
-            if mem:
-                roles_str, top_role = role_names(mem)
-                members_info[uid] = {
-                    "discord_user": str(mem),
-                    "roles": roles_str,
-                    "top_role": top_role,
-                }
-            else:
-                members_info[uid] = {"discord_user": uid, "roles": "", "top_role": ""}
-
-        files = export_registration_audit_files(registry, members_info, sql_rows)
-        # Also produce an XLSX workbook with three sheets
-        try:
-            xlsx_bytes = export_registration_audit_xlsx_bytes(registry, members_info, sql_rows)
-        except Exception:
-            logger.exception("Failed to produce XLSX audit workbook")
-            xlsx_bytes = None
-
-        # ---------- Compute counts for the audit embed ----------
-        # Total registered account rows (accounts per user)
-        registered_accounts_total = 0
-        registered_ids_set: set[str] = set()
-        for uid, data in (registry or {}).items():
-            accs = data.get("accounts") or {}
-            if isinstance(accs, dict):
-                registered_accounts_total += len(accs)
-                for det in accs.values():
-                    # attempt to find GovernorID from common keys
-                    gid = ""
-                    if isinstance(det, dict):
-                        for k in (
-                            "GovernorID",
-                            "Governor Id",
-                            "GovernorId",
-                            "gov_id",
-                            "govid",
-                            "GovID",
-                            "Gov Id",
-                        ):
-                            v = det.get(k)
-                            if v:
-                                gid = str(v).strip()
-                                break
-                        if not gid:
-                            # fallback: check any value keys containing governor+id
-                            for k2, v2 in det.items():
-                                nk = re.sub(r"[^a-z0-9]", "", str(k2).lower())
-                                if (
-                                    ("governor" in nk and "id" in nk)
-                                    or nk in ("govid", "governorid")
-                                ) and v2:
-                                    gid = str(v2).strip()
-                                    break
-                    if gid:
-                        # normalize numeric-like from audit normalizer (strip wrappers/commas)
-                        try:
-                            gid_norm = _norm_gid(gid)
-                        except Exception:
-                            gid_norm = gid
-                        if gid_norm:
-                            registered_ids_set.add(gid_norm)
-
-        # compute current IDs from SQL rows (as per prior logic)
-        current_ids: set[str] = set()
-        for r in sql_rows:
-            gid_val = r.get("GovernorID")
-            if gid_val is None:
-                continue
-            try:
-                gid_sql = str(int(gid_val))
-            except Exception:
-                gid_sql = str(gid_val)
-            current_ids.add(gid_sql)
-
-        unregistered_ids = sorted(current_ids - registered_ids_set)
-        unregistered_count = len(unregistered_ids)
-        members_without_registration_count = len(members_without_reg)
 
         # ---------- Summary embed ----------
         embed = discord.Embed(
             title="🧾 Registration Audit (Current Governors)", color=discord.Color.blurple()
         )
         embed.add_field(
-            name="Registered accounts", value=f"{registered_accounts_total:,}", inline=True
+            name="Registered accounts",
+            value=f"{audit_payload.registered_accounts_total:,}",
+            inline=True,
         )
         embed.add_field(
             name="Unregistered current governors (SQL)",
-            value=f"{unregistered_count:,}",
+            value=f"{audit_payload.unregistered_current_governors_count:,}",
             inline=True,
         )
         embed.add_field(
             name="Discord members without registration",
-            value=f"{members_without_registration_count:,}",
+            value=f"{audit_payload.members_without_registration_count:,}",
             inline=True,
         )
         embed.set_footer(
@@ -1002,18 +741,23 @@ def register_registry(bot: ext_commands.Bot) -> None:
         send_files = []
         try:
             send_files = [
-                discord.File(files["registered_accounts.csv"], filename="registered_accounts.csv"),
                 discord.File(
-                    files["unregistered_current_governors.csv"],
+                    audit_payload.files["registered_accounts.csv"],
+                    filename="registered_accounts.csv",
+                ),
+                discord.File(
+                    audit_payload.files["unregistered_current_governors.csv"],
                     filename="unregistered_current_governors.csv",
                 ),
                 discord.File(
-                    files["members_without_registration.csv"],
+                    audit_payload.files["members_without_registration.csv"],
                     filename="members_without_registration.csv",
                 ),
             ]
-            if xlsx_bytes:
-                send_files.append(discord.File(xlsx_bytes, filename="registration_audit.xlsx"))
+            if audit_payload.xlsx_bytes:
+                send_files.append(
+                    discord.File(audit_payload.xlsx_bytes, filename="registration_audit.xlsx")
+                )
 
             await ctx.followup.send(files=send_files, ephemeral=True)
         except Exception:
@@ -1044,8 +788,6 @@ def register_registry(bot: ext_commands.Bot) -> None:
           - Dual ID columns: raw + Excel-safe formula form (e.g., =\"123...\")
           - Stable sorting for easier audits (discord_user, then account_type)
         """
-        import csv as _csv
-
         await safe_defer(ctx, ephemeral=True)
 
         guild: discord.Guild | None = ctx.guild
@@ -1081,7 +823,6 @@ def register_registry(bot: ext_commands.Bot) -> None:
             )
             return
 
-        # Helper: stringify a member's roles (exclude @everyone)
         def role_names(member: discord.Member | None) -> tuple[str, str]:
             if member is None:
                 return "", ""
@@ -1090,118 +831,39 @@ def register_registry(bot: ext_commands.Bot) -> None:
             top = member.top_role.name if names else ""
             return roles_str, top
 
-        # Helper: Excel-safe formula wrapper to prevent numeric coercion on open
-        def excel_safe_formula(value: str) -> str:
-            v = (value or "").strip()
-            return f'="{v}"' if v else ""
-
-        # Build a quick lookup from cached members (best case when Members Intent is enabled)
-        # Use len(guild.members) to avoid relying on private attributes.
+        members_info: dict[str, dict] = {}
         cached_members: dict[str, discord.Member] = (
             {str(m.id): m for m in guild.members} if guild.members else {}
         )
+        missing_ids = {
+            str(uid).strip() for uid in registry.keys() if str(uid).strip() not in cached_members
+        }
+        fetched: dict[str, discord.Member | None] = {}
+        for uid in missing_ids:
+            try:
+                fetched[uid] = await guild.fetch_member(int(uid))
+            except Exception:
+                fetched[uid] = None
 
-        rows = []
-        missing_ids: set[str] = set()  # users not in cache; we'll try fetching lazily
+        for uid, member in {**cached_members, **fetched}.items():
+            roles_str, top = role_names(member)
+            members_info[uid] = {"roles": roles_str, "top_role": top}
 
-        for uid, data in registry.items():
-            uid_str = str(uid).strip()
-            member = cached_members.get(uid_str)
-            if member is None:
-                missing_ids.add(uid_str)
-
-            accounts = data.get("accounts", {})
-            if not isinstance(accounts, dict):
-                continue
-
-            for acc_type, details in accounts.items():
-                gov_id_raw = str(details.get("GovernorID", "")).strip()
-                rows.append(
-                    {
-                        "discord_id": uid_str,
-                        "discord_id_excel": excel_safe_formula(uid_str),
-                        "discord_user": data.get("discord_name", uid_str),
-                        "account_type": str(acc_type).strip(),
-                        "governor_id": gov_id_raw,
-                        "governor_id_excel": excel_safe_formula(gov_id_raw),
-                        "governor_name": details.get("GovernorName", ""),
-                        "_roles_member": member,  # temp; fill roles/top_role later
-                        "roles": "",
-                        "top_role": "",
-                    }
-                )
-
-        # Try to fetch any members that weren't cached (if Members Intent isn’t populating guild.members)
-        if missing_ids:
-            fetched: dict[str, discord.Member | None] = {}
-            for uid in list(missing_ids):
-                try:
-                    m = await guild.fetch_member(int(uid))
-                    fetched[uid] = m
-                except Exception:
-                    fetched[uid] = None  # keep None if not found (left the server, etc.)
-
-            # fill roles/top_role for missing via fetched
-            for r in rows:
-                if r["_roles_member"] is None:
-                    mem = fetched.get(r["discord_id"])
-                    r["_roles_member"] = mem
-
-        # Now populate roles/top_role and strip temp field
-        for r in rows:
-            roles_str, top = role_names(r["_roles_member"])
-            r["roles"] = roles_str
-            r["top_role"] = top
-            r.pop("_roles_member", None)
-
-        if not rows:
+        export_payload = build_registration_export_payload(registry, members_info)
+        if export_payload.row_count == 0:
             await ctx.interaction.edit_original_response(
                 content="📭 No registrations found to export."
             )
             return
 
-        # Stable sort: discord_user (casefolded) then account_type
-        rows.sort(
-            key=lambda r: (
-                str(r.get("discord_user", "")).casefold(),
-                str(r.get("account_type", "")).casefold(),
-            )
-        )
-
-        # Write CSV with UTF-8 BOM (utf-8-sig) so Excel handles Unicode cleanly
-        buf = io.StringIO()
-        headers = [
-            "discord_id",  # raw (machine-readable)
-            "discord_id_excel",  # Excel-safe display (=\"...\")
-            "discord_user",
-            "account_type",
-            "governor_id",  # raw (machine-readable)
-            "governor_id_excel",  # Excel-safe display (=\"...\")
-            "governor_name",
-            "roles",
-            "top_role",
-        ]
-        writer = _csv.DictWriter(buf, fieldnames=headers, lineterminator="\n")
-        writer.writeheader()
-        for r in rows:
-            writer.writerow({k: r.get(k, "") for k in headers})
-
-        # Encode with BOM for Excel
-        csv_bytes = io.BytesIO(buf.getvalue().encode("utf-8-sig"))
-
-        # Also produce XLSX for the same rows (preserve roles, excel-safe columns)
-        try:
-            xlsx_bytes = rows_to_xlsx_bytes(rows, headers, sheet_name="registrations")
-        except Exception:
-            logger.exception("Failed to produce XLSX export for registrations")
-            xlsx_bytes = None
-
         await ctx.interaction.edit_original_response(
             content="📤 Exported current registrations (CSV and XLSX)."
         )
-        send_files = [discord.File(csv_bytes, filename="registrations_export.csv")]
-        if xlsx_bytes:
-            send_files.append(discord.File(xlsx_bytes, filename="registrations_export.xlsx"))
+        send_files = [discord.File(export_payload.csv_bytes, filename="registrations_export.csv")]
+        if export_payload.xlsx_bytes:
+            send_files.append(
+                discord.File(export_payload.xlsx_bytes, filename="registrations_export.xlsx")
+            )
         try:
             await ctx.followup.send(files=send_files, ephemeral=True)
         except Exception:
@@ -1215,7 +877,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
             "[EXPORT] bulk export by %s (%s) — %d registration row(s)",
             ctx.user,
             ctx.user.id,
-            len(rows),
+            export_payload.row_count,
         )
 
     # ===== BULK IMPORT (FOLLOW-UP ATTACHMENT FLOW) =====
@@ -1313,17 +975,15 @@ def register_registry(bot: ext_commands.Bot) -> None:
             )
             return
 
-        rows = _parse_attachment(raw, ftype)
+        rows = parse_attachment_bytes(raw, ftype)
         if not rows:
             await ctx.interaction.edit_original_response(
                 content="❌ File could not be parsed or appears to have no data."
             )
             return
 
-        from registry.registry_service import load_registry_as_dict
-
         try:
-            existing = load_registry_as_dict()
+            existing = registry_service.load_registry_as_dict()
         except Exception as e:
             logger.exception("[IMPORT] load_registry_as_dict failed")
             await ctx.interaction.edit_original_response(
@@ -1335,82 +995,73 @@ def register_registry(bot: ext_commands.Bot) -> None:
             )
             return
 
-        changes, errors, warnings, error_rows = prepare_import_plan(rows, existing)
+        preview = build_import_preview(rows, existing)
 
         logger.info(
             "[IMPORT] dry-run complete — file: %s rows_parsed: %d proposed_changes: %d "
             "errors: %d warnings: %d actor: %s (%s)",
             attach.filename,
             len(rows),
-            len(changes),
-            len(errors),
-            len(warnings),
+            len(preview.changes),
+            len(preview.errors),
+            len(preview.warnings),
             ctx.user,
             ctx.user.id,
         )
 
         send = ctx.followup.send if deferred else ctx.respond
 
-        if errors:
-            err_csv_bytes = build_error_csv_bytes(error_rows)
-            err_xlsx_bytes = None
-            try:
-                err_xlsx_bytes = build_error_xlsx_bytes(error_rows)
-            except Exception:
-                logger.exception("[IMPORT] failed to build XLSX error workbook")
-
-            files = [discord.File(err_csv_bytes, filename="import_errors.csv")]
-            if err_xlsx_bytes:
-                files.append(discord.File(err_xlsx_bytes, filename="import_errors.xlsx"))
+        if preview.errors:
+            files = []
+            if preview.error_csv_bytes:
+                files.append(discord.File(preview.error_csv_bytes, filename="import_errors.csv"))
+            if preview.error_xlsx_bytes:
+                files.append(discord.File(preview.error_xlsx_bytes, filename="import_errors.xlsx"))
 
             short_msg = (
-                f"❌ Validation failed: {len(errors)} error(s). "
+                f"❌ Validation failed: {len(preview.errors)} error(s). "
                 "Correct the highlighted rows and re-upload. See attached file(s) for details."
             )
-            if len(errors) <= 10:
-                content = short_msg + "\n\nErrors:\n" + "\n".join(errors[:10])
+            if len(preview.errors) <= 10:
+                content = short_msg + "\n\nErrors:\n" + "\n".join(preview.errors[:10])
                 if len(content) <= 1900:
                     await send(content=content, files=files, ephemeral=True)
                     return
             await send(content=short_msg, files=files, ephemeral=True)
             return
 
-        # Build preview embed
-        preview = [
-            f"Row {c.get('source_row')}: {c['discord_id']} | "
-            f"{c['account_type']} → {c['governor_id']}"
-            for c in changes[:20]
-        ]
         embed = discord.Embed(
             title="✅ Dry-Run Validation Passed",
             color=discord.Color.green(),
         )
         embed.description = (
-            f"**{len(changes)} change(s) proposed.**\n"
+            f"**{len(preview.changes)} change(s) proposed.**\n"
             f"Conflict behaviour: **Overwrite** — existing active slots will be superseded "
             f"and replaced with the imported values.\n\n"
-            + "\n".join(preview)
-            + (f"\n… and {len(changes) - 20} more" if len(changes) > 20 else "")
+            + "\n".join(preview.preview_lines)
+            + (f"\n… and {len(preview.changes) - 20} more" if len(preview.changes) > 20 else "")
         )
-        if warnings:
+        if preview.warnings:
             embed.add_field(
-                name=f"⚠️ Warnings ({len(warnings)})",
-                value="\n".join(warnings[:10])
-                + (f"\n… and {len(warnings) - 10} more" if len(warnings) > 10 else ""),
+                name=f"⚠️ Warnings ({len(preview.warnings)})",
+                value="\n".join(preview.warnings[:10])
+                + (
+                    f"\n… and {len(preview.warnings) - 10} more"
+                    if len(preview.warnings) > 10
+                    else ""
+                ),
                 inline=False,
             )
         embed.set_footer(text="Click Confirm to apply, or Cancel to abort.")
 
         async def _apply_import(interaction: discord.Interaction):
             try:
-                _new_registry, summary, apply_errors = apply_import_plan(
-                    changes, None, dry_run=False
-                )
-                if apply_errors:
+                apply_result = apply_import_changes(preview.changes)
+                if apply_result.errors:
                     logger.warning(
                         "[IMPORT] %d row(s) failed during apply: %s",
-                        len(apply_errors),
-                        apply_errors,
+                        len(apply_result.errors),
+                        apply_result.errors,
                     )
             except Exception as e:
                 logger.exception("[IMPORT] apply_import_plan failed at confirm")
@@ -1427,17 +1078,20 @@ def register_registry(bot: ext_commands.Bot) -> None:
                 "[IMPORT] confirmed and applied by %s (%s) — %d change(s) from file: %s",
                 interaction.user,
                 interaction.user.id,
-                len(summary),
+                apply_result.applied_count,
                 attach.filename,
             )
 
-            text = f"✅ Import applied: {len(summary)} change(s) made.\n" + "\n".join(summary[:50])
+            text = "✅ " + build_import_summary_text(
+                apply_result,
+                include_apply_errors=False,
+            )
             if len(text) <= 1900:
                 await interaction.followup.send(text, ephemeral=True)
             else:
-                bio = io.BytesIO(("\n".join(summary)).encode("utf-8"))
+                bio = build_import_summary_file_bytes(apply_result)
                 await interaction.followup.send(
-                    f"✅ Import applied: {len(summary)} change(s). Full summary attached.",
+                    f"✅ Import applied: {apply_result.applied_count} change(s). Full summary attached.",
                     file=discord.File(bio, filename="import_summary.txt"),
                     ephemeral=True,
                 )
@@ -1492,17 +1146,15 @@ def register_registry(bot: ext_commands.Bot) -> None:
             )
             return
 
-        rows = _parse_attachment(raw, ftype)
+        rows = parse_attachment_bytes(raw, ftype)
         if not rows:
             await ctx.interaction.edit_original_response(
                 content="❌ File could not be parsed or appears to have no data."
             )
             return
 
-        from registry.registry_service import load_registry_as_dict
-
         try:
-            existing = load_registry_as_dict()
+            existing = registry_service.load_registry_as_dict()
         except Exception as e:
             logger.exception("[IMPORT] load_registry_as_dict failed")
             await ctx.interaction.edit_original_response(
@@ -1514,34 +1166,32 @@ def register_registry(bot: ext_commands.Bot) -> None:
             )
             return
 
-        changes, errors, warnings, error_rows = prepare_import_plan(rows, existing)
+        preview = build_import_preview(rows, existing)
 
         send = ctx.followup.send if deferred else ctx.respond
 
-        if errors:
-            err_csv_bytes = build_error_csv_bytes(error_rows)
-            files = [discord.File(err_csv_bytes, filename="import_errors.csv")]
-            try:
-                err_xlsx_bytes = build_error_xlsx_bytes(error_rows)
-                files.append(discord.File(err_xlsx_bytes, filename="import_errors.xlsx"))
-            except Exception:
-                logger.exception("[IMPORT] failed to build XLSX error workbook")
+        if preview.errors:
+            files = []
+            if preview.error_csv_bytes:
+                files.append(discord.File(preview.error_csv_bytes, filename="import_errors.csv"))
+            if preview.error_xlsx_bytes:
+                files.append(discord.File(preview.error_xlsx_bytes, filename="import_errors.xlsx"))
 
             logger.warning(
                 "[IMPORT] live import aborted — validation failed: %d error(s) "
                 "actor: %s (%s) file: %s",
-                len(errors),
+                len(preview.errors),
                 ctx.user,
                 ctx.user.id,
                 attach.filename,
             )
 
             short_msg = (
-                f"❌ Validation failed: {len(errors)} error(s). "
+                f"❌ Validation failed: {len(preview.errors)} error(s). "
                 "No changes have been applied. Correct the highlighted rows and re-upload."
             )
-            if len(errors) <= 10:
-                content = short_msg + "\n\nErrors:\n" + "\n".join(errors[:10])
+            if len(preview.errors) <= 10:
+                content = short_msg + "\n\nErrors:\n" + "\n".join(preview.errors[:10])
                 if len(content) <= 1900:
                     await send(content=content, files=files, ephemeral=True)
                     return
@@ -1549,14 +1199,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
             return
 
         try:
-            _new_registry, summary, apply_errors = apply_import_plan(
-                changes, existing, dry_run=False
-            )
-            text = f"✅ Import applied: {len(summary)} change(s) made.\n" + "\n".join(summary[:50])
-            if apply_errors:
-                text += f"\n\n⚠️ {len(apply_errors)} row(s) failed:\n" + "\n".join(
-                    f"- {e}" for e in apply_errors[:20]
-                )
+            apply_result = apply_import_changes(preview.changes)
         except Exception as e:
             logger.exception("[IMPORT] apply_import_plan failed")
             await send(f"❌ Failed to apply import: {type(e).__name__}: {e}", ephemeral=True)
@@ -1565,26 +1208,21 @@ def register_registry(bot: ext_commands.Bot) -> None:
         logger.info(
             "[IMPORT] live import complete — %d change(s) applied, %d warning(s) "
             "actor: %s (%s) file: %s",
-            len(summary),
-            len(warnings),
+            apply_result.applied_count,
+            len(preview.warnings),
             ctx.user,
             ctx.user.id,
             attach.filename,
         )
 
-        text = f"✅ Import applied: {len(summary)} change(s) made.\n" + "\n".join(summary[:50])
-        if warnings:
-            text += "\n\n⚠️ Warnings:\n" + "\n".join(f"- {w}" for w in warnings[:20])
+        text = "✅ " + build_import_summary_text(apply_result, preview.warnings)
 
         if len(text) <= 1900:
             await send(text, ephemeral=True)
         else:
-            full = "\n".join(summary)
-            if warnings:
-                full += "\n\nWarnings:\n" + "\n".join(warnings)
-            bio = io.BytesIO(full.encode("utf-8"))
+            bio = build_import_summary_file_bytes(apply_result, preview.warnings)
             await send(
-                content=f"✅ Import applied: {len(summary)} change(s). Full summary attached.",
+                content=f"✅ Import applied: {apply_result.applied_count} change(s). Full summary attached.",
                 file=discord.File(bio, filename="import_summary.txt"),
                 ephemeral=True,
             )
