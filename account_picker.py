@@ -6,7 +6,7 @@ Commands and UI modules. This decouples the account picker helper from Commands.
 so UI modules (kvk_ui, crystaltech UI, etc.) don't need to import Commands at runtime.
 
 Exports:
-- build_unique_gov_options(accounts: dict) -> list[discord.SelectOption]
+- build_unique_gov_options(accounts_or_summary) -> list[discord.SelectOption]
 - AccountPickerView(...) -> reusable discord.ui.View for account selection
 """
 
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
 import logging
+from typing import Any
 
 import discord
 
@@ -35,43 +36,62 @@ def _slot_rank(slot_name: str) -> int:
         return _PREFERRED_ORDER.index(slot_name)
     except ValueError:
         # push unknown slots after preferred list, but keep deterministic ordering
-        return len(_PREFERRED_ORDER) + hash(slot_name) % 10000
+        return len(_PREFERRED_ORDER)
 
 
-def build_unique_gov_options(accounts: dict[str, dict]) -> list[discord.SelectOption]:
-    """
-    Build a list of discord.SelectOption objects from a mapping of account slot -> account dict.
-    accounts: { slot_name: { "GovernorID": "...", "GovernorName": "..." }, ... }
+def _iter_account_option_rows(accounts_or_summary: Any) -> list[tuple[str, str, str]]:
+    if hasattr(accounts_or_summary, "resolved_accounts"):
+        return [
+            (
+                str(account.slot),
+                str(account.governor_id_str).strip(),
+                str(account.governor_name or account.slot),
+            )
+            for account in getattr(accounts_or_summary, "resolved_accounts", ())
+        ]
 
-    Behavior:
-    - Keeps one option per unique GovernorID (first seen by slot preference).
-    - Labels are GovernorName (if present) or slot fallback.
-    - Value is the governor id (string).
-    - Description is the slot name.
-    """
-    if not accounts:
+    accounts = accounts_or_summary or {}
+    if not isinstance(accounts, dict):
         return []
 
-    # Flatten and preserve order using preferred slot ranking
     items: list[tuple[str, dict]] = sorted(
         accounts.items(), key=lambda kv: (_slot_rank(kv[0]), kv[0])
     )
-
-    seen_gids: set[str] = set()
-    options: list[discord.SelectOption] = []
-
+    rows: list[tuple[str, str, str]] = []
     for slot, acc in items:
         if not acc or not isinstance(acc, dict):
             continue
         gid = acc.get("GovernorID") or acc.get("GovernorId") or acc.get("GovernorIdStr") or ""
         gid = str(gid).strip()
         if not gid:
-            # If there's no numeric id, skip this entry
             continue
+        name = acc.get("GovernorName") or acc.get("Governor") or slot
+        rows.append((str(slot), gid, str(name) if name is not None else str(slot)))
+    return rows
+
+
+def build_unique_gov_options(accounts_or_summary: Any) -> list[discord.SelectOption]:
+    """
+    Build a list of discord.SelectOption objects from AccountResolutionSummary
+    or a legacy mapping of account slot -> account dict.
+
+    Behavior:
+    - Keeps one option per unique GovernorID (first seen by canonical/slot preference).
+    - Labels are GovernorName (if present) or slot fallback.
+    - Value is the governor id (string).
+    - Description is the slot name.
+    """
+    rows = _iter_account_option_rows(accounts_or_summary)
+    if not rows:
+        return []
+
+    seen_gids: set[str] = set()
+    options: list[discord.SelectOption] = []
+
+    for slot, gid, name in rows:
         if gid in seen_gids:
             continue
         seen_gids.add(gid)
-        name = acc.get("GovernorName") or acc.get("Governor") or slot
         label = str(name)[:100] if name is not None else slot
         desc = str(slot) if slot else None
         opt = discord.SelectOption(label=label, value=gid, description=desc)
@@ -80,14 +100,14 @@ def build_unique_gov_options(accounts: dict[str, dict]) -> list[discord.SelectOp
     return options
 
 
-def safe_build_unique_gov_options(accounts: dict) -> list[discord.SelectOption]:
+def safe_build_unique_gov_options(accounts_or_summary: Any) -> list[discord.SelectOption]:
     """
     Error-handling wrapper around build_unique_gov_options.
     Logs and returns an empty list on any failure. Use this in command/view code
     where a crash from the options builder should never surface as an unhandled exception.
     """
     try:
-        opts = build_unique_gov_options(accounts)
+        opts = build_unique_gov_options(accounts_or_summary)
         if isinstance(opts, list):
             return opts
         logger.warning(
@@ -119,12 +139,11 @@ async def _rebuild_options_from_registry(
     behaviour used in kvk_ui._rebuild_options. Returns empty list on error.
     """
     try:
-        from services.governor_account_service import get_accounts_for_user
+        from services.governor_account_service import get_account_summary_for_user
 
-        lookup = await get_accounts_for_user(ctx.user.id)
-        accounts = lookup.accounts if lookup.ok else {}
+        summary = await get_account_summary_for_user(ctx.user.id)
         # Use the canonical builder in this module
-        return build_unique_gov_options(accounts)
+        return build_unique_gov_options(summary if summary.ok else {})
     except Exception:
         logger.exception("[AccountPicker] _rebuild_options_from_registry failed")
         return []

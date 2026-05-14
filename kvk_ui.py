@@ -181,13 +181,12 @@ def make_kvk_targets_view(
 
     async def _rebuild_options(ctx_inner: discord.ApplicationContext):
         try:
-            from services.governor_account_service import get_accounts_for_user
+            from services.governor_account_service import get_account_summary_for_user
 
-            lookup = await get_accounts_for_user(ctx_inner.user.id)
-            accounts = lookup.accounts if lookup.ok else {}
+            summary = await get_account_summary_for_user(ctx_inner.user.id)
             from account_picker import safe_build_unique_gov_options
 
-            return safe_build_unique_gov_options(accounts)
+            return safe_build_unique_gov_options(summary if summary.ok else {})
         except Exception:
             logger.exception("[KVK_UI] _rebuild_options failed")
             return []

@@ -134,14 +134,14 @@ async def test_manual_governorid_triggers_run_target_lookup(monkeypatch):
 
 async def test_single_registered_account_auto_opens(monkeypatch):
     import commands.telemetry_cmds as C
-    from services.governor_account_service import AccountLookup
+    from services.governor_account_service import summarize_accounts
 
     async def fake_load_last_kvk_map():
         return {}
 
-    async def fake_get_accounts_for_user(user_id):
+    async def fake_get_account_summary_for_user(user_id):
         assert user_id == 99
-        return AccountLookup(True, {"Main": {"GovernorID": "999", "GovernorName": "X"}})
+        return summarize_accounts({"Main": {"GovernorID": "999", "GovernorName": "X"}})
 
     called = {"run_target_lookup": 0}
 
@@ -158,7 +158,7 @@ async def test_single_registered_account_auto_opens(monkeypatch):
         return fn(*a, **k)
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(C, "get_accounts_for_user", fake_get_accounts_for_user)
+    monkeypatch.setattr(C, "get_account_summary_for_user", fake_get_account_summary_for_user)
     monkeypatch.setattr(C, "run_target_lookup", fake_run_target_lookup)
 
     ctx = DummyCtx(user_id=99)
@@ -172,15 +172,14 @@ async def test_single_registered_account_auto_opens(monkeypatch):
 
 async def test_multi_account_builds_selector(monkeypatch):
     import commands.telemetry_cmds as C
-    from services.governor_account_service import AccountLookup
+    from services.governor_account_service import summarize_accounts
 
     async def fake_load_last_kvk_map():
         return {}
 
-    async def fake_get_accounts_for_user(user_id):
+    async def fake_get_account_summary_for_user(user_id):
         assert user_id == 5
-        return AccountLookup(
-            True,
+        return summarize_accounts(
             {
                 "Main": {"GovernorID": "1", "GovernorName": "A"},
                 "Alt 1": {"GovernorID": "2", "GovernorName": "B"},
@@ -191,7 +190,7 @@ async def test_multi_account_builds_selector(monkeypatch):
         return fn(*a, **k)
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(C, "get_accounts_for_user", fake_get_accounts_for_user)
+    monkeypatch.setattr(C, "get_account_summary_for_user", fake_get_account_summary_for_user)
     monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
     monkeypatch.setattr(
         C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
@@ -219,20 +218,20 @@ async def test_multi_account_builds_selector(monkeypatch):
 
 async def test_no_registered_accounts_shows_hint_and_empty_picker(monkeypatch):
     import commands.telemetry_cmds as C
-    from services.governor_account_service import AccountLookup
+    from services.governor_account_service import summarize_accounts
 
     async def fake_load_last_kvk_map():
         return {}
 
-    async def fake_get_accounts_for_user(user_id):
+    async def fake_get_account_summary_for_user(user_id):
         assert user_id == 7
-        return AccountLookup(True, {})
+        return summarize_accounts({})
 
     async def fake_to_thread(fn, *a, **k):
         return fn(*a, **k)
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(C, "get_accounts_for_user", fake_get_accounts_for_user)
+    monkeypatch.setattr(C, "get_account_summary_for_user", fake_get_account_summary_for_user)
     monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
     monkeypatch.setattr(
         C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
@@ -254,3 +253,73 @@ async def test_no_registered_accounts_shows_hint_and_empty_picker(monkeypatch):
 
     assert ctx.followup.sent, "Expected followup hint when no accounts"
     assert "options" in captured and captured["options"] == []
+
+
+async def test_crystaltech_single_registered_account_auto_opens(monkeypatch):
+    import commands.telemetry_cmds as C
+    from services.governor_account_service import summarize_accounts
+
+    async def fake_get_account_summary_for_user(user_id):
+        assert user_id == 33
+        return summarize_accounts({"Main": {"GovernorID": "333", "GovernorName": "Crystal"}})
+
+    called = {}
+
+    async def fake_run_crystaltech_flow(interaction, gid, ephemeral=False):
+        called["gid"] = gid
+        called["ephemeral"] = ephemeral
+
+    monkeypatch.setattr(
+        C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
+    )
+    monkeypatch.setattr(C, "get_account_summary_for_user", fake_get_account_summary_for_user)
+    monkeypatch.setattr(C, "run_crystaltech_flow_service", fake_run_crystaltech_flow)
+
+    ctx = DummyCtx(user_id=33)
+    handler = _get_registered_command_impl(C, "mykvkcrystaltech")
+    assert handler is not None
+
+    await handler(ctx, governorid=None, only_me=True)
+
+    assert called == {"gid": "333", "ephemeral": True}
+
+
+async def test_crystaltech_multi_account_builds_summary_selector(monkeypatch):
+    import commands.telemetry_cmds as C
+    from services.governor_account_service import AccountResolutionSummary, summarize_accounts
+
+    async def fake_get_account_summary_for_user(user_id):
+        assert user_id == 44
+        return summarize_accounts(
+            {
+                "Main": {"GovernorID": "444", "GovernorName": "Main"},
+                "Alt 1": {"GovernorID": "445", "GovernorName": "Alt"},
+            }
+        )
+
+    captured = {}
+
+    def fake_picker_view(ctx, options, on_select_governor, **kwargs):
+        captured["options"] = options
+        captured["heading"] = kwargs.get("heading")
+        return types.SimpleNamespace(heading=kwargs.get("heading"))
+
+    def fake_options(summary):
+        assert isinstance(summary, AccountResolutionSummary)
+        return [types.SimpleNamespace(value="444"), types.SimpleNamespace(value="445")]
+
+    monkeypatch.setattr(
+        C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
+    )
+    monkeypatch.setattr(C, "get_account_summary_for_user", fake_get_account_summary_for_user)
+    monkeypatch.setattr(C, "safe_build_unique_gov_options", fake_options)
+    monkeypatch.setattr(C, "AccountPickerView", fake_picker_view)
+
+    ctx = DummyCtx(user_id=44)
+    handler = _get_registered_command_impl(C, "mykvkcrystaltech")
+    assert handler is not None
+
+    await handler(ctx, governorid=None, only_me=True)
+
+    assert len(captured["options"]) == 2
+    assert captured["heading"] == "Select an account to manage its Crystal Tech:"

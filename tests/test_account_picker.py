@@ -46,6 +46,24 @@ def test_build_unique_gov_options_labels_and_desc_limits():
     assert opts[0].description == "Main"
 
 
+def test_build_unique_gov_options_accepts_account_resolution_summary():
+    from services.governor_account_service import summarize_accounts
+
+    summary = summarize_accounts(
+        {
+            "Farm 1": {"GovernorID": "900", "GovernorName": "FarmOne"},
+            "Alt 1": {"GovernorID": "200", "GovernorName": "AltOne"},
+            "Main": {"GovernorID": "100", "GovernorName": "MainUser"},
+            "Alt 2": {"GovernorID": "200", "GovernorName": "AltDuplicate"},
+        }
+    )
+
+    opts = build_unique_gov_options(summary)
+
+    assert [o.value for o in opts] == ["100", "200", "900"]
+    assert [o.description for o in opts] == ["Main", "Alt 1", "Farm 1"]
+
+
 @pytest.mark.asyncio
 async def test_account_picker_uses_generic_governor_placeholder():
     view = AccountPickerView(

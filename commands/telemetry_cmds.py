@@ -51,7 +51,7 @@ from logging_setup import CRASH_LOG_PATH, ERROR_LOG_PATH, FULL_LOG_PATH
 from profile_cache import search_by_governor_name
 from registry.account_slots import ACCOUNT_ORDER
 from registry.registry_service import load_registry_as_dict
-from services.governor_account_service import free_account_slots, get_accounts_for_user
+from services.governor_account_service import get_account_summary_for_user
 from target_utils import (
     _name_cache,
     autocomplete_governor_names,
@@ -214,14 +214,14 @@ def register_commands(bot_instance):
                 pass
 
             try:
-                account_lookup = await get_accounts_for_user(interaction.user.id)
-                if not account_lookup.ok:
+                account_summary = await get_account_summary_for_user(interaction.user.id)
+                if not account_summary.ok:
                     await interaction.followup.send(
                         "Registry is temporarily unavailable. Please try again later.",
                         ephemeral=True,
                     )
                     return
-                free_slots = free_account_slots(account_lookup.accounts)
+                free_slots = account_summary.free_slots()
 
                 if not free_slots:
                     await interaction.followup.send(
@@ -379,10 +379,9 @@ def register_commands(bot_instance):
 
         # 2) Registered accounts path
         try:
-            account_lookup = await get_accounts_for_user(ctx.user.id)
-            if not account_lookup.ok:
-                raise RuntimeError(account_lookup.error or "registry unavailable")
-            accounts = account_lookup.accounts
+            account_summary = await get_account_summary_for_user(ctx.user.id)
+            if not account_summary.ok:
+                raise RuntimeError(account_summary.error or "registry unavailable")
         except Exception:
             logger.exception("[/mykvktargets] load_registry failed")
             await ctx.followup.send(
@@ -391,7 +390,7 @@ def register_commands(bot_instance):
             )
             return
 
-        options = safe_build_unique_gov_options(accounts)
+        options = safe_build_unique_gov_options(account_summary)
 
         # Single-account auto-open → use canonical helper
         if options and len(options) == 1:
@@ -679,10 +678,9 @@ def register_commands(bot_instance):
 
         # 2) Registered accounts path — reuse same registry logic & helpers as /mykvktargets
         try:
-            account_lookup = await get_accounts_for_user(ctx.user.id)
-            if not account_lookup.ok:
-                raise RuntimeError(account_lookup.error or "registry unavailable")
-            accounts = account_lookup.accounts
+            account_summary = await get_account_summary_for_user(ctx.user.id)
+            if not account_summary.ok:
+                raise RuntimeError(account_summary.error or "registry unavailable")
         except Exception:
             logger.exception("[/mykvkcrystaltech] load_registry failed")
             await ctx.followup.send(
@@ -692,7 +690,7 @@ def register_commands(bot_instance):
             return
 
         # Use canonical builder (safe fallback included)
-        options = safe_build_unique_gov_options(accounts)
+        options = safe_build_unique_gov_options(account_summary)
 
         if options:
             if len(options) == 1:
