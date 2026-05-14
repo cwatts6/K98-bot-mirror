@@ -33,3 +33,9 @@ def test_registration_audit_fetches_missing_registered_members_before_payload() 
     assert "missing_registered_uids" in source
     assert "guild.fetch_member" in source
     assert "build_registration_audit_payload(registry, members_info, sql_rows)" in source
+
+
+def test_registry_cmds_do_not_import_registry_dal_directly() -> None:
+    source = Path("commands/registry_cmds.py").read_text(encoding="utf-8")
+
+    assert "from registry.dal" not in source

@@ -62,6 +62,14 @@ def test_build_registration_export_payload_sorts_and_preserves_excel_safe_column
     assert rows[0]["discord_id_excel"] == '="100"'
     assert rows[0]["governor_id_excel"] == '="100002"'
     assert rows[0]["roles"] == "R1;R2"
+    main_row = next(row for row in rows if row["account_type"] == "Main")
+    assert main_row["governor_id"] == '="100001"'
+    assert main_row["governor_id_excel"] == '="100001"'
+
+
+def test_excel_safe_formula_does_not_double_wrap_existing_formula() -> None:
+    assert svc.excel_safe_formula('="100001"') == '="100001"'
+    assert svc.excel_safe_formula("100001") == '="100001"'
 
 
 def test_build_import_preview_creates_error_files_for_invalid_rows() -> None:

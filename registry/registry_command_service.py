@@ -84,7 +84,16 @@ class RegistryImportApplyResult:
 
 def excel_safe_formula(value: object) -> str:
     v = str(value or "").strip()
+    if len(v) >= 3 and v.startswith('="') and v.endswith('"'):
+        return v
     return f'="{v}"' if v else ""
+
+
+def fetch_active_player_rows() -> list[dict[str, Any]]:
+    """Fetch current active player rows for registration audit workflows."""
+    from registry.dal.audit_dal import get_active_players
+
+    return get_active_players()
 
 
 def normalize_registry_governor_id(value: object) -> str:

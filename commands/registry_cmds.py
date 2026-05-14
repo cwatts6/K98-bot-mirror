@@ -12,7 +12,6 @@ from bot_config import GUILD_ID
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import is_admin_and_notify_channel, track_usage
 from registry.account_slots import ACCOUNT_ORDER
-from registry.dal.audit_dal import get_active_players
 from registry.governor_registry import (
     ConfirmRemoveView,
     ModifyGovernorView,
@@ -25,6 +24,7 @@ from registry.registry_command_service import (
     build_import_summary_text,
     build_registration_audit_payload,
     build_registration_export_payload,
+    fetch_active_player_rows,
     parse_attachment_bytes,
 )
 import registry.registry_service as registry_service
@@ -652,7 +652,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
             return
 
         try:
-            sql_rows = await asyncio.to_thread(get_active_players)
+            sql_rows = await asyncio.to_thread(fetch_active_player_rows)
         except Exception as e:
             logger.exception("[registration_audit] SQL fetch failed")
             await ctx.interaction.edit_original_response(
