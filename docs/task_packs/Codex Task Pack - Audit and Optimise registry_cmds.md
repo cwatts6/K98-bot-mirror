@@ -225,16 +225,16 @@ Capture out-of-scope findings structurally.
 Codex must populate this table after audit:
 
 Issue	Decision	Reason
-Duplicate account type lists	fix now / defer	
-Direct _name_cache access	fix now / defer	
-Duplicate GovernorID normalisation	fix now / defer	
-Duplicate Excel-safe helpers	fix now / defer	
-Heavy audit logic in command	fix now / defer	
-Heavy import dry-run/apply logic in command	fix now / defer	
-Mixed registry load methods	fix now / defer	
-Inline imports inside command functions	fix now / defer	
-Response/defer inconsistency	fix now / defer	
-Test gaps	fix now / defer	
+Duplicate account type lists	fix now / defer
+Direct _name_cache access	fix now / defer
+Duplicate GovernorID normalisation	fix now / defer
+Duplicate Excel-safe helpers	fix now / defer
+Heavy audit logic in command	fix now / defer
+Heavy import dry-run/apply logic in command	fix now / defer
+Mixed registry load methods	fix now / defer
+Inline imports inside command functions	fix now / defer
+Response/defer inconsistency	fix now / defer
+Test gaps	fix now / defer
 
 Deferred items must use the structured format from docs/reference/K98 Bot - Deferred Optimisation Framework.md.
 
