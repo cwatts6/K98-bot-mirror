@@ -9,7 +9,8 @@ import logging
 import discord
 from discord import Embed
 
-from registry.governor_registry import ConfirmRemoveView, ModifyGovernorView, RegisterGovernorView
+from registry.governor_registry import register_account
+from registry.registry_service import check_governor_claimed_by_other, remove_governor
 from utils import normalize_governor_id
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,130 @@ def configure_registry_views(
     _name_cache_getter = name_cache_getter
     _send_profile_to_channel = send_profile_to_channel
     _account_order_getter = account_order_getter
+
+
+class RegisterGovernorView(discord.ui.View):
+    def __init__(self, user, account_type, governor_id, governor_name):
+        super().__init__(timeout=60)
+        self.user = user
+        self.account_type = account_type
+        self.governor_id = governor_id
+        self.governor_name = governor_name
+
+    @discord.ui.button(label="✅ Confirm", style=discord.ButtonStyle.success)
+    async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message(
+                "This isn't your registration to confirm!", ephemeral=True
+            )
+            return
+
+        ok, err = register_account(
+            discord_id=str(self.user.id),
+            discord_name=str(self.user),
+            account_type=self.account_type,
+            governor_id=self.governor_id,
+            governor_name=self.governor_name,
+        )
+
+        if not ok:
+            await interaction.response.edit_message(
+                content=f"❌ Registration failed: {err or 'Unknown error.'}", view=None
+            )
+        else:
+            await interaction.response.edit_message(
+                content=(
+                    f"✅ Registered `{self.account_type}` as "
+                    f"**{self.governor_name}** (ID: `{self.governor_id}`)"
+                ),
+                view=None,
+            )
+
+    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.danger)
+    async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction):
+        if interaction.user.id == self.user.id:
+            await interaction.response.edit_message(content="❌ Registration cancelled.", view=None)
+
+
+class ModifyGovernorView(discord.ui.View):
+    def __init__(self, user, account_type, new_gov_id, new_gov_name):
+        super().__init__(timeout=60)
+        self.user = user
+        self.account_type = account_type
+        self.new_gov_id = new_gov_id
+        self.new_gov_name = new_gov_name
+
+    @discord.ui.button(label="✅ Confirm Change", style=discord.ButtonStyle.success)
+    async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message(
+                "This isn't your registration to change!", ephemeral=True
+            )
+            return
+
+        ok, err = register_account(
+            discord_id=str(self.user.id),
+            discord_name=str(self.user),
+            account_type=self.account_type,
+            governor_id=self.new_gov_id,
+            governor_name=self.new_gov_name,
+        )
+
+        if not ok:
+            await interaction.response.edit_message(
+                content=f"❌ Update failed: {err or 'Unknown error.'}", view=None
+            )
+        else:
+            await interaction.response.edit_message(
+                content=(
+                    f"✅ `{self.account_type}` updated to "
+                    f"**{self.new_gov_name}** (ID: `{self.new_gov_id}`)"
+                ),
+                view=None,
+            )
+
+    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.danger)
+    async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction):
+        if interaction.user.id == self.user.id:
+            await interaction.response.edit_message(content="❌ Modification cancelled.", view=None)
+
+
+class ConfirmRemoveView(discord.ui.View):
+    def __init__(self, user, account_type):
+        super().__init__(timeout=60)
+        self.user = user
+        self.account_type = account_type
+
+    @discord.ui.button(label="✅ Confirm Remove", style=discord.ButtonStyle.danger)
+    async def confirm(self, button, interaction: discord.Interaction):
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message(
+                "You cannot modify someone else's registration.", ephemeral=True
+            )
+            return
+
+        ok, err = remove_governor(
+            discord_user_id=interaction.user.id,
+            account_type=self.account_type,
+            removed_by=interaction.user.id,
+        )
+
+        if ok:
+            await interaction.response.send_message(
+                f"✅ `{self.account_type}` has been removed from your registered accounts.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                f"❌ {err or 'Could not remove registration.'}", ephemeral=True
+            )
+        self.stop()
+
+    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, button, interaction: discord.Interaction):
+        if interaction.user.id == self.user.id:
+            await interaction.response.edit_message(content="❌ Removal cancelled.", view=None)
+        self.stop()
 
 
 class MyRegsActionView(discord.ui.View):
@@ -439,8 +564,6 @@ class EnterGovernorIDModal(discord.ui.Modal):
             )
             return
 
-        from registry.registry_service import check_governor_claimed_by_other
-
         try:
             claimed_by_other = await asyncio.to_thread(
                 check_governor_claimed_by_other, governor_id, self.author_id
@@ -567,12 +690,15 @@ class GovernorSelectView(discord.ui.View):
 
 
 __all__ = [
+    "ConfirmRemoveView",
     "EnterGovernorIDModal",
     "GovNameModal",
     "GovernorSelect",
     "GovernorSelectView",
+    "ModifyGovernorView",
     "ModifyStartView",
     "MyRegsActionView",
+    "RegisterGovernorView",
     "RegisterStartView",
     "configure_registry_views",
 ]

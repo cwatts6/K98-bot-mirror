@@ -5,6 +5,7 @@ Unit tests for registry.governor_registry façade.
 Verifies the backward-compat shim behaviour:
   - load_registry() reads from SQL and returns the legacy dict shape.
   - load_registry() returns {} (not raise) on SQL failure and logs at ERROR.
+  - registry Discord views live in ui.views.registry_views with lazy facade compatibility.
   - KVKStatsView has been moved to ui/views/stats_views.py.
 """
 
@@ -79,8 +80,31 @@ def test_load_registry_uses_cache_path(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# KVKStatsView location
+# Moved view locations
 # ---------------------------------------------------------------------------
+
+
+def test_registry_views_not_defined_in_governor_registry():
+    """Registry confirmation views should be owned by ui.views.registry_views."""
+    for name in ("RegisterGovernorView", "ModifyGovernorView", "ConfirmRemoveView"):
+        assert name not in gg.__dict__
+
+
+def test_registry_view_compat_imports_resolve_to_ui_views():
+    from registry.governor_registry import (
+        ConfirmRemoveView,
+        ModifyGovernorView,
+        RegisterGovernorView,
+    )
+    from ui.views.registry_views import (
+        ConfirmRemoveView as UiConfirmRemoveView,
+        ModifyGovernorView as UiModifyGovernorView,
+        RegisterGovernorView as UiRegisterGovernorView,
+    )
+
+    assert RegisterGovernorView is UiRegisterGovernorView
+    assert ModifyGovernorView is UiModifyGovernorView
+    assert ConfirmRemoveView is UiConfirmRemoveView
 
 
 def test_kvkstatsview_not_in_governor_registry():

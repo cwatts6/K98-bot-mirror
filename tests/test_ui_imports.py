@@ -36,7 +36,19 @@ def test_import_all_ui_view_modules_and_instantiate_core_views(monkeypatch, tmp_
     gov_stub.ConfirmRemoveView = _DummyView
     gov_stub.ModifyGovernorView = _DummyView
     gov_stub.RegisterGovernorView = _DummyView
+    gov_stub.register_account = lambda **_kw: (True, None)
     monkeypatch.setitem(sys.modules, "governor_registry", gov_stub)
+
+    registry_gov_stub = types.ModuleType("registry.governor_registry")
+    registry_gov_stub.register_account = lambda **_kw: (True, None)
+    monkeypatch.setitem(sys.modules, "registry.governor_registry", registry_gov_stub)
+
+    registry_service_stub = types.ModuleType("registry.registry_service")
+    registry_service_stub.check_governor_claimed_by_other = (
+        lambda governor_id, owner_discord_id: False
+    )
+    registry_service_stub.remove_governor = lambda **_kw: (True, None)
+    monkeypatch.setitem(sys.modules, "registry.registry_service", registry_service_stub)
 
     utils_stub = types.ModuleType("utils")
     utils_stub.get_next_fights = lambda n: []

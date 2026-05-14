@@ -5,28 +5,15 @@ import os
 import sys
 import types
 
-import discord
-
 
 def _load_registry_views(monkeypatch):
     os.environ.setdefault("OUR_KINGDOM", "0")
     monkeypatch.setitem(sys.modules, "aiofiles", types.SimpleNamespace(open=None))
 
-    # Stub the registry package modules at their new locations.
-    # Both the dotted path and the bare name are registered so that any
-    # import style (import registry.governor_registry / from registry import ...)
-    # resolves to the same stub without importing the real SQL-backed module.
-
+    # Stub the facade dependency used by registry_views without importing SQL-backed code.
     gov_stub = types.ModuleType("registry.governor_registry")
-
-    class _DummyView(discord.ui.View):
-        def __init__(self, *args, **kwargs):
-            super().__init__(timeout=10)
-
-    gov_stub.ConfirmRemoveView = _DummyView
-    gov_stub.ModifyGovernorView = _DummyView
-    gov_stub.RegisterGovernorView = _DummyView
     gov_stub.load_registry = lambda: {}
+    gov_stub.register_account = lambda **_kw: (True, None)
     monkeypatch.setitem(sys.modules, "registry.governor_registry", gov_stub)
 
     # Stub registry_service so any import from it doesn't attempt a SQL connection.
@@ -38,7 +25,9 @@ def _load_registry_views(monkeypatch):
             *[f"Farm {i}" for i in range(1, 21)],
         }
     )
+    svc_stub.check_governor_claimed_by_other = lambda governor_id, owner_discord_id: False
     svc_stub.get_user_accounts = lambda uid: {}
+    svc_stub.remove_governor = lambda **_kw: (True, None)
     monkeypatch.setitem(sys.modules, "registry.registry_service", svc_stub)
 
     utils_stub = types.ModuleType("utils")
@@ -79,11 +68,25 @@ def test_registry_views_instantiate(monkeypatch):
         )
         m2 = rv.EnterGovernorIDModal(author_id=1, mode="register", account_type="Main")
         v4 = rv.GovernorSelectView([("A", 1)], author_id=1)
+        v5 = rv.RegisterGovernorView(_User(1), "Main", "1", "A")
+        v6 = rv.ModifyGovernorView(_User(1), "Main", "2", "B")
+        v7 = rv.ConfirmRemoveView(_User(1), "Main")
         assert v1.author_id == 1
         assert m1.author_id == 1
         assert len(v2.children) == 1
         assert len(v3.children) == 1
         assert m2.account_type == "Main"
         assert len(v4.children) == 1
+        assert v5.governor_id == "1"
+        assert v6.new_gov_id == "2"
+        assert v7.account_type == "Main"
 
     asyncio.run(_run())
+
+
+class _User:
+    def __init__(self, user_id: int):
+        self.id = user_id
+
+    def __str__(self) -> str:
+        return f"User({self.id})"

@@ -51,19 +51,10 @@ Resolved historical notes were moved to `archive/deferred_optimisations_resolved
 - Dependencies: Preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to the KVK_ALL modernisation programme.
 
 ### Deferred Optimisation
-- Area: `registry/governor_registry.py`
-- Type: architecture
-- Description: The legacy registry facade still contains Discord UI view classes alongside backward-compatible persistence helpers, mixing service facade responsibilities with interaction-layer code.
-- Suggested Fix: Move `RegisterGovernorView`, `ModifyGovernorView`, and `ConfirmRemoveView` into `ui/views/registry_views.py` or a focused registry view module, then keep `registry/governor_registry.py` as a compatibility facade over registry services only.
-- Impact: medium
-- Risk: medium
-- Dependencies: Confirm all imports from registry command, telemetry, stats, and UI flows are updated without breaking registration confirmation behavior.
-
-### Deferred Optimisation
 - Area: `services/governor_account_service.py`, `services/stats_account_service.py`, `commands/mge_cmds.py`, `commands/stats_cmds.py`, `commands/telemetry_cmds.py`, `commands/inventory_cmds.py`, `inventory/inventory_service.py`
 - Type: consistency
-- Description: PR 84 centralised basic registry account slot helpers and Discord user-id parsing, but richer account resolution is still split across command and subsystem services. Stats has `StatsAccountSummary`, registry has `AccountLookup`, inventory still builds `RegisteredGovernor` lists from the legacy registry facade, and MGE/telemetry paths should be audited for their own GovernorID/name/account-list lookup shapes.
+- Description: PR 84 centralised basic registry account slot helpers and Discord user-id parsing, PR 85A extracted registry audit/import/export orchestration, and the registry confirmation views have moved into the UI layer, but richer account resolution is still split across command and subsystem services. Stats has `StatsAccountSummary`, registry has `AccountLookup`, inventory still builds `RegisteredGovernor` lists from the registry facade, and MGE/telemetry paths should be audited for their own GovernorID/name/account-list lookup shapes.
 - Suggested Fix: Design one shared account-resolution summary object that exposes ordered accounts, GovernorIDs as strings and ints, account names, slot metadata, default account selection, lookup errors, and permission-friendly helpers. Migrate stats, telemetry, MGE, registry, and inventory callers to the shared object incrementally with focused tests for each command surface.
 - Impact: medium
 - Risk: medium
-- Dependencies: Preserve current command output, autocomplete ordering, inventory permission checks, and stats export behaviour while migrating callers.
+- Dependencies: Preserve current command output, autocomplete ordering, inventory permission checks, and stats export behaviour while migrating callers. Requires a dedicated cross-subsystem design pass before implementation.

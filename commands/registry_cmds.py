@@ -12,11 +12,6 @@ from bot_config import GUILD_ID
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import is_admin_and_notify_channel, track_usage
 from registry.account_slots import ACCOUNT_ORDER
-from registry.governor_registry import (
-    ConfirmRemoveView,
-    ModifyGovernorView,
-    RegisterGovernorView,
-)
 from registry.registry_command_service import (
     apply_import_changes,
     build_import_preview,
@@ -42,7 +37,12 @@ from services.governor_account_service import (
 )
 import target_utils
 from ui.views.admin_views import ConfirmImportView
-from ui.views.registry_views import MyRegsActionView
+from ui.views.registry_views import (
+    ConfirmRemoveView,
+    ModifyGovernorView,
+    MyRegsActionView,
+    RegisterGovernorView,
+)
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
@@ -354,8 +354,6 @@ def register_registry(bot: ext_commands.Bot) -> None:
                 content="❌ Please paste a valid Discord user ID (15–22 digits) or a mention."
             )
             return
-
-        from registry.registry_service import get_user_accounts, remove_governor
 
         accounts = await asyncio.to_thread(get_user_accounts, target_id)
         if not accounts:
