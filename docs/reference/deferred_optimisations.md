@@ -51,19 +51,28 @@ Resolved historical notes were moved to `archive/deferred_optimisations_resolved
 - Dependencies: Preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to the KVK_ALL modernisation programme.
 
 ### Deferred Optimisation
-- Area: `ark/registration_flow.py`, `account_picker.py`, `services/governor_account_service.py`
+- Area: `commands/registry_cmds.py` `/my_registrations`, `services/governor_account_service.py`, `registry/registry_service.py`
 - Type: consistency
-- Description: Ark registration flows still load raw registry account dictionaries, build governor select options through the legacy account picker path, and resolve governor names from local account dictionaries. The flow also has Ark-specific signup, ban, roster, active-match, and persistent-message behaviour, so it should not be migrated opportunistically with registry command/view work even after the registry command/view summary migration.
-- Suggested Fix: Audit Ark self-service join/sub/leave/switch account lookup and governor-name resolution for safe reuse of `AccountResolutionSummary`. Migrate only after confirming Ark signup behaviour, ban enforcement, roster filtering, active signup detection, and persistent registration-message refresh remain unchanged.
+- Description: `/my_registrations` still builds its display payload by loading the full registry through `registry_service.load_registry_as_dict()` and then selecting the invoking user's account dictionary locally. PR 89 intentionally preserved that path to avoid expanding a write-sensitive registry summary migration, but it leaves this one player-facing registry display flow outside the direct `AccountResolutionSummary` migration used by telemetry/KVK, registry action views, stats, inventory, and MGE adapters.
+- Suggested Fix: Audit `/my_registrations` and migrate its per-user display loading to `get_account_summary_for_user()` or a focused Discord-free registry display service that consumes `AccountResolutionSummary`, preserving embed title/copy, account slot ordering, empty-state copy, action buttons, truncation guard, ephemeral response behaviour, and stale/unavailable registry handling. Keep `load_registry_as_dict()` for audit/export/import flows that still need full-registry snapshots.
 - Impact: medium
-- Risk: medium
-- Dependencies: Registry command/view direct migration complete; preserve Ark signup behaviour and focused Ark regression coverage.
+- Risk: low
+- Dependencies: PR 89 registry command/view direct migration complete; add focused `/my_registrations` regression coverage before changing the loader path.
 
 ### Deferred Optimisation
-- Area: `services/governor_account_service.py`, `services/stats_account_service.py`, `inventory/inventory_service.py`, `mge/mge_signup_service.py`, `ark/registration_flow.py`, `account_picker.py`
-- Type: cleanup
-- Description: Compatibility adapters and duplicate local account classification/linked-governor/registered-governor shaping remain necessary while Ark consumers are still pending migration. Removing them now would risk breaking public shapes used by stats, inventory, MGE, telemetry, registry compatibility imports, and Ark tests.
-- Suggested Fix: After Ark account-resolution migration has focused regression coverage, remove obsolete `AccountLookup`-only pathways and any duplicate local classification or option-shaping helpers that no longer have external callers.
+- Area: `ark/registration_flow.py` admin add fuzzy/name-cache lookup
+- Type: consistency
+- Description: Ark admin add still searches `target_utils._name_cache` directly for exact GovernorID, partial GovernorID, and substring fuzzy name matching. This is separate from the self-service linked-account migration because it supports admin roster search, cache refresh fallback, fuzzy selection, and admin slot prompts rather than selecting one of the actor's registered accounts.
+- Suggested Fix: Move Ark admin governor search into a focused Discord-free helper or service that uses public target/profile lookup helpers where available, preserves exact ID, partial ID, fuzzy name, cache refresh, and no-match messages, and leaves the view/controller responsible only for Discord response routing.
 - Impact: medium
 - Risk: medium
-- Dependencies: Telemetry/KVK and registry command/view surfaces migrated to `AccountResolutionSummary`; Ark migration and focused regression coverage still pending. Preserve coverage for stats export, inventory permissions, MGE signup, telemetry/KVK pickers, registry flows, and Ark signup before cleanup.
+- Dependencies: Preserve Ark admin add behaviour, fuzzy result ordering, name-cache refresh fallback, ban enforcement, slot capacity checks, and admin/leadership permission tests.
+
+### Deferred Optimisation
+- Area: `services/governor_account_service.py`, `services/stats_account_service.py`, `inventory/inventory_service.py`, `mge/mge_signup_service.py`, `account_picker.py`, `ui/views/kvk_personal_views.py`
+- Type: cleanup
+- Description: Compatibility adapters and duplicate local account classification/linked-governor/registered-governor shaping remain after the stats, inventory, MGE, telemetry/KVK, registry, and Ark direct migrations. Removing them in the Ark PR would expand scope across legacy public shapes and KVK personal view compatibility paths.
+- Suggested Fix: In a dedicated cleanup PR, remove obsolete `AccountLookup`-only pathways and any duplicate local classification or option-shaping helpers that no longer have external callers.
+- Impact: medium
+- Risk: medium
+- Dependencies: Telemetry/KVK, registry command/view, and Ark surfaces migrated to `AccountResolutionSummary`; preserve coverage for stats export, inventory permissions, MGE signup, telemetry/KVK pickers, registry flows, KVK personal views, and Ark signup before cleanup.

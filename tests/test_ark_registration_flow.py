@@ -6,6 +6,7 @@ import pytest
 
 from ark.registration_flow import ArkRegistrationController
 from ark.state.ark_state import ArkMessageRef, ArkMessageState
+from services.governor_account_service import summarize_accounts
 
 
 class DummyResponse:
@@ -50,6 +51,10 @@ class DummyInteraction:
 
 def _future_close() -> datetime:
     return datetime.now(UTC) + timedelta(hours=2)
+
+
+def _account_summary(accounts: dict[str, dict[str, str]]):
+    return summarize_accounts(accounts)
 
 
 @pytest.mark.asyncio
@@ -215,12 +220,12 @@ async def test_join_player_adds_signup(monkeypatch):
     monkeypatch.setattr("ark.registration_flow.insert_audit_log", _audit)
     monkeypatch.setattr(controller, "refresh_registration_message", _refresh)
 
-    async def _get_user_accounts_stub(_user_id):
-        return {"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}}
+    async def _get_account_summary_stub(_user_id):
+        return _account_summary({"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}})
 
     monkeypatch.setattr(
-        "ark.registration_flow._get_user_accounts",
-        _get_user_accounts_stub,
+        "ark.registration_flow.get_account_summary_for_user",
+        _get_account_summary_stub,
     )
 
     await controller.join_player(interaction)
@@ -241,12 +246,12 @@ async def test_leave_marks_withdrawn(monkeypatch):
 
     monkeypatch.setattr(controller, "_prompt_governor_selection", _prompt)
 
-    async def _get_user_accounts_stub(_user_id):
-        return {"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}}
+    async def _get_account_summary_stub(_user_id):
+        return _account_summary({"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}})
 
     monkeypatch.setattr(
-        "ark.registration_flow._get_user_accounts",
-        _get_user_accounts_stub,
+        "ark.registration_flow.get_account_summary_for_user",
+        _get_account_summary_stub,
     )
 
     async def _get_match(match_id):
@@ -368,15 +373,17 @@ async def test_switch_updates_governor(monkeypatch):
     monkeypatch.setattr("ark.registration_flow.insert_audit_log", _audit)
     monkeypatch.setattr(controller, "refresh_registration_message", _refresh)
 
-    async def _get_user_accounts_stub(_user_id):
-        return {
-            "Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"},
-            "Alt 2": {"GovernorID": "2510418", "GovernorName": "Scrooge M"},
-        }
+    async def _get_account_summary_stub(_user_id):
+        return _account_summary(
+            {
+                "Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"},
+                "Alt 2": {"GovernorID": "2510418", "GovernorName": "Scrooge M"},
+            }
+        )
 
     monkeypatch.setattr(
-        "ark.registration_flow._get_user_accounts",
-        _get_user_accounts_stub,
+        "ark.registration_flow.get_account_summary_for_user",
+        _get_account_summary_stub,
     )
 
     await controller.switch(interaction)
@@ -544,12 +551,12 @@ async def test_join_player_blocks_duplicate_weekend_governor(monkeypatch):
     monkeypatch.setattr("ark.registration_flow.find_active_signup_for_weekend", _conflict)
     monkeypatch.setattr("ark.registration_flow.add_signup", _add_signup)
 
-    async def _get_user_accounts_stub(_user_id):
-        return {"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}}
+    async def _get_account_summary_stub(_user_id):
+        return _account_summary({"Main": {"GovernorID": "2441482", "GovernorName": "Chrislos"}})
 
     monkeypatch.setattr(
-        "ark.registration_flow._get_user_accounts",
-        _get_user_accounts_stub,
+        "ark.registration_flow.get_account_summary_for_user",
+        _get_account_summary_stub,
     )
 
     await controller.join_player(interaction)
@@ -557,6 +564,42 @@ async def test_join_player_blocks_duplicate_weekend_governor(monkeypatch):
     assert called["add"] is False
     assert interaction.response.sent
     assert "another match this Ark weekend" in interaction.response.sent[-1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_join_player_uses_summary_failure_as_no_registered_governors(monkeypatch):
+    controller = ArkRegistrationController(match_id=20, config={"PlayersCap": 30, "SubsCap": 15})
+    interaction = DummyInteraction()
+
+    async def _get_match(match_id):
+        return {
+            "MatchId": 20,
+            "Alliance": "K98",
+            "ArkWeekendDate": datetime(2026, 3, 7, tzinfo=UTC).date(),
+            "MatchDay": "Sat",
+            "MatchTimeUtc": datetime(2026, 3, 7, 11, 0, tzinfo=UTC).time(),
+            "SignupCloseUtc": _future_close(),
+            "Status": "Scheduled",
+        }
+
+    async def _get_roster(match_id):
+        return []
+
+    async def _get_account_summary_stub(_user_id):
+        return summarize_accounts({}, ok=False, error="db down")
+
+    monkeypatch.setattr("ark.registration_flow.get_match", _get_match)
+    monkeypatch.setattr("ark.registration_flow.get_roster", _get_roster)
+    monkeypatch.setattr(
+        "ark.registration_flow.get_account_summary_for_user",
+        _get_account_summary_stub,
+    )
+
+    await controller.join_player(interaction)
+
+    messages = interaction.response.sent + interaction.followup.sent
+    assert messages
+    assert "Use `/register_governor` first" in messages[-1]["content"]
 
 
 @pytest.mark.asyncio
@@ -634,7 +677,14 @@ async def test_switch_blocks_when_governor_already_signed(monkeypatch):
         "ark.registration_flow.find_active_signup_for_weekend", lambda *_a, **_k: None
     )
 
-    await controller._apply_switch(interaction, match, roster, {}, "2441482", "2510418")
+    await controller._apply_switch(
+        interaction,
+        match,
+        roster,
+        _account_summary({}),
+        "2441482",
+        "2510418",
+    )
 
     assert interaction.response.sent
     assert "already active in this match" in interaction.response.sent[-1]["content"]
@@ -666,7 +716,14 @@ async def test_switch_blocks_when_same_governor_selected(monkeypatch):
 
     monkeypatch.setattr(controller, "_validate_governor", lambda *_a, **_k: True)
 
-    await controller._apply_switch(interaction, match, roster, {}, "2441482", "2441482")
+    await controller._apply_switch(
+        interaction,
+        match,
+        roster,
+        _account_summary({}),
+        "2441482",
+        "2441482",
+    )
 
     assert interaction.response.sent
     assert "already signed up with that governor" in interaction.response.sent[-1]["content"]

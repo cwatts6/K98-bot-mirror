@@ -686,34 +686,111 @@ Important context:
 - Update deferred docs as completed/deferred and run the K98 validation gates selected by `scripts/select_tests.py`.
 ```
 
-## 31. PR 89 Registry Command/View Direct Migration Update
+## 31. PR 89 Registry Command/View Direct Migration Completion Update
 
-Status: local validation complete; pending PR review and production smoke test.
+Status: smoke tested successfully and deployed to production.
 
-PR 89 scope:
+PR 89 delivered:
 
 - `commands/registry_cmds.py` uses `get_account_summary_for_user()` directly for account-type autocomplete, `/modify_registration` slot existence checks, and admin remove pre-check display data.
 - `ui/views/registry_views.py` uses `get_account_summary_for_user()` directly from `MyRegsActionView` when opening modify/register entry points.
 - `ModifyStartView` now receives `AccountResolutionSummary` and builds options from `summary.ordered_accounts`.
 - `RegisterStartView` can receive `AccountResolutionSummary` for registry flows while retaining `free_slots` compatibility for telemetry/KVK callers that still open the same start view.
 - `AccountResolutionSummary.registered_slots()` was added so command autocomplete can preserve canonical registered-slot ordering without dropping back to `AccountLookup`.
+- `/modify_registration` autocomplete now falls back to the invoking user only when the autocomplete context belongs to the self-service modify command.
+- Admin remove autocomplete keeps the full slot list until a target Discord user or pasted user ID is present, avoiding accidental suggestions from the invoking admin's own registrations.
+- `MyRegsActionView` modify entry now reports temporary registry unavailability separately instead of treating summary load failure as no accounts registered.
 - Focused command/view/service tests cover summary-backed slot filtering, registry selection migration, view entry points, and registry-unavailable handling.
 - The active deferred item for registry command/view direct migration was removed from `docs/reference/deferred_optimisations.md`.
+
+Smoke coverage completed after deployment:
+
+- `/modify_registration` registered-slot autocomplete shows the invoking user's registered slots in canonical order.
+- `/modify_registration` valid modify path opens the existing confirmation prompt and preserves confirm/cancel behaviour.
+- `/modify_registration` `REMOVE` path opens the existing removal confirmation prompt and preserves confirm/cancel behaviour.
+- Admin `/remove_registration` autocomplete shows full slot suggestions before a target is entered, then target-specific registered slots once a Discord user or pasted ID is present.
+- Admin `/remove_registration_by_id` still handles valid removals, unregistered slots, and no-registration IDs with the existing user-facing responses.
+- `/my_registrations` action buttons open modify/register selectors from the shared account summary.
+- `/register_governor` confirmation flow still opens and preserves confirm/cancel behaviour.
+- Telemetry/KVK entry points that reuse `RegisterStartView` still open the slot picker through the preserved `free_slots` compatibility path.
 
 Validation completed during PR 89:
 
 - `.\.venv\Scripts\python.exe -m py_compile commands\registry_cmds.py ui\views\registry_views.py services\governor_account_service.py tests\test_registry_cmds.py tests\test_registry_views_smoke.py tests\test_governor_account_service.py`
-- `.\.venv\Scripts\python.exe -m pytest -q tests\test_registry_cmds.py tests\test_registry_views_smoke.py tests\test_governor_account_service.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_registry_cmds.py tests\test_registry_views_smoke.py tests\test_governor_account_service.py` (`23 passed` after review fixes)
 - `.\.venv\Scripts\python.exe scripts\select_tests.py`
 - `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
 - `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
 - `.\.venv\Scripts\python.exe -m pytest -q tests\test_registry_cmds.py tests\test_registry_views_smoke.py tests\test_governor_account_service.py tests\test_ui_imports.py`
 - `.\.venv\Scripts\python.exe scripts\smoke_imports.py`
 - `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
-- `.\.venv\Scripts\python.exe -m pytest -q tests` (`1353 passed, 2 skipped`)
+- `.\.venv\Scripts\python.exe -m pytest -q tests` (`1355 passed, 2 skipped` after review fixes)
 - `.\.venv\Scripts\python.exe -m pre_commit run -a`
 
 Remaining follow-up slices intentionally left deferred:
 
 1. Ark account-resolution audit/migration: inspect `ark/registration_flow.py` self-service join/sub/leave/switch lookup and governor-name resolution for safe reuse of `AccountResolutionSummary`.
 2. Compatibility cleanup: remove obsolete `AccountLookup`-only pathways and duplicate local classification/option-shaping helpers only after Ark has focused regression coverage and the existing stats, inventory, MGE, telemetry/KVK, and registry regression surfaces remain green.
+
+## 32. Next Phase Chat Starter
+
+Use this in a fresh Codex chat for the next shared account-resolution deferred slice:
+
+```text
+Codex, start the next registry/account optimisation after PR 89 (`registry-account-summary-direct`) was smoke tested successfully and deployed to production.
+
+Use the K98 repo workflow and required docs. Read `docs/task_packs/Codex Task Pack - Audit and Optimise registry_cmds.md` and `docs/reference/deferred_optimisations.md` first.
+
+Goal: deliver the next PR-sized follow-up slice for the shared account-resolution migration. PR 87 introduced `ResolvedAccount` and `AccountResolutionSummary` in `services/governor_account_service.py`; PR 88 migrated telemetry/KVK target/CrystalTech picker setup in `commands/telemetry_cmds.py`, `account_picker.py`, and `kvk_ui.py`; PR 89 migrated registry command/view account-selection flows in `commands/registry_cmds.py` and `ui/views/registry_views.py` to consume the shared summary directly. Now audit Ark and migrate only if the safe PR-sized shape is clear.
+
+Important context:
+- PR 84 centralised basic account slots, Discord user-id parsing, public GovernorID roster lookup, and `/my_registrations` loading through `registry_service.load_registry_as_dict`.
+- PR 85A extracted registration audit, bulk export, bulk import dry-run preview/error files, and bulk import apply summary shaping into `registry/registry_command_service.py`.
+- PR 86 moved registry confirmation views into `ui/views/registry_views.py`, kept compatibility re-exports from `registry/governor_registry.py`, and removed the remaining inline registry-service import in `remove_registration_by_id`.
+- PR 87 introduced the shared richer account-resolution summary object and migrated stats, inventory, and MGE service adapters while preserving public shapes.
+- PR 88 migrated telemetry/KVK target/CrystalTech picker setup to `AccountResolutionSummary` and preserved selector labels, option ordering, refresh behaviour, lookup/register buttons, and slot fallback labels for blank or `Unknown` GovernorName values.
+- PR 89 migrated registry command/view account-selection flows to `AccountResolutionSummary`, preserved self-service/admin autocomplete behaviour, confirmation/cancel behaviour, duplicate ownership checks, and `RegisterStartView` compatibility for telemetry/KVK callers.
+- Remaining deferred slices are:
+  1. audit and, if safe, migrate `ark/registration_flow.py` account lookup and governor-name helpers to reuse `AccountResolutionSummary`;
+  2. remove compatibility adapters and duplicate local classification/option-shaping helpers only after Ark has focused regression coverage.
+- Recommended next slice: Ark account-resolution audit/migration. Start with audit/scope and stop for approval before implementation unless explicitly told otherwise.
+- Preserve current Ark signup behaviour, join/sub/leave/switch flows, ban enforcement, roster filtering, active signup detection, persistent registration-message refresh, account picker labels/ordering, telemetry/KVK picker behaviour, registry flows, inventory permission behaviour, stats export behaviour, and MGE signup behaviour.
+- Validate any SQL-facing assumptions against `C:\K98-bot-SQL-Server` before implementation.
+- Keep the work PR-sized. If Ark migration is not safely small, propose the split and leave compatibility cleanup deferred.
+- Update deferred docs as completed/deferred and run the K98 validation gates selected by `scripts/select_tests.py`.
+```
+
+## 33. PR 90 Ark Account-Resolution Direct Migration Completion Update
+
+Status: local validation complete; pending PR review and production smoke test.
+
+PR 90 delivered:
+
+- `ark/registration_flow.py` now uses `get_account_summary_for_user()` directly for self-service Ark join, sub, leave, and switch flows.
+- Ark self-service governor selectors now pass `AccountResolutionSummary` to the shared account picker option builder, preserving selector ordering, GovernorID de-dupe, and slot fallback labels.
+- Ark leave and switch roster filtering now derives linked GovernorIDs from `summary.governor_id_strings` instead of rebuilding local sets from raw account dictionaries.
+- Ark signup and switch GovernorName snapshots now resolve through `AccountResolutionSummary.governor_name_for_id()`.
+- The Ark-local raw account loader and duplicate governor-name helper were removed from `ark/registration_flow.py`.
+- Admin add name-cache and fuzzy lookup behaviour was intentionally left unchanged because it is an admin roster-search flow, not a linked-account selection path; a structured deferred item now tracks that cleanup separately.
+- The active Ark deferred optimisation item was removed from `docs/reference/deferred_optimisations.md`.
+- Compatibility adapter cleanup remains deferred as the next dedicated cleanup slice, alongside the separate `/my_registrations` display-loader item.
+
+Validation completed during PR 90:
+
+- `.\.venv\Scripts\python.exe -m py_compile ark\registration_flow.py services\governor_account_service.py tests\test_ark_registration_flow.py tests\test_governor_account_service.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_ark_registration_flow.py tests\test_governor_account_service.py tests\test_account_picker.py` (`33 passed`)
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_ark_bans_enforcement.py tests\test_ark_admin_roster.py` (`8 passed`)
+- `.\.venv\Scripts\python.exe scripts\select_tests.py`
+- `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
+- `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
+- `.\.venv\Scripts\python.exe scripts\smoke_imports.py`
+- `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests` (`1356 passed, 2 skipped`)
+- `.\.venv\Scripts\python.exe -m pytest -q <explicit test_ark_*.py file list>` (`165 passed`)
+- `.\.venv\Scripts\python.exe -m pre_commit run -a`
+
+Remaining follow-up slices intentionally left deferred:
+
+1. `/my_registrations` display-loader migration: audit and, if safe, move the player-facing display payload from full-registry local selection to `AccountResolutionSummary` or a focused display service.
+2. Ark admin fuzzy/name-cache lookup cleanup: move admin roster-search lookup out of the controller into a focused helper/service while preserving exact ID, partial ID, fuzzy name, refresh fallback, no-match responses, and admin slot prompts.
+3. Compatibility cleanup: remove obsolete `AccountLookup`-only pathways and duplicate local classification/option-shaping helpers only after preserving focused regression coverage for stats export, inventory permissions, MGE signup, telemetry/KVK pickers, registry flows, KVK personal views, and Ark signup.

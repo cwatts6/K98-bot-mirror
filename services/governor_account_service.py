@@ -69,6 +69,16 @@ class AccountResolutionSummary:
     def registered_slots(self, prefix: str | None = None, *, limit: int = 25) -> list[str]:
         return registered_account_slots(self.ordered_accounts, prefix, limit=limit)
 
+    def governor_name_for_id(self, governor_id: str | int, fallback: str = "Unknown") -> str:
+        gid = _normalize_governor_id_str(governor_id)
+        if not gid:
+            return fallback
+        for account in self.resolved_accounts:
+            if account.governor_id_str == gid:
+                name = (account.governor_name or "").strip()
+                return fallback if not name or name.casefold() == "unknown" else name
+        return fallback
+
 
 def _normalize_governor_id_str(value: Any) -> str:
     try:

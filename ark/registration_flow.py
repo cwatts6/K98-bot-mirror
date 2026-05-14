@@ -33,7 +33,11 @@ from ark.registration_messages import upsert_registration_message
 from ark.state.ark_state import ArkJsonState, ArkMessageRef, ArkMessageState
 from decoraters import _has_leadership_role, _is_admin
 from profile_cache import get_profile_cached
-from registry.registry_service import get_discord_user_for_governor, get_user_accounts
+from registry.registry_service import get_discord_user_for_governor
+from services.governor_account_service import (
+    AccountResolutionSummary,
+    get_account_summary_for_user,
+)
 from target_utils import (
     _name_cache,
     get_name_cache_status,
@@ -170,22 +174,6 @@ async def _ensure_name_cache_ready() -> None:
             await asyncio.to_thread(sync_refresh_worker)
     except Exception:
         logger.exception("[ARK] Failed ensuring name cache is ready")
-
-
-async def _get_user_accounts(user_id: int) -> dict[str, dict]:
-    try:
-        return dict(await asyncio.to_thread(get_user_accounts, int(user_id)) or {})
-    except Exception:
-        logger.exception("ark_registration_user_accounts_lookup_failed user_id=%s", user_id)
-        return {}
-
-
-def _get_governor_name(accounts: dict[str, dict], governor_id: str) -> str:
-    gid = str(governor_id).strip()
-    for info in (accounts or {}).values():
-        if str(info.get("GovernorID", "")).strip() == gid:
-            return str(info.get("GovernorName") or "Unknown")
-    return "Unknown"
 
 
 def _find_user_signup(roster: list[dict], user_id: int) -> dict[str, Any] | None:
@@ -482,7 +470,7 @@ class ArkRegistrationController:
         self,
         interaction: discord.Interaction,
         *,
-        accounts: dict[str, dict],
+        accounts: AccountResolutionSummary,
         on_select,
         heading: str,
         only_governor_ids: set[str] | None = None,
@@ -584,7 +572,7 @@ class ArkRegistrationController:
 
         # NOTE: Removed user-level block. Governor-level duplicate check happens in _apply_join.
 
-        accounts = await _get_user_accounts(interaction.user.id)
+        accounts = await get_account_summary_for_user(interaction.user.id)
 
         async def _apply(inter: discord.Interaction, governor_id: str) -> None:
             await self._apply_join(inter, match, roster, accounts, governor_id, slot_type="Player")
@@ -617,7 +605,7 @@ class ArkRegistrationController:
             await interaction.followup.send("❌ Sub slots are full.", ephemeral=True)
             return
 
-        accounts = await _get_user_accounts(interaction.user.id)
+        accounts = await get_account_summary_for_user(interaction.user.id)
 
         async def _apply(inter: discord.Interaction, governor_id: str) -> None:
             await self._apply_join(inter, match, roster, accounts, governor_id, slot_type="Sub")
@@ -634,7 +622,7 @@ class ArkRegistrationController:
         interaction: discord.Interaction,
         match: dict[str, Any],
         roster: list[dict[str, Any]],
-        accounts: dict[str, dict],
+        accounts: AccountResolutionSummary,
         governor_id: str,
         *,
         slot_type: str,
@@ -703,7 +691,7 @@ class ArkRegistrationController:
         if not await self._validate_governor(interaction, governor_id):
             return
 
-        gov_name = _get_governor_name(accounts, governor_id)
+        gov_name = accounts.governor_name_for_id(governor_id)
         existing = await get_signup(self.match_id, int(governor_id))
         if existing and (existing.get("Status") or "").lower() != "active":
             ok = await reactivate_signup(
@@ -756,13 +744,8 @@ class ArkRegistrationController:
             return
 
         roster = await get_roster(self.match_id)
-        accounts = await _get_user_accounts(interaction.user.id)
-
-        account_gov_ids = {
-            str(info.get("GovernorID")).strip()
-            for info in (accounts or {}).values()
-            if info.get("GovernorID") is not None
-        }
+        accounts = await get_account_summary_for_user(interaction.user.id)
+        account_gov_ids = set(accounts.governor_id_strings)
 
         # Filter roster to governors linked to this Discord user
         roster_govs = [r for r in roster if str(r.get("GovernorId")).strip() in account_gov_ids]
@@ -823,14 +806,8 @@ class ArkRegistrationController:
             return
 
         roster = await get_roster(self.match_id)
-        accounts = await _get_user_accounts(interaction.user.id)
-
-        # Governor IDs linked to this Discord user
-        account_gov_ids = {
-            str(info.get("GovernorID")).strip()
-            for info in (accounts or {}).values()
-            if info.get("GovernorID") is not None
-        }
+        accounts = await get_account_summary_for_user(interaction.user.id)
+        account_gov_ids = set(accounts.governor_id_strings)
 
         # Active signups in this match that belong to this user
         active_govs = {
@@ -902,7 +879,7 @@ class ArkRegistrationController:
         interaction: discord.Interaction,
         match: dict[str, Any],
         roster: list[dict[str, Any]],
-        accounts: dict[str, dict],
+        accounts: AccountResolutionSummary,
         current_governor_id: str,
         governor_id: str,
     ) -> None:
@@ -936,7 +913,7 @@ class ArkRegistrationController:
         if not await self._validate_governor(interaction, governor_id):
             return
 
-        gov_name = _get_governor_name(accounts, governor_id)
+        gov_name = accounts.governor_name_for_id(governor_id)
 
         current_entry = next(
             (r for r in roster if str(r.get("GovernorId")) == str(current_governor_id)),

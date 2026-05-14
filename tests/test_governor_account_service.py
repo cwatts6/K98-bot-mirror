@@ -72,6 +72,9 @@ def test_account_resolution_summary_orders_deduplicates_and_defaults_to_main():
     assert summary.default_choice == "Main"
     assert summary.classification == ("multi", None)
     assert summary.contains_governor_id("100")
+    assert summary.governor_name_for_id("100") == "Main"
+    assert summary.governor_name_for_id(300) == "Farm"
+    assert summary.governor_name_for_id("999") == "Unknown"
     assert summary.registered_slots() == ["Main", "Alt 1", "Alt 2", "Farm 1"]
     assert summary.registered_slots("alt") == ["Alt 1", "Alt 2"]
 
@@ -85,6 +88,20 @@ def test_account_resolution_summary_single_classification_handles_unknown_slots(
     assert summary.classification == ("single", "987")
     assert summary.first_account is not None
     assert summary.first_account.slot == "Custom"
+
+
+def test_governor_name_for_id_treats_unknown_as_missing():
+    from services import governor_account_service as svc
+
+    summary = svc.summarize_accounts(
+        {
+            "Main": {"GovernorID": "987", "GovernorName": "Unknown"},
+            "Alt 1": {"GovernorID": "654", "GovernorName": "  "},
+        }
+    )
+
+    assert summary.governor_name_for_id("987", fallback="Governor 987") == "Governor 987"
+    assert summary.governor_name_for_id("654", fallback="Governor 654") == "Governor 654"
 
 
 def test_parse_discord_user_id_accepts_mentions_and_raw_ids():
