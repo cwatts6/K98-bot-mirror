@@ -543,17 +543,39 @@ Important context:
 
 ## 27. PR 87 Shared Account-Resolution First Slice
 
-Status: implementation slice approved after the PR 86 scope pass.
+Status: smoke tested successfully and deployed to production.
 
-PR 87 first slice scope:
+PR 87 delivered:
 
-- Introduce a shared richer account-resolution summary object in `services/governor_account_service.py`.
-- Preserve the existing `AccountLookup` public shape for registry, telemetry, and UI callers.
-- Preserve `StatsAccountSummary` for stats commands and personal stats export while backing it with the shared summary.
-- Preserve inventory `RegisteredGovernor` output, inventory permission behavior, and inventory report/export behavior while resolving accounts through the shared summary.
-- Preserve MGE linked-governor list output and self-service/admin signup behavior while resolving ownership through the shared summary.
-- Do not change command names, command output, autocomplete ordering, permission checks, ephemeral/admin behavior, inventory permission behavior, or stats export behavior.
-- Do not remove compatibility adapters until each command surface has focused regression coverage.
+- A shared richer account-resolution summary object in `services/governor_account_service.py`.
+- `ResolvedAccount` and `AccountResolutionSummary` with canonical account ordering, deduplicated GovernorIDs, GovernorID string/int access, account names, default choice, classification, free-slot, and ownership helpers.
+- Preservation of the existing `AccountLookup` public shape for registry, telemetry, and UI callers.
+- Preservation of `StatsAccountSummary` for stats commands and personal stats export while backing it with the shared summary.
+- Preservation of inventory `RegisteredGovernor` output, inventory permission behavior, stale registry fallback behavior, legacy inventory display-label fallback behavior, and inventory report/export behavior while resolving accounts through the shared summary.
+- Preservation of MGE linked-governor list output and self-service/admin signup behavior while resolving ownership through the shared summary.
+- Documentation of the remaining command/view and Ark follow-up slices without removing compatibility adapters prematurely.
+
+Smoke coverage completed after deployment:
+
+- `/my_stats`
+- `/mykvkstats`
+- inventory import/report/export account resolution and permission paths
+- MGE linked-governor signup behavior
+- inventory missing-name display fallback (`Governor` or GovernorID rather than `Unknown`)
+
+Validation completed during PR 87:
+
+- `.\.venv\Scripts\python.exe -m py_compile services\governor_account_service.py services\stats_account_service.py inventory\inventory_service.py mge\mge_signup_service.py tests\test_governor_account_service.py tests\test_stats_account_service.py tests\test_inventory_service.py tests\test_mge_signup_service.py`
+- `.\.venv\Scripts\python.exe scripts\select_tests.py`
+- `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
+- `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
+- `.\.venv\Scripts\python.exe scripts\smoke_imports.py`
+- `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
+- `.\.venv\Scripts\python.exe -m pre_commit run -a`
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_governor_account_service.py tests\test_stats_account_service.py tests\test_inventory_service.py tests\test_inventory_export_service.py tests\test_inventory_reporting_service.py tests\test_mge_signup_service.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests -k "inventory"`
+- `.\.venv\Scripts\python.exe -m pytest -q tests -k "mge"`
+- `.\.venv\Scripts\python.exe -m pytest -q tests`
 
 Follow-up slices intentionally left deferred:
 
@@ -561,3 +583,30 @@ Follow-up slices intentionally left deferred:
 2. Registry command/view direct migration: update registry command and view account-selection flows to use the shared summary directly, then retire `AccountLookup` only after compatibility imports and smoke tests are updated.
 3. Ark account-resolution audit: inspect `ark/registration_flow.py` account lookup and governor-name helpers for safe reuse of `AccountResolutionSummary`; migrate only if Ark signup behavior and tests remain stable.
 4. Compatibility cleanup: after all command/view surfaces are migrated, remove duplicate local classification, linked-governor, and registered-governor adapter code that no longer has external callers.
+
+## 28. Next Phase Chat Starter
+
+Use this in a fresh Codex chat for the remaining shared account-resolution follow-up slices:
+
+```text
+Codex, start the next registry/account optimisation after PR 87 (`shared-account-resolution-slice`) was smoke tested successfully and deployed to production.
+
+Use the K98 repo workflow and required docs. Read `docs/task_packs/Codex Task Pack - Audit and Optimise registry_cmds.md` and `docs/reference/deferred_optimisations.md` first.
+
+Goal: deliver the next PR-sized follow-up slice for the shared account-resolution migration. PR 87 introduced `ResolvedAccount` and `AccountResolutionSummary` in `services/governor_account_service.py` and migrated the stats, inventory, and MGE service adapters while preserving their public shapes. Now audit and begin direct command/view migration for the remaining consumers.
+
+Important context:
+- PR 84 centralised basic account slots, Discord user-id parsing, public GovernorID roster lookup, and `/my_registrations` loading through `registry_service.load_registry_as_dict`.
+- PR 85A extracted registration audit, bulk export, bulk import dry-run preview/error files, and bulk import apply summary shaping into `registry/registry_command_service.py`.
+- PR 86 moved registry confirmation views into `ui/views/registry_views.py`, kept compatibility re-exports from `registry/governor_registry.py`, and removed the remaining inline registry-service import in `remove_registration_by_id`.
+- PR 87 introduced the shared richer account-resolution summary object and migrated stats, inventory, and MGE service adapters.
+- Remaining follow-up slices are:
+  1. migrate telemetry/KVK target/CrystalTech picker setup in `commands/telemetry_cmds.py`, `account_picker.py`, `kvk_ui.py`, and related views to consume `AccountResolutionSummary` directly;
+  2. migrate registry command/view account-selection flows in `commands/registry_cmds.py` and `ui/views/registry_views.py` to the shared summary;
+  3. audit `ark/registration_flow.py` account lookup and governor-name helpers for safe reuse of the shared summary;
+  4. remove compatibility adapters only after every direct command/view surface has focused regression coverage.
+- Keep the work PR-sized. Start with audit/scope and propose whether the first implementation slice should be telemetry/KVK target/CrystalTech or registry command/view direct migration.
+- Preserve current command output, autocomplete ordering, permission checks, ephemeral/admin behaviour, inventory permission behaviour, stats export behaviour, MGE signup behaviour, and Ark signup behaviour.
+- Validate any SQL-facing assumptions against `C:\K98-bot-SQL-Server` before implementation.
+- Update deferred docs as completed/deferred and run the K98 validation gates selected by `scripts/select_tests.py`.
+```
