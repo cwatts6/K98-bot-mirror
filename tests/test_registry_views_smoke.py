@@ -84,9 +84,164 @@ def test_registry_views_instantiate(monkeypatch):
     asyncio.run(_run())
 
 
+def test_register_governor_confirm_defers_writes_and_edits_prompt(monkeypatch):
+    rv = _load_registry_views(monkeypatch)
+    calls = []
+
+    def _register_account(**kwargs):
+        calls.append(kwargs)
+        return True, None
+
+    monkeypatch.setattr(rv, "register_account", _register_account)
+
+    async def _run():
+        view = rv.RegisterGovernorView(_User(1), "Main", "123", "Alice")
+        interaction = _FakeInteraction(_User(1))
+
+        await _button(view, "✅ Confirm").callback(interaction)
+
+        assert interaction.response.deferred_ephemeral is True
+        assert calls == [
+            {
+                "discord_id": "1",
+                "discord_name": "User(1)",
+                "account_type": "Main",
+                "governor_id": "123",
+                "governor_name": "Alice",
+            }
+        ]
+        assert interaction.original_edits[-1]["view"] is None
+        assert "Registered `Main`" in interaction.original_edits[-1]["content"]
+
+    asyncio.run(_run())
+
+
+def test_modify_governor_confirm_defers_writes_and_edits_prompt(monkeypatch):
+    rv = _load_registry_views(monkeypatch)
+    calls = []
+
+    def _register_account(**kwargs):
+        calls.append(kwargs)
+        return True, None
+
+    monkeypatch.setattr(rv, "register_account", _register_account)
+
+    async def _run():
+        view = rv.ModifyGovernorView(_User(1), "Alt 1", "456", "Bob")
+        interaction = _FakeInteraction(_User(1))
+
+        await _button(view, "✅ Confirm Change").callback(interaction)
+
+        assert interaction.response.deferred_ephemeral is True
+        assert calls == [
+            {
+                "discord_id": "1",
+                "discord_name": "User(1)",
+                "account_type": "Alt 1",
+                "governor_id": "456",
+                "governor_name": "Bob",
+            }
+        ]
+        assert interaction.original_edits[-1]["view"] is None
+        assert "`Alt 1` updated" in interaction.original_edits[-1]["content"]
+
+    asyncio.run(_run())
+
+
+def test_remove_governor_confirm_defers_write_and_clears_prompt(monkeypatch):
+    rv = _load_registry_views(monkeypatch)
+    calls = []
+
+    def _remove_governor(**kwargs):
+        calls.append(kwargs)
+        return True, None
+
+    monkeypatch.setattr(rv, "remove_governor", _remove_governor)
+
+    async def _run():
+        view = rv.ConfirmRemoveView(_User(1), "Farm 1")
+        interaction = _FakeInteraction(_User(1))
+
+        await _button(view, "✅ Confirm Remove").callback(interaction)
+
+        assert interaction.response.deferred_ephemeral is True
+        assert calls == [
+            {
+                "discord_user_id": 1,
+                "account_type": "Farm 1",
+                "removed_by": 1,
+            }
+        ]
+        assert interaction.original_edits[-1]["view"] is None
+        assert "`Farm 1` has been removed" in interaction.original_edits[-1]["content"]
+
+    asyncio.run(_run())
+
+
+def test_confirmation_cancel_callbacks_clear_prompt(monkeypatch):
+    rv = _load_registry_views(monkeypatch)
+
+    async def _run():
+        view = rv.RegisterGovernorView(_User(1), "Main", "123", "Alice")
+        interaction = _FakeInteraction(_User(1))
+
+        await _button(view, "❌ Cancel").callback(interaction)
+
+        assert interaction.response.edits[-1]["view"] is None
+        assert "cancelled" in interaction.response.edits[-1]["content"]
+
+    asyncio.run(_run())
+
+
+def _button(view, label: str):
+    return next(child for child in view.children if getattr(child, "label", "") == label)
+
+
 class _User:
     def __init__(self, user_id: int):
         self.id = user_id
 
     def __str__(self) -> str:
         return f"User({self.id})"
+
+
+class _FakeResponse:
+    def __init__(self):
+        self.deferred_ephemeral = None
+        self.done = False
+        self.edits = []
+        self.messages = []
+
+    def is_done(self):
+        return self.done
+
+    async def defer(self, *, ephemeral=False):
+        self.done = True
+        self.deferred_ephemeral = ephemeral
+
+    async def send_message(self, content=None, *, ephemeral=False, **kwargs):
+        self.done = True
+        self.messages.append({"content": content, "ephemeral": ephemeral, **kwargs})
+
+    async def edit_message(self, content=None, *, view=None, **kwargs):
+        self.done = True
+        self.edits.append({"content": content, "view": view, **kwargs})
+
+
+class _FakeFollowup:
+    def __init__(self):
+        self.messages = []
+
+    async def send(self, content=None, *, ephemeral=False, **kwargs):
+        self.messages.append({"content": content, "ephemeral": ephemeral, **kwargs})
+
+
+class _FakeInteraction:
+    def __init__(self, user):
+        self.user = user
+        self.response = _FakeResponse()
+        self.followup = _FakeFollowup()
+        self.original_edits = []
+
+    async def edit_original_response(self, content=None, *, view=None, **kwargs):
+        self.original_edits.append({"content": content, "view": view, **kwargs})

@@ -107,6 +107,20 @@ def test_registry_view_compat_imports_resolve_to_ui_views():
     assert ConfirmRemoveView is UiConfirmRemoveView
 
 
+def test_registry_view_compat_import_star_includes_moved_views():
+    namespace = {}
+    exec("from registry.governor_registry import *", namespace)
+    from ui.views.registry_views import (
+        ConfirmRemoveView as UiConfirmRemoveView,
+        ModifyGovernorView as UiModifyGovernorView,
+        RegisterGovernorView as UiRegisterGovernorView,
+    )
+
+    assert namespace["RegisterGovernorView"] is UiRegisterGovernorView
+    assert namespace["ModifyGovernorView"] is UiModifyGovernorView
+    assert namespace["ConfirmRemoveView"] is UiConfirmRemoveView
+
+
 def test_kvkstatsview_not_in_governor_registry():
     """KVKStatsView must have been removed from governor_registry."""
     assert not hasattr(

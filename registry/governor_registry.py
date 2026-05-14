@@ -187,6 +187,9 @@ def __getattr__(name: str):
 
 
 __all__ = [
+    "ConfirmRemoveView",  # noqa: F822 - provided lazily by __getattr__
+    "ModifyGovernorView",  # noqa: F822 - provided lazily by __getattr__
+    "RegisterGovernorView",  # noqa: F822 - provided lazily by __getattr__
     "get_discord_name_for_governor",
     "get_user_main_governor_id",
     "get_user_main_governor_name",

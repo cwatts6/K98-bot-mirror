@@ -48,6 +48,29 @@ def configure_registry_views(
     _account_order_getter = account_order_getter
 
 
+async def _defer_component(interaction: discord.Interaction) -> None:
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+    except Exception:
+        pass
+
+
+async def _edit_component_prompt(
+    interaction: discord.Interaction,
+    *,
+    content: str,
+    view: discord.ui.View | None = None,
+) -> None:
+    try:
+        await interaction.edit_original_response(content=content, view=view)
+    except Exception:
+        try:
+            await interaction.followup.send(content, ephemeral=True)
+        except Exception:
+            pass
+
+
 class RegisterGovernorView(discord.ui.View):
     def __init__(self, user, account_type, governor_id, governor_name):
         super().__init__(timeout=60)
@@ -64,7 +87,9 @@ class RegisterGovernorView(discord.ui.View):
             )
             return
 
-        ok, err = register_account(
+        await _defer_component(interaction)
+        ok, err = await asyncio.to_thread(
+            register_account,
             discord_id=str(self.user.id),
             discord_name=str(self.user),
             account_type=self.account_type,
@@ -73,11 +98,12 @@ class RegisterGovernorView(discord.ui.View):
         )
 
         if not ok:
-            await interaction.response.edit_message(
-                content=f"❌ Registration failed: {err or 'Unknown error.'}", view=None
+            await _edit_component_prompt(
+                interaction, content=f"❌ Registration failed: {err or 'Unknown error.'}", view=None
             )
         else:
-            await interaction.response.edit_message(
+            await _edit_component_prompt(
+                interaction,
                 content=(
                     f"✅ Registered `{self.account_type}` as "
                     f"**{self.governor_name}** (ID: `{self.governor_id}`)"
@@ -107,7 +133,9 @@ class ModifyGovernorView(discord.ui.View):
             )
             return
 
-        ok, err = register_account(
+        await _defer_component(interaction)
+        ok, err = await asyncio.to_thread(
+            register_account,
             discord_id=str(self.user.id),
             discord_name=str(self.user),
             account_type=self.account_type,
@@ -116,11 +144,12 @@ class ModifyGovernorView(discord.ui.View):
         )
 
         if not ok:
-            await interaction.response.edit_message(
-                content=f"❌ Update failed: {err or 'Unknown error.'}", view=None
+            await _edit_component_prompt(
+                interaction, content=f"❌ Update failed: {err or 'Unknown error.'}", view=None
             )
         else:
-            await interaction.response.edit_message(
+            await _edit_component_prompt(
+                interaction,
                 content=(
                     f"✅ `{self.account_type}` updated to "
                     f"**{self.new_gov_name}** (ID: `{self.new_gov_id}`)"
@@ -148,20 +177,25 @@ class ConfirmRemoveView(discord.ui.View):
             )
             return
 
-        ok, err = remove_governor(
+        await _defer_component(interaction)
+        ok, err = await asyncio.to_thread(
+            remove_governor,
             discord_user_id=interaction.user.id,
             account_type=self.account_type,
             removed_by=interaction.user.id,
         )
 
         if ok:
-            await interaction.response.send_message(
-                f"✅ `{self.account_type}` has been removed from your registered accounts.",
-                ephemeral=True,
+            await _edit_component_prompt(
+                interaction,
+                content=f"✅ `{self.account_type}` has been removed from your registered accounts.",
+                view=None,
             )
         else:
-            await interaction.response.send_message(
-                f"❌ {err or 'Could not remove registration.'}", ephemeral=True
+            await _edit_component_prompt(
+                interaction,
+                content=f"❌ {err or 'Could not remove registration.'}",
+                view=None,
             )
         self.stop()
 
