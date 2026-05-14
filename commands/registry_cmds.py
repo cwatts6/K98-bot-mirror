@@ -454,9 +454,9 @@ def register_registry(bot: ext_commands.Bot) -> None:
         await ensure_deferred(ephemeral=True)
 
         try:
-            registry: dict[str, Any] = await asyncio.to_thread(
-                registry_service.load_registry_as_dict
-            ) or {}
+            registry: dict[str, Any] = (
+                await asyncio.to_thread(registry_service.load_registry_as_dict) or {}
+            )
         except Exception:
             logger.exception("[my_registrations] load_registry_as_dict failed")
             msg = "⚠️ Sorry, I couldn’t load your registrations. Please try again shortly."
