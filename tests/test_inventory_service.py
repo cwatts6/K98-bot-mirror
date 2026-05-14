@@ -157,6 +157,34 @@ async def test_get_registered_governors_preserves_legacy_name_fallbacks(monkeypa
     assert governors[1].governor_name == "222"
 
 
+async def test_get_registered_governors_falls_back_to_stale_registry(monkeypatch):
+    async def _failed_summary(_discord_user_id):
+        return inventory_service.governor_account_service.summarize_accounts(
+            {}, ok=False, error="RuntimeError: db down"
+        )
+
+    monkeypatch.setattr(
+        inventory_service.governor_account_service,
+        "get_account_summary_for_user",
+        _failed_summary,
+    )
+    monkeypatch.setattr(
+        inventory_service,
+        "load_registry",
+        lambda: {
+            "123": {
+                "accounts": {
+                    "Main": {"GovernorID": "111", "GovernorName": "StaleGov"},
+                }
+            }
+        },
+    )
+
+    governors = await inventory_service.get_registered_governors_for_user(123)
+
+    assert governors == [inventory_service.RegisteredGovernor(111, "StaleGov", "Main")]
+
+
 async def test_user_can_import_for_governor_uses_shared_registered_governors(monkeypatch):
     async def _summary(_discord_user_id):
         return inventory_service.governor_account_service.summarize_accounts(
