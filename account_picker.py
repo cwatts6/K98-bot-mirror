@@ -39,13 +39,23 @@ def _slot_rank(slot_name: str) -> int:
         return len(_PREFERRED_ORDER)
 
 
+def _account_option_label_source(governor_name: Any, slot: Any) -> str:
+    slot_text = str(slot)
+    if governor_name is None:
+        return slot_text
+    name_text = str(governor_name).strip()
+    if not name_text or name_text.casefold() == "unknown":
+        return slot_text
+    return name_text
+
+
 def _iter_account_option_rows(accounts_or_summary: Any) -> list[tuple[str, str, str]]:
     if hasattr(accounts_or_summary, "resolved_accounts"):
         return [
             (
                 str(account.slot),
                 str(account.governor_id_str).strip(),
-                str(account.governor_name or account.slot),
+                _account_option_label_source(account.governor_name, account.slot),
             )
             for account in getattr(accounts_or_summary, "resolved_accounts", ())
         ]
@@ -65,8 +75,8 @@ def _iter_account_option_rows(accounts_or_summary: Any) -> list[tuple[str, str, 
         gid = str(gid).strip()
         if not gid:
             continue
-        name = acc.get("GovernorName") or acc.get("Governor") or slot
-        rows.append((str(slot), gid, str(name) if name is not None else str(slot)))
+        name = acc.get("GovernorName") or acc.get("Governor")
+        rows.append((str(slot), gid, _account_option_label_source(name, slot)))
     return rows
 
 
