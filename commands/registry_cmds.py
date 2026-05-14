@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Protocol
 
 import discord
 from discord.ext import commands as ext_commands
@@ -11,7 +11,6 @@ from discord.ext import commands as ext_commands
 from bot_config import GUILD_ID
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import is_admin_and_notify_channel, track_usage
-from registry.account_slots import ACCOUNT_ORDER
 from registry.registry_command_service import (
     apply_import_changes,
     build_import_preview,
@@ -29,9 +28,11 @@ from registry.registry_service import (
     remove_governor,
 )
 from services.governor_account_service import (
+    AccountResolutionSummary,
     filter_account_slots,
     get_account_summary_for_user,
     parse_discord_user_id,
+    summarize_accounts,
 )
 import target_utils
 from ui.views.admin_views import ConfirmImportView
@@ -44,6 +45,59 @@ from ui.views.registry_views import (
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
+
+
+class _DisplayRequester(Protocol):
+    name: str
+
+
+async def _load_my_registrations_summary(discord_user_id: int) -> AccountResolutionSummary:
+    summary = await get_account_summary_for_user(discord_user_id)
+    if summary.ok:
+        return summary
+
+    if summary.error:
+        logger.warning("[my_registrations] account summary unavailable: %s", summary.error)
+
+    try:
+        registry: dict[str, Any] = (
+            await asyncio.to_thread(registry_service.load_registry_as_dict) or {}
+        )
+    except Exception:
+        logger.exception("[my_registrations] stale registry fallback failed")
+        return summary
+
+    user_data = registry.get(str(discord_user_id)) or registry.get(discord_user_id) or {}
+    return summarize_accounts(user_data.get("accounts", {}) or {})
+
+
+def _build_my_registrations_embed(
+    account_summary: AccountResolutionSummary,
+    *,
+    requested_by: _DisplayRequester,
+) -> tuple[discord.Embed, bool]:
+    lines: list[str] = []
+    for slot, info in account_summary.ordered_accounts.items():
+        gid = str(info.get("GovernorID", "")).strip()
+        gname = str(info.get("GovernorName", "")).strip()
+        label = f"**{gname}** (`{gid}`)" if (gname or gid) else "—"
+        lines.append(f"• **{slot}** — {label}")
+
+    has_regs = len(lines) > 0
+    desc = "\n".join(lines) if has_regs else "You don’t have any accounts registered yet."
+
+    if len(desc) > 4000:
+        logger.warning("[my_registrations] description too long (%d); truncating", len(desc))
+        desc = desc[:3970] + "\n… (truncated)"
+
+    embed = discord.Embed(
+        title="Your Registered Accounts",
+        description=desc,
+        colour=discord.Colour.green() if has_regs else discord.Colour.orange(),
+    )
+    requested_by_name = getattr(requested_by, "display_name", getattr(requested_by, "name", "?"))
+    embed.set_footer(text=f"Requested by {requested_by_name}")
+    return embed, has_regs
 
 
 def register_registry(bot: ext_commands.Bot) -> None:
@@ -445,11 +499,12 @@ def register_registry(bot: ext_commands.Bot) -> None:
         await ensure_deferred(ephemeral=True)
 
         try:
-            registry: dict[str, Any] = (
-                await asyncio.to_thread(registry_service.load_registry_as_dict) or {}
-            )
+            account_summary = await _load_my_registrations_summary(ctx.user.id)
         except Exception:
-            logger.exception("[my_registrations] load_registry_as_dict failed")
+            logger.exception("[my_registrations] account summary load failed")
+            account_summary = None
+
+        if not account_summary or not account_summary.ok:
             msg = "⚠️ Sorry, I couldn’t load your registrations. Please try again shortly."
             try:
                 await ctx.interaction.edit_original_response(content=msg, embed=None, view=None)
@@ -460,39 +515,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
                     pass
             return
 
-        user_key_str = str(ctx.user.id)
-        user_data = registry.get(user_key_str) or registry.get(ctx.user.id) or {}
-        accounts = user_data.get("accounts", {}) or {}
-
-        # --- Build lines in a predictable order; fall back to sorted keys
-        try:
-            order = list(ACCOUNT_ORDER)
-        except NameError:
-            order = sorted(accounts.keys())
-
-        lines: list[str] = []
-        for slot in order:
-            info = accounts.get(slot)
-            if info:
-                gid = str(info.get("GovernorID", "")).strip()
-                gname = str(info.get("GovernorName", "")).strip()
-                label = f"**{gname}** (`{gid}`)" if (gname or gid) else "—"
-                lines.append(f"• **{slot}** — {label}")
-
-        has_regs = len(lines) > 0
-        desc = "\n".join(lines) if has_regs else "You don’t have any accounts registered yet."
-
-        # --- Guard Discord 4096-char embed description limit
-        if len(desc) > 4000:
-            logger.warning("[my_registrations] description too long (%d); truncating", len(desc))
-            desc = desc[:3970] + "\n… (truncated)"
-
-        embed = discord.Embed(
-            title="Your Registered Accounts",
-            description=desc,
-            colour=discord.Colour.green() if has_regs else discord.Colour.orange(),
-        )
-        embed.set_footer(text=f"Requested by {getattr(ctx.user, 'display_name', ctx.user.name)}")
+        embed, has_regs = _build_my_registrations_embed(account_summary, requested_by=ctx.user)
 
         # --- Build the action view defensively
         view = None

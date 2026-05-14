@@ -762,7 +762,7 @@ Important context:
 
 ## 33. PR 90 Ark Account-Resolution Direct Migration Completion Update
 
-Status: local validation complete; pending PR review and production smoke test.
+Status: smoke tested successfully and deployed to production.
 
 PR 90 delivered:
 
@@ -773,7 +773,7 @@ PR 90 delivered:
 - The Ark-local raw account loader and duplicate governor-name helper were removed from `ark/registration_flow.py`.
 - Admin add name-cache and fuzzy lookup behaviour was intentionally left unchanged because it is an admin roster-search flow, not a linked-account selection path; a structured deferred item now tracks that cleanup separately.
 - The active Ark deferred optimisation item was removed from `docs/reference/deferred_optimisations.md`.
-- Compatibility adapter cleanup remains deferred as the next dedicated cleanup slice, alongside the separate `/my_registrations` display-loader item.
+- Compatibility adapter cleanup remains deferred as a dedicated cleanup slice, alongside the separate `/my_registrations` display-loader item.
 
 Validation completed during PR 90:
 
@@ -794,3 +794,20 @@ Remaining follow-up slices intentionally left deferred:
 1. `/my_registrations` display-loader migration: audit and, if safe, move the player-facing display payload from full-registry local selection to `AccountResolutionSummary` or a focused display service.
 2. Ark admin fuzzy/name-cache lookup cleanup: move admin roster-search lookup out of the controller into a focused helper/service while preserving exact ID, partial ID, fuzzy name, refresh fallback, no-match responses, and admin slot prompts.
 3. Compatibility cleanup: remove obsolete `AccountLookup`-only pathways and duplicate local classification/option-shaping helpers only after preserving focused regression coverage for stats export, inventory permissions, MGE signup, telemetry/KVK pickers, registry flows, KVK personal views, and Ark signup.
+
+## 34. PR 91 My Registrations Display-Loader Completion Update
+
+Status: implementation and validation complete; pending PR review and production smoke test.
+
+PR 91 delivered:
+
+- `/my_registrations` now loads the invoking user's display accounts through `get_account_summary_for_user()` instead of loading a full-registry snapshot and selecting locally.
+- The command builds its display from `AccountResolutionSummary.ordered_accounts`, preserving embed title/copy, account slot ordering, empty-state copy, action buttons, truncation guard, and ephemeral response behaviour.
+- Registry audit, export, and import paths still use `registry_service.load_registry_as_dict()` because they require full-registry snapshots.
+- Focused regression coverage now checks the `/my_registrations` summary-backed display payload and empty-state copy.
+- The active `/my_registrations` display-loader deferred item was removed from `docs/reference/deferred_optimisations.md`.
+
+Remaining follow-up slices intentionally left deferred:
+
+1. Ark admin fuzzy/name-cache lookup cleanup: move admin roster-search lookup out of the controller into a focused helper/service while preserving exact ID, partial ID, fuzzy name, refresh fallback, no-match responses, slot prompts, ban enforcement, and admin/leadership permissions.
+2. Compatibility cleanup: remove obsolete `AccountLookup`-only pathways and duplicate local classification/option-shaping helpers only after preserving focused regression coverage for stats export, inventory permissions, MGE signup, telemetry/KVK pickers, registry flows, KVK personal views, and Ark signup.

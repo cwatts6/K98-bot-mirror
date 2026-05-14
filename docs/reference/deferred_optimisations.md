@@ -51,15 +51,6 @@ Resolved historical notes were moved to `archive/deferred_optimisations_resolved
 - Dependencies: Preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to the KVK_ALL modernisation programme.
 
 ### Deferred Optimisation
-- Area: `commands/registry_cmds.py` `/my_registrations`, `services/governor_account_service.py`, `registry/registry_service.py`
-- Type: consistency
-- Description: `/my_registrations` still builds its display payload by loading the full registry through `registry_service.load_registry_as_dict()` and then selecting the invoking user's account dictionary locally. PR 89 intentionally preserved that path to avoid expanding a write-sensitive registry summary migration, but it leaves this one player-facing registry display flow outside the direct `AccountResolutionSummary` migration used by telemetry/KVK, registry action views, stats, inventory, and MGE adapters.
-- Suggested Fix: Audit `/my_registrations` and migrate its per-user display loading to `get_account_summary_for_user()` or a focused Discord-free registry display service that consumes `AccountResolutionSummary`, preserving embed title/copy, account slot ordering, empty-state copy, action buttons, truncation guard, ephemeral response behaviour, and stale/unavailable registry handling. Keep `load_registry_as_dict()` for audit/export/import flows that still need full-registry snapshots.
-- Impact: medium
-- Risk: low
-- Dependencies: PR 89 registry command/view direct migration complete; add focused `/my_registrations` regression coverage before changing the loader path.
-
-### Deferred Optimisation
 - Area: `ark/registration_flow.py` admin add fuzzy/name-cache lookup
 - Type: consistency
 - Description: Ark admin add still searches `target_utils._name_cache` directly for exact GovernorID, partial GovernorID, and substring fuzzy name matching. This is separate from the self-service linked-account migration because it supports admin roster search, cache refresh fallback, fuzzy selection, and admin slot prompts rather than selecting one of the actor's registered accounts.
