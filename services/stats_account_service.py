@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import logging
 
 from registry import registry_service
-from registry.account_slots import ACCOUNT_ORDER
+from services import governor_account_service
 
 logger = logging.getLogger(__name__)
 
@@ -29,59 +29,26 @@ class StatsAccountSummary:
 
 
 def order_accounts(accounts: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
-    ordered: dict[str, dict[str, str]] = {}
-    for slot in ACCOUNT_ORDER:
-        if slot in accounts:
-            ordered[slot] = dict(accounts[slot] or {})
-    for slot in sorted(accounts):
-        if slot not in ordered:
-            ordered[slot] = dict(accounts[slot] or {})
-    return ordered
+    return governor_account_service.order_accounts(accounts)
 
 
 def summarize_accounts(accounts: dict[str, dict[str, str]]) -> StatsAccountSummary:
-    ordered_accounts = order_accounts(accounts or {})
-    governor_ids: list[int] = []
-    account_names: list[str] = []
-    name_to_id: dict[str, int] = {}
+    shared = governor_account_service.summarize_accounts(accounts or {})
+    return _from_shared_summary(shared)
 
-    for info in ordered_accounts.values():
-        try:
-            gid = int(str(info.get("GovernorID") or info.get("GovernorId") or "").strip())
-        except (TypeError, ValueError):
-            continue
-        if gid <= 0:
-            continue
-        if gid not in governor_ids:
-            governor_ids.append(gid)
-        name = str(info.get("GovernorName") or info.get("governor_name") or "").strip()
-        if name and name not in name_to_id:
-            account_names.append(name)
-            name_to_id[name] = gid
-        elif name and name_to_id.get(name) != gid:
-            logger.warning(
-                "summarize_accounts: name %r maps to multiple GovernorIDs (%s, %s); first wins",
-                name,
-                name_to_id[name],
-                gid,
-            )
 
-    default_choice = "ALL"
-    main = ordered_accounts.get("Main") or {}
-    main_name = str(main.get("GovernorName") or "").strip()
-    if main_name and main_name in name_to_id:
-        default_choice = main_name
-    elif account_names:
-        default_choice = account_names[0]
-
+def _from_shared_summary(
+    shared: governor_account_service.AccountResolutionSummary,
+) -> StatsAccountSummary:
     return StatsAccountSummary(
-        ok=True,
-        accounts=dict(accounts or {}),
-        ordered_accounts=ordered_accounts,
-        governor_ids=governor_ids,
-        account_names=account_names,
-        name_to_id=name_to_id,
-        default_choice=default_choice,
+        ok=shared.ok,
+        accounts=shared.accounts,
+        ordered_accounts=shared.ordered_accounts,
+        governor_ids=list(shared.governor_ids),
+        account_names=list(shared.account_names),
+        name_to_id=dict(shared.name_to_id),
+        default_choice=shared.default_choice,
+        error=shared.error,
     )
 
 

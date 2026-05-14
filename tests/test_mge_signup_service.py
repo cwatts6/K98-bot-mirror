@@ -85,14 +85,20 @@ def _patch_signup_happy_path(monkeypatch):
 def test_get_linked_governors_uses_registry_service_boundary(monkeypatch):
     calls = []
 
-    def _get_user_accounts(discord_user_id):
+    def _get_account_summary_for_user_sync(discord_user_id):
         calls.append(discord_user_id)
-        return {
-            "Main": {"GovernorID": 100, "GovernorName": "Main Gov"},
-            "Alt 1": {"GovernorID": "200", "GovernorName": "Alt Gov"},
-        }
+        return mge_signup_service.governor_account_service.summarize_accounts(
+            {
+                "Main": {"GovernorID": 100, "GovernorName": "Main Gov"},
+                "Alt 1": {"GovernorID": "200", "GovernorName": "Alt Gov"},
+            }
+        )
 
-    monkeypatch.setattr(mge_signup_service, "get_user_accounts", _get_user_accounts)
+    monkeypatch.setattr(
+        mge_signup_service.governor_account_service,
+        "get_account_summary_for_user_sync",
+        _get_account_summary_for_user_sync,
+    )
 
     result = mge_signup_service.get_linked_governors_for_user(123)
 
@@ -104,12 +110,36 @@ def test_get_linked_governors_uses_registry_service_boundary(monkeypatch):
 
 
 def test_get_linked_governors_returns_empty_on_registry_failure(monkeypatch):
-    def _raise(_discord_user_id):
-        raise RuntimeError("registry unavailable")
+    def _summary(_discord_user_id):
+        return mge_signup_service.governor_account_service.summarize_accounts(
+            {}, ok=False, error="RuntimeError: registry unavailable"
+        )
 
-    monkeypatch.setattr(mge_signup_service, "get_user_accounts", _raise)
+    monkeypatch.setattr(
+        mge_signup_service.governor_account_service,
+        "get_account_summary_for_user_sync",
+        _summary,
+    )
 
     assert mge_signup_service.get_linked_governors_for_user(123) == []
+
+
+def test_is_governor_linked_to_user_uses_shared_summary(monkeypatch):
+    def _summary(_discord_user_id):
+        return mge_signup_service.governor_account_service.summarize_accounts(
+            {
+                "Alt 1": {"GovernorID": "200", "GovernorName": "Alt Gov"},
+            }
+        )
+
+    monkeypatch.setattr(
+        mge_signup_service.governor_account_service,
+        "get_account_summary_for_user_sync",
+        _summary,
+    )
+
+    assert mge_signup_service._is_governor_linked_to_user(123, 200) is True
+    assert mge_signup_service._is_governor_linked_to_user(123, 999) is False
 
 
 def test_admin_signup_resolves_discord_identity_from_registry(monkeypatch):

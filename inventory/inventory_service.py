@@ -23,7 +23,7 @@ from inventory.models import (
     RegisteredGovernor,
 )
 from inventory.parsing import normalize_final_values
-from registry.governor_registry import load_registry
+from services import governor_account_service
 from services.vision_client import InventoryVisionClient
 
 logger = logging.getLogger(__name__)
@@ -72,24 +72,14 @@ def is_supported_image_attachment(filename: str | None, content_type: str | None
 
 
 async def get_registered_governors_for_user(discord_user_id: int) -> list[RegisteredGovernor]:
-    registry = await asyncio.to_thread(load_registry)
-    block = registry.get(str(discord_user_id)) or registry.get(discord_user_id) or {}
-    accounts = block.get("accounts") or {}
+    summary = await governor_account_service.get_account_summary_for_user(discord_user_id)
     governors: list[RegisteredGovernor] = []
-    for account_type, account in accounts.items():
-        if not isinstance(account, dict):
-            continue
-        raw_gid = account.get("GovernorID") or account.get("GovernorId")
-        try:
-            gid = int(str(raw_gid).strip())
-        except (TypeError, ValueError):
-            continue
-        name = str(account.get("GovernorName") or account.get("Governor") or gid)
+    for account in summary.resolved_accounts:
         governors.append(
             RegisteredGovernor(
-                governor_id=gid,
-                governor_name=name,
-                account_type=str(account_type),
+                governor_id=account.governor_id,
+                governor_name=account.governor_name,
+                account_type=account.slot,
             )
         )
     return governors

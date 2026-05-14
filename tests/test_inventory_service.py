@@ -116,23 +116,46 @@ async def test_analyse_inventory_image_does_not_send_type_hint(monkeypatch):
 
 
 async def test_get_registered_governors_for_user_maps_registry(monkeypatch):
-    monkeypatch.setattr(
-        inventory_service,
-        "load_registry",
-        lambda: {
-            "123": {
-                "accounts": {
-                    "Main": {"GovernorID": "111", "GovernorName": "MainGov"},
-                    "Alt 1": {"GovernorID": "222", "GovernorName": "AltGov"},
-                }
+    async def _summary(_discord_user_id):
+        return inventory_service.governor_account_service.summarize_accounts(
+            {
+                "Main": {"GovernorID": "111", "GovernorName": "MainGov"},
+                "Alt 1": {"GovernorID": "222", "GovernorName": "AltGov"},
             }
-        },
+        )
+
+    monkeypatch.setattr(
+        inventory_service.governor_account_service,
+        "get_account_summary_for_user",
+        _summary,
     )
 
     governors = await inventory_service.get_registered_governors_for_user(123)
 
     assert [item.governor_id for item in governors] == [111, 222]
     assert governors[0].account_type == "Main"
+
+
+async def test_user_can_import_for_governor_uses_shared_registered_governors(monkeypatch):
+    async def _summary(_discord_user_id):
+        return inventory_service.governor_account_service.summarize_accounts(
+            {"Alt 1": {"GovernorID": "222", "GovernorName": "AltGov"}}
+        )
+
+    monkeypatch.setattr(
+        inventory_service.governor_account_service,
+        "get_account_summary_for_user",
+        _summary,
+    )
+
+    assert (
+        await inventory_service.user_can_import_for_governor(discord_user_id=123, governor_id=222)
+        is True
+    )
+    assert (
+        await inventory_service.user_can_import_for_governor(discord_user_id=123, governor_id=999)
+        is False
+    )
 
 
 async def test_analyse_inventory_image_marks_random_image_failed(monkeypatch):

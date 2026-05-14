@@ -19,7 +19,8 @@ from mge.mge_validation import (
     validate_rank_band,
     validate_self_service_window,
 )
-from registry.registry_service import get_discord_user_for_governor, get_user_accounts
+from registry.registry_service import get_discord_user_for_governor
+from services import governor_account_service
 
 logger = logging.getLogger(__name__)
 
@@ -44,31 +45,25 @@ def _is_admin_or_leadership(actor_roles: set[int], admin_role_ids: set[int]) -> 
 
 
 def get_linked_governors_for_user(discord_user_id: int) -> list[dict[str, str]]:
-    try:
-        accounts = get_user_accounts(int(discord_user_id))
-    except Exception:
-        logger.exception(
-            "mge_signup_registry_accounts_lookup_failed discord_user_id=%s",
-            discord_user_id,
-        )
+    summary = governor_account_service.get_account_summary_for_user_sync(discord_user_id)
+    if not summary.ok:
         return []
 
     rows: list[dict[str, str]] = []
     seen: set[str] = set()
-
-    for _slot, info in accounts.items():
-        gid = str(info.get("GovernorID") or "").strip()
-        gname = str(info.get("GovernorName") or "").strip()
-        if not gid or gid in seen:
+    for account in summary.resolved_accounts:
+        if account.governor_id_str in seen:
             continue
-        seen.add(gid)
-        rows.append({"GovernorID": gid, "GovernorName": gname or "Unknown"})
+        seen.add(account.governor_id_str)
+        rows.append({"GovernorID": account.governor_id_str, "GovernorName": account.governor_name})
     return rows
 
 
 def _is_governor_linked_to_user(discord_user_id: int, governor_id: int) -> bool:
-    linked = get_linked_governors_for_user(discord_user_id)
-    return any(str(item["GovernorID"]) == str(governor_id) for item in linked)
+    summary = governor_account_service.get_account_summary_for_user_sync(discord_user_id)
+    if not summary.ok:
+        return False
+    return summary.contains_governor_id(governor_id)
 
 
 def _resolve_signup_discord_user_id(

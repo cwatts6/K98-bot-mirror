@@ -51,6 +51,40 @@ def test_account_classification_and_free_slots():
     assert "Farm 20" in free
 
 
+def test_account_resolution_summary_orders_deduplicates_and_defaults_to_main():
+    from services import governor_account_service as svc
+
+    summary = svc.summarize_accounts(
+        {
+            "Farm 1": {"GovernorID": "300", "GovernorName": "Farm"},
+            "Main": {"GovernorID": "100", "GovernorName": "Main"},
+            "Alt 1": {"GovernorID": "100", "GovernorName": "Main"},
+            "Alt 2": {"GovernorID": "not-a-number", "GovernorName": "Bad"},
+        }
+    )
+
+    assert summary.ok is True
+    assert list(summary.ordered_accounts) == ["Main", "Alt 1", "Alt 2", "Farm 1"]
+    assert summary.governor_ids == (100, 300)
+    assert summary.governor_id_strings == ("100", "300")
+    assert summary.account_names == ("Main", "Farm")
+    assert summary.name_to_id == {"Main": 100, "Farm": 300}
+    assert summary.default_choice == "Main"
+    assert summary.classification == ("multi", None)
+    assert summary.contains_governor_id("100")
+
+
+def test_account_resolution_summary_single_classification_handles_unknown_slots():
+    from services import governor_account_service as svc
+
+    summary = svc.summarize_accounts({"Custom": {"GovernorID": "987", "GovernorName": "C"}})
+
+    assert list(summary.ordered_accounts) == ["Custom"]
+    assert summary.classification == ("single", "987")
+    assert summary.first_account is not None
+    assert summary.first_account.slot == "Custom"
+
+
 def test_parse_discord_user_id_accepts_mentions_and_raw_ids():
     from services import governor_account_service as svc
 
@@ -79,12 +113,11 @@ def test_account_slot_filters_use_canonical_sql_backed_slots():
 async def test_resolve_governor_label(monkeypatch):
     from services import governor_account_service as svc
 
-    async def fake_get_accounts_for_user(discord_user_id):
-        return svc.AccountLookup(
-            True,
+    async def fake_get_account_summary_for_user(discord_user_id):
+        return svc.summarize_accounts(
             {"Main": {"GovernorID": "123", "GovernorName": "Ada"}},
         )
 
-    monkeypatch.setattr(svc, "get_accounts_for_user", fake_get_accounts_for_user)
+    monkeypatch.setattr(svc, "get_account_summary_for_user", fake_get_account_summary_for_user)
 
     assert await svc.resolve_governor_label(42, "123") == "Ada (123)"

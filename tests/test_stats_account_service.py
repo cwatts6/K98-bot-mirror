@@ -36,6 +36,18 @@ def test_summarize_accounts_deduplicates_names_and_ids() -> None:
     assert summary.name_to_id == {"Shared": 100, "Other": 200}
 
 
+def test_summarize_accounts_uses_shared_resolution_shape() -> None:
+    accounts = {"Farm 20": {"GovernorID": "900", "GovernorName": "Farm"}}
+
+    shared = stats_account_service.governor_account_service.summarize_accounts(accounts)
+    summary = stats_account_service.summarize_accounts(accounts)
+
+    assert summary.ordered_accounts == shared.ordered_accounts
+    assert summary.governor_ids == list(shared.governor_ids)
+    assert summary.account_names == list(shared.account_names)
+    assert summary.default_choice == shared.default_choice
+
+
 @pytest.mark.asyncio
 async def test_get_account_summary_uses_registry_service(monkeypatch) -> None:
     called = {}

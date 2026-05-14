@@ -481,17 +481,83 @@ Important context:
 - Update deferred docs as completed/deferred and run the K98 validation gates selected by `scripts/select_tests.py`.
 ```
 
-## 25. Registry View-Layer Extraction Completion Update
+## 25. PR 86 Registry View-Layer Extraction Completion Update
 
-Status: implemented for the next registry optimisation after PR 85A.
+Status: smoke tested successfully and deployed to production.
 
-This phase delivered:
+PR 86 delivered:
 
 - `RegisterGovernorView`, `ModifyGovernorView`, and `ConfirmRemoveView` now live in `ui/views/registry_views.py`.
 - `registry/governor_registry.py` remains a compatibility facade for registry persistence/service helpers and exposes lazy compatibility re-exports for the moved view classes.
 - `commands/registry_cmds.py` imports registry confirmation views from the UI layer.
 - The remaining inline `registry.registry_service` import inside `remove_registration_by_id` was removed; the command now uses the module-level service imports.
 - Registration confirmation, modification confirmation, removal confirmation, cancel behaviour, ephemeral behaviour, command names, and permission boundaries were preserved.
+- Review fixes ensured moved view names remain available through `from registry.governor_registry import *`, confirmation callbacks defer before SQL-backed writes, blocking registry writes run through `asyncio.to_thread`, and removal confirmations clear the original prompt.
+- Focused callback coverage was added for register, modify, remove, cancel, and compatibility import-star behaviour.
 - The active deferred item for moving registry view classes was removed from `docs/reference/deferred_optimisations.md`.
 
-The richer shared account-resolution summary remains deferred as a separate cross-subsystem design and migration task.
+Smoke coverage completed after deployment:
+
+- `/register_governor` confirmation flow
+- `/modify_registration` confirmation flow
+- `/modify_registration` removal confirmation flow
+- confirmation cancel paths
+- `/my_registrations` post-change verification
+- compatibility import checks for the moved registry view classes
+
+Validation completed during PR 86:
+
+- `.\.venv\Scripts\python.exe -m py_compile commands/registry_cmds.py registry/governor_registry.py ui/views/registry_views.py tests/test_registry_governor_registry.py tests/test_registry_views_smoke.py tests/test_ui_imports.py`
+- `.\.venv\Scripts\python.exe -m pre_commit run -a`
+- `.\.venv\Scripts\python.exe scripts\select_tests.py`
+- `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
+- `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
+- `.\.venv\Scripts\python.exe scripts\smoke_imports.py`
+- `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests/test_registry_governor_registry.py tests/test_registry_views_smoke.py tests/test_ui_imports.py tests/test_registry_cmds.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests -k "registry"`
+- `.\.venv\Scripts\python.exe -m pytest -q tests`
+
+The richer shared account-resolution summary is now the only remaining registry/account optimisation item from this audit series. It remains deferred as a separate cross-subsystem design and migration task.
+
+## 26. Next Phase Chat Starter
+
+Use this in a fresh Codex chat for the remaining registry/account optimisation:
+
+```text
+Codex, start the next registry/account optimisation after PR 86 (`registry-view-layer-extraction`) was smoke tested successfully and deployed to production.
+
+Use the K98 repo workflow and required docs. Read `docs/task_packs/Codex Task Pack - Audit and Optimise registry_cmds.md` and `docs/reference/deferred_optimisations.md` first.
+
+Goal: design and begin the migration for the remaining deferred richer shared account-resolution summary object across registry, stats, telemetry, MGE, and inventory. Keep the work PR-sized: start with an audit/scope pass, identify the shared result shape, and propose a safe first implementation slice before coding.
+
+Important context:
+- PR 84 centralised basic account slots, Discord user-id parsing, public GovernorID roster lookup, and `/my_registrations` loading through `registry_service.load_registry_as_dict`.
+- PR 85A extracted registration audit, bulk export, bulk import dry-run preview/error files, and bulk import apply summary shaping into `registry/registry_command_service.py`.
+- PR 86 moved `RegisterGovernorView`, `ModifyGovernorView`, and `ConfirmRemoveView` into `ui/views/registry_views.py`, kept compatibility re-exports from `registry/governor_registry.py`, and removed the remaining inline registry-service import in `remove_registration_by_id`.
+- The remaining active registry/account deferred item is the shared account-resolution summary object. Current shapes include registry `AccountLookup`, stats `StatsAccountSummary`, inventory `RegisteredGovernor` resolution, and possible MGE/telemetry lookup variants.
+- Preserve current command output, autocomplete ordering, permission checks, ephemeral/admin behaviour, inventory permission behaviour, and stats export behaviour.
+- Validate SQL-facing assumptions against `C:\K98-bot-SQL-Server` before implementation, especially any GovernorID/account persistence assumptions.
+- Update deferred docs as completed/deferred and run the K98 validation gates selected by `scripts/select_tests.py`.
+```
+
+## 27. PR 87 Shared Account-Resolution First Slice
+
+Status: implementation slice approved after the PR 86 scope pass.
+
+PR 87 first slice scope:
+
+- Introduce a shared richer account-resolution summary object in `services/governor_account_service.py`.
+- Preserve the existing `AccountLookup` public shape for registry, telemetry, and UI callers.
+- Preserve `StatsAccountSummary` for stats commands and personal stats export while backing it with the shared summary.
+- Preserve inventory `RegisteredGovernor` output, inventory permission behavior, and inventory report/export behavior while resolving accounts through the shared summary.
+- Preserve MGE linked-governor list output and self-service/admin signup behavior while resolving ownership through the shared summary.
+- Do not change command names, command output, autocomplete ordering, permission checks, ephemeral/admin behavior, inventory permission behavior, or stats export behavior.
+- Do not remove compatibility adapters until each command surface has focused regression coverage.
+
+Follow-up slices intentionally left deferred:
+
+1. Telemetry/KVK target/CrystalTech direct migration: update `commands/telemetry_cmds.py`, `account_picker.py`, and related KVK target views to consume the shared summary directly instead of only the `AccountLookup` compatibility adapter.
+2. Registry command/view direct migration: update registry command and view account-selection flows to use the shared summary directly, then retire `AccountLookup` only after compatibility imports and smoke tests are updated.
+3. Ark account-resolution audit: inspect `ark/registration_flow.py` account lookup and governor-name helpers for safe reuse of `AccountResolutionSummary`; migrate only if Ark signup behavior and tests remain stable.
+4. Compatibility cleanup: after all command/view surfaces are migrated, remove duplicate local classification, linked-governor, and registered-governor adapter code that no longer has external callers.
