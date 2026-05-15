@@ -1162,7 +1162,7 @@ Update `docs/reference/deferred_optimisations.md` and any affected task-pack/run
 
 ## 42. Profile/Location Profile-Cache Lookup Standardisation Update
 
-Status: implemented and ready for PR validation.
+Status: smoke tested successfully and PR complete.
 
 This phase completed the active `/player_profile` and `/player_location` profile-cache lookup item:
 
@@ -1173,10 +1173,11 @@ This phase completed the active `/player_profile` and `/player_location` profile
 - Removed the active profile/location lookup item from `docs/reference/deferred_optimisations.md`.
 - Captured a separate deferred item for `/import_locations` command-layer import orchestration, which remains out of scope for the profile/location lookup PR.
 
-Validation completed during implementation:
+Validation completed during implementation and review follow-up:
 
 - `.\.venv\Scripts\python.exe -m py_compile services\profile_lookup_service.py commands\telemetry_cmds.py commands\location_cmds.py tests\test_profile_lookup_service.py`
 - `.\.venv\Scripts\python.exe -m pytest -q tests\test_profile_lookup_service.py tests\test_location_views_smoke.py tests\test_registry_views_smoke.py` (`15 passed`)
+- Review follow-up for PR feedback: `/player_profile` now strips the score field before constructing `GovernorSelectView`; focused regression coverage passed with `16 passed`.
 - `.\.venv\Scripts\python.exe scripts\select_tests.py commands\telemetry_cmds.py commands\location_cmds.py services\profile_lookup_service.py tests\test_profile_lookup_service.py`
 - `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
 - `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
@@ -1184,3 +1185,208 @@ Validation completed during implementation:
 - `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
 - `.\.venv\Scripts\python.exe -m pytest -q tests` (`1365 passed, 2 skipped`)
 - `.\.venv\Scripts\python.exe -m pre_commit run -a`
+
+## 43. Next Deferred Work Chat Starter
+
+Use this in a fresh Codex chat for the `/import_locations` command-layer orchestration deferred item:
+
+```text
+Codex, start the `/import_locations` command-layer orchestration cleanup after PR 95 (`profile-location-lookup-service`) was smoke tested successfully and completed.
+
+Use the K98 repo workflow and required docs. Read `docs/reference/deferred_optimisations.md` first, then follow `AGENTS.md`, `README-DEV.md`, and the reference index in `docs/reference/README.md`.
+
+## 1. Task Header
+
+- Task name: `import-locations-command-orchestration-cleanup`
+- Date: 2026-05-15
+- Owner/context: deferred optimisation captured during PR 95 profile/location lookup standardisation
+- Task type: refactor | deferred optimisation batch
+- One-pass approved: no
+
+## 2. Required Reading
+
+Before implementation, read:
+
+- `AGENTS.md`
+- `README-DEV.md`
+- `docs/reference/README.md`
+
+Then follow the required reading order and conditional references defined by `docs/reference/README.md`.
+
+For SQL-facing work, validate schema, procedure, view, index, staging/output table, and `ProcConfig` details against:
+
+`C:\K98-bot-SQL-Server`
+
+## 3. Objective
+
+Refactor `/import_locations` so command-layer code is thinner and orchestration/result shaping moves into a service/helper layer. Preserve existing Discord behaviour, admin/notify-channel gate, CSV validation messages, staging merge behaviour, location refresh signalling, and success/error copy.
+
+## 4. Background
+
+PR 95 completed `/player_profile` and `/player_location` profile-cache lookup standardisation. While touching `commands/location_cmds.py`, Codex found that `/import_locations` still mixes CSV attachment validation, parsing handoff, staging merge dispatch, and Discord response rendering inside the command module. The matching deferred item is active in `docs/reference/deferred_optimisations.md`.
+
+## 5. Scope
+
+### In Scope
+
+- Audit `commands/location_cmds.py` `/import_locations`.
+- Review `location_importer.py` and any tests around `parse_output_csv`, `load_staging_and_merge`, and location refresh signalling.
+- Extract import orchestration and result shaping into a small service/helper if the audit confirms a safe PR-sized slice.
+- Keep command code responsible for permission gates, safe defer/respond behaviour, attachment IO, and Discord rendering.
+- Add or update focused tests for extracted logic and command-facing behaviour.
+- Update deferred docs/task-pack notes when complete.
+
+### Out of Scope
+
+- Changing `/player_location` lookup behaviour from PR 95.
+- Redesigning location scanner/import SQL.
+- Changing Discord command names, permissions, channel gates, or user-facing import copy unless required for correctness.
+- Touching `DL_bot.py` upload routing.
+- Broad location refresh lifecycle redesign.
+
+## 6. Source Deferred Items
+
+### Deferred Optimisation
+- Area: `commands/location_cmds.py` `/import_locations`, `location_importer.py`
+- Type: architecture
+- Description: `/import_locations` still owns CSV attachment validation, parsing handoff, staging merge dispatch, and Discord response rendering in the command module. This was observed while standardising `/player_location` lookup and left out of scope to keep the profile/location lookup PR focused.
+- Suggested Fix: Extract import orchestration and result shaping into a location service, leaving `commands/location_cmds.py` responsible for permission gates, safe defer/respond behaviour, attachment IO, and Discord rendering.
+- Impact: medium
+- Risk: medium
+- Dependencies: Preserve admin/notify-channel gate, CSV validation copy, `load_staging_and_merge()` behaviour, location refresh signalling, and current import success/error messages.
+
+## 7. Codex Skills To Use
+
+| Skill | Decision | Notes |
+|---|---|---|
+| `k98-architecture-scope` | use | Required before implementation to map command/service/DAL/cache boundaries. |
+| `k98-discord-command-feature` | use | `/import_locations` is a slash command with permissions, responses, and user-facing copy. |
+| `k98-sql-validation` | use | Location import depends on SQL-facing staging/merge behaviour through `location_importer.py`. |
+| `k98-test-selection` | use | Required to choose focused location/import tests and validation gates. |
+| `k98-deferred-optimisation-capture` | use | Required for closing/updating the deferred item and capturing any newly found debt. |
+| `k98-pr-review` | use | Use before PR handoff. |
+| `k98-promotion-check` | not applicable initially | Use only before production promotion/deployment, not during first audit. |
+
+## 8. Mandatory Workflow
+
+1. Audit / scope review, then stop for approval.
+2. Architecture validation, then stop for approval.
+3. Implementation plan, then stop for approval.
+4. Implementation after approval.
+5. Validation and final review.
+
+Do not proceed in one pass unless explicitly approved.
+
+## 9. Audit Requirements
+
+Review the touched area for:
+
+- direct SQL or SQL-facing work in command paths
+- business logic in the command layer
+- duplicate CSV validation, response shaping, or import result helpers
+- weak validation or logging
+- cache and location refresh safety
+- restart/persistence implications
+- test coverage gaps
+
+Map likely affected commands, services, DAL/import helpers, SQL objects/contracts, location cache behaviour, refresh signalling, docs, and tests.
+
+## 10. Architecture Targets
+
+| Concern | Target |
+|---|---|
+| Slash command | `commands/location_cmds.py` remains thin interaction plumbing |
+| Service / orchestration | `services/` or a focused location helper module |
+| Import/parser logic | `location_importer.py` unless audit finds a better existing location module |
+| Views / modals | no expected change |
+| SQL schema | SQL repo only, if schema changes are unexpectedly required |
+| Tests | `tests/` focused location/import coverage |
+
+## 11. Likely Files
+
+### Review
+
+- `commands/location_cmds.py`
+- `location_importer.py`
+- `tests/`
+- `docs/reference/deferred_optimisations.md`
+- SQL repo objects referenced by `location_importer.py`
+
+### Modify
+
+- `commands/location_cmds.py`
+- a focused service/helper module if justified
+- relevant tests
+- deferred/task-pack documentation
+
+### Create
+
+- Optional: `services/location_import_service.py`
+- Optional: focused tests for the extracted service/helper
+
+## 12. Implementation Requirements
+
+- Preserve `/import_locations` command name and admin/notify-channel restriction.
+- Preserve CSV file validation and existing user-facing success/error copy.
+- Preserve `parse_output_csv()` and `load_staging_and_merge()` behaviour unless the audit identifies a bug.
+- Preserve `signal_location_refresh_complete()` behaviour after successful import.
+- Keep SQL execution/data access outside the command layer.
+- Add tests for extracted result shaping/orchestration.
+- Do not mix in `/player_profile`, `/player_location`, or `DL_bot.py` work.
+
+## 13. Refactor Decisions
+
+Codex must populate this table after audit:
+
+| Issue | Decision | Reason |
+|---|---|---|
+| CSV attachment validation in command | fix now / defer / not applicable | |
+| Parsing handoff in command | fix now / defer / not applicable | |
+| Staging merge dispatch in command | fix now / defer / not applicable | |
+| Discord response/result shaping in command | fix now / defer / not applicable | |
+| Location refresh signalling ownership | fix now / defer / not applicable | |
+| SQL-facing ambiguity in `location_importer.py` | fix now / defer / blocked / not applicable | |
+| Test gaps | fix now / defer / not applicable | |
+
+## 14. Testing Requirements
+
+Run or justify:
+
+- `.\.venv\Scripts\python.exe scripts\select_tests.py`
+- `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
+- `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
+- `.\.venv\Scripts\python.exe scripts\smoke_imports.py`
+- `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
+- focused pytest for location import/parser/service changes
+- `.\.venv\Scripts\python.exe -m pytest -q tests` if shared command/import behaviour changes
+- `.\.venv\Scripts\python.exe -m pre_commit run -a`
+
+Cover happy path, invalid/missing attachment, non-CSV attachment, empty parsed rows, parser failure, merge failure, success summary formatting, permission/channel boundaries where practical, and refresh signalling.
+
+## 15. Acceptance Criteria
+
+- [ ] Scope is complete and no unrelated location/DL_bot work was mixed in.
+- [ ] `/import_locations` command is thinner or a clear defer reason is documented.
+- [ ] No new direct SQL exists in commands or views.
+- [ ] SQL-facing assumptions are validated against `C:\K98-bot-SQL-Server`.
+- [ ] Existing Discord copy and permission boundaries are preserved.
+- [ ] Location refresh signalling remains correct.
+- [ ] Tests are added/updated or exceptions documented.
+- [ ] K98 validation gates are run or skipped with reasons.
+- [ ] Deferred item is updated or removed after completion.
+
+## 16. Required Delivery Output
+
+Return:
+
+1. Summary
+2. File Manifest
+3. New Files
+4. Modified Files
+5. SQL Changes
+6. Helpers Reused
+7. Refactor Findings
+8. Test Plan
+9. Deployment Steps
+10. Deferred Optimisations
+```

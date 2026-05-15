@@ -9,7 +9,10 @@ def test_validate_location_csv_attachment_rejects_non_csv():
     result = svc.validate_location_csv_attachment(filename="output.txt", size=10)
 
     assert result.ok is False
-    assert result.message == "❌ `output.txt` isn’t a CSV file. Please upload a `.csv` (e.g., `output.csv`)."
+    assert (
+        result.message
+        == "❌ `output.txt` isn’t a CSV file. Please upload a `.csv` (e.g., `output.csv`)."
+    )
 
 
 def test_validate_location_csv_attachment_rejects_oversize_csv():
@@ -118,10 +121,10 @@ async def test_import_location_csv_bytes_preserves_success_when_refresh_signal_f
 
 def test_parse_output_csv_skips_bad_rows_and_keeps_valid_rows():
     csv_bytes = (
-        "player_id,player_name,player_power,player_kills,player_ch,player_alliance,x,y\n"
-        "123,Alice,1000,20,25,K98,10,20\n"
-        "bad,Broken,1000,20,25,K98,10,20\n"
-    ).encode()
+        b"player_id,player_name,player_power,player_kills,player_ch,player_alliance,x,y\n"
+        b"123,Alice,1000,20,25,K98,10,20\n"
+        b"bad,Broken,1000,20,25,K98,10,20\n"
+    )
 
     rows = svc.parse_output_csv(csv_bytes)
 
