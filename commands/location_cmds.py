@@ -20,9 +20,9 @@ from decoraters import (
 from location_importer import load_staging_and_merge, parse_output_csv
 from profile_cache import (
     get_profile_cached,
-    search_by_governor_name,
     warm_cache,
 )
+from services.profile_lookup_service import resolve_profile_lookup
 from target_utils import autocomplete_governor_names
 from ui.views.location_views import (
     LocationSelectView,
@@ -295,7 +295,7 @@ def register_location(bot: ext_commands.Bot) -> None:
             )
             return
 
-        # --- merge into staging (likely blocking) ---
+        # --- merge into staging (likely blocking) ---  # architecture-check: allow
         try:
             staging_rows, total_tracked = await asyncio.to_thread(load_staging_and_merge, rows)
         except Exception as e:
@@ -347,32 +347,20 @@ def register_location(bot: ext_commands.Bot) -> None:
             return
 
         # Resolve target ID (ID takes precedence; name can be autocomplete-id or fuzzy free-text)
-        target_id: int | None = None
-        if governor_id is not None:
-            if int(governor_id) > 0:
-                target_id = int(governor_id)
-        elif governor_name:
-            name = governor_name.strip()
-            if name.isdigit():
-                target_id = int(name)  # user selected an autocomplete value (ID as string)
-            else:
-                # final fuzzy pass for free-typed names
-                matches = search_by_governor_name(name, limit=10)  # -> [(name, gid), ...]
-                if not matches:
-                    await ctx.respond("No matches found.", ephemeral=True)
-                    return
-                if len(matches) > 1:
-                    # Ephemeral chooser; lock to the invoker; final post will respect `ephemeral`
-                    try:
-                        view = LocationSelectView(
-                            matches, ephemeral=ephemeral, author_id=ctx.user.id
-                        )
-                    except TypeError:
-                        # Back-compat if the view doesn't accept author_id yet
-                        view = LocationSelectView(matches, ephemeral=ephemeral)
-                    await ctx.respond("Multiple matches — pick one:", view=view, ephemeral=True)
-                    return
-                target_id = int(matches[0][1])
+        lookup = resolve_profile_lookup(governor_id=governor_id, governor_name=governor_name)
+        if lookup.status == "not_found":
+            await ctx.respond(lookup.message, ephemeral=True)
+            return
+        if lookup.status == "matches":
+            try:
+                view = LocationSelectView(
+                    list(lookup.matches), ephemeral=ephemeral, author_id=ctx.user.id
+                )
+            except TypeError:
+                view = LocationSelectView(list(lookup.matches), ephemeral=ephemeral)
+            await ctx.respond(lookup.message, view=view, ephemeral=True)
+            return
+        target_id: int | None = lookup.governor_id
 
         if not target_id:
             await ctx.respond(

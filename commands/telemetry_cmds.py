@@ -48,10 +48,10 @@ from core.interaction_safety import (
     safe_defer,
 )
 from logging_setup import CRASH_LOG_PATH, ERROR_LOG_PATH, FULL_LOG_PATH
-from profile_cache import search_by_governor_name
 from registry.account_slots import ACCOUNT_ORDER
 from registry.registry_service import load_registry_as_dict
 from services.governor_account_service import get_account_summary_for_user
+from services.profile_lookup_service import resolve_profile_lookup
 from target_utils import (
     autocomplete_governor_names,
     lookup_governor_id,
@@ -584,35 +584,19 @@ def register_commands(bot_instance):
             return
 
         # --- Resolve target (accept autocomplete value as ID) ---
-        target_id: int | None = None
-
-        if governor_id is not None:
-            # Option is int already; clamp to positive
-            if int(governor_id) > 0:
-                target_id = int(governor_id)
-
-        elif governor_name:
-            name = governor_name.strip()
-            if name.isdigit():
-                # User picked an autocomplete value (ID as string)
-                target_id = int(name)
-            else:
-                # Free-text fuzzy pass
-                matches = search_by_governor_name(name, limit=10)  # -> [(name, gid), ...]
-                if not matches:
-                    await ctx.respond("No matches found.", ephemeral=True)
-                    return
-                if len(matches) > 1:
-                    # Prefer a view that restricts interaction to the invoker if available
-                    # In player_profile_command when multiple matches:
-                    try:
-                        view = GovernorSelectView(matches, author_id=ctx.user.id)
-                    except TypeError:
-                        # Back-compat if the class signature differs
-                        view = GovernorSelectView(matches)
-                    await ctx.respond("Multiple matches — pick one:", view=view, ephemeral=True)
-                    return
-                target_id = int(matches[0][1])
+        lookup = resolve_profile_lookup(governor_id=governor_id, governor_name=governor_name)
+        if lookup.status == "not_found":
+            await ctx.respond(lookup.message, ephemeral=True)
+            return
+        if lookup.status == "matches":
+            governor_matches = [(name, governor_id) for name, governor_id, *_ in lookup.matches]
+            try:
+                view = GovernorSelectView(governor_matches, author_id=ctx.user.id)
+            except TypeError:
+                view = GovernorSelectView(governor_matches)
+            await ctx.respond(lookup.message, view=view, ephemeral=True)
+            return
+        target_id: int | None = lookup.governor_id
 
         if not target_id:
             await ctx.respond(

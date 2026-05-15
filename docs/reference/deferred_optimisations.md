@@ -5,6 +5,20 @@ to GitHub issues/task packs.
 
 Resolved historical notes were moved to `archive/deferred_optimisations_resolved.md`.
 
+Last reviewed during the profile/location lookup cache-semantics phase after PR 94
+(`mge-admin-governor-lookup-standardisation`) was smoke tested and deployed to production.
+The governor fuzzy/name/partial-ID lookup standardisation item and profile/location
+profile-cache lookup item are complete; the remaining active backlog is listed below.
+
+### Deferred Optimisation
+- Area: `commands/location_cmds.py` `/import_locations`, `location_importer.py`
+- Type: architecture
+- Description: `/import_locations` still owns CSV attachment validation, parsing handoff, staging merge dispatch, and Discord response rendering in the command module. This was observed while standardising `/player_location` lookup and left out of scope to keep the profile/location lookup PR focused.
+- Suggested Fix: Extract import orchestration and result shaping into a location service, leaving `commands/location_cmds.py` responsible for permission gates, safe defer/respond behaviour, attachment IO, and Discord rendering.
+- Impact: medium
+- Risk: medium
+- Dependencies: Preserve admin/notify-channel gate, CSV validation copy, `load_staging_and_merge()` behaviour, location refresh signalling, and current import success/error messages.
+
 ### Deferred Optimisation
 - Area: tests/stats_service.py, tests/targets_sql_cache_subproc.py, tests/prekvk_stats.py, tests/proc_config_import_phase2.py, tests/sheets_sync_flow.py
 - Type: consistency

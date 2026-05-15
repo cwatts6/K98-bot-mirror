@@ -1075,7 +1075,7 @@ Update `docs/reference/deferred_optimisations.md` and this task pack as complete
 
 ## 40. MGE Admin-Add Fuzzy Lookup Standardisation Update
 
-Status: implemented and ready for PR validation.
+Status: smoke tested successfully and deployed to production.
 
 This phase completed the active governor fuzzy/name/partial-ID lookup deferred item:
 
@@ -1086,11 +1086,19 @@ This phase completed the active governor fuzzy/name/partial-ID lookup deferred i
 - Audited registry/KVK lookup, target/profile lookup, autocomplete, Ark preference validation, and diagnostic/test cache reads. Those paths were preserved because they either already use public target-utils helpers or rely on different profile-cache semantics.
 - Validated SQL-facing cache assumptions against `C:\K98-bot-SQL-Server`: `target_utils.sync_refresh_worker()` reads `dbo.vw_All_Governors_Clean`, whose SQL definition exposes `GovernorID`, trimmed `GovernorName`, and `CityHallLevel` from `dbo.ALL_GOVS`.
 - Removed the active fuzzy lookup standardisation item from `docs/reference/deferred_optimisations.md`.
+- Captured a separate deferred item for `/player_profile` and `/player_location`, which still use `profile_cache.search_by_governor_name()` and should be audited separately because that lookup depends on profile/location cache semantics rather than the target-utils roster cache.
+- Addressed review feedback by reusing one `get_name_cache_rows()` snapshot per resolver path and passing it into helper searches, avoiding repeated copied-list allocations while preserving match ordering.
 
-Focused validation completed during implementation:
+Smoke coverage completed after deployment:
+
+- MGE admin-add exact GovernorID, partial GovernorID, fuzzy-name select, no-match messaging, and signup continuation worked in production.
+- Ark admin add behaviour remained stable through the Ark-facing adapter.
+- Registry/KVK lookup, target/profile lookup, autocomplete, and cache-refresh behaviour remained unchanged.
+
+Validation completed during implementation and review follow-up:
 
 - `.\.venv\Scripts\python.exe -m py_compile services\governor_lookup_service.py ark\admin_governor_lookup_service.py ui\views\mge_admin_add_signup_view.py tests\test_governor_lookup_service.py tests\test_ark_admin_governor_lookup_service.py tests\test_mge_simplified_leadership_admin_add.py`
-- `.\.venv\Scripts\python.exe -m pytest -q tests\test_governor_lookup_service.py tests\test_ark_admin_governor_lookup_service.py tests\test_ark_admin_roster.py tests\test_mge_simplified_leadership_admin_add.py` (`16 passed`)
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_governor_lookup_service.py tests\test_ark_admin_governor_lookup_service.py tests\test_ark_admin_roster.py tests\test_mge_simplified_leadership_admin_add.py` (`17 passed` after review follow-up)
 - `.\.venv\Scripts\python.exe -m pytest -q tests\test_target_utils_governor_lookup.py tests\test_registry_views_smoke.py tests\test_kvk_personal_views.py tests\test_mykvktargets.py` (`26 passed`)
 - `.\.venv\Scripts\python.exe -m pytest -q tests\test_ark_registration_flow.py tests\test_ark_fuzzy_select_view.py tests\test_mge_signup_views.py tests\test_mge_signup_service.py` (`43 passed`)
 - `.\.venv\Scripts\python.exe scripts\select_tests.py`
@@ -1103,3 +1111,76 @@ Focused validation completed during implementation:
 - `.\.venv\Scripts\python.exe -m pytest -q tests` (`1358 passed, 2 skipped`)
 - `.\.venv\Scripts\python.exe -m pre_commit run -a`
 - `git diff --check`
+
+## 41. Next Deferred Work Chat Starter
+
+Use this in a fresh Codex chat to pick up the remaining active deferred optimisation backlog after PR 94:
+
+```text
+Codex, start the next deferred optimisation phase after PR 94 (`mge-admin-governor-lookup-standardisation`) was smoke tested successfully and deployed to production.
+
+Use the K98 repo workflow and required docs. Read `docs/reference/deferred_optimisations.md` first, then follow `README-DEV.md` and the reference index in `docs/reference/README.md`.
+
+Goal: review the remaining active deferred optimisation backlog and select a PR-sized implementation slice. Start with audit/scope only, classify each active item, then recommend the safest next task before coding.
+
+Important completed context:
+- PR 84 through PR 93 completed the registry/account-resolution cleanup series.
+- PR 94 completed the MGE admin-add and broader governor fuzzy/name/partial-ID lookup standardisation. `services/governor_lookup_service.py` now owns the shared Discord-free lookup resolver, MGE admin-add no longer reads `target_utils._name_cache` directly, and Ark admin add remains behind its adapter.
+- The active deferred backlog no longer contains account-resolution or target-utils roster governor fuzzy-lookup work. `/player_profile` and `/player_location` profile-cache name lookup remains separately deferred because it uses `profile_cache.search_by_governor_name()`.
+
+Active deferred items to review:
+- `/player_profile` and `/player_location` still use profile-cache name lookup and need a separate profile/location lookup audit before any shared-helper change.
+- Non-Ark tests that still reach live SQL Server or connection construction in local/Codex validation without the bot machine's ODBC setup.
+- Non-DB full-suite environment blockers: `DL_bot` interpreter path assumptions and sandbox-limited subprocess worker tests.
+- `DL_bot.py` PreKvK upload routing still mixes filename matching, current-KVK lookup, offload dispatch, and Discord rendering.
+- SQL repo legacy PreKvK phase objects still represent the old scan-window delta model.
+- `DL_bot.py` KVK_ALL upload routing still mixes attachment filtering, offload dispatch, import result handling, Discord rendering, and export scheduling.
+
+Recommended first slice:
+- Start with the local validation environment consistency items if the goal is to make future PR validation more reliable. Keep it PR-sized by addressing either live-DB test gating or non-DB sandbox/interpreter blockers, not both at once unless the audit proves they share the same small test harness change.
+- If choosing feature architecture instead, pick either PreKvK upload routing or KVK_ALL upload routing, not both, and preserve existing Discord output and offload behaviour.
+- Treat the legacy SQL PreKvK phase-object cleanup as a SQL-repo audit/design task before any bot-code implementation.
+
+Required audit before coding:
+- Search the bot repo for the files and tests named in `docs/reference/deferred_optimisations.md`.
+- For the profile/location lookup item, search `commands/telemetry_cmds.py`, `commands/location_cmds.py`, `profile_cache.py`, `commands/player_profile_flow.py`, and related tests for `search_by_governor_name`, `get_profile_cached`, profile-cache warm/refresh behaviour, and multi-match selector copy.
+- If touching SQL-facing PreKvK or KVK paths, validate object names, views, stored procedures, and dependencies against `C:\K98-bot-SQL-Server` before implementation.
+- Classify each active item as fix now, defer, blocked, or not applicable, with a structured reason.
+- Keep runtime behaviour and production upload flows unchanged unless the selected task explicitly changes them.
+
+Run or justify the K98 validation gates selected by `scripts/select_tests.py`, including:
+- `scripts/validate_architecture_boundaries.py`
+- `scripts/validate_deferred_items.py`
+- `scripts/smoke_imports.py`
+- `scripts/validate_command_registration.py` when command registration could be affected
+- focused tests for the selected deferred slice
+- full `.\.venv\Scripts\python.exe -m pytest -q tests` if the selected fix changes shared test harness, upload routing, or cross-subsystem validation behaviour
+- `.\.venv\Scripts\python.exe -m pre_commit run -a`
+
+Update `docs/reference/deferred_optimisations.md` and any affected task-pack/runbook docs before PR handoff.
+```
+
+## 42. Profile/Location Profile-Cache Lookup Standardisation Update
+
+Status: implemented and ready for PR validation.
+
+This phase completed the active `/player_profile` and `/player_location` profile-cache lookup item:
+
+- Added `services/profile_lookup_service.py` as a Discord-free resolver for profile/location command input.
+- Kept profile/location lookup on `profile_cache.search_by_governor_name()` instead of the SQL-backed target-utils roster cache used by `services/governor_lookup_service.py`.
+- Updated `/player_profile` and `/player_location` so command handlers share the same profile-cache lookup semantics while preserving permission gates, autocomplete-ID handling, multi-match selectors, no-match copy, profile cache warm/disk fallback behaviour, and location refresh behaviour.
+- Validated SQL-facing assumptions against `C:\K98-bot-SQL-Server`: `profile_cache.build_full_cache()` reads `dbo.v_PlayerProfile`, which exposes `GovernorID`, `Governor_Name`, profile stats, `PlayerLocation.X/Y/LastUpdated`, `PlayerAccountStatus`, and forts metadata.
+- Removed the active profile/location lookup item from `docs/reference/deferred_optimisations.md`.
+- Captured a separate deferred item for `/import_locations` command-layer import orchestration, which remains out of scope for the profile/location lookup PR.
+
+Validation completed during implementation:
+
+- `.\.venv\Scripts\python.exe -m py_compile services\profile_lookup_service.py commands\telemetry_cmds.py commands\location_cmds.py tests\test_profile_lookup_service.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_profile_lookup_service.py tests\test_location_views_smoke.py tests\test_registry_views_smoke.py` (`15 passed`)
+- `.\.venv\Scripts\python.exe scripts\select_tests.py commands\telemetry_cmds.py commands\location_cmds.py services\profile_lookup_service.py tests\test_profile_lookup_service.py`
+- `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
+- `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
+- `.\.venv\Scripts\python.exe scripts\smoke_imports.py`
+- `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests` (`1365 passed, 2 skipped`)
+- `.\.venv\Scripts\python.exe -m pre_commit run -a`
