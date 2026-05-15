@@ -1,5 +1,6 @@
 # tests/test_ui_imports.py
 import asyncio
+from datetime import UTC, datetime
 import importlib
 import os
 import sys
@@ -56,10 +57,13 @@ def test_import_all_ui_view_modules_and_instantiate_core_views(monkeypatch, tmp_
     utils_stub.normalize_governor_id = lambda v: str(v).strip()
     utils_stub.make_cid = lambda scope, uid: f"{scope}:{uid}:abc123"
     utils_stub.fmt_short = lambda v: str(v)
+    utils_stub.utcnow = lambda: datetime.now(UTC)
 
     const_stub = types.ModuleType("constants")
     const_stub.DEFAULT_REMINDER_TIMES = ["5m", "15m"]
     const_stub.VALID_TYPES = ["ruins", "altars", "major", "fights", "all"]
+    const_stub.PLAYER_TARGETS_CACHE = str(tmp_path / "player_targets_cache.json")
+    const_stub._conn = lambda: None
 
     monkeypatch.setitem(sys.modules, "embed_utils", embed_stub)
     monkeypatch.setitem(sys.modules, "utils", utils_stub)

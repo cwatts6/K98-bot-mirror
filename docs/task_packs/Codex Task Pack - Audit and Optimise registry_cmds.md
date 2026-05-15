@@ -972,17 +972,27 @@ Update `docs/reference/deferred_optimisations.md` and this task pack as complete
 
 ## 38. Final Shared Account-Resolution Compatibility Cleanup Update
 
-Status: implementation and validation complete; pending PR review and production smoke test.
+Status: smoke tested successfully and deployed to production.
 
-This final cleanup slice targets the remaining account-resolution compatibility adapters after PR 92:
+PR 93 delivered the final shared account-resolution compatibility cleanup slice after PR 92:
 
-- Remove obsolete `AccountLookup`, `get_accounts_for_user()`, `classify_accounts()`, `free_account_slots()`, `resolve_governor_label()`, and `StatsAccountSummary` adapter paths after confirming no runtime callers still require those public shapes.
-- Migrate stats commands, stats export, CrystalTech, and KVK personal registration actions directly to `AccountResolutionSummary`.
+- Removed obsolete `AccountLookup`, `get_accounts_for_user()`, `classify_accounts()`, `free_account_slots()`, `resolve_governor_label()`, and `StatsAccountSummary` adapter paths after confirming no runtime callers still require those public shapes.
+- Migrated stats commands, stats export, CrystalTech, and KVK personal registration actions directly to `AccountResolutionSummary`.
 - Preserve `inventory.models.RegisteredGovernor` as the inventory/reporting DTO because inventory report and export flows still use it as a domain model.
-- Preserve shared `account_picker` helpers, but allow them to consume `AccountResolutionSummary`, legacy account maps, linked-governor row lists, and `RegisteredGovernor` objects so local fake account maps can be removed.
-- Remove inventory `governors_to_accounts()` and MGE signup local option-shaping where the shared picker can consume the existing domain rows directly.
-- Bring `ark/ark_preference_service.py` into this slice by replacing direct `_name_cache` reads with public `target_utils.get_name_cache_rows()`.
-- Keep `ui/views/mge_admin_add_signup_view.py` deferred as part of a broader governor fuzzy-lookup standardisation pass, because several Ark/MGE/registry/KVK lookup flows need to be audited together before extracting shared behaviour.
+- Preserved shared `account_picker` helpers, but allowed them to consume `AccountResolutionSummary`, legacy account maps, linked-governor row lists, and `RegisteredGovernor` objects so local fake account maps could be removed.
+- Removed inventory `governors_to_accounts()` and MGE signup local option-shaping where the shared picker can consume the existing domain rows directly.
+- Brought `ark/ark_preference_service.py` into this slice by replacing direct `_name_cache` reads with public `target_utils.get_name_cache_rows()`.
+- Kept `ui/views/mge_admin_add_signup_view.py` deferred as part of a broader governor fuzzy-lookup standardisation pass, because several Ark/MGE/registry/KVK lookup flows need to be audited together before extracting shared behaviour.
+- Deleted `services/stats_account_service.py` and its dedicated tests after stats callers moved to the shared summary directly.
+
+Smoke coverage completed after deployment:
+
+- Stats personal account selection and stats export continued to resolve the expected linked governors.
+- KVK personal registration actions continued to show the correct lookup/register/edit options from the shared summary.
+- CrystalTech picker/setup labels continued to render the selected governor with preserved fallback copy.
+- Inventory import, permission, and report governor display paths continued to use the inventory/reporting DTO safely.
+- MGE self-service signup continued to offer linked governor options through the shared picker.
+- Ark preference validation continued to resolve valid governors and reject invalid IDs through the public target-utils cache accessor.
 
 Validation completed during implementation:
 
@@ -1010,3 +1020,86 @@ Deferred follow-up captured in `docs/reference/deferred_optimisations.md`:
 - Risk: medium
 - Dependencies: Preserve MGE admin-add signup permissions and modal/select behaviour, Ark admin add lookup behaviour, registry/KVK lookup copy, target/profile lookup behaviour, and existing fuzzy result ordering.
 ```
+
+## 39. Next Phase Chat Starter
+
+Use this in a fresh Codex chat for the MGE admin-add fuzzy lookup and broader governor fuzzy-lookup standardisation item:
+
+```text
+Codex, start the MGE admin-add fuzzy lookup / broader governor fuzzy-lookup standardisation phase after PR 93 (`account-resolution-compatibility-cleanup`) was smoke tested successfully and deployed to production.
+
+Use the K98 repo workflow and required docs. Read `docs/task_packs/Codex Task Pack - Audit and Optimise registry_cmds.md` and `docs/reference/deferred_optimisations.md` first.
+
+Goal: audit and standardise governor fuzzy/name/partial-ID lookup flows, with MGE admin-add signup lookup as the primary cleanup candidate. Start with repo-wide audit/scope before coding, then keep the implementation PR-sized.
+
+Important completed context:
+- PR 84 centralised basic account slots, Discord user-id parsing, public GovernorID roster lookup, and initial `/my_registrations` loading through `registry_service.load_registry_as_dict`.
+- PR 87 introduced `ResolvedAccount` and `AccountResolutionSummary` in `services/governor_account_service.py`.
+- PR 88 through PR 91 migrated telemetry/KVK target/CrystalTech, registry, Ark self-service, and `/my_registrations` account-selection/display flows to `AccountResolutionSummary`.
+- PR 92 moved Ark admin add exact ID, partial ID, fuzzy name, substring fallback, and cache-refresh lookup into `ark/admin_governor_lookup_service.py` and removed controller-level direct `_name_cache` reads.
+- PR 93 removed obsolete account-resolution compatibility adapters, migrated remaining runtime callers to `AccountResolutionSummary`, and moved Ark preference validation to public `target_utils.get_name_cache_rows()`.
+- The remaining active deferred item is fuzzy lookup standardisation, not shared account-resolution compatibility.
+
+Required audit before coding:
+- Search the full repo for `lookup_governor_id`, `autocomplete_governor_names`, `search_by_governor_name`, `lookup_governor_row_by_id`, `get_name_cache_rows`, `get_name_cache_status`, `refresh_name_cache_from_sql`, `sync_refresh_worker`, `_name_cache`, `fuzzy`, `fuzzy_matches`, `Governor Name Search Results`, `substring`, and `partial`.
+- Include command modules, views, services, Ark, MGE, registry/KVK, target/profile lookup, autocomplete paths, tests, and docs.
+- Classify every finding as preserve, migrate to shared lookup service/helper, remove, or defer with a structured reason.
+- Compare exact numeric GovernorID, partial GovernorID, fuzzy name, substring fallback, cache warm/refresh behaviour, no-match copy, result ordering, selector behaviour, permission boundaries, and user-facing copy.
+- Confirm whether reusable behaviour from `ark/admin_governor_lookup_service.py` should move into a shared target/governor lookup helper or stay Ark-specific behind smaller shared cache/search helpers.
+
+Likely cleanup candidates:
+- `ui/views/mge_admin_add_signup_view.py`: extract Discord-free lookup/service logic and replace direct `_name_cache` reads.
+- `ark/admin_governor_lookup_service.py`: review for reusable exact/partial/fuzzy/cache-refresh behaviours without changing Ark admin add UX.
+- Registry/KVK lookup views, target/profile lookup, and autocomplete paths: audit duplication and preserve existing copy/order unless there is a clear shared helper with focused coverage.
+
+Preserve behaviour:
+- MGE admin-add permissions, event lock/signup-close behaviour, modal/select copy, exact ID/partial/fuzzy behaviour, no-match messages, signup creation/edit flows, and result ordering.
+- Ark admin add behaviour from PR 92.
+- Registry/KVK lookup and target/profile user-facing copy.
+- Cache refresh behaviour and stale/empty cache fallbacks.
+- Existing fuzzy result ordering unless the audit proves a safer shared order.
+
+Validate SQL-facing assumptions against `C:\K98-bot-SQL-Server`, especially the GovernorID/GovernorName source used by target-utils cache refresh, before implementation.
+
+Run or justify the K98 validation gates selected by `scripts/select_tests.py`, including:
+- `scripts/validate_architecture_boundaries.py`
+- `scripts/validate_deferred_items.py`
+- `scripts/smoke_imports.py`
+- `scripts/validate_command_registration.py`
+- focused tests for MGE admin add/signup views, Ark admin lookup, registry/KVK lookup views, target_utils lookup, telemetry/KVK, and affected fuzzy/autocomplete paths
+- full `.\.venv\Scripts\python.exe -m pytest -q tests` if shared lookup code crosses subsystem boundaries
+- `.\.venv\Scripts\python.exe -m pre_commit run -a`
+
+Update `docs/reference/deferred_optimisations.md` and this task pack as completed/deferred before PR handoff.
+```
+
+## 40. MGE Admin-Add Fuzzy Lookup Standardisation Update
+
+Status: implemented and ready for PR validation.
+
+This phase completed the active governor fuzzy/name/partial-ID lookup deferred item:
+
+- Added `services/governor_lookup_service.py` as a Discord-free shared resolver for exact numeric GovernorID lookup, partial GovernorID matches, fuzzy name lookup, substring fallback, cache warm/refresh behaviour, and no-match shaping.
+- Kept `ark/admin_governor_lookup_service.py` as the Ark-facing adapter so Ark admin add result shape and controller UX remain stable.
+- Updated `ui/views/mge_admin_add_signup_view.py` so MGE admin-add lookup no longer imports or reads `target_utils._name_cache` directly; the view now owns only modal handling, fuzzy embed/select rendering, and signup-flow continuation.
+- Preserved MGE admin-add permissions, event lock/completed-event gating, modal/select copy, signup creation/edit continuation, exact ID/partial/fuzzy behaviour, no-match messages, and cache refresh fallback.
+- Audited registry/KVK lookup, target/profile lookup, autocomplete, Ark preference validation, and diagnostic/test cache reads. Those paths were preserved because they either already use public target-utils helpers or rely on different profile-cache semantics.
+- Validated SQL-facing cache assumptions against `C:\K98-bot-SQL-Server`: `target_utils.sync_refresh_worker()` reads `dbo.vw_All_Governors_Clean`, whose SQL definition exposes `GovernorID`, trimmed `GovernorName`, and `CityHallLevel` from `dbo.ALL_GOVS`.
+- Removed the active fuzzy lookup standardisation item from `docs/reference/deferred_optimisations.md`.
+
+Focused validation completed during implementation:
+
+- `.\.venv\Scripts\python.exe -m py_compile services\governor_lookup_service.py ark\admin_governor_lookup_service.py ui\views\mge_admin_add_signup_view.py tests\test_governor_lookup_service.py tests\test_ark_admin_governor_lookup_service.py tests\test_mge_simplified_leadership_admin_add.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_governor_lookup_service.py tests\test_ark_admin_governor_lookup_service.py tests\test_ark_admin_roster.py tests\test_mge_simplified_leadership_admin_add.py` (`16 passed`)
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_target_utils_governor_lookup.py tests\test_registry_views_smoke.py tests\test_kvk_personal_views.py tests\test_mykvktargets.py` (`26 passed`)
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_ark_registration_flow.py tests\test_ark_fuzzy_select_view.py tests\test_mge_signup_views.py tests\test_mge_signup_service.py` (`43 passed`)
+- `.\.venv\Scripts\python.exe scripts\select_tests.py`
+- `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
+- `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
+- `.\.venv\Scripts\python.exe scripts\smoke_imports.py`
+- `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_ark_*.py` via explicit PowerShell file list (`166 passed`)
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_ui_imports.py` (`1 passed`)
+- `.\.venv\Scripts\python.exe -m pytest -q tests` (`1358 passed, 2 skipped`)
+- `.\.venv\Scripts\python.exe -m pre_commit run -a`
+- `git diff --check`
