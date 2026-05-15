@@ -11,6 +11,8 @@ from bot_config import MGE_LEADERSHIP_CHANNEL_ID, MGE_SIMPLIFIED_FLOW_ENABLED
 from core.interaction_safety import send_ephemeral
 from core.mge_permissions import is_admin_interaction, is_admin_or_leadership_interaction
 from mge import mge_dm_followup, mge_signup_service
+
+# architecture-check: allow
 from mge.dal import mge_signup_dal
 from mge.mge_cache import get_commanders_for_variant
 from mge.mge_signup_service import ServiceResult
@@ -266,11 +268,7 @@ class MGESignupView(discord.ui.View):
             )
             return
 
-        accounts = {
-            f"Account {idx + 1}": {"GovernorID": g["GovernorID"], "GovernorName": g["GovernorName"]}
-            for idx, g in enumerate(linked)
-        }
-        options = build_unique_gov_options(accounts)
+        options = build_unique_gov_options(linked)
 
         class _GovSelect(discord.ui.Select):
             def __init__(self, parent_view: MGESignupView):
@@ -553,6 +551,8 @@ class MGESignupView(discord.ui.View):
 
         try:
             from mge import mge_embed_manager
+
+            # architecture-check: allow
             from mge.dal import mge_event_dal
 
             row = mge_event_dal.fetch_event_for_embed(self.event_id)

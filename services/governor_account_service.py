@@ -15,13 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
-class AccountLookup:
-    ok: bool
-    accounts: dict[str, dict[str, str]]
-    error: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class ResolvedAccount:
     slot: str
     governor_id: int
@@ -64,7 +57,8 @@ class AccountResolutionSummary:
         return bool(gid and gid in self.governor_id_strings)
 
     def free_slots(self) -> list[str]:
-        return free_account_slots(self.accounts)
+        used = set(self.accounts.keys())
+        return [slot for slot in _ACCOUNT_ORDER if slot not in used]
 
     def registered_slots(self, prefix: str | None = None, *, limit: int = 25) -> list[str]:
         return registered_account_slots(self.ordered_accounts, prefix, limit=limit)
@@ -229,30 +223,3 @@ def get_account_summary_for_user_sync(discord_user_id: int) -> AccountResolution
         logger.exception("governor_account_summary_failed discord_user_id=%s", discord_user_id)
         return summarize_accounts({}, ok=False, error=f"{type(exc).__name__}: {exc}")
     return summarize_accounts(dict(accounts or {}))
-
-
-async def get_accounts_for_user(discord_user_id: int) -> AccountLookup:
-    summary = await get_account_summary_for_user(discord_user_id)
-    return AccountLookup(summary.ok, summary.accounts, summary.error)
-
-
-def classify_accounts(accounts: dict[str, dict[str, str]]) -> tuple[str, str | None]:
-    """Return ('none'|'single'|'multi', governor_id_if_single)."""
-    return summarize_accounts(accounts).classification
-
-
-async def resolve_governor_label(discord_user_id: int, governor_id: str) -> str:
-    summary = await get_account_summary_for_user(discord_user_id)
-    gid = str(governor_id)
-    if not summary.ok:
-        return f"Governor {gid}"
-    for account in summary.resolved_accounts:
-        if account.governor_id_str == gid:
-            name = account.governor_name
-            return f"{name} ({gid})" if name and name != "Unknown" else f"Governor {gid}"
-    return f"Governor {gid}"
-
-
-def free_account_slots(accounts: dict[str, dict[str, str]]) -> list[str]:
-    used = set(accounts.keys())
-    return [slot for slot in _ACCOUNT_ORDER if slot not in used]

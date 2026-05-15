@@ -11,7 +11,7 @@ import tempfile
 
 import pandas as pd
 
-from services import stats_account_service
+from services import governor_account_service
 from stats.dal import stats_export_dal
 from stats_exporter import build_user_stats_excel
 from stats_exporter_csv import build_user_stats_csv
@@ -73,7 +73,7 @@ async def build_personal_stats_export(
     requested_format: str,
     days: int,
 ) -> StatsExportOutcome:
-    account_summary = await stats_account_service.get_account_summary_for_user(discord_user_id)
+    account_summary = await governor_account_service.get_account_summary_for_user(discord_user_id)
     if not account_summary.ok:
         return StatsExportOutcome(
             status="registry_error",
@@ -85,7 +85,8 @@ async def build_personal_stats_export(
             message="You have no registered accounts. Use `/register_governor` first.",
         )
 
-    df_daily = await _fetch_daily(account_summary.governor_ids)
+    governor_ids = list(account_summary.governor_ids)
+    df_daily = await _fetch_daily(governor_ids)
     if df_daily.empty:
         return StatsExportOutcome(
             status="no_data",
@@ -111,7 +112,7 @@ async def build_personal_stats_export(
             filename=filename,
             export_format=export_format,
             days=days,
-            governor_ids=account_summary.governor_ids,
+            governor_ids=governor_ids,
             discord_user_id=discord_user_id,
         )
     except Exception:
@@ -124,7 +125,7 @@ async def build_personal_stats_export(
                 format_emoji="",
                 description="",
                 instructions="",
-                governor_ids=account_summary.governor_ids,
+                governor_ids=governor_ids,
                 row_count=len(df_daily),
                 days=days,
                 telemetry={},

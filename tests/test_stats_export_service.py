@@ -25,10 +25,10 @@ def _daily_frame() -> pd.DataFrame:
 @pytest.mark.asyncio
 async def test_build_personal_stats_export_no_registered_accounts(monkeypatch) -> None:
     async def fake_summary(_discord_user_id: int):
-        return stats_export_service.stats_account_service.summarize_accounts({})
+        return stats_export_service.governor_account_service.summarize_accounts({})
 
     monkeypatch.setattr(
-        stats_export_service.stats_account_service,
+        stats_export_service.governor_account_service,
         "get_account_summary_for_user",
         fake_summary,
     )
@@ -47,7 +47,7 @@ async def test_build_personal_stats_export_no_registered_accounts(monkeypatch) -
 @pytest.mark.asyncio
 async def test_build_personal_stats_export_empty_data(monkeypatch) -> None:
     async def fake_summary(_discord_user_id: int):
-        return stats_export_service.stats_account_service.summarize_accounts(
+        return stats_export_service.governor_account_service.summarize_accounts(
             {"Main": {"GovernorID": "123", "GovernorName": "Player"}}
         )
 
@@ -55,7 +55,7 @@ async def test_build_personal_stats_export_empty_data(monkeypatch) -> None:
         return pd.DataFrame()
 
     monkeypatch.setattr(
-        stats_export_service.stats_account_service,
+        stats_export_service.governor_account_service,
         "get_account_summary_for_user",
         fake_summary,
     )
@@ -74,7 +74,7 @@ async def test_build_personal_stats_export_empty_data(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_build_personal_stats_export_selects_csv_builder(monkeypatch, tmp_path) -> None:
     async def fake_summary(_discord_user_id: int):
-        return stats_export_service.stats_account_service.summarize_accounts(
+        return stats_export_service.governor_account_service.summarize_accounts(
             {"Main": {"GovernorID": "123", "GovernorName": "Player"}}
         )
 
@@ -91,7 +91,7 @@ async def test_build_personal_stats_export_selects_csv_builder(monkeypatch, tmp_
         assert days_for_daily_table == 30
 
     monkeypatch.setattr(
-        stats_export_service.stats_account_service,
+        stats_export_service.governor_account_service,
         "get_account_summary_for_user",
         fake_summary,
     )
@@ -120,7 +120,7 @@ async def test_build_personal_stats_export_cleans_partial_file_on_builder_failur
     monkeypatch, tmp_path
 ) -> None:
     async def fake_summary(_discord_user_id: int):
-        return stats_export_service.stats_account_service.summarize_accounts(
+        return stats_export_service.governor_account_service.summarize_accounts(
             {"Main": {"GovernorID": "123", "GovernorName": "Player"}}
         )
 
@@ -137,7 +137,7 @@ async def test_build_personal_stats_export_cleans_partial_file_on_builder_failur
         raise RuntimeError("writer failed")
 
     monkeypatch.setattr(
-        stats_export_service.stats_account_service,
+        stats_export_service.governor_account_service,
         "get_account_summary_for_user",
         fake_summary,
     )

@@ -4,7 +4,7 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_get_accounts_for_user_uses_registry_service(monkeypatch):
+async def test_get_account_summary_for_user_uses_registry_service(monkeypatch):
     from services import governor_account_service as svc
 
     def fake_get_user_accounts(discord_user_id):
@@ -13,14 +13,15 @@ async def test_get_accounts_for_user_uses_registry_service(monkeypatch):
 
     monkeypatch.setattr(svc.registry_service, "get_user_accounts", fake_get_user_accounts)
 
-    result = await svc.get_accounts_for_user(42)
+    result = await svc.get_account_summary_for_user(42)
 
     assert result.ok is True
     assert result.accounts["Main"]["GovernorID"] == "123"
+    assert result.governor_ids == (123,)
 
 
 @pytest.mark.asyncio
-async def test_get_accounts_for_user_reports_failure(monkeypatch):
+async def test_get_account_summary_for_user_reports_failure(monkeypatch):
     from services import governor_account_service as svc
 
     def fake_get_user_accounts(discord_user_id):
@@ -28,24 +29,26 @@ async def test_get_accounts_for_user_reports_failure(monkeypatch):
 
     monkeypatch.setattr(svc.registry_service, "get_user_accounts", fake_get_user_accounts)
 
-    result = await svc.get_accounts_for_user(42)
+    result = await svc.get_account_summary_for_user(42)
 
     assert result.ok is False
     assert result.accounts == {}
     assert "db down" in result.error
 
 
-def test_account_classification_and_free_slots():
+def test_account_resolution_summary_classification_and_free_slots():
     from services import governor_account_service as svc
 
-    assert svc.classify_accounts({}) == ("none", None)
-    assert svc.classify_accounts({"Main": {"GovernorID": "1"}}) == ("single", "1")
-    assert svc.classify_accounts({"Main": {"GovernorID": "1"}, "Alt 1": {"GovernorID": "2"}}) == (
+    assert svc.summarize_accounts({}).classification == ("none", None)
+    assert svc.summarize_accounts({"Main": {"GovernorID": "1"}}).classification == ("single", "1")
+    assert svc.summarize_accounts(
+        {"Main": {"GovernorID": "1"}, "Alt 1": {"GovernorID": "2"}}
+    ).classification == (
         "multi",
         None,
     )
 
-    free = svc.free_account_slots({"Main": {"GovernorID": "1"}})
+    free = svc.summarize_accounts({"Main": {"GovernorID": "1"}}).free_slots()
     assert "Main" not in free
     assert "Alt 1" in free
     assert "Farm 20" in free
@@ -126,17 +129,3 @@ def test_account_slot_filters_use_canonical_sql_backed_slots():
             "Custom": {"GovernorID": "99"},
         }
     ) == ["Main", "Farm 20", "Custom"]
-
-
-@pytest.mark.asyncio
-async def test_resolve_governor_label(monkeypatch):
-    from services import governor_account_service as svc
-
-    async def fake_get_account_summary_for_user(discord_user_id):
-        return svc.summarize_accounts(
-            {"Main": {"GovernorID": "123", "GovernorName": "Ada"}},
-        )
-
-    monkeypatch.setattr(svc, "get_account_summary_for_user", fake_get_account_summary_for_user)
-
-    assert await svc.resolve_governor_label(42, "123") == "Ada (123)"

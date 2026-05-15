@@ -8,7 +8,7 @@ import discord
 
 from core.interaction_safety import send_or_followup
 from crystaltech_di import get_crystaltech_service
-from services.governor_account_service import resolve_governor_label
+from services.governor_account_service import get_account_summary_for_user
 from services.governor_session_lock_service import (
     claim_governor_session,
     refresh_governor_session,
@@ -109,7 +109,9 @@ async def run_crystaltech_flow(
             await refresh_governor_session(governor_id, interaction.user.id)
             return
 
-        label = await resolve_governor_label(interaction.user.id, governor_id)
+        summary = await get_account_summary_for_user(interaction.user.id)
+        name = summary.governor_name_for_id(governor_id, fallback="") if summary.ok else ""
+        label = f"{name} ({governor_id})" if name else f"Governor {governor_id}"
         view = SetupView(
             author_id=interaction.user.id,
             accounts=[(governor_id, label)],

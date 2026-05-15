@@ -12,7 +12,7 @@ from file_utils import (
     fetch_one_dict,
     get_conn_with_retries,
 )
-from services import stats_account_service
+from services import governor_account_service
 from stats_helpers import is_single_day_slice
 from utils import csv_from_ids, ensure_aware_utc, to_ints
 
@@ -36,14 +36,14 @@ def _key(discord_id: int, slice_key: str, gov_ids: list[int]) -> tuple[int, str,
 
 async def get_registered_governor_ids_for_discord(discord_id: int) -> list[int]:
     """Read registered account IDs through the SQL-backed registry service boundary."""
-    summary = await stats_account_service.get_account_summary_for_user(discord_id)
+    summary = await governor_account_service.get_account_summary_for_user(discord_id)
     return to_ints(summary.governor_ids)
 
 
 async def get_registered_governor_names_for_discord(discord_id: int) -> list[str]:
     """Return registered account names in canonical slot order."""
-    summary = await stats_account_service.get_account_summary_for_user(discord_id)
-    return summary.account_names
+    summary = await governor_account_service.get_account_summary_for_user(discord_id)
+    return list(summary.account_names)
 
 
 def _fetch_proc_sync(gov_ids: list[int], slices_csv: str, include_aggregate: bool) -> list[dict]:

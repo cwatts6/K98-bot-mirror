@@ -17,7 +17,6 @@ from inventory.models import (
     InventoryAnalysisSummary,
     InventoryImagePayload,
     InventoryImportType,
-    RegisteredGovernor,
 )
 from inventory.parsing import (
     apply_resource_total_corrections,
@@ -38,16 +37,6 @@ SCREENSHOT_GUIDELINES = (
 )
 INVENTORY_REVIEW_TIMEOUT_SECONDS = 900
 INVENTORY_REVIEW_UI_TIMEOUT_SECONDS = 870
-
-
-def governors_to_accounts(governors: list[RegisteredGovernor]) -> dict[str, dict[str, Any]]:
-    return {
-        item.account_type: {
-            "GovernorID": item.governor_id,
-            "GovernorName": item.governor_name,
-        }
-        for item in governors
-    }
 
 
 def _format_values_for_display(summary: InventoryAnalysisSummary) -> str:
@@ -1103,7 +1092,7 @@ async def start_import_command(ctx: discord.ApplicationContext, bot: Any) -> Non
         await _create_session(governors[0].governor_id)
         return
 
-    options = build_unique_gov_options(governors_to_accounts(governors))
+    options = build_unique_gov_options(governors)
 
     async def _on_select(
         interaction: discord.Interaction, governor_id: str, ephemeral: bool
@@ -1236,7 +1225,7 @@ async def handle_inventory_upload_message(message: discord.Message, bot: Any) ->
         )
         return True
 
-    options = build_unique_gov_options(governors_to_accounts(governors))
+    options = build_unique_gov_options(governors)
     ctx = type("_InventoryUploadCtx", (), {"user": message.author})()
     view = InventoryUploadGovernorSelectView(
         ctx=ctx,

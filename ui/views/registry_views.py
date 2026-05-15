@@ -12,6 +12,7 @@ from discord import Embed
 from registry.governor_registry import register_account
 from registry.registry_service import check_governor_claimed_by_other, remove_governor
 from services.governor_account_service import AccountResolutionSummary, get_account_summary_for_user
+from target_utils import lookup_governor_row_by_id
 from utils import normalize_governor_id
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,6 @@ _lookup_governor_id: Callable[[str], object] = lambda _name: {
     "message": "No results found.",
 }
 _target_lookup_view_factory: Callable[[list[dict], int], object] | None = None
-_name_cache_getter: Callable[[], object] = lambda: {}
 _send_profile_to_channel: Callable[[discord.Interaction, int, object], object] = (
     lambda *_a, **_k: None
 )
@@ -35,16 +35,14 @@ def configure_registry_views(
     async_load_registry: Callable[[], object],
     lookup_governor_id: Callable[[str], object],
     target_lookup_view_factory: Callable[[list[dict], int], object] | None,
-    name_cache_getter: Callable[[], object],
     send_profile_to_channel: Callable[[discord.Interaction, int, object], object],
     account_order_getter: Callable[[], list[str]],
 ) -> None:
     global _async_load_registry, _lookup_governor_id, _target_lookup_view_factory
-    global _name_cache_getter, _send_profile_to_channel, _account_order_getter
+    global _send_profile_to_channel, _account_order_getter
     _async_load_registry = async_load_registry
     _lookup_governor_id = lookup_governor_id
     _target_lookup_view_factory = target_lookup_view_factory
-    _name_cache_getter = name_cache_getter
     _send_profile_to_channel = send_profile_to_channel
     _account_order_getter = account_order_getter
 
@@ -596,11 +594,7 @@ class EnterGovernorIDModal(discord.ui.Modal):
             )
             return
 
-        name_cache = _name_cache_getter()
-        all_rows = (name_cache or {}).get("rows", []) if isinstance(name_cache, dict) else []
-        matched_row = next(
-            (r for r in all_rows if str(r.get("GovernorID", "")).strip() == governor_id), None
-        )
+        matched_row = await lookup_governor_row_by_id(governor_id)
         if not matched_row:
             await interaction.followup.send(
                 f"❌ Governor ID `{governor_id}` not found in the database. Try **Look up Governor ID** first.",

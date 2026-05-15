@@ -60,6 +60,34 @@ def _iter_account_option_rows(accounts_or_summary: Any) -> list[tuple[str, str, 
             for account in getattr(accounts_or_summary, "resolved_accounts", ())
         ]
 
+    if isinstance(accounts_or_summary, (list, tuple)):
+        rows: list[tuple[str, str, str]] = []
+        for idx, item in enumerate(accounts_or_summary, start=1):
+            slot = (
+                getattr(item, "account_type", None)
+                or (item.get("account_type") if isinstance(item, dict) else None)
+                or (item.get("AccountType") if isinstance(item, dict) else None)
+                or f"Account {idx}"
+            )
+            gid = (
+                getattr(item, "governor_id", None)
+                or (item.get("GovernorID") if isinstance(item, dict) else None)
+                or (item.get("GovernorId") if isinstance(item, dict) else None)
+                or (item.get("governor_id") if isinstance(item, dict) else None)
+                or ""
+            )
+            gid = str(gid).strip()
+            if not gid:
+                continue
+            name = (
+                getattr(item, "governor_name", None)
+                or (item.get("GovernorName") if isinstance(item, dict) else None)
+                or (item.get("Governor") if isinstance(item, dict) else None)
+                or (item.get("governor_name") if isinstance(item, dict) else None)
+            )
+            rows.append((str(slot), gid, _account_option_label_source(name, slot)))
+        return rows
+
     accounts = accounts_or_summary or {}
     if not isinstance(accounts, dict):
         return []

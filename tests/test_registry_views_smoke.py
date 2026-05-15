@@ -34,6 +34,14 @@ def _load_registry_views(monkeypatch):
     utils_stub.normalize_governor_id = lambda v: str(v).strip()
     monkeypatch.setitem(sys.modules, "utils", utils_stub)
 
+    target_utils_stub = types.ModuleType("target_utils")
+
+    async def _lookup_governor_row_by_id(_governor_id):
+        return None
+
+    target_utils_stub.lookup_governor_row_by_id = _lookup_governor_row_by_id
+    monkeypatch.setitem(sys.modules, "target_utils", target_utils_stub)
+
     if "ui.views.registry_views" in sys.modules:
         del sys.modules["ui.views.registry_views"]
     return importlib.import_module("ui.views.registry_views")
@@ -56,7 +64,6 @@ def test_registry_views_instantiate(monkeypatch):
             async_load_registry=_async_load_registry,
             lookup_governor_id=_lookup,
             target_lookup_view_factory=None,
-            name_cache_getter=lambda: {"rows": []},
             send_profile_to_channel=_send_profile,
             account_order_getter=lambda: ["Main", "Alt 1"],
         )

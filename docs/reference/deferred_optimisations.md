@@ -51,10 +51,10 @@ Resolved historical notes were moved to `archive/deferred_optimisations_resolved
 - Dependencies: Preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to the KVK_ALL modernisation programme.
 
 ### Deferred Optimisation
-- Area: `services/governor_account_service.py`, `services/stats_account_service.py`, `inventory/inventory_service.py`, `mge/mge_signup_service.py`, `account_picker.py`, `ui/views/kvk_personal_views.py`
+- Area: `ui/views/mge_admin_add_signup_view.py`, Ark/MGE/registry governor fuzzy lookup flows
 - Type: cleanup
-- Description: Compatibility adapters and duplicate local account classification/linked-governor/registered-governor shaping remain after the stats, inventory, MGE, telemetry/KVK, registry, and Ark direct migrations. Removing them in the Ark PR would expand scope across legacy public shapes and KVK personal view compatibility paths.
-- Suggested Fix: In a dedicated cleanup PR, remove obsolete `AccountLookup`-only pathways and any duplicate local classification or option-shaping helpers that no longer have external callers.
+- Description: MGE admin-add signup lookup still owns local name-cache/fuzzy lookup logic and reads `target_utils._name_cache` directly. The repo now has several governor fuzzy/name lookup flows, including Ark admin lookup, MGE admin-add lookup, registry/KVK lookup views, and target/profile lookup paths, so this should be standardised as a focused audit instead of being folded into account-resolution compatibility cleanup.
+- Suggested Fix: In a dedicated fuzzy-lookup optimisation PR, audit all governor fuzzy/name/partial-ID lookup flows, compare exact ID, partial ID, fuzzy name, substring fallback, cache refresh, no-match copy, result ordering, and selector behaviour, then extract or reuse a shared service/helper where behaviour can be standardised without changing user-facing flows.
 - Impact: medium
 - Risk: medium
-- Dependencies: Telemetry/KVK, registry command/view, and Ark surfaces migrated to `AccountResolutionSummary`; preserve coverage for stats export, inventory permissions, MGE signup, telemetry/KVK pickers, registry flows, KVK personal views, and Ark signup before cleanup.
+- Dependencies: Preserve MGE admin-add signup permissions and modal/select behaviour, Ark admin add lookup behaviour, registry/KVK lookup copy, target/profile lookup behaviour, and existing fuzzy result ordering.

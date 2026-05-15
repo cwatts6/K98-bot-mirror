@@ -37,7 +37,9 @@ def _load_service_module(monkeypatch):
 
 def test_set_preference_creates_preference(monkeypatch):
     service = _load_service_module(monkeypatch)
-    service._name_cache["rows"] = [{"GovernorID": "123", "GovernorName": "Tester"}]
+    monkeypatch.setattr(
+        service, "get_name_cache_rows", lambda: [{"GovernorID": "123", "GovernorName": "Tester"}]
+    )
 
     async def _get_team_preference(*_a, **_k):
         return None
@@ -65,7 +67,7 @@ def test_set_preference_creates_preference(monkeypatch):
 
 def test_set_preference_rejects_unknown_governor(monkeypatch):
     service = _load_service_module(monkeypatch)
-    service._name_cache["rows"] = []
+    monkeypatch.setattr(service, "get_name_cache_rows", lambda: [])
 
     async def _refresh():
         return None
@@ -78,7 +80,9 @@ def test_set_preference_rejects_unknown_governor(monkeypatch):
 
 def test_set_preference_rejects_invalid_team(monkeypatch):
     service = _load_service_module(monkeypatch)
-    service._name_cache["rows"] = [{"GovernorID": "123", "GovernorName": "Tester"}]
+    monkeypatch.setattr(
+        service, "get_name_cache_rows", lambda: [{"GovernorID": "123", "GovernorName": "Tester"}]
+    )
 
     with pytest.raises(service.ArkPreferenceError, match="Preferred team must be 1 or 2"):
         asyncio.run(service.set_preference(123, 3, "discord:1"))
@@ -86,7 +90,9 @@ def test_set_preference_rejects_invalid_team(monkeypatch):
 
 def test_clear_preference_soft_deletes(monkeypatch):
     service = _load_service_module(monkeypatch)
-    service._name_cache["rows"] = [{"GovernorID": "123", "GovernorName": "Tester"}]
+    monkeypatch.setattr(
+        service, "get_name_cache_rows", lambda: [{"GovernorID": "123", "GovernorName": "Tester"}]
+    )
 
     async def _clear_team_preference(governor_id: int, updated_by: str):
         return {

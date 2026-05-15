@@ -32,7 +32,7 @@ from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
 from kvk.services import kvk_admin_service
 from profile_cache import autocomplete_choices
 from registry.account_slots import ACCOUNT_ORDER
-from services import kvk_history_service, stats_account_service, stats_export_service
+from services import governor_account_service, kvk_history_service, stats_export_service
 from stats_alerts.embeds.kvk import send_kvk_embed
 from stats_alerts.honors import get_latest_honor_top, purge_latest_honor_scan
 from stats_alerts.interface import send_stats_update_embed
@@ -252,7 +252,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         # We always keep the selector private to the caller
         await safe_defer(ctx, ephemeral=True)
 
-        account_summary = await stats_account_service.get_account_summary_for_user(ctx.user.id)
+        account_summary = await governor_account_service.get_account_summary_for_user(ctx.user.id)
         if not account_summary.ok:
             await ctx.interaction.edit_original_response(
                 content=f"❌ Could not load registry: `{account_summary.error}`"
@@ -494,7 +494,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         user_obj, guild_obj = _actor_from_ctx(ctx)
         user_id = user_obj.id
 
-        account_summary = await stats_account_service.get_account_summary_for_user(user_id)
+        account_summary = await governor_account_service.get_account_summary_for_user(user_id)
         if not account_summary.ok:
             await ctx.followup.send(
                 f"Registry is temporarily unavailable: `{account_summary.error}`",
@@ -502,7 +502,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             )
             return
 
-        gov_ids = account_summary.governor_ids
+        gov_ids = list(account_summary.governor_ids)
         if not gov_ids:
             await ctx.followup.send(
                 "I don’t see any governor accounts linked to you. Use `/link_account` first.",
@@ -511,7 +511,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             return
 
         # Friendly account names for the dropdown
-        account_names = account_summary.account_names
+        account_names = list(account_summary.account_names)
         name_to_id = account_summary.name_to_id
 
         # Initial slice & payload
@@ -851,7 +851,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=ephemeral)
 
-        account_summary = await stats_account_service.get_account_summary_for_user(ctx.user.id)
+        account_summary = await governor_account_service.get_account_summary_for_user(ctx.user.id)
         if not account_summary.ok and not governor_id:
             await ctx.followup.send(
                 f"Registry is temporarily unavailable: `{account_summary.error}`",

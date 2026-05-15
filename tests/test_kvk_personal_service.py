@@ -1,25 +1,8 @@
-"""
-tests/test_kvk_personal_service.py
-
-Unit tests for services.kvk_personal_service and commands.kvk_personal_posting.
-
-Tests cover:
-- resolve_user_accounts: happy path and registry load failure
-- classify_accounts: single, multi, and no accounts
-- load_last_kvk_map: cold cache safety
-- post_stats_embeds (commands.kvk_personal_posting): orig channel success, fallback to kvk channel, all fail → DM
-"""
-
 from __future__ import annotations
 
-import asyncio
 import types
 
 import pytest
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 class DummyChannel:
@@ -43,7 +26,7 @@ class DummyChannel:
 
     @property
     def guild(self):
-        return None  # simplifies _can_send check — no guild = True
+        return None
 
 
 class DummyUser:
@@ -74,105 +57,8 @@ class DummyBot:
         id = 1
 
 
-# ---------------------------------------------------------------------------
-# resolve_user_accounts
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_resolve_user_accounts_happy_path(monkeypatch):
-    """Returns the accounts dict for a known user."""
-
-    def fake_get_user_accounts(discord_user_id):
-        assert discord_user_id == 42
-        return {"Main": {"GovernorID": "999", "GovernorName": "X"}}
-
-    async def fake_to_thread(fn, *a, **kw):
-        return fn(*a, **kw)
-
-    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-
-    from services import kvk_personal_service
-
-    monkeypatch.setattr(
-        kvk_personal_service.registry_service,
-        "get_user_accounts",
-        fake_get_user_accounts,
-    )
-
-    result = await kvk_personal_service.resolve_user_accounts(42)
-    assert result == {"Main": {"GovernorID": "999", "GovernorName": "X"}}
-
-
-@pytest.mark.asyncio
-async def test_resolve_user_accounts_registry_failure(monkeypatch):
-    """Registry load failure returns an empty dict."""
-
-    async def fake_to_thread(fn, *a, **kw):
-        raise RuntimeError("disk error")
-
-    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-
-    from services import kvk_personal_service
-
-    result = await kvk_personal_service.resolve_user_accounts(42)
-    assert result == {}
-
-
-# ---------------------------------------------------------------------------
-# classify_accounts
-# ---------------------------------------------------------------------------
-
-
-def test_classify_accounts_no_accounts():
-    from services import kvk_personal_service
-
-    kind, gid = kvk_personal_service.classify_accounts({})
-    assert kind == "none"
-    assert gid is None
-
-
-def test_classify_accounts_single_account():
-    from services import kvk_personal_service
-
-    accounts = {"Main": {"GovernorID": "123", "GovernorName": "Solo"}}
-    kind, gid = kvk_personal_service.classify_accounts(accounts)
-    assert kind == "single"
-    assert gid == "123"
-
-
-def test_classify_accounts_multi_account():
-    from services import kvk_personal_service
-
-    accounts = {
-        "Main": {"GovernorID": "100", "GovernorName": "A"},
-        "Alt 1": {"GovernorID": "200", "GovernorName": "B"},
-    }
-    kind, gid = kvk_personal_service.classify_accounts(accounts)
-    assert kind == "multi"
-    assert gid is None
-
-
-def test_classify_accounts_empty_governor_ids():
-    """Accounts with empty GovernorIDs should count as none."""
-    from services import kvk_personal_service
-
-    accounts = {
-        "Main": {"GovernorID": "", "GovernorName": "Empty"},
-        "Alt 1": {},
-    }
-    kind, gid = kvk_personal_service.classify_accounts(accounts)
-    assert kind == "none"
-
-
-# ---------------------------------------------------------------------------
-# load_last_kvk_map — cold cache safety
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
 async def test_load_last_kvk_map_cold_cache(monkeypatch):
-    """Returns an empty dict when cache is not warmed."""
     import stats_cache_helpers
 
     async def fake_load():
@@ -187,14 +73,8 @@ async def test_load_last_kvk_map_cold_cache(monkeypatch):
     assert result == {}
 
 
-# ---------------------------------------------------------------------------
-# post_stats_embeds
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
 async def test_post_stats_embeds_orig_channel_succeeds():
-    """Happy path: original channel succeeds — returns (True, 'orig_channel')."""
     import unittest.mock as mock
 
     import bot_config
@@ -203,25 +83,23 @@ async def test_post_stats_embeds_orig_channel_succeeds():
     ctx = DummyCtx(channel=channel)
     bot = DummyBot()
 
-    embeds = [types.SimpleNamespace()]
-    file = None
-
     with (
         mock.patch.object(bot_config, "KVK_PLAYER_STATS_CHANNEL_ID", 50),
         mock.patch.object(bot_config, "NOTIFY_CHANNEL_ID", 51),
     ):
         from commands import kvk_personal_posting
 
-        posted, used = await kvk_personal_posting.post_stats_embeds(bot, ctx, embeds, file)
+        posted, used = await kvk_personal_posting.post_stats_embeds(
+            bot, ctx, [types.SimpleNamespace()], None
+        )
 
     assert posted is True
     assert used == "orig_channel"
-    assert channel.sent  # message was sent to original channel
+    assert channel.sent
 
 
 @pytest.mark.asyncio
 async def test_post_stats_embeds_orig_fails_kvk_succeeds():
-    """Orig channel fails → falls back to KVK_PLAYER_STATS_CHANNEL_ID."""
     import unittest.mock as mock
 
     import bot_config
@@ -231,16 +109,15 @@ async def test_post_stats_embeds_orig_fails_kvk_succeeds():
     ctx = DummyCtx(channel=orig_ch)
     bot = DummyBot(channels={50: kvk_ch})
 
-    embeds = [types.SimpleNamespace()]
-    file = None
-
     with (
         mock.patch.object(bot_config, "KVK_PLAYER_STATS_CHANNEL_ID", 50),
         mock.patch.object(bot_config, "NOTIFY_CHANNEL_ID", 51),
     ):
         from commands import kvk_personal_posting
 
-        posted, used = await kvk_personal_posting.post_stats_embeds(bot, ctx, embeds, file)
+        posted, used = await kvk_personal_posting.post_stats_embeds(
+            bot, ctx, [types.SimpleNamespace()], None
+        )
 
     assert posted is True
     assert used == "kvk_channel"
@@ -249,7 +126,6 @@ async def test_post_stats_embeds_orig_fails_kvk_succeeds():
 
 @pytest.mark.asyncio
 async def test_post_stats_embeds_all_fail_dm_attempted():
-    """All channels fail → DM attempted and result returned."""
     import unittest.mock as mock
 
     import bot_config
@@ -257,10 +133,7 @@ async def test_post_stats_embeds_all_fail_dm_attempted():
     orig_ch = DummyChannel(fail=True)
     user = DummyUser()
     ctx = DummyCtx(channel=orig_ch, user=user)
-    bot = DummyBot()  # no channels registered → get_channel returns None
-
-    embeds = [types.SimpleNamespace()]
-    file = None
+    bot = DummyBot()
 
     with (
         mock.patch.object(bot_config, "KVK_PLAYER_STATS_CHANNEL_ID", 50),
@@ -268,9 +141,10 @@ async def test_post_stats_embeds_all_fail_dm_attempted():
     ):
         from commands import kvk_personal_posting
 
-        posted, used = await kvk_personal_posting.post_stats_embeds(bot, ctx, embeds, file)
+        posted, used = await kvk_personal_posting.post_stats_embeds(
+            bot, ctx, [types.SimpleNamespace()], None
+        )
 
-    # DM was the last resort; user.sent should have been populated
     assert posted is True
     assert used == "dm"
     assert user.sent

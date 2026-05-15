@@ -53,7 +53,6 @@ from registry.account_slots import ACCOUNT_ORDER
 from registry.registry_service import load_registry_as_dict
 from services.governor_account_service import get_account_summary_for_user
 from target_utils import (
-    _name_cache,
     autocomplete_governor_names,
     lookup_governor_id,
     run_target_lookup,
@@ -137,7 +136,6 @@ configure_registry_views(
     target_lookup_view_factory=lambda matches, author_id: FuzzySelectView(
         matches, author_id, show_targets=True
     ),
-    name_cache_getter=lambda: _name_cache,
     send_profile_to_channel=send_profile_to_channel_service,
     account_order_getter=lambda: ACCOUNT_ORDER,
 )

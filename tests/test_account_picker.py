@@ -80,6 +80,34 @@ def test_build_unique_gov_options_summary_falls_back_to_slot_for_unknown_names()
     assert [o.label for o in opts] == ["Main", "Alt 1", "Farm 1"]
 
 
+def test_build_unique_gov_options_accepts_governor_row_list():
+    rows = [
+        {"GovernorID": "111", "GovernorName": "One"},
+        {"GovernorID": "222", "GovernorName": "Two"},
+        {"GovernorID": "111", "GovernorName": "Duplicate"},
+    ]
+
+    opts = build_unique_gov_options(rows)
+
+    assert [o.value for o in opts] == ["111", "222"]
+    assert [o.label for o in opts] == ["One", "Two"]
+    assert [o.description for o in opts] == ["Account 1", "Account 2"]
+
+
+def test_build_unique_gov_options_accepts_registered_governor_objects():
+    from inventory.models import RegisteredGovernor
+
+    rows = [
+        RegisteredGovernor(111, "One", "Main"),
+        RegisteredGovernor(222, "Two", "Alt 1"),
+    ]
+
+    opts = build_unique_gov_options(rows)
+
+    assert [o.value for o in opts] == ["111", "222"]
+    assert [o.description for o in opts] == ["Main", "Alt 1"]
+
+
 @pytest.mark.asyncio
 async def test_account_picker_uses_generic_governor_placeholder():
     view = AccountPickerView(

@@ -12,7 +12,7 @@ from ark.dal.ark_dal import (
     upsert_team_preference,
 )
 from profile_cache import get_profile_cached
-from target_utils import _name_cache, refresh_name_cache_from_sql, sync_refresh_worker
+from target_utils import get_name_cache_rows, refresh_name_cache_from_sql, sync_refresh_worker
 
 logger = logging.getLogger(__name__)
 _ALLOWED_TEAMS = {1, 2}
@@ -24,7 +24,7 @@ class ArkPreferenceError(ValueError):
 
 
 async def _ensure_governor_cache_ready() -> None:
-    rows = (_name_cache or {}).get("rows") if isinstance(_name_cache, dict) else None
+    rows = get_name_cache_rows()
     if rows:
         return
 
@@ -34,7 +34,7 @@ async def _ensure_governor_cache_ready() -> None:
     except Exception:
         logger.exception("[ARK_PREF] refresh_name_cache_from_sql failed")
 
-    rows = (_name_cache or {}).get("rows") if isinstance(_name_cache, dict) else None
+    rows = get_name_cache_rows()
     if rows:
         return
 
@@ -111,7 +111,7 @@ async def _validate_governor_id(governor_id: int) -> dict[str, str]:
 
     # 1) in-memory cache (fast path)
     await _ensure_governor_cache_ready()
-    rows = (_name_cache or {}).get("rows") if isinstance(_name_cache, dict) else []
+    rows = get_name_cache_rows()
     for row in rows or []:
         if str(row.get("GovernorID") or "").strip() == governor_id_str:
             return {
@@ -229,7 +229,7 @@ async def get_preference(governor_id: int) -> dict[str, Any] | None:
         return None
 
     governor_name = None
-    rows = (_name_cache or {}).get("rows") if isinstance(_name_cache, dict) else []
+    rows = get_name_cache_rows()
     target_id = str(int(governor_id))
     for item in rows or []:
         if str(item.get("GovernorID") or "").strip() == target_id:

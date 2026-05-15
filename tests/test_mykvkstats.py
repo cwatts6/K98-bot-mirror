@@ -110,7 +110,7 @@ async def test_no_registered_accounts_shows_registration_prompt(monkeypatch):
         return {}
 
     async def fake_get_account_summary_for_user(_user_id):
-        return C.stats_account_service.summarize_accounts({})
+        return C.governor_account_service.summarize_accounts({})
 
     # Provide an async-to-thread shim so `await asyncio.to_thread(load_registry)` works
     async def fake_to_thread(fn, *a, **k):
@@ -118,7 +118,7 @@ async def test_no_registered_accounts_shows_registration_prompt(monkeypatch):
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
     monkeypatch.setattr(
-        C.stats_account_service,
+        C.governor_account_service,
         "get_account_summary_for_user",
         fake_get_account_summary_for_user,
     )
@@ -159,7 +159,7 @@ async def test_single_account_sends_public_embed(monkeypatch):
         return {}
 
     async def fake_get_account_summary_for_user(_user_id):
-        return C.stats_account_service.summarize_accounts(
+        return C.governor_account_service.summarize_accounts(
             {"Main": {"GovernorID": "123", "GovernorName": "X"}}
         )
 
@@ -168,7 +168,7 @@ async def test_single_account_sends_public_embed(monkeypatch):
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
     monkeypatch.setattr(
-        C.stats_account_service,
+        C.governor_account_service,
         "get_account_summary_for_user",
         fake_get_account_summary_for_user,
     )
@@ -196,7 +196,7 @@ async def test_multi_account_builds_selector(monkeypatch):
         return {}
 
     async def fake_get_account_summary_for_user(_user_id):
-        return C.stats_account_service.summarize_accounts(
+        return C.governor_account_service.summarize_accounts(
             {
                 "Main": {"GovernorID": 1, "GovernorName": "A"},
                 "Alt 1": {"GovernorID": 2, "GovernorName": "B"},
@@ -208,7 +208,7 @@ async def test_multi_account_builds_selector(monkeypatch):
 
     monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
     monkeypatch.setattr(
-        C.stats_account_service,
+        C.governor_account_service,
         "get_account_summary_for_user",
         fake_get_account_summary_for_user,
     )
