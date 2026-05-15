@@ -656,7 +656,7 @@ async def on_message(message: discord.Message):
 
                 # 2) Signal any waiting tasks that the refresh is complete
                 try:
-                    from Commands import (
+                    from commands.location_cmds import (
                         signal_location_refresh_complete,  # import where the globals live
                     )
 
