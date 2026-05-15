@@ -245,6 +245,12 @@ def get_name_cache_status() -> dict[str, Any]:
     }
 
 
+def get_name_cache_rows() -> list[dict[str, Any]]:
+    """Return a copy of cached governor rows for service-layer search helpers."""
+    rows = _name_cache.get("rows", []) if isinstance(_name_cache, dict) else []
+    return [dict(row) for row in rows if isinstance(row, dict)]
+
+
 # ---------------- Targets: EXEMPT/NOT ACTIVE fallback (still via SQL) ----------------
 
 

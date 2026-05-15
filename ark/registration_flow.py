@@ -3,12 +3,12 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 import logging
-import math
 from typing import Any
 
 import discord
 
 from account_picker import build_unique_gov_options
+from ark.admin_governor_lookup_service import resolve_admin_governor_query
 from ark.ark_constants import ARK_MATCH_STATUS_CANCELLED, ARK_MATCH_STATUS_COMPLETED
 from ark.ban_utils import admin_override_ban_rule, format_ban_block_message
 from ark.dal.ark_dal import (
@@ -38,13 +38,6 @@ from services.governor_account_service import (
     AccountResolutionSummary,
     get_account_summary_for_user,
 )
-from target_utils import (
-    _name_cache,
-    get_name_cache_status,
-    lookup_governor_id,
-    refresh_name_cache_from_sql,
-    sync_refresh_worker,
-)
 from ui.views.ark_fuzzy_select_view import ArkFuzzySelectView
 from ui.views.ark_views import (
     ArkAdminAddNameModal,
@@ -57,29 +50,6 @@ from utils import ensure_aware_utc, utcnow
 logger = logging.getLogger(__name__)
 
 _SIGNUP_CLOSED_MESSAGE = "❌ Signups are closed. Contact leadership for changes."
-
-
-def _is_missing(val: Any) -> bool:
-    if val is None:
-        return True
-    try:
-        return math.isnan(float(val))
-    except Exception:
-        return False
-
-
-def _get_city_hall_level(governor_id: str) -> float | None:
-    rows = (_name_cache or {}).get("rows", []) if isinstance(_name_cache, dict) else []
-    for row in rows:
-        if str(row.get("GovernorID", "")).strip() == str(governor_id).strip():
-            ch = row.get("CityHallLevel")
-            if _is_missing(ch):
-                return None
-            try:
-                return float(ch)
-            except Exception:
-                return None
-    return None
 
 
 def _resolve_admin_add_discord_user_id(
@@ -117,29 +87,6 @@ def _resolve_admin_add_discord_user_id(
     return resolved_discord_id
 
 
-def _fallback_substring_matches(query: str, limit: int = 25) -> list[dict[str, str]]:
-    q = (query or "").strip().lower()
-    if not q:
-        return []
-
-    rows = _name_cache.get("rows") or []
-    matches: list[dict[str, str]] = []
-    for row in rows:
-        name = str(row.get("GovernorName") or "").strip()
-        if not name:
-            continue
-        if q in name.lower():
-            matches.append(
-                {
-                    "GovernorName": name,
-                    "GovernorID": str(row.get("GovernorID") or ""),
-                }
-            )
-            if len(matches) >= limit:
-                break
-    return matches
-
-
 def _build_fuzzy_embed(query: str, matches: list[dict]) -> discord.Embed:
     MAX_LINES = 15
     lines = [f"• **{m['GovernorName']}** — `{m['GovernorID']}`" for m in matches[:MAX_LINES]]
@@ -152,28 +99,6 @@ def _build_fuzzy_embed(query: str, matches: list[dict]) -> discord.Embed:
         description=desc,
         color=discord.Color.blue(),
     )
-
-
-async def _ensure_name_cache_ready() -> None:
-    """
-    Ensure the name cache is populated in THIS process.
-    refresh_name_cache_from_sql may run in a subprocess, so we
-    fallback to sync_refresh_worker in-thread if cache is still empty.
-    """
-    try:
-        status = get_name_cache_status()
-        if status.get("rows_count", 0) > 0:
-            return
-
-        # Try normal refresh first (may run in subprocess)
-        await refresh_name_cache_from_sql()
-
-        # If still empty, run worker in this process
-        status = get_name_cache_status()
-        if status.get("rows_count", 0) == 0:
-            await asyncio.to_thread(sync_refresh_worker)
-    except Exception:
-        logger.exception("[ARK] Failed ensuring name cache is ready")
 
 
 def _find_user_signup(roster: list[dict], user_id: int) -> dict[str, Any] | None:
@@ -1017,7 +942,6 @@ class ArkRegistrationController:
         )
 
     async def _handle_admin_add_name(self, interaction: discord.Interaction, raw_name: str) -> None:
-        # ✅ acknowledge immediately to prevent "Unknown interaction"
         responder = getattr(interaction, "response", None)
         is_done = False
         try:
@@ -1038,122 +962,17 @@ class ArkRegistrationController:
             await self._safe_send(interaction, "❌ Name is required.", ephemeral=True)
             return
 
-        def _fallback_governor_id_matches(query: str, limit: int = 25) -> list[dict[str, str]]:
-            q = (query or "").strip()
-            if not q:
-                return []
-
-            rows = _name_cache.get("rows") or []
-            matches: list[dict[str, str]] = []
-            for row in rows:
-                gid = str(row.get("GovernorID") or "").strip()
-                name = str(row.get("GovernorName") or "").strip()
-                if not gid:
-                    continue
-                if q in gid:
-                    matches.append(
-                        {
-                            "GovernorName": name,
-                            "GovernorID": gid,
-                        }
-                    )
-                    if len(matches) >= limit:
-                        break
-            return matches
-
-        # If numeric GovernorID provided, attempt exact ID lookup
-        if name.isdigit():
-            governor_id = str(name)
-
-            # Ensure cache is populated (this process)
-            await _ensure_name_cache_ready()
-
-            governor_name = None
-            for row in _name_cache.get("rows") or []:
-                if str(row.get("GovernorID")) == governor_id:
-                    governor_name = str(row.get("GovernorName") or "").strip()
-                    break
-
-            if governor_name:
-                await self._prompt_admin_slot_selection(
-                    interaction,
-                    governor_id=governor_id,
-                    governor_name=governor_name,
-                )
-                return
-
-            # Fallback: treat ID as search input (fuzzy)
-            matches = _fallback_governor_id_matches(governor_id)
-            if matches:
-
-                async def _apply_fuzzy_pick(inter: discord.Interaction, picked_id: str) -> None:
-                    id_to_name = {
-                        str(m.get("GovernorID")): str(m.get("GovernorName")) for m in matches
-                    }
-                    await self._prompt_admin_slot_selection(
-                        inter,
-                        governor_id=picked_id,
-                        governor_name=id_to_name.get(str(picked_id), "Unknown"),
-                    )
-
-                embed = _build_fuzzy_embed(governor_id, matches)
-                view = ArkFuzzySelectView(matches, interaction.user.id, _apply_fuzzy_pick)
-                await view.send_followup(interaction, embed)
-                return
-
-            await self._safe_send(
-                interaction,
-                "❌ GovernorID not found in name cache. Please verify the ID.",
-                ephemeral=True,
-            )
-            return
-
-        result = await lookup_governor_id(name)
-        status = (result or {}).get("status")
-
-        # If cache is stale/empty, refresh once and retry
-        if status == "not_found":
-            await _ensure_name_cache_ready()
-            result = await lookup_governor_id(name)
-            status = (result or {}).get("status")
-
-        # fallback substring matches even if lookup still not_found
-        if status == "not_found":
-            matches = _fallback_substring_matches(name)
-            if matches:
-
-                async def _apply(inter: discord.Interaction, governor_id: str) -> None:
-                    id_to_name = {
-                        str(m.get("GovernorID")): str(m.get("GovernorName")) for m in matches
-                    }
-                    await self._prompt_admin_slot_selection(
-                        inter,
-                        governor_id=governor_id,
-                        governor_name=id_to_name.get(str(governor_id), "Unknown"),
-                    )
-
-                embed = _build_fuzzy_embed(name, matches)
-                view = ArkFuzzySelectView(matches, interaction.user.id, _apply)
-                await view.send_followup(interaction, embed)
-                return
-
-        if status == "found":
-            data = result.get("data") or {}
+        result = await resolve_admin_governor_query(name)
+        if result.status == "found":
             await self._prompt_admin_slot_selection(
                 interaction,
-                governor_id=str(data.get("GovernorID")),
-                governor_name=str(data.get("GovernorName") or "Unknown"),
+                governor_id=str(result.governor_id or ""),
+                governor_name=str(result.governor_name or "Unknown"),
             )
             return
 
-        if status == "fuzzy_matches":
-            matches = result.get("matches") or []
-            if not matches:
-                matches = _fallback_substring_matches(name)
-
-            if not matches:
-                await self._safe_send(interaction, "No matches found.", ephemeral=True)
-                return
+        if result.status == "matches":
+            matches = list(result.matches)
 
             async def _apply(inter: discord.Interaction, governor_id: str) -> None:
                 id_to_name = {str(m.get("GovernorID")): str(m.get("GovernorName")) for m in matches}
@@ -1163,16 +982,12 @@ class ArkRegistrationController:
                     governor_name=id_to_name.get(str(governor_id), "Unknown"),
                 )
 
-            embed = _build_fuzzy_embed(name, matches)
+            embed = _build_fuzzy_embed(result.query, matches)
             view = ArkFuzzySelectView(matches, interaction.user.id, _apply)
             await view.send_followup(interaction, embed)
             return
 
-        await self._safe_send(
-            interaction,
-            (result or {}).get("message", "No matches found."),
-            ephemeral=True,
-        )
+        await self._safe_send(interaction, result.message, ephemeral=True)
 
     async def _prompt_admin_slot_selection(
         self,

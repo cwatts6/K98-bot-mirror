@@ -240,24 +240,24 @@ async def test_admin_add_partial_governor_id_fuzzy_matches(monkeypatch):
         config={"PlayersCap": 30, "SubsCap": 15, "AdminOverrideSubRule": 0},
     )
 
-    # Dummy interaction (from existing helpers in this file)
     interaction = DummyInteraction()
 
-    # Seed name cache with a governor that should match a partial ID
-    monkeypatch.setattr(
-        "ark.registration_flow._name_cache",
-        {
-            "rows": [
+    from ark.admin_governor_lookup_service import ArkAdminGovernorLookupResult
+
+    async def _resolve_admin_governor_query(query):
+        return ArkAdminGovernorLookupResult(
+            status="matches",
+            query=query,
+            matches=(
                 {"GovernorID": "12072972", "GovernorName": "Talita Tia"},
                 {"GovernorID": "99999999", "GovernorName": "Other"},
-            ]
-        },
+            ),
+        )
+
+    monkeypatch.setattr(
+        "ark.registration_flow.resolve_admin_governor_query",
+        _resolve_admin_governor_query,
     )
-
-    async def _ensure_cache():
-        return None
-
-    monkeypatch.setattr("ark.registration_flow._ensure_name_cache_ready", _ensure_cache)
 
     created_views = []
 
@@ -278,7 +278,6 @@ async def test_admin_add_partial_governor_id_fuzzy_matches(monkeypatch):
 
     monkeypatch.setattr("ark.registration_flow.ArkFuzzySelectView", _view_factory)
 
-    # Run with partial GovernorID
     await controller._handle_admin_add_name(interaction, "120729")
 
     assert created_views, "Expected fuzzy view to be created for partial ID"

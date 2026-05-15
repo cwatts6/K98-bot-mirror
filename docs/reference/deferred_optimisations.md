@@ -51,15 +51,6 @@ Resolved historical notes were moved to `archive/deferred_optimisations_resolved
 - Dependencies: Preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to the KVK_ALL modernisation programme.
 
 ### Deferred Optimisation
-- Area: `ark/registration_flow.py` admin add fuzzy/name-cache lookup
-- Type: consistency
-- Description: Ark admin add still searches `target_utils._name_cache` directly for exact GovernorID, partial GovernorID, and substring fuzzy name matching. This is separate from the self-service linked-account migration because it supports admin roster search, cache refresh fallback, fuzzy selection, and admin slot prompts rather than selecting one of the actor's registered accounts.
-- Suggested Fix: Move Ark admin governor search into a focused Discord-free helper or service that uses public target/profile lookup helpers where available, preserves exact ID, partial ID, fuzzy name, cache refresh, and no-match messages, and leaves the view/controller responsible only for Discord response routing.
-- Impact: medium
-- Risk: medium
-- Dependencies: Preserve Ark admin add behaviour, fuzzy result ordering, name-cache refresh fallback, ban enforcement, slot capacity checks, and admin/leadership permission tests.
-
-### Deferred Optimisation
 - Area: `services/governor_account_service.py`, `services/stats_account_service.py`, `inventory/inventory_service.py`, `mge/mge_signup_service.py`, `account_picker.py`, `ui/views/kvk_personal_views.py`
 - Type: cleanup
 - Description: Compatibility adapters and duplicate local account classification/linked-governor/registered-governor shaping remain after the stats, inventory, MGE, telemetry/KVK, registry, and Ark direct migrations. Removing them in the Ark PR would expand scope across legacy public shapes and KVK personal view compatibility paths.

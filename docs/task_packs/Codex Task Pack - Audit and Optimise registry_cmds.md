@@ -797,17 +797,109 @@ Remaining follow-up slices intentionally left deferred:
 
 ## 34. PR 91 My Registrations Display-Loader Completion Update
 
-Status: implementation and validation complete; pending PR review and production smoke test.
+Status: smoke tested successfully and deployed to production.
 
 PR 91 delivered:
 
-- `/my_registrations` now loads the invoking user's display accounts through `get_account_summary_for_user()` instead of loading a full-registry snapshot and selecting locally.
+- `/my_registrations` now loads the invoking user's display accounts through `get_account_summary_for_user()` instead of using the full-registry snapshot as the primary loader.
+- A review fix preserved the previous stale-cache degraded mode by falling back to `registry_service.load_registry_as_dict()` only when the primary per-user summary load fails.
 - The command builds its display from `AccountResolutionSummary.ordered_accounts`, preserving embed title/copy, account slot ordering, empty-state copy, action buttons, truncation guard, and ephemeral response behaviour.
 - Registry audit, export, and import paths still use `registry_service.load_registry_as_dict()` because they require full-registry snapshots.
-- Focused regression coverage now checks the `/my_registrations` summary-backed display payload and empty-state copy.
+- Focused regression coverage now checks the `/my_registrations` summary-backed display payload, empty-state copy, stale-cache fallback success, and no-fallback failure behaviour.
 - The active `/my_registrations` display-loader deferred item was removed from `docs/reference/deferred_optimisations.md`.
+
+Smoke coverage completed after deployment:
+
+- `/my_registrations` displays registered accounts in the expected canonical slot order.
+- `/my_registrations` preserves the existing title/copy, empty-state copy, action buttons, and ephemeral response behaviour.
+- `/my_registrations` action buttons still open the existing modify/register selectors.
+- Registry audit, export, and import full-snapshot flows were not changed by this PR.
+
+Validation completed during PR 91:
+
+- `.\.venv\Scripts\python.exe -m py_compile commands\registry_cmds.py tests\test_registry_cmds.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_registry_cmds.py tests\test_registry_views_smoke.py tests\test_governor_account_service.py` (`28 passed` after review fixes)
+- `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
+- `.\.venv\Scripts\python.exe scripts\select_tests.py`
+- `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
+- `.\.venv\Scripts\python.exe scripts\smoke_imports.py`
+- `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests` (`1361 passed, 2 skipped` after review fixes)
+- `.\.venv\Scripts\python.exe -m pre_commit run -a`
 
 Remaining follow-up slices intentionally left deferred:
 
 1. Ark admin fuzzy/name-cache lookup cleanup: move admin roster-search lookup out of the controller into a focused helper/service while preserving exact ID, partial ID, fuzzy name, refresh fallback, no-match responses, slot prompts, ban enforcement, and admin/leadership permissions.
 2. Compatibility cleanup: remove obsolete `AccountLookup`-only pathways and duplicate local classification/option-shaping helpers only after preserving focused regression coverage for stats export, inventory permissions, MGE signup, telemetry/KVK pickers, registry flows, KVK personal views, and Ark signup.
+
+## 35. Next Phase Chat Starter
+
+Use this in a fresh Codex chat for the final shared account-resolution cleanup slices:
+
+```text
+Codex, start the final registry/account optimisation phase after PR 91 (`my-registrations-display-loader`) was smoke tested successfully and deployed to production.
+
+Use the K98 repo workflow and required docs. Read `docs/task_packs/Codex Task Pack - Audit and Optimise registry_cmds.md` and `docs/reference/deferred_optimisations.md` first.
+
+Goal: deliver the remaining final PR-sized slices for the shared account-resolution migration. PR 87 introduced `ResolvedAccount` and `AccountResolutionSummary` in `services/governor_account_service.py`; PR 88 migrated telemetry/KVK target/CrystalTech picker setup in `commands/telemetry_cmds.py`, `account_picker.py`, and `kvk_ui.py`; PR 89 migrated registry command/view account-selection flows in `commands/registry_cmds.py` and `ui/views/registry_views.py`; PR 90 migrated Ark self-service join/sub/leave/switch account-selection flows in `ark/registration_flow.py`; PR 91 migrated `/my_registrations` display loading while preserving stale-cache fallback.
+
+Important context:
+- PR 84 centralised basic account slots, Discord user-id parsing, public GovernorID roster lookup, and initial `/my_registrations` loading through `registry_service.load_registry_as_dict`.
+- PR 85A extracted registration audit, bulk export, bulk import dry-run preview/error files, and bulk import apply summary shaping into `registry/registry_command_service.py`.
+- PR 86 moved registry confirmation views into `ui/views/registry_views.py`, kept compatibility re-exports from `registry/governor_registry.py`, and removed the remaining inline registry-service import in `remove_registration_by_id`.
+- PR 87 introduced the shared richer account-resolution summary object and migrated stats, inventory, and MGE service adapters while preserving public shapes.
+- PR 88 migrated telemetry/KVK target/CrystalTech picker setup to `AccountResolutionSummary` and preserved selector labels, option ordering, refresh behaviour, lookup/register buttons, and slot fallback labels for blank or `Unknown` GovernorName values.
+- PR 89 migrated registry command/view account-selection flows to `AccountResolutionSummary`, preserving self-service/admin autocomplete behaviour, confirmation/cancel behaviour, duplicate ownership checks, and `RegisterStartView` compatibility for telemetry/KVK callers.
+- PR 90 migrated Ark self-service join/sub/leave/switch flows to `AccountResolutionSummary`, preserving signup behaviour, ban enforcement, roster filtering, active signup detection, persistent registration-message refresh, and account picker labels/ordering.
+- PR 91 migrated `/my_registrations` display loading to `AccountResolutionSummary`, restored stale-cache degraded fallback after review, and preserved embed copy, slot ordering, action buttons, truncation guard, and ephemeral behaviour.
+
+Remaining active deferred slices:
+1. Ark admin fuzzy/name-cache lookup cleanup: move admin roster-search lookup out of `ark/registration_flow.py` into a focused Discord-free helper/service while preserving exact ID, partial ID, fuzzy name, cache refresh fallback, no-match responses, fuzzy result ordering, slot prompts, ban enforcement, slot capacity checks, and admin/leadership permissions.
+2. Compatibility cleanup: remove obsolete `AccountLookup`-only pathways and duplicate local account classification, linked-governor, registered-governor, and option-shaping helpers after auditing external callers.
+
+Recommended approach:
+- Start with audit/scope only and decide whether Ark admin fuzzy/name-cache cleanup and compatibility cleanup should be one PR or two.
+- Prefer Ark admin fuzzy/name-cache cleanup first if compatibility cleanup still has uncertainty or broad caller risk.
+- Keep compatibility cleanup deferred unless the audit shows no remaining public callers and the regression surface is small.
+
+Preserve telemetry/KVK picker behaviour, registry flows, `/my_registrations` stale fallback, inventory permission behaviour, stats export behaviour, MGE signup behaviour, Ark self-service signup behaviour, and Ark admin add behaviour.
+
+Validate any SQL-facing assumptions against `C:\K98-bot-SQL-Server` before implementation.
+
+Run or justify the K98 validation gates selected by `scripts/select_tests.py`, including `scripts/validate_architecture_boundaries.py`, `scripts/validate_deferred_items.py`, `scripts/smoke_imports.py`, `scripts/validate_command_registration.py`, focused Ark/account tests, and full tests if selector/risk warrants it.
+
+Update `docs/reference/deferred_optimisations.md` and this task pack as completed/deferred before PR handoff.
+```
+
+## 36. PR 92 Ark Admin Governor Lookup Service Update
+
+Status: implementation and validation complete; pending PR review and production smoke test.
+
+PR 92 delivered the Ark admin fuzzy/name-cache lookup cleanup slice:
+
+- `ark/registration_flow.py` now delegates admin add governor query resolution to a Discord-free Ark lookup service.
+- `ark/admin_governor_lookup_service.py` owns exact numeric GovernorID lookup, partial GovernorID matching, fuzzy name lookup, stale/empty cache refresh fallback, substring fallback, and no-match result shaping.
+- `target_utils.get_name_cache_rows()` exposes a small public cache-row accessor so Ark admin lookup no longer reads `target_utils._name_cache` from the controller.
+- The Ark controller remains responsible for Discord modal/selector routing, fuzzy embed/view display, slot prompt wiring, and the existing admin add apply path.
+- Existing ban enforcement, player/sub capacity checks, duplicate signup checks, active-weekend conflict checks, admin/leadership permissions, audit logging, and registration-message refresh remain in `_apply_admin_add`.
+- Focused tests cover the lookup service exact ID path, partial ID ordering, substring fallback after refresh, numeric no-match copy, fuzzy selector routing, admin permissions, ban enforcement, and slot capacity behaviour.
+- The active Ark admin fuzzy/name-cache lookup deferred item was removed from `docs/reference/deferred_optimisations.md`.
+
+Validation completed during PR 92 implementation:
+
+- `.\.venv\Scripts\python.exe -m py_compile ark\registration_flow.py ark\admin_governor_lookup_service.py target_utils.py tests\test_ark_admin_governor_lookup_service.py tests\test_ark_admin_roster.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_ark_admin_governor_lookup_service.py tests\test_ark_admin_roster.py tests\test_ark_bans_enforcement.py tests\test_ark_registration_flow.py tests\test_ark_fuzzy_select_view.py` (`32 passed`)
+- `.\.venv\Scripts\python.exe scripts\select_tests.py`
+- `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
+- `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
+- `.\.venv\Scripts\python.exe scripts\smoke_imports.py`
+- `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
+- `.\.venv\Scripts\python.exe -m pytest -q tests\test_account_picker.py tests\test_governor_account_service.py` (`14 passed`)
+- `.\.venv\Scripts\python.exe -m pytest -q tests -k "ark"` (`453 passed, 2 skipped, 912 deselected`)
+- `.\.venv\Scripts\python.exe -m pytest -q tests` (`1365 passed, 2 skipped`)
+- `.\.venv\Scripts\python.exe -m pre_commit run -a`
+- `git diff --check`
+
+Remaining follow-up slice intentionally left deferred:
+
+1. Compatibility cleanup: remove obsolete `AccountLookup`-only pathways and duplicate local account classification, linked-governor, registered-governor, and option-shaping helpers after preserving focused regression coverage for stats export, inventory permissions, MGE signup, telemetry/KVK pickers, registry flows, KVK personal views, and Ark signup.
