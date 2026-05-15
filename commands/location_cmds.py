@@ -17,10 +17,13 @@ from decoraters import (
     is_admin_and_notify_channel,
     track_usage,
 )
-from location_importer import load_staging_and_merge, parse_output_csv
 from profile_cache import (
     get_profile_cached,
     warm_cache,
+)
+from services.location_import_service import (
+    import_location_csv_bytes,
+    validate_location_csv_attachment,
 )
 from services.profile_lookup_service import resolve_profile_lookup
 from target_utils import autocomplete_governor_names
@@ -251,26 +254,14 @@ def register_location(bot: ext_commands.Bot) -> None:
             )
             return
 
-        # --- basic validation ---
-        fname = (attach.filename or "").lower()
-        if not fname.endswith(".csv"):
-            await ctx.interaction.edit_original_response(
-                content=f"❌ `{attach.filename}` isn’t a CSV file. Please upload a `.csv` (e.g., `output.csv`)."
-            )
+        validation = validate_location_csv_attachment(
+            filename=getattr(attach, "filename", None),
+            size=getattr(attach, "size", None),
+        )
+        if not validation.ok:
+            await ctx.interaction.edit_original_response(content=validation.message)
             return
 
-        # Optional: size guard (e.g., 10 MB)
-        try:
-            fsize = getattr(attach, "size", None)
-            if isinstance(fsize, int) and fsize > 10 * 1024 * 1024:
-                await ctx.interaction.edit_original_response(
-                    content=f"❌ File too large ({fsize/1024/1024:.1f} MB). Please keep CSV under **10 MB**."
-                )
-                return
-        except Exception:
-            pass
-
-        # --- read + parse ---
         try:
             csv_bytes = await attach.read()
         except Exception as e:
@@ -280,39 +271,14 @@ def register_location(bot: ext_commands.Bot) -> None:
             )
             return
 
-        try:
-            rows = parse_output_csv(csv_bytes)
-        except Exception as e:
-            logger.exception("[/import_locations] parse_output_csv crashed")
-            await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to parse CSV: `{type(e).__name__}: {e}`"
-            )
-            return
-
-        if not rows:
-            await ctx.interaction.edit_original_response(
-                content="⚠️ No valid rows found in the CSV."
-            )
-            return
-
-        # --- merge into staging (likely blocking) ---  # architecture-check: allow
-        try:
-            staging_rows, total_tracked = await asyncio.to_thread(load_staging_and_merge, rows)
-        except Exception as e:
-            logger.exception("[/import_locations] load_staging_and_merge failed")
-            await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to import rows: `{type(e).__name__}: {e}`"
-            )
-            return
-
-        dur = (datetime.now(UTC) - started).total_seconds()
-        count_part = f"Imported **{staging_rows}** row{'s' if staging_rows != 1 else ''}."
-        tracked_part = (
-            f" Total tracked now **{total_tracked}**." if total_tracked is not None else ""
+        result = await import_location_csv_bytes(
+            csv_bytes,
+            filename=getattr(attach, "filename", None),
+            size=getattr(attach, "size", None),
+            on_success=signal_location_refresh_complete,
+            started_at_utc=started,
         )
-        msg = f"✅ {count_part}{tracked_part} ⏱ {dur:.1f}s"
-
-        await ctx.interaction.edit_original_response(content=msg)
+        await ctx.interaction.edit_original_response(content=result.message)
 
     @bot.slash_command(
         name="player_location",

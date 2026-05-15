@@ -11,15 +11,6 @@ The governor fuzzy/name/partial-ID lookup standardisation item and profile/locat
 profile-cache lookup item are complete; the remaining active backlog is listed below.
 
 ### Deferred Optimisation
-- Area: `commands/location_cmds.py` `/import_locations`, `location_importer.py`
-- Type: architecture
-- Description: `/import_locations` still owns CSV attachment validation, parsing handoff, staging merge dispatch, and Discord response rendering in the command module. This was observed while standardising `/player_location` lookup and left out of scope to keep the profile/location lookup PR focused.
-- Suggested Fix: Extract import orchestration and result shaping into a location service, leaving `commands/location_cmds.py` responsible for permission gates, safe defer/respond behaviour, attachment IO, and Discord rendering.
-- Impact: medium
-- Risk: medium
-- Dependencies: Preserve admin/notify-channel gate, CSV validation copy, `load_staging_and_merge()` behaviour, location refresh signalling, and current import success/error messages.
-
-### Deferred Optimisation
 - Area: tests/stats_service.py, tests/targets_sql_cache_subproc.py, tests/prekvk_stats.py, tests/proc_config_import_phase2.py, tests/sheets_sync_flow.py
 - Type: consistency
 - Description: Several non-Ark unit tests still reach live SQL Server or connection construction when run in the Codex/local PR validation environment without the bot machine's ODBC setup.
@@ -45,6 +36,15 @@ profile-cache lookup item are complete; the remaining active backlog is listed b
 - Impact: medium
 - Risk: medium
 - Dependencies: PreKvK diagnostics result model should remain stable after the import-history rollout.
+
+### Deferred Optimisation
+- Area: `DL_bot.py` player location CSV auto-import, `Commands.py` compatibility shim
+- Type: architecture
+- Description: The player location auto-import flow in `DL_bot.py` attempts to import `signal_location_refresh_complete` from the legacy `Commands.py` shim, but the signal currently lives in `commands/location_cmds.py` and is not exposed by `Commands.py`. This makes refresh-completion signalling fragile for the legacy auto-import path and should be handled with the broader DL_bot routing cleanup.
+- Suggested Fix: When refactoring DL_bot upload routing, move player-location auto-import orchestration into a dedicated route/service boundary and centralise location refresh signalling behind an importable helper that both command and legacy routing paths can call.
+- Impact: medium
+- Risk: medium
+- Dependencies: Coordinate with the existing deferred DL_bot upload-routing improvements; preserve current player location auto-import Discord output and scanner/import behaviour.
 
 ### Deferred Optimisation
 - Area: SQL repo legacy PreKvK phase objects
