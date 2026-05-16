@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import logging
 
 import pytest
 
@@ -245,6 +246,24 @@ async def test_prekvk_route_importer_failure_sends_existing_error():
 
 
 @pytest.mark.asyncio
+async def test_prekvk_route_duplicate_governor_rejection_is_error():
+    deps, sent, _offloads, created, stats = _deps(
+        offload_result=(False, "Duplicate GovernorID(s) detected in file: 123.", 0)
+    )
+
+    handled = await route.handle_prekvk_upload(_message(), deps)
+
+    assert handled is True
+    assert created == []
+    assert stats == []
+    _ch, title, fields, color, _mention = sent[-1]
+    assert title == "Pre-KVK Import ❌"
+    assert fields["Error"] == "Duplicate GovernorID(s) detected in file: 123."
+    assert "Info" not in fields
+    assert color == 0xE74C3C
+
+
+@pytest.mark.asyncio
 async def test_prekvk_route_importer_exception_sends_existing_error():
     deps, sent, _offloads, created, stats = _deps(offload_exception=RuntimeError("boom"))
 
@@ -260,8 +279,10 @@ async def test_prekvk_route_importer_exception_sends_existing_error():
 
 
 @pytest.mark.asyncio
-async def test_prekvk_route_stats_refresh_failure_is_best_effort():
+async def test_prekvk_route_stats_refresh_failure_is_best_effort(caplog):
     deps, sent, _offloads, created, stats = _deps(stats_exception=RuntimeError("stats down"))
+
+    caplog.set_level(logging.DEBUG, logger=route.__name__)
 
     handled = await route.handle_prekvk_upload(_message(), deps)
 
@@ -271,3 +292,4 @@ async def test_prekvk_route_stats_refresh_failure_is_best_effort():
     _ch, title, _fields, color, _mention = sent[-1]
     assert title == "Pre-KVK Snapshot Imported ✅"
     assert color == 0x2ECC71
+    assert "Failed to refresh stats embed after Pre-KVK import" in caplog.text

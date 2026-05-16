@@ -174,22 +174,20 @@ async def handle_prekvk_upload(message: Any, deps: PreKvkRouteDeps) -> bool:
                 try:
                     await _refresh_stats_embed(deps)
                 except Exception:
-                    pass
+                    logger.debug(
+                        "Failed to refresh stats embed after Pre-KVK import", exc_info=True
+                    )
         else:
             await deps.send_embed(
                 notify_ch,
-                (
-                    "Pre-KVK Import (Skipped/Duplicate) ℹ️"
-                    if "Duplicate" in (note or "")
-                    else "Pre-KVK Import ❌"
-                ),
+                "Pre-KVK Import ❌",
                 {
                     "Filename": target.filename,
                     "Channel": f"#{message.channel.name} ({message.channel.id})",
                     "Uploader": f"{message.author} ({message.author.id})",
-                    "Info" if "Duplicate" in (note or "") else "Error": note or "Unknown",
+                    "Error": note or "Unknown",
                 },
-                0xF1C40F if "Duplicate" in (note or "") else 0xE74C3C,
+                0xE74C3C,
             )
     except Exception as e:
         await deps.send_embed(
