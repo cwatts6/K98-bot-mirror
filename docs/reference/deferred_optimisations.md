@@ -5,12 +5,13 @@ to GitHub issues/task packs.
 
 Resolved historical notes were moved to `archive/deferred_optimisations_resolved.md`.
 
-Last reviewed during the DL_bot upload-routing Phase 1 work. PR 96
+Last reviewed during the DL_bot upload-routing Phase 2A work. PR 96
 (`import-locations-command-orchestration-cleanup`) was smoke tested successfully and deployed to
-production. The governor fuzzy/name/partial-ID lookup standardisation item, profile/location
-profile-cache lookup item, `/import_locations` command orchestration item, and DL_bot player
-location auto-import route/signal coupling item are complete or being completed by the Phase 1
-upload-route PR; the remaining active backlog is listed below.
+production. PR 97 (`dlbot-player-location-upload-route`) was smoke tested successfully and
+promoted to production. The governor fuzzy/name/partial-ID lookup standardisation item,
+profile/location profile-cache lookup item, `/import_locations` command orchestration item, DL_bot
+player location auto-import route/signal coupling item, and DL_bot PreKvK upload route extraction
+item are complete; the remaining active backlog is listed below.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 upload routing and related test-environment blockers, not as a continuation of the
@@ -36,22 +37,22 @@ both this backlog and the current `K98-bot-mirror` GitHub issues list.
 - Dependencies: Local validation environment contract for venv naming and subprocess permissions.
 
 ### Deferred Optimisation
-- Area: `DL_bot.py` PreKvK upload routing
-- Type: architecture
-- Description: PreKvK upload routing still lives in the legacy root bot listener with filename matching, current-KVK lookup, offload dispatch, and Discord response rendering mixed together.
-- Suggested Fix: Move PreKvK upload routing into a dedicated route/service module and leave `DL_bot.py` responsible only for delegating the Discord event.
-- Impact: medium
-- Risk: medium
-- Dependencies: PreKvK diagnostics result model should remain stable after the import-history rollout.
-
-### Deferred Optimisation
 - Area: SQL repo legacy PreKvK phase objects
 - Type: cleanup
 - Description: `dbo.PreKvk_Phases`, `dbo.fn_PreKvkPhaseDelta`, and KVK-specific phase views still represent the old scan-window delta model even though Python reporting now uses direct stage columns.
-- Suggested Fix: Audit production SQL/report dependencies, then replace with direct-stage equivalents or retire the legacy objects in a separate SQL cleanup task.
+- Suggested Fix: Phase 2B should audit production SQL/report/manual workflow dependencies, then replace with direct-stage equivalents or retire the legacy objects only after an approved SQL cleanup design.
 - Impact: medium
 - Risk: medium
 - Dependencies: Confirm no production reports or manual SQL workflows still depend on scan-window phase objects.
+
+### Deferred Optimisation
+- Area: PreKvK report/embed
+- Type: feature
+- Description: PreKvK stage-level import data is now available, but there is no dedicated PreKvK report command or embed outside the existing stats-alert panel.
+- Suggested Fix: Phase 2C should design and implement a dedicated PreKvK report/embed after the upload route boundary is stable, defining command/channel surface, permissions, limits, empty-data behaviour, and mobile-safe Discord output.
+- Impact: medium
+- Risk: low
+- Dependencies: Complete Phase 2A route extraction first; reuse direct-stage PreKvK data path where practical.
 
 ### Deferred Optimisation
 - Area: `DL_bot.py` KVK_ALL upload routing

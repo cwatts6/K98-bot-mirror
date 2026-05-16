@@ -135,11 +135,11 @@ from embed_utils import send_embed
 from honor_importer import ingest_honor_snapshot, parse_honor_xlsx
 from kvk_all_importer import _auto_export_kvk, ingest_kvk_all_excel
 from log_health import LogHeadroomError, preflight_from_env_sync
-from prekvk_importer import import_prekvk_bytes
 from upload_routes.player_location_route import (
     PlayerLocationRouteDeps,
     handle_player_location_upload,
 )
+from upload_routes.prekvk_route import PreKvkRouteDeps, handle_prekvk_upload
 from utils import live_queue, update_live_queue_embed, utcnow
 from weekly_activity_importer import ingest_weekly_activity_excel
 
@@ -679,176 +679,19 @@ async def on_message(message: discord.Message):
             return
 
     # === Fast-path: Pre-KVK snapshot ingest (dynamic KVK lookup) ===
-    if message.channel.id == PREKVK_CHANNEL_ID and message.attachments:
-        notify_ch = await _get_notify_channel() or message.channel
-
-        prekvk_name_rx = re.compile(
-            r"^(?:1198_prekvk|PreKvK_Rankings_[^\\/:*?\"<>|]+)\.xlsx$",
-            re.IGNORECASE,
-        )
-        target = next(
-            (a for a in message.attachments if prekvk_name_rx.match(a.filename.strip())),
-            None,
-        )
-
-        if not target:
-            await send_embed(
-                notify_ch,
-                "Pre-KVK Import ⚠️",
-                {
-                    "Info": "No matching file found.",
-                    "Expected": "1198_prekvk.xlsx or PreKvK_Rankings_*.xlsx",
-                    "Channel": f"#{message.channel.name} ({message.channel.id})",
-                    "Uploader": f"{message.author} ({message.author.id})",
-                },
-                0xE67E22,
-            )
-            return
-
-        try:
-            file_bytes = await target.read()
-
-            # NEW: preflight check
-            ok = await ensure_sql_headroom_or_notify(notify_ch)
-            if not ok:
-                return
-
-            # Resolve current KVK number dynamically (offload when available)
-            try:
-                from file_utils import run_blocking_in_thread
-            except Exception:
-                run_blocking_in_thread = None
-
-            meta = None
-            try:
-                import stats_alerts.kvk_meta as kvk_meta
-
-                if run_blocking_in_thread is not None:
-                    meta = await run_blocking_in_thread(
-                        kvk_meta.get_latest_kvk_metadata_sql,
-                        name="get_latest_kvk_metadata_sql_dlbot",
-                    )
-                else:
-                    # fallback to asyncio.to_thread
-                    meta = await asyncio.to_thread(kvk_meta.get_latest_kvk_metadata_sql)
-            except Exception:
-                logger.exception("[DL_BOT] Failed to determine current KVK metadata")
-
-            # Hard-fail if we cannot determine a valid kvk_no
-            detected_kvk_no = None
-            try:
-                if meta and meta.get("kvk_no") is not None:
-                    detected_kvk_no = int(meta.get("kvk_no"))
-            except Exception:
-                detected_kvk_no = None
-
-            if detected_kvk_no is None:
-                logger.error(
-                    "[DL_BOT] Could not determine current KVK number; aborting Pre-KVK import"
-                )
-                await send_embed(
-                    notify_ch,
-                    "Pre-KVK Import ❌",
-                    {
-                        "Error": "Could not determine current KVK number (kvk_no). Import aborted.",
-                        "Filename": target.filename,
-                        "Channel": f"#{message.channel.name} ({message.channel.id})",
-                        "Uploader": f"{message.author} ({message.author.id})",
-                    },
-                    0xE74C3C,
-                )
-                return
-
-            # Run importer offload (prefer process) with detected kvk_no
-            ok, note, rows = await _offload_callable(
-                import_prekvk_bytes,
-                file_bytes,
-                target.filename,
-                kvk_no=detected_kvk_no,
-                uploader_discord_id=(
-                    int(message.author.id)
-                    if getattr(message.author, "id", None) is not None
-                    else None
-                ),
-                channel_id=(
-                    int(message.channel.id)
-                    if getattr(message.channel, "id", None) is not None
-                    else None
-                ),
-                message_id=int(message.id) if getattr(message, "id", None) is not None else None,
-                name="import_prekvk_bytes",
-                prefer_process=True,
-                meta={"filename": target.filename, "kvk_no": detected_kvk_no},
-            )
-
-            if ok:
-                duplicate_skip = "duplicate file skipped" in (note or "").lower()
-                await send_embed(
-                    notify_ch,
-                    (
-                        "Pre-KVK Snapshot Skipped"
-                        if duplicate_skip
-                        else "Pre-KVK Snapshot Imported ✅"
-                    ),
-                    {
-                        "KVK": str(detected_kvk_no),
-                        "Rows": str(rows),
-                        "Filename": target.filename,
-                        "Channel": f"#{message.channel.name} ({message.channel.id})",
-                        "Uploader": f"{message.author} ({message.author.id})",
-                        "Note": note,
-                    },
-                    0xF1C40F if duplicate_skip else 0x2ECC71,
-                )
-
-                # schedule a background log-backup trigger (best-effort)
-                try:
-                    asyncio.create_task(trigger_log_backup_background())
-                except Exception:
-                    logger.exception("Failed to schedule background log-backup trigger")
-
-                # Optional: refresh your daily/pinned stats embed which includes the Pre-KVK panel.
-                # Guarded so it never crashes this path if debug is enabled
-                try:
-                    from stats_alerts.interface import send_stats_update_embed
-
-                    ts = utcnow().strftime("%Y-%m-%d %H:%M UTC")
-
-                    # ✅ IMPORTANT: is_kvk=True to trigger Pre-KVK path (before Pass 4)
-                    await send_stats_update_embed(bot, ts, True, is_test=False)
-                except Exception:
-                    # Silent: embed refresh is a bonus; import success is what matters
-                    pass
-            else:
-                await send_embed(
-                    notify_ch,
-                    (
-                        "Pre-KVK Import (Skipped/Duplicate) ℹ️"
-                        if "Duplicate" in (note or "")
-                        else "Pre-KVK Import ❌"
-                    ),
-                    {
-                        "Filename": target.filename,
-                        "Channel": f"#{message.channel.name} ({message.channel.id})",
-                        "Uploader": f"{message.author} ({message.author.id})",
-                        "Info" if "Duplicate" in (note or "") else "Error": note or "Unknown",
-                    },
-                    0xF1C40F if "Duplicate" in (note or "") else 0xE74C3C,
-                )
-        except Exception as e:
-            await send_embed(
-                notify_ch,
-                "Pre-KVK Import ❌",
-                {
-                    "Error": f"{type(e).__name__}: {e}",
-                    "Filename": target.filename,
-                    "Channel": f"#{message.channel.name} ({message.channel.id})",
-                    "Uploader": f"{message.author} ({message.author.id})",
-                },
-                0xE74C3C,
-            )
-        finally:
-            return  # do not fall through to other pipelines
+    if await handle_prekvk_upload(
+        message,
+        PreKvkRouteDeps(
+            prekvk_channel_id=PREKVK_CHANNEL_ID,
+            bot=bot,
+            get_notify_channel=_get_notify_channel,
+            send_embed=send_embed,
+            ensure_sql_headroom_or_notify=ensure_sql_headroom_or_notify,
+            offload_callable=_offload_callable,
+            trigger_log_backup_background=trigger_log_backup_background,
+        ),
+    ):
+        return
 
     # === Fast-path: KVK Honour ingest (full snapshots, multiple/day) ===
     if message.channel.id == HONOR_CHANNEL_ID and message.attachments:

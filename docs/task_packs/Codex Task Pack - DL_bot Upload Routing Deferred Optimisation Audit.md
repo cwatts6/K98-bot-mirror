@@ -253,7 +253,8 @@ Player location route extraction and refresh signal helper	likely fix now	Remove
 KVK_ALL route extraction	likely defer to phase 4	Higher blast radius due to multi-attachment import and auto-export scheduling.
 Local DB test blockers	likely partial fix now	Needed only where it blocks validating the selected first slice.
 Subprocess worker blockers	likely defer or capability-gate	Should not widen first routing PR unless validation is blocked.
-SQL legacy PreKvK phase objects	defer	Separate SQL cleanup task.
+SQL legacy PreKvK phase objects	defer to Phase 2B	Separate SQL cleanup audit/design task; do not mix destructive SQL cleanup into the route-extraction PR.
+New PreKvK report/embed	defer to Phase 2C	Separate user-facing reporting task after the route boundary is stable.
 
 Final decisions must be updated after Step 1 audit.
 
@@ -271,24 +272,47 @@ Phase breakdown:
    - Move location refresh signalling out of `commands/location_cmds.py` into a shared service.
    - Preserve current Discord output, SQL preflight, `load_staging_and_replace`, profile-cache
      warm, background log backup scheduling, and handled/fall-through behaviour.
-2. **Phase 2 - PreKvK upload route**
+2. **Phase 2A - PreKvK upload route extraction**
    - Extract filename detection, current-KVK lookup, offload dispatch, result rendering, duplicate
      handling, and stats-embed refresh behind the same route contract.
-3. **Phase 3 - Local validation blockers**
+   - Preserve the existing Discord output and importer metadata contract except for the approved
+     duplicate-skip side-effect change: duplicate skips should send the skipped embed but should
+     not schedule a background log backup or refresh the stats embed.
+   - Keep SQL schema cleanup and new PreKvK report/embed work out of this PR.
+3. **Phase 2B - PreKvK SQL cleanup audit and design**
+   - Audit dependencies on legacy SQL phase objects before proposing any SQL cleanup:
+     `dbo.PreKvk_Phases`, `dbo.fn_PreKvkPhaseDelta`, and KVK-specific PreKvK phase views.
+   - Validate production SQL/report/manual workflow dependencies in `C:\K98-bot-SQL-Server`.
+   - Stop for approval before any SQL object replacement, retirement, or destructive cleanup.
+4. **Phase 2C - New PreKvK report/embed**
+   - Design and implement a dedicated PreKvK report/embed after the route extraction is stable.
+   - Reuse the direct-stage PreKvK data path where possible and avoid changing upload routing
+     behaviour in the reporting PR.
+   - Define command/channel surface, permissions, limits, empty-data behaviour, and mobile-safe
+     Discord output before implementation.
+5. **Phase 3 - Local validation blockers**
    - Fix or capability-gate DB/non-DB local validation blockers that affect confidence in the
      routing work.
-4. **Phase 4 - KVK_ALL upload route**
+6. **Phase 4 - KVK_ALL upload route**
    - Extract the higher-risk multi-attachment KVK_ALL route after smaller routes prove the pattern.
    - Preserve structured importer failures, health output, link button, and auto-export scheduling.
-5. **Phase 5 - Remaining upload fast-path consolidation**
+7. **Phase 5 - Remaining upload fast-path consolidation**
    - Consolidate MGE, honor, weekly activity, rally, inventory, fallback queueing, shared
      SQL-preflight/offload handling, shared import embed rendering, and route-level structured
      logging into the general upload-routing layer.
-6. **Phase 6 - Startup/lifecycle separation**
+8. **Phase 6 - Startup/lifecycle separation**
    - Audit and optimise `DL_bot.py` lifecycle/startup responsibilities alongside a full
      `bot_instance.py` review.
    - Define the target ownership model for bot construction, startup checks, lifecycle wiring,
      singleton/runtime concerns, and event registration separately from upload-route behaviour.
+
+Phase 2A delivery notes:
+
+- PreKvK upload routing is extracted into the `upload_routes` pattern with `DL_bot.py` retaining
+  listener/delegation responsibility.
+- Duplicate skips intentionally preserve the skipped embed but do not schedule background log
+  backup or stats-embed refresh.
+- Phase 2B SQL cleanup and Phase 2C report/embed work remain separate approval-gated follow-ons.
 
 14. Testing Requirements
 
