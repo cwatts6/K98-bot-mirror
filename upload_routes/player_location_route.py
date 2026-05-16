@@ -111,5 +111,4 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             0xE74C3C,
             mention=None,
         )
-    finally:
-        return True
+    return True

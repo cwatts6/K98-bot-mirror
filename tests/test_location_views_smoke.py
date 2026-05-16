@@ -62,6 +62,7 @@ def test_location_views_instantiate_and_build_options():
 
         async def _guard(coro):
             await coro()
+            return True
 
         async def _timeout(_interaction):
             return None
@@ -91,5 +92,57 @@ def test_location_views_instantiate_and_build_options():
 
         v2 = lv.RefreshLocationView(target_id=123456, ephemeral=True)
         assert len(v2.children) == 1
+
+    asyncio.run(_run())
+
+
+def test_refresh_location_view_reports_rejected_guard():
+    lv = importlib.import_module("ui.views.location_views")
+
+    async def _run():
+        followups = []
+
+        async def _on_profile(_interaction, _gid, _ephemeral):
+            return None
+
+        async def _request_refresh(_interaction):
+            raise AssertionError("refresh request should not run when guard rejects")
+
+        async def _wait(_timeout):
+            raise AssertionError("wait should not run when guard rejects")
+
+        async def _guard(_coro):
+            return False
+
+        async def _timeout(_interaction):
+            raise AssertionError("timeout should not run when guard rejects")
+
+        class _RecordingFollow:
+            async def send(self, *args, **kwargs):
+                followups.append((args, kwargs))
+
+        interaction = _DummyInteraction()
+        interaction.followup = _RecordingFollow()
+
+        lv.configure_location_views(
+            on_profile_selected=_on_profile,
+            on_request_refresh=_request_refresh,
+            on_wait_for_refresh=_wait,
+            build_refreshed_location_embed=_embed_for,
+            check_refresh_permission=lambda _i: True,
+            is_refresh_running=lambda: False,
+            is_refresh_rate_limited=lambda: (False, 0),
+            mark_refresh_started=lambda: None,
+            run_refresh_guarded=_guard,
+            on_refresh_timeout=_timeout,
+        )
+
+        view = lv.RefreshLocationView(target_id=123456, ephemeral=True)
+        await view._on_refresh(interaction)
+
+        assert followups
+        args, kwargs = followups[-1]
+        assert "refresh is already running" in args[0]
+        assert kwargs["ephemeral"] is True
 
     asyncio.run(_run())
