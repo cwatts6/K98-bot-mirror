@@ -1,7 +1,6 @@
 # commands/location_cmds.py
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime
 import logging
 
@@ -25,6 +24,14 @@ from services.location_import_service import (
     import_location_csv_bytes,
     validate_location_csv_attachment,
 )
+from services.location_refresh_signal import (
+    is_location_refresh_rate_limited,
+    is_location_refresh_running,
+    mark_location_refresh_started,
+    run_location_refresh_guarded,
+    signal_location_refresh_complete,
+    wait_for_location_refresh,
+)
 from services.profile_lookup_service import resolve_profile_lookup
 from target_utils import autocomplete_governor_names
 from ui.views.location_views import (
@@ -37,19 +44,6 @@ from versioning import versioned
 logger = logging.getLogger(__name__)
 UTC = UTC
 ALLOWED_CHANNEL_IDS = {int(cid) for cid in (NOTIFY_CHANNEL_ID, LEADERSHIP_CHANNEL_ID) if cid}
-
-# --- Location refresh coordination (global, in-process) ---
-_location_refresh_lock = asyncio.Lock()
-_location_refresh_event = asyncio.Event()
-_last_location_refresh_utc: datetime | None = None
-
-
-def signal_location_refresh_complete() -> None:
-    """Called by the CSV import flow when the location cache has been updated."""
-    try:
-        _location_refresh_event.set()
-    except Exception:
-        logger.exception("Failed to signal location refresh completion")
 
 
 async def _send_find_all_to_location_channel(
@@ -71,38 +65,6 @@ async def _send_find_all_to_location_channel(
 def _check_location_refresh_permission(interaction: discord.Interaction) -> bool:
     member = interaction.guild.get_member(interaction.user.id) if interaction.guild else None
     return bool(_is_admin(interaction.user) or _has_leadership_role(member))
-
-
-def _is_location_refresh_running() -> bool:
-    return _location_refresh_lock.locked()
-
-
-def _is_location_refresh_rate_limited() -> tuple[bool, int]:
-    if not _last_location_refresh_utc:
-        return False, 0
-    now = datetime.now(UTC)
-    delta = (now - _last_location_refresh_utc).total_seconds()
-    remain = 3600 - int(delta)
-    return (remain > 0), max(0, remain)
-
-
-def _mark_location_refresh_started() -> None:
-    global _last_location_refresh_utc
-    _last_location_refresh_utc = datetime.now(UTC)
-    _location_refresh_event.clear()
-
-
-async def _wait_for_location_refresh(timeout_seconds: float) -> bool:
-    try:
-        await asyncio.wait_for(_location_refresh_event.wait(), timeout=timeout_seconds)
-        return True
-    except TimeoutError:
-        return False
-
-
-async def _run_location_refresh_guarded(coro):
-    async with _location_refresh_lock:
-        await coro()
 
 
 async def _notify_location_refresh_timeout(
@@ -206,15 +168,15 @@ def register_location(bot: ext_commands.Bot) -> None:
         on_request_refresh=lambda interaction: _send_find_all_to_location_channel(
             bot, interaction=interaction
         ),
-        on_wait_for_refresh=_wait_for_location_refresh,
+        on_wait_for_refresh=wait_for_location_refresh,
         build_refreshed_location_embed=lambda target_id: _build_location_embed_for_target(
             target_id, refreshed=True
         ),
         check_refresh_permission=_check_location_refresh_permission,
-        is_refresh_running=_is_location_refresh_running,
-        is_refresh_rate_limited=_is_location_refresh_rate_limited,
-        mark_refresh_started=_mark_location_refresh_started,
-        run_refresh_guarded=_run_location_refresh_guarded,
+        is_refresh_running=is_location_refresh_running,
+        is_refresh_rate_limited=is_location_refresh_rate_limited,
+        mark_refresh_started=mark_location_refresh_started,
+        run_refresh_guarded=run_location_refresh_guarded,
         on_refresh_timeout=lambda interaction: _notify_location_refresh_timeout(bot, interaction),
     )
 

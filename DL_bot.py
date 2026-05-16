@@ -134,9 +134,12 @@ from Commands import register_commands
 from embed_utils import send_embed
 from honor_importer import ingest_honor_snapshot, parse_honor_xlsx
 from kvk_all_importer import _auto_export_kvk, ingest_kvk_all_excel
-from location_importer import load_staging_and_replace, parse_output_csv
 from log_health import LogHeadroomError, preflight_from_env_sync
 from prekvk_importer import import_prekvk_bytes
+from upload_routes.player_location_route import (
+    PlayerLocationRouteDeps,
+    handle_player_location_upload,
+)
 from utils import live_queue, update_live_queue_embed, utcnow
 from weekly_activity_importer import ingest_weekly_activity_excel
 
@@ -583,101 +586,18 @@ async def on_message(message: discord.Message):
             return
 
     # === Fast-path: Player Location CSV auto-import ===
-    if message.channel.id == PLAYER_LOCATION_CHANNEL_ID and message.attachments:
-        target = next(
-            (a for a in message.attachments if a.filename.lower() == "scan_1198.csv"), None
-        )
-        if target:
-            # Resolve target channel first so it's always defined
-            target_ch = message.channel
-            try:
-                notify_ch = await _get_notify_channel()
-                if notify_ch:
-                    target_ch = notify_ch
-            except Exception:
-                # keep fallback to message.channel
-                pass
-
-            try:
-                csv_bytes = await target.read()
-                rows = parse_output_csv(csv_bytes)
-
-                if not rows:
-                    await send_embed(
-                        target_ch,
-                        "Player Location Import",
-                        {
-                            "Status": "No valid rows found in CSV.",
-                            "Source Channel": f"#{message.channel.name} ({message.channel.id})",
-                            "Uploaded By": f"{message.author} ({message.author.id})",
-                        },
-                        0xE74C3C,
-                    )
-                    return
-
-                # NEW: preflight check before heavy DB work
-                ok = await ensure_sql_headroom_or_notify(target_ch)
-                if not ok:
-                    return
-
-                # Run blocking DB work off the event loop via offload helper
-                staging_rows, total_tracked = await _offload_callable(
-                    load_staging_and_replace,
-                    rows,
-                    name="load_staging_and_replace",
-                    prefer_process=True,
-                )
-
-                await send_embed(
-                    target_ch,
-                    "Player Location Import ✅",
-                    {
-                        "Imported Rows": str(staging_rows),
-                        "Total Tracked": str(total_tracked),
-                        "Source Channel": f"#{message.channel.name} ({message.channel.id})",
-                        "Uploaded By": f"{message.author} ({message.author.id})",
-                    },
-                    0x2ECC71,
-                )
-
-                # schedule a background log-backup trigger (best-effort)
-                try:
-                    asyncio.create_task(trigger_log_backup_background())
-                except Exception:
-                    logger.exception("Failed to schedule background log-backup trigger")
-
-                # 1) Ensure the profile cache reflects the newly merged data
-                try:
-                    from profile_cache import warm_cache as warm_profile_cache
-
-                    warm_profile_cache()
-                except Exception:
-                    pass
-
-                # 2) Signal any waiting tasks that the refresh is complete
-                try:
-                    from commands.location_cmds import (
-                        signal_location_refresh_complete,  # import where the globals live
-                    )
-
-                    signal_location_refresh_complete()
-                except Exception:
-                    pass
-
-            except Exception as e:
-                await send_embed(
-                    target_ch,
-                    "Player Location Import ❌",
-                    {
-                        "Error": f"{type(e).__name__}: {e}",
-                        "Source Channel": f"#{message.channel.name} ({message.channel.id})",
-                        "Uploaded By": f"{message.author} ({message.author.id})",
-                    },
-                    0xE74C3C,
-                    mention=None,
-                )
-            finally:
-                return  # don't enqueue into the heavy pipeline
+    if await handle_player_location_upload(
+        message,
+        PlayerLocationRouteDeps(
+            player_location_channel_id=PLAYER_LOCATION_CHANNEL_ID,
+            get_notify_channel=_get_notify_channel,
+            send_embed=send_embed,
+            ensure_sql_headroom_or_notify=ensure_sql_headroom_or_notify,
+            offload_callable=_offload_callable,
+            trigger_log_backup_background=trigger_log_backup_background,
+        ),
+    ):
+        return
 
     # === Fast-path: MGE results auto-import ===
     if message.channel.id == MGE_DATA_CHANNEL_ID and message.attachments:

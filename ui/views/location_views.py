@@ -33,6 +33,11 @@ class ProfileLinksView(discord.ui.View):
             )
 
 
+async def _default_run_refresh_guarded(coro: Callable[[], Awaitable[None]]) -> bool:
+    await coro()
+    return True
+
+
 # injected hooks from Commands.py
 _on_profile_selected: Callable[[discord.Interaction, int, bool], Awaitable[None]] = (
     lambda *_a, **_k: None
@@ -48,8 +53,8 @@ _check_refresh_permission: Callable[[discord.Interaction], bool] = lambda *_a, *
 _is_refresh_running: Callable[[], bool] = lambda: False
 _is_refresh_rate_limited: Callable[[], tuple[bool, int]] = lambda: (False, 0)
 _mark_refresh_started: Callable[[], None] = lambda: None
-_run_refresh_guarded: Callable[[Callable[[], Awaitable[None]]], Awaitable[None]] = (
-    lambda coro: coro()
+_run_refresh_guarded: Callable[[Callable[[], Awaitable[None]]], Awaitable[bool]] = (
+    _default_run_refresh_guarded
 )
 _on_refresh_timeout: Callable[[discord.Interaction], Awaitable[None]] = lambda *_a, **_k: None
 
@@ -64,7 +69,7 @@ def configure_location_views(
     is_refresh_running: Callable[[], bool],
     is_refresh_rate_limited: Callable[[], tuple[bool, int]],
     mark_refresh_started: Callable[[], None],
-    run_refresh_guarded: Callable[[Callable[[], Awaitable[None]]], Awaitable[None]],
+    run_refresh_guarded: Callable[[Callable[[], Awaitable[None]]], Awaitable[bool]],
     on_refresh_timeout: Callable[[discord.Interaction], Awaitable[None]],
 ) -> None:
     global _on_profile_selected
@@ -239,7 +244,12 @@ class RefreshLocationView(discord.ui.View):
             except (NotFound, HTTPException):
                 await interaction.followup.send(embed=embed, ephemeral=self.ephemeral)
 
-        await _run_refresh_guarded(_do_refresh)
+        ran = await _run_refresh_guarded(_do_refresh)
+        if not ran:
+            await interaction.followup.send(
+                "⏳ A refresh is already running or was just started. Please try again later.",
+                ephemeral=True,
+            )
 
 
 __all__ = [
