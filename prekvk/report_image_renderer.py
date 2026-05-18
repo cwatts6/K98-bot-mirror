@@ -23,6 +23,93 @@ GOLD = (250, 204, 21)
 BLUE = (96, 165, 250)
 
 
+def _is_variation_selector(codepoint: int) -> bool:
+    return 0xFE00 <= codepoint <= 0xFE0F
+
+
+def _is_emoji_modifier(codepoint: int) -> bool:
+    return 0x1F3FB <= codepoint <= 0x1F3FF
+
+
+def _is_regional_indicator(codepoint: int) -> bool:
+    return 0x1F1E6 <= codepoint <= 0x1F1FF
+
+
+def _is_tag_char(codepoint: int) -> bool:
+    return 0xE0020 <= codepoint <= 0xE007F
+
+
+def _is_combining_or_modifier(ch: str) -> bool:
+    codepoint = ord(ch)
+    return (
+        unicodedata.combining(ch) > 0
+        or _is_variation_selector(codepoint)
+        or _is_emoji_modifier(codepoint)
+        or _is_tag_char(codepoint)
+        or codepoint == 0x20E3
+    )
+
+
+def _text_clusters(text: str) -> list[str]:
+    clusters: list[str] = []
+    idx = 0
+    while idx < len(text):
+        cluster = text[idx]
+        idx += 1
+
+        if _is_regional_indicator(ord(cluster)):
+            if idx < len(text) and _is_regional_indicator(ord(text[idx])):
+                cluster += text[idx]
+                idx += 1
+            clusters.append(cluster)
+            continue
+
+        while idx < len(text):
+            ch = text[idx]
+            codepoint = ord(ch)
+            if _is_combining_or_modifier(ch):
+                cluster += ch
+                idx += 1
+                continue
+            if codepoint == 0x200D and idx + 1 < len(text):
+                cluster += ch + text[idx + 1]
+                idx += 2
+                continue
+            break
+
+        clusters.append(cluster)
+    return clusters
+
+
+def _font_candidates_for_char(ch: str, *, bold: bool = False) -> list[str]:
+    return _font_candidates_for_text(ch, bold=bold)
+
+
+def _font_candidates_for_text(text: str, *, bold: bool = False) -> list[str]:
+    codepoints = [ord(ch) for ch in text]
+    if (
+        any(0x1F000 <= codepoint <= 0x1FAFF for codepoint in codepoints)
+        or any(0x2600 <= codepoint <= 0x27BF for codepoint in codepoints)
+        or any(unicodedata.category(ch) in {"So", "Sk"} for ch in text)
+    ):
+        return [
+            "C:/Windows/Fonts/seguiemj.ttf",
+            "C:/Windows/Fonts/seguisym.ttf",
+        ]
+    if (
+        any(0x3000 <= codepoint <= 0x30FF for codepoint in codepoints)
+        or any(0x3400 <= codepoint <= 0x9FFF for codepoint in codepoints)
+        or any(0xAC00 <= codepoint <= 0xD7AF for codepoint in codepoints)
+    ):
+        return [
+            "C:/Windows/Fonts/YuGothB.ttc" if bold else "C:/Windows/Fonts/YuGothM.ttc",
+            "C:/Windows/Fonts/msgothic.ttc",
+            "C:/Windows/Fonts/simsun.ttc",
+            "C:/Windows/Fonts/malgunbd.ttf" if bold else "C:/Windows/Fonts/malgun.ttf",
+        ]
+    return []
+
+
 @lru_cache(maxsize=32)
 def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
     candidates = [
@@ -35,6 +122,21 @@ def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
         except Exception:
             continue
     return ImageFont.load_default()
+
+
+@lru_cache(maxsize=512)
+def _font_for_char(ch: str, size: int, *, bold: bool = False) -> ImageFont.ImageFont:
+    return _font_for_text(ch, size, bold=bold)
+
+
+@lru_cache(maxsize=512)
+def _font_for_text(text: str, size: int, *, bold: bool = False) -> ImageFont.ImageFont:
+    for candidate in _font_candidates_for_text(text, bold=bold):
+        try:
+            return ImageFont.truetype(candidate, size=size)
+        except Exception:
+            continue
+    return _font(size, bold=bold)
 
 
 def _compact(value: int | None) -> str:
@@ -56,6 +158,34 @@ def _clean_text(value: str, max_chars: int) -> str:
     return cleaned if len(cleaned) <= max_chars else cleaned[: max_chars - 1].rstrip() + "."
 
 
+def _text_width(
+    draw: ImageDraw.ImageDraw, text: str, *, font: ImageFont.ImageFont, bold: bool = False
+) -> int:
+    width = 0
+    for cluster in _text_clusters(text):
+        cluster_font = _font_for_text(cluster, getattr(font, "size", 20), bold=bold)
+        box = draw.textbbox((0, 0), cluster, font=cluster_font)
+        width += int(box[2] - box[0])
+    return width
+
+
+def _draw_text(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[int, int],
+    text: str,
+    *,
+    font: ImageFont.ImageFont,
+    fill: tuple[int, int, int],
+    bold: bool = False,
+) -> None:
+    x, y = xy
+    for cluster in _text_clusters(text):
+        cluster_font = _font_for_text(cluster, getattr(font, "size", 20), bold=bold)
+        draw.text((x, y), cluster, fill=fill, font=cluster_font)
+        box = draw.textbbox((0, 0), cluster, font=cluster_font)
+        x += int(box[2] - box[0])
+
+
 def _cell(
     draw: ImageDraw.ImageDraw,
     xy: tuple[int, int],
@@ -65,16 +195,15 @@ def _cell(
     align: str = "left",
     font: ImageFont.ImageFont | None = None,
     fill: tuple[int, int, int] = TEXT,
+    bold: bool = False,
 ) -> None:
     font = font or _font(20)
     x, y = xy
     if align == "right":
-        box = draw.textbbox((0, 0), text, font=font)
-        x = x + width - int(box[2] - box[0])
+        x = x + width - _text_width(draw, text, font=font, bold=bold)
     elif align == "center":
-        box = draw.textbbox((0, 0), text, font=font)
-        x = x + max(0, (width - int(box[2] - box[0])) // 2)
-    draw.text((x, y), text, fill=fill, font=font)
+        x = x + max(0, (width - _text_width(draw, text, font=font, bold=bold)) // 2)
+    _draw_text(draw, (x, y), text, fill=fill, font=font, bold=bold)
 
 
 def render_prekvk_report(payload: PreKvkReportPayload) -> RenderedPreKvkReportImage | None:
@@ -112,7 +241,16 @@ def render_prekvk_report(payload: PreKvkReportPayload) -> RenderedPreKvkReportIm
     y = HEADER_H
     draw.rounded_rectangle((48, y, WIDTH - 48, y + ROW_H), radius=8, fill=HEADER)
     for title, x, w, align in cols:
-        _cell(draw, (x, y + 8), title, width=w, align=align, font=_font(18, bold=True), fill=TEXT)
+        _cell(
+            draw,
+            (x, y + 8),
+            title,
+            width=w,
+            align=align,
+            font=_font(18, bold=True),
+            fill=TEXT,
+            bold=True,
+        )
 
     for idx, row in enumerate(payload.rows):
         y = HEADER_H + ROW_H * (idx + 1)
