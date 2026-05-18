@@ -34,3 +34,27 @@ def test_unwrap_targets_result_accepts_worker_parsed_tuple():
     target = {"GovernorID": "2441482", "TargetState": "ACTIVE"}
 
     assert target_utils._unwrap_targets_result((target, {"status": "success"})) == target
+
+
+def test_unwrap_targets_result_raises_for_failed_maintenance_tuple():
+    with pytest.raises(RuntimeError, match="Target maintenance failed"):
+        target_utils._unwrap_targets_result((False, "database unavailable"))
+
+
+@pytest.mark.asyncio
+async def test_run_target_lookup_reports_error_for_failed_maintenance(monkeypatch):
+    async def fake_run_maintenance_with_isolation(*_args, **_kwargs):
+        return False, "database unavailable"
+
+    monkeypatch.setattr(
+        file_utils,
+        "run_maintenance_with_isolation",
+        fake_run_maintenance_with_isolation,
+        raising=True,
+    )
+
+    res = await target_utils.run_target_lookup("2441482")
+
+    assert res is not None
+    assert res["status"] == "error"
+    assert res["message"] == "Internal error retrieving targets by ID"

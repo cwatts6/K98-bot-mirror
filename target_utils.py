@@ -259,9 +259,13 @@ def _unwrap_targets_result(result: Any) -> dict[str, Any] | None:
 
     first, second = result[0], result[1]
     if isinstance(first, bool):
-        return second if first and isinstance(second, dict) else None
+        if not first:
+            raise RuntimeError(f"Target maintenance failed: {second}")
+        return second if isinstance(second, dict) else None
     if isinstance(second, bool):
-        return first if second and isinstance(first, dict) else None
+        if not second:
+            raise RuntimeError(f"Target maintenance failed: {first}")
+        return first if isinstance(first, dict) else None
     if isinstance(first, dict):
         return first
     if isinstance(second, dict) and isinstance(second.get("result"), dict):
