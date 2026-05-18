@@ -251,6 +251,24 @@ def get_name_cache_rows() -> list[dict[str, Any]]:
     return [dict(row) for row in rows if isinstance(row, dict)]
 
 
+def _unwrap_targets_result(result: Any) -> dict[str, Any] | None:
+    if isinstance(result, dict):
+        return result
+    if not isinstance(result, tuple) or len(result) < 2:
+        return None
+
+    first, second = result[0], result[1]
+    if isinstance(first, bool):
+        return second if first and isinstance(second, dict) else None
+    if isinstance(second, bool):
+        return first if second and isinstance(first, dict) else None
+    if isinstance(first, dict):
+        return first
+    if isinstance(second, dict) and isinstance(second.get("result"), dict):
+        return second["result"]
+    return None
+
+
 # ---------------- Targets: EXEMPT/NOT ACTIVE fallback (still via SQL) ----------------
 
 
@@ -623,17 +641,14 @@ async def run_target_lookup(*args, **kwargs) -> dict[str, Any] | None:
                     run_blocking_in_thread = None
 
                 if run_maintenance_with_isolation is not None:
-                    res = await run_maintenance_with_isolation(
-                        get_targets_for_governor,
-                        gid,
-                        name="get_targets_for_governor",
-                        prefer_process=True,
-                        meta={"governor_id": gid},
-                    )
-                    targets = (
-                        res[0]
-                        if isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], dict)
-                        else res
+                    targets = _unwrap_targets_result(
+                        await run_maintenance_with_isolation(
+                            get_targets_for_governor,
+                            gid,
+                            name="get_targets_for_governor",
+                            prefer_process=True,
+                            meta={"governor_id": gid},
+                        )
                     )
                 elif run_blocking_in_thread is not None:
                     targets = await run_blocking_in_thread(
@@ -758,17 +773,14 @@ async def run_target_lookup(*args, **kwargs) -> dict[str, Any] | None:
                     run_blocking_in_thread = None
 
                 if run_maintenance_with_isolation is not None:
-                    res = await run_maintenance_with_isolation(
-                        get_targets_for_governor,
-                        gid,
-                        name="get_targets_for_governor",
-                        prefer_process=True,
-                        meta={"governor_id": gid},
-                    )
-                    targets = (
-                        res[0]
-                        if isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], dict)
-                        else res
+                    targets = _unwrap_targets_result(
+                        await run_maintenance_with_isolation(
+                            get_targets_for_governor,
+                            gid,
+                            name="get_targets_for_governor",
+                            prefer_process=True,
+                            meta={"governor_id": gid},
+                        )
                     )
                 elif run_blocking_in_thread is not None:
                     targets = await run_blocking_in_thread(
