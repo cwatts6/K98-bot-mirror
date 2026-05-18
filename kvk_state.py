@@ -5,8 +5,7 @@ import datetime as dt
 import logging
 from typing import Literal, TypedDict
 
-from constants import _conn
-from file_utils import fetch_one_dict
+from file_utils import fetch_one_dict, get_conn_with_retries
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +41,15 @@ class KVKDetails(TypedDict):
     max_scan_order: int | None
     state: State
     state_reason: str
+
+
+class KVKWindow(TypedDict):
+    kvk_no: int
+    matchmaking_scan: int | None
+    kvk_end_scan: int | None
+    pass4_start_scan: int | None
+    max_scan_order: int | None
+    source: str
 
 
 def _as_date(v) -> dt.date | None:
@@ -104,7 +112,7 @@ def resolve_kvk_scan_state(
 
 def _get_max_scan_order() -> int | None:
     try:
-        with _conn() as conn, conn.cursor() as cur:
+        with get_conn_with_retries() as conn, conn.cursor() as cur:
             cur.execute(
                 "SELECT MAX(ScanOrder) AS MaxScanOrder FROM ROK_TRACKER.dbo.kingdomscandata4"
             )
@@ -120,7 +128,7 @@ def _get_max_scan_order() -> int | None:
 def get_latest_kvk_details(today: dt.date | None = None) -> KVKDetails | None:
     today = today or dt.date.today()
     try:
-        with _conn() as conn, conn.cursor() as cur:
+        with get_conn_with_retries() as conn, conn.cursor() as cur:
             cur.execute("""
                 SELECT TOP 1
                     KVK_NO,
@@ -210,6 +218,87 @@ def get_latest_kvk_details(today: dt.date | None = None) -> KVKDetails | None:
         state=state,
         state_reason=reason,
     )
+
+
+def _is_valid_kvk_window(matchmaking_scan: int | None, kvk_end_scan: int | None) -> bool:
+    if not isinstance(matchmaking_scan, int) or matchmaking_scan <= 0:
+        return False
+    if kvk_end_scan is None:
+        return True
+    return isinstance(kvk_end_scan, int) and kvk_end_scan > 0 and kvk_end_scan >= matchmaking_scan
+
+
+def _get_proc_config_window(max_scan_order: int | None) -> KVKWindow | None:
+    try:
+        with get_conn_with_retries() as conn, conn.cursor() as cur:
+            cur.execute("""
+                SELECT MAX(TRY_CAST(ConfigValue AS int)) AS CurrentKVK
+                FROM dbo.ProcConfig
+                WHERE ConfigKey = 'CURRENTKVK3'
+            """)
+            row = fetch_one_dict(cur)
+            current_kvk = _as_int(row.get("CurrentKVK")) if row else None
+            if not current_kvk:
+                log.warning("[kvk_state] No CURRENTKVK3 found in ProcConfig.")
+                return None
+
+            cur.execute(
+                """
+                SELECT ConfigKey, ConfigValue
+                FROM dbo.ProcConfig
+                WHERE KVKVersion = ? AND ConfigKey IN ('MATCHMAKING_SCAN', 'KVK_END_SCAN')
+                """,
+                (current_kvk,),
+            )
+            kv_map = {x.ConfigKey: x.ConfigValue for x in cur.fetchall()}
+
+        matchmaking_scan = _as_int(kv_map.get("MATCHMAKING_SCAN"))
+        kvk_end_scan = _as_int(kv_map.get("KVK_END_SCAN"))
+        if not _is_valid_kvk_window(matchmaking_scan, kvk_end_scan):
+            log.warning(
+                "[kvk_state] Invalid ProcConfig KVK window. kvk_no=%s matchmaking_scan=%r kvk_end_scan=%r",
+                current_kvk,
+                matchmaking_scan,
+                kvk_end_scan,
+            )
+            return None
+        return KVKWindow(
+            kvk_no=current_kvk,
+            matchmaking_scan=matchmaking_scan,
+            kvk_end_scan=kvk_end_scan,
+            pass4_start_scan=None,
+            max_scan_order=max_scan_order,
+            source="ProcConfig",
+        )
+    except Exception as e:
+        log.warning("[kvk_state] Could not read ProcConfig KVK window: %s", e)
+        return None
+
+
+def get_kvk_window_with_fallback() -> KVKWindow | None:
+    details = get_latest_kvk_details()
+    max_scan_order = details["max_scan_order"] if details else _get_max_scan_order()
+    if details and _is_valid_kvk_window(details["matchmaking_scan"], details["kvk_end_scan"]):
+        return KVKWindow(
+            kvk_no=details["kvk_no"],
+            matchmaking_scan=details["matchmaking_scan"],
+            kvk_end_scan=details["kvk_end_scan"],
+            pass4_start_scan=details["pass4_start_scan"],
+            max_scan_order=max_scan_order,
+            source="KVK_Details",
+        )
+
+    fallback = _get_proc_config_window(max_scan_order)
+    if fallback:
+        log.info(
+            "[kvk_state] Using ProcConfig KVK window fallback. kvk_no=%s matchmaking_scan=%r "
+            "kvk_end_scan=%r max_scan_order=%r",
+            fallback["kvk_no"],
+            fallback["matchmaking_scan"],
+            fallback["kvk_end_scan"],
+            fallback["max_scan_order"],
+        )
+    return fallback
 
 
 def get_kvk_context_today(today: dt.date | None = None) -> KVKContext | None:

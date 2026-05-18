@@ -9,7 +9,12 @@ from constants import (
     KVK_SHEET_ID,
 )
 import gsheet_module as gm
-from kvk_state import get_kvk_context_today, get_latest_kvk_details, is_scan_within_open_window
+from kvk_state import (
+    get_kvk_context_today,
+    get_kvk_window_with_fallback,
+    get_latest_kvk_details,
+    is_scan_within_open_window,
+)
 
 # Fixed import: parse_mixed_dates exists as that name in formatters.py
 from stats_alerts.formatters import parse_mixed_dates as _parse_mixed_dates
@@ -82,14 +87,14 @@ def get_latest_kvk_metadata() -> dict[str, Any] | None:
 
 def get_kvk_window_from_sql() -> dict[str, int | None] | None:
     try:
-        details = get_latest_kvk_details()
-        if not details:
+        window = get_kvk_window_with_fallback()
+        if not window:
             return None
         return {
-            "kvk_no": details["kvk_no"],
-            "matchmaking_scan": details["matchmaking_scan"],
-            "kvk_end_scan": details["kvk_end_scan"],
-            "pass4_start_scan": details["pass4_start_scan"],
+            "kvk_no": window["kvk_no"],
+            "matchmaking_scan": window["matchmaking_scan"],
+            "kvk_end_scan": window["kvk_end_scan"],
+            "pass4_start_scan": window["pass4_start_scan"],
         }
     except Exception:
         logger.exception("[KVK SQL] Failed to read KVK window")
@@ -98,13 +103,13 @@ def get_kvk_window_from_sql() -> dict[str, int | None] | None:
 
 def is_currently_kvk(*_args: Any, **_kwargs: Any) -> bool:
     try:
-        ctx = get_kvk_context_today()
-        if not ctx:
+        window = get_kvk_window_with_fallback()
+        if not window:
             return False
         return is_scan_within_open_window(
-            ctx.get("matchmaking_scan"),
-            ctx.get("kvk_end_scan"),
-            ctx.get("max_scan_order"),
+            window.get("matchmaking_scan"),
+            window.get("kvk_end_scan"),
+            window.get("max_scan_order"),
         )
     except Exception:
         logger.exception("[KVK CHECK] Unexpected failure in KVK detection logic")
