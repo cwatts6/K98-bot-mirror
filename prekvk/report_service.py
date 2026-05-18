@@ -1,0 +1,171 @@
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+from prekvk.dal import report_dal
+from prekvk.models import (
+    PREKVK_REPORT_LIMITS,
+    PreKvkReportPayload,
+    PreKvkReportRow,
+    PreKvkReportSort,
+)
+
+SORT_LABELS = {
+    PreKvkReportSort.OVERALL: "Overall",
+    PreKvkReportSort.STAGE1: "Stage 1",
+    PreKvkReportSort.STAGE2: "Stage 2",
+    PreKvkReportSort.STAGE3: "Stage 3",
+}
+
+
+def parse_report_sort(value: str | None) -> PreKvkReportSort:
+    normalized = (value or PreKvkReportSort.OVERALL.value).strip().lower().replace(" ", "")
+    aliases = {
+        "overall": PreKvkReportSort.OVERALL,
+        "total": PreKvkReportSort.OVERALL,
+        "stage1": PreKvkReportSort.STAGE1,
+        "stagei": PreKvkReportSort.STAGE1,
+        "p1": PreKvkReportSort.STAGE1,
+        "stage2": PreKvkReportSort.STAGE2,
+        "stageii": PreKvkReportSort.STAGE2,
+        "p2": PreKvkReportSort.STAGE2,
+        "stage3": PreKvkReportSort.STAGE3,
+        "stageiii": PreKvkReportSort.STAGE3,
+        "p3": PreKvkReportSort.STAGE3,
+    }
+    try:
+        return aliases[normalized]
+    except KeyError as exc:
+        raise ValueError("Sort must be Overall, Stage 1, Stage 2, or Stage 3.") from exc
+
+
+def normalize_report_limit(value: int | None) -> int:
+    try:
+        requested = int(value or PREKVK_REPORT_LIMITS[0])
+    except Exception:
+        requested = PREKVK_REPORT_LIMITS[0]
+    return requested if requested in PREKVK_REPORT_LIMITS else PREKVK_REPORT_LIMITS[0]
+
+
+def _to_int_or_none(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(float(value))
+    except Exception:
+        return None
+
+
+def _sort_value(row: PreKvkReportRow, sort_by: PreKvkReportSort) -> int:
+    if sort_by == PreKvkReportSort.STAGE1:
+        return int(row.stage1_points or 0)
+    if sort_by == PreKvkReportSort.STAGE2:
+        return int(row.stage2_points or 0)
+    if sort_by == PreKvkReportSort.STAGE3:
+        return int(row.stage3_points or 0)
+    return int(row.overall_points or 0)
+
+
+def _rank_rows(rows: list[PreKvkReportRow], sort_by: PreKvkReportSort) -> list[PreKvkReportRow]:
+    sorted_rows = sorted(
+        rows,
+        key=lambda row: (-_sort_value(row, sort_by), -(row.power or 0), row.governor_id),
+    )
+    ranked: list[PreKvkReportRow] = []
+    previous_value: int | None = None
+    current_rank = 0
+    for index, row in enumerate(sorted_rows, start=1):
+        value = _sort_value(row, sort_by)
+        if previous_value is None or value != previous_value:
+            current_rank = index
+            previous_value = value
+        ranked.append(
+            PreKvkReportRow(
+                rank=current_rank,
+                governor_id=row.governor_id,
+                governor_name=row.governor_name,
+                power=row.power,
+                stage1_points=row.stage1_points,
+                stage2_points=row.stage2_points,
+                stage3_points=row.stage3_points,
+                overall_points=row.overall_points,
+            )
+        )
+    return ranked
+
+
+def build_report_payload_from_rows(
+    kvk_no: int,
+    raw_rows: list[dict[str, Any]],
+    *,
+    sort_by: PreKvkReportSort = PreKvkReportSort.OVERALL,
+    limit: int = 10,
+) -> PreKvkReportPayload:
+    normalized_limit = normalize_report_limit(limit)
+    rows: list[PreKvkReportRow] = []
+    scan_id = None
+    scan_timestamp_utc = None
+    source_filename = None
+    for raw in raw_rows:
+        if scan_id is None:
+            scan_id = _to_int_or_none(raw.get("ScanID"))
+            scan_timestamp_utc = raw.get("ScanTimestampUTC")
+            source_filename = raw.get("SourceFileName")
+        governor_id = _to_int_or_none(raw.get("GovernorID"))
+        if governor_id is None:
+            continue
+        rows.append(
+            PreKvkReportRow(
+                rank=0,
+                governor_id=governor_id,
+                governor_name=str(raw.get("GovernorName") or governor_id).strip()
+                or str(governor_id),
+                power=_to_int_or_none(raw.get("Power")),
+                stage1_points=_to_int_or_none(raw.get("Stage1Points")),
+                stage2_points=_to_int_or_none(raw.get("Stage2Points")),
+                stage3_points=_to_int_or_none(raw.get("Stage3Points")),
+                overall_points=int(_to_int_or_none(raw.get("OverallPoints")) or 0),
+            )
+        )
+    ranked = _rank_rows(rows, sort_by)[:normalized_limit]
+    return PreKvkReportPayload(
+        kvk_no=int(kvk_no),
+        sort_by=sort_by,
+        limit=normalized_limit,
+        rows=ranked,
+        scan_id=scan_id,
+        scan_timestamp_utc=scan_timestamp_utc,
+        source_filename=source_filename,
+    )
+
+
+def resolve_current_kvk_no() -> int | None:
+    from stats_alerts.kvk_meta import get_latest_kvk_metadata_sql
+
+    meta = get_latest_kvk_metadata_sql()
+    if not meta or meta.get("kvk_no") is None:
+        return None
+    return int(meta["kvk_no"])
+
+
+async def build_prekvk_report_payload(
+    *,
+    kvk_no: int | None = None,
+    sort_by: PreKvkReportSort = PreKvkReportSort.OVERALL,
+    limit: int = 10,
+) -> PreKvkReportPayload:
+    resolved_kvk_no = (
+        int(kvk_no) if kvk_no is not None else await asyncio.to_thread(resolve_current_kvk_no)
+    )
+    if not resolved_kvk_no:
+        raise ValueError("Could not determine the current KVK number.")
+    raw_rows = await asyncio.to_thread(
+        report_dal.fetch_latest_prekvk_report_rows, int(resolved_kvk_no)
+    )
+    return build_report_payload_from_rows(
+        int(resolved_kvk_no),
+        raw_rows,
+        sort_by=sort_by,
+        limit=limit,
+    )
