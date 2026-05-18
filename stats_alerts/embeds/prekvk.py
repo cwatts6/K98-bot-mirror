@@ -16,11 +16,11 @@ import discord
 from constants import CUSTOM_AVATAR_URL, KVK_BANNER_MAP, TARGETS_SHEET_ID, TIMELINE_SHEET_ID
 from embed_utils import LocalTimeToggleView, format_event_time
 from event_cache import get_all_upcoming_events
+from prekvk import report_service
 from stats_alerts.formatters import fmt_honor
 from stats_alerts.guard import claim_send, sent_today, sent_today_any
 from stats_alerts.honors import get_latest_honor_top
 from stats_alerts.kvk_meta import get_latest_kvk_metadata_sql
-from stats_alerts.prekvk_stats import load_prekvk_top3
 from stats_alerts.state import load_state, save_state
 from utils import date_to_utc_start, ensure_aware_utc, utcnow
 
@@ -139,50 +139,29 @@ async def send_prekvk_embed(
         name="Season timeline", value="\n".join(tl_lines) if tl_lines else "—", inline=False
     )
 
-    # Load Pre-KVK tops (overall + phase deltas) using the new helper
+    # Load Pre-KVK scheduled summary from the report service architecture.
     kvk_no_i = None
     try:
         kvk_no_i = int(kvk_no)
     except Exception:
         kvk_no_i = None
 
-    tops = {"overall": [], "p1": [], "p2": [], "p3": []}
-    prev_tops = {"overall": [], "p1": [], "p2": [], "p3": []}
+    tops = report_service.build_scheduled_top_blocks_from_rows([])
+    prev_tops = report_service.build_scheduled_top_blocks_from_rows([])
     try:
-        try:
-            from file_utils import run_blocking_in_thread
-        except Exception:
-            run_blocking_in_thread = None
-
         if kvk_no_i:
-            if run_blocking_in_thread is not None:
-                tops = await run_blocking_in_thread(
-                    load_prekvk_top3,
-                    kvk_no_i,
-                    3,
-                    name="load_prekvk_top3",
-                    meta={"kvk_no": kvk_no_i},
-                )
-            else:
-                tops = await asyncio.to_thread(load_prekvk_top3, kvk_no_i, 3)
-
-            # previous KVK top-1 (for targets)
-            if kvk_no_i > 0:
-                prev_no = kvk_no_i - 1
-                if run_blocking_in_thread is not None:
-                    prev_tops = await run_blocking_in_thread(
-                        load_prekvk_top3,
-                        prev_no,
-                        1,
-                        name="load_prekvk_top3_prev",
-                        meta={"kvk_no": prev_no},
-                    )
-                else:
-                    prev_tops = await asyncio.to_thread(load_prekvk_top3, prev_no, 1)
+            summary = await report_service.build_prekvk_scheduled_summary(
+                kvk_no=kvk_no_i,
+                previous_kvk_no=kvk_no_i - 1 if kvk_no_i > 0 else None,
+                current_limit=3,
+                previous_limit=1,
+            )
+            tops = summary.current
+            prev_tops = summary.previous
     except Exception:
         logger.exception("[PREKVK] Failed loading Pre-KVK top blocks")
-        tops = {"overall": [], "p1": [], "p2": [], "p3": []}
-        prev_tops = {"overall": [], "p1": [], "p2": [], "p3": []}
+        tops = report_service.build_scheduled_top_blocks_from_rows([])
+        prev_tops = report_service.build_scheduled_top_blocks_from_rows([])
 
     def _fmt_top_simple(rows, units="pts", limit=3):
         if not rows:
@@ -190,8 +169,12 @@ async def send_prekvk_embed(
         medals = ["🥇", "🥈", "🥉"]
         lines = []
         for i, r in enumerate(rows[:limit]):
-            name = r.get("Name") or r.get("name") or r.get("GovernorName") or "Unknown"
-            pts = r.get("Points") or 0
+            if isinstance(r, dict):
+                name = r.get("Name") or r.get("name") or r.get("GovernorName") or "Unknown"
+                pts = r.get("Points") or r.get("points") or 0
+            else:
+                name = getattr(r, "name", None) or "Unknown"
+                pts = getattr(r, "points", 0)
             try:
                 pts_i = int(pts)
             except Exception:
@@ -205,16 +188,16 @@ async def send_prekvk_embed(
     # Add fields for overall and phases.
     embed.add_field(
         name="🏆 Overall Pre-KVK Rankings:",
-        value=_fmt_top_simple(tops.get("overall", []), "pts", limit=3),
+        value=_fmt_top_simple(tops.overall, "pts", limit=3),
         inline=False,
     )
 
     # Add last-kvk top1 for overall (gives a concrete target)
     try:
-        if prev_tops and prev_tops.get("overall"):
+        if prev_tops and prev_tops.overall:
             embed.add_field(
                 name="🏆 Overall - last kvk",
-                value=_fmt_top_simple(prev_tops.get("overall", []), "pts", limit=1),
+                value=_fmt_top_simple(prev_tops.overall, "pts", limit=1),
                 inline=False,
             )
     except Exception:
@@ -223,36 +206,36 @@ async def send_prekvk_embed(
     # Phases: current (top-3)
     embed.add_field(
         name="🗡️ Phase 1 — Marauders",
-        value=_fmt_top_simple(tops.get("p1", []), "pts", limit=3),
+        value=_fmt_top_simple(tops.p1, "pts", limit=3),
         inline=True,
     )
     embed.add_field(
         name="🏕️ Phase 2 — Marauder Forts",
-        value=_fmt_top_simple(tops.get("p2", []), "pts", limit=3),
+        value=_fmt_top_simple(tops.p2, "pts", limit=3),
         inline=True,
     )
     embed.add_field(
         name="🏗️ Phase 3 — Training",
-        value=_fmt_top_simple(tops.get("p3", []), "pts", limit=3),
+        value=_fmt_top_simple(tops.p3, "pts", limit=3),
         inline=True,
     )
 
     # Phases: last kvk — show only TOP 1 for each phase to provide targets
     try:
-        if prev_tops and any(prev_tops.get(k) for k in ("p1", "p2", "p3")):
+        if prev_tops and any((prev_tops.p1, prev_tops.p2, prev_tops.p3)):
             embed.add_field(
                 name="Marauders - last kvk:",
-                value=_fmt_top_simple(prev_tops.get("p1", []), "pts", limit=1),
+                value=_fmt_top_simple(prev_tops.p1, "pts", limit=1),
                 inline=True,
             )
             embed.add_field(
                 name="Marauder Forts - last kvk:",
-                value=_fmt_top_simple(prev_tops.get("p2", []), "pts", limit=1),
+                value=_fmt_top_simple(prev_tops.p2, "pts", limit=1),
                 inline=True,
             )
             embed.add_field(
                 name="Training -last kvk:",
-                value=_fmt_top_simple(prev_tops.get("p3", []), "pts", limit=1),
+                value=_fmt_top_simple(prev_tops.p3, "pts", limit=1),
                 inline=True,
             )
     except Exception:

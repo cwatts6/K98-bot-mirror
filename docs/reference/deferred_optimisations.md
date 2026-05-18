@@ -5,7 +5,7 @@ to GitHub issues/task packs.
 
 Resolved historical notes were moved to `archive/deferred_optimisations_resolved.md`.
 
-Last reviewed after the DL_bot upload-routing Phase 2B production SQL cleanup. PR 96
+Last reviewed after the DL_bot upload-routing Phase 2C PreKvK report production release. PR 96
 (`import-locations-command-orchestration-cleanup`) was smoke tested successfully and deployed to
 production. PR 97 (`dlbot-player-location-upload-route`) was smoke tested successfully and
 promoted to production. The governor fuzzy/name/partial-ID lookup standardisation item,
@@ -13,7 +13,10 @@ profile/location profile-cache lookup item, `/import_locations` command orchestr
 player location auto-import route/signal coupling item, and DL_bot PreKvK upload route extraction
 item from PR 98 (`dlbot-prekvk-upload-route`) are complete, smoke tested successfully, and
 promoted to production. Phase 2B PreKvK SQL compatibility cleanup was deployed and smoke tested
-successfully; the remaining active backlog is listed below.
+successfully. Phase 2C delivered the public read-only `/prekvk report` image report, was smoke
+tested successfully, and was pushed to production. Phase 2D refactored the scheduled PreKvK
+stats-alert path onto the Phase 2C report service architecture while preserving scheduled embed,
+guard/state, and upload-refresh behaviour; the remaining active backlog is listed below.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 upload routing and related test-environment blockers, not as a continuation of the
@@ -64,15 +67,6 @@ both this backlog and the current `K98-bot-mirror` GitHub issues list.
 - Impact: high
 - Risk: medium
 - Dependencies: Complete the active DL_bot upload-routing phases first; preserve current production schema export as a drift/safety mechanism while preventing direct overwrite of `main`.
-
-### Deferred Optimisation
-- Area: `stats_alerts/prekvk_stats.py`, `stats_alerts/embeds/prekvk.py`
-- Type: refactor
-- Description: After the Phase 2C dedicated PreKvK report introduces the new report DAL/service/image-rendering architecture, the scheduled PreKvK stats-alert embed will still use its older helper/rendering path.
-- Suggested Fix: Phase 2D should refactor the scheduled PreKvK stats-alert helper/embed to reuse the new PreKvK architecture while preserving scheduled-post behaviour, guard/state handling, and existing upload-refresh behaviour.
-- Impact: medium
-- Risk: medium
-- Dependencies: Complete and validate Phase 2C dedicated report first; do not move on from the PreKvK report phase until Phase 2D is complete.
 
 ### Deferred Optimisation
 - Area: `DL_bot.py` KVK_ALL upload routing

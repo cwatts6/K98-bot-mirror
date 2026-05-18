@@ -51,6 +51,29 @@ class PreKvkReportPayload:
 
 
 @dataclass(frozen=True)
+class PreKvkScheduledTopEntry:
+    name: str
+    points: int
+
+
+@dataclass(frozen=True)
+class PreKvkScheduledTopBlocks:
+    overall: list[PreKvkScheduledTopEntry] = field(default_factory=list)
+    p1: list[PreKvkScheduledTopEntry] = field(default_factory=list)
+    p2: list[PreKvkScheduledTopEntry] = field(default_factory=list)
+    p3: list[PreKvkScheduledTopEntry] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class PreKvkScheduledSummary:
+    kvk_no: int
+    current: PreKvkScheduledTopBlocks = field(default_factory=PreKvkScheduledTopBlocks)
+    previous_kvk_no: int | None = None
+    previous: PreKvkScheduledTopBlocks = field(default_factory=PreKvkScheduledTopBlocks)
+    generated_at_utc: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+
+@dataclass(frozen=True)
 class RenderedPreKvkReportImage:
     filename: str
     image_bytes: BytesIO

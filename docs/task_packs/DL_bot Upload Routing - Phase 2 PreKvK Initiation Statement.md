@@ -87,6 +87,9 @@ Delivered outcome:
 
 Goal: design and implement a dedicated PreKvK report/embed after the route boundary is stable.
 
+Status: implemented, smoke tested successfully, pushed to production, and followed by Phase 2D
+for scheduled stats-alert architecture reuse.
+
 Approved implementation direction:
 
 - Add a public read-only `/prekvk report` subcommand under a shared PreKvK command group so
@@ -99,12 +102,33 @@ Approved implementation direction:
 - Use a new PreKvK report DAL/service/rendering architecture rather than extending upload routing
   or import behaviour.
 
-Phase 2C should not change upload routing behaviour unless separately approved.
+Delivered outcome:
+
+- Public read-only `/prekvk report` was added under the shared `/prekvk` command group.
+- The report defaults to the current KVK, supports optional `kvk_no`, sort switching, and Top 10,
+  Top 25, Top 50, and Top 100 controls.
+- The report renders a mobile-safe PNG leaderboard using the Phase 2C PreKvK DAL/service/image
+  renderer/view architecture.
+- Governor-name rendering was hardened for accented names, CJK characters, Thai symbols, emoji
+  grapheme clusters, fallback font coverage, and measured-width truncation.
+- Phase 2C did not change upload routing, import behaviour, or production SQL behaviour.
+
+Phase 2C starter and delivery notes:
+
+- `docs/task_packs/DL_bot Upload Routing - Phase 2C PreKvK Report Starter.md`
 
 ## Phase 2D - PreKvK Stats-Alert Architecture Refactor
 
 Goal: after Phase 2C is validated, refactor the scheduled PreKvK stats-alert helper/embed to use
 the new PreKvK report architecture where practical.
+
+Status: implemented in the current Phase 2D branch. The scheduled stats-alert path now uses a
+compact PreKvK scheduled-summary service shape backed by the Phase 2C report DAL/service
+architecture.
+
+Starter packet:
+
+- `docs/task_packs/DL_bot Upload Routing - Phase 2D PreKvK Stats-Alert Refactor Starter.md`
 
 In scope:
 
@@ -114,7 +138,7 @@ In scope:
   behaviour
 - focused tests proving the scheduled stats-alert behaviour still works
 
-Phase 2D must be completed before moving on from the PreKvK report phase.
+Phase 2D should be validated and reviewed before moving on from the PreKvK report phase.
 
 ## Required Stop Points
 

@@ -9,6 +9,9 @@ from prekvk.models import (
     PreKvkReportPayload,
     PreKvkReportRow,
     PreKvkReportSort,
+    PreKvkScheduledSummary,
+    PreKvkScheduledTopBlocks,
+    PreKvkScheduledTopEntry,
 )
 
 SORT_LABELS = {
@@ -95,23 +98,9 @@ def _rank_rows(rows: list[PreKvkReportRow], sort_by: PreKvkReportSort) -> list[P
     return ranked
 
 
-def build_report_payload_from_rows(
-    kvk_no: int,
-    raw_rows: list[dict[str, Any]],
-    *,
-    sort_by: PreKvkReportSort = PreKvkReportSort.OVERALL,
-    limit: int = 10,
-) -> PreKvkReportPayload:
-    normalized_limit = normalize_report_limit(limit)
+def _rows_from_raw(raw_rows: list[dict[str, Any]]) -> list[PreKvkReportRow]:
     rows: list[PreKvkReportRow] = []
-    scan_id = None
-    scan_timestamp_utc = None
-    source_filename = None
     for raw in raw_rows:
-        if scan_id is None:
-            scan_id = _to_int_or_none(raw.get("ScanID"))
-            scan_timestamp_utc = raw.get("ScanTimestampUTC")
-            source_filename = raw.get("SourceFileName")
         governor_id = _to_int_or_none(raw.get("GovernorID"))
         if governor_id is None:
             continue
@@ -128,6 +117,27 @@ def build_report_payload_from_rows(
                 overall_points=int(_to_int_or_none(raw.get("OverallPoints")) or 0),
             )
         )
+    return rows
+
+
+def build_report_payload_from_rows(
+    kvk_no: int,
+    raw_rows: list[dict[str, Any]],
+    *,
+    sort_by: PreKvkReportSort = PreKvkReportSort.OVERALL,
+    limit: int = 10,
+) -> PreKvkReportPayload:
+    normalized_limit = normalize_report_limit(limit)
+    scan_id = None
+    scan_timestamp_utc = None
+    source_filename = None
+    for raw in raw_rows:
+        if scan_id is None:
+            scan_id = _to_int_or_none(raw.get("ScanID"))
+            scan_timestamp_utc = raw.get("ScanTimestampUTC")
+            source_filename = raw.get("SourceFileName")
+            break
+    rows = _rows_from_raw(raw_rows)
     ranked = _rank_rows(rows, sort_by)[:normalized_limit]
     return PreKvkReportPayload(
         kvk_no=int(kvk_no),
@@ -168,4 +178,116 @@ async def build_prekvk_report_payload(
         raw_rows,
         sort_by=sort_by,
         limit=limit,
+    )
+
+
+def _normalize_scheduled_limit(value: int | None, default: int) -> int:
+    try:
+        limit = int(value if value is not None else default)
+    except Exception:
+        limit = default
+    return max(1, limit)
+
+
+def _stage_points(row: PreKvkReportRow, sort_by: PreKvkReportSort) -> int | None:
+    if sort_by == PreKvkReportSort.STAGE1:
+        return row.stage1_points
+    if sort_by == PreKvkReportSort.STAGE2:
+        return row.stage2_points
+    if sort_by == PreKvkReportSort.STAGE3:
+        return row.stage3_points
+    return row.overall_points
+
+
+def _scheduled_entries(
+    rows: list[PreKvkReportRow],
+    *,
+    sort_by: PreKvkReportSort,
+    limit: int,
+) -> list[PreKvkScheduledTopEntry]:
+    entries: list[PreKvkScheduledTopEntry] = []
+    for row in _rank_rows(rows, sort_by):
+        points = _stage_points(row, sort_by)
+        if points is None:
+            continue
+        entries.append(
+            PreKvkScheduledTopEntry(
+                name=row.governor_name,
+                points=int(points),
+            )
+        )
+        if len(entries) >= limit:
+            break
+    return entries
+
+
+def build_scheduled_top_blocks_from_rows(
+    raw_rows: list[dict[str, Any]],
+    *,
+    limit: int = 3,
+) -> PreKvkScheduledTopBlocks:
+    normalized_limit = _normalize_scheduled_limit(limit, 3)
+    rows = _rows_from_raw(raw_rows)
+    return PreKvkScheduledTopBlocks(
+        overall=_scheduled_entries(
+            rows,
+            sort_by=PreKvkReportSort.OVERALL,
+            limit=normalized_limit,
+        ),
+        p1=_scheduled_entries(
+            rows,
+            sort_by=PreKvkReportSort.STAGE1,
+            limit=normalized_limit,
+        ),
+        p2=_scheduled_entries(
+            rows,
+            sort_by=PreKvkReportSort.STAGE2,
+            limit=normalized_limit,
+        ),
+        p3=_scheduled_entries(
+            rows,
+            sort_by=PreKvkReportSort.STAGE3,
+            limit=normalized_limit,
+        ),
+    )
+
+
+def build_prekvk_scheduled_summary_sync(
+    *,
+    kvk_no: int,
+    previous_kvk_no: int | None = None,
+    current_limit: int = 3,
+    previous_limit: int = 1,
+) -> PreKvkScheduledSummary:
+    resolved_kvk_no = int(kvk_no)
+    current_rows = report_dal.fetch_latest_prekvk_report_rows(resolved_kvk_no)
+    previous_blocks = PreKvkScheduledTopBlocks()
+    resolved_previous_kvk_no = int(previous_kvk_no) if previous_kvk_no is not None else None
+    if resolved_previous_kvk_no is not None and resolved_previous_kvk_no > 0:
+        previous_rows = report_dal.fetch_latest_prekvk_report_rows(resolved_previous_kvk_no)
+        previous_blocks = build_scheduled_top_blocks_from_rows(
+            previous_rows,
+            limit=previous_limit,
+        )
+    return PreKvkScheduledSummary(
+        kvk_no=resolved_kvk_no,
+        current=build_scheduled_top_blocks_from_rows(current_rows, limit=current_limit),
+        previous_kvk_no=resolved_previous_kvk_no,
+        previous=previous_blocks,
+    )
+
+
+async def build_prekvk_scheduled_summary(
+    *,
+    kvk_no: int,
+    previous_kvk_no: int | None = None,
+    current_limit: int = 3,
+    previous_limit: int = 1,
+) -> PreKvkScheduledSummary:
+    return await asyncio.to_thread(
+        build_prekvk_scheduled_summary_sync,
+        kvk_no=int(kvk_no),
+        previous_kvk_no=previous_kvk_no,
+        current_limit=current_limit,
+        previous_limit=previous_limit,
     )
