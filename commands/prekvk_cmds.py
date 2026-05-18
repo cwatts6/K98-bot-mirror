@@ -12,14 +12,21 @@ from prekvk import report_service
 from ui.views.prekvk_report_views import send_prekvk_report
 from versioning import versioned
 
+from .prekvk_admin_cmds import attach_prekvk_import_history
+
 logger = logging.getLogger(__name__)
 
 
 def register_prekvk(bot: ext_commands.Bot) -> None:
-    @bot.slash_command(
-        name="prekvk_report",
-        description="View the current PreKvK rankings report",
+    group = discord.SlashCommandGroup(
+        "prekvk",
+        "PreKvK reports and diagnostics",
         guild_ids=[GUILD_ID],
+    )
+
+    @group.command(
+        name="report",
+        description="View the current PreKvK rankings report",
     )
     @versioned("v1.00")
     @safe_command
@@ -63,3 +70,6 @@ def register_prekvk(bot: ext_commands.Bot) -> None:
                 "PreKvK report generation failed. Please try again or contact an admin.",
                 ephemeral=True,
             )
+
+    attach_prekvk_import_history(group)
+    bot.add_application_command(group)

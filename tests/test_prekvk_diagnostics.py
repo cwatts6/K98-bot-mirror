@@ -5,7 +5,7 @@ import inspect
 
 import pandas as pd
 
-from commands.prekvk_admin_cmds import register_prekvk_admin
+from commands.prekvk_admin_cmds import attach_prekvk_import_history
 from kvk.dal import kvk_stats_dal
 from prekvk import diagnostics_service
 from prekvk.dal import import_history_dal
@@ -328,8 +328,9 @@ def test_format_history_rows_sanitizes_markdown_and_mentions():
 
 
 def test_prekvk_import_history_command_has_admin_gate():
-    source = inspect.getsource(register_prekvk_admin)
+    source = inspect.getsource(attach_prekvk_import_history)
 
+    assert 'name="import_history"' in source
     assert "@is_admin_and_notify_channel()" in source
     assert "@safe_command" in source
     assert "@track_usage()" in source

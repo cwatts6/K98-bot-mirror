@@ -6,7 +6,9 @@ from commands.prekvk_cmds import register_prekvk
 def test_prekvk_report_command_is_public_read_only_surface():
     source = inspect.getsource(register_prekvk)
 
-    assert 'name="prekvk_report"' in source
+    assert "SlashCommandGroup" in source
+    assert '"prekvk"' in source
+    assert 'name="report"' in source
     assert "@safe_command" in source
     assert "@track_usage()" in source
     assert "safe_defer(ctx, ephemeral=True)" in source

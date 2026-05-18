@@ -22,12 +22,15 @@ def test_register_commands_smoke(monkeypatch):
 
     import Commands
 
+    registered_top_level = []
     fake_bot = types.SimpleNamespace()
     fake_bot.tree = types.SimpleNamespace(command=lambda **kw: (lambda fn: fn))
     fake_bot.add_listener = lambda *args, **kwargs: None
+    fake_bot.add_application_command = lambda command: registered_top_level.append(command.name)
 
     def slash_command(**kwargs):
         def deco(fn):
+            registered_top_level.append(kwargs.get("name"))
             return fn
 
         return deco
@@ -35,3 +38,8 @@ def test_register_commands_smoke(monkeypatch):
     fake_bot.slash_command = slash_command
 
     Commands.register_commands(fake_bot)
+
+    assert len([name for name in registered_top_level if name]) <= 100
+    assert "prekvk" in registered_top_level
+    assert "prekvk_report" not in registered_top_level
+    assert "prekvk_import_history" not in registered_top_level

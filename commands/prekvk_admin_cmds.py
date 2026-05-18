@@ -15,11 +15,10 @@ from versioning import versioned
 logger = logging.getLogger(__name__)
 
 
-def register_prekvk_admin(bot: ext_commands.Bot) -> None:
-    @bot.slash_command(
-        name="prekvk_import_history",
+def attach_prekvk_import_history(command_group: discord.SlashCommandGroup) -> None:
+    @command_group.command(
+        name="import_history",
         description="Show recent PreKvK import diagnostics",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.00")
     @safe_command
@@ -91,3 +90,13 @@ def register_prekvk_admin(bot: ext_commands.Bot) -> None:
         embed.add_field(name="Rows", value=str(len(rows)), inline=True)
 
         await ctx.followup.send(embed=embed, ephemeral=True)
+
+
+def register_prekvk_admin(bot: ext_commands.Bot) -> None:
+    group = discord.SlashCommandGroup(
+        "prekvk",
+        "PreKvK reports and diagnostics",
+        guild_ids=[GUILD_ID],
+    )
+    attach_prekvk_import_history(group)
+    bot.add_application_command(group)

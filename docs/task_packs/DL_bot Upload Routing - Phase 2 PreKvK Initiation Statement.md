@@ -89,7 +89,8 @@ Goal: design and implement a dedicated PreKvK report/embed after the route bound
 
 Approved implementation direction:
 
-- Add a public read-only `/prekvk_report` slash command.
+- Add a public read-only `/prekvk report` subcommand under a shared PreKvK command group so
+  the report does not increase the Discord top-level command count.
 - Default to the current KVK when `kvk_no` is omitted.
 - Render a dedicated PNG leaderboard rather than a fixed-width embed table.
 - Include `Rank`, `GovernorName`, `Power`, `Stage 1`, `Stage 2`, `Stage 3`, and `Overall`.

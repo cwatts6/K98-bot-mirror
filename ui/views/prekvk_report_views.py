@@ -84,7 +84,7 @@ class PreKvkReportView(discord.ui.View):
     async def _refresh(self, interaction: discord.Interaction) -> None:
         if int(interaction.user.id) != self.requester_id:
             await interaction.response.send_message(
-                "This PreKvK report control is not yours. Run `/prekvk_report` to open a fresh report.",
+                "This PreKvK report control is not yours. Run `/prekvk report` to open a fresh report.",
                 ephemeral=True,
             )
             return
@@ -126,7 +126,7 @@ class PreKvkReportView(discord.ui.View):
             )
             try:
                 await interaction.followup.send(
-                    "PreKvK report refresh failed. Please try again or run `/prekvk_report` for a fresh report.",
+                    "PreKvK report refresh failed. Please try again or run `/prekvk report` for a fresh report.",
                     ephemeral=True,
                 )
             except Exception:

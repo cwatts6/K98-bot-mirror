@@ -48,6 +48,7 @@ async def test_prekvk_report_view_rejects_wrong_user():
     await view._refresh(interaction)
 
     assert "not yours" in response["content"]
+    assert "/prekvk report" in response["content"]
     assert response["ephemeral"] is True
 
 
@@ -89,6 +90,7 @@ async def test_prekvk_report_view_refresh_failure_sends_private_feedback(monkeyp
 
     assert followups
     assert "refresh failed" in followups[0][0]
+    assert "/prekvk report" in followups[0][0]
     assert followups[0][1]["ephemeral"] is True
 
 

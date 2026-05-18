@@ -21,6 +21,15 @@ upload routing and related test-environment blockers, not as a continuation of t
 both this backlog and the current `K98-bot-mirror` GitHub issues list.
 
 ### Deferred Optimisation
+- Area: `commands/`, `scripts/validate_command_registration.py`
+- Type: architecture
+- Description: The primary Discord application-command set is currently at the 100 top-level command limit. Phase 2C avoided the limit by grouping PreKvK commands under `/prekvk`, but future standalone slash commands can still break startup sync with Discord error 30032 unless command surface consolidation is planned before new command work.
+- Suggested Fix: Run a command-surface balancing audit before the next command-heavy feature. Group related commands by domain where user experience allows, identify stale/low-use admin commands for consolidation or retirement, update docs for renamed paths, and keep `scripts/validate_command_registration.py` enforcing the 100-command ceiling in PR validation.
+- Impact: high
+- Risk: medium
+- Dependencies: Coordinate with bot operators before renaming public command paths; preserve admin-only permission checks when commands move into groups.
+
+### Deferred Optimisation
 - Area: tests/stats_service.py, tests/targets_sql_cache_subproc.py, tests/prekvk_stats.py, tests/proc_config_import_phase2.py, tests/sheets_sync_flow.py
 - Type: consistency
 - Description: Several non-Ark unit tests still reach live SQL Server or connection construction when run in the Codex/local PR validation environment without the bot machine's ODBC setup.

@@ -25,7 +25,9 @@ report surface, architecture direction, and implementation plan are each approve
 
 The audit/design packet was reviewed and implementation was approved with these decisions:
 
-- Build a public read-only `/prekvk_report` slash command rather than an admin-only command.
+- Build a public read-only `/prekvk report` subcommand rather than an admin-only command. Use the
+  shared `/prekvk` top-level group to avoid exceeding Discord's 100 top-level application-command
+  limit.
 - Keep the command unannounced initially; it remains low risk because it only reads existing
   PreKvK data.
 - Default to the current `kvk_no` from metadata, with an optional `kvk_no` override.
