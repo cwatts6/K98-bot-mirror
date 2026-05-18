@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from io import BytesIO
+from pathlib import Path
 import unicodedata
 
 from PIL import Image, ImageDraw, ImageFont
@@ -96,12 +97,23 @@ def _font_candidates_for_text(text: str, *, bold: bool = False) -> list[str]:
             "C:/Windows/Fonts/seguiemj.ttf",
             "C:/Windows/Fonts/seguisym.ttf",
         ]
-    if (
-        any(0x3000 <= codepoint <= 0x30FF for codepoint in codepoints)
-        or any(0x3400 <= codepoint <= 0x9FFF for codepoint in codepoints)
-        or any(0xAC00 <= codepoint <= 0xD7AF for codepoint in codepoints)
+    if any(0x0E00 <= codepoint <= 0x0E7F for codepoint in codepoints):
+        return [
+            "C:/Windows/Fonts/LeelaUIb.ttf" if bold else "C:/Windows/Fonts/LeelawUI.ttf",
+            "C:/Windows/Fonts/LEELAWAD.TTF",
+        ]
+    if any(0x3400 <= codepoint <= 0x9FFF for codepoint in codepoints):
+        return [
+            "C:/Windows/Fonts/msyhbd.ttc" if bold else "C:/Windows/Fonts/msyh.ttc",
+            "C:/Windows/Fonts/simsun.ttc",
+            "C:/Windows/Fonts/YuGothB.ttc" if bold else "C:/Windows/Fonts/YuGothM.ttc",
+            "C:/Windows/Fonts/msgothic.ttc",
+        ]
+    if any(0x3000 <= codepoint <= 0x30FF for codepoint in codepoints) or any(
+        0xAC00 <= codepoint <= 0xD7AF for codepoint in codepoints
     ):
         return [
+            "C:/Windows/Fonts/msyhbd.ttc" if bold else "C:/Windows/Fonts/msyh.ttc",
             "C:/Windows/Fonts/YuGothB.ttc" if bold else "C:/Windows/Fonts/YuGothM.ttc",
             "C:/Windows/Fonts/msgothic.ttc",
             "C:/Windows/Fonts/simsun.ttc",
@@ -132,11 +144,56 @@ def _font_for_char(ch: str, size: int, *, bold: bool = False) -> ImageFont.Image
 @lru_cache(maxsize=512)
 def _font_for_text(text: str, size: int, *, bold: bool = False) -> ImageFont.ImageFont:
     for candidate in _font_candidates_for_text(text, bold=bold):
+        if not _font_supports_text(candidate, text):
+            continue
         try:
             return ImageFont.truetype(candidate, size=size)
         except Exception:
             continue
     return _font(size, bold=bold)
+
+
+def _cluster_font_size(text: str, base_size: int) -> int:
+    codepoints = [ord(ch) for ch in text]
+    if any(0x0E00 <= codepoint <= 0x0E7F for codepoint in codepoints) or any(
+        0x3000 <= codepoint <= 0x9FFF or 0xAC00 <= codepoint <= 0xD7AF for codepoint in codepoints
+    ):
+        return base_size + 4
+    return base_size
+
+
+def _coverage_codepoints(text: str) -> list[int]:
+    return [
+        ord(ch)
+        for ch in text
+        if ord(ch) != 0x200D and not _is_variation_selector(ord(ch)) and not _is_tag_char(ord(ch))
+    ]
+
+
+@lru_cache(maxsize=512)
+def _font_supports_text(font_path: str, text: str) -> bool:
+    if not Path(font_path).exists():
+        return False
+    codepoints = _coverage_codepoints(text)
+    if not codepoints:
+        return True
+    try:
+        from fontTools.ttLib import TTCollection, TTFont
+    except Exception:
+        return True
+    try:
+        font_obj = (
+            TTCollection(font_path).fonts[0]
+            if font_path.lower().endswith(".ttc")
+            else TTFont(font_path, lazy=True)
+        )
+        coverage: set[int] = set()
+        for table in font_obj["cmap"].tables:
+            coverage.update(table.cmap.keys())
+        return all(codepoint in coverage for codepoint in codepoints)
+    except Exception:
+        return True
+    return False
 
 
 def _compact(value: int | None) -> str:
@@ -151,8 +208,7 @@ def _compact(value: int | None) -> str:
 
 
 def _clean_text(value: str, max_chars: int) -> str:
-    normalized = unicodedata.normalize("NFKD", str(value or ""))
-    cleaned = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    cleaned = unicodedata.normalize("NFC", str(value or ""))
     cleaned = cleaned.replace("\r", " ").replace("\n", " ")
     cleaned = " ".join(cleaned.split()) or "Unknown"
     return cleaned if len(cleaned) <= max_chars else cleaned[: max_chars - 1].rstrip() + "."
@@ -163,7 +219,8 @@ def _text_width(
 ) -> int:
     width = 0
     for cluster in _text_clusters(text):
-        cluster_font = _font_for_text(cluster, getattr(font, "size", 20), bold=bold)
+        base_size = getattr(font, "size", 20)
+        cluster_font = _font_for_text(cluster, _cluster_font_size(cluster, base_size), bold=bold)
         box = draw.textbbox((0, 0), cluster, font=cluster_font)
         width += int(box[2] - box[0])
     return width
@@ -180,7 +237,8 @@ def _draw_text(
 ) -> None:
     x, y = xy
     for cluster in _text_clusters(text):
-        cluster_font = _font_for_text(cluster, getattr(font, "size", 20), bold=bold)
+        base_size = getattr(font, "size", 20)
+        cluster_font = _font_for_text(cluster, _cluster_font_size(cluster, base_size), bold=bold)
         draw.text((x, y), cluster, fill=fill, font=cluster_font)
         box = draw.textbbox((0, 0), cluster, font=cluster_font)
         x += int(box[2] - box[0])
