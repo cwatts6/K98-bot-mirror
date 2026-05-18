@@ -52,11 +52,8 @@ def _cache_matches_context(cache: dict[str, Any], ctx: dict[str, Any] | None) ->
     return meta.get("kvk_no") == ctx.get("kvk_no") and meta.get("state") == ctx.get("state")
 
 
-def _cache_might_be_stale(cache: dict[str, Any], key: str) -> bool:
+def _cache_might_be_stale(cache: dict[str, Any]) -> bool:
     if not cache:
-        return True
-    by_gov = cache.get("by_gov") or {}
-    if key not in by_gov:
         return True
     meta = cache.get("_meta") if isinstance(cache, dict) else None
     if not isinstance(meta, dict):
@@ -214,7 +211,7 @@ def get_targets_for_governor(governor_id: int) -> dict[str, Any] | None:
         key = str(governor_id)
 
     cache = _read_json(PLAYER_TARGETS_CACHE)
-    if _cache_might_be_stale(cache, key):
+    if _cache_might_be_stale(cache):
         ctx = get_kvk_context_today()
         if ctx and not _cache_matches_context(cache, ctx):
             if cache:

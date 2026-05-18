@@ -152,6 +152,29 @@ def test_get_targets_for_governor_uses_active_cache_without_context_lookup(monke
     assert res["TargetState"] == "ACTIVE"
 
 
+def test_get_targets_for_governor_uses_active_cache_miss_without_context_lookup(monkeypatch):
+    def fail_context_lookup():
+        raise AssertionError("context lookup should not be called for active cache misses")
+
+    monkeypatch.setattr("targets_sql_cache.get_kvk_context_today", fail_context_lookup)
+    monkeypatch.setattr(
+        "targets_sql_cache._read_json",
+        lambda _path: {
+            "_meta": {"kvk_no": 15, "state": "ACTIVE"},
+            "by_gov": {
+                "123": {
+                    "GovernorID": "123",
+                    "GovernorName": "Alice",
+                    "TargetState": "ACTIVE",
+                    "KVK_NO": 15,
+                }
+            },
+        },
+    )
+
+    assert tsc.get_targets_for_governor(999) is None
+
+
 def test_get_targets_for_governor_keeps_cache_when_context_missing(monkeypatch):
     monkeypatch.setattr("targets_sql_cache.get_kvk_context_today", lambda: None)
     monkeypatch.setattr(
