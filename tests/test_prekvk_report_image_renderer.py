@@ -180,6 +180,56 @@ def test_render_prekvk_report_handles_symbol_names():
     assert report_image_renderer._cluster_font_size("\u0e5b", 18) == 22
 
 
+def test_font_for_text_skips_unsupported_candidate(monkeypatch):
+    report_image_renderer._font_for_text.cache_clear()
+    used_paths = []
+
+    monkeypatch.setattr(
+        report_image_renderer,
+        "_font_candidates_for_text",
+        lambda text, *, bold=False: ["unsupported.ttf", "supported.ttf"],
+    )
+    monkeypatch.setattr(
+        report_image_renderer,
+        "_font_supports_text",
+        lambda path, text: path == "supported.ttf",
+    )
+
+    def _fake_truetype(path, *, size):
+        used_paths.append(path)
+        return object()
+
+    monkeypatch.setattr(report_image_renderer.ImageFont, "truetype", _fake_truetype)
+
+    assert report_image_renderer._font_for_text("\u4e49", 18) is not None
+    assert used_paths == ["supported.ttf"]
+    report_image_renderer._font_for_text.cache_clear()
+
+
+def test_font_supports_text_reuses_cached_coverage():
+    report_image_renderer._font_coverage.cache_clear()
+    report_image_renderer._font_supports_text.cache_clear()
+
+    path = "C:/Windows/Fonts/definitely_missing_test_font.ttf"
+
+    assert report_image_renderer._font_supports_text(path, "A") is False
+    assert report_image_renderer._font_supports_text(path, "B") is False
+    assert report_image_renderer._font_coverage.cache_info().misses == 1
+    assert report_image_renderer._font_coverage.cache_info().hits == 1
+
+
+def test_fit_text_to_width_truncates_by_rendered_width():
+    image = report_image_renderer.Image.new("RGBA", (420, 80))
+    draw = report_image_renderer.ImageDraw.Draw(image)
+    font = report_image_renderer._font(18)
+    text = "\u30c5" * 80
+
+    fitted = report_image_renderer._fit_text_to_width(draw, text, width=120, font=font)
+
+    assert fitted.endswith(".")
+    assert report_image_renderer._text_width(draw, fitted, font=font) <= 120
+
+
 def test_render_prekvk_report_empty_payload_returns_none():
     payload = PreKvkReportPayload(
         kvk_no=15,

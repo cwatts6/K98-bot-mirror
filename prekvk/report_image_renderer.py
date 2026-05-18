@@ -171,16 +171,13 @@ def _coverage_codepoints(text: str) -> list[int]:
 
 
 @lru_cache(maxsize=512)
-def _font_supports_text(font_path: str, text: str) -> bool:
+def _font_coverage(font_path: str) -> frozenset[int] | None:
     if not Path(font_path).exists():
-        return False
-    codepoints = _coverage_codepoints(text)
-    if not codepoints:
-        return True
+        return frozenset()
     try:
         from fontTools.ttLib import TTCollection, TTFont
     except Exception:
-        return True
+        return None
     try:
         font_obj = (
             TTCollection(font_path).fonts[0]
@@ -190,10 +187,20 @@ def _font_supports_text(font_path: str, text: str) -> bool:
         coverage: set[int] = set()
         for table in font_obj["cmap"].tables:
             coverage.update(table.cmap.keys())
-        return all(codepoint in coverage for codepoint in codepoints)
+        return frozenset(coverage)
     except Exception:
+        return None
+
+
+@lru_cache(maxsize=512)
+def _font_supports_text(font_path: str, text: str) -> bool:
+    codepoints = _coverage_codepoints(text)
+    if not codepoints:
         return True
-    return False
+    coverage = _font_coverage(font_path)
+    if coverage is None:
+        return True
+    return all(codepoint in coverage for codepoint in codepoints)
 
 
 def _compact(value: int | None) -> str:
@@ -212,6 +219,26 @@ def _clean_text(value: str, max_chars: int) -> str:
     cleaned = cleaned.replace("\r", " ").replace("\n", " ")
     cleaned = " ".join(cleaned.split()) or "Unknown"
     return cleaned if len(cleaned) <= max_chars else cleaned[: max_chars - 1].rstrip() + "."
+
+
+def _fit_text_to_width(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    *,
+    width: int,
+    font: ImageFont.ImageFont,
+    bold: bool = False,
+) -> str:
+    if _text_width(draw, text, font=font, bold=bold) <= width:
+        return text
+    out = ""
+    suffix = "."
+    for cluster in _text_clusters(text):
+        candidate = f"{out}{cluster}{suffix}"
+        if _text_width(draw, candidate, font=font, bold=bold) > width:
+            break
+        out += cluster
+    return (out.rstrip() + suffix) if out.strip() else suffix
 
 
 def _text_width(
@@ -315,9 +342,16 @@ def render_prekvk_report(payload: PreKvkReportPayload) -> RenderedPreKvkReportIm
         if idx % 2 == 0:
             draw.rectangle((48, y, WIDTH - 48, y + ROW_H), fill=(15, 41, 72))
         rank_fill = GOLD if row.rank <= 3 else TEXT
+        name_font = _font(18)
+        governor_name = _fit_text_to_width(
+            draw,
+            _clean_text(row.governor_name, 40),
+            width=360,
+            font=name_font,
+        )
         values = [
             (str(row.rank), 58, 78, "left", rank_fill),
-            (_clean_text(row.governor_name, 28), 150, 360, "left", TEXT),
+            (governor_name, 150, 360, "left", TEXT),
             (_compact(row.power), 540, 150, "right", MUTED if row.power is None else TEXT),
             (
                 _compact(row.stage1_points),
@@ -343,7 +377,7 @@ def render_prekvk_report(payload: PreKvkReportPayload) -> RenderedPreKvkReportIm
             (_compact(row.overall_points), 1288, 180, "right", TEXT),
         ]
         for value, x, w, align, fill in values:
-            _cell(draw, (x, y + 8), value, width=w, align=align, font=_font(18), fill=fill)
+            _cell(draw, (x, y + 8), value, width=w, align=align, font=name_font, fill=fill)
 
     footer = (
         "Legacy total-only imports show N/A for stage columns."
