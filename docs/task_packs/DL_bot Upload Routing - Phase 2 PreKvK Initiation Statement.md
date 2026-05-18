@@ -10,8 +10,8 @@ This phase is split into three approval-gated slices:
 Goal: extract the PreKvK upload route from `DL_bot.py` into the existing `upload_routes` pattern
 introduced in Phase 1.
 
-Status: implemented as the Phase 2A route-extraction slice. Phase 2B and Phase 2C remain separate
-approval-gated follow-ons.
+Status: implemented in PR 98 (`dlbot-prekvk-upload-route`), smoke tested successfully, and pushed
+to production. Phase 2B and Phase 2C remain separate approval-gated follow-ons.
 
 In scope:
 
@@ -54,6 +54,14 @@ Out of scope for Phase 2A:
 
 Goal: audit whether legacy PreKvK SQL phase objects can be replaced or retired safely.
 
+Status: implemented in SQL PR 3 (`codex/prekvk-phase-sql-cleanup`), deployed to production,
+smoke tested successfully, and left `dbo.PreKvk_Phases` in place for a later Option C retirement
+audit.
+
+Starter packet:
+
+- `docs/task_packs/DL_bot Upload Routing - Phase 2B PreKvK SQL Cleanup Audit Statement.md`
+
 Minimum objects to review in `C:\K98-bot-SQL-Server`:
 
 - `dbo.PreKvk_Phases`
@@ -65,21 +73,47 @@ Minimum objects to review in `C:\K98-bot-SQL-Server`:
 This phase must stop for approval before any SQL object replacement, retirement, destructive
 cleanup, or production SQL migration.
 
+Delivered outcome:
+
+- `dbo.fn_PreKvkPhaseDelta` and `dbo.v_PreKvk13_Phase1/2/3` were preserved as compatibility
+  object names but now source direct stage values from `dbo.PreKvk_Scores`.
+- `dbo.sp_Build_Prekvk_And_Honor_Rankings` was aligned so PreKvK stage values and `ScanID` come
+  from the same deterministic best-score row.
+- Production deploy and rollback scripts were created in the SQL repo.
+- Later destructive retirement of `dbo.PreKvk_Phases` remains deferred until a separate Option C
+  audit and approval.
+
 ## Phase 2C - New PreKvK Report/Embed
 
 Goal: design and implement a dedicated PreKvK report/embed after the route boundary is stable.
 
-Design decisions required before implementation:
+Approved implementation direction:
 
-- Command, scheduled embed, admin-only, or channel-triggered surface.
-- Permission model and target channel.
-- Report limits and tie handling.
-- Empty-data and legacy total-only-row behaviour.
-- Whether to reuse `stats_alerts.prekvk_stats.load_prekvk_top3` directly or introduce a service
-  boundary for report orchestration.
-- Mobile-safe Discord output shape.
+- Add a public read-only `/prekvk_report` slash command.
+- Default to the current KVK when `kvk_no` is omitted.
+- Render a dedicated PNG leaderboard rather than a fixed-width embed table.
+- Include `Rank`, `GovernorName`, `Power`, `Stage 1`, `Stage 2`, `Stage 3`, and `Overall`.
+- Default sort is `Overall`; allow sorting by `Overall`, `Stage 1`, `Stage 2`, or `Stage 3`.
+- Default limit is Top 10; allow Top 10, Top 25, Top 50, and Top 100 buttons.
+- Use a new PreKvK report DAL/service/rendering architecture rather than extending upload routing
+  or import behaviour.
 
 Phase 2C should not change upload routing behaviour unless separately approved.
+
+## Phase 2D - PreKvK Stats-Alert Architecture Refactor
+
+Goal: after Phase 2C is validated, refactor the scheduled PreKvK stats-alert helper/embed to use
+the new PreKvK report architecture where practical.
+
+In scope:
+
+- `stats_alerts/prekvk_stats.py`
+- `stats_alerts/embeds/prekvk.py`
+- preservation of scheduled-post, guard/state, previous-KVK target, honor, event, and upload-refresh
+  behaviour
+- focused tests proving the scheduled stats-alert behaviour still works
+
+Phase 2D must be completed before moving on from the PreKvK report phase.
 
 ## Required Stop Points
 
@@ -87,3 +121,5 @@ Phase 2C should not change upload routing behaviour unless separately approved.
    before route extraction code changes.
 2. Phase 2B must produce a SQL dependency audit/design packet and stop before SQL changes.
 3. Phase 2C must produce a report/embed design packet and stop before implementation.
+4. Phase 2D must preserve scheduled stats-alert behaviour while adopting the new report
+   architecture.

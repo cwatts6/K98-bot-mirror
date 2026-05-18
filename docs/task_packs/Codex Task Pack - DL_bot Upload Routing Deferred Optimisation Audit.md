@@ -312,7 +312,15 @@ Phase 2A delivery notes:
   listener/delegation responsibility.
 - Duplicate skips intentionally preserve the skipped embed but do not schedule background log
   backup or stats-embed refresh.
+- PR 98 (`dlbot-prekvk-upload-route`) was smoke tested successfully and pushed to production.
 - Phase 2B SQL cleanup and Phase 2C report/embed work remain separate approval-gated follow-ons.
+
+Phase 2B starter:
+
+- `docs/task_packs/DL_bot Upload Routing - Phase 2B PreKvK SQL Cleanup Audit Statement.md`
+- Phase 2B is audit/design only until explicitly approved for SQL changes.
+- It must validate dependencies on `dbo.PreKvk_Phases`, `dbo.fn_PreKvkPhaseDelta`, and
+  KVK-specific PreKvK phase views against `C:\K98-bot-SQL-Server` before proposing cleanup.
 
 14. Testing Requirements
 

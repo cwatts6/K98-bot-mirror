@@ -5,13 +5,15 @@ to GitHub issues/task packs.
 
 Resolved historical notes were moved to `archive/deferred_optimisations_resolved.md`.
 
-Last reviewed during the DL_bot upload-routing Phase 2A work. PR 96
+Last reviewed after the DL_bot upload-routing Phase 2B production SQL cleanup. PR 96
 (`import-locations-command-orchestration-cleanup`) was smoke tested successfully and deployed to
 production. PR 97 (`dlbot-player-location-upload-route`) was smoke tested successfully and
 promoted to production. The governor fuzzy/name/partial-ID lookup standardisation item,
 profile/location profile-cache lookup item, `/import_locations` command orchestration item, DL_bot
 player location auto-import route/signal coupling item, and DL_bot PreKvK upload route extraction
-item are complete; the remaining active backlog is listed below.
+item from PR 98 (`dlbot-prekvk-upload-route`) are complete, smoke tested successfully, and
+promoted to production. Phase 2B PreKvK SQL compatibility cleanup was deployed and smoke tested
+successfully; the remaining active backlog is listed below.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 upload routing and related test-environment blockers, not as a continuation of the
@@ -37,22 +39,31 @@ both this backlog and the current `K98-bot-mirror` GitHub issues list.
 - Dependencies: Local validation environment contract for venv naming and subprocess permissions.
 
 ### Deferred Optimisation
-- Area: SQL repo legacy PreKvK phase objects
+- Area: SQL repo legacy PreKvK phase object retirement
 - Type: cleanup
-- Description: `dbo.PreKvk_Phases`, `dbo.fn_PreKvkPhaseDelta`, and KVK-specific phase views still represent the old scan-window delta model even though Python reporting now uses direct stage columns.
-- Suggested Fix: Phase 2B should audit production SQL/report/manual workflow dependencies, then replace with direct-stage equivalents or retire the legacy objects only after an approved SQL cleanup design.
-- Impact: medium
+- Description: After Phase 2B compatibility wrappers remove active scan-window logic, `dbo.PreKvk_Phases` and any compatibility-only phase objects may remain as unused legacy SQL surface.
+- Suggested Fix: Run a later Option C retirement audit after at least one production cycle, re-check live SQL dependencies and manual/report usage, then prepare a SQL-repo-only drop plan with rollback scripts if no consumers remain.
+- Impact: low
 - Risk: medium
-- Dependencies: Confirm no production reports or manual SQL workflows still depend on scan-window phase objects.
+- Dependencies: Phase 2B compatibility wrapper deployment completed and smoke tested; live dependency checks confirm no references beyond the objects being retired; production owner approves destructive SQL cleanup.
 
 ### Deferred Optimisation
-- Area: PreKvK report/embed
-- Type: feature
-- Description: PreKvK stage-level import data is now available, but there is no dedicated PreKvK report command or embed outside the existing stats-alert panel.
-- Suggested Fix: Phase 2C should design and implement a dedicated PreKvK report/embed after the upload route boundary is stable, defining command/channel surface, permissions, limits, empty-data behaviour, and mobile-safe Discord output.
+- Area: `C:\K98-bot-SQL-Server` SQL development and deployment workflow
+- Type: architecture
+- Description: SQL schema changes can now be developed through Git PRs, but the existing production export routine can still overwrite Git-driven SQL changes because it syncs production schema back to the repository as the main routine.
+- Suggested Fix: After the current upload-routing phase set is complete, use `C:\Users\cwatt\Downloads\sql_deploy_route_task_pack.md` to create a PR-based SQL promotion workflow with guarded deploy scripts, migration history, a safe production schema export branch, `migrations/` conventions, and `docs/SQL_PROMOTION_GUIDE.md`.
+- Impact: high
+- Risk: medium
+- Dependencies: Complete the active DL_bot upload-routing phases first; preserve current production schema export as a drift/safety mechanism while preventing direct overwrite of `main`.
+
+### Deferred Optimisation
+- Area: `stats_alerts/prekvk_stats.py`, `stats_alerts/embeds/prekvk.py`
+- Type: refactor
+- Description: After the Phase 2C dedicated PreKvK report introduces the new report DAL/service/image-rendering architecture, the scheduled PreKvK stats-alert embed will still use its older helper/rendering path.
+- Suggested Fix: Phase 2D should refactor the scheduled PreKvK stats-alert helper/embed to reuse the new PreKvK architecture while preserving scheduled-post behaviour, guard/state handling, and existing upload-refresh behaviour.
 - Impact: medium
-- Risk: low
-- Dependencies: Complete Phase 2A route extraction first; reuse direct-stage PreKvK data path where practical.
+- Risk: medium
+- Dependencies: Complete and validate Phase 2C dedicated report first; do not move on from the PreKvK report phase until Phase 2D is complete.
 
 ### Deferred Optimisation
 - Area: `DL_bot.py` KVK_ALL upload routing
