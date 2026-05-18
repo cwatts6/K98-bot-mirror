@@ -16,7 +16,9 @@ promoted to production. Phase 2B PreKvK SQL compatibility cleanup was deployed a
 successfully. Phase 2C delivered the public read-only `/prekvk report` image report, was smoke
 tested successfully, and was pushed to production. Phase 2D refactored the scheduled PreKvK
 stats-alert path onto the Phase 2C report service architecture while preserving scheduled embed,
-guard/state, and upload-refresh behaviour; the remaining active backlog is listed below.
+guard/state, and upload-refresh behaviour; it was smoke tested successfully and pushed to
+production. Phase 3 local validation blockers are now the next upload-routing programme slice; the
+remaining active backlog is listed below.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 upload routing and related test-environment blockers, not as a continuation of the

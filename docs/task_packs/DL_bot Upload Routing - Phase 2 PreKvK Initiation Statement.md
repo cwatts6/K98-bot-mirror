@@ -122,9 +122,9 @@ Phase 2C starter and delivery notes:
 Goal: after Phase 2C is validated, refactor the scheduled PreKvK stats-alert helper/embed to use
 the new PreKvK report architecture where practical.
 
-Status: implemented in the current Phase 2D branch. The scheduled stats-alert path now uses a
-compact PreKvK scheduled-summary service shape backed by the Phase 2C report DAL/service
-architecture.
+Status: implemented in PR 103 (`codex/prekvk-phase-2d-scheduled-summary`), smoke tested
+successfully, and pushed to production. The scheduled stats-alert path now uses a compact PreKvK
+scheduled-summary service shape backed by the Phase 2C report DAL/service architecture.
 
 Starter packet:
 
@@ -138,7 +138,17 @@ In scope:
   behaviour
 - focused tests proving the scheduled stats-alert behaviour still works
 
-Phase 2D should be validated and reviewed before moving on from the PreKvK report phase.
+Phase 2D completed the PreKvK report follow-on. The next upload-routing programme slice is Phase 3
+local validation blockers.
+
+## Phase 3 - Local Validation Blockers
+
+Goal: fix or capability-gate DB/non-DB local validation blockers that affect confidence in the
+upload-routing work.
+
+Starter packet:
+
+- `docs/task_packs/DL_bot Upload Routing - Phase 3 Local Validation Blockers Starter.md`
 
 ## Required Stop Points
 
@@ -146,5 +156,7 @@ Phase 2D should be validated and reviewed before moving on from the PreKvK repor
    before route extraction code changes.
 2. Phase 2B must produce a SQL dependency audit/design packet and stop before SQL changes.
 3. Phase 2C must produce a report/embed design packet and stop before implementation.
-4. Phase 2D must preserve scheduled stats-alert behaviour while adopting the new report
-   architecture.
+4. Phase 2D had to preserve scheduled stats-alert behaviour while adopting the new report
+   architecture; it is complete, smoke tested, and pushed to production.
+5. Phase 3 must begin with review/scope only, then stop before code changes unless explicitly
+   approved for one-pass implementation.

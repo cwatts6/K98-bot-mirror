@@ -12,6 +12,27 @@ Phase 2D is the required follow-on to bring the scheduled PreKvK stats-alert hel
 new Phase 2C PreKvK report architecture where practical. It should not alter upload routing,
 PreKvK import behaviour, or SQL behaviour unless a separate approval explicitly expands scope.
 
+## Completion Status
+
+Phase 2D is complete. The scheduled PreKvK stats-alert path was refactored to use a compact
+PreKvK scheduled-summary service shape backed by the Phase 2C report DAL/service architecture.
+The change was smoke tested successfully and pushed to production.
+
+Delivered production behaviour:
+
+- `stats_alerts/prekvk_stats.py` no longer owns duplicated PreKvK ranking SQL; it remains only as a
+  compatibility wrapper over the PreKvK report service.
+- `stats_alerts/embeds/prekvk.py` keeps scheduled stats-alert responsibilities: metadata,
+  timeline, honor block, event block, guard/state handling, edit-vs-send behaviour, and upload
+  refresh compatibility.
+- Current Top 3 and previous-KVK target blocks are fed by the new PreKvK scheduled-summary service
+  shape.
+- Upload routing, PreKvK import behaviour, SQL behaviour, and `/prekvk report` UX were unchanged.
+
+Next required follow-on:
+
+- `docs/task_packs/DL_bot Upload Routing - Phase 3 Local Validation Blockers Starter.md`
+
 ## Goal
 
 Refactor the scheduled PreKvK stats-alert path so it reuses the new PreKvK report architecture

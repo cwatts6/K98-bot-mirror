@@ -29,9 +29,12 @@ Delivered production behaviour:
   handling, command-limit grouping, retry prompt naming, and governor-name glyph rendering.
 - No upload routing, importer, or production SQL behaviour was changed by Phase 2C.
 
-Next required follow-on:
+Follow-on status:
 
-- `docs/task_packs/DL_bot Upload Routing - Phase 2D PreKvK Stats-Alert Refactor Starter.md`
+- Phase 2D (`docs/task_packs/DL_bot Upload Routing - Phase 2D PreKvK Stats-Alert Refactor Starter.md`)
+  is complete, smoke tested successfully, and pushed to production.
+- The next upload-routing programme slice is Phase 3 local validation blockers:
+  `docs/task_packs/DL_bot Upload Routing - Phase 3 Local Validation Blockers Starter.md`.
 
 ## Goal
 
