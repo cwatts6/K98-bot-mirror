@@ -234,7 +234,7 @@ async def send_prekvk_embed(
                 inline=True,
             )
             embed.add_field(
-                name="Training -last kvk:",
+                name="Training - last kvk:",
                 value=_fmt_top_simple(prev_tops.p3, "pts", limit=1),
                 inline=True,
             )

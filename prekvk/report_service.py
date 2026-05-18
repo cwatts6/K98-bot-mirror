@@ -98,26 +98,46 @@ def _rank_rows(rows: list[PreKvkReportRow], sort_by: PreKvkReportSort) -> list[P
     return ranked
 
 
+def _max_int(left: int | None, right: int | None) -> int | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return max(left, right)
+
+
 def _rows_from_raw(raw_rows: list[dict[str, Any]]) -> list[PreKvkReportRow]:
-    rows: list[PreKvkReportRow] = []
+    rows_by_governor: dict[int, PreKvkReportRow] = {}
     for raw in raw_rows:
         governor_id = _to_int_or_none(raw.get("GovernorID"))
         if governor_id is None:
             continue
-        rows.append(
-            PreKvkReportRow(
-                rank=0,
-                governor_id=governor_id,
-                governor_name=str(raw.get("GovernorName") or governor_id).strip()
-                or str(governor_id),
-                power=_to_int_or_none(raw.get("Power")),
-                stage1_points=_to_int_or_none(raw.get("Stage1Points")),
-                stage2_points=_to_int_or_none(raw.get("Stage2Points")),
-                stage3_points=_to_int_or_none(raw.get("Stage3Points")),
-                overall_points=int(_to_int_or_none(raw.get("OverallPoints")) or 0),
-            )
+        governor_name = str(raw.get("GovernorName") or governor_id).strip() or str(governor_id)
+        candidate = PreKvkReportRow(
+            rank=0,
+            governor_id=governor_id,
+            governor_name=governor_name,
+            power=_to_int_or_none(raw.get("Power")),
+            stage1_points=_to_int_or_none(raw.get("Stage1Points")),
+            stage2_points=_to_int_or_none(raw.get("Stage2Points")),
+            stage3_points=_to_int_or_none(raw.get("Stage3Points")),
+            overall_points=int(_to_int_or_none(raw.get("OverallPoints")) or 0),
         )
-    return rows
+        existing = rows_by_governor.get(governor_id)
+        if existing is None:
+            rows_by_governor[governor_id] = candidate
+            continue
+        rows_by_governor[governor_id] = PreKvkReportRow(
+            rank=0,
+            governor_id=governor_id,
+            governor_name=existing.governor_name or candidate.governor_name,
+            power=_max_int(existing.power, candidate.power),
+            stage1_points=_max_int(existing.stage1_points, candidate.stage1_points),
+            stage2_points=_max_int(existing.stage2_points, candidate.stage2_points),
+            stage3_points=_max_int(existing.stage3_points, candidate.stage3_points),
+            overall_points=int(_max_int(existing.overall_points, candidate.overall_points) or 0),
+        )
+    return list(rows_by_governor.values())
 
 
 def build_report_payload_from_rows(
@@ -136,7 +156,8 @@ def build_report_payload_from_rows(
             scan_id = _to_int_or_none(raw.get("ScanID"))
             scan_timestamp_utc = raw.get("ScanTimestampUTC")
             source_filename = raw.get("SourceFileName")
-            break
+            if scan_id is not None or scan_timestamp_utc is not None or source_filename:
+                break
     rows = _rows_from_raw(raw_rows)
     ranked = _rank_rows(rows, sort_by)[:normalized_limit]
     return PreKvkReportPayload(
@@ -263,6 +284,8 @@ def build_prekvk_scheduled_summary_sync(
     current_rows = report_dal.fetch_latest_prekvk_report_rows(resolved_kvk_no)
     previous_blocks = PreKvkScheduledTopBlocks()
     resolved_previous_kvk_no = int(previous_kvk_no) if previous_kvk_no is not None else None
+    if resolved_previous_kvk_no is not None and resolved_previous_kvk_no <= 0:
+        resolved_previous_kvk_no = None
     if resolved_previous_kvk_no is not None and resolved_previous_kvk_no > 0:
         previous_rows = report_dal.fetch_latest_prekvk_report_rows(resolved_previous_kvk_no)
         previous_blocks = build_scheduled_top_blocks_from_rows(

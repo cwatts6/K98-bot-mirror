@@ -55,6 +55,31 @@ def test_build_report_payload_defaults_overall_and_keeps_scan_metadata():
     assert [row.rank for row in payload.rows] == [1, 2]
 
 
+def test_build_report_payload_keeps_scanning_for_metadata():
+    payload = report_service.build_report_payload_from_rows(
+        15,
+        [
+            {
+                "GovernorID": 1,
+                "GovernorName": "Alpha",
+                "OverallPoints": 60,
+            },
+            {
+                "GovernorID": 2,
+                "GovernorName": "Bravo",
+                "OverallPoints": 70,
+                "ScanID": 7,
+                "ScanTimestampUTC": "now",
+                "SourceFileName": "PreKvK.xlsx",
+            },
+        ],
+    )
+
+    assert payload.scan_id == 7
+    assert payload.scan_timestamp_utc == "now"
+    assert payload.source_filename == "PreKvK.xlsx"
+
+
 def test_build_report_payload_sorts_by_stage_and_uses_power_tiebreaker():
     payload = report_service.build_report_payload_from_rows(
         15,
@@ -112,6 +137,50 @@ def test_build_scheduled_top_blocks_omits_legacy_empty_stage_blocks():
     assert blocks.p3 == []
 
 
+def test_build_scheduled_top_blocks_deduplicates_governors_before_ranking():
+    blocks = report_service.build_scheduled_top_blocks_from_rows(
+        [
+            {
+                "GovernorID": 1,
+                "GovernorName": "Alpha",
+                "Power": 100_000_000,
+                "Stage1Points": 10,
+                "Stage2Points": 5,
+                "Stage3Points": 7,
+                "OverallPoints": 60,
+            },
+            {
+                "GovernorID": 1,
+                "GovernorName": "Alpha duplicate",
+                "Power": 110_000_000,
+                "Stage1Points": 20,
+                "Stage2Points": 15,
+                "Stage3Points": 17,
+                "OverallPoints": 80,
+            },
+            {
+                "GovernorID": 2,
+                "GovernorName": "Bravo",
+                "Power": 90_000_000,
+                "Stage1Points": 11,
+                "Stage2Points": 30,
+                "Stage3Points": 27,
+                "OverallPoints": 70,
+            },
+        ],
+        limit=2,
+    )
+
+    assert [(entry.name, entry.points) for entry in blocks.overall] == [
+        ("Alpha", 80),
+        ("Bravo", 70),
+    ]
+    assert [(entry.name, entry.points) for entry in blocks.p1] == [
+        ("Alpha", 20),
+        ("Bravo", 11),
+    ]
+
+
 def test_build_prekvk_scheduled_summary_fetches_current_and_previous_once(monkeypatch):
     calls = []
 
@@ -145,3 +214,22 @@ def test_build_prekvk_scheduled_summary_fetches_current_and_previous_once(monkey
     assert summary.previous_kvk_no == 14
     assert summary.current.overall[0].name == "Bravo"
     assert summary.previous.overall[0].name == "Previous"
+
+
+def test_build_prekvk_scheduled_summary_normalizes_non_positive_previous_kvk(monkeypatch):
+    calls = []
+
+    def fake_fetch(kvk_no):
+        calls.append(kvk_no)
+        return _rows()
+
+    monkeypatch.setattr(report_service.report_dal, "fetch_latest_prekvk_report_rows", fake_fetch)
+
+    summary = report_service.build_prekvk_scheduled_summary_sync(
+        kvk_no=1,
+        previous_kvk_no=0,
+    )
+
+    assert calls == [1]
+    assert summary.previous_kvk_no is None
+    assert summary.previous.overall == []
