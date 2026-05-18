@@ -135,6 +135,7 @@ def get_latest_kvk_details(today: dt.date | None = None) -> KVKDetails | None:
                     PASS4_START_SCAN,
                     KVK_END_SCAN
                 FROM dbo.KVK_Details
+                WHERE KVK_NO IS NOT NULL
                 ORDER BY KVK_NO DESC
             """)
             row = fetch_one_dict(cur)
@@ -154,7 +155,10 @@ def get_latest_kvk_details(today: dt.date | None = None) -> KVKDetails | None:
         # positional fallback
         return vals[idx] if idx < len(vals) else None
 
-    kvk_no = int(by_name("KVK_NO", idx=0))
+    kvk_no = _as_int(by_name("KVK_NO", idx=0))
+    if not kvk_no:
+        log.warning("[kvk_state] Ignoring KVK_Details row with invalid KVK_NO=%r", kvk_no)
+        return None
     name = (by_name("KVK_NAME", idx=1) or f"KVK {kvk_no}").strip()
     registration = _as_date(by_name("KVK_REGISTRATION_DATE", idx=2))
     start_d = _as_date(by_name("KVK_START_DATE", idx=3))
@@ -162,7 +166,7 @@ def get_latest_kvk_details(today: dt.date | None = None) -> KVKDetails | None:
     mm_start = _as_date(by_name("MATCHMAKING_START_DATE", idx=5))
     fight_start = _as_date(by_name("FIGHTING_START_DATE", idx=6))
     next_no_raw = by_name("NEXT_KVK_NO", "NextKVKNo", idx=7)
-    next_no = int(next_no_raw) if next_no_raw is not None else None
+    next_no = _as_int(next_no_raw)
     matchmaking_scan = _as_int(by_name("MATCHMAKING_SCAN", idx=8))
     pass4_start_scan = _as_int(by_name("PASS4_START_SCAN", idx=9))
     kvk_end_scan = _as_int(by_name("KVK_END_SCAN", idx=10))

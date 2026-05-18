@@ -52,6 +52,18 @@ def _cache_matches_context(cache: dict[str, Any], ctx: dict[str, Any] | None) ->
     return meta.get("kvk_no") == ctx.get("kvk_no") and meta.get("state") == ctx.get("state")
 
 
+def _cache_might_be_stale(cache: dict[str, Any], key: str) -> bool:
+    if not cache:
+        return True
+    by_gov = cache.get("by_gov") or {}
+    if key not in by_gov:
+        return True
+    meta = cache.get("_meta") if isinstance(cache, dict) else None
+    if not isinstance(meta, dict):
+        return True
+    return meta.get("state") == "DRAFT"
+
+
 def _fetch_targets_from_view(cur) -> list[dict[str, Any]]:
     """
     Reads from dbo.v_TARGETS_FOR_UPLOAD and normalizes columns to:
@@ -196,22 +208,29 @@ def refresh_targets_cache() -> dict[str, Any]:
 
 
 def get_targets_for_governor(governor_id: int) -> dict[str, Any] | None:
-    cache = _read_json(PLAYER_TARGETS_CACHE)
-    ctx = get_kvk_context_today()
-    if not cache or not _cache_matches_context(cache, ctx):
-        if cache:
-            logger.info(
-                "[targets_sql_cache] Refreshing stale targets cache. cached_kvk=%r cached_state=%r "
-                "resolved_kvk=%r resolved_state=%r reason=%r",
-                (cache.get("_meta") or {}).get("kvk_no"),
-                (cache.get("_meta") or {}).get("state"),
-                (ctx or {}).get("kvk_no"),
-                (ctx or {}).get("state"),
-                (ctx or {}).get("state_reason"),
-            )
-        cache = refresh_targets_cache()
     try:
         key = normalize_governor_id(governor_id)
     except Exception:
         key = str(governor_id)
+
+    cache = _read_json(PLAYER_TARGETS_CACHE)
+    if _cache_might_be_stale(cache, key):
+        ctx = get_kvk_context_today()
+        if ctx and not _cache_matches_context(cache, ctx):
+            if cache:
+                logger.info(
+                    "[targets_sql_cache] Refreshing stale targets cache. cached_kvk=%r cached_state=%r "
+                    "resolved_kvk=%r resolved_state=%r reason=%r",
+                    (cache.get("_meta") or {}).get("kvk_no"),
+                    (cache.get("_meta") or {}).get("state"),
+                    ctx.get("kvk_no"),
+                    ctx.get("state"),
+                    ctx.get("state_reason"),
+                )
+            cache = refresh_targets_cache()
+        elif not ctx and cache:
+            logger.info(
+                "[targets_sql_cache] Keeping existing targets cache because KVK context could not be resolved."
+            )
+
     return (cache.get("by_gov") or {}).get(str(key))

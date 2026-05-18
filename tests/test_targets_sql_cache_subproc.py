@@ -124,3 +124,56 @@ def test_get_targets_for_governor_refreshes_stale_state(monkeypatch):
 
     assert res is not None
     assert res["TargetState"] == "ACTIVE"
+
+
+def test_get_targets_for_governor_uses_active_cache_without_context_lookup(monkeypatch):
+    def fail_context_lookup():
+        raise AssertionError("context lookup should not be called for active cache hits")
+
+    monkeypatch.setattr("targets_sql_cache.get_kvk_context_today", fail_context_lookup)
+    monkeypatch.setattr(
+        "targets_sql_cache._read_json",
+        lambda _path: {
+            "_meta": {"kvk_no": 15, "state": "ACTIVE"},
+            "by_gov": {
+                "123": {
+                    "GovernorID": "123",
+                    "GovernorName": "Alice",
+                    "TargetState": "ACTIVE",
+                    "KVK_NO": 15,
+                }
+            },
+        },
+    )
+
+    res = tsc.get_targets_for_governor(123)
+
+    assert res is not None
+    assert res["TargetState"] == "ACTIVE"
+
+
+def test_get_targets_for_governor_keeps_cache_when_context_missing(monkeypatch):
+    monkeypatch.setattr("targets_sql_cache.get_kvk_context_today", lambda: None)
+    monkeypatch.setattr(
+        "targets_sql_cache.refresh_targets_cache",
+        lambda: (_ for _ in ()).throw(AssertionError("refresh should not run without context")),
+    )
+    monkeypatch.setattr(
+        "targets_sql_cache._read_json",
+        lambda _path: {
+            "_meta": {"kvk_no": 15, "state": "DRAFT"},
+            "by_gov": {
+                "123": {
+                    "GovernorID": "123",
+                    "GovernorName": "Alice",
+                    "TargetState": "DRAFT",
+                    "KVK_NO": 15,
+                }
+            },
+        },
+    )
+
+    res = tsc.get_targets_for_governor(123)
+
+    assert res is not None
+    assert res["TargetState"] == "DRAFT"

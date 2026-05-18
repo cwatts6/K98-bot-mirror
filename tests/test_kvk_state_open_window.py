@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import kvk_state
 from kvk_state import is_scan_within_open_window, resolve_kvk_scan_state
 import stats_alerts.kvk_meta as kvk_meta
 
@@ -79,3 +80,45 @@ def test_stats_alerts_fighting_gate_allows_null_end_scan(monkeypatch) -> None:
     )
 
     assert kvk_meta.is_kvk_fighting_open() is True
+
+
+class _KvkCursor:
+    sql = ""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return None
+
+    def execute(self, sql):
+        self.sql = sql
+
+
+class _KvkConn:
+    cursor_obj = _KvkCursor()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return None
+
+    def cursor(self):
+        return self.cursor_obj
+
+
+def test_latest_kvk_details_filters_null_kvk_no(monkeypatch) -> None:
+    conn = _KvkConn()
+    monkeypatch.setattr(kvk_state, "_conn", lambda: conn)
+    monkeypatch.setattr(kvk_state, "fetch_one_dict", lambda _cur: None)
+
+    assert kvk_state.get_latest_kvk_details() is None
+    assert "WHERE KVK_NO IS NOT NULL" in conn.cursor_obj.sql
+
+
+def test_latest_kvk_details_returns_none_for_invalid_kvk_no(monkeypatch) -> None:
+    monkeypatch.setattr(kvk_state, "_conn", lambda: _KvkConn())
+    monkeypatch.setattr(kvk_state, "fetch_one_dict", lambda _cur: {"KVK_NO": None})
+
+    assert kvk_state.get_latest_kvk_details() is None
