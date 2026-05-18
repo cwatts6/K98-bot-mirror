@@ -43,6 +43,15 @@ def _write_json(path: str, data: dict[str, Any]) -> None:
         raise
 
 
+def _cache_matches_context(cache: dict[str, Any], ctx: dict[str, Any] | None) -> bool:
+    if not cache or not ctx:
+        return False
+    meta = cache.get("_meta") if isinstance(cache, dict) else None
+    if not isinstance(meta, dict):
+        return False
+    return meta.get("kvk_no") == ctx.get("kvk_no") and meta.get("state") == ctx.get("state")
+
+
 def _fetch_targets_from_view(cur) -> list[dict[str, Any]]:
     """
     Reads from dbo.v_TARGETS_FOR_UPLOAD and normalizes columns to:
@@ -120,6 +129,11 @@ def refresh_targets_cache() -> dict[str, Any]:
             "generated_at": utcnow().isoformat(),
             "kvk_no": ctx.get("kvk_no"),
             "state": ctx.get("state"),
+            "state_reason": ctx.get("state_reason"),
+            "matchmaking_scan": ctx.get("matchmaking_scan"),
+            "pass4_start_scan": ctx.get("pass4_start_scan"),
+            "kvk_end_scan": ctx.get("kvk_end_scan"),
+            "max_scan_order": ctx.get("max_scan_order"),
         },
         "by_gov": {},
     }
@@ -183,7 +197,18 @@ def refresh_targets_cache() -> dict[str, Any]:
 
 def get_targets_for_governor(governor_id: int) -> dict[str, Any] | None:
     cache = _read_json(PLAYER_TARGETS_CACHE)
-    if not cache:
+    ctx = get_kvk_context_today()
+    if not cache or not _cache_matches_context(cache, ctx):
+        if cache:
+            logger.info(
+                "[targets_sql_cache] Refreshing stale targets cache. cached_kvk=%r cached_state=%r "
+                "resolved_kvk=%r resolved_state=%r reason=%r",
+                (cache.get("_meta") or {}).get("kvk_no"),
+                (cache.get("_meta") or {}).get("state"),
+                (ctx or {}).get("kvk_no"),
+                (ctx or {}).get("state"),
+                (ctx or {}).get("state_reason"),
+            )
         cache = refresh_targets_cache()
     try:
         key = normalize_governor_id(governor_id)

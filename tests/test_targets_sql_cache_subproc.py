@@ -84,3 +84,43 @@ def test_refresh_targets_cache_returns_full_when_not_subprocess(monkeypatch, tmp
     assert "_meta" in res
     assert "by_gov" in res
     assert len(res["by_gov"]) == 2
+
+
+def test_get_targets_for_governor_refreshes_stale_state(monkeypatch):
+    monkeypatch.setattr(
+        "targets_sql_cache.get_kvk_context_today",
+        lambda: {"kvk_no": 15, "state": "ACTIVE", "state_reason": "test_active"},
+    )
+    monkeypatch.setattr(
+        "targets_sql_cache._read_json",
+        lambda _path: {
+            "_meta": {"kvk_no": 15, "state": "DRAFT"},
+            "by_gov": {
+                "123": {
+                    "GovernorID": "123",
+                    "GovernorName": "Alice",
+                    "TargetState": "DRAFT",
+                    "KVK_NO": 15,
+                }
+            },
+        },
+    )
+    monkeypatch.setattr(
+        "targets_sql_cache.refresh_targets_cache",
+        lambda: {
+            "_meta": {"kvk_no": 15, "state": "ACTIVE"},
+            "by_gov": {
+                "123": {
+                    "GovernorID": "123",
+                    "GovernorName": "Alice",
+                    "TargetState": "ACTIVE",
+                    "KVK_NO": 15,
+                }
+            },
+        },
+    )
+
+    res = tsc.get_targets_for_governor(123)
+
+    assert res is not None
+    assert res["TargetState"] == "ACTIVE"
