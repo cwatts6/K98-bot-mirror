@@ -9,6 +9,30 @@ We are starting Phase 2C after:
 Phase 2C is the dedicated PreKvK report/embed design task. It should not alter upload routing or
 PreKvK import behaviour unless a separate approval explicitly expands scope.
 
+## Completion Status
+
+Phase 2C is complete. The public read-only `/prekvk report` image report was implemented, smoke
+tested successfully, and pushed to production.
+
+Delivered production behaviour:
+
+- `/prekvk report` lives under the shared `/prekvk` command group to avoid adding another
+  top-level Discord command.
+- The command defaults to the current KVK and supports optional `kvk_no`.
+- The report renders a PNG leaderboard with `Rank`, `GovernorName`, `Power`, `Stage 1`, `Stage 2`,
+  `Stage 3`, and `Overall`.
+- The report defaults to `Overall` ordering and supports `Overall`, `Stage 1`, `Stage 2`, and
+  `Stage 3` ordering.
+- Buttons support Top 10, Top 25, Top 50, and Top 100.
+- The report uses the new PreKvK DAL/service/image-rendering/view architecture.
+- Review follow-ups fixed followup message capture, component refresh editing, public defer/error
+  handling, command-limit grouping, retry prompt naming, and governor-name glyph rendering.
+- No upload routing, importer, or production SQL behaviour was changed by Phase 2C.
+
+Next required follow-on:
+
+- `docs/task_packs/DL_bot Upload Routing - Phase 2D PreKvK Stats-Alert Refactor Starter.md`
+
 ## Goal
 
 Design a dedicated PreKvK report surface that uses the now-stable direct-stage PreKvK data path:
