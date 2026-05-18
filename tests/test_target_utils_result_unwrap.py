@@ -37,8 +37,13 @@ def test_unwrap_targets_result_accepts_worker_parsed_tuple():
 
 
 def test_unwrap_targets_result_raises_for_failed_maintenance_tuple():
-    with pytest.raises(RuntimeError, match="Target maintenance failed"):
-        target_utils._unwrap_targets_result((False, "database unavailable"))
+    raw_error = "Return code 1. Output:\n" + ("secret-ish output " * 100)
+
+    with pytest.raises(RuntimeError) as exc:
+        target_utils._unwrap_targets_result((False, raw_error))
+
+    assert str(exc.value) == "Target maintenance failed"
+    assert "secret-ish output" not in str(exc.value)
 
 
 @pytest.mark.asyncio

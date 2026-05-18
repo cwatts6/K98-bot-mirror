@@ -260,11 +260,11 @@ def _unwrap_targets_result(result: Any) -> dict[str, Any] | None:
     first, second = result[0], result[1]
     if isinstance(first, bool):
         if not first:
-            raise RuntimeError(f"Target maintenance failed: {second}")
+            raise RuntimeError("Target maintenance failed")
         return second if isinstance(second, dict) else None
     if isinstance(second, bool):
         if not second:
-            raise RuntimeError(f"Target maintenance failed: {first}")
+            raise RuntimeError("Target maintenance failed")
         return first if isinstance(first, dict) else None
     if isinstance(first, dict):
         return first
