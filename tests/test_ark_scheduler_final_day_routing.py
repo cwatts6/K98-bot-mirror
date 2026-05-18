@@ -1,0 +1,118 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+
+import pytest
+
+from ark.ark_scheduler import ArkSchedulerState, _run_match_reminder_dispatch
+
+
+class DummyMsg:
+    def __init__(self, channel_id: int):
+        self.id = 999
+        self.channel = type("C", (), {"id": channel_id})()
+
+
+class DummyChannel:
+    def __init__(self, channel_id: int):
+        self.id = channel_id
+        self.sent = []
+
+    async def send(self, content=None, embed=None, **kwargs):
+        self.sent.append({"content": content, "embed": embed, **kwargs})
+
+
+class DummyClient:
+    guild_id = 1234
+
+    def __init__(self):
+        self.channels = {111: DummyChannel(111), 222: DummyChannel(222)}
+
+    def get_channel(self, cid: int):
+        return self.channels.get(cid)
+
+    def get_user(self, _uid):
+        return None
+
+    async def fetch_user(self, _uid):
+        class _U:
+            async def send(self, _content):
+                return None
+
+        return _U()
+
+
+@pytest.mark.asyncio
+async def test_final_day_not_dispatched(monkeypatch, tmp_path):
+    """REMINDER_FINAL_DAY is deprecated and must not be dispatched to any channel.
+
+    The scheduler no longer dispatches a 'final_day' reminder. This test verifies
+    that no message containing 'final_day', 'final-day', or 'final day' is sent to
+    either the registration channel or the confirmation channel.
+    """
+    now = datetime.now(UTC).replace(hour=12, minute=5, second=0, microsecond=0)
+    close_dt = now.replace(hour=23, minute=0, second=0, microsecond=0)
+
+    match = {
+        "MatchId": 21,
+        "Alliance": "K98",
+        "ArkWeekendDate": now.date(),
+        "MatchDay": "Sat",
+        "MatchTimeUtc": (now + timedelta(hours=20)).time().replace(microsecond=0),
+        "SignupCloseUtc": close_dt,
+        "Status": "Scheduled",
+        "RegistrationStartsAtUtc": None,
+    }
+
+    async def _get_match(_mid):
+        return dict(match)
+
+    async def _get_alliance(_alliance):
+        return {"RegistrationChannelId": 111, "ConfirmationChannelId": 222}
+
+    async def _get_roster(_mid):
+        return []
+
+    async def _get_prefs(_uid):
+        return {"OptOutAll": 0}
+
+    async def _list_team_rows(_mid, draft_only=False):
+        return []
+
+    class _State:
+        def __init__(self):
+            self.messages = {}
+
+        async def load_async(self):
+            return None
+
+    monkeypatch.setattr("ark.ark_scheduler._utcnow", lambda: now)
+    monkeypatch.setattr("ark.ark_scheduler.get_match", _get_match)
+    monkeypatch.setattr("ark.ark_scheduler.get_alliance", _get_alliance)
+    monkeypatch.setattr("ark.ark_scheduler.get_roster", _get_roster)
+    monkeypatch.setattr("ark.ark_scheduler.get_reminder_prefs", _get_prefs)
+    monkeypatch.setattr("ark.ark_scheduler.list_match_team_rows", _list_team_rows)
+    monkeypatch.setattr("ark.ark_scheduler.ArkJsonState", lambda: _State())
+
+    state = ArkSchedulerState()
+    state.reminder_state.path = tmp_path / "ark_reminder_state.json"
+
+    client = DummyClient()
+    await _run_match_reminder_dispatch(client=client, state=state, match=match)
+
+    all_payloads = list(client.channels[111].sent) + list(client.channels[222].sent)
+    all_text = " ".join(
+        str(m.get("content") or "").lower()
+        + " "
+        + str(getattr(m.get("embed"), "title", "") or "").lower()
+        + " "
+        + str(getattr(m.get("embed"), "description", "") or "").lower()
+        for m in all_payloads
+    )
+
+    # REMINDER_FINAL_DAY is deprecated — must never appear in any sent message
+    for token in ("final_day", "final-day", "final day"):
+        assert token not in all_text, (
+            f"Deprecated REMINDER_FINAL_DAY token '{token}' found in sent messages. "
+            f"This reminder type must no longer be dispatched."
+        )
