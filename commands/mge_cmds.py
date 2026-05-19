@@ -7,8 +7,8 @@ import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID, MGE_LEADERSHIP_CHANNEL_ID, MGE_SIMPLIFIED_FLOW_ENABLED
-from core.mge_permissions import is_admin_interaction
 from core.interaction_safety import safe_command, safe_defer
+from core.mge_permissions import is_admin_interaction
 from decoraters import (
     channel_only,
     is_admin_and_notify_channel,
@@ -20,8 +20,8 @@ from mge.mge_embed_manager import sync_event_leadership_embed
 from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
 from mge.mge_results_import import OverwriteConfirmationRequired, import_results_manual
 from mge.mge_review_service import get_review_pool_with_summary
-from ui.views.mge_commander_admin_view import MgeCommanderAdminView
 from ui.views.mge_admin_completion_view import MgeAdminCompletionView
+from ui.views.mge_commander_admin_view import MgeCommanderAdminView
 from ui.views.mge_leadership_board_view import MgeLeadershipBoardView
 from ui.views.mge_results_overwrite_confirm_view import MgeResultsOverwriteConfirmView
 from versioning import versioned

@@ -41,13 +41,11 @@ def register_sample(bot):
 def test_main_warns_when_primary_command_count_nears_limit(tmp_path, monkeypatch, capsys):
     command_lines = []
     for index in range(validator.PRIMARY_COMMAND_WARNING_THRESHOLD):
-        command_lines.append(
-            f"""
+        command_lines.append(f"""
     @bot.slash_command(name="cmd_{index}", description="Command {index}")
     async def cmd_{index}(ctx):
         pass
-"""
-        )
+""")
     _write(
         tmp_path / "commands" / "many_cmds.py",
         "def register_many(bot):\n" + "\n".join(command_lines),
