@@ -28,6 +28,7 @@ from bot_config import (
 )
 from core.interaction_safety import get_operation_lock, safe_command, safe_defer
 from discord.ext import commands as ext_commands
+from commands.command_inventory import flatten_application_commands
 from commands.crystaltech_flow import run_crystaltech_flow
 from commands.telemetry_cmds import (
     _pick_log_source,
@@ -765,8 +766,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 new_cache = []
                 updated = []
 
-                for command in bot.application_commands:
-                    name = command.name
+                for name, command in flatten_application_commands(bot.application_commands):
                     version = getattr(command.callback, "__version__", "N/A")
                     description = command.description or ""
                     cached_version = old_cache.get(name, {}).get("version")
@@ -823,7 +823,10 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
         try:
             # Sort for stable output
-            cmds = sorted(bot.application_commands, key=lambda c: c.name.lower())
+            cmds = sorted(
+                flatten_application_commands(bot.application_commands),
+                key=lambda item: item[0].lower(),
+            )
 
             embed = discord.Embed(
                 title="📦 Loaded Slash Command Versions",
@@ -833,16 +836,16 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
             # Discord embeds allow max 25 fields. If we have more, use a description list.
             if len(cmds) <= 25:
-                for command in cmds:
+                for command_name, command in cmds:
                     version = getattr(command.callback, "__version__", "N/A")
                     embed.add_field(
-                        name=f"/{command.name}", value=f"Version: `{version}`", inline=False
+                        name=f"/{command_name}", value=f"Version: `{version}`", inline=False
                     )
             else:
                 lines = []
-                for command in cmds:
+                for command_name, command in cmds:
                     version = getattr(command.callback, "__version__", "N/A")
-                    lines.append(f"/{command.name} — `{version}`")
+                    lines.append(f"/{command_name} — `{version}`")
                 text = "\n".join(lines)
                 # Keep under embed description limits (~4096 chars)
                 if len(text) > 3900:
@@ -888,15 +891,17 @@ def register_admin(bot: ext_commands.Bot) -> None:
             return
 
         # Build checks
-        loaded_cmds = sorted(bot.application_commands, key=lambda c: c.name.lower())
-        loaded_names = {c.name for c in loaded_cmds}
+        loaded_cmds = sorted(
+            flatten_application_commands(bot.application_commands),
+            key=lambda item: item[0].lower(),
+        )
+        loaded_names = {name for name, _command in loaded_cmds}
         cache_names = set(cache.keys())
 
         issues = []
 
         # Missing or mismatched
-        for command in loaded_cmds:
-            name = command.name
+        for name, command in loaded_cmds:
             version = getattr(command.callback, "__version__", "N/A")
             cached = cache.get(name)
             if cached is None:

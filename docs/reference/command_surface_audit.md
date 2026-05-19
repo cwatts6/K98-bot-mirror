@@ -7,12 +7,12 @@ Last updated: 2026-05-19
 `scripts/validate_command_registration.py` reports:
 
 ```text
-primary=82 grouped_subcommands=21 secondary_cogs=5 secondary_subscribe=1 total_unique=82
+primary=82 grouped_subcommands_detected=21 secondary_cogs=5 secondary_subscribe=1 total_unique=82
 ```
 
 Grouped command summary:
 
-| Group | Subcommands |
+| Group | Statically detected subcommands |
 |---|---:|
 | `/ops` | 14 |
 | `/mge` | 6 |

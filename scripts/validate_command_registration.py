@@ -142,7 +142,7 @@ def collect_primary_names() -> set[str]:
 
 def main() -> int:
     primary_names, grouped = collect_primary_inventory()
-    grouped_subcommand_count = sum(len(commands) for commands in grouped.values())
+    grouped_subcommand_detected_count = sum(len(commands) for commands in grouped.values())
     paths = {"commands package (authoritative)": primary_names}
     paths.update({label: collect_names(path) for label, path in SECONDARY_MODULES})
     owners: dict[str, list[str]] = {}
@@ -155,14 +155,14 @@ def main() -> int:
     total_unique = len(set().union(*paths.values()))
     print(
         f"registration summary: primary={primary_count} "
-        f"grouped_subcommands={grouped_subcommand_count} "
+        f"grouped_subcommands_detected={grouped_subcommand_detected_count} "
         f"secondary_cogs={len(paths['cogs/commands.py (secondary)'])} "
         f"secondary_subscribe={len(paths['subscribe.py (secondary)'])} "
         f"total_unique={total_unique}"
     )
 
     if grouped:
-        print("grouped command summary:")
+        print("grouped command summary (statically detected):")
         for group_name in sorted(grouped):
             subcommands = grouped[group_name]
             print(f"  /{group_name}: {len(subcommands)} subcommand(s)")
