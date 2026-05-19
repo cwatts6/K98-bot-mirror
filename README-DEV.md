@@ -32,6 +32,13 @@ the run explicitly, for example:
 Use `python scripts/analyse_pytest_log_noise.py` to verify that pytest did not write to
 `logs/log.txt`, `logs/error_log.txt`, `logs/crash.log`, or `logs/telemetry_log.jsonl`.
 
+When a full-suite run feels slow, capture durations with the audit artifact so the next
+optimisation task has actionable timing evidence:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -vv tests --durations=30 --durations-min=1.0 2>&1 | Tee-Object -FilePath .codex_pytest_audit.log
+```
+
 Optional: for fast local searches, place `rg.exe` at `C:\discord_file_downloader\tools\rg.exe`.
 `dev.ps1` adds `tools\` to `PATH` when that binary exists.
 

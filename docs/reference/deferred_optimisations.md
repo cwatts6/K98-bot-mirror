@@ -26,6 +26,15 @@ upload routing and related test-environment blockers, not as a continuation of t
 both this backlog and the current `K98-bot-mirror` GitHub issues list.
 
 ### Deferred Optimisation
+- Area: `tests/test_processing_pipeline.py`, `tests/test_processing_pipeline_build_cache.py`, `tests/test_processing_pipeline_run_step_and_normalization.py`, `tests/test_event_cache.py`, slow full-suite pytest paths
+- Type: performance
+- Description: Production smoke validation for the pytest log-isolation delivery passed, but the saved duration audit shows several unit tests spending real wall-clock time in expensive pipeline, timeout, lock, or offload paths. The worst offenders were `tests/test_processing_pipeline.py::test_run_stats_copy_archive_success` at 252.28s, `tests/test_processing_pipeline.py::test_run_stats_copy_archive_unexpected_shape` at 234.79s, `tests/test_event_cache.py::test_refresh_event_cache_times_out` at 45.00s, `tests/test_processing_pipeline_run_step_and_normalization.py::test_run_step_with_sync_and_async` at 17.27s, `tests/test_processing_pipeline_build_cache.py::test_build_player_stats_cache_offloaded_and_completes` at 17.26s, and `tests/test_processing_pipeline_build_cache.py::test_build_player_stats_cache_timeout_handled` at 16.32s.
+- Suggested Fix: Start with the two `tests/test_processing_pipeline.py` cases and audit which downstream stages still execute after `run_stats_copy_archive` is mocked. Patch heavy unit-test boundaries such as cache rebuilds, post-import maintenance, ProcConfig preflight/import, exports, lock waits, and intentional timeout sleeps so unit coverage asserts orchestration and failure handling without real multi-second waits. Add duration-focused regression validation using `pytest -vv --durations=30 --durations-min=1.0` and keep full-suite log-noise validation intact.
+- Impact: high
+- Risk: medium
+- Dependencies: Preserve negative-path coverage and production timeout behaviour; do not weaken `scripts/analyse_pytest_log_noise.py` or live integration gating.
+
+### Deferred Optimisation
 - Area: `commands/`, `scripts/validate_command_registration.py`
 - Type: architecture
 - Description: The primary Discord application-command set is currently at the 100 top-level command limit. Phase 2C avoided the limit by grouping PreKvK commands under `/prekvk`, but future standalone slash commands can still break startup sync with Discord error 30032 unless command surface consolidation is planned before new command work.

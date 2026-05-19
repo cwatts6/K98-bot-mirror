@@ -254,6 +254,27 @@ expected negative-path logs remain assertable inside tests
  Runtime production logging behaviour is not weakened.
  Documentation/promotion guidance is updated if deployment validation steps change.
 
+## 15A. Delivery Status
+
+Delivered and promoted to production on 2026-05-19.
+
+Production smoke validation passed with:
+
+```powershell
+pytest -q tests -v 2>&1 | Tee-Object -FilePath .codex_pytest_audit.log
+```
+
+Observed result from the saved audit artifact:
+
+- `1450 passed, 2 skipped, 19 warnings`
+- production pytest smoke completed without false-positive operational error storms
+- pytest evidence is reviewed through pytest output, `caplog`, or `.codex_pytest_audit.log`
+- production operational logs remain runtime evidence, not negative-path unit-test evidence
+
+Follow-up finding: the production smoke audit exposed slow-running tests. That performance work
+is intentionally deferred and tracked in `docs/reference/deferred_optimisations.md` plus
+`docs/task_packs/Codex Chat Starter - Slow Pytest Optimisation.md`.
+
 ## 16. Required Delivery Output
 
 Summary
