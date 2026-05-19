@@ -314,9 +314,13 @@ def test_refresh_award_reminders_command_uses_admin_decorator(monkeypatch):
     class _RecordedBot:
         def __init__(self):
             self.tree = _RecordedRegistrar()
+            self.application_commands = []
 
         def slash_command(self, *args, **kwargs):
             return self.tree.slash_command(*args, **kwargs)
+
+        def add_application_command(self, command):
+            self.application_commands.append(command)
 
     def _fake_is_admin_and_notify_channel(*, allow_leadership=False):
         captured["allow_leadership"] = allow_leadership
@@ -336,12 +340,10 @@ def test_refresh_award_reminders_command_uses_admin_decorator(monkeypatch):
     bot = _RecordedBot()
     mge_cmds.register_mge(bot)
 
-    refresh_commands = [
-        command for command in bot.tree.commands if command.name == "mge_refresh_award_reminders"
-    ]
-
     assert captured["allow_leadership"] is True
-    assert refresh_commands
+    assert [command.name for command in bot.application_commands] == ["mge"]
     assert any(
-        getattr(command.callback, "_admin_check_applied", False) for command in refresh_commands
+        getattr(command.callback, "_admin_check_applied", False)
+        for command in bot.application_commands[0].subcommands
+        if command.name == "refresh_award_reminders"
     )

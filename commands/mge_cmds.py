@@ -7,6 +7,7 @@ import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID, MGE_LEADERSHIP_CHANNEL_ID, MGE_SIMPLIFIED_FLOW_ENABLED
+from core.mge_permissions import is_admin_interaction
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import (
     channel_only,
@@ -20,6 +21,7 @@ from mge.mge_publish_discord_adapter import MgePublishDiscordAdapter
 from mge.mge_results_import import OverwriteConfirmationRequired, import_results_manual
 from mge.mge_review_service import get_review_pool_with_summary
 from ui.views.mge_commander_admin_view import MgeCommanderAdminView
+from ui.views.mge_admin_completion_view import MgeAdminCompletionView
 from ui.views.mge_leadership_board_view import MgeLeadershipBoardView
 from ui.views.mge_results_overwrite_confirm_view import MgeResultsOverwriteConfirmView
 from versioning import versioned
@@ -52,10 +54,15 @@ def _format_import_report(report: dict) -> str:
 def register_mge(bot: ext_commands.Bot) -> None:
     """Register MGE leadership command(s)."""
 
-    @bot.slash_command(
-        name="mge_leadership_board",
-        description="Open leadership board and roster builder for an MGE event",
+    group = discord.SlashCommandGroup(
+        "mge",
+        "MGE leadership and admin controls",
         guild_ids=[GUILD_ID],
+    )
+
+    @group.command(
+        name="leadership_board",
+        description="Open leadership board and roster builder for an MGE event",
     )
     @versioned("v1.03")
     @safe_command
@@ -123,10 +130,9 @@ def register_mge(bot: ext_commands.Bot) -> None:
             ephemeral=True,
         )
 
-    @bot.slash_command(
-        name="mge_import_results",
+    @group.command(
+        name="import_results",
         description="Manually import MGE results (.xlsx) for a completed event",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.02")
     @safe_command
@@ -235,10 +241,9 @@ def register_mge(bot: ext_commands.Bot) -> None:
             ephemeral=True,
         )
 
-    @bot.slash_command(
-        name="mge_refresh_cache",
+    @group.command(
+        name="refresh_cache",
         description="Refresh MGE commander caches from database",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.01")
     @safe_command
@@ -297,10 +302,9 @@ def register_mge(bot: ext_commands.Bot) -> None:
                 ephemeral=True,
             )
 
-    @bot.slash_command(
-        name="mge_refresh_award_reminders",
+    @group.command(
+        name="refresh_award_reminders",
         description="Refresh or repost MGE award reminders for a published event",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.0")
     @safe_command
@@ -335,10 +339,9 @@ def register_mge(bot: ext_commands.Bot) -> None:
             text += f"\nStatus: `{result.status}`"
         await ctx.followup.send(text, ephemeral=True)
 
-    @bot.slash_command(
-        name="mge_commanders",
+    @group.command(
+        name="commanders",
         description="Manage MGE commanders and variant assignment (admin only)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.0")
     @safe_command
@@ -357,3 +360,34 @@ def register_mge(bot: ext_commands.Bot) -> None:
             view=MgeCommanderAdminView(variants=variants),
             ephemeral=True,
         )
+
+    @group.command(
+        name="admin_completion",
+        description="Open MGE completion/reopen controls (admin only).",
+    )
+    @versioned("v1.0")
+    @safe_command
+    @track_usage()
+    async def mge_admin_completion(ctx: discord.ApplicationContext, event_id: int) -> None:
+        await safe_defer(ctx, ephemeral=True)
+        interaction = ctx.interaction
+        if interaction is None or not is_admin_interaction(interaction):
+            if interaction is not None:
+                await interaction.followup.send(
+                    "You do not have permission to use this command.",
+                    ephemeral=True,
+                )
+            return
+
+        view = MgeAdminCompletionView(
+            event_id=event_id,
+            leadership_channel_id=MGE_LEADERSHIP_CHANNEL_ID,
+            timeout=300,
+        )
+        await interaction.followup.send(
+            f"Admin completion controls for event {event_id}",
+            ephemeral=True,
+            view=view,
+        )
+
+    bot.add_application_command(group)

@@ -18,6 +18,20 @@
 
 This keeps one authoritative registration flow in production and avoids double registration.
 
+## 2026-05-19 command-surface balancing update
+
+Batch 1 grouped admin-heavy commands to restore headroom under Discord's 100 top-level command
+limit:
+
+- Primary top-level commands: `82`
+- Grouped subcommands statically detected: `21`
+- New groups: `/ops`, `/mge`
+- Existing group retained: `/prekvk`
+
+Current renamed paths are documented in `docs/reference/command_surface_audit.md`.
+`scripts/validate_command_registration.py` now warns at 90+ top-level commands and still fails
+above 100.
+
 ## Duplicate command names found
 
 These command names are declared in more than one source module:

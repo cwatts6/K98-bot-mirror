@@ -28,6 +28,12 @@ Secondary command entrypoints that exist in repo:
 
 ## 2) Slash command inventory
 
+> 2026-05-19 update: the Batch 1 command-surface balancing audit grouped operational admin
+> commands under `/ops` and MGE commands under `/mge`, reducing the primary top-level command
+> count to 82. See `docs/reference/command_surface_audit.md` for the current renamed command
+> paths. The older flat paths below remain useful historical inventory context, but should not be
+> treated as the current operator command list for `/ops` and `/mge`.
+
 ### 2.1 Primary slash commands (`Commands.py` via `register_commands`)
 
 | Command | Module | Domain | Permission/decorator profile | Typical output |

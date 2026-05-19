@@ -40,6 +40,11 @@ def test_register_commands_smoke(monkeypatch):
     Commands.register_commands(fake_bot)
 
     assert len([name for name in registered_top_level if name]) <= 100
+    assert len([name for name in registered_top_level if name]) < 90
+    assert "ops" in registered_top_level
+    assert "mge" in registered_top_level
     assert "prekvk" in registered_top_level
+    assert "run_sql_proc" not in registered_top_level
+    assert "mge_refresh_award_reminders" not in registered_top_level
     assert "prekvk_report" not in registered_top_level
     assert "prekvk_import_history" not in registered_top_level

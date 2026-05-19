@@ -5,7 +5,11 @@ to GitHub issues/task packs.
 
 Resolved historical notes were moved to `archive/deferred_optimisations_resolved.md`.
 
-Last reviewed after the DL_bot upload-routing Phase 2C PreKvK report production release. PR 96
+Last reviewed after the slow-pytest optimisation production release. PR 107
+(`pytest-log-delivery-docs`) resolved the high-impact pytest duration outliers found after the
+pytest log-isolation production smoke audit, reducing the duration audit from `1450 passed, 2
+skipped, 19 warnings in 638.91s` to `1450 passed, 2 skipped, 19 warnings in 54.86s`; it was smoke
+tested successfully and deployed to production. PR 96
 (`import-locations-command-orchestration-cleanup`) was smoke tested successfully and deployed to
 production. PR 97 (`dlbot-player-location-upload-route`) was smoke tested successfully and
 promoted to production. The governor fuzzy/name/partial-ID lookup standardisation item,
@@ -26,22 +30,49 @@ upload routing and related test-environment blockers, not as a continuation of t
 both this backlog and the current `K98-bot-mirror` GitHub issues list.
 
 ### Deferred Optimisation
-- Area: `tests/test_processing_pipeline.py`, `tests/test_processing_pipeline_build_cache.py`, `tests/test_processing_pipeline_run_step_and_normalization.py`, `tests/test_event_cache.py`, slow full-suite pytest paths
+- Area: `tests/test_ark_preference_service.py`, `tests/test_ark_bans_enforcement.py`, `tests/test_lock_timeout.py`, `tests/test_calendar_service.py`, `tests/test_calendar_pipeline.py`, remaining slow full-suite pytest paths
 - Type: performance
-- Description: Production smoke validation for the pytest log-isolation delivery passed, but the saved duration audit shows several unit tests spending real wall-clock time in expensive pipeline, timeout, lock, or offload paths. The worst offenders were `tests/test_processing_pipeline.py::test_run_stats_copy_archive_success` at 252.28s, `tests/test_processing_pipeline.py::test_run_stats_copy_archive_unexpected_shape` at 234.79s, `tests/test_event_cache.py::test_refresh_event_cache_times_out` at 45.00s, `tests/test_processing_pipeline_run_step_and_normalization.py::test_run_step_with_sync_and_async` at 17.27s, `tests/test_processing_pipeline_build_cache.py::test_build_player_stats_cache_offloaded_and_completes` at 17.26s, and `tests/test_processing_pipeline_build_cache.py::test_build_player_stats_cache_timeout_handled` at 16.32s.
-- Suggested Fix: Start with the two `tests/test_processing_pipeline.py` cases and audit which downstream stages still execute after `run_stats_copy_archive` is mocked. Patch heavy unit-test boundaries such as cache rebuilds, post-import maintenance, ProcConfig preflight/import, exports, lock waits, and intentional timeout sleeps so unit coverage asserts orchestration and failure handling without real multi-second waits. Add duration-focused regression validation using `pytest -vv --durations=30 --durations-min=1.0` and keep full-suite log-noise validation intact.
-- Impact: high
+- Description: After PR 107 resolved the original slow pytest offenders, the new duration audit `C:\Users\cwatt\Downloads\.codex_pytest_audit-new.log` shows the remaining full-suite outliers are concentrated in Ark preference/ban negative paths, lock-timeout coverage, calendar failure-path retries, live queue persistence, maintenance subprocess timeout/success coverage, and one inventory vision import case. The slowest current timings are `tests/test_ark_preference_service.py::test_set_preference_rejects_unknown_governor` at 7.33s, `tests/test_ark_bans_enforcement.py::test_admin_add_allows_when_override_on` at 5.23s, `tests/test_lock_timeout.py::test_remove_view_tracker_entry_returns_false_when_locked` at 5.06s, `tests/test_lock_timeout.py::test_save_view_tracker_raises_on_lock` at 5.06s, `tests/test_calendar_service.py::test_refresh_full_stops_on_sync_failure` at 3.02s, and `tests/test_calendar_pipeline.py::test_pipeline_stops_on_sync_failure` at 3.01s.
+- Suggested Fix: Start a fresh audit from `.codex_pytest_audit-new.log` and classify each remaining slow path as intentional timeout coverage, missing test boundary, live dependency leakage, retry/backoff, or genuine defect. Preserve lock-timeout and subprocess timeout coverage, but replace real multi-second waits with patched timeout constants, fake clocks, controlled retry policies, or explicit service/DAL boundary fakes where safe. Keep the scope separate from PR 107 and validate with `pytest -vv tests --durations=30 --durations-min=1.0`, focused subsystem tests, `scripts/analyse_pytest_log_noise.py`, and `python -m pytest -q tests`.
+- Impact: medium
 - Risk: medium
-- Dependencies: Preserve negative-path coverage and production timeout behaviour; do not weaken `scripts/analyse_pytest_log_noise.py` or live integration gating.
+- Dependencies: Use the post-PR-107 audit baseline (`1450 passed, 2 skipped, 19 warnings in 54.86s`); preserve genuine timeout, subprocess, lock, negative-path, and log-noise coverage.
 
 ### Deferred Optimisation
 - Area: `commands/`, `scripts/validate_command_registration.py`
 - Type: architecture
-- Description: The primary Discord application-command set is currently at the 100 top-level command limit. Phase 2C avoided the limit by grouping PreKvK commands under `/prekvk`, but future standalone slash commands can still break startup sync with Discord error 30032 unless command surface consolidation is planned before new command work.
-- Suggested Fix: Run a command-surface balancing audit before the next command-heavy feature. Group related commands by domain where user experience allows, identify stale/low-use admin commands for consolidation or retirement, update docs for renamed paths, and keep `scripts/validate_command_registration.py` enforcing the 100-command ceiling in PR validation.
+- Description: Batch 1 of the command-surface balancing audit grouped admin-heavy `/ops` and `/mge` commands, reducing the primary Discord application-command set from 100 to 82 top-level commands. Future standalone slash commands can still erode this buffer and eventually break startup sync with Discord error 30032 unless additional command-surface consolidation remains planned.
+- Suggested Fix: Continue the command-surface programme through the staged follow-up batches below. Group related commands by domain where user experience allows, identify stale/low-use admin commands for consolidation or retirement, update docs for renamed paths, and keep `scripts/validate_command_registration.py` enforcing the 100-command ceiling with a warning at 90+.
 - Impact: high
 - Risk: medium
-- Dependencies: Coordinate with bot operators before renaming public command paths; preserve admin-only permission checks when commands move into groups.
+- Dependencies: Batch 1 `/ops` and `/mge` grouping validation remains clean; coordinate with bot operators before renaming public command paths; preserve admin-only permission checks when commands move into groups.
+
+### Deferred Optimisation
+- Area: `commands/ark_cmds.py`, `docs/ark/`, Ark command tests
+- Type: architecture
+- Description: Ark still exposes many top-level commands (`/ark_create_match`, `/ark_force_announce`, `/ark_amend_match`, `/ark_cancel_match`, `/ark_set_preference`, `/ark_clear_preference`, `/ark_ban_add`, `/ark_ban_revoke`, `/ark_ban_list`, `/ark_set_result`, `/ark_generate_draft`, `/create_ark_team`, plus public `/ark_reminder_prefs` and `/ark_report_players`). These are a natural `/ark` command group and could recover another large block of top-level command headroom, but several docs and public/operator workflows reference the flat paths.
+- Suggested Fix: Prepare a second command-surface migration batch that groups Ark commands under `/ark`, preserving `is_admin_or_leadership_only`, `channel_only`, public reminder/report behavior, autocomplete/options, and interaction responses. Coordinate operator communication for public path changes before implementation and update Ark docs/tests to the new paths.
+- Impact: high
+- Risk: medium
+- Dependencies: Batch 1 `/ops` and `/mge` grouping deployed cleanly; operators approve public Ark path migration and announcement timing.
+
+### Deferred Optimisation
+- Area: `commands/stats_cmds.py`, `commands/registry_cmds.py`, `commands/inventory_cmds.py`, `commands/calendar_cmds.py`, `commands/subscriptions_cmds.py`, user-facing command docs/tests
+- Type: architecture
+- Description: Public/player-facing command domains still use many top-level paths that could be grouped later (`/kvk`, `/registry`, `/inventory`, `/calendar`, `/subscriptions`). These commands are more discoverability-sensitive than admin-only surfaces and include heavily documented player workflows, so moving them without coordination could confuse users even though it would reduce startup sync risk further.
+- Suggested Fix: Scope a later public command-path migration with operator-approved UX rules, aliases/transition messaging if feasible, and focused docs/test updates. Prioritise admin-heavy subcommands inside each domain first, then evaluate whether player paths should remain flat for discoverability.
+- Impact: medium
+- Risk: medium
+- Dependencies: Operator approval for public command rename policy; updated command reference/announcement plan; Batch 1 validation remains below the warning threshold.
+
+### Deferred Optimisation
+- Area: `cogs/commands.py`, `subscribe.py`, `scripts/validate_command_registration.py`, startup command audit docs
+- Type: cleanup
+- Description: Disabled secondary command surfaces still declare duplicate command names (`/summary`, `/weeksummary`, `/history`, `/failures`, `/ping`, `/subscribe`). The validator reports these duplicates, but the output does not clearly separate intentionally disabled legacy surfaces from active startup-sync risk.
+- Suggested Fix: Decide whether to retire the disabled secondary cogs or enhance validator output to classify duplicates by active vs disabled registration path. If the files are retained, document the environment gating and keep duplicate warnings informational; if retired, remove or archive the dead command declarations with smoke/import coverage.
+- Impact: medium
+- Risk: low
+- Dependencies: Confirm secondary cogs remain disabled by default in production and no operator workflow depends on loading them.
 
 ### Deferred Optimisation
 - Area: tests/stats_service.py, tests/targets_sql_cache_subproc.py, tests/prekvk_stats.py, tests/proc_config_import_phase2.py, tests/sheets_sync_flow.py

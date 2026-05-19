@@ -25,9 +25,7 @@ from bot_config import (
     GUILD_ID,
     NOTIFY_CHANNEL_ID,
     OFFSEASON_STATS_CHANNEL_ID,
-    MGE_LEADERSHIP_CHANNEL_ID,
 )
-from core.mge_permissions import is_admin_interaction
 from core.interaction_safety import get_operation_lock, safe_command, safe_defer
 from discord.ext import commands as ext_commands
 from commands.crystaltech_flow import run_crystaltech_flow
@@ -47,7 +45,6 @@ from stats_alerts.interface import send_stats_update_embed
 from stats_alerts.kvk_meta import is_currently_kvk
 from stats_module import run_stats_copy_archive
 from ui.views.admin_views import ConfirmRestartView, LogTailView
-from ui.views.mge_admin_completion_view import MgeAdminCompletionView
 from utils import utcnow
 from versioning import versioned
 
@@ -311,10 +308,15 @@ def register_admin(bot: ext_commands.Bot) -> None:
         except Exception:
             pass
 
-    @bot.slash_command(
+    ops_group = discord.SlashCommandGroup(
+        "ops",
+        "Operational admin controls",
+        guild_ids=[GUILD_ID],
+    )
+
+    @ops_group.command(
         name="run_sql_proc",
         description="Manually run the SQL stored procedure",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.03")
     @safe_command
@@ -412,10 +414,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
             content=summary if success else f"⚠️ Completed with issues:\n{summary}"
         )
 
-    @bot.slash_command(
+    @ops_group.command(
         name="run_gsheets_export",
         description="Manually trigger Google Sheets export",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.04")
     @safe_command
@@ -510,8 +511,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
         await ctx.interaction.edit_original_response(content=None, embed=embed)
 
-    @bot.slash_command(
-        name="restart_bot", description="Forcefully restart the bot", guild_ids=[GUILD_ID]
+    @ops_group.command(
+        name="restart_bot",
+        description="Forcefully restart the bot",
     )
     @versioned("v1.06")
     @safe_command
@@ -631,10 +633,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 pass
 
     # Commands.py — replace the whole function body of force_restart with this slimmer flow
-    @bot.slash_command(
+    @ops_group.command(
         name="force_restart",
         description="Force a restart via the watchdog mechanism (admin only).",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.07")
     @safe_command
@@ -710,10 +711,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
         # IMPORTANT: return immediately so we don’t block the loop
         return
 
-    @bot.slash_command(
+    @ops_group.command(
         name="resync_commands",
         description="Force resync of slash commands and update command cache",  # architecture-check: allow
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.09")
     @safe_command
@@ -809,10 +809,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     )
                 )
 
-    @bot.slash_command(
+    @ops_group.command(
         name="show_command_versions",
         description="List all currently loaded slash commands with their versions",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.03")
     @safe_command
@@ -860,10 +859,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 content=f"❌ Failed to build command version list: `{type(e).__name__}: {e}`"
             )
 
-    @bot.slash_command(
+    @ops_group.command(
         name="validate_command_cache",
         description="Check for mismatched or missing entries in command_cache.json",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.04")
     @safe_command
@@ -937,8 +935,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
         await ctx.interaction.edit_original_response(embed=embed)
 
-    @bot.slash_command(
-        name="view_restart_log", description="View recent bot restarts", guild_ids=[GUILD_ID]
+    @ops_group.command(
+        name="view_restart_log",
+        description="View recent bot restarts",
     )
     @versioned("v1.01")
     @safe_command
@@ -1015,10 +1014,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 content=f"❌ Failed to load restart log: `{type(e).__name__}: {e}`"
             )
 
-    @bot.slash_command(
+    @ops_group.command(
         name="import_proc_config",
         description="Manually run the ProcConfig import (admin only)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.03")
     @safe_command
@@ -1126,10 +1124,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
             except Exception:
                 logger.debug("Failed to send failure response to user", exc_info=False)
 
-    @bot.slash_command(
+    @ops_group.command(
         name="dl_bot_status",
         description="Check if the bot is running and connected to SQL.",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.03")
     @safe_command
@@ -1195,10 +1192,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
         await ctx.interaction.edit_original_response(embed=embed)
 
-    @bot.slash_command(
+    @ops_group.command(
         name="logs",
         description="Tail logs with filters & paging (general/error/crash).",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.10")
     @safe_command
@@ -1239,10 +1235,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
         await view.render(ctx.interaction)
         await ctx.interaction.edit_original_response(view=view)
 
-    @bot.slash_command(
+    @ops_group.command(
         name="show_logs",
         description="Show recent entries from the general log file.",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.01")
     @safe_command
@@ -1306,10 +1301,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 content=f"❌ Failed to read log: `{type(e).__name__}: {e}`"
             )
 
-    @bot.slash_command(
+    @ops_group.command(
         name="last_errors",
         description="Show recent entries from the error log.",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.01")
     @safe_command
@@ -1370,10 +1364,9 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 content=f"❌ Failed to read error log: `{type(e).__name__}: {e}`"
             )
 
-    @bot.slash_command(
+    @ops_group.command(
         name="crash_log",
         description="Show recent entries from the crash log.",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.01")
     @safe_command
@@ -2029,32 +2022,4 @@ def register_admin(bot: ext_commands.Bot) -> None:
         embed.timestamp = datetime.utcnow()
         await ctx.interaction.edit_original_response(embed=embed)
 
-    @bot.slash_command(
-        name="mge_admin_completion",
-        description="Open MGE completion/reopen controls (admin only).",
-        guild_ids=[GUILD_ID],
-    )
-    @versioned("v1.0")
-    @safe_command
-    @track_usage()
-    async def mge_admin_completion(ctx: discord.ApplicationContext, event_id: int) -> None:
-        await safe_defer(ctx, ephemeral=True)
-        interaction = ctx.interaction
-        if interaction is None or not is_admin_interaction(interaction):
-            if interaction is not None:
-                await interaction.followup.send(
-                    "You do not have permission to use this command.",
-                    ephemeral=True,
-                )
-            return
-
-        view = MgeAdminCompletionView(
-            event_id=event_id,
-            leadership_channel_id=MGE_LEADERSHIP_CHANNEL_ID,
-            timeout=300,
-        )
-        await interaction.followup.send(
-            f"Admin completion controls for event {event_id}",
-            ephemeral=True,
-            view=view,
-        )
+    bot.add_application_command(ops_group)
