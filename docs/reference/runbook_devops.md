@@ -34,12 +34,15 @@ For normal PR work:
 python scripts/validate_architecture_boundaries.py
 python scripts/validate_deferred_items.py
 python scripts/select_tests.py
+python scripts/analyse_pytest_log_noise.py
 python scripts/smoke_imports.py
 python scripts/validate_command_registration.py
 ```
 
 Run focused pytest commands for the touched subsystem. Use full `pytest -q tests` before
-promotion or when the blast radius is broad.
+promotion or when the blast radius is broad. Use `python scripts/analyse_pytest_log_noise.py`
+when deployment validation needs proof that pytest did not write WARNING/ERROR records to
+production operational logs.
 
 ## Runtime Configuration
 
@@ -66,6 +69,9 @@ Important runtime locations are configured in `constants.py` and `logging_setup.
 - `BOT_LOCK_PATH`
 
 Back up `DATA_DIR` and operational logs before risky deployment or migration work.
+
+Pytest evidence is intentionally separate from these operational logs. Review test failures in
+pytest output or an explicitly captured audit file, for example `.codex_pytest_audit.log`.
 
 ## Maintenance And Offloads
 

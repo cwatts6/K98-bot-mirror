@@ -87,6 +87,15 @@ CRASH_LOG_PATH = os.path.join(LOG_DIR, "crash.log")
 TELEMETRY_LOG_PATH = os.path.join(LOG_DIR, "telemetry_log.jsonl")  # NEW
 
 
+def is_pytest_logging_mode() -> bool:
+    """Return True when running under the repo's pytest isolation boundary."""
+    return (
+        os.getenv("K98_TEST_MODE") == "1"
+        or os.getenv("PYTEST_RUNNING") == "1"
+        or "PYTEST_CURRENT_TEST" in os.environ
+    )
+
+
 # === Formatter (UTC) ===
 formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 try:
@@ -168,6 +177,14 @@ def _build_file_handlers(max_bytes: int = None, backup_count: int = None):
     return error_h, full_h, crash_h, telemetry_h
 
 
+def _build_listener_handlers(max_bytes: int = None, backup_count: int = None):
+    if is_pytest_logging_mode():
+        null_h = logging.NullHandler()
+        null_h.is_our_test_null_handler = True
+        return (null_h,)
+    return _build_file_handlers(max_bytes=max_bytes, backup_count=backup_count)
+
+
 # === Queue-based non-blocking setup ===
 def _ensure_queue_logging(max_bytes: int = None, backup_count: int = None):
     """
@@ -180,7 +197,7 @@ def _ensure_queue_logging(max_bytes: int = None, backup_count: int = None):
     qh.is_our_queue = True
     logger.addHandler(qh)
     # Listener owns the file handlers; include telemetry handler as the 4th
-    handlers = _build_file_handlers(max_bytes=max_bytes, backup_count=backup_count)
+    handlers = _build_listener_handlers(max_bytes=max_bytes, backup_count=backup_count)
     _LISTENER = QueueListener(_LOG_QUEUE, *handlers, respect_handler_level=True)
     _LISTENER.start()
 
@@ -518,6 +535,7 @@ __all__ = [
     "configure_logging",
     "ensure_utf8_console",
     "flush_logs",
+    "is_pytest_logging_mode",
     "setup_logging",
     "shutdown_logging",
 ]

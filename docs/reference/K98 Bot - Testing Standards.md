@@ -146,9 +146,20 @@ python scripts/validate_architecture_boundaries.py
 python scripts/validate_deferred_items.py
 python scripts/select_tests.py
 python -m pytest -q tests
+python scripts/analyse_pytest_log_noise.py
 python scripts/smoke_imports.py
 python scripts/validate_command_registration.py
 ```
+
+Normal pytest runs are isolated from production operational logs. Expected negative-path logging
+must remain assertable with `caplog` or pytest's captured output, but tests must not write to
+`logs/log.txt`, `logs/error_log.txt`, `logs/crash.log`, or `logs/telemetry_log.jsonl`. When a
+reviewable pytest log artifact is needed, explicitly tee the pytest command to a non-production
+audit file such as `.codex_pytest_audit.log`.
+
+Run `python scripts/analyse_pytest_log_noise.py` for broad validation or deployment review when
+log hygiene matters. The script runs pytest with the test-mode logging boundary enabled and fails
+if production operational log files change.
 
 For targeted work, also run the most relevant focused test commands where practical, for example:
 

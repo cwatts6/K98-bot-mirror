@@ -15,7 +15,7 @@ class DummyClient:
         class _User:
             id = user_id
 
-            async def send(self, _content):
+            async def send(self, _content=None, **_kwargs):
                 raise RuntimeError("DM blocked")
 
         return _User()

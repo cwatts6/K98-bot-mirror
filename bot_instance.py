@@ -132,6 +132,14 @@ def _aware(dt: datetime) -> datetime:
     return ensure_aware_utc(dt)
 
 
+def _is_pytest_mode() -> bool:
+    return (
+        os.getenv("K98_TEST_MODE") == "1"
+        or os.getenv("PYTEST_RUNNING") == "1"
+        or "PYTEST_CURRENT_TEST" in os.environ
+    )
+
+
 START_TIME = _aware(utcnow())
 
 
@@ -741,6 +749,9 @@ async def _count_errors_last_minutes(
     Count only real [LEVEL] lines within the last N minutes.
     Expected prefix: 'YYYY-MM-DD HH:MM:SS,fff ' (23 chars) before the level token.
     """
+    if _is_pytest_mode():
+        return 0
+
     path = _safe_error_log_path()
     if not os.path.exists(path) or minutes <= 0:
         return 0
@@ -1243,6 +1254,9 @@ async def _update_health_embed():
     try:
         need_alert = False
         reasons = []
+
+        if _is_pytest_mode():
+            return
 
         if not sql_ok:
             need_alert = True

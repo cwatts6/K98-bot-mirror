@@ -40,7 +40,7 @@ class DummyClient:
         class _U:
             id = user_id
 
-            async def send(self, _content):
+            async def send(self, _content=None, **_kwargs):
                 return None
 
         return _U()

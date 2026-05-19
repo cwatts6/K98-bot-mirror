@@ -108,6 +108,14 @@ _DB_BACKOFF_BASE = float(os.getenv("DB_BACKOFF_BASE", "1.0"))  # seconds
 _DB_BACKOFF_MAX = float(os.getenv("DB_BACKOFF_MAX", "30.0"))  # seconds (cap)
 
 
+def _is_pytest_unit_mode() -> bool:
+    return os.getenv("RUN_DB_TESTS", "0") != "1" and (
+        os.getenv("K98_TEST_MODE") == "1"
+        or os.getenv("PYTEST_RUNNING") == "1"
+        or "PYTEST_CURRENT_TEST" in os.environ
+    )
+
+
 # ---------------------------
 # New telemetry helper
 # ---------------------------
@@ -229,6 +237,13 @@ def get_conn_with_retries(
 
     Optional `meta` is attached to telemetry (best-effort).
     """
+    if _is_pytest_unit_mode():
+        raise AssertionError(
+            "Unit test attempted live DB access through get_conn_with_retries. "
+            "Patch the DAL/service boundary or run with RUN_DB_TESTS=1 for explicit "
+            "integration coverage."
+        )
+
     attempts = 0
     last_exc: Exception | None = None
 

@@ -18,7 +18,19 @@ python scripts/select_tests.py
 
 pre-commit run -a
 pytest -q tests
+python scripts/analyse_pytest_log_noise.py
 ```
+
+`pytest` runs are isolated from production operational log files. Expected negative-path logs
+remain visible through pytest output and `caplog`; when a saved audit artifact is needed, capture
+the run explicitly, for example:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests 2>&1 | Tee-Object -FilePath .codex_pytest_audit.log
+```
+
+Use `python scripts/analyse_pytest_log_noise.py` to verify that pytest did not write to
+`logs/log.txt`, `logs/error_log.txt`, `logs/crash.log`, or `logs/telemetry_log.jsonl`.
 
 Optional: for fast local searches, place `rg.exe` at `C:\discord_file_downloader\tools\rg.exe`.
 `dev.ps1` adds `tools\` to `PATH` when that binary exists.

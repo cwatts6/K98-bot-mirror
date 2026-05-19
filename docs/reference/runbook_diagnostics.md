@@ -14,6 +14,28 @@ Purpose: triage errors, crashes, performance issues, offload problems, and telem
 
 Exact paths are defined in `constants.py` and `logging_setup.py`.
 
+## Pytest Log Review
+
+Pytest runs are intentionally isolated from production operational logs. Expected negative-path
+ERROR/WARNING records remain visible through pytest output and `caplog`, but routine test execution
+must not write to `logs/log.txt`, `logs/error_log.txt`, `logs/crash.log`, or
+`logs/telemetry_log.jsonl`.
+
+For a saved pytest review artifact, tee the command to a non-production audit file:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests 2>&1 | Tee-Object -FilePath .codex_pytest_audit.log
+```
+
+To verify that pytest did not touch production operational logs, run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\analyse_pytest_log_noise.py
+```
+
+Use production log files only for runtime diagnostics, deployment health, and bot-machine
+operation review, not as the source of pytest negative-path evidence.
+
 ## Collect Diagnostics
 
 ```powershell

@@ -34,7 +34,7 @@ class DummyClient:
 
     async def fetch_user(self, _uid):
         class _U:
-            async def send(self, _content):
+            async def send(self, _content=None, **_kwargs):
                 return None
 
         return _U()
