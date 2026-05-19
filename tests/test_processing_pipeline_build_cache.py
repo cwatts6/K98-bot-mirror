@@ -23,9 +23,15 @@ async def test_build_player_stats_cache_offloaded_and_completes(monkeypatch):
     async def fake_send_embed_safe(*args, **kwargs):
         return True
 
+    async def fake_run_maintenance_with_isolation(*args, **kwargs):
+        return True, "OK"
+
     monkeypatch.setattr(pp, "send_embed_safe", fake_send_embed_safe)
+    monkeypatch.setattr(pp, "send_status_embed", fake_send_embed_safe)
     monkeypatch.setattr(pp, "run_all_exports", lambda *a, **k: (True, "OK"))
-    monkeypatch.setattr(pp, "run_maintenance_with_isolation", lambda *a, **k: (True, "OK"))
+    monkeypatch.setattr(pp, "run_maintenance_with_isolation", fake_run_maintenance_with_isolation)
+    monkeypatch.setattr(pp, "preflight_from_env_sync", lambda *a, **k: None)
+    monkeypatch.setattr(pp, "read_json_safe", lambda *a, **k: {"_meta": {"count": 1}})
 
     # warm_name_cache / warm_target_cache must be async (processing_pipeline awaits them)
     async def fake_warm_name_cache():
@@ -116,9 +122,15 @@ async def test_build_player_stats_cache_timeout_handled(monkeypatch):
     async def fake_send_embed_safe(*a, **k):
         return True
 
+    async def fake_run_maintenance_with_isolation(*a, **k):
+        return True, "OK"
+
     monkeypatch.setattr(pp, "send_embed_safe", fake_send_embed_safe)
+    monkeypatch.setattr(pp, "send_status_embed", fake_send_embed_safe)
     monkeypatch.setattr(pp, "run_all_exports", lambda *a, **k: (True, "OK"))
-    monkeypatch.setattr(pp, "run_maintenance_with_isolation", lambda *a, **k: (True, "OK"))
+    monkeypatch.setattr(pp, "run_maintenance_with_isolation", fake_run_maintenance_with_isolation)
+    monkeypatch.setattr(pp, "preflight_from_env_sync", lambda *a, **k: None)
+    monkeypatch.setattr(pp, "read_json_safe", lambda *a, **k: {"_meta": {"count": 1}})
 
     async def fake_warm_name_cache():
         return None
@@ -136,12 +148,19 @@ async def test_build_player_stats_cache_timeout_handled(monkeypatch):
 
     monkeypatch.setattr(pp, "run_stats_copy_archive", fake_run_stats_copy_archive)
 
-    # build_player_stats_cache will sleep longer than timeout (sync function)
-    def slow_build():
-        time.sleep(0.5)
+    def fake_build_cache():
         return None
 
-    monkeypatch.setattr(pp, "build_player_stats_cache", slow_build)
+    monkeypatch.setattr(pp, "build_player_stats_cache", fake_build_cache)
+
+    original_run_step = pp.run_step
+
+    async def fake_run_step(func, *args, **kwargs):
+        if func is fake_build_cache:
+            raise TimeoutError
+        return await original_run_step(func, *args, **kwargs)
+
+    monkeypatch.setattr(pp, "run_step", fake_run_step)
 
     # Capture telemetry_logger.info calls
     calls = []

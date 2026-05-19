@@ -3,7 +3,6 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 import logging
 
-from constants import GSHEETS_CALL_TIMEOUT
 import event_cache as ec
 import event_data_loader as edl
 
@@ -106,10 +105,12 @@ def test_refresh_event_cache_times_out(monkeypatch, caplog):
     Confirm that refresh_event_cache completes (bounded) and logs a timeout message.
     """
     caplog.set_level(logging.WARNING)
+    monkeypatch.setattr(ec, "GSHEETS_CALL_TIMEOUT", 0.02)
+    monkeypatch.setattr(ec, "EVENT_CACHE_MIN_REFRESH_TIMEOUT", 0.05)
 
     async def long_loader(timeout=None):
         # Sleep longer than per-loader timeout
-        await asyncio.sleep(float(GSHEETS_CALL_TIMEOUT or 30) * 2)
+        await asyncio.sleep(1)
         return []
 
     async def quick_loader(timeout=None):

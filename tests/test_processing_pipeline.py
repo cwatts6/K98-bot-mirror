@@ -6,12 +6,48 @@ import pytest
 pytest_plugins = ("pytest_asyncio",)
 
 
+def _patch_lightweight_pipeline_boundaries(monkeypatch):
+    async def fake_send_status_embed(*args, **kwargs):
+        return True
+
+    async def fake_send_embed_safe(*args, **kwargs):
+        return True
+
+    async def fake_build_cache():
+        return None
+
+    async def fake_warm_cache():
+        return None
+
+    async def fake_run_maintenance_with_isolation(*args, **kwargs):
+        return True, "OK"
+
+    monkeypatch.setattr("processing_pipeline.send_status_embed", fake_send_status_embed)
+    monkeypatch.setattr("processing_pipeline.send_embed_safe", fake_send_embed_safe)
+    monkeypatch.setattr("processing_pipeline.get_channel_safe", lambda *a, **k: None)
+    monkeypatch.setattr("processing_pipeline.build_player_stats_cache", fake_build_cache)
+    monkeypatch.setattr("processing_pipeline.build_lastkvk_player_stats_cache", fake_build_cache)
+    monkeypatch.setattr(
+        "processing_pipeline.read_json_safe", lambda *a, **k: {"_meta": {"count": 0}}
+    )
+    monkeypatch.setattr(
+        "processing_pipeline.run_maintenance_with_isolation",
+        fake_run_maintenance_with_isolation,
+    )
+    monkeypatch.setattr("processing_pipeline.preflight_from_env_sync", lambda *a, **k: None)
+    monkeypatch.setattr("processing_pipeline.run_all_exports", lambda *a, **k: (True, "OK"))
+    monkeypatch.setattr("processing_pipeline.warm_name_cache", fake_warm_cache)
+    monkeypatch.setattr("processing_pipeline.warm_target_cache", fake_warm_cache)
+
+
 @pytest.mark.asyncio
 async def test_run_stats_copy_archive_success(monkeypatch, tmp_path):
     """
     Ensure execute_processing_pipeline handles a well-formed run_stats_copy_archive return.
     """
     from processing_pipeline import execute_processing_pipeline
+
+    _patch_lightweight_pipeline_boundaries(monkeypatch)
 
     # Mock run_stats_copy_archive to return expected tuple
     async def fake_run_stats_copy_archive(
@@ -42,6 +78,8 @@ async def test_run_stats_copy_archive_unexpected_shape(monkeypatch):
     and not crash.
     """
     from processing_pipeline import execute_processing_pipeline
+
+    _patch_lightweight_pipeline_boundaries(monkeypatch)
 
     async def bad_run(rank, seed, **kwargs):
         # Return something unexpected

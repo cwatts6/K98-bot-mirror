@@ -32,6 +32,7 @@ UTC = UTC
 PRESERVE_EVENT_CACHE_ON_EMPTY_SECONDS = int(
     os.getenv("PRESERVE_EVENT_CACHE_ON_EMPTY_SECONDS", "3600")
 )
+EVENT_CACHE_MIN_REFRESH_TIMEOUT = float(os.getenv("EVENT_CACHE_MIN_REFRESH_TIMEOUT", "5.0"))
 
 
 # ---- Helpers -----------------------------------------------------------------
@@ -229,7 +230,7 @@ async def refresh_event_cache() -> int:
         ]
 
         # Bound the entire refresh so a misbehaving loader can't hang forever.
-        overall_timeout = max(5.0, per_loader_timeout * 1.5)
+        overall_timeout = max(EVENT_CACHE_MIN_REFRESH_TIMEOUT, per_loader_timeout * 1.5)
         try:
             ruins_raw, altars_raw, majors_raw, chronicles_raw = await asyncio.wait_for(
                 asyncio.gather(*tasks), timeout=overall_timeout
