@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 import pytest
 
@@ -22,6 +23,9 @@ def test_pytest_logging_mode_uses_null_listener(monkeypatch: pytest.MonkeyPatch)
 
     assert len(handlers) == 1
     assert isinstance(handlers[0], logging.NullHandler)
+    assert logging_setup.should_redirect_stdio_to_logging() is False
+    assert not isinstance(sys.stdout, logging_setup.StreamToLogger)
+    assert not isinstance(sys.stderr, logging_setup.StreamToLogger)
 
 
 def test_production_logging_mode_builds_file_handlers(monkeypatch: pytest.MonkeyPatch):
@@ -33,6 +37,7 @@ def test_production_logging_mode_builds_file_handlers(monkeypatch: pytest.Monkey
     handlers = logging_setup._build_listener_handlers(max_bytes=1024, backup_count=1)
 
     try:
+        assert logging_setup.should_redirect_stdio_to_logging() is True
         assert len(handlers) == 4
         assert all(isinstance(handler, logging.FileHandler) for handler in handlers)
     finally:
@@ -45,7 +50,9 @@ def test_db_retry_guard_fails_fast_in_unit_tests(monkeypatch: pytest.MonkeyPatch
     monkeypatch.delenv("RUN_DB_TESTS", raising=False)
     import file_utils
 
-    with pytest.raises(AssertionError, match="Unit test attempted live DB access"):
+    with pytest.raises(
+        file_utils.UnitTestLiveDbAccessError, match="Unit test attempted live DB access"
+    ):
         file_utils.get_conn_with_retries()
 
 

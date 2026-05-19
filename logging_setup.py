@@ -96,6 +96,16 @@ def is_pytest_logging_mode() -> bool:
     )
 
 
+def should_redirect_stdio_to_logging() -> bool:
+    """
+    Return True only when stdout/stderr may safely be redirected into logging.
+
+    In pytest logging mode, leave stdio attached to pytest capture streams so
+    print() output remains observable without touching operational log files.
+    """
+    return not is_pytest_logging_mode()
+
+
 # === Formatter (UTC) ===
 formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 try:
@@ -281,11 +291,10 @@ class StreamToLogger:
         return False
 
 
-# Redirect AFTER handlers are set up; console handler keeps ORIG_STDOUT
-# NOTE: We still redirect prints to logging (non-blocking via queue).
+# Redirect AFTER handlers are set up; console handler keeps ORIG_STDOUT.
 # In pytest mode, skip redirection so test output remains observable via pytest's
 # normal stdout/stderr capture instead of being silently dropped by NullHandler.
-if not is_pytest_logging_mode():
+if should_redirect_stdio_to_logging():
     sys.stdout = StreamToLogger(_STDIO_LOGGER, logging.INFO)
     sys.stderr = StreamToLogger(_STDIO_LOGGER, logging.ERROR)
 
@@ -540,5 +549,6 @@ __all__ = [
     "flush_logs",
     "is_pytest_logging_mode",
     "setup_logging",
+    "should_redirect_stdio_to_logging",
     "shutdown_logging",
 ]
