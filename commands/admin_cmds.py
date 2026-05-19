@@ -63,6 +63,7 @@ from constants import (
     CREDENTIALS_FILE,
     CSV_LOG,
     DATABASE,
+    COMMAND_CACHE_FILE,
     EXIT_CODE_FILE,
     FAILED_LOG,
     PASSWORD,
@@ -749,17 +750,19 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 )
                 return
 
-            # === Update command_cache.json (atomically)  # architecture-check: allow
+            # === Update command cache (atomically)  # architecture-check: allow
             try:
                 # Load existing cache (if present)
                 try:
-                    with open("command_cache.json", encoding="utf-8") as f:
+                    with open(COMMAND_CACHE_FILE, encoding="utf-8") as f:
                         old_cache = {cmd["name"]: cmd for cmd in json.load(f)}
                 except FileNotFoundError:
                     old_cache = {}
                 except Exception as e:
                     logger.warning(
-                        "[COMMAND SYNC] Could not read existing command_cache.json: %s", e
+                        "[COMMAND SYNC] Could not read existing command cache %s: %s",
+                        COMMAND_CACHE_FILE,
+                        e,
                     )
                     old_cache = {}
 
@@ -783,7 +786,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                         updated.append(f"/{name} → `{cached_version}` ➜ `{version}`")
 
                 # Write atomically
-                atomic_json_write("command_cache.json", new_cache)
+                atomic_json_write(COMMAND_CACHE_FILE, new_cache)
 
                 summary = "\n".join(updated) if updated else "✅ No changes to cached versions."
                 # Keep under embed description limit
@@ -876,7 +879,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
         # Load cache
         try:
-            with open("command_cache.json", encoding="utf-8") as f:
+            with open(COMMAND_CACHE_FILE, encoding="utf-8") as f:
                 raw = json.load(f)
                 cache = {entry["name"]: entry.get("version", "N/A") for entry in raw}
         except Exception as e:
