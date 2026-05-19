@@ -28,11 +28,18 @@ def test_pytest_logging_mode_uses_null_listener(monkeypatch: pytest.MonkeyPatch)
     assert not isinstance(sys.stderr, logging_setup.StreamToLogger)
 
 
-def test_production_logging_mode_builds_file_handlers(monkeypatch: pytest.MonkeyPatch):
+def test_production_logging_mode_builds_file_handlers(monkeypatch: pytest.MonkeyPatch, tmp_path):
+    monkeypatch.setenv("K98_TEST_MODE", "1")
+    import logging_setup
+
+    monkeypatch.setattr(logging_setup, "ERROR_LOG_PATH", str(tmp_path / "error_log.txt"))
+    monkeypatch.setattr(logging_setup, "FULL_LOG_PATH", str(tmp_path / "log.txt"))
+    monkeypatch.setattr(logging_setup, "CRASH_LOG_PATH", str(tmp_path / "crash.log"))
+    monkeypatch.setattr(logging_setup, "TELEMETRY_LOG_PATH", str(tmp_path / "telemetry_log.jsonl"))
+
     monkeypatch.delenv("K98_TEST_MODE", raising=False)
     monkeypatch.delenv("PYTEST_RUNNING", raising=False)
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
-    import logging_setup
 
     handlers = logging_setup._build_listener_handlers(max_bytes=1024, backup_count=1)
 

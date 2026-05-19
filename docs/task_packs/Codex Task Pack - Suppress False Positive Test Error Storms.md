@@ -23,7 +23,7 @@ Before implementation, read:
 - `logging` / health monitor setup files
 - any test logging helpers or pytest config files
 
-Use the current Codex Task Pack Template as canonical task shape. :contentReference[oaicite:2]{index=2}
+Use `docs/templates/Codex Task Pack Template.md` as the canonical task shape.
 
 ## 3. Objective
 
