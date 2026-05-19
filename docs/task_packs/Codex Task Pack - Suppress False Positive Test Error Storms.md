@@ -31,10 +31,11 @@ Investigate and resolve the false-positive production-style error storm produced
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q tests
+```
 
 The goal is that expected negative-path tests still validate failure handling, but no longer pollute production logs, trigger health warnings, flash dashboards, or look like real bot failures.
 
-4. Background
+## 4. Background
 
 Current test runs emit large volumes of realistic ERROR and WARNING log records. Examples include:
 
@@ -46,8 +47,10 @@ test-induced failures from MGE, inventory, KVK import, stats, telemetry, and loc
 
 These are expected test scenarios but operationally indistinguishable from real failures. This slows releases, makes logs noisy, risks missing genuine failures, and may degrade the bot while tests run.
 
-5. Scope
-In Scope
+## 5. Scope
+
+### In Scope
+
 Audit all ERROR/WARNING emissions during pytest -q tests.
 Classify each as:
 expected negative-path test noise
@@ -66,14 +69,19 @@ Add or update pytest config / fixtures to isolate test logs.
 Fix dummy objects/mocks that cause avoidable errors, e.g. dummy send() not accepting embed=.
 Fix unpatched DAL/service boundaries where unit tests attempt live DB access.
 Add a validation script or pytest option to fail if tests emit unexpected production-level logs.
-Out of Scope
+
+### Out of Scope
+
 Rewriting subsystem business logic unless a genuine bug is found.
 Reducing useful production logging outside test mode.
 Removing negative-path tests.
 Changing production alert thresholds as the primary fix.
 Full logging framework redesign unless required by audit.
-6. Source Deferred Item
-Deferred Optimisation
+
+## 6. Source Deferred Item
+
+**Deferred Optimisation**
+
 Area: tests/, logging setup, health monitor, runtime dependency guards
 Type: tooling / cleanup / consistency
 Description: Running pytest -q tests in production produces a false-positive failure storm. Expected test failures are logged as real operational errors, triggering dashboard/health noise and making deployment logs harder to review.
@@ -81,7 +89,9 @@ Suggested Fix: Add test-mode logging isolation, classify expected negative-path 
 Impact: high
 Risk: medium
 Dependencies: Coordinate with bot operator before changing production health logging or deployment scripts.
-7. Codex Skills To Use
+
+## 7. Codex Skills To Use
+
 Skill	Decision	Notes
 k98-architecture-scope	use	Logging and test infrastructure touches multiple layers.
 k98-discord-command-feature	use if touched	Some failures come from Discord views, embeds, DM reminders, and command flows.
@@ -90,7 +100,9 @@ k98-test-selection	use	Required before validation and final test selection.
 k98-deferred-optimisation-capture	use	Capture out-of-scope logging/test debt.
 k98-pr-review	use	Required before PR handoff.
 k98-promotion-check	use	This affects deployment validation and production release flow.
-8. Mandatory Workflow
+
+## 8. Mandatory Workflow
+
 Audit / scope review, then stop for approval.
 Architecture validation, then stop for approval.
 Implementation plan, then stop for approval.
@@ -99,7 +111,7 @@ Validation and final review.
 
 Do not proceed one-pass unless explicitly approved.
 
-9. Audit Requirements
+## 9. Audit Requirements
 
 Run and capture:
 
@@ -132,7 +144,9 @@ EVENT_CALENDAR_SHEET_ID is not configured
 mocked RuntimeError("boom"), db down, disk full, channel send failed
 DB retry storms reaching 5 attempts
 [HEALTH] Admin DM sent: error spike
-10. Architecture Targets
+
+## 10. Architecture Targets
+
 Concern	Target
 Test log isolation	tests/conftest.py, pytest.ini / pyproject.toml
 Logging setup	central logging/bootstrap module or existing root setup
@@ -141,8 +155,11 @@ DB retry test mode	file_utils.py, DAL wrappers, test fixtures
 External dependency guards	test fixtures and service boundaries
 Documentation	deployment/promotion guide if pytest behaviour changes
 Tests	focused tests proving expected negative-path logs do not trigger production handlers
-11. Likely Files
-Review
+
+## 11. Likely Files
+
+**Review**
+
 tests/conftest.py
 pytest.ini
 pyproject.toml
@@ -161,18 +178,21 @@ embed_my_stats.py
 telemetry/dal/command_usage_dal.py
 rehydrate_views.py
 services/location_import_service.py
-Modify
+
+**Modify**
 
 To be confirmed after audit.
 
-Create
+**Create**
 
 Likely:
 
 tests/helpers/logging_assertions.py
 tests/test_test_logging_isolation.py
 optional scripts/analyse_pytest_log_noise.py
-12. Implementation Requirements
+
+## 12. Implementation Requirements
+
 Preserve negative-path test coverage.
 Do not hide genuine test failures.
 Ensure test-mode suppression is explicit and limited to pytest.
@@ -182,14 +202,17 @@ DB retry loops must be short-circuited or patched in unit tests.
 Health monitor/admin alerts must be disabled during pytest unless explicitly testing health alerts.
 Any tests intentionally verifying error logging must mark or whitelist the expected record.
 Add a final gate that fails on unexpected production-level logs during the full test run.
-13. Refactor Decisions
+
+## 13. Refactor Decisions
+
 Issue	Decision	Reason
 Production handlers active during pytest	fix now	Primary cause of false-positive production noise.
 Unit tests reaching live DB guard	fix now	Indicates missing DAL/service patching.
 Mocked failures logged as real errors	fix now	Expected negative tests should not trigger operational alerts.
 Excessive retry/backoff in tests	fix now	Adds deployment time and noise.
 Broad logging redesign	defer	Only needed if targeted isolation is insufficient.
-14. Testing Requirements
+
+## 14. Testing Requirements
 
 Minimum validation:
 
@@ -218,7 +241,9 @@ no admin health alert triggered
 no production dashboard warning triggered
 no unexpected ERROR records reach production log handlers
 expected negative-path logs remain assertable inside tests
-15. Acceptance Criteria
+
+## 15. Acceptance Criteria
+
  pytest -q tests no longer creates a production-style error storm.
  Expected negative-path tests still assert the intended behaviour.
  Unit tests do not attempt live DB access unless explicitly marked integration and run with RUN_DB_TESTS=1.
@@ -228,7 +253,9 @@ expected negative-path logs remain assertable inside tests
  Deployment logs are clean enough to identify genuine failures.
  Runtime production logging behaviour is not weakened.
  Documentation/promotion guidance is updated if deployment validation steps change.
-16. Required Delivery Output
+
+## 16. Required Delivery Output
+
 Summary
 File Manifest
 New Files
@@ -239,7 +266,9 @@ Refactor Findings
 Test Plan
 Deployment Steps
 Deferred Optimisations
-17. PR Summary Template
+
+## 17. PR Summary Template
+
 ## Summary
 
 - Isolated pytest logging from production operational handlers.

@@ -238,7 +238,7 @@ def get_conn_with_retries(
     Optional `meta` is attached to telemetry (best-effort).
     """
     if _is_pytest_unit_mode():
-        raise AssertionError(
+        raise RuntimeError(
             "Unit test attempted live DB access through get_conn_with_retries. "
             "Patch the DAL/service boundary or run with RUN_DB_TESTS=1 for explicit "
             "integration coverage."

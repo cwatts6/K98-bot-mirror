@@ -94,6 +94,7 @@ from gsheet_module import check_basic_gsheets_access  # <-- add
 from logging_setup import (
     LOG_DIR,
     clean_old_lock_files,
+    is_pytest_logging_mode,
 )
 from mge.mge_scheduler import schedule_mge_lifecycle
 from player_stats_cache import (  # optional, see note
@@ -130,14 +131,6 @@ from decoraters import usage_tracker  # lazy singleton; safe to import here
 def _aware(dt: datetime) -> datetime:
     """Ensure dt is timezone-aware in UTC."""
     return ensure_aware_utc(dt)
-
-
-def _is_pytest_mode() -> bool:
-    return (
-        os.getenv("K98_TEST_MODE") == "1"
-        or os.getenv("PYTEST_RUNNING") == "1"
-        or "PYTEST_CURRENT_TEST" in os.environ
-    )
 
 
 START_TIME = _aware(utcnow())
@@ -749,7 +742,7 @@ async def _count_errors_last_minutes(
     Count only real [LEVEL] lines within the last N minutes.
     Expected prefix: 'YYYY-MM-DD HH:MM:SS,fff ' (23 chars) before the level token.
     """
-    if _is_pytest_mode():
+    if is_pytest_logging_mode():
         return 0
 
     path = _safe_error_log_path()
@@ -1255,7 +1248,7 @@ async def _update_health_embed():
         need_alert = False
         reasons = []
 
-        if _is_pytest_mode():
+        if is_pytest_logging_mode():
             return
 
         if not sql_ok:

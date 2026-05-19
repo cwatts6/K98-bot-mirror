@@ -283,8 +283,11 @@ class StreamToLogger:
 
 # Redirect AFTER handlers are set up; console handler keeps ORIG_STDOUT
 # NOTE: We still redirect prints to logging (non-blocking via queue).
-sys.stdout = StreamToLogger(_STDIO_LOGGER, logging.INFO)
-sys.stderr = StreamToLogger(_STDIO_LOGGER, logging.ERROR)
+# In pytest mode, skip redirection so test output remains observable via pytest's
+# normal stdout/stderr capture instead of being silently dropped by NullHandler.
+if not is_pytest_logging_mode():
+    sys.stdout = StreamToLogger(_STDIO_LOGGER, logging.INFO)
+    sys.stderr = StreamToLogger(_STDIO_LOGGER, logging.ERROR)
 
 
 # === Explicit Flush Utility ===
