@@ -41,11 +41,11 @@ both this backlog and the current `K98-bot-mirror` GitHub issues list.
 ### Deferred Optimisation
 - Area: `commands/`, `scripts/validate_command_registration.py`
 - Type: architecture
-- Description: Batch 1 of the command-surface balancing audit grouped admin-heavy `/ops` and `/mge` commands, reducing the primary Discord application-command set from 100 to 82 top-level commands. Future standalone slash commands can still erode this buffer and eventually break startup sync with Discord error 30032 unless additional command-surface consolidation remains planned.
+- Description: Batch 1 of the command-surface balancing audit grouped admin-heavy `/ops` and `/mge` commands, reducing the primary Discord application-command set from 100 to 82 top-level commands. The batch was promoted to production and smoke tested through the cache-migration restart plus a settled follow-up restart with `commands_changed result: False`. Future standalone slash commands can still erode this buffer and eventually break startup sync with Discord error 30032 unless additional command-surface consolidation remains planned.
 - Suggested Fix: Continue the command-surface programme through the staged follow-up batches below. Group related commands by domain where user experience allows, identify stale/low-use admin commands for consolidation or retirement, update docs for renamed paths, and keep `scripts/validate_command_registration.py` enforcing the 100-command ceiling with a warning at 90+.
 - Impact: high
 - Risk: medium
-- Dependencies: Batch 1 `/ops` and `/mge` grouping validation remains clean; coordinate with bot operators before renaming public command paths; preserve admin-only permission checks when commands move into groups.
+- Dependencies: Batch 1 `/ops` and `/mge` grouping is production-complete; coordinate with bot operators before renaming public command paths; preserve admin-only permission checks when commands move into groups.
 
 ### Deferred Optimisation
 - Area: `commands/ark_cmds.py`, `docs/ark/`, Ark command tests
@@ -54,7 +54,7 @@ both this backlog and the current `K98-bot-mirror` GitHub issues list.
 - Suggested Fix: Prepare a second command-surface migration batch that groups Ark commands under `/ark`, preserving `is_admin_or_leadership_only`, `channel_only`, public reminder/report behavior, autocomplete/options, and interaction responses. Coordinate operator communication for public path changes before implementation and update Ark docs/tests to the new paths.
 - Impact: high
 - Risk: medium
-- Dependencies: Batch 1 `/ops` and `/mge` grouping deployed cleanly; operators approve public Ark path migration and announcement timing.
+- Dependencies: Batch 1 `/ops` and `/mge` grouping is production-complete; operators approve public Ark path migration and announcement timing.
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/registry_cmds.py`, `commands/inventory_cmds.py`, `commands/calendar_cmds.py`, `commands/subscriptions_cmds.py`, user-facing command docs/tests
@@ -63,7 +63,7 @@ both this backlog and the current `K98-bot-mirror` GitHub issues list.
 - Suggested Fix: Scope a later public command-path migration with operator-approved UX rules, aliases/transition messaging if feasible, and focused docs/test updates. Prioritise admin-heavy subcommands inside each domain first, then evaluate whether player paths should remain flat for discoverability.
 - Impact: medium
 - Risk: medium
-- Dependencies: Operator approval for public command rename policy; updated command reference/announcement plan; Batch 1 validation remains below the warning threshold.
+- Dependencies: Operator approval for public command rename policy; updated command reference/announcement plan; Batch 1 production validation remains below the warning threshold.
 
 ### Deferred Optimisation
 - Area: `cogs/commands.py`, `subscribe.py`, `scripts/validate_command_registration.py`, startup command audit docs

@@ -18,7 +18,7 @@
 
 This keeps one authoritative registration flow in production and avoids double registration.
 
-## 2026-05-19 command-surface balancing update
+## 2026-05-20 command-surface balancing update
 
 Batch 1 grouped admin-heavy commands to restore headroom under Discord's 100 top-level command
 limit:
@@ -31,6 +31,13 @@ limit:
 Current renamed paths are documented in `docs/reference/command_surface_audit.md`.
 `scripts/validate_command_registration.py` now warns at 90+ top-level commands and still fails
 above 100.
+
+Final production smoke validated the settled startup state after cache migration:
+
+- first restart detected the new grouped paths and updated `COMMAND_CACHE_FILE`;
+- follow-up restart reported `commands_changed result: False`;
+- no grouped-command `_callback` signature extraction warnings remained;
+- loaded command logging now lists grouped subcommands rather than only group roots.
 
 ## Duplicate command names found
 
@@ -67,3 +74,4 @@ At startup, `DL_bot.py` now:
 2. Confirm startup logs include `[COMMAND AUDIT] registration summary`.
 3. Confirm duplicate warnings are informational only (no startup failure).
 4. In Discord slash command UI, verify there is exactly one instance per command name.
+5. After any command grouping migration, restart once more and confirm `commands_changed result: False`.

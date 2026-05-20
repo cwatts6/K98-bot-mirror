@@ -1,6 +1,17 @@
 # Command Surface Audit
 
-Last updated: 2026-05-19
+Last updated: 2026-05-20
+
+## Delivery Status
+
+Batch 1 is complete, merged, promoted to production, and smoke tested on the bot machine.
+
+Production restart evidence from 2026-05-20 confirmed:
+
+- grouped command signatures are stable across restarts;
+- no `SlashCommandGroup` `_callback` signature warnings remain for `/ops`, `/mge`, or `/prekvk`;
+- the one-time command cache migration completed and the follow-up restart reported `commands_changed result: False`;
+- startup skipped Discord command sync on the settled cache and continued through reminder/event cache rehydration.
 
 ## Current Registration Summary
 
@@ -20,6 +31,10 @@ Grouped command summary:
 
 The primary command surface now has an 18-command buffer below Discord's 100 top-level
 application-command limit. The validator warns at 90+ and fails above 100.
+
+Runtime command-cache and command-version checks flatten grouped commands before reading callback
+versions, so moved commands are tracked as paths such as `/ops run_sql_proc`, `/mge refresh_cache`,
+and `/prekvk report`.
 
 ## Batch 1 Renamed Command Paths
 

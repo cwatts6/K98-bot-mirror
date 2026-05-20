@@ -7,6 +7,27 @@
 - Owner/context: Deferred optimisation — Discord command registration limit
 - Task type: deferred optimisation batch
 - One-pass approved: no
+- Final status: Batch 1 complete, merged, promoted to production, and smoke tested successfully on 2026-05-20.
+
+## 1A. Final Delivery Summary
+
+Batch 1 delivered the approved low-risk grouping slice:
+
+- operational admin commands moved under `/ops`;
+- MGE admin/leadership commands moved under `/mge`;
+- PreKvK grouped paths remain active under `/prekvk`;
+- command registration validation reports `primary=82 grouped_subcommands_detected=21 secondary_cogs=5 secondary_subscribe=1 total_unique=82`;
+- PR validation keeps the 100 top-level command ceiling and 90+ warning threshold;
+- startup command-cache/version checks flatten grouped subcommands so grouped handlers remain version-tracked.
+
+Production smoke evidence:
+
+- first restart detected the new grouped command signatures, synced commands, and updated the command cache;
+- follow-up restart reported `commands_changed result: False`;
+- no `/ops`, `/mge`, or `/prekvk` group `_callback` signature warnings remained;
+- loaded command logging listed grouped subcommands such as `/ops run_sql_proc`, `/mge refresh_cache`, and `/prekvk report`.
+
+Remaining command-surface work is captured in `docs/reference/deferred_optimisations.md` for later batches: Ark grouping, public/player domain grouping, and disabled secondary command-surface cleanup.
 
 ## 2. Required Reading
 
