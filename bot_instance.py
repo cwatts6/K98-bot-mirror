@@ -46,6 +46,7 @@ from bot_helpers import (
 )
 from bot_loader import bot
 from bot_startup_gate import claim_startup_once
+from commands.command_inventory import flatten_application_commands
 from constants import (
     COMMAND_CACHE_FILE,
     CREDENTIALS_FILE,
@@ -1662,8 +1663,11 @@ async def on_ready():
         logger.info(f"✅ Bot is ready – logged in as {bot.user} (ID: {bot.user.id})")
 
         commands = list(bot.application_commands)
+        signature_commands = list(flatten_application_commands(commands))
         current_signatures = [
-            sig for cmd in commands if (sig := get_command_signature(cmd)) is not None
+            sig
+            for name, cmd in signature_commands
+            if (sig := get_command_signature(cmd, name=name)) is not None
         ]
 
         logger.info("🧪 Reading command cache file...")
@@ -1719,8 +1723,8 @@ async def on_ready():
             logger.warning("⏩ Slash commands unchanged — skipping sync and update.")
 
         logger.warning("📋 Loaded slash commands:")
-        for cmd in commands:
-            logger.warning(f" - /{cmd.name} – {cmd.description}")
+        for name, cmd in signature_commands:
+            logger.warning(f" - /{name} – {cmd.description}")
 
         logger.info(f"[REMINDER_CACHE] Attempting to load from {REMINDER_TRACKING_FILE}")
         loaded_ids = await load_active_reminders(bot)

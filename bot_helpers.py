@@ -57,18 +57,19 @@ def prune_restart_log(log_file="restart_log.csv", max_entries=100):
         logger.warning(f"[LOG] Failed to prune {log_file}: {e}")
 
 
-def get_command_signature(command):
+def get_command_signature(command, *, name: str | None = None):
     if command is None:
         logger.warning("[SIGNATURE] Skipping null command object.")
         return None
     try:
         return {
-            "name": command.name,
+            "name": name or command.name,
             "description": command.description,
             "version": getattr(command.callback, "__version__", "v1.0"),
         }
     except Exception as e:
-        logger.warning(f"[SIGNATURE] Failed to extract signature from {command}: {e}")
+        command_name = name or getattr(command, "name", command)
+        logger.warning(f"[SIGNATURE] Failed to extract signature from {command_name}: {e}")
         return None
 
 
