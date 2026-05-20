@@ -1,5 +1,6 @@
 # stats_alerts/state.py
 import logging
+from pathlib import Path
 from typing import Any
 
 from constants import STATS_ALERT_LOG
@@ -13,6 +14,43 @@ _STATE_LOCK_PATH = f"{STATE_PATH}.lock"
 _LOCK_TIMEOUT_SECS = 5.0
 
 
+def _repair_empty_state_file() -> bool:
+    """Rewrite an empty/whitespace state file as a valid empty JSON object."""
+    path = Path(STATE_PATH)
+    if not path.exists():
+        return False
+
+    try:
+        with acquire_lock(_STATE_LOCK_PATH, timeout=_LOCK_TIMEOUT_SECS):
+            if not path.exists():
+                return False
+
+            try:
+                raw = path.read_text(encoding="utf-8")
+            except Exception:
+                logger.exception("[STATE] Failed reading state file %s for repair.", STATE_PATH)
+                return False
+
+            if raw.strip():
+                return False
+
+            atomic_write_json(path, {})
+            logger.warning(
+                "[STATE] State file %s was empty; repaired with an empty JSON object.",
+                STATE_PATH,
+            )
+            return True
+    except TimeoutError:
+        logger.warning(
+            "[STATE] Timeout acquiring state lock while checking empty state file %s.",
+            STATE_PATH,
+        )
+        return False
+    except Exception:
+        logger.exception("[STATE] Failed checking empty state file %s.", STATE_PATH)
+        return False
+
+
 def load_state() -> dict[str, Any]:
     """
     Load persisted state from JSON file.
@@ -21,6 +59,9 @@ def load_state() -> dict[str, Any]:
     Uses file_utils.read_json_safe which logs JSON errors and returns a default.
     """
     try:
+        if _repair_empty_state_file():
+            return {}
+
         data = read_json_safe(STATE_PATH, default={})
         if isinstance(data, dict):
             return data
