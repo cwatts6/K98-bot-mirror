@@ -21,13 +21,15 @@ successfully. Phase 2C delivered the public read-only `/prekvk report` image rep
 tested successfully, and was pushed to production. Phase 2D refactored the scheduled PreKvK
 stats-alert path onto the Phase 2C report service architecture while preserving scheduled embed,
 guard/state, and upload-refresh behaviour; it was smoke tested successfully and pushed to
-production. Phase 3 local validation blockers are now the next upload-routing programme slice; the
-remaining active backlog is listed below.
+production. Phase 3 local validation blockers were audited on 2026-05-20 and closed as a no-op:
+the focused DB/non-DB blocker tests, full suite, and pytest log-noise validation all passed under
+the documented `.venv` workflow without `RUN_DB_TESTS=1`. Phase 4 KVK_ALL upload-route extraction
+is now the next upload-routing programme slice; the remaining active backlog is listed below.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
-upload routing and related test-environment blockers, not as a continuation of the
-`/import_locations` command cleanup. Start that task with a new audit/scope pass and review
-both this backlog and the current `K98-bot-mirror` GitHub issues list.
+upload routing, not as a continuation of the `/import_locations` command cleanup. Start that task
+with a new audit/scope pass and review both this backlog and the current `K98-bot-mirror` GitHub
+issues list.
 
 ### Deferred Optimisation
 - Area: `tests/test_ark_preference_service.py`, `tests/test_ark_bans_enforcement.py`, `tests/test_lock_timeout.py`, `tests/test_calendar_service.py`, `tests/test_calendar_pipeline.py`, remaining slow full-suite pytest paths
@@ -75,24 +77,6 @@ both this backlog and the current `K98-bot-mirror` GitHub issues list.
 - Dependencies: Confirm secondary cogs remain disabled by default in production and no operator workflow depends on loading them.
 
 ### Deferred Optimisation
-- Area: tests/stats_service.py, tests/targets_sql_cache_subproc.py, tests/prekvk_stats.py, tests/proc_config_import_phase2.py, tests/sheets_sync_flow.py
-- Type: consistency
-- Description: Several non-Ark unit tests still reach live SQL Server or connection construction when run in the Codex/local PR validation environment without the bot machine's ODBC setup.
-- Suggested Fix: Add subsystem-specific DAL/service boundary patches or explicit integration markers, then gate live DB coverage behind RUN_DB_TESTS=1.
-- Impact: high
-- Risk: medium
-- Dependencies: Agreement on which non-Ark tests should remain live DB integration coverage.
-
-### Deferred Optimisation
-- Area: tests/test_dl_bot_mge_auto_import.py, tests/test_integration_end_to_end_fake_worker.py, tests/test_maintenance_suite.py
-- Type: consistency
-- Description: Full-suite validation in the Codex/local PR environment has non-DB environment blockers: DL_bot expects venv/Scripts/python.exe while the documented command uses .venv, and subprocess worker tests fail with WinError 5 in the sandbox.
-- Suggested Fix: Make startup interpreter validation configurable for tests and mark subprocess worker tests with an environment capability gate when process spawning is unavailable.
-- Impact: medium
-- Risk: medium
-- Dependencies: Local validation environment contract for venv naming and subprocess permissions.
-
-### Deferred Optimisation
 - Area: SQL repo legacy PreKvK phase object retirement
 - Type: cleanup
 - Description: After Phase 2B compatibility wrappers remove active scan-window logic, `dbo.PreKvk_Phases` and any compatibility-only phase objects may remain as unused legacy SQL surface.
@@ -117,7 +101,7 @@ both this backlog and the current `K98-bot-mirror` GitHub issues list.
 - Suggested Fix: Move KVK_ALL upload orchestration into a dedicated service or route module in a later phase, leaving `DL_bot.py` responsible for event delegation and Discord response plumbing.
 - Impact: medium
 - Risk: medium
-- Dependencies: Preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to the KVK_ALL modernisation programme.
+- Dependencies: Start with `docs/task_packs/DL_bot Upload Routing - Phase 4 KVK_ALL Upload Route Starter.md`; preserve existing Discord output and auto-export behaviour; broader restart/performance hardening remains assigned to the KVK_ALL modernisation programme.
 
 ### Deferred Optimisation
 - Area: `DL_bot.py` remaining fast-path upload routes

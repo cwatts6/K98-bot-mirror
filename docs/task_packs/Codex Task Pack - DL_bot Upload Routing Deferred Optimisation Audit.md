@@ -55,7 +55,9 @@ The active deferred backlog identifies these DL_bot-specific architecture items:
 - PreKvK upload routing still mixes filename matching, KVK lookup, offload dispatch, and Discord rendering.
 - Player location CSV auto-import still couples `DL_bot.py` to `commands/location_cmds.py` refresh signalling.
 - KVK_ALL upload routing still mixes attachment filtering, import handling, Discord rendering, and export scheduling.
-- Local validation has DB and non-DB environment blockers that affect safe PR validation.
+- Local validation previously had DB and non-DB environment blockers that affected safe PR
+  validation; Phase 3 later audited these and closed them as a no-op after current `main` passed
+  focused blocker tests, full pytest, and log-noise validation.
 
 ## 5. Scope
 
@@ -93,7 +95,7 @@ The active deferred backlog identifies these DL_bot-specific architecture items:
 - Suggested Fix: Add subsystem-specific DAL/service boundary patches or explicit integration markers, then gate live DB coverage behind RUN_DB_TESTS=1.
 - Impact: high
 - Risk: medium
-- Dependencies: Agreement on which non-Ark tests should remain live DB integration coverage.
+- Dependencies: Resolved by Phase 3 no-op audit on 2026-05-20; focused tests and full suite passed without live DB opt-in.
 
 ### Deferred Optimisation
 - Area: tests/test_dl_bot_mge_auto_import.py, tests/test_integration_end_to_end_fake_worker.py, tests/test_maintenance_suite.py
@@ -102,7 +104,7 @@ The active deferred backlog identifies these DL_bot-specific architecture items:
 - Suggested Fix: Make startup interpreter validation configurable for tests and mark subprocess worker tests with an environment capability gate when process spawning is unavailable.
 - Impact: medium
 - Risk: medium
-- Dependencies: Local validation environment contract for venv naming and subprocess permissions.
+- Dependencies: Resolved by Phase 3 no-op audit on 2026-05-20; `.venv` interpreter and subprocess-worker tests passed locally.
 
 ### Deferred Optimisation
 - Area: `DL_bot.py` PreKvK upload routing
@@ -291,11 +293,15 @@ Phase breakdown:
    - Define command/channel surface, permissions, limits, empty-data behaviour, and mobile-safe
      Discord output before implementation.
 5. **Phase 3 - Local validation blockers**
-   - Fix or capability-gate DB/non-DB local validation blockers that affect confidence in the
-     routing work.
+   - Completed as a no-op on 2026-05-20 after the listed blockers no longer reproduced on current
+     `main`.
+   - Validation evidence: focused DB-facing blocker tests passed (`28 passed`), focused non-DB
+     environment blocker tests passed (`20 passed`), full pytest passed (`1461 passed, 2 skipped`),
+     and pytest log-noise validation passed with production operational logs unchanged.
 6. **Phase 4 - KVK_ALL upload route**
    - Extract the higher-risk multi-attachment KVK_ALL route after smaller routes prove the pattern.
    - Preserve structured importer failures, health output, link button, and auto-export scheduling.
+   - Starter packet: `docs/task_packs/DL_bot Upload Routing - Phase 4 KVK_ALL Upload Route Starter.md`
 7. **Phase 5 - Remaining upload fast-path consolidation**
    - Consolidate MGE, honor, weekly activity, rally, inventory, fallback queueing, shared
      SQL-preflight/offload handling, shared import embed rendering, and route-level structured
@@ -321,6 +327,14 @@ Phase 2B starter:
 - Phase 2B is audit/design only until explicitly approved for SQL changes.
 - It must validate dependencies on `dbo.PreKvk_Phases`, `dbo.fn_PreKvkPhaseDelta`, and
   KVK-specific PreKvK phase views against `C:\K98-bot-SQL-Server` before proposing cleanup.
+
+Phase 3 delivery notes:
+
+- Phase 3 local validation blockers were audited on current `main` and closed as a no-op.
+- No bot code, SQL, tests, deployment scripts, or upload-routing behaviour changed.
+- The two validation-blocker deferred items were removed from the active backlog after the focused
+  blocker reproductions, full test suite, and log-noise validation all passed under `.venv`.
+- Phase 4 KVK_ALL upload-route extraction is now the next active upload-routing programme slice.
 
 14. Testing Requirements
 

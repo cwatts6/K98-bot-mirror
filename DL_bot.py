@@ -133,8 +133,9 @@ from bot_helpers import channel_queues
 from Commands import register_commands
 from embed_utils import send_embed
 from honor_importer import ingest_honor_snapshot, parse_honor_xlsx
-from kvk_all_importer import _auto_export_kvk, ingest_kvk_all_excel
+from kvk_all_importer import _auto_export_kvk
 from log_health import LogHeadroomError, preflight_from_env_sync
+from upload_routes.kvk_all_route import KvkAllRouteDeps, handle_kvk_all_upload
 from upload_routes.player_location_route import (
     PlayerLocationRouteDeps,
     handle_player_location_upload,
@@ -1048,185 +1049,25 @@ async def on_message(message: discord.Message):
         return  # don't enqueue into the heavy stats pipeline
 
     # === KVK (all kingdoms) ingest ===
-    if message.channel.id == PROKINGDOM_CHANNEL_ID and message.attachments:
-        notify_ch = await _get_notify_channel() or message.channel
-
-        # Log what Discord actually gave us
-        try:
-            logger.info(
-                "[KVK] msg=%s attachments=%s", message.id, [a.filename for a in message.attachments]
-            )
-        except Exception:
-            pass
-
-        # Find ALL excel/csv attachments (process each)
-        excel_attachments = [
-            a
-            for a in message.attachments
-            if a.filename.lower().strip().endswith((".xlsx", ".xls", ".csv"))
-        ]
-
-        if not excel_attachments:
-            await send_embed(
-                notify_ch,
-                "KVK All-Kingdom Import ⚠️",
-                {
-                    "Info": "No .xlsx/.xls/.csv attachment found.",
-                    "Channel": f"#{message.channel.name} ({message.channel.id})",
-                    "Uploader": f"{message.author} ({message.author.id})",
-                },
-                0xE67E22,
-            )
-            return
-
-        # Process each matching attachment independently
-        for att in excel_attachments:
-            try:
-                logger.info("[KVK] Reading attachment: %s (%s bytes)", att.filename, att.size)
-                file_bytes = await att.read()
-
-                # NEW: preflight check
-                ok = await ensure_sql_headroom_or_notify(notify_ch)
-                if not ok:
-                    await send_embed(
-                        notify_ch,
-                        "KVK All-Kingdom Import Aborted ❌",
-                        {"File": att.filename, "Reason": "SQL log headroom insufficient"},
-                        0xE74C3C,
-                    )
-                    continue
-
-                # Offload heavy importer to an isolated process when available
-                result = await _offload_callable(
-                    ingest_kvk_all_excel,
-                    content=file_bytes,
-                    source_filename=att.filename,
-                    uploader_id=message.author.id,
-                    scan_ts_utc=message.created_at,
-                    server=os.environ.get("SQL_SERVER"),
-                    database=os.environ.get("SQL_DATABASE"),
-                    username=os.environ.get("SQL_USERNAME"),
-                    password=os.environ.get("SQL_PASSWORD"),
-                    name="ingest_kvk_all_excel",
-                    prefer_process=True,
-                    meta={"filename": att.filename},
-                )
-
-                # Handle structured importer failures (no traceback)
-                if isinstance(result, dict) and not result.get("success", True):
-                    # concise log (no stacktrace) and user-facing embed
-                    logger.info("[KVK] Import failed for %s: %s", att.filename, result.get("error"))
-                    await send_embed(
-                        notify_ch,
-                        "KVK All-Kingdom Import ❌",
-                        {
-                            "Filename": att.filename,
-                            "Channel": f"#{message.channel.name} ({message.channel.id})",
-                            "Uploader": f"{message.author} ({message.author.id})",
-                            "Error": result.get("error"),
-                            "Sheet": result.get("sheet", "unknown"),
-                        },
-                        0xE74C3C,
-                    )
-                    continue  # move on to next attachment
-
-                kvk_no = int(result["kvk_no"])
-                scan_id = int(result["scan_id"])
-                rows = int(result["row_count"])
-                neg = int(result["negatives"])
-                dur_s = float(result["duration_s"])
-                staged = int(
-                    result.get("staged_rows", rows)
-                )  # fallback to final rows if not provided
-                proc_ms = float(result.get("proc_ms", max(0.0, dur_s * 1000.0)))
-                io_ms = max(0.0, dur_s * 1000.0 - proc_ms)
-
-                # Tiny badge + color flip if negatives > 0
-                neg_badge = "0" if neg == 0 else f"{neg} ⚠️"
-                color = 0x2ECC71 if neg == 0 else 0xE67E22  # green vs orange
-                title = "KVK All-Kingdom Import ✅" if neg == 0 else "KVK All-Kingdom Import ⚠️"
-
-                # Optional recompute timing (returned by new importer)
-                recompute_ms = float(result.get("recompute_ms", 0.0))
-
-                sheet_used = result.get("sheet", "unknown")
-
-                fields = {
-                    "KVK": str(kvk_no),
-                    "ScanID": str(scan_id),
-                    "Rows": str(rows),
-                    "Staged": str(staged),  # ← NEW
-                    "Negative Corrections": neg_badge,
-                    "Duration": f"{dur_s:.2f}s",
-                    # Health line: proc / I/O (+ recompute if available)
-                    "Health": (
-                        f"proc `{proc_ms:.0f}ms` • I/O `{io_ms:.0f}ms`"
-                        + (f" • recompute `{recompute_ms:.0f}ms`" if recompute_ms > 0 else "")
-                    ),
-                    "File": att.filename,
-                    "Sheet": sheet_used,
-                    "Channel": f"#{message.channel.name} ({message.channel.id})",
-                    "Uploader": f"{message.author} ({message.author.id})",
-                }
-                embed = discord.Embed(title=title, color=color)
-                for k, v in fields.items():
-                    embed.add_field(name=k, value=str(v), inline=True)
-
-                # Optional: keep your bot’s branding thumbnail for consistency
-                try:
-                    from constants import CUSTOM_AVATAR_URL
-
-                    if CUSTOM_AVATAR_URL:
-                        embed.set_thumbnail(url=CUSTOM_AVATAR_URL)
-                except Exception:
-                    pass
-
-                # Add a link button to the stats sheet (graceful no-op if ID missing)
-                view = None
-                try:
-                    sheet_id = (
-                        ALL_KVK_SHEET_ID
-                        or os.environ.get("KVK_SHEET_ID")
-                        or os.environ.get("ALL_KVK_SHEET_ID")
-                    )
-                    if sheet_id:
-                        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}"
-                        view = discord.ui.View()
-                        view.add_item(
-                            discord.ui.Button(
-                                label="📄 Open KVK_ALLPLAYER_OUTPUT",
-                                url=url,
-                                style=discord.ButtonStyle.link,
-                            )
-                        )
-                except Exception:
-                    logger.info("[KVK EXPORT] ALL KVK SHEET ID INVALID")
-                    view = None  # never block on UI bits
-
-                await notify_ch.send(embed=embed, view=view)
-
-                # Auto-export to Google Sheets (non-blocking) — keep your existing logic
-                if KVK_AUTO_EXPORT:
-                    logger.info(
-                        "[KVK_EXPORT] Scheduling auto-export for KVK %s (Scan %s)", kvk_no, scan_id
-                    )
-                    asyncio.create_task(_auto_export_kvk(kvk_no, notify_ch, bot.loop))
-
-            except Exception as e:
-                # Log + surface any error per-attachment
-                logger.exception("[KVK] Import failed for %s: %s", att.filename, e)
-                await send_embed(
-                    notify_ch,
-                    "KVK All-Kingdom Import ❌",
-                    {
-                        "Error": f"{type(e).__name__}: {e}",
-                        "File": att.filename,
-                        "Channel": f"#{message.channel.name} ({message.channel.id})",
-                        "Uploader": f"{message.author} ({message.author.id})",
-                    },
-                    0xE74C3C,
-                )
-        return  # don't enqueue into other pipelines
+    if await handle_kvk_all_upload(
+        message,
+        KvkAllRouteDeps(
+            prokingdom_channel_id=PROKINGDOM_CHANNEL_ID,
+            bot=bot,
+            get_notify_channel=_get_notify_channel,
+            send_embed=send_embed,
+            ensure_sql_headroom_or_notify=ensure_sql_headroom_or_notify,
+            offload_callable=_offload_callable,
+            auto_export_enabled=KVK_AUTO_EXPORT,
+            auto_export_scheduler=_auto_export_kvk,
+            get_sheet_id=lambda: (
+                ALL_KVK_SHEET_ID
+                or os.environ.get("KVK_SHEET_ID")
+                or os.environ.get("ALL_KVK_SHEET_ID")
+            ),
+        ),
+    ):
+        return
 
     # === Main monitored channels: enqueue heavy imports for worker processes ===
     if message.channel.id in CHANNEL_IDS:
