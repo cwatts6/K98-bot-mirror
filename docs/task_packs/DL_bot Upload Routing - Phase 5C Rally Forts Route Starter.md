@@ -23,9 +23,50 @@ We are starting Phase 5C of the DL_bot upload-routing optimisation programme aft
   successfully on 2026-05-26 with inventory and alliance weekly uploads, deployed to production,
   and closed.
 
-Phase 5C is the next small upload-routing slice. It should keep using the proven `upload_routes`
-pattern and `upload_routes/common.py` helpers where behaviour matches. Do not pull the main
-monitored-channel fallback queue into this phase unless explicitly approved after the audit packet.
+Phase 5C was the next small upload-routing slice. It kept using the proven `upload_routes`
+pattern and `upload_routes/common.py` helpers where behaviour matched, without pulling the main
+monitored-channel fallback queue into the Rally Forts route extraction.
+
+## Completion Note
+
+Status: Phase 5C complete in PR 115 (`codex/dlbot-upload-routing-phase-5c`), smoke tested
+successfully, merged, deployed to production, and pushed to production.
+
+Delivered behaviour:
+
+- `DL_bot.py` delegates Rally Forts upload handling through `handle_rally_forts_upload()`.
+- `upload_routes/rally_forts_route.py` owns Rally Forts Discord route matching, daily/all-time
+  filename classification, local download staging under `LOG_DIR/downloads`, lazy importer loading,
+  SQL preflight handoff, offload dispatch, result aggregation, Discord output, and best-effort
+  log-backup scheduling.
+- `FORT_RALLY_CHANNEL_ID=0` is treated as disabled route configuration and falls through without
+  sending embeds, matching the existing upload-route convention for disabled channel IDs.
+- Attachment names containing path separators are rejected before local save to prevent path
+  traversal or directory-component staging.
+- `forts_ingest.py` and Rally SQL/importer contracts were not changed.
+- Phase 5D remains required as the final upload-routing sub-phase for main monitored-channel
+  fallback queueing.
+
+Validation evidence included:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests\test_rally_forts_upload_route.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_rally_forts_upload_route.py tests\test_weekly_activity_upload_route.py tests\test_honor_upload_route.py tests\test_mge_results_upload_route.py
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pre_commit run -a
+.\.venv\Scripts\python.exe -m pytest -q tests
+.\.venv\Scripts\python.exe scripts\analyse_pytest_log_noise.py
+```
+
+Observed final full-suite result after review fixes: `1528 passed, 2 skipped`. Pytest log-noise
+validation confirmed production operational logs were unchanged.
+
+The next starter packet is
+`docs/task_packs/DL_bot Upload Routing - Phase 5D Fallback Queue Route Starter.md`.
 
 ## Goal
 

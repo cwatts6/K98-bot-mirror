@@ -21,6 +21,8 @@ We are starting Phase 5 of the DL_bot upload-routing optimisation programme afte
   `upload_routes/inventory_route.py` and `upload_routes/weekly_activity_route.py`, was smoke tested
   successfully on 2026-05-26 with inventory and alliance weekly uploads, deployed to production,
   and closed.
+- Phase 5C extracted Rally Forts ingest into `upload_routes/rally_forts_route.py`, was smoke
+  tested successfully, merged, deployed to production, and pushed to production.
 
 ## Completion Note
 
@@ -104,14 +106,49 @@ Validation evidence included:
 Observed full-suite result: `1511 passed, 2 skipped`. Pytest log-noise validation confirmed
 production operational logs were unchanged.
 
-Phase 5C Rally Forts upload-route extraction is now the next active upload-routing programme
-slice. Starter packet:
+Phase 5C Rally Forts upload-route extraction was completed in PR 115. Its starter packet is
+retained for delivery history:
 `docs/task_packs/DL_bot Upload Routing - Phase 5C Rally Forts Route Starter.md`.
 
-Phase 5D is expected to be required as the final upload-routing sub-phase for main
-monitored-channel fallback queueing because that path touches `channel_queues`, `live_queue`,
-worker-process handoff, queue embed updates, and background log-backup scheduling. Keeping it
-separate avoids mixing Rally importer extraction with queue/lifecycle ownership changes.
+## Phase 5C Completion Note
+
+Status: Phase 5C complete in PR 115 (`codex/dlbot-upload-routing-phase-5c`), smoke tested
+successfully, merged, deployed to production, and pushed to production.
+
+Delivered behaviour:
+
+- `DL_bot.py` delegates Rally Forts upload handling through `handle_rally_forts_upload()`.
+- `upload_routes/rally_forts_route.py` preserves daily and all-time Rally filename matching,
+  local `LOG_DIR/downloads` staging, lazy `forts_ingest` import behaviour, SQL preflight order,
+  offload arguments, per-file result aggregation, final Discord embed shape, and best-effort
+  background log-backup scheduling.
+- Disabled `FORT_RALLY_CHANNEL_ID=0` falls through without sending embeds, matching the existing
+  disabled-channel convention.
+- Rally upload filenames containing path separators are rejected before local save.
+- `forts_ingest.py`, SQL objects, stored procedures, views, file formats, importer contracts, and
+  worker queue ownership were not changed.
+
+Validation evidence included:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests\test_rally_forts_upload_route.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_rally_forts_upload_route.py tests\test_weekly_activity_upload_route.py tests\test_honor_upload_route.py tests\test_mge_results_upload_route.py
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pre_commit run -a
+.\.venv\Scripts\python.exe -m pytest -q tests
+.\.venv\Scripts\python.exe scripts\analyse_pytest_log_noise.py
+```
+
+Observed final full-suite result after review fixes: `1528 passed, 2 skipped`. Pytest log-noise
+validation confirmed production operational logs were unchanged.
+
+Phase 5D is now the final upload-routing sub-phase for main monitored-channel fallback queueing.
+Starter packet:
+`docs/task_packs/DL_bot Upload Routing - Phase 5D Fallback Queue Route Starter.md`.
 
 Phase 5 is the remaining fast-path upload-route consolidation slice. It should use the proven
 `upload_routes` pattern to reduce `DL_bot.py` listener responsibilities while preserving production
@@ -125,9 +162,9 @@ modules or an approved shared upload-router boundary.
 The desired end state is:
 
 - `DL_bot.py` delegates remaining upload message handling and keeps only listener/event plumbing.
-- MGE results import, KVK Honour ingest, weekly activity ingest, and inventory upload-first routing
-  have clear route ownership after Phase 5B. Rally forts ingest and fallback monitored-channel
-  queueing remain to be extracted in later Phase 5 sub-phases.
+- MGE results import, KVK Honour ingest, weekly activity ingest, inventory upload-first routing,
+  and Rally Forts ingest have clear route ownership after Phase 5C. Fallback monitored-channel
+  queueing remains to be extracted in Phase 5D.
 - Shared SQL preflight, offload dispatch, import embed rendering, and route-level structured
   logging are consolidated only where behaviour parity is safe and testable.
 - Current Discord output, importer contracts, accepted filenames/extensions, side effects, fallback
@@ -155,6 +192,7 @@ Before audit work, read:
 - `docs/task_packs/DL_bot Upload Routing - Phase 4 KVK_ALL Upload Route Starter.md`
 - `docs/task_packs/DL_bot Upload Routing - Phase 5B Inventory and Weekly Activity Route Starter.md`
 - `docs/task_packs/DL_bot Upload Routing - Phase 5C Rally Forts Route Starter.md`
+- `docs/task_packs/DL_bot Upload Routing - Phase 5D Fallback Queue Route Starter.md`
 
 Use `C:\K98-bot-SQL-Server` as the SQL source of truth for any importer, DAL, export, stored
 procedure, view, or output-contract assumptions reviewed during this phase.
@@ -174,8 +212,8 @@ procedure, view, or output-contract assumptions reviewed during this phase.
 ### Deferred Optimisation
 - Area: `DL_bot.py` remaining fast-path upload routes
 - Type: architecture
-- Description: After Phase 5B, `DL_bot.py` still owns Rally Forts ingest and main monitored-channel fallback queue handling directly in the root listener. Player location, PreKvK, KVK_ALL, MGE results, KVK Honor, inventory upload-first, and weekly activity ingest now delegate through the `upload_routes` pattern.
-- Suggested Fix: Continue Phase 5 with small sub-phases: Phase 5C should extract Rally Forts ingest into the `upload_routes` pattern, and Phase 5D should separately scope the main monitored-channel fallback queue route because it touches worker queue ownership, `channel_queues`, `live_queue`, and queue embed side effects.
+- Description: After Phase 5C, `DL_bot.py` still owns main monitored-channel fallback queue handling directly in the root listener. Player location, PreKvK, KVK_ALL, MGE results, KVK Honor, inventory upload-first, weekly activity ingest, and Rally Forts ingest now delegate through the `upload_routes` pattern.
+- Suggested Fix: Complete Phase 5 with a final Phase 5D audit/scope pass for the main monitored-channel fallback queue route because it touches worker queue ownership, `channel_queues`, `live_queue`, and queue embed side effects.
 - Impact: medium
 - Risk: medium
 - Dependencies: Player-location, PreKvK, validation-blocker, and KVK_ALL phases are complete and production smoke tested; preserve existing Discord output and importer contracts.
@@ -194,9 +232,8 @@ In scope for Step 1 audit:
   contracts.
 - Capture out-of-scope findings structurally.
 
-Likely remaining route candidates:
+Likely remaining route candidate:
 
-- Rally forts XLSX auto-ingest route.
 - Main monitored-channel fallback queue route.
 
 Out of scope until separately approved:
@@ -250,17 +287,13 @@ Likely tests:
 
 ## Design Questions
 
-- Should Phase 5C extract Rally Forts only, leaving fallback monitored-channel queueing to a final
-  Phase 5D? Current recommendation: yes, because the fallback queue path has worker/lifecycle
-  side effects that should not be mixed with Rally importer extraction.
+- Should Phase 5D extract fallback monitored-channel queueing into a route module, or should the
+  audit recommend leaving it in `DL_bot.py` until Phase 6 lifecycle/queue ownership work?
 - Which shared dependency object or helper should be introduced without over-abstracting the route
   pattern proven by player-location, PreKvK, and KVK_ALL?
-- Which repeated embed-rendering patterns are identical enough to consolidate safely, and which
-  should remain route-local to preserve exact Discord output?
-- Should fallback monitored-channel queueing become a route module, or should it remain at the end
-  of `DL_bot.py` until Phase 6 lifecycle/queue ownership is scoped?
-- Which SQL contracts need source-of-truth validation before implementation, and which are already
-  covered by existing tests?
+- Which queue side effects are identical enough to preserve inside a route module, and which
+  should remain in `DL_bot.py` until Phase 6?
+- Is any SQL-facing contract actually touched by Phase 5D? Current expectation: no.
 - What is the minimal first PR that reduces listener complexity without creating a hard-to-review
   broad router rewrite?
 

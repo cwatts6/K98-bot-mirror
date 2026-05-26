@@ -36,9 +36,14 @@ fields, and best-effort background task scheduling. Phase 5B inventory and weekl
 extraction was completed in PR 114 (`codex/dlbot-upload-routing-phase-5b`), smoke tested
 successfully on 2026-05-26 with inventory and alliance weekly uploads, deployed to production, and
 closed: `DL_bot.py` now delegates those routes through `upload_routes/inventory_route.py` and
-`upload_routes/weekly_activity_route.py`. Phase 5C Rally Forts upload-route extraction is now the
-next upload-routing programme slice; Phase 5D is expected to be the final upload-routing sub-phase
-for main monitored-channel fallback queueing before Phase 6 lifecycle/startup separation.
+`upload_routes/weekly_activity_route.py`. Phase 5C Rally Forts upload-route extraction was
+completed in PR 115 (`codex/dlbot-upload-routing-phase-5c`), smoke tested successfully, merged,
+deployed to production, and pushed to production: `DL_bot.py` now delegates Rally Forts handling
+through `upload_routes/rally_forts_route.py` while preserving filename matching, local download
+staging, lazy importer loading, SQL preflight, offload dispatch, aggregate Discord output,
+safe filename rejection, disabled-channel fall-through, and best-effort log-backup scheduling.
+Phase 5D is now the final upload-routing sub-phase for main monitored-channel fallback queueing
+before Phase 6 lifecycle/startup separation.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 upload routing, not as a continuation of the `/import_locations` command cleanup. Start that task
@@ -111,11 +116,11 @@ issues list.
 ### Deferred Optimisation
 - Area: `DL_bot.py` remaining fast-path upload routes
 - Type: architecture
-- Description: After Phase 5B, `DL_bot.py` still owns Rally Forts ingest and main monitored-channel fallback queue handling directly in the root listener. Player location, PreKvK, KVK_ALL, MGE results, KVK Honor, inventory upload-first, and weekly activity ingest now delegate through the `upload_routes` pattern, but the remaining inline routes still contain route-specific preflight/offload/rendering/logging and queue-bookkeeping patterns.
-- Suggested Fix: Continue Phase 5 with small sub-phases that consolidate the remaining fast paths into the `upload_routes` pattern. Phase 5C should extract Rally Forts ingest into a focused route module while preserving filename matching, local download staging, importer contracts, SQL preflight, per-file result aggregation, Discord output, and log-backup scheduling. Phase 5D should separately scope the main monitored-channel fallback queue route because it touches worker queue ownership, `channel_queues`, `live_queue`, and queue embed side effects.
+- Description: After Phase 5C, `DL_bot.py` still owns the main monitored-channel fallback queue handling directly in the root listener. Player location, PreKvK, KVK_ALL, MGE results, KVK Honor, inventory upload-first, weekly activity ingest, and Rally Forts ingest now delegate through the `upload_routes` pattern, but the fallback queue path still mixes monitored-channel matching, worker queue handoff, `live_queue` bookkeeping, queue embed updates, and best-effort log-backup scheduling in the listener.
+- Suggested Fix: Complete Phase 5 with a final Phase 5D audit/scope pass for the main monitored-channel fallback queue route. Extract the fallback queue path into a focused `upload_routes` boundary only if the audit confirms route-order, queue ownership, `channel_queues`, `live_queue`, queue embed, worker handoff, and background log-backup side effects can be preserved with focused tests. Keep broader worker/lifecycle ownership and `processing_pipeline.py` refactors out of Phase 5D unless explicitly approved.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5B is complete, smoke tested, deployed, and production-pushed; start Phase 5C from `docs/task_packs/DL_bot Upload Routing - Phase 5C Rally Forts Route Starter.md`.
+- Dependencies: Phase 5C is complete, smoke tested, merged, deployed, and production-pushed; start Phase 5D from `docs/task_packs/DL_bot Upload Routing - Phase 5D Fallback Queue Route Starter.md`.
 
 ### Deferred Optimisation
 - Area: `DL_bot.py`, `bot_instance.py` startup and lifecycle

@@ -101,7 +101,6 @@ logger.info("[LOCK] Child lock acquired at %s (PID %d)", BOT_LOCK_PATH, os.getpi
 # sys.path.append(os.path.expanduser(r"~\AppData\Roaming\Python\Python311\site-packages"))
 
 import asyncio
-from asyncio import QueueFull
 import json
 import signal
 import threading
@@ -133,6 +132,10 @@ from Commands import register_commands
 from embed_utils import send_embed
 from kvk_all_importer import _auto_export_kvk
 from log_health import LogHeadroomError, preflight_from_env_sync
+from upload_routes.fallback_queue_route import (
+    FallbackQueueRouteDeps,
+    handle_fallback_queue_upload,
+)
 from upload_routes.honor_route import HonorRouteDeps, handle_honor_upload
 from upload_routes.inventory_route import InventoryRouteDeps, handle_inventory_upload
 from upload_routes.kvk_all_route import KvkAllRouteDeps, handle_kvk_all_upload
@@ -147,7 +150,7 @@ from upload_routes.weekly_activity_route import (
     WeeklyActivityRouteDeps,
     handle_weekly_activity_upload,
 )
-from utils import live_queue, update_live_queue_embed, utcnow
+from utils import live_queue, live_queue_lock, update_live_queue_embed, utcnow
 
 # === Load environment variables ===
 if not TOKEN:
@@ -679,60 +682,20 @@ async def on_message(message: discord.Message):
         return
 
     # === Main monitored channels: enqueue heavy imports for worker processes ===
-    if message.channel.id in CHANNEL_IDS:
-        logger.info("✅ Channel %s is monitored.", message.channel.id)
-
-        for attachment in message.attachments:
-            logger.info("📎 Attachment: %s", attachment.filename)
-            if attachment.filename.lower().endswith((".xlsx", ".xls", ".csv")):
-                logger.info("📥 Enqueuing message %s for worker", message.id)
-                queue = channel_queues.get(message.channel.id)
-                if not queue:
-                    logger.warning(
-                        "No queue configured for channel %s; message %s not enqueued",
-                        message.channel.id,
-                        message.id,
-                    )
-                    continue
-                try:
-                    queue.put_nowait(message)
-                except QueueFull:
-                    logger.warning(
-                        "⚠️ Queue full for channel %s; dropping message %s",
-                        message.channel.id,
-                        message.id,
-                    )
-                else:
-                    # Protect the in-memory live_queue mutation with a lock to reduce risks
-                    # if any other threads or off-loop tasks access live_queue.
-                    try:
-                        with LIVE_QUEUE_LOCK:
-                            live_queue["jobs"].append(
-                                {
-                                    "filename": attachment.filename,
-                                    "user": str(message.author),
-                                    "channel": message.channel.name,
-                                    "uploaded": utcnow().isoformat(),
-                                    "status": "🕐 Queued",
-                                }
-                            )
-                    except Exception:
-                        # Never crash on queue bookkeeping; log debug info for investigation.
-                        logger.debug("Failed to append to live_queue (continuing)", exc_info=True)
-                    try:
-                        await update_live_queue_embed(bot, NOTIFY_CHANNEL_ID)
-                    except Exception:
-                        logger.exception("Failed to update live queue embed")
-
-                    # NEW: schedule a background log-backup trigger (best-effort) for main imports
-                    # This reduces the window where transaction log bursts between scheduled backups can cause aborts.
-                    try:
-                        asyncio.create_task(trigger_log_backup_background())
-                    except Exception:
-                        logger.exception(
-                            "Failed to schedule background log-backup trigger for queued import"
-                        )
-
+    await handle_fallback_queue_upload(
+        message,
+        FallbackQueueRouteDeps(
+            channel_ids=CHANNEL_IDS,
+            channel_queues=channel_queues,
+            live_queue=live_queue,
+            live_queue_lock=live_queue_lock,
+            bot=bot,
+            notify_channel_id=NOTIFY_CHANNEL_ID,
+            update_live_queue_embed=update_live_queue_embed,
+            trigger_log_backup_background=trigger_log_backup_background,
+            utcnow=utcnow,
+        ),
+    )
     await bot.process_commands(message)
 
 
@@ -744,11 +707,6 @@ async def on_message(message: discord.Message):
 _closing = False
 _closing_lock = threading.Lock()
 _SHUTDOWN_TIMEOUT_SECONDS = 10
-
-# Lock to guard in-memory live_queue mutations across threads if needed.
-# In normal operation the event-loop mutates this, but some helper threads or future changes
-# might touch it; this lock reduces risk of race conditions.
-LIVE_QUEUE_LOCK = threading.Lock()
 
 
 async def _write_shutdown_markers(exit_code: int = 0, reason: str = "signal"):
