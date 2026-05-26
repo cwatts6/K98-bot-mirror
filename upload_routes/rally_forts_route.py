@@ -44,7 +44,25 @@ def _load_importers() -> tuple[Callable[..., Any], Callable[..., Any]]:
 
 async def handle_rally_forts_upload(message: Any, deps: RallyFortsRouteDeps) -> bool:
     """Handle Rally Forts XLSX imports from the configured Fort Rally channel."""
-    if message.channel.id != deps.fort_rally_channel_id or not message.attachments:
+    if not message.attachments:
+        return False
+
+    if not deps.fort_rally_channel_id:
+        notify_ch = await resolve_notify_channel(
+            deps.get_notify_channel,
+            message.channel,
+            logger,
+            "rally_forts_upload",
+        )
+        await deps.send_embed(
+            notify_ch,
+            "Rally Forts Import \u274c",
+            {"Error": "FORT_RALLY_CHANNEL_ID is 0 (unset). Check .env/bot_config."},
+            0xE74C3C,
+        )
+        return True
+
+    if message.channel.id != deps.fort_rally_channel_id:
         return False
 
     notify_ch = await resolve_notify_channel(
@@ -53,15 +71,6 @@ async def handle_rally_forts_upload(message: Any, deps: RallyFortsRouteDeps) -> 
         logger,
         "rally_forts_upload",
     )
-
-    if not deps.fort_rally_channel_id:
-        await deps.send_embed(
-            notify_ch,
-            "Rally Forts Import \u274c",
-            {"Error": "FORT_RALLY_CHANNEL_ID is 0 (unset). Check .env/bot_config."},
-            0xE74C3C,
-        )
-        return True
 
     try:
         importer_loader = deps.importer_loader or _load_importers
@@ -90,7 +99,18 @@ async def handle_rally_forts_upload(message: Any, deps: RallyFortsRouteDeps) -> 
         if not attachment.filename.lower().endswith(".xlsx"):
             continue
 
-        local_path = os.path.join(downloads_dir, attachment.filename)
+        # Sanitize filename to prevent path traversal
+        # Reject any filename containing path separators (both / and \)
+        if "/" in attachment.filename or "\\" in attachment.filename:
+            logger.warning(
+                "[RALLY] Rejecting unsafe filename with path components: %s",
+                attachment.filename,
+            )
+            results.append(("err", attachment.filename, "Invalid filename: path separators not allowed"))
+            continue
+
+        safe_filename = os.path.basename(attachment.filename)
+        local_path = os.path.join(downloads_dir, safe_filename)
         try:
             await attachment.save(local_path)
             filename = attachment.filename
