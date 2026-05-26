@@ -61,9 +61,8 @@ Ability to consider:
 
 Ability to:
 
-- use CodeRabbit as a follow-up reviewer for non-trivial code changes before PR handoff
 - use Codex Security when security-sensitive surfaces are touched
-- distinguish review gates from tests and avoid replacing local validation with AI review
+- distinguish security review from tests and avoid replacing local validation with AI review
 - document clear skip reasons for documentation-only, comment-only, or mechanical changes
 
 ## 2. Refactor Triggers
@@ -145,7 +144,7 @@ Expected response:
 6. What state must survive restart?
 7. What test types are required?
 8. Which conditional reference docs apply?
-9. Does the task trigger CodeRabbit or Codex Security review gates?
+9. Does the task trigger Codex Security review?
 10. What technical debt is obvious enough that leaving it untouched would likely repeat the
    problem later?
 
@@ -158,7 +157,7 @@ Expected response:
 5. Did I explicitly list any debt I chose not to fix?
 6. Would another engineer understand the flow from logs if it failed in production?
 7. Would the feature still behave correctly after a restart?
-8. Were CodeRabbit and Codex Security run or explicitly skipped with reasons?
+8. Was Codex Security run or explicitly skipped with reasons?
 
 ## 5. Practical Use In Task Packs
 
@@ -191,7 +190,7 @@ Before completion:
 - [ ] tests added, updated, or explicitly ruled out
 - [ ] logging adequate
 - [ ] restart safety preserved
-- [ ] CodeRabbit and Codex Security review gates run or skipped with reasons
+- [ ] Codex Security review gate run or skipped with reasons
 - [ ] follow-on debt listed if still present
 
 ## 7. Deferred Optimisation Handling

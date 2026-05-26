@@ -21,9 +21,8 @@ pytest -q tests
 python scripts/analyse_pytest_log_noise.py
 ```
 
-Before PR handoff, also run or justify skipping these AI-assisted review gates:
+Before PR handoff, also run or justify skipping this AI-assisted review gate:
 
-- CodeRabbit follow-up review for non-trivial code changes.
 - Codex Security review when the change touches permissions, Discord interactions, SQL/data
   access, file handling, secrets/config, deployment, network calls, user-controlled input, or
   restart-sensitive persistence.

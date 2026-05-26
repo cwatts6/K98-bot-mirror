@@ -132,10 +132,11 @@ from bot_config import (
 from bot_helpers import channel_queues
 from Commands import register_commands
 from embed_utils import send_embed
-from honor_importer import ingest_honor_snapshot, parse_honor_xlsx
 from kvk_all_importer import _auto_export_kvk
 from log_health import LogHeadroomError, preflight_from_env_sync
+from upload_routes.honor_route import HonorRouteDeps, handle_honor_upload
 from upload_routes.kvk_all_route import KvkAllRouteDeps, handle_kvk_all_upload
+from upload_routes.mge_results_route import MgeResultsRouteDeps, handle_mge_results_upload
 from upload_routes.player_location_route import (
     PlayerLocationRouteDeps,
     handle_player_location_upload,
@@ -601,83 +602,18 @@ async def on_message(message: discord.Message):
         return
 
     # === Fast-path: MGE results auto-import ===
-    if message.channel.id == MGE_DATA_CHANNEL_ID and message.attachments:
-        notify_ch = await _get_notify_channel() or message.channel
-        target = next(
-            (a for a in message.attachments if a.filename.lower().endswith(".xlsx")),
-            None,
-        )
-        if not target:
-            await send_embed(
-                notify_ch,
-                "MGE Results Import ⚠️",
-                {
-                    "Info": "No .xlsx file found.",
-                    "Expected": "mge_rankings_kd####_YYYYMMDD.xlsx",
-                    "Channel": f"#{message.channel.name} ({message.channel.id})",
-                    "Uploader": f"{message.author} ({message.author.id})",
-                },
-                0xE67E22,
-            )
-            return
-
-        try:
-            file_bytes = await target.read()
-
-            # optional: same preflight used by other imports
-            ok = await ensure_sql_headroom_or_notify(notify_ch)
-            if not ok:
-                return
-
-            result = await _offload_callable(
-                __import__(
-                    "mge.mge_results_import", fromlist=["import_results_auto"]
-                ).import_results_auto,
-                file_bytes,
-                target.filename,
-                message.author.id,
-                name="import_results_auto",
-                prefer_process=True,
-                meta={"filename": target.filename, "channel_id": message.channel.id},
-            )
-
-            fields = {
-                "EventId": str(result["event_id"]),
-                "Mode": str(result["event_mode"]),
-                "Rows": str(result["rows"]),
-                "ImportId": str(result["import_id"]),
-                "File": target.filename,
-            }
-
-            # include report summary
-            report = result.get("report") or {}
-            if report.get("type") == "open_top15":
-                fields["Report"] = "Open Top-15 generated"
-            elif report.get("type") == "controlled_awarded_vs_actual":
-                fields["Awarded"] = str(report.get("awarded_total", 0))
-                fields["Matched"] = str(report.get("matched_actual_total", 0))
-
-            await send_embed(notify_ch, "MGE Results Import ✅", fields, 0x2ECC71)
-
-            try:
-                asyncio.create_task(trigger_log_backup_background())
-            except Exception:
-                logger.exception("Failed to schedule background log-backup trigger")
-
-        except Exception as e:
-            await send_embed(
-                notify_ch,
-                "MGE Results Import ❌",
-                {
-                    "Error": f"{type(e).__name__}: {e}",
-                    "File": target.filename,
-                    "Channel": f"#{message.channel.name} ({message.channel.id})",
-                    "Uploader": f"{message.author} ({message.author.id})",
-                },
-                0xE74C3C,
-            )
-        finally:
-            return
+    if await handle_mge_results_upload(
+        message,
+        MgeResultsRouteDeps(
+            mge_data_channel_id=MGE_DATA_CHANNEL_ID,
+            get_notify_channel=_get_notify_channel,
+            send_embed=send_embed,
+            ensure_sql_headroom_or_notify=ensure_sql_headroom_or_notify,
+            offload_callable=_offload_callable,
+            trigger_log_backup_background=trigger_log_backup_background,
+        ),
+    ):
+        return
 
     # === Fast-path: Pre-KVK snapshot ingest (dynamic KVK lookup) ===
     if await handle_prekvk_upload(
@@ -695,126 +631,19 @@ async def on_message(message: discord.Message):
         return
 
     # === Fast-path: KVK Honour ingest (full snapshots, multiple/day) ===
-    if message.channel.id == HONOR_CHANNEL_ID and message.attachments:
-        notify_ch = await _get_notify_channel() or message.channel
-
-        # Accept canonical + common variants (TEST_/DEMO_/SAMPLE_ prefix, extra words), .xlsx only
-        honor_name_rx = re.compile(
-            r"^(?:test_|demo_|sample_)?1198[_\s-]*honor.*\.xlsx$", re.IGNORECASE
-        )
-
-        target = next(
-            (a for a in message.attachments if honor_name_rx.match(a.filename.strip())), None
-        )
-
-        if not target:
-            await send_embed(
-                notify_ch,
-                "KVK Honor Import ⚠️",
-                {
-                    "Info": "No matching file found.",
-                    "Expected": "1198_honor.xlsx  • also accepts *1198_honor*.xlsx with optional TEST_/DEMO_/SAMPLE_ prefix",
-                    "Channel": f"#{message.channel.name} ({message.channel.id})",
-                    "Uploader": f"{message.author} ({message.author.id})",
-                },
-                0xE67E22,
-            )
-            return
-
-        try:
-            # Decide test-mode from message text or filename
-            msg_text = (message.content or "").lower()
-            is_test = ("[test]" in msg_text) or (" test " in f" {msg_text} ")
-            is_test = is_test or target.filename.lower().startswith(("test_", "demo_", "sample_"))
-
-            # Read bytes once
-            file_bytes = await target.read()
-
-            # NEW: pre-parse for row count (used only for the status embed)
-            try:
-                pre_df = await _offload_callable(
-                    parse_honor_xlsx,
-                    file_bytes,
-                    name="parse_honor_xlsx",
-                    prefer_process=True,
-                    meta={"filename": target.filename},
-                )
-                row_count = len(pre_df)
-            except Exception:
-                row_count = 0  # don't fail the import if pre-parse fails
-
-            # NEW: preflight check
-            ok = await ensure_sql_headroom_or_notify(notify_ch)
-            if not ok:
-                return
-
-            # Ingest (blocking DB work off-loop) via offload helper
-            kvk_no, scan_id = await _offload_callable(
-                ingest_honor_snapshot,
-                file_bytes,
-                source_filename=target.filename,
-                scan_ts_utc=message.created_at,  # aware UTC from Discord
-                name="ingest_honor_snapshot",
-                prefer_process=True,
-                meta={"filename": target.filename},
-            )
-
-            # Success embed
-            await send_embed(
-                notify_ch,
-                "KVK Honor Import ✅" + (" (TEST)" if is_test else ""),
-                {
-                    "KVK": str(kvk_no),
-                    "ScanID": str(scan_id),
-                    "Rows": str(row_count),
-                    "Filename": target.filename,
-                    "Channel": f"#{message.channel.name} ({message.channel.id})",
-                    "Uploader": f"{message.author} ({message.author.id})",
-                },
-                0x2ECC71,
-            )
-
-            # schedule a background log-backup trigger (best-effort)
-            try:
-                asyncio.create_task(trigger_log_backup_background())
-            except Exception:
-                logger.exception("Failed to schedule background log-backup trigger")
-
-            # Optional: refresh stats embed so Honour Top-3 appears/refreshes.
-            # Respect test-mode so it won't ping or claim daily limits.
-            try:
-                from stats_alerts.interface import send_stats_update_embed
-
-                sql_conn_str = (
-                    f"DRIVER={{ODBC Driver 17 for SQL Server}};"
-                    f"SERVER={os.environ.get('SQL_SERVER')};DATABASE={os.environ.get('SQL_DATABASE')};UID={os.environ.get('SQL_USERNAME')};PWD={os.environ.get('SQL_PASSWORD')};"
-                )
-                ts = utcnow().strftime("%Y-%m-%d %H:%M UTC")
-                await send_stats_update_embed(
-                    bot,
-                    ts,
-                    True,  # is_kvk=True (season path)
-                    sql_conn_str,
-                    is_test=is_test,  # <- critical
-                )
-            except Exception:
-                # Non-blocking nicety; ignore failures
-                pass
-
-        except Exception as e:
-            await send_embed(
-                notify_ch,
-                "KVK Honor Import ❌",
-                {
-                    "Error": f"{type(e).__name__}: {e}",
-                    "Filename": target.filename,
-                    "Channel": f"#{message.channel.name} ({message.channel.id})",
-                    "Uploader": f"{message.author} ({message.author.id})",
-                },
-                0xE74C3C,
-            )
-        finally:
-            return  # do not fall through to other pipelines
+    if await handle_honor_upload(
+        message,
+        HonorRouteDeps(
+            honor_channel_id=HONOR_CHANNEL_ID,
+            bot=bot,
+            get_notify_channel=_get_notify_channel,
+            send_embed=send_embed,
+            ensure_sql_headroom_or_notify=ensure_sql_headroom_or_notify,
+            offload_callable=_offload_callable,
+            trigger_log_backup_background=trigger_log_backup_background,
+        ),
+    ):
+        return
 
     # --- Fast-path: Weekly activity ingest ---
     if message.channel.id == ACTIVITY_UPLOAD_CHANNEL_ID and message.attachments:

@@ -35,8 +35,6 @@ background, operational, promotion, domain, or template-support material.
   - `python scripts/validate_architecture_boundaries.py`
   - `python scripts/validate_deferred_items.py`
   - `python scripts/select_tests.py`
-- Before PR handoff, run or justify skipping a CodeRabbit follow-up review for non-trivial code
-  changes.
 - Run or justify skipping a Codex Security review when a change touches security-sensitive
   surfaces such as permissions, Discord interactions, SQL/data access, file handling,
   secrets/config, deployment, network calls, user-controlled input, or restart-sensitive

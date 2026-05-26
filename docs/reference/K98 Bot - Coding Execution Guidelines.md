@@ -304,11 +304,10 @@ Additional rules:
 
 See `K98 Bot - Testing Standards.md` for the fuller matrix.
 
-## 15. AI Review Gates
+## 15. AI Review Gate
 
-Before PR handoff, run or justify skipping these AI-assisted review gates:
+Before PR handoff, run or justify skipping this AI-assisted review gate:
 
-- CodeRabbit follow-up review for non-trivial code changes.
 - Codex Security review when security-sensitive surfaces are touched.
 
 Security-sensitive surfaces include:
@@ -321,9 +320,9 @@ Security-sensitive surfaces include:
 - network calls, webhooks, external integrations, or user-controlled input parsing
 - restart-sensitive persistence, rehydration, scheduler state, or duplicate-action prevention
 
-For documentation-only, comment-only, or purely mechanical changes, these gates may be skipped
-when the skip is stated in the delivery output. If either review reports actionable issues, fix
-only issues within the approved scope unless the user approves expanding the task.
+For documentation-only, comment-only, or purely mechanical changes, this gate may be skipped when
+the skip is stated in the delivery output. If review reports actionable issues, fix only issues
+within the approved scope unless the user approves expanding the task.
 
 ## 16. Output Format For Delivered Work
 
@@ -336,7 +335,7 @@ When delivering code or a task pack, provide:
 5. refactor findings in touched areas
 6. test plan and commands run
 7. deployment / migration order
-8. CodeRabbit and Codex Security review status, including skip reasons
+8. Codex Security review status, including skip reason when not run
 9. follow-on debt or deferred improvements
 
 For documentation-only changes, state that no runtime code, SQL, helper reuse, or restart behaviour
@@ -358,7 +357,6 @@ A task is done only when:
 - [ ] restart safety is preserved
 - [ ] tests were added, updated, or explicitly ruled out
 - [ ] quality gates were considered
-- [ ] CodeRabbit review was run or explicitly skipped
 - [ ] Codex Security review was run or explicitly skipped based on risk triggers
 - [ ] deferred debt is captured using the Deferred Optimisation Framework format
 
@@ -378,12 +376,11 @@ python scripts/validate_command_registration.py
 For SQL-heavy, configuration-heavy, or domain-specific tasks, also include targeted validation
 commands relevant to the subsystem.
 
-Add AI-assisted review gates before PR handoff:
+Add the AI-assisted review gate before PR handoff:
 
-- CodeRabbit follow-up review for non-trivial code changes.
 - Codex Security review for changes touching the security-sensitive surfaces listed in section 15.
 
-If a gate is skipped, record the reason in the delivery output.
+If the gate is skipped, record the reason in the delivery output.
 
 ## 19. If Uncertain
 
