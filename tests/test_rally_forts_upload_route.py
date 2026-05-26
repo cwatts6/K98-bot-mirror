@@ -367,19 +367,14 @@ async def test_rally_notify_failure_falls_back_to_source_channel(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_rally_fort_rally_channel_id_zero_is_detected_before_channel_filter(tmp_path):
-    """Misconfigured channel ID (0) must be detected and reported."""
+async def test_rally_fort_rally_channel_id_zero_disables_route(tmp_path):
     deps, sent, offloads, _created, _preflight = _deps(tmp_path, fort_rally_channel_id=0)
 
-    # Message has attachments but channel ID is 0
     handled = await route.handle_rally_forts_upload(_message(), deps)
 
-    assert handled is True
+    assert handled is False
+    assert sent == []
     assert offloads == []
-    _ch, title, fields, color, _mention = sent[-1]
-    assert title == "Rally Forts Import \u274c"
-    assert "FORT_RALLY_CHANNEL_ID is 0" in fields["Error"]
-    assert color == 0xE74C3C
 
 
 @pytest.mark.asyncio

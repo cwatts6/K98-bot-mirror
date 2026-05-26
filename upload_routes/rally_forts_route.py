@@ -44,25 +44,11 @@ def _load_importers() -> tuple[Callable[..., Any], Callable[..., Any]]:
 
 async def handle_rally_forts_upload(message: Any, deps: RallyFortsRouteDeps) -> bool:
     """Handle Rally Forts XLSX imports from the configured Fort Rally channel."""
-    if not message.attachments:
-        return False
-
-    if not deps.fort_rally_channel_id:
-        notify_ch = await resolve_notify_channel(
-            deps.get_notify_channel,
-            message.channel,
-            logger,
-            "rally_forts_upload",
-        )
-        await deps.send_embed(
-            notify_ch,
-            "Rally Forts Import \u274c",
-            {"Error": "FORT_RALLY_CHANNEL_ID is 0 (unset). Check .env/bot_config."},
-            0xE74C3C,
-        )
-        return True
-
-    if message.channel.id != deps.fort_rally_channel_id:
+    if (
+        not deps.fort_rally_channel_id
+        or message.channel.id != deps.fort_rally_channel_id
+        or not message.attachments
+    ):
         return False
 
     notify_ch = await resolve_notify_channel(
