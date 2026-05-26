@@ -8,7 +8,6 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
-from mge.mge_results_import import import_results_auto
 from upload_routes.common import message_source_fields, resolve_notify_channel, schedule_best_effort
 
 logger = logging.getLogger(__name__)
@@ -23,6 +22,12 @@ class MgeResultsRouteDeps:
     offload_callable: Callable[..., Awaitable[Any]]
     trigger_log_backup_background: Callable[[], Awaitable[Any]]
     create_task: Callable[[Awaitable[Any]], Any] = asyncio.create_task
+
+
+def _load_import_results_auto() -> Callable[..., dict[str, Any]]:
+    from mge.mge_results_import import import_results_auto
+
+    return import_results_auto
 
 
 async def handle_mge_results_upload(message: Any, deps: MgeResultsRouteDeps) -> bool:
@@ -58,7 +63,7 @@ async def handle_mge_results_upload(message: Any, deps: MgeResultsRouteDeps) -> 
             return True
 
         result = await deps.offload_callable(
-            import_results_auto,
+            _load_import_results_auto(),
             file_bytes,
             target.filename,
             message.author.id,

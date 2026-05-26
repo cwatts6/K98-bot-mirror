@@ -54,6 +54,10 @@ def _success_result(**overrides):
     return result
 
 
+def _fake_import_results_auto(*_args, **_kwargs):
+    raise AssertionError("offload test double should not call importer directly")
+
+
 def _deps(**overrides):
     sent = []
     offloads = []
@@ -150,13 +154,19 @@ async def test_mge_results_route_sql_preflight_abort_skips_import():
 @pytest.mark.asyncio
 async def test_mge_results_route_success_preserves_import_contract_and_side_effects():
     deps, sent, offloads, created = _deps()
+    route_import = _fake_import_results_auto
 
-    handled = await route.handle_mge_results_upload(_message(), deps)
+    original_loader = route._load_import_results_auto
+    route._load_import_results_auto = lambda: route_import
+    try:
+        handled = await route.handle_mge_results_upload(_message(), deps)
+    finally:
+        route._load_import_results_auto = original_loader
 
     assert handled is True
     assert len(offloads) == 1
     func, args, kwargs = offloads[0]
-    assert func is route.import_results_auto
+    assert func is route_import
     assert args == (b"xlsx", "mge_rankings_kd1198_20260311.xlsx", 123456789)
     assert kwargs["name"] == "import_results_auto"
     assert kwargs["prefer_process"] is True

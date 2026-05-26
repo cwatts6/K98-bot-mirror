@@ -104,6 +104,7 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
             )
             row_count = len(pre_df)
         except Exception:
+            logger.debug("honor_upload_row_count_parse_failed", exc_info=True)
             row_count = 0
 
         ok = await deps.ensure_sql_headroom_or_notify(notify_ch)
