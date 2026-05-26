@@ -56,11 +56,11 @@ async def handle_mge_results_upload(message: Any, deps: MgeResultsRouteDeps) -> 
         return True
 
     try:
-        file_bytes = await target.read()
-
         ok = await deps.ensure_sql_headroom_or_notify(notify_ch)
         if not ok:
             return True
+
+        file_bytes = await target.read()
 
         result = await deps.offload_callable(
             _load_import_results_auto(),

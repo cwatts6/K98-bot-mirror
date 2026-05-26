@@ -92,8 +92,12 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
 
     try:
         is_test = _is_test_upload(message, target.filename)
-        file_bytes = await target.read()
 
+        ok = await deps.ensure_sql_headroom_or_notify(notify_ch)
+        if not ok:
+            return True
+
+        file_bytes = await target.read()
         try:
             pre_df = await deps.offload_callable(
                 parse_honor_xlsx,
@@ -106,10 +110,6 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
         except Exception:
             logger.debug("honor_upload_row_count_parse_failed", exc_info=True)
             row_count = 0
-
-        ok = await deps.ensure_sql_headroom_or_notify(notify_ch)
-        if not ok:
-            return True
 
         kvk_no, scan_id = await deps.offload_callable(
             ingest_honor_snapshot,

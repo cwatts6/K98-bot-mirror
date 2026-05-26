@@ -161,8 +161,7 @@ async def test_honor_route_sql_preflight_abort_skips_ingest():
 
     assert handled is True
     assert sent == []
-    assert len(offloads) == 1
-    assert offloads[0][0] is route.parse_honor_xlsx
+    assert offloads == []
 
 
 @pytest.mark.asyncio
