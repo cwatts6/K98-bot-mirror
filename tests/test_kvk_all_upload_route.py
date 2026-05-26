@@ -232,18 +232,15 @@ async def test_kvk_all_route_sql_preflight_abort_skips_only_current_attachment()
         offload_result=_success_result(scan_id=3),
     )
 
-    handled = await route.handle_kvk_all_upload(
-        _message(attachments=[_FakeAttachment("first.xlsx"), _FakeAttachment("second.xlsx")]),
-        deps,
-    )
+    msg = _message(attachments=[_FakeAttachment("first.xlsx"), _FakeAttachment("second.xlsx")])
+
+    handled = await route.handle_kvk_all_upload(msg, deps)
 
     assert handled is True
     assert len(offloads) == 1
     assert offloads[0][2]["source_filename"] == "second.xlsx"
-    _ch, title, fields, color, _mention = sent[-1]
-    assert title == "KVK All-Kingdom Import Aborted \u274c"
-    assert fields == {"File": "first.xlsx", "Reason": "SQL log headroom insufficient"}
-    assert color == 0xE74C3C
+    assert sent == []
+    assert msg.channel.sent[0]["embed"].field_dict()["ScanID"] == "3"
 
 
 @pytest.mark.asyncio

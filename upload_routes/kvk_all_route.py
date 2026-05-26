@@ -162,12 +162,6 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
 
             ok = await deps.ensure_sql_headroom_or_notify(notify_ch)
             if not ok:
-                await deps.send_embed(
-                    notify_ch,
-                    "KVK All-Kingdom Import Aborted \u274c",
-                    {"File": attachment.filename, "Reason": "SQL log headroom insufficient"},
-                    0xE74C3C,
-                )
                 continue
 
             result = await deps.offload_callable(
