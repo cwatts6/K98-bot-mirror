@@ -19,9 +19,30 @@ We are starting Phase 5B of the DL_bot upload-routing optimisation programme aft
   `upload_routes/common.py`, was smoke tested successfully on 2026-05-26, deployed to production,
   and closed.
 
-Phase 5B is the next small upload-routing slice. It should keep using the proven `upload_routes`
-pattern and the new `upload_routes/common.py` helpers where the behaviour matches, without forcing
-a broad router framework before rally and fallback queueing are scoped.
+## Completion Note
+
+Status: Phase 5B complete in PR 114 (`codex/dlbot-upload-routing-phase-5b`), smoke tested
+successfully on 2026-05-26 with inventory and alliance weekly uploads, deployed to production, and
+closed.
+
+Delivered behaviour:
+
+- `DL_bot.py` delegates inventory upload-first handling through `handle_inventory_upload()`.
+- `DL_bot.py` delegates weekly activity ingest through `handle_weekly_activity_upload()`.
+- `upload_routes/inventory_route.py` wraps the existing inventory view handler without redesigning
+  inventory service/view internals.
+- `upload_routes/weekly_activity_route.py` preserves accepted filename matching, SQL preflight
+  behaviour, importer arguments, duplicate/success/error embeds, notify fallback, exception
+  shielding, and best-effort log-backup scheduling.
+- Focused route tests and the full suite passed before PR handoff. Production smoke confirmed
+  inventory and alliance weekly uploads after merge and production push.
+
+Phase 5C Rally Forts route extraction is now the next active slice. Phase 5D is expected to be
+required as the final upload-routing sub-phase for main monitored-channel fallback queueing.
+
+Phase 5B was the next small upload-routing slice. It kept using the proven `upload_routes`
+pattern and the new `upload_routes/common.py` helpers where the behaviour matched, without forcing
+a broad router framework before rally and fallback queueing were scoped.
 
 ## Goal
 

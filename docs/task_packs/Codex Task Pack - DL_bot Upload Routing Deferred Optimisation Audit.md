@@ -48,11 +48,11 @@ PR 96 (`import-locations-command-orchestration-cleanup`) was smoke tested succes
 
 The `/import_locations` command cleanup is complete. This task is fresh work around `DL_bot.py` upload routing and related validation blockers.
 
-Current `DL_bot.py` still contains multiple fast-path upload routes inside the root `on_message`
-listener. Player location CSV import, PreKvK snapshot ingest, KVK_ALL import, MGE results import,
-and KVK Honour ingest have been extracted into the `upload_routes` pattern. Weekly activity import,
-rally forts import, inventory upload-first routing, and fallback monitored-channel queueing remain
-inline after Phase 5A.
+Current `DL_bot.py` still contains two upload-related branches inside the root `on_message`
+listener after Phase 5B: Rally Forts ingest and main monitored-channel fallback queueing. Player
+location CSV import, PreKvK snapshot ingest, KVK_ALL import, MGE results import, KVK Honour ingest,
+inventory upload-first routing, and weekly activity ingest have been extracted into the
+`upload_routes` pattern.
 
 The active deferred backlog identifies these DL_bot-specific architecture items:
 
@@ -315,9 +315,12 @@ Phase breakdown:
    - Phase 5A completed MGE results and KVK Honor route extraction in PR 113
      (`codex/dlbot-upload-routing-phase-5a`), smoke tested successfully on 2026-05-26, deployed
      to production, and closed.
-   - Continue with small sub-phases for weekly activity, rally, inventory, fallback queueing,
-     shared SQL-preflight/offload handling, shared import embed rendering where safe, and
-     route-level structured logging into the general upload-routing layer.
+   - Phase 5B completed inventory upload-first and weekly activity route extraction in PR 114
+     (`codex/dlbot-upload-routing-phase-5b`), smoke tested successfully on 2026-05-26 with
+     inventory and alliance weekly uploads, deployed to production, and closed.
+   - Continue with Phase 5C for Rally Forts route extraction and Phase 5D for main
+     monitored-channel fallback queueing. Phase 5D is expected to be the final upload-routing
+     sub-phase before Phase 6 lifecycle/startup separation.
    - Starter packet: `docs/task_packs/DL_bot Upload Routing - Phase 5 Remaining Upload Fast Paths Starter.md`
 8. **Phase 6 - Startup/lifecycle separation**
    - Audit and optimise `DL_bot.py` lifecycle/startup responsibilities alongside a full
@@ -374,7 +377,22 @@ Phase 5A delivery notes:
   stats-refresh best-effort behaviour.
 - PR 113 (`codex/dlbot-upload-routing-phase-5a`) was smoke tested successfully, deployed to
   production, and closed.
-- Phase 5B inventory and weekly activity route extraction is now the next active slice.
+- Phase 5B inventory and weekly activity route extraction was the next active slice.
+
+Phase 5B delivery notes:
+
+- Inventory upload-first routing is extracted into `upload_routes/inventory_route.py`.
+- Weekly activity upload routing is extracted into `upload_routes/weekly_activity_route.py`.
+- `DL_bot.py` now delegates both through the `upload_routes` pattern while preserving route order,
+  fall-through behaviour, inventory service/view contracts, weekly accepted filename matching,
+  weekly SQL preflight/importer arguments, duplicate/success/error embeds, notify fallback, and
+  best-effort log-backup scheduling.
+- Focused route tests cover inventory delegation/error handling and weekly activity matching,
+  non-matching fall-through, SQL preflight abort, success, duplicate skip, importer exception,
+  Discord error-notification failure, and notify fallback.
+- PR 114 (`codex/dlbot-upload-routing-phase-5b`) was smoke tested successfully with inventory and
+  alliance weekly uploads, deployed to production, and closed.
+- Phase 5C Rally Forts route extraction is now the next active slice.
 
 14. Testing Requirements
 

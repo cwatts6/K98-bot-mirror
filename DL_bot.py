@@ -103,7 +103,6 @@ logger.info("[LOCK] Child lock acquired at %s (PID %d)", BOT_LOCK_PATH, os.getpi
 import asyncio
 from asyncio import QueueFull
 import json
-import re
 import signal
 import threading
 
@@ -143,6 +142,7 @@ from upload_routes.player_location_route import (
     handle_player_location_upload,
 )
 from upload_routes.prekvk_route import PreKvkRouteDeps, handle_prekvk_upload
+from upload_routes.rally_forts_route import RallyFortsRouteDeps, handle_rally_forts_upload
 from upload_routes.weekly_activity_route import (
     WeeklyActivityRouteDeps,
     handle_weekly_activity_upload,
@@ -534,14 +534,6 @@ async def _get_notify_channel():
     return ch
 
 
-def is_rally_daily(fn: str) -> bool:
-    return re.search(r"^Rally_data_\d{2}-\d{2}-\d{4}\.xlsx$", fn, re.I) is not None
-
-
-def is_rally_alltime(fn: str) -> bool:
-    return re.search(r"Rally[_\s]?data.*all[\s_]?time.*\.xlsx$", fn, re.I) is not None
-
-
 # === Global Error Logging ===
 @bot.event
 async def on_error(event_method, *args, **kwargs):
@@ -651,150 +643,19 @@ async def on_message(message: discord.Message):
         return
 
     # === Fast-path: Rally Forts XLSX auto-ingest (hardened) ===
-    if message.channel.id == FORT_RALLY_CHANNEL_ID and message.attachments:
-        notify_ch = await _get_notify_channel() or message.channel
-
-        if not FORT_RALLY_CHANNEL_ID:
-            # channel id missing from env/config – surface it loudly
-            await send_embed(
-                notify_ch,
-                "Rally Forts Import ❌",
-                {"Error": "FORT_RALLY_CHANNEL_ID is 0 (unset). Check .env/bot_config."},
-                0xE74C3C,
-            )
-            return
-
-        # Lazy import so missing deps don't crash startup
-        try:
-            from forts_ingest import import_rally_alltime_xlsx, import_rally_daily_xlsx
-        except Exception as e:
-            await send_embed(
-                notify_ch,
-                "Rally Forts Import ❌",
-                {
-                    "Error": f"Import failure: {type(e).__name__}: {e}",
-                    "Hint": "Ensure forts_ingest.py and its dependencies (pandas, pyodbc) are installed in the venv.",
-                },
-                0xE74C3C,
-            )
-            return
-
-        try:
-            os.makedirs(os.path.join(LOG_DIR, "downloads"), exist_ok=True)
-        except Exception:
-            pass
-
-        results = []
-        matched_any = False
-        for att in message.attachments:
-            if not att.filename.lower().endswith(".xlsx"):
-                continue
-
-            local_path = os.path.join(LOG_DIR, "downloads", att.filename)
-            try:
-                await att.save(local_path)
-                fn = att.filename
-                logger.info("[RALLY] Saved %s to %s", fn, local_path)
-
-                if is_rally_alltime(fn):
-                    matched_any = True
-                    logger.info("[RALLY] Detected ALL-TIME file: %s", fn)
-                    # NEW: preflight check per-file
-                    ok = await ensure_sql_headroom_or_notify(notify_ch)
-                    if not ok:
-                        results.append(("err", fn, "Aborted: SQL log headroom insufficient"))
-                        continue
-
-                    res = await _offload_callable(
-                        import_rally_alltime_xlsx,
-                        local_path,
-                        name="import_rally_alltime_xlsx",
-                        prefer_process=True,
-                        meta={"path": local_path},
-                    )
-                    results.append(("ok", fn, res))
-
-                    # schedule a background log-backup trigger (best-effort) for each successful file
-                    try:
-                        asyncio.create_task(trigger_log_backup_background())
-                    except Exception:
-                        logger.exception("Failed to schedule background log-backup trigger")
-                elif is_rally_daily(fn):
-                    matched_any = True
-                    logger.info("[RALLY] Detected DAILY file: %s", fn)
-                    ok = await ensure_sql_headroom_or_notify(notify_ch)
-                    if not ok:
-                        results.append(("err", fn, "Aborted: SQL log headroom insufficient"))
-                        continue
-
-                    res = await _offload_callable(
-                        import_rally_daily_xlsx,
-                        local_path,
-                        name="import_rally_daily_xlsx",
-                        prefer_process=True,
-                        meta={"path": local_path},
-                    )
-                    results.append(("ok", fn, res))
-
-                    # schedule a background log-backup trigger (best-effort) for each successful file
-                    try:
-                        asyncio.create_task(trigger_log_backup_background())
-                    except Exception:
-                        logger.exception("Failed to schedule background log-backup trigger")
-                else:
-                    results.append(("skip", fn, "Unrecognized rally filename"))
-            except Exception as e:
-                logger.exception("[RALLY] Error processing attachment %s", att.filename)
-                results.append(("err", att.filename, f"{type(e).__name__}: {e}"))
-
-        # If nothing matched (e.g., wrong filenames or no .xlsx), surface that
-        if not matched_any and not results:
-            await send_embed(
-                notify_ch,
-                "Rally Forts Import ⚠️",
-                {
-                    "Info": "No rally .xlsx attachments matched expected patterns.",
-                    "Expected Daily": "Rally_data_DD-MM-YYYY.xlsx",
-                    "Expected All-Time": "Rally_data_All_Time*.xlsx",
-                },
-                0xE67E22,
-            )
-            return
-
-        fields = {
-            "Source Channel": f"#{message.channel.name} ({message.channel.id})",
-            "Uploaded By": f"{message.author} ({message.author.id})",
-        }
-        oks = [r for r in results if r[0] == "ok"]
-        errs = [r for r in results if r[0] == "err"]
-        skips = [r for r in results if r[0] == "skip"]
-
-        for _, fn, res in oks[:5]:
-            if isinstance(res, dict):
-                rows = res.get("rows")
-                asof = res.get("as_of")
-                extra = f"rows={rows}" + (f"; as_of={asof}" if asof else "")
-            else:
-                extra = str(res)
-            fields[f"✅ {fn}"] = extra or "ok"
-
-        for _, fn, why in skips[:5]:
-            fields[f"⏭️ {fn}"] = why
-
-        for _, fn, err in errs[:5]:
-            fields[f"❌ {fn}"] = err
-
-        color = 0x2ECC71 if oks and not errs else (0xE67E22 if oks and errs else 0xE74C3C)
-        title = "Rally Forts Import" + (
-            " ✅" if oks and not errs else " ⚠️" if oks and errs else " ❌"
-        )
-
-        try:
-            await send_embed(notify_ch, title, fields, color)
-        except Exception:
-            logger.exception("Failed to send Rally Forts import embed")
-
-        return  # don't enqueue into the heavy stats pipeline
+    if await handle_rally_forts_upload(
+        message,
+        RallyFortsRouteDeps(
+            fort_rally_channel_id=FORT_RALLY_CHANNEL_ID,
+            log_dir=LOG_DIR,
+            get_notify_channel=_get_notify_channel,
+            send_embed=send_embed,
+            ensure_sql_headroom_or_notify=ensure_sql_headroom_or_notify,
+            offload_callable=_offload_callable,
+            trigger_log_backup_background=trigger_log_backup_background,
+        ),
+    ):
+        return
 
     # === KVK (all kingdoms) ingest ===
     if await handle_kvk_all_upload(

@@ -4,7 +4,11 @@ Purpose: document the weekly alliance activity Excel import path.
 
 ## Main Files
 
-- `DL_bot.py` handles uploads in `ACTIVITY_UPLOAD_CHANNEL_ID`.
+- `DL_bot.py` delegates uploads in `ACTIVITY_UPLOAD_CHANNEL_ID` through
+  `upload_routes/weekly_activity_route.py`.
+- `upload_routes/weekly_activity_route.py` owns Discord route matching, SQL preflight, offload
+  dispatch, duplicate/success/error embeds, notify-channel fallback, and best-effort log-backup
+  scheduling.
 - `weekly_activity_importer.py` parses and writes activity snapshots.
 - SQL schema lives in `C:\K98-bot-SQL-Server`.
 
@@ -66,4 +70,12 @@ Validate these objects against the SQL repo before changing importer behaviour.
 
 ## Tests
 
-No dedicated unit test file exists for the weekly activity importer. Integration coverage is exercised via manual upload testing in the development environment.
+- Focused route coverage lives in `tests/test_weekly_activity_upload_route.py`.
+- No dedicated unit test file exists for the weekly activity importer. Importer integration coverage
+  is exercised via manual upload testing in the development environment.
+
+## Delivery Notes
+
+- Phase 5B extracted weekly activity routing into `upload_routes/weekly_activity_route.py`.
+- Alliance weekly upload was smoke tested successfully on 2026-05-26 after PR 114 was merged and
+  pushed to production.
