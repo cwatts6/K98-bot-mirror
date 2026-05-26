@@ -311,22 +311,31 @@ Phase breakdown:
      scheduling.
    - Starter packet: `docs/task_packs/DL_bot Upload Routing - Phase 4 KVK_ALL Upload Route Starter.md`
 7. **Phase 5 - Remaining upload fast-path consolidation**
-   - Active programme after Phase 4.
+   - Completed after Phase 4.
    - Phase 5A completed MGE results and KVK Honor route extraction in PR 113
      (`codex/dlbot-upload-routing-phase-5a`), smoke tested successfully on 2026-05-26, deployed
      to production, and closed.
    - Phase 5B completed inventory upload-first and weekly activity route extraction in PR 114
      (`codex/dlbot-upload-routing-phase-5b`), smoke tested successfully on 2026-05-26 with
      inventory and alliance weekly uploads, deployed to production, and closed.
-   - Continue with Phase 5C for Rally Forts route extraction and Phase 5D for main
-     monitored-channel fallback queueing. Phase 5D is expected to be the final upload-routing
-     sub-phase before Phase 6 lifecycle/startup separation.
+   - Phase 5C completed Rally Forts route extraction in PR 115
+     (`codex/dlbot-upload-routing-phase-5c`), smoke tested successfully, merged, deployed to
+     production, and pushed to production.
+   - Phase 5D completed main monitored-channel fallback queue extraction in PR 116
+     (`codex/dlbot-upload-routing-phase-5d`), smoke tested successfully on 2026-05-26, closed,
+     pushed to production, and confirmed in production logs.
+   - Phase 5 is complete: MGE results, KVK Honor, inventory upload-first, weekly activity, Rally
+     Forts, and fallback monitored-channel queueing now delegate through focused `upload_routes`
+     modules.
    - Starter packet: `docs/task_packs/DL_bot Upload Routing - Phase 5 Remaining Upload Fast Paths Starter.md`
 8. **Phase 6 - Startup/lifecycle separation**
+   - Next active architecture batch after Phase 5 completion.
    - Audit and optimise `DL_bot.py` lifecycle/startup responsibilities alongside a full
      `bot_instance.py` review.
    - Define the target ownership model for bot construction, startup checks, lifecycle wiring,
-     singleton/runtime concerns, and event registration separately from upload-route behaviour.
+     singleton/runtime concerns, event registration, task supervision, queue worker lifecycle,
+     shutdown, and restart-safe state separately from upload-route behaviour.
+   - Starter packet: `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`
 
 Phase 2A delivery notes:
 
@@ -362,7 +371,8 @@ Phase 4 delivery notes:
 - The SQL preflight review fix intentionally relies on `ensure_sql_headroom_or_notify()` for the
   user-facing abort notification and does not emit a duplicate route-level abort embed.
 - PR 110 (`codex/kvk-all-upload-route`) was smoke tested successfully and promoted to production.
-- Phase 5 remaining fast-path consolidation is now the next active upload-routing programme slice.
+- Phase 5 remaining fast-path consolidation was the next active upload-routing programme slice and
+  has since completed.
 
 Phase 5A delivery notes:
 
@@ -392,7 +402,35 @@ Phase 5B delivery notes:
   Discord error-notification failure, and notify fallback.
 - PR 114 (`codex/dlbot-upload-routing-phase-5b`) was smoke tested successfully with inventory and
   alliance weekly uploads, deployed to production, and closed.
-- Phase 5C Rally Forts route extraction is now the next active slice.
+- Phase 5C Rally Forts route extraction was the next active slice and has since completed.
+
+Phase 5C delivery notes:
+
+- Rally Forts upload routing is extracted into `upload_routes/rally_forts_route.py`.
+- `DL_bot.py` delegates Rally Forts upload handling through `handle_rally_forts_upload()`.
+- The route preserves daily/all-time filename matching, local download staging under
+  `LOG_DIR/downloads`, lazy importer loading, SQL preflight handoff, offload dispatch, result
+  aggregation, Discord output, disabled-channel fall-through, unsafe filename rejection, and
+  best-effort log-backup scheduling.
+- PR 115 (`codex/dlbot-upload-routing-phase-5c`) was smoke tested successfully, merged, deployed
+  to production, and pushed to production.
+- Phase 5D fallback queue route extraction was the next active slice and has since completed.
+
+Phase 5D delivery notes:
+
+- Main monitored-channel fallback queue handling is extracted into
+  `upload_routes/fallback_queue_route.py`.
+- `DL_bot.py` delegates fallback queueing through `handle_fallback_queue_upload()` after all
+  specific upload routes and before `bot.process_commands(message)`, preserving route order and
+  command fall-through.
+- The route preserves `.xlsx/.xls/.csv` fallback attachment filtering, `channel_queues` handoff,
+  current enqueue-once-per-accepted-attachment behaviour, `QueueFull` drop logging, live queue
+  bookkeeping, queue embed updates, shared `utils.live_queue_lock` usage, and best-effort
+  log-backup scheduling.
+- PR 116 (`codex/dlbot-upload-routing-phase-5d`) was smoke tested successfully on 2026-05-26,
+  closed, pushed to production, and confirmed in production logs.
+- Phase 5 upload-routing consolidation is complete. Phase 6 startup/lifecycle separation is the
+  next active architecture batch.
 
 14. Testing Requirements
 

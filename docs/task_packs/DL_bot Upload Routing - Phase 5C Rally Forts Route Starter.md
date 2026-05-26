@@ -44,7 +44,7 @@ Delivered behaviour:
 - Attachment names containing path separators are rejected before local save to prevent path
   traversal or directory-component staging.
 - `forts_ingest.py` and Rally SQL/importer contracts were not changed.
-- Phase 5D remains required as the final upload-routing sub-phase for main monitored-channel
+- Phase 5D has since completed as the final upload-routing sub-phase for main monitored-channel
   fallback queueing.
 
 Validation evidence included:
@@ -65,8 +65,11 @@ Validation evidence included:
 Observed final full-suite result after review fixes: `1528 passed, 2 skipped`. Pytest log-noise
 validation confirmed production operational logs were unchanged.
 
-The next starter packet is
+Phase 5D starter packet, retained for delivery history:
 `docs/task_packs/DL_bot Upload Routing - Phase 5D Fallback Queue Route Starter.md`.
+
+Phase 5 upload-routing consolidation is now complete. Phase 6 startup/lifecycle separation is the
+next active architecture batch.
 
 ## Goal
 
@@ -217,8 +220,8 @@ Likely SQL repo objects to validate:
   way as the inline branch?
 - What route tests prove behaviour parity without adding live SQL or filesystem-heavy integration
   coverage?
-- Should Phase 5D be required? Current recommendation: yes. Phase 5D should be the final
-  upload-routing sub-phase and should focus only on the main monitored-channel fallback queue route.
+- Should Phase 5D be required? Historical answer: yes. Phase 5D completed the final
+  upload-routing sub-phase and focused only on the main monitored-channel fallback queue route.
 
 ## Step 1 Required Output
 
@@ -284,8 +287,8 @@ $env:RUN_DB_TESTS="1"
 - `upload_routes/common.py` is reused where behaviour parity is clear and covered.
 - Out-of-scope fallback queue, SQL, lifecycle, worker, or importer-internal findings are captured
   structurally.
-- The implementation packet explicitly states whether Phase 5D remains required. Current expected
-  answer: yes, Phase 5D is required for fallback monitored-channel queueing and should be the final
+- The implementation packet explicitly states whether Phase 5D remains required. Historical
+  answer: yes; Phase 5D later completed fallback monitored-channel queueing as the final
   upload-routing sub-phase.
 
 ## Explicit Stop Point

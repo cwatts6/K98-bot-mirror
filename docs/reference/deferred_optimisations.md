@@ -42,13 +42,19 @@ deployed to production, and pushed to production: `DL_bot.py` now delegates Rall
 through `upload_routes/rally_forts_route.py` while preserving filename matching, local download
 staging, lazy importer loading, SQL preflight, offload dispatch, aggregate Discord output,
 safe filename rejection, disabled-channel fall-through, and best-effort log-backup scheduling.
-Phase 5D is now the final upload-routing sub-phase for main monitored-channel fallback queueing
-before Phase 6 lifecycle/startup separation.
+Phase 5D fallback queue route extraction was completed in PR 116
+(`codex/dlbot-upload-routing-phase-5d`), smoke tested successfully on 2026-05-26, closed, and
+pushed to production: `DL_bot.py` now delegates the monitored-channel fallback queue path through
+`upload_routes/fallback_queue_route.py` while preserving route order, `.xlsx/.xls/.csv` fallback
+attachment handling, worker queue handoff, `QueueFull` drop behaviour, live queue bookkeeping,
+queue embed updates, shared `utils.live_queue_lock` usage, command fall-through, and best-effort
+log-backup scheduling. Phase 5 upload-routing consolidation is complete. Phase 6 startup/lifecycle
+separation is now the next DL_bot architecture batch.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
-upload routing, not as a continuation of the `/import_locations` command cleanup. Start that task
-with a new audit/scope pass and review both this backlog and the current `K98-bot-mirror` GitHub
-issues list.
+startup/lifecycle ownership, not as a continuation of upload routing. Start that task with a new
+audit/scope pass and review `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`,
+this backlog, and the current `K98-bot-mirror` GitHub issues list.
 
 ### Deferred Optimisation
 - Area: `tests/test_ark_preference_service.py`, `tests/test_ark_bans_enforcement.py`, `tests/test_lock_timeout.py`, `tests/test_calendar_service.py`, `tests/test_calendar_pipeline.py`, remaining slow full-suite pytest paths
@@ -114,19 +120,10 @@ issues list.
 - Dependencies: Complete the active DL_bot upload-routing phases first; preserve current production schema export as a drift/safety mechanism while preventing direct overwrite of `main`.
 
 ### Deferred Optimisation
-- Area: `DL_bot.py` remaining fast-path upload routes
-- Type: architecture
-- Description: After Phase 5C, `DL_bot.py` still owns the main monitored-channel fallback queue handling directly in the root listener. Player location, PreKvK, KVK_ALL, MGE results, KVK Honor, inventory upload-first, weekly activity ingest, and Rally Forts ingest now delegate through the `upload_routes` pattern, but the fallback queue path still mixes monitored-channel matching, worker queue handoff, `live_queue` bookkeeping, queue embed updates, and best-effort log-backup scheduling in the listener.
-- Suggested Fix: Complete Phase 5 with a final Phase 5D audit/scope pass for the main monitored-channel fallback queue route. Extract the fallback queue path into a focused `upload_routes` boundary only if the audit confirms route-order, queue ownership, `channel_queues`, `live_queue`, queue embed, worker handoff, and background log-backup side effects can be preserved with focused tests. Keep broader worker/lifecycle ownership and `processing_pipeline.py` refactors out of Phase 5D unless explicitly approved.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 5C is complete, smoke tested, merged, deployed, and production-pushed; start Phase 5D from `docs/task_packs/DL_bot Upload Routing - Phase 5D Fallback Queue Route Starter.md`.
-
-### Deferred Optimisation
 - Area: `DL_bot.py`, `bot_instance.py` startup and lifecycle
 - Type: architecture
-- Description: Startup and lifecycle responsibilities remain spread across DL_bot and bot_instance, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, and lifecycle coordination for the wider bot.
-- Suggested Fix: Phase 6 should audit DL_bot and bot_instance together, define the target lifecycle ownership model, and separate startup/runtime wiring from upload routing after the fast-path router consolidation is complete.
+- Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, task supervision, queue worker startup, live queue rehydration, cache warming, scheduler startup, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, so lifecycle ownership can now be audited independently.
+- Suggested Fix: Start Phase 6 from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`. Audit `DL_bot.py`, `bot_instance.py`, `bot_loader.py`, `bot_startup_gate.py`, `boot_safety.py`, `startup_utils.py`, `singleton_lock.py`, `bot_helpers.py`, `utils.py`, and startup/shutdown runbooks before proposing any implementation. Define a target ownership model for process entry, bot construction, command registration, event registration, startup sequencing, task supervision, queue worker lifecycle, graceful shutdown, singleton/runtime files, and restart-safe state. Stop for approval before code changes.
 - Impact: medium
 - Risk: medium
-- Dependencies: Defer until Phase 5 upload routing is complete so lifecycle changes are reviewed independently from upload-route behaviour.
+- Dependencies: Phase 5 upload routing is complete, smoke tested, closed, and production-pushed; proceed with audit/design before implementation.

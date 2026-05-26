@@ -23,6 +23,9 @@ We are starting Phase 5 of the DL_bot upload-routing optimisation programme afte
   and closed.
 - Phase 5C extracted Rally Forts ingest into `upload_routes/rally_forts_route.py`, was smoke
   tested successfully, merged, deployed to production, and pushed to production.
+- Phase 5D extracted main monitored-channel fallback queueing into
+  `upload_routes/fallback_queue_route.py`, was smoke tested successfully on 2026-05-26, closed,
+  pushed to production, and completed Phase 5 upload-routing consolidation.
 
 ## Completion Note
 
@@ -146,13 +149,77 @@ Validation evidence included:
 Observed final full-suite result after review fixes: `1528 passed, 2 skipped`. Pytest log-noise
 validation confirmed production operational logs were unchanged.
 
-Phase 5D is now the final upload-routing sub-phase for main monitored-channel fallback queueing.
-Starter packet:
+Phase 5D fallback queue route extraction was completed in PR 116. Its starter packet is retained
+for delivery history:
 `docs/task_packs/DL_bot Upload Routing - Phase 5D Fallback Queue Route Starter.md`.
 
-Phase 5 is the remaining fast-path upload-route consolidation slice. It should use the proven
+## Phase 5D Completion Note
+
+Status: Phase 5D complete in PR 116 (`codex/dlbot-upload-routing-phase-5d`), smoke tested
+successfully on 2026-05-26 with a monitored-channel stats workbook upload, closed, pushed to
+production, and confirmed in production logs.
+
+Delivered behaviour:
+
+- `DL_bot.py` delegates main monitored-channel fallback queue handling through
+  `handle_fallback_queue_upload()`.
+- `upload_routes/fallback_queue_route.py` preserves route order after inventory, player location,
+  MGE results, PreKvK, Honor, weekly activity, Rally Forts, and KVK_ALL routes.
+- Fallback accepted attachment extensions remain `.xlsx`, `.xls`, and `.csv`.
+- Worker queue handoff through `channel_queues` is preserved, including current
+  enqueue-once-per-accepted-attachment behaviour.
+- `QueueFull` remains a logged drop with no user-facing Discord response.
+- Live queue bookkeeping, queue embed updates, command fall-through, and best-effort background
+  log-backup scheduling are preserved.
+- Review fixes kept synchronous log-backup awaitable construction failures non-fatal and switched
+  fallback live-queue appends to the shared `utils.live_queue_lock` async lock used by
+  `update_live_queue_embed()` and processing pipeline updates.
+- Worker ownership, `processing_pipeline.py`, importer execution, queue persistence semantics,
+  SQL/importer contracts, and startup/lifecycle ownership were not changed.
+
+Validation evidence included:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests\test_fallback_queue_route.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_fallback_queue_route.py tests\test_live_queue_persistence.py tests\test_utils_live_queue.py tests\test_processing_pipeline.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_fallback_queue_route.py tests\test_utils_live_queue.py tests\test_live_queue_persistence.py tests\test_processing_pipeline.py
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pre_commit run -a
+.\.venv\Scripts\python.exe -m pytest -q tests
+.\.venv\Scripts\python.exe scripts\analyse_pytest_log_noise.py
+```
+
+Observed full-suite result before final review fixes: `1539 passed, 2 skipped`. Pytest log-noise
+validation confirmed production operational logs were unchanged.
+
+Production smoke evidence confirmed a monitored-channel workbook upload was recognized by
+`upload_routes.fallback_queue_route`, enqueued for the worker, triggered a successful background
+log-backup request, and completed the downstream processing pipeline through Excel processing,
+archive, SQL procedure, export, ProcConfig import, cache refresh, and final success summary.
+
+## Phase 5 Completion Note
+
+Status: Phase 5 complete. The remaining upload fast paths after Phase 4 now delegate through
+focused `upload_routes` modules:
+
+- MGE results: `upload_routes/mge_results_route.py`
+- KVK Honor: `upload_routes/honor_route.py`
+- Inventory upload-first: `upload_routes/inventory_route.py`
+- Weekly activity: `upload_routes/weekly_activity_route.py`
+- Rally Forts: `upload_routes/rally_forts_route.py`
+- Main monitored-channel fallback queue: `upload_routes/fallback_queue_route.py`
+
+`DL_bot.py` now keeps upload listener/event plumbing and delegates upload-route behaviour. Phase 6
+is the next architecture batch and should audit startup/lifecycle ownership separately from upload
+routing.
+
+Phase 5 was the remaining fast-path upload-route consolidation slice. It used the proven
 `upload_routes` pattern to reduce `DL_bot.py` listener responsibilities while preserving production
-behaviour.
+behaviour. This section is retained as delivery history.
 
 ## Goal
 
@@ -161,10 +228,10 @@ modules or an approved shared upload-router boundary.
 
 The desired end state is:
 
-- `DL_bot.py` delegates remaining upload message handling and keeps only listener/event plumbing.
+- `DL_bot.py` delegates remaining upload message handling and keeps upload listener/event plumbing.
 - MGE results import, KVK Honour ingest, weekly activity ingest, inventory upload-first routing,
-  and Rally Forts ingest have clear route ownership after Phase 5C. Fallback monitored-channel
-  queueing remains to be extracted in Phase 5D.
+  Rally Forts ingest, and fallback monitored-channel queueing have clear route ownership after
+  Phase 5D.
 - Shared SQL preflight, offload dispatch, import embed rendering, and route-level structured
   logging are consolidated only where behaviour parity is safe and testable.
 - Current Discord output, importer contracts, accepted filenames/extensions, side effects, fallback
@@ -234,7 +301,7 @@ In scope for Step 1 audit:
 
 Likely remaining route candidate:
 
-- Main monitored-channel fallback queue route.
+- None. Phase 5D completed the final remaining fallback queue route.
 
 Out of scope until separately approved:
 

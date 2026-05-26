@@ -25,9 +25,62 @@ We are starting Phase 5D of the DL_bot upload-routing optimisation programme aft
 - Phase 5C extracted Rally Forts ingest into `upload_routes/rally_forts_route.py`, was smoke
   tested successfully, merged, deployed to production, and pushed to production.
 
-Phase 5D is expected to be the final upload-routing sub-phase before Phase 6 startup/lifecycle
-separation. It is intentionally more sensitive than the previous upload-route slices because the
-remaining inline path owns queue handoff, live queue bookkeeping, and queue embed side effects.
+Phase 5D was the final upload-routing sub-phase before Phase 6 startup/lifecycle separation. It
+was intentionally more sensitive than the previous upload-route slices because the remaining inline
+path owned queue handoff, live queue bookkeeping, and queue embed side effects.
+
+## Completion Note
+
+Status: Phase 5D complete in PR 116 (`codex/dlbot-upload-routing-phase-5d`), smoke tested
+successfully on 2026-05-26 with a monitored-channel stats workbook upload, closed, pushed to
+production, and confirmed in production logs.
+
+Delivered behaviour:
+
+- `DL_bot.py` delegates main monitored-channel fallback queue handling through
+  `handle_fallback_queue_upload()`.
+- `upload_routes/fallback_queue_route.py` owns monitored-channel fallback matching, supported
+  attachment filtering, worker queue handoff, live queue job append, queue embed update, and
+  best-effort log-backup scheduling.
+- Route order and command fall-through are preserved after all specific fast-path upload routes.
+- Accepted fallback attachments remain `.xlsx`, `.xls`, and `.csv`.
+- Existing worker queue handoff through `channel_queues` is preserved.
+- Existing `QueueFull` behaviour is preserved as a logged drop with no user-facing Discord embed.
+- Existing `live_queue["jobs"]` bookkeeping and `update_live_queue_embed()` side effects are
+  preserved while using the shared `utils.live_queue_lock` async lock.
+- Existing best-effort log-backup scheduling for queued imports is preserved, including non-fatal
+  handling for both awaitable construction failures and task scheduling failures.
+- No worker-process, `processing_pipeline.py`, queue persistence, SQL/importer, or lifecycle
+  ownership changes were introduced.
+
+Validation evidence included:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests\test_fallback_queue_route.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_fallback_queue_route.py tests\test_live_queue_persistence.py tests\test_utils_live_queue.py tests\test_processing_pipeline.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_fallback_queue_route.py tests\test_utils_live_queue.py tests\test_live_queue_persistence.py tests\test_processing_pipeline.py
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pre_commit run -a
+.\.venv\Scripts\python.exe -m pytest -q tests
+.\.venv\Scripts\python.exe scripts\analyse_pytest_log_noise.py
+```
+
+Observed full-suite result before final review fixes: `1539 passed, 2 skipped`. Pytest log-noise
+validation confirmed production operational logs were unchanged.
+
+Production smoke evidence confirmed a monitored-channel workbook upload was recognized by
+`upload_routes.fallback_queue_route`, enqueued for the worker, triggered a successful background
+log-backup request, and completed the downstream processing pipeline through Excel processing,
+archive, SQL procedure, export, ProcConfig import, cache refresh, and final success summary.
+
+Phase 5 upload-routing consolidation is now complete. Phase 6 remains required for
+startup/lifecycle separation and should audit `DL_bot.py`, `bot_instance.py`, startup/shutdown
+runbooks, task supervision, singleton/runtime concerns, queue worker lifecycle, live queue
+rehydration, scheduler startup, and restart-safe state separately from upload routing.
 
 ## Goal
 
@@ -48,8 +101,7 @@ The desired end state is:
 - No worker-process, `processing_pipeline.py`, queue persistence, SQL/importer, or lifecycle
   ownership changes are introduced unless explicitly approved after the audit packet.
 
-Step 1 is an audit/design packet, not implementation. Stop before code changes until the Phase 5D
-route classification and implementation scope are approved.
+Step 1 was completed before implementation. This starter is retained for delivery history.
 
 ## Required Reading
 
@@ -203,18 +255,18 @@ Phase 5D Step 1 must produce:
 - Approval Questions
 - Explicit Stop Point
 
-Do not write bot code, tests, SQL, or deployment scripts during Step 1.
+Step 1 output was completed before implementation.
 
 ## Validation Requirements
 
-For audit/design-only work:
+For audit/design-only work, the expected checks were:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\validate_deferred_items.py
 .\.venv\Scripts\python.exe scripts\select_tests.py
 ```
 
-For implementation after approval, choose validation based on the approved Phase 5D route slice:
+For implementation after approval, validation was selected from:
 
 - focused new fallback queue route tests
 - relevant existing queue/live-queue tests
@@ -248,8 +300,6 @@ For implementation after approval, choose validation based on the approved Phase
 
 ## Explicit Stop Point
 
-Stop after the Phase 5D audit/design packet.
-
-Do not implement route extraction, alter queue ownership, change worker behaviour, change
-processing-pipeline behaviour, or open a PR until the audit packet, route classification, and first
-implementation scope have each been approved.
+Completed. Do not reopen Phase 5D. Use
+`docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md` for startup/lifecycle
+separation and broader queue ownership audits.

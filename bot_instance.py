@@ -66,6 +66,7 @@ from constants import (
     USERNAME,
 )
 from core.interaction_safety import get_operation_lock
+from core.startup_lifecycle import StartupPhase, run_startup_phases
 from crystaltech_di import init_crystaltech_service
 from daily_KVK_overview_embed import post_or_update_daily_KVK_overview
 from embed_utils import expire_old_event_embeds, send_summary_embed
@@ -1534,19 +1535,11 @@ async def on_ready():
         logger.info("[STARTUP] on_ready called again — startup already completed; skipping.")
         return
 
-    # Install the global asyncio loop exception handler once the loop exists
-    try:
-        loop = asyncio.get_running_loop()
-        loop.set_exception_handler(global_asyncio_exception_handler)
-        logger.info("[BOOT] Global asyncio exception handler installed on running loop.")
-    except Exception as e:
-        logger.warning(f"[BOOT] Failed to set global loop exception handler: {e}")
-
-    # Defensive: ensure no console handlers linger (QueueHandler only).
-    try:
-        _drop_console_handlers_once()
-    except Exception:
-        pass
+    await run_startup_phases(
+        [
+            StartupPhase("ready_runtime_bootstrap", _run_ready_runtime_bootstrap),
+        ]
+    )
 
     # Start heartbeat now that the loop is running
 
@@ -1893,6 +1886,22 @@ async def on_ready():
 
     except Exception as e:
         logger.exception(f"[CRITICAL] Exception during on_ready: {e}")
+
+
+async def _run_ready_runtime_bootstrap() -> None:
+    # Install the global asyncio loop exception handler once the loop exists.
+    try:
+        loop = asyncio.get_running_loop()
+        loop.set_exception_handler(global_asyncio_exception_handler)
+        logger.info("[BOOT] Global asyncio exception handler installed on running loop.")
+    except Exception as e:
+        logger.warning(f"[BOOT] Failed to set global loop exception handler: {e}")
+
+    # Defensive: ensure no console handlers linger (QueueHandler only).
+    try:
+        _drop_console_handlers_once()
+    except Exception:
+        pass
 
 
 @bot.event

@@ -37,8 +37,9 @@ Delivered behaviour:
 - Focused route tests and the full suite passed before PR handoff. Production smoke confirmed
   inventory and alliance weekly uploads after merge and production push.
 
-Phase 5C Rally Forts route extraction is now the next active slice. Phase 5D is expected to be
-required as the final upload-routing sub-phase for main monitored-channel fallback queueing.
+Phase 5C Rally Forts route extraction and Phase 5D fallback monitored-channel queue extraction
+have since completed, been smoke tested, and been pushed to production. Phase 5 upload-routing
+consolidation is complete.
 
 Phase 5B was the next small upload-routing slice. It kept using the proven `upload_routes`
 pattern and the new `upload_routes/common.py` helpers where the behaviour matched, without forcing
