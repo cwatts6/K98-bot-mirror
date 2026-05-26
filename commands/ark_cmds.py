@@ -317,11 +317,11 @@ def register_ark(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def ark_force_announce(
         ctx: discord.ApplicationContext,
-        match_id: int = discord.Option(
+        match_id: int | None = discord.Option(
             int,
             "Optional Ark match ID fallback when the match is not in the dropdown",
             required=False,
-            default=0,
+            default=None,
             min_value=1,
         ),
     ):
@@ -352,9 +352,7 @@ def register_ark(bot: ext_commands.Bot) -> None:
                 ARK_MATCH_STATUS_CANCELLED.lower(),
                 ARK_MATCH_STATUS_COMPLETED.lower(),
             }:
-                await interaction.followup.send(
-                    "Match is cancelled or completed.", ephemeral=True
-                )
+                await interaction.followup.send("Match is cancelled or completed.", ephemeral=True)
                 return
 
             controller = ArkRegistrationController(match_id=int(match_id), config=config)
@@ -367,9 +365,12 @@ def register_ark(bot: ext_commands.Bot) -> None:
                 update_refresh_timestamp=True,
             )
             if not msg_ref:
-                await interaction.followup.send(
-                    "Failed to refresh the registration message.", ephemeral=True
+                error_message = (
+                    "Failed to repost the registration announcement."
+                    if announce
+                    else "Failed to refresh the registration message."
                 )
+                await interaction.followup.send(error_message, ephemeral=True)
                 return
 
             await insert_audit_log(
@@ -379,7 +380,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
                 actor_discord_id=interaction.user.id,
                 match_id=int(match_id),
                 governor_id=None,
-                details_json={"source": "CommandDropdown"},
+                details_json={
+                    "source": "CommandManual" if manual_match_id else "CommandDropdown"
+                },
             )
 
             action = "announcement reposted" if announce else "signup embed refreshed"
@@ -408,7 +411,7 @@ def register_ark(bot: ext_commands.Bot) -> None:
         async def _on_cancel(interaction: discord.Interaction):
             await interaction.response.edit_message(content="Closed.", view=None)
 
-        manual_match_id = match_id if isinstance(match_id, int) and match_id > 0 else 0
+        manual_match_id = None if isinstance(match_id, discord.Option) else match_id
         if manual_match_id:
             await _send_registration_result(
                 ctx.interaction,
@@ -431,7 +434,7 @@ def register_ark(bot: ext_commands.Bot) -> None:
         )
 
         await ctx.interaction.edit_original_response(
-            content="Pick an active Ark match, then choose refresh or force announce:",
+            content=view.message_content(),
             view=view,
         )
         return

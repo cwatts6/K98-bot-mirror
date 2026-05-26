@@ -601,6 +601,8 @@ RegistrationMaintenanceCallback = Callable[
 
 
 class ArkRegistrationMaintenanceView(discord.ui.View):
+    initial_content = "Pick an active Ark match, then choose refresh or force announce:"
+
     def __init__(
         self,
         *,
@@ -617,10 +619,11 @@ class ArkRegistrationMaintenanceView(discord.ui.View):
         self.on_refresh = on_refresh
         self.on_force_announce = on_force_announce
         self.on_cancel = on_cancel
+        self.match_labels_by_id: dict[int, str] = {}
 
         self.match_select = discord.ui.Select(
             placeholder="Select active Ark match",
-            options=[self._match_option(m) for m in matches][:25],
+            options=[self._match_option(m) for m in matches[:25]],
             min_values=1,
             max_values=1,
         )
@@ -647,8 +650,7 @@ class ArkRegistrationMaintenanceView(discord.ui.View):
         self.cancel_btn.callback = self._on_cancel
         self.add_item(self.cancel_btn)
 
-    @staticmethod
-    def _match_option(match: dict) -> discord.SelectOption:
+    def _match_option(self, match: dict) -> discord.SelectOption:
         alliance = (match.get("Alliance") or "").strip()
         weekend = match.get("ArkWeekendDate")
         day = match.get("MatchDay") or ""
@@ -658,7 +660,9 @@ class ArkRegistrationMaintenanceView(discord.ui.View):
         )
         weekend_str = weekend.strftime("%Y-%m-%d") if hasattr(weekend, "strftime") else str(weekend)
         label = f"{alliance} - {weekend_str} {day} {time_str} UTC"
-        return discord.SelectOption(label=label[:100], value=str(match["MatchId"]))
+        match_id = int(match["MatchId"])
+        self.match_labels_by_id[match_id] = label
+        return discord.SelectOption(label=label[:100], value=str(match_id))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.author_id:
@@ -670,6 +674,15 @@ class ArkRegistrationMaintenanceView(discord.ui.View):
         self.selection.match_id = match_id
         self.refresh_btn.disabled = False
         self.force_btn.disabled = False
+
+    def message_content(self) -> str:
+        if not self.selection.match_id:
+            return self.initial_content
+        label = self.match_labels_by_id.get(self.selection.match_id, "selected match")
+        return (
+            f"Selected Ark match: {label} "
+            f"(ID {self.selection.match_id}). Choose refresh or force announce:"
+        )
 
     async def _send_error(self, interaction: discord.Interaction, message: str) -> None:
         if interaction.response.is_done():
@@ -698,7 +711,7 @@ class ArkRegistrationMaintenanceView(discord.ui.View):
             await interaction.response.send_message("No match selected.", ephemeral=True)
             return
         self._apply_match_selection(int(self.match_select.values[0]))
-        await interaction.response.edit_message(view=self)
+        await interaction.response.edit_message(content=self.message_content(), view=self)
 
     async def _on_refresh(self, interaction: discord.Interaction) -> None:
         if not self.selection.match_id:

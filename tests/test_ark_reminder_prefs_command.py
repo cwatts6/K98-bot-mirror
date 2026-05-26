@@ -150,7 +150,10 @@ async def test_ark_force_announce_manual_match_id_bypasses_dropdown(monkeypatch)
             "RegistrationChannelId": 123,
         }
 
-    async def _audit(**_kwargs):
+    captured = {}
+
+    async def _audit(**kwargs):
+        captured["audit"] = kwargs
         return 1
 
     class _Controller:
@@ -176,3 +179,45 @@ async def test_ark_force_announce_manual_match_id_bypasses_dropdown(monkeypatch)
     assert not ctx.interaction.edits
     assert ctx.interaction.followup.sent
     assert "announcement reposted" in ctx.interaction.followup.sent[-1]["content"]
+    assert captured["audit"]["details_json"]["source"] == "CommandManual"
+
+
+@pytest.mark.asyncio
+async def test_ark_force_announce_manual_failure_uses_repost_message(monkeypatch):
+    bot = DummyBot()
+    ark_cmds.register_ark(bot)
+    cmd = bot.registered["ark_force_announce"]
+    while hasattr(cmd, "__wrapped__"):
+        cmd = cmd.__wrapped__
+
+    async def _safe_defer(_ctx, ephemeral=True):
+        return None
+
+    async def _get_config():
+        return {"PlayersCap": 30, "SubsCap": 15}
+
+    async def _get_match(match_id):
+        return {
+            "MatchId": match_id,
+            "Status": "Scheduled",
+            "RegistrationChannelId": 123,
+        }
+
+    class _Controller:
+        def __init__(self, *, match_id, config):
+            self.match_id = match_id
+            self.config = config
+
+        async def ensure_registration_message(self, **_kwargs):
+            return None
+
+    monkeypatch.setattr("commands.ark_cmds.safe_defer", _safe_defer)
+    monkeypatch.setattr("commands.ark_cmds.get_config", _get_config)
+    monkeypatch.setattr("commands.ark_cmds.get_match", _get_match)
+    monkeypatch.setattr("commands.ark_cmds.ArkRegistrationController", _Controller)
+
+    ctx = DummyCtx(user_id=777)
+    await cmd(ctx, match_id=99)
+
+    assert ctx.interaction.followup.sent
+    assert "Failed to repost" in ctx.interaction.followup.sent[-1]["content"]

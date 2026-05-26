@@ -128,6 +128,8 @@ async def test_registration_maintenance_view_select_enables_actions_and_calls_re
 
     assert view.refresh_btn.disabled is False
     assert view.force_btn.disabled is False
+    assert "k98A - 2026-05-30 Sat 20:00 UTC" in view.message_content()
+    assert "(ID 44)" in view.message_content()
     assert captured == {"refresh": 44}
 
 
