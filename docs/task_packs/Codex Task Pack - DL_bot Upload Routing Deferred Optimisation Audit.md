@@ -49,10 +49,10 @@ PR 96 (`import-locations-command-orchestration-cleanup`) was smoke tested succes
 The `/import_locations` command cleanup is complete. This task is fresh work around `DL_bot.py` upload routing and related validation blockers.
 
 Current `DL_bot.py` still contains multiple fast-path upload routes inside the root `on_message`
-listener. Player location CSV import, PreKvK snapshot ingest, and KVK_ALL import have been
-extracted into the `upload_routes` pattern; MGE results import, KVK Honour ingest, weekly activity
-import, rally forts import, inventory upload-first routing, and fallback monitored-channel queueing
-remain inline.
+listener. Player location CSV import, PreKvK snapshot ingest, KVK_ALL import, MGE results import,
+and KVK Honour ingest have been extracted into the `upload_routes` pattern. Weekly activity import,
+rally forts import, inventory upload-first routing, and fallback monitored-channel queueing remain
+inline after Phase 5A.
 
 The active deferred backlog identifies these DL_bot-specific architecture items:
 
@@ -311,8 +311,11 @@ Phase breakdown:
      scheduling.
    - Starter packet: `docs/task_packs/DL_bot Upload Routing - Phase 4 KVK_ALL Upload Route Starter.md`
 7. **Phase 5 - Remaining upload fast-path consolidation**
-   - Next active slice.
-   - Audit and consolidate MGE, honor, weekly activity, rally, inventory, fallback queueing,
+   - Active programme after Phase 4.
+   - Phase 5A completed MGE results and KVK Honor route extraction in PR 113
+     (`codex/dlbot-upload-routing-phase-5a`), smoke tested successfully on 2026-05-26, deployed
+     to production, and closed.
+   - Continue with small sub-phases for weekly activity, rally, inventory, fallback queueing,
      shared SQL-preflight/offload handling, shared import embed rendering where safe, and
      route-level structured logging into the general upload-routing layer.
    - Starter packet: `docs/task_packs/DL_bot Upload Routing - Phase 5 Remaining Upload Fast Paths Starter.md`
@@ -357,6 +360,21 @@ Phase 4 delivery notes:
   user-facing abort notification and does not emit a duplicate route-level abort embed.
 - PR 110 (`codex/kvk-all-upload-route`) was smoke tested successfully and promoted to production.
 - Phase 5 remaining fast-path consolidation is now the next active upload-routing programme slice.
+
+Phase 5A delivery notes:
+
+- MGE results upload routing is extracted into `upload_routes/mge_results_route.py`.
+- KVK Honor upload routing is extracted into `upload_routes/honor_route.py`.
+- `upload_routes/common.py` now provides shared notify-channel fallback, source/uploader embed
+  field construction, and best-effort task scheduling for later route slices.
+- The MGE importer remains lazily loaded inside the route handler to preserve startup resilience.
+- The MGE and Honor routes run SQL headroom preflight before workbook reads.
+- Focused route tests cover matching, non-matching, SQL preflight aborts, importer success/failure,
+  exception rendering, side effects, report summary fields, Honor test-mode handling, and Honor
+  stats-refresh best-effort behaviour.
+- PR 113 (`codex/dlbot-upload-routing-phase-5a`) was smoke tested successfully, deployed to
+  production, and closed.
+- Phase 5B inventory and weekly activity route extraction is now the next active slice.
 
 14. Testing Requirements
 

@@ -14,6 +14,53 @@ We are starting Phase 5 of the DL_bot upload-routing optimisation programme afte
   tests, full suite, and log-noise validation all passed under `.venv`.
 - Phase 4 extracted the KVK_ALL route into `upload_routes/kvk_all_route.py`, was smoke tested
   successfully on 2026-05-26, and was pushed to production.
+- Phase 5A extracted the MGE results and KVK Honor routes into `upload_routes/mge_results_route.py`
+  and `upload_routes/honor_route.py`, added shared route helpers in `upload_routes/common.py`, was
+  smoke tested successfully on 2026-05-26, deployed to production, and closed.
+
+## Completion Note
+
+Status: Phase 5A complete in PR 113 (`codex/dlbot-upload-routing-phase-5a`), smoke tested
+successfully on 2026-05-26, deployed to production, and closed.
+
+Delivered behaviour:
+
+- `DL_bot.py` delegates MGE results auto-import through `handle_mge_results_upload()`.
+- `DL_bot.py` delegates KVK Honor upload ingest through `handle_honor_upload()`.
+- `upload_routes/common.py` provides shared notify-channel fallback, source/uploader embed fields,
+  and best-effort task scheduling for reuse by later Phase 5 sub-phases.
+- The MGE importer remains lazily loaded inside the route handler so MGE import dependency failures
+  cannot block bot startup or unrelated message routes.
+- SQL headroom preflight runs before workbook reads in the new MGE and Honor routes to avoid
+  unnecessary attachment I/O when imports will abort.
+- Current Discord output, importer contracts, SQL preflight behaviour, Honor stats refresh,
+  background log-backup scheduling, route order, and fall-through behaviour were preserved.
+
+Validation evidence included:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests/test_mge_results_upload_route.py tests/test_honor_upload_route.py tests/test_dl_bot_mge_auto_import.py
+.\.venv\Scripts\python.exe -m pytest -q tests/test_mge_results_import.py tests/test_mge_results_import_service.py tests/test_honor_importer.py
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pre_commit run -a
+.\.venv\Scripts\python.exe -m pytest -q tests
+.\.venv\Scripts\python.exe scripts\analyse_pytest_log_noise.py
+```
+
+Observed full-suite result: `1498 passed, 2 skipped`. Pytest log-noise validation confirmed
+production operational logs were unchanged.
+
+Production smoke evidence confirmed the Honor route passed SQL preflight, parsed and ingested
+`1198_honor.xlsx` for `KVK_NO=15`, created `ScanID=40` with `93` rows, and scheduled a successful
+background log-backup trigger.
+
+Phase 5B inventory and weekly activity route extraction is now the next active upload-routing
+programme slice. Starter packet:
+`docs/task_packs/DL_bot Upload Routing - Phase 5B Inventory and Weekly Activity Route Starter.md`.
 
 Phase 5 is the remaining fast-path upload-route consolidation slice. It should use the proven
 `upload_routes` pattern to reduce `DL_bot.py` listener responsibilities while preserving production
@@ -27,8 +74,9 @@ modules or an approved shared upload-router boundary.
 The desired end state is:
 
 - `DL_bot.py` delegates remaining upload message handling and keeps only listener/event plumbing.
-- MGE results import, KVK Honour ingest, weekly activity ingest, rally forts ingest, inventory
-  upload-first routing, and fallback monitored-channel queueing have clear route ownership.
+- MGE results import and KVK Honour ingest have clear route ownership after Phase 5A. Weekly
+  activity ingest, rally forts ingest, inventory upload-first routing, and fallback monitored-channel
+  queueing remain to be extracted in later Phase 5 sub-phases.
 - Shared SQL preflight, offload dispatch, import embed rendering, and route-level structured
   logging are consolidated only where behaviour parity is safe and testable.
 - Current Discord output, importer contracts, accepted filenames/extensions, side effects, fallback
@@ -54,6 +102,7 @@ Before audit work, read:
 - `docs/reference/deferred_optimisations.md`
 - `docs/task_packs/Codex Task Pack - DL_bot Upload Routing Deferred Optimisation Audit.md`
 - `docs/task_packs/DL_bot Upload Routing - Phase 4 KVK_ALL Upload Route Starter.md`
+- `docs/task_packs/DL_bot Upload Routing - Phase 5B Inventory and Weekly Activity Route Starter.md`
 
 Use `C:\K98-bot-SQL-Server` as the SQL source of truth for any importer, DAL, export, stored
 procedure, view, or output-contract assumptions reviewed during this phase.
@@ -73,8 +122,8 @@ procedure, view, or output-contract assumptions reviewed during this phase.
 ### Deferred Optimisation
 - Area: `DL_bot.py` remaining fast-path upload routes
 - Type: architecture
-- Description: After the first upload-route slices, `DL_bot.py` still owns MGE results import, KVK honor ingest, weekly activity ingest, rally forts ingest, inventory upload-first routing, and fallback monitored-channel queue handling directly in the root listener, with repeated preflight/offload/rendering/logging patterns.
-- Suggested Fix: Phase 5 should audit and consolidate the remaining fast paths into the `upload_routes` pattern, add shared SQL-preflight/offload handling where safe, centralise repeated import embed rendering only where behaviour parity is testable, and add route-level structured logging without changing importer contracts or Discord output.
+- Description: After Phase 5A, `DL_bot.py` still owns weekly activity ingest, rally forts ingest, inventory upload-first routing, and fallback monitored-channel queue handling directly in the root listener, with repeated preflight/offload/rendering/logging patterns. MGE results import and KVK Honor ingest now delegate through the `upload_routes` pattern.
+- Suggested Fix: Continue Phase 5 in small sub-phases, starting with inventory upload-first routing and weekly activity ingest in Phase 5B. Reuse `upload_routes/common.py` where behaviour parity is clear and covered, and only add new shared helpers when later routes prove the same contract.
 - Impact: medium
 - Risk: medium
 - Dependencies: Player-location, PreKvK, validation-blocker, and KVK_ALL phases are complete and production smoke tested; preserve existing Discord output and importer contracts.
@@ -96,8 +145,6 @@ In scope for Step 1 audit:
 Likely remaining route candidates:
 
 - Inventory upload-first route currently delegated to `ui.views.inventory_views.handle_inventory_upload_message`.
-- MGE results auto-import route.
-- KVK Honour ingest route.
 - Weekly activity ingest route.
 - Rally forts XLSX auto-ingest route.
 - Main monitored-channel fallback queue route.
@@ -119,6 +166,9 @@ Likely route/listener files:
 - `upload_routes/player_location_route.py`
 - `upload_routes/prekvk_route.py`
 - `upload_routes/kvk_all_route.py`
+- `upload_routes/mge_results_route.py`
+- `upload_routes/honor_route.py`
+- `upload_routes/common.py`
 - `upload_routes/__init__.py`
 
 Likely importer/service/helper files:

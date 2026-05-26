@@ -27,8 +27,13 @@ the documented `.venv` workflow without `RUN_DB_TESTS=1`. Phase 4 KVK_ALL upload
 was completed in PR 110 (`codex/kvk-all-upload-route`), smoke tested successfully on 2026-05-26,
 and promoted to production: KVK_ALL now delegates through `upload_routes/kvk_all_route.py` while
 preserving multi-attachment handling, SQL preflight behaviour, Discord output, sheet link button
-behaviour, and non-blocking auto-export scheduling. Phase 5 remaining fast-path consolidation is
-now the next upload-routing programme slice; the remaining active backlog is listed below.
+behaviour, and non-blocking auto-export scheduling. Phase 5A MGE results and KVK Honor upload-route
+extraction was completed in PR 113 (`codex/dlbot-upload-routing-phase-5a`), smoke tested
+successfully on 2026-05-26, deployed to production, and closed: `DL_bot.py` now delegates those
+routes through `upload_routes/mge_results_route.py` and `upload_routes/honor_route.py`, with shared
+route helpers in `upload_routes/common.py` for notify-channel fallback, source/uploader embed
+fields, and best-effort background task scheduling. Phase 5B is now the next upload-routing
+programme slice; the remaining active backlog is listed below.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 upload routing, not as a continuation of the `/import_locations` command cleanup. Start that task
@@ -101,11 +106,11 @@ issues list.
 ### Deferred Optimisation
 - Area: `DL_bot.py` remaining fast-path upload routes
 - Type: architecture
-- Description: After the first upload-route slices, `DL_bot.py` still owns MGE results import, KVK honor ingest, weekly activity ingest, rally forts ingest, inventory upload-first routing, and fallback monitored-channel queue handling directly in the root listener, with repeated preflight/offload/rendering/logging patterns.
-- Suggested Fix: Phase 5 should audit and consolidate the remaining fast paths into the `upload_routes` pattern, add shared SQL-preflight/offload handling where safe, centralise repeated import embed rendering only where behaviour parity is testable, and add route-level structured logging without changing importer contracts or Discord output.
+- Description: After Phase 5A, `DL_bot.py` still owns weekly activity ingest, rally forts ingest, inventory upload-first routing, and fallback monitored-channel queue handling directly in the root listener. MGE results import and KVK Honor ingest now delegate through `upload_routes/mge_results_route.py` and `upload_routes/honor_route.py`, but the remaining inline routes still contain repeated preflight/offload/rendering/logging and queue-bookkeeping patterns.
+- Suggested Fix: Continue Phase 5 with small sub-phases that consolidate the remaining fast paths into the `upload_routes` pattern. Reuse `upload_routes/common.py` where the contract is already identical, add shared SQL-preflight/offload/rendering/logging helpers only when behaviour parity is clear and covered, and avoid changing importer contracts, Discord output, route order, or fallback queue behaviour.
 - Impact: medium
 - Risk: medium
-- Dependencies: Start with `docs/task_packs/DL_bot Upload Routing - Phase 5 Remaining Upload Fast Paths Starter.md`; player-location, PreKvK, validation-blocker, and KVK_ALL phases are complete and production smoke tested, so Phase 5 can be scoped against proven route contracts.
+- Dependencies: Phase 5A is complete and production smoke tested; start Phase 5B from `docs/task_packs/DL_bot Upload Routing - Phase 5B Inventory and Weekly Activity Route Starter.md`.
 
 ### Deferred Optimisation
 - Area: `DL_bot.py`, `bot_instance.py` startup and lifecycle

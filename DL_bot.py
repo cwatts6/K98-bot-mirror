@@ -135,6 +135,7 @@ from embed_utils import send_embed
 from kvk_all_importer import _auto_export_kvk
 from log_health import LogHeadroomError, preflight_from_env_sync
 from upload_routes.honor_route import HonorRouteDeps, handle_honor_upload
+from upload_routes.inventory_route import InventoryRouteDeps, handle_inventory_upload
 from upload_routes.kvk_all_route import KvkAllRouteDeps, handle_kvk_all_upload
 from upload_routes.mge_results_route import MgeResultsRouteDeps, handle_mge_results_upload
 from upload_routes.player_location_route import (
@@ -142,8 +143,11 @@ from upload_routes.player_location_route import (
     handle_player_location_upload,
 )
 from upload_routes.prekvk_route import PreKvkRouteDeps, handle_prekvk_upload
+from upload_routes.weekly_activity_route import (
+    WeeklyActivityRouteDeps,
+    handle_weekly_activity_upload,
+)
 from utils import live_queue, update_live_queue_embed, utcnow
-from weekly_activity_importer import ingest_weekly_activity_excel
 
 # === Load environment variables ===
 if not TOKEN:
@@ -561,31 +565,14 @@ async def on_message(message: discord.Message):
             logger.exception("mge_dm_followup_route_unexpected_failed")
 
     # === Fast-path: inventory image upload-first import ===
-    if (
-        INVENTORY_UPLOAD_CHANNEL_ID
-        and message.channel.id == INVENTORY_UPLOAD_CHANNEL_ID
-        and message.attachments
+    if await handle_inventory_upload(
+        message,
+        InventoryRouteDeps(
+            inventory_upload_channel_id=INVENTORY_UPLOAD_CHANNEL_ID,
+            bot=bot,
+        ),
     ):
-        try:
-            from ui.views.inventory_views import handle_inventory_upload_message
-
-            handled = await handle_inventory_upload_message(message, bot)
-            if handled:
-                return
-        except Exception:
-            logger.exception(
-                "inventory_upload_first_route_failed message_id=%s channel_id=%s",
-                getattr(message, "id", None),
-                getattr(getattr(message, "channel", None), "id", None),
-            )
-            try:
-                await message.channel.send(
-                    f"<@{message.author.id}> Inventory import failed unexpectedly. Please try again.",
-                    delete_after=120,
-                )
-            except Exception:
-                pass
-            return
+        return
 
     # === Fast-path: Player Location CSV auto-import ===
     if await handle_player_location_upload(
@@ -646,90 +633,22 @@ async def on_message(message: discord.Message):
         return
 
     # --- Fast-path: Weekly activity ingest ---
-    if message.channel.id == ACTIVITY_UPLOAD_CHANNEL_ID and message.attachments:
-        target = next(
-            (
-                a
-                for a in message.attachments
-                if a.filename.lower().endswith("1198_alliance_activity.xlsx")
-            ),
-            None,
-        )
-        if target:
-            target_ch = message.channel
-            try:
-                notify = await _get_notify_channel()
-                if notify:
-                    target_ch = notify
-            except Exception:
-                pass
-
-            try:
-                file_bytes = await target.read()
-                # NEW: preflight check
-                ok = await ensure_sql_headroom_or_notify(target_ch)
-                if not ok:
-                    return
-
-                snap_id, row_count = await _offload_callable(
-                    ingest_weekly_activity_excel,
-                    content=file_bytes,
-                    snapshot_ts_utc=message.created_at,
-                    message_id=message.id,
-                    channel_id=message.channel.id,
-                    server=os.environ.get("SQL_SERVER"),
-                    database=os.environ.get("SQL_DATABASE"),
-                    username=os.environ.get("SQL_USERNAME"),
-                    password=os.environ.get("SQL_PASSWORD"),
-                    source_filename=target.filename,
-                    name="ingest_weekly_activity_excel",
-                    prefer_process=True,
-                    meta={"filename": target.filename},
-                )
-                if snap_id == 0:
-                    await send_embed(
-                        target_ch,
-                        "Alliance Activity Import",
-                        {"Status": "Duplicate detected for this week. Skipped."},
-                        0xF1C40F,
-                    )
-                else:
-                    await send_embed(
-                        target_ch,
-                        "Alliance Activity Import ✅",
-                        {
-                            "SnapshotId": str(snap_id),
-                            "Rows": str(row_count),
-                            "Filename": target.filename,
-                            "Channel": f"#{message.channel.name} ({message.channel.id})",
-                            "Uploader": f"{message.author} ({message.author.id})",
-                            "Note": "",
-                        },
-                        0x2ECC71,
-                    )
-
-                    # schedule a background log-backup trigger (best-effort)
-                    try:
-                        asyncio.create_task(trigger_log_backup_background())
-                    except Exception:
-                        logger.exception("Failed to schedule background log-backup trigger")
-
-            except Exception as e:
-                await send_embed(
-                    target_ch,
-                    "Alliance Activity Import ❌",
-                    {
-                        "Error": f"{type(e).__name__}: {e}",
-                        "Filename": target.filename,
-                        "Channel": f"#{message.channel.name} ({message.channel.id})",
-                        "Uploader": f"{message.author} ({message.author.id})",
-                    },
-                    0xE74C3C,
-                    mention=None,
-                )
-            finally:
-                # do not fall through to other pipeline logic
-                return
+    if await handle_weekly_activity_upload(
+        message,
+        WeeklyActivityRouteDeps(
+            activity_upload_channel_id=ACTIVITY_UPLOAD_CHANNEL_ID,
+            get_notify_channel=_get_notify_channel,
+            send_embed=send_embed,
+            ensure_sql_headroom_or_notify=ensure_sql_headroom_or_notify,
+            offload_callable=_offload_callable,
+            trigger_log_backup_background=trigger_log_backup_background,
+            server=os.environ.get("SQL_SERVER"),
+            database=os.environ.get("SQL_DATABASE"),
+            username=os.environ.get("SQL_USERNAME"),
+            password=os.environ.get("SQL_PASSWORD"),
+        ),
+    ):
+        return
 
     # === Fast-path: Rally Forts XLSX auto-ingest (hardened) ===
     if message.channel.id == FORT_RALLY_CHANNEL_ID and message.attachments:
