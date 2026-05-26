@@ -76,7 +76,9 @@ def _resolve_sheet_id(deps: KvkAllRouteDeps) -> str | None:
     return os.environ.get("KVK_SHEET_ID") or os.environ.get("ALL_KVK_SHEET_ID")
 
 
-def _build_result_embed(deps: KvkAllRouteDeps, title: str, color: int, fields: dict[str, str]) -> Any:
+def _build_result_embed(
+    deps: KvkAllRouteDeps, title: str, color: int, fields: dict[str, str]
+) -> Any:
     embed_factory = deps.embed_factory or _default_embed_factory
     embed = embed_factory(title=title, color=color)
     for key, value in fields.items():
@@ -96,7 +98,9 @@ def _build_sheet_view(deps: KvkAllRouteDeps) -> Any | None:
         view_factory = deps.view_factory or _default_view_factory
         button_factory = deps.button_factory or _default_button_factory
         button_style_link = (
-            deps.button_style_link if deps.button_style_link is not None else _default_button_style_link()
+            deps.button_style_link
+            if deps.button_style_link is not None
+            else _default_button_style_link()
         )
         view = view_factory()
         view.add_item(
@@ -182,7 +186,9 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
             )
 
             if isinstance(result, dict) and not result.get("success", True):
-                logger.info("[KVK] Import failed for %s: %s", attachment.filename, result.get("error"))
+                logger.info(
+                    "[KVK] Import failed for %s: %s", attachment.filename, result.get("error")
+                )
                 await deps.send_embed(
                     notify_ch,
                     "KVK All-Kingdom Import \u274c",
