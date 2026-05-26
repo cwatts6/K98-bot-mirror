@@ -172,6 +172,13 @@ For documentation-only changes, the architecture/deferred/test-selector scripts 
 minimum useful gate. Runtime pytest may be skipped when no code or test files changed, but the skip
 must be stated.
 
+AI-assisted review gates are separate from tests, but should be considered before PR handoff:
+
+- Run or justify skipping CodeRabbit follow-up review for non-trivial code changes.
+- Run or justify skipping Codex Security review when the change touches permissions, Discord
+  interactions, SQL/data access, file handling, secrets/config, deployment, network calls,
+  user-controlled input, or restart-sensitive persistence.
+
 ## 9. Assertions To Prefer
 
 Prefer tests that assert:
@@ -219,3 +226,4 @@ A change is test-ready when:
 - [ ] existing related tests were reviewed
 - [ ] focused and general validation commands are identified
 - [ ] documentation-only skips are explicitly justified
+- [ ] CodeRabbit and Codex Security review decisions are documented before PR handoff

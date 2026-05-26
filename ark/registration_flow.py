@@ -399,6 +399,7 @@ class ArkRegistrationController:
         on_select,
         heading: str,
         only_governor_ids: set[str] | None = None,
+        on_timeout_callback=None,
     ) -> None:
         options = build_unique_gov_options(accounts)
 
@@ -426,6 +427,7 @@ class ArkRegistrationController:
             author_id=interaction.user.id,
             options=options,
             on_select=on_select,
+            on_timeout_callback=on_timeout_callback,
         )
 
         if self._response_is_done(interaction):
@@ -721,9 +723,12 @@ class ArkRegistrationController:
     async def switch(self, interaction: discord.Interaction) -> None:
         async def _close_menu(inter: discord.Interaction, message: str) -> None:
             if inter.response.is_done():
-                await inter.edit_original_response(content=message, view=None)
+                await inter.followup.send(message, ephemeral=True)
             else:
                 await inter.response.edit_message(content=message, view=None)
+
+        async def _repair_registration_message() -> None:
+            await self.refresh_registration_message(interaction.client)
 
         await interaction.response.defer(ephemeral=True)
         match = await self._ensure_open_match(interaction)
@@ -789,6 +794,7 @@ class ArkRegistrationController:
                 on_select=_apply,
                 heading="Select an **inactive** governor to switch to:",
                 only_governor_ids=eligible_targets,
+                on_timeout_callback=_repair_registration_message,
             )
 
         await self._prompt_governor_selection(
@@ -797,6 +803,7 @@ class ArkRegistrationController:
             on_select=_select_new,
             heading="Select the **current** governor to switch off:",
             only_governor_ids=active_govs,
+            on_timeout_callback=_repair_registration_message,
         )
 
     async def _apply_switch(

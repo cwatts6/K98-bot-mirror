@@ -80,6 +80,8 @@ instead of deleting a skill silently.
 | `k98-deferred-optimisation-capture` | Audit or implementation finds out-of-scope debt, refactor triggers, duplicate helpers, direct SQL in commands/views, restart-safety gaps, or cleanup candidates. |
 | `k98-pr-review` | Before merge or PR handoff, to check architecture, SQL alignment, tests, deferred items, Discord safety, and promotion readiness. |
 | `k98-promotion-check` | Before production promotion, production PR creation, production merge, SQL deployment sequencing, or bot-machine deployment. |
+| `coderabbit:code-review` | Before PR handoff for non-trivial code changes, after local validation, to catch follow-up review issues. |
+| `codex-security:security-scan` | When security-sensitive surfaces are touched, including permissions, Discord interactions, SQL/data access, file handling, secrets/config, deployment, network calls, user-controlled input, or restart-sensitive persistence. |
 
 ### Skill Decisions
 
@@ -92,6 +94,8 @@ instead of deleting a skill silently.
 | `k98-deferred-optimisation-capture` | `<use | not applicable>` | `<why>` |
 | `k98-pr-review` | `<use | not applicable>` | `<why>` |
 | `k98-promotion-check` | `<use | not applicable>` | `<why>` |
+| `coderabbit:code-review` | `<use | not applicable>` | `<why>` |
+| `codex-security:security-scan` | `<use | not applicable>` | `<why>` |
 
 ## 8. Mandatory Workflow
 
@@ -102,6 +106,8 @@ Default workflow:
 3. Implementation plan, then stop for approval.
 4. Implementation after approval.
 5. Validation and final review.
+6. CodeRabbit follow-up review for non-trivial code changes, or documented skip reason.
+7. Codex Security review when risk triggers apply, or documented skip reason.
 
 Proceed in one pass only when the user explicitly approves it.
 
@@ -210,6 +216,11 @@ consider:
 .\.venv\Scripts\python.exe scripts\validate_command_registration.py
 ```
 
+Before PR handoff, include AI-assisted review gate decisions:
+
+- CodeRabbit follow-up review for non-trivial code changes, or a documented skip reason.
+- Codex Security review when security-sensitive surfaces are touched, or a documented skip reason.
+
 ## 15. Acceptance Criteria
 
 - [ ] Scope is complete and no out-of-scope work was mixed in.
@@ -220,6 +231,8 @@ consider:
 - [ ] Restart safety is preserved or explicitly not applicable.
 - [ ] Tests were added/updated or a clear testing exception is documented.
 - [ ] Quality gates were run or documented.
+- [ ] CodeRabbit follow-up review was run or explicitly skipped.
+- [ ] Codex Security review was run or explicitly skipped based on risk triggers.
 - [ ] Deferred optimisations are captured structurally.
 
 ## 16. Required Delivery Output
@@ -234,8 +247,9 @@ Use this delivery shape:
 6. Helpers Reused
 7. Refactor Findings
 8. Test Plan
-9. Deployment Steps
-10. Deferred Optimisations
+9. AI Review Gates
+10. Deployment Steps
+11. Deferred Optimisations
 
 For documentation-only work, state that no runtime code, SQL, helper reuse, or restart behaviour
 changed.
@@ -254,6 +268,11 @@ changed.
 ## Tests
 
 - <test command or verification>
+
+## AI Review Gates
+
+- CodeRabbit: <run | skipped, with reason>
+- Codex Security: <run | skipped, with reason>
 
 ## Deferred Optimisations
 

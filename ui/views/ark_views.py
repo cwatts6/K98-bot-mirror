@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
+from inspect import isawaitable
 import logging
 
 import discord
@@ -589,7 +590,147 @@ class CancelArkMatchView(discord.ui.View):
         await interaction.response.edit_message(content="Cancelled.", view=None)
 
 
+@dataclass
+class ArkRegistrationMaintenanceSelection:
+    match_id: int | None = None
+
+
+RegistrationMaintenanceCallback = Callable[
+    [discord.Interaction, ArkRegistrationMaintenanceSelection], object
+]
+
+
+class ArkRegistrationMaintenanceView(discord.ui.View):
+    def __init__(
+        self,
+        *,
+        author_id: int,
+        matches: list[dict],
+        on_refresh: RegistrationMaintenanceCallback,
+        on_force_announce: RegistrationMaintenanceCallback,
+        on_cancel: OnCancel | None = None,
+        timeout: float = 300.0,
+    ) -> None:
+        super().__init__(timeout=timeout)
+        self.author_id = author_id
+        self.selection = ArkRegistrationMaintenanceSelection()
+        self.on_refresh = on_refresh
+        self.on_force_announce = on_force_announce
+        self.on_cancel = on_cancel
+
+        self.match_select = discord.ui.Select(
+            placeholder="Select active Ark match",
+            options=[self._match_option(m) for m in matches][:25],
+            min_values=1,
+            max_values=1,
+        )
+        self.match_select.callback = self._on_match
+        self.add_item(self.match_select)
+
+        self.refresh_btn = discord.ui.Button(
+            label="Refresh buttons",
+            style=discord.ButtonStyle.primary,
+            disabled=True,
+        )
+        self.refresh_btn.callback = self._on_refresh
+        self.add_item(self.refresh_btn)
+
+        self.force_btn = discord.ui.Button(
+            label="Repost + @everyone",
+            style=discord.ButtonStyle.danger,
+            disabled=True,
+        )
+        self.force_btn.callback = self._on_force_announce
+        self.add_item(self.force_btn)
+
+        self.cancel_btn = discord.ui.Button(label="Close", style=discord.ButtonStyle.secondary)
+        self.cancel_btn.callback = self._on_cancel
+        self.add_item(self.cancel_btn)
+
+    @staticmethod
+    def _match_option(match: dict) -> discord.SelectOption:
+        alliance = (match.get("Alliance") or "").strip()
+        weekend = match.get("ArkWeekendDate")
+        day = match.get("MatchDay") or ""
+        match_time = match.get("MatchTimeUtc")
+        time_str = (
+            match_time.strftime("%H:%M") if hasattr(match_time, "strftime") else str(match_time)
+        )
+        weekend_str = weekend.strftime("%Y-%m-%d") if hasattr(weekend, "strftime") else str(weekend)
+        label = f"{alliance} - {weekend_str} {day} {time_str} UTC"
+        return discord.SelectOption(label=label[:100], value=str(match["MatchId"]))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("This menu is not for you.", ephemeral=True)
+            return False
+        return True
+
+    def _apply_match_selection(self, match_id: int) -> None:
+        self.selection.match_id = match_id
+        self.refresh_btn.disabled = False
+        self.force_btn.disabled = False
+
+    async def _send_error(self, interaction: discord.Interaction, message: str) -> None:
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+
+    async def _run_action(
+        self,
+        interaction: discord.Interaction,
+        callback: RegistrationMaintenanceCallback,
+        *,
+        log_message: str,
+        user_message: str,
+    ) -> None:
+        try:
+            result = callback(interaction, self.selection)
+            if isawaitable(result):
+                await result
+        except Exception:
+            logger.exception(log_message)
+            await self._send_error(interaction, user_message)
+
+    async def _on_match(self, interaction: discord.Interaction) -> None:
+        if not self.match_select.values:
+            await interaction.response.send_message("No match selected.", ephemeral=True)
+            return
+        self._apply_match_selection(int(self.match_select.values[0]))
+        await interaction.response.edit_message(view=self)
+
+    async def _on_refresh(self, interaction: discord.Interaction) -> None:
+        if not self.selection.match_id:
+            await interaction.response.send_message("No match selected.", ephemeral=True)
+            return
+        await self._run_action(
+            interaction,
+            self.on_refresh,
+            log_message="[ARK] Registration maintenance refresh handler failed",
+            user_message="Failed to refresh the registration message.",
+        )
+
+    async def _on_force_announce(self, interaction: discord.Interaction) -> None:
+        if not self.selection.match_id:
+            await interaction.response.send_message("No match selected.", ephemeral=True)
+            return
+        await self._run_action(
+            interaction,
+            self.on_force_announce,
+            log_message="[ARK] Registration maintenance force-announce handler failed",
+            user_message="Failed to repost the registration message.",
+        )
+
+    async def _on_cancel(self, interaction: discord.Interaction) -> None:
+        if self.on_cancel:
+            await self.on_cancel(interaction)
+            return
+        await interaction.response.edit_message(content="Closed.", view=None)
+
+
 GovernorSelectCallback = Callable[[discord.Interaction, str], object]
+TimeoutCallback = Callable[[], object]
 
 
 class ArkGovernorSelectView(discord.ui.View):
@@ -599,11 +740,13 @@ class ArkGovernorSelectView(discord.ui.View):
         author_id: int,
         options: list[discord.SelectOption],
         on_select: GovernorSelectCallback,
+        on_timeout_callback: TimeoutCallback | None = None,
         timeout: float = 120.0,
     ) -> None:
         super().__init__(timeout=timeout)
         self.author_id = author_id
         self._on_select = on_select
+        self._on_timeout_callback = on_timeout_callback
         self.message: discord.Message | None = None
 
         self.select = discord.ui.Select(
@@ -622,7 +765,15 @@ class ArkGovernorSelectView(discord.ui.View):
             if self.message:
                 await self.message.edit(view=self)
         except Exception:
-            pass
+            logger.exception("[ARK] Failed to disable governor selector after timeout")
+
+        if self._on_timeout_callback:
+            try:
+                result = self._on_timeout_callback()
+                if isawaitable(result):
+                    await result
+            except Exception:
+                logger.exception("[ARK] Governor selector timeout recovery failed")
 
     async def _handle_select(self, interaction: discord.Interaction):
         if interaction.user.id != self.author_id:

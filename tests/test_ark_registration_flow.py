@@ -49,6 +49,29 @@ class DummyInteraction:
         self.client = object()
 
 
+class DoneAfterDeferResponse(DummyResponse):
+    def __init__(self) -> None:
+        super().__init__()
+        self._done = False
+
+    async def defer(self, ephemeral: bool = True):
+        await super().defer(ephemeral=ephemeral)
+        self._done = True
+
+    def is_done(self) -> bool:
+        return self._done
+
+
+class PublicMessageGuardInteraction(DummyInteraction):
+    def __init__(self, user_id: int = 999) -> None:
+        super().__init__(user_id=user_id)
+        self.response = DoneAfterDeferResponse()
+        self.original_edits = []
+
+    async def edit_original_response(self, content=None, view=None):
+        self.original_edits.append({"content": content, "view": view})
+
+
 def _future_close() -> datetime:
     return datetime.now(UTC) + timedelta(hours=2)
 
@@ -170,7 +193,7 @@ async def test_join_player_adds_signup(monkeypatch):
     controller = ArkRegistrationController(match_id=1, config={"PlayersCap": 30, "SubsCap": 15})
     interaction = DummyInteraction()
 
-    async def _prompt(interaction, *, accounts, on_select, heading, only_governor_ids=None):
+    async def _prompt(interaction, *, accounts, on_select, heading, only_governor_ids=None, **_k):
         if only_governor_ids:
             await on_select(interaction, next(iter(only_governor_ids)))
         else:
@@ -241,7 +264,7 @@ async def test_leave_marks_withdrawn(monkeypatch):
     controller = ArkRegistrationController(match_id=2, config={"PlayersCap": 30, "SubsCap": 15})
     interaction = DummyInteraction()
 
-    async def _prompt(interaction, *, accounts, on_select, heading, only_governor_ids=None):
+    async def _prompt(interaction, *, accounts, on_select, heading, only_governor_ids=None, **_k):
         await on_select(interaction, "2441482")
 
     monkeypatch.setattr(controller, "_prompt_governor_selection", _prompt)
@@ -306,7 +329,7 @@ async def test_switch_updates_governor(monkeypatch):
     controller = ArkRegistrationController(match_id=3, config={"PlayersCap": 30, "SubsCap": 15})
     interaction = DummyInteraction()
 
-    async def _prompt(interaction, *, accounts, on_select, heading, only_governor_ids=None):
+    async def _prompt(interaction, *, accounts, on_select, heading, only_governor_ids=None, **_k):
         if only_governor_ids:
             await on_select(interaction, next(iter(only_governor_ids)))
         else:
@@ -512,7 +535,7 @@ async def test_join_player_blocks_duplicate_weekend_governor(monkeypatch):
     controller = ArkRegistrationController(match_id=13, config={"PlayersCap": 30, "SubsCap": 15})
     interaction = DummyInteraction()
 
-    async def _prompt(interaction, *, accounts, on_select, heading, only_governor_ids=None):
+    async def _prompt(interaction, *, accounts, on_select, heading, only_governor_ids=None, **_k):
         if only_governor_ids:
             await on_select(interaction, next(iter(only_governor_ids)))
         else:
@@ -730,6 +753,57 @@ async def test_switch_blocks_when_same_governor_selected(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_switch_auto_current_governor_does_not_edit_public_registration_message(monkeypatch):
+    controller = ArkRegistrationController(match_id=21, config={"PlayersCap": 30, "SubsCap": 15})
+    interaction = PublicMessageGuardInteraction(user_id=999)
+
+    async def _get_match(match_id):
+        return {
+            "MatchId": 21,
+            "Alliance": "K98",
+            "ArkWeekendDate": datetime(2026, 3, 7, tzinfo=UTC).date(),
+            "MatchDay": "Sat",
+            "MatchTimeUtc": datetime(2026, 3, 7, 11, 0, tzinfo=UTC).time(),
+            "SignupCloseUtc": _future_close(),
+            "Status": "Scheduled",
+        }
+
+    async def _get_roster(match_id):
+        return [
+            {
+                "GovernorId": 111,
+                "GovernorNameSnapshot": "Current",
+                "DiscordUserId": interaction.user.id,
+                "SlotType": "Player",
+            }
+        ]
+
+    async def _get_account_summary_stub(_user_id):
+        return _account_summary(
+            {
+                "Main": {"GovernorID": "111", "GovernorName": "Current"},
+                "Alt 1": {"GovernorID": "222", "GovernorName": "Target One"},
+                "Alt 2": {"GovernorID": "333", "GovernorName": "Target Two"},
+            }
+        )
+
+    monkeypatch.setattr("ark.registration_flow.get_match", _get_match)
+    monkeypatch.setattr("ark.registration_flow.get_roster", _get_roster)
+    monkeypatch.setattr(
+        "ark.registration_flow.get_account_summary_for_user",
+        _get_account_summary_stub,
+    )
+    monkeypatch.setattr(controller, "refresh_registration_message", lambda *_a, **_k: None)
+
+    await controller.switch(interaction)
+
+    assert interaction.original_edits == []
+    assert interaction.followup.sent
+    assert "Current governor selected" in interaction.followup.sent[0]["content"]
+    assert any(msg.get("view") is not None for msg in interaction.followup.sent)
+
+
+@pytest.mark.asyncio
 async def test_join_blocks_when_user_already_signed_up(monkeypatch):
     controller = ArkRegistrationController(match_id=17, config={"PlayersCap": 30, "SubsCap": 15})
     interaction = DummyInteraction()
@@ -757,7 +831,7 @@ async def test_join_blocks_when_user_already_signed_up(monkeypatch):
 
     called = {"prompt": False}
 
-    async def _prompt(interaction, *, accounts, on_select, heading, only_governor_ids=None):
+    async def _prompt(interaction, *, accounts, on_select, heading, only_governor_ids=None, **_k):
         called["prompt"] = True
         await on_select(interaction, "2441482")
 

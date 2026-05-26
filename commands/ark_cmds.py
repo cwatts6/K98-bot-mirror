@@ -65,7 +65,12 @@ from core.interaction_safety import safe_command, safe_defer
 from decoraters import channel_only, is_admin_or_leadership_only, track_usage
 from ui.views.ark_reminder_prefs_view import ArkReminderPrefsView  # NEW
 from ui.views.ark_report_view import ArkReportPlayersView
-from ui.views.ark_views import AmendArkMatchView, CancelArkMatchView, CreateArkMatchView
+from ui.views.ark_views import (
+    AmendArkMatchView,
+    ArkRegistrationMaintenanceView,
+    CancelArkMatchView,
+    CreateArkMatchView,
+)
 from ui.views.team_builder_views import ArkTeamBuilderView
 from versioning import versioned
 
@@ -111,7 +116,7 @@ async def _dispatch_cancel_dms_background(
 def register_ark(bot: ext_commands.Bot) -> None:
     @bot.slash_command(
         name="ark_create_match",
-        description="Create an Ark of Osiris match (leadership)",
+        description="Set up an Ark of Osiris match (leadership)",
         guild_ids=[GUILD_ID],
     )
     @versioned("v1.03")
@@ -253,7 +258,7 @@ def register_ark(bot: ext_commands.Bot) -> None:
                 match_id = await create_match(req)
                 if not match_id:
                     await interaction.response.send_message(
-                        "❌ Failed to create match in SQL.", ephemeral=True
+                        "❌ Failed to save match.", ephemeral=True
                     )
                     return
 
@@ -312,60 +317,124 @@ def register_ark(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def ark_force_announce(
         ctx: discord.ApplicationContext,
-        match_id: int = discord.Option(int, "Ark match ID"),
+        match_id: int = discord.Option(
+            int,
+            "Optional Ark match ID fallback when the match is not in the dropdown",
+            required=False,
+            default=0,
+            min_value=1,
+        ),
     ):
         await safe_defer(ctx, ephemeral=True)
 
         config = await get_config()
         if not config:
             await ctx.interaction.edit_original_response(
-                content="❌ ArkConfig is missing or invalid. Contact an admin."
+                content="ArkConfig is missing or invalid. Contact an admin."
             )
             return
 
-        match = await get_match(match_id)
-        if not match:
-            await ctx.interaction.edit_original_response(content="❌ Match not found.")
-            return
+        async def _send_registration_result(
+            interaction: discord.Interaction,
+            *,
+            match_id: int,
+            announce: bool,
+        ) -> None:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
 
-        if (match.get("Status") or "").lower() in {
-            ARK_MATCH_STATUS_CANCELLED.lower(),
-            ARK_MATCH_STATUS_COMPLETED.lower(),
-        }:
-            await ctx.interaction.edit_original_response(
-                content="❌ Match is cancelled or completed."
+            match = await get_match(match_id)
+            if not match:
+                await interaction.followup.send("Match not found.", ephemeral=True)
+                return
+
+            if (match.get("Status") or "").lower() in {
+                ARK_MATCH_STATUS_CANCELLED.lower(),
+                ARK_MATCH_STATUS_COMPLETED.lower(),
+            }:
+                await interaction.followup.send(
+                    "Match is cancelled or completed.", ephemeral=True
+                )
+                return
+
+            controller = ArkRegistrationController(match_id=int(match_id), config=config)
+            msg_ref = await controller.ensure_registration_message(
+                client=interaction.client,
+                announce=announce,
+                force_announce=announce,
+                force_repost=announce,
+                target_channel_id=match.get("RegistrationChannelId"),
+                update_refresh_timestamp=True,
+            )
+            if not msg_ref:
+                await interaction.followup.send(
+                    "Failed to refresh the registration message.", ephemeral=True
+                )
+                return
+
+            await insert_audit_log(
+                action_type=(
+                    "registration_force_announce" if announce else "registration_manual_refresh"
+                ),
+                actor_discord_id=interaction.user.id,
+                match_id=int(match_id),
+                governor_id=None,
+                details_json={"source": "CommandDropdown"},
+            )
+
+            action = "announcement reposted" if announce else "signup embed refreshed"
+            await interaction.followup.send(
+                (
+                    f"Registration {action}: "
+                    f"https://discord.com/channels/{ctx.guild_id}/{msg_ref.channel_id}/{msg_ref.message_id}"
+                ),
+                ephemeral=True,
+            )
+
+        async def _on_refresh(interaction: discord.Interaction, sel):
+            await _send_registration_result(
+                interaction,
+                match_id=int(sel.match_id),
+                announce=False,
+            )
+
+        async def _on_force_announce(interaction: discord.Interaction, sel):
+            await _send_registration_result(
+                interaction,
+                match_id=int(sel.match_id),
+                announce=True,
+            )
+
+        async def _on_cancel(interaction: discord.Interaction):
+            await interaction.response.edit_message(content="Closed.", view=None)
+
+        manual_match_id = match_id if isinstance(match_id, int) and match_id > 0 else 0
+        if manual_match_id:
+            await _send_registration_result(
+                ctx.interaction,
+                match_id=int(manual_match_id),
+                announce=True,
             )
             return
 
-        controller = ArkRegistrationController(match_id=int(match_id), config=config)
-        msg_ref = await controller.ensure_registration_message(
-            client=ctx.interaction.client,
-            announce=True,
-            force_announce=True,
-            force_repost=True,
-            target_channel_id=match.get("RegistrationChannelId"),
-            update_refresh_timestamp=True,
-        )
-        if not msg_ref:
-            await ctx.interaction.edit_original_response(
-                content="❌ Failed to repost the registration message."
-            )
+        matches = await list_open_matches()
+        if not matches:
+            await ctx.interaction.edit_original_response(content="No active Ark matches found.")
             return
 
-        await insert_audit_log(
-            action_type="registration_force_announce",
-            actor_discord_id=ctx.user.id,
-            match_id=int(match_id),
-            governor_id=None,
-            details_json={"source": "Command"},
+        view = ArkRegistrationMaintenanceView(
+            author_id=ctx.user.id,
+            matches=matches,
+            on_refresh=_on_refresh,
+            on_force_announce=_on_force_announce,
+            on_cancel=_on_cancel,
         )
 
         await ctx.interaction.edit_original_response(
-            content=(
-                "✅ Registration announcement reposted: "
-                f"https://discord.com/channels/{ctx.guild_id}/{msg_ref.channel_id}/{msg_ref.message_id}"
-            )
+            content="Pick an active Ark match, then choose refresh or force announce:",
+            view=view,
         )
+        return
 
     @bot.slash_command(
         name="ark_amend_match",
@@ -590,7 +659,7 @@ def register_ark(bot: ext_commands.Bot) -> None:
         )
 
         await ctx.interaction.edit_original_response(
-            content="Select a match and the fields to amend:",
+            content="Pick a match and the fields to amend:",
             view=view,
         )
 
@@ -717,7 +786,7 @@ def register_ark(bot: ext_commands.Bot) -> None:
         )
 
         await ctx.interaction.edit_original_response(
-            content="Select a match to cancel:",
+            content="Pick a match to cancel:",
             view=view,
         )
 

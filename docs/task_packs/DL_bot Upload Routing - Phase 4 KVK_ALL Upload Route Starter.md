@@ -13,9 +13,56 @@ We are starting Phase 4 of the DL_bot upload-routing optimisation programme afte
 - Phase 3 local validation blockers were audited and closed as a no-op after the focused blocker
   tests, full suite, and log-noise validation all passed under `.venv`.
 
-Phase 4 is the next higher-blast-radius upload-routing slice: extract the KVK_ALL upload route from
-the root `DL_bot.py` listener into the established `upload_routes` pattern while preserving current
-production behaviour.
+## Completion Note
+
+Status: complete in PR 110 (`codex/kvk-all-upload-route`), smoke tested successfully on
+2026-05-26, and promoted to production.
+
+Phase 4 extracted the KVK_ALL upload route from the root `DL_bot.py` listener into
+`upload_routes/kvk_all_route.py` while preserving current production behaviour.
+
+Delivered behaviour:
+
+- `DL_bot.py` delegates KVK_ALL message handling to `handle_kvk_all_upload()` and keeps only
+  listener/event plumbing for this route.
+- KVK_ALL attachment filtering, SQL preflight, offload dispatch, result interpretation, embed
+  rendering, sheet link button, per-attachment continuation, and auto-export scheduling are covered
+  by focused route tests in `tests/test_kvk_all_upload_route.py`.
+- Current Discord output, importer contract, structured failure handling, health line, and
+  fall-through behaviour were preserved.
+- The SQL preflight review fix relies on `ensure_sql_headroom_or_notify()` for the user-facing
+  abort notification and avoids emitting a duplicate route-level abort embed.
+- No SQL schema, stored procedure, view, export contract, or workbook-format changes were made.
+
+Validation evidence included:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests/test_kvk_all_upload_route.py
+.\.venv\Scripts\python.exe -m pytest -q tests/test_player_location_upload_route.py tests/test_prekvk_upload_route.py
+.\.venv\Scripts\python.exe -m pytest -q tests/test_kvk_all_importer.py tests/test_kvk_all_import_dal.py tests/test_kvk_all_import_service.py tests/test_kvk_all_schema.py tests/test_kvk_export_service.py
+.\.venv\Scripts\python.exe -m pytest -q tests/test_kvk_all_recompute_sql_contract.py
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pre_commit run -a
+.\.venv\Scripts\python.exe -m pytest -q tests
+```
+
+Observed full-suite result after review fix: `1473 passed, 2 skipped`.
+
+Smoke evidence from production confirmed the route handled a KVK_ALL workbook, passed SQL
+preflight, staged/imported Full Data, scheduled auto-export for KVK 15 Scan 31, and wrote the
+expected Google Sheets export tabs.
+
+Phase 5 remaining fast-path upload-route consolidation is the next upload-routing programme slice.
+
+## Original Goal
+
+Phase 4 was the next higher-blast-radius upload-routing slice: extract the KVK_ALL upload route
+from the root `DL_bot.py` listener into the established `upload_routes` pattern while preserving
+current production behaviour.
 
 ## Goal
 

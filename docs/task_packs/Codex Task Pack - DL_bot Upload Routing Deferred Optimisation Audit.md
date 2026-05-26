@@ -48,13 +48,17 @@ PR 96 (`import-locations-command-orchestration-cleanup`) was smoke tested succes
 
 The `/import_locations` command cleanup is complete. This task is fresh work around `DL_bot.py` upload routing and related validation blockers.
 
-Current `DL_bot.py` still contains multiple fast-path upload routes inside the root `on_message` listener, including player location CSV import, PreKvK snapshot ingest, KVK Honour ingest, weekly activity import, rally import, KVK_ALL import, and fallback monitored-channel queueing.
+Current `DL_bot.py` still contains multiple fast-path upload routes inside the root `on_message`
+listener. Player location CSV import, PreKvK snapshot ingest, and KVK_ALL import have been
+extracted into the `upload_routes` pattern; MGE results import, KVK Honour ingest, weekly activity
+import, rally forts import, inventory upload-first routing, and fallback monitored-channel queueing
+remain inline.
 
 The active deferred backlog identifies these DL_bot-specific architecture items:
 
 - PreKvK upload routing still mixes filename matching, KVK lookup, offload dispatch, and Discord rendering.
 - Player location CSV auto-import still couples `DL_bot.py` to `commands/location_cmds.py` refresh signalling.
-- KVK_ALL upload routing still mixes attachment filtering, import handling, Discord rendering, and export scheduling.
+- KVK_ALL upload routing was extracted in Phase 4 and no longer lives inline in `DL_bot.py`.
 - Local validation previously had DB and non-DB environment blockers that affected safe PR
   validation; Phase 3 later audited these and closed them as a no-op after current `main` passed
   focused blocker tests, full pytest, and log-noise validation.
@@ -131,7 +135,7 @@ The active deferred backlog identifies these DL_bot-specific architecture items:
 - Suggested Fix: Move KVK_ALL upload orchestration into a dedicated service or route module in a later phase, leaving `DL_bot.py` responsible for event delegation and Discord response plumbing.
 - Impact: medium
 - Risk: medium
-- Dependencies: Preserve existing Discord output and auto-export behaviour.
+- Dependencies: Resolved by Phase 4 in PR 110 (`codex/kvk-all-upload-route`); KVK_ALL now delegates to `upload_routes/kvk_all_route.py` and preserves existing Discord output and auto-export behaviour.
 ```
 
 7. Codex Skills To Use
@@ -299,13 +303,19 @@ Phase breakdown:
      environment blocker tests passed (`20 passed`), full pytest passed (`1461 passed, 2 skipped`),
      and pytest log-noise validation passed with production operational logs unchanged.
 6. **Phase 4 - KVK_ALL upload route**
-   - Extract the higher-risk multi-attachment KVK_ALL route after smaller routes prove the pattern.
-   - Preserve structured importer failures, health output, link button, and auto-export scheduling.
+   - Completed in PR 110 (`codex/kvk-all-upload-route`) and smoke tested successfully on
+     2026-05-26.
+   - Extracted the higher-risk multi-attachment KVK_ALL route into
+     `upload_routes/kvk_all_route.py` after smaller routes proved the pattern.
+   - Preserved structured importer failures, health output, link button, and auto-export
+     scheduling.
    - Starter packet: `docs/task_packs/DL_bot Upload Routing - Phase 4 KVK_ALL Upload Route Starter.md`
 7. **Phase 5 - Remaining upload fast-path consolidation**
-   - Consolidate MGE, honor, weekly activity, rally, inventory, fallback queueing, shared
-     SQL-preflight/offload handling, shared import embed rendering, and route-level structured
-     logging into the general upload-routing layer.
+   - Next active slice.
+   - Audit and consolidate MGE, honor, weekly activity, rally, inventory, fallback queueing,
+     shared SQL-preflight/offload handling, shared import embed rendering where safe, and
+     route-level structured logging into the general upload-routing layer.
+   - Starter packet: `docs/task_packs/DL_bot Upload Routing - Phase 5 Remaining Upload Fast Paths Starter.md`
 8. **Phase 6 - Startup/lifecycle separation**
    - Audit and optimise `DL_bot.py` lifecycle/startup responsibilities alongside a full
      `bot_instance.py` review.
@@ -334,7 +344,19 @@ Phase 3 delivery notes:
 - No bot code, SQL, tests, deployment scripts, or upload-routing behaviour changed.
 - The two validation-blocker deferred items were removed from the active backlog after the focused
   blocker reproductions, full test suite, and log-noise validation all passed under `.venv`.
-- Phase 4 KVK_ALL upload-route extraction is now the next active upload-routing programme slice.
+
+Phase 4 delivery notes:
+
+- KVK_ALL upload routing is extracted into the `upload_routes` pattern with `DL_bot.py` retaining
+  listener/delegation responsibility.
+- The route preserves accepted `.xlsx`, `.xls`, and `.csv` attachment filtering, no-file warning
+  output, per-attachment continuation, SQL preflight behaviour, structured importer failure
+  rendering, success/warning embeds, branding thumbnail, Google Sheet link button, and non-blocking
+  auto-export scheduling.
+- The SQL preflight review fix intentionally relies on `ensure_sql_headroom_or_notify()` for the
+  user-facing abort notification and does not emit a duplicate route-level abort embed.
+- PR 110 (`codex/kvk-all-upload-route`) was smoke tested successfully and promoted to production.
+- Phase 5 remaining fast-path consolidation is now the next active upload-routing programme slice.
 
 14. Testing Requirements
 

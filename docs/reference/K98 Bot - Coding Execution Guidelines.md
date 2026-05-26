@@ -304,7 +304,28 @@ Additional rules:
 
 See `K98 Bot - Testing Standards.md` for the fuller matrix.
 
-## 15. Output Format For Delivered Work
+## 15. AI Review Gates
+
+Before PR handoff, run or justify skipping these AI-assisted review gates:
+
+- CodeRabbit follow-up review for non-trivial code changes.
+- Codex Security review when security-sensitive surfaces are touched.
+
+Security-sensitive surfaces include:
+
+- permission checks or role boundaries
+- Discord commands, views, modals, callbacks, or user-facing interaction flows
+- SQL/data access, imports, exports, reports, or SQL-backed caches
+- file handling, path handling, uploads, downloads, archives, or generated artifacts
+- secrets, tokens, environment variables, runtime config, or deployment scripts
+- network calls, webhooks, external integrations, or user-controlled input parsing
+- restart-sensitive persistence, rehydration, scheduler state, or duplicate-action prevention
+
+For documentation-only, comment-only, or purely mechanical changes, these gates may be skipped
+when the skip is stated in the delivery output. If either review reports actionable issues, fix
+only issues within the approved scope unless the user approves expanding the task.
+
+## 16. Output Format For Delivered Work
 
 When delivering code or a task pack, provide:
 
@@ -315,12 +336,13 @@ When delivering code or a task pack, provide:
 5. refactor findings in touched areas
 6. test plan and commands run
 7. deployment / migration order
-8. follow-on debt or deferred improvements
+8. CodeRabbit and Codex Security review status, including skip reasons
+9. follow-on debt or deferred improvements
 
 For documentation-only changes, state that no runtime code, SQL, helper reuse, or restart behaviour
 changed.
 
-## 16. Definition Of Done
+## 17. Definition Of Done
 
 A task is done only when:
 
@@ -336,9 +358,11 @@ A task is done only when:
 - [ ] restart safety is preserved
 - [ ] tests were added, updated, or explicitly ruled out
 - [ ] quality gates were considered
+- [ ] CodeRabbit review was run or explicitly skipped
+- [ ] Codex Security review was run or explicitly skipped based on risk triggers
 - [ ] deferred debt is captured using the Deferred Optimisation Framework format
 
-## 17. Quality Gates
+## 18. Quality Gates
 
 Run or recommend these before completion:
 
@@ -354,7 +378,14 @@ python scripts/validate_command_registration.py
 For SQL-heavy, configuration-heavy, or domain-specific tasks, also include targeted validation
 commands relevant to the subsystem.
 
-## 18. If Uncertain
+Add AI-assisted review gates before PR handoff:
+
+- CodeRabbit follow-up review for non-trivial code changes.
+- Codex Security review for changes touching the security-sensitive surfaces listed in section 15.
+
+If a gate is skipped, record the reason in the delivery output.
+
+## 19. If Uncertain
 
 When unsure:
 

@@ -57,6 +57,15 @@ Ability to consider:
 - local validation
 - production promotion and migration order
 
+### AI-Assisted Review Judgement
+
+Ability to:
+
+- use CodeRabbit as a follow-up reviewer for non-trivial code changes before PR handoff
+- use Codex Security when security-sensitive surfaces are touched
+- distinguish review gates from tests and avoid replacing local validation with AI review
+- document clear skip reasons for documentation-only, comment-only, or mechanical changes
+
 ## 2. Refactor Triggers
 
 These triggers should prompt cleanup in the touched area or a structured deferred item.
@@ -114,6 +123,18 @@ Expected response:
 - update tests as part of the refactor
 - do not leave tests describing old layer boundaries
 
+### Trigger H - Security-Sensitive Surface Touched
+
+Security-sensitive surfaces include permissions, Discord interactions, SQL/data access, file
+handling, secrets/config, deployment, network calls, user-controlled input, and restart-sensitive
+persistence.
+
+Expected response:
+
+- run or justify skipping Codex Security review before PR handoff
+- fix validated issues within the approved scope
+- capture larger out-of-scope security hardening work using the Deferred Optimisation Framework
+
 ## 3. Review Questions Before Coding
 
 1. Which layer should own this behaviour?
@@ -124,7 +145,8 @@ Expected response:
 6. What state must survive restart?
 7. What test types are required?
 8. Which conditional reference docs apply?
-9. What technical debt is obvious enough that leaving it untouched would likely repeat the
+9. Does the task trigger CodeRabbit or Codex Security review gates?
+10. What technical debt is obvious enough that leaving it untouched would likely repeat the
    problem later?
 
 ## 4. Review Questions Before Marking Complete
@@ -136,6 +158,7 @@ Expected response:
 5. Did I explicitly list any debt I chose not to fix?
 6. Would another engineer understand the flow from logs if it failed in production?
 7. Would the feature still behave correctly after a restart?
+8. Were CodeRabbit and Codex Security run or explicitly skipped with reasons?
 
 ## 5. Practical Use In Task Packs
 
@@ -168,6 +191,7 @@ Before completion:
 - [ ] tests added, updated, or explicitly ruled out
 - [ ] logging adequate
 - [ ] restart safety preserved
+- [ ] CodeRabbit and Codex Security review gates run or skipped with reasons
 - [ ] follow-on debt listed if still present
 
 ## 7. Deferred Optimisation Handling

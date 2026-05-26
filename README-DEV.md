@@ -21,6 +21,13 @@ pytest -q tests
 python scripts/analyse_pytest_log_noise.py
 ```
 
+Before PR handoff, also run or justify skipping these AI-assisted review gates:
+
+- CodeRabbit follow-up review for non-trivial code changes.
+- Codex Security review when the change touches permissions, Discord interactions, SQL/data
+  access, file handling, secrets/config, deployment, network calls, user-controlled input, or
+  restart-sensitive persistence.
+
 `pytest` runs are isolated from production operational log files. Expected negative-path logs
 remain visible through pytest output and `caplog`; when a saved audit artifact is needed, capture
 the run explicitly, for example:
