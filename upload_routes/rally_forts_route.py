@@ -42,6 +42,19 @@ def _load_importers() -> tuple[Callable[..., Any], Callable[..., Any]]:
     return import_rally_alltime_xlsx, import_rally_daily_xlsx
 
 
+def _safe_attachment_filename(filename: str) -> str | None:
+    safe_name = os.path.basename(filename)
+    if (
+        not safe_name
+        or safe_name in {".", ".."}
+        or safe_name != filename
+        or "/" in filename
+        or "\\" in filename
+    ):
+        return None
+    return safe_name
+
+
 async def handle_rally_forts_upload(message: Any, deps: RallyFortsRouteDeps) -> bool:
     """Handle Rally Forts XLSX imports from the configured Fort Rally channel."""
     if message.channel.id != deps.fort_rally_channel_id or not message.attachments:
@@ -53,15 +66,6 @@ async def handle_rally_forts_upload(message: Any, deps: RallyFortsRouteDeps) -> 
         logger,
         "rally_forts_upload",
     )
-
-    if not deps.fort_rally_channel_id:
-        await deps.send_embed(
-            notify_ch,
-            "Rally Forts Import \u274c",
-            {"Error": "FORT_RALLY_CHANNEL_ID is 0 (unset). Check .env/bot_config."},
-            0xE74C3C,
-        )
-        return True
 
     try:
         importer_loader = deps.importer_loader or _load_importers
@@ -90,10 +94,16 @@ async def handle_rally_forts_upload(message: Any, deps: RallyFortsRouteDeps) -> 
         if not attachment.filename.lower().endswith(".xlsx"):
             continue
 
-        local_path = os.path.join(downloads_dir, attachment.filename)
+        filename = attachment.filename
+        safe_filename = _safe_attachment_filename(filename)
+        if safe_filename is None:
+            logger.warning("[RALLY] Rejected unsafe attachment filename: %r", filename)
+            results.append(("err", filename, "Unsafe attachment filename"))
+            continue
+
+        local_path = os.path.join(downloads_dir, safe_filename)
         try:
             await attachment.save(local_path)
-            filename = attachment.filename
             logger.info("[RALLY] Saved %s to %s", filename, local_path)
 
             if is_rally_alltime(filename):

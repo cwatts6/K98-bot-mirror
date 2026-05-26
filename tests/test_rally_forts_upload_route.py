@@ -152,6 +152,17 @@ async def test_rally_route_ignores_empty_attachments(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_rally_route_zero_channel_id_falls_through(tmp_path):
+    deps, sent, offloads, _created, _preflight = _deps(tmp_path, fort_rally_channel_id=0)
+
+    handled = await route.handle_rally_forts_upload(_message(channel_id=10), deps)
+
+    assert handled is False
+    assert sent == []
+    assert offloads == []
+
+
+@pytest.mark.asyncio
 async def test_rally_route_no_xlsx_warns_and_handles(tmp_path):
     deps, sent, offloads, _created, _preflight = _deps(tmp_path)
 
@@ -266,9 +277,7 @@ async def test_rally_sql_preflight_abort_happens_after_save_before_offload(tmp_p
     assert created == []
     _ch, title, fields, color, _mention = sent[-1]
     assert title == "Rally Forts Import \u274c"
-    assert fields["\u274c Rally_data_26-05-2026.xlsx"] == (
-        "Aborted: SQL log headroom insufficient"
-    )
+    assert fields["\u274c Rally_data_26-05-2026.xlsx"] == ("Aborted: SQL log headroom insufficient")
     assert color == 0xE74C3C
 
 
@@ -277,9 +286,7 @@ async def test_rally_unrecognized_xlsx_is_saved_and_reported_as_skip(tmp_path):
     attachment = _FakeAttachment("rally_notes.xlsx")
     deps, sent, offloads, created, _preflight = _deps(tmp_path)
 
-    handled = await route.handle_rally_forts_upload(
-        _message(attachments=[attachment]), deps
-    )
+    handled = await route.handle_rally_forts_upload(_message(attachments=[attachment]), deps)
 
     assert handled is True
     assert attachment.saved_paths == [os.path.join(str(tmp_path), "downloads", "rally_notes.xlsx")]
@@ -288,6 +295,24 @@ async def test_rally_unrecognized_xlsx_is_saved_and_reported_as_skip(tmp_path):
     _ch, title, fields, color, _mention = sent[-1]
     assert title == "Rally Forts Import \u274c"
     assert fields["\u23ed\ufe0f rally_notes.xlsx"] == "Unrecognized rally filename"
+    assert color == 0xE74C3C
+
+
+@pytest.mark.asyncio
+async def test_rally_unsafe_attachment_filename_is_rejected_before_save(tmp_path):
+    attachment = _FakeAttachment("..\\Rally_data_26-05-2026.xlsx")
+    deps, sent, offloads, created, preflight = _deps(tmp_path)
+
+    handled = await route.handle_rally_forts_upload(_message(attachments=[attachment]), deps)
+
+    assert handled is True
+    assert attachment.saved_paths == []
+    assert preflight == []
+    assert offloads == []
+    assert created == []
+    _ch, title, fields, color, _mention = sent[-1]
+    assert title == "Rally Forts Import \u274c"
+    assert fields["\u274c ..\\Rally_data_26-05-2026.xlsx"] == "Unsafe attachment filename"
     assert color == 0xE74C3C
 
 
