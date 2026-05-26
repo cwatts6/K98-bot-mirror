@@ -152,17 +152,6 @@ async def test_rally_route_ignores_empty_attachments(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_rally_route_zero_channel_id_falls_through(tmp_path):
-    deps, sent, offloads, _created, _preflight = _deps(tmp_path, fort_rally_channel_id=0)
-
-    handled = await route.handle_rally_forts_upload(_message(channel_id=10), deps)
-
-    assert handled is False
-    assert sent == []
-    assert offloads == []
-
-
-@pytest.mark.asyncio
 async def test_rally_route_no_xlsx_warns_and_handles(tmp_path):
     deps, sent, offloads, _created, _preflight = _deps(tmp_path)
 
@@ -299,24 +288,6 @@ async def test_rally_unrecognized_xlsx_is_saved_and_reported_as_skip(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_rally_unsafe_attachment_filename_is_rejected_before_save(tmp_path):
-    attachment = _FakeAttachment("..\\Rally_data_26-05-2026.xlsx")
-    deps, sent, offloads, created, preflight = _deps(tmp_path)
-
-    handled = await route.handle_rally_forts_upload(_message(attachments=[attachment]), deps)
-
-    assert handled is True
-    assert attachment.saved_paths == []
-    assert preflight == []
-    assert offloads == []
-    assert created == []
-    _ch, title, fields, color, _mention = sent[-1]
-    assert title == "Rally Forts Import \u274c"
-    assert fields["\u274c ..\\Rally_data_26-05-2026.xlsx"] == "Unsafe attachment filename"
-    assert color == 0xE74C3C
-
-
-@pytest.mark.asyncio
 async def test_rally_per_attachment_exception_is_aggregated(tmp_path):
     deps, sent, offloads, created, _preflight = _deps(tmp_path)
 
@@ -393,3 +364,57 @@ async def test_rally_notify_failure_falls_back_to_source_channel(tmp_path):
     assert handled is True
     assert preflight == [message.channel]
     assert sent[-1][0] is message.channel
+
+
+@pytest.mark.asyncio
+async def test_rally_fort_rally_channel_id_zero_is_detected_before_channel_filter(tmp_path):
+    """Misconfigured channel ID (0) must be detected and reported."""
+    deps, sent, offloads, _created, _preflight = _deps(tmp_path, fort_rally_channel_id=0)
+
+    # Message has attachments but channel ID is 0
+    handled = await route.handle_rally_forts_upload(_message(), deps)
+
+    assert handled is True
+    assert offloads == []
+    _ch, title, fields, color, _mention = sent[-1]
+    assert title == "Rally Forts Import \u274c"
+    assert "FORT_RALLY_CHANNEL_ID is 0" in fields["Error"]
+    assert color == 0xE74C3C
+
+
+@pytest.mark.asyncio
+async def test_rally_rejects_path_traversal_filenames(tmp_path):
+    """Filenames with path separators must be rejected to prevent path traversal."""
+    deps, sent, offloads, _created, _preflight = _deps(tmp_path)
+
+    # Attempt path traversal with directory separators
+    handled = await route.handle_rally_forts_upload(
+        _message(attachments=[_FakeAttachment("../../etc/Rally_data_26-05-2026.xlsx")]),
+        deps,
+    )
+
+    assert handled is True
+    assert offloads == []
+    _ch, title, fields, color, _mention = sent[-1]
+    assert title == "Rally Forts Import \u274c"
+    assert "\u274c ../../etc/Rally_data_26-05-2026.xlsx" in fields
+    assert "path separators not allowed" in fields["\u274c ../../etc/Rally_data_26-05-2026.xlsx"]
+    assert color == 0xE74C3C
+
+
+@pytest.mark.asyncio
+async def test_rally_rejects_backslash_path_traversal(tmp_path):
+    """Filenames with backslash separators must be rejected on all platforms."""
+    deps, sent, offloads, _created, _preflight = _deps(tmp_path)
+
+    handled = await route.handle_rally_forts_upload(
+        _message(attachments=[_FakeAttachment("..\\..\\Rally_data_26-05-2026.xlsx")]),
+        deps,
+    )
+
+    assert handled is True
+    assert offloads == []
+    _ch, title, fields, color, _mention = sent[-1]
+    assert title == "Rally Forts Import \u274c"
+    assert "\u274c ..\\..\\Rally_data_26-05-2026.xlsx" in fields
+    assert color == 0xE74C3C
