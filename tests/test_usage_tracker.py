@@ -44,7 +44,7 @@ def test_global_usage_tracker_preserves_decorator_flush_settings(monkeypatch):
     assert tracker.batch_size == 20
 
 
-def test_decorater_usage_tracker_uses_shared_global_tracker(monkeypatch):
+def test_decorator_usage_tracker_uses_shared_global_tracker(monkeypatch):
     """Decorators and startup use the same tracker instance."""
     monkeypatch.setattr(usage_tracker_module, "_GLOBAL_TRACKER", None)
 
