@@ -1808,7 +1808,7 @@ async def _run_ready_runtime_services() -> None:
             health_dashboard_task.start()
             logger.info("[BOOT] Health dashboard task started")
     except Exception:
-        logger.error("[BOOT] Failed to start health_dashboard_task: {e}")
+        logger.exception("[BOOT] Failed to start health_dashboard_task")
 
     # Start offload monitor as a supervised TaskMonitor task if available
     try:
