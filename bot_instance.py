@@ -35,20 +35,14 @@ from bot_config import (
     UTC_CLOCK_CHANNEL_ID,
 )
 from bot_helpers import (
-    commands_changed,
     connection_watchdog,
-    get_command_signature,
-    load_command_signatures,
     prune_restart_log,
     queue_cleanup_loop,
     queue_worker,
-    save_command_signatures,
 )
 from bot_loader import bot
 from bot_startup_gate import claim_startup_once
-from commands.command_inventory import flatten_application_commands
 from constants import (
-    COMMAND_CACHE_FILE,
     CREDENTIALS_FILE,
     CSV_LOG,
     DATABASE,
@@ -65,6 +59,7 @@ from constants import (
     SUMMARY_LOG,
     USERNAME,
 )
+from core.command_lifecycle import run_ready_command_sync
 from core.interaction_safety import get_operation_lock
 from core.startup_lifecycle import StartupPhase, run_startup_phases
 from crystaltech_di import init_crystaltech_service
@@ -1545,70 +1540,7 @@ async def on_ready():
 
     try:
         logger.info(f"✅ Bot is ready – logged in as {bot.user} (ID: {bot.user.id})")
-
-        commands = list(bot.application_commands)
-        signature_commands = list(flatten_application_commands(commands))
-        current_signatures = [
-            sig
-            for name, cmd in signature_commands
-            if (sig := get_command_signature(cmd, name=name)) is not None
-        ]
-
-        logger.info("🧪 Reading command cache file...")
-        saved_signatures = load_command_signatures(filepath=COMMAND_CACHE_FILE)
-        logger.info("✅ Command cache loaded")
-
-        try:
-            result = commands_changed(current_signatures, saved_signatures)
-            logger.info(f"✅ commands_changed result: {result}")
-        except Exception:
-            logger.exception("💥 Exception in commands_changed")
-            result = False
-
-        if bool(result):
-            logger.info(
-                f"[DEBUG] Slash commands changed — syncing to GUILD_ID={os.getenv('GUILD_ID')}"
-            )
-            gid_env = os.getenv("GUILD_ID")
-            try:
-                if gid_env:
-                    gid = int(gid_env)
-                    try:
-                        await asyncio.wait_for(bot.sync_commands(guild_ids=[gid]), timeout=10.0)
-                        logger.info("[DEBUG] Commands synced successfully")
-                    except TimeoutError:
-                        logger.warning("[WARN] Command sync timed out — skipping for now.")
-                        try:
-                            emit_telemetry_event(
-                                {
-                                    "event": "command_sync",
-                                    "status": "timeout",
-                                    "guild_id": gid,
-                                    "orphaned_offload_possible": False,
-                                }
-                            )
-                        except Exception:
-                            logger.debug(
-                                "[TELEMETRY] Failed to emit command_sync timeout telemetry",
-                                exc_info=True,
-                            )
-                    except Exception as e:
-                        logger.warning(f"[WARN] Command sync failed: {e}")
-                else:
-                    logger.warning("[WARN] GUILD_ID not set; skipping scoped sync.")
-            except ValueError:
-                logger.warning("[WARN] GUILD_ID is not an integer; skipping scoped sync.")
-            except Exception as e:
-                logger.warning(f"[WARN] Command sync failed: {e}")
-
-            save_command_signatures(current_signatures, filepath=COMMAND_CACHE_FILE)
-            logger.warning("🔁 Slash commands changed — updated cache")
-        else:
-            logger.warning("⏩ Slash commands unchanged — skipping sync and update.")
-
-        logger.warning("📋 Loaded slash commands:")
-        for name, cmd in signature_commands:
-            logger.warning(f" - /{name} – {cmd.description}")
+        await run_startup_phases([StartupPhase("ready_command_sync", _run_ready_command_sync)])
 
         logger.info(f"[REMINDER_CACHE] Attempting to load from {REMINDER_TRACKING_FILE}")
         loaded_ids = await load_active_reminders(bot)
@@ -1793,6 +1725,10 @@ async def _run_ready_runtime_bootstrap() -> None:
         _drop_console_handlers_once()
     except Exception:
         pass
+
+
+async def _run_ready_command_sync() -> None:
+    await run_ready_command_sync(bot)
 
 
 async def _run_ready_runtime_services() -> None:

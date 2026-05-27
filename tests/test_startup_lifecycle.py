@@ -47,27 +47,45 @@ def test_on_ready_uses_named_startup_lifecycle_boundary():
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "on_ready"
     )
 
-    runner_call = next(
+    startup_phase_names = []
+    runner_calls = [
         node
         for node in ast.walk(on_ready)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "run_startup_phases"
-    )
-    phases_arg = runner_call.args[0]
-    assert isinstance(phases_arg, ast.List)
+    ]
+    assert runner_calls
 
-    startup_phase_names = []
-    for phase_call in phases_arg.elts:
-        assert isinstance(phase_call, ast.Call)
-        assert isinstance(phase_call.func, ast.Name)
-        assert phase_call.func.id == "StartupPhase"
-        assert phase_call.args
-        assert isinstance(phase_call.args[0], ast.Constant)
-        assert isinstance(phase_call.args[0].value, str)
-        startup_phase_names.append(phase_call.args[0].value)
+    for runner_call in runner_calls:
+        phases_arg = runner_call.args[0]
+        assert isinstance(phases_arg, ast.List)
+        for phase_call in phases_arg.elts:
+            assert isinstance(phase_call, ast.Call)
+            assert isinstance(phase_call.func, ast.Name)
+            assert phase_call.func.id == "StartupPhase"
+            assert phase_call.args
+            assert isinstance(phase_call.args[0], ast.Constant)
+            assert isinstance(phase_call.args[0].value, str)
+            startup_phase_names.append(phase_call.args[0].value)
 
-    assert startup_phase_names == ["ready_runtime_bootstrap", "ready_runtime_services"]
+    assert startup_phase_names == [
+        "ready_runtime_bootstrap",
+        "ready_runtime_services",
+        "ready_command_sync",
+    ]
+
+
+def test_on_ready_command_sync_lifecycle_uses_dedicated_helper():
+    src = Path("bot_instance.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    command_sync = _async_function(tree, "_run_ready_command_sync")
+    on_ready = _async_function(tree, "on_ready")
+
+    assert _calls_name(command_sync, "run_ready_command_sync")
+    assert not _calls_name(on_ready, "commands_changed")
+    assert not _calls_name(on_ready, "save_command_signatures")
 
 
 def _async_function(tree: ast.AST, name: str) -> ast.AsyncFunctionDef:

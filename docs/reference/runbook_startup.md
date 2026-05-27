@@ -17,6 +17,8 @@ Purpose: describe the bot startup sequence, guardrails, logging setup, and commo
    - `ready_runtime_services` starts heartbeat, health dashboard, offload monitor, image-show
      safety patching, legacy lock cleanup, the shared usage tracker and usage JSONL prune loop,
      daily summary, activity tracking, and server status channel loops.
+   - `ready_command_sync` owns slash-command signature inventory, command-cache comparison,
+     scoped command sync when signatures change, timeout telemetry, and loaded-command logging.
 9. Caches, rehydration, background tasks, heartbeat, and admin notification start.
 
 ## Main Files
@@ -30,6 +32,7 @@ Purpose: describe the bot startup sequence, guardrails, logging setup, and commo
 - `logging_setup.py`
 - `singleton_lock.py`
 - `Commands.py`
+- `core/command_lifecycle.py`
 
 ## Startup Guards
 
@@ -74,8 +77,10 @@ runtime services/observability startup. Phase 6C consolidated usage tracking ont
 `usage_tracker.py` singleton, with tracker startup and usage JSONL pruning owned by
 `ready_runtime_services`. The unified tracker intentionally uses the previous command/decorator
 cadence of a 5-second flush interval or 20-event batch size for command, component, metric, and
-alert usage events. Remaining lifecycle cleanup includes command/cache extraction, rehydration and
-scheduler boundaries, queue worker lifecycle, and shutdown coordination.
+alert usage events. Phase 6D moved startup command signature/cache/sync handling behind
+`ready_command_sync` and `core/command_lifecycle.py`. Remaining lifecycle cleanup after that
+includes rehydration and scheduler boundaries, queue worker lifecycle, command lifecycle admin
+tooling convergence, and shutdown coordination.
 
 When changing startup, verify restart safety and avoid duplicate task creation.
 

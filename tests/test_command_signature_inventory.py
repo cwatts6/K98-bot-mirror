@@ -24,9 +24,11 @@ def test_get_command_signature_uses_grouped_inventory_name():
 
 
 def test_bot_startup_uses_flattened_command_inventory_for_signatures():
-    source = open("bot_instance.py", encoding="utf-8").read()
+    lifecycle_source = open("core/command_lifecycle.py", encoding="utf-8").read()
+    startup_source = open("bot_instance.py", encoding="utf-8").read()
 
-    assert "from commands.command_inventory import flatten_application_commands" in source
-    assert "signature_commands = list(flatten_application_commands(commands))" in source
-    assert "get_command_signature(cmd, name=name)" in source
-    assert "for name, cmd in signature_commands:" in source
+    assert "from commands.command_inventory import flatten_application_commands" in lifecycle_source
+    assert "signature_commands = list(flatten_application_commands(commands))" in lifecycle_source
+    assert "get_command_signature(cmd, name=name)" in lifecycle_source
+    assert "for name, cmd in signature_commands:" in lifecycle_source
+    assert 'StartupPhase("ready_command_sync", _run_ready_command_sync)' in startup_source

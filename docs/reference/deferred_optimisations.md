@@ -67,6 +67,7 @@ singleton and moved usage JSONL prune startup into `ready_runtime_services`, lea
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 startup/lifecycle ownership, not as a continuation of upload routing. Continue that task from
 `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md` and
+`docs/task_packs/Codex Chat Starter - DL_bot Phase 6D Command Sync Cache.md`, with this backlog and
 the current `K98-bot-mirror` GitHub issues list as supporting context.
 
 ### Deferred Optimisation
@@ -136,7 +137,25 @@ the current `K98-bot-mirror` GitHub issues list as supporting context.
 - Area: `DL_bot.py`, `bot_instance.py` startup and lifecycle
 - Type: architecture
 - Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, task supervision, queue worker startup, live queue rehydration, cache warming, scheduler startup, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, Phase 6A introduced the first named startup lifecycle boundary for the initial `on_ready()` runtime bootstrap, Phase 6B extracted runtime services/observability startup into `ready_runtime_services`, and Phase 6C consolidated usage tracker lifecycle ownership. Remaining `on_ready()` work still mixes command sync/cache handling, event cache and rehydration, scheduler registration, queue worker startup, startup notifications, and later shutdown coordination.
-- Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`. The next PR-sized slice should audit a coherent remaining startup responsibility such as command sync/cache handling or event cache/rehydration boundaries while preserving startup order, idempotency, and production smoke log expectations. Keep queue worker lifecycle and shutdown coordination in later approval-gated slices.
+- Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md` and `docs/task_packs/Codex Chat Starter - DL_bot Phase 6D Command Sync Cache.md`. The next PR-sized slice should audit and extract command signature/cache/sync handling into an explicit lifecycle owner while preserving command registration, cache update, sync timeout, and loaded-command logging behaviour. Keep event cache/rehydration, scheduler startup, queue worker lifecycle, and shutdown coordination in later approval-gated slices.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 5 upload routing, Phase 6A startup lifecycle boundary, Phase 6B runtime services extraction, and Phase 6C usage tracker ownership consolidation are complete in code; proceed with audit/design before each remaining implementation slice.
+
+### Deferred Optimisation
+- Area: `core/command_lifecycle.py`, `commands/admin_cmds.py`, command cache admin tooling
+- Type: architecture
+- Description: Phase 6D establishes a startup command lifecycle owner, but admin command tooling still has separate cache and sync handling in `/ops resync_commands`, `/ops validate_command_cache`, and `/ops show_command_versions`. Those flows intentionally remain out of the conservative startup slice because they include Discord embed UX, permission-gated admin interaction behaviour, and different timeout/output expectations.
+- Suggested Fix: Add a later Phase 6 command-lifecycle slice that reuses `core/command_lifecycle.py` for admin resync, cache validation, and command-version inventory while preserving existing admin-only permissions, ephemeral responses, embed output, timeout behaviour, and operator-facing summaries. Add focused tests for shared startup/admin signature parity, manual resync cache writes, validation output, timeout handling, and command registration smoke coverage.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 6D startup command lifecycle extraction is merged and smoke tested; keep slash-command renaming and command-surface consolidation out of this slice.
+
+### Deferred Optimisation
+- Area: `commands/`, command documentation, `scripts/validate_command_registration.py`
+- Type: architecture
+- Description: The wider command-surface end state remains separate from startup lifecycle ownership. Grouping or retiring slash-command surfaces can reduce Discord's 100-command sync risk, but it affects public/operator command paths, documentation, tests, and rollout communication.
+- Suggested Fix: Scope a standalone command-surface optimisation programme after the Phase 6 lifecycle slices. Group or retire command paths by domain only with operator-approved UX rules, update docs and tests for renamed paths, preserve permissions and autocomplete behaviour, and keep `scripts/validate_command_registration.py` enforcing command-count guardrails. Treat this as a separate wider task, not a startup lifecycle PR.
+- Impact: high
+- Risk: medium
+- Dependencies: Operator approval for command path changes; command lifecycle admin tooling convergence can happen first but is not required for command-surface grouping.
