@@ -28,7 +28,6 @@ from bot_config import (
 )
 from core.interaction_safety import get_operation_lock, safe_command, safe_defer
 from discord.ext import commands as ext_commands
-from commands.command_inventory import flatten_application_commands
 from commands.crystaltech_flow import run_crystaltech_flow
 from commands.telemetry_cmds import (
     _pick_log_source,
@@ -38,7 +37,7 @@ from commands.telemetry_cmds import (
 
 from embed_utils import FailuresView, HistoryView, generate_summary_embed
 from event_calendar.service import get_calendar_service
-from file_utils import append_csv_line, atomic_json_write, read_json_safe, read_summary_log_rows
+from file_utils import append_csv_line, read_json_safe, read_summary_log_rows
 from gsheet_module import check_basic_gsheets_access, run_all_exports
 from logging_setup import CRASH_LOG_PATH, ERROR_LOG_PATH, FULL_LOG_PATH, flush_logs
 from proc_config_import import run_proc_config_import_offload
@@ -722,15 +721,17 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @is_admin_and_notify_channel()
     @track_usage()
     async def resync_commands(ctx):
+        from core.command_lifecycle import command_cache_update, sync_commands_for_guild
+
         async with get_operation_lock("resync"):
             await safe_defer(ctx, ephemeral=True)
 
             # === Sync commands with timeout
-            try:
-                await asyncio.wait_for(bot.sync_commands(guild_ids=[GUILD_ID]), timeout=5.0)
+            sync_result = await sync_commands_for_guild(bot, guild_id=GUILD_ID, timeout_seconds=5.0)
+            if sync_result.ok:
                 logger.info("[COMMAND SYNC] Slash commands successfully resynced.")
-            except TimeoutError:
-                logger.exception("[COMMAND SYNC] Timed out during sync — skipping.")
+            elif sync_result.timed_out:
+                logger.warning("[COMMAND SYNC] Timed out during sync — skipping.")
                 await ctx.interaction.edit_original_response(
                     embed=discord.Embed(
                         title="⚠️ Sync Timed Out",
@@ -739,8 +740,12 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     )
                 )
                 return
-            except Exception as e:
-                logger.exception("[COMMAND SYNC] Resync failed")
+            else:
+                e = sync_result.error or RuntimeError("Unknown command sync failure")
+                logger.error(
+                    "[COMMAND SYNC] Resync failed",
+                    exc_info=(type(e), e, e.__traceback__),
+                )
                 await ctx.interaction.edit_original_response(
                     embed=discord.Embed(
                         title="❌ Sync Failed",
@@ -755,40 +760,28 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 # Load existing cache (if present)
                 try:
                     with open(COMMAND_CACHE_FILE, encoding="utf-8") as f:
-                        old_cache = {cmd["name"]: cmd for cmd in json.load(f)}
+                        old_cache = json.load(f)
                 except FileNotFoundError:
-                    old_cache = {}
+                    old_cache = []
                 except Exception as e:
                     logger.warning(
                         "[COMMAND SYNC] Could not read existing command cache %s: %s",
                         COMMAND_CACHE_FILE,
                         e,
                     )
-                    old_cache = {}
+                    old_cache = []
 
-                new_cache = []
-                updated = []
+                update_result = command_cache_update(
+                    list(bot.application_commands),
+                    existing_signatures=old_cache,
+                    cache_file=COMMAND_CACHE_FILE,
+                )
 
-                for name, command in flatten_application_commands(bot.application_commands):
-                    version = getattr(command.callback, "__version__", "N/A")
-                    description = command.description or ""
-                    cached_version = old_cache.get(name, {}).get("version")
-
-                    entry = {
-                        "name": name,
-                        "version": version,
-                        "description": description,
-                        "admin_only": True,  # keep as-is; refine later if we introspect decorators
-                    }
-                    new_cache.append(entry)
-
-                    if cached_version != version:
-                        updated.append(f"/{name} → `{cached_version}` ➜ `{version}`")
-
-                # Write atomically
-                atomic_json_write(COMMAND_CACHE_FILE, new_cache)
-
-                summary = "\n".join(updated) if updated else "✅ No changes to cached versions."
+                summary = (
+                    "\n".join(update_result.updated_lines)
+                    if update_result.updated_lines
+                    else "✅ No changes to cached versions."
+                )
                 # Keep under embed description limit
                 if len(summary) > 4000:
                     summary = summary[:3990] + "…"
@@ -821,15 +814,13 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @is_admin_and_notify_channel()
     @track_usage()
     async def show_command_versions(ctx):
+        from core.command_lifecycle import command_version_lines, sorted_command_signatures
 
         await safe_defer(ctx, ephemeral=True)
 
         try:
             # Sort for stable output
-            cmds = sorted(
-                flatten_application_commands(bot.application_commands),
-                key=lambda item: item[0].lower(),
-            )
+            signatures = sorted_command_signatures(list(bot.application_commands))
 
             embed = discord.Embed(
                 title="📦 Loaded Slash Command Versions",
@@ -838,17 +829,15 @@ def register_admin(bot: ext_commands.Bot) -> None:
             )
 
             # Discord embeds allow max 25 fields. If we have more, use a description list.
-            if len(cmds) <= 25:
-                for command_name, command in cmds:
-                    version = getattr(command.callback, "__version__", "N/A")
+            if len(signatures) <= 25:
+                for signature in signatures:
+                    command_name = signature["name"]
+                    version = signature.get("version", "N/A")
                     embed.add_field(
                         name=f"/{command_name}", value=f"Version: `{version}`", inline=False
                     )
             else:
-                lines = []
-                for command_name, command in cmds:
-                    version = getattr(command.callback, "__version__", "N/A")
-                    lines.append(f"/{command_name} — `{version}`")
+                lines = command_version_lines(list(bot.application_commands))
                 text = "\n".join(lines)
                 # Keep under embed description limits (~4096 chars)
                 if len(text) > 3900:
@@ -874,6 +863,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @is_admin_and_notify_channel()
     @track_usage()
     async def validate_command_cache(ctx):
+        from core.command_lifecycle import validate_command_cache as build_command_cache_validation
 
         await safe_defer(ctx, ephemeral=True)
 
@@ -881,7 +871,6 @@ def register_admin(bot: ext_commands.Bot) -> None:
         try:
             with open(COMMAND_CACHE_FILE, encoding="utf-8") as f:
                 raw = json.load(f)
-                cache = {entry["name"]: entry.get("version", "N/A") for entry in raw}
         except Exception as e:
             logger.exception("[COMMAND] /validate_command_cache load failed")
             await ctx.interaction.edit_original_response(
@@ -894,28 +883,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
             return
 
         # Build checks
-        loaded_cmds = sorted(
-            flatten_application_commands(bot.application_commands),
-            key=lambda item: item[0].lower(),
-        )
-        loaded_names = {name for name, _command in loaded_cmds}
-        cache_names = set(cache.keys())
-
-        issues = []
-
-        # Missing or mismatched
-        for name, command in loaded_cmds:
-            version = getattr(command.callback, "__version__", "N/A")
-            cached = cache.get(name)
-            if cached is None:
-                issues.append(f"➕ `/{name}` is **missing** from cache (code=`{version}`)")
-            elif cached != version:
-                issues.append(f"🔁 `/{name}` version mismatch: cache=`{cached}`, code=`{version}`")
-
-        # Stale entries (in cache but not loaded anymore)
-        stale = sorted(cache_names - loaded_names)
-        for name in stale:
-            issues.append(f"➖ `/{name}` is in cache but not currently loaded")
+        validation = build_command_cache_validation(list(bot.application_commands), raw)
+        issues = validation.issues
 
         # Build response
         if issues:

@@ -79,8 +79,8 @@ runtime services/observability startup. Phase 6C consolidated usage tracking ont
 cadence of a 5-second flush interval or 20-event batch size for command, component, metric, and
 alert usage events. Phase 6D moved startup command signature/cache/sync handling behind
 `ready_command_sync` and `core/command_lifecycle.py`. Remaining lifecycle cleanup after that
-includes rehydration and scheduler boundaries, queue worker lifecycle, command lifecycle admin
-tooling convergence, and shutdown coordination.
+starts with command lifecycle admin tooling convergence, then continues into rehydration and
+scheduler boundaries, queue worker lifecycle, and shutdown coordination.
 
 When changing startup, verify restart safety and avoid duplicate task creation.
 

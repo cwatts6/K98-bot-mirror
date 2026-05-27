@@ -62,13 +62,18 @@ tracking, UTC clock, and member-count status loops through the named `ready_runt
 phase while preserving startup order and behaviour. Phase 6C usage tracker lifecycle ownership
 then consolidated command/component/metric usage logging onto the shared `usage_tracker.py`
 singleton and moved usage JSONL prune startup into `ready_runtime_services`, leaving
-`full_startup_sequence()` free of usage observability startup.
+`full_startup_sequence()` free of usage observability startup. Phase 6D command sync lifecycle
+ownership was completed in PR 121 (`codex/dlbot-phase-6d-command-lifecycle`), smoke tested with
+unchanged, changed, and post-cache-update restart paths, merged, and pushed to production:
+`bot_instance.py:on_ready()` now delegates startup command signature/cache/sync handling through
+`core/command_lifecycle.py` and the named `ready_command_sync` phase while preserving scoped sync,
+timeout telemetry, command-cache writes, and loaded-command logging.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 startup/lifecycle ownership, not as a continuation of upload routing. Continue that task from
 `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md` and
-`docs/task_packs/Codex Chat Starter - DL_bot Phase 6D Command Sync Cache.md`, with this backlog and
-the current `K98-bot-mirror` GitHub issues list as supporting context.
+`docs/task_packs/Codex Chat Starter - DL_bot Phase 6E Command Lifecycle Admin Tooling.md`, with
+this backlog and the current `K98-bot-mirror` GitHub issues list as supporting context.
 
 ### Deferred Optimisation
 - Area: `tests/test_ark_preference_service.py`, `tests/test_ark_bans_enforcement.py`, `tests/test_lock_timeout.py`, `tests/test_calendar_service.py`, `tests/test_calendar_pipeline.py`, remaining slow full-suite pytest paths
@@ -136,17 +141,17 @@ the current `K98-bot-mirror` GitHub issues list as supporting context.
 ### Deferred Optimisation
 - Area: `DL_bot.py`, `bot_instance.py` startup and lifecycle
 - Type: architecture
-- Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, task supervision, queue worker startup, live queue rehydration, cache warming, scheduler startup, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, Phase 6A introduced the first named startup lifecycle boundary for the initial `on_ready()` runtime bootstrap, Phase 6B extracted runtime services/observability startup into `ready_runtime_services`, and Phase 6C consolidated usage tracker lifecycle ownership. Remaining `on_ready()` work still mixes command sync/cache handling, event cache and rehydration, scheduler registration, queue worker startup, startup notifications, and later shutdown coordination.
-- Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md` and `docs/task_packs/Codex Chat Starter - DL_bot Phase 6D Command Sync Cache.md`. The next PR-sized slice should audit and extract command signature/cache/sync handling into an explicit lifecycle owner while preserving command registration, cache update, sync timeout, and loaded-command logging behaviour. Keep event cache/rehydration, scheduler startup, queue worker lifecycle, and shutdown coordination in later approval-gated slices.
+- Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, task supervision, queue worker startup, live queue rehydration, cache warming, scheduler startup, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, Phase 6A introduced the first named startup lifecycle boundary for the initial `on_ready()` runtime bootstrap, Phase 6B extracted runtime services/observability startup into `ready_runtime_services`, Phase 6C consolidated usage tracker lifecycle ownership, and Phase 6D extracted startup command signature/cache/sync handling into `core/command_lifecycle.py` and `ready_command_sync`. Remaining `on_ready()` work still mixes event cache and rehydration, scheduler registration, queue worker startup, startup notifications, and later shutdown coordination.
+- Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`. The next PR-sized slice is command lifecycle admin tooling convergence from `docs/task_packs/Codex Chat Starter - DL_bot Phase 6E Command Lifecycle Admin Tooling.md`; after that, keep event cache/rehydration, scheduler startup, queue worker lifecycle, and shutdown coordination in later approval-gated slices.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5 upload routing, Phase 6A startup lifecycle boundary, Phase 6B runtime services extraction, and Phase 6C usage tracker ownership consolidation are complete in code; proceed with audit/design before each remaining implementation slice.
+- Dependencies: Phase 5 upload routing, Phase 6A startup lifecycle boundary, Phase 6B runtime services extraction, Phase 6C usage tracker ownership consolidation, and Phase 6D command sync lifecycle extraction are complete in code and production smoke tested; proceed with audit/design before each remaining implementation slice.
 
 ### Deferred Optimisation
 - Area: `core/command_lifecycle.py`, `commands/admin_cmds.py`, command cache admin tooling
 - Type: architecture
 - Description: Phase 6D establishes a startup command lifecycle owner, but admin command tooling still has separate cache and sync handling in `/ops resync_commands`, `/ops validate_command_cache`, and `/ops show_command_versions`. Those flows intentionally remain out of the conservative startup slice because they include Discord embed UX, permission-gated admin interaction behaviour, and different timeout/output expectations.
-- Suggested Fix: Add a later Phase 6 command-lifecycle slice that reuses `core/command_lifecycle.py` for admin resync, cache validation, and command-version inventory while preserving existing admin-only permissions, ephemeral responses, embed output, timeout behaviour, and operator-facing summaries. Add focused tests for shared startup/admin signature parity, manual resync cache writes, validation output, timeout handling, and command registration smoke coverage.
+- Suggested Fix: Execute Phase 6E from `docs/task_packs/Codex Chat Starter - DL_bot Phase 6E Command Lifecycle Admin Tooling.md`: reuse `core/command_lifecycle.py` for admin resync, cache validation, and command-version inventory while preserving existing admin-only permissions, ephemeral responses, embed output, timeout behaviour, and operator-facing summaries. Add focused tests for shared startup/admin signature parity, manual resync cache writes, validation output, timeout handling, and command registration smoke coverage.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 6D startup command lifecycle extraction is merged and smoke tested; keep slash-command renaming and command-surface consolidation out of this slice.

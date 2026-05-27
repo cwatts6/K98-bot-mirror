@@ -1,7 +1,10 @@
 # Codex Chat Starter - DL_bot Phase 6D Command Sync Cache
 
-Use this starter to continue Phase 6 after Phase 6C usage tracker lifecycle ownership was merged,
-smoke-tested, pushed to production, and marked complete.
+Status: complete. PR 121 (`codex/dlbot-phase-6d-command-lifecycle`) was merged, smoke-tested, and
+pushed to production on 2026-05-27. This starter is retained as historical context for Phase 6D.
+
+Use `docs/task_packs/Codex Chat Starter - DL_bot Phase 6E Command Lifecycle Admin Tooling.md` for
+the next Phase 6 slice.
 
 ## Copy/Paste Starter
 

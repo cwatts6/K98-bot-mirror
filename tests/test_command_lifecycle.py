@@ -5,7 +5,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from core.command_lifecycle import build_command_signatures, run_ready_command_sync
+from core.command_lifecycle import (
+    build_command_signatures,
+    command_cache_update,
+    command_version_lines,
+    run_ready_command_sync,
+    sync_commands_for_guild,
+    validate_command_cache,
+)
 
 
 def _command(name: str, *, description: str = "desc", version: str = "v1.0"):
@@ -39,6 +46,82 @@ def test_build_command_signatures_uses_flattened_inventory_names():
             "version": "v2.0",
         }
     ]
+
+
+def test_command_cache_update_writes_startup_signature_shape_atomically():
+    command = _command("ping", description="Ping", version="v2.0")
+    writes = []
+
+    result = command_cache_update(
+        [command],
+        existing_signatures=[
+            {
+                "name": "ping",
+                "description": "Ping",
+                "version": "v1.0",
+                "admin_only": True,
+            }
+        ],
+        cache_file="cache.json",
+        writer=lambda path, data: writes.append((path, data)),
+    )
+
+    assert result.updated_lines == ["/ping → `v1.0` ➜ `v2.0`"]
+    assert result.signatures == [{"name": "ping", "description": "Ping", "version": "v2.0"}]
+    assert writes == [("cache.json", result.signatures)]
+
+
+def test_validate_command_cache_uses_shared_signature_model():
+    command = _command("ping", description="Ping", version="v2.0")
+    stale = {"name": "old", "description": "Old", "version": "v1.0"}
+
+    result = validate_command_cache(
+        [command],
+        [
+            {"name": "ping", "description": "Ping", "version": "v1.0"},
+            stale,
+        ],
+    )
+
+    assert result.issues == [
+        "🔁 `/ping` version mismatch: cache=`v1.0`, code=`v2.0`",
+        "➖ `/old` is in cache but not currently loaded",
+    ]
+
+
+def test_command_version_lines_use_flattened_group_names():
+    subcommand = _command("run_sql_proc", description="Run SQL", version="v1.03")
+    group = SimpleNamespace(name="ops", subcommands=[subcommand])
+
+    assert command_version_lines([group]) == ["/ops run_sql_proc — `v1.03`"]
+
+
+@pytest.mark.asyncio
+async def test_sync_commands_for_guild_reports_success():
+    bot = FakeBot([])
+
+    result = await sync_commands_for_guild(bot, guild_id=123, timeout_seconds=5.0)
+
+    assert result.ok is True
+    assert result.guild_id == 123
+    assert bot.sync_calls == [[123]]
+
+
+@pytest.mark.asyncio
+async def test_sync_commands_for_guild_reports_timeout():
+    class TimeoutBot(FakeBot):
+        async def sync_commands(self, *, guild_ids):
+            self.sync_calls.append(guild_ids)
+            raise TimeoutError
+
+    bot = TimeoutBot([])
+
+    result = await sync_commands_for_guild(bot, guild_id=123, timeout_seconds=5.0)
+
+    assert result.ok is False
+    assert result.timed_out is True
+    assert result.error is None
+    assert bot.sync_calls == [[123]]
 
 
 @pytest.mark.asyncio

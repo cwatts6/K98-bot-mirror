@@ -19,4 +19,6 @@ def test_admin_command_cache_handlers_use_canonical_cache_path():
     combined = "\n".join(functions.values())
     assert "COMMAND_CACHE_FILE" in combined
     assert '"command_cache.json"' not in combined
-    assert "atomic_json_write(COMMAND_CACHE_FILE" in functions["resync_commands"]
+    assert "command_cache_update(" in functions["resync_commands"]
+    assert "build_command_cache_validation(" in functions["validate_command_cache"]
+    assert "flatten_application_commands" not in combined
