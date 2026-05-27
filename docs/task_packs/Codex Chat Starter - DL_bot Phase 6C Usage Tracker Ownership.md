@@ -1,6 +1,12 @@
 # Codex Chat Starter - DL_bot Phase 6C Usage Tracker Ownership
 
-Use this starter to continue Phase 6 after Phase 6B runtime services extraction was merged,
+Use this starter for historical Phase 6C context. Phase 6C was completed in PR 120
+(`codex/dlbot-phase-6c-usage-tracker`), smoke-tested, merged, and pushed to production.
+
+For the next active slice, use
+`docs/task_packs/Codex Chat Starter - DL_bot Phase 6D Command Sync Cache.md`.
+
+This original starter continued Phase 6 after Phase 6B runtime services extraction was merged,
 smoke-tested, pushed to production, and marked complete.
 
 ## Copy/Paste Starter
@@ -184,7 +190,7 @@ This starter continues the usage tracker ownership deferred optimisation in
 
 ## Phase 6C Is Complete
 
-**Status**: Merged via PR codex/dlbot-phase-6c-usage-tracker (commit d39f5b0) and pushed to production.
+**Status**: Merged via PR 120 (`codex/dlbot-phase-6c-usage-tracker`), smoke-tested, and pushed to production.
 
 **What Changed**:
 
@@ -205,4 +211,5 @@ This starter continues the usage tracker ownership deferred optimisation in
 
 **Next Steps**:
 
-Continue with the next Phase 6 task when identified, or proceed to other architectural optimisation work as prioritized.
+Continue with Phase 6D command signature/cache/sync lifecycle ownership:
+`docs/task_packs/Codex Chat Starter - DL_bot Phase 6D Command Sync Cache.md`.

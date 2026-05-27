@@ -5,7 +5,7 @@
 - Task name: `DL_bot startup/lifecycle separation - Phase 6 audit`
 - Date: `2026-05-26`
 - Last updated: `2026-05-27`
-- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B startup lifecycle boundaries were pushed to production`
+- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B/6C startup lifecycle boundaries were pushed to production`
 - Task type: `deferred optimisation batch`
 - One-pass approved: `no`
 
@@ -80,8 +80,19 @@ Phase 6B runtime services extraction is complete:
   started the runtime services, completed, and then allowed command cache, event cache,
   rehydration, schedulers, queue workers, and `full_startup_sequence()` to continue.
 - The PR was merged and pushed to production.
-- Usage tracker ownership remains a deliberate follow-up because usage tracking is started in the
-  runtime services phase and later startup/prune-loop behaviour remains in `full_startup_sequence()`.
+- Usage tracker ownership remained a deliberate follow-up because usage tracking was started in the
+  runtime services phase and later startup/prune-loop behaviour remained in `full_startup_sequence()`.
+
+Phase 6C usage tracker lifecycle ownership is complete:
+
+- PR 120 (`codex/dlbot-phase-6c-usage-tracker`) consolidated command, component, metric, and alert
+  usage logging onto the shared `usage_tracker.py` singleton.
+- `_run_ready_runtime_services()` now owns usage tracker startup and `usage_jsonl_prune` TaskMonitor
+  registration.
+- `full_startup_sequence()` no longer owns usage observability startup.
+- Production smoke testing on 2026-05-27 confirmed usage tracker startup, prune-loop scheduling,
+  command/component SQL flushes, and startup sequence continuity.
+- The PR was merged and pushed to production.
 
 `DL_bot.py` is now much closer to listener/delegation ownership for uploads, but startup and
 lifecycle concerns remain spread across `DL_bot.py`, `bot_instance.py`, `bot_loader.py`,
@@ -290,7 +301,8 @@ Initial classification before audit:
 | Bot construction and event registration ownership | audit first | Current ownership is spread across `bot_loader.py`, `bot_instance.py`, and `DL_bot.py`. |
 | Initial `on_ready()` runtime bootstrap boundary | complete | Phase 6A moved loop exception handler setup and console-handler cleanup behind `ready_runtime_bootstrap`, preserving startup order and adding named phase logs. |
 | Runtime services/observability startup | complete | Phase 6B moved heartbeat, health dashboard, offload monitor, PIL safety patch, lock cleanup, usage tracker, daily summary, activity listeners, and status-channel loops behind `ready_runtime_services`, preserving startup order and smoke-tested behaviour. |
-| Usage tracker lifecycle ownership | next recommended slice | Usage tracking now has clearer phase attribution but still has split ownership between `ready_runtime_services`, `full_startup_sequence()`, and shutdown. Audit and consolidate this before broader `full_startup_sequence()` extraction. |
+| Usage tracker lifecycle ownership | complete | Phase 6C consolidated command/component/metric/alert usage logging onto the shared `usage_tracker.py` singleton and moved usage JSONL pruning into `ready_runtime_services`, preserving startup order and smoke-tested behaviour. |
+| Command signature/cache/sync ownership | next recommended slice | This is the next contiguous `on_ready()` block after named startup phases. Audit and extract command signature generation, command-cache load/compare/save, scoped sync, timeout telemetry, and loaded-command logging before event cache or scheduler work. |
 | `on_ready()` / `full_startup_sequence()` remaining responsibilities | audit first | Continue extracting in small slices; do not move command sync, event rehydration, schedulers, queue workers, startup notifications, and shutdown together. |
 | Queue worker startup and live queue rehydration | audit first | Restart-sensitive; must preserve worker handoff and live queue persistence. |
 | Task monitor/scheduler startup | audit first | Multiple subsystems depend on startup order and duplicate prevention. |

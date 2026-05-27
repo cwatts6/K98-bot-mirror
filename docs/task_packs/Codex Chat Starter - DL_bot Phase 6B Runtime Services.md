@@ -4,8 +4,9 @@ Use this starter for historical Phase 6B context. Phase 6B was completed in PR 1
 (`codex/dlbot-phase-6b-runtime-services`), smoke-tested on 2026-05-27, merged, and pushed to
 production.
 
-For the next active slice, use
-`docs/task_packs/Codex Chat Starter - DL_bot Phase 6C Usage Tracker Ownership.md`.
+Phase 6C was completed in PR 120 (`codex/dlbot-phase-6c-usage-tracker`), smoke-tested, merged,
+and pushed to production. For the next active slice, use
+`docs/task_packs/Codex Chat Starter - DL_bot Phase 6D Command Sync Cache.md`.
 
 This original starter continued Phase 6 after Phase 6A startup lifecycle boundary was merged,
 smoke-tested, pushed to production, and marked complete.

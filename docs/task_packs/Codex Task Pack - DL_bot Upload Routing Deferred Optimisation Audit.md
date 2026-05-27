@@ -337,10 +337,13 @@ Phase breakdown:
      (`codex/dlbot-phase-6b-runtime-services`), routing heartbeat, health dashboard, offload
      monitor, lock cleanup, usage tracker startup, daily summary, activity tracking, and status
      channel loops through `ready_runtime_services`.
-   - Remaining work: usage tracker lifecycle ownership, command sync/cache extraction, event cache
-     and rehydration boundaries, scheduler/task ownership, queue worker lifecycle, shutdown, and
-     restart-safe state coordination.
-   - Current starter packet: `docs/task_packs/Codex Chat Starter - DL_bot Phase 6C Usage Tracker Ownership.md`
+   - Phase 6C completed usage tracker lifecycle ownership in PR 120
+     (`codex/dlbot-phase-6c-usage-tracker`), consolidating command/component/metric/alert usage
+     logging onto the shared `usage_tracker.py` singleton and moving usage JSONL prune startup
+     into `ready_runtime_services`.
+   - Remaining work: command sync/cache extraction, event cache and rehydration boundaries,
+     scheduler/task ownership, queue worker lifecycle, shutdown, and restart-safe state coordination.
+   - Current starter packet: `docs/task_packs/Codex Chat Starter - DL_bot Phase 6D Command Sync Cache.md`
 
 Phase 2A delivery notes:
 
