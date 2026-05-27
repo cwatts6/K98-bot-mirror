@@ -197,24 +197,29 @@ class AsyncUsageTracker:
 # -------------------------
 _GLOBAL_TRACKER: Optional[AsyncUsageTracker] = None
 _GLOBAL_LOCK = threading.Lock()
+_DEFAULT_FLUSH_INTERVAL_SEC = 5
+_DEFAULT_BATCH_SIZE = 20
 
 
-def _ensure_global_tracker() -> AsyncUsageTracker:
+def get_usage_tracker() -> AsyncUsageTracker:
     # NOTE: caller must call start_usage_tracker() after the event loop is running.
     global _GLOBAL_TRACKER
     with _GLOBAL_LOCK:
         if _GLOBAL_TRACKER is None:
-            _GLOBAL_TRACKER = AsyncUsageTracker()
+            _GLOBAL_TRACKER = AsyncUsageTracker(
+                flush_interval_sec=_DEFAULT_FLUSH_INTERVAL_SEC,
+                batch_size=_DEFAULT_BATCH_SIZE,
+            )
             log.debug("[USAGE] Global tracker created; awaiting start_usage_tracker() call")
         return _GLOBAL_TRACKER
 
 
 def start_usage_tracker() -> "AsyncUsageTracker":
     """
-    Start the global usage tracker. Call this from bot startup (full_startup_sequence)
+    Start the global usage tracker. Call this from bot startup
     after the event loop is running. Safe to call multiple times.
     """
-    tracker = _ensure_global_tracker()
+    tracker = get_usage_tracker()
     tracker.start()
     return tracker
 
@@ -358,7 +363,7 @@ def _emit_alert(name: str, count: int, window: int) -> None:
         log.exception("[USAGE] Could not persist alert JSONL")
     # Attempt to enqueue an alert event into the usage tracker so it gets flushed to SQL
     try:
-        tracker = _ensure_global_tracker()
+        tracker = get_usage_tracker()
         # Build a compact usage event payload
         evt = {
             "executed_at_utc": utcnow(),
@@ -462,7 +467,7 @@ def usage_event(name: str, value: int = 1, metadata: Optional[dict] = None) -> N
 
     # Attempt to enqueue to AsyncUsageTracker (best-effort, non-blocking)
     try:
-        tracker = _ensure_global_tracker()
+        tracker = get_usage_tracker()
         # lightweight usage-entry for SQL flush
         evt = {
             "executed_at_utc": ts,
@@ -517,6 +522,7 @@ def set_alert_thresholds(threshold: int, window_s: int, suppress_s: int = 300) -
 # so they can call usage_tracker.usage_event(...) to record metrics
 __all__ = [
     "AsyncUsageTracker",
+    "get_usage_tracker",
     "metrics_window_count",
     "prune_usage_jsonl_files",
     "set_alert_callback",

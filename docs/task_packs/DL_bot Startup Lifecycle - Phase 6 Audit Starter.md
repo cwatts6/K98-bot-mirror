@@ -5,7 +5,7 @@
 - Task name: `DL_bot startup/lifecycle separation - Phase 6 audit`
 - Date: `2026-05-26`
 - Last updated: `2026-05-27`
-- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A startup lifecycle boundary was pushed to production`
+- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B startup lifecycle boundaries were pushed to production`
 - Task type: `deferred optimisation batch`
 - One-pass approved: `no`
 
@@ -68,6 +68,20 @@ Phase 6A startup lifecycle boundary is complete:
   health dashboard, command-cache, scheduler, queue worker, rehydration, and full startup logs to
   continue.
 - The PR was merged and pushed to production.
+
+Phase 6B runtime services extraction is complete:
+
+- PR 119 (`codex/dlbot-phase-6b-runtime-services`) added the named
+  `ready_runtime_services` phase after `ready_runtime_bootstrap`.
+- `bot_instance.py:on_ready()` now delegates heartbeat, health dashboard, offload monitor,
+  `PIL.Image.show()` safety patch, lock-file cleanup, usage tracker startup, daily summary,
+  activity tracking, UTC clock, and member-count status loops through `run_startup_phases()`.
+- Smoke testing on 2026-05-27 confirmed the expected `ready_runtime_services` phase started,
+  started the runtime services, completed, and then allowed command cache, event cache,
+  rehydration, schedulers, queue workers, and `full_startup_sequence()` to continue.
+- The PR was merged and pushed to production.
+- Usage tracker ownership remains a deliberate follow-up because usage tracking is started in the
+  runtime services phase and later startup/prune-loop behaviour remains in `full_startup_sequence()`.
 
 `DL_bot.py` is now much closer to listener/delegation ownership for uploads, but startup and
 lifecycle concerns remain spread across `DL_bot.py`, `bot_instance.py`, `bot_loader.py`,
@@ -275,8 +289,9 @@ Initial classification before audit:
 | Process entry and singleton lock ownership | audit first | High-impact startup path; define target ownership before edits. |
 | Bot construction and event registration ownership | audit first | Current ownership is spread across `bot_loader.py`, `bot_instance.py`, and `DL_bot.py`. |
 | Initial `on_ready()` runtime bootstrap boundary | complete | Phase 6A moved loop exception handler setup and console-handler cleanup behind `ready_runtime_bootstrap`, preserving startup order and adding named phase logs. |
-| Runtime services/observability startup | next recommended slice | The next contiguous `on_ready()` block starts heartbeat, health dashboard, offload monitor, PIL safety patch, lock cleanup, usage tracker, daily summary, activity listeners, and status-channel loops. It is a coherent PR-sized slice before command sync/cache work. |
-| `on_ready()` / `full_startup_sequence()` remaining responsibilities | audit first | Continue extracting in small slices; do not move command sync, event rehydration, schedulers, queue workers, and shutdown together. |
+| Runtime services/observability startup | complete | Phase 6B moved heartbeat, health dashboard, offload monitor, PIL safety patch, lock cleanup, usage tracker, daily summary, activity listeners, and status-channel loops behind `ready_runtime_services`, preserving startup order and smoke-tested behaviour. |
+| Usage tracker lifecycle ownership | next recommended slice | Usage tracking now has clearer phase attribution but still has split ownership between `ready_runtime_services`, `full_startup_sequence()`, and shutdown. Audit and consolidate this before broader `full_startup_sequence()` extraction. |
+| `on_ready()` / `full_startup_sequence()` remaining responsibilities | audit first | Continue extracting in small slices; do not move command sync, event rehydration, schedulers, queue workers, startup notifications, and shutdown together. |
 | Queue worker startup and live queue rehydration | audit first | Restart-sensitive; must preserve worker handoff and live queue persistence. |
 | Task monitor/scheduler startup | audit first | Multiple subsystems depend on startup order and duplicate prevention. |
 | Graceful shutdown and signal handling | audit first | High blast radius; may be separate PR from startup extraction. |

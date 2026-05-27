@@ -128,6 +128,7 @@ telemetry_logger = logging.getLogger("telemetry")
 
 # Usage tracker (for component + autocomplete logging)
 from decoraters import usage_tracker  # lazy singleton; safe to import here
+from usage_tracker import start_usage_tracker, usage_jsonl_prune_loop
 
 
 def _aware(dt: datetime) -> datetime:
@@ -1850,12 +1851,21 @@ async def _run_ready_runtime_services() -> None:
     except Exception as e:
         logger.warning(f"[LOCK_FILES] Failed to clean lock files: {e}")
 
-    # Make sure usage tracker is alive (idempotent)
+    # Make sure usage tracking and retention pruning are alive (idempotent)
     try:
-        usage_tracker().start()
+        start_usage_tracker()
         logger.info("[BOOT] Usage tracker started.")
     except Exception:
         logger.exception("[BOOT] Failed to start usage tracker.")
+
+    try:
+        task_monitor.create("usage_jsonl_prune", usage_jsonl_prune_loop)
+        logger.info(
+            "[BOOT] Usage JSONL prune loop started (retention=%s days).",
+            os.getenv("USAGE_JSONL_RETENTION_DAYS", "30"),
+        )
+    except Exception:
+        logger.exception("[BOOT] Failed to start usage JSONL prune loop.")
 
     try:
         if not daily_summary.is_running():
@@ -1939,16 +1949,6 @@ async def full_startup_sequence():
         try:
             logger.warning(f"🤖 Logged in as {bot.user} (ID: {bot.user.id})")
             logger.warning("✅ Bot is ready.")
-
-            from usage_tracker import start_usage_tracker, usage_jsonl_prune_loop
-
-            start_usage_tracker()
-            logger.info("[STARTUP] Usage tracker started.")
-            task_monitor.create("usage_jsonl_prune", usage_jsonl_prune_loop)
-            logger.info(
-                "[STARTUP] Usage JSONL prune loop started (retention=%s days).",
-                os.getenv("USAGE_JSONL_RETENTION_DAYS", "30"),
-            )
 
             notify_channel = bot.get_channel(NOTIFY_CHANNEL_ID)
             if not notify_channel:

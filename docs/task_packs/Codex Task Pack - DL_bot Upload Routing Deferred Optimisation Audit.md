@@ -329,13 +329,18 @@ Phase breakdown:
      modules.
    - Starter packet: `docs/task_packs/DL_bot Upload Routing - Phase 5 Remaining Upload Fast Paths Starter.md`
 8. **Phase 6 - Startup/lifecycle separation**
-   - Next active architecture batch after Phase 5 completion.
-   - Audit and optimise `DL_bot.py` lifecycle/startup responsibilities alongside a full
-     `bot_instance.py` review.
-   - Define the target ownership model for bot construction, startup checks, lifecycle wiring,
-     singleton/runtime concerns, event registration, task supervision, queue worker lifecycle,
-     shutdown, and restart-safe state separately from upload-route behaviour.
-   - Starter packet: `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`
+   - Active architecture batch after Phase 5 completion.
+   - Phase 6A completed the first named startup lifecycle boundary in PR 117
+     (`codex/dlbot-phase-6-startup-lifecycle-1`), routing initial `on_ready()` runtime bootstrap
+     through `ready_runtime_bootstrap`.
+   - Phase 6B completed runtime services extraction in PR 119
+     (`codex/dlbot-phase-6b-runtime-services`), routing heartbeat, health dashboard, offload
+     monitor, lock cleanup, usage tracker startup, daily summary, activity tracking, and status
+     channel loops through `ready_runtime_services`.
+   - Remaining work: usage tracker lifecycle ownership, command sync/cache extraction, event cache
+     and rehydration boundaries, scheduler/task ownership, queue worker lifecycle, shutdown, and
+     restart-safe state coordination.
+   - Current starter packet: `docs/task_packs/Codex Chat Starter - DL_bot Phase 6C Usage Tracker Ownership.md`
 
 Phase 2A delivery notes:
 

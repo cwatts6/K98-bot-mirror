@@ -68,3 +68,49 @@ def test_on_ready_uses_named_startup_lifecycle_boundary():
         startup_phase_names.append(phase_call.args[0].value)
 
     assert startup_phase_names == ["ready_runtime_bootstrap", "ready_runtime_services"]
+
+
+def _async_function(tree: ast.AST, name: str) -> ast.AsyncFunctionDef:
+    return next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == name
+    )
+
+
+def _calls_name(node: ast.AST, name: str) -> bool:
+    return any(
+        isinstance(child, ast.Call) and isinstance(child.func, ast.Name) and child.func.id == name
+        for child in ast.walk(node)
+    )
+
+
+def _creates_task_monitor_task(node: ast.AST, task_name: str) -> bool:
+    for child in ast.walk(node):
+        if not (
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Attribute)
+            and child.func.attr == "create"
+            and isinstance(child.func.value, ast.Name)
+            and child.func.value.id == "task_monitor"
+            and child.args
+            and isinstance(child.args[0], ast.Constant)
+        ):
+            continue
+        if child.args[0].value == task_name:
+            return True
+    return False
+
+
+def test_usage_tracking_lifecycle_owned_by_runtime_services_phase():
+    src = Path("bot_instance.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    runtime_services = _async_function(tree, "_run_ready_runtime_services")
+    full_startup = _async_function(tree, "full_startup_sequence")
+
+    assert _calls_name(runtime_services, "start_usage_tracker")
+    assert _creates_task_monitor_task(runtime_services, "usage_jsonl_prune")
+
+    assert not _calls_name(full_startup, "start_usage_tracker")
+    assert not _creates_task_monitor_task(full_startup, "usage_jsonl_prune")

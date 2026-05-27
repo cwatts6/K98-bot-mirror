@@ -13,8 +13,15 @@ import tempfile
 
 import pytest
 
+import decoraters
 from telemetry.dal.command_usage_dal import _coerce_ts
-from usage_tracker import AsyncUsageTracker, prune_usage_jsonl_files, start_usage_tracker
+import usage_tracker as usage_tracker_module
+from usage_tracker import (
+    AsyncUsageTracker,
+    get_usage_tracker,
+    prune_usage_jsonl_files,
+    start_usage_tracker,
+)
 
 # ---------------------------------------------------------------------------
 # Lifecycle tests
@@ -27,13 +34,32 @@ def test_tracker_not_started_before_start_called():
     assert tracker._task is None
 
 
-def test_start_usage_tracker_creates_task():
+def test_global_usage_tracker_preserves_decorator_flush_settings(monkeypatch):
+    """The shared tracker keeps the previous decorator-level flush cadence."""
+    monkeypatch.setattr(usage_tracker_module, "_GLOBAL_TRACKER", None)
+
+    tracker = get_usage_tracker()
+
+    assert tracker.flush_interval_sec == 5
+    assert tracker.batch_size == 20
+
+
+def test_decorater_usage_tracker_uses_shared_global_tracker(monkeypatch):
+    """Decorators and startup use the same tracker instance."""
+    monkeypatch.setattr(usage_tracker_module, "_GLOBAL_TRACKER", None)
+
+    assert decoraters.usage_tracker() is get_usage_tracker()
+
+
+def test_start_usage_tracker_creates_task(monkeypatch):
     """start_usage_tracker() returns a tracker with a running task."""
+    monkeypatch.setattr(usage_tracker_module, "_GLOBAL_TRACKER", None)
 
     async def _inner():
         tracker = start_usage_tracker()
         try:
             assert tracker._task is not None
+            assert tracker is get_usage_tracker()
         finally:
             # Cancel the background task so the test loop can exit cleanly
             tracker._task.cancel()

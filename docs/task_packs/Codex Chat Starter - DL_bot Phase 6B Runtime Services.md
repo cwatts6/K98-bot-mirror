@@ -1,6 +1,13 @@
 # Codex Chat Starter - DL_bot Phase 6B Runtime Services
 
-Use this starter to continue Phase 6 after Phase 6A startup lifecycle boundary was merged,
+Use this starter for historical Phase 6B context. Phase 6B was completed in PR 119
+(`codex/dlbot-phase-6b-runtime-services`), smoke-tested on 2026-05-27, merged, and pushed to
+production.
+
+For the next active slice, use
+`docs/task_packs/Codex Chat Starter - DL_bot Phase 6C Usage Tracker Ownership.md`.
+
+This original starter continued Phase 6 after Phase 6A startup lifecycle boundary was merged,
 smoke-tested, pushed to production, and marked complete.
 
 ## Copy/Paste Starter
@@ -20,6 +27,28 @@ Phase 6A is complete:
   - `[STARTUP] phase completed: ready_runtime_bootstrap`
   - normal heartbeat, health dashboard, command-cache, scheduler, queue worker, rehydration, and
     full startup logs continued afterward.
+
+Phase 6B is complete:
+
+- PR 119 (`codex/dlbot-phase-6b-runtime-services`) was merged and pushed to production.
+- `bot_instance.py:on_ready()` now delegates runtime services and observability startup through
+  the named `ready_runtime_services` phase.
+- Production smoke logs confirmed:
+  - `[STARTUP] phase started: ready_runtime_services`
+  - `[BOOT] Heartbeat loop started`
+  - `[BOOT] Health dashboard task started`
+  - `[BOOT] Offload monitor scheduled via TaskMonitor`
+  - `[BOOT] Usage tracker started.`
+  - `[BOOT] daily_summary loop started`
+  - `[BOOT] Server activity tracking initialized`
+  - `[BOOT] UTC clock status channel loop started`
+  - `[BOOT] Member count status channel loop started`
+  - `[STARTUP] phase completed: ready_runtime_services`
+  - command cache, event cache, rehydration, schedulers, queue workers, and
+    `full_startup_sequence()` continued afterward.
+- Follow-up note: usage tracker ownership remains intentionally visible for a later Phase 6 slice
+  because the runtime services phase starts usage tracking and `full_startup_sequence()` later
+  starts usage tracking/prune-loop behaviour through a second ownership path.
 
 This is review/scope first. Do not implement code changes until the Phase 6B scope, target
 phase boundary, and first PR-sized implementation plan have each been approved.

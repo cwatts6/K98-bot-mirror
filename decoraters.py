@@ -18,7 +18,7 @@ from bot_config import (
     LEADERSHIP_ROLE_NAMES,
     NOTIFY_CHANNEL_ID,
 )
-from usage_tracker import AsyncUsageTracker
+from usage_tracker import AsyncUsageTracker, get_usage_tracker
 
 # Use timezone.utc for broad Python compatibility (works on Py 3.8+).
 UTC = UTC
@@ -310,17 +310,8 @@ def channel_only(
     return decorator
 
 
-# lazy singleton to avoid circular imports
-_tracker: AsyncUsageTracker | None = None
-
-
 def usage_tracker() -> AsyncUsageTracker:
-    global _tracker
-    if _tracker is None:
-        # Flush every 5s or every 20 events while testing
-        _tracker = AsyncUsageTracker(flush_interval_sec=5, batch_size=20)
-        # .start() is called from bot_instance.full_startup_sequence() after the event loop is running.
-    return _tracker
+    return get_usage_tracker()
 
 
 # add near _safe_args_shape

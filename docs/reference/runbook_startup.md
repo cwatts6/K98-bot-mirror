@@ -12,6 +12,11 @@ Purpose: describe the bot startup sequence, guardrails, logging setup, and commo
 6. Commands are registered locally.
 7. Discord client starts.
 8. `bot_instance.on_ready()` runs the full startup sequence.
+   - `ready_runtime_bootstrap` installs the running-loop exception handler and final console
+     handler cleanup.
+   - `ready_runtime_services` starts heartbeat, health dashboard, offload monitor, image-show
+     safety patching, legacy lock cleanup, the shared usage tracker and usage JSONL prune loop,
+     daily summary, activity tracking, and server status channel loops.
 9. Caches, rehydration, background tasks, heartbeat, and admin notification start.
 
 ## Main Files
@@ -55,6 +60,7 @@ Important checks include:
 
 Startup may rehydrate or start:
 
+- named lifecycle phases from `core/startup_lifecycle.py`
 - command signature cache
 - live queue state
 - event views
@@ -62,6 +68,14 @@ Startup may rehydrate or start:
 - subscription reminder tasks
 - maintenance/health tasks
 - heartbeat file updates
+
+Phase 6A and 6B introduced named `on_ready()` startup phases for initial runtime bootstrap and
+runtime services/observability startup. Phase 6C consolidated usage tracking onto the shared
+`usage_tracker.py` singleton, with tracker startup and usage JSONL pruning owned by
+`ready_runtime_services`. The unified tracker intentionally uses the previous command/decorator
+cadence of a 5-second flush interval or 20-event batch size for command, component, metric, and
+alert usage events. Remaining lifecycle cleanup includes command/cache extraction, rehydration and
+scheduler boundaries, queue worker lifecycle, and shutdown coordination.
 
 When changing startup, verify restart safety and avoid duplicate task creation.
 
