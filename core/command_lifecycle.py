@@ -31,7 +31,9 @@ class CommandSyncLifecycleResult:
     sync_skipped_reason: str | None = None
 
 
-def build_command_signatures(commands: Sequence[Any]) -> tuple[list[dict[str, Any]], list[tuple[str, Any]]]:
+def build_command_signatures(
+    commands: Sequence[Any],
+) -> tuple[list[dict[str, Any]], list[tuple[str, Any]]]:
     signature_commands = list(flatten_application_commands(commands))
     current_signatures = [
         sig

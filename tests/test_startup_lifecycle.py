@@ -56,6 +56,7 @@ def test_on_ready_uses_named_startup_lifecycle_boundary():
         and node.func.id == "run_startup_phases"
     ]
     assert runner_calls
+    runner_calls.sort(key=lambda node: getattr(node, "lineno", 0))
 
     for runner_call in runner_calls:
         phases_arg = runner_call.args[0]
