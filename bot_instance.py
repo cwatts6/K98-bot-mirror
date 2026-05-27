@@ -1538,119 +1538,9 @@ async def on_ready():
     await run_startup_phases(
         [
             StartupPhase("ready_runtime_bootstrap", _run_ready_runtime_bootstrap),
+            StartupPhase("ready_runtime_services", _run_ready_runtime_services),
         ]
     )
-
-    # Start heartbeat now that the loop is running
-
-    try:
-        os.makedirs(LOG_DIR, exist_ok=True)
-        task_monitor.create("heartbeat", heartbeat_loop)
-        logger.info("[BOOT] Heartbeat loop started; writing to %s/heartbeat.json", LOG_DIR)
-    except Exception:
-        logger.exception("[BOOT] Failed to start heartbeat loop")
-
-    try:
-        if not health_dashboard_task.is_running():
-            health_dashboard_task.start()
-            logger.info("[BOOT] Health dashboard task started")
-    except Exception:
-        logger.error("[BOOT] Failed to start health_dashboard_task: {e}")
-
-    # Start offload monitor as a supervised TaskMonitor task if available
-    try:
-        if monitor_loop_coro is not None:
-            # avoid duplicate creation if already scheduled
-            if not task_monitor.is_running("offload_monitor"):
-                # run with reasonable defaults; adjust via env or later config if needed
-                task_monitor.create(
-                    "offload_monitor",
-                    lambda: monitor_loop_coro(
-                        interval_seconds=int(os.getenv("OFFLOAD_MONITOR_INTERVAL", "300")),
-                        rotate_days=int(os.getenv("OFFLOAD_MONITOR_ROTATE_DAYS", "30")),
-                        max_entries=int(os.getenv("OFFLOAD_MONITOR_MAX_ENTRIES", "2000")),
-                    ),
-                )
-                logger.info("[BOOT] Offload monitor scheduled via TaskMonitor")
-            else:
-                logger.info("[BOOT] Offload monitor already running; skipping schedule")
-    except Exception:
-        logger.exception("[BOOT] Failed to schedule offload monitor")
-
-    # 🔒 Prevent accidental Image.show() calls that invoke tkinter
-    try:
-        from PIL import Image
-
-        def disabled_show(*args, **kwargs):
-            import warnings
-
-            warnings.warn("⚠️ Image.show() disabled to prevent tkinter-based crashes.")
-
-        Image.show = disabled_show
-        logger.info("[BOOT] PIL.Image.show() disabled at startup.")
-    except Exception as e:
-        logger.warning(f"[BOOT] Failed to patch Image.show(): {e}")
-
-    try:
-        clean_old_lock_files(LOG_DIR)
-        logger.info("[LOCK_FILES] Cleared old LOCK Files on Startup")
-    except Exception as e:
-        logger.warning(f"[LOCK_FILES] Failed to clean lock files: {e}")
-
-    # Make sure usage tracker is alive (idempotent)
-    try:
-        usage_tracker().start()
-        logger.info("[BOOT] Usage tracker started.")
-    except Exception:
-        logger.exception("[BOOT] Failed to start usage tracker.")
-
-    try:
-        if not daily_summary.is_running():
-            daily_summary.start()
-            logger.info("[BOOT] daily_summary loop started")
-    except Exception:
-        logger.exception("[BOOT] Failed to start daily_summary loop")
-
-    if ACTIVITY_TRACKING_ENABLED:
-        try:
-            await run_blocking(ensure_activity_schema)
-            register_activity_listeners(bot)
-            logger.info("[BOOT] Server activity tracking initialized")
-        except Exception:
-            logger.exception("[BOOT] Failed to initialize server activity tracking")
-
-    if SERVER_STATUS_ENABLED:
-        if UTC_CLOCK_CHANNEL_ID:
-            try:
-                if not task_monitor.is_running("utc_clock_channel"):
-                    task_monitor.create(
-                        "utc_clock_channel",
-                        lambda: run_utc_clock_channel_loop(bot),
-                        replace=False,
-                    )
-                    logger.info("[BOOT] UTC clock status channel loop started")
-            except Exception:
-                logger.exception("[BOOT] Failed to start UTC clock status channel loop")
-        else:
-            logger.debug(
-                "[BOOT] UTC clock status channel loop skipped – UTC_CLOCK_CHANNEL_ID not set"
-            )
-
-        if MEMBER_COUNT_CHANNEL_ID:
-            try:
-                if not task_monitor.is_running("member_count_channel"):
-                    task_monitor.create(
-                        "member_count_channel",
-                        lambda: run_member_count_channel_loop(bot),
-                        replace=False,
-                    )
-                    logger.info("[BOOT] Member count status channel loop started")
-            except Exception:
-                logger.exception("[BOOT] Failed to start member count status channel loop")
-        else:
-            logger.debug(
-                "[BOOT] Member count status channel loop skipped – MEMBER_COUNT_CHANNEL_ID not set"
-            )
 
     try:
         logger.info(f"✅ Bot is ready – logged in as {bot.user} (ID: {bot.user.id})")
@@ -1902,6 +1792,118 @@ async def _run_ready_runtime_bootstrap() -> None:
         _drop_console_handlers_once()
     except Exception:
         pass
+
+
+async def _run_ready_runtime_services() -> None:
+    # Start heartbeat now that the loop is running
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        task_monitor.create("heartbeat", heartbeat_loop)
+        logger.info("[BOOT] Heartbeat loop started; writing to %s/heartbeat.json", LOG_DIR)
+    except Exception:
+        logger.exception("[BOOT] Failed to start heartbeat loop")
+
+    try:
+        if not health_dashboard_task.is_running():
+            health_dashboard_task.start()
+            logger.info("[BOOT] Health dashboard task started")
+    except Exception:
+        logger.error("[BOOT] Failed to start health_dashboard_task: {e}")
+
+    # Start offload monitor as a supervised TaskMonitor task if available
+    try:
+        if monitor_loop_coro is not None:
+            # avoid duplicate creation if already scheduled
+            if not task_monitor.is_running("offload_monitor"):
+                # run with reasonable defaults; adjust via env or later config if needed
+                task_monitor.create(
+                    "offload_monitor",
+                    lambda: monitor_loop_coro(
+                        interval_seconds=int(os.getenv("OFFLOAD_MONITOR_INTERVAL", "300")),
+                        rotate_days=int(os.getenv("OFFLOAD_MONITOR_ROTATE_DAYS", "30")),
+                        max_entries=int(os.getenv("OFFLOAD_MONITOR_MAX_ENTRIES", "2000")),
+                    ),
+                )
+                logger.info("[BOOT] Offload monitor scheduled via TaskMonitor")
+            else:
+                logger.info("[BOOT] Offload monitor already running; skipping schedule")
+    except Exception:
+        logger.exception("[BOOT] Failed to schedule offload monitor")
+
+    # 🔒 Prevent accidental Image.show() calls that invoke tkinter
+    try:
+        from PIL import Image
+
+        def disabled_show(*args, **kwargs):
+            import warnings
+
+            warnings.warn("⚠️ Image.show() disabled to prevent tkinter-based crashes.")
+
+        Image.show = disabled_show
+        logger.info("[BOOT] PIL.Image.show() disabled at startup.")
+    except Exception as e:
+        logger.warning(f"[BOOT] Failed to patch Image.show(): {e}")
+
+    try:
+        clean_old_lock_files(LOG_DIR)
+        logger.info("[LOCK_FILES] Cleared old LOCK Files on Startup")
+    except Exception as e:
+        logger.warning(f"[LOCK_FILES] Failed to clean lock files: {e}")
+
+    # Make sure usage tracker is alive (idempotent)
+    try:
+        usage_tracker().start()
+        logger.info("[BOOT] Usage tracker started.")
+    except Exception:
+        logger.exception("[BOOT] Failed to start usage tracker.")
+
+    try:
+        if not daily_summary.is_running():
+            daily_summary.start()
+            logger.info("[BOOT] daily_summary loop started")
+    except Exception:
+        logger.exception("[BOOT] Failed to start daily_summary loop")
+
+    if ACTIVITY_TRACKING_ENABLED:
+        try:
+            await run_blocking(ensure_activity_schema)
+            register_activity_listeners(bot)
+            logger.info("[BOOT] Server activity tracking initialized")
+        except Exception:
+            logger.exception("[BOOT] Failed to initialize server activity tracking")
+
+    if SERVER_STATUS_ENABLED:
+        if UTC_CLOCK_CHANNEL_ID:
+            try:
+                if not task_monitor.is_running("utc_clock_channel"):
+                    task_monitor.create(
+                        "utc_clock_channel",
+                        lambda: run_utc_clock_channel_loop(bot),
+                        replace=False,
+                    )
+                    logger.info("[BOOT] UTC clock status channel loop started")
+            except Exception:
+                logger.exception("[BOOT] Failed to start UTC clock status channel loop")
+        else:
+            logger.debug(
+                "[BOOT] UTC clock status channel loop skipped – UTC_CLOCK_CHANNEL_ID not set"
+            )
+
+        if MEMBER_COUNT_CHANNEL_ID:
+            try:
+                if not task_monitor.is_running("member_count_channel"):
+                    task_monitor.create(
+                        "member_count_channel",
+                        lambda: run_member_count_channel_loop(bot),
+                        replace=False,
+                    )
+                    logger.info("[BOOT] Member count status channel loop started")
+            except Exception:
+                logger.exception("[BOOT] Failed to start member count status channel loop")
+        else:
+            logger.debug(
+                "[BOOT] Member count status channel loop skipped – MEMBER_COUNT_CHANNEL_ID not set"
+            )
 
 
 @bot.event

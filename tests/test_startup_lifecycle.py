@@ -67,4 +67,4 @@ def test_on_ready_uses_named_startup_lifecycle_boundary():
         assert isinstance(phase_call.args[0].value, str)
         startup_phase_names.append(phase_call.args[0].value)
 
-    assert startup_phase_names == ["ready_runtime_bootstrap"]
+    assert startup_phase_names == ["ready_runtime_bootstrap", "ready_runtime_services"]

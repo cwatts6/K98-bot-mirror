@@ -4,7 +4,8 @@
 
 - Task name: `DL_bot startup/lifecycle separation - Phase 6 audit`
 - Date: `2026-05-26`
-- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and pushed to production`
+- Last updated: `2026-05-27`
+- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A startup lifecycle boundary was pushed to production`
 - Task type: `deferred optimisation batch`
 - One-pass approved: `no`
 
@@ -56,6 +57,17 @@ Phase 5 upload-routing consolidation is complete:
 - Phase 5B extracted inventory upload-first and weekly activity routes.
 - Phase 5C extracted Rally Forts routing.
 - Phase 5D extracted main monitored-channel fallback queueing.
+
+Phase 6A startup lifecycle boundary is complete:
+
+- PR 117 (`codex/dlbot-phase-6-startup-lifecycle-1`) added `core/startup_lifecycle.py`.
+- `bot_instance.py:on_ready()` now delegates the initial loop/console bootstrap through
+  `run_startup_phases([StartupPhase("ready_runtime_bootstrap", ...)])`.
+- Smoke testing on 2026-05-27 confirmed the expected `ready_runtime_bootstrap` phase started,
+  installed the global asyncio exception handler, completed, and then allowed normal heartbeat,
+  health dashboard, command-cache, scheduler, queue worker, rehydration, and full startup logs to
+  continue.
+- The PR was merged and pushed to production.
 
 `DL_bot.py` is now much closer to listener/delegation ownership for uploads, but startup and
 lifecycle concerns remain spread across `DL_bot.py`, `bot_instance.py`, `bot_loader.py`,
@@ -262,13 +274,15 @@ Initial classification before audit:
 | Upload-route consolidation | not applicable | Phase 5 is complete; do not reopen routing in Phase 6. |
 | Process entry and singleton lock ownership | audit first | High-impact startup path; define target ownership before edits. |
 | Bot construction and event registration ownership | audit first | Current ownership is spread across `bot_loader.py`, `bot_instance.py`, and `DL_bot.py`. |
-| `on_ready()` / `full_startup_sequence()` size and responsibilities | audit first | Likely first implementation candidate, but requires careful map and tests. |
+| Initial `on_ready()` runtime bootstrap boundary | complete | Phase 6A moved loop exception handler setup and console-handler cleanup behind `ready_runtime_bootstrap`, preserving startup order and adding named phase logs. |
+| Runtime services/observability startup | next recommended slice | The next contiguous `on_ready()` block starts heartbeat, health dashboard, offload monitor, PIL safety patch, lock cleanup, usage tracker, daily summary, activity listeners, and status-channel loops. It is a coherent PR-sized slice before command sync/cache work. |
+| `on_ready()` / `full_startup_sequence()` remaining responsibilities | audit first | Continue extracting in small slices; do not move command sync, event rehydration, schedulers, queue workers, and shutdown together. |
 | Queue worker startup and live queue rehydration | audit first | Restart-sensitive; must preserve worker handoff and live queue persistence. |
 | Task monitor/scheduler startup | audit first | Multiple subsystems depend on startup order and duplicate prevention. |
 | Graceful shutdown and signal handling | audit first | High blast radius; may be separate PR from startup extraction. |
 | SQL/importer contracts | not applicable unless discovered | Phase 6 should avoid SQL/importer contract changes. |
 
-Final decisions must be updated after Step 1 audit.
+Final decisions should be updated after each Phase 6 sub-phase.
 
 ## 14. Testing Requirements
 

@@ -49,12 +49,18 @@ pushed to production: `DL_bot.py` now delegates the monitored-channel fallback q
 attachment handling, worker queue handoff, `QueueFull` drop behaviour, live queue bookkeeping,
 queue embed updates, shared `utils.live_queue_lock` usage, command fall-through, and best-effort
 log-backup scheduling. Phase 5 upload-routing consolidation is complete. Phase 6 startup/lifecycle
-separation is now the next DL_bot architecture batch.
+separation is now the active DL_bot architecture batch. Phase 6A startup lifecycle boundary work
+was completed in PR 117 (`codex/dlbot-phase-6-startup-lifecycle-1`), smoke tested successfully on
+2026-05-27, merged, and pushed to production: `bot_instance.py:on_ready()` now routes its initial
+runtime bootstrap through `core.startup_lifecycle.run_startup_phases()` with a named
+`ready_runtime_bootstrap` phase, preserving startup order while adding phase start/completion and
+failure attribution logs.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
-startup/lifecycle ownership, not as a continuation of upload routing. Start that task with a new
-audit/scope pass and review `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`,
-this backlog, and the current `K98-bot-mirror` GitHub issues list.
+startup/lifecycle ownership, not as a continuation of upload routing. Continue that task from
+`docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md` and
+`docs/task_packs/Codex Chat Starter - DL_bot Phase 6B Runtime Services.md`, with this backlog and
+the current `K98-bot-mirror` GitHub issues list as supporting context.
 
 ### Deferred Optimisation
 - Area: `tests/test_ark_preference_service.py`, `tests/test_ark_bans_enforcement.py`, `tests/test_lock_timeout.py`, `tests/test_calendar_service.py`, `tests/test_calendar_pipeline.py`, remaining slow full-suite pytest paths
@@ -122,8 +128,8 @@ this backlog, and the current `K98-bot-mirror` GitHub issues list.
 ### Deferred Optimisation
 - Area: `DL_bot.py`, `bot_instance.py` startup and lifecycle
 - Type: architecture
-- Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, task supervision, queue worker startup, live queue rehydration, cache warming, scheduler startup, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, so lifecycle ownership can now be audited independently.
-- Suggested Fix: Start Phase 6 from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`. Audit `DL_bot.py`, `bot_instance.py`, `bot_loader.py`, `bot_startup_gate.py`, `boot_safety.py`, `startup_utils.py`, `singleton_lock.py`, `bot_helpers.py`, `utils.py`, and startup/shutdown runbooks before proposing any implementation. Define a target ownership model for process entry, bot construction, command registration, event registration, startup sequencing, task supervision, queue worker lifecycle, graceful shutdown, singleton/runtime files, and restart-safe state. Stop for approval before code changes.
+- Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, task supervision, queue worker startup, live queue rehydration, cache warming, scheduler startup, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, and Phase 6A introduced the first named startup lifecycle boundary for the initial `on_ready()` runtime bootstrap. Remaining `on_ready()` work still mixes runtime service startup, command sync/cache handling, event cache and rehydration, scheduler registration, queue worker startup, startup notifications, and later shutdown coordination.
+- Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md` and `docs/task_packs/Codex Chat Starter - DL_bot Phase 6B Runtime Services.md`. The next PR-sized slice should extract the `on_ready()` runtime services/observability block after `ready_runtime_bootstrap` into a named lifecycle phase while preserving order and behaviour. Keep command sync/cache, event rehydration, queue worker lifecycle, and shutdown coordination in later approval-gated slices.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5 upload routing is complete, smoke tested, closed, and production-pushed; proceed with audit/design before implementation.
+- Dependencies: Phase 5 upload routing and Phase 6A startup lifecycle boundary are complete, smoke tested, merged, and production-pushed; proceed with audit/design before each remaining implementation slice.
