@@ -179,3 +179,30 @@ The smoke test should not show:
 
 This starter continues the usage tracker ownership deferred optimisation in
 `docs/reference/deferred_optimisations.md`.
+
+---
+
+## Phase 6C Is Complete
+
+**Status**: Merged via PR codex/dlbot-phase-6c-usage-tracker (commit d39f5b0) and pushed to production.
+
+**What Changed**:
+
+- `decoraters.usage_tracker()` now delegates to the shared `usage_tracker.get_usage_tracker()` singleton.
+- `usage_tracker.py` owns the shared tracker singleton with unified flush cadence (`5s` / `20` events) for commands, components, metrics, and alerts.
+- `_run_ready_runtime_services()` now owns both usage tracker startup (`start_usage_tracker()`) and usage JSONL prune-loop registration (`task_monitor.create("usage_jsonl_prune", ...)`).
+- Usage observability startup removed from `full_startup_sequence()`.
+- Focused lifecycle tests added to assert shared singleton, preserved flush settings, and runtime-services ownership boundary.
+- Startup runbook and Phase 6 task-pack/deferred optimisation docs updated to reflect Phase 6C status.
+
+**Validation**:
+
+- All tests pass (1546 passed, 2 skipped).
+- All validation scripts pass (architecture boundaries, deferred items, select tests, smoke imports, command registration).
+- Pre-commit hooks pass.
+- Codex Security diff review completed (no findings).
+- Production smoke logs confirmed usage tracker startup in `ready_runtime_services` phase.
+
+**Next Steps**:
+
+Continue with the next Phase 6 task when identified, or proceed to other architectural optimisation work as prioritized.
