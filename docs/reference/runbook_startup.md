@@ -31,6 +31,9 @@ Purpose: describe the bot startup sequence, guardrails, logging setup, and commo
    - `ready_view_rehydration` schedules tracked persistent view rehydration.
    - `ready_domain_scheduler_tasks` starts the Ark lifecycle scheduler, MGE cache warm, and MGE
      lifecycle scheduler.
+   - `ready_queue_lifecycle` starts queue workers, loads persisted live queue state, refreshes the
+     live queue embed best-effort, and starts queue cleanup/watchdog tasks at the existing
+     `full_startup_sequence()` point.
    - `ready_pinned_calendar_rehydration` schedules pinned calendar view rehydration at the
      existing later startup point after `full_startup_sequence()`.
    - `ready_calendar_scheduler_tasks` starts the daily pinned calendar refresh and calendar
@@ -101,11 +104,19 @@ smoke on 2026-05-28 confirmed those commands loaded, executed, flushed usage tel
 scoped command resync completed successfully. Phase 6F completed in PR 123
 (`codex/dlbot-phase-6f-event-rehydration`), was smoke tested cleanly, merged, and pushed to
 production: event cache, reminder loading, tracked view rehydration, and pinned calendar
-rehydration now have explicit startup lifecycle boundaries. Phase 6G then separated scheduler and
-task-supervision startup into `core/scheduler_lifecycle.py` while preserving event readiness
-gating, task names, duplicate prevention, and the existing Ark/MGE/calendar ordering. Remaining
-lifecycle cleanup continues with queue worker lifecycle, shutdown coordination, and final
-process-entry/bot-construction cleanup.
+rehydration now have explicit startup lifecycle boundaries. Phase 6G completed in PR 124
+(`codex/dlbot-phase-6g-scheduler-lifecycle`), was smoke tested cleanly, merged, and pushed to
+production: scheduler and task-supervision startup now runs through `core/scheduler_lifecycle.py`
+while preserving event readiness gating, task names, duplicate prevention, and the existing
+Ark/MGE/calendar ordering. Review follow-up kept `refresh_event_cache_task` at its prior point
+before tracked view rehydration via `ready_event_cache_refresh_loop` and changed Ark scheduler
+registration failures to `logger.exception()` for traceback parity. Production smoke confirmed all
+new scheduler phases, Ark/MGE scheduler ticks, `full_startup_sequence()`, reminder cleanup, pinned
+calendar rehydration, daily pinned refresh, and calendar reminder loop startup with no startup
+phase failure or `on_ready()` critical exception. Phase 6H moved queue worker/live queue startup
+into `core/queue_lifecycle.py` and the `ready_queue_lifecycle` phase while preserving the existing
+`full_startup_sequence()` ordering. Remaining lifecycle cleanup continues with shutdown
+coordination and final process-entry/bot-construction cleanup.
 
 When changing startup, verify restart safety and avoid duplicate task creation.
 

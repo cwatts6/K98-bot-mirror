@@ -1,14 +1,31 @@
 # Codex Chat Starter - DL_bot Phase 6G Scheduler Task Supervision Boundary
 
-Use this starter to continue Phase 6 after Phase 6F event cache, reminder loading, and
-rehydration boundary was merged, smoke-tested, pushed to production, and marked complete.
+Status: complete. PR 124 (`codex/dlbot-phase-6g-scheduler-lifecycle`) was merged,
+smoke-tested, and pushed to production on 2026-05-28. This starter is retained as historical
+context for Phase 6G.
 
-Status: implementation approved and in progress. The approved ownership model uses
-`core/scheduler_lifecycle.py` for scheduler/task registration ordering, `TaskMonitor`
-registration, duplicate prevention, readiness gating, and best-effort logging. Scheduler
-implementation behavior remains in the existing domain modules.
-The long-running `refresh_event_cache_task` loop keeps its prior startup position before tracked
-view rehydration through the dedicated `ready_event_cache_refresh_loop` phase.
+Use `docs/task_packs/Codex Chat Starter - DL_bot Phase 6H Queue Worker Lifecycle.md` for the next
+Phase 6 slice.
+
+Delivered outcome:
+
+- `core/scheduler_lifecycle.py` now owns scheduler/task registration ordering, readiness gating,
+  `TaskMonitor` registration, duplicate-prevention checks, and best-effort failure logging.
+- `bot_instance.py:on_ready()` delegates event-dependent schedulers through
+  `ready_event_scheduler_tasks`, the long-running event cache refresh loop through
+  `ready_event_cache_refresh_loop`, Ark/MGE schedulers through `ready_domain_scheduler_tasks`, and
+  calendar schedulers through `ready_calendar_scheduler_tasks`.
+- Review feedback restored `refresh_event_cache_task.start()` to its prior ordering before tracked
+  view rehydration by giving it the dedicated `ready_event_cache_refresh_loop` phase.
+- Review feedback also changed Ark scheduler registration failure logging to `logger.exception()`
+  so it retains tracebacks like the other scheduler registration paths.
+- Production smoke confirmed all new scheduler lifecycle phases ran in order, event readiness
+  gating succeeded, event-dependent schedulers started, the event cache refresh loop was armed
+  before tracked view rehydration, Ark and MGE schedulers ticked, `full_startup_sequence()`
+  completed, reminder cleanup started, pinned calendar rehydration completed, daily pinned
+  calendar refresh started, and the calendar reminder loop armed.
+- No startup phase failure, `on_ready()` critical exception, scheduler registration failure,
+  pinned-calendar scheduling failure, or calendar reminder loop failure was observed.
 
 ## Copy/Paste Starter
 

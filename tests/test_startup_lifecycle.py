@@ -159,3 +159,20 @@ def test_event_rehydration_lifecycle_uses_dedicated_helpers():
     assert not _calls_name(on_ready, "load_active_reminders")
     assert not _calls_name(on_ready, "rehydrate_tracked_views")
     assert not _calls_name(on_ready, "rehydrate_pinned_calendar_view")
+
+
+def test_queue_lifecycle_uses_dedicated_helper():
+    src = Path("bot_instance.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    queue_lifecycle = _async_function(tree, "_run_ready_queue_lifecycle")
+    full_startup = _async_function(tree, "full_startup_sequence")
+
+    assert _calls_name(queue_lifecycle, "run_ready_queue_lifecycle")
+    assert _calls_name(full_startup, "run_startup_phases")
+
+    assert not _calls_name(full_startup, "queue_worker")
+    assert not _calls_name(full_startup, "load_live_queue")
+    assert not _calls_name(full_startup, "update_live_queue_embed")
+    assert not _creates_task_monitor_task(full_startup, "queue_cleanup")
+    assert not _creates_task_monitor_task(full_startup, "connection_watchdog")

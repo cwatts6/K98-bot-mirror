@@ -75,12 +75,27 @@ admin tooling convergence was completed in PR 122
 signature inventory, version display, cache update, and cache validation while preserving admin
 permissions, ephemeral responses, operation locking, embeds, timeout behaviour, and grouped command
 names. Production smoke confirmed both command execution and usage telemetry flushes, including a
-successful manual command resync.
+successful manual command resync. Phase 6F event cache/reminder/view rehydration was completed in
+PR 123 (`codex/dlbot-phase-6f-event-rehydration`), merged, smoke tested, and pushed to production
+on 2026-05-28. Phase 6G scheduler/task-supervision startup was completed in PR 124
+(`codex/dlbot-phase-6g-scheduler-lifecycle`), merged, smoke tested, and pushed to production on
+2026-05-28: `core/scheduler_lifecycle.py` now owns scheduler/task registration ordering, event
+readiness gating, `TaskMonitor` registration, duplicate-prevention checks, and best-effort logging;
+`bot_instance.py:on_ready()` delegates through `ready_event_scheduler_tasks`,
+`ready_event_cache_refresh_loop`, `ready_domain_scheduler_tasks`, and
+`ready_calendar_scheduler_tasks`. Production smoke confirmed event-dependent schedulers,
+`refresh_event_cache_task`, tracked view rehydration, Ark/MGE schedulers, `full_startup_sequence()`,
+reminder cleanup, pinned calendar rehydration, daily pinned refresh, and calendar reminder loop all
+started in the expected order with no startup phase failure or `on_ready()` critical exception.
+Phase 6H queue worker/live queue lifecycle moved queue worker registration, live queue recovery,
+best-effort queue embed refresh, queue cleanup startup, and connection watchdog startup into
+`core/queue_lifecycle.py` and the `ready_queue_lifecycle` startup phase while preserving the
+existing `full_startup_sequence()` ordering.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 startup/lifecycle ownership, not as a continuation of upload routing. Continue that task from
 `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md` and
-`docs/task_packs/Codex Chat Starter - DL_bot Phase 6G Scheduler Task Supervision Boundary.md`, with
+`docs/task_packs/Codex Chat Starter - DL_bot Phase 6H Queue Worker Lifecycle.md`, with
 this backlog and the current `K98-bot-mirror` GitHub issues list as supporting context.
 
 ### Deferred Optimisation
@@ -149,20 +164,29 @@ this backlog and the current `K98-bot-mirror` GitHub issues list as supporting c
 ### Deferred Optimisation
 - Area: `DL_bot.py`, `bot_instance.py` startup and lifecycle
 - Type: architecture
-- Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, queue worker startup, live queue rehydration, cache warming, startup notifications, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, Phase 6A introduced the first named startup lifecycle boundary for the initial `on_ready()` runtime bootstrap, Phase 6B extracted runtime services/observability startup into `ready_runtime_services`, Phase 6C consolidated usage tracker lifecycle ownership, Phase 6D extracted startup command signature/cache/sync handling into `core/command_lifecycle.py` and `ready_command_sync`, Phase 6E converged command lifecycle admin tooling onto the same lifecycle owner, Phase 6F extracted event cache, reminder loading, tracked view rehydration, and pinned calendar view rehydration behind named lifecycle boundaries, and Phase 6G extracted scheduler/task-supervision startup into `core/scheduler_lifecycle.py`. Remaining `on_ready()` work still mixes cache warming, queue worker startup, startup notifications, and later shutdown coordination.
-- Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`. After Phase 6G, keep queue worker lifecycle, shutdown coordination, and final process-entry/bot-construction cleanup in later approval-gated slices.
+- Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, cache warming, startup notifications, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, Phase 6A introduced the first named startup lifecycle boundary for the initial `on_ready()` runtime bootstrap, Phase 6B extracted runtime services/observability startup into `ready_runtime_services`, Phase 6C consolidated usage tracker lifecycle ownership, Phase 6D extracted startup command signature/cache/sync handling into `core/command_lifecycle.py` and `ready_command_sync`, Phase 6E converged command lifecycle admin tooling onto the same lifecycle owner, Phase 6F extracted event cache, reminder loading, tracked view rehydration, and pinned calendar view rehydration behind named lifecycle boundaries, Phase 6G extracted scheduler/task-supervision startup into `core/scheduler_lifecycle.py`, and Phase 6H extracted queue worker/live queue startup into `core/queue_lifecycle.py`. Remaining `on_ready()` work still mixes cache warming, startup notifications, shutdown coordination, and process-entry/bot-construction cleanup.
+- Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`. After Phase 6H, keep shutdown coordination and final process-entry/bot-construction cleanup in later approval-gated slices.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5 upload routing and Phase 6A through Phase 6F lifecycle slices are complete, merged, production-pushed, and smoke tested; Phase 6G is the current scheduler/task-supervision implementation slice and should be smoke tested before marking complete.
+- Dependencies: Phase 5 upload routing and Phase 6A through Phase 6H lifecycle slices are complete or in delivery; proceed with shutdown/recovery coordination before process-entry cleanup.
 
 ### Deferred Optimisation
-- Area: `bot_instance.py:_start_event_dependent_tasks`
-- Type: architecture
-- Description: Phase 6G moved the event-dependent scheduler bundle and later Ark/MGE/calendar scheduler registrations out of `bot_instance.py:on_ready()` and the event cache/rehydration boundary into `core/scheduler_lifecycle.py`, while preserving readiness gating, startup order, `TaskMonitor` duplicate prevention, and existing production logging.
-- Suggested Fix: After Phase 6G production smoke, remove this item from the active backlog or move it to resolved history. Keep any remaining queue-worker, shutdown, process-entry, and pinned-calendar persistence work as separate deferred items.
+- Area: `utils.py`, `bot_helpers.py`, `core/queue_lifecycle.py`, queue runtime state
+- Type: refactor
+- Description: Phase 6H separated queue lifecycle startup, but broader queue persistence hardening remains out of scope. `load_live_queue()` is synchronous while scheduling an async state apply when an event loop is running, and queue draining/state flush semantics are still coupled to later shutdown behavior.
+- Suggested Fix: Add a dedicated queue persistence hardening slice after Phase 6I or fold it into Phase 6I only if shutdown work requires it. Make live queue load/apply explicitly awaitable where practical, preserve sync test compatibility or add a safe wrapper, verify atomic save behavior and stale metadata handling, and add restart/persistence tests for load-before-embed-refresh ordering and state flush after queue cancellation.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 6F boundary extraction completed in PR 123 (`codex/dlbot-phase-6f-event-rehydration`), smoke tested cleanly, merged, and pushed to production; scheduler ownership was explicitly deferred to Phase 6G.
+- Dependencies: Phase 6H lifecycle extraction; coordinate with Phase 6I cooperative cancellation and queue draining/state flush design.
+
+### Deferred Optimisation
+- Area: `bot_helpers.py`, `bot_instance.py`, `DL_bot.py` shutdown and queue task lifecycle
+- Type: architecture
+- Description: Queue workers, queue cleanup, connection watchdog, and other background tasks still lack a single approved shutdown/recovery coordination boundary for cooperative cancellation, queue draining, state flush, singleton/PID markers, and logging shutdown order.
+- Suggested Fix: Phase 6I should fix cooperative cancellation, queue draining/state flush, and shutdown ordering. Audit signal/admin shutdown paths, `TaskMonitor` cancellation behavior, queue worker cancellation, `QUEUE_CACHE_FILE` persistence, `LAST_SHUTDOWN_INFO` writing, singleton/PID cleanup, and logging flush order before implementation.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 6H queue lifecycle extraction; keep process-entry and bot-construction cleanup for Phase 6J unless Phase 6I reveals a hard dependency.
 
 ### Deferred Optimisation
 - Area: `event_calendar/pinned_embed.py`

@@ -5,7 +5,7 @@
 - Task name: `DL_bot startup/lifecycle separation - Phase 6 audit`
 - Date: `2026-05-26`
 - Last updated: `2026-05-28`
-- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B/6C/6D/6E/6F startup lifecycle boundaries were pushed to production`
+- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B/6C/6D/6E/6F/6G startup lifecycle boundaries were pushed to production`
 - Task type: `deferred optimisation batch`
 - One-pass approved: `no`
 
@@ -136,8 +136,9 @@ Phase 6F event cache, reminder loading, and rehydration boundary is complete:
   scheduling failure, or `on_ready()` critical exception was observed.
 - The PR was merged and pushed to production.
 
-Phase 6G scheduler and task-supervision boundary is the current implementation slice:
+Phase 6G scheduler and task-supervision boundary is complete:
 
+- PR 124 (`codex/dlbot-phase-6g-scheduler-lifecycle`) added `core/scheduler_lifecycle.py`.
 - `core/scheduler_lifecycle.py` owns scheduler/task registration ordering, readiness gating,
   `TaskMonitor` registration, duplicate-prevention checks, and best-effort logging.
 - `bot_instance.py:on_ready()` delegates event-dependent schedulers through
@@ -146,6 +147,17 @@ Phase 6G scheduler and task-supervision boundary is the current implementation s
   calendar schedulers through `ready_calendar_scheduler_tasks`.
 - `reminder_cleanup` deliberately remains at its existing point after `full_startup_sequence()` and
   before pinned calendar rehydration.
+- Review feedback restored `refresh_event_cache_task.start()` to its previous position before
+  tracked view rehydration via the dedicated `ready_event_cache_refresh_loop` phase and changed Ark
+  scheduler registration failure logging to `logger.exception()` for traceback parity.
+- Production smoke testing on 2026-05-28 confirmed all Phase 6G lifecycle phases ran in order,
+  event-dependent schedulers started after event readiness, `refresh_event_cache_task` armed before
+  tracked view rehydration, Ark and MGE schedulers started and ticked, `full_startup_sequence()`
+  completed, reminder cleanup started, pinned calendar rehydration completed, daily pinned calendar
+  refresh started, and the calendar reminder loop armed.
+- No startup phase failure, `on_ready()` critical exception, scheduler registration failure,
+  pinned-calendar scheduling failure, or calendar reminder loop failure was observed.
+- The PR was merged and pushed to production.
 - Queue worker lifecycle, shutdown coordination, and process-entry cleanup remain later Phase 6
   slices.
 
@@ -360,9 +372,9 @@ Initial classification before audit:
 | Command signature/cache/sync ownership | complete | Phase 6D moved startup command signature/cache/sync handling into `core/command_lifecycle.py` and `ready_command_sync`, preserving cache, scoped sync, timeout telemetry, and loaded-command logging behaviour. |
 | Command lifecycle admin tooling convergence | complete | Phase 6E reused `core/command_lifecycle.py` from `/ops resync_commands`, `/ops validate_command_cache`, and `/ops show_command_versions` while preserving admin permissions, embeds, timeout behaviour, and operator-facing summaries. |
 | Event cache, reminder loading, and rehydration boundary | complete | Phase 6F separated event cache load/refresh, active reminder loading, event-dependent view rehydration, tracked view rehydration, and pinned calendar view rehydration from the remaining `on_ready()` body with explicit ordering and startup phase logs. Scheduler ownership inside the existing event-dependent bundle was deliberately deferred to Phase 6G. |
-| Scheduler and task-supervision boundary | current slice | Phase 6G separates scheduler/task registration from the remaining `on_ready()` body and the current event-dependent bundle while preserving startup order, readiness gates, best-effort behavior, and `TaskMonitor` duplicate prevention. |
-| `on_ready()` / `full_startup_sequence()` remaining responsibilities | audit first | Continue extracting in small slices; do not move cache warming, queue workers, startup notifications, and shutdown together. |
-| Queue worker startup and live queue rehydration | audit first | Restart-sensitive; must preserve worker handoff and live queue persistence. |
+| Scheduler and task-supervision boundary | complete | Phase 6G separated scheduler/task registration from the remaining `on_ready()` body and the previous event-dependent bundle while preserving startup order, readiness gates, best-effort behavior, and `TaskMonitor` duplicate prevention. |
+| `on_ready()` / `full_startup_sequence()` remaining responsibilities | audit first | Continue extracting in small slices; do not move cache warming, startup notifications, shutdown, and process entry together. |
+| Queue worker startup and live queue rehydration | complete | Phase 6H extracted queue worker registration, live queue recovery, best-effort queue embed refresh, queue cleanup startup, and connection watchdog startup into `core/queue_lifecycle.py` and `ready_queue_lifecycle` while preserving ordering and `TaskMonitor` duplicate prevention. |
 | Task monitor/scheduler startup | audit first | Multiple subsystems depend on startup order and duplicate prevention. |
 | Graceful shutdown and signal handling | audit first | High blast radius; may be separate PR from startup extraction. |
 | SQL/importer contracts | not applicable unless discovered | Phase 6 should avoid SQL/importer contract changes. |
@@ -371,12 +383,14 @@ Final decisions should be updated after each Phase 6 sub-phase.
 
 ## 13.1 Remaining Phase 6 Slices
 
-Current recommended order after Phase 6G:
+Current recommended order after Phase 6H:
 
-1. Phase 6H queue worker and live queue lifecycle: isolate queue worker startup, live queue rehydration,
-   queue embed refresh, and queue persistence/recovery concerns.
-2. Phase 6I shutdown and recovery coordination: audit graceful teardown, signal handling, task
-   cancellation, state flush, singleton/PID/shutdown markers, and logging shutdown order.
+1. Phase 6I shutdown and recovery coordination: audit graceful teardown, signal handling, task
+   cancellation, state flush, singleton/PID/shutdown markers, and logging shutdown order. Fix:
+   handle cooperative cancellation, queue draining/state flush, and shutdown ordering.
+2. Optional queue persistence hardening slice: after Phase 6I, or inside Phase 6I only if shutdown
+   work requires it, harden live queue load/apply semantics, atomic save verification, stale
+   metadata handling, and restart/state-flush tests.
 3. Phase 6J process-entry and bot-construction cleanup: only after the smaller runtime lifecycle slices are
    stable, review whether `DL_bot.py`, `bot_loader.py`, and `bot_instance.py` need a clearer final
    ownership split.

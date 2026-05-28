@@ -66,6 +66,7 @@ from core.event_rehydration_lifecycle import (
     wait_for_events,
 )
 from core.interaction_safety import get_operation_lock
+from core.queue_lifecycle import run_ready_queue_lifecycle
 from core.scheduler_lifecycle import (
     run_ready_calendar_scheduler_tasks,
     run_ready_domain_scheduler_tasks,
@@ -1676,6 +1677,20 @@ async def _run_ready_calendar_scheduler_tasks() -> None:
     )
 
 
+async def _run_ready_queue_lifecycle() -> None:
+    await run_ready_queue_lifecycle(
+        channel_ids=CHANNEL_IDS,
+        task_monitor_create=task_monitor.create,
+        queue_worker=queue_worker,
+        load_live_queue=load_live_queue,
+        update_live_queue_embed=update_live_queue_embed,
+        bot=bot,
+        notify_channel_id=NOTIFY_CHANNEL_ID,
+        queue_cleanup_loop=queue_cleanup_loop,
+        connection_watchdog=connection_watchdog,
+    )
+
+
 async def _run_ready_runtime_services() -> None:
     # Start heartbeat now that the loop is running
     try:
@@ -2037,17 +2052,9 @@ async def full_startup_sequence():
                         csv.writer(f).writerow(headers)
                         logger.info(f"[LOG INIT] Initialized headers for {log_file}")
 
-            for cid in CHANNEL_IDS:
-                task_monitor.create(f"queue_worker:{cid}", lambda cid=cid: queue_worker(cid))
-
-            load_live_queue()
-            try:
-                await update_live_queue_embed(bot, NOTIFY_CHANNEL_ID)
-            except Exception as e:
-                logger.error(f"💥 Failed to update queue embed: {e}")
-
-            task_monitor.create("queue_cleanup", queue_cleanup_loop)
-            task_monitor.create("connection_watchdog", lambda: connection_watchdog(bot))
+            await run_startup_phases(
+                [StartupPhase("ready_queue_lifecycle", _run_ready_queue_lifecycle)]
+            )
 
             # --- CrystalTech config load & validate at startup ---
             try:
