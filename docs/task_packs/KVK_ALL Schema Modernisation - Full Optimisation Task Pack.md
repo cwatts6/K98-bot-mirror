@@ -705,7 +705,7 @@ tests/test_kvk_export_service.py
 tests/test_gsheet_module.py
 tests/test_kvk_all_recompute_sql_contract.py
 sql/kvk_all_phase5_export_contract_decoupling.sql
-docs/KVK_ALL Schema Modernisation - Phase 5 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 5 Initiation Statement.md
 
 SQL delivery:
 
@@ -785,7 +785,7 @@ kvk/dal/kvk_reporting_dal.py
 kvk/services/kvk_reporting_service.py
 tests/test_kvk_reporting_service.py
 tests/test_kvk_embed.py
-docs/KVK_ALL Schema Modernisation - Phase 6 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 6 Initiation Statement.md
 
 Python delivery:
 
@@ -853,7 +853,7 @@ kvk/dal/kvk_admin_dal.py
 kvk/services/kvk_admin_service.py
 tests/test_kvk_admin_service.py
 tests/test_stats_cmds.py
-docs/KVK_ALL Schema Modernisation - Phase 7 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 7 Initiation Statement.md
 
 Python delivery:
 
@@ -922,7 +922,7 @@ kvk_all_importer.py
 tests/test_kvk_all_import_dal.py
 tests/test_kvk_all_importer.py
 tests/test_kvk_all_recompute_sql_contract.py
-docs/KVK_ALL Schema Modernisation - Phase 8 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 8 Initiation Statement.md
 
 SQL delivery:
 

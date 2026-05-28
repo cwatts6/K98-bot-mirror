@@ -24,7 +24,7 @@ Before changing code, review:
 * `docs/K98 Bot - Testing Standards.md`
 * `docs/k98 Bot - Deferred Optimisation Framework.md`
 * `docs/deferred_optimisations.md`
-* `docs/Codex Task Pack - MGE Process Audit + Polish.md`
+* `docs/task_packs/archive/Codex Task Pack - MGE Process Audit + Polish.md`
 * Recent MGE PRs, especially PR #74 and the earlier PRs #71 and #72
 * GitHub issues #29 and #32
 
