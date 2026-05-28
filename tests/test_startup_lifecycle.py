@@ -232,6 +232,25 @@ def test_graceful_teardown_drains_and_flushes_queue_before_task_monitor_stop():
     assert _first_call_line(teardown, "_flush_live_queue_state") < task_monitor_stop_line
 
 
+def test_queue_shutdown_drain_waits_even_when_qsize_is_zero():
+    src = Path("bot_instance.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    drain = _async_function(tree, "_drain_shutdown_queues")
+    total_pending_branch = next(
+        node
+        for node in ast.walk(drain)
+        if isinstance(node, ast.If)
+        and isinstance(node.test, ast.Compare)
+        and isinstance(node.test.left, ast.Name)
+        and node.test.left.id == "total_pending"
+    )
+
+    assert not any(isinstance(child, ast.Return) for child in ast.walk(total_pending_branch))
+    assert "gather" in _call_order(drain, {"gather", "wait_for"})
+    assert "wait_for" in _call_order(drain, {"gather", "wait_for"})
+
+
 def test_dl_bot_signal_shutdown_calls_bot_instance_teardown_before_bot_close():
     src = Path("DL_bot.py").read_text(encoding="utf-8")
     tree = ast.parse(src)

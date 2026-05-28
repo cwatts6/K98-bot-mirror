@@ -1422,15 +1422,18 @@ async def _drain_shutdown_queues(timeout_seconds: float = _QUEUE_SHUTDOWN_DRAIN_
     pending_before = {channel_id: queue.qsize() for channel_id, queue in queues}
     total_pending = sum(pending_before.values())
     if total_pending <= 0:
-        logger.info("[SHUTDOWN] Channel queues already empty before task cancellation.")
-        return
-
-    logger.info(
-        "[SHUTDOWN] Draining %d queued message(s) across %d channel queue(s) for up to %.1fs.",
-        total_pending,
-        len(queues),
-        timeout_seconds,
-    )
+        logger.info(
+            "[SHUTDOWN] Channel queues have no pending items; waiting up to %.1fs for "
+            "any in-flight queue work to finish.",
+            timeout_seconds,
+        )
+    else:
+        logger.info(
+            "[SHUTDOWN] Draining %d queued message(s) across %d channel queue(s) for up to %.1fs.",
+            total_pending,
+            len(queues),
+            timeout_seconds,
+        )
     joins = [queue.join() for _channel_id, queue in queues]
     try:
         await asyncio.wait_for(asyncio.gather(*joins), timeout=timeout_seconds)
