@@ -113,6 +113,8 @@ archive/
 !docs/reference/archive/**
 !docs/templates/archive/
 !docs/templates/archive/**
+!docs/task_packs/archive/
+!docs/task_packs/archive/**
 restart_log.csv
 download_log.csv
 input_log.csv

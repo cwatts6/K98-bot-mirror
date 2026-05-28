@@ -1,5 +1,13 @@
 # Codex Task Pack - DL_bot Upload Routing Deferred Optimisation Audit
 
+Status: complete. This DL_bot upload-routing deferred optimisation programme is closed after
+Phase 6L. Phases 1 through 5 extracted the upload routing paths from the legacy `DL_bot.py`
+listener into the `upload_routes` pattern, and Phase 6A through Phase 6L separated and documented
+startup/lifecycle ownership. The final ownership model is stable: `DL_bot.py` owns process entry
+and message/upload delegation, `bot_loader.py` owns bot construction, and `bot_instance.py` owns
+runtime lifecycle. Remaining work is tracked as separate deferred optimisation batches rather than
+continuing this programme.
+
 ## 1. Task Header
 
 - Task name: `DL_bot upload-routing deferred optimisation audit`
@@ -437,8 +445,8 @@ Phase 5D delivery notes:
   log-backup scheduling.
 - PR 116 (`codex/dlbot-upload-routing-phase-5d`) was smoke tested successfully on 2026-05-26,
   closed, pushed to production, and confirmed in production logs.
-- Phase 5 upload-routing consolidation is complete. Phase 6 startup/lifecycle separation is the
-  next active architecture batch.
+- Phase 5 upload-routing consolidation is complete. Phase 6 startup/lifecycle separation was
+  completed through Phase 6L and the DL_bot optimisation programme is closed.
 
 14. Testing Requirements
 

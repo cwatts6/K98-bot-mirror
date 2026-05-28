@@ -171,6 +171,18 @@ BOT_PID_FILE = (
     Path(LOG_DIR).parent / "bot_pid.txt"
 )  # keep path consistent with LOG_DIR/BASE_DIR layout
 
+
+def _write_child_pid_file() -> None:
+    """Publish the current child PID for watchdog and operator tooling."""
+    try:
+        tmp = BOT_PID_FILE.with_suffix(".tmp")
+        tmp.write_text(str(os.getpid()), encoding="utf-8")
+        os.replace(tmp, BOT_PID_FILE)
+        logger.info("[PID] bot_pid.txt updated -> %s (PID %d)", BOT_PID_FILE, os.getpid())
+    except Exception as e:
+        logger.debug("[PID] Failed to update %s (continuing): %s", BOT_PID_FILE, e, exc_info=True)
+
+
 # --- DEBUG guard: detect Button shadowing early ---
 import inspect
 
@@ -180,16 +192,7 @@ if not inspect.isclass(discord.ui.Button):
         "Search for 'from discord.ui import Button' or 'Button =' assignments."
     )
 
-# Atomic write so ops tools always see the current child PID
-try:
-    tmp = BOT_PID_FILE.with_suffix(".tmp")
-    tmp.write_text(str(os.getpid()), encoding="utf-8")
-    # os.replace is atomic on NTFS; Path.replace works too
-    os.replace(tmp, BOT_PID_FILE)
-    logger.info("[PID] bot_pid.txt updated -> %s (PID %d)", BOT_PID_FILE, os.getpid())
-except Exception as e:
-    # Keep startup resilient but capture full stack at DEBUG level for later debugging
-    logger.debug("[PID] Failed to update %s (continuing): %s", BOT_PID_FILE, e, exc_info=True)
+_write_child_pid_file()
 
 # --- Process-level exception fallbacks (non-async) — SAFE, non-logging ---
 # Keep original std streams so we can bypass logging safely
@@ -850,21 +853,25 @@ def _sigterm_handler(signum, frame):
     _begin_shutdown_from_signal("SIGTERM", exit_code=0)
 
 
-# Register signal/console control handlers (Windows-first, cross-platform safe)
-try:
-    signal.signal(signal.SIGINT, _sigint_handler)  # Ctrl-C
-except Exception:
-    pass
-try:
-    if hasattr(signal, "SIGBREAK"):
-        signal.signal(signal.SIGBREAK, _sigbreak_handler)  # Ctrl-Break (Windows)
-except Exception:
-    pass
-try:
-    if hasattr(signal, "SIGTERM"):
-        signal.signal(signal.SIGTERM, _sigterm_handler)  # POSIX/services
-except Exception:
-    pass
+def _register_process_signal_handlers() -> None:
+    """Register process-level shutdown signal handlers."""
+    try:
+        signal.signal(signal.SIGINT, _sigint_handler)  # Ctrl-C
+    except Exception:
+        pass
+    try:
+        if hasattr(signal, "SIGBREAK"):
+            signal.signal(signal.SIGBREAK, _sigbreak_handler)  # Ctrl-Break (Windows)
+    except Exception:
+        pass
+    try:
+        if hasattr(signal, "SIGTERM"):
+            signal.signal(signal.SIGTERM, _sigterm_handler)  # POSIX/services
+    except Exception:
+        pass
+
+
+_register_process_signal_handlers()
 
 # === Run Bot ===
 if __name__ == "__main__":

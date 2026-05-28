@@ -1,11 +1,17 @@
 # DL_bot Startup Lifecycle - Phase 6 Audit Starter
 
+Status: complete. Phase 6A through Phase 6L are delivered and the startup/lifecycle programme is
+closed. `DL_bot.py` remains process-entry and message/upload owner, `bot_loader.py` remains bot
+construction owner, and `bot_instance.py` remains lifecycle owner. Historical Phase 6 starters are
+archived under `docs/task_packs/archive/`; future lifecycle-adjacent work should be scoped as new
+deferred optimisation tasks.
+
 ## 1. Task Header
 
 - Task name: `DL_bot startup/lifecycle separation - Phase 6 audit`
 - Date: `2026-05-26`
 - Last updated: `2026-05-28`
-- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B/6C/6D/6E/6F/6G/6H/6I/6J lifecycle boundaries were pushed to production`
+- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B/6C/6D/6E/6F/6G/6H/6I/6J/6K lifecycle boundaries were pushed to production`
 - Task type: `deferred optimisation batch`
 - One-pass approved: `no`
 
@@ -31,6 +37,7 @@ Before implementation, read the current repository instructions and indexed core
 - `docs/task_packs/Codex Chat Starter - DL_bot Phase 6I Shutdown Recovery Coordination.md`
 - `docs/task_packs/Codex Chat Starter - DL_bot Phase 6J Graceful Restart Shutdown Operations.md`
 - `docs/task_packs/Codex Chat Starter - DL_bot Phase 6K Queue Persistence Hardening.md`
+- `docs/task_packs/Codex Chat Starter - DL_bot Phase 6L Process Entry Bot Construction Cleanup.md`
 
 Use `docs/reference/ENV_REFERENCE.md` if environment-variable ownership or runtime configuration
 validation becomes part of the design.
@@ -217,6 +224,25 @@ Phase 6J graceful restart and shutdown operations hardening is complete:
   stop, watchdog restart, and startup return through Phase 6 lifecycle logs.
 - The smoke log did not include a literal `[SHUTDOWN] Logging quiesced` line; this is expected
   because `quiesce_logging()` is currently silent.
+
+Phase 6K queue persistence hardening is complete:
+
+- PR 128 (`codex/dlbot-phase-6k-queue-persistence`) was merged, pushed to production, and smoke
+  tested successfully on 2026-05-28.
+- `core/queue_lifecycle.py` now awaits persisted live queue state load/apply before best-effort
+  embed refresh.
+- `utils.py` provides explicit async live queue load/save helpers while preserving sync-compatible
+  wrappers for existing offloaded callers.
+- Live queue cache writes use the established atomic JSON helper.
+- Sync/offloaded queue saves snapshot without awaiting the Discord main-loop `live_queue_lock`.
+- `bot_instance.py` persists live queue state before supervised task cancellation and reports
+  success only after the atomic save completes.
+- `core/restart_operations.py` forces process exit with the restart code if `bot.close()` times out
+  after restart markers are written.
+- Production `/ops graceful_restart` smoke confirmed queue drain, live queue persistence, task
+  cancellation, usage tracker stop, watchdog restart, `ready_queue_lifecycle` startup return,
+  stale queue embed metadata replacement, queue cleanup/watchdog registration, and startup
+  continuation through `ready_calendar_scheduler_tasks`.
 
 `DL_bot.py` is now much closer to listener/delegation ownership for uploads, but startup and
 lifecycle concerns remain spread across `DL_bot.py`, `bot_instance.py`, `bot_loader.py`,
@@ -450,13 +476,12 @@ Current recommended order after Phase 6J:
    `graceful_shutdown.py` so scheduled machine restarts first request cooperative teardown with a
    configurable 15-second default fallback. Complete in PR 127 and pushed to production; smoke
    proved Phase 6I shutdown logs in production.
-3. Optional Phase 6K queue persistence hardening slice: harden live queue load/apply semantics,
-   atomic save verification, stale metadata handling, and restart/state-flush tests now that the
-   cooperative restart path is proven.
-4. Final process-entry and bot-construction cleanup: only after the smaller runtime lifecycle
-   slices are stable, graceful restart/shutdown operations are smoke-tested, and the optional queue
-   persistence hardening decision is made. Review whether `DL_bot.py`, `bot_loader.py`, and
-   `bot_instance.py` need a clearer final ownership split.
+3. Phase 6K queue persistence hardening: complete in PR 128 and pushed to production. Smoke proved
+   live queue load-before-refresh ordering, atomic queue persistence, stale metadata recovery,
+   graceful restart queue flush, and watchdog restart continuity.
+4. Phase 6L final process-entry and bot-construction cleanup: complete. The final ownership split
+   is documented as `DL_bot.py` for process entry/message ownership, `bot_loader.py` for bot
+   construction, and `bot_instance.py` for lifecycle ownership.
 
 The wider command-surface migration/renaming programme is deliberately separate from Phase 6.
 

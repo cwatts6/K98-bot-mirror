@@ -1,7 +1,31 @@
 # Codex Chat Starter - DL_bot Phase 6K Queue Persistence Hardening
 
-Use this starter only if the optional queue persistence hardening slice is approved after Phase 6J.
-If this slice is skipped, proceed instead to final process-entry and bot-construction cleanup.
+Status: complete. Phase 6K was delivered in PR 128
+(`codex/dlbot-phase-6k-queue-persistence`), merged, pushed to production, and smoke tested
+successfully on 2026-05-28.
+
+Delivered outcome:
+
+- `core/queue_lifecycle.py` now awaits live queue load/apply before best-effort embed refresh.
+- `utils.py` provides explicit async live queue load/save helpers while preserving sync-compatible
+  wrappers.
+- Live queue cache writes use the established atomic JSON helper.
+- Sync/offloaded queue saves remain thread-safe and do not await the Discord main-loop
+  `live_queue_lock`.
+- Shutdown persists live queue state before supervised task cancellation and reports success only
+  after the atomic write completes.
+- Stale persisted queue embed metadata is cleared/replaced during startup embed refresh.
+- `core/restart_operations.py` forces process exit with the restart exit code if `bot.close()`
+  times out after restart markers are written, preventing the watchdog from waiting indefinitely.
+- Production `/ops graceful_restart` smoke confirmed queue drain, live queue persistence, task
+  cancellation, usage tracker stop, watchdog restart, `ready_queue_lifecycle` startup return,
+  queue cleanup/watchdog registration, stale metadata recovery, and startup continuation through
+  `ready_calendar_scheduler_tasks`.
+
+Phase 6L subsequently closed process-entry and bot-construction cleanup. This starter is retained
+as historical context for the archived DL_bot programme.
+
+Historical starter content follows.
 
 ## Copy/Paste Starter
 
@@ -182,10 +206,9 @@ After implementation and deployment, manually verify:
 
 ## Remaining Phase 6 Slices
 
-Recommended order after Phase 6J:
+Recommended order after Phase 6K:
 
-1. Optional Phase 6K queue persistence hardening.
-2. Final process-entry and bot-construction cleanup after the queue persistence decision.
+1. Final process-entry and bot-construction cleanup.
 
 The wider command-surface migration/renaming programme remains separate from Phase 6.
 
@@ -196,6 +219,6 @@ This starter continues the queue runtime state deferred optimisation in
 
 Carry forward, but do not implement unless separately approved:
 
-- process-entry and bot-construction cleanup after the queue persistence decision
+- process-entry and bot-construction cleanup
 - pinned calendar tracker persistence hardening in `event_calendar/pinned_embed.py`
 - wider command-surface migration/renaming programme

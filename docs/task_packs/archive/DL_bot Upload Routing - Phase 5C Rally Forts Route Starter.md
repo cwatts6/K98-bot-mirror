@@ -68,8 +68,8 @@ validation confirmed production operational logs were unchanged.
 Phase 5D starter packet, retained for delivery history:
 `docs/task_packs/DL_bot Upload Routing - Phase 5D Fallback Queue Route Starter.md`.
 
-Phase 5 upload-routing consolidation is now complete. Phase 6 startup/lifecycle separation is the
-next active architecture batch.
+Phase 5 upload-routing consolidation is complete. Phase 6 startup/lifecycle separation was later
+completed through Phase 6L.
 
 ## Goal
 

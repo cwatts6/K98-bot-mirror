@@ -263,3 +263,39 @@ def test_dl_bot_signal_shutdown_calls_bot_instance_teardown_before_bot_close():
 
     quiesce = _async_function(tree, "_quiesce_background_tasks")
     assert _calls_name(quiesce, "run_graceful_teardown")
+
+
+def test_dl_bot_process_entry_uses_named_pid_and_signal_helpers():
+    src = Path("DL_bot.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    assert _function(tree, "_write_child_pid_file")
+    assert _function(tree, "_register_process_signal_handlers")
+
+    module_calls = [
+        child
+        for child in tree.body
+        if isinstance(child, ast.Expr)
+        and isinstance(child.value, ast.Call)
+        and isinstance(child.value.func, ast.Name)
+    ]
+    called_names = [child.value.func.id for child in module_calls]
+    assert "_write_child_pid_file" in called_names
+    assert "_register_process_signal_handlers" in called_names
+
+    main_guard_line = next(
+        node.lineno
+        for node in tree.body
+        if isinstance(node, ast.If)
+        and isinstance(node.test, ast.Compare)
+        and isinstance(node.test.left, ast.Name)
+        and node.test.left.id == "__name__"
+    )
+    assert _first_call_line(tree, "_write_child_pid_file") < main_guard_line
+    assert _first_call_line(tree, "_register_process_signal_handlers") < main_guard_line
+
+
+def _function(tree: ast.AST, name: str) -> ast.FunctionDef:
+    return next(
+        node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == name
+    )

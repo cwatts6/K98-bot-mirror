@@ -11,9 +11,9 @@ startup continuity, but it did not provide a reliable in-process graceful shutdo
 `/ops force_restart` remains the break-glass restart path.
 
 Phase 6J was subsequently completed in PR 127 and proved the cooperative restart path in
-production. Use `docs/task_packs/Codex Chat Starter - DL_bot Phase 6K Queue Persistence Hardening.md`
-for the next optional Phase 6 slice, or proceed to final process-entry and bot-construction cleanup
-if the queue hardening slice is skipped.
+production. Phase 6K was subsequently completed in PR 128 and hardened live queue persistence.
+Phase 6L subsequently closed process-entry and bot-construction cleanup. This starter is retained
+as historical context for the archived DL_bot programme.
 
 Historical starter retained below.
 
@@ -278,10 +278,9 @@ understood, and only when shutdown/restart still continues cleanly.
 
 ## Remaining Phase 6 Slices
 
-Recommended order after Phase 6J:
+Recommended order after Phase 6K:
 
-1. Optional Phase 6K queue persistence hardening.
-2. Final process-entry and bot-construction cleanup after the queue persistence decision.
+1. Final process-entry and bot-construction cleanup.
 
 The wider command-surface migration/renaming programme remains separate from Phase 6.
 
@@ -293,6 +292,5 @@ lifecycle extraction.
 
 Carry forward, but do not implement unless separately approved:
 
-- queue persistence hardening as the next optional Phase 6 slice
-- process-entry and bot-construction cleanup after the queue persistence decision
+- process-entry and bot-construction cleanup, completed in Phase 6L
 - pinned calendar tracker persistence hardening in `event_calendar/pinned_embed.py`

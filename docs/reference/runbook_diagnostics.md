@@ -97,7 +97,10 @@ Only cancel work when you understand the import/process being interrupted.
 ## Live Queue Recovery
 
 `QUEUE_CACHE_FILE` stores queued job state and message metadata. If the bot restarts, queue
-helpers reload the persisted state and attempt to rehydrate the queue message.
+helpers reload the persisted state and attempt to rehydrate the queue message. Since Phase 6K,
+startup awaits live queue state load/apply before best-effort embed refresh, live queue writes use
+the project atomic JSON helper, and stale/deleted queue message metadata is cleared and replaced
+during embed refresh while preserving queued job display state where possible.
 
 If recovery fails:
 
@@ -105,6 +108,10 @@ If recovery fails:
 2. Check `logs/error_log.txt` and `logs/crash.log`.
 3. Confirm the queue message/channel still exists and is accessible.
 4. Clear stale metadata only after preserving the file for review.
+
+Queue-domain redesign and SQL-backed queue persistence are deferred follow-on programmes after the
+completed DL_bot Phase 6 lifecycle work. Treat investigations in this runbook as diagnostics for
+the current file-backed model unless a new approved task explicitly changes the persistence model.
 
 ## Common Triage Flow
 

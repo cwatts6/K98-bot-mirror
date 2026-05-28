@@ -9,9 +9,9 @@ as the emergency path, centralized restart marker writing/cooperative invocation
 `core/restart_operations.py`, and updated `graceful_shutdown.py` to request cooperative teardown
 first with a configurable fallback timeout defaulting to 15 seconds.
 
-Use `docs/task_packs/Codex Chat Starter - DL_bot Phase 6K Queue Persistence Hardening.md` for the
-next optional Phase 6 slice, or continue to final process-entry/bot-construction cleanup if that
-queue hardening slice is explicitly skipped.
+Phase 6K was subsequently completed in PR 128, and Phase 6L subsequently closed process-entry and
+bot-construction cleanup. This starter is retained as historical context for the archived DL_bot
+programme.
 
 Historical starter content follows for audit context.
 
@@ -296,13 +296,9 @@ handler failures appear.
 
 ## Remaining Phase 6 Slices
 
-Recommended order after Phase 6J:
+Recommended order after Phase 6K:
 
-1. Optional Phase 6K queue persistence hardening:
-   - make live queue load/apply semantics clearer and explicitly awaitable where practical
-   - verify atomic save behavior and stale metadata handling
-   - add restart/persistence tests for load-before-embed-refresh ordering and shutdown state flush
-2. Final process-entry and bot-construction cleanup:
+1. Final process-entry and bot-construction cleanup:
    - audit `DL_bot.py`, `bot_loader.py`, and `bot_instance.py` ownership
    - keep upload routing and command-surface migration out of scope
    - proceed only after separate review/scope approval
@@ -317,7 +313,5 @@ coordination with residual graceful smoke-test risk.
 
 Carry forward, but do not implement unless separately approved:
 
-- full queue persistence hardening as the next optional Phase 6 slice
-- process-entry and bot-construction cleanup after queue persistence hardening, or next if the
-  queue slice is skipped
+- process-entry and bot-construction cleanup, completed in Phase 6L
 - pinned calendar tracker persistence hardening in `event_calendar/pinned_embed.py`

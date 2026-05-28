@@ -20,6 +20,7 @@ High-level flow:
 
 - `DL_bot.py` handles process-level startup/shutdown wiring and signals.
 - `bot_instance.py` handles bot/client lifecycle and task supervision.
+- `bot_loader.py` owns bot singleton construction and is not part of shutdown coordination.
 - `logging_setup.py` provides `flush_logs()` and `shutdown_logging()`.
 - `singleton_lock.py` owns lock acquisition/release.
 - `constants.py` defines lock, PID, shutdown, queue, and log paths.
@@ -129,5 +130,38 @@ console-like stream handlers while keeping queue/file logging alive. Treat the a
 exact line as acceptable when the surrounding shutdown and startup markers are clean and there are
 no late logging handler failures.
 
-Queue persistence hardening and process-entry cleanup remain follow-up slices. Do not weaken
-`/ops force_restart`; it remains the recovery route when cooperative teardown cannot be trusted.
+## Phase 6K Outcome
+
+Phase 6K was completed in PR 128 (`codex/dlbot-phase-6k-queue-persistence`), merged, pushed to
+production, and smoke tested successfully. It hardened the file-backed live queue persistence model
+without changing upload-route behavior or queue worker processing.
+
+Delivered persistence and restart model:
+
+- Startup awaits persisted live queue load/apply before best-effort live queue embed refresh.
+- Live queue shutdown persistence uses the explicit async save helper and reports success only
+  after the atomic JSON write completes.
+- Sync/offloaded queue saves remain thread-safe by snapshotting without awaiting the Discord
+  main-loop `live_queue_lock`.
+- Stale persisted queue embed metadata is cleared/replaced during embed refresh while preserving
+  startup continuity.
+- Cooperative `bot.close()` timeout after restart markers are written forces process exit with the
+  restart code, preventing the watchdog from waiting indefinitely on a still-running child.
+
+Production `/ops graceful_restart` smoke on 2026-05-28 confirmed queue drain, live queue
+persistence, task cancellation, usage tracker stop, watchdog restart, singleton lock reacquisition,
+`ready_queue_lifecycle` startup return, stale queue embed metadata replacement, queue cleanup and
+connection watchdog registration, and startup continuation through `ready_calendar_scheduler_tasks`.
+
+## Phase 6L Outcome
+
+Phase 6L closed the DL_bot startup/lifecycle separation programme. `DL_bot.py` remains the
+process-entry and signal owner, `bot_loader.py` remains the construction owner, and
+`bot_instance.py` remains the bot-side lifecycle and teardown owner. The Phase 6L runtime cleanup
+only names the child PID write and process signal registration helpers in `DL_bot.py`; it does not
+change shutdown marker writing, bot-side graceful teardown, `bot.close()` ordering, singleton lock
+release, restart exit-code handling, queue drain, or live queue persistence.
+
+Do not weaken `/ops force_restart`; it remains the recovery route when cooperative teardown cannot
+be trusted. Future lifecycle-adjacent work should be scoped as new deferred optimisation tasks, not
+as additional Phase 6 slices.

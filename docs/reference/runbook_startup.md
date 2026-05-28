@@ -42,9 +42,13 @@ Purpose: describe the bot startup sequence, guardrails, logging setup, and commo
 
 ## Main Files
 
-- `DL_bot.py`
-- `bot_instance.py`
-- `bot_loader.py`
+- `DL_bot.py` - process entrypoint, logging/env/watchdog guards, child singleton/PID setup,
+  authoritative command registration, upload/message listener ownership, process signal wiring,
+  and `bot.run()`.
+- `bot_loader.py` - sole owner of bot singleton construction and Discord intents.
+- `bot_instance.py` - lifecycle event owner for `on_ready()`, reconnect/disconnect events,
+  interaction usage listening, named startup phases, task supervision, and bot-side graceful
+  teardown.
 - `bot_startup_gate.py`
 - `boot_safety.py`
 - `startup_utils.py`
@@ -136,13 +140,30 @@ restart marker writing and cooperative restart invocation are centralized in
 `core/restart_operations.py`, and `graceful_shutdown.py` now uses a configurable cooperative
 fallback timeout that defaults to 15 seconds. The 2026-05-28 smoke log confirmed queue drain, live
 queue persistence, task cancellation, usage tracker stop, watchdog recovery, and startup return
-through `ready_calendar_scheduler_tasks`. The next Phase 6 slice is the optional queue persistence
-hardening pass; final process-entry/bot-construction cleanup remains after that unless the queue
-slice is explicitly skipped.
+through `ready_calendar_scheduler_tasks`. Phase 6K completed in PR 128
+(`codex/dlbot-phase-6k-queue-persistence`), was merged, pushed to production, and smoke tested
+successfully: `ready_queue_lifecycle` now awaits persisted live queue load/apply before best-effort
+embed refresh, queue cache writes use the established atomic JSON helper, sync/offloaded queue
+saves remain thread-safe without awaiting the main-loop lock, stale queue message metadata is
+cleared/replaced during startup embed refresh, and later startup phases continue normally.
+Phase 6L closed the startup/lifecycle programme by confirming the final ownership model:
+`DL_bot.py` remains the process-entry and message/upload owner, `bot_loader.py` remains the bot
+construction owner, and `bot_instance.py` remains the lifecycle owner. The Phase 6L code cleanup is
+intentionally narrow: process PID publication and signal registration in `DL_bot.py` are wrapped in
+named helpers without changing startup order, command registration, event registration, shutdown
+semantics, or `bot.run()` flow.
 
 When changing startup, verify restart safety and avoid duplicate task creation. Live queue startup
 must keep the Phase 6K ordering contract: workers register first, persisted state is applied before
 the embed refresh runs, and cleanup/watchdog tasks start after the best-effort refresh.
+
+## Phase 6 Closure
+
+The DL_bot upload-routing and startup/lifecycle optimisation programme is complete after Phase 6L.
+Historical task packs and chat starters live under `docs/task_packs/archive/`. The current
+post-Phase 6 programmes are the wider command-surface migration, queue-domain redesign, optional
+SQL-backed queue persistence, disabled secondary command-surface cleanup, SQL deployment workflow,
+and pinned calendar tracker atomic-write hardening; each needs its own scope and validation plan.
 
 ## Common Startup Failures
 
