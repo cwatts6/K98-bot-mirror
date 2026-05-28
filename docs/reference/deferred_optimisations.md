@@ -192,6 +192,15 @@ this backlog and the current `K98-bot-mirror` GitHub issues list as supporting c
 - Dependencies: Phase 6H queue lifecycle extraction; keep process-entry and bot-construction cleanup for Phase 6J unless Phase 6I reveals a hard dependency.
 
 ### Deferred Optimisation
+- Area: `graceful_shutdown.py`, `run_bot.py`, `commands/admin_cmds.py`, shutdown operations
+- Type: architecture
+- Description: The existing weekly-machine-restart helper `graceful_shutdown.py` writes shutdown markers and externally terminates matching `DL_bot.py` processes, but it does not request the bot's in-process graceful teardown path first. This can preserve watchdog/recovery markers while bypassing cooperative queue drain, live queue state flush, `TaskMonitor` cancellation ordering, usage tracker stop, and logging shutdown order.
+- Suggested Fix: Scope a dedicated shutdown-operations hardening slice after Phase 6I. Preserve `/ops force_restart` as the break-glass restart path for stuck or looping bot states, add or document a separate graceful restart/shutdown path for cooperative drains, and update `graceful_shutdown.py` so scheduled machine restarts first request the in-process graceful teardown/restart path with a bounded timeout before falling back to external process termination. Add smoke instructions and focused tests where practical for marker writing, queue drain/flush, timeout fallback, and watchdog recovery.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 6I shutdown coordination PR; operator approval for any new `/ops graceful_restart` or shutdown command naming and behavior.
+
+### Deferred Optimisation
 - Area: `event_calendar/pinned_embed.py`
 - Type: refactor
 - Description: Pinned calendar tracker persistence currently uses direct `Path.write_text()` JSON writes in `_save_tracker()`, unlike other restart-sensitive tracker files that use atomic JSON helpers and clearer failure boundaries.
