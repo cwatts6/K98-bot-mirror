@@ -28,7 +28,7 @@ Before audit work, read:
 - `docs/reference/deferred_optimisations.md`
 - `docs/task_packs/DL_bot Upload Routing - Phase 2 PreKvK Initiation Statement.md`
 - `docs/task_packs/Codex Task Pack - DL_bot Upload Routing Deferred Optimisation Audit.md`
-- `docs/task_packs/prekvk_schema_standardisation_task_pack.md`
+- `docs/task_packs/archive/prekvk_schema_standardisation_task_pack.md`
 
 Use `C:\K98-bot-SQL-Server` as the SQL source of truth.
 

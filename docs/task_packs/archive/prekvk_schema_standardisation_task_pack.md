@@ -1,5 +1,11 @@
 # Codex Task Pack — PreKvK Import Schema Standardisation & Reporting Retention
 
+## Archive Status
+
+Archived after the PreKvK import/schema/reporting programme was delivered through the later
+DL_bot upload-routing and PreKvK reporting phases. The remaining related work is narrowed to SQL
+legacy PreKvK phase object retirement in `docs/reference/deferred_optimisations.md`.
+
 ## Task Summary
 
 The PreKvK ranking file format has changed. This task is not a simple importer patch: it is a schema standardisation and reporting compatibility task.

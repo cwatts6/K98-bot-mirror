@@ -20,19 +20,19 @@ docs/K98 Bot - Testing Standards.md
 docs/K98 Bot - Skills & Refactor Triggers.md
 docs/k98 Bot - Deferred Optimisation Framework.md
 docs/K98 Bot Deferred Optimisation Scoring Model.md
-docs/KVK_ALL Schema Modernisation - Full Optimisation Task Pack.md
-docs/KVK_ALL Schema Modernisation - Audit & Migration Planning Task Pack.md
-docs/KVK_ALL Schema Modernisation - Phase 2 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation - Phase 3 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation - Phase 4 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md
-docs/KVK_ALL Schema Modernisation - Phase 5 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation - Phase 6 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation - Phase 7 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation - Phase 8 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation - Phase 9 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation - Phase 10 Initiation Statement.md
-docs/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md
+docs/task_packs/KVK_ALL Schema Modernisation - Full Optimisation Task Pack.md
+docs/task_packs/KVK_ALL Schema Modernisation - Audit & Migration Planning Task Pack.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 2 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 3 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 4 Initiation Statement.md
+docs/task_packs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 5 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 6 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 7 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 8 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 9 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 10 Initiation Statement.md
+docs/task_packs/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md
 
 Authoritative SQL repository:
 

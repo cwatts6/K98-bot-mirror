@@ -1,5 +1,11 @@
 # Codex Task Pack — Slow Pytest Optimisation
 
+## Archive Status
+
+Archived after PR 107 (`pytest-log-delivery-docs`) resolved and production-smoke-tested the
+original high-impact slow pytest offenders. The remaining post-PR-107 duration outliers are tracked
+as a separate active item in `docs/reference/deferred_optimisations.md`.
+
 ## 1. Task Header
 
 - Task name: Slow Pytest Optimisation

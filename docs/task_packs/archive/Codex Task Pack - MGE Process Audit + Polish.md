@@ -4,6 +4,9 @@
 
 Phase 1 has been delivered in branch `codex/mge-process-polish` and promoted to production after local validation and production smoke testing.
 
+This Phase 1 task pack is archived. Follow-on architecture work remains active in
+`docs/task_packs/MGE Process Polish - Phase 2 Initiation Statement.md`.
+
 ### Phase 1 Delivered
 
 * Completed the Step 1 MGE lifecycle audit before implementation.

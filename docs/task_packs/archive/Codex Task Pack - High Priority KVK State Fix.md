@@ -1,5 +1,11 @@
 # Codex Task Pack — High Priority KVK State Fix
 
+## Archive Status
+
+Archived after the open-ended KVK fighting-window fix was delivered. Current code centralises the
+window logic in `kvk_state.py`, and regression coverage lives in
+`tests/test_kvk_state_open_window.py`.
+
 ## 1. Task Header
 
 - Task name: `Fix active KVK state when KVK_END_SCAN is not yet known`

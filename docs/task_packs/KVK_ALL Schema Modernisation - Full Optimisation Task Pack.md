@@ -521,7 +521,7 @@ Implemented:
 sql/kvk_all_phase2_full_data_capacity.sql
 kvk_all_importer.py
 tests/test_kvk_all_schema.py
-docs/KVK_ALL Schema Modernisation - Phase 2 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 2 Initiation Statement.md
 
 SQL deployment delivered:
 
@@ -655,7 +655,7 @@ Tests cover recompute formulas using representative fixture data.
 Completion Notes
 Implemented:
 
-docs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md
+docs/task_packs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md
 sql/kvk_all_phase4_recompute_modernisation.sql
 tests/test_kvk_all_recompute_sql_contract.py
 
@@ -1052,7 +1052,7 @@ scripts/benchmark_kvk_all_phase9.py
 tests/test_kvk_all_import_service.py
 tests/test_kvk_all_import_dal.py
 tests/test_kvk_all_importer.py
-docs/KVK_ALL Schema Modernisation - Phase 9 Initiation Statement.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 9 Initiation Statement.md
 
 Python delivery:
 
@@ -1180,8 +1180,8 @@ C:\K98-bot-SQL-Server\sql_schema\KVK.sp_KVK_Recompute_Windows.StoredProcedure.sq
 sql/kvk_all_phase10_recompute_correctness.sql
 scripts/diagnose_kvk_all_phase10.py
 tests/test_kvk_all_recompute_sql_contract.py
-docs/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md
-docs/KVK_ALL Schema Modernisation - Phase 10 Initiation Statement.md
+docs/task_packs/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 10 Initiation Statement.md
 
 SQL delivery:
 
