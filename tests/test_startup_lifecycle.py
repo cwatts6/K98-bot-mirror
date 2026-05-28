@@ -75,8 +75,12 @@ def test_on_ready_uses_named_startup_lifecycle_boundary():
         "ready_runtime_services",
         "ready_command_sync",
         "ready_event_cache_rehydration",
+        "ready_event_scheduler_tasks",
+        "ready_event_cache_refresh_loop",
         "ready_view_rehydration",
+        "ready_domain_scheduler_tasks",
         "ready_pinned_calendar_rehydration",
+        "ready_calendar_scheduler_tasks",
     ]
 
 

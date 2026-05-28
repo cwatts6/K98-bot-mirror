@@ -1,7 +1,22 @@
 # Codex Chat Starter - DL_bot Phase 6F Event Cache Rehydration Boundary
 
-Use this starter to continue Phase 6 after Phase 6E command lifecycle admin tooling convergence
-was merged, smoke-tested, pushed to production, and marked complete.
+Status: complete. PR 123 (`codex/dlbot-phase-6f-event-rehydration`) was merged, smoke-tested,
+and pushed to production on 2026-05-28. This starter is retained as historical context for Phase
+6F.
+
+Use `docs/task_packs/Codex Chat Starter - DL_bot Phase 6G Scheduler Task Supervision Boundary.md`
+for the next Phase 6 slice.
+
+Delivered outcome:
+
+- `core/event_rehydration_lifecycle.py` now owns event cache/reminder/view rehydration startup
+  ordering, readiness gating, and best-effort scheduling boundaries.
+- `bot_instance.py:on_ready()` delegates through `ready_event_cache_rehydration`,
+  `ready_view_rehydration`, and `ready_pinned_calendar_rehydration`.
+- The current event-dependent scheduler bundle was deliberately preserved and deferred to Phase 6G.
+- Production smoke confirmed clean startup phases, event cache ready count, active reminder
+  rehydration, tracked view scheduling, pinned calendar rehydration scheduling, later scheduler
+  continuation, full startup completion, and no Phase 6F error signatures.
 
 Approved Phase 6F scope decision: extract event cache, reminder loading, tracked view rehydration,
 and pinned calendar rehydration behind explicit startup lifecycle boundaries. Preserve the current

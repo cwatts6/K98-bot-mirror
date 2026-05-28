@@ -80,7 +80,7 @@ successful manual command resync.
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 startup/lifecycle ownership, not as a continuation of upload routing. Continue that task from
 `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md` and
-`docs/task_packs/Codex Chat Starter - DL_bot Phase 6F Event Cache Rehydration Boundary.md`, with
+`docs/task_packs/Codex Chat Starter - DL_bot Phase 6G Scheduler Task Supervision Boundary.md`, with
 this backlog and the current `K98-bot-mirror` GitHub issues list as supporting context.
 
 ### Deferred Optimisation
@@ -149,20 +149,20 @@ this backlog and the current `K98-bot-mirror` GitHub issues list as supporting c
 ### Deferred Optimisation
 - Area: `DL_bot.py`, `bot_instance.py` startup and lifecycle
 - Type: architecture
-- Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, task supervision, queue worker startup, live queue rehydration, cache warming, scheduler startup, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, Phase 6A introduced the first named startup lifecycle boundary for the initial `on_ready()` runtime bootstrap, Phase 6B extracted runtime services/observability startup into `ready_runtime_services`, Phase 6C consolidated usage tracker lifecycle ownership, Phase 6D extracted startup command signature/cache/sync handling into `core/command_lifecycle.py` and `ready_command_sync`, and Phase 6E converged command lifecycle admin tooling onto the same lifecycle owner. Remaining `on_ready()` work still mixes event cache refresh, reminder state loading, tracked/live view rehydration, pinned calendar rehydration, scheduler registration, queue worker startup, startup notifications, and later shutdown coordination.
-- Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`. The next PR-sized slice is event cache, reminder loading, and rehydration boundary extraction from `docs/task_packs/Codex Chat Starter - DL_bot Phase 6F Event Cache Rehydration Boundary.md`; after that, keep scheduler/task supervision, queue worker lifecycle, shutdown coordination, and final process-entry/bot-construction cleanup in later approval-gated slices.
+- Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, queue worker startup, live queue rehydration, cache warming, startup notifications, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, Phase 6A introduced the first named startup lifecycle boundary for the initial `on_ready()` runtime bootstrap, Phase 6B extracted runtime services/observability startup into `ready_runtime_services`, Phase 6C consolidated usage tracker lifecycle ownership, Phase 6D extracted startup command signature/cache/sync handling into `core/command_lifecycle.py` and `ready_command_sync`, Phase 6E converged command lifecycle admin tooling onto the same lifecycle owner, Phase 6F extracted event cache, reminder loading, tracked view rehydration, and pinned calendar view rehydration behind named lifecycle boundaries, and Phase 6G extracted scheduler/task-supervision startup into `core/scheduler_lifecycle.py`. Remaining `on_ready()` work still mixes cache warming, queue worker startup, startup notifications, and later shutdown coordination.
+- Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`. After Phase 6G, keep queue worker lifecycle, shutdown coordination, and final process-entry/bot-construction cleanup in later approval-gated slices.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5 upload routing and Phase 6A through Phase 6E lifecycle slices are complete, merged, production-pushed, and smoke tested; proceed with audit/design before each remaining implementation slice.
+- Dependencies: Phase 5 upload routing and Phase 6A through Phase 6F lifecycle slices are complete, merged, production-pushed, and smoke tested; Phase 6G is the current scheduler/task-supervision implementation slice and should be smoke tested before marking complete.
 
 ### Deferred Optimisation
 - Area: `bot_instance.py:_start_event_dependent_tasks`
 - Type: architecture
-- Description: The Phase 6F event cache and rehydration boundary deliberately preserves the existing event-dependent startup bundle, which still mixes readiness-bound live view rehydration with scheduler/task-supervision concerns such as periodic live embed updates, daily KVK overview updates, legacy event reminder scheduling, and event embed expiry.
-- Suggested Fix: In Phase 6G, split scheduler and task-supervision ownership out of the event cache/rehydration boundary into a focused lifecycle owner while preserving readiness gating, startup order, `TaskMonitor` duplicate prevention, and existing production logging.
+- Description: Phase 6G moved the event-dependent scheduler bundle and later Ark/MGE/calendar scheduler registrations out of `bot_instance.py:on_ready()` and the event cache/rehydration boundary into `core/scheduler_lifecycle.py`, while preserving readiness gating, startup order, `TaskMonitor` duplicate prevention, and existing production logging.
+- Suggested Fix: After Phase 6G production smoke, remove this item from the active backlog or move it to resolved history. Keep any remaining queue-worker, shutdown, process-entry, and pinned-calendar persistence work as separate deferred items.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 6F boundary extraction approved with scheduler ownership explicitly deferred to Phase 6G.
+- Dependencies: Phase 6F boundary extraction completed in PR 123 (`codex/dlbot-phase-6f-event-rehydration`), smoke tested cleanly, merged, and pushed to production; scheduler ownership was explicitly deferred to Phase 6G.
 
 ### Deferred Optimisation
 - Area: `event_calendar/pinned_embed.py`

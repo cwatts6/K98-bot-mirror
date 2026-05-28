@@ -66,6 +66,13 @@ from core.event_rehydration_lifecycle import (
     wait_for_events,
 )
 from core.interaction_safety import get_operation_lock
+from core.scheduler_lifecycle import (
+    run_ready_calendar_scheduler_tasks,
+    run_ready_domain_scheduler_tasks,
+    run_ready_event_scheduler_tasks,
+    start_event_cache_refresh_loop,
+    start_legacy_reminder_cleanup,
+)
 from core.startup_lifecycle import StartupPhase, run_startup_phases
 from crystaltech_di import init_crystaltech_service
 from daily_KVK_overview_embed import post_or_update_daily_KVK_overview
@@ -298,7 +305,7 @@ async def calendar_reminder_task():
     await run_calendar_reminder_loop(bot)
 
 
-async def _start_event_dependent_tasks():
+async def _start_event_scheduler_tasks():
     """Start tasks that require a ready event cache."""
     # Live embeds
     task_monitor.create("periodic_live_embed_update", periodic_live_embed_update)
@@ -1514,6 +1521,9 @@ async def on_ready():
         await run_startup_phases(
             [StartupPhase("ready_event_cache_rehydration", _run_ready_event_cache_rehydration)]
         )
+        await run_startup_phases(
+            [StartupPhase("ready_event_scheduler_tasks", _run_ready_event_scheduler_tasks)]
+        )
 
         try:
             schedule_bg("warm_name_cache", 8.0, lambda: warm_name_cache())
@@ -1561,60 +1571,26 @@ async def on_ready():
         except Exception:
             logger.exception("[SUBSCRIPTIONS] Failed to load at startup")
 
-        try:
-            if not refresh_event_cache_task.is_running():
-                refresh_event_cache_task.start()
-            else:
-                logger.info("[BOOT] refresh_event_cache_task already running; skipping start.")
-        except Exception:
-            logger.exception("[BOOT] Failed to start refresh_event_cache_task")
+        await run_startup_phases(
+            [StartupPhase("ready_event_cache_refresh_loop", _run_ready_event_cache_refresh_loop)]
+        )
 
         await run_startup_phases(
             [StartupPhase("ready_view_rehydration", _run_ready_view_rehydration)]
         )
-
-        try:
-            task_monitor.create("ark_scheduler", lambda: schedule_ark_lifecycle(bot))
-            logger.info("[BOOT] Ark scheduler started")
-        except Exception as e:
-            logger.error(f"[BOOT] Failed to start Ark scheduler: {e}")
-
-        try:
-            if not task_monitor.is_running("refresh_mge_caches_on_startup"):
-                task_monitor.create(
-                    "refresh_mge_caches_on_startup",
-                    _refresh_mge_caches_on_startup,
-                    replace=False,
-                )
-                logger.info("[BOOT] MGE cache refresh scheduled")
-            else:
-                logger.info("[BOOT] MGE cache refresh already running")
-        except Exception:
-            logger.exception("[BOOT] Failed to schedule MGE cache refresh")
-
-        try:
-            if not task_monitor.is_running("mge_lifecycle"):
-                task_monitor.create(
-                    "mge_lifecycle",
-                    lambda: schedule_mge_lifecycle(bot),
-                    replace=False,
-                )
-                logger.info("[BOOT] MGE scheduler started")
-            else:
-                logger.info("[BOOT] MGE scheduler already running")
-        except Exception:
-            logger.exception("[BOOT] Failed to start MGE scheduler")
+        await run_startup_phases(
+            [StartupPhase("ready_domain_scheduler_tasks", _run_ready_domain_scheduler_tasks)]
+        )
 
         logger.info("[DEBUG] Calling full_startup_sequence...")
         try:
             await full_startup_sequence()
         except Exception:
             logger.exception("[STARTUP] ❌ full_startup_sequence failed")
-        try:
-            task_monitor.create("reminder_cleanup", reminder_cleanup_loop)
-            logger.info("[BOOT] Reminder cleanup task started")
-        except Exception:
-            logger.exception("[BOOT] Failed to start reminder_cleanup_loop")
+        await start_legacy_reminder_cleanup(
+            task_monitor_create=task_monitor.create,
+            reminder_cleanup_loop=reminder_cleanup_loop,
+        )
 
         await run_startup_phases(
             [
@@ -1625,26 +1601,9 @@ async def on_ready():
             ]
         )
 
-        try:
-            task_monitor.create(
-                "daily_pinned_calendar_refresh", schedule_daily_pinned_calendar_refresh
-            )
-            logger.info("[BOOT] daily pinned calendar refresh started")
-        except Exception:
-            logger.exception("[BOOT] failed to start daily pinned calendar refresh")
-
-        try:
-            if not task_monitor.is_running("calendar_reminder_loop"):
-                task_monitor.create(
-                    "calendar_reminder_loop",
-                    calendar_reminder_task,
-                    replace=False,
-                )
-                logger.info("[CALENDAR][REMINDER] reminder loop armed")
-            else:
-                logger.info("[CALENDAR][REMINDER] reminder loop already running; skipping")
-        except Exception:
-            logger.exception("[BOOT] failed to start calendar reminder loop")
+        await run_startup_phases(
+            [StartupPhase("ready_calendar_scheduler_tasks", _run_ready_calendar_scheduler_tasks)]
+        )
 
     except Exception:
         logger.exception("[CRITICAL] Exception during on_ready")
@@ -1675,8 +1634,14 @@ async def _run_ready_event_cache_rehydration() -> None:
     _startup_loaded_reminder_ids = await run_ready_event_cache_rehydration(
         bot=bot,
         schedule_bg=schedule_bg,
+    )
+
+
+async def _run_ready_event_scheduler_tasks() -> None:
+    await run_ready_event_scheduler_tasks(
+        start_event_scheduler_tasks=_start_event_scheduler_tasks,
+        wait_for_events=wait_for_events,
         task_monitor_create=task_monitor.create,
-        start_event_dependent_tasks=_start_event_dependent_tasks,
     )
 
 
@@ -1684,8 +1649,31 @@ async def _run_ready_view_rehydration() -> None:
     await run_ready_tracked_view_rehydration(bot=bot, schedule_bg=schedule_bg)
 
 
+async def _run_ready_event_cache_refresh_loop() -> None:
+    await start_event_cache_refresh_loop(refresh_event_cache_task=refresh_event_cache_task)
+
+
+async def _run_ready_domain_scheduler_tasks() -> None:
+    await run_ready_domain_scheduler_tasks(
+        task_monitor_create=task_monitor.create,
+        task_monitor_is_running=task_monitor.is_running,
+        schedule_ark_lifecycle=lambda: schedule_ark_lifecycle(bot),
+        refresh_mge_caches_on_startup=_refresh_mge_caches_on_startup,
+        schedule_mge_lifecycle=lambda: schedule_mge_lifecycle(bot),
+    )
+
+
 async def _run_ready_pinned_calendar_rehydration() -> None:
     await run_ready_pinned_calendar_rehydration(bot=bot, schedule_bg=schedule_bg)
+
+
+async def _run_ready_calendar_scheduler_tasks() -> None:
+    await run_ready_calendar_scheduler_tasks(
+        task_monitor_create=task_monitor.create,
+        task_monitor_is_running=task_monitor.is_running,
+        schedule_daily_pinned_calendar_refresh=schedule_daily_pinned_calendar_refresh,
+        calendar_reminder_task=calendar_reminder_task,
+    )
 
 
 async def _run_ready_runtime_services() -> None:

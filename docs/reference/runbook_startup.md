@@ -22,11 +22,19 @@ Purpose: describe the bot startup sequence, guardrails, logging setup, and commo
      Phase 6E also converged `/ops` command lifecycle admin tooling onto the same command
      lifecycle helpers while keeping Discord admin UX in `commands/admin_cmds.py`.
    - `ready_event_cache_rehydration` owns active reminder loading, event cache disk load,
-     stale/empty cache refresh, one-shot refresh scheduling, and the current event-dependent
-     startup bundle. Scheduler ownership inside that bundle remains deferred to Phase 6G.
+     stale/empty cache refresh, and one-shot refresh scheduling.
+   - `ready_event_scheduler_tasks` owns event-readiness-gated startup for live event embed
+     updates, daily KVK overview updates, event reminders, reminder format refresh,
+     live-event view rehydration, and event embed expiry.
+   - `ready_event_cache_refresh_loop` starts the long-running event cache refresh loop at the
+     existing point before tracked view rehydration.
    - `ready_view_rehydration` schedules tracked persistent view rehydration.
+   - `ready_domain_scheduler_tasks` starts the Ark lifecycle scheduler, MGE cache warm, and MGE
+     lifecycle scheduler.
    - `ready_pinned_calendar_rehydration` schedules pinned calendar view rehydration at the
      existing later startup point after `full_startup_sequence()`.
+   - `ready_calendar_scheduler_tasks` starts the daily pinned calendar refresh and calendar
+     reminder loop after pinned calendar rehydration.
 9. Caches, rehydration, background tasks, heartbeat, and admin notification start.
 
 ## Main Files
@@ -41,6 +49,7 @@ Purpose: describe the bot startup sequence, guardrails, logging setup, and commo
 - `singleton_lock.py`
 - `Commands.py`
 - `core/command_lifecycle.py`
+- `core/scheduler_lifecycle.py`
 
 ## Startup Guards
 
@@ -89,10 +98,13 @@ alert usage events. Phase 6D moved startup command signature/cache/sync handling
 `ready_command_sync` and `core/command_lifecycle.py`. Phase 6E reused that lifecycle owner from
 `/ops resync_commands`, `/ops validate_command_cache`, and `/ops show_command_versions`; production
 smoke on 2026-05-28 confirmed those commands loaded, executed, flushed usage telemetry, and manual
-scoped command resync completed successfully. Phase 6F added explicit boundaries for event cache,
-reminder loading, tracked view rehydration, and pinned calendar rehydration while preserving the
-existing event-dependent scheduler bundle for Phase 6G. Remaining lifecycle cleanup continues with
-scheduler/task supervision, queue worker lifecycle, shutdown coordination, and final
+scoped command resync completed successfully. Phase 6F completed in PR 123
+(`codex/dlbot-phase-6f-event-rehydration`), was smoke tested cleanly, merged, and pushed to
+production: event cache, reminder loading, tracked view rehydration, and pinned calendar
+rehydration now have explicit startup lifecycle boundaries. Phase 6G then separated scheduler and
+task-supervision startup into `core/scheduler_lifecycle.py` while preserving event readiness
+gating, task names, duplicate prevention, and the existing Ark/MGE/calendar ordering. Remaining
+lifecycle cleanup continues with queue worker lifecycle, shutdown coordination, and final
 process-entry/bot-construction cleanup.
 
 When changing startup, verify restart safety and avoid duplicate task creation.
