@@ -93,13 +93,25 @@ best-effort queue embed refresh, queue cleanup startup, and connection watchdog 
 existing `full_startup_sequence()` ordering. PR 125
 (`codex/dlbot-phase-6h-queue-lifecycle`) was merged, smoke tested cleanly, pushed to production,
 and confirmed the new queue lifecycle phase ran in order with queue workers, live queue recovery,
-queue cleanup, connection watchdog, and later startup phases continuing normally.
+queue cleanup, connection watchdog, and later startup phases continuing normally. Phase 6I shutdown
+and recovery coordination was completed in PR 126
+(`codex/dlbot-phase-6i-shutdown-recovery`), merged, and pushed to production: signal shutdown now
+routes through bot-side graceful teardown before `bot.close()`, `bot_instance.py` briefly waits for
+configured `channel_queues` including in-flight `queue.join()` work, persists `QUEUE_CACHE_FILE`
+through `save_live_queue()`, then cancels supervised tasks and stops usage tracking. Validation
+passed locally, and production `/ops force_restart` smoke confirmed restart recovery and all
+Phase 6A-H startup phases continued normally. Because `/ops force_restart` intentionally remains a
+break-glass path and Windows/process termination did not expose a reliable in-process graceful
+shutdown log trail, Phase 6I is closed with residual smoke risk. Phase 6J now owns the approved
+two-route operator model: retire `/ops restart_bot`, add `/ops graceful_restart` as the safe
+cooperative restart path, preserve `/ops force_restart` as break-glass, and harden
+`graceful_shutdown.py` with a configurable cooperative fallback timeout.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 startup/lifecycle ownership, not as a continuation of upload routing. Continue that task from
 `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md` and
-`docs/task_packs/Codex Chat Starter - DL_bot Phase 6I Shutdown Recovery Coordination.md`, with
-this backlog and the current `K98-bot-mirror` GitHub issues list as supporting context.
+`docs/task_packs/Codex Chat Starter - DL_bot Phase 6J Graceful Restart Shutdown Operations.md`,
+with this backlog and the current `K98-bot-mirror` GitHub issues list as supporting context.
 
 ### Deferred Optimisation
 - Area: `tests/test_ark_preference_service.py`, `tests/test_ark_bans_enforcement.py`, `tests/test_lock_timeout.py`, `tests/test_calendar_service.py`, `tests/test_calendar_pipeline.py`, remaining slow full-suite pytest paths
@@ -167,29 +179,38 @@ this backlog and the current `K98-bot-mirror` GitHub issues list as supporting c
 ### Deferred Optimisation
 - Area: `DL_bot.py`, `bot_instance.py` startup and lifecycle
 - Type: architecture
-- Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, cache warming, startup notifications, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, Phase 6A introduced the first named startup lifecycle boundary for the initial `on_ready()` runtime bootstrap, Phase 6B extracted runtime services/observability startup into `ready_runtime_services`, Phase 6C consolidated usage tracker lifecycle ownership, Phase 6D extracted startup command signature/cache/sync handling into `core/command_lifecycle.py` and `ready_command_sync`, Phase 6E converged command lifecycle admin tooling onto the same lifecycle owner, Phase 6F extracted event cache, reminder loading, tracked view rehydration, and pinned calendar view rehydration behind named lifecycle boundaries, Phase 6G extracted scheduler/task-supervision startup into `core/scheduler_lifecycle.py`, and Phase 6H extracted queue worker/live queue startup into `core/queue_lifecycle.py`. Remaining `on_ready()` work still mixes cache warming, startup notifications, shutdown coordination, and process-entry/bot-construction cleanup.
-- Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`. After Phase 6H, keep shutdown coordination and final process-entry/bot-construction cleanup in later approval-gated slices.
+- Description: Startup and lifecycle responsibilities remain spread across `DL_bot.py` and `bot_instance.py`, including interpreter/startup checks, bot construction/import wiring, event registration, singleton/runtime concerns, signal/shutdown handling, cache warming, startup notifications, and lifecycle coordination for the wider bot. Phase 5 completed upload-route separation, Phase 6A introduced the first named startup lifecycle boundary for the initial `on_ready()` runtime bootstrap, Phase 6B extracted runtime services/observability startup into `ready_runtime_services`, Phase 6C consolidated usage tracker lifecycle ownership, Phase 6D extracted startup command signature/cache/sync handling into `core/command_lifecycle.py` and `ready_command_sync`, Phase 6E converged command lifecycle admin tooling onto the same lifecycle owner, Phase 6F extracted event cache, reminder loading, tracked view rehydration, and pinned calendar view rehydration behind named lifecycle boundaries, Phase 6G extracted scheduler/task-supervision startup into `core/scheduler_lifecycle.py`, Phase 6H extracted queue worker/live queue startup into `core/queue_lifecycle.py`, Phase 6I added bot-side graceful teardown coordination for queue drain/state flush before supervised task cancellation, and Phase 6J now scopes cooperative restart/shutdown operations. Remaining lifecycle work after Phase 6J should address process-entry/bot-construction cleanup.
+- Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`. Complete Phase 6J graceful restart/shutdown operations hardening, then keep final process-entry and bot-construction cleanup for a later approval-gated slice.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5 upload routing and Phase 6A through Phase 6H lifecycle slices are complete, merged, production-pushed, and smoke tested; proceed with shutdown/recovery coordination before process-entry cleanup.
+- Dependencies: Phase 5 upload routing and Phase 6A through Phase 6I lifecycle slices are complete, merged, production-pushed, and locally validated; Phase 6I production smoke confirmed restart recovery but not a reliable in-process graceful shutdown log trail, so Phase 6J should prove that path before process-entry cleanup.
 
 ### Deferred Optimisation
 - Area: `utils.py`, `bot_helpers.py`, `core/queue_lifecycle.py`, queue runtime state
 - Type: refactor
 - Description: Phase 6H separated queue lifecycle startup, but broader queue persistence hardening remains out of scope. `load_live_queue()` is synchronous while scheduling an async state apply when an event loop is running, and queue draining/state flush semantics are coupled to later shutdown behavior.
-- Suggested Fix: Add a dedicated queue persistence hardening slice after Phase 6I or fold it into Phase 6I only if shutdown work requires it. Make live queue load/apply explicitly awaitable where practical, preserve sync test compatibility or add a safe wrapper, verify atomic save behavior and stale metadata handling, and add restart/persistence tests for load-before-embed-refresh ordering and state flush after queue cancellation.
+- Suggested Fix: Add a dedicated queue persistence hardening slice after Phase 6J or fold it into Phase 6J only if graceful restart/shutdown work requires it. Make live queue load/apply explicitly awaitable where practical, preserve sync test compatibility or add a safe wrapper, verify atomic save behavior and stale metadata handling, and add restart/persistence tests for load-before-embed-refresh ordering and state flush after queue cancellation.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 6H lifecycle extraction is complete and production-smoke-tested; coordinate with Phase 6I cooperative cancellation and queue draining/state flush design.
+- Dependencies: Phase 6H lifecycle extraction and Phase 6I shutdown coordination are complete and production-pushed; coordinate with Phase 6J graceful restart/shutdown operations before starting broader queue persistence hardening.
 
 ### Deferred Optimisation
 - Area: `bot_helpers.py`, `bot_instance.py`, `DL_bot.py` shutdown and queue task lifecycle
 - Type: architecture
-- Description: Queue workers, queue cleanup, connection watchdog, and other background tasks still lack a single approved shutdown/recovery coordination boundary for cooperative cancellation, queue draining, state flush, singleton/PID markers, and logging shutdown order.
-- Suggested Fix: Phase 6I should fix cooperative cancellation, queue draining/state flush, and shutdown ordering. Audit signal/admin shutdown paths, `TaskMonitor` cancellation behavior, queue worker cancellation, `QUEUE_CACHE_FILE` persistence, `LAST_SHUTDOWN_INFO` writing, singleton/PID cleanup, and logging flush order before implementation.
+- Description: Phase 6I added a single approved shutdown/recovery coordination boundary for cooperative cancellation, queue draining/state flush, and logging order, but the available production `/ops force_restart` smoke path is intentionally break-glass and did not reliably exercise in-process graceful teardown logs. Phase 6J introduces the cooperative restart entry point needed to verify those logs.
+- Suggested Fix: Treat Phase 6I as delivered but smoke-limited until Phase 6J is deployed and smoke-tested. In Phase 6J, add `/ops graceful_restart`, retire `/ops restart_bot`, keep `/ops force_restart` as the break-glass path, and update smoke guidance so queue drain/live queue flush/TaskMonitor cancellation can be proven through logs.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 6H queue lifecycle extraction; keep process-entry and bot-construction cleanup for Phase 6J unless Phase 6I reveals a hard dependency.
+- Dependencies: Phase 6I shutdown coordination is merged and production-pushed; preserve operator access to force restart for stuck or looping states.
+
+### Deferred Optimisation
+- Area: `graceful_shutdown.py`, `run_bot.py`, `commands/admin_cmds.py`, shutdown operations
+- Type: architecture
+- Description: The existing weekly-machine-restart helper `graceful_shutdown.py` writes shutdown markers and externally terminates matching `DL_bot.py` processes, but it needs an explicit cooperative-first timeout/fallback model so logs prove whether in-process teardown completed or fell back to kill.
+- Suggested Fix: Prioritise this as Phase 6J. Preserve `/ops force_restart` as the break-glass restart path for stuck or looping bot states, add `/ops graceful_restart` for cooperative drains, retire `/ops restart_bot`, and update `graceful_shutdown.py` so scheduled machine restarts first request the in-process graceful teardown/restart path with a configurable timeout defaulting to 15 seconds before falling back to external process termination. Add smoke instructions and focused tests where practical for marker writing, queue drain/flush, timeout fallback, and watchdog recovery.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 6I shutdown coordination PR; operator approval for any new `/ops graceful_restart` or shutdown command naming and behavior.
 
 ### Deferred Optimisation
 - Area: `event_calendar/pinned_embed.py`

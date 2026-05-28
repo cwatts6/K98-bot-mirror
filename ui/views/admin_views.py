@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections import deque
 from collections.abc import Awaitable, Callable
 from datetime import datetime
@@ -12,14 +11,6 @@ import os
 import re
 
 import discord
-
-from bot_config import ADMIN_USER_ID
-
-try:
-    from constants import RESTART_EXIT_CODE, RESTART_FLAG_PATH
-except Exception:
-    RESTART_EXIT_CODE = 1
-    RESTART_FLAG_PATH = ".restart_flag.json"
 
 
 class LogTailView(discord.ui.View):
@@ -173,77 +164,6 @@ class LogTailView(discord.ui.View):
         await interaction.response.send_message(txt, ephemeral=True)
 
 
-class ConfirmRestartView(discord.ui.View):
-    def __init__(self, ctx, *, bot, notify_channel_id: int, timeout: int = 30):
-        super().__init__(timeout=timeout)
-        self.ctx = ctx
-        self.bot = bot
-        self.notify_channel_id = notify_channel_id
-        self.confirmed = asyncio.Event()
-        self.cancelled = False
-        self.message: discord.Message | None = None
-
-    def _disable_all(self):
-        for c in self.children:
-            c.disabled = True
-
-    async def _try_disable_ui(self):
-        try:
-            if self.message is None:
-                self.message = await self.ctx.interaction.original_response()
-            self._disable_all()
-            await self.message.edit(view=self)
-        except Exception:
-            pass
-
-    @discord.ui.button(label="✅ Confirm Restart", style=discord.ButtonStyle.danger)
-    async def confirm(self, _button: discord.ui.Button, interaction: discord.Interaction):
-        if interaction.user.id != ADMIN_USER_ID:
-            await interaction.response.send_message(
-                "❌ Only the admin can confirm this action.", ephemeral=True
-            )
-            return
-
-        embed_user = discord.Embed(
-            title="🔄 Bot Restart Initiated",
-            description="Attempting to restart the bot now. If it doesn't come back online, check your host.",
-            color=0xF39C12,
-        )
-        embed_user.set_footer(text="Restart requested by admin")
-        embed_user.timestamp = datetime.utcnow()
-        await interaction.response.send_message(embed=embed_user, ephemeral=True)
-
-        try:
-            notify_channel = self.bot.get_channel(self.notify_channel_id)
-            if notify_channel:
-                embed_broadcast = discord.Embed(
-                    title="🛠️ Bot Restart Requested",
-                    description=f"Admin <@{interaction.user.id}> initiated a restart via slash command.",
-                    color=0xF39C12,
-                )
-                embed_broadcast.timestamp = datetime.utcnow()
-                await notify_channel.send(embed=embed_broadcast)
-        except Exception:
-            pass
-
-        await self._try_disable_ui()
-        self.confirmed.set()
-        self.stop()
-
-    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.secondary)
-    async def cancel(self, _button: discord.ui.Button, interaction: discord.Interaction):
-        if interaction.user.id != ADMIN_USER_ID:
-            await interaction.response.send_message(
-                "❌ Only the admin can cancel this action.", ephemeral=True
-            )
-            return
-        await interaction.response.send_message("❎ Bot restart cancelled.", ephemeral=True)
-        self.cancelled = True
-        await self._try_disable_ui()
-        self.confirmed.set()
-        self.stop()
-
-
 class ConfirmImportView(discord.ui.View):
     def __init__(
         self,
@@ -301,6 +221,5 @@ class ConfirmImportView(discord.ui.View):
 
 __all__ = [
     "ConfirmImportView",
-    "ConfirmRestartView",
     "LogTailView",
 ]

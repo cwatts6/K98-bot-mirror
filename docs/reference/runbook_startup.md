@@ -123,8 +123,18 @@ cleanup startup, and connection watchdog startup. Production smoke confirmed the
 ran after `ready_domain_scheduler_tasks`, started workers for configured monitored channels, loaded
 live queue state before embed refresh, started queue cleanup and connection watchdog once, and
 allowed `full_startup_sequence()`, reminder cleanup, pinned calendar rehydration, and calendar
-scheduler startup to continue normally. Remaining lifecycle cleanup continues with shutdown
-coordination and final process-entry/bot-construction cleanup.
+scheduler startup to continue normally. Phase 6I completed in PR 126
+(`codex/dlbot-phase-6i-shutdown-recovery`), was merged and pushed to production: shutdown now
+routes through bot-side graceful teardown before `bot.close()`, briefly drains configured
+`channel_queues`, persists live queue state, cancels supervised tasks, and stops usage tracking.
+Production `/ops force_restart` smoke confirmed restart recovery and startup continuity, but it did
+not prove the in-process graceful shutdown log trail because `force_restart` remains a break-glass
+path. The next Phase 6 slice should add `/ops graceful_restart` and harden
+`graceful_shutdown.py` so Phase 6I shutdown behavior can be categorically smoke-tested before final
+process-entry/bot-construction cleanup. The approved Phase 6J operator model retires the old
+`/ops restart_bot` command, makes `/ops graceful_restart` the preferred safe restart path, keeps
+`/ops force_restart` as the emergency path, and gives `graceful_shutdown.py` a configurable
+cooperative fallback timeout that defaults to 15 seconds.
 
 When changing startup, verify restart safety and avoid duplicate task creation.
 

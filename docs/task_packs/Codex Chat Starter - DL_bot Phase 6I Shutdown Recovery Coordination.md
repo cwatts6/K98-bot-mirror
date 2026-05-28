@@ -1,7 +1,21 @@
 # Codex Chat Starter - DL_bot Phase 6I Shutdown Recovery Coordination
 
-Use this starter to continue Phase 6 after Phase 6H queue worker/live queue lifecycle was merged,
-smoke-tested, pushed to production, and marked complete.
+Status: complete. Phase 6I was delivered in PR 126
+(`codex/dlbot-phase-6i-shutdown-recovery`), merged, and pushed to production.
+
+Phase 6I added bot-side graceful teardown coordination before `bot.close()`, brief channel queue
+drain handling including in-flight `queue.join()` work, live queue snapshot persistence, supervised
+task cancellation ordering, shutdown heartbeat writing, usage tracker stop, and logging
+quiesce/shutdown ordering. Production `/ops force_restart` smoke confirmed restart recovery and
+startup continuity, but it did not provide a reliable in-process graceful shutdown log trail because
+`/ops force_restart` remains the break-glass restart path.
+
+Use `docs/task_packs/Codex Chat Starter - DL_bot Phase 6J Graceful Restart Shutdown Operations.md`
+for the next Phase 6 slice. Phase 6J should add a smoke-testable cooperative `/ops graceful_restart`
+path, preserve `/ops force_restart` for stuck/looping states, and update `graceful_shutdown.py` so
+scheduled machine restarts can exercise the Phase 6I graceful teardown path before bounded fallback.
+
+Historical starter retained below.
 
 ## Copy/Paste Starter
 
@@ -128,7 +142,7 @@ state flush.
   writing, idempotency, and continued clean restart behavior where practical.
 - Decide whether queue persistence hardening is required inside Phase 6I or should remain a
   separate follow-up slice after shutdown ordering is settled.
-- Capture process-entry and broader bot-construction cleanup findings as Phase 6J work unless
+- Capture process-entry and broader bot-construction cleanup findings as Phase 6K work unless
   explicitly approved for this slice.
 
 ## Out Of Scope
@@ -264,12 +278,15 @@ understood, and only when shutdown/restart still continues cleanly.
 
 ## Remaining Phase 6 Slices
 
-Recommended order after Phase 6H:
+Recommended order after Phase 6I:
 
-1. Phase 6I shutdown and recovery coordination, including cooperative cancellation, queue
-   draining/state flush, and shutdown ordering.
-2. Optional queue persistence hardening slice after Phase 6I, unless Phase 6I requires it directly.
-3. Phase 6J process-entry and bot-construction cleanup.
+1. Phase 6J graceful restart/shutdown operations:
+   - add `/ops graceful_restart`
+   - preserve `/ops force_restart` as break-glass
+   - update `graceful_shutdown.py`
+   - prove the Phase 6I graceful teardown path with production smoke logs
+2. Optional queue persistence hardening slice after Phase 6J, unless Phase 6J requires it directly.
+3. Phase 6K process-entry and bot-construction cleanup.
 
 The wider command-surface migration/renaming programme remains separate from Phase 6.
 
@@ -281,6 +298,6 @@ lifecycle extraction.
 
 Carry forward, but do not implement unless separately approved:
 
-- process-entry and bot-construction cleanup
-- queue persistence hardening after Phase 6I, unless required directly by Phase 6I shutdown work
+- process-entry and bot-construction cleanup as Phase 6K
+- queue persistence hardening after Phase 6J, unless required directly by Phase 6J shutdown work
 - pinned calendar tracker persistence hardening in `event_calendar/pinned_embed.py`

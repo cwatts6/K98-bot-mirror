@@ -38,6 +38,36 @@ formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+DEFAULT_COOPERATIVE_SHUTDOWN_TIMEOUT_SECONDS = 15.0
+
+
+def _cooperative_shutdown_timeout_seconds() -> float:
+    raw = os.getenv("GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS")
+    if raw is None:
+        return DEFAULT_COOPERATIVE_SHUTDOWN_TIMEOUT_SECONDS
+    try:
+        timeout = float(raw)
+    except ValueError:
+        msg = (
+            "[SHUTDOWN] Invalid GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS="
+            f"{raw!r}; using {DEFAULT_COOPERATIVE_SHUTDOWN_TIMEOUT_SECONDS:.1f}s."
+        )
+        print(msg, flush=True)
+        logger.warning(msg)
+        return DEFAULT_COOPERATIVE_SHUTDOWN_TIMEOUT_SECONDS
+    if timeout <= 0:
+        msg = (
+            "[SHUTDOWN] Non-positive GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS="
+            f"{raw!r}; using {DEFAULT_COOPERATIVE_SHUTDOWN_TIMEOUT_SECONDS:.1f}s."
+        )
+        print(msg, flush=True)
+        logger.warning(msg)
+        return DEFAULT_COOPERATIVE_SHUTDOWN_TIMEOUT_SECONDS
+    return timeout
+
+
+COOPERATIVE_SHUTDOWN_TIMEOUT_SECONDS = _cooperative_shutdown_timeout_seconds()
+
 
 # --- Helpers for time / UTC ---
 def _now_iso() -> str:
@@ -184,7 +214,10 @@ async def send_shutdown_embed():
 
 
 # === Step 4: Kill all matching DL_bot.py processes ===
-async def terminate_all_dl_bot(reason="scheduled_shutdown"):
+async def terminate_all_dl_bot(
+    reason="scheduled_shutdown",
+    cooperative_timeout_seconds: float = COOPERATIVE_SHUTDOWN_TIMEOUT_SECONDS,
+):
     """
     Best-effort: iterate processes that look like DL_bot.py and terminate them.
     - psutil is optional; if absent, we skip termination (but markers are still written).
@@ -249,13 +282,20 @@ async def terminate_all_dl_bot(reason="scheduled_shutdown"):
 
                 print(f"  PID {pid}: {proc.info.get('name')} – {' '.join(cmdline)}", flush=True)
                 try:
-                    # Attempt graceful terminate
+                    log_shutdown("cooperative_requested", pid, cmdline, reason, info=info)
                     proc.terminate()
                     try:
                         if psutil:
-                            proc.wait(timeout=5)
+                            proc.wait(timeout=cooperative_timeout_seconds)
+                        log_shutdown("cooperative_exited", pid, cmdline, reason, info=info)
                     except Exception:
-                        # Timeout or other issues: escalate to kill
+                        log_shutdown(
+                            "cooperative_timeout_kill",
+                            pid,
+                            cmdline,
+                            f"{reason}; timeout={cooperative_timeout_seconds:.1f}s",
+                            info=info,
+                        )
                         try:
                             proc.kill()
                         except Exception:

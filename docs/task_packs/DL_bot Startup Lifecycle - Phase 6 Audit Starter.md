@@ -5,7 +5,7 @@
 - Task name: `DL_bot startup/lifecycle separation - Phase 6 audit`
 - Date: `2026-05-26`
 - Last updated: `2026-05-28`
-- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B/6C/6D/6E/6F/6G/6H startup lifecycle boundaries were pushed to production`
+- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B/6C/6D/6E/6F/6G/6H/6I lifecycle boundaries were pushed to production`
 - Task type: `deferred optimisation batch`
 - One-pass approved: `no`
 
@@ -29,6 +29,7 @@ Before implementation, read the current repository instructions and indexed core
 - `docs/task_packs/Codex Task Pack - DL_bot Upload Routing Deferred Optimisation Audit.md`
 - `docs/task_packs/Codex Chat Starter - DL_bot Phase 6H Queue Worker Lifecycle.md`
 - `docs/task_packs/Codex Chat Starter - DL_bot Phase 6I Shutdown Recovery Coordination.md`
+- `docs/task_packs/Codex Chat Starter - DL_bot Phase 6J Graceful Restart Shutdown Operations.md`
 
 Use `docs/reference/ENV_REFERENCE.md` if environment-variable ownership or runtime configuration
 validation becomes part of the design.
@@ -179,7 +180,37 @@ Phase 6H queue worker/live queue lifecycle is complete:
 - No startup phase failure, `on_ready()` critical exception, queue embed refresh failure,
   `queue_worker` monitor crash, `queue_cleanup` crash, or `connection_watchdog` crash was observed.
 - The PR was merged and pushed to production.
-- Shutdown coordination and process-entry cleanup remain later Phase 6 slices.
+- Shutdown coordination was completed next in Phase 6I.
+
+Phase 6I shutdown and recovery coordination is complete:
+
+- PR 126 (`codex/dlbot-phase-6i-shutdown-recovery`) was merged and pushed to production.
+- `DL_bot.py` signal shutdown now calls bot-side graceful teardown before `bot.close()`.
+- `bot_instance.py` waits briefly for configured `channel_queues`, including in-flight
+  `queue.join()` work, persists live queue state through `save_live_queue()`, cancels supervised
+  `TaskMonitor` tasks, cancels reminder registries, writes shutdown heartbeat, stops usage
+  tracking, and quiesces logging.
+- Focused tests cover shutdown ordering, queue drain before `TaskMonitor.stop()`, zero-`qsize()`
+  in-flight queue work, and signal teardown ordering.
+- Production `/ops force_restart` smoke confirmed the restart flag path, restart recovery,
+  `ready_queue_lifecycle`, queue worker startup, queue cleanup, connection watchdog startup,
+  `full_startup_sequence()`, reminder cleanup, pinned calendar rehydration, and calendar scheduler
+  startup continued normally.
+- The production smoke did not produce a reliable in-process graceful shutdown log trail because
+  `/ops force_restart` remains a break-glass termination-oriented path. Phase 6I is closed with
+  this documented residual risk: the graceful teardown implementation may need rework if the next
+  slice exposes a defect while making it directly smoke-testable.
+
+Phase 6J graceful restart and shutdown operations hardening is the next priority:
+
+- Add `/ops graceful_restart` as the cooperative restart path that intentionally exercises
+  Phase 6I graceful teardown before restart.
+- Remove `/ops restart_bot` rather than keeping overlapping restart routes.
+- Preserve `/ops force_restart` as the break-glass path for stuck or looping bot states.
+- Update `graceful_shutdown.py` so weekly bot-machine restarts request cooperative shutdown first
+  with a configurable timeout defaulting to 15 seconds before falling back to external termination.
+- Use this slice to categorically smoke-test Phase 6I queue drain/state flush/task cancellation
+  logs.
 
 `DL_bot.py` is now much closer to listener/delegation ownership for uploads, but startup and
 lifecycle concerns remain spread across `DL_bot.py`, `bot_instance.py`, `bot_loader.py`,
@@ -405,15 +436,20 @@ Final decisions should be updated after each Phase 6 sub-phase.
 
 Current recommended order after Phase 6H:
 
-1. Phase 6I shutdown and recovery coordination: audit graceful teardown, signal handling, task
-   cancellation, state flush, singleton/PID/shutdown markers, and logging shutdown order. Fix:
-   handle cooperative cancellation, queue draining/state flush, and shutdown ordering.
-2. Optional queue persistence hardening slice: after Phase 6I, or inside Phase 6I only if shutdown
+1. Phase 6I shutdown and recovery coordination: complete in PR 126 and pushed to production.
+   Local validation passed and restart recovery smoke passed, but in-process graceful shutdown logs
+   could not be categorically exercised from the current operator paths.
+2. Phase 6J graceful restart and shutdown operations hardening: add `/ops graceful_restart`,
+   remove `/ops restart_bot`, preserve `/ops force_restart` as break-glass, and update
+   `graceful_shutdown.py` so scheduled machine restarts first request cooperative teardown with a
+   configurable 15-second default fallback. This slice should prove Phase 6I shutdown logs in
+   production.
+3. Optional queue persistence hardening slice: after Phase 6J, or inside Phase 6J only if shutdown
    work requires it, harden live queue load/apply semantics, atomic save verification, stale
    metadata handling, and restart/state-flush tests.
-3. Phase 6J process-entry and bot-construction cleanup: only after the smaller runtime lifecycle slices are
-   stable, review whether `DL_bot.py`, `bot_loader.py`, and `bot_instance.py` need a clearer final
-   ownership split.
+4. Phase 6K process-entry and bot-construction cleanup: only after the smaller runtime lifecycle
+   slices are stable and graceful restart/shutdown operations are smoke-tested, review whether
+   `DL_bot.py`, `bot_loader.py`, and `bot_instance.py` need a clearer final ownership split.
 
 The wider command-surface migration/renaming programme is deliberately separate from Phase 6.
 

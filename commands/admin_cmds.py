@@ -10,7 +10,6 @@ import json
 import os
 import re
 import signal
-import sys
 from collections import deque
 from datetime import datetime, timezone
 from math import ceil
@@ -34,6 +33,7 @@ from commands.telemetry_cmds import (
     _usage_detail_value_ac,
     start_bot_time,
 )
+from core.restart_operations import run_cooperative_restart, write_restart_request
 
 from embed_utils import FailuresView, HistoryView, generate_summary_embed
 from event_calendar.service import get_calendar_service
@@ -44,7 +44,7 @@ from proc_config_import import run_proc_config_import_offload
 from stats_alerts.interface import send_stats_update_embed
 from stats_alerts.kvk_meta import is_currently_kvk
 from stats_module import run_stats_copy_archive
-from ui.views.admin_views import ConfirmRestartView, LogTailView
+from ui.views.admin_views import LogTailView
 from utils import utcnow
 from versioning import versioned
 
@@ -63,11 +63,9 @@ from constants import (
     CSV_LOG,
     DATABASE,
     COMMAND_CACHE_FILE,
-    EXIT_CODE_FILE,
     FAILED_LOG,
     PASSWORD,
     RESTART_EXIT_CODE,
-    RESTART_FLAG_PATH,
     SERVER,
     SHEET_ID,
     SUMMARY_LOG,
@@ -513,127 +511,59 @@ def register_admin(bot: ext_commands.Bot) -> None:
         await ctx.interaction.edit_original_response(content=None, embed=embed)
 
     @ops_group.command(
-        name="restart_bot",
-        description="Forcefully restart the bot",
+        name="graceful_restart",
+        description="Safely drain work and restart the bot via the watchdog.",
     )
-    @versioned("v1.06")
+    @versioned("v1.00")
     @safe_command
     @is_admin_and_notify_channel()
+    @ext_commands.has_permissions(administrator=True)
     @track_usage()
-    async def restart_bot_command(ctx):
-        view = ConfirmRestartView(ctx, bot=bot, notify_channel_id=NOTIFY_CHANNEL_ID)
-        await ctx.respond("⚠️ Are you sure you want to restart the bot?", view=view, ephemeral=True)
+    async def graceful_restart(ctx):
+        logger.info("[COMMAND] /graceful_restart invoked by %s", ctx.user)
 
-        # Cache the original ephemeral message so the view can disable itself
         try:
-            view.message = await ctx.interaction.original_response()
+            await safe_defer(ctx, ephemeral=True)
         except Exception:
             pass
 
         try:
-            await asyncio.wait_for(view.confirmed.wait(), timeout=30)
-        except TimeoutError:
-            # Use followup after initial respond
-            await view._try_disable_ui()
-            await ctx.followup.send(
-                "⏱️ Restart cancelled – no confirmation received.", ephemeral=True
+            await ctx.interaction.edit_original_response(
+                content="Restarting safely: draining queues and saving runtime state..."
             )
-            return
+        except Exception:
+            pass
 
-        if view.cancelled:
-            await ctx.followup.send("✅ Restart request cancelled.", ephemeral=True)
-            return
-
-        logger.info("[RESTART] Confirmation received – proceeding with restart.")
-        await asyncio.sleep(2)
-
-        restart_data = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "user_id": ctx.user.id,
-            "reason": "slash_restart",
-        }
-
-        try:
-            with open(RESTART_FLAG_PATH, "w", encoding="utf-8") as f:
-                json.dump(restart_data, f)
-                f.flush()
-                os.fsync(f.fileno())
-            logger.info("[RESTART] Restart flag file written")
-
+        async def _do_graceful_restart():
             try:
-                with open(RESTART_FLAG_PATH, encoding="utf-8") as f:
-                    contents = f.read().strip()
-                logger.info(f"[RESTART] Restart flag content: {contents}")
-            except Exception as e:
-                logger.exception(f"[RESTART] Failed to read back restart flag: {e}")
+                from bot_instance import run_graceful_teardown
 
-            ws_code, ws_reason, ws_time = "", "", ""
-            if os.path.exists(".last_disconnect_reason"):
-                try:
-                    with open(".last_disconnect_reason", encoding="utf-8") as f:
-                        ws_info = json.load(f)
-                        ws_code = str(ws_info.get("code", ""))
-                        ws_reason = ws_info.get("reason", "")
-                        ws_time = ws_info.get("timestamp", "")
-                except Exception as e:
-                    logger.exception(
-                        f"[RESTART] Failed to read .last_disconnect_reason for CSV: {e}"
-                    )
-
-            await append_csv_line(
-                "restart_log.csv",
-                [
-                    restart_data["timestamp"],
-                    restart_data["reason"],
-                    restart_data["user_id"],
-                    "success",
-                    ws_code,
-                    ws_reason,
-                    ws_time,
-                ],
-            )
-
-        except Exception as e:
-            logger.exception(f"[RESTART] Failed to write restart flag or log: {e}")
-
-        try:
-            logger.info("[RESTART] Restarting bot via slash command.")
-            logger.info(f"[RESTART] sys.executable = {sys.executable}")
-            logger.info(f"[RESTART] sys.argv = {sys.argv}")
-
-            # Followup (not respond) after the initial message
-            await ctx.followup.send(
-                "✅ Restarting now... This may take a few seconds.", ephemeral=True
-            )
-            await asyncio.sleep(3)
-
-            flush_logs()
-
-            with open(EXIT_CODE_FILE, "w", encoding="utf-8") as f:
-                f.write(str(RESTART_EXIT_CODE))
-
-            flush_logs()
-            await asyncio.sleep(1)
-            print("[RESTART] Restart flag written – sleeping before SIGTERM")
-            print("[RESTART] Sending SIGTERM to self now.")
-            os.kill(os.getpid(), signal.SIGTERM)
-
-        except Exception as e:
-            logger.exception(f"[RESTART ERROR] Restart attempt failed: {e}")
-            try:
-                await ctx.followup.send(
-                    # architecture-check: allow
-                    embed=discord.Embed(
-                        title="❌ Restart Failed",
-                        description=f"Bot restart failed: `{type(e).__name__}: {e}`",
-                        color=0xE74C3C,
-                    ),
-                    ephemeral=True,
+                await run_cooperative_restart(
+                    reason="slash_graceful_restart",
+                    user_id=str(ctx.user.id),
+                    append_csv_line=append_csv_line,
+                    graceful_teardown=run_graceful_teardown,
+                    close_bot=bot.close,
+                    flush_logs=flush_logs,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.exception("[RESTART ERROR] Graceful restart attempt failed: %s", e)
+                try:
+                    await ctx.followup.send(
+                        # architecture-check: allow
+                        embed=discord.Embed(
+                            title="Graceful Restart Failed",
+                            description=f"Bot restart failed: `{type(e).__name__}: {e}`",
+                            color=0xE74C3C,
+                        ),
+                        ephemeral=True,
+                    )
+                except Exception:
+                    pass
 
-    # Commands.py — replace the whole function body of force_restart with this slimmer flow
+        asyncio.create_task(_do_graceful_restart())
+        return
+
     @ops_group.command(
         name="force_restart",
         description="Force a restart via the watchdog mechanism (admin only).",
@@ -661,41 +591,12 @@ def register_admin(bot: ext_commands.Bot) -> None:
         # 3) Schedule the actual restart; DO NOT await long-running work here
         async def _do_restart():
             try:
-                # Write restart flag + audit quickly
-                restart_flag = {
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "reason": "slash_force_restart",
-                    "user_id": str(ctx.user.id),
-                }
-                with open(RESTART_FLAG_PATH, "w", encoding="utf-8") as f:
-                    json.dump(restart_flag, f)
-                    f.flush()
-                    os.fsync(f.fileno())
+                await write_restart_request(
+                    reason="slash_force_restart",
+                    user_id=str(ctx.user.id),
+                    append_csv_line=append_csv_line,
+                )
                 logger.info("[RESTART] Flag written")
-
-                # Optional CSV audit (best-effort)
-                try:
-                    await append_csv_line(
-                        "restart_log.csv",
-                        [
-                            restart_flag["timestamp"],
-                            restart_flag["reason"],
-                            restart_flag["user_id"],
-                            "success",
-                            "",
-                            "",
-                            "",
-                        ],
-                    )
-                except Exception:
-                    pass
-
-                # Exit code file for watchdog
-                try:
-                    with open(EXIT_CODE_FILE, "w", encoding="utf-8") as f:
-                        f.write(str(RESTART_EXIT_CODE))
-                except Exception:
-                    pass
 
                 # Small delay to let the response leave the socket
                 await asyncio.sleep(0.25)

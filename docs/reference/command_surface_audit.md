@@ -1,6 +1,6 @@
 # Command Surface Audit
 
-Last updated: 2026-05-19
+Last updated: 2026-05-28
 
 ## Current Registration Summary
 
@@ -29,7 +29,8 @@ application-command limit. The validator warns at 90+ and fails above 100.
 |---|---|
 | `/run_sql_proc` | `/ops run_sql_proc` |
 | `/run_gsheets_export` | `/ops run_gsheets_export` |
-| `/restart_bot` | `/ops restart_bot` |
+| `/restart_bot` | retired in favour of `/ops graceful_restart` |
+| n/a | `/ops graceful_restart` |
 | `/force_restart` | `/ops force_restart` |
 | `/resync_commands` | `/ops resync_commands` |
 | `/show_command_versions` | `/ops show_command_versions` |
