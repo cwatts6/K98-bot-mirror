@@ -807,18 +807,10 @@ def save_live_queue():
     Sync-compatible live queue persistence wrapper.
 
     Async lifecycle code should prefer `save_live_queue_async()` so failures can
-    be awaited and reported accurately.
+    be awaited and reported accurately. This wrapper may run in worker threads
+    via `run_step()`, so it must not await the main-loop `live_queue_lock`.
     """
     try:
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            asyncio.run(save_live_queue_async())
-            return True
-
-        # Running in an event loop: keep legacy sync compatibility by taking a
-        # shallow snapshot without awaiting the async lock. Startup/shutdown paths
-        # now use the explicit async helper.
         payload = {
             "jobs": list(live_queue.get("jobs", []) or []),
             "message_meta": live_queue.get("message_meta"),

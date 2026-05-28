@@ -136,6 +136,35 @@ async def test_save_live_queue_async_propagates_write_failure(monkeypatch):
         await utils.save_live_queue_async()
 
 
+async def test_save_live_queue_sync_wrapper_does_not_use_async_lock(monkeypatch):
+    writes = []
+
+    class ExplodingLock:
+        async def __aenter__(self):
+            raise AssertionError("sync save should not await live_queue_lock")
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    def fake_write(payload):
+        writes.append(payload)
+
+    monkeypatch.setattr(utils, "live_queue_lock", ExplodingLock())
+    monkeypatch.setattr(utils, "_write_live_queue_payload", fake_write)
+    utils.live_queue["jobs"] = [{"filename": "threaded.csv", "status": "queued"}]
+    utils.live_queue["message_meta"] = {"channel_id": 111, "message_id": 222}
+
+    saved = await asyncio.to_thread(utils.save_live_queue)
+
+    assert saved is True
+    assert writes == [
+        {
+            "jobs": [{"filename": "threaded.csv", "status": "queued"}],
+            "message_meta": {"channel_id": 111, "message_id": 222},
+        }
+    ]
+
+
 async def test_update_live_queue_embed_rehydrate(monkeypatch):
     """
     Integration-style test that simulates rehydration:
