@@ -56,3 +56,18 @@ Use existing atomic file helpers where possible.
 - Logs are flushed before logging shutdown.
 - Critical state is persisted atomically.
 - Tests cover lock release, task cancellation, or state persistence where practical.
+
+## Phase 6I Focus
+
+Phase 6I is the next approved-review slice after Phase 6H queue lifecycle extraction. It should
+audit and then fix cooperative cancellation, queue draining/state flush, and shutdown ordering
+without reopening upload routing, scheduler ownership, command lifecycle, or process-entry cleanup.
+
+Review these shutdown/recovery surfaces together before implementation:
+
+- signal/admin/watchdog shutdown entry points
+- `bot_instance.py` graceful teardown and `TaskMonitor` cancellation behavior
+- queue workers, queue cleanup, connection watchdog, and `QUEUE_CACHE_FILE` persistence
+- shutdown marker writing, singleton/PID cleanup, and logging flush order
+- whether queue persistence hardening belongs inside Phase 6I or should remain a separate
+  follow-up slice after shutdown ordering is settled

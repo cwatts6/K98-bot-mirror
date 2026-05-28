@@ -5,7 +5,7 @@
 - Task name: `DL_bot startup/lifecycle separation - Phase 6 audit`
 - Date: `2026-05-26`
 - Last updated: `2026-05-28`
-- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B/6C/6D/6E/6F/6G startup lifecycle boundaries were pushed to production`
+- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B/6C/6D/6E/6F/6G/6H startup lifecycle boundaries were pushed to production`
 - Task type: `deferred optimisation batch`
 - One-pass approved: `no`
 
@@ -25,13 +25,13 @@ Before implementation, read the current repository instructions and indexed core
 - `docs/reference/runbook_startup.md`
 - `docs/reference/runbook_shutdown.md`
 - `docs/reference/singleton_lock.md`
+- `docs/reference/runbook_diagnostics.md`
 - `docs/task_packs/Codex Task Pack - DL_bot Upload Routing Deferred Optimisation Audit.md`
-- `docs/task_packs/DL_bot Upload Routing - Phase 5 Remaining Upload Fast Paths Starter.md`
-- `docs/task_packs/DL_bot Upload Routing - Phase 5D Fallback Queue Route Starter.md`
+- `docs/task_packs/Codex Chat Starter - DL_bot Phase 6H Queue Worker Lifecycle.md`
+- `docs/task_packs/Codex Chat Starter - DL_bot Phase 6I Shutdown Recovery Coordination.md`
 
-Use `docs/reference/runbook_diagnostics.md` if the audit needs deeper diagnostics, telemetry,
-offload registry, queue recovery, watchdog, or log-backup context. Use `docs/reference/ENV_REFERENCE.md`
-if environment-variable ownership or runtime configuration validation becomes part of the design.
+Use `docs/reference/ENV_REFERENCE.md` if environment-variable ownership or runtime configuration
+validation becomes part of the design.
 
 SQL validation is not expected for the first Phase 6 audit unless the review unexpectedly reaches
 SQL-backed cache, import, export, report, or ProcConfig contracts. If it does, validate relevant
@@ -158,8 +158,28 @@ Phase 6G scheduler and task-supervision boundary is complete:
 - No startup phase failure, `on_ready()` critical exception, scheduler registration failure,
   pinned-calendar scheduling failure, or calendar reminder loop failure was observed.
 - The PR was merged and pushed to production.
-- Queue worker lifecycle, shutdown coordination, and process-entry cleanup remain later Phase 6
-  slices.
+
+Phase 6H queue worker/live queue lifecycle is complete:
+
+- PR 125 (`codex/dlbot-phase-6h-queue-lifecycle`) added `core/queue_lifecycle.py`.
+- `core/queue_lifecycle.py` owns queue worker registration, live queue recovery, best-effort queue
+  embed refresh, queue cleanup startup, connection watchdog startup, ordering, logging, and
+  `TaskMonitor` duplicate-prevention preservation.
+- `bot_instance.py:full_startup_sequence()` delegates queue startup through the named
+  `ready_queue_lifecycle` phase at the existing point after restart/log initialization and before
+  CrystalTech startup.
+- Focused tests cover worker registration ordering, live queue load before embed refresh,
+  best-effort embed refresh failure behavior, and duplicate-prevention delegation through
+  `TaskMonitor.create()`.
+- Production smoke testing on 2026-05-28 confirmed the queue lifecycle phase ran after
+  `ready_domain_scheduler_tasks`, queue workers started for the configured monitored channels, live
+  queue state loaded before embed refresh, queue cleanup and connection watchdog started once,
+  `full_startup_sequence()` completed, reminder cleanup started, pinned calendar rehydration
+  completed, and calendar scheduler tasks armed.
+- No startup phase failure, `on_ready()` critical exception, queue embed refresh failure,
+  `queue_worker` monitor crash, `queue_cleanup` crash, or `connection_watchdog` crash was observed.
+- The PR was merged and pushed to production.
+- Shutdown coordination and process-entry cleanup remain later Phase 6 slices.
 
 `DL_bot.py` is now much closer to listener/delegation ownership for uploads, but startup and
 lifecycle concerns remain spread across `DL_bot.py`, `bot_instance.py`, `bot_loader.py`,
@@ -374,7 +394,7 @@ Initial classification before audit:
 | Event cache, reminder loading, and rehydration boundary | complete | Phase 6F separated event cache load/refresh, active reminder loading, event-dependent view rehydration, tracked view rehydration, and pinned calendar view rehydration from the remaining `on_ready()` body with explicit ordering and startup phase logs. Scheduler ownership inside the existing event-dependent bundle was deliberately deferred to Phase 6G. |
 | Scheduler and task-supervision boundary | complete | Phase 6G separated scheduler/task registration from the remaining `on_ready()` body and the previous event-dependent bundle while preserving startup order, readiness gates, best-effort behavior, and `TaskMonitor` duplicate prevention. |
 | `on_ready()` / `full_startup_sequence()` remaining responsibilities | audit first | Continue extracting in small slices; do not move cache warming, startup notifications, shutdown, and process entry together. |
-| Queue worker startup and live queue rehydration | complete | Phase 6H extracted queue worker registration, live queue recovery, best-effort queue embed refresh, queue cleanup startup, and connection watchdog startup into `core/queue_lifecycle.py` and `ready_queue_lifecycle` while preserving ordering and `TaskMonitor` duplicate prevention. |
+| Queue worker startup and live queue rehydration | complete | Phase 6H extracted queue worker registration, live queue recovery, best-effort queue embed refresh, queue cleanup startup, and connection watchdog startup into `core/queue_lifecycle.py` and `ready_queue_lifecycle` while preserving ordering and `TaskMonitor` duplicate prevention. PR 125 was smoke tested, merged, and pushed to production. |
 | Task monitor/scheduler startup | audit first | Multiple subsystems depend on startup order and duplicate prevention. |
 | Graceful shutdown and signal handling | audit first | High blast radius; may be separate PR from startup extraction. |
 | SQL/importer contracts | not applicable unless discovered | Phase 6 should avoid SQL/importer contract changes. |

@@ -90,12 +90,15 @@ started in the expected order with no startup phase failure or `on_ready()` crit
 Phase 6H queue worker/live queue lifecycle moved queue worker registration, live queue recovery,
 best-effort queue embed refresh, queue cleanup startup, and connection watchdog startup into
 `core/queue_lifecycle.py` and the `ready_queue_lifecycle` startup phase while preserving the
-existing `full_startup_sequence()` ordering.
+existing `full_startup_sequence()` ordering. PR 125
+(`codex/dlbot-phase-6h-queue-lifecycle`) was merged, smoke tested cleanly, pushed to production,
+and confirmed the new queue lifecycle phase ran in order with queue workers, live queue recovery,
+queue cleanup, connection watchdog, and later startup phases continuing normally.
 
 The next coherent major architecture batch should be scoped as fresh work around `DL_bot.py`
 startup/lifecycle ownership, not as a continuation of upload routing. Continue that task from
 `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md` and
-`docs/task_packs/Codex Chat Starter - DL_bot Phase 6H Queue Worker Lifecycle.md`, with
+`docs/task_packs/Codex Chat Starter - DL_bot Phase 6I Shutdown Recovery Coordination.md`, with
 this backlog and the current `K98-bot-mirror` GitHub issues list as supporting context.
 
 ### Deferred Optimisation
@@ -168,16 +171,16 @@ this backlog and the current `K98-bot-mirror` GitHub issues list as supporting c
 - Suggested Fix: Continue Phase 6 incrementally from `docs/task_packs/DL_bot Startup Lifecycle - Phase 6 Audit Starter.md`. After Phase 6H, keep shutdown coordination and final process-entry/bot-construction cleanup in later approval-gated slices.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5 upload routing and Phase 6A through Phase 6H lifecycle slices are complete or in delivery; proceed with shutdown/recovery coordination before process-entry cleanup.
+- Dependencies: Phase 5 upload routing and Phase 6A through Phase 6H lifecycle slices are complete, merged, production-pushed, and smoke tested; proceed with shutdown/recovery coordination before process-entry cleanup.
 
 ### Deferred Optimisation
 - Area: `utils.py`, `bot_helpers.py`, `core/queue_lifecycle.py`, queue runtime state
 - Type: refactor
-- Description: Phase 6H separated queue lifecycle startup, but broader queue persistence hardening remains out of scope. `load_live_queue()` is synchronous while scheduling an async state apply when an event loop is running, and queue draining/state flush semantics are still coupled to later shutdown behavior.
+- Description: Phase 6H separated queue lifecycle startup, but broader queue persistence hardening remains out of scope. `load_live_queue()` is synchronous while scheduling an async state apply when an event loop is running, and queue draining/state flush semantics are coupled to later shutdown behavior.
 - Suggested Fix: Add a dedicated queue persistence hardening slice after Phase 6I or fold it into Phase 6I only if shutdown work requires it. Make live queue load/apply explicitly awaitable where practical, preserve sync test compatibility or add a safe wrapper, verify atomic save behavior and stale metadata handling, and add restart/persistence tests for load-before-embed-refresh ordering and state flush after queue cancellation.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 6H lifecycle extraction; coordinate with Phase 6I cooperative cancellation and queue draining/state flush design.
+- Dependencies: Phase 6H lifecycle extraction is complete and production-smoke-tested; coordinate with Phase 6I cooperative cancellation and queue draining/state flush design.
 
 ### Deferred Optimisation
 - Area: `bot_helpers.py`, `bot_instance.py`, `DL_bot.py` shutdown and queue task lifecycle

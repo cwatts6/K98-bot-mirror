@@ -52,6 +52,7 @@ Purpose: describe the bot startup sequence, guardrails, logging setup, and commo
 - `singleton_lock.py`
 - `Commands.py`
 - `core/command_lifecycle.py`
+- `core/queue_lifecycle.py`
 - `core/scheduler_lifecycle.py`
 
 ## Startup Guards
@@ -113,9 +114,16 @@ before tracked view rehydration via `ready_event_cache_refresh_loop` and changed
 registration failures to `logger.exception()` for traceback parity. Production smoke confirmed all
 new scheduler phases, Ark/MGE scheduler ticks, `full_startup_sequence()`, reminder cleanup, pinned
 calendar rehydration, daily pinned refresh, and calendar reminder loop startup with no startup
-phase failure or `on_ready()` critical exception. Phase 6H moved queue worker/live queue startup
-into `core/queue_lifecycle.py` and the `ready_queue_lifecycle` phase while preserving the existing
-`full_startup_sequence()` ordering. Remaining lifecycle cleanup continues with shutdown
+phase failure or `on_ready()` critical exception. Phase 6H completed in PR 125
+(`codex/dlbot-phase-6h-queue-lifecycle`), was smoke tested cleanly, merged, and pushed to
+production: queue worker/live queue startup now runs through `core/queue_lifecycle.py` and the
+`ready_queue_lifecycle` phase while preserving the existing `full_startup_sequence()` ordering,
+`TaskMonitor` duplicate prevention, live queue recovery, best-effort queue embed refresh, queue
+cleanup startup, and connection watchdog startup. Production smoke confirmed the new queue phase
+ran after `ready_domain_scheduler_tasks`, started workers for configured monitored channels, loaded
+live queue state before embed refresh, started queue cleanup and connection watchdog once, and
+allowed `full_startup_sequence()`, reminder cleanup, pinned calendar rehydration, and calendar
+scheduler startup to continue normally. Remaining lifecycle cleanup continues with shutdown
 coordination and final process-entry/bot-construction cleanup.
 
 When changing startup, verify restart safety and avoid duplicate task creation.

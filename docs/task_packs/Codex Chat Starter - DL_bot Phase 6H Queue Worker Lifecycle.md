@@ -1,12 +1,24 @@
 # Codex Chat Starter - DL_bot Phase 6H Queue Worker Lifecycle
 
-Use this starter to continue Phase 6 after Phase 6G scheduler/task-supervision startup was
-merged, smoke-tested, pushed to production, and marked complete.
+Status: complete. PR 125 (`codex/dlbot-phase-6h-queue-lifecycle`) was merged, smoke-tested, and
+pushed to production on 2026-05-28. This starter is retained as historical context for Phase 6H.
 
-Status: implementation approved and in progress. The approved ownership model uses
-`core/queue_lifecycle.py` and the `ready_queue_lifecycle` phase for queue worker registration,
-live queue recovery, best-effort queue embed refresh, queue cleanup startup, connection watchdog
-startup, ordering, logging, and `TaskMonitor` duplicate-prevention preservation.
+Use `docs/task_packs/Codex Chat Starter - DL_bot Phase 6I Shutdown Recovery Coordination.md` for
+the next Phase 6 slice.
+
+Delivered outcome:
+
+- `core/queue_lifecycle.py` now owns queue worker registration, live queue recovery, best-effort
+  queue embed refresh, queue cleanup startup, connection watchdog startup, ordering, logging, and
+  `TaskMonitor` duplicate-prevention preservation.
+- `bot_instance.py:full_startup_sequence()` delegates queue startup through the named
+  `ready_queue_lifecycle` phase at the existing startup point.
+- Production smoke confirmed the new queue lifecycle phase ran after `ready_domain_scheduler_tasks`,
+  queue workers started for the configured monitored channels, live queue state loaded before
+  embed refresh, queue cleanup and connection watchdog started once, and later startup phases
+  continued normally.
+- No startup phase failure, `on_ready()` critical exception, queue embed refresh failure,
+  `queue_worker` monitor crash, `queue_cleanup` crash, or `connection_watchdog` crash was observed.
 
 Follow-up note: queue persistence hardening is intentionally not part of the Phase 6H lifecycle
 extraction. Track it as an optional slice after Phase 6I, or include it in Phase 6I only if
@@ -261,8 +273,8 @@ The wider command-surface migration/renaming programme remains separate from Pha
 ## Deferred Item Links
 
 This starter continues the DL_bot startup/lifecycle deferred optimisation in
-`docs/reference/deferred_optimisations.md` after Phase 6G completed scheduler/task-supervision
-boundary extraction.
+`docs/reference/deferred_optimisations.md` after Phase 6H completed queue worker/live queue
+lifecycle extraction.
 
 Carry forward, but do not implement unless separately approved:
 

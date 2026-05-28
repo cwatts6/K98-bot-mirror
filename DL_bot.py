@@ -733,17 +733,24 @@ async def _write_shutdown_markers(exit_code: int = 0, reason: str = "signal"):
 
 async def _quiesce_background_tasks():
     """
-    Stop schedulers/registries before closing the Discord client.
+    Stop app-owned schedulers/registries before closing the Discord client.
     Must be safe/idempotent if called multiple times.
     """
-    # 1) Cancel registry/scheduler loops if present
+    try:
+        from bot_instance import run_graceful_teardown
+
+        await run_graceful_teardown()
+        return
+    except Exception:
+        logger.exception("[SHUTDOWN] bot_instance graceful teardown failed.")
+
+    # Fallback only: keep the previous narrow cleanup if the bot teardown import/path fails.
     try:
         from reminder_task_registry import TaskRegistry
 
         await TaskRegistry.cancel_all(timeout=5)
     except Exception:
-        logger.debug("[SHUTDOWN] TaskRegistry cancel skipped or failed.", exc_info=True)
-    # 2) Quiesce any per-module loops (no hard fails)
+        logger.debug("[SHUTDOWN] TaskRegistry fallback cancel skipped or failed.", exc_info=True)
     try:
         from bot_instance import quiesce_logging
 

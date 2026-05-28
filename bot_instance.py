@@ -35,6 +35,7 @@ from bot_config import (
     UTC_CLOCK_CHANNEL_ID,
 )
 from bot_helpers import (
+    channel_queues,
     connection_watchdog,
     prune_restart_log,
     queue_cleanup_loop,
@@ -112,7 +113,13 @@ from server_activity.activity_store import ensure_activity_schema
 from server_status import run_member_count_channel_loop, run_utc_clock_channel_loop
 from subscription_tracker import load_subscriptions
 from target_utils import warm_name_cache
-from utils import ensure_aware_utc, load_live_queue, update_live_queue_embed, utcnow
+from utils import (
+    ensure_aware_utc,
+    load_live_queue,
+    save_live_queue,
+    update_live_queue_embed,
+    utcnow,
+)
 
 # offload monitor integration
 try:
@@ -1401,6 +1408,54 @@ async def schedule_event_embed_expiry():
 
 # --- Graceful teardown ------------------
 _shutdown_once = asyncio.Event()
+_QUEUE_SHUTDOWN_DRAIN_SECONDS = 3.0
+_QUEUE_SHUTDOWN_SAVE_SECONDS = 5.0
+
+
+async def _drain_shutdown_queues(timeout_seconds: float = _QUEUE_SHUTDOWN_DRAIN_SECONDS) -> None:
+    """Briefly let queue workers finish pending channel queue items before cancellation."""
+    queues = list(channel_queues.items())
+    if not queues:
+        logger.info("[SHUTDOWN] No channel queues configured for drain.")
+        return
+
+    pending_before = {channel_id: queue.qsize() for channel_id, queue in queues}
+    total_pending = sum(pending_before.values())
+    if total_pending <= 0:
+        logger.info("[SHUTDOWN] Channel queues already empty before task cancellation.")
+        return
+
+    logger.info(
+        "[SHUTDOWN] Draining %d queued message(s) across %d channel queue(s) for up to %.1fs.",
+        total_pending,
+        len(queues),
+        timeout_seconds,
+    )
+    joins = [queue.join() for _channel_id, queue in queues]
+    try:
+        await asyncio.wait_for(asyncio.gather(*joins), timeout=timeout_seconds)
+        logger.info("[SHUTDOWN] Channel queues drained before task cancellation.")
+    except TimeoutError:
+        pending_after = {channel_id: queue.qsize() for channel_id, queue in queues}
+        logger.warning(
+            "[SHUTDOWN] Channel queue drain timed out; pending_before=%s pending_after=%s",
+            pending_before,
+            pending_after,
+        )
+
+
+async def _flush_live_queue_state(timeout_seconds: float = _QUEUE_SHUTDOWN_SAVE_SECONDS) -> None:
+    """Persist live queue state before logging and process resources shut down."""
+    try:
+        await asyncio.wait_for(asyncio.to_thread(save_live_queue), timeout=timeout_seconds)
+        logger.info("[SHUTDOWN] Live queue state persisted.")
+    except TimeoutError:
+        logger.warning(
+            "[SHUTDOWN] Timed out persisting live queue state after %.1fs.",
+            timeout_seconds,
+        )
+    except Exception:
+        logger.exception("[SHUTDOWN] Failed persisting live queue state.")
 
 
 async def _graceful_teardown():
@@ -1423,6 +1478,16 @@ async def _graceful_teardown():
             logger.info("[SHUTDOWN] Stopped refresh_event_cache_task loop.")
     except Exception:
         logger.exception("[SHUTDOWN] Failed stopping refresh_event_cache_task.")
+
+    try:
+        await _drain_shutdown_queues()
+    except Exception:
+        logger.exception("[SHUTDOWN] Queue drain failed.")
+
+    try:
+        await _flush_live_queue_state()
+    except Exception:
+        logger.exception("[SHUTDOWN] Live queue flush failed.")
 
     # Cancel supervised tasks
     try:
@@ -1490,10 +1555,14 @@ async def _graceful_teardown():
         pass
 
 
+async def run_graceful_teardown():
+    await _graceful_teardown()
+
+
 @bot.event
 async def on_graceful_shutdown():
     try:
-        await _graceful_teardown()
+        await run_graceful_teardown()
     except Exception:
         logger.exception("[SHUTDOWN] on_graceful_shutdown failed.")
 

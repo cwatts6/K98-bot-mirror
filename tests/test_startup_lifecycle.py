@@ -176,3 +176,71 @@ def test_queue_lifecycle_uses_dedicated_helper():
     assert not _calls_name(full_startup, "update_live_queue_embed")
     assert not _creates_task_monitor_task(full_startup, "queue_cleanup")
     assert not _creates_task_monitor_task(full_startup, "connection_watchdog")
+
+
+def _call_order(node: ast.AST, names: set[str]) -> list[str]:
+    ordered: list[tuple[int, str]] = []
+    for child in ast.walk(node):
+        if not isinstance(child, ast.Call):
+            continue
+        func = child.func
+        name: str | None = None
+        if isinstance(func, ast.Name):
+            name = func.id
+        elif isinstance(func, ast.Attribute):
+            name = func.attr
+        if name in names:
+            ordered.append((getattr(child, "lineno", 0), name))
+    return [name for _lineno, name in sorted(ordered)]
+
+
+def _task_monitor_stop_line(node: ast.AST) -> int:
+    for child in ast.walk(node):
+        if not (
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Attribute)
+            and child.func.attr == "stop"
+            and isinstance(child.func.value, ast.Name)
+            and child.func.value.id == "task_monitor"
+        ):
+            continue
+        return getattr(child, "lineno", 0)
+    raise AssertionError("task_monitor.stop() call not found")
+
+
+def _first_call_line(node: ast.AST, name: str) -> int:
+    lines = [
+        getattr(child, "lineno", 0)
+        for child in ast.walk(node)
+        if isinstance(child, ast.Call)
+        and isinstance(child.func, ast.Name)
+        and child.func.id == name
+    ]
+    if not lines:
+        raise AssertionError(f"{name}() call not found")
+    return min(lines)
+
+
+def test_graceful_teardown_drains_and_flushes_queue_before_task_monitor_stop():
+    src = Path("bot_instance.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    teardown = _async_function(tree, "_graceful_teardown")
+    task_monitor_stop_line = _task_monitor_stop_line(teardown)
+
+    assert _first_call_line(teardown, "_drain_shutdown_queues") < task_monitor_stop_line
+    assert _first_call_line(teardown, "_flush_live_queue_state") < task_monitor_stop_line
+
+
+def test_dl_bot_signal_shutdown_calls_bot_instance_teardown_before_bot_close():
+    src = Path("DL_bot.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    shutdown = _async_function(tree, "_graceful_shutdown")
+    order = _call_order(shutdown, {"_quiesce_background_tasks", "close", "_shutdown_logging"})
+
+    assert order.index("_quiesce_background_tasks") < order.index("close")
+    assert order.index("close") < order.index("_shutdown_logging")
+
+    quiesce = _async_function(tree, "_quiesce_background_tasks")
+    assert _calls_name(quiesce, "run_graceful_teardown")
