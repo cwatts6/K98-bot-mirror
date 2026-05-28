@@ -19,6 +19,14 @@ Purpose: describe the bot startup sequence, guardrails, logging setup, and commo
      daily summary, activity tracking, and server status channel loops.
    - `ready_command_sync` owns slash-command signature inventory, command-cache comparison,
      scoped command sync when signatures change, timeout telemetry, and loaded-command logging.
+     Phase 6E also converged `/ops` command lifecycle admin tooling onto the same command
+     lifecycle helpers while keeping Discord admin UX in `commands/admin_cmds.py`.
+   - `ready_event_cache_rehydration` owns active reminder loading, event cache disk load,
+     stale/empty cache refresh, one-shot refresh scheduling, and the current event-dependent
+     startup bundle. Scheduler ownership inside that bundle remains deferred to Phase 6G.
+   - `ready_view_rehydration` schedules tracked persistent view rehydration.
+   - `ready_pinned_calendar_rehydration` schedules pinned calendar view rehydration at the
+     existing later startup point after `full_startup_sequence()`.
 9. Caches, rehydration, background tasks, heartbeat, and admin notification start.
 
 ## Main Files
@@ -78,9 +86,14 @@ runtime services/observability startup. Phase 6C consolidated usage tracking ont
 `ready_runtime_services`. The unified tracker intentionally uses the previous command/decorator
 cadence of a 5-second flush interval or 20-event batch size for command, component, metric, and
 alert usage events. Phase 6D moved startup command signature/cache/sync handling behind
-`ready_command_sync` and `core/command_lifecycle.py`. Remaining lifecycle cleanup after that
-starts with command lifecycle admin tooling convergence, then continues into rehydration and
-scheduler boundaries, queue worker lifecycle, and shutdown coordination.
+`ready_command_sync` and `core/command_lifecycle.py`. Phase 6E reused that lifecycle owner from
+`/ops resync_commands`, `/ops validate_command_cache`, and `/ops show_command_versions`; production
+smoke on 2026-05-28 confirmed those commands loaded, executed, flushed usage telemetry, and manual
+scoped command resync completed successfully. Phase 6F added explicit boundaries for event cache,
+reminder loading, tracked view rehydration, and pinned calendar rehydration while preserving the
+existing event-dependent scheduler bundle for Phase 6G. Remaining lifecycle cleanup continues with
+scheduler/task supervision, queue worker lifecycle, shutdown coordination, and final
+process-entry/bot-construction cleanup.
 
 When changing startup, verify restart safety and avoid duplicate task creation.
 

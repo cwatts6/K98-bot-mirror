@@ -52,7 +52,6 @@ from constants import (
     LAST_RESTART_INFO,
     LAST_SHUTDOWN_INFO,
     PASSWORD,
-    REMINDER_TRACKING_FILE,
     RESTART_LOG_FILE,
     SERVER,
     STATS_SHEET_ID,
@@ -60,24 +59,24 @@ from constants import (
     USERNAME,
 )
 from core.command_lifecycle import run_ready_command_sync
+from core.event_rehydration_lifecycle import (
+    run_ready_event_cache_rehydration,
+    run_ready_pinned_calendar_rehydration,
+    run_ready_tracked_view_rehydration,
+    wait_for_events,
+)
 from core.interaction_safety import get_operation_lock
 from core.startup_lifecycle import StartupPhase, run_startup_phases
 from crystaltech_di import init_crystaltech_service
 from daily_KVK_overview_embed import post_or_update_daily_KVK_overview
 from embed_utils import expire_old_event_embeds, send_summary_embed
-from event_cache import (
-    get_all_upcoming_events,
-    is_cache_stale,
-    load_event_cache,
-    refresh_event_cache,
-)
-from event_calendar.pinned_embed import rehydrate_pinned_calendar_view, update_calendar_embed
+from event_cache import refresh_event_cache
+from event_calendar.pinned_embed import update_calendar_embed
 from event_calendar.reminders import run_calendar_reminder_loop
 from event_calendar.service import get_calendar_service
 from event_embed_manager import rehydrate_live_event_views, update_live_event_embeds
 from event_scheduler import (
     cleanup_orphaned_reminders,
-    load_active_reminders,
     load_dm_scheduled_tracker,
     load_dm_sent_tracker,
     refresh_reminder_format,
@@ -100,7 +99,6 @@ from player_stats_cache import (  # optional, see note
 )
 from proc_config_import import run_proc_config_import, run_proc_config_import_offload
 from profile_cache import get_cache_stats, warm_cache as warm_profile_cache
-from rehydrate_views import rehydrate_tracked_views
 from server_activity import register_activity_listeners
 from server_activity.activity_store import ensure_activity_schema
 from server_status import run_member_count_channel_loop, run_utc_clock_channel_loop
@@ -186,19 +184,6 @@ async def _refresh_mge_caches_on_startup() -> None:
         )
     except Exception:
         logger.exception("[BOOT] MGE cache refresh failed")
-
-
-async def wait_for_events(timeout_seconds: int = 10) -> bool:
-    """Return True as soon as we have at least 1 upcoming event, else False after timeout."""
-    checks = int(max(1, timeout_seconds) * 10)
-    for _ in range(checks):
-        try:
-            if get_all_upcoming_events():  # non-empty list means ready
-                return True
-        except Exception:
-            pass
-        await asyncio.sleep(0.1)
-    return False
 
 
 def schedule_bg(name: str, timeout: float, coro_factory: Callable[[], Awaitable[Any]]):
@@ -356,7 +341,7 @@ async def _start_event_dependent_tasks():
         )
         logger.info("[BOOT] rehydrate_live_event_views complete")
     except Exception:
-        logger.error("[BOOT] Failed to start rehydrate_live_event_views: {e}")
+        logger.exception("[BOOT] Failed to start rehydrate_live_event_views")
 
     # Scheduled expiry
     try:
@@ -364,25 +349,6 @@ async def _start_event_dependent_tasks():
         logger.info("[BOOT] Event embed expiry task scheduled for 08:00 UTC daily")
     except Exception as e:
         logger.error(f"[BOOT] Failed to start event_embed_expiry task: {e}")
-
-
-async def _start_event_tasks_when_ready(max_wait_seconds: int = 300):
-    """
-    Block until the event cache has at least one upcoming event (or timeout),
-    then start all event-dependent background tasks exactly once.
-    """
-    try:
-        ready = await wait_for_events(timeout_seconds=max_wait_seconds)
-        if not ready:
-            logger.warning(
-                "[BOOT] Event cache still not ready after %ss; "
-                "skipping event-dependent task start for now.",
-                max_wait_seconds,
-            )
-            return
-        await _start_event_dependent_tasks()
-    except Exception as e:
-        logger.exception("[BOOT] _start_event_tasks_when_ready failed: %s", e)
 
 
 # wrap blockers
@@ -1524,6 +1490,9 @@ async def on_graceful_shutdown():
         logger.exception("[SHUTDOWN] on_graceful_shutdown failed.")
 
 
+_startup_loaded_reminder_ids: set[Any] = set()
+
+
 @bot.event
 async def on_ready():
     # Gate: only the first on_ready() does startup work
@@ -1542,38 +1511,9 @@ async def on_ready():
         logger.info(f"✅ Bot is ready – logged in as {bot.user} (ID: {bot.user.id})")
         await run_startup_phases([StartupPhase("ready_command_sync", _run_ready_command_sync)])
 
-        logger.info(f"[REMINDER_CACHE] Attempting to load from {REMINDER_TRACKING_FILE}")
-        loaded_ids = await load_active_reminders(bot)
-
-        try:
-            load_event_cache()
-            logger.info("[EVENT_CACHE] Loaded cache from disk")
-            if is_cache_stale() or not get_all_upcoming_events():
-                logger.info("[EVENT_CACHE] Cache was stale or empty — refreshing from GSheet")
-                await refresh_event_cache()
-
-            # Log a definitive post-refresh count so we can see what the bot is working with
-            try:
-                count = len(get_all_upcoming_events() or [])
-                logger.info(f"[EVENT_CACHE] Ready with {count} upcoming events.")
-            except Exception:
-                logger.info("[EVENT_CACHE] Ready; but could not count events.")
-        except Exception as e:
-            logger.error(f"[STARTUP] Failed to load or refresh event cache: {e}")
-
-        schedule_bg("refresh_event_cache_once", 10.0, lambda: refresh_event_cache())
-
-        ready = await wait_for_events(10)
-        if ready:
-            await _start_event_dependent_tasks()
-        else:
-            logger.warning(
-                "[BOOT] Event cache not ready; will wait in background and start event-dependent tasks when populated."
-            )
-            task_monitor.create(
-                "event_tasks_when_ready",
-                lambda: _start_event_tasks_when_ready(max_wait_seconds=300),
-            )
+        await run_startup_phases(
+            [StartupPhase("ready_event_cache_rehydration", _run_ready_event_cache_rehydration)]
+        )
 
         try:
             schedule_bg("warm_name_cache", 8.0, lambda: warm_name_cache())
@@ -1604,7 +1544,7 @@ async def on_ready():
         except Exception as e:
             logger.warning(f"[CACHE] Failed to schedule last-KVK cache build: {e}")
 
-        await cleanup_orphaned_reminders(loaded_ids)
+        await cleanup_orphaned_reminders(_startup_loaded_reminder_ids)
 
         try:
             load_dm_sent_tracker()
@@ -1619,7 +1559,7 @@ async def on_ready():
             load_subscriptions()
             logger.info("[SUBSCRIPTIONS] Subscription file loaded successfully.")
         except Exception:
-            logger.error("[SUBSCRIPTIONS] Failed to load at startup: {e}")
+            logger.exception("[SUBSCRIPTIONS] Failed to load at startup")
 
         try:
             if not refresh_event_cache_task.is_running():
@@ -1627,13 +1567,11 @@ async def on_ready():
             else:
                 logger.info("[BOOT] refresh_event_cache_task already running; skipping start.")
         except Exception:
-            logger.error("[BOOT] Failed to start refresh_event_cache_task: {e}")
+            logger.exception("[BOOT] Failed to start refresh_event_cache_task")
 
-        try:
-            schedule_bg("rehydrate_tracked_views", 10.0, lambda: rehydrate_tracked_views(bot))
-            logger.info("[BOOT] View tracker rehydration scheduled")
-        except Exception:
-            logger.error("[BOOT] Failed to start rehydrate_tracked_views: {e}")
+        await run_startup_phases(
+            [StartupPhase("ready_view_rehydration", _run_ready_view_rehydration)]
+        )
 
         try:
             task_monitor.create("ark_scheduler", lambda: schedule_ark_lifecycle(bot))
@@ -1676,15 +1614,16 @@ async def on_ready():
             task_monitor.create("reminder_cleanup", reminder_cleanup_loop)
             logger.info("[BOOT] Reminder cleanup task started")
         except Exception:
-            logger.error("[BOOT] Failed to start reminder_cleanup_loop: {e}")
+            logger.exception("[BOOT] Failed to start reminder_cleanup_loop")
 
-        try:
-            schedule_bg(
-                "rehydrate_pinned_calendar_view", 8.0, lambda: rehydrate_pinned_calendar_view(bot)
-            )
-            logger.info("[BOOT] pinned calendar view rehydration scheduled")
-        except Exception:
-            logger.exception("[BOOT] failed to schedule pinned calendar rehydration")
+        await run_startup_phases(
+            [
+                StartupPhase(
+                    "ready_pinned_calendar_rehydration",
+                    _run_ready_pinned_calendar_rehydration,
+                )
+            ]
+        )
 
         try:
             task_monitor.create(
@@ -1707,8 +1646,8 @@ async def on_ready():
         except Exception:
             logger.exception("[BOOT] failed to start calendar reminder loop")
 
-    except Exception as e:
-        logger.exception(f"[CRITICAL] Exception during on_ready: {e}")
+    except Exception:
+        logger.exception("[CRITICAL] Exception during on_ready")
 
 
 async def _run_ready_runtime_bootstrap() -> None:
@@ -1729,6 +1668,24 @@ async def _run_ready_runtime_bootstrap() -> None:
 
 async def _run_ready_command_sync() -> None:
     await run_ready_command_sync(bot)
+
+
+async def _run_ready_event_cache_rehydration() -> None:
+    global _startup_loaded_reminder_ids
+    _startup_loaded_reminder_ids = await run_ready_event_cache_rehydration(
+        bot=bot,
+        schedule_bg=schedule_bg,
+        task_monitor_create=task_monitor.create,
+        start_event_dependent_tasks=_start_event_dependent_tasks,
+    )
+
+
+async def _run_ready_view_rehydration() -> None:
+    await run_ready_tracked_view_rehydration(bot=bot, schedule_bg=schedule_bg)
+
+
+async def _run_ready_pinned_calendar_rehydration() -> None:
+    await run_ready_pinned_calendar_rehydration(bot=bot, schedule_bg=schedule_bg)
 
 
 async def _run_ready_runtime_services() -> None:

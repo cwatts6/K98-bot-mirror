@@ -74,6 +74,9 @@ def test_on_ready_uses_named_startup_lifecycle_boundary():
         "ready_runtime_bootstrap",
         "ready_runtime_services",
         "ready_command_sync",
+        "ready_event_cache_rehydration",
+        "ready_view_rehydration",
+        "ready_pinned_calendar_rehydration",
     ]
 
 
@@ -133,3 +136,22 @@ def test_usage_tracking_lifecycle_owned_by_runtime_services_phase():
 
     assert not _calls_name(full_startup, "start_usage_tracker")
     assert not _creates_task_monitor_task(full_startup, "usage_jsonl_prune")
+
+
+def test_event_rehydration_lifecycle_uses_dedicated_helpers():
+    src = Path("bot_instance.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    event_cache = _async_function(tree, "_run_ready_event_cache_rehydration")
+    tracked_views = _async_function(tree, "_run_ready_view_rehydration")
+    pinned_calendar = _async_function(tree, "_run_ready_pinned_calendar_rehydration")
+    on_ready = _async_function(tree, "on_ready")
+
+    assert _calls_name(event_cache, "run_ready_event_cache_rehydration")
+    assert _calls_name(tracked_views, "run_ready_tracked_view_rehydration")
+    assert _calls_name(pinned_calendar, "run_ready_pinned_calendar_rehydration")
+
+    assert not _calls_name(on_ready, "load_event_cache")
+    assert not _calls_name(on_ready, "load_active_reminders")
+    assert not _calls_name(on_ready, "rehydrate_tracked_views")
+    assert not _calls_name(on_ready, "rehydrate_pinned_calendar_view")

@@ -1,7 +1,20 @@
 # Codex Chat Starter - DL_bot Phase 6E Command Lifecycle Admin Tooling
 
-Use this starter to continue Phase 6 after Phase 6D command sync lifecycle ownership was merged,
-smoke-tested, pushed to production, and marked complete.
+Status: complete. PR 122 (`codex/dlbot-phase-6e-command-admin-tooling`) was merged, smoke-tested,
+and pushed to production on 2026-05-28. This starter is retained as historical context for Phase
+6E.
+
+Use `docs/task_packs/Codex Chat Starter - DL_bot Phase 6F Event Cache Rehydration Boundary.md` for
+the next Phase 6 slice.
+
+Delivered outcome:
+
+- `/ops resync_commands`, `/ops validate_command_cache`, and `/ops show_command_versions` now reuse
+  `core/command_lifecycle.py` for lifecycle mechanics.
+- `commands/admin_cmds.py` continues to own Discord admin UX, permissions, ephemeral responses,
+  operation locking, and embeds.
+- Production smoke confirmed the three `/ops` commands loaded and executed, command usage telemetry
+  flushed normally, and manual scoped resync logged success.
 
 ## Copy/Paste Starter
 

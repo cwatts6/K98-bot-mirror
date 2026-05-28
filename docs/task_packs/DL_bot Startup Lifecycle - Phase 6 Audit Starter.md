@@ -4,8 +4,8 @@
 
 - Task name: `DL_bot startup/lifecycle separation - Phase 6 audit`
 - Date: `2026-05-26`
-- Last updated: `2026-05-27`
-- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B/6C/6D startup lifecycle boundaries were pushed to production`
+- Last updated: `2026-05-28`
+- Owner/context: `Follow-up after Phase 5 upload-routing consolidation completed and Phase 6A/6B/6C/6D/6E startup lifecycle boundaries were pushed to production`
 - Task type: `deferred optimisation batch`
 - One-pass approved: `no`
 
@@ -104,6 +104,19 @@ Phase 6D command sync lifecycle ownership is complete:
 - Production smoke testing on 2026-05-27 confirmed the unchanged-command path, a changed-command
   `/summary` version bump path with successful scoped guild sync and cache update, and a follow-up
   restart returning to `commands_changed result: False`.
+- The PR was merged and pushed to production.
+
+Phase 6E command lifecycle admin tooling convergence is complete:
+
+- PR 122 (`codex/dlbot-phase-6e-command-admin-tooling`) reused `core/command_lifecycle.py` from
+  `/ops resync_commands`, `/ops validate_command_cache`, and `/ops show_command_versions`.
+- `commands/admin_cmds.py` still owns admin permissions, notify-channel gating, ephemeral deferral,
+  operation locking, and Discord embeds.
+- `core.command_lifecycle` now owns shared command signature sorting, version-line rendering,
+  manual scoped sync result handling, atomic command-cache updates, and cache validation logic.
+- Production smoke testing on 2026-05-28 confirmed `show_command_versions`,
+  `validate_command_cache`, and `resync_commands` loaded and executed, usage telemetry flushed
+  normally, and manual command sync logged `[COMMAND SYNC] Slash commands successfully resynced.`
 - The PR was merged and pushed to production.
 
 `DL_bot.py` is now much closer to listener/delegation ownership for uploads, but startup and
@@ -315,8 +328,9 @@ Initial classification before audit:
 | Runtime services/observability startup | complete | Phase 6B moved heartbeat, health dashboard, offload monitor, PIL safety patch, lock cleanup, usage tracker, daily summary, activity listeners, and status-channel loops behind `ready_runtime_services`, preserving startup order and smoke-tested behaviour. |
 | Usage tracker lifecycle ownership | complete | Phase 6C consolidated command/component/metric/alert usage logging onto the shared `usage_tracker.py` singleton and moved usage JSONL pruning into `ready_runtime_services`, preserving startup order and smoke-tested behaviour. |
 | Command signature/cache/sync ownership | complete | Phase 6D moved startup command signature/cache/sync handling into `core/command_lifecycle.py` and `ready_command_sync`, preserving cache, scoped sync, timeout telemetry, and loaded-command logging behaviour. |
-| Command lifecycle admin tooling convergence | next recommended slice | Phase 6E should reuse `core/command_lifecycle.py` from `/ops resync_commands`, `/ops validate_command_cache`, and `/ops show_command_versions` while preserving admin permissions, embeds, timeout behaviour, and operator-facing summaries. |
-| `on_ready()` / `full_startup_sequence()` remaining responsibilities | audit first | Continue extracting in small slices; do not move command sync, event rehydration, schedulers, queue workers, startup notifications, and shutdown together. |
+| Command lifecycle admin tooling convergence | complete | Phase 6E reused `core/command_lifecycle.py` from `/ops resync_commands`, `/ops validate_command_cache`, and `/ops show_command_versions` while preserving admin permissions, embeds, timeout behaviour, and operator-facing summaries. |
+| Event cache, reminder loading, and rehydration boundary | approved/current slice | Phase 6F separates event cache load/refresh, active reminder loading, event-dependent view rehydration, tracked view rehydration, and pinned calendar view rehydration from the remaining `on_ready()` body with explicit ordering and startup phase logs. Scheduler ownership inside the existing event-dependent bundle is deliberately deferred to Phase 6G. |
+| `on_ready()` / `full_startup_sequence()` remaining responsibilities | audit first | Continue extracting in small slices; do not move event rehydration, schedulers, queue workers, startup notifications, and shutdown together. |
 | Queue worker startup and live queue rehydration | audit first | Restart-sensitive; must preserve worker handoff and live queue persistence. |
 | Task monitor/scheduler startup | audit first | Multiple subsystems depend on startup order and duplicate prevention. |
 | Graceful shutdown and signal handling | audit first | High blast radius; may be separate PR from startup extraction. |
@@ -326,21 +340,20 @@ Final decisions should be updated after each Phase 6 sub-phase.
 
 ## 13.1 Remaining Phase 6 Slices
 
-Current recommended order after Phase 6D:
+Current recommended order after Phase 6E:
 
-1. Phase 6E command lifecycle admin tooling convergence: reuse `core/command_lifecycle.py` from
-   `/ops resync_commands`, `/ops validate_command_cache`, and `/ops show_command_versions` while
-   preserving admin UX and keeping command-surface consolidation out of scope.
-2. Event cache, reminder loading, and rehydration boundary: separate event cache refresh,
+1. Phase 6F event cache, reminder loading, and rehydration boundary: separate event cache refresh,
    reminder state loading, tracked view rehydration, and calendar pinned view rehydration from the
-   remaining `on_ready()` body with explicit startup ordering.
-3. Scheduler and task-supervision boundary: extract Ark, MGE, event reminder, calendar reminder,
+   remaining `on_ready()` body with explicit startup ordering. Preserve the current event-dependent
+   scheduler bundle as a compatibility path and carry the scheduler/task-supervision split into
+   Phase 6G.
+2. Phase 6G scheduler and task-supervision boundary: extract Ark, MGE, event reminder, calendar reminder,
    daily pinned refresh, and related TaskMonitor registrations into named lifecycle ownership.
-4. Queue worker and live queue lifecycle: isolate queue worker startup, live queue rehydration,
+3. Phase 6H queue worker and live queue lifecycle: isolate queue worker startup, live queue rehydration,
    queue embed refresh, and queue persistence/recovery concerns.
-5. Shutdown and recovery coordination: audit graceful teardown, signal handling, task
+4. Phase 6I shutdown and recovery coordination: audit graceful teardown, signal handling, task
    cancellation, state flush, singleton/PID/shutdown markers, and logging shutdown order.
-6. Process-entry and bot-construction cleanup: only after the smaller runtime lifecycle slices are
+5. Phase 6J process-entry and bot-construction cleanup: only after the smaller runtime lifecycle slices are
    stable, review whether `DL_bot.py`, `bot_loader.py`, and `bot_instance.py` need a clearer final
    ownership split.
 
