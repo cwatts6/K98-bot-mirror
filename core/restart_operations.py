@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 RestartAuditWriter = Callable[[str, list[Any]], Awaitable[Any]]
 AsyncStep = Callable[[], Awaitable[Any]]
 FlushLogs = Callable[[], Any]
+ForceExit = Callable[[int], Any]
 DEFAULT_BOT_CLOSE_TIMEOUT_SECONDS = 10.0
 
 
@@ -84,6 +85,7 @@ async def run_cooperative_restart(
     graceful_teardown: AsyncStep,
     close_bot: AsyncStep,
     flush_logs: FlushLogs | None = None,
+    force_exit: ForceExit | None = os._exit,
     response_delay_seconds: float = 0.25,
     close_timeout_seconds: float = DEFAULT_BOT_CLOSE_TIMEOUT_SECONDS,
 ) -> dict[str, str]:
@@ -101,4 +103,9 @@ async def run_cooperative_restart(
         await asyncio.wait_for(close_bot(), timeout=close_timeout_seconds)
     except TimeoutError:
         logger.warning("[RESTART] bot.close() timed out after %.1fs", close_timeout_seconds)
+        if flush_logs is not None:
+            flush_logs()
+        if force_exit is not None:
+            logger.warning("[RESTART] Forcing process exit after bot.close() timeout.")
+            force_exit(RESTART_EXIT_CODE)
     return restart_flag

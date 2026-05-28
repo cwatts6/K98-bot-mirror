@@ -81,23 +81,53 @@ Expected Phase 6I shutdown log markers when the in-process graceful path is exer
 - `[MONITOR] Stop requested; tasks cancelled where applicable.`
 - `[SHUTDOWN] Usage tracker stopped.`
 
-## Phase 6J Focus
+## Phase 6J Outcome
 
-Phase 6J should make the Phase 6I shutdown path categorically smoke-testable without weakening
-the current break-glass restart behavior.
+Phase 6J was completed in PR 127 (`codex/dlbot-phase-6j-graceful-restart-starter`), merged, pushed
+to production, and smoke tested successfully. It makes the Phase 6I graceful teardown path directly
+testable from normal operator tooling while keeping the existing emergency restart route.
 
-Approved operator model:
+Delivered operator model:
 
 - `/ops graceful_restart` is the preferred safe restart path. It writes the restart marker and
-  watchdog exit-code file, enters the bot-side graceful teardown path, drains queues briefly,
-  persists live queue state, stops supervised tasks and usage tracking, flushes logs, then closes
-  the bot so the watchdog restarts it.
+  watchdog exit-code file through `core/restart_operations.py`, enters the bot-side graceful
+  teardown path, drains queues briefly, persists live queue state, stops supervised tasks and usage
+  tracking, flushes logs, then closes the bot so the watchdog restarts it. If `bot.close()` times
+  out after markers are written, the restart helper forces process exit with the restart exit code
+  so the watchdog is not left blocked waiting for a still-running child process.
 - `/ops force_restart` remains the emergency break-glass path for stuck, looping, or unresponsive
   states.
-- The old `/ops restart_bot` path is retired instead of kept as a compatibility alias.
-- `graceful_shutdown.py` should request cooperative process teardown first and wait up to
-  `GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS` seconds, defaulting to `15`, before falling back to process
-  kill.
+- `/ops restart_bot` is retired and is no longer registered.
+- `graceful_shutdown.py` now requests cooperative process teardown first and waits up to
+  `GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS`, defaulting to `15`, before falling back to process kill.
+  Invalid or non-positive timeout values fall back to `15` instead of aborting the helper at import
+  time.
+- Restart audit CSV writes are best-effort. Marker and exit-code writes remain the restart control
+  path; a locked or unavailable restart log must not prevent teardown.
+- Cooperative `bot.close()` is bounded so a Discord close stall does not leave the watchdog waiting
+  indefinitely after restart markers have been written.
+- Live queue shutdown persistence uses the explicit async live queue save helper and only reports
+  success after the atomic JSON write completes.
 
-Queue persistence hardening and process-entry cleanup remain follow-up slices unless Phase 6J
-smoke testing proves they are required for safe cooperative restart behavior.
+Production `/ops graceful_restart` smoke on 2026-05-28 confirmed:
+
+- command invocation and usage telemetry flush
+- graceful teardown initiation
+- channel queue drain/join handling before supervised task cancellation
+- live queue persistence before cancellation
+- reminder task registry cancellation
+- usage tracker stop before disconnect
+- watchdog restart and singleton lock reacquisition
+- startup return through Phase 6 lifecycle logs, including `ready_runtime_bootstrap`,
+  `ready_queue_lifecycle`, and `ready_calendar_scheduler_tasks`
+- command inventory containing `/ops graceful_restart` and `/ops force_restart`, with
+  `/ops restart_bot` absent
+
+The smoke log did not include a literal `[SHUTDOWN] Logging quiesced` line. That is expected with
+the current implementation: `bot_instance.quiesce_logging()` is intentionally silent and removes
+console-like stream handlers while keeping queue/file logging alive. Treat the absence of that
+exact line as acceptable when the surrounding shutdown and startup markers are clean and there are
+no late logging handler failures.
+
+Queue persistence hardening and process-entry cleanup remain follow-up slices. Do not weaken
+`/ops force_restart`; it remains the recovery route when cooperative teardown cannot be trusted.

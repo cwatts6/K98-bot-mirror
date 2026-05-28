@@ -1,7 +1,19 @@
 # Codex Chat Starter - DL_bot Phase 6J Graceful Restart Shutdown Operations
 
-Use this starter to continue Phase 6 after Phase 6I shutdown/recovery coordination was merged,
-pushed to production, and closed with a known smoke-test gap.
+Status: complete. Phase 6J was delivered in PR 127
+(`codex/dlbot-phase-6j-graceful-restart-starter`), merged, pushed to production, and smoke tested
+successfully on 2026-05-28.
+
+Phase 6J added `/ops graceful_restart`, retired `/ops restart_bot`, preserved `/ops force_restart`
+as the emergency path, centralized restart marker writing/cooperative invocation in
+`core/restart_operations.py`, and updated `graceful_shutdown.py` to request cooperative teardown
+first with a configurable fallback timeout defaulting to 15 seconds.
+
+Use `docs/task_packs/Codex Chat Starter - DL_bot Phase 6K Queue Persistence Hardening.md` for the
+next optional Phase 6 slice, or continue to final process-entry/bot-construction cleanup if that
+queue hardening slice is explicitly skipped.
+
+Historical starter content follows for audit context.
 
 ## Copy/Paste Starter
 
@@ -237,10 +249,14 @@ The graceful restart smoke test should show logs similar to:
 [SHUTDOWN] Live queue state persisted
 [MONITOR] Stop requested
 [SHUTDOWN] Usage tracker stopped
-[SHUTDOWN] Logging quiesced
 [STARTUP] phase started: ready_runtime_bootstrap
 [STARTUP] phase completed: ready_calendar_scheduler_tasks
 ```
+
+The literal `[SHUTDOWN] Logging quiesced` line was an aspirational smoke marker in the original
+starter. It is not emitted by the delivered implementation because `quiesce_logging()` is silent;
+use the absence of late logging handler failures plus clean watchdog/startup return as the current
+logging quiesce/shutdown signal.
 
 The smoke test should not show:
 
@@ -258,18 +274,38 @@ The smoke test should not show:
 Known best-effort warnings may be acceptable only when intentionally induced or otherwise
 understood, and only when shutdown/restart still continues cleanly.
 
+## Phase 6J Smoke Outcome
+
+Production `/ops graceful_restart` smoke confirmed the intended path:
+
+- command invocation and usage telemetry flush
+- graceful teardown initiation
+- channel queue drain/join handling before supervised task cancellation
+- live queue persistence before cancellation
+- reminder task registry cancellation
+- usage tracker stop before disconnect
+- watchdog restart and startup return through Phase 6 lifecycle phases
+- `/ops graceful_restart` and `/ops force_restart` present in command inventory
+- `/ops restart_bot` absent from command inventory
+
+The smoke log did not include a literal `[SHUTDOWN] Logging quiesced` line. This is expected: the
+current `bot_instance.quiesce_logging()` helper is intentionally silent and removes console-like
+stream handlers while retaining queue/file logging until final shutdown. Treat the missing literal
+line as acceptable when the surrounding shutdown/startup markers are clean and no late logging
+handler failures appear.
+
 ## Remaining Phase 6 Slices
 
-Recommended order after Phase 6I:
+Recommended order after Phase 6J:
 
-1. Phase 6J graceful restart/shutdown operations:
-   - add `/ops graceful_restart`
-   - remove `/ops restart_bot`
-   - preserve `/ops force_restart` as break-glass
-   - update `graceful_shutdown.py` with a configurable 15-second default fallback
-   - prove the Phase 6I graceful teardown path with production smoke logs
-2. Optional queue persistence hardening slice after Phase 6J, unless Phase 6J requires it directly.
-3. Phase 6K process-entry and bot-construction cleanup.
+1. Optional Phase 6K queue persistence hardening:
+   - make live queue load/apply semantics clearer and explicitly awaitable where practical
+   - verify atomic save behavior and stale metadata handling
+   - add restart/persistence tests for load-before-embed-refresh ordering and shutdown state flush
+2. Final process-entry and bot-construction cleanup:
+   - audit `DL_bot.py`, `bot_loader.py`, and `bot_instance.py` ownership
+   - keep upload routing and command-surface migration out of scope
+   - proceed only after separate review/scope approval
 
 The wider command-surface migration/renaming programme remains separate from Phase 6.
 
@@ -281,7 +317,7 @@ coordination with residual graceful smoke-test risk.
 
 Carry forward, but do not implement unless separately approved:
 
-- full queue persistence hardening after Phase 6J, unless required directly by Phase 6J shutdown
-  operations
-- process-entry and bot-construction cleanup as Phase 6K
+- full queue persistence hardening as the next optional Phase 6 slice
+- process-entry and bot-construction cleanup after queue persistence hardening, or next if the
+  queue slice is skipped
 - pinned calendar tracker persistence hardening in `event_calendar/pinned_embed.py`

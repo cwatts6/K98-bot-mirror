@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import pytest
 
@@ -48,6 +49,91 @@ async def test_save_and_load_structure(tmp_path, monkeypatch):
             "message_id": 222,
             "message_created": None,
         }
+
+
+async def test_load_live_queue_async_applies_before_return(tmp_path, monkeypatch):
+    temp_file = tmp_path / "queue_cache.json"
+    monkeypatch.setattr(utils, "QUEUE_CACHE_FILE", str(temp_file))
+    temp_file.write_text(
+        json.dumps(
+            {
+                "jobs": [{"filename": "queued.csv", "status": "queued"}],
+                "message_meta": {"channel_id": "111", "message_id": "222"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    async with utils.live_queue_lock:
+        utils.live_queue["jobs"] = []
+        utils.live_queue["message_meta"] = None
+
+    loaded = await utils.load_live_queue_async()
+
+    assert loaded is True
+    async with utils.live_queue_lock:
+        assert utils.live_queue["jobs"] == [{"filename": "queued.csv", "status": "queued"}]
+        assert utils.live_queue["message_meta"] == {
+            "channel_id": 111,
+            "message_id": 222,
+            "message_created": None,
+        }
+
+
+async def test_load_live_queue_async_clears_invalid_message_meta(tmp_path, monkeypatch):
+    temp_file = tmp_path / "queue_cache.json"
+    monkeypatch.setattr(utils, "QUEUE_CACHE_FILE", str(temp_file))
+    temp_file.write_text(
+        json.dumps(
+            {
+                "jobs": [{"filename": "queued.csv", "status": "queued"}],
+                "message_meta": {"channel_id": "not-an-int", "message_id": 222},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = await utils.load_live_queue_async()
+
+    assert loaded is True
+    async with utils.live_queue_lock:
+        assert utils.live_queue["jobs"] == [{"filename": "queued.csv", "status": "queued"}]
+        assert utils.live_queue["message_meta"] is None
+
+
+async def test_save_live_queue_async_uses_atomic_json_writer(tmp_path, monkeypatch):
+    temp_file = tmp_path / "queue_cache.json"
+    monkeypatch.setattr(utils, "QUEUE_CACHE_FILE", str(temp_file))
+    writes = []
+
+    def fake_write(payload):
+        writes.append(payload)
+
+    monkeypatch.setattr(utils, "_write_live_queue_payload", fake_write)
+
+    async with utils.live_queue_lock:
+        utils.live_queue["jobs"] = [{"filename": "a.txt", "status": "ok"}]
+        utils.live_queue["message_meta"] = {"channel_id": 111, "message_id": 222}
+
+    saved = await utils.save_live_queue_async()
+
+    assert saved is True
+    assert writes == [
+        {
+            "jobs": [{"filename": "a.txt", "status": "ok"}],
+            "message_meta": {"channel_id": 111, "message_id": 222},
+        }
+    ]
+
+
+async def test_save_live_queue_async_propagates_write_failure(monkeypatch):
+    def fail_write(_payload):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(utils, "_write_live_queue_payload", fail_write)
+
+    with pytest.raises(OSError, match="disk full"):
+        await utils.save_live_queue_async()
 
 
 async def test_update_live_queue_embed_rehydrate(monkeypatch):

@@ -126,6 +126,7 @@ async def test_run_cooperative_restart_close_timeout_does_not_hang(monkeypatch, 
         append_csv_line=None,
         graceful_teardown=graceful_teardown,
         close_bot=close_bot,
+        force_exit=lambda _code: calls.append(("force_exit", _code)),
         response_delay_seconds=0,
         close_timeout_seconds=0.01,
     )
@@ -134,8 +135,10 @@ async def test_run_cooperative_restart_close_timeout_does_not_hang(monkeypatch, 
         ("write", "slash_graceful_restart", "123"),
         ("teardown",),
         ("close",),
+        ("force_exit", 15),
     ]
     assert "bot.close() timed out" in caplog.text
+    assert "Forcing process exit" in caplog.text
 
 
 def _async_function(tree: ast.AST, name: str) -> ast.AsyncFunctionDef:

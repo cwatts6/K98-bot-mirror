@@ -115,8 +115,8 @@ from subscription_tracker import load_subscriptions
 from target_utils import warm_name_cache
 from utils import (
     ensure_aware_utc,
-    load_live_queue,
-    save_live_queue,
+    load_live_queue_async,
+    save_live_queue_async,
     update_live_queue_embed,
     utcnow,
 )
@@ -1450,7 +1450,7 @@ async def _drain_shutdown_queues(timeout_seconds: float = _QUEUE_SHUTDOWN_DRAIN_
 async def _flush_live_queue_state(timeout_seconds: float = _QUEUE_SHUTDOWN_SAVE_SECONDS) -> None:
     """Persist live queue state before logging and process resources shut down."""
     try:
-        await asyncio.wait_for(asyncio.to_thread(save_live_queue), timeout=timeout_seconds)
+        await asyncio.wait_for(save_live_queue_async(), timeout=timeout_seconds)
         logger.info("[SHUTDOWN] Live queue state persisted.")
     except TimeoutError:
         logger.warning(
@@ -1754,7 +1754,7 @@ async def _run_ready_queue_lifecycle() -> None:
         channel_ids=CHANNEL_IDS,
         task_monitor_create=task_monitor.create,
         queue_worker=queue_worker,
-        load_live_queue=load_live_queue,
+        load_live_queue=load_live_queue_async,
         update_live_queue_embed=update_live_queue_embed,
         bot=bot,
         notify_channel_id=NOTIFY_CHANNEL_ID,

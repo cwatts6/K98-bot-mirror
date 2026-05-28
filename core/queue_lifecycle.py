@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable
+import inspect
 import logging
 from typing import Any
 
@@ -30,8 +31,10 @@ async def run_ready_queue_lifecycle(
         )
     logger.info("[QUEUE] Queue workers registered for monitored channels.")
 
-    load_live_queue()
-    logger.info("[QUEUE] Live queue state load requested.")
+    load_result = load_live_queue()
+    if inspect.isawaitable(load_result):
+        await load_result
+    logger.info("[QUEUE] Live queue state loaded.")
 
     try:
         await update_live_queue_embed(bot, notify_channel_id)

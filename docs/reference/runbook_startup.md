@@ -31,9 +31,9 @@ Purpose: describe the bot startup sequence, guardrails, logging setup, and commo
    - `ready_view_rehydration` schedules tracked persistent view rehydration.
    - `ready_domain_scheduler_tasks` starts the Ark lifecycle scheduler, MGE cache warm, and MGE
      lifecycle scheduler.
-   - `ready_queue_lifecycle` starts queue workers, loads persisted live queue state, refreshes the
-     live queue embed best-effort, and starts queue cleanup/watchdog tasks at the existing
-     `full_startup_sequence()` point.
+   - `ready_queue_lifecycle` starts queue workers, awaits persisted live queue state load/apply,
+     refreshes the live queue embed best-effort, and starts queue cleanup/watchdog tasks at the
+     existing `full_startup_sequence()` point.
    - `ready_pinned_calendar_rehydration` schedules pinned calendar view rehydration at the
      existing later startup point after `full_startup_sequence()`.
    - `ready_calendar_scheduler_tasks` starts the daily pinned calendar refresh and calendar
@@ -129,14 +129,20 @@ routes through bot-side graceful teardown before `bot.close()`, briefly drains c
 `channel_queues`, persists live queue state, cancels supervised tasks, and stops usage tracking.
 Production `/ops force_restart` smoke confirmed restart recovery and startup continuity, but it did
 not prove the in-process graceful shutdown log trail because `force_restart` remains a break-glass
-path. The next Phase 6 slice should add `/ops graceful_restart` and harden
-`graceful_shutdown.py` so Phase 6I shutdown behavior can be categorically smoke-tested before final
-process-entry/bot-construction cleanup. The approved Phase 6J operator model retires the old
-`/ops restart_bot` command, makes `/ops graceful_restart` the preferred safe restart path, keeps
-`/ops force_restart` as the emergency path, and gives `graceful_shutdown.py` a configurable
-cooperative fallback timeout that defaults to 15 seconds.
+path. Phase 6J completed in PR 127 (`codex/dlbot-phase-6j-graceful-restart-starter`), was merged,
+pushed to production, and smoke tested successfully: `/ops graceful_restart` is now the preferred
+safe restart path, `/ops force_restart` remains the emergency path, `/ops restart_bot` is retired,
+restart marker writing and cooperative restart invocation are centralized in
+`core/restart_operations.py`, and `graceful_shutdown.py` now uses a configurable cooperative
+fallback timeout that defaults to 15 seconds. The 2026-05-28 smoke log confirmed queue drain, live
+queue persistence, task cancellation, usage tracker stop, watchdog recovery, and startup return
+through `ready_calendar_scheduler_tasks`. The next Phase 6 slice is the optional queue persistence
+hardening pass; final process-entry/bot-construction cleanup remains after that unless the queue
+slice is explicitly skipped.
 
-When changing startup, verify restart safety and avoid duplicate task creation.
+When changing startup, verify restart safety and avoid duplicate task creation. Live queue startup
+must keep the Phase 6K ordering contract: workers register first, persisted state is applied before
+the embed refresh runs, and cleanup/watchdog tasks start after the best-effort refresh.
 
 ## Common Startup Failures
 

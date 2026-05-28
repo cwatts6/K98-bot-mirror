@@ -10,10 +10,10 @@ quiesce/shutdown ordering. Production `/ops force_restart` smoke confirmed resta
 startup continuity, but it did not provide a reliable in-process graceful shutdown log trail because
 `/ops force_restart` remains the break-glass restart path.
 
-Use `docs/task_packs/Codex Chat Starter - DL_bot Phase 6J Graceful Restart Shutdown Operations.md`
-for the next Phase 6 slice. Phase 6J should add a smoke-testable cooperative `/ops graceful_restart`
-path, preserve `/ops force_restart` for stuck/looping states, and update `graceful_shutdown.py` so
-scheduled machine restarts can exercise the Phase 6I graceful teardown path before bounded fallback.
+Phase 6J was subsequently completed in PR 127 and proved the cooperative restart path in
+production. Use `docs/task_packs/Codex Chat Starter - DL_bot Phase 6K Queue Persistence Hardening.md`
+for the next optional Phase 6 slice, or proceed to final process-entry and bot-construction cleanup
+if the queue hardening slice is skipped.
 
 Historical starter retained below.
 
@@ -278,15 +278,10 @@ understood, and only when shutdown/restart still continues cleanly.
 
 ## Remaining Phase 6 Slices
 
-Recommended order after Phase 6I:
+Recommended order after Phase 6J:
 
-1. Phase 6J graceful restart/shutdown operations:
-   - add `/ops graceful_restart`
-   - preserve `/ops force_restart` as break-glass
-   - update `graceful_shutdown.py`
-   - prove the Phase 6I graceful teardown path with production smoke logs
-2. Optional queue persistence hardening slice after Phase 6J, unless Phase 6J requires it directly.
-3. Phase 6K process-entry and bot-construction cleanup.
+1. Optional Phase 6K queue persistence hardening.
+2. Final process-entry and bot-construction cleanup after the queue persistence decision.
 
 The wider command-surface migration/renaming programme remains separate from Phase 6.
 
@@ -298,6 +293,6 @@ lifecycle extraction.
 
 Carry forward, but do not implement unless separately approved:
 
-- process-entry and bot-construction cleanup as Phase 6K
-- queue persistence hardening after Phase 6J, unless required directly by Phase 6J shutdown work
+- queue persistence hardening as the next optional Phase 6 slice
+- process-entry and bot-construction cleanup after the queue persistence decision
 - pinned calendar tracker persistence hardening in `event_calendar/pinned_embed.py`

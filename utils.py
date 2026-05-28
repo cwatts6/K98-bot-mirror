@@ -210,50 +210,74 @@ def load_live_queue():
     This function will populate live_queue["jobs"] and live_queue["message_meta"].
     It will NOT attempt to fetch the real discord.Message object (that is done in update_live_queue_embed).
     """
+
+    async def _load_in_running_loop():
+        await load_live_queue_async()
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(load_live_queue_async())
+
+    asyncio.create_task(_load_in_running_loop())
+    return True
+
+
+def _normalise_live_queue_payload(data: Any) -> tuple[list[Any], dict[str, Any] | None]:
+    if not isinstance(data, dict):
+        logger.warning("[QUEUE] queue file did not contain an object; resetting to empty queue.")
+        return [], None
+
+    jobs = data.get("jobs", [])
+    message_meta = data.get("message_meta")
+
+    if not isinstance(jobs, list):
+        logger.warning("[QUEUE] queue file contained non-list jobs; resetting to empty list.")
+        jobs = []
+
+    if message_meta is not None:
+        if not isinstance(message_meta, dict):
+            logger.warning("[QUEUE] queue file contained invalid message_meta; ignoring.")
+            message_meta = None
+        else:
+            try:
+                channel_id = int(message_meta["channel_id"])
+                message_id = int(message_meta["message_id"])
+            except (KeyError, TypeError, ValueError):
+                logger.warning("[QUEUE] queue file contained stale message_meta; ignoring.")
+                message_meta = None
+            else:
+                message_meta = {
+                    "channel_id": channel_id,
+                    "message_id": message_id,
+                    "message_created": message_meta.get("message_created"),
+                }
+
+    return jobs, message_meta
+
+
+async def load_live_queue_async() -> bool:
+    """
+    Load persisted live queue state and apply it before returning.
+
+    This is the lifecycle-safe helper for startup code. The sync `load_live_queue()`
+    wrapper remains for compatibility with older tests and sync call sites.
+    """
     if not os.path.exists(QUEUE_CACHE_FILE):
-        return
+        return False
     try:
         with open(QUEUE_CACHE_FILE, encoding="utf-8") as f:
             data = json.load(f) or {}
-        jobs = data.get("jobs", [])
-        message_meta = data.get("message_meta")
-        # Defensive checks
-        if not isinstance(jobs, list):
-            logger.warning("[QUEUE] queue file contained non-list jobs; resetting to empty list.")
-            jobs = []
-        if message_meta is not None and not isinstance(message_meta, dict):
-            logger.warning("[QUEUE] queue file contained invalid message_meta; ignoring.")
-            message_meta = None
+        jobs, message_meta = _normalise_live_queue_payload(data)
 
-        # Update global live_queue under lock to avoid races with background tasks
-        async def _apply():
-            async with live_queue_lock:
-                live_queue["jobs"] = jobs
-                live_queue["message_meta"] = message_meta
-                # We intentionally do NOT set live_queue["message"] here (can't rehydrate without bot)
-
-        try:
-            loop = asyncio.get_running_loop()
-            # running in event loop -> schedule
-            asyncio.run_coroutine_threadsafe(_apply(), loop)
-        except RuntimeError:
-            # No running loop (likely in sync test or separate thread) -> create a temporary loop and run
-            new_loop = asyncio.new_event_loop()
-            try:
-                new_loop.run_until_complete(_apply())
-            finally:
-                new_loop.close()
-        except Exception:
-            # Catch-all fallback (older code used get_event_loop); try a safe run
-            try:
-                asyncio.get_event_loop().run_until_complete(_apply())
-            except Exception:
-                # Last resort: set state without lock (best-effort)
-                live_queue["jobs"] = jobs
-                live_queue["message_meta"] = message_meta
+        async with live_queue_lock:
+            live_queue["jobs"] = jobs
+            live_queue["message_meta"] = message_meta
+            # We intentionally do NOT set live_queue["message"] here (can't rehydrate without bot)
+        return True
     except Exception as e:
         logger.warning(f"[QUEUE] Failed to load live queue: {e}")
-        return
+        return False
 
 
 def load_stat_cache() -> dict:
@@ -757,61 +781,53 @@ def get_next_events(limit=5, event_type=None):
     return filtered[:limit]
 
 
-# Atomic save for live queue (overwrite temp then replace)
-def save_live_queue():
-    """
-    Persist live_queue jobs and a small message metadata blob so the process can
-    attempt to rehydrate the embed after restart.
+def _write_live_queue_payload(payload: dict[str, Any]) -> None:
+    from file_utils import atomic_json_write
 
-    Persisted JSON shape:
-    {
-      "jobs": [...],
-      "message_meta": {"channel_id": int, "message_id": int, "message_created": iso8601|null} | null
-    }
-    """
-    try:
-        tmp = f"{QUEUE_CACHE_FILE}.tmp"
-        # Snapshot current live_queue state in a best-effort, race-tolerant manner.
-        try:
-            # If running inside an event loop, try to snapshot under lock to avoid races.
-            loop = asyncio.get_running_loop()
+    atomic_json_write(QUEUE_CACHE_FILE, payload)
 
-            # We're in async context -> schedule a quick snapshot coroutine
-            async def _snapshot():
-                async with live_queue_lock:
-                    return {
-                        "jobs": live_queue.get("jobs", []),
-                        "message_meta": live_queue.get("message_meta"),
-                    }
 
-            fut = asyncio.run_coroutine_threadsafe(_snapshot(), loop)
-            data = fut.result(timeout=2)
-        except Exception:
-            # Not in running loop or snapshot failed — shallow copy as best-effort
-            data = {
-                "jobs": list(live_queue.get("jobs", [])),
-                "message_meta": live_queue.get("message_meta"),
-            }
-
-        meta = data.get("message_meta") if isinstance(data, dict) else None
-
-        # If live_queue already has a message_meta (from load), prefer that if meta is None
-        if meta is None:
-            existing_meta = live_queue.get("message_meta")
-            if existing_meta:
-                meta = existing_meta
-
-        # final persisted payload
-        payload = {
-            "jobs": data.get("jobs", []) if isinstance(data, dict) else [],
-            "message_meta": meta,
+async def _snapshot_live_queue_payload() -> dict[str, Any]:
+    async with live_queue_lock:
+        return {
+            "jobs": list(live_queue.get("jobs", []) or []),
+            "message_meta": live_queue.get("message_meta"),
         }
 
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(payload, f)
-        os.replace(tmp, QUEUE_CACHE_FILE)
+
+async def save_live_queue_async() -> bool:
+    """Persist live queue state through the project atomic JSON helper."""
+    payload = await _snapshot_live_queue_payload()
+    await asyncio.to_thread(_write_live_queue_payload, payload)
+    return True
+
+
+def save_live_queue():
+    """
+    Sync-compatible live queue persistence wrapper.
+
+    Async lifecycle code should prefer `save_live_queue_async()` so failures can
+    be awaited and reported accurately.
+    """
+    try:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(save_live_queue_async())
+            return True
+
+        # Running in an event loop: keep legacy sync compatibility by taking a
+        # shallow snapshot without awaiting the async lock. Startup/shutdown paths
+        # now use the explicit async helper.
+        payload = {
+            "jobs": list(live_queue.get("jobs", []) or []),
+            "message_meta": live_queue.get("message_meta"),
+        }
+        _write_live_queue_payload(payload)
+        return True
     except Exception as e:
         logger.warning(f"[QUEUE] Failed to save: {e}")
+        return False
 
 
 # -----------------------
