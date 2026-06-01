@@ -271,8 +271,8 @@ def _collect_declared_command_names_safely(label: str, path: Path) -> set[str]:
         return set()
 
 
-def audit_command_registration_paths() -> tuple[dict[str, set[str]], dict[str, list[str]]]:
-    """Return registration map and duplicate command-name map across known paths."""
+def _collect_command_registration_audit():
+    """Collect startup command audit details with one authoritative inventory pass."""
     root = Path(__file__).parent
     inventory = collect_static_primary_inventory(root)
     paths = {
@@ -291,13 +291,17 @@ def audit_command_registration_paths() -> tuple[dict[str, set[str]], dict[str, l
             owners.setdefault(cmd_name, []).append(source)
 
     duplicates = {name: sorted(srcs) for name, srcs in owners.items() if len(srcs) > 1}
+    return paths, duplicates, inventory
+
+
+def audit_command_registration_paths() -> tuple[dict[str, set[str]], dict[str, list[str]]]:
+    """Return registration map and duplicate command-name map across known paths."""
+    paths, duplicates, _inventory = _collect_command_registration_audit()
     return paths, duplicates
 
 
 def _log_registration_audit() -> dict[str, list[str]]:
-    paths, duplicates = audit_command_registration_paths()
-    root = Path(__file__).parent
-    inventory = collect_static_primary_inventory(root)
+    paths, duplicates, inventory = _collect_command_registration_audit()
     primary_names = paths["commands package (authoritative)"]
     secondary_cogs = paths["cogs/commands.py (disabled legacy)"]
     secondary_subscribe = paths["subscribe.py (disabled legacy)"]
