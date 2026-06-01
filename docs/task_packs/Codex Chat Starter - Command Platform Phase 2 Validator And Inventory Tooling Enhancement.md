@@ -1,7 +1,8 @@
 # Codex Chat Starter - Command Platform Phase 2 Validator And Inventory Tooling Enhancement
 
-Status: implemented in the Phase 2 validator and inventory tooling PR. This starter remains as
-the execution record for Phase 2 of the Command Platform Audit & Optimisation Programme.
+Status: complete. Implemented in PR 132 (`codex/command-platform-phase-2-validator-inventory`),
+smoke tested successfully, merged, and pushed to production. This starter remains as the execution
+record for Phase 2 of the Command Platform Audit & Optimisation Programme.
 
 Source programme documents:
 
@@ -14,7 +15,8 @@ Source programme documents:
 Phase 1, Permission Decorator Standardisation, was completed in PR 131
 (`codex/command-platform-phase-1-permission-decorators`), smoke tested successfully, merged, and
 pushed to production. Phase 2 then retired the unused disabled secondary command declarations and
-updated validator reporting. The current command-platform baseline is:
+updated validator reporting in PR 132, which was also smoke tested, merged, and pushed to
+production. The current command-platform baseline is:
 
 ```text
 primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82
@@ -97,6 +99,7 @@ Implemented result:
 - detected `/prekvk import_history` as a helper-attached grouped subcommand
 - preserved all active command paths and the active top-level command count
 - updated validator output to report no active duplicate risks
+- captured the stale `DL_bot.py` startup audit summary follow-up for Phase 3
 
 ## 4. Scope
 

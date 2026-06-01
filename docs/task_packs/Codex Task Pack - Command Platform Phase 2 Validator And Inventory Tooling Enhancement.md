@@ -7,7 +7,8 @@
 - Owner/context: Command Platform Audit & Optimisation Programme
 - Task type: deferred optimisation batch / tooling refactor
 - One-pass approved: no
-- Status: implemented
+- Status: complete; delivered in PR 132, smoke tested successfully, merged, and pushed to
+  production
 
 ## 2. Required Reading
 
@@ -52,8 +53,10 @@ permission gates onto decorators while preserving the current command baseline:
 primary=82 grouped_subcommands_detected=21 secondary_cogs=5 secondary_subscribe=1 total_unique=82
 ```
 
-Phase 2 preserved the active command count and active command paths while retiring the unused
-disabled secondary command declarations. The validator now reports:
+Phase 2 was delivered in PR 132 (`codex/command-platform-phase-2-validator-inventory`), smoke
+tested successfully, merged, and pushed to production. It preserved the active command count and
+active command paths while retiring the unused disabled secondary command declarations. The
+validator now reports:
 
 ```text
 primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82
@@ -62,6 +65,10 @@ primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 se
 The next migration phases will move or group command paths. Before that work begins, the validator
 and command inventory should clearly report what is active, what is disabled legacy surface, what
 is grouped, and which warnings represent real startup-sync risk.
+
+Production smoke note: graceful restart and `/ops validate_command_cache` were green. The smoke log
+also showed the stale `DL_bot.py` startup command-audit summary as `primary=0 ... total_unique=0`;
+that follow-up is captured in Phase 3.
 
 Known current issue:
 
