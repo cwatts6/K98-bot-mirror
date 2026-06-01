@@ -1,13 +1,28 @@
 # Command Surface Audit
 
-Last updated: 2026-05-28
+Last updated: 2026-06-01
+
+## Post-Audit Programme Updates
+
+Command Platform Phase 1, Permission Decorator Standardisation, was completed in PR 131
+(`codex/command-platform-phase-1-permission-decorators`), smoke tested successfully, merged, and
+pushed to production. Phase 1 did not rename, retire, regroup, or change the count of any slash
+commands. It standardised active command permission gates onto decorators and kept the registration
+baseline unchanged:
+
+```text
+primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82
+```
+
+The next programme slice is Phase 2, Validator And Inventory Tooling Enhancement. It should improve
+registration reporting and disabled-secondary classification before further grouping migrations.
 
 ## Current Registration Summary
 
 `scripts/validate_command_registration.py` reports:
 
 ```text
-primary=82 grouped_subcommands_detected=21 secondary_cogs=5 secondary_subscribe=1 total_unique=82
+primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82
 ```
 
 Grouped command summary:
@@ -16,7 +31,7 @@ Grouped command summary:
 |---|---:|
 | `/ops` | 14 |
 | `/mge` | 6 |
-| `/prekvk` | 1 statically detected, plus `/prekvk import_history` attached through the PreKvK admin helper |
+| `/prekvk` | 2 |
 
 The primary command surface now has an 18-command buffer below Discord's 100 top-level
 application-command limit. The validator warns at 90+ and fails above 100.
@@ -43,7 +58,9 @@ application-command limit. The validator warns at 90+ and fails above 100.
 | `/last_errors` | `/ops last_errors` |
 | `/crash_log` | `/ops crash_log` |
 
-Permission decorators and inline admin checks were preserved.
+Permission decorators were preserved during Batch 1. Phase 1 later removed redundant inline admin
+checks from already-decorated `/ops run_sql_proc`, `/ops run_gsheets_export`, and
+`/ops dl_bot_status` without changing these command paths.
 
 ### MGE Commands
 
@@ -56,14 +73,21 @@ Permission decorators and inline admin checks were preserved.
 | `/mge_commanders` | `/mge commanders` |
 | `/mge_admin_completion` | `/mge admin_completion` |
 
-Permission decorators, MGE leadership channel checks, and admin completion interaction checks were
-preserved.
+Permission decorators and MGE leadership channel checks were preserved during Batch 1. Phase 1
+later moved `/mge admin_completion` access control onto the standard decorator layer without
+changing the grouped command path.
 
 ## Deferred Follow-Up Batches
 
-Next command-surface batches are staged in `docs/reference/deferred_optimisations.md`.
-Recommended order:
+Next command-surface batches are staged in `docs/reference/deferred_optimisations.md` and the
+command-platform programme docs. Recommended order:
 
-1. Ark grouping under `/ark`, with operator communication for public paths.
-2. Public/player domain grouping across KVK, registry, inventory, calendar, and subscriptions.
-3. Secondary command surface retirement or clearer validator classification for disabled cogs.
+1. Validator and command inventory tooling enhancement.
+2. Low-risk Ops consolidation, after validator reporting is clearer.
+3. Ark grouping under `/ark`, with operator communication for public paths.
+4. Public/player domain grouping across KVK, registry, inventory, calendar, and subscriptions.
+
+Phase 2 retired the unused disabled secondary command declarations in `cogs/commands.py` and
+root `subscribe.py`, leaving `commands/` as the only command registration surface and removing the
+previous informational duplicate warnings for `/summary`, `/weeksummary`, `/history`,
+`/failures`, `/ping`, and `/subscribe`.

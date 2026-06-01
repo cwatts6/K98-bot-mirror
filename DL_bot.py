@@ -264,6 +264,15 @@ def _collect_declared_slash_commands(module_relpath: str) -> set[str]:
     """Collect decorator-declared slash/app command names from a module file."""
     module_path = Path(__file__).parent / module_relpath
     names: set[str] = set()
+    if not module_path.exists():
+        if module_relpath == "Commands.py":
+            logger.warning(
+                "[COMMAND AUDIT] Authoritative command module missing: %s",
+                module_relpath,
+            )
+        else:
+            logger.info("[COMMAND AUDIT] Legacy command module retired: %s", module_relpath)
+        return names
     try:
         source = module_path.read_text(encoding="utf-8-sig")
         tree = ast.parse(source, filename=str(module_path))

@@ -2,12 +2,22 @@
 
 Last updated: 2026-06-01
 
+## Programme Status
+
+Phase 1, Permission Decorator Standardisation, was completed in PR 131
+(`codex/command-platform-phase-1-permission-decorators`), smoke tested successfully, merged, and
+pushed to production. The PR standardised active command permission gates onto decorators without
+changing command paths, command grouping, or command registration count.
+
+The next approved programme slice should start from Phase 2, Validator And Inventory Tooling
+Enhancement, before any further command grouping migrations.
+
 ## Audit Baseline
 
 Static command registration validation currently reports:
 
 ```text
-primary=82 grouped_subcommands_detected=21 secondary_cogs=5 secondary_subscribe=1 total_unique=82
+primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82
 ```
 
 Grouped command summary:
@@ -16,7 +26,7 @@ Grouped command summary:
 |---|---:|
 | `/ops` | 14 |
 | `/mge` | 6 |
-| `/prekvk` | 1 |
+| `/prekvk` | 2 |
 
 The primary command surface has an 18-command buffer below Discord's 100 top-level application
 command limit. The validator warns at 90+ and fails above 100.
@@ -34,6 +44,8 @@ commands are marked `none observed` pending SQL usage review.
   second migration.
 - Public/player command moves require operator approval and user-facing communication.
 - Disabled secondary command surfaces must be retired or classified separately by the validator.
+  Phase 2 retired the unused `cogs/commands.py` and root `subscribe.py` legacy declarations after
+  confirming they are not loaded by startup.
 
 ## Command Inventory
 
@@ -152,8 +164,8 @@ commands are marked `none observed` pending SQL usage review.
 | Registry | Strong service/cache tests and command service extraction. | Public self-service paths are discoverability-sensitive; admin bulk operations remain flat. | Group admin registry commands first; decide public path policy separately. |
 | Inventory | Service-oriented implementation and focused inventory tests. Phase 1 standardised command access checks onto decorators. | Inventory export still passes admin context to the service for self-service/admin override semantics. | Group under `/inventory` only after public-path UX approval. |
 | Calendar / Events | Calendar command layer is thin and docs are extensive. | Calendar admin commands live in `admin_cmds.py` while public commands live in `calendar_cmds.py`; many docs reference flat paths. | Group calendar public/admin commands with careful docs update. |
-| Subscriptions | Public flow is simple and tested via views. | Legacy `subscribe.py` still duplicates `/subscribe`; public path migration needs communication. | Retire or classify legacy cog first, then consider `/subscriptions` group. |
-| Secondary cogs | Disabled by default, reducing active startup risk. | Validator duplicate output does not distinguish disabled code from active risk. | Enhance validator or retire legacy declarations. |
+| Subscriptions | Public flow is simple and tested via views. | Public path migration needs communication. | Consider `/subscriptions` grouping after public-path UX approval. |
+| Secondary cogs | Phase 2 retired unused disabled legacy declarations. | No active secondary command surface remains. | Keep validator tolerant of missing retired paths and focused on active startup-sync risks. |
 
 ## Technical Debt Register
 
@@ -173,14 +185,15 @@ commands are marked `none observed` pending SQL usage review.
 - Risk: medium
 - Dependencies: Operator approval for public Ark path changes.
 
-### Deferred Optimisation
+### Phase 2 Completed Item
 - Area: `scripts/validate_command_registration.py`, `cogs/commands.py`, `subscribe.py`
 - Type: cleanup
-- Description: Duplicate command warnings do not distinguish disabled legacy surfaces from active startup-sync risk.
-- Suggested Fix: Add active/disabled classification or retire disabled declarations after confirmation.
-- Impact: medium
-- Risk: low
-- Dependencies: Confirm secondary cogs are never production-loaded.
+- Description: Phase 2 retired unused disabled secondary command declarations and updated
+  validator reporting so duplicates are classified as active startup-sync risks versus disabled
+  legacy declarations when retained in test fixtures.
+- Resolution: Removed the legacy `cogs/commands.py` and root `subscribe.py` files after confirming
+  startup uses `Commands.register_commands(bot)` as the authoritative path and does not load these
+  cogs. The validator now reports no retained disabled legacy command surfaces.
 
 ### Deferred Optimisation
 - Area: `commands/`, command documentation
@@ -194,6 +207,8 @@ commands are marked `none observed` pending SQL usage review.
 ## Phased Roadmap
 
 ### Phase 1 - Permission Decorator Standardisation
+
+Status: complete. Delivered in PR 131, smoke tested successfully, merged, and pushed to production.
 
 Goal: remove inline permission checks from command handlers and move command access control onto
 standard decorators.
@@ -228,7 +243,19 @@ Validation:
 - Codex Security review required before PR because this phase touches permission boundaries and
   Discord interactions.
 
+Delivered validation:
+
+- Command registration remained
+  `primary=82 grouped_subcommands_detected=21 secondary_cogs=5 secondary_subscribe=1 total_unique=82`.
+- Focused command permission decorator tests passed.
+- Full pytest, pre-commit, smoke imports, architecture validation, deferred-item validation,
+  command registration validation, pytest log-noise analysis, and Codex Security diff review
+  passed before merge.
+- Production smoke testing completed successfully after merge/promotion.
+
 ### Phase 2 - Validator And Inventory Tooling Enhancement
+
+Status: next.
 
 Goal: improve command-platform reporting before large migrations.
 
@@ -242,6 +269,7 @@ Scope:
 Implementation notes:
 
 - Distinguish active authoritative command paths from disabled secondary cogs.
+- Retire confirmed-unused disabled secondary declarations.
 - Detect helper-attached grouped subcommands such as `/prekvk import_history`.
 - Report command owner module, group/subcommand path, duplicate source, and near-limit risk.
 - Keep the existing hard fail above 100 top-level commands and warning at 90+.

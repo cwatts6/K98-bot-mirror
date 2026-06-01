@@ -1,7 +1,8 @@
 # Codex Chat Starter - Command Platform Phase 1 Permission Decorator Standardisation
 
-Status: implemented in the Phase 1 permission decorator standardisation PR. This starter remains
-as the execution record for Phase 1 of the Command Platform Audit & Optimisation Programme.
+Status: implemented in PR 131 (`codex/command-platform-phase-1-permission-decorators`), smoke
+tested successfully, merged, and pushed to production. This starter remains as the execution record
+for Phase 1 of the Command Platform Audit & Optimisation Programme.
 
 Source programme documents:
 

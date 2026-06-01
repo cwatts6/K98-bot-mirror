@@ -5,7 +5,19 @@ to GitHub issues/task packs.
 
 Resolved historical notes were moved to `archive/deferred_optimisations_resolved.md`.
 
-Last reviewed after the slow-pytest optimisation production release. PR 107
+Last reviewed after Command Platform Phase 1, Permission Decorator Standardisation. PR 131
+(`codex/command-platform-phase-1-permission-decorators`) was smoke tested successfully, merged,
+and pushed to production on 2026-06-01. Phase 1 standardised active command permission gates onto
+decorators, added focused decorator tests, preserved command paths and registration count, and kept
+the command-platform baseline at
+`primary=82 grouped_subcommands_detected=21 secondary_cogs=5 secondary_subscribe=1 total_unique=82`.
+Phase 2 of the command-platform programme then retired the unused disabled secondary command
+declarations in `cogs/commands.py` and root `subscribe.py`, updated validator terminology for
+active versus disabled legacy surfaces, and detected helper-attached grouped subcommands including
+`/prekvk import_history`. The active command baseline after Phase 2 is
+`primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82`.
+Earlier review history: after the slow-pytest optimisation production
+release, PR 107
 (`pytest-log-delivery-docs`) resolved the high-impact pytest duration outliers found after the
 pytest log-isolation production smoke audit, reducing the duration audit from `1450 passed, 2
 skipped, 19 warnings in 638.91s` to `1450 passed, 2 skipped, 19 warnings in 54.86s`; it was smoke
@@ -138,11 +150,11 @@ atomic-write hardening; each requires a fresh scope instead of an additional Pha
 ### Deferred Optimisation
 - Area: `commands/`, `scripts/validate_command_registration.py`
 - Type: architecture
-- Description: Batch 1 of the command-surface balancing audit grouped admin-heavy `/ops` and `/mge` commands, reducing the primary Discord application-command set from 100 to 82 top-level commands. Future standalone slash commands can still erode this buffer and eventually break startup sync with Discord error 30032 unless additional command-surface consolidation remains planned.
-- Suggested Fix: Continue the command-surface programme through the staged follow-up batches below. Group related commands by domain where user experience allows, identify stale/low-use admin commands for consolidation or retirement, update docs for renamed paths, and keep `scripts/validate_command_registration.py` enforcing the 100-command ceiling with a warning at 90+.
+- Description: Batch 1 of the command-surface balancing audit grouped admin-heavy `/ops` and `/mge` commands, reducing the primary Discord application-command set from 100 to 82 top-level commands. Phase 1 then standardised active command permission gates onto decorators without changing the command count. Future standalone slash commands can still erode this buffer and eventually break startup sync with Discord error 30032 unless additional command-surface consolidation and validator improvements remain planned.
+- Suggested Fix: Continue the command-platform programme through the staged follow-up batches. Start with validator and command-inventory tooling enhancement, then group related commands by domain where user experience allows, identify stale/low-use admin commands for consolidation or retirement, update docs for renamed paths, and keep `scripts/validate_command_registration.py` enforcing the 100-command ceiling with a warning at 90+.
 - Impact: high
 - Risk: medium
-- Dependencies: Batch 1 `/ops` and `/mge` grouping validation remains clean; coordinate with bot operators before renaming public command paths; preserve admin-only permission checks when commands move into groups.
+- Dependencies: Batch 1 `/ops` and `/mge` grouping and Phase 1 permission decorator standardisation remain deployed cleanly; coordinate with bot operators before renaming public command paths; preserve standard decorator permission checks when commands move into groups.
 
 ### Deferred Optimisation
 - Area: `commands/ark_cmds.py`, `docs/ark/`, Ark command tests
@@ -161,15 +173,6 @@ atomic-write hardening; each requires a fresh scope instead of an additional Pha
 - Impact: medium
 - Risk: medium
 - Dependencies: Operator approval for public command rename policy; updated command reference/announcement plan; Batch 1 validation remains below the warning threshold.
-
-### Deferred Optimisation
-- Area: `cogs/commands.py`, `subscribe.py`, `scripts/validate_command_registration.py`, startup command audit docs
-- Type: cleanup
-- Description: Disabled secondary command surfaces still declare duplicate command names (`/summary`, `/weeksummary`, `/history`, `/failures`, `/ping`, `/subscribe`). The validator reports these duplicates, but the output does not clearly separate intentionally disabled legacy surfaces from active startup-sync risk.
-- Suggested Fix: Decide whether to retire the disabled secondary cogs or enhance validator output to classify duplicates by active vs disabled registration path. If the files are retained, document the environment gating and keep duplicate warnings informational; if retired, remove or archive the dead command declarations with smoke/import coverage.
-- Impact: medium
-- Risk: low
-- Dependencies: Confirm secondary cogs remain disabled by default in production and no operator workflow depends on loading them.
 
 ### Deferred Optimisation
 - Area: SQL repo legacy PreKvK phase object retirement

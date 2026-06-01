@@ -53,6 +53,12 @@ All command-related issues, optimisations, inconsistencies, architecture concern
 
 Batch 1 command grouping successfully reduced the command count from the Discord limit boundary and introduced grouped /ops and /mge commands.
 
+Phase 1 of this programme, Permission Decorator Standardisation, was completed in PR 131
+(`codex/command-platform-phase-1-permission-decorators`), smoke tested successfully, merged, and
+pushed to production. Phase 1 standardised active command permission gates onto decorators,
+introduced the reusable decorator support needed by the current command estate, added focused
+permission-decorator tests, and preserved all command paths and the registration count.
+
 The current validator reports:
 
 82 primary commands
@@ -250,6 +256,15 @@ Recommended phased implementation plan.
 8. Phase Planning Rules
 
 After audit completion, Codex must propose phases.
+
+Current phase status:
+
+Phase 1 - Permission Decorator Standardisation: complete, smoke tested, merged, and pushed to
+production in PR 131.
+
+Phase 2 - Validator And Inventory Tooling Enhancement: next executable phase. This phase should
+improve command-platform reporting and disabled-secondary classification before additional command
+grouping.
 
 Example:
 
