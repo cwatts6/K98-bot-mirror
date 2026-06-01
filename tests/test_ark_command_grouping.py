@@ -3,7 +3,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 EXPECTED_ARK_SUBCOMMANDS = {
     "ark_create_match": "create_match",
     "ark_force_announce": "force_announce",
