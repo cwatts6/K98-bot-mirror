@@ -21,6 +21,13 @@ to production. The PR grouped the approved operational/reporting commands under 
 startup command-audit logging with the authoritative command inventory, and confirmed
 `/ops validate_command_cache` remained green after restart.
 
+Phase 4, Ark Command Grouping, was completed in PR 134
+(`codex/command-platform-phase-4-ark-grouping`), smoke tested successfully, merged, and pushed to
+production. The PR grouped all 14 Ark commands under `/ark`, including public
+`/ark reminder_prefs` and `/ark report_players`, preserved existing permissions/options/versions
+and Ark modal/view flows, added a post-merge Discord briefing note, and confirmed
+`/ops validate_command_cache` remained green after restart.
+
 ## Audit Baseline
 
 Static command registration validation after Phase 4 implementation reports:
@@ -62,7 +69,7 @@ commands are marked `none observed` pending SQL usage review.
 
 | Category | Current path | Owner module | Permission model | Usage | Registration | Proposed path / disposition |
 |---|---|---|---|---:|---|---|
-| Activity | `/activity_top` | `commands/activity_cmds.py` | decorator | none observed | top-level | Candidate `/activity top` |
+| Activity | `/activity_top` | `commands/activity_cmds.py` | decorator | none observed | top-level | Phase 5A `/activity top` |
 | Ark | `/ark create_match` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
 | Ark | `/ark force_announce` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
 | Ark | `/ark amend_match` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
@@ -77,29 +84,29 @@ commands are marked `none observed` pending SQL usage review.
 | Ark | `/ark report_players` | `commands/ark_cmds.py` | public | none observed | grouped | Preserve |
 | Ark | `/ark generate_draft` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
 | Ark | `/ark create_team` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
-| Calendar | `/calendar` | `commands/calendar_cmds.py` | public | none observed | top-level | Keep or candidate `/calendar browse` after UX approval |
-| Calendar | `/calendar_next_event` | `commands/calendar_cmds.py` | public | none observed | top-level | Candidate `/calendar next_event` |
-| Calendar | `/calendar_reminder_config` | `commands/calendar_cmds.py` | public | none observed | top-level | Candidate `/calendar reminder_config` |
-| Calendar Ops | `/calendar_refresh` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/calendar refresh` |
-| Calendar Ops | `/calendar_generate` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/calendar generate` |
-| Calendar Ops | `/calendar_publish_cache` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/calendar publish_cache` |
-| Calendar Ops | `/calendar_status` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/calendar status` |
-| CrystalTech Ops | `/crystaltech_validate` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/crystaltech validate` |
-| CrystalTech Ops | `/crystaltech_reload` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/crystaltech reload` |
-| CrystalTech Ops | `/crystaltech_admin_reset` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/crystaltech admin_reset` |
-| Events | `/next_kvk_fight` | `commands/events_cmds.py` | public | none observed | top-level | Candidate `/events next_fight` |
-| Events | `/next_kvk_event` | `commands/events_cmds.py` | public | none observed | top-level | Candidate `/events next_event` |
-| Events | `/refresh_events` | `commands/events_cmds.py` | decorator | none observed | top-level | Candidate `/events refresh` |
-| Events | `/refresh_kvk_overview` | `commands/events_cmds.py` | decorator | none observed | top-level | Candidate `/events refresh_kvk_overview` |
-| Honor/KVK | `/honor_rankings` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/honor rankings` |
-| Honor/KVK | `/honor_purge_last` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/honor purge_last` |
-| Inventory | `/import_inventory` | `commands/inventory_cmds.py` | decorator | none observed | top-level | Candidate `/inventory import` |
-| Inventory | `/myinventory` | `commands/inventory_cmds.py` | public | none observed | top-level | Candidate `/inventory report` |
-| Inventory | `/inventory_preferences` | `commands/inventory_cmds.py` | public | none observed | top-level | Candidate `/inventory preferences` |
-| Inventory | `/export_inventory` | `commands/inventory_cmds.py` | service authorization context | none observed | top-level | Candidate `/inventory export` |
-| Inventory | `/inventory_import_audit` | `commands/inventory_cmds.py` | decorator | none observed | top-level | Candidate `/inventory audit` |
-| Location | `/import_locations` | `commands/location_cmds.py` | decorator | none observed | top-level | Candidate `/location import` |
-| Location | `/player_location` | `commands/location_cmds.py` | decorator | none observed | top-level | Candidate `/location player` |
+| Calendar | `/calendar` | `commands/calendar_cmds.py` | public | none observed | top-level | Defer calendar/KVK calendar UX redesign |
+| Calendar | `/calendar_next_event` | `commands/calendar_cmds.py` | public | none observed | top-level | Defer calendar/KVK calendar UX redesign |
+| Calendar | `/calendar_reminder_config` | `commands/calendar_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
+| Calendar Ops | `/calendar_refresh` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/calendar refresh` |
+| Calendar Ops | `/calendar_generate` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/calendar generate` |
+| Calendar Ops | `/calendar_publish_cache` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/calendar publish_cache` |
+| Calendar Ops | `/calendar_status` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/calendar status` |
+| CrystalTech Ops | `/crystaltech_validate` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/crystaltech validate` |
+| CrystalTech Ops | `/crystaltech_reload` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/crystaltech reload` |
+| CrystalTech Ops | `/crystaltech_admin_reset` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/crystaltech admin_reset` |
+| Events | `/next_kvk_fight` | `commands/events_cmds.py` | public | none observed | top-level | Defer calendar/KVK calendar UX redesign |
+| Events | `/next_kvk_event` | `commands/events_cmds.py` | public | none observed | top-level | Defer calendar/KVK calendar UX redesign |
+| Events | `/refresh_events` | `commands/events_cmds.py` | decorator | none observed | top-level | Phase 5A `/events refresh` |
+| Events | `/refresh_kvk_overview` | `commands/events_cmds.py` | decorator | none observed | top-level | Phase 5A `/events refresh_kvk_overview` |
+| Honor/KVK | `/honor_rankings` | `commands/stats_cmds.py` | decorator | none observed | top-level | Defer; public/channel-limited ranking UX |
+| Honor/KVK | `/honor_purge_last` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/honor purge_last` |
+| Inventory | `/import_inventory` | `commands/inventory_cmds.py` | decorator | none observed | top-level | Phase 5A `/inventory import` |
+| Inventory | `/myinventory` | `commands/inventory_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
+| Inventory | `/inventory_preferences` | `commands/inventory_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
+| Inventory | `/export_inventory` | `commands/inventory_cmds.py` | service authorization context | none observed | top-level | Defer player self-service workflow redesign |
+| Inventory | `/inventory_import_audit` | `commands/inventory_cmds.py` | decorator | none observed | top-level | Phase 5A `/inventory audit` |
+| Location | `/import_locations` | `commands/location_cmds.py` | decorator | none observed | top-level | Phase 5A `/location import` |
+| Location | `/player_location` | `commands/location_cmds.py` | admin/leadership allowed channels | none observed | top-level | Phase 5A `/location player` |
 | MGE | `/mge leadership_board` | `commands/mge_cmds.py` | decorator | none observed | grouped | Preserve |
 | MGE | `/mge import_results` | `commands/mge_cmds.py` | decorator | none observed | grouped | Preserve |
 | MGE | `/mge refresh_cache` | `commands/mge_cmds.py` | decorator | none observed | grouped | Preserve |
@@ -120,46 +127,46 @@ commands are marked `none observed` pending SQL usage review.
 | Ops | `/ops show_logs` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
 | Ops | `/ops last_errors` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
 | Ops | `/ops crash_log` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
-| Player/KVK | `/mykvktargets` | `commands/telemetry_cmds.py` | decorator | none observed | top-level | Candidate `/kvk targets` |
-| Player/KVK | `/mygovernorid` | `commands/telemetry_cmds.py` | public | none observed | top-level | Candidate `/registry lookup` or keep flat |
-| Player/KVK | `/player_profile` | `commands/telemetry_cmds.py` | decorator | none observed | top-level | Candidate `/profile player` |
-| Player/KVK | `/mykvkcrystaltech` | `commands/telemetry_cmds.py` | decorator | none observed | top-level | Candidate `/crystaltech progress` |
+| Player/KVK | `/mykvktargets` | `commands/telemetry_cmds.py` | decorator | none observed | top-level | Defer player self-service workflow redesign |
+| Player/KVK | `/mygovernorid` | `commands/telemetry_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
+| Player/KVK | `/player_profile` | `commands/telemetry_cmds.py` | decorator | none observed | top-level | Defer profile workflow review |
+| Player/KVK | `/mykvkcrystaltech` | `commands/telemetry_cmds.py` | decorator | none observed | top-level | Defer player self-service workflow redesign |
 | PreKvK | `/prekvk report` | `commands/prekvk_cmds.py` | public | none observed | grouped | Preserve |
 | PreKvK Admin | `/prekvk import_history` | `commands/prekvk_admin_cmds.py` | decorator | none observed | grouped by helper | Preserve; improve static validator detection |
 | Processing Reports | `/ops summary` | `commands/admin_cmds.py` | public | none observed | grouped | Preserve |
 | Processing Reports | `/ops weeksummary` | `commands/admin_cmds.py` | public | none observed | grouped | Preserve |
 | Processing Reports | `/ops history` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
 | Processing Reports | `/ops failures` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
-| Registry | `/register_governor` | `commands/registry_cmds.py` | public | none observed | top-level | Candidate `/registry register` or keep flat |
-| Registry | `/modify_registration` | `commands/registry_cmds.py` | public | none observed | top-level | Candidate `/registry modify` or keep flat |
-| Registry | `/remove_registration` | `commands/registry_cmds.py` | decorator | none observed | top-level | Candidate `/registry remove` |
-| Registry | `/remove_registration_by_id` | `commands/registry_cmds.py` | decorator | none observed | top-level | Candidate `/registry remove_by_id` |
-| Registry | `/my_registrations` | `commands/registry_cmds.py` | public | none observed | top-level | Candidate `/registry mine` or keep flat |
-| Registry | `/admin_register_governor` | `commands/registry_cmds.py` | decorator | none observed | top-level | Candidate `/registry admin_register` |
-| Registry | `/registration_audit` | `commands/registry_cmds.py` | decorator | none observed | top-level | Candidate `/registry audit` |
-| Registry | `/bulk_export_registrations` | `commands/registry_cmds.py` | decorator | none observed | top-level | Candidate `/registry bulk_export` |
-| Registry | `/bulk_import_registrations_dryrun` | `commands/registry_cmds.py` | decorator | none observed | top-level | Candidate `/registry bulk_import_dryrun` |
-| Registry | `/bulk_import_registrations` | `commands/registry_cmds.py` | decorator | none observed | top-level | Candidate `/registry bulk_import` |
+| Registry | `/register_governor` | `commands/registry_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
+| Registry | `/modify_registration` | `commands/registry_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
+| Registry | `/remove_registration` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry remove` |
+| Registry | `/remove_registration_by_id` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry remove_by_id` |
+| Registry | `/my_registrations` | `commands/registry_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
+| Registry | `/admin_register_governor` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry admin_register` |
+| Registry | `/registration_audit` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry audit` |
+| Registry | `/bulk_export_registrations` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry bulk_export` |
+| Registry | `/bulk_import_registrations_dryrun` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry bulk_import_dryrun` |
+| Registry | `/bulk_import_registrations` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry bulk_import` |
 | Stats Ops | `/ops test_embed` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
-| Stats/KVK | `/test_kvk_export` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk test_export` |
-| Stats/KVK | `/mykvkstats` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk stats` or keep flat |
-| Stats/KVK | `/refresh_stats_cache` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk refresh_stats_cache` |
-| Stats/KVK | `/my_stats` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/stats mine` or keep flat |
-| Stats/KVK | `/my_stats_export` | `commands/stats_cmds.py` | public | none observed | top-level | Candidate `/stats export` or keep flat |
-| Stats/KVK | `/player_stats` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/stats player` |
-| Stats/KVK | `/mykvkhistory` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk history` or keep flat |
-| Stats/KVK | `/kvk_rankings` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk rankings` |
-| Stats/KVK | `/kvk_export_all` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk export_all` |
-| Stats/KVK | `/kvk_recompute` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk recompute` |
-| Stats/KVK | `/kvk_list_scans` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk list_scans` |
-| Stats/KVK | `/test_kvk_embed` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk test_embed` |
-| Stats/KVK | `/kvk_window_preview` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk window_preview` |
-| Subscriptions | `/subscribe` | `commands/subscriptions_cmds.py` | public | none observed | top-level | Candidate `/subscriptions subscribe` or keep flat |
-| Subscriptions | `/modify_subscription` | `commands/subscriptions_cmds.py` | public | none observed | top-level | Candidate `/subscriptions modify` or keep flat |
-| Subscriptions | `/unsubscribe` | `commands/subscriptions_cmds.py` | public | none observed | top-level | Candidate `/subscriptions unsubscribe` or keep flat |
-| Subscriptions | `/list_subscribers` | `commands/subscriptions_cmds.py` | decorator | none observed | top-level | Candidate `/subscriptions list` |
-| Subscriptions | `/migrate_subscriptions_dryrun` | `commands/subscriptions_cmds.py` | decorator | none observed | top-level | Candidate `/subscriptions migrate_dryrun` |
-| Subscriptions | `/migrate_subscriptions_apply` | `commands/subscriptions_cmds.py` | decorator | none observed | top-level | Candidate `/subscriptions migrate_apply` |
+| Stats/KVK | `/test_kvk_export` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk test_export` |
+| Stats/KVK | `/mykvkstats` | `commands/stats_cmds.py` | decorator | none observed | top-level | Defer player self-service workflow redesign |
+| Stats/KVK | `/refresh_stats_cache` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk refresh_stats_cache` |
+| Stats/KVK | `/my_stats` | `commands/stats_cmds.py` | decorator | none observed | top-level | Defer player self-service workflow redesign |
+| Stats/KVK | `/my_stats_export` | `commands/stats_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
+| Stats/KVK | `/player_stats` | `commands/stats_cmds.py` | admin/leadership | none observed | top-level | Phase 5A `/stats player` |
+| Stats/KVK | `/mykvkhistory` | `commands/stats_cmds.py` | decorator | none observed | top-level | Defer player self-service workflow redesign |
+| Stats/KVK | `/kvk_rankings` | `commands/stats_cmds.py` | decorator | none observed | top-level | Defer; public/channel-limited ranking UX |
+| Stats/KVK | `/kvk_export_all` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk export_all` |
+| Stats/KVK | `/kvk_recompute` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk recompute` |
+| Stats/KVK | `/kvk_list_scans` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk list_scans` |
+| Stats/KVK | `/test_kvk_embed` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk test_embed` |
+| Stats/KVK | `/kvk_window_preview` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk window_preview` |
+| Subscriptions | `/subscribe` | `commands/subscriptions_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
+| Subscriptions | `/modify_subscription` | `commands/subscriptions_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
+| Subscriptions | `/unsubscribe` | `commands/subscriptions_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
+| Subscriptions | `/list_subscribers` | `commands/subscriptions_cmds.py` | decorator | none observed | top-level | Phase 5A `/subscriptions list` |
+| Subscriptions | `/migrate_subscriptions_dryrun` | `commands/subscriptions_cmds.py` | decorator | none observed | top-level | Phase 5A `/subscriptions migrate_dryrun` |
+| Subscriptions | `/migrate_subscriptions_apply` | `commands/subscriptions_cmds.py` | decorator | none observed | top-level | Phase 5A `/subscriptions migrate_apply` |
 | Telemetry | `/ping` | `commands/telemetry_cmds.py` | public | none observed | top-level | Keep flat or move to `/ops ping` |
 | Usage Analytics | `/ops usage` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
 | Usage Analytics | `/ops usage_detail` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
@@ -168,14 +175,14 @@ commands are marked `none observed` pending SQL usage review.
 
 | Domain | Strengths | Weaknesses / risks | Improvement opportunity |
 |---|---|---|---|
-| Ark | Strong service/DAL/test ecosystem and consistent leadership decorators on most admin paths. Phase 4 groups all Ark commands under `/ark`. | Create/amend/cancel command bodies still contain substantial orchestration that should move into services later. | Follow up with an Ark command orchestration extraction batch. |
-| Ops | Core operational tools are grouped and command lifecycle reuse is strong. Phase 3 moved approved reporting, usage, and test ops paths under `/ops`. | Calendar and CrystalTech ops remain flat pending later domain grouping. | Continue with domain-specific grouping only after operator approval. |
+| Ark | Strong service/DAL/test ecosystem and consistent leadership decorators on most admin paths. Phase 4 grouped all Ark commands under `/ark`. | Create/amend/cancel command bodies still contain substantial orchestration that should move into services later. | Follow up with an Ark command orchestration extraction batch. |
+| Ops | Core operational tools are grouped and command lifecycle reuse is strong. Phase 3 moved approved reporting, usage, and test ops paths under `/ops`. | Calendar, CrystalTech, registry admin, KVK admin, location, activity, and subscription admin commands remain flat. | Execute approved Phase 5A admin/leadership/operator domain grouping. |
 | MGE | Already grouped; permission decorators mostly consistent. | `/mge admin_completion` uses an inline admin check. | Standardise decorator and preserve current grouped path. |
-| Public KVK/Stats | Rich test coverage and recent service/DAL cleanup around KVK admin commands. | Many public player paths are flat and highly discoverable; moving them could confuse players. | Split admin KVK commands first; defer player path changes until approved UX rules exist. |
-| Registry | Strong service/cache tests and command service extraction. | Public self-service paths are discoverability-sensitive; admin bulk operations remain flat. | Group admin registry commands first; decide public path policy separately. |
-| Inventory | Service-oriented implementation and focused inventory tests. Phase 1 standardised command access checks onto decorators. | Inventory export still passes admin context to the service for self-service/admin override semantics. | Group under `/inventory` only after public-path UX approval. |
-| Calendar / Events | Calendar command layer is thin and docs are extensive. | Calendar admin commands live in `admin_cmds.py` while public commands live in `calendar_cmds.py`; many docs reference flat paths. | Group calendar public/admin commands with careful docs update. |
-| Subscriptions | Public flow is simple and tested via views. | Public path migration needs communication. | Consider `/subscriptions` grouping after public-path UX approval. |
+| Public KVK/Stats | Rich test coverage and recent service/DAL cleanup around KVK admin commands. | Personal player paths are flat and likely high-traffic; some current commands may reflect development slices rather than ideal user journeys. | Move only admin/leadership KVK/stat commands in Phase 5A; defer personal player workflow redesign. |
+| Registry | Strong service/cache tests and command service extraction. | Public self-service paths are discoverability-sensitive and may be better redesigned around a coherent Governor ID/account workflow. | Group admin registry commands in Phase 5A; defer public account workflow redesign. |
+| Inventory | Service-oriented implementation and focused inventory tests. Phase 1 standardised command access checks onto decorators. | Inventory export still passes admin context to the service for self-service/admin override semantics; personal commands are high-discoverability. | Move import/audit only in Phase 5A; defer personal inventory workflow redesign. |
+| Calendar / Events | Calendar command layer is thin and docs are extensive. | Public calendar/KVK calendar commands have inconsistent naming, visibility, scope, and button behavior. | Move admin refresh/status commands in Phase 5A; defer public calendar/KVK calendar UX redesign. |
+| Subscriptions | Public flow is simple and tested via views. | Public subscription commands are player self-service paths that need communication and may benefit from flow redesign. | Move admin list/migration commands in Phase 5A; defer subscription self-service redesign. |
 | Secondary cogs | Phase 2 retired unused disabled legacy declarations. | No active secondary command surface remains. | Keep validator tolerant of missing retired paths and focused on active startup-sync risks. |
 
 ## Technical Debt Register
@@ -187,14 +194,19 @@ commands are marked `none observed` pending SQL usage review.
 - Resolution: Added reusable decorator support for admin-only, admin-or-leadership in allowed channels, and missing-config channel denial. Preserved command paths, command count, service handoff behavior, and denial visibility. `/export_inventory` remains service-authorized because it is self-service with admin override context rather than a command-denial gate.
 - Validation: Command registration remained `primary=82 grouped_subcommands_detected=21 secondary_cogs=5 secondary_subscribe=1 total_unique=82`; full pytest, pre-commit, log-noise validation, and Codex Security diff review passed.
 
-### Deferred Optimisation
+### Phase 4 Completed Item
 - Area: `commands/ark_cmds.py`, `docs/ark/`, Ark command tests
 - Type: architecture
-- Description: Ark remains a large flat command surface with stale flat-path documentation and public/operator workflows tied to current names.
-- Suggested Fix: Design an approved `/ark` grouping migration with docs/tests/operator communication.
-- Impact: high
-- Risk: medium
-- Dependencies: Operator approval for public Ark path changes.
+- Description: Phase 4 grouped all Ark commands under `/ark`, including public reminder
+  preferences and player report commands, while preserving existing behavior, permissions, command
+  options, versions, usage tracking, response visibility, modal/view flows, and command-cache
+  semantics.
+- Resolution: Delivered in PR 134
+  (`codex/command-platform-phase-4-ark-grouping`), smoke tested successfully, merged, and pushed to
+  production.
+- Validation: Production smoke confirmed `/ops validate_command_cache` green and the active
+  baseline at
+  `primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62`.
 
 ### Phase 2 Completed Item
 - Area: `scripts/validate_command_registration.py`, `cogs/commands.py`, `subscribe.py`
@@ -348,12 +360,12 @@ Delivered validation:
 
 ### Phase 4 - Ark Command Grouping
 
-Status: implementation in progress in the Phase 4 PR. See
-`docs/task_packs/Codex Task Pack - Command Platform Phase 4 Ark Command Grouping.md`.
+Status: complete. Delivered in PR 134, smoke tested successfully, merged, and pushed to
+production.
 
 Goal: group Ark commands under `/ark`, recovering the largest remaining top-level block.
 
-Implemented scope:
+Delivered scope:
 
 - Leadership/admin paths: `create_match`, `force_announce`, `amend_match`, `cancel_match`,
   `set_preference`, `clear_preference`, `ban_add`, `ban_revoke`, `ban_list`, `set_result`,
@@ -362,42 +374,58 @@ Implemented scope:
 
 Implementation notes:
 
-- Public Ark path migration was approved because Ark is fortnightly and the public commands are
-  not currently in active use; publish the post-merge Discord briefing note before the next Ark
-  cycle.
-- Preserve `is_admin_or_leadership_only`, `channel_only`, autocomplete/options, modal/view flows,
+- Public Ark path migration was approved because Ark is fortnightly and the public commands were
+  not currently in active use; a post-merge Discord briefing note was added at
+  `docs/ark/ark_command_grouping_discord_briefing.md`.
+- Preserved `is_admin_or_leadership_only`, `channel_only`, autocomplete/options, modal/view flows,
   and interaction response behavior.
-- Update Ark docs and smoke-test runbooks that reference flat paths.
+- Updated Ark docs and smoke-test runbooks that referenced flat paths.
 - Follow up separately on extracting substantial create/amend/cancel orchestration out of
   `commands/ark_cmds.py` into Ark services.
 
-Validation:
+Delivered validation:
 
 - Ark command tests, including reminder prefs and force announce.
 - Ark registration, draft, ban, cancel, and result focused tests where touched.
 - Command registration validation and smoke imports.
-- Codex Security review required due to permissions, public interactions, and restart-sensitive Ark
-  flows.
+- Full pytest, pre-commit, architecture validation, deferred-item validation, command registration
+  validation, pytest log-noise analysis, and Codex Security diff review passed before merge.
+- Production smoke confirmed `/ops validate_command_cache` green after restart.
 
-### Phase 5 - Public Domain Grouping Design
+### Phase 5 - Public Domain Grouping Design / Phase 5A Admin Grouping
 
-Goal: decide the player-facing command policy before touching high-discoverability paths.
+Status: design approved for Phase 5A only. See
+`docs/task_packs/Codex Task Pack - Command Platform Phase 5 Public Domain Grouping Design.md`.
 
-Scope candidates:
+Goal: implement only the approved admin/leadership/operator grouping slice and defer player
+self-service plus public calendar/KVK calendar redesign out of this command-count programme.
 
-- `/registry`: registration, my registrations, admin registry operations
-- `/kvk` and `/stats`: KVK rankings, personal stats, exports, admin KVK operations
-- `/inventory`: import, report, preferences, export, audit
-- `/calendar` and `/events`: calendar browsing, reminder config, next KVK events/fights,
-  refresh operations
-- `/subscriptions`: subscribe, modify, unsubscribe, list, migration commands
-- `/crystaltech`, `/honor`, `/location`, `/activity`
+Approved Phase 5A scope:
+
+- `/registry`: remove, remove_by_id, admin_register, audit, bulk_export, bulk_import_dryrun,
+  bulk_import
+- `/kvk`: test_export, refresh_stats_cache, export_all, recompute, list_scans, test_embed,
+  window_preview
+- `/stats`: player
+- `/inventory`: import, audit
+- `/calendar`: refresh, generate, publish_cache, status
+- `/events`: refresh, refresh_kvk_overview
+- `/subscriptions`: list, migrate_dryrun, migrate_apply
+- `/crystaltech`: validate, reload, admin_reset
+- `/honor`: purge_last
+- `/location`: import, player
+- `/activity`: top
 
 Implementation notes:
 
-- Split admin-heavy commands from player self-service commands where that reduces UX risk.
-- Keep heavily used/self-service paths flat unless operators approve migration.
-- Consider transition docs or announcement copy for public renames.
+- Preserve behavior, permissions, options, autocomplete, versions, usage tracking, response
+  visibility, command-cache behavior, and handler bodies.
+- `/player_location` and `/player_stats` are included because they are admin/leadership lookup
+  commands, not player self-service commands.
+- Leave player self-service commands flat in Phase 5A; capture them as a separate workflow
+  redesign deferred optimisation.
+- Leave generic public calendar/KVK calendar commands flat in Phase 5A; capture them as a
+  separate calendar UX redesign deferred optimisation.
 
 Validation:
 
@@ -444,9 +472,10 @@ Validation:
 2. Phase 2: Validator And Inventory Tooling Enhancement.
 3. Phase 3: Low-Risk Ops Consolidation And Startup Audit Log Alignment.
 4. Phase 4: Ark Command Grouping.
-5. Phase 5: Public Domain Grouping Design.
+5. Phase 5A: Admin/Leadership/Operator Domain Grouping.
 6. Phase 6: Canonical Command Documentation.
 7. Phase 7: Future Governance And CI Guardrails.
 
-The current implementation PR is Phase 4 only, with all 14 Ark commands approved for grouping.
-Any wider public/player command grouping belongs to later phases.
+The next implementation PR should be Phase 5A only. Player self-service workflow redesign and
+public calendar/KVK calendar redesign are deferred into separate optimisation tasks rather than
+continued as simple command grouping inside this programme.

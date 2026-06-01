@@ -1,41 +1,4 @@
-# Codex Chat Starter - Command Platform Phase 4 Ark Command Grouping
-
-Use this starter to begin the next Command Platform Audit & Optimisation Programme phase.
-
-Source programme documents:
-
-- `docs/task_packs/Codex Task Pack - Command Platform Audit & Optimisation Programme.md`
-- `docs/task_packs/Codex Task Pack - Command Platform Phase 4 Ark Command Grouping.md`
-- `docs/reference/command_platform_audit.md`
-- `docs/reference/command_surface_audit.md`
-- `docs/reference/deferred_optimisations.md`
-
-Phase 3 was completed in PR 133 (`codex/command-platform-phase-3-ops-startup-audit`), smoke tested
-successfully, merged, and pushed to production. Production smoke confirmed:
-
-- startup command audit reports
-  `primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75`
-- the stale `primary=0 ... total_unique=0` startup summary is gone
-- `/ops validate_command_cache` reports all commands correctly versioned and cached
-- the moved `/ops` commands execute correctly
-
-## Copy/Paste Starter
-
-Codex, begin Phase 4 of the Command Platform Audit & Optimisation Programme: Ark Command Grouping.
-
-This follows the completed Phase 3 ops consolidation and startup audit alignment PR:
-
-- PR 133: `codex/command-platform-phase-3-ops-startup-audit`
-- Result: smoke tested successfully, merged, pushed to production
-- Current validator baseline:
-
-```text
-primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75
-```
-
-The objective for this phase is to recover command headroom by grouping approved Ark commands
-under `/ark` while preserving behavior, permissions, options, autocomplete, modal/view flows,
-versions, usage tracking, and command-cache semantics.
+# Codex Task Pack - Command Platform Phase 4 Ark Command Grouping
 
 ## 1. Task Header
 
@@ -43,7 +6,8 @@ versions, usage tracking, and command-cache semantics.
 - Date: 2026-06-01
 - Owner/context: Command Platform Audit & Optimisation Programme
 - Task type: deferred optimisation batch / command-surface migration
-- One-pass approved: no
+- One-pass approved: yes, after review/scope approval in implementation chat
+- Status: complete; delivered in PR 134, smoke tested, merged, and pushed to production
 
 ## 2. Required Reading
 
@@ -58,7 +22,6 @@ Before implementation, read:
 - `docs/reference/K98 Bot - Skills & Refactor Triggers.md`
 - `docs/reference/K98 Bot - Deferred Optimisation Framework.md`
 - `docs/task_packs/Codex Task Pack - Command Platform Audit & Optimisation Programme.md`
-- `docs/task_packs/Codex Task Pack - Command Platform Phase 4 Ark Command Grouping.md`
 - `docs/reference/command_platform_audit.md`
 - `docs/reference/command_surface_audit.md`
 - `docs/reference/deferred_optimisations.md`
@@ -79,21 +42,54 @@ Also review:
 
 ## 3. Objective
 
+Recover the largest remaining low-risk command headroom block by grouping approved Ark commands
+under `/ark` while preserving existing behavior, permissions, options, autocomplete, modal/view
+flows, response behavior, versions, usage tracking, and restart-sensitive Ark workflows.
+
 This phase should:
 
-- migrate approved Ark top-level commands under `/ark`
-- preserve existing command behavior, permissions, options, autocomplete, descriptions, versions,
-  usage tracking, modal/view flows, and response behavior
-- public `/ark_reminder_prefs` and `/ark_report_players` are approved for grouping
-- leave unapproved public/player command paths unchanged
+- migrate approved Ark command paths from flat top-level names to `/ark` subcommands
+- preserve leadership/admin decorators and channel restrictions exactly
+- preserve public Ark command behavior; public `/ark_reminder_prefs` and `/ark_report_players`
+  migration is explicitly approved for this phase
 - reduce active top-level command count without touching non-Ark command domains
-- update tests and docs for any moved paths
+- update tests and docs for moved paths
+- keep command registration validation and startup smoke evidence aligned with the new baseline
 
-## 4. Scope
+## 4. Background
+
+Phase 3 was completed in PR 133 (`codex/command-platform-phase-3-ops-startup-audit`), smoke tested
+successfully, merged, and pushed to production. It moved the approved low-risk operational and
+reporting commands under `/ops`, fixed the stale startup command-audit summary, and left the active
+baseline at:
+
+```text
+primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75
+```
+
+The current grouped command summary is:
+
+| Group | Statically detected subcommands |
+|---|---:|
+| `/ops` | 21 |
+| `/mge` | 6 |
+| `/prekvk` | 2 |
+
+Ark is now the largest remaining flat command block and is the next planned command-platform
+optimisation phase. The public Ark paths are approved for this phase because Ark runs every two
+weeks and the public Ark commands are not currently in active use. Add a simple post-merge Discord
+briefing note before the next Ark cycle.
+
+Phase 4 was completed in PR 134 (`codex/command-platform-phase-4-ark-grouping`), smoke tested
+successfully, merged, and pushed to production. Production smoke confirmed
+`/ops validate_command_cache` remained green after restart and Discord command discovery showed
+the new `/ark` group with the old flat Ark paths removed.
+
+## 5. Scope
 
 ### In Scope
 
-Leadership/admin Ark grouping candidates:
+Create an `/ark` command group and move approved Ark commands:
 
 - `/ark_create_match` -> `/ark create_match`
 - `/ark_force_announce` -> `/ark force_announce`
@@ -108,7 +104,7 @@ Leadership/admin Ark grouping candidates:
 - `/ark_generate_draft` -> `/ark generate_draft`
 - `/create_ark_team` -> `/ark create_team`
 
-Public Ark grouping candidates, only if explicitly approved:
+Public Ark paths approved for this phase:
 
 - `/ark_reminder_prefs` -> `/ark reminder_prefs`
 - `/ark_report_players` -> `/ark report_players`
@@ -116,20 +112,38 @@ Public Ark grouping candidates, only if explicitly approved:
 Also in scope:
 
 - `commands/ark_cmds.py`
-- command registration, cache/version, and validator tests
-- Ark docs and smoke/runbook updates
+- command inventory, registration, cache/version, and validator tests
+- Ark command docs and smoke/runbook references
+- Discord briefing note for post-merge operator sharing
 - command-platform docs updates
+- command-cache validation expectations for grouped Ark paths
 
 ### Out Of Scope
 
-- non-Ark command grouping
-- public/player command migration outside approved Ark paths
+- Non-Ark command grouping
+- Public/player command migration beyond explicitly approved Ark paths
 - aliases or transition messaging unless explicitly approved
 - SQL schema changes
 - permission-decorator changes except preserving existing gates during movement
 - production promotion or deployment
 
-## 5. Mandatory Workflow
+## 6. Baseline And Expected Count
+
+Starting validator baseline:
+
+```text
+primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75
+```
+
+All 14 Ark commands are approved, so the expected top-level baseline is:
+
+```text
+primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62
+```
+
+Recalculate during implementation only if the final command set changes unexpectedly.
+
+## 7. Mandatory Workflow
 
 1. Review/scope Phase 4 and stop for approval.
 2. Map every Ark command handler, decorator, option, autocomplete, usage-tracking version, and
@@ -142,12 +156,12 @@ Also in scope:
 7. Run validation.
 8. Run Codex Security review before PR handoff.
 
-Proceed in one pass only if explicitly approved in the new chat.
+One-pass implementation was approved after the scope review for the full 14-command Ark grouping.
 
-## 6. Acceptance Criteria
+## 8. Acceptance Criteria
 
 - [ ] Approved Ark commands are grouped under `/ark` without behavior regressions.
-- [ ] Unapproved public/player command paths remain unchanged.
+- [ ] Unapproved public/player paths remain unchanged.
 - [ ] Command descriptions, options, autocomplete, versions, usage tracking, permissions, and
       response behavior are preserved.
 - [ ] Modal/view flows still open and respond correctly from grouped handlers.
@@ -158,7 +172,7 @@ Proceed in one pass only if explicitly approved in the new chat.
 - [ ] Ark docs, smoke expectations, and command-platform docs reflect the new paths and baseline.
 - [ ] Codex Security review is completed before PR handoff.
 
-## 7. Suggested Validation
+## 9. Suggested Validation
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
@@ -166,7 +180,13 @@ Proceed in one pass only if explicitly approved in the new chat.
 .\.venv\Scripts\python.exe scripts\select_tests.py
 .\.venv\Scripts\python.exe scripts\smoke_imports.py
 .\.venv\Scripts\python.exe scripts\validate_command_registration.py
-.\.venv\Scripts\python.exe -m pytest -q tests\test_validate_command_registration.py tests\test_command_registration_smoke.py tests\test_command_inventory.py tests\test_command_lifecycle.py tests\test_ark_reminder_prefs_command.py tests\test_ark_preference_commands.py tests\test_ark_ban_commands.py tests\test_ark_cancel_match.py tests\test_ark_phase3a_create_match.py tests\test_ark_phase3b_amend_match.py tests\test_ark_registration_flow.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_validate_command_registration.py tests\test_command_registration_smoke.py tests\test_command_inventory.py tests\test_command_lifecycle.py
+```
+
+Run focused Ark coverage based on the approved paths, likely including:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests\test_ark_reminder_prefs_command.py tests\test_ark_preference_commands.py tests\test_ark_ban_commands.py tests\test_ark_cancel_match.py tests\test_ark_phase3a_create_match.py tests\test_ark_phase3b_amend_match.py tests\test_ark_registration_flow.py
 ```
 
 Before PR handoff, run or justify skipping:
@@ -180,7 +200,7 @@ Before PR handoff, run or justify skipping:
 Codex Security is required because this phase changes Discord command paths, permissions-sensitive
 handlers, public interaction entry points if approved, and restart-sensitive Ark workflows.
 
-## 8. Required Delivery Output
+## 10. Required Delivery Output
 
 Use this delivery shape:
 

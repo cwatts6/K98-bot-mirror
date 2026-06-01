@@ -283,14 +283,21 @@ merged, and pushed to production in PR 133. This phase fixed the stale `DL_bot.p
 summary and grouped approved low-risk operational/reporting commands under `/ops`, reducing the
 active top-level command count to 75.
 
-Phase 4 - Ark Command Grouping: implementation approved for all 14 Ark commands. The active task
-pack is `docs/task_packs/Codex Task Pack - Command Platform Phase 4 Ark Command Grouping.md`.
+Phase 4 - Ark Command Grouping: complete, smoke tested, merged, and pushed to production in PR 134
+(`codex/command-platform-phase-4-ark-grouping`). This phase grouped all 14 Ark commands under
+`/ark`, added the post-merge Discord briefing note, and reduced the active top-level command count
+to 62.
+
+Phase 5 - Public Domain Grouping Design: design approved for Phase 5A only. The active task pack
+is `docs/task_packs/Codex Task Pack - Command Platform Phase 5 Public Domain Grouping Design.md`.
+Phase 5A should group admin/leadership/operator paths only. Player self-service command redesign
+and public calendar/KVK calendar redesign are deferred outside this command-count programme.
 
 Remaining roadmap:
 
 Phase 5
 
-Public Domain Grouping Design
+Phase 5A Admin/Leadership/Operator Domain Grouping
 
 Phase 6
 

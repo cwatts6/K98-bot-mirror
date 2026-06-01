@@ -11,8 +11,8 @@ calendar tracker atomic-write hardening when one of those programmes is approved
 The active command-platform programme is tracked in:
 
 - `Codex Task Pack - Command Platform Audit & Optimisation Programme.md`
-- `Codex Task Pack - Command Platform Phase 4 Ark Command Grouping.md`
-- `Codex Chat Starter - Command Platform Phase 4 Ark Command Grouping.md`
+- `Codex Task Pack - Command Platform Phase 5 Public Domain Grouping Design.md`
+- `Codex Chat Starter - Command Platform Phase 5 Public Domain Grouping Design.md`
 
-Phase 1, Phase 2, Phase 3, and the superseded command-surface balancing audit pack are archived as
-execution records.
+Phase 1, Phase 2, Phase 3, Phase 4, and the superseded command-surface balancing audit pack are
+archived as execution records.

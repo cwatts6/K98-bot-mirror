@@ -5,8 +5,7 @@ to GitHub issues/task packs.
 
 Resolved historical notes were moved to `archive/deferred_optimisations_resolved.md`.
 
-Last reviewed after Command Platform Phase 3, Low-Risk Ops Consolidation And Startup Audit Log
-Alignment. PR 131
+Last reviewed after Command Platform Phase 4, Ark Command Grouping. PR 131
 (`codex/command-platform-phase-1-permission-decorators`) was smoke tested successfully, merged,
 and pushed to production on 2026-06-01. Phase 1 standardised active command permission gates onto
 decorators, added focused decorator tests, preserved command paths and registration count, and kept
@@ -26,8 +25,11 @@ restart plus `/ops validate_command_cache`. PR 133
 pushed to production on 2026-06-01. The active command baseline after Phase 3 is
 `primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75`.
 Phase 4 then grouped all 14 Ark commands under `/ark`, including the public reminder preferences
-and player report commands after approval, reducing the implementation baseline to
+and player report commands after approval, added a post-merge Discord briefing note, and reduced
+the active command baseline to
 `primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62`.
+PR 134 (`codex/command-platform-phase-4-ark-grouping`) was smoke tested successfully, merged, and
+pushed to production on 2026-06-01.
 Earlier review history: after the slow-pytest optimisation production
 release, PR 107
 (`pytest-log-delivery-docs`) resolved the high-impact pytest duration outliers found after the
@@ -182,16 +184,25 @@ atomic-write hardening; each requires a fresh scope instead of an additional Pha
 - Suggested Fix: Scope a follow-up Ark command orchestration extraction that moves create/amend/cancel workflow coordination into Ark services while leaving command handlers responsible for permissions, deferral, input collection, and response rendering. Preserve existing DAL contracts, restart-sensitive message/reminder state behavior, and modal/view callback behavior with focused regression tests.
 - Impact: medium
 - Risk: medium
-- Dependencies: Complete and smoke test Phase 4 Ark command grouping first; validate service boundaries against existing Ark registration, confirmation, reminder, cancel, and audit tests.
+- Dependencies: Phase 4 Ark command grouping is complete and smoke tested; validate service boundaries against existing Ark registration, confirmation, reminder, cancel, and audit tests.
 
 ### Deferred Optimisation
-- Area: `commands/stats_cmds.py`, `commands/registry_cmds.py`, `commands/inventory_cmds.py`, `commands/calendar_cmds.py`, `commands/subscriptions_cmds.py`, user-facing command docs/tests
+- Area: `commands/registry_cmds.py`, `commands/telemetry_cmds.py`, `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `commands/subscriptions_cmds.py`, `commands/calendar_cmds.py`, player self-service command docs/tests
 - Type: architecture
-- Description: Public/player-facing command domains still use many top-level paths that could be grouped later (`/kvk`, `/registry`, `/inventory`, `/calendar`, `/subscriptions`). These commands are more discoverability-sensitive than admin-only surfaces and include heavily documented player workflows, so moving them without coordination could confuse users even though it would reduce startup sync risk further.
-- Suggested Fix: Scope a later public command-path migration with operator-approved UX rules, aliases/transition messaging if feasible, and focused docs/test updates. Prioritise admin-heavy subcommands inside each domain first, then evaluate whether player paths should remain flat for discoverability.
+- Description: Player self-service commands are still split across development-era entry points instead of being designed as complete user workflows. The affected paths include `/register_governor`, `/modify_registration`, `/my_registrations`, `/mygovernorid`, `/mykvkstats`, `/my_stats`, `/my_stats_export`, `/mykvkhistory`, `/mykvktargets`, `/mykvkcrystaltech`, `/myinventory`, `/inventory_preferences`, `/export_inventory`, `/subscribe`, `/modify_subscription`, `/unsubscribe`, and `/calendar_reminder_config`. These are high-discoverability, likely high-traffic commands that players use for critical self-service tasks, and simple path grouping could preserve a fragmented user model while still forcing players to relearn command names.
+- Suggested Fix: Scope a dedicated player self-service workflow redesign outside the command-count programme. Review each block as a user journey before choosing command paths. For registry/account flows, specifically evaluate whether lookup, register, review, and modify should be consolidated into a coherent Governor ID/account command surface rather than four separate commands. Review SQL-backed command usage, transition/announcement needs, Discord alias limitations, docs/smoke references, permission and channel behavior, and focused regression tests before any implementation.
+- Impact: high
+- Risk: medium
+- Dependencies: Phase 5A admin/leadership/operator grouping should be completed first; requires operator approval, SQL-backed usage review, user-facing briefing, and a fresh task pack.
+
+### Deferred Optimisation
+- Area: `commands/calendar_cmds.py`, `commands/events_cmds.py`, `ui/views/calendar.py`, `ui/views/events_views.py`, public calendar/KVK calendar docs/tests
+- Type: architecture
+- Description: Generic public calendar and KVK calendar commands have inconsistent naming, visibility, scope, and interaction behavior. `/calendar` is an ephemeral calendar overview; `/calendar_next_event` is ephemeral and shows one next calendar event; `/next_kvk_fight` is public and shows one fight with controls for the next three fights; `/next_kvk_event` is public and shows one event with controls for the next five events. There is also no clearly named `/kvk_calendar` or equivalent KVK calendar overview, so grouping these commands now would tidy paths without resolving the user-facing model.
+- Suggested Fix: Scope a dedicated public calendar/KVK calendar UX redesign outside the command-count programme. Review whether the end state should use grouped paths such as `/calendar overview`, `/calendar kvk_overview`, `/calendar next_event`, `/calendar next_kvk_fight`, and `/calendar next_kvk_event`; decide whether all public information commands should post publicly; define the missing KVK calendar overview behavior; align button counts and visibility; update docs/smoke references; and add focused command/view tests before implementation.
 - Impact: medium
 - Risk: medium
-- Dependencies: Operator approval for public command rename policy; updated command reference/announcement plan; Batch 1 validation remains below the warning threshold.
+- Dependencies: Phase 5A admin/leadership/operator grouping should be completed first; requires operator approval for public visibility changes and a fresh task pack.
 
 ### Deferred Optimisation
 - Area: SQL repo legacy PreKvK phase object retirement

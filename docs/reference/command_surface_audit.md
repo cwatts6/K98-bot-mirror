@@ -21,13 +21,21 @@ and pushed to production. Phase 3 moved the approved low-risk operational/report
 `/ops`, fixed the stale startup command-audit summary, and confirmed command-cache validation
 remained green after restart.
 
+Command Platform Phase 4, Ark Command Grouping, was completed in PR 134
+(`codex/command-platform-phase-4-ark-grouping`), smoke tested successfully, merged, and pushed to
+production. Phase 4 moved all 14 Ark commands under `/ark`, including public reminder preferences
+and player report commands, while preserving Ark permissions, command options, versions, usage
+tracking, response visibility, modal/view flows, and command-cache behavior.
+
 Current baseline after Phase 4 implementation:
 
 ```text
 primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62
 ```
 
-The next command-platform phase is Ark grouping under `/ark`.
+The next command-platform phase is Phase 5A admin/leadership/operator domain grouping. Player
+self-service and generic public calendar/KVK calendar redesign are deferred outside this
+command-count programme.
 
 ## Current Registration Summary
 
@@ -124,9 +132,18 @@ usage tracking, options, and modal/view flows while moving all Ark commands into
 Next command-surface batches are staged in `docs/reference/deferred_optimisations.md` and the
 command-platform programme docs. Recommended order:
 
-1. Ark grouping under `/ark` is implemented in Phase 4; publish the post-merge Discord briefing
-   note before the next Ark cycle.
-2. Public/player domain grouping across KVK, registry, inventory, calendar, and subscriptions.
+1. Phase 5A admin/leadership/operator domain grouping across registry admin, KVK/stat admin,
+   inventory import/audit, calendar/event admin refresh/status paths, subscriptions admin,
+   CrystalTech admin, honor purge, location admin/leadership, and activity leadership commands.
+2. Canonical command documentation after approved Phase 5A path decisions.
+3. Future governance and CI guardrails.
+
+The previously considered player self-service grouping is deferred because commands such as
+`/register_governor`, `/modify_registration`, `/my_registrations`, `/mygovernorid`,
+`/mykvkstats`, `/my_stats`, `/myinventory`, and `/subscribe` likely need workflow redesign rather
+than simple path grouping. The public calendar/KVK calendar commands are also deferred because
+`/calendar`, `/calendar_next_event`, `/next_kvk_fight`, and `/next_kvk_event` have inconsistent
+visibility, naming, scope, and button behavior that should be redesigned together.
 
 Phase 2 retired the unused disabled secondary command declarations in `cogs/commands.py` and
 root `subscribe.py`, leaving `commands/` as the only command registration surface and removing the
