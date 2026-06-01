@@ -5,7 +5,8 @@ to GitHub issues/task packs.
 
 Resolved historical notes were moved to `archive/deferred_optimisations_resolved.md`.
 
-Last reviewed after Command Platform Phase 1, Permission Decorator Standardisation. PR 131
+Last reviewed after Command Platform Phase 3, Low-Risk Ops Consolidation And Startup Audit Log
+Alignment. PR 131
 (`codex/command-platform-phase-1-permission-decorators`) was smoke tested successfully, merged,
 and pushed to production on 2026-06-01. Phase 1 standardised active command permission gates onto
 decorators, added focused decorator tests, preserved command paths and registration count, and kept
@@ -18,9 +19,15 @@ active versus disabled legacy surfaces, and detected helper-attached grouped sub
 `primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82`.
 PR 132 (`codex/command-platform-phase-2-validator-inventory`) was smoke tested successfully,
 merged, and pushed to production on 2026-06-01. Phase 3 grouped the approved low-risk
-operational/reporting commands under `/ops` and aligned startup command-audit logging. The active
-command baseline after Phase 3 is
+operational/reporting commands under `/ops`, aligned startup command-audit logging, confirmed the
+stale `primary=0 ... total_unique=0` startup summary was gone, and passed production smoke via
+restart plus `/ops validate_command_cache`. PR 133
+(`codex/command-platform-phase-3-ops-startup-audit`) was smoke tested successfully, merged, and
+pushed to production on 2026-06-01. The active command baseline after Phase 3 is
 `primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75`.
+Phase 4 then grouped all 14 Ark commands under `/ark`, including the public reminder preferences
+and player report commands after approval, reducing the implementation baseline to
+`primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62`.
 Earlier review history: after the slow-pytest optimisation production
 release, PR 107
 (`pytest-log-delivery-docs`) resolved the high-impact pytest duration outliers found after the
@@ -161,14 +168,21 @@ atomic-write hardening; each requires a fresh scope instead of an additional Pha
 - Risk: medium
 - Dependencies: Batch 1 `/ops` and `/mge` grouping and Phase 1 permission decorator standardisation remain deployed cleanly; coordinate with bot operators before renaming public command paths; preserve standard decorator permission checks when commands move into groups.
 
-### Deferred Optimisation
+### Phase 4 Completed Item
 - Area: `commands/ark_cmds.py`, `docs/ark/`, Ark command tests
 - Type: architecture
-- Description: Ark still exposes many top-level commands (`/ark_create_match`, `/ark_force_announce`, `/ark_amend_match`, `/ark_cancel_match`, `/ark_set_preference`, `/ark_clear_preference`, `/ark_ban_add`, `/ark_ban_revoke`, `/ark_ban_list`, `/ark_set_result`, `/ark_generate_draft`, `/create_ark_team`, plus public `/ark_reminder_prefs` and `/ark_report_players`). These are a natural `/ark` command group and could recover another large block of top-level command headroom, but several docs and public/operator workflows reference the flat paths.
-- Suggested Fix: Prepare a second command-surface migration batch that groups Ark commands under `/ark`, preserving `is_admin_or_leadership_only`, `channel_only`, public reminder/report behavior, autocomplete/options, and interaction responses. Coordinate operator communication for public path changes before implementation and update Ark docs/tests to the new paths.
-- Impact: high
+- Description: Phase 4 grouped all Ark commands under `/ark`, including `/ark reminder_prefs` and `/ark report_players`, while preserving permissions, options, versions, usage tracking, response visibility, modal/view flows, and command-cache semantics.
+- Resolution: Added the `/ark` command group, updated Ark command docs/tests and command-platform docs, and added a post-merge Discord briefing note.
+- Validation: Command registration reports `primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62` in implementation validation.
+
+### Deferred Optimisation
+- Area: `commands/ark_cmds.py`, `ark/registration_flow.py`, `ark/confirmation_flow.py`, `ark/reminders.py`, `ark/dal/ark_dal.py`
+- Type: refactor
+- Description: The Ark create, amend, and cancel command handlers still contain substantial workflow orchestration, including config parsing, match validation, registration embed edits, JSON state lookup, reminder rescheduling/cancellation, audit logging, and cancel-DM dispatch coordination. Phase 4 intentionally preserved these bodies while moving command paths under `/ark` to avoid mixing command-surface migration with service extraction.
+- Suggested Fix: Scope a follow-up Ark command orchestration extraction that moves create/amend/cancel workflow coordination into Ark services while leaving command handlers responsible for permissions, deferral, input collection, and response rendering. Preserve existing DAL contracts, restart-sensitive message/reminder state behavior, and modal/view callback behavior with focused regression tests.
+- Impact: medium
 - Risk: medium
-- Dependencies: Batch 1 `/ops` and `/mge` grouping deployed cleanly; operators approve public Ark path migration and announcement timing.
+- Dependencies: Complete and smoke test Phase 4 Ark command grouping first; validate service boundaries against existing Ark registration, confirmation, reminder, cancel, and audit tests.
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/registry_cmds.py`, `commands/inventory_cmds.py`, `commands/calendar_cmds.py`, `commands/subscriptions_cmds.py`, user-facing command docs/tests

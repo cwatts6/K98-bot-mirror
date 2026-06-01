@@ -24,7 +24,7 @@
   - `ArkSignups.NoShowAtUtc`
 
 ### 3) Reporting
-- `/ark_report_players` produces a paged player report.
+- `/ark report_players` produces a paged player report.
 - Report includes:
   - Matches played
   - Emergency withdrawals
@@ -58,7 +58,7 @@
 ---
 
 ## 1) Create Match
-1. Use `/ark_create_match` in setup channel.
+1. Use `/ark create_match` in setup channel.
 2. Select alliance / weekend / day / time.
 3. Verify **registration embed** posts.
 4. Confirm SQL row created in `ArkMatches`.
@@ -139,7 +139,7 @@
 ---
 
 ## 10) Reporting
-1. Run `/ark_report_players` (public).
+1. Run `/ark report_players` (public).
 2. Confirm report posts in channel.
 3. Use Next/Prev buttons to navigate pages.
 4. Verify values:

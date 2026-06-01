@@ -86,7 +86,7 @@ def register_sample(bot):
     assert grouped == {"ops": {"audit", "status"}}
 
 
-def test_current_command_surface_reflects_phase3_ops_grouping():
+def test_current_command_surface_reflects_phase4_ark_grouping():
     names, grouped = validator.collect_primary_inventory()
 
     moved_to_ops = {
@@ -98,12 +98,31 @@ def test_current_command_surface_reflects_phase3_ops_grouping():
         "usage_detail",
         "test_embed",
     }
+    moved_to_ark = {
+        "ark_create_match": "create_match",
+        "ark_force_announce": "force_announce",
+        "ark_amend_match": "amend_match",
+        "ark_cancel_match": "cancel_match",
+        "ark_reminder_prefs": "reminder_prefs",
+        "ark_set_preference": "set_preference",
+        "ark_clear_preference": "clear_preference",
+        "ark_ban_add": "ban_add",
+        "ark_ban_revoke": "ban_revoke",
+        "ark_ban_list": "ban_list",
+        "ark_set_result": "set_result",
+        "ark_report_players": "report_players",
+        "ark_generate_draft": "generate_draft",
+        "create_ark_team": "create_team",
+    }
 
-    assert len(names) == 75
+    assert len(names) == 62
     assert moved_to_ops.isdisjoint(names)
     assert moved_to_ops.issubset(grouped["ops"])
+    assert set(moved_to_ark).isdisjoint(names)
+    assert set(moved_to_ark.values()).issubset(grouped["ark"])
     assert len(grouped["ops"]) == 21
-    assert sum(len(commands) for commands in grouped.values()) == 29
+    assert len(grouped["ark"]) == 14
+    assert sum(len(commands) for commands in grouped.values()) == 43
 
 
 def test_validator_delegates_static_inventory_to_shared_helper():

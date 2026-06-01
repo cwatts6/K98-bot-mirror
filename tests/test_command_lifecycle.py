@@ -96,6 +96,24 @@ def test_command_version_lines_use_flattened_group_names():
     assert command_version_lines([group]) == ["/ops run_sql_proc — `v1.03`"]
 
 
+def test_command_cache_validation_uses_grouped_ark_names():
+    subcommand = _command("reminder_prefs", description="Prefs", version="v1.02")
+    group = SimpleNamespace(name="ark", subcommands=[subcommand])
+
+    result = validate_command_cache(
+        [group],
+        [{"name": "ark_reminder_prefs", "description": "Prefs", "version": "v1.02"}],
+    )
+
+    assert result.signatures == [
+        {"name": "ark reminder_prefs", "description": "Prefs", "version": "v1.02"}
+    ]
+    assert result.issues == [
+        "➕ `/ark reminder_prefs` is **missing** from cache (code=`v1.02`)",
+        "➖ `/ark_reminder_prefs` is in cache but not currently loaded",
+    ]
+
+
 @pytest.mark.asyncio
 async def test_sync_commands_for_guild_reports_success():
     bot = FakeBot([])

@@ -1,4 +1,4 @@
-# Phase 3B — /ark_amend_match Command Spec
+# Phase 3B — /ark amend_match Command Spec
 
 ## Overview
 Allows leadership to amend an existing Ark match (day/time/notes). Alliance can only change if **no signups** exist.
@@ -30,7 +30,7 @@ Allows leadership to amend an existing Ark match (day/time/notes). Alliance can 
 
 ## UX / UI Flow
 
-### Command: `/ark_amend_match`
+### Command: `/ark amend_match`
 
 **Step 1 — Match selector**
 - Dropdown: upcoming matches (by Alliance + ArkWeekendDate + Time).

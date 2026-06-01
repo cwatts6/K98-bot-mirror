@@ -15,33 +15,38 @@ Command Platform Phase 2, Validator And Inventory Tooling Enhancement, was compl
 pushed to production. Phase 2 retired unused disabled secondary command declarations and made
 helper-attached `/prekvk import_history` visible in static grouped-subcommand reporting.
 
-Current baseline:
+Command Platform Phase 3, Low-Risk Ops Consolidation And Startup Audit Log Alignment, was completed
+in PR 133 (`codex/command-platform-phase-3-ops-startup-audit`), smoke tested successfully, merged,
+and pushed to production. Phase 3 moved the approved low-risk operational/reporting commands under
+`/ops`, fixed the stale startup command-audit summary, and confirmed command-cache validation
+remained green after restart.
+
+Current baseline after Phase 4 implementation:
 
 ```text
-primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75
+primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62
 ```
 
-Phase 3, Low-Risk Ops Consolidation And Startup Audit Log Alignment, moved the approved low-risk
-operational/reporting commands under `/ops` and aligned startup command-audit logging with the
-authoritative command inventory.
+The next command-platform phase is Ark grouping under `/ark`.
 
 ## Current Registration Summary
 
 `scripts/validate_command_registration.py` reports:
 
 ```text
-primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75
+primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62
 ```
 
 Grouped command summary:
 
 | Group | Statically detected subcommands |
 |---|---:|
+| `/ark` | 14 |
 | `/ops` | 21 |
 | `/mge` | 6 |
 | `/prekvk` | 2 |
 
-The primary command surface now has a 25-command buffer below Discord's 100 top-level
+The primary command surface now has a 38-command buffer below Discord's 100 top-level
 application-command limit. The validator warns at 90+ and fails above 100.
 
 ## Batch 1 Renamed Command Paths
@@ -92,12 +97,35 @@ Permission decorators and MGE leadership channel checks were preserved during Ba
 later moved `/mge admin_completion` access control onto the standard decorator layer without
 changing the grouped command path.
 
+### Ark Commands
+
+| Old path | New path |
+|---|---|
+| `/ark_create_match` | `/ark create_match` |
+| `/ark_force_announce` | `/ark force_announce` |
+| `/ark_amend_match` | `/ark amend_match` |
+| `/ark_cancel_match` | `/ark cancel_match` |
+| `/ark_reminder_prefs` | `/ark reminder_prefs` |
+| `/ark_set_preference` | `/ark set_preference` |
+| `/ark_clear_preference` | `/ark clear_preference` |
+| `/ark_ban_add` | `/ark ban_add` |
+| `/ark_ban_revoke` | `/ark ban_revoke` |
+| `/ark_ban_list` | `/ark ban_list` |
+| `/ark_set_result` | `/ark set_result` |
+| `/ark_report_players` | `/ark report_players` |
+| `/ark_generate_draft` | `/ark generate_draft` |
+| `/create_ark_team` | `/ark create_team` |
+
+Phase 4 preserved existing Ark permissions, public/private response visibility, command versions,
+usage tracking, options, and modal/view flows while moving all Ark commands into the `/ark` group.
+
 ## Deferred Follow-Up Batches
 
 Next command-surface batches are staged in `docs/reference/deferred_optimisations.md` and the
 command-platform programme docs. Recommended order:
 
-1. Ark grouping under `/ark`, with operator communication for public paths.
+1. Ark grouping under `/ark` is implemented in Phase 4; publish the post-merge Discord briefing
+   note before the next Ark cycle.
 2. Public/player domain grouping across KVK, registry, inventory, calendar, and subscriptions.
 
 Phase 2 retired the unused disabled secondary command declarations in `cogs/commands.py` and

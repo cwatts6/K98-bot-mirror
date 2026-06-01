@@ -33,9 +33,9 @@ Phase 8 adds enforceable Ark bans with deterministic weekend-window coverage and
 - `AdminOverrideBanRule` config flag allows emergency bypass (default `0` / OFF).
 
 ### 5) Commands
-- `/ark_ban_add`
-- `/ark_ban_revoke`
-- `/ark_ban_list`
+- `/ark ban_add`
+- `/ark ban_revoke`
+- `/ark ban_list`
 
 ### 6) Messages
 - Self block:

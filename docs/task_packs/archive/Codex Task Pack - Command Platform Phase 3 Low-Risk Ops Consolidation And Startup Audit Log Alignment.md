@@ -7,7 +7,8 @@
 - Owner/context: Command Platform Audit & Optimisation Programme
 - Task type: deferred optimisation batch / command-surface migration
 - One-pass approved: no
-- Status: implemented
+- Status: complete; delivered in PR 133, smoke tested successfully, merged, and pushed to
+  production
 
 ## 2. Required Reading
 

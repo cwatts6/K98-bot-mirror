@@ -15,32 +15,36 @@ pushed to production. The PR retired unused disabled secondary command declarati
 `/prekvk import_history` visible to static grouped-subcommand reporting, and preserved all active
 command paths and the active top-level command count.
 
-Phase 3, Low-Risk Ops Consolidation And Startup Audit Log Alignment, grouped the approved
-operational/reporting commands under `/ops` and aligned startup command-audit logging with the
-authoritative command inventory.
+Phase 3, Low-Risk Ops Consolidation And Startup Audit Log Alignment, was completed in PR 133
+(`codex/command-platform-phase-3-ops-startup-audit`), smoke tested successfully, merged, and pushed
+to production. The PR grouped the approved operational/reporting commands under `/ops`, aligned
+startup command-audit logging with the authoritative command inventory, and confirmed
+`/ops validate_command_cache` remained green after restart.
 
 ## Audit Baseline
 
-Static command registration validation currently reports:
+Static command registration validation after Phase 4 implementation reports:
 
 ```text
-primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75
+primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62
 ```
 
 Grouped command summary:
 
 | Group | Statically detected subcommands |
 |---|---:|
+| `/ark` | 14 |
 | `/ops` | 21 |
 | `/mge` | 6 |
 | `/prekvk` | 2 |
 
-The primary command surface has a 25-command buffer below Discord's 100 top-level application
+The primary command surface has a 38-command buffer below Discord's 100 top-level application
 command limit. The validator warns at 90+ and fails above 100.
 
 Usage levels below are based only on local JSONL usage files under `data/command_usage_*.jsonl`
 available during the audit. SQL-backed production history may contain broader usage evidence.
-Observed local usage only showed `/ark_reminder_prefs` activity, with 439 events. All other
+Observed local usage only showed Ark reminder preferences activity, with 439 events under the
+previous `/ark_reminder_prefs` path. All other
 commands are marked `none observed` pending SQL usage review.
 
 ## Audit Decisions
@@ -59,20 +63,20 @@ commands are marked `none observed` pending SQL usage review.
 | Category | Current path | Owner module | Permission model | Usage | Registration | Proposed path / disposition |
 |---|---|---|---|---:|---|---|
 | Activity | `/activity_top` | `commands/activity_cmds.py` | decorator | none observed | top-level | Candidate `/activity top` |
-| Ark | `/ark_create_match` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark create_match` |
-| Ark | `/ark_force_announce` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark force_announce` |
-| Ark | `/ark_amend_match` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark amend_match` |
-| Ark | `/ark_cancel_match` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark cancel_match` |
-| Ark | `/ark_reminder_prefs` | `commands/ark_cmds.py` | public | high local JSONL | top-level | Candidate `/ark reminder_prefs`; public migration needs approval |
-| Ark | `/ark_set_preference` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark set_preference` |
-| Ark | `/ark_clear_preference` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark clear_preference` |
-| Ark | `/ark_ban_add` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark ban_add` |
-| Ark | `/ark_ban_revoke` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark ban_revoke` |
-| Ark | `/ark_ban_list` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark ban_list` |
-| Ark | `/ark_set_result` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark set_result` |
-| Ark | `/ark_report_players` | `commands/ark_cmds.py` | public | none observed | top-level | Candidate `/ark report_players`; public migration needs approval |
-| Ark | `/ark_generate_draft` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark generate_draft` |
-| Ark | `/create_ark_team` | `commands/ark_cmds.py` | decorator | none observed | top-level | Candidate `/ark create_team` |
+| Ark | `/ark create_match` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
+| Ark | `/ark force_announce` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
+| Ark | `/ark amend_match` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
+| Ark | `/ark cancel_match` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
+| Ark | `/ark reminder_prefs` | `commands/ark_cmds.py` | public | high local JSONL | grouped | Preserve |
+| Ark | `/ark set_preference` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
+| Ark | `/ark clear_preference` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
+| Ark | `/ark ban_add` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
+| Ark | `/ark ban_revoke` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
+| Ark | `/ark ban_list` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
+| Ark | `/ark set_result` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
+| Ark | `/ark report_players` | `commands/ark_cmds.py` | public | none observed | grouped | Preserve |
+| Ark | `/ark generate_draft` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
+| Ark | `/ark create_team` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
 | Calendar | `/calendar` | `commands/calendar_cmds.py` | public | none observed | top-level | Keep or candidate `/calendar browse` after UX approval |
 | Calendar | `/calendar_next_event` | `commands/calendar_cmds.py` | public | none observed | top-level | Candidate `/calendar next_event` |
 | Calendar | `/calendar_reminder_config` | `commands/calendar_cmds.py` | public | none observed | top-level | Candidate `/calendar reminder_config` |
@@ -164,7 +168,7 @@ commands are marked `none observed` pending SQL usage review.
 
 | Domain | Strengths | Weaknesses / risks | Improvement opportunity |
 |---|---|---|---|
-| Ark | Strong service/DAL/test ecosystem and consistent leadership decorators on most admin paths. | Largest flat top-level block; public paths require operator communication; docs reference flat names. | First high-value grouping phase after decorator audit. |
+| Ark | Strong service/DAL/test ecosystem and consistent leadership decorators on most admin paths. Phase 4 groups all Ark commands under `/ark`. | Create/amend/cancel command bodies still contain substantial orchestration that should move into services later. | Follow up with an Ark command orchestration extraction batch. |
 | Ops | Core operational tools are grouped and command lifecycle reuse is strong. Phase 3 moved approved reporting, usage, and test ops paths under `/ops`. | Calendar and CrystalTech ops remain flat pending later domain grouping. | Continue with domain-specific grouping only after operator approval. |
 | MGE | Already grouped; permission decorators mostly consistent. | `/mge admin_completion` uses an inline admin check. | Standardise decorator and preserve current grouped path. |
 | Public KVK/Stats | Rich test coverage and recent service/DAL cleanup around KVK admin commands. | Many public player paths are flat and highly discoverable; moving them could confuse players. | Split admin KVK commands first; defer player path changes until approved UX rules exist. |
@@ -302,7 +306,7 @@ Delivered validation:
 
 ### Phase 3 - Low-Risk Ops Consolidation And Startup Audit Log Alignment
 
-Status: implemented in the current Phase 3 branch.
+Status: complete. Delivered in PR 133, smoke tested successfully, merged, and pushed to production.
 
 Goal: recover command headroom with low public-UX risk after permissions are standardised.
 
@@ -334,11 +338,22 @@ Validation:
 - Expected validator baseline after Phase 3:
   `primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75`.
 
+Delivered validation:
+
+- Startup smoke confirmed the authoritative command-audit line reports
+  `primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75`.
+- Startup smoke no longer showed the stale `primary=0 ... total_unique=0` summary.
+- `/ops validate_command_cache` reported all commands correctly versioned and cached.
+- Manual smoke confirmed the moved commands executed correctly after production promotion.
+
 ### Phase 4 - Ark Command Grouping
+
+Status: implementation in progress in the Phase 4 PR. See
+`docs/task_packs/Codex Task Pack - Command Platform Phase 4 Ark Command Grouping.md`.
 
 Goal: group Ark commands under `/ark`, recovering the largest remaining top-level block.
 
-Scope candidates:
+Implemented scope:
 
 - Leadership/admin paths: `create_match`, `force_announce`, `amend_match`, `cancel_match`,
   `set_preference`, `clear_preference`, `ban_add`, `ban_revoke`, `ban_list`, `set_result`,
@@ -347,10 +362,14 @@ Scope candidates:
 
 Implementation notes:
 
-- Public Ark path migration requires operator approval and communication timing.
+- Public Ark path migration was approved because Ark is fortnightly and the public commands are
+  not currently in active use; publish the post-merge Discord briefing note before the next Ark
+  cycle.
 - Preserve `is_admin_or_leadership_only`, `channel_only`, autocomplete/options, modal/view flows,
   and interaction response behavior.
 - Update Ark docs and smoke-test runbooks that reference flat paths.
+- Follow up separately on extracting substantial create/amend/cancel orchestration out of
+  `commands/ark_cmds.py` into Ark services.
 
 Validation:
 
@@ -429,6 +448,5 @@ Validation:
 6. Phase 6: Canonical Command Documentation.
 7. Phase 7: Future Governance And CI Guardrails.
 
-The first implementation PR should be Phase 1 only. Grouping before decorator standardisation would
-make permission preservation harder to verify and would mix behavior-risk cleanup with path
-migration.
+The current implementation PR is Phase 4 only, with all 14 Ark commands approved for grouping.
+Any wider public/player command grouping belongs to later phases.

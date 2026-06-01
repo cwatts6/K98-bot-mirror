@@ -39,21 +39,33 @@ class DummyCtx:
 
 class DummyBot:
     def __init__(self):
-        self.registered = {}
+        self.application_commands = []
 
     def slash_command(self, name, description, guild_ids):
         def deco(fn):
-            self.registered[name] = fn
             return fn
 
         return deco
+
+    def add_application_command(self, command):
+        self.application_commands.append(command)
+
+
+def _registered_ark_command(bot: DummyBot, name: str):
+    assert bot.application_commands
+    ark_group = bot.application_commands[0]
+    assert ark_group.name == "ark"
+    for command in ark_group.subcommands:
+        if command.name == name:
+            return command.callback
+    raise AssertionError(f"Ark subcommand not registered: {name}")
 
 
 @pytest.mark.asyncio
 async def test_ark_reminder_prefs_command_seeds_defaults(monkeypatch):
     bot = DummyBot()
     ark_cmds.register_ark(bot)
-    cmd = bot.registered["ark_reminder_prefs"]
+    cmd = _registered_ark_command(bot, "reminder_prefs")
 
     async def _safe_defer(_ctx, ephemeral=True):
         return None
@@ -92,7 +104,7 @@ async def test_ark_force_announce_opens_active_match_dropdown(monkeypatch):
 
     bot = DummyBot()
     ark_cmds.register_ark(bot)
-    cmd = bot.registered["ark_force_announce"]
+    cmd = _registered_ark_command(bot, "force_announce")
     while hasattr(cmd, "__wrapped__"):
         cmd = cmd.__wrapped__
 
@@ -130,7 +142,7 @@ async def test_ark_force_announce_opens_active_match_dropdown(monkeypatch):
 async def test_ark_force_announce_manual_match_id_bypasses_dropdown(monkeypatch):
     bot = DummyBot()
     ark_cmds.register_ark(bot)
-    cmd = bot.registered["ark_force_announce"]
+    cmd = _registered_ark_command(bot, "force_announce")
     while hasattr(cmd, "__wrapped__"):
         cmd = cmd.__wrapped__
 
@@ -186,7 +198,7 @@ async def test_ark_force_announce_manual_match_id_bypasses_dropdown(monkeypatch)
 async def test_ark_force_announce_manual_failure_uses_repost_message(monkeypatch):
     bot = DummyBot()
     ark_cmds.register_ark(bot)
-    cmd = bot.registered["ark_force_announce"]
+    cmd = _registered_ark_command(bot, "force_announce")
     while hasattr(cmd, "__wrapped__"):
         cmd = cmd.__wrapped__
 

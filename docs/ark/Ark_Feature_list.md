@@ -174,7 +174,7 @@ Acceptance criteria
 Restart resilience plan is explicit: on startup, load open matches from SQL, rehydrate reminder schedules, and re-link to existing messages when possible.
 
 Phase 3 — Match Lifecycle Commands (Admin/Leadership)
-Task 3A — /ark_create_match command UX and validations
+Task 3A — /ark create_match command UX and validations
 
 Deliverables
 
@@ -202,7 +202,7 @@ Acceptance criteria
 
 Creating a match results in a valid SQL row and a posted embed ready for signups.
 
-Task 3B — /ark_amend_match command
+Task 3B — /ark amend_match command
 
 Deliverables
 
@@ -218,7 +218,7 @@ Acceptance criteria
 
 Existing signups remain, roster preserved, reminders shift to new time.
 
-Task 3C — /ark_cancel_match command
+Task 3C — /ark cancel_match command
 
 Deliverables
 
@@ -538,9 +538,9 @@ Task 8A — Ban rules + auto expiry
   - Structured logs for blocked attempts (match/alliance/weekend/user/governor/ban/source).
   - Audit log action for blocked attempts: `ban_block_signup`.
 - Admin commands:
-  - `/ark_ban_add`
-  - `/ark_ban_revoke`
-  - `/ark_ban_list`
+  - `/ark ban_add`
+  - `/ark ban_revoke`
+  - `/ark ban_list`
 
 **Acceptance criteria**
 ✅ Ban naturally expires after configured N weekends  
@@ -554,7 +554,7 @@ Task 9A — Record win/loss and lock completed state
 
 Deliverables
 
-/ark_set_result admin command:
+/ark set_result admin command:
 
 sets Win/Loss and optional notes
 

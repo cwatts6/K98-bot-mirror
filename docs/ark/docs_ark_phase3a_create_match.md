@@ -1,4 +1,4 @@
-# Phase 3A — /ark_create_match Command Spec + UI
+# Phase 3A — /ark create_match Command Spec + UI
 
 ## Overview
 Create one Ark match per alliance per Ark weekend. The command guides leadership through selecting:
@@ -30,7 +30,7 @@ The command posts a registration embed and persists the match to SQL, **plus** s
 3) **Uniqueness**  
    - Must enforce `(Alliance, ArkWeekendDate)` uniqueness.
    - If duplicate exists, respond with:
-     - “A match already exists for {Alliance} on {ArkWeekendDate}. Use /ark_amend_match instead.”
+     - “A match already exists for {Alliance} on {ArkWeekendDate}. Use /ark amend_match instead.”
 
 4) **Time slot validation**  
    - Must be in `ArkConfig.AllowedTimeSlotsJson`.
@@ -44,7 +44,7 @@ The command posts a registration embed and persists the match to SQL, **plus** s
 
 ## UX / UI Flow (Slash Command)
 
-### Command: `/ark_create_match`
+### Command: `/ark create_match`
 
 **Step 1 — Alliance selector**
 - Dropdown list from `ArkAlliances` where `IsActive=1`.

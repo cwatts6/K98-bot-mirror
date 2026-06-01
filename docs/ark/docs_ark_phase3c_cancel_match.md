@@ -1,4 +1,4 @@
-# Phase 3C — /ark_cancel_match Command Spec
+# Phase 3C — /ark cancel_match Command Spec
 
 ## Overview
 Allows leadership to cancel an Ark match. Cancelling disables signups, edits the embed, and stops reminders.
@@ -23,7 +23,7 @@ Allows leadership to cancel an Ark match. Cancelling disables signups, edits the
 
 ## UX / UI Flow
 
-### Command: `/ark_cancel_match`
+### Command: `/ark cancel_match`
 
 **Step 1 — Match selector**
 - Dropdown: upcoming matches (by Alliance + ArkWeekendDate + Time).

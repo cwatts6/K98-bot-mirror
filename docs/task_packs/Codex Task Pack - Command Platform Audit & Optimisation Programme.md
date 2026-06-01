@@ -65,10 +65,16 @@ pushed to production. Phase 2 retired unused disabled secondary command declarat
 duplicate-risk terminology, detected helper-attached grouped subcommands, and preserved all active
 command paths.
 
+Phase 3 of this programme, Low-Risk Ops Consolidation And Startup Audit Log Alignment, was
+completed in PR 133 (`codex/command-platform-phase-3-ops-startup-audit`), smoke tested
+successfully, merged, and pushed to production. Phase 3 grouped approved low-risk
+operational/reporting commands under `/ops`, aligned startup command-audit logging with the
+authoritative inventory, and confirmed command-cache validation remained green after restart.
+
 The current validator reports:
 
-82 primary commands
-22 grouped subcommands
+75 primary commands
+29 grouped subcommands
 0 disabled legacy command declarations
 warning threshold at 90
 hard fail at 100
@@ -272,39 +278,27 @@ production in PR 131.
 Phase 2 - Validator And Inventory Tooling Enhancement: complete, smoke tested, merged, and pushed
 to production in PR 132.
 
-Phase 3 - Low-Risk Ops Consolidation And Startup Audit Log Alignment: implemented. This phase
-fixed the stale `DL_bot.py` startup audit summary and grouped approved low-risk
-operational/reporting commands under `/ops`, reducing the active top-level command count to 75.
+Phase 3 - Low-Risk Ops Consolidation And Startup Audit Log Alignment: complete, smoke tested,
+merged, and pushed to production in PR 133. This phase fixed the stale `DL_bot.py` startup audit
+summary and grouped approved low-risk operational/reporting commands under `/ops`, reducing the
+active top-level command count to 75.
 
-Example:
+Phase 4 - Ark Command Grouping: implementation approved for all 14 Ark commands. The active task
+pack is `docs/task_packs/Codex Task Pack - Command Platform Phase 4 Ark Command Grouping.md`.
 
-Phase 1
-
-Low-risk admin consolidation
-
-Phase 2
-
-Ark grouping
-
-Phase 3
-
-Validator improvements
-
-Phase 4
-
-Documentation standardisation
+Remaining roadmap:
 
 Phase 5
 
-Public command optimisation
+Public Domain Grouping Design
 
 Phase 6
 
-Architecture cleanup
+Canonical Command Documentation
 
 Phase 7
 
-Future command governance
+Future Governance And CI Guardrails
 
 Codex may create additional phases if justified.
 

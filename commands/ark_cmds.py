@@ -114,10 +114,15 @@ async def _dispatch_cancel_dms_background(
 
 
 def register_ark(bot: ext_commands.Bot) -> None:
-    @bot.slash_command(
-        name="ark_create_match",
-        description="Set up an Ark of Osiris match (leadership)",
+    ark_group = discord.SlashCommandGroup(
+        "ark",
+        "Ark of Osiris commands",
         guild_ids=[GUILD_ID],
+    )
+
+    @ark_group.command(
+        name="create_match",
+        description="Set up an Ark of Osiris match (leadership)",
     )
     @versioned("v1.03")
     @safe_command
@@ -305,10 +310,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
             view=view,
         )
 
-    @bot.slash_command(
-        name="ark_force_announce",
+    @ark_group.command(
+        name="force_announce",
         description="Repost the active Ark registration with @everyone (leadership)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.00")
     @safe_command
@@ -437,10 +441,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
         )
         return
 
-    @bot.slash_command(
-        name="ark_amend_match",
+    @ark_group.command(
+        name="amend_match",
         description="Amend an Ark of Osiris match (leadership)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.03")
     @safe_command
@@ -664,10 +667,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
             view=view,
         )
 
-    @bot.slash_command(
-        name="ark_cancel_match",
+    @ark_group.command(
+        name="cancel_match",
         description="Cancel an Ark of Osiris match (leadership)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.10")
     @safe_command
@@ -791,10 +793,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
             view=view,
         )
 
-    @bot.slash_command(
-        name="ark_reminder_prefs",
+    @ark_group.command(
+        name="reminder_prefs",
         description="Configure your Ark reminder DM preferences",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.02")
     @safe_command
@@ -820,10 +821,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
         content = view._render_text(prefs)
         await ctx.interaction.edit_original_response(content=content, view=view)
 
-    @bot.slash_command(
-        name="ark_set_preference",
+    @ark_group.command(
+        name="set_preference",
         description="Set a governor's default Ark draft team (leadership)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.01")
     @safe_command
@@ -858,10 +858,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
             ephemeral=True,
         )
 
-    @bot.slash_command(
-        name="ark_clear_preference",
+    @ark_group.command(
+        name="clear_preference",
         description="Clear a governor's default Ark draft team (leadership)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.01")
     @safe_command
@@ -902,10 +901,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
             ephemeral=True,
         )
 
-    @bot.slash_command(
-        name="ark_ban_add",
+    @ark_group.command(
+        name="ban_add",
         description="Add an Ark ban for next N Ark weekends (leadership)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.01")
     @safe_command
@@ -981,10 +979,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
             ephemeral=True,
         )
 
-    @bot.slash_command(
-        name="ark_ban_revoke",
+    @ark_group.command(
+        name="ban_revoke",
         description="Revoke an Ark ban by BanId (leadership)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.01")
     @safe_command
@@ -1016,10 +1013,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
             "✅ Ban revoked. It will no longer block future signups.", ephemeral=True
         )
 
-    @bot.slash_command(
-        name="ark_ban_list",
+    @ark_group.command(
+        name="ban_list",
         description="List Ark bans (leadership)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.01")
     @safe_command
@@ -1049,10 +1045,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
             )
         await ctx.followup.send("\n".join(lines), ephemeral=True)
 
-    @bot.slash_command(
-        name="ark_set_result",
+    @ark_group.command(
+        name="set_result",
         description="Record Win/Loss for an Ark match (leadership)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.01")
     @safe_command
@@ -1108,10 +1103,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
 
         await ctx.followup.send("✅ Result recorded.", ephemeral=True)
 
-    @bot.slash_command(
-        name="ark_report_players",
+    @ark_group.command(
+        name="report_players",
         description="Show Ark player report (public)",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.01")
     @safe_command
@@ -1152,10 +1146,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
         view = ArkReportPlayersView(author_id=ctx.user.id, pages=pages)
         await ctx.interaction.edit_original_response(embed=pages[0], view=view)
 
-    @bot.slash_command(
-        name="ark_generate_draft",
+    @ark_group.command(
+        name="generate_draft",
         description="Generate persisted auto-draft teams for an Ark match.",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.00")
     @safe_command
@@ -1200,10 +1193,9 @@ def register_ark(bot: ext_commands.Bot) -> None:
             ephemeral=True,
         )
 
-    @bot.slash_command(
-        name="create_ark_team",
+    @ark_group.command(
+        name="create_team",
         description="Open Ark Team Builder for a match.",
-        guild_ids=[GUILD_ID],
     )
     @versioned("v1.00")
     @safe_command
@@ -1223,3 +1215,5 @@ def register_ark(bot: ext_commands.Bot) -> None:
 
         view = ArkTeamBuilderView(match_id=int(match_id), actor_discord_id=ctx.user.id)
         await ctx.interaction.edit_original_response(content="Ark Team Builder", view=view)
+
+    bot.add_application_command(ark_group)

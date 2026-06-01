@@ -42,9 +42,24 @@ def test_register_commands_smoke(monkeypatch):
 
     assert len([name for name in registered_top_level if name]) <= 100
     assert len([name for name in registered_top_level if name]) < 90
+    assert "ark" in registered_top_level
     assert "ops" in registered_top_level
     assert "mge" in registered_top_level
     assert "prekvk" in registered_top_level
+    assert "ark_create_match" not in registered_top_level
+    assert "ark_force_announce" not in registered_top_level
+    assert "ark_amend_match" not in registered_top_level
+    assert "ark_cancel_match" not in registered_top_level
+    assert "ark_reminder_prefs" not in registered_top_level
+    assert "ark_set_preference" not in registered_top_level
+    assert "ark_clear_preference" not in registered_top_level
+    assert "ark_ban_add" not in registered_top_level
+    assert "ark_ban_revoke" not in registered_top_level
+    assert "ark_ban_list" not in registered_top_level
+    assert "ark_set_result" not in registered_top_level
+    assert "ark_report_players" not in registered_top_level
+    assert "ark_generate_draft" not in registered_top_level
+    assert "create_ark_team" not in registered_top_level
     assert "run_sql_proc" not in registered_top_level
     assert "mge_refresh_award_reminders" not in registered_top_level
     assert "prekvk_report" not in registered_top_level

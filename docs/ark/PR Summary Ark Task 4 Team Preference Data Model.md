@@ -66,8 +66,8 @@ This keeps command and service layers free of direct SQL.
 ### 5) Admin command support
 Added admin/leadership slash commands:
 
-- `/ark_set_preference`
-- `/ark_clear_preference`
+- `/ark set_preference`
+- `/ark clear_preference`
 
 These follow existing Ark admin command patterns:
 
@@ -166,10 +166,10 @@ That means the remaining work is operational rather than implementation-heavy:
 
 1. Deploy the updated bot code.
 2. Restart the bot and confirm command registration refresh.
-3. Run `/ark_set_preference` with a known governor and team `1`.
+3. Run `/ark set_preference` with a known governor and team `1`.
 4. Verify success response and SQL row persistence.
-5. Run `/ark_set_preference` again with team `2` and verify update behavior.
-6. Run `/ark_clear_preference` and verify `IsActive = 0`.
+5. Run `/ark set_preference` again with team `2` and verify update behavior.
+6. Run `/ark clear_preference` and verify `IsActive = 0`.
 7. Try an invalid governor ID and verify clear user-facing validation.
 8. Confirm no unintended interaction with Ark match creation or registration flows.
 

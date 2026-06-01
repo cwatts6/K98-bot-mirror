@@ -44,7 +44,7 @@ This allows production operators and later tasks to distinguish:
 without forking the Ark runtime model.
 
 ### C) Manual create alignment
-Manual `/ark_create_match` now stamps `CreatedSource = 'manual'` so both creation paths share the
+Manual `/ark create_match` now stamps `CreatedSource = 'manual'` so both creation paths share the
 same lineage contract.
 
 ### D) Scheduler integration

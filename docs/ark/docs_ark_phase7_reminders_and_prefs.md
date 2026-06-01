@@ -11,7 +11,7 @@ Implemented scope:
   - 24h / 4h / 1h / start
 - Check-in reminder:
   - T-12h DM reminder
-- `/ark_reminder_prefs` command + UI toggles
+- `/ark reminder_prefs` command + UI toggles
 - SQL-backed per-user preference persistence
 - JSON reminder dedupe/state persistence with restart grace window
 - Scheduler logging + failure handling
@@ -63,7 +63,7 @@ Implemented scope:
   - User guard (only requester can edit)
   - Added `__all__ = ["ArkReminderPrefsView"]`
 - `commands/ark_cmds.py`
-  - `/ark_reminder_prefs` command
+  - `/ark reminder_prefs` command
   - Default-seed behavior for first-time users
 - DAL additions for `get_reminder_prefs` and `upsert_reminder_prefs`
 

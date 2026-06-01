@@ -46,8 +46,8 @@ The Ark DAL now includes SQL helpers for preference persistence:
 ### C) Admin command support
 Leadership/admin command support was added in `commands/ark_cmds.py`:
 
-- `/ark_set_preference`
-- `/ark_clear_preference`
+- `/ark set_preference`
+- `/ark clear_preference`
 
 ### D) SQL schema delivery
 A table contract was delivered for:
@@ -145,20 +145,20 @@ No additional core implementation is required for Task 4 unless smoke testing re
 ## 7) Suggested Discord smoke validation
 
 ### Command success path
-- run `/ark_set_preference` for a known governor with team `1`
+- run `/ark set_preference` for a known governor with team `1`
 - confirm success response
 - verify row exists and is active in SQL
 
 ### Update path
-- rerun `/ark_set_preference` for the same governor with team `2`
+- rerun `/ark set_preference` for the same governor with team `2`
 - verify the same row is updated rather than duplicated
 
 ### Clear path
-- run `/ark_clear_preference`
+- run `/ark clear_preference`
 - verify the row remains present but `IsActive = 0`
 
 ### Validation path
-- run `/ark_set_preference` with an invalid governor ID
+- run `/ark set_preference` with an invalid governor ID
 - confirm a clear rejection message is returned
 
 ### Integration safety
