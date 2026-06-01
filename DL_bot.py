@@ -263,16 +263,26 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return str(raw).strip().lower() in {"1", "true", "yes", "on", "y"}
 
 
+def _collect_declared_command_names_safely(label: str, path: Path) -> set[str]:
+    try:
+        return collect_declared_command_names(path)
+    except Exception as exc:
+        logger.warning("[COMMAND AUDIT] Failed parsing %s: %s", label, exc)
+        return set()
+
+
 def audit_command_registration_paths() -> tuple[dict[str, set[str]], dict[str, list[str]]]:
     """Return registration map and duplicate command-name map across known paths."""
     root = Path(__file__).parent
     inventory = collect_static_primary_inventory(root)
     paths = {
         "commands package (authoritative)": inventory.names,
-        "cogs/commands.py (disabled legacy)": collect_declared_command_names(
-            root / "cogs" / "commands.py"
+        "cogs/commands.py (disabled legacy)": _collect_declared_command_names_safely(
+            "cogs/commands.py", root / "cogs" / "commands.py"
         ),
-        "subscribe.py (disabled legacy)": collect_declared_command_names(root / "subscribe.py"),
+        "subscribe.py (disabled legacy)": _collect_declared_command_names_safely(
+            "subscribe.py", root / "subscribe.py"
+        ),
     }
 
     owners: dict[str, list[str]] = {}

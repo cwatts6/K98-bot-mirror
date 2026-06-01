@@ -66,3 +66,31 @@ def test_phase3_ops_commands_are_grouped_with_existing_wrappers():
         } | {decorator.id for decorator in decorators if isinstance(decorator, ast.Name)}
         assert "safe_command" in decorator_names
         assert "track_usage" in decorator_names
+
+
+def test_phase3_ops_command_logs_use_grouped_paths():
+    source = Path("commands/admin_cmds.py").read_text(encoding="utf-8")
+
+    expected_paths = [
+        "/ops summary",
+        "/ops weeksummary",
+        "/ops history",
+        "/ops failures",
+        "/ops test_embed",
+        "/ops usage",
+        "/ops usage_detail",
+    ]
+    for path in expected_paths:
+        assert path in source
+
+    stale_log_markers = [
+        "[COMMAND] /summary",
+        "[COMMAND] /weeksummary",
+        "[COMMAND] /history",
+        "[COMMAND] /failures",
+        "[/test_embed]",
+        "[/usage]",
+        "[/usage_detail]",
+    ]
+    for marker in stale_log_markers:
+        assert marker not in source

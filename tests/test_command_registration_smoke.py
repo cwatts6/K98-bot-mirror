@@ -64,5 +64,7 @@ def test_startup_command_audit_uses_authoritative_inventory():
     assert "collect_static_primary_inventory" in source
     assert "commands package (authoritative)" in source
     assert "grouped_subcommands_detected" in source
+    assert "_collect_declared_command_names_safely" in source
+    assert "Failed parsing %s" in source
     assert "Commands.py (authoritative)" not in source
     assert "_collect_declared_slash_commands" not in source

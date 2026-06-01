@@ -7,7 +7,6 @@ Usage:
 
 from __future__ import annotations
 
-import ast
 from dataclasses import dataclass
 import importlib.util
 from pathlib import Path
@@ -44,102 +43,8 @@ SECONDARY_MODULES = [
 ]
 
 
-def _literal_string(node: ast.AST) -> str | None:
-    if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value:
-        return str(node.value)
-    return None
-
-
-def _node_name(node: ast.AST) -> str | None:
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        parent = _node_name(node.value)
-        return f"{parent}.{node.attr}" if parent else node.attr
-    return None
-
-
-def _call_name(call: ast.Call) -> str | None:
-    return _node_name(call.func)
-
-
 def collect_names(path: Path) -> set[str]:
     return collect_declared_command_names(path)
-
-
-def _collect_group_helper_commands(command_paths: list[Path]) -> dict[str, set[str]]:
-    helpers: dict[str, set[str]] = {}
-
-    for path in command_paths:
-        source = path.read_text(encoding="utf-8-sig")
-        tree = ast.parse(source, filename=str(path))
-
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or not node.args.args:
-                continue
-            group_arg_name = node.args.args[0].arg
-            command_names: set[str] = set()
-
-            for child in ast.walk(node):
-                if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    continue
-                for deco in child.decorator_list:
-                    if not isinstance(deco, ast.Call) or not isinstance(deco.func, ast.Attribute):
-                        continue
-                    if deco.func.attr != "command":
-                        continue
-                    if not (
-                        isinstance(deco.func.value, ast.Name)
-                        and deco.func.value.id == group_arg_name
-                    ):
-                        continue
-                    for kw in deco.keywords:
-                        name = _literal_string(kw.value) if kw.arg == "name" else None
-                        if name:
-                            command_names.add(name)
-                            break
-
-            if command_names:
-                helpers[node.name] = command_names
-
-    return helpers
-
-
-def _active_command_paths(command_paths: list[Path]) -> list[Path]:
-    init_path = ROOT / "commands" / "__init__.py"
-    if not init_path.exists():
-        return command_paths
-
-    source = init_path.read_text(encoding="utf-8-sig")
-    tree = ast.parse(source, filename=str(init_path))
-    imported_registers: dict[str, str] = {}
-    active_registers: set[str] = set()
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module:
-            module_name = node.module.lstrip(".")
-            for alias in node.names:
-                imported_registers[alias.asname or alias.name] = module_name
-        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            active_registers.add(node.func.id)
-
-    active_paths = []
-    for register_name in active_registers:
-        module_name = imported_registers.get(register_name)
-        if not module_name:
-            continue
-        path = ROOT / "commands" / f"{module_name}.py"
-        if path.exists():
-            active_paths.append(path)
-
-    return sorted(set(active_paths)) or command_paths
-
-
-def _relative_label(path: Path) -> str:
-    try:
-        return path.resolve().relative_to(ROOT.resolve()).as_posix()
-    except ValueError:
-        return path.as_posix()
 
 
 def _collect_primary_inventory_details() -> (

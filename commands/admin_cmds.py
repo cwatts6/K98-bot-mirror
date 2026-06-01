@@ -117,7 +117,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @safe_command
     @track_usage()
     async def summary_command(ctx):
-        logger.info("[COMMAND] /summary invoked")
+        logger.info("[COMMAND] /ops summary invoked")
         # Public by default (no ephemeral=True)
         try:
             await safe_defer(ctx)
@@ -134,7 +134,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     content="⚠️ No summary log available or no files processed today."
                 )
         except Exception as e:
-            logger.exception("[COMMAND] /summary failed")
+            logger.exception("[COMMAND] /ops summary failed")
             await ctx.interaction.edit_original_response(
                 content=f"❌ Failed to build summary: `{type(e).__name__}: {e}`"
             )
@@ -147,7 +147,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def weeksummary_command(ctx):
 
-        logger.info("[COMMAND] /weeksummary invoked")
+        logger.info("[COMMAND] /ops weeksummary invoked")
 
         try:
             await safe_defer(ctx)
@@ -163,7 +163,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     content="⚠️ No summary log available or no files processed in the last 7 days."
                 )
         except Exception as e:
-            logger.exception("[COMMAND] /weeksummary failed")
+            logger.exception("[COMMAND] /ops weeksummary failed")
             await ctx.interaction.edit_original_response(
                 content=f"❌ Failed to build weekly summary: `{type(e).__name__}: {e}`"
             )
@@ -177,7 +177,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def history_command(ctx, page: int = 1):
 
-        logger.info("[COMMAND] /history invoked (page=%s) by %s", page, ctx.user)
+        logger.info("[COMMAND] /ops history invoked (page=%s) by %s", page, ctx.user)
 
         try:
             await safe_defer(ctx)
@@ -192,7 +192,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         try:
             rows = await read_summary_log_rows(log_file)
         except Exception as e:
-            logger.exception("[COMMAND] /history read_summary_log_rows failed")
+            logger.exception("[COMMAND] /ops history read_summary_log_rows failed")
             await ctx.interaction.edit_original_response(
                 content=f"❌ Failed to read log: `{type(e).__name__}: {e}`"
             )
@@ -244,7 +244,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def failures_command(ctx, page: int = 1):
 
-        logger.info("[COMMAND] /failures invoked (page=%s) by %s", page, ctx.user)
+        logger.info("[COMMAND] /ops failures invoked (page=%s) by %s", page, ctx.user)
 
         try:
             await safe_defer(ctx)
@@ -259,7 +259,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         try:
             rows = await read_summary_log_rows(log_file)
         except Exception as e:
-            logger.exception("[COMMAND] /failures read_summary_log_rows failed")
+            logger.exception("[COMMAND] /ops failures read_summary_log_rows failed")
             await ctx.interaction.edit_original_response(
                 content=f"❌ Failed to read log: `{type(e).__name__}: {e}`"
             )
@@ -1314,10 +1314,10 @@ def register_admin(bot: ext_commands.Bot) -> None:
                     f"- Duration: **{dur:.1f}s**"
                 )
             )
-            logger.info("[/test_embed] success (kvk=%s, dur=%.2fs)", is_kvk, dur)
+            logger.info("[/ops test_embed] success (kvk=%s, dur=%.2fs)", is_kvk, dur)
 
         except Exception as e:
-            logger.exception("[/test_embed] failed")
+            logger.exception("[/ops test_embed] failed")
             await ctx.interaction.edit_original_response(
                 content=f"❌ Failed to send embed:\n```{type(e).__name__}: {e}```"
             )
@@ -1381,7 +1381,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
             )
             await ctx.interaction.edit_original_response(embed=embed)
         except Exception as e:
-            logger.exception("[/usage] failed")
+            logger.exception("[/ops usage] failed")
             await ctx.interaction.edit_original_response(
                 content=f"Sorry, I couldn't load usage stats: `{type(e).__name__}: {e}`"
             )
@@ -1463,7 +1463,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 await ctx.interaction.edit_original_response(embed=embed)
 
         except Exception as e:
-            logger.exception("[/usage_detail] failed")
+            logger.exception("[/ops usage_detail] failed")
             await ctx.interaction.edit_original_response(
                 content=f"Sorry, I couldn't load usage detail: `{type(e).__name__}: {e}`"
             )

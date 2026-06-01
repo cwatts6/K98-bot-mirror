@@ -106,6 +106,17 @@ def test_current_command_surface_reflects_phase3_ops_grouping():
     assert sum(len(commands) for commands in grouped.values()) == 29
 
 
+def test_validator_delegates_static_inventory_to_shared_helper():
+    source = Path("scripts/validate_command_registration.py").read_text(encoding="utf-8")
+
+    assert "collect_static_primary_inventory" in source
+    assert "def _collect_group_helper_commands" not in source
+    assert "def _active_command_paths" not in source
+    assert "def _relative_label" not in source
+    assert "def _literal_string" not in source
+    assert "def _call_name" not in source
+
+
 def test_main_reports_active_duplicate_risks(tmp_path, monkeypatch, capsys):
     _write(
         tmp_path / "commands" / "one_cmds.py",
