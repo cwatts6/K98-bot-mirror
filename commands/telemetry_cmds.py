@@ -24,9 +24,7 @@ from bot_config import (
 from commands.crystaltech_flow import run_crystaltech_flow as run_crystaltech_flow_service
 from commands.player_profile_flow import send_profile_to_channel as send_profile_to_channel_service
 from decoraters import (
-    _has_leadership_role,
-    _is_admin,
-    _is_allowed_channel,
+    admin_or_leadership_in_allowed_channels,
     channel_only,
     track_usage,
 )
@@ -558,6 +556,7 @@ def register_commands(bot_instance):
     )
     @versioned("v1.11")
     @safe_command
+    @admin_or_leadership_in_allowed_channels(ALLOWED_CHANNEL_IDS)
     @track_usage()
     async def player_profile_command(
         ctx: discord.ApplicationContext,
@@ -569,19 +568,6 @@ def register_commands(bot_instance):
             required=False,
         ),
     ):
-
-        # --- Gates BEFORE any defer (keep ephemeral one-shot replies here) ---
-        if not _is_allowed_channel(ctx.channel):
-            mentions = " or ".join(f"<#{cid}>" for cid in ALLOWED_CHANNEL_IDS)
-            await ctx.respond(f"🔒 This command can only be used in {mentions}.", ephemeral=True)
-            return
-
-        member = ctx.author if isinstance(ctx.author, discord.Member) else None
-        if not (_is_admin(ctx.user) or _has_leadership_role(member)):
-            await ctx.respond(
-                "❌ This command is restricted to Admin or Leadership.", ephemeral=True
-            )
-            return
 
         # --- Resolve target (accept autocomplete value as ID) ---
         lookup = resolve_profile_lookup(governor_id=governor_id, governor_name=governor_name)

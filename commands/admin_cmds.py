@@ -20,7 +20,6 @@ import discord
 
 from admin_helpers import prompt_admin_inputs, log_processing_result
 from bot_config import (
-    ADMIN_USER_ID,
     GUILD_ID,
     NOTIFY_CHANNEL_ID,
     OFFSEASON_STATS_CHANNEL_ID,
@@ -49,10 +48,7 @@ from utils import utcnow
 from versioning import versioned
 
 from decoraters import (
-    _has_leadership_role,
-    _is_admin,
-    _is_allowed_channel,
-    channel_only,
+    admin_only,
     is_admin_and_notify_channel,
     is_admin_or_leadership,
     track_usage,
@@ -171,6 +167,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
     )
     @versioned("v1.02")
     @safe_command
+    @admin_only()
     @track_usage()
     async def history_command(ctx, page: int = 1):
 
@@ -180,13 +177,6 @@ def register_admin(bot: ext_commands.Bot) -> None:
             await safe_defer(ctx)
         except Exception:
             pass  # already acknowledged elsewhere
-
-        # Admin gate
-        if ctx.user.id != ADMIN_USER_ID:
-            await ctx.interaction.edit_original_response(
-                content="❌ This command is restricted to admins."
-            )
-            return
 
         log_file = CSV_LOG
         if not os.path.exists(log_file):
@@ -244,6 +234,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
     )
     @versioned("v1.01")
     @safe_command
+    @admin_only()
     @track_usage()
     async def failures_command(ctx, page: int = 1):
 
@@ -253,13 +244,6 @@ def register_admin(bot: ext_commands.Bot) -> None:
             await safe_defer(ctx)
         except Exception:
             pass  # already acknowledged
-
-        # Admin gate
-        if ctx.user.id != ADMIN_USER_ID:
-            await ctx.interaction.edit_original_response(
-                content="❌ This command is restricted to admins."
-            )
-            return
 
         log_file = FAILED_LOG
         if not os.path.exists(log_file):
@@ -330,13 +314,6 @@ def register_admin(bot: ext_commands.Bot) -> None:
             await safe_defer(ctx)
         except Exception:
             pass  # already acknowledged elsewhere
-
-        # Hard admin gate (in addition to decorator)
-        if ctx.user.id != ADMIN_USER_ID:
-            await ctx.interaction.edit_original_response(
-                content="❌ This command is restricted to admins."
-            )
-            return
 
         # Let the user know we’ve started
         try:
@@ -429,13 +406,6 @@ def register_admin(bot: ext_commands.Bot) -> None:
             await safe_defer(ctx)
         except Exception:
             pass  # already acked
-
-        # Extra admin gate (in addition to decorator)
-        if ctx.user.id != ADMIN_USER_ID:
-            await ctx.interaction.edit_original_response(
-                content="❌ This command is restricted to admins."
-            )
-            return
 
         # Let caller know we're starting
         try:
@@ -1012,13 +982,6 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def status_command(ctx):
         await safe_defer(ctx, ephemeral=True)
-
-        # Belt-and-braces admin gate (decorator already limits usage)
-        if ctx.user.id != ADMIN_USER_ID:
-            await ctx.interaction.edit_original_response(
-                content="❌ This command is restricted to admins."
-            )
-            return
 
         # --- Check DB connection
         try:

@@ -12,7 +12,7 @@ from core.interaction_safety import safe_command, safe_defer
 from decoraters import (
     _has_leadership_role,
     _is_admin,
-    _is_allowed_channel,
+    admin_or_leadership_in_allowed_channels,
     is_admin_and_notify_channel,
     track_usage,
 )
@@ -249,6 +249,7 @@ def register_location(bot: ext_commands.Bot) -> None:
     )
     @versioned("v1.07")
     @safe_command
+    @admin_or_leadership_in_allowed_channels(ALLOWED_CHANNEL_IDS)
     @track_usage()
     async def player_location(
         ctx: discord.ApplicationContext,
@@ -261,19 +262,6 @@ def register_location(bot: ext_commands.Bot) -> None:
         ),
         ephemeral: bool = discord.Option(bool, "Only show to me", required=False, default=False),
     ):
-        # Channel + role gates (same model used in /player_profile)
-        if not _is_allowed_channel(ctx.channel):
-            mentions = " or ".join(f"<#{cid}>" for cid in ALLOWED_CHANNEL_IDS)
-            await ctx.respond(f"🔒 This command can only be used in {mentions}.", ephemeral=True)
-            return
-
-        member = ctx.author if isinstance(ctx.author, discord.Member) else None
-        if not (_is_admin(ctx.user) or _has_leadership_role(member)):
-            await ctx.respond(
-                "❌ This command is restricted to Admin or Leadership.", ephemeral=True
-            )
-            return
-
         # Resolve target ID (ID takes precedence; name can be autocomplete-id or fuzzy free-text)
         lookup = resolve_profile_lookup(governor_id=governor_id, governor_name=governor_name)
         if lookup.status == "not_found":

@@ -5,9 +5,9 @@ import logging
 import discord
 from discord.ext import commands as ext_commands
 
-from bot_config import ADMIN_USER_ID, GUILD_ID, INVENTORY_UPLOAD_CHANNEL_ID
+from bot_config import GUILD_ID, INVENTORY_UPLOAD_CHANNEL_ID
 from core.interaction_safety import safe_command, safe_defer
-from decoraters import _is_admin, track_usage
+from decoraters import _is_admin, admin_only, channel_only, track_usage
 from inventory import audit_service, export_service, reporting_service
 from inventory.models import InventoryAuditRecord
 from ui.views.inventory_report_views import (
@@ -28,32 +28,16 @@ def register_inventory(bot: ext_commands.Bot) -> None:
     )
     @versioned("v1.00")
     @safe_command
+    @channel_only(
+        INVENTORY_UPLOAD_CHANNEL_ID,
+        admin_override=True,
+        missing_config_message=(
+            "Inventory imports are not configured yet. Missing inventory channel."
+        ),
+    )
     @track_usage()
     async def import_inventory(ctx: discord.ApplicationContext) -> None:
         await safe_defer(ctx, ephemeral=True)
-        if not INVENTORY_UPLOAD_CHANNEL_ID:
-            await ctx.followup.send(
-                "Inventory imports are not configured yet. Missing inventory channel.",
-                ephemeral=True,
-            )
-            return
-        chan = getattr(ctx, "channel", None)
-        chan_id = getattr(chan, "id", None)
-        parent_id = getattr(chan, "parent_id", None)
-        try:
-            is_admin = int(ctx.user.id) == int(ADMIN_USER_ID)
-        except Exception:
-            is_admin = False
-        if (
-            not is_admin
-            and chan_id != INVENTORY_UPLOAD_CHANNEL_ID
-            and parent_id != INVENTORY_UPLOAD_CHANNEL_ID
-        ):
-            await ctx.followup.send(
-                f"❌ This command may only be used in <#{INVENTORY_UPLOAD_CHANNEL_ID}>. Please try there.",
-                ephemeral=True,
-            )
-            return
         try:
             await start_import_command(ctx, bot)
         except PermissionError as exc:
@@ -212,6 +196,7 @@ def register_inventory(bot: ext_commands.Bot) -> None:
     )
     @versioned("v1.00")
     @safe_command
+    @admin_only(denial_message="You do not have permission to use this command.")
     @track_usage()
     async def inventory_import_audit(
         ctx: discord.ApplicationContext,
@@ -267,11 +252,6 @@ def register_inventory(bot: ext_commands.Bot) -> None:
         ),
     ) -> None:
         await safe_defer(ctx, ephemeral=True)
-        if not _is_admin(ctx.user):
-            await ctx.followup.send(
-                "You do not have permission to use this command.", ephemeral=True
-            )
-            return
         try:
             parsed_status = audit_service.parse_audit_status(
                 status.strip().lower().replace(" ", "_")

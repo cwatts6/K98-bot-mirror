@@ -10,7 +10,6 @@ import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import (
-    ADMIN_USER_ID,
     GUILD_ID,
     KVK_PLAYER_STATS_CHANNEL_ID,
     STATS_ALERT_CHANNEL_ID,
@@ -113,13 +112,6 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             await safe_defer(ctx, ephemeral=True)
         except Exception:
             pass
-
-        # Extra admin gate (decorator already limits usage)
-        if ctx.user.id != ADMIN_USER_ID:
-            await ctx.interaction.edit_original_response(
-                content="❌ This command is restricted to admins."
-            )
-            return
 
         # Resolve current KVK if not provided (reuse existing helper)
         if kvk_no == 0:

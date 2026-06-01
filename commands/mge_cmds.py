@@ -8,8 +8,8 @@ from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID, MGE_LEADERSHIP_CHANNEL_ID, MGE_SIMPLIFIED_FLOW_ENABLED
 from core.interaction_safety import safe_command, safe_defer
-from core.mge_permissions import is_admin_interaction
 from decoraters import (
+    admin_only,
     channel_only,
     is_admin_and_notify_channel,
     is_admin_or_leadership_only,
@@ -367,18 +367,11 @@ def register_mge(bot: ext_commands.Bot) -> None:
     )
     @versioned("v1.0")
     @safe_command
+    @admin_only(denial_message="You do not have permission to use this command.")
     @track_usage()
     async def mge_admin_completion(ctx: discord.ApplicationContext, event_id: int) -> None:
         await safe_defer(ctx, ephemeral=True)
         interaction = ctx.interaction
-        if interaction is None or not is_admin_interaction(interaction):
-            if interaction is not None:
-                await interaction.followup.send(
-                    "You do not have permission to use this command.",
-                    ephemeral=True,
-                )
-            return
-
         view = MgeAdminCompletionView(
             event_id=event_id,
             leadership_channel_id=MGE_LEADERSHIP_CHANNEL_ID,

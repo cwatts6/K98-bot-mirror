@@ -222,6 +222,30 @@ def is_admin_or_leadership():
     return deco
 
 
+def admin_only(
+    *,
+    denial_message: str = "❌ This command is restricted to admins.",
+):
+    """Gate: Admin by ADMIN_USER_ID, with no channel restriction."""
+
+    def deco(func):
+        @wraps(func)
+        async def wrapper(arg0, *args, **kwargs):
+            inter = _resolve_interaction(arg0)
+            if not inter:
+                return
+
+            if not _is_admin(getattr(inter, "user", None)):
+                await _safe_ephemeral_send(inter, denial_message)
+                return
+
+            return await func(arg0, *args, **kwargs)
+
+        return wrapper
+
+    return deco
+
+
 def is_admin_or_leadership_only():
     """
     Gate: (Admin by ADMIN_USER_ID) OR (has Leadership role).
@@ -252,11 +276,12 @@ def is_admin_or_leadership_only():
 
 
 def channel_only(
-    channels: int | Iterable[int],
+    channels: int | str | Iterable[int | str] | None,
     *,
     allow_threads: bool = True,
     admin_override: bool = True,
     allow_leadership: bool = False,
+    missing_config_message: str | None = None,
 ):
     """
     Restrict a command to one or more channel IDs (threads allowed via parent).
@@ -264,17 +289,21 @@ def channel_only(
     - allow_threads: if True, a thread whose parent is one of the allowed channels is allowed
     - admin_override: if True the ADMIN_USER_ID can bypass the guard
     - allow_leadership: if True also permit the preconfigured LEADERSHIP channel(s) in ALLOWED_CHANNEL_IDS
+    - missing_config_message: if supplied, deny with this message when no channel IDs are configured
     Returns an async decorator suitable for your command functions (slash handlers).
     """
-    # normalize to set of ints
-    if isinstance(channels, int):
-        allowed = {int(channels)}
+    # normalize to configured channel IDs; config defaults such as 0 mean "unset"
+    if channels is None:
+        raw_channels = ()
+    elif isinstance(channels, (int, str)):
+        raw_channels = (channels,)
     else:
-        allowed = {int(x) for x in (channels or [])}
+        raw_channels = channels or ()
+    allowed = {channel_id for channel_id in (int(x) for x in raw_channels) if channel_id}
 
     # optionally include leadership IDs
     if allow_leadership:
-        allowed |= ALLOWED_CHANNEL_IDS
+        allowed |= {cid for cid in ALLOWED_CHANNEL_IDS if cid}
 
     def decorator(func):
         @wraps(func)
@@ -288,6 +317,10 @@ def channel_only(
             parent_id = getattr(
                 chan, "parent_id", getattr(getattr(chan, "parent", None), "id", None)
             )
+
+            if not allowed and missing_config_message:
+                await _safe_ephemeral_send(inter, missing_config_message)
+                return
 
             # admin bypass
             if admin_override and _is_admin(getattr(inter, "user", None)):
@@ -308,6 +341,53 @@ def channel_only(
         return wrapper
 
     return decorator
+
+
+def admin_or_leadership_in_allowed_channels(
+    channels: int | str | Iterable[int | str],
+    *,
+    allow_threads: bool = True,
+    channel_denial_message: str | None = None,
+    permission_denial_message: str = "❌ This command is restricted to Admin or Leadership.",
+):
+    """Gate: allowed channel first, then Admin or Leadership."""
+    if isinstance(channels, (int, str)):
+        allowed = {int(channels)}
+    else:
+        allowed = {int(x) for x in (channels or [])}
+
+    def deco(func):
+        @wraps(func)
+        async def wrapper(arg0, *args, **kwargs):
+            inter = _resolve_interaction(arg0)
+            if not inter:
+                return
+
+            chan = getattr(inter, "channel", None)
+            chan_id = getattr(chan, "id", None)
+            parent_id = getattr(
+                chan, "parent_id", getattr(getattr(chan, "parent", None), "id", None)
+            )
+            in_channel = (chan_id in allowed) or (allow_threads and parent_id in allowed)
+            if not in_channel:
+                mentions = " or ".join(f"<#{cid}>" for cid in sorted(allowed))
+                await _safe_ephemeral_send(
+                    inter,
+                    channel_denial_message or f"🔒 This command can only be used in {mentions}.",
+                )
+                return
+
+            user = getattr(inter, "user", None)
+            member = user if isinstance(user, discord.Member) else getattr(arg0, "author", None)
+            if not (_is_admin(user) or _has_leadership_role(member)):
+                await _safe_ephemeral_send(inter, permission_denial_message)
+                return
+
+            return await func(arg0, *args, **kwargs)
+
+        return wrapper
+
+    return deco
 
 
 def usage_tracker() -> AsyncUsageTracker:
