@@ -1,6 +1,5 @@
 # DL_bot.py
 # Note: minimal edit to use centralized logging_setup (UTC timestamps, rotation, console handling).
-import ast
 import io
 import os
 from pathlib import Path
@@ -129,6 +128,10 @@ from bot_config import (
 )
 from bot_helpers import channel_queues
 from Commands import register_commands
+from commands.command_inventory import (
+    collect_declared_command_names,
+    collect_static_primary_inventory,
+)
 from embed_utils import send_embed
 from kvk_all_importer import _auto_export_kvk
 from log_health import LogHeadroomError, preflight_from_env_sync
@@ -260,55 +263,16 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return str(raw).strip().lower() in {"1", "true", "yes", "on", "y"}
 
 
-def _collect_declared_slash_commands(module_relpath: str) -> set[str]:
-    """Collect decorator-declared slash/app command names from a module file."""
-    module_path = Path(__file__).parent / module_relpath
-    names: set[str] = set()
-    if not module_path.exists():
-        if module_relpath == "Commands.py":
-            logger.warning(
-                "[COMMAND AUDIT] Authoritative command module missing: %s",
-                module_relpath,
-            )
-        else:
-            logger.info("[COMMAND AUDIT] Legacy command module retired: %s", module_relpath)
-        return names
-    try:
-        source = module_path.read_text(encoding="utf-8-sig")
-        tree = ast.parse(source, filename=str(module_path))
-    except Exception as exc:
-        logger.warning("[COMMAND AUDIT] Failed parsing %s: %s", module_relpath, exc)
-        return names
-
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        for deco in node.decorator_list:
-            if not isinstance(deco, ast.Call) or not isinstance(deco.func, ast.Attribute):
-                continue
-            attr = deco.func.attr
-            is_slash = attr == "slash_command"
-            is_app = (
-                attr == "command"
-                and isinstance(deco.func.value, ast.Name)
-                and deco.func.value.id == "app_commands"
-            )
-            if not (is_slash or is_app):
-                continue
-
-            for kw in deco.keywords:
-                if kw.arg == "name" and isinstance(kw.value, ast.Constant) and kw.value.value:
-                    names.add(str(kw.value.value))
-                    break
-    return names
-
-
 def audit_command_registration_paths() -> tuple[dict[str, set[str]], dict[str, list[str]]]:
     """Return registration map and duplicate command-name map across known paths."""
+    root = Path(__file__).parent
+    inventory = collect_static_primary_inventory(root)
     paths = {
-        "Commands.py (authoritative)": _collect_declared_slash_commands("Commands.py"),
-        "cogs/commands.py (secondary)": _collect_declared_slash_commands("cogs/commands.py"),
-        "subscribe.py (secondary)": _collect_declared_slash_commands("subscribe.py"),
+        "commands package (authoritative)": inventory.names,
+        "cogs/commands.py (disabled legacy)": collect_declared_command_names(
+            root / "cogs" / "commands.py"
+        ),
+        "subscribe.py (disabled legacy)": collect_declared_command_names(root / "subscribe.py"),
     }
 
     owners: dict[str, list[str]] = {}
@@ -322,13 +286,21 @@ def audit_command_registration_paths() -> tuple[dict[str, set[str]], dict[str, l
 
 def _log_registration_audit() -> dict[str, list[str]]:
     paths, duplicates = audit_command_registration_paths()
+    root = Path(__file__).parent
+    inventory = collect_static_primary_inventory(root)
+    primary_names = paths["commands package (authoritative)"]
+    secondary_cogs = paths["cogs/commands.py (disabled legacy)"]
+    secondary_subscribe = paths["subscribe.py (disabled legacy)"]
     logger.info(
-        "[COMMAND AUDIT] registration summary: primary=%d secondary_cogs=%d secondary_subscribe=%d total_unique=%d",
-        len(paths["Commands.py (authoritative)"]),
-        len(paths["cogs/commands.py (secondary)"]),
-        len(paths["subscribe.py (secondary)"]),
+        "[COMMAND AUDIT] registration summary: primary=%d grouped_subcommands_detected=%d disabled_legacy=%d secondary_cogs=%d secondary_subscribe=%d total_unique=%d",
+        len(primary_names),
+        inventory.grouped_subcommand_count,
+        len(secondary_cogs) + len(secondary_subscribe),
+        len(secondary_cogs),
+        len(secondary_subscribe),
         len(set().union(*paths.values())),
     )
+    logger.info("[COMMAND AUDIT] active command surface: commands package (authoritative)")
     if duplicates:
         logger.warning(
             "[COMMAND AUDIT] Duplicate slash command names detected across registration paths:"

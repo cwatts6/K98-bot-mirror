@@ -16,6 +16,11 @@ declarations in `cogs/commands.py` and root `subscribe.py`, updated validator te
 active versus disabled legacy surfaces, and detected helper-attached grouped subcommands including
 `/prekvk import_history`. The active command baseline after Phase 2 is
 `primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82`.
+PR 132 (`codex/command-platform-phase-2-validator-inventory`) was smoke tested successfully,
+merged, and pushed to production on 2026-06-01. Phase 3 grouped the approved low-risk
+operational/reporting commands under `/ops` and aligned startup command-audit logging. The active
+command baseline after Phase 3 is
+`primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75`.
 Earlier review history: after the slow-pytest optimisation production
 release, PR 107
 (`pytest-log-delivery-docs`) resolved the high-impact pytest duration outliers found after the
@@ -150,8 +155,8 @@ atomic-write hardening; each requires a fresh scope instead of an additional Pha
 ### Deferred Optimisation
 - Area: `commands/`, `scripts/validate_command_registration.py`
 - Type: architecture
-- Description: Batch 1 of the command-surface balancing audit grouped admin-heavy `/ops` and `/mge` commands, reducing the primary Discord application-command set from 100 to 82 top-level commands. Phase 1 then standardised active command permission gates onto decorators without changing the command count. Future standalone slash commands can still erode this buffer and eventually break startup sync with Discord error 30032 unless additional command-surface consolidation and validator improvements remain planned.
-- Suggested Fix: Continue the command-platform programme through the staged follow-up batches. Start with validator and command-inventory tooling enhancement, then group related commands by domain where user experience allows, identify stale/low-use admin commands for consolidation or retirement, update docs for renamed paths, and keep `scripts/validate_command_registration.py` enforcing the 100-command ceiling with a warning at 90+.
+- Description: Batch 1 of the command-surface balancing audit grouped admin-heavy `/ops` and `/mge` commands, reducing the primary Discord application-command set from 100 to 82 top-level commands. Phase 3 later moved approved low-risk ops/reporting commands under `/ops`, reducing the primary set to 75. Future standalone slash commands can still erode this buffer and eventually break startup sync with Discord error 30032 unless additional command-surface consolidation remains planned.
+- Suggested Fix: Continue the command-platform programme through staged follow-up batches. Group related commands by domain where user experience allows, identify stale/low-use admin commands for consolidation or retirement, update docs for renamed paths, and keep `scripts/validate_command_registration.py` enforcing the 100-command ceiling with a warning at 90+.
 - Impact: high
 - Risk: medium
 - Dependencies: Batch 1 `/ops` and `/mge` grouping and Phase 1 permission decorator standardisation remain deployed cleanly; coordinate with bot operators before renaming public command paths; preserve standard decorator permission checks when commands move into groups.

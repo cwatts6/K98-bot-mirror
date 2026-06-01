@@ -9,26 +9,33 @@ Phase 1, Permission Decorator Standardisation, was completed in PR 131
 pushed to production. The PR standardised active command permission gates onto decorators without
 changing command paths, command grouping, or command registration count.
 
-The next approved programme slice should start from Phase 2, Validator And Inventory Tooling
-Enhancement, before any further command grouping migrations.
+Phase 2, Validator And Inventory Tooling Enhancement, was completed in PR 132
+(`codex/command-platform-phase-2-validator-inventory`), smoke tested successfully, merged, and
+pushed to production. The PR retired unused disabled secondary command declarations, made
+`/prekvk import_history` visible to static grouped-subcommand reporting, and preserved all active
+command paths and the active top-level command count.
+
+Phase 3, Low-Risk Ops Consolidation And Startup Audit Log Alignment, grouped the approved
+operational/reporting commands under `/ops` and aligned startup command-audit logging with the
+authoritative command inventory.
 
 ## Audit Baseline
 
 Static command registration validation currently reports:
 
 ```text
-primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82
+primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75
 ```
 
 Grouped command summary:
 
 | Group | Statically detected subcommands |
 |---|---:|
-| `/ops` | 14 |
+| `/ops` | 21 |
 | `/mge` | 6 |
 | `/prekvk` | 2 |
 
-The primary command surface has an 18-command buffer below Discord's 100 top-level application
+The primary command surface has a 25-command buffer below Discord's 100 top-level application
 command limit. The validator warns at 90+ and fails above 100.
 
 Usage levels below are based only on local JSONL usage files under `data/command_usage_*.jsonl`
@@ -115,10 +122,10 @@ commands are marked `none observed` pending SQL usage review.
 | Player/KVK | `/mykvkcrystaltech` | `commands/telemetry_cmds.py` | decorator | none observed | top-level | Candidate `/crystaltech progress` |
 | PreKvK | `/prekvk report` | `commands/prekvk_cmds.py` | public | none observed | grouped | Preserve |
 | PreKvK Admin | `/prekvk import_history` | `commands/prekvk_admin_cmds.py` | decorator | none observed | grouped by helper | Preserve; improve static validator detection |
-| Processing Reports | `/summary` | `commands/admin_cmds.py` | public | none observed | top-level | Candidate `/ops summary`; confirm public/admin intent |
-| Processing Reports | `/weeksummary` | `commands/admin_cmds.py` | public | none observed | top-level | Candidate `/ops weeksummary`; confirm public/admin intent |
-| Processing Reports | `/history` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/ops history` |
-| Processing Reports | `/failures` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/ops failures` |
+| Processing Reports | `/ops summary` | `commands/admin_cmds.py` | public | none observed | grouped | Preserve |
+| Processing Reports | `/ops weeksummary` | `commands/admin_cmds.py` | public | none observed | grouped | Preserve |
+| Processing Reports | `/ops history` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
+| Processing Reports | `/ops failures` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
 | Registry | `/register_governor` | `commands/registry_cmds.py` | public | none observed | top-level | Candidate `/registry register` or keep flat |
 | Registry | `/modify_registration` | `commands/registry_cmds.py` | public | none observed | top-level | Candidate `/registry modify` or keep flat |
 | Registry | `/remove_registration` | `commands/registry_cmds.py` | decorator | none observed | top-level | Candidate `/registry remove` |
@@ -129,7 +136,7 @@ commands are marked `none observed` pending SQL usage review.
 | Registry | `/bulk_export_registrations` | `commands/registry_cmds.py` | decorator | none observed | top-level | Candidate `/registry bulk_export` |
 | Registry | `/bulk_import_registrations_dryrun` | `commands/registry_cmds.py` | decorator | none observed | top-level | Candidate `/registry bulk_import_dryrun` |
 | Registry | `/bulk_import_registrations` | `commands/registry_cmds.py` | decorator | none observed | top-level | Candidate `/registry bulk_import` |
-| Stats Ops | `/test_embed` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/ops test_embed` |
+| Stats Ops | `/ops test_embed` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
 | Stats/KVK | `/test_kvk_export` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk test_export` |
 | Stats/KVK | `/mykvkstats` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk stats` or keep flat |
 | Stats/KVK | `/refresh_stats_cache` | `commands/stats_cmds.py` | decorator | none observed | top-level | Candidate `/kvk refresh_stats_cache` |
@@ -150,15 +157,15 @@ commands are marked `none observed` pending SQL usage review.
 | Subscriptions | `/migrate_subscriptions_dryrun` | `commands/subscriptions_cmds.py` | decorator | none observed | top-level | Candidate `/subscriptions migrate_dryrun` |
 | Subscriptions | `/migrate_subscriptions_apply` | `commands/subscriptions_cmds.py` | decorator | none observed | top-level | Candidate `/subscriptions migrate_apply` |
 | Telemetry | `/ping` | `commands/telemetry_cmds.py` | public | none observed | top-level | Keep flat or move to `/ops ping` |
-| Usage Analytics | `/usage` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/ops usage` |
-| Usage Analytics | `/usage_detail` | `commands/admin_cmds.py` | decorator | none observed | top-level | Candidate `/ops usage_detail` |
+| Usage Analytics | `/ops usage` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
+| Usage Analytics | `/ops usage_detail` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
 
 ## Domain Review Summary
 
 | Domain | Strengths | Weaknesses / risks | Improvement opportunity |
 |---|---|---|---|
 | Ark | Strong service/DAL/test ecosystem and consistent leadership decorators on most admin paths. | Largest flat top-level block; public paths require operator communication; docs reference flat names. | First high-value grouping phase after decorator audit. |
-| Ops | Core operational tools already grouped and command lifecycle reuse is strong. Phase 1 standardised `/history`, `/failures`, and redundant already-decorated admin gates. | Processing report commands remain flat. | Move remaining report/usage/test ops commands under `/ops` after operator approval. |
+| Ops | Core operational tools are grouped and command lifecycle reuse is strong. Phase 3 moved approved reporting, usage, and test ops paths under `/ops`. | Calendar and CrystalTech ops remain flat pending later domain grouping. | Continue with domain-specific grouping only after operator approval. |
 | MGE | Already grouped; permission decorators mostly consistent. | `/mge admin_completion` uses an inline admin check. | Standardise decorator and preserve current grouped path. |
 | Public KVK/Stats | Rich test coverage and recent service/DAL cleanup around KVK admin commands. | Many public player paths are flat and highly discoverable; moving them could confuse players. | Split admin KVK commands first; defer player path changes until approved UX rules exist. |
 | Registry | Strong service/cache tests and command service extraction. | Public self-service paths are discoverability-sensitive; admin bulk operations remain flat. | Group admin registry commands first; decide public path policy separately. |
@@ -193,7 +200,9 @@ commands are marked `none observed` pending SQL usage review.
   legacy declarations when retained in test fixtures.
 - Resolution: Removed the legacy `cogs/commands.py` and root `subscribe.py` files after confirming
   startup uses `Commands.register_commands(bot)` as the authoritative path and does not load these
-  cogs. The validator now reports no retained disabled legacy command surfaces.
+  cogs. The validator now reports no retained disabled legacy command surfaces. PR 132 was smoke
+  tested with a graceful restart and `/ops validate_command_cache`, merged, and pushed to
+  production.
 
 ### Deferred Optimisation
 - Area: `commands/`, command documentation
@@ -255,7 +264,7 @@ Delivered validation:
 
 ### Phase 2 - Validator And Inventory Tooling Enhancement
 
-Status: next.
+Status: complete. Delivered in PR 132, smoke tested successfully, merged, and pushed to production.
 
 Goal: improve command-platform reporting before large migrations.
 
@@ -282,28 +291,48 @@ Validation:
 - `tests/test_command_registration_smoke.py`
 - `python scripts/validate_command_registration.py`
 
-### Phase 3 - Low-Risk Ops Consolidation
+Delivered validation:
+
+- Command registration now reports
+  `primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82`.
+- Focused validator, inventory, lifecycle, and registration smoke tests passed.
+- Full pytest, pre-commit, smoke imports, architecture validation, deferred-item validation,
+  command registration validation, and pytest log-noise analysis passed before merge.
+- Production smoke testing completed via graceful restart and `/ops validate_command_cache`.
+
+### Phase 3 - Low-Risk Ops Consolidation And Startup Audit Log Alignment
+
+Status: implemented in the current Phase 3 branch.
 
 Goal: recover command headroom with low public-UX risk after permissions are standardised.
 
-Scope candidates:
+Delivered scope:
 
-- Move `/summary`, `/weeksummary`, `/history`, `/failures` under `/ops`.
-- Move `/usage` and `/usage_detail` under `/ops`.
-- Move `/test_embed` under `/ops` or retire if no longer useful.
-- Consider `/ping` ownership: keep flat for health/debug discoverability or move to `/ops ping`.
+- Moved `/summary`, `/weeksummary`, `/history`, `/failures` under `/ops`.
+- Moved `/usage` and `/usage_detail` under `/ops`.
+- Moved `/test_embed` under `/ops`.
+- Kept `/ping` flat for health/debug discoverability.
+- Fixed stale `DL_bot.py` startup command audit logging so startup smoke logs do not show
+  `primary=0 ... total_unique=0` when the authoritative validator reports the real active command
+  inventory.
 
 Implementation notes:
 
 - Preserve existing command behavior, output, and usage tracking.
 - Update docs that mention the old paths.
-- Treat public visibility of `/summary` and `/weeksummary` as an explicit operator decision.
+- Public visibility of `/summary` and `/weeksummary` was explicitly approved for grouping and
+  preserved at `/ops summary` and `/ops weeksummary`.
+- Complete startup audit log alignment before or alongside command grouping so Phase 3 smoke logs
+  can be trusted.
 
 Validation:
 
 - Command registration smoke tests.
 - Focused tests for migrated handlers.
 - Command cache/version tests where grouped names affect signatures.
+- Startup log smoke for corrected command audit summary or explicit removal of stale counts.
+- Expected validator baseline after Phase 3:
+  `primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75`.
 
 ### Phase 4 - Ark Command Grouping
 
@@ -394,7 +423,7 @@ Validation:
 
 1. Phase 1: Permission Decorator Standardisation.
 2. Phase 2: Validator And Inventory Tooling Enhancement.
-3. Phase 3: Low-Risk Ops Consolidation.
+3. Phase 3: Low-Risk Ops Consolidation And Startup Audit Log Alignment.
 4. Phase 4: Ark Command Grouping.
 5. Phase 5: Public Domain Grouping Design.
 6. Phase 6: Canonical Command Documentation.

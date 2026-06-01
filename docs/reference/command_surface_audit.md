@@ -8,32 +8,40 @@ Command Platform Phase 1, Permission Decorator Standardisation, was completed in
 (`codex/command-platform-phase-1-permission-decorators`), smoke tested successfully, merged, and
 pushed to production. Phase 1 did not rename, retire, regroup, or change the count of any slash
 commands. It standardised active command permission gates onto decorators and kept the registration
-baseline unchanged:
+baseline unchanged.
+
+Command Platform Phase 2, Validator And Inventory Tooling Enhancement, was completed in PR 132
+(`codex/command-platform-phase-2-validator-inventory`), smoke tested successfully, merged, and
+pushed to production. Phase 2 retired unused disabled secondary command declarations and made
+helper-attached `/prekvk import_history` visible in static grouped-subcommand reporting.
+
+Current baseline:
 
 ```text
-primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82
+primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75
 ```
 
-The next programme slice is Phase 2, Validator And Inventory Tooling Enhancement. It should improve
-registration reporting and disabled-secondary classification before further grouping migrations.
+Phase 3, Low-Risk Ops Consolidation And Startup Audit Log Alignment, moved the approved low-risk
+operational/reporting commands under `/ops` and aligned startup command-audit logging with the
+authoritative command inventory.
 
 ## Current Registration Summary
 
 `scripts/validate_command_registration.py` reports:
 
 ```text
-primary=82 grouped_subcommands_detected=22 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=82
+primary=75 grouped_subcommands_detected=29 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=75
 ```
 
 Grouped command summary:
 
 | Group | Statically detected subcommands |
 |---|---:|
-| `/ops` | 14 |
+| `/ops` | 21 |
 | `/mge` | 6 |
 | `/prekvk` | 2 |
 
-The primary command surface now has an 18-command buffer below Discord's 100 top-level
+The primary command surface now has a 25-command buffer below Discord's 100 top-level
 application-command limit. The validator warns at 90+ and fails above 100.
 
 ## Batch 1 Renamed Command Paths
@@ -57,6 +65,13 @@ application-command limit. The validator warns at 90+ and fails above 100.
 | `/show_logs` | `/ops show_logs` |
 | `/last_errors` | `/ops last_errors` |
 | `/crash_log` | `/ops crash_log` |
+| `/summary` | `/ops summary` |
+| `/weeksummary` | `/ops weeksummary` |
+| `/history` | `/ops history` |
+| `/failures` | `/ops failures` |
+| `/usage` | `/ops usage` |
+| `/usage_detail` | `/ops usage_detail` |
+| `/test_embed` | `/ops test_embed` |
 
 Permission decorators were preserved during Batch 1. Phase 1 later removed redundant inline admin
 checks from already-decorated `/ops run_sql_proc`, `/ops run_gsheets_export`, and
@@ -82,12 +97,14 @@ changing the grouped command path.
 Next command-surface batches are staged in `docs/reference/deferred_optimisations.md` and the
 command-platform programme docs. Recommended order:
 
-1. Validator and command inventory tooling enhancement.
-2. Low-risk Ops consolidation, after validator reporting is clearer.
-3. Ark grouping under `/ark`, with operator communication for public paths.
-4. Public/player domain grouping across KVK, registry, inventory, calendar, and subscriptions.
+1. Ark grouping under `/ark`, with operator communication for public paths.
+2. Public/player domain grouping across KVK, registry, inventory, calendar, and subscriptions.
 
 Phase 2 retired the unused disabled secondary command declarations in `cogs/commands.py` and
 root `subscribe.py`, leaving `commands/` as the only command registration surface and removing the
 previous informational duplicate warnings for `/summary`, `/weeksummary`, `/history`,
 `/failures`, `/ping`, and `/subscribe`.
+
+Phase 3 corrected the stale `DL_bot.py` startup audit count so restart smoke logs use the same
+authoritative command inventory semantics as the validator instead of reporting
+`primary=0 ... total_unique=0` from the legacy `Commands.py` shim.

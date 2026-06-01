@@ -59,10 +59,17 @@ pushed to production. Phase 1 standardised active command permission gates onto 
 introduced the reusable decorator support needed by the current command estate, added focused
 permission-decorator tests, and preserved all command paths and the registration count.
 
+Phase 2 of this programme, Validator And Inventory Tooling Enhancement, was completed in PR 132
+(`codex/command-platform-phase-2-validator-inventory`), smoke tested successfully, merged, and
+pushed to production. Phase 2 retired unused disabled secondary command declarations, updated
+duplicate-risk terminology, detected helper-attached grouped subcommands, and preserved all active
+command paths.
+
 The current validator reports:
 
 82 primary commands
-21 grouped subcommands
+22 grouped subcommands
+0 disabled legacy command declarations
 warning threshold at 90
 hard fail at 100
 
@@ -262,9 +269,12 @@ Current phase status:
 Phase 1 - Permission Decorator Standardisation: complete, smoke tested, merged, and pushed to
 production in PR 131.
 
-Phase 2 - Validator And Inventory Tooling Enhancement: next executable phase. This phase should
-improve command-platform reporting and disabled-secondary classification before additional command
-grouping.
+Phase 2 - Validator And Inventory Tooling Enhancement: complete, smoke tested, merged, and pushed
+to production in PR 132.
+
+Phase 3 - Low-Risk Ops Consolidation And Startup Audit Log Alignment: implemented. This phase
+fixed the stale `DL_bot.py` startup audit summary and grouped approved low-risk
+operational/reporting commands under `/ops`, reducing the active top-level command count to 75.
 
 Example:
 

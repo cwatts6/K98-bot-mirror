@@ -9,9 +9,24 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
+import importlib.util
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+_COMMAND_INVENTORY_SPEC = importlib.util.spec_from_file_location(
+    "_command_inventory", ROOT / "commands" / "command_inventory.py"
+)
+if _COMMAND_INVENTORY_SPEC is None or _COMMAND_INVENTORY_SPEC.loader is None:
+    raise RuntimeError("Could not load commands/command_inventory.py")
+_COMMAND_INVENTORY = importlib.util.module_from_spec(_COMMAND_INVENTORY_SPEC)
+sys.modules[_COMMAND_INVENTORY_SPEC.name] = _COMMAND_INVENTORY
+_COMMAND_INVENTORY_SPEC.loader.exec_module(_COMMAND_INVENTORY)
+collect_declared_command_names = _COMMAND_INVENTORY.collect_declared_command_names
+collect_static_primary_inventory = _COMMAND_INVENTORY.collect_static_primary_inventory
 
 PRIMARY_COMMAND_LIMIT = 100
 PRIMARY_COMMAND_WARNING_THRESHOLD = 90
@@ -49,33 +64,7 @@ def _call_name(call: ast.Call) -> str | None:
 
 
 def collect_names(path: Path) -> set[str]:
-    names: set[str] = set()
-    if not path.exists():
-        return names
-    source = path.read_text(encoding="utf-8-sig")
-    tree = ast.parse(source, filename=str(path))
-
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        for deco in node.decorator_list:
-            if not isinstance(deco, ast.Call) or not isinstance(deco.func, ast.Attribute):
-                continue
-            attr = deco.func.attr
-            is_slash = attr == "slash_command"
-            is_app = (
-                attr == "command"
-                and isinstance(deco.func.value, ast.Name)
-                and deco.func.value.id == "app_commands"
-            )
-            if not (is_slash or is_app):
-                continue
-            for kw in deco.keywords:
-                name = _literal_string(kw.value) if kw.arg == "name" else None
-                if name:
-                    names.add(name)
-                    break
-    return names
+    return collect_declared_command_names(path)
 
 
 def _collect_group_helper_commands(command_paths: list[Path]) -> dict[str, set[str]]:
@@ -156,91 +145,8 @@ def _relative_label(path: Path) -> str:
 def _collect_primary_inventory_details() -> (
     tuple[set[str], dict[str, set[str]], dict[str, list[str]]]
 ):
-    names: set[str] = set()
-    grouped: dict[str, set[str]] = {}
-    name_sources: dict[str, list[str]] = {}
-    all_command_paths = [
-        path for path in sorted((ROOT / "commands").glob("*.py")) if path.name != "__init__.py"
-    ]
-    active_command_paths = _active_command_paths(all_command_paths)
-    group_helpers = _collect_group_helper_commands(all_command_paths)
-
-    for path in active_command_paths:
-        source_label = _relative_label(path)
-        source = path.read_text(encoding="utf-8-sig")
-        tree = ast.parse(source, filename=str(path))
-        group_vars: dict[str, str] = {}
-
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Call):
-                continue
-            if not (_call_name(node.value) or "").endswith("SlashCommandGroup"):
-                continue
-
-            group_name = None
-            if node.value.args:
-                group_name = _literal_string(node.value.args[0])
-            for kw in node.value.keywords:
-                if kw.arg == "name":
-                    group_name = _literal_string(kw.value) or group_name
-
-            if not group_name:
-                continue
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    group_vars[target.id] = group_name
-            names.add(group_name)
-            name_sources.setdefault(group_name, []).append(source_label)
-            grouped.setdefault(group_name, set())
-
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                for deco in node.decorator_list:
-                    if not isinstance(deco, ast.Call) or not isinstance(deco.func, ast.Attribute):
-                        continue
-                    attr = deco.func.attr
-                    owner = deco.func.value
-                    is_bot_slash = (
-                        attr == "slash_command"
-                        and isinstance(owner, ast.Name)
-                        and owner.id in {"bot", "bot_instance"}
-                    )
-                    is_app_command = (
-                        attr == "command"
-                        and isinstance(owner, ast.Name)
-                        and owner.id == "app_commands"
-                    )
-                    if not (is_bot_slash or is_app_command):
-                        if attr == "command" and isinstance(owner, ast.Name):
-                            group_name = group_vars.get(owner.id)
-                            if group_name:
-                                for kw in deco.keywords:
-                                    name = _literal_string(kw.value) if kw.arg == "name" else None
-                                    if name:
-                                        grouped.setdefault(group_name, set()).add(name)
-                                        break
-                        continue
-                    for kw in deco.keywords:
-                        name = _literal_string(kw.value) if kw.arg == "name" else None
-                        if name:
-                            names.add(name)
-                            name_sources.setdefault(name, []).append(source_label)
-                            break
-            elif isinstance(node, ast.Call):
-                helper_name = _call_name(node)
-                helper_commands = group_helpers.get(helper_name or "") or group_helpers.get(
-                    (helper_name or "").split(".")[-1]
-                )
-                if not helper_commands or not node.args:
-                    continue
-                first_arg = node.args[0]
-                if not isinstance(first_arg, ast.Name):
-                    continue
-                group_name = group_vars.get(first_arg.id)
-                if group_name:
-                    grouped.setdefault(group_name, set()).update(helper_commands)
-
-    return names, grouped, name_sources
+    inventory = collect_static_primary_inventory(ROOT)
+    return inventory.names, inventory.grouped, inventory.name_sources
 
 
 def collect_primary_inventory() -> tuple[set[str], dict[str, set[str]]]:

@@ -104,7 +104,13 @@ def _format_validate_embed(report) -> discord.Embed:
 
 
 def register_admin(bot: ext_commands.Bot) -> None:
-    @bot.slash_command(
+    ops_group = discord.SlashCommandGroup(
+        "ops",
+        "Operational admin controls",
+        guild_ids=[GUILD_ID],
+    )
+
+    @ops_group.command(
         name="summary", description="View today's file processing summary", guild_ids=[GUILD_ID]
     )
     @versioned("v1.05")
@@ -133,7 +139,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 content=f"❌ Failed to build summary: `{type(e).__name__}: {e}`"
             )
 
-    @bot.slash_command(
+    @ops_group.command(
         name="weeksummary", description="View 7-day file processing summary", guild_ids=[GUILD_ID]
     )
     @versioned("v1.01")
@@ -162,7 +168,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 content=f"❌ Failed to build weekly summary: `{type(e).__name__}: {e}`"
             )
 
-    @bot.slash_command(
+    @ops_group.command(
         name="history", description="View recently processed files", guild_ids=[GUILD_ID]
     )
     @versioned("v1.10")
@@ -229,7 +235,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         except Exception:
             pass
 
-    @bot.slash_command(
+    @ops_group.command(
         name="failures", description="View recently failed jobs", guild_ids=[GUILD_ID]
     )
     @versioned("v1.10")
@@ -290,12 +296,6 @@ def register_admin(bot: ext_commands.Bot) -> None:
             await ctx.interaction.edit_original_response(content="")
         except Exception:
             pass
-
-    ops_group = discord.SlashCommandGroup(
-        "ops",
-        "Operational admin controls",
-        guild_ids=[GUILD_ID],
-    )
 
     @ops_group.command(
         name="run_sql_proc",
@@ -1273,7 +1273,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 content=f"❌ Failed to read crash log: `{type(e).__name__}: {e}`"
             )
 
-    @bot.slash_command(
+    @ops_group.command(
         # architecture-check: allow
         name="test_embed",
         description="🧪 Manually trigger the stats update embed",  # architecture-check: allow
@@ -1322,7 +1322,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 content=f"❌ Failed to send embed:\n```{type(e).__name__}: {e}```"
             )
 
-    @bot.slash_command(
+    @ops_group.command(
         name="usage",
         description="View bot usage summary (admin/leadership)",
         guild_ids=[GUILD_ID],
@@ -1386,7 +1386,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 content=f"Sorry, I couldn't load usage stats: `{type(e).__name__}: {e}`"
             )
 
-    @bot.slash_command(
+    @ops_group.command(
         name="usage_detail",
         description="Drill down into a specific command or user (admin/leadership)",
         guild_ids=[GUILD_ID],

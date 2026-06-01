@@ -86,6 +86,26 @@ def register_sample(bot):
     assert grouped == {"ops": {"audit", "status"}}
 
 
+def test_current_command_surface_reflects_phase3_ops_grouping():
+    names, grouped = validator.collect_primary_inventory()
+
+    moved_to_ops = {
+        "summary",
+        "weeksummary",
+        "history",
+        "failures",
+        "usage",
+        "usage_detail",
+        "test_embed",
+    }
+
+    assert len(names) == 75
+    assert moved_to_ops.isdisjoint(names)
+    assert moved_to_ops.issubset(grouped["ops"])
+    assert len(grouped["ops"]) == 21
+    assert sum(len(commands) for commands in grouped.values()) == 29
+
+
 def test_main_reports_active_duplicate_risks(tmp_path, monkeypatch, capsys):
     _write(
         tmp_path / "commands" / "one_cmds.py",

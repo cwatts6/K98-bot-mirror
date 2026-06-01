@@ -1,5 +1,6 @@
 import datetime
 import os
+from pathlib import Path
 import sys
 import types
 
@@ -48,3 +49,20 @@ def test_register_commands_smoke(monkeypatch):
     assert "mge_refresh_award_reminders" not in registered_top_level
     assert "prekvk_report" not in registered_top_level
     assert "prekvk_import_history" not in registered_top_level
+    assert "summary" not in registered_top_level
+    assert "weeksummary" not in registered_top_level
+    assert "history" not in registered_top_level
+    assert "failures" not in registered_top_level
+    assert "usage" not in registered_top_level
+    assert "usage_detail" not in registered_top_level
+    assert "test_embed" not in registered_top_level
+
+
+def test_startup_command_audit_uses_authoritative_inventory():
+    source = Path("DL_bot.py").read_text(encoding="utf-8")
+
+    assert "collect_static_primary_inventory" in source
+    assert "commands package (authoritative)" in source
+    assert "grouped_subcommands_detected" in source
+    assert "Commands.py (authoritative)" not in source
+    assert "_collect_declared_slash_commands" not in source
