@@ -84,7 +84,7 @@ announcement is requested, and
 either it is the first automatic announce or an explicit force-announce is requested. 
 
 Manual admin override
-/ark force_announce was added so leadership can explicitly repost the active registration with @everyone. 
+/ark_force_announce was added so leadership can explicitly repost the active registration with @everyone.
 
 Daily visibility refresh
 The scheduler now uses dedupe + controller-driven repost logic during the 20:00 UTC daily window. 
@@ -116,7 +116,7 @@ JSON registration refs are fallback/migration-only,
 create/repost/refresh should go through ArkRegistrationController.ensure_registration_message(...). 
 
 Command-layer expectation
-Commands should stay thin and call Ark lifecycle logic rather than performing direct Discord post orchestration themselves. /ark create_match and /ark force_announce now follow that pattern. 
+Commands should stay thin and call Ark lifecycle logic rather than performing direct Discord post orchestration themselves. /ark_create_match and /ark_force_announce now follow that pattern.
 
 Scheduler expectation
 There is now a registration visibility refresh path at 20:00 UTC, so later Ark tasks should not reintroduce a parallel daily registration reminder flow. 
