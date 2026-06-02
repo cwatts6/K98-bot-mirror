@@ -1,4 +1,4 @@
-﻿# Codex Task Pack - Inventory Image Import Module
+# Codex Task Pack - Inventory Image Import Module
 
 ## Status Summary
 

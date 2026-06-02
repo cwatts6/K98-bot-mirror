@@ -5,7 +5,9 @@ to GitHub issues/task packs.
 
 Resolved historical notes were moved to `archive/deferred_optimisations_resolved.md`.
 
-Last reviewed after Command Platform Phase 5A, Admin/Leadership/Operator Domain Grouping. PR 131
+Last reviewed after Command Platform Phase 5A, Admin/Leadership/Operator Domain Grouping. PR 136
+(`codex/command-platform-phase-5a-admin-grouping`) was smoke tested successfully, merged, and
+pushed to production on 2026-06-02. Earlier in the programme, PR 131
 (`codex/command-platform-phase-1-permission-decorators`) was smoke tested successfully, merged,
 and pushed to production on 2026-06-01. Phase 1 standardised active command permission gates onto
 decorators, added focused decorator tests, preserved command paths and registration count, and kept

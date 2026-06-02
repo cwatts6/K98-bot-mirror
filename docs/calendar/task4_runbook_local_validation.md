@@ -1,4 +1,4 @@
-﻿# Task 4 Local Validation Runbook
+# Task 4 Local Validation Runbook
 
 ## 1) Pytest (calendar target suites)
 

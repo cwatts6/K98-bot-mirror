@@ -1,4 +1,4 @@
-﻿# TASK 5 â€” Runtime Cache Consolidation, Health/Resilience Hardening, and Deterministic Quality Gates âœ… COMPLETED
+# TASK 5 — Runtime Cache Consolidation, Health/Resilience Hardening, and Deterministic Quality Gates ✅ COMPLETED
 
 ## Objective
 Finalize Task 5 by consolidating runtime cache logic, integrating mandatory Task 4 review feedback, improving status/health resilience, and validating via pytest + SQL scripts in local-first deployment flow.
@@ -90,4 +90,4 @@ Result: **local SQL verification checks completed successfully**.
 - `.env` can now tune anomaly thresholds without code changes.
 - Manual PR workflow remains unchanged.
 - Architecture remains resilient:
-  - Sheets (editor surface) â†’ SQL (operational source) â†’ JSON cache (runtime source).
+  - Sheets (editor surface) → SQL (operational source) → JSON cache (runtime source).

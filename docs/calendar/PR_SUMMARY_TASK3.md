@@ -1,9 +1,9 @@
-﻿# PR Summary â€” Task 3: Event Instance Generator + SQLâ†’JSON Publish
+# PR Summary — Task 3: Event Instance Generator + SQL→JSON Publish
 
 ## Overview
 This PR completes **Task 3** of the resilient Event Calendar architecture for K98 Bot:
 
-**Google Sheets â†’ SQL source tables â†’ EventInstances â†’ JSON cache â†’ Bot runtime**
+**Google Sheets → SQL source tables → EventInstances → JSON cache → Bot runtime**
 
 The implementation preserves the reliability goals established in Task 1/2:
 - Bot runtime does not depend on live Google Sheets.
@@ -33,15 +33,15 @@ Implemented core generator module with deterministic behavior:
 - Generates recurring occurrences within configurable horizon.
 - Merges one-off events into unified instance set.
 - Applies overrides deterministically:
-  - `cancel` â†’ marks instance cancelled
-  - `modify` â†’ patches non-null `New*` fields
+  - `cancel` → marks instance cancelled
+  - `modify` → patches non-null `New*` fields
 - Sorts deterministically for stable output.
 - Computes/stores `EffectiveHash` on final post-override payload.
 - Writes `EventInstances` with transactional safety.
 
 ---
 
-## 2) SQL â†’ JSON cache publishing
+## 2) SQL → JSON cache publishing
 Implemented cache publisher module:
 
 - `load_runtime_instances(conn, horizon_days=365)`
@@ -62,7 +62,7 @@ Implemented cache publisher module:
 
 - `generate(...)`
 - `publish_cache(...)`
-- `refresh_full(...)` (sync â†’ generate â†’ publish orchestration)
+- `refresh_full(...)` (sync → generate → publish orchestration)
 
 ### Reliability/operations improvements
 - Blocking sync/generate/publish paths run in worker thread via `asyncio.to_thread(...)`.
@@ -133,7 +133,7 @@ Result: **all tests passed**.
 - [x] Override cancel/modify behavior implemented.
 - [x] Deterministic sorting and stable instance output.
 - [x] EffectiveHash generated from final payload.
-- [x] SQLâ†’JSON publish implemented from SQL source.
+- [x] SQL→JSON publish implemented from SQL source.
 - [x] Preserve-on-empty cache guard implemented.
 - [x] Admin controls for generate/publish/status added.
 - [x] Failure telemetry and graceful behavior implemented.
@@ -142,7 +142,7 @@ Result: **all tests passed**.
 
 ## Proposed Task 4 (next)
 
-## Task 4 â€” Runtime Consumption, Quality Gates, and Production Hardening
+## Task 4 — Runtime Consumption, Quality Gates, and Production Hardening
 
 ## Objective
 Finalize the calendar pipeline for production bot usage by integrating runtime command consumption, strengthening idempotency/observability, and adding deployment-grade safeguards.
@@ -169,7 +169,7 @@ Finalize the calendar pipeline for production bot usage by integrating runtime c
 
 ### 4) Observability upgrades
 - Add run duration metrics (sync/generate/publish).
-- Add structured â€œlast successful runâ€ and â€œlast failed runâ€ fields.
+- Add structured “last successful run” and “last failed run” fields.
 - Add `calendar_health` summary block for status command:
   - cache_age_minutes
   - next_upcoming_event

@@ -1,4 +1,4 @@
-﻿# TASK 7 â€” Admin Commands (Manual Control + Diagnostics)
+# TASK 7 — Admin Commands (Manual Control + Diagnostics)
 
 ## Objective
 Provide robust admin command controls for manual pipeline execution and diagnostics, while preserving Task 6 resilience guarantees and integrating Task 6 code-review follow-ups.
@@ -76,7 +76,7 @@ Remove non-essential inline fixture comment:
 
 - `type_index_path = "cache/event_type_index.json"`
 
-(no inline â€œadd thisâ€ comment)
+(no inline “add this” comment)
 
 ### D) Retry policy currently bypassed by stage wrappers
 Issue:

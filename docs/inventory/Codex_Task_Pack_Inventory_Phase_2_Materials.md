@@ -1,8 +1,8 @@
-﻿# Codex Task Pack â€” Inventory Image Import Module â€” Phase 2 Materials
+# Codex Task Pack — Inventory Image Import Module — Phase 2 Materials
 
 ## Status / Context
 
-Phase 0 and Phase 1Aâ€“1E are complete and deployed. Phase 1F should already be complete before this phase begins. Phase 2 is the Materials phase only.
+Phase 0 and Phase 1A–1E are complete and deployed. Phase 1F should already be complete before this phase begins. Phase 2 is the Materials phase only.
 
 Phase 2 must extend the existing Inventory Image Import Module to support Rise of Kingdoms equipment materials screenshots, while preserving the current Resources and Speedups behaviour.
 
@@ -224,19 +224,19 @@ Keep current privacy behaviour:
 
 ## Accepted Materials Image Types
 
-### Type A â€” Choice Chest screen
+### Type A — Choice Chest screen
 
 Recognise Equipment Material Choice Chests in these rarities:
 
-- Normal choice chest â€” grey
-- Advanced choice chest â€” green
-- Elite choice chest â€” blue
-- Epic choice chest â€” purple
-- Legendary choice chest â€” orange
+- Normal choice chest — grey
+- Advanced choice chest — green
+- Elite choice chest — blue
+- Epic choice chest — purple
+- Legendary choice chest — orange
 
 Store choice chests separately from fixed material types because they are flexible inventory, not committed to Bone, Leather, Ebony, or Iron.
 
-### Type B/C â€” Individual materials
+### Type B/C — Individual materials
 
 Recognise these material types:
 
@@ -247,11 +247,11 @@ Recognise these material types:
 
 Each material can appear in these rarities:
 
-- Normal â€” grey
-- Advanced â€” green
-- Elite â€” blue
-- Epic â€” purple
-- Legendary â€” orange
+- Normal — grey
+- Advanced — green
+- Elite — blue
+- Epic — purple
+- Legendary — orange
 
 The individual material rows may be split over two or more screenshots.
 
@@ -567,11 +567,11 @@ Codex must explicitly address this in Step 1 audit and Step 4 implementation pla
 
 Use these uploaded samples during local testing:
 
-- `material_summary_exampleonly_output.png` â€” output design reference only.
-- `Materials_import1.png` â€” materials import test image.
-- `Materials_import2.png` â€” materials import test image.
-- `Materials_import3.png` â€” materials import test image.
-- `Materials_import4.png` â€” materials import test image.
+- `material_summary_exampleonly_output.png` — output design reference only.
+- `Materials_import1.png` — materials import test image.
+- `Materials_import2.png` — materials import test image.
+- `Materials_import3.png` — materials import test image.
+- `Materials_import4.png` — materials import test image.
 
 Expected interpretation from supplied samples should be established during audit/test setup. More samples will be added during actual testing.
 
@@ -695,5 +695,5 @@ Codex must return:
 ## Suggested Opening Prompt for Codex
 
 ```text
-Start Phase 2 review/scope for the Inventory Image Import Module: Materials Import. Phase 0 and Phase 1Aâ€“1F are complete. Use the updated task pack at docs/inventory/Codex Task Pack - Inventory Image Import Module.md and the Phase 2 Materials task pack. Scope is Materials only: up to 4 screenshots per governor/day, choice chests, individual materials, raw SQL storage, legendary-equivalent calculations, typed correction flow, /myinventory Materials output, export, and audit. Keep AP, /my_stats integration, export button under images, import-again button, and broad Resources/Speedups redesign out of scope. Begin with audit/scope only and STOP for architecture validation before coding.
+Start Phase 2 review/scope for the Inventory Image Import Module: Materials Import. Phase 0 and Phase 1A–1F are complete. Use the updated task pack at docs/inventory/Codex Task Pack - Inventory Image Import Module.md and the Phase 2 Materials task pack. Scope is Materials only: up to 4 screenshots per governor/day, choice chests, individual materials, raw SQL storage, legendary-equivalent calculations, typed correction flow, /myinventory Materials output, export, and audit. Keep AP, /my_stats integration, export button under images, import-again button, and broad Resources/Speedups redesign out of scope. Begin with audit/scope only and STOP for architecture validation before coding.
 ```

@@ -1,9 +1,9 @@
-﻿# TASK 3 â€” Build Event Instance Generator + SQLâ†’JSON Publish (Production-Ready)
+# TASK 3 — Build Event Instance Generator + SQL→JSON Publish (Production-Ready)
 
 ## Objective
 Implement the generation and publish stage of the Event Calendar pipeline:
 
-Google Sheets â†’ SQL source tables â†’ EventInstances â†’ JSON cache â†’ Bot runtime
+Google Sheets → SQL source tables → EventInstances → JSON cache → Bot runtime
 
 Task 3 must generate concrete event instances from SQL source tables, apply overrides deterministically, and publish a runtime JSON cache from SQL with strong resilience guarantees.
 
@@ -55,8 +55,8 @@ Match precedence key:
 
 Actions:
 
-- `cancel` â†’ mark cancelled (preferred) or remove from publish set (must be deterministic and documented)
-- `modify` â†’ patch `New*` fields onto target instance
+- `cancel` → mark cancelled (preferred) or remove from publish set (must be deterministic and documented)
+- `modify` → patch `New*` fields onto target instance
 
 Validation:
 
@@ -77,7 +77,7 @@ Requirements:
 - Compute and store `EffectiveHash` from final post-override payload.
 - Ensure idempotent reruns and deterministic output.
 
-### 4) Publish SQL â†’ JSON runtime cache
+### 4) Publish SQL → JSON runtime cache
 Create module:
 
 - `event_calendar/cache_publisher.py` (or equivalent service-layer function)

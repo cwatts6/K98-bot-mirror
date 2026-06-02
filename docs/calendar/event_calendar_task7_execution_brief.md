@@ -1,11 +1,11 @@
-﻿# TASK 7 â€” Execution Brief (Admin Controls + Diagnostics) âœ… COMPLETED
+# TASK 7 — Execution Brief (Admin Controls + Diagnostics) ✅ COMPLETED
 
 ## Objective
 Provide robust admin command controls for manual pipeline execution and diagnostics, while preserving resilience guarantees and reusing existing canonical pipeline logic.
 
 Architecture remains:
 
-**Google Sheets â†’ SQL â†’ JSON cache â†’ Bot**
+**Google Sheets → SQL → JSON cache → Bot**
 
 ---
 

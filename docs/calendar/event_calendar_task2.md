@@ -1,4 +1,4 @@
-﻿# TASK 2 â€” Build Google Sheets â†’ SQL Sync Module âœ… COMPLETED
+# TASK 2 — Build Google Sheets → SQL Sync Module ✅ COMPLETED
 
 ## Objective
 Load Google Sheets data into SQL source tables with validation, normalization, hash-based change detection, and graceful failure handling.
