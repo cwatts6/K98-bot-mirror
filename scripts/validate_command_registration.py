@@ -31,6 +31,9 @@ collect_static_primary_inventory = _COMMAND_INVENTORY.collect_static_primary_inv
 
 PRIMARY_COMMAND_LIMIT = 100
 PRIMARY_COMMAND_WARNING_THRESHOLD = 90
+PRIMARY_COMMAND_SURFACE_LABEL = "commands package (authoritative)"
+SECONDARY_COGS_LABEL = "cogs/commands.py (disabled legacy)"
+SECONDARY_SUBSCRIBE_LABEL = "subscribe.py (disabled legacy)"
 APPROVED_TOP_LEVEL_COMMANDS = frozenset(
     {
         "activity",
@@ -107,15 +110,19 @@ class CommandRegistrationReport:
 
     @property
     def secondary_cogs_count(self) -> int:
-        return len(self.paths["cogs/commands.py (disabled legacy)"])
+        return len(self.paths.get(SECONDARY_COGS_LABEL, set()))
 
     @property
     def secondary_subscribe_count(self) -> int:
-        return len(self.paths["subscribe.py (disabled legacy)"])
+        return len(self.paths.get(SECONDARY_SUBSCRIBE_LABEL, set()))
 
     @property
     def disabled_legacy_count(self) -> int:
-        return self.secondary_cogs_count + self.secondary_subscribe_count
+        return sum(
+            len(names)
+            for label, names in self.paths.items()
+            if label != PRIMARY_COMMAND_SURFACE_LABEL
+        )
 
     @property
     def headroom(self) -> int:
@@ -123,8 +130,8 @@ class CommandRegistrationReport:
 
 
 SECONDARY_MODULES = [
-    CommandSource("cogs/commands.py (disabled legacy)", ROOT / "cogs" / "commands.py"),
-    CommandSource("subscribe.py (disabled legacy)", ROOT / "subscribe.py"),
+    CommandSource(SECONDARY_COGS_LABEL, ROOT / "cogs" / "commands.py"),
+    CommandSource(SECONDARY_SUBSCRIBE_LABEL, ROOT / "subscribe.py"),
 ]
 
 
@@ -151,7 +158,7 @@ def collect_primary_names() -> set[str]:
 
 def _build_report() -> CommandRegistrationReport:
     primary_names, grouped, primary_name_sources = _collect_primary_inventory_details()
-    paths = {"commands package (authoritative)": primary_names}
+    paths = {PRIMARY_COMMAND_SURFACE_LABEL: primary_names}
     paths.update({source.label: collect_names(source.path) for source in SECONDARY_MODULES})
     owners: dict[str, list[str]] = {}
     for label, names in paths.items():
@@ -215,11 +222,13 @@ def _report_payload(report: CommandRegistrationReport) -> dict[str, object]:
 
 def _format_text(report: CommandRegistrationReport) -> str:
     lines = [_summary_line(report)]
-    lines.append("active command surface: commands package (authoritative)")
+    lines.append(f"active command surface: {PRIMARY_COMMAND_SURFACE_LABEL}")
     if report.disabled_legacy_count:
         lines.append("disabled legacy command surfaces retained:")
         for source in SECONDARY_MODULES:
-            lines.append(f"  {source.label}: {len(report.paths[source.label])} command(s)")
+            lines.append(
+                f"  {source.label}: {len(report.paths.get(source.label, set()))} command(s)"
+            )
     else:
         lines.append("disabled legacy command surfaces: none retained")
 
@@ -306,11 +315,11 @@ def _format_markdown(report: CommandRegistrationReport) -> str:
         lines.append("- No unexpected top-level command drift detected.")
     if report.missing_approved_top_level:
         lines.append("- Approved top-level commands missing from current inventory:")
-        lines.extend(f"- `/{name}`" for name in sorted(report.missing_approved_top_level))
+        lines.extend(f"  - `/{name}`" for name in sorted(report.missing_approved_top_level))
     if report.active_duplicates:
         lines.append("- Active duplicate risks detected:")
         lines.extend(
-            f"- `/{name}`: {', '.join(report.active_duplicates[name])}"
+            f"  - `/{name}`: {', '.join(report.active_duplicates[name])}"
             for name in sorted(report.active_duplicates)
         )
     else:

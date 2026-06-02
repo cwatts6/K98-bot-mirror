@@ -446,3 +446,47 @@ def register_sample(bot):
     assert "| Top-level commands | 1 |" in output
     assert "- `/ping`" in output
     assert "No unexpected top-level command drift detected" in output
+
+
+def test_markdown_inventory_nests_missing_and_duplicate_details() -> None:
+    report = validator.CommandRegistrationReport(
+        primary_names={"new_tool", "ping"},
+        grouped={},
+        primary_name_sources={"ping": ["commands/a.py", "commands/b.py"]},
+        paths={
+            validator.PRIMARY_COMMAND_SURFACE_LABEL: {"new_tool", "ping"},
+            "renamed secondary label": {"legacy_ping"},
+        },
+        active_duplicates={"ping": ["commands/a.py", "commands/b.py"]},
+        disabled_legacy_duplicates={},
+        unexpected_top_level={"new_tool"},
+        missing_approved_top_level={"ops"},
+    )
+
+    output = validator._format_markdown(report)
+
+    assert "- Approved top-level commands missing from current inventory:" in output
+    assert "  - `/ops`" in output
+    assert "- Active duplicate risks detected:" in output
+    assert "  - `/ping`: commands/a.py, commands/b.py" in output
+    assert "| Disabled legacy declarations | 1 |" in output
+
+
+def test_report_secondary_counts_tolerate_missing_or_extended_labels() -> None:
+    report = validator.CommandRegistrationReport(
+        primary_names={"ping"},
+        grouped={},
+        primary_name_sources={},
+        paths={
+            validator.PRIMARY_COMMAND_SURFACE_LABEL: {"ping"},
+            "custom secondary surface": {"legacy_ping", "legacy_subscribe"},
+        },
+        active_duplicates={},
+        disabled_legacy_duplicates={},
+        unexpected_top_level=set(),
+        missing_approved_top_level=set(),
+    )
+
+    assert report.secondary_cogs_count == 0
+    assert report.secondary_subscribe_count == 0
+    assert report.disabled_legacy_count == 2

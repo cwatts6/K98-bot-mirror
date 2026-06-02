@@ -16,7 +16,10 @@ def test_command_governance_workflow_runs_validator_and_focused_tests() -> None:
 
     assert "python scripts/validate_command_registration.py" in workflow
     assert "command-registration-inventory.md" in workflow
-    assert (
-        "python -m pytest -q tests/test_validate_command_registration.py "
-        "tests/test_command_inventory.py tests/test_command_registration_smoke.py"
-    ) in workflow
+    assert "Commands.py" in workflow
+    assert "DL_bot.py" in workflow
+    assert "tests/test_command_governance_config.py" in workflow
+    assert "python -m pytest -q" in workflow
+    assert "tests/test_validate_command_registration.py" in workflow
+    assert "tests/test_command_inventory.py" in workflow
+    assert "tests/test_command_registration_smoke.py" in workflow
