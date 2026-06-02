@@ -181,11 +181,15 @@ atomic-write hardening; each requires a fresh scope instead of an additional Pha
 - Risk: medium
 - Dependencies: Use the post-PR-107 audit baseline (`1450 passed, 2 skipped, 19 warnings in 54.86s`); preserve genuine timeout, subprocess, lock, negative-path, and log-noise coverage.
 
-### Deferred Optimisation
+### Phase 7 In-Progress Item
 - Area: `commands/`, `scripts/validate_command_registration.py`
 - Type: architecture
 - Description: Batch 1 of the command-surface balancing audit grouped admin-heavy `/ops` and `/mge` commands, reducing the primary Discord application-command set from 100 to 82 top-level commands. Phase 3 later moved approved low-risk ops/reporting commands under `/ops`, reducing the primary set to 75. Future standalone slash commands can still erode this buffer and eventually break startup sync with Discord error 30032 unless additional command-surface consolidation remains planned.
-- Suggested Fix: Complete the command-platform programme with Phase 7 governance/CI guardrails. Group related commands by domain only through separately approved future task packs where user experience allows, identify stale/low-use admin commands for consolidation or retirement, update docs for renamed paths, and keep `scripts/validate_command_registration.py` enforcing the 100-command ceiling with a warning at 90+.
+- Resolution In Progress: Command Platform Phase 7 adds approved top-level baseline enforcement,
+  JSON/Markdown validator artifact output, focused command-governance CI, pre-commit validation,
+  and command-change checklist material. After Phase 7 lands, this command-limit drift item can be
+  closed; player self-service workflow redesign and public calendar/KVK calendar redesign remain
+  separate deferred optimisation programmes.
 - Impact: high
 - Risk: medium
 - Dependencies: Batch 1 `/ops` and `/mge` grouping, Phase 1 permission decorator standardisation, Phase 4 Ark grouping, and Phase 5A admin/leadership/operator grouping remain deployed cleanly; coordinate with bot operators before renaming public command paths; preserve standard decorator permission checks when commands move into groups.

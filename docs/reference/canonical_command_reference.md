@@ -42,6 +42,9 @@ Grouped command summary:
 
 - New admin, leadership, operator, diagnostic, and domain-maintenance commands should be designed
   group-first unless an approved task explicitly keeps them flat.
+- New top-level slash commands are blocked by `scripts/validate_command_registration.py` unless
+  the task explicitly approves the new flat path, updates the approved top-level baseline in that
+  validator, updates this reference, and documents why a grouped command is not suitable.
 - Preserve player self-service and public calendar/KVK calendar commands as flat paths until a
   dedicated workflow redesign is approved.
 - All active commands are expected to use `@versioned()`, `@safe_command`, and `@track_usage()`
@@ -52,6 +55,32 @@ Grouped command summary:
   validation expectations, and smoke references.
 - Keep `scripts/validate_command_registration.py` green. The current warning threshold is 90
   top-level commands and the hard limit is Discord's 100 top-level application-command ceiling.
+
+## Approved Top-Level Baseline
+
+The approved top-level command baseline is enforced by `APPROVED_TOP_LEVEL_COMMANDS` in
+`scripts/validate_command_registration.py`. The current approved baseline is:
+
+```text
+activity, ark, calendar, calendar_next_event, calendar_reminder_config, crystaltech, events,
+export_inventory, honor, honor_rankings, inventory, inventory_preferences, kvk, kvk_rankings,
+location, mge, modify_registration, modify_subscription, my_registrations, my_stats,
+my_stats_export, mygovernorid, myinventory, mykvkcrystaltech, mykvkhistory, mykvkstats,
+mykvktargets, next_kvk_event, next_kvk_fight, ops, ping, player_profile, prekvk,
+register_governor, registry, stats, subscribe, subscriptions, unsubscribe
+```
+
+If a task proposes a new top-level command, it must:
+
+- state why the command cannot be grouped under an existing domain group
+- include operator approval for the flat path
+- update `APPROVED_TOP_LEVEL_COMMANDS`
+- update this canonical command table and grouped summary if applicable
+- update operator/user docs and smoke references for the new path
+- run command registration validation and focused command inventory tests
+
+Grouped subcommands do not require changing the approved top-level baseline unless they create a
+new group.
 
 ## Canonical Command Table
 

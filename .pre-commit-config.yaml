@@ -106,3 +106,9 @@ repos:
             if bad:
                 print("logging.basicConfig() is not allowed. Offenders:\n - " + "\n - ".join(bad))
                 sys.exit(1)
+      - id: validate-command-registration
+        name: Validate command registration
+        entry: python scripts/validate_command_registration.py
+        language: system
+        pass_filenames: false
+        files: '^(commands/|scripts/validate_command_registration\.py|docs/reference/canonical_command_reference\.md|\.github/pull_request_template\.md)'

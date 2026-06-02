@@ -44,6 +44,11 @@ promotion or when the blast radius is broad. Use `python scripts/analyse_pytest_
 when deployment validation needs proof that pytest did not write WARNING/ERROR records to
 production operational logs.
 
+For command-surface changes, `scripts/validate_command_registration.py` also enforces the approved
+top-level command baseline. New top-level commands or command groups require operator approval,
+an `APPROVED_TOP_LEVEL_COMMANDS` update, and a matching
+`docs/reference/canonical_command_reference.md` update before promotion.
+
 ## Runtime Configuration
 
 Use `ENV_REFERENCE.md` for variable details. Common required/important values:

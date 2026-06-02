@@ -536,16 +536,19 @@ Validation:
 
 ### Phase 7 - Future Governance And CI Guardrails
 
-Status: final planned phase.
+Status: in implementation as the final planned phase.
 
 Goal: prevent command-limit drift after the programme ends.
 
 Scope:
 
 - CI enforcement around validator output.
-- Optional richer command inventory artifact from validation.
-- Command design checklist for task packs.
-- Near-limit risk reporting and domain owner summaries.
+- Pre-commit enforcement around command registration validation.
+- Approved top-level command baseline enforcement in `scripts/validate_command_registration.py`.
+- Optional JSON/Markdown command inventory artifacts from validation.
+- Command design checklist for task packs and PRs.
+- Near-limit risk reporting, grouped summary reporting, duplicate-risk reporting, and command
+  drift reporting.
 
 Validation:
 

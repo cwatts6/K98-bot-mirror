@@ -93,6 +93,22 @@ git diff --check
 git status
 ```
 
+For command-surface changes, also confirm:
+
+- `scripts/validate_command_registration.py` reports the expected primary/grouped baseline.
+- If a new top-level command or command group was approved, the production PR includes the
+  operator approval rationale, the `APPROVED_TOP_LEVEL_COMMANDS` update, and the matching
+  `docs/reference/canonical_command_reference.md` update.
+- If grouped subcommands changed, the canonical command table, grouped summary, smoke references,
+  command versions, usage tracking, permissions, and command-cache behavior were reviewed.
+- When useful for review, attach or paste the Markdown inventory generated with:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/validate_command_registration.py `
+  --format markdown `
+  --output command-registration-inventory.md
+```
+
 If pre-commit reformats files or makes other changes:
 ```powershell
 git add -A

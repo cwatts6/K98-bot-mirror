@@ -172,6 +172,31 @@ Map the likely:
 - Add or update tests unless the change is documentation-only or tooling-only.
 - Capture new out-of-scope findings as deferred optimisations.
 
+### Command Surface Governance
+
+Use this section when the task creates, moves, renames, retires, or changes any slash command,
+command group, grouped subcommand, command decorator, command registration helper, or command
+lifecycle/cache behavior. Delete it only when the task has no command-surface impact.
+
+- [ ] State whether the task changes top-level command count, grouped subcommand count, or neither.
+- [ ] Prefer grouped commands for admin, leadership, operator, diagnostic, and domain-maintenance
+  work.
+- [ ] If the task creates a new top-level command, document why an existing command group is not
+  suitable, record operator approval for the flat path, update
+  `scripts/validate_command_registration.py::APPROVED_TOP_LEVEL_COMMANDS`, update
+  `docs/reference/canonical_command_reference.md`, update relevant user/operator docs and smoke
+  references, and run command registration validation.
+- [ ] If the task creates a grouped subcommand under an existing group, update the canonical
+  command table and grouped summary, but do not change the approved top-level baseline.
+- [ ] If the task creates a new command group, treat it as a new top-level command and complete
+  the flat-path approval/baseline steps above.
+- [ ] Preserve or explicitly update `@versioned()`, `@safe_command`, `@track_usage()`, permission
+  decorators, response visibility, autocomplete/options, usage-log identity, and command-cache
+  behavior.
+- [ ] Run or justify skipping `scripts/validate_command_registration.py`,
+  `tests/test_validate_command_registration.py`, `tests/test_command_inventory.py`, and
+  `tests/test_command_registration_smoke.py`.
+
 ## 13. Refactor Decisions
 
 Classify each issue found during audit:

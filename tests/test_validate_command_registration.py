@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from scripts import validate_command_registration as validator
@@ -204,6 +205,7 @@ def register_two(bot):
     )
 
     monkeypatch.setattr(validator, "ROOT", tmp_path)
+    monkeypatch.setattr(validator, "APPROVED_TOP_LEVEL_COMMANDS", frozenset({"ping"}))
     monkeypatch.setattr(
         validator,
         "SECONDARY_MODULES",
@@ -224,7 +226,9 @@ def register_two(bot):
 
 def test_main_warns_when_primary_command_count_nears_limit(tmp_path, monkeypatch, capsys):
     command_lines = []
+    expected_names = set()
     for index in range(validator.PRIMARY_COMMAND_WARNING_THRESHOLD):
+        expected_names.add(f"cmd_{index}")
         command_lines.append(f"""
     @bot.slash_command(name="cmd_{index}", description="Command {index}")
     async def cmd_{index}(ctx):
@@ -238,6 +242,7 @@ def test_main_warns_when_primary_command_count_nears_limit(tmp_path, monkeypatch
     _write(tmp_path / "subscribe.py", "")
 
     monkeypatch.setattr(validator, "ROOT", tmp_path)
+    monkeypatch.setattr(validator, "APPROVED_TOP_LEVEL_COMMANDS", frozenset(expected_names))
     monkeypatch.setattr(
         validator,
         "SECONDARY_MODULES",
@@ -268,6 +273,7 @@ def register_sample(bot):
     )
 
     monkeypatch.setattr(validator, "ROOT", tmp_path)
+    monkeypatch.setattr(validator, "APPROVED_TOP_LEVEL_COMMANDS", frozenset({"ping"}))
     monkeypatch.setattr(
         validator,
         "SECONDARY_MODULES",
@@ -312,6 +318,7 @@ class SummaryCommands(commands.Cog):
     _write(tmp_path / "subscribe.py", "")
 
     monkeypatch.setattr(validator, "ROOT", tmp_path)
+    monkeypatch.setattr(validator, "APPROVED_TOP_LEVEL_COMMANDS", frozenset({"ping"}))
     monkeypatch.setattr(
         validator,
         "SECONDARY_MODULES",
@@ -330,3 +337,112 @@ class SummaryCommands(commands.Cog):
     assert "no active duplicate risks detected" in output
     assert "disabled legacy duplicates detected:" in output
     assert "/ping: cogs/commands.py (disabled legacy), commands package (authoritative)" in output
+
+
+def test_main_fails_on_unapproved_top_level_command(tmp_path, monkeypatch, capsys):
+    _write(
+        tmp_path / "commands" / "sample_cmds.py",
+        """
+def register_sample(bot):
+    @bot.slash_command(name="new_admin_tool", description="New admin tool")
+    async def new_admin_tool(ctx):
+        pass
+""",
+    )
+
+    monkeypatch.setattr(validator, "ROOT", tmp_path)
+    monkeypatch.setattr(validator, "APPROVED_TOP_LEVEL_COMMANDS", frozenset({"ping"}))
+    monkeypatch.setattr(
+        validator,
+        "SECONDARY_MODULES",
+        [
+            validator.CommandSource(
+                "cogs/commands.py (disabled legacy)", tmp_path / "cogs" / "commands.py"
+            ),
+            validator.CommandSource("subscribe.py (disabled legacy)", tmp_path / "subscribe.py"),
+        ],
+    )
+
+    assert validator.main() == 1
+
+    output = capsys.readouterr().out
+    assert "unexpected top-level command drift detected:" in output
+    assert "/new_admin_tool" in output
+    assert "approved top-level commands missing from current inventory:" in output
+    assert "/ping" in output
+
+
+def test_main_writes_json_inventory_artifact(tmp_path, monkeypatch, capsys):
+    _write(
+        tmp_path / "commands" / "sample_cmds.py",
+        """
+import discord
+
+
+def register_sample(bot):
+    group = discord.SlashCommandGroup("ops", "Ops")
+
+    @group.command(name="status", description="Status")
+    async def status(ctx):
+        pass
+
+    bot.add_application_command(group)
+""",
+    )
+    output_path = tmp_path / "artifacts" / "commands.json"
+
+    monkeypatch.setattr(validator, "ROOT", tmp_path)
+    monkeypatch.setattr(validator, "APPROVED_TOP_LEVEL_COMMANDS", frozenset({"ops"}))
+    monkeypatch.setattr(
+        validator,
+        "SECONDARY_MODULES",
+        [
+            validator.CommandSource(
+                "cogs/commands.py (disabled legacy)", tmp_path / "cogs" / "commands.py"
+            ),
+            validator.CommandSource("subscribe.py (disabled legacy)", tmp_path / "subscribe.py"),
+        ],
+    )
+
+    assert validator.main(["--format", "json", "--output", str(output_path)]) == 0
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["summary"]["primary"] == 1
+    assert payload["summary"]["grouped_subcommands_detected"] == 1
+    assert payload["top_level_commands"] == ["ops"]
+    assert payload["grouped_commands"] == {"ops": ["status"]}
+    assert json.loads(capsys.readouterr().out)["summary"]["headroom"] == 99
+
+
+def test_main_writes_markdown_inventory_artifact(tmp_path, monkeypatch):
+    _write(
+        tmp_path / "commands" / "sample_cmds.py",
+        """
+def register_sample(bot):
+    @bot.slash_command(name="ping", description="Ping")
+    async def ping(ctx):
+        pass
+""",
+    )
+    output_path = tmp_path / "artifacts" / "commands.md"
+
+    monkeypatch.setattr(validator, "ROOT", tmp_path)
+    monkeypatch.setattr(validator, "APPROVED_TOP_LEVEL_COMMANDS", frozenset({"ping"}))
+    monkeypatch.setattr(
+        validator,
+        "SECONDARY_MODULES",
+        [
+            validator.CommandSource(
+                "cogs/commands.py (disabled legacy)", tmp_path / "cogs" / "commands.py"
+            ),
+            validator.CommandSource("subscribe.py (disabled legacy)", tmp_path / "subscribe.py"),
+        ],
+    )
+
+    assert validator.main(["--format", "markdown", "--output", str(output_path)]) == 0
+
+    output = output_path.read_text(encoding="utf-8")
+    assert "# Command Registration Inventory" in output
+    assert "| Top-level commands | 1 |" in output
+    assert "- `/ping`" in output
+    assert "No unexpected top-level command drift detected" in output

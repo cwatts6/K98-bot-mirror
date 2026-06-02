@@ -56,6 +56,11 @@ Phase 7 governance and CI guardrails are the final planned command-platform prog
 self-service and generic public calendar/KVK calendar redesign remain deferred outside this
 command-count programme.
 
+Phase 7 guardrails enforce the approved top-level command baseline in
+`scripts/validate_command_registration.py`, wire command registration validation into local
+pre-commit and focused CI, and require future top-level command additions to update the canonical
+command reference with operator-approved rationale.
+
 This file remains the historical command-surface audit and migration record.
 
 ## Current Registration Summary

@@ -193,6 +193,12 @@ Silently leaving it in place is not acceptable.
 
 All new commands live in `commands/<domain>_cmds.py`.
 
+New admin, leadership, operator, diagnostic, and domain-maintenance command work should be
+group-first. A new top-level slash command or command group requires explicit task approval,
+operator rationale for why an existing group is unsuitable, an
+`APPROVED_TOP_LEVEL_COMMANDS` update in `scripts/validate_command_registration.py`, and a matching
+update to `docs/reference/canonical_command_reference.md`.
+
 Commands must:
 
 - use `@versioned()`, `@safe_command`, and `@track_usage()` where the local command pattern requires them

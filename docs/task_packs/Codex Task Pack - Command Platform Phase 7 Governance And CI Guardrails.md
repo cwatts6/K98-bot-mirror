@@ -103,10 +103,20 @@ should preserve that headroom through governance rather than more command moveme
 ## 7. Design Questions
 
 - Should command registration validation be enforced only in CI, or also through pre-commit?
+  - Decision: enforce in both. Pre-commit gives fast local feedback; focused CI protects PRs.
 - Should the validator produce a reusable command inventory artifact for PR review?
+  - Decision: yes. Support JSON and Markdown output; CI uploads a Markdown inventory artifact.
 - Should the validator fail on ungrouped admin/leadership/operator commands, or only warn?
+  - Decision: fail on any unexpected top-level command not present in the approved baseline. A new
+    top-level command or command group requires explicit operator approval, validator baseline
+    update, canonical reference update, and docs/smoke review.
 - What exact checklist should future task packs include when adding or changing commands?
+  - Decision: require a command-surface impact statement, group-first design, top-level approval
+    rationale when applicable, canonical docs update, validator run, focused command inventory
+    tests, and preservation/review of decorators, versions, usage tracking, response visibility,
+    command-cache behavior, docs, and smoke references.
 - Should Phase 7 close the programme after guardrails land?
+  - Decision: yes.
 
 Recommended answer for the final question: yes. Phase 7 is the final planned command-platform
 programme phase. Player self-service workflow redesign and public calendar/KVK calendar redesign
