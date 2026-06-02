@@ -24,8 +24,14 @@ def _render_activity_top(result) -> str:
 
 
 def register_activity(bot: ext_commands.Bot) -> None:
-    @bot.slash_command(
-        name="activity_top",
+    activity_group = discord.SlashCommandGroup(
+        "activity",
+        "Activity reporting controls",
+        guild_ids=[GUILD_ID],
+    )
+
+    @activity_group.command(
+        name="top",
         description="Show the top active users for a recent window.",
         guild_ids=[GUILD_ID],
     )
@@ -60,3 +66,5 @@ def register_activity(bot: ext_commands.Bot) -> None:
 
         result = await get_top_users(guild_id=int(guild_id), window=resolved_window, limit=10)
         await ctx.interaction.edit_original_response(content=_render_activity_top(result))
+
+    bot.add_application_command(activity_group)

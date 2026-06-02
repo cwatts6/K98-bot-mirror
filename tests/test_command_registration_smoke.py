@@ -43,9 +43,19 @@ def test_register_commands_smoke(monkeypatch):
     assert len([name for name in registered_top_level if name]) <= 100
     assert len([name for name in registered_top_level if name]) < 90
     assert "ark" in registered_top_level
+    assert "activity" in registered_top_level
+    assert "crystaltech" in registered_top_level
+    assert "events" in registered_top_level
+    assert "honor" in registered_top_level
+    assert "inventory" in registered_top_level
+    assert "kvk" in registered_top_level
+    assert "location" in registered_top_level
     assert "ops" in registered_top_level
     assert "mge" in registered_top_level
     assert "prekvk" in registered_top_level
+    assert "registry" in registered_top_level
+    assert "stats" in registered_top_level
+    assert "subscriptions" in registered_top_level
     assert "ark_create_match" not in registered_top_level
     assert "ark_force_announce" not in registered_top_level
     assert "ark_amend_match" not in registered_top_level
@@ -71,6 +81,43 @@ def test_register_commands_smoke(monkeypatch):
     assert "usage" not in registered_top_level
     assert "usage_detail" not in registered_top_level
     assert "test_embed" not in registered_top_level
+    assert "remove_registration" not in registered_top_level
+    assert "remove_registration_by_id" not in registered_top_level
+    assert "admin_register_governor" not in registered_top_level
+    assert "registration_audit" not in registered_top_level
+    assert "bulk_export_registrations" not in registered_top_level
+    assert "bulk_import_registrations_dryrun" not in registered_top_level
+    assert "bulk_import_registrations" not in registered_top_level
+    assert "test_kvk_export" not in registered_top_level
+    assert "refresh_stats_cache" not in registered_top_level
+    assert "player_stats" not in registered_top_level
+    assert "kvk_export_all" not in registered_top_level
+    assert "kvk_recompute" not in registered_top_level
+    assert "kvk_list_scans" not in registered_top_level
+    assert "test_kvk_embed" not in registered_top_level
+    assert "kvk_window_preview" not in registered_top_level
+    assert "import_inventory" not in registered_top_level
+    assert "inventory_import_audit" not in registered_top_level
+    assert "calendar_refresh" not in registered_top_level
+    assert "calendar_generate" not in registered_top_level
+    assert "calendar_publish_cache" not in registered_top_level
+    assert "calendar_status" not in registered_top_level
+    assert "refresh_events" not in registered_top_level
+    assert "refresh_kvk_overview" not in registered_top_level
+    assert "list_subscribers" not in registered_top_level
+    assert "migrate_subscriptions_dryrun" not in registered_top_level
+    assert "migrate_subscriptions_apply" not in registered_top_level
+    assert "crystaltech_validate" not in registered_top_level
+    assert "crystaltech_reload" not in registered_top_level
+    assert "crystaltech_admin_reset" not in registered_top_level
+    assert "honor_purge_last" not in registered_top_level
+    assert "import_locations" not in registered_top_level
+    assert "player_location" not in registered_top_level
+    assert "activity_top" not in registered_top_level
+    assert "calendar" in registered_top_level
+    assert "honor_rankings" in registered_top_level
+    assert "player_profile" in registered_top_level
+    assert "ping" in registered_top_level
 
 
 def test_startup_command_audit_uses_authoritative_inventory():

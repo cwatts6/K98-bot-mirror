@@ -5,7 +5,7 @@ to GitHub issues/task packs.
 
 Resolved historical notes were moved to `archive/deferred_optimisations_resolved.md`.
 
-Last reviewed after Command Platform Phase 4, Ark Command Grouping. PR 131
+Last reviewed after Command Platform Phase 5, Public Domain Grouping Design. PR 131
 (`codex/command-platform-phase-1-permission-decorators`) was smoke tested successfully, merged,
 and pushed to production on 2026-06-01. Phase 1 standardised active command permission gates onto
 decorators, added focused decorator tests, preserved command paths and registration count, and kept
@@ -30,6 +30,15 @@ the active command baseline to
 `primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62`.
 PR 134 (`codex/command-platform-phase-4-ark-grouping`) was smoke tested successfully, merged, and
 pushed to production on 2026-06-01.
+Phase 5 then approved Phase 5A as the admin/leadership/operator implementation slice, captured
+player self-service workflow redesign and public calendar/KVK calendar redesign as separate
+deferred optimisations, and left the command baseline unchanged at
+`primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62`.
+PR 135 (`codex/command-platform-phase-5a-design-docs`) was merged and pushed to production in
+production PR 444 on 2026-06-01.
+Phase 5A grouped the approved admin, leadership, and operator paths under domain command groups
+and reduced the active command baseline to
+`primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39`.
 Earlier review history: after the slow-pytest optimisation production
 release, PR 107
 (`pytest-log-delivery-docs`) resolved the high-impact pytest duration outliers found after the
@@ -193,7 +202,7 @@ atomic-write hardening; each requires a fresh scope instead of an additional Pha
 - Suggested Fix: Scope a dedicated player self-service workflow redesign outside the command-count programme. Review each block as a user journey before choosing command paths. For registry/account flows, specifically evaluate whether lookup, register, review, and modify should be consolidated into a coherent Governor ID/account command surface rather than four separate commands. Review SQL-backed command usage, transition/announcement needs, Discord alias limitations, docs/smoke references, permission and channel behavior, and focused regression tests before any implementation.
 - Impact: high
 - Risk: medium
-- Dependencies: Phase 5A admin/leadership/operator grouping should be completed first; requires operator approval, SQL-backed usage review, user-facing briefing, and a fresh task pack.
+- Dependencies: Phase 5A admin/leadership/operator grouping is complete; requires operator approval, SQL-backed usage review, user-facing briefing, and a fresh task pack.
 
 ### Deferred Optimisation
 - Area: `commands/calendar_cmds.py`, `commands/events_cmds.py`, `ui/views/calendar.py`, `ui/views/events_views.py`, public calendar/KVK calendar docs/tests
@@ -202,7 +211,7 @@ atomic-write hardening; each requires a fresh scope instead of an additional Pha
 - Suggested Fix: Scope a dedicated public calendar/KVK calendar UX redesign outside the command-count programme. Review whether the end state should use grouped paths such as `/calendar overview`, `/calendar kvk_overview`, `/calendar next_event`, `/calendar next_kvk_fight`, and `/calendar next_kvk_event`; decide whether all public information commands should post publicly; define the missing KVK calendar overview behavior; align button counts and visibility; update docs/smoke references; and add focused command/view tests before implementation.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5A admin/leadership/operator grouping should be completed first; requires operator approval for public visibility changes and a fresh task pack.
+- Dependencies: Phase 5A admin/leadership/operator grouping is complete; requires operator approval for public visibility changes and a fresh task pack. Phase 5A moved calendar admin/operator commands under existing `/ops calendar_*` paths so the flat public `/calendar` command remains untouched until this redesign.
 
 ### Deferred Optimisation
 - Area: SQL repo legacy PreKvK phase object retirement

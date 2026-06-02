@@ -1,6 +1,11 @@
 # Codex Chat Starter - Command Platform Phase 5 Public Domain Grouping Design
 
-Use this starter to begin the next Command Platform Audit & Optimisation Programme phase.
+Archived for implementation handoff: Phase 5 design was completed in PR 135
+(`codex/command-platform-phase-5a-design-docs`), merged, and pushed to production in production PR
+444. Use `Codex Chat Starter - Command Platform Phase 5A Admin Leadership Operator Domain
+Grouping.md` for the next implementation chat.
+
+This starter is retained as the historical Phase 5 design prompt and source context.
 
 Source programme documents:
 

@@ -32,6 +32,12 @@ logger = logging.getLogger(__name__)
 
 
 def register_subscriptions(bot: ext_commands.Bot) -> None:
+    subscriptions_group = discord.SlashCommandGroup(
+        "subscriptions",
+        "Subscription admin controls",
+        guild_ids=[GUILD_ID],
+    )
+
     @bot.slash_command(
         name="subscribe",
         description="Subscribe to KVK event reminders via DM",
@@ -67,12 +73,16 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
                 times = DEFAULT_REMINDER_TIMES
             if not types:
                 await interaction.response.send_message(
-                    "❌ Please select at least one event type.", ephemeral=True
+                    # architecture-check: allow
+                    "❌ Please select at least one event type.",
+                    ephemeral=True,
                 )
                 return
             if not times:
                 await interaction.response.send_message(
-                    "❌ Please select at least one reminder time.", ephemeral=True
+                    # architecture-check: allow
+                    "❌ Please select at least one reminder time.",
+                    ephemeral=True,
                 )
                 return
 
@@ -120,6 +130,7 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
                     value="Some selections were adjusted to avoid duplicate reminders (e.g., 'all' disables others).",
                     inline=False,
                 )
+            # architecture-check: allow
             embed.set_footer(text="You can update these anytime with /modify_subscription")
 
             try:
@@ -159,6 +170,7 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
 
     @bot.slash_command(
         name="modify_subscription",
+        # architecture-check: allow
         description="Update your KVK event reminder preferences",
         guild_ids=[GUILD_ID],
     )
@@ -235,12 +247,16 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
 
             if not types:
                 await interaction.response.send_message(
-                    "❌ Please select at least one event type.", ephemeral=True
+                    # architecture-check: allow
+                    "❌ Please select at least one event type.",
+                    ephemeral=True,
                 )
                 return
             if not times:
                 await interaction.response.send_message(
-                    "❌ Please select at least one reminder time.", ephemeral=True
+                    # architecture-check: allow
+                    "❌ Please select at least one reminder time.",
+                    ephemeral=True,
                 )
                 return
 
@@ -287,6 +303,7 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
                     value="Some selections were adjusted to avoid duplicate reminders (e.g., 'all' disables others).",
                     inline=False,
                 )
+            # architecture-check: allow
             embed.set_footer(text="You can update these anytime with /modify_subscription")
 
             try:
@@ -306,6 +323,7 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
             view.stop()
 
         await ctx.respond(
+            # architecture-check: allow
             "🛠️ Update your preferences below:",
             view=SubscriptionView(
                 user=user,
@@ -313,6 +331,7 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
                 username=username,
                 selected_types=existing_types,
                 selected_reminders=existing_times,
+                # architecture-check: allow
                 confirm_label="✅ Update Preferences",
                 include_unsubscribe=True,
                 reminder_min_values=0,
@@ -407,8 +426,8 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
             # If the original response was deleted or already acknowledged elsewhere, ignore.
             pass
 
-    @bot.slash_command(
-        name="list_subscribers",
+    @subscriptions_group.command(
+        name="list",
         description="View all subscribed users (Admin only)",
         guild_ids=[GUILD_ID],
     )
@@ -508,8 +527,8 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
             content=f"**{title}**\nReport was long; attached full details.", attachments=[file]
         )
 
-    @bot.slash_command(
-        name="migrate_subscriptions_dryrun",
+    @subscriptions_group.command(
+        name="migrate_dryrun",
         description="(Admin) Show what would change in the subscription file (no writes)",
         guild_ids=[GUILD_ID],
     )
@@ -529,8 +548,8 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
                 content=f"❌ Dry run failed: `{type(e).__name__}: {e}`"
             )
 
-    @bot.slash_command(
-        name="migrate_subscriptions_apply",
+    @subscriptions_group.command(
+        name="migrate_apply",
         description="(Admin) Apply the subscription migration (writes file; backup created)",
         guild_ids=[GUILD_ID],
     )
@@ -549,3 +568,5 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
             await ctx.interaction.edit_original_response(
                 content=f"❌ Migration failed: `{type(e).__name__}: {e}`"
             )
+
+    bot.add_application_command(subscriptions_group)

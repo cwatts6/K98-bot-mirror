@@ -163,6 +163,12 @@ async def _on_location_selected(
 
 
 def register_location(bot: ext_commands.Bot) -> None:
+    location_group = discord.SlashCommandGroup(
+        "location",
+        "Location admin and lookup controls",
+        guild_ids=[GUILD_ID],
+    )
+
     configure_location_views(
         on_profile_selected=_on_location_selected,
         on_request_refresh=lambda interaction: _send_find_all_to_location_channel(
@@ -180,8 +186,8 @@ def register_location(bot: ext_commands.Bot) -> None:
         on_refresh_timeout=lambda interaction: _notify_location_refresh_timeout(bot, interaction),
     )
 
-    @bot.slash_command(
-        name="import_locations",
+    @location_group.command(
+        name="import",
         description="Admin: import player locations from an attached output.csv",
         guild_ids=[GUILD_ID],
     )
@@ -242,8 +248,8 @@ def register_location(bot: ext_commands.Bot) -> None:
         )
         await ctx.interaction.edit_original_response(content=result.message)
 
-    @bot.slash_command(
-        name="player_location",
+    @location_group.command(
+        name="player",
         description="Show last-known (X,Y) for a Governor (by ID or Name).",
         guild_ids=[GUILD_ID],
     )
@@ -342,3 +348,5 @@ def register_location(bot: ext_commands.Bot) -> None:
         await ctx.interaction.edit_original_response(
             embed=embed, view=RefreshLocationView(target_id=target_id, ephemeral=ephemeral)
         )
+
+    bot.add_application_command(location_group)

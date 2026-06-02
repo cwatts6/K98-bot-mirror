@@ -28,24 +28,45 @@ production. The PR grouped all 14 Ark commands under `/ark`, including public
 and Ark modal/view flows, added a post-merge Discord briefing note, and confirmed
 `/ops validate_command_cache` remained green after restart.
 
+Phase 5, Public Domain Grouping Design, was completed in PR 135
+(`codex/command-platform-phase-5a-design-docs`), merged, and pushed to production in production PR
+444. The design approved Phase 5A as the next implementation slice for admin/leadership/operator
+domain grouping only, and deferred player self-service plus public calendar/KVK calendar workflow
+redesign out of the command-count programme.
+
+Phase 5A, Admin/Leadership/Operator Domain Grouping, grouped the approved admin, leadership, and
+operator paths under `/activity`, `/crystaltech`, `/events`, `/honor`, `/inventory`, `/kvk`,
+`/location`, `/ops`, `/registry`, `/stats`, and `/subscriptions` while preserving player
+self-service and public calendar/KVK calendar paths.
+
 ## Audit Baseline
 
-Static command registration validation after Phase 4 implementation reports:
+Static command registration validation after Phase 5A implementation reports:
 
 ```text
-primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62
+primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39
 ```
 
 Grouped command summary:
 
 | Group | Statically detected subcommands |
 |---|---:|
+| `/activity` | 1 |
 | `/ark` | 14 |
-| `/ops` | 21 |
+| `/crystaltech` | 3 |
+| `/events` | 2 |
+| `/honor` | 1 |
+| `/inventory` | 2 |
+| `/kvk` | 7 |
+| `/location` | 2 |
+| `/ops` | 25 |
 | `/mge` | 6 |
 | `/prekvk` | 2 |
+| `/registry` | 7 |
+| `/stats` | 1 |
+| `/subscriptions` | 3 |
 
-The primary command surface has a 38-command buffer below Discord's 100 top-level application
+The primary command surface has a 61-command buffer below Discord's 100 top-level application
 command limit. The validator warns at 90+ and fails above 100.
 
 Usage levels below are based only on local JSONL usage files under `data/command_usage_*.jsonl`
@@ -69,7 +90,7 @@ commands are marked `none observed` pending SQL usage review.
 
 | Category | Current path | Owner module | Permission model | Usage | Registration | Proposed path / disposition |
 |---|---|---|---|---:|---|---|
-| Activity | `/activity_top` | `commands/activity_cmds.py` | decorator | none observed | top-level | Phase 5A `/activity top` |
+| Activity | `/activity top` | `commands/activity_cmds.py` | decorator | none observed | grouped | Preserve |
 | Ark | `/ark create_match` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
 | Ark | `/ark force_announce` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
 | Ark | `/ark amend_match` | `commands/ark_cmds.py` | decorator | none observed | grouped | Preserve |
@@ -87,26 +108,26 @@ commands are marked `none observed` pending SQL usage review.
 | Calendar | `/calendar` | `commands/calendar_cmds.py` | public | none observed | top-level | Defer calendar/KVK calendar UX redesign |
 | Calendar | `/calendar_next_event` | `commands/calendar_cmds.py` | public | none observed | top-level | Defer calendar/KVK calendar UX redesign |
 | Calendar | `/calendar_reminder_config` | `commands/calendar_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
-| Calendar Ops | `/calendar_refresh` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/calendar refresh` |
-| Calendar Ops | `/calendar_generate` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/calendar generate` |
-| Calendar Ops | `/calendar_publish_cache` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/calendar publish_cache` |
-| Calendar Ops | `/calendar_status` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/calendar status` |
-| CrystalTech Ops | `/crystaltech_validate` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/crystaltech validate` |
-| CrystalTech Ops | `/crystaltech_reload` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/crystaltech reload` |
-| CrystalTech Ops | `/crystaltech_admin_reset` | `commands/admin_cmds.py` | decorator | none observed | top-level | Phase 5A `/crystaltech admin_reset` |
+| Calendar Ops | `/ops calendar_refresh` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
+| Calendar Ops | `/ops calendar_generate` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
+| Calendar Ops | `/ops calendar_publish_cache` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
+| Calendar Ops | `/ops calendar_status` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
+| CrystalTech Ops | `/crystaltech validate` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
+| CrystalTech Ops | `/crystaltech reload` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
+| CrystalTech Ops | `/crystaltech admin_reset` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
 | Events | `/next_kvk_fight` | `commands/events_cmds.py` | public | none observed | top-level | Defer calendar/KVK calendar UX redesign |
 | Events | `/next_kvk_event` | `commands/events_cmds.py` | public | none observed | top-level | Defer calendar/KVK calendar UX redesign |
-| Events | `/refresh_events` | `commands/events_cmds.py` | decorator | none observed | top-level | Phase 5A `/events refresh` |
-| Events | `/refresh_kvk_overview` | `commands/events_cmds.py` | decorator | none observed | top-level | Phase 5A `/events refresh_kvk_overview` |
+| Events | `/events refresh` | `commands/events_cmds.py` | decorator | none observed | grouped | Preserve |
+| Events | `/events refresh_kvk_overview` | `commands/events_cmds.py` | decorator | none observed | grouped | Preserve |
 | Honor/KVK | `/honor_rankings` | `commands/stats_cmds.py` | decorator | none observed | top-level | Defer; public/channel-limited ranking UX |
-| Honor/KVK | `/honor_purge_last` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/honor purge_last` |
-| Inventory | `/import_inventory` | `commands/inventory_cmds.py` | decorator | none observed | top-level | Phase 5A `/inventory import` |
+| Honor/KVK | `/honor purge_last` | `commands/stats_cmds.py` | decorator | none observed | grouped | Preserve |
+| Inventory | `/inventory import` | `commands/inventory_cmds.py` | decorator | none observed | grouped | Preserve |
 | Inventory | `/myinventory` | `commands/inventory_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
 | Inventory | `/inventory_preferences` | `commands/inventory_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
 | Inventory | `/export_inventory` | `commands/inventory_cmds.py` | service authorization context | none observed | top-level | Defer player self-service workflow redesign |
-| Inventory | `/inventory_import_audit` | `commands/inventory_cmds.py` | decorator | none observed | top-level | Phase 5A `/inventory audit` |
-| Location | `/import_locations` | `commands/location_cmds.py` | decorator | none observed | top-level | Phase 5A `/location import` |
-| Location | `/player_location` | `commands/location_cmds.py` | admin/leadership allowed channels | none observed | top-level | Phase 5A `/location player` |
+| Inventory | `/inventory audit` | `commands/inventory_cmds.py` | decorator | none observed | grouped | Preserve |
+| Location | `/location import` | `commands/location_cmds.py` | decorator | none observed | grouped | Preserve |
+| Location | `/location player` | `commands/location_cmds.py` | admin/leadership allowed channels | none observed | grouped | Preserve |
 | MGE | `/mge leadership_board` | `commands/mge_cmds.py` | decorator | none observed | grouped | Preserve |
 | MGE | `/mge import_results` | `commands/mge_cmds.py` | decorator | none observed | grouped | Preserve |
 | MGE | `/mge refresh_cache` | `commands/mge_cmds.py` | decorator | none observed | grouped | Preserve |
@@ -139,34 +160,34 @@ commands are marked `none observed` pending SQL usage review.
 | Processing Reports | `/ops failures` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
 | Registry | `/register_governor` | `commands/registry_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
 | Registry | `/modify_registration` | `commands/registry_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
-| Registry | `/remove_registration` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry remove` |
-| Registry | `/remove_registration_by_id` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry remove_by_id` |
+| Registry | `/registry remove` | `commands/registry_cmds.py` | decorator | none observed | grouped | Preserve |
+| Registry | `/registry remove_by_id` | `commands/registry_cmds.py` | decorator | none observed | grouped | Preserve |
 | Registry | `/my_registrations` | `commands/registry_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
-| Registry | `/admin_register_governor` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry admin_register` |
-| Registry | `/registration_audit` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry audit` |
-| Registry | `/bulk_export_registrations` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry bulk_export` |
-| Registry | `/bulk_import_registrations_dryrun` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry bulk_import_dryrun` |
-| Registry | `/bulk_import_registrations` | `commands/registry_cmds.py` | decorator | none observed | top-level | Phase 5A `/registry bulk_import` |
+| Registry | `/registry admin_register` | `commands/registry_cmds.py` | decorator | none observed | grouped | Preserve |
+| Registry | `/registry audit` | `commands/registry_cmds.py` | decorator | none observed | grouped | Preserve |
+| Registry | `/registry bulk_export` | `commands/registry_cmds.py` | decorator | none observed | grouped | Preserve |
+| Registry | `/registry bulk_import_dryrun` | `commands/registry_cmds.py` | decorator | none observed | grouped | Preserve |
+| Registry | `/registry bulk_import` | `commands/registry_cmds.py` | decorator | none observed | grouped | Preserve |
 | Stats Ops | `/ops test_embed` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
-| Stats/KVK | `/test_kvk_export` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk test_export` |
+| Stats/KVK | `/kvk test_export` | `commands/stats_cmds.py` | decorator | none observed | grouped | Preserve |
 | Stats/KVK | `/mykvkstats` | `commands/stats_cmds.py` | decorator | none observed | top-level | Defer player self-service workflow redesign |
-| Stats/KVK | `/refresh_stats_cache` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk refresh_stats_cache` |
+| Stats/KVK | `/kvk refresh_stats_cache` | `commands/stats_cmds.py` | decorator | none observed | grouped | Preserve |
 | Stats/KVK | `/my_stats` | `commands/stats_cmds.py` | decorator | none observed | top-level | Defer player self-service workflow redesign |
 | Stats/KVK | `/my_stats_export` | `commands/stats_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
-| Stats/KVK | `/player_stats` | `commands/stats_cmds.py` | admin/leadership | none observed | top-level | Phase 5A `/stats player` |
+| Stats/KVK | `/stats player` | `commands/stats_cmds.py` | admin/leadership | none observed | grouped | Preserve |
 | Stats/KVK | `/mykvkhistory` | `commands/stats_cmds.py` | decorator | none observed | top-level | Defer player self-service workflow redesign |
 | Stats/KVK | `/kvk_rankings` | `commands/stats_cmds.py` | decorator | none observed | top-level | Defer; public/channel-limited ranking UX |
-| Stats/KVK | `/kvk_export_all` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk export_all` |
-| Stats/KVK | `/kvk_recompute` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk recompute` |
-| Stats/KVK | `/kvk_list_scans` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk list_scans` |
-| Stats/KVK | `/test_kvk_embed` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk test_embed` |
-| Stats/KVK | `/kvk_window_preview` | `commands/stats_cmds.py` | decorator | none observed | top-level | Phase 5A `/kvk window_preview` |
+| Stats/KVK | `/kvk export_all` | `commands/stats_cmds.py` | decorator | none observed | grouped | Preserve |
+| Stats/KVK | `/kvk recompute` | `commands/stats_cmds.py` | decorator | none observed | grouped | Preserve |
+| Stats/KVK | `/kvk list_scans` | `commands/stats_cmds.py` | decorator | none observed | grouped | Preserve |
+| Stats/KVK | `/kvk test_embed` | `commands/stats_cmds.py` | decorator | none observed | grouped | Preserve |
+| Stats/KVK | `/kvk window_preview` | `commands/stats_cmds.py` | decorator | none observed | grouped | Preserve |
 | Subscriptions | `/subscribe` | `commands/subscriptions_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
 | Subscriptions | `/modify_subscription` | `commands/subscriptions_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
 | Subscriptions | `/unsubscribe` | `commands/subscriptions_cmds.py` | public | none observed | top-level | Defer player self-service workflow redesign |
-| Subscriptions | `/list_subscribers` | `commands/subscriptions_cmds.py` | decorator | none observed | top-level | Phase 5A `/subscriptions list` |
-| Subscriptions | `/migrate_subscriptions_dryrun` | `commands/subscriptions_cmds.py` | decorator | none observed | top-level | Phase 5A `/subscriptions migrate_dryrun` |
-| Subscriptions | `/migrate_subscriptions_apply` | `commands/subscriptions_cmds.py` | decorator | none observed | top-level | Phase 5A `/subscriptions migrate_apply` |
+| Subscriptions | `/subscriptions list` | `commands/subscriptions_cmds.py` | decorator | none observed | grouped | Preserve |
+| Subscriptions | `/subscriptions migrate_dryrun` | `commands/subscriptions_cmds.py` | decorator | none observed | grouped | Preserve |
+| Subscriptions | `/subscriptions migrate_apply` | `commands/subscriptions_cmds.py` | decorator | none observed | grouped | Preserve |
 | Telemetry | `/ping` | `commands/telemetry_cmds.py` | public | none observed | top-level | Keep flat or move to `/ops ping` |
 | Usage Analytics | `/ops usage` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
 | Usage Analytics | `/ops usage_detail` | `commands/admin_cmds.py` | decorator | none observed | grouped | Preserve |
@@ -176,13 +197,13 @@ commands are marked `none observed` pending SQL usage review.
 | Domain | Strengths | Weaknesses / risks | Improvement opportunity |
 |---|---|---|---|
 | Ark | Strong service/DAL/test ecosystem and consistent leadership decorators on most admin paths. Phase 4 grouped all Ark commands under `/ark`. | Create/amend/cancel command bodies still contain substantial orchestration that should move into services later. | Follow up with an Ark command orchestration extraction batch. |
-| Ops | Core operational tools are grouped and command lifecycle reuse is strong. Phase 3 moved approved reporting, usage, and test ops paths under `/ops`. | Calendar, CrystalTech, registry admin, KVK admin, location, activity, and subscription admin commands remain flat. | Execute approved Phase 5A admin/leadership/operator domain grouping. |
+| Ops | Core operational tools are grouped and command lifecycle reuse is strong. Phase 3 moved approved reporting, usage, and test ops paths under `/ops`; Phase 5A added calendar admin/operator paths under `/ops calendar_*`. | Public/player command moves are still intentionally deferred. | Preserve grouped ops paths and continue to defer public/player workflow redesign work. |
 | MGE | Already grouped; permission decorators mostly consistent. | `/mge admin_completion` uses an inline admin check. | Standardise decorator and preserve current grouped path. |
-| Public KVK/Stats | Rich test coverage and recent service/DAL cleanup around KVK admin commands. | Personal player paths are flat and likely high-traffic; some current commands may reflect development slices rather than ideal user journeys. | Move only admin/leadership KVK/stat commands in Phase 5A; defer personal player workflow redesign. |
-| Registry | Strong service/cache tests and command service extraction. | Public self-service paths are discoverability-sensitive and may be better redesigned around a coherent Governor ID/account workflow. | Group admin registry commands in Phase 5A; defer public account workflow redesign. |
-| Inventory | Service-oriented implementation and focused inventory tests. Phase 1 standardised command access checks onto decorators. | Inventory export still passes admin context to the service for self-service/admin override semantics; personal commands are high-discoverability. | Move import/audit only in Phase 5A; defer personal inventory workflow redesign. |
-| Calendar / Events | Calendar command layer is thin and docs are extensive. | Public calendar/KVK calendar commands have inconsistent naming, visibility, scope, and button behavior. | Move admin refresh/status commands in Phase 5A; defer public calendar/KVK calendar UX redesign. |
-| Subscriptions | Public flow is simple and tested via views. | Public subscription commands are player self-service paths that need communication and may benefit from flow redesign. | Move admin list/migration commands in Phase 5A; defer subscription self-service redesign. |
+| Public KVK/Stats | Rich test coverage and recent service/DAL cleanup around KVK admin commands. Phase 5A grouped KVK admin paths under `/kvk` and leadership lookup under `/stats player`. | Personal player paths are flat and likely high-traffic; some current commands may reflect development slices rather than ideal user journeys. | Defer personal player workflow redesign. |
+| Registry | Strong service/cache tests and command service extraction. Phase 5A grouped registry admin paths under `/registry`. | Public self-service paths are discoverability-sensitive and may be better redesigned around a coherent Governor ID/account workflow. | Defer public account workflow redesign. |
+| Inventory | Service-oriented implementation and focused inventory tests. Phase 5A grouped import/audit admin paths under `/inventory`. | Inventory export still passes admin context to the service for self-service/admin override semantics; personal commands are high-discoverability. | Defer personal inventory workflow redesign. |
+| Calendar / Events | Calendar command layer is thin and docs are extensive. Phase 5A grouped calendar admin paths under `/ops` and event refresh paths under `/events`. | Public calendar/KVK calendar commands have inconsistent naming, visibility, scope, and button behavior. | Defer public calendar/KVK calendar UX redesign. |
+| Subscriptions | Public flow is simple and tested via views. Phase 5A grouped admin list/migration paths under `/subscriptions`. | Public subscription commands are player self-service paths that need communication and may benefit from flow redesign. | Defer subscription self-service redesign. |
 | Secondary cogs | Phase 2 retired unused disabled legacy declarations. | No active secondary command surface remains. | Keep validator tolerant of missing retired paths and focused on active startup-sync risks. |
 
 ## Technical Debt Register
@@ -392,15 +413,37 @@ Delivered validation:
   validation, pytest log-noise analysis, and Codex Security diff review passed before merge.
 - Production smoke confirmed `/ops validate_command_cache` green after restart.
 
-### Phase 5 - Public Domain Grouping Design / Phase 5A Admin Grouping
+### Phase 5 - Public Domain Grouping Design
 
-Status: design approved for Phase 5A only. See
-`docs/task_packs/Codex Task Pack - Command Platform Phase 5 Public Domain Grouping Design.md`.
+Status: complete. Delivered in PR 135 (`codex/command-platform-phase-5a-design-docs`), merged,
+and pushed to production in production PR 444.
 
-Goal: implement only the approved admin/leadership/operator grouping slice and defer player
-self-service plus public calendar/KVK calendar redesign out of this command-count programme.
+Goal: decide the public/player command policy before runtime movement. The design approved Phase
+5A only for admin/leadership/operator grouping, and deferred player self-service plus public
+calendar/KVK calendar redesign out of the command-count programme.
 
-Approved Phase 5A scope:
+Delivered scope:
+
+- Approved Phase 5A as the only next implementation slice.
+- Captured player self-service workflow redesign as a separate deferred optimisation.
+- Captured public calendar/KVK calendar UX redesign as a separate deferred optimisation.
+- Archived the completed Phase 4 task pack and added Phase 5 source docs.
+
+Validation:
+
+- Architecture boundary validation
+- Deferred optimisation validation
+- Test selector
+- Command registration validation
+- Smoke imports
+
+### Phase 5A - Admin/Leadership/Operator Domain Grouping
+
+Status: implemented in this Phase 5A branch.
+
+Goal: group only the approved admin/leadership/operator command slice.
+
+Delivered Phase 5A scope:
 
 - `/registry`: remove, remove_by_id, admin_register, audit, bulk_export, bulk_import_dryrun,
   bulk_import
@@ -408,7 +451,7 @@ Approved Phase 5A scope:
   window_preview
 - `/stats`: player
 - `/inventory`: import, audit
-- `/calendar`: refresh, generate, publish_cache, status
+- `/ops`: calendar_refresh, calendar_generate, calendar_publish_cache, calendar_status
 - `/events`: refresh, refresh_kvk_overview
 - `/subscriptions`: list, migrate_dryrun, migrate_apply
 - `/crystaltech`: validate, reload, admin_reset
@@ -422,6 +465,8 @@ Implementation notes:
   visibility, command-cache behavior, and handler bodies.
 - `/player_location` and `/player_stats` are included because they are admin/leadership lookup
   commands, not player self-service commands.
+- Calendar admin/operator commands moved under existing `/ops calendar_*` paths in Phase 5A
+  because `/calendar` remains a flat public command until a later public calendar redesign.
 - Leave player self-service commands flat in Phase 5A; capture them as a separate workflow
   redesign deferred optimisation.
 - Leave generic public calendar/KVK calendar commands flat in Phase 5A; capture them as a
@@ -432,6 +477,8 @@ Validation:
 - Domain-focused command tests.
 - Permission boundary tests for admin/public split.
 - Docs update review for every renamed path.
+- Command registration validation reports
+  `primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39`.
 
 ### Phase 6 - Canonical Command Documentation
 
@@ -472,10 +519,12 @@ Validation:
 2. Phase 2: Validator And Inventory Tooling Enhancement.
 3. Phase 3: Low-Risk Ops Consolidation And Startup Audit Log Alignment.
 4. Phase 4: Ark Command Grouping.
-5. Phase 5A: Admin/Leadership/Operator Domain Grouping.
-6. Phase 6: Canonical Command Documentation.
-7. Phase 7: Future Governance And CI Guardrails.
+5. Phase 5: Public Domain Grouping Design.
+6. Phase 5A: Admin/Leadership/Operator Domain Grouping.
+7. Phase 6: Canonical Command Documentation.
+8. Phase 7: Future Governance And CI Guardrails.
 
-The next implementation PR should be Phase 5A only. Player self-service workflow redesign and
-public calendar/KVK calendar redesign are deferred into separate optimisation tasks rather than
+With Phase 5A implemented, the next command-platform work should be canonical command
+documentation and governance guardrails. Player self-service workflow redesign and public
+calendar/KVK calendar redesign remain deferred into separate optimisation tasks rather than
 continued as simple command grouping inside this programme.

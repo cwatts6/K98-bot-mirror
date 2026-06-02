@@ -71,6 +71,7 @@ def _get_registered_command_impl(module, command_name: str):
 
     fake_bot.add_listener = add_listener
     fake_bot.slash_command = slash_command
+    fake_bot.add_application_command = lambda _command: None
     fake_bot.tree = types.SimpleNamespace()
     fake_bot.tree.command = lambda **kw: lambda f: f
 

@@ -21,8 +21,14 @@ logger = logging.getLogger(__name__)
 
 
 def register_inventory(bot: ext_commands.Bot) -> None:
-    @bot.slash_command(
-        name="import_inventory",
+    inventory_group = discord.SlashCommandGroup(
+        "inventory",
+        "Inventory admin controls",
+        guild_ids=[GUILD_ID],
+    )
+
+    @inventory_group.command(
+        name="import",
         description="Import a resources, speedups, or materials inventory screenshot",
         guild_ids=[GUILD_ID],
     )
@@ -189,8 +195,8 @@ def register_inventory(bot: ext_commands.Bot) -> None:
             if export_file is not None:
                 export_service.cleanup_export_file(export_file)
 
-    @bot.slash_command(
-        name="inventory_import_audit",
+    @inventory_group.command(
+        name="audit",
         description="Admin: review inventory import batches and retained debug references",
         guild_ids=[GUILD_ID],
     )
@@ -275,6 +281,8 @@ def register_inventory(bot: ext_commands.Bot) -> None:
                 "Inventory import audit failed. Please try again or contact an admin.",
                 ephemeral=True,
             )
+
+    bot.add_application_command(inventory_group)
 
 
 def _build_inventory_audit_embed(

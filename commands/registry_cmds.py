@@ -101,6 +101,11 @@ def _build_my_registrations_embed(
 
 
 def register_registry(bot: ext_commands.Bot) -> None:
+    registry_group = discord.SlashCommandGroup(
+        "registry",
+        "Registry admin controls",
+        guild_ids=[GUILD_ID],
+    )
 
     # --- helpers (reuse if already present) ---
     # --- UNIFIED autocomplete for account_type (works with both commands) ---
@@ -162,6 +167,7 @@ def register_registry(bot: ext_commands.Bot) -> None:
                 embed=None,
                 view=None,
             )
+
             return
 
         # Validate numeric GovernorID
@@ -310,8 +316,8 @@ def register_registry(bot: ext_commands.Bot) -> None:
         )
 
     # === Normal command (member picker OR raw ID) ===
-    @bot.slash_command(
-        name="remove_registration",
+    @registry_group.command(
+        name="remove",
         description="Admin-only: Remove a registered Governor account from a user.",
         guild_ids=[GUILD_ID],
     )
@@ -392,8 +398,8 @@ def register_registry(bot: ext_commands.Bot) -> None:
             )
         )
 
-    @bot.slash_command(
-        name="remove_registration_by_id",
+    @registry_group.command(
+        name="remove_by_id",
         description="Admin: remove a registered account by Discord ID (works if user not in server)",
         guild_ids=[GUILD_ID],
     )
@@ -551,8 +557,8 @@ def register_registry(bot: ext_commands.Bot) -> None:
             pass
 
     # --- Admin-only: register a governor for another user ---
-    @bot.slash_command(
-        name="admin_register_governor",
+    @registry_group.command(
+        name="admin_register",
         description="Admin: register a player's account by Discord user + Governor ID.",
         guild_ids=[GUILD_ID],
     )
@@ -661,8 +667,8 @@ def register_registry(bot: ext_commands.Bot) -> None:
         )
 
     # --- Admin-only: audit registrations and gaps ---
-    @bot.slash_command(
-        name="registration_audit",
+    @registry_group.command(
+        name="audit",
         description="Admin: visualise who is registered, who isn't, and which GovernorIDs are unregistered.",
         guild_ids=[GUILD_ID],
     )
@@ -824,8 +830,8 @@ def register_registry(bot: ext_commands.Bot) -> None:
                 logger.exception("Failed to send registration_audit files.")
 
     # ---------- EXPORT (now includes roles and excel safe RAW fields) ----------
-    @bot.slash_command(
-        name="bulk_export_registrations",
+    @registry_group.command(
+        name="bulk_export",
         description="Admin: export current registrations as CSV (with roles).",
         guild_ids=[GUILD_ID],
     )
@@ -988,8 +994,8 @@ def register_registry(bot: ext_commands.Bot) -> None:
             return attach, "xlsx"
         return attach, "unknown"
 
-    @bot.slash_command(
-        name="bulk_import_registrations_dryrun",
+    @registry_group.command(
+        name="bulk_import_dryrun",
         description="Admin: validate a registrations CSV without saving.",
         guild_ids=[GUILD_ID],
     )
@@ -1159,8 +1165,8 @@ def register_registry(bot: ext_commands.Bot) -> None:
             await send(embed=embed, ephemeral=True)
 
     # ---------- IMPORT (COMMIT) ----------
-    @bot.slash_command(
-        name="bulk_import_registrations",
+    @registry_group.command(
+        name="bulk_import",
         description="Admin: import registrations from CSV or XLSX (commits changes).",
         guild_ids=[GUILD_ID],
     )
@@ -1278,3 +1284,5 @@ def register_registry(bot: ext_commands.Bot) -> None:
                 file=discord.File(bio, filename="import_summary.txt"),
                 ephemeral=True,
             )
+
+    bot.add_application_command(registry_group)

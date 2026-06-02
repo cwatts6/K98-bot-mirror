@@ -40,17 +40,34 @@ def test_render_activity_top_breakdown():
 async def test_activity_command_registration_handoff(monkeypatch):
     import commands.activity_cmds as activity_cmds
 
-    registered = {}
+    groups = {}
 
-    class FakeBot:
-        def slash_command(self, **kwargs):
+    class FakeGroup:
+        def __init__(self, name, description, guild_ids=None):
+            self.name = name
+            self.description = description
+            self.guild_ids = guild_ids
+            self.commands = {}
+
+        def command(self, **kwargs):
             def _decorator(fn):
-                registered[kwargs["name"]] = fn
+                self.commands[kwargs["name"]] = fn
                 return fn
 
             return _decorator
 
+    class FakeBot:
+        def slash_command(self, **kwargs):
+            def _decorator(fn):
+                return fn
+
+            return _decorator
+
+        def add_application_command(self, group):
+            groups[group.name] = group
+
     monkeypatch.setattr(activity_cmds, "GUILD_ID", 1)
+    monkeypatch.setattr(activity_cmds.discord, "SlashCommandGroup", FakeGroup)
     activity_cmds.register_activity(FakeBot())
 
-    assert "activity_top" in registered
+    assert groups["activity"].commands.keys() == {"top"}

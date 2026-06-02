@@ -109,6 +109,11 @@ def register_admin(bot: ext_commands.Bot) -> None:
         "Operational admin controls",
         guild_ids=[GUILD_ID],
     )
+    crystaltech_group = discord.SlashCommandGroup(
+        "crystaltech",
+        "CrystalTech admin controls",
+        guild_ids=[GUILD_ID],
+    )
 
     @ops_group.command(
         name="summary", description="View today's file processing summary", guild_ids=[GUILD_ID]
@@ -1468,8 +1473,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
                 content=f"Sorry, I couldn't load usage detail: `{type(e).__name__}: {e}`"
             )
 
-    @bot.slash_command(
-        name="crystaltech_validate",
+    @crystaltech_group.command(
+        name="validate",
         description="Validate CrystalTech config & assets.",
         guild_ids=[GUILD_ID],
     )
@@ -1493,8 +1498,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
         embed = _format_validate_embed(report)
         await ctx.respond(embed=embed, ephemeral=True)
 
-    @bot.slash_command(
-        name="crystaltech_reload",
+    @crystaltech_group.command(
+        name="reload",
         description="Reload CrystalTech config (hot).",
         guild_ids=[GUILD_ID],
     )
@@ -1514,8 +1519,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
         embed = _format_validate_embed(report)
         await ctx.respond(embed=embed, ephemeral=True)
 
-    @bot.slash_command(
-        name="crystaltech_admin_reset",
+    @crystaltech_group.command(
+        name="admin_reset",
         description="Archive CrystalTech progress and reset for the next KVK.",
         guild_ids=[GUILD_ID],
     )
@@ -1563,7 +1568,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
             logger.exception("[/crystaltech_admin_reset] failed")
             await ctx.followup.send(f"❌ Failed: `{type(e).__name__}: {e}`", ephemeral=only_me)
 
-    @bot.slash_command(
+    @ops_group.command(
         name="calendar_refresh",
         description="Refresh Event Calendar pipeline (sync → generate → publish).",
         guild_ids=[GUILD_ID],
@@ -1635,7 +1640,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
         embed.timestamp = datetime.utcnow()
         await ctx.interaction.edit_original_response(embed=embed)
 
-    @bot.slash_command(
+    @ops_group.command(
         name="calendar_generate",
         description="Generate EventInstances from SQL source tables.",
         guild_ids=[GUILD_ID],
@@ -1687,7 +1692,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
         await ctx.interaction.edit_original_response(embed=embed)
 
-    @bot.slash_command(
+    @ops_group.command(
         name="calendar_publish_cache",
         description="Publish runtime Event Calendar JSON cache from SQL.",
         guild_ids=[GUILD_ID],
@@ -1740,7 +1745,7 @@ def register_admin(bot: ext_commands.Bot) -> None:
 
         await ctx.interaction.edit_original_response(embed=embed)
 
-    @bot.slash_command(
+    @ops_group.command(
         name="calendar_status",
         description="Show Event Calendar sync/generate/publish status.",
         guild_ids=[GUILD_ID],
@@ -1864,3 +1869,4 @@ def register_admin(bot: ext_commands.Bot) -> None:
         await ctx.interaction.edit_original_response(embed=embed)
 
     bot.add_application_command(ops_group)
+    bot.add_application_command(crystaltech_group)

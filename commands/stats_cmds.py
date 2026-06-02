@@ -56,9 +56,24 @@ bot: ext_commands.Bot | None = None
 def register_stats(bot_instance: ext_commands.Bot) -> None:
     global bot
     bot = bot_instance
+    kvk_group = discord.SlashCommandGroup(
+        "kvk",
+        "KVK admin controls",
+        guild_ids=[GUILD_ID],
+    )
+    stats_group = discord.SlashCommandGroup(
+        "stats",
+        "Stats leadership controls",
+        guild_ids=[GUILD_ID],
+    )
+    honor_group = discord.SlashCommandGroup(
+        "honor",
+        "Honor admin controls",
+        guild_ids=[GUILD_ID],
+    )
 
-    @bot.slash_command(
-        name="test_kvk_export",
+    @kvk_group.command(
+        name="test_export",
         description="🧪 Admin: Test KVK Google Sheets export without performing an import",
         guild_ids=[GUILD_ID],
     )
@@ -367,7 +382,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             view=view,
         )
 
-    @bot.slash_command(
+    @kvk_group.command(
         name="refresh_stats_cache",
         description="Admin only: Refresh player stats cache",
         guild_ids=[GUILD_ID],
@@ -693,8 +708,8 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         finally:
             stats_export_service.cleanup_export_file(export_file)
 
-    @bot.slash_command(
-        name="player_stats",
+    @stats_group.command(
+        name="player",
         description="(Leadership) View stats for a player by GovernorID or fuzzy name",
         guild_ids=[GUILD_ID],
     )
@@ -950,8 +965,8 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             except Exception:
                 view.message = None
 
-    @bot.slash_command(
-        name="kvk_export_all",
+    @kvk_group.command(
+        name="export_all",
         description="Export all-kingdom KVK tabs",
         guild_ids=[GUILD_ID],
     )
@@ -1019,8 +1034,8 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 f"💥 Export failed for KVK `{kvk_no}`. Check logs.", ephemeral=True
             )
 
-    @bot.slash_command(
-        name="kvk_recompute",
+    @kvk_group.command(
+        name="recompute",
         description="Recompute windowed outputs for the current KVK",
         guild_ids=[GUILD_ID],
     )
@@ -1042,8 +1057,8 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         except Exception as e:
             await ctx.followup.send(f"💥 {type(e).__name__}: {e}", ephemeral=True)
 
-    @bot.slash_command(
-        name="kvk_list_scans",
+    @kvk_group.command(
+        name="list_scans",
         description="List recent scans for a KVK",
         guild_ids=[GUILD_ID],
     )
@@ -1072,8 +1087,8 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         except Exception as e:
             await ctx.followup.send(f"❌ {type(e).__name__}: {e}", ephemeral=True)
 
-    @bot.slash_command(
-        name="test_kvk_embed",
+    @kvk_group.command(
+        name="test_embed",
         description="🧪 Post the KVK daily embed in test mode",
         guild_ids=[GUILD_ID],
     )
@@ -1116,8 +1131,8 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 f"❌ Failed to send test embed:\n`{type(e).__name__}: {e}`", ephemeral=True
             )
 
-    @bot.slash_command(
-        name="kvk_window_preview",
+    @kvk_group.command(
+        name="window_preview",
         description="Show KVK windows with scan edges, scan counts, and row counts",
         guild_ids=[GUILD_ID],
     )
@@ -1211,8 +1226,8 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         view = HonorRankingView()
         await ctx.followup.send(embed=embed, view=view, ephemeral=False)
 
-    @bot.slash_command(
-        name="honor_purge_last",
+    @honor_group.command(
+        name="purge_last",
         description="Purge the latest Honour scan (test cleanup).",
         guild_ids=[GUILD_ID],
     )
@@ -1236,3 +1251,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
 
         embed = discord.Embed(title=title, description=desc, color=color)
         await ctx.followup.send(embed=embed, ephemeral=True)
+
+    bot.add_application_command(kvk_group)
+    bot.add_application_command(stats_group)
+    bot.add_application_command(honor_group)

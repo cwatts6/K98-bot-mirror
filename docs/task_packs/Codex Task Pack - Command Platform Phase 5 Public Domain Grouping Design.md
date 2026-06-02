@@ -7,7 +7,7 @@
 - Owner/context: Command Platform Audit & Optimisation Programme
 - Task type: deferred optimisation batch / command-surface design
 - One-pass approved: no
-- Status: approved for Phase 5A admin/leadership/operator grouping only
+- Status: complete; delivered in PR 135, merged, and pushed to production in production PR 444
 
 ## 2. Required Reading
 
@@ -120,10 +120,10 @@ Approved Phase 5A candidates:
   - `/import_inventory` -> `/inventory import`
   - `/inventory_import_audit` -> `/inventory audit`
 - Calendar admin/operator:
-  - `/calendar_refresh` -> `/calendar refresh`
-  - `/calendar_generate` -> `/calendar generate`
-  - `/calendar_publish_cache` -> `/calendar publish_cache`
-  - `/calendar_status` -> `/calendar status`
+  - `/calendar_refresh` -> `/ops calendar_refresh`
+  - `/calendar_generate` -> `/ops calendar_generate`
+  - `/calendar_publish_cache` -> `/ops calendar_publish_cache`
+  - `/calendar_status` -> `/ops calendar_status`
 - Events admin/operator:
   - `/refresh_events` -> `/events refresh`
   - `/refresh_kvk_overview` -> `/events refresh_kvk_overview`
@@ -148,6 +148,12 @@ admin/leadership lookup commands, not player self-service commands.
 
 Expected Phase 5A outcome: reduce the top-level command count without changing public/player
 self-service workflows.
+
+Implementation correction: Phase 5A should not create a `/calendar` command group while the public
+flat `/calendar` command remains in place. Calendar admin/operator commands should move under the
+existing `/ops` group for Phase 5A. A future public calendar/KVK calendar redesign can decide
+whether `/calendar overview` and related grouped public paths should replace the current flat
+public command.
 
 ## 6. Deferred From Phase 5A
 

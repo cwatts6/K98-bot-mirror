@@ -86,7 +86,7 @@ def register_sample(bot):
     assert grouped == {"ops": {"audit", "status"}}
 
 
-def test_current_command_surface_reflects_phase4_ark_grouping():
+def test_current_command_surface_reflects_phase5a_admin_grouping():
     names, grouped = validator.collect_primary_inventory()
 
     moved_to_ops = {
@@ -97,6 +97,10 @@ def test_current_command_surface_reflects_phase4_ark_grouping():
         "usage",
         "usage_detail",
         "test_embed",
+        "calendar_refresh",
+        "calendar_generate",
+        "calendar_publish_cache",
+        "calendar_status",
     }
     moved_to_ark = {
         "ark_create_match": "create_match",
@@ -114,15 +118,58 @@ def test_current_command_surface_reflects_phase4_ark_grouping():
         "ark_generate_draft": "generate_draft",
         "create_ark_team": "create_team",
     }
+    phase5a_moves = {
+        "registry": {
+            "remove_registration": "remove",
+            "remove_registration_by_id": "remove_by_id",
+            "admin_register_governor": "admin_register",
+            "registration_audit": "audit",
+            "bulk_export_registrations": "bulk_export",
+            "bulk_import_registrations_dryrun": "bulk_import_dryrun",
+            "bulk_import_registrations": "bulk_import",
+        },
+        "kvk": {
+            "test_kvk_export": "test_export",
+            "refresh_stats_cache": "refresh_stats_cache",
+            "kvk_export_all": "export_all",
+            "kvk_recompute": "recompute",
+            "kvk_list_scans": "list_scans",
+            "test_kvk_embed": "test_embed",
+            "kvk_window_preview": "window_preview",
+        },
+        "stats": {"player_stats": "player"},
+        "inventory": {"import_inventory": "import", "inventory_import_audit": "audit"},
+        "events": {"refresh_events": "refresh", "refresh_kvk_overview": "refresh_kvk_overview"},
+        "subscriptions": {
+            "list_subscribers": "list",
+            "migrate_subscriptions_dryrun": "migrate_dryrun",
+            "migrate_subscriptions_apply": "migrate_apply",
+        },
+        "crystaltech": {
+            "crystaltech_validate": "validate",
+            "crystaltech_reload": "reload",
+            "crystaltech_admin_reset": "admin_reset",
+        },
+        "honor": {"honor_purge_last": "purge_last"},
+        "location": {"import_locations": "import", "player_location": "player"},
+        "activity": {"activity_top": "top"},
+    }
 
-    assert len(names) == 62
+    assert len(names) == 39
     assert moved_to_ops.isdisjoint(names)
     assert moved_to_ops.issubset(grouped["ops"])
     assert set(moved_to_ark).isdisjoint(names)
     assert set(moved_to_ark.values()).issubset(grouped["ark"])
-    assert len(grouped["ops"]) == 21
+    for group_name, mapping in phase5a_moves.items():
+        assert set(mapping).isdisjoint(names)
+        assert set(mapping.values()).issubset(grouped[group_name])
+    assert len(grouped["ops"]) == 25
     assert len(grouped["ark"]) == 14
-    assert sum(len(commands) for commands in grouped.values()) == 43
+    assert sum(len(commands) for commands in grouped.values()) == 76
+    assert "calendar" in names
+    assert "honor_rankings" in names
+    assert "player_profile" in names
+    assert "ping" in names
 
 
 def test_validator_delegates_static_inventory_to_shared_helper():

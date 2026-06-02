@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 import logging
 
+import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID, KVK_EVENT_CHANNEL_ID
@@ -24,6 +25,12 @@ UTC = UTC
 
 
 def register_events(bot: ext_commands.Bot) -> None:
+    events_group = discord.SlashCommandGroup(
+        "events",
+        "Event admin controls",
+        guild_ids=[GUILD_ID],
+    )
+
     @bot.slash_command(
         name="next_kvk_fight",
         description="Shows the next KVK fight or up to the next 3 fights!",
@@ -149,8 +156,8 @@ def register_events(bot: ext_commands.Bot) -> None:
                 view=None,
             )
 
-    @bot.slash_command(
-        name="refresh_events",
+    @events_group.command(
+        name="refresh",
         description="Manually refresh the event cache and countdowns",
         guild_ids=[GUILD_ID],
     )
@@ -187,7 +194,7 @@ def register_events(bot: ext_commands.Bot) -> None:
                 content=f"❌ Failed to refresh event cache or embeds:\n```{type(e).__name__}: {e}```"
             )
 
-    @bot.slash_command(
+    @events_group.command(
         name="refresh_kvk_overview",
         description="📅 Refresh the Daily KVK Overview embed manually",
         guild_ids=[GUILD_ID],
@@ -234,3 +241,5 @@ def register_events(bot: ext_commands.Bot) -> None:
             await ctx.interaction.edit_original_response(
                 content=f"❌ Failed to refresh KVK overview:\n```{type(e).__name__}: {e}```"
             )
+
+    bot.add_application_command(events_group)

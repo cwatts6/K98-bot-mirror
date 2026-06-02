@@ -288,16 +288,25 @@ Phase 4 - Ark Command Grouping: complete, smoke tested, merged, and pushed to pr
 `/ark`, added the post-merge Discord briefing note, and reduced the active top-level command count
 to 62.
 
-Phase 5 - Public Domain Grouping Design: design approved for Phase 5A only. The active task pack
-is `docs/task_packs/Codex Task Pack - Command Platform Phase 5 Public Domain Grouping Design.md`.
-Phase 5A should group admin/leadership/operator paths only. Player self-service command redesign
-and public calendar/KVK calendar redesign are deferred outside this command-count programme.
+Phase 5 - Public Domain Grouping Design: complete. PR 135
+(`codex/command-platform-phase-5a-design-docs`) was merged and pushed to production in production
+PR 444. Phase 5 approved Phase 5A as the next implementation slice for admin/leadership/operator
+paths only. Player self-service command redesign and public calendar/KVK calendar redesign are
+deferred outside this command-count programme.
+
+Phase 5A - Admin/Leadership/Operator Domain Grouping: implemented on the Phase 5A implementation
+branch, reducing the active top-level command baseline to 39 while preserving player self-service
+and public calendar/KVK calendar commands.
 
 Remaining roadmap:
 
 Phase 5
 
-Phase 5A Admin/Leadership/Operator Domain Grouping
+Public Domain Grouping Design: complete
+
+Phase 5A
+
+Admin/Leadership/Operator Domain Grouping: implemented
 
 Phase 6
 

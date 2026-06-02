@@ -46,6 +46,7 @@ def _get_stats_export_handler():
         return decorator
 
     fake_bot.slash_command = slash_command
+    fake_bot.add_application_command = lambda _command: None
     C.register_stats(fake_bot)
     fn = fake_bot.registered["my_stats_export"]
     while hasattr(fn, "__wrapped__"):
