@@ -47,10 +47,14 @@ Current baseline after Phase 5A delivery:
 primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39
 ```
 
-Phase 6, Canonical Command Documentation, created `canonical_command_reference.md` as the
-maintained current command reference. Phase 7 governance and CI guardrails should follow after the
-canonical command reference is merged. Player self-service and generic public calendar/KVK calendar
-redesign remain deferred outside this command-count programme.
+Command Platform Phase 6, Canonical Command Documentation, was completed in PR 137
+(`codex/command-platform-phase-6-canonical-docs`), merged, marked complete, and pushed to
+production. It created `canonical_command_reference.md` as the maintained current command
+reference and updated stale active command docs and smoke references.
+
+Phase 7 governance and CI guardrails is the final planned command-platform programme phase. Player
+self-service and generic public calendar/KVK calendar redesign remain deferred outside this
+command-count programme.
 
 This file remains the historical command-surface audit and migration record.
 
@@ -165,8 +169,7 @@ production.
 Remaining command-surface batches are staged in `docs/reference/deferred_optimisations.md` and the
 command-platform programme docs. Recommended order:
 
-1. Phase 6: Canonical command documentation after Phase 5A path changes.
-2. Phase 7: Future governance and CI guardrails.
+1. Phase 7: Future governance and CI guardrails.
 
 The previously considered player self-service grouping is deferred because commands such as
 `/register_governor`, `/modify_registration`, `/my_registrations`, `/mygovernorid`,

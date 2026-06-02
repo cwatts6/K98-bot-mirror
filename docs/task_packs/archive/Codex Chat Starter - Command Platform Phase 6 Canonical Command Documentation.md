@@ -1,6 +1,12 @@
 # Codex Chat Starter - Command Platform Phase 6 Canonical Command Documentation
 
-Use this starter to begin the next Command Platform Audit & Optimisation Programme phase.
+Archived starter for completed Command Platform Phase 6.
+
+Phase 6 was delivered in PR 137 (`codex/command-platform-phase-6-canonical-docs`), merged, marked
+complete, and pushed to production on 2026-06-02. Use the Phase 7 starter for the next and final
+command-platform programme phase.
+
+Historical starter content follows.
 
 Source programme documents:
 

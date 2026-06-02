@@ -43,6 +43,12 @@ calendar paths. Smoke follow-up fixes preserved grouped usage-log identities, re
 CrystalTech service imports, awaited `/stats player` embed rendering, and chunked long
 `/kvk list_scans` output below Discord content limits.
 
+Phase 6, Canonical Command Documentation, was completed in PR 137
+(`codex/command-platform-phase-6-canonical-docs`), merged, marked complete, and pushed to
+production. It created `canonical_command_reference.md` as the maintained current command
+reference, updated stale active command docs and smoke references, and prepared Phase 7 governance
+and CI guardrails as the final programme phase.
+
 ## Audit Baseline
 
 Static command registration validation after Phase 5A delivery reports:
@@ -73,7 +79,7 @@ Grouped command summary:
 The primary command surface has a 61-command buffer below Discord's 100 top-level application
 command limit. The validator warns at 90+ and fails above 100.
 
-The maintained command reference after Phase 6 lives in `canonical_command_reference.md`. Use that
+The maintained command reference lives in `canonical_command_reference.md`. Use that
 file for current command paths, owner modules, permission models, response visibility, and
 version/usage expectations. The inventory below remains audit context for the command-platform
 programme.
@@ -257,8 +263,9 @@ commands are marked `none observed` pending SQL usage review.
 - Resolution: Phase 6 promoted the current command inventory into `canonical_command_reference.md`
   with path, owner, permissions, response visibility, usage/version expectations, migration
   status, and operator-facing notes.
-- Validation: Documentation validation, command registration validation, focused command
-  inventory/registration tests, and pre-commit are required before PR handoff.
+- Validation: Delivered in PR 137 with deferred-item validation, test selector, command
+  registration validation, smoke imports, focused command inventory/registration tests, and
+  pre-commit passing.
 
 ## Phased Roadmap
 
@@ -505,7 +512,8 @@ Delivered validation:
 
 ### Phase 6 - Canonical Command Documentation
 
-Status: complete.
+Status: complete. Delivered in PR 137 (`codex/command-platform-phase-6-canonical-docs`), merged,
+marked complete, and pushed to production.
 
 Goal: make command ownership, permissions, and path status discoverable.
 
@@ -521,8 +529,14 @@ Validation:
 - Documentation review.
 - `python scripts/validate_deferred_items.py`
 - `python scripts/select_tests.py`
+- `python scripts/validate_command_registration.py`
+- `python scripts/smoke_imports.py`
+- `python -m pytest -q tests/test_validate_command_registration.py tests/test_command_inventory.py tests/test_command_registration_smoke.py`
+- `python -m pre_commit run -a`
 
 ### Phase 7 - Future Governance And CI Guardrails
+
+Status: final planned phase.
 
 Goal: prevent command-limit drift after the programme ends.
 
@@ -549,8 +563,7 @@ Validation:
 7. Phase 6: Canonical Command Documentation.
 8. Phase 7: Future Governance And CI Guardrails.
 
-With Phase 5A delivered, merged, smoke tested, and promoted, Phase 6 is creating the maintained
-canonical command reference. Phase 7 governance and CI guardrails should follow once the reference
-is merged. Player self-service workflow redesign and public calendar/KVK calendar redesign remain
-deferred into separate optimisation tasks rather than continued as simple command grouping inside
-this programme.
+With Phase 6 delivered, merged, marked complete, and pushed to production, Phase 7 governance and
+CI guardrails is the final planned command-platform programme phase. Player self-service workflow
+redesign and public calendar/KVK calendar redesign remain deferred into separate optimisation
+tasks rather than continued as simple command grouping inside this programme.

@@ -7,7 +7,8 @@
 - Owner/context: Command Platform Audit & Optimisation Programme
 - Task type: documentation / governance preparation
 - One-pass approved: no
-- Status: next active command-platform phase
+- Status: complete. Delivered in PR 137 (`codex/command-platform-phase-6-canonical-docs`),
+  merged, marked complete, and pushed to production on 2026-06-02.
 
 ## 2. Required Reading
 
@@ -42,6 +43,10 @@ Create a canonical maintained command reference after the Phase 5A path migratio
 The reference should make command ownership, path status, permissions, response visibility,
 versioning, usage tracking, and migration/disposition discoverable without requiring maintainers
 to inspect every command module.
+
+Completion note: Phase 6 created `docs/reference/canonical_command_reference.md`, updated active
+command docs and smoke references after Phase 5A path changes, archived completed Phase 5A
+task-pack records, and set Phase 7 governance/CI guardrails as the final command-platform phase.
 
 ## 4. Background
 

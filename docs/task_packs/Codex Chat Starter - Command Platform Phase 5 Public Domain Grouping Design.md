@@ -5,7 +5,7 @@ Archived for implementation handoff: Phase 5 design was completed in PR 135
 444. Phase 5A was later completed in PR 136
 (`codex/command-platform-phase-5a-admin-grouping`), smoke tested successfully, merged, and pushed
 to production on 2026-06-02. Use
-`Codex Chat Starter - Command Platform Phase 6 Canonical Command Documentation.md` for the next
+`Codex Chat Starter - Command Platform Phase 7 Governance And CI Guardrails.md` for the final
 command-platform chat.
 
 This starter is retained as the historical Phase 5 design prompt and source context.
