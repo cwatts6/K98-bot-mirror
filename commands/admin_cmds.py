@@ -1484,6 +1484,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def crystaltech_validate(ctx: discord.ApplicationContext):
         await ctx.defer(ephemeral=True)
+        from crystaltech_di import get_crystaltech_service
+
         try:
             service = get_crystaltech_service()
         except Exception as e:
@@ -1509,6 +1511,8 @@ def register_admin(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def crystaltech_reload(ctx: discord.ApplicationContext, fail_on_warn: bool = False):
         await ctx.defer(ephemeral=True)
+        from crystaltech_di import get_crystaltech_service
+
         try:
             service = get_crystaltech_service()
         except Exception as e:

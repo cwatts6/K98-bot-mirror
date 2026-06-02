@@ -104,6 +104,51 @@ async def test_track_usage_explicit_command_name_still_wins(monkeypatch):
     assert events[0]["command_name"] == "player_stats"
 
 
+@pytest.mark.asyncio
+async def test_admin_denial_logs_grouped_name_from_application_context(monkeypatch):
+    """Denied grouped commands should prefer ApplicationContext qualified_name."""
+    events = []
+
+    class FakeUsageTracker:
+        async def log(self, event):
+            events.append(event)
+
+    class FakeResponse:
+        def is_done(self):
+            return False
+
+        async def send_message(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setattr(decoraters, "NOTIFY_CHANNEL_ID", 123)
+    monkeypatch.setattr(decoraters, "usage_tracker", lambda: FakeUsageTracker())
+
+    invoked = False
+
+    @decoraters.is_admin_and_notify_channel()
+    async def handler(_ctx):
+        nonlocal invoked
+        invoked = True
+
+    interaction = SimpleNamespace(
+        command=SimpleNamespace(name="validate"),
+        data={"name": "crystaltech"},
+        channel=SimpleNamespace(id=999, parent_id=None),
+        user=SimpleNamespace(id=1, display_name="Tester"),
+        guild=SimpleNamespace(id=2),
+        response=FakeResponse(),
+    )
+    ctx = SimpleNamespace(
+        command=SimpleNamespace(name="validate", qualified_name="crystaltech validate"),
+        interaction=interaction,
+    )
+
+    await handler(ctx)
+
+    assert invoked is False
+    assert events[0]["command_name"] == "crystaltech validate"
+
+
 def test_start_usage_tracker_creates_task(monkeypatch):
     """start_usage_tracker() returns a tracker with a running task."""
     monkeypatch.setattr(usage_tracker_module, "_GLOBAL_TRACKER", None)

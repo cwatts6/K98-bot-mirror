@@ -146,7 +146,7 @@ def is_admin_and_notify_channel(allow_leadership: bool = False):
             # Helper: log a denied attempt (non-blocking, best-effort)
             async def _log_denied(reason: str):
                 try:
-                    cmd_name = _resolve_command_name(inter)
+                    cmd_name = _resolve_command_name(arg0)
                     evt = {
                         "executed_at_utc": datetime.now(UTC).isoformat(),
                         "command_name": cmd_name,
