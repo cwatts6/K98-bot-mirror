@@ -121,4 +121,3 @@ Use this delivery shape:
 7. AI Review Gates
 8. Deployment / Rollback Notes
 9. Deferred Optimisations
-
