@@ -1,8 +1,8 @@
-# Codex Task Pack — Inventory Image Import Module — Phase 2 Materials
+﻿# Codex Task Pack â€” Inventory Image Import Module â€” Phase 2 Materials
 
 ## Status / Context
 
-Phase 0 and Phase 1A–1E are complete and deployed. Phase 1F should already be complete before this phase begins. Phase 2 is the Materials phase only.
+Phase 0 and Phase 1Aâ€“1E are complete and deployed. Phase 1F should already be complete before this phase begins. Phase 2 is the Materials phase only.
 
 Phase 2 must extend the existing Inventory Image Import Module to support Rise of Kingdoms equipment materials screenshots, while preserving the current Resources and Speedups behaviour.
 
@@ -24,7 +24,7 @@ Implemented capability:
 - Approval writes one logical import batch with material child rows.
 - `/myinventory` supports Materials output with KPI cards, trend graph, range controls, and `assets/materials_logo.png`.
 - `/export_inventory` includes Materials rows.
-- `/inventory_import_audit` supports Materials imports and Materials-related debug metadata.
+- `/inventory audit` supports Materials imports and Materials-related debug metadata.
 - Admin debug captures failed, rejected, cancelled, corrected, and low-confidence Materials paths.
 - Existing Resources and Speedups behaviour was preserved.
 
@@ -103,7 +103,7 @@ Final local validation snapshot:
 - Materials approval workflow.
 - Materials output image under `/myinventory`.
 - Materials support in `/export_inventory`.
-- Materials support in `/inventory_import_audit`.
+- Materials support in `/inventory audit`.
 - Admin debug retention for failed, corrected, cancelled, rejected, or low-confidence material imports.
 - Test coverage for parsing, conversion, import sessions, reporting, export, and audit.
 
@@ -224,19 +224,19 @@ Keep current privacy behaviour:
 
 ## Accepted Materials Image Types
 
-### Type A — Choice Chest screen
+### Type A â€” Choice Chest screen
 
 Recognise Equipment Material Choice Chests in these rarities:
 
-- Normal choice chest — grey
-- Advanced choice chest — green
-- Elite choice chest — blue
-- Epic choice chest — purple
-- Legendary choice chest — orange
+- Normal choice chest â€” grey
+- Advanced choice chest â€” green
+- Elite choice chest â€” blue
+- Epic choice chest â€” purple
+- Legendary choice chest â€” orange
 
 Store choice chests separately from fixed material types because they are flexible inventory, not committed to Bone, Leather, Ebony, or Iron.
 
-### Type B/C — Individual materials
+### Type B/C â€” Individual materials
 
 Recognise these material types:
 
@@ -247,11 +247,11 @@ Recognise these material types:
 
 Each material can appear in these rarities:
 
-- Normal — grey
-- Advanced — green
-- Elite — blue
-- Epic — purple
-- Legendary — orange
+- Normal â€” grey
+- Advanced â€” green
+- Elite â€” blue
+- Epic â€” purple
+- Legendary â€” orange
 
 The individual material rows may be split over two or more screenshots.
 
@@ -520,7 +520,7 @@ Do not expose private image URLs to normal users unless already allowed by the e
 
 ## Admin Audit Requirements
 
-Extend `/inventory_import_audit` filters and display to support `materials` import type.
+Extend `/inventory audit` filters and display to support `materials` import type.
 
 Audit should allow review of:
 
@@ -567,11 +567,11 @@ Codex must explicitly address this in Step 1 audit and Step 4 implementation pla
 
 Use these uploaded samples during local testing:
 
-- `material_summary_exampleonly_output.png` — output design reference only.
-- `Materials_import1.png` — materials import test image.
-- `Materials_import2.png` — materials import test image.
-- `Materials_import3.png` — materials import test image.
-- `Materials_import4.png` — materials import test image.
+- `material_summary_exampleonly_output.png` â€” output design reference only.
+- `Materials_import1.png` â€” materials import test image.
+- `Materials_import2.png` â€” materials import test image.
+- `Materials_import3.png` â€” materials import test image.
+- `Materials_import4.png` â€” materials import test image.
 
 Expected interpretation from supplied samples should be established during audit/test setup. More samples will be added during actual testing.
 
@@ -617,7 +617,7 @@ Add focused tests.
 ### Export/audit tests
 
 - `/export_inventory` includes Materials rows.
-- `/inventory_import_audit` supports Materials filter.
+- `/inventory audit` supports Materials filter.
 - Corrected Materials imports show detected/corrected/final metadata.
 - Failed/cancelled Materials imports retain debug references where expected.
 
@@ -669,7 +669,7 @@ Phase 2 is complete when:
 - `/myinventory` can render Materials output with KPI cards and trend graph.
 - `/myinventory` output selector includes Materials but not AP.
 - `/export_inventory` includes Materials rows.
-- `/inventory_import_audit` supports Materials imports.
+- `/inventory audit` supports Materials imports.
 - Failed/cancelled/corrected Materials imports are retained in admin debug where required.
 - Restart/timeout safety is explicitly handled.
 - Existing Resources and Speedups behaviour is unchanged.
@@ -695,5 +695,5 @@ Codex must return:
 ## Suggested Opening Prompt for Codex
 
 ```text
-Start Phase 2 review/scope for the Inventory Image Import Module: Materials Import. Phase 0 and Phase 1A–1F are complete. Use the updated task pack at docs/inventory/Codex Task Pack - Inventory Image Import Module.md and the Phase 2 Materials task pack. Scope is Materials only: up to 4 screenshots per governor/day, choice chests, individual materials, raw SQL storage, legendary-equivalent calculations, typed correction flow, /myinventory Materials output, export, and audit. Keep AP, /my_stats integration, export button under images, import-again button, and broad Resources/Speedups redesign out of scope. Begin with audit/scope only and STOP for architecture validation before coding.
+Start Phase 2 review/scope for the Inventory Image Import Module: Materials Import. Phase 0 and Phase 1Aâ€“1F are complete. Use the updated task pack at docs/inventory/Codex Task Pack - Inventory Image Import Module.md and the Phase 2 Materials task pack. Scope is Materials only: up to 4 screenshots per governor/day, choice chests, individual materials, raw SQL storage, legendary-equivalent calculations, typed correction flow, /myinventory Materials output, export, and audit. Keep AP, /my_stats integration, export button under images, import-again button, and broad Resources/Speedups redesign out of scope. Begin with audit/scope only and STOP for architecture validation before coding.
 ```

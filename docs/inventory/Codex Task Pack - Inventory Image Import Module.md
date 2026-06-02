@@ -1,4 +1,4 @@
-# Codex Task Pack - Inventory Image Import Module
+﻿# Codex Task Pack - Inventory Image Import Module
 
 ## Status Summary
 
@@ -42,9 +42,9 @@ Phase 0 PRs:
 
 Phase 1A delivered:
 
-- Canonical `/import_inventory` command.
+- Canonical `/inventory import` command.
 - Upload-first inventory image detection limited to `INVENTORY_UPLOAD_CHANNEL_ID`.
-- `/import_inventory` restricted to `INVENTORY_UPLOAD_CHANNEL_ID`.
+- `/inventory import` restricted to `INVENTORY_UPLOAD_CHANNEL_ID`.
 - Vision-derived image type instead of asking the user to choose Resources vs Speedups first.
 - Resources and Speedups import foundation.
 - Materials detection handled as disabled until Phase 2.
@@ -110,7 +110,7 @@ Phase 1B validation:
 Phase 1C delivered:
 
 - `/export_inventory` raw inventory exports.
-- `/inventory_import_audit` admin audit tooling.
+- `/inventory audit` admin audit tooling.
 - Export and audit logic kept behind service/DAL boundaries.
 - Admin audit/debug reference access for import review.
 - Interaction boundary hardening follow-up.
@@ -319,12 +319,12 @@ Phase 1A established the import foundation and live intake path for Resources an
 
 Use these command names:
 
-- `/import_inventory`
+- `/inventory import`
 - `/myinventory`
 - `/export_inventory`
-- `/inventory_import_audit`
+- `/inventory audit`
 
-Canonical import command name is `/import_inventory`.
+Canonical import command name is `/inventory import`.
 
 Do not use `/inventory_import` for the user-facing command name.
 
@@ -332,10 +332,10 @@ Do not use `/inventory_import` for the user-facing command name.
 
 Add:
 
-- `/import_inventory` - complete in Phase 1A.
+- `/inventory import` - complete in Phase 1A.
 - `/myinventory` - complete in Phase 1B.
 - `/export_inventory` - complete in Phase 1C.
-- `/inventory_import_audit` - complete in Phase 1C.
+- `/inventory audit` - complete in Phase 1C.
 
 Commands must live in the target architecture, likely `commands/inventory_cmds.py`, with business logic in service modules and data access in DAL/repository modules.
 
@@ -350,15 +350,15 @@ Commands must use existing project command standards:
 
 Commands must not contain direct SQL or business logic.
 
-`/import_inventory` must be restricted to `INVENTORY_UPLOAD_CHANNEL_ID` using the existing channel restriction pattern. Admin override may be allowed where consistent with existing command behaviour, but the command must not be available across arbitrary channels.
+`/inventory import` must be restricted to `INVENTORY_UPLOAD_CHANNEL_ID` using the existing channel restriction pattern. Admin override may be allowed where consistent with existing command behaviour, but the command must not be available across arbitrary channels.
 
 Upload-first detection must also be restricted to `INVENTORY_UPLOAD_CHANNEL_ID`. Do not scan arbitrary server image uploads.
 
-### `/import_inventory` Flow
+### `/inventory import` Flow
 
 Status: complete in Phase 1A.
 
-1. User runs `/import_inventory`.
+1. User runs `/inventory import`.
 2. Bot shows standard governor selector, reusing the `/mykvktargets` / registry account-selection pattern where practical.
 3. User selects governor.
 4. Bot opens or uses a private ephemeral upload workflow.
@@ -391,7 +391,7 @@ If the detected type is Materials during Phase 1, the bot must explain that Mate
 
 Status: complete in Phase 1A.
 
-Users may start an import by uploading an image directly in the configured inventory channel instead of running `/import_inventory`.
+Users may start an import by uploading an image directly in the configured inventory channel instead of running `/inventory import`.
 
 1. User uploads an image attachment in `INVENTORY_UPLOAD_CHANNEL_ID`.
 2. Bot confirms the message is in the configured inventory channel and contains a supported image attachment.
@@ -402,7 +402,7 @@ Users may start an import by uploading an image directly in the configured inven
 7. If multiple registered governors exist, bot asks which governor the image is for using the standard account selector.
 8. Once the governor is confirmed, bot deletes the original public upload message when it has permission to reduce the public visibility window.
 9. If the user does not respond to the governor-selection follow-up before timeout, bot deletes the original public upload message when it has permission and exits cleanly.
-10. After governor confirmation, the same vision analysis, confirmation, correction, cancellation, approval, daily limit, and debug retention rules as `/import_inventory` apply.
+10. After governor confirmation, the same vision analysis, confirmation, correction, cancellation, approval, daily limit, and debug retention rules as `/inventory import` apply.
 
 Upload-first detection must never run outside `INVENTORY_UPLOAD_CHANNEL_ID`.
 
@@ -813,7 +813,7 @@ Phase 1C is complete, tested, and deployed.
 Delivered scope:
 
 - `/export_inventory`
-- `/inventory_import_audit`
+- `/inventory audit`
 - raw inventory export using service/DAL boundaries
 - admin audit filtering and debug-message reference access
 - compare detected, corrected, and final JSON for retained admin review
@@ -1368,7 +1368,7 @@ Materials:
 
 Add:
 
-- `/inventory_import_audit`
+- `/inventory audit`
 
 Admin only.
 
@@ -1402,7 +1402,7 @@ Test:
 
 - registered governor permission - Phase 1A complete
 - admin override - Phase 1A complete
-- `/import_inventory` restricted to `INVENTORY_UPLOAD_CHANNEL_ID` - Phase 1A complete
+- `/inventory import` restricted to `INVENTORY_UPLOAD_CHANNEL_ID` - Phase 1A complete
 - upload-first detection restricted to `INVENTORY_UPLOAD_CHANNEL_ID` - Phase 1A complete
 - upload-first ignores images outside the configured inventory channel - Phase 1A complete
 - upload-first no registered governors path - Phase 1A complete
@@ -1420,7 +1420,7 @@ Test:
 - image output generation - Phase 1B complete for Resources and Speedups
 - visibility preference persistence - Phase 1B complete
 - `/export_inventory` - Phase 1C
-- `/inventory_import_audit` - Phase 1C
+- `/inventory audit` - Phase 1C
 - restart/persistence behaviour for active/imported state - Phase 1A complete for import batches; Phase 1B complete for reporting preferences
 - cache safety where applicable - continue in Phase 1C
 
@@ -1453,14 +1453,14 @@ Complete, tested, and deployed.
 Delivered scope:
 
 - `/export_inventory`
-- `/inventory_import_audit`
+- `/inventory audit`
 - raw inventory export files using service/DAL boundaries
 - admin audit filtering and debug-message reference access
 - targeted cleanup of Phase 1A inventory view/service boundaries
 
 Recommended Phase 1C audit points:
 
-- Verify command names remain canonical: `/export_inventory`, `/inventory_import_audit`.
+- Verify command names remain canonical: `/export_inventory`, `/inventory audit`.
 - Keep `/export_inventory` service/DAL-based and do not copy direct SQL from `/my_stats_export`.
 - Confirm GitHub issue #46 remains the tracking item for the existing stats export direct-SQL refactor.
 - Do not expand into `/my_stats` integration.
@@ -1566,7 +1566,7 @@ Do not include in Phase 1B:
 - Import Again button
 - Export button under image
 - `/export_inventory`
-- `/inventory_import_audit`
+- `/inventory audit`
 - Further OCR/prompt tuning unless a Phase 1A production issue specifically requires it
 
 Do not include in Phase 1C:

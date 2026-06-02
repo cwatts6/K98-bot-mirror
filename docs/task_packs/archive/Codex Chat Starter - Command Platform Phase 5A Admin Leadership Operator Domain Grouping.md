@@ -1,7 +1,13 @@
 # Codex Chat Starter - Command Platform Phase 5A Admin Leadership Operator Domain Grouping
 
-Use this starter to begin the next Command Platform Audit & Optimisation Programme implementation
-phase.
+Archived for implementation handoff: Phase 5A was completed in PR 136
+(`codex/command-platform-phase-5a-admin-grouping`), smoke tested successfully, merged, and pushed
+to production on 2026-06-02.
+
+Use `Codex Chat Starter - Command Platform Phase 6 Canonical Command Documentation.md` for the
+next command-platform chat.
+
+This starter is retained as the historical Phase 5A implementation prompt and source context.
 
 Source programme documents:
 
@@ -17,13 +23,13 @@ and pushed to production in production PR 444. It approved Phase 5A only: admin,
 operator command grouping. It deferred player self-service workflow redesign and public
 calendar/KVK calendar redesign outside the command-count programme.
 
-Current validator baseline:
+Phase 5A starting validator baseline:
 
 ```text
 primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62
 ```
 
-Expected Phase 5A baseline if the approved implementation scope is delivered as written:
+Delivered Phase 5A baseline:
 
 ```text
 primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39

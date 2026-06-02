@@ -1,6 +1,6 @@
 # Command Platform Audit
 
-Last updated: 2026-06-01
+Last updated: 2026-06-02
 
 ## Programme Status
 
@@ -34,14 +34,18 @@ Phase 5, Public Domain Grouping Design, was completed in PR 135
 domain grouping only, and deferred player self-service plus public calendar/KVK calendar workflow
 redesign out of the command-count programme.
 
-Phase 5A, Admin/Leadership/Operator Domain Grouping, grouped the approved admin, leadership, and
-operator paths under `/activity`, `/crystaltech`, `/events`, `/honor`, `/inventory`, `/kvk`,
-`/location`, `/ops`, `/registry`, `/stats`, and `/subscriptions` while preserving player
-self-service and public calendar/KVK calendar paths.
+Phase 5A, Admin/Leadership/Operator Domain Grouping, was completed in PR 136
+(`codex/command-platform-phase-5a-admin-grouping`), smoke tested successfully, merged, and pushed
+to production. It grouped the approved admin, leadership, and operator paths under `/activity`,
+`/crystaltech`, `/events`, `/honor`, `/inventory`, `/kvk`, `/location`, `/ops`, `/registry`,
+`/stats`, and `/subscriptions` while preserving player self-service and public calendar/KVK
+calendar paths. Smoke follow-up fixes preserved grouped usage-log identities, restored
+CrystalTech service imports, awaited `/stats player` embed rendering, and chunked long
+`/kvk list_scans` output below Discord content limits.
 
 ## Audit Baseline
 
-Static command registration validation after Phase 5A implementation reports:
+Static command registration validation after Phase 5A delivery reports:
 
 ```text
 primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39
@@ -68,6 +72,11 @@ Grouped command summary:
 
 The primary command surface has a 61-command buffer below Discord's 100 top-level application
 command limit. The validator warns at 90+ and fails above 100.
+
+The maintained command reference after Phase 6 lives in `canonical_command_reference.md`. Use that
+file for current command paths, owner modules, permission models, response visibility, and
+version/usage expectations. The inventory below remains audit context for the command-platform
+programme.
 
 Usage levels below are based only on local JSONL usage files under `data/command_usage_*.jsonl`
 available during the audit. SQL-backed production history may contain broader usage evidence.
@@ -241,14 +250,15 @@ commands are marked `none observed` pending SQL usage review.
   tested with a graceful restart and `/ops validate_command_cache`, merged, and pushed to
   production.
 
-### Deferred Optimisation
+### Phase 6 Completed Item
 - Area: `commands/`, command documentation
 - Type: consistency
 - Description: Permission model and command-path documentation are not consistently discoverable across domains.
-- Suggested Fix: Promote this inventory into a canonical command reference with path, owner, permissions, usage, migration status, and operator-facing notes.
-- Impact: high
-- Risk: low
-- Dependencies: Complete SQL-backed usage review or explicitly accept local JSONL-only usage evidence.
+- Resolution: Phase 6 promoted the current command inventory into `canonical_command_reference.md`
+  with path, owner, permissions, response visibility, usage/version expectations, migration
+  status, and operator-facing notes.
+- Validation: Documentation validation, command registration validation, focused command
+  inventory/registration tests, and pre-commit are required before PR handoff.
 
 ## Phased Roadmap
 
@@ -439,7 +449,8 @@ Validation:
 
 ### Phase 5A - Admin/Leadership/Operator Domain Grouping
 
-Status: implemented in this Phase 5A branch.
+Status: complete. Delivered in PR 136 (`codex/command-platform-phase-5a-admin-grouping`), smoke
+tested successfully, merged, and pushed to production.
 
 Goal: group only the approved admin/leadership/operator command slice.
 
@@ -480,13 +491,27 @@ Validation:
 - Command registration validation reports
   `primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39`.
 
+Delivered validation:
+
+- Architecture boundary validation, deferred optimisation validation, test selector, smoke
+  imports, command registration validation, pre-commit, full pytest, pytest log-noise analysis,
+  and Codex Security diff review passed before PR handoff.
+- Production smoke confirmed the grouped command surface and exposed two runtime issues that were
+  fixed before final merge/promotion: `/stats player` now awaits async embed rendering and
+  `/kvk list_scans` chunks long scan output under Discord's content limit.
+- Review follow-ups confirmed grouped command usage logging records full paths such as
+  `stats player`, `inventory import`, and `location import`, including denied grouped
+  invocations where `ApplicationContext.command.qualified_name` is available.
+
 ### Phase 6 - Canonical Command Documentation
+
+Status: in progress.
 
 Goal: make command ownership, permissions, and path status discoverable.
 
 Scope:
 
-- Promote this audit into a maintained command reference.
+- Promote this audit into `canonical_command_reference.md` as the maintained command reference.
 - Update stale Ark, calendar, inventory, registry, and KVK docs after approved path changes.
 - Add guidance for new commands: group-first design, permission decorator choice, test minimums,
   and command-count impact.
@@ -524,7 +549,8 @@ Validation:
 7. Phase 6: Canonical Command Documentation.
 8. Phase 7: Future Governance And CI Guardrails.
 
-With Phase 5A implemented, the next command-platform work should be canonical command
-documentation and governance guardrails. Player self-service workflow redesign and public
-calendar/KVK calendar redesign remain deferred into separate optimisation tasks rather than
-continued as simple command grouping inside this programme.
+With Phase 5A delivered, merged, smoke tested, and promoted, Phase 6 is creating the maintained
+canonical command reference. Phase 7 governance and CI guardrails should follow once the reference
+is merged. Player self-service workflow redesign and public calendar/KVK calendar redesign remain
+deferred into separate optimisation tasks rather than continued as simple command grouping inside
+this programme.

@@ -1,4 +1,4 @@
-# TASK 5 — Runtime Cache Consolidation, Health/Resilience Hardening, and Deterministic Quality Gates ✅ COMPLETED
+﻿# TASK 5 â€” Runtime Cache Consolidation, Health/Resilience Hardening, and Deterministic Quality Gates âœ… COMPLETED
 
 ## Objective
 Finalize Task 5 by consolidating runtime cache logic, integrating mandatory Task 4 review feedback, improving status/health resilience, and validating via pytest + SQL scripts in local-first deployment flow.
@@ -38,7 +38,7 @@ Finalize Task 5 by consolidating runtime cache logic, integrating mandatory Task
 ---
 
 ## 3) Status/health behavior (verbose structure preserved)
-- `/calendar_status` remains verbose.
+- `/ops calendar_status` remains verbose.
 - `calendar_health` path hardened:
   - stale/degraded evaluation retained
   - next upcoming event extraction retained
@@ -80,7 +80,7 @@ Result: **local SQL verification checks completed successfully**.
 - [x] Non-blocking status health path implemented
 - [x] Scheduler interval semantics corrected/validated
 - [x] Env-driven anomaly threshold controls added
-- [x] Verbose `/calendar_status` retained with health reporting
+- [x] Verbose `/ops calendar_status` retained with health reporting
 - [x] pytest updates completed and passing
 - [x] SQL verification scripts executed locally
 
@@ -90,4 +90,4 @@ Result: **local SQL verification checks completed successfully**.
 - `.env` can now tune anomaly thresholds without code changes.
 - Manual PR workflow remains unchanged.
 - Architecture remains resilient:
-  - Sheets (editor surface) → SQL (operational source) → JSON cache (runtime source).
+  - Sheets (editor surface) â†’ SQL (operational source) â†’ JSON cache (runtime source).

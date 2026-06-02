@@ -1,6 +1,6 @@
 # Command Surface Audit
 
-Last updated: 2026-06-01
+Last updated: 2026-06-02
 
 ## Post-Audit Programme Updates
 
@@ -33,19 +33,26 @@ Command Platform Phase 5, Public Domain Grouping Design, was completed in PR 135
 domain grouping only, and deferred player self-service plus public calendar/KVK calendar redesign
 outside this command-count programme.
 
-Command Platform Phase 5A, Admin/Leadership/Operator Domain Grouping, grouped the approved admin,
-leadership, and operator paths by domain while preserving player self-service commands and generic
-public calendar/KVK calendar commands.
+Command Platform Phase 5A, Admin/Leadership/Operator Domain Grouping, was completed in PR 136
+(`codex/command-platform-phase-5a-admin-grouping`), smoke tested successfully, merged, and pushed
+to production. Phase 5A grouped the approved admin, leadership, and operator paths by domain while
+preserving player self-service commands and generic public calendar/KVK calendar commands. Smoke
+follow-up fixes preserved grouped usage-log identities, restored CrystalTech service imports,
+awaited `/stats player` embed rendering, and chunked long `/kvk list_scans` output under
+Discord's content limit.
 
-Current baseline after Phase 5A implementation:
+Current baseline after Phase 5A delivery:
 
 ```text
 primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39
 ```
 
-The next command-platform phases are canonical command documentation and future governance/CI
-guardrails. Player self-service and generic public calendar/KVK calendar redesign remain deferred
-outside this command-count programme.
+Phase 6, Canonical Command Documentation, created `canonical_command_reference.md` as the
+maintained current command reference. Phase 7 governance and CI guardrails should follow after the
+canonical command reference is merged. Player self-service and generic public calendar/KVK calendar
+redesign remain deferred outside this command-count programme.
+
+This file remains the historical command-surface audit and migration record.
 
 ## Current Registration Summary
 
@@ -152,13 +159,14 @@ usage tracking, options, and modal/view flows while moving all Ark commands into
 Phase 5A completed the approved admin/leadership/operator domain grouping across registry admin,
 KVK/stat admin, inventory import/audit, calendar/event admin refresh/status paths, subscriptions
 admin, CrystalTech admin, honor purge, location admin/leadership, and activity leadership
-commands.
+commands. It was delivered in PR 136, smoke tested successfully, merged, and pushed to
+production.
 
 Remaining command-surface batches are staged in `docs/reference/deferred_optimisations.md` and the
 command-platform programme docs. Recommended order:
 
-1. Canonical command documentation after Phase 5A path changes.
-2. Future governance and CI guardrails.
+1. Phase 6: Canonical command documentation after Phase 5A path changes.
+2. Phase 7: Future governance and CI guardrails.
 
 The previously considered player self-service grouping is deferred because commands such as
 `/register_governor`, `/modify_registration`, `/my_registrations`, `/mygovernorid`,

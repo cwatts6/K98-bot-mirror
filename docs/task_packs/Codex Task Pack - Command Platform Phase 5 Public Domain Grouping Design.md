@@ -8,6 +8,8 @@
 - Task type: deferred optimisation batch / command-surface design
 - One-pass approved: no
 - Status: complete; delivered in PR 135, merged, and pushed to production in production PR 444
+  Phase 5A was later delivered in PR 136, smoke tested successfully, merged, and pushed to
+  production on 2026-06-02.
 
 ## 2. Required Reading
 
@@ -96,6 +98,12 @@ Phase 5A is the only approved implementation slice from this design phase. It sh
 admin/leadership/operator-heavy commands by domain while preserving behavior, permissions,
 options, versions, usage tracking, autocomplete, response visibility, command-cache semantics,
 and handler bodies.
+
+Phase 5A completion note: PR 136 (`codex/command-platform-phase-5a-admin-grouping`) delivered the
+approved implementation slice, passed smoke testing, merged, and was pushed to production. The
+delivered baseline is
+`primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39`.
+The next command-platform phase is Phase 6, Canonical Command Documentation.
 
 Approved Phase 5A candidates:
 

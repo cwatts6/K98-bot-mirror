@@ -1,4 +1,4 @@
-# TASK 7 — Admin Commands (Manual Control + Diagnostics)
+﻿# TASK 7 â€” Admin Commands (Manual Control + Diagnostics)
 
 ## Objective
 Provide robust admin command controls for manual pipeline execution and diagnostics, while preserving Task 6 resilience guarantees and integrating Task 6 code-review follow-ups.
@@ -17,7 +17,7 @@ Primary operator outcomes:
 Implement/standardize:
 
 - `/refresh_calendar`
-- `/calendar_status`
+- `/ops calendar_status`
 
 Suggested file:
 
@@ -33,7 +33,7 @@ Runs canonical pipeline and returns concise operational summary:
 - generated/published counts
 - errors (if any)
 
-### `/calendar_status`
+### `/ops calendar_status`
 Must work at all times (even before any refresh) and display:
 
 - last sync time/status
@@ -76,7 +76,7 @@ Remove non-essential inline fixture comment:
 
 - `type_index_path = "cache/event_type_index.json"`
 
-(no inline “add this” comment)
+(no inline â€œadd thisâ€ comment)
 
 ### D) Retry policy currently bypassed by stage wrappers
 Issue:
@@ -132,7 +132,7 @@ Task 7 requirement:
 - error embeds/messages must include stage + concise error detail
 
 ### 2) Status behavior without refresh
-`/calendar_status` must return meaningful output if no pipeline run has happened yet:
+`/ops calendar_status` must return meaningful output if no pipeline run has happened yet:
 
 - explicit `not_started` values
 - no crashes on missing cache file
@@ -157,7 +157,7 @@ Task 7 requirement:
 ## Acceptance criteria
 
 - [x] `/refresh_calendar` triggers canonical pipeline and returns summary
-- [x] `/calendar_status` works before and after refresh runs
+- [x] `/ops calendar_status` works before and after refresh runs
 - [x] status includes sync/generate/publish/pipeline + cache health elements
 - [x] errors are clearly reported with stage context
 - [x] command path remains Sheets-decoupled at runtime read layer
@@ -188,8 +188,8 @@ Cover:
 
 1. `/refresh_calendar` happy path response includes run id + stage summary
 2. `/refresh_calendar` failure path includes stage + error detail
-3. `/calendar_status` works with no prior run (`not_started` states)
-4. `/calendar_status` with cache missing/invalid returns safe diagnostics
+3. `/ops calendar_status` works with no prior run (`not_started` states)
+4. `/ops calendar_status` with cache missing/invalid returns safe diagnostics
 5. scheduler timeout policy bound is valid for configured stage policies
 6. result-based retry path retries configured retryable statuses
 7. non-retryable statuses do not retry
@@ -218,7 +218,7 @@ Suggested additions:
 ## Implementation order (recommended)
 
 1. Wire/standardize `/refresh_calendar` command to canonical pipeline call
-2. Wire/standardize `/calendar_status` output contract
+2. Wire/standardize `/ops calendar_status` output contract
 3. Add stage/run-id summary formatting helpers
 4. Fix scheduler outer-timeout policy strategy
 5. Update service retry logic to support result-based retry eligibility

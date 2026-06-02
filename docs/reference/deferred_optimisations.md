@@ -5,7 +5,7 @@ to GitHub issues/task packs.
 
 Resolved historical notes were moved to `archive/deferred_optimisations_resolved.md`.
 
-Last reviewed after Command Platform Phase 5, Public Domain Grouping Design. PR 131
+Last reviewed after Command Platform Phase 5A, Admin/Leadership/Operator Domain Grouping. PR 131
 (`codex/command-platform-phase-1-permission-decorators`) was smoke tested successfully, merged,
 and pushed to production on 2026-06-01. Phase 1 standardised active command permission gates onto
 decorators, added focused decorator tests, preserved command paths and registration count, and kept
@@ -39,6 +39,12 @@ production PR 444 on 2026-06-01.
 Phase 5A grouped the approved admin, leadership, and operator paths under domain command groups
 and reduced the active command baseline to
 `primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39`.
+PR 136 (`codex/command-platform-phase-5a-admin-grouping`) was smoke tested successfully, merged,
+and pushed to production on 2026-06-02. Smoke follow-up fixes preserved grouped command usage
+logging, restored CrystalTech service imports, awaited `/stats player` embed rendering, and
+chunked long `/kvk list_scans` output below Discord content limits. Phase 6 created the maintained
+canonical command reference in `docs/reference/canonical_command_reference.md`. The next
+command-platform phase is Phase 7 governance and CI guardrails.
 Earlier review history: after the slow-pytest optimisation production
 release, PR 107
 (`pytest-log-delivery-docs`) resolved the high-impact pytest duration outliers found after the
@@ -174,10 +180,10 @@ atomic-write hardening; each requires a fresh scope instead of an additional Pha
 - Area: `commands/`, `scripts/validate_command_registration.py`
 - Type: architecture
 - Description: Batch 1 of the command-surface balancing audit grouped admin-heavy `/ops` and `/mge` commands, reducing the primary Discord application-command set from 100 to 82 top-level commands. Phase 3 later moved approved low-risk ops/reporting commands under `/ops`, reducing the primary set to 75. Future standalone slash commands can still erode this buffer and eventually break startup sync with Discord error 30032 unless additional command-surface consolidation remains planned.
-- Suggested Fix: Continue the command-platform programme through staged follow-up batches. Group related commands by domain where user experience allows, identify stale/low-use admin commands for consolidation or retirement, update docs for renamed paths, and keep `scripts/validate_command_registration.py` enforcing the 100-command ceiling with a warning at 90+.
+- Suggested Fix: Continue the command-platform programme through Phase 6 canonical command documentation and Phase 7 governance/CI guardrails. Group related commands by domain only through separately approved future task packs where user experience allows, identify stale/low-use admin commands for consolidation or retirement, update docs for renamed paths, and keep `scripts/validate_command_registration.py` enforcing the 100-command ceiling with a warning at 90+.
 - Impact: high
 - Risk: medium
-- Dependencies: Batch 1 `/ops` and `/mge` grouping and Phase 1 permission decorator standardisation remain deployed cleanly; coordinate with bot operators before renaming public command paths; preserve standard decorator permission checks when commands move into groups.
+- Dependencies: Batch 1 `/ops` and `/mge` grouping, Phase 1 permission decorator standardisation, Phase 4 Ark grouping, and Phase 5A admin/leadership/operator grouping remain deployed cleanly; coordinate with bot operators before renaming public command paths; preserve standard decorator permission checks when commands move into groups.
 
 ### Phase 4 Completed Item
 - Area: `commands/ark_cmds.py`, `docs/ark/`, Ark command tests

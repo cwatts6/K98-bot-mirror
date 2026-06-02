@@ -1,21 +1,21 @@
-# TASK 7 — Execution Brief (Admin Controls + Diagnostics) ✅ COMPLETED
+﻿# TASK 7 â€” Execution Brief (Admin Controls + Diagnostics) âœ… COMPLETED
 
 ## Objective
 Provide robust admin command controls for manual pipeline execution and diagnostics, while preserving resilience guarantees and reusing existing canonical pipeline logic.
 
 Architecture remains:
 
-**Google Sheets → SQL → JSON cache → Bot**
+**Google Sheets â†’ SQL â†’ JSON cache â†’ Bot**
 
 ---
 
 ## Final implementation status
 
 ### 1) Command behavior
-- `/calendar_refresh` retained (no rename) and upgraded to trigger canonical full pipeline orchestration.
-- `/calendar_status` retained embed structure and extended diagnostic fields.
+- `/ops calendar_refresh` retained (no rename) and upgraded to trigger canonical full pipeline orchestration.
+- `/ops calendar_status` retained embed structure and extended diagnostic fields.
 
-### 2) `/calendar_refresh` operator summary
+### 2) `/ops calendar_refresh` operator summary
 Implemented output includes:
 - overall `ok`
 - `severity` (`ok|warning|degraded|failed`)
@@ -26,7 +26,7 @@ Implemented output includes:
 - publish reason
 - concise error context on failure paths
 
-### 3) `/calendar_status` diagnostics
+### 3) `/ops calendar_status` diagnostics
 Extended output now includes:
 - sync/generate/publish blocks with last timestamps
 - pipeline status + last run timestamp + run id
@@ -63,8 +63,8 @@ Extended output now includes:
 - Task 7 SQL verification scripts passed locally in SQL workflow.
 
 ### Manual smoke tests
-- `/calendar_refresh`: successful, run id + durations + counts shown.
-- `/calendar_status`: successful, pipeline + health diagnostics shown.
+- `/ops calendar_refresh`: successful, run id + durations + counts shown.
+- `/ops calendar_status`: successful, pipeline + health diagnostics shown.
 
 ---
 

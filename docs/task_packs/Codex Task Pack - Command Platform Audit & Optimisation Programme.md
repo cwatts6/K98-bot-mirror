@@ -73,8 +73,8 @@ authoritative inventory, and confirmed command-cache validation remained green a
 
 The current validator reports:
 
-75 primary commands
-29 grouped subcommands
+39 primary commands
+76 grouped subcommands
 0 disabled legacy command declarations
 warning threshold at 90
 hard fail at 100
@@ -294,9 +294,13 @@ PR 444. Phase 5 approved Phase 5A as the next implementation slice for admin/lea
 paths only. Player self-service command redesign and public calendar/KVK calendar redesign are
 deferred outside this command-count programme.
 
-Phase 5A - Admin/Leadership/Operator Domain Grouping: implemented on the Phase 5A implementation
-branch, reducing the active top-level command baseline to 39 while preserving player self-service
-and public calendar/KVK calendar commands.
+Phase 5A - Admin/Leadership/Operator Domain Grouping: complete. PR 136
+(`codex/command-platform-phase-5a-admin-grouping`) was smoke tested successfully, merged, and
+pushed to production. This phase reduced the active top-level command baseline to 39 while
+preserving player self-service and public calendar/KVK calendar commands. Smoke follow-up fixes
+preserved grouped usage-log identities, restored CrystalTech service imports, awaited
+`/stats player` embed rendering, and chunked long `/kvk list_scans` output below Discord content
+limits.
 
 Remaining roadmap:
 
@@ -306,11 +310,12 @@ Public Domain Grouping Design: complete
 
 Phase 5A
 
-Admin/Leadership/Operator Domain Grouping: implemented
+Admin/Leadership/Operator Domain Grouping: complete, smoke tested, merged, and pushed to
+production
 
 Phase 6
 
-Canonical Command Documentation
+Canonical Command Documentation: next active command-platform phase
 
 Phase 7
 

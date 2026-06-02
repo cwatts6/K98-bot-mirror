@@ -1,4 +1,4 @@
-We are building a resilient Event Calendar feature for the K98 Discord bot.
+﻿We are building a resilient Event Calendar feature for the K98 Discord bot.
 
 Target architecture:
 Google Sheets -> SQL -> JSON cache -> Bot
@@ -18,20 +18,20 @@ Data model already defined in 3 input tabs:
 
 Need production-quality implementation with validation, logging, graceful fallback behaviour, and admin refresh/status controls.
 
-K98 Bot – Event Calendar System
+K98 Bot â€“ Event Calendar System
 System Architecture
 Google Sheets
-      ↓
+      â†“
 Sheet Sync Module
-      ↓
+      â†“
 SQL Tables (persistent)
-      ↓
+      â†“
 Event Generator
-      ↓
+      â†“
 EventInstances table
-      ↓
+      â†“
 JSON Cache
-      ↓
+      â†“
 Discord Bot commands + calendar embed
 
 Key design rules:
@@ -58,8 +58,8 @@ Pipeline must degrade gracefully
 - Sync run logging via `EventSyncLog`
 - Graceful failure behavior enforced (no source table clobber)
 - Admin controls wired:
-  - `/calendar_refresh`
-  - `/calendar_status`
+  - `/ops calendar_refresh`
+  - `/ops calendar_status`
 
 ### Next: Task 3
 - Generate event instances into `EventInstances`

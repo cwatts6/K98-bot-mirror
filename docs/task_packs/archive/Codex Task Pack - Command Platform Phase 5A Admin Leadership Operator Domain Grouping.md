@@ -7,7 +7,8 @@
 - Owner/context: Command Platform Audit & Optimisation Programme
 - Task type: deferred optimisation batch / command-surface migration
 - One-pass approved: no
-- Status: implemented in this Phase 5A branch
+- Status: complete; delivered in PR 136, smoke tested successfully, merged, and pushed to
+  production
 
 ## 2. Required Reading
 
@@ -113,6 +114,17 @@ Grouped command summary:
 | `/subscriptions` | 3 |
 
 Recalculate during implementation if any target path changes after scope review.
+
+Phase 5A completion note:
+
+- Mirror PR: 136 (`codex/command-platform-phase-5a-admin-grouping`)
+- Result: smoke tested successfully, merged, and pushed to production on 2026-06-02
+- Delivered baseline:
+  `primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39`
+- Smoke follow-up fixes preserved grouped usage-log identities, restored CrystalTech service
+  imports, awaited `/stats player` embed rendering, and chunked long `/kvk list_scans` output
+  below Discord content limits.
+- Next phase: Command Platform Phase 6 - Canonical Command Documentation.
 
 ## 5. Scope
 

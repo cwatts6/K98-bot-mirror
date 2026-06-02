@@ -1,4 +1,4 @@
-# Task 4 Local Validation Runbook
+﻿# Task 4 Local Validation Runbook
 
 ## 1) Pytest (calendar target suites)
 
@@ -54,7 +54,7 @@ Expected:
 
 ## 5) Status and stale-cache checks
 
-Run `/calendar_status` and verify:
+Run `/ops calendar_status` and verify:
 
 - `sync`, `generate`, `publish` sections present
 - `calendar_health` includes:

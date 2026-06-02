@@ -22,6 +22,7 @@ Read the task brief, issue, or task pack before these documents when one exists.
 |------|-----------|
 | Deferred optimisation backlog | `deferred_optimisations.md` |
 | Deferred optimisation batching/scoring | `K98 Bot Deferred Optimisation Scoring Model.md` |
+| Command reference and command-surface governance | `canonical_command_reference.md` |
 | Promotion or deployment | `Promotion Guide.md`, `runbook_devops.md` |
 | Environment variables or runtime config | `ENV_REFERENCE.md` |
 | Startup lifecycle | `runbook_startup.md`, `singleton_lock.md` |
