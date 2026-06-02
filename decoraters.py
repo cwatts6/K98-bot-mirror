@@ -49,6 +49,17 @@ def _resolve_interaction(arg0) -> discord.Interaction | None:
     return getattr(arg0, "interaction", None)
 
 
+def _resolve_command_name(ctx: Any, fallback: str = "unknown") -> str:
+    """Resolve slash command usage identity, preserving grouped command paths."""
+    command = getattr(ctx, "command", None)
+    return (
+        getattr(command, "qualified_name", None)
+        or getattr(command, "name", None)
+        or (getattr(ctx, "data", {}) or {}).get("name")
+        or fallback
+    )
+
+
 def _actor_from_ctx(ctx):
     interaction = getattr(ctx, "interaction", None)
     user = (
@@ -135,11 +146,7 @@ def is_admin_and_notify_channel(allow_leadership: bool = False):
             # Helper: log a denied attempt (non-blocking, best-effort)
             async def _log_denied(reason: str):
                 try:
-                    cmd_name = (
-                        getattr(getattr(inter, "command", None), "name", None)
-                        or (getattr(inter, "data", {}) or {}).get("name")
-                        or "unknown"
-                    )
+                    cmd_name = _resolve_command_name(inter)
                     evt = {
                         "executed_at_utc": datetime.now(UTC).isoformat(),
                         "command_name": cmd_name,
@@ -495,11 +502,7 @@ def track_usage(command_name: str | None = None, app_context: str = "slash"):
 
                 # robust version lookup
                 version = _resolve_version(ctx, func, wrapper)
-                cmd_name = (
-                    command_name
-                    or getattr(getattr(ctx, "command", None), "name", None)
-                    or func.__name__
-                )
+                cmd_name = command_name or _resolve_command_name(ctx, func.__name__)
 
                 evt = {
                     "executed_at_utc": datetime.now(UTC).isoformat(),

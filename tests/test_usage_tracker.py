@@ -10,6 +10,7 @@ import asyncio
 from datetime import UTC, datetime
 import os
 import tempfile
+from types import SimpleNamespace
 
 import pytest
 
@@ -49,6 +50,58 @@ def test_decorator_usage_tracker_uses_shared_global_tracker(monkeypatch):
     monkeypatch.setattr(usage_tracker_module, "_GLOBAL_TRACKER", None)
 
     assert decoraters.usage_tracker() is get_usage_tracker()
+
+
+@pytest.mark.asyncio
+async def test_track_usage_logs_grouped_qualified_command_name(monkeypatch):
+    """Grouped slash commands must log the full path, not only the leaf name."""
+    events = []
+
+    class FakeUsageTracker:
+        async def log(self, event):
+            events.append(event)
+
+    monkeypatch.setattr(decoraters, "usage_tracker", lambda: FakeUsageTracker())
+
+    @decoraters.track_usage()
+    async def handler(_ctx):
+        return "ok"
+
+    ctx = SimpleNamespace(
+        command=SimpleNamespace(name="player", qualified_name="stats player"),
+        user=SimpleNamespace(id=1, display_name="Tester"),
+        guild=SimpleNamespace(id=2),
+        channel=SimpleNamespace(id=3),
+    )
+
+    assert await handler(ctx) == "ok"
+    assert events[0]["command_name"] == "stats player"
+
+
+@pytest.mark.asyncio
+async def test_track_usage_explicit_command_name_still_wins(monkeypatch):
+    """Existing explicit usage identities remain stable."""
+    events = []
+
+    class FakeUsageTracker:
+        async def log(self, event):
+            events.append(event)
+
+    monkeypatch.setattr(decoraters, "usage_tracker", lambda: FakeUsageTracker())
+
+    @decoraters.track_usage("player_stats")
+    async def handler(_ctx):
+        return "ok"
+
+    ctx = SimpleNamespace(
+        command=SimpleNamespace(name="player", qualified_name="stats player"),
+        user=SimpleNamespace(id=1, display_name="Tester"),
+        guild=SimpleNamespace(id=2),
+        channel=SimpleNamespace(id=3),
+    )
+
+    assert await handler(ctx) == "ok"
+    assert events[0]["command_name"] == "player_stats"
 
 
 def test_start_usage_tracker_creates_task(monkeypatch):
