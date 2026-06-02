@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from commands.stats_cmds import _split_discord_content
+
 IN_SCOPE_KVK_ADMIN_COMMANDS = {
     "test_kvk_export",
     "kvk_export_all",
@@ -49,3 +51,41 @@ def test_stats_cmds_imports_kvk_admin_service_boundary() -> None:
 
     assert "from kvk.services import kvk_admin_service" in source
     assert "from kvk.dal.kvk_history_dal import resolve_current_kvk_no_from_cursor" not in source
+
+
+def test_player_stats_awaits_async_embed_builder() -> None:
+    source = Path("commands/stats_cmds.py").read_text(encoding="utf-8")
+    command = next(
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "player_stats_command"
+    )
+
+    awaited_calls = [
+        node.value.func.id
+        for node in ast.walk(command)
+        if isinstance(node, ast.Await)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+    ]
+
+    assert "build_embeds" in awaited_calls
+
+
+def test_split_discord_content_keeps_chunks_under_limit() -> None:
+    content = "header\n" + "\n".join(f"row {idx:03d} " + ("x" * 80) for idx in range(60))
+
+    chunks = _split_discord_content(content, max_chars=500)
+
+    assert len(chunks) > 1
+    assert all(len(chunk) <= 500 for chunk in chunks)
+    assert "\n".join(chunks) == content
+
+
+def test_kvk_list_scans_uses_discord_content_splitter() -> None:
+    source = Path("commands/stats_cmds.py").read_text(encoding="utf-8")
+    command = _command_nodes()["kvk_list_scans"]
+    segment = ast.get_source_segment(source, command) or ""
+
+    assert "_split_discord_content" in segment
+    assert "for chunk in chunks" in segment

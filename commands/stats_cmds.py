@@ -53,6 +53,34 @@ bot: ext_commands.Bot | None = None
 # MyKVKStatsSelectView is defined canonically in ui.views.kvk_personal_views and imported above.
 
 
+def _split_discord_content(content: str, *, max_chars: int = 1900) -> list[str]:
+    """Split command output into Discord-safe content chunks."""
+    if len(content) <= max_chars:
+        return [content]
+
+    chunks: list[str] = []
+    current = ""
+    for line in content.splitlines():
+        candidate = line if not current else f"{current}\n{line}"
+        if len(candidate) <= max_chars:
+            current = candidate
+            continue
+
+        if current:
+            chunks.append(current)
+            current = ""
+
+        while len(line) > max_chars:
+            chunks.append(line[:max_chars])
+            line = line[max_chars:]
+        current = line
+
+    if current:
+        chunks.append(current)
+
+    return chunks or [""]
+
+
 def register_stats(bot_instance: ext_commands.Bot) -> None:
     global bot
     bot = bot_instance
@@ -818,7 +846,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         choice = "ALL" if len(gov_ids) > 1 else (account_options[0] if account_options else "ALL")
 
         # Build embed & view
-        embeds, files = build_embeds(slice_key, choice, payload)
+        embeds, files = await build_embeds(slice_key, choice, payload)
         view = SliceButtons(
             requester_id=requester_id,
             initial_slice=slice_key,
@@ -1080,10 +1108,9 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         try:
             result = await asyncio.to_thread(kvk_admin_service.list_recent_scans, kvk_no, limit)
 
-            await ctx.followup.send(
-                content=kvk_admin_service.format_recent_scans_message(result),
-                ephemeral=True,
-            )
+            chunks = _split_discord_content(kvk_admin_service.format_recent_scans_message(result))
+            for chunk in chunks:
+                await ctx.followup.send(content=chunk, ephemeral=True)
         except Exception as e:
             await ctx.followup.send(f"❌ {type(e).__name__}: {e}", ephemeral=True)
 
