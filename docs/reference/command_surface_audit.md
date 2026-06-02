@@ -52,7 +52,7 @@ Command Platform Phase 6, Canonical Command Documentation, was completed in PR 1
 production. It created `canonical_command_reference.md` as the maintained current command
 reference and updated stale active command docs and smoke references.
 
-Phase 7 governance and CI guardrails is the final planned command-platform programme phase. Player
+Phase 7 governance and CI guardrails are the final planned command-platform programme phase. Player
 self-service and generic public calendar/KVK calendar redesign remain deferred outside this
 command-count programme.
 

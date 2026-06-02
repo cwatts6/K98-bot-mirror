@@ -564,6 +564,6 @@ Validation:
 8. Phase 7: Future Governance And CI Guardrails.
 
 With Phase 6 delivered, merged, marked complete, and pushed to production, Phase 7 governance and
-CI guardrails is the final planned command-platform programme phase. Player self-service workflow
+CI guardrails are the final planned command-platform programme phase. Player self-service workflow
 redesign and public calendar/KVK calendar redesign remain deferred into separate optimisation
 tasks rather than continued as simple command grouping inside this programme.
