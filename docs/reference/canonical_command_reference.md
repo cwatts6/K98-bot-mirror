@@ -202,7 +202,7 @@ Legend:
 - Phase 3 grouped low-risk ops/reporting commands under `/ops`.
 - Phase 4 grouped all Ark commands under `/ark`.
 - Phase 5A grouped approved admin, leadership, and operator paths under `/activity`,
-  `/crystaltech`, `/events`, `/honor`, `/inventory`, `/kvk`, `/location`, `/ops`, `/registry`,
+  `/crystaltech`, `/events`, `/honor`, `/inventory`, `/kvk` (renamed to `/kvk_admin` in Phase 2A), `/location`, `/ops`, `/registry`,
   `/stats`, and `/subscriptions`.
 - KVK Player Experience Redesign Phase 2A moved KVK admin/operator commands from `/kvk` to
   `/kvk_admin`, leaving `/kvk` available for the player KVK scaffold.
