@@ -51,18 +51,19 @@ Optional later expansion after the core group is stable:
 
 ### Admin/operator command group
 
-Target later admin command group:
+Delivered Phase 2A admin command group:
 
 ```text
+/kvk_admin test_export
+/kvk_admin refresh_stats_cache
 /kvk_admin recompute
 /kvk_admin export_all
 /kvk_admin list_scans
 /kvk_admin window_preview
-/kvk_admin refresh_stats_cache
-/kvk_admin diagnostics
+/kvk_admin test_embed
 ```
 
-The admin group is intentionally separated from the player `/kvk` group so player journeys remain clean and admin/operator tools do not clutter the public command surface.
+The admin group is intentionally separated from the player `/kvk` group so player journeys remain clean and admin/operator tools do not clutter the public command surface. Phase 2A delivered this split in PR #140; `/kvk` is now reserved for the player scaffold.
 
 ## 5. Target User Journeys
 
@@ -208,31 +209,20 @@ No code changes.
 
 ### Phase 2A — Admin `/kvk` Collision Resolution
 
-Move or duplicate current admin/operator `/kvk` commands away from the player `/kvk` surface before the player scaffold is introduced.
+Status: complete. Delivered and merged in PR #140.
 
-Potential target admin surfaces:
+The former admin/operator `/kvk ...` commands were moved to `/kvk_admin ...` before the player scaffold was introduced:
 
 ```text
+/kvk_admin test_export
+/kvk_admin refresh_stats_cache
 /kvk_admin recompute
 /kvk_admin export_all
 /kvk_admin list_scans
 /kvk_admin window_preview
-/kvk_admin refresh_stats_cache
-/kvk_admin diagnostics
 ```
 
-or, if avoiding a new top-level admin group:
-
-```text
-/ops kvk_recompute
-/ops kvk_export_all
-/ops kvk_list_scans
-/ops kvk_window_preview
-/ops kvk_refresh_cache
-/ops kvk_diagnostics
-```
-
-Preserve permissions, channel restrictions, logging, usage tracking, service/DAL ownership, command-cache behaviour, and operator rollout notes.
+Old `/kvk ...` admin paths were intentionally removed from the active command surface. Permissions, channel restrictions, logging, usage tracking, service/DAL ownership, command-cache governance, and operator reference documentation were updated without changing SQL, import, recompute, export, or Google Sheets behaviour.
 
 ### Phase 2B — New `/kvk` Player Command Group Scaffold
 
@@ -280,7 +270,7 @@ Support dropdowns/buttons for ranking type and pagination. Keep image output opt
 
 ### Phase 6 — Admin Command Hardening And Legacy Operator Cleanup
 
-Harden the approved admin/operator KVK command surface after Phase 2A.
+Harden the delivered `/kvk_admin` operator command surface after Phase 2A.
 
 This phase should preserve all permissions, channel restrictions, logging, and existing service/DAL ownership.
 
@@ -417,10 +407,10 @@ Do not include these in the early phases unless separately approved:
 
 ## 14. Suggested Next Action
 
-Start with:
+Proceed with:
 
 ```text
-KVK Player Experience Redesign — Phase 1 Audit and Design Only
+KVK Player Experience Redesign - Phase 2B Player /kvk Scaffold
 ```
 
-Do not implement until Phase 1 has produced and agreed the target command model, visual architecture, migration plan, and risk controls.
+Phase 1 audit/design and Phase 2A admin collision resolution are complete. Phase 2B can now scaffold the player `/kvk` group while preserving the legacy flat player commands.

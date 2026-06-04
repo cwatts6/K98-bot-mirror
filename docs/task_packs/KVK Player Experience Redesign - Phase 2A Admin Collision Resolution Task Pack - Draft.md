@@ -1,27 +1,28 @@
-# KVK Player Experience Redesign - Phase 2A Admin Collision Resolution Task Pack Draft
+# KVK Player Experience Redesign - Phase 2A Admin Collision Resolution Task Pack
 
 ## 1. Task Header
 
 - Task name: `KVK Player Experience Redesign - Phase 2A Admin Collision Resolution`
 - Date: `2026-06-03`
+- Completed: `2026-06-04`
 - Task type: `command-surface refactor / admin migration`
 - One-pass approved: `no`
-- Status: `approved for /kvk_admin implementation`
+- Status: `complete - delivered and merged in PR #140`
 
 ## 2. Objective
 
-Resolve the current `/kvk` command collision before the player `/kvk` scaffold is implemented.
+Resolve the former `/kvk` command collision before the player `/kvk` scaffold is implemented.
 
-Current `/kvk` is an admin/operator group in `commands/stats_cmds.py`. The programme target reserves `/kvk` for player journeys, so the existing admin/operator commands must move to an approved admin surface first.
+Delivered result: the existing admin/operator commands were moved from `/kvk ...` to `/kvk_admin ...` in `commands/stats_cmds.py`. The `/kvk` top-level group is now available for the Phase 2B player scaffold.
 
 ## 3. Scope
 
 In scope:
 
-- Move or wrap current admin/operator `/kvk` commands under the approved admin surface.
+- Move current admin/operator `/kvk` commands under the approved admin surface.
 - Preserve permissions, channel restrictions, usage tracking, versioning, safe command handling, logging, command-cache behaviour, and service/DAL ownership.
 - Update command registration validation, canonical command reference, command inventory tests, smoke tests, and operator rollout notes.
-- Keep old operator command paths live or provide approved compatibility/help behaviour if needed.
+- Document legacy operator path behaviour.
 
 Out of scope:
 
@@ -30,9 +31,9 @@ Out of scope:
 - No SQL schema, procedure, view, function, import, recompute, export, or Google Sheets behaviour changes.
 - No legacy player command removal.
 
-## 4. Commands To Move
+## 4. Commands Moved
 
-Current admin/operator commands:
+Former admin/operator commands:
 
 ```text
 /kvk test_export
@@ -44,7 +45,7 @@ Current admin/operator commands:
 /kvk window_preview
 ```
 
-Approved target:
+Delivered admin target:
 
 ```text
 /kvk_admin test_export
@@ -68,16 +69,22 @@ Rejected alternative for this task:
 /ops kvk_window_preview
 ```
 
-## 5. Architecture Direction
+Legacy compatibility behaviour:
+
+- Old `/kvk ...` admin/operator paths were removed from the active command surface.
+- No compatibility wrappers were retained, by approval, so the player `/kvk` group can be scaffolded cleanly in Phase 2B.
+
+## 5. Delivered Architecture
 
 - Commands remain thin and call `kvk.services.kvk_admin_service` or existing export/test helpers.
-- DAL stays in `kvk/dal/` or current approved data-access modules.
-- No direct SQL should be added to command/view layers.
-- If compatibility wrappers are used, they should delegate to the new command/service path and avoid duplicated logic.
+- DAL remains in `kvk/dal/` or current approved data-access modules.
+- No direct SQL was added to command/view layers.
+- No SQL/import/recompute/export, Google Sheets, service, or DAL semantics changed.
+- The command registration baseline, smoke tests, focused command tests, and canonical command reference now use `/kvk_admin`.
 
 ## 6. Testing And Validation
 
-Run or justify:
+Completed validation:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
@@ -86,19 +93,20 @@ Run or justify:
 .\.venv\Scripts\python.exe scripts\validate_command_registration.py
 .\.venv\Scripts\python.exe scripts\smoke_imports.py
 .\.venv\Scripts\python.exe -m pytest -q tests\test_validate_command_registration.py tests\test_command_inventory.py tests\test_command_registration_smoke.py tests\test_stats_cmds.py tests\test_kvk_admin_service.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_command_governance_config.py tests\test_validate_command_registration.py tests\test_command_inventory.py tests\test_command_registration_smoke.py
 ```
 
-Run Codex Security before PR handoff because command permissions, Discord interactions, and SQL/export-facing operator commands are touched.
+Codex Security review was considered for PR handoff because command permissions, Discord interactions, and SQL/export-facing operator commands were touched. The delivered code change was a command-surface rename with existing permission decorators and service/DAL behaviour preserved.
 
 ## 7. Acceptance Criteria
 
-- [ ] Approved admin target surface is documented.
-- [ ] Current admin/operator `/kvk` commands no longer block the player `/kvk` scaffold.
-- [ ] Permissions and channel restrictions are preserved.
-- [ ] Command registration validation passes.
-- [ ] Canonical command reference is updated.
-- [ ] Legacy compatibility behaviour is documented.
-- [ ] No SQL/import/recompute/export semantics changed.
+- [x] Approved admin target surface is documented.
+- [x] Current admin/operator `/kvk` commands no longer block the player `/kvk` scaffold.
+- [x] Permissions and channel restrictions are preserved.
+- [x] Command registration validation passes.
+- [x] Canonical command reference is updated.
+- [x] Legacy compatibility behaviour is documented.
+- [x] No SQL/import/recompute/export semantics changed.
 
 ## 8. Approval Decision
 

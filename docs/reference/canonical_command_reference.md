@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39
+primary=40 grouped_subcommands_detected=80 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=40
 ```
 
 Grouped command summary:
@@ -30,6 +30,7 @@ Grouped command summary:
 | `/events` | 2 |
 | `/honor` | 1 |
 | `/inventory` | 2 |
+| `/kvk` | 4 |
 | `/kvk_admin` | 7 |
 | `/location` | 2 |
 | `/mge` | 6 |
@@ -64,7 +65,7 @@ The approved top-level command baseline is enforced by `APPROVED_TOP_LEVEL_COMMA
 
 ```text
 activity, ark, calendar, calendar_next_event, calendar_reminder_config, crystaltech, events,
-export_inventory, honor, honor_rankings, inventory, inventory_preferences, kvk_admin, kvk_rankings,
+export_inventory, honor, honor_rankings, inventory, inventory_preferences, kvk, kvk_admin, kvk_rankings,
 location, mge, modify_registration, modify_subscription, my_registrations, my_stats,
 my_stats_export, mygovernorid, myinventory, mykvkcrystaltech, mykvkhistory, mykvkstats,
 mykvktargets, next_kvk_event, next_kvk_fight, ops, ping, player_profile, prekvk,
@@ -160,6 +161,10 @@ Legend:
 | Ops | `/ops test_embed` | `commands/admin_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Test embed dispatch. |
 | Ops | `/ops usage` | `commands/admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve | Usage analytics summary. |
 | Ops | `/ops usage_detail` | `commands/admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve | Usage analytics detail. |
+| Player/KVK | `/kvk stats` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator with admin override | Private selector; selected single-account stats post public | Standard | New Phase 2B player scaffold; legacy `/mykvkstats` remains live | Player KVK stats journey. |
+| Player/KVK | `/kvk targets` | `commands/kvk_cmds.py` | Grouped | KVK target channel decorator with admin override | User-selectable | Standard | New Phase 2B player scaffold; legacy `/mykvktargets` remains live | Player KVK targets journey. |
+| Player/KVK | `/kvk history` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator | User-selectable | Standard | New Phase 2B player scaffold; legacy `/mykvkhistory` remains live | Player KVK history chart/table journey. |
+| Player/KVK | `/kvk rankings` | `commands/kvk_cmds.py` | Grouped | Mode-specific legacy gates: KVK stats channel with admin override for `kvk`, KVK stats channel without admin override for `honor`, public command-level access for `prekvk` | Public for KVK/honor; PreKvK posts report with private acknowledgement | Standard | New Phase 2B player scaffold; legacy ranking commands remain live | Required `type` option supports `kvk`, `honor`, and `prekvk`. |
 | Player/KVK | `/mykvktargets` | `commands/telemetry_cmds.py` | Flat | KVK target channel decorator with admin override | User-selectable | Standard | Defer player self-service redesign | Player target lookup. |
 | Player/KVK | `/mygovernorid` | `commands/telemetry_cmds.py` | Flat | Public command-level access | Ephemeral | Standard | Defer player self-service redesign | Governor ID lookup. |
 | Player/KVK | `/player_profile` | `commands/telemetry_cmds.py` | Flat | Admin or leadership in allowed channels | Ephemeral | Standard | Defer profile workflow review | Leadership profile lookup. |
@@ -206,6 +211,8 @@ Legend:
   `/stats`, and `/subscriptions`.
 - KVK Player Experience Redesign Phase 2A moved KVK admin/operator commands from `/kvk` to
   `/kvk_admin`, leaving `/kvk` available for the player KVK scaffold.
+- KVK Player Experience Redesign Phase 2B added the player `/kvk` group with `stats`, `targets`,
+  `history`, and `rankings` subcommands in parallel with the legacy flat player commands.
 - Player self-service paths remain flat pending a dedicated workflow redesign.
 - Public calendar and KVK calendar paths remain flat pending a dedicated UX redesign.
 - `/ping` remains flat for simple health/debug discoverability.

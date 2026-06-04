@@ -22,3 +22,8 @@ material.
 
 Player self-service workflow redesign and public calendar/KVK calendar UX redesign remain separate
 deferred optimisation programmes, not additional command-platform phases.
+
+KVK Player Experience Redesign is active. Phase 1 audit/design is complete, and Phase 2A Admin
+Collision Resolution was delivered in PR 140 by moving admin/operator commands from `/kvk ...` to
+`/kvk_admin ...`. Use the Phase 2B Player `/kvk` Scaffold task pack for the next implementation
+step.

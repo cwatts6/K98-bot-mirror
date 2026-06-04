@@ -1,4 +1,4 @@
-# KVK Player Experience Redesign - Phase 2B Player KVK Scaffold Task Pack Draft
+# KVK Player Experience Redesign - Phase 2B Player KVK Scaffold Task Pack
 
 ## 1. Task Header
 
@@ -6,11 +6,13 @@
 - Date: `2026-06-03`
 - Task type: `feature / command-surface migration scaffold`
 - One-pass approved: `no`
-- Status: `draft`
+- Status: `ready for implementation`
 
 ## 2. Objective
 
-Create the player-facing `/kvk` command group after Phase 2A resolves the admin collision.
+Create the player-facing `/kvk` command group after Phase 2A resolved the admin collision.
+
+Prerequisite status: Phase 2A is complete in PR #140. Admin/operator KVK commands now live under `/kvk_admin ...`, and the old `/kvk ...` admin paths are no longer active.
 
 Initial player subcommands:
 
@@ -20,8 +22,7 @@ Initial player subcommands:
 /kvk history
 /kvk rankings
 ```
-
-Legacy commands remain live.
+Legacy commands must remain live.
 
 ## 3. Approved Behaviour
 
@@ -40,7 +41,7 @@ In scope:
 - Preserve legacy flat commands unchanged.
 - Preserve current permissions and visibility unless this task explicitly changes them.
 - Add tests for command registration, permissions, delegation, ranking modes, and old-command preservation.
-- Update canonical command reference and command inventory expectations.
+- Update canonical command reference, approved top-level command baseline, and command inventory expectations for the new player `/kvk` group.
 - Begin targets service/DAL payload cleanup only where needed to keep `/kvk targets` thin and testable.
 
 Out of scope:
@@ -53,8 +54,10 @@ Out of scope:
 
 ## 5. Architecture Direction
 
-- New command module target: `commands/kvk_cmds.py`, unless Phase 2A establishes a better local pattern.
+- New player command module target: `commands/kvk_cmds.py`.
+- Existing admin/operator handlers remain in `commands/stats_cmds.py` under `/kvk_admin`.
 - Commands validate, defer safely, preserve permission checks, and call services/views.
+- Command registration governance should add `/kvk` as the player top-level group while keeping `/kvk_admin` as the operator top-level group.
 - KVK targets should move toward `kvk/services/` and `kvk/dal/` ownership for payload construction.
 - Ranking mode adapters should not duplicate ranking calculations.
 - PreKvK image/report rendering remains in `prekvk/` and `ui/views/prekvk_report_views.py`; `/kvk rankings type:prekvk` should delegate.
@@ -100,7 +103,7 @@ Requirements:
 - Preserve current KVK ranking calculations and pagination.
 - Preserve current honor ranking calculations and pagination.
 - Preserve current PreKvK report payload, sort, limit, and generated PNG behaviour by delegation.
-- Decide whether `type` is a required slash option, defaulted slash option, or interactive select before implementation.
+- Use `type` as a required slash option for the scaffold, with choices `kvk`, `honor`, and `prekvk`.
 
 ## 10. Testing And Validation
 
@@ -121,9 +124,10 @@ Run Codex Security before PR handoff because user-facing commands, permissions, 
 
 ## 11. Acceptance Criteria
 
-- [ ] Phase 2A is complete or explicitly accounted for.
+- [x] Phase 2A is complete; `/kvk` is available for the player scaffold.
 - [ ] `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` are registered.
 - [ ] `/kvk rankings` supports `kvk`, `honor`, and `prekvk` modes.
+- [ ] `/kvk rankings type` is implemented as a required slash option.
 - [ ] `/kvk stats` preserves private selection and public selected stat output.
 - [ ] Legacy commands remain live.
 - [ ] No generated card work is mixed into this scaffold.

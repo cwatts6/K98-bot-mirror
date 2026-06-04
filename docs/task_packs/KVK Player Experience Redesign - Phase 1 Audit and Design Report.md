@@ -4,6 +4,10 @@ Date: 2026-06-03
 
 Scope: audit/design only. No runtime code, SQL, command registration, or output behaviour changed.
 
+Phase 2A completion update: admin/operator KVK commands have now moved from `/kvk ...` to
+`/kvk_admin ...` in PR #140. The collision identified by this audit is resolved, and `/kvk`
+is available for the Phase 2B player scaffold.
+
 ## 1. Summary
 
 The programme goal is sound: the current KVK player experience is valuable but fragmented across flat legacy commands, mixed modules, and inconsistent output styles. The target should be a coherent player journey around:
@@ -13,7 +17,7 @@ The programme goal is sound: the current KVK player experience is valuable but f
 - `/kvk history`
 - `/kvk rankings`
 
-The key design correction from the initial programme pack is that `/kvk` already exists today as an admin/operator command group in `commands/stats_cmds.py`, with subcommands such as `export_all`, `recompute`, `list_scans`, `refresh_stats_cache`, `test_export`, `test_embed`, and `window_preview`. Phase 2 cannot simply add player subcommands under the current `/kvk` group without mixing player and operator journeys. The recommended path is to reserve `/kvk` for players and migrate current `/kvk` admin/operator commands to a later approved admin surface before or during the player scaffold rollout.
+The key design correction from the initial programme pack was that `/kvk` already existed as an admin/operator command group in `commands/stats_cmds.py`, with subcommands such as `export_all`, `recompute`, `list_scans`, `refresh_stats_cache`, `test_export`, `test_embed`, and `window_preview`. Phase 2 could not simply add player subcommands under that `/kvk` group without mixing player and operator journeys. Phase 2A has now delivered the recommended path: `/kvk` is reserved for players, and the admin/operator commands live under `/kvk_admin`.
 
 Approved Phase 2 direction:
 
@@ -44,7 +48,7 @@ Approved Phase 2 direction:
 
 ## 3. Admin/Operator Command Audit
 
-Current `/kvk` is an admin/operator group in `commands/stats_cmds.py`:
+Historical finding before Phase 2A: `/kvk` was an admin/operator group in `commands/stats_cmds.py`:
 
 - `/kvk test_export`
 - `/kvk refresh_stats_cache`
@@ -56,18 +60,17 @@ Current `/kvk` is an admin/operator group in `commands/stats_cmds.py`:
 
 These commands use `@is_admin_and_notify_channel()`, `@safe_command`, `@versioned()`, and `@track_usage()`. They are operational, SQL/data/export-facing, and should not share the final player `/kvk` group.
 
-Recommended admin separation:
+Delivered admin separation:
 
-- Preferred: move current operator commands to `/kvk_admin ...` in Phase 6 or an approved prerequisite phase.
-- Alternative: move high-risk operational commands under existing `/ops kvk_*` names to avoid adding a new top-level group.
-- Do not mix player `/kvk stats` with admin `/kvk recompute` in the same group unless explicitly approved as a temporary compatibility compromise.
+- Current operator commands moved to `/kvk_admin ...` in Phase 2A.
+- Old `/kvk ...` admin paths were removed from the active command surface by approval.
+- Player `/kvk stats` and admin `/kvk_admin recompute` are now separated before the Phase 2B scaffold.
 
 Command-surface governance:
 
-- `/kvk` already exists, so keeping the same top-level group does not increase top-level count.
-- Repurposing `/kvk` from admin to player does change grouped subcommand ownership and command-cache expectations.
-- A new `/kvk_admin` top-level group would require `APPROVED_TOP_LEVEL_COMMANDS`, canonical command reference, command inventory, smoke tests, and operator approval.
-- If admin commands move to `/ops`, no new top-level group is needed, but qualified command paths and docs/tests still change.
+- `/kvk` remains reserved for the player group.
+- `/kvk_admin` is now an approved top-level command group.
+- `APPROVED_TOP_LEVEL_COMMANDS`, the canonical command reference, command inventory expectations, smoke tests, and operator rollout notes were updated in Phase 2A.
 
 ## 4. Player Journey Audit
 
@@ -209,7 +212,7 @@ Recommended player group:
 /kvk rankings [type: kvk|honor|prekvk] [sort?] [limit?]
 ```
 
-Recommended admin/operator model:
+Delivered admin/operator model:
 
 ```text
 /kvk_admin export_all
@@ -221,26 +224,14 @@ Recommended admin/operator model:
 /kvk_admin test_embed
 ```
 
-Alternative if avoiding a new top-level group:
-
-```text
-/ops kvk_export_all
-/ops kvk_recompute
-/ops kvk_list_scans
-/ops kvk_refresh_stats_cache
-/ops kvk_window_preview
-/ops kvk_test_export
-/ops kvk_test_embed
-```
-
-Phase 2A should choose and implement one admin model before Phase 2B modifies `/kvk`.
+Phase 2A chose and implemented `/kvk_admin` before Phase 2B modifies `/kvk`.
 
 ## 10. Migration and Deprecation Plan
 
-1. Approve command-surface ownership: player `/kvk` plus either `/kvk_admin` or `/ops kvk_*`.
-2. Move/scaffold admin command paths only if needed to free `/kvk`; keep old paths live or redirect during an agreed compatibility window.
-3. Add player `/kvk` subcommands with parity output and old-command reuse.
-4. Update command registration validation, canonical command reference, command inventory tests, and smoke tests.
+1. Complete: command-surface ownership approved as player `/kvk` plus admin `/kvk_admin`.
+2. Complete: admin command paths moved to `/kvk_admin`; old `/kvk ...` admin paths removed by approval.
+3. Complete: command registration validation, canonical command reference, command inventory tests, and smoke tests updated for `/kvk_admin`.
+4. Add player `/kvk` subcommands with parity output and old-command reuse.
 5. Soft-launch with player announcement listing old and new paths.
 6. Monitor usage through command usage logs.
 7. Deprecate flat commands with redirect/help responses after approval.
@@ -259,11 +250,11 @@ Legacy commands to keep live through at least Phase 5:
 
 Phase 2 is split:
 
-Phase 2A: admin collision resolution.
+Phase 2A: admin collision resolution. Complete in PR #140.
 
-- Move current admin/operator `/kvk` commands away from the player `/kvk` surface.
-- Preserve permissions, channel restrictions, usage tracking, command cache behaviour, and existing service/DAL ownership.
-- Keep legacy compatibility or clear rollout notes for old operator paths.
+- Moved current admin/operator `/kvk` commands away from the player `/kvk` surface.
+- Preserved permissions, channel restrictions, usage tracking, command cache behaviour, and existing service/DAL ownership.
+- Documented that old `/kvk ...` operator paths were removed from the active command surface.
 
 Phase 2B: player `/kvk` scaffold.
 
@@ -334,16 +325,14 @@ Codex Security:
 | SQL result-shape drift | High | Validate object contracts against SQL repo before each implementation phase. |
 | View restart/persistence assumptions | Medium | Keep Phase 2 views non-persistent unless explicitly designed; test timeout/stale interactions. |
 
-## 14. Deferred Optimisations
+## 14. Resolved Finding And Remaining Programme Work
 
-### Deferred Optimisation
+Resolved Phase 2A finding:
+
 - Area: `commands/stats_cmds.py` `/kvk` admin group and future KVK player commands
 - Type: architecture
-- Description: The `/kvk` top-level group currently contains admin/operator commands, but the target KVK player redesign wants `/kvk` to be the player-facing surface. Mixing both would weaken discoverability and increase permission-regression risk.
-- Suggested Fix: Scope and approve an admin command-surface migration to `/kvk_admin` or `/ops kvk_*` before or as part of the player `/kvk` scaffold. Update command registration validation, canonical command reference, smoke tests, and operator docs.
-- Impact: high
-- Risk: medium
-- Dependencies: Operator approval for the final admin command path and compatibility/announcement plan.
+- Resolution: Admin/operator commands moved from `/kvk ...` to `/kvk_admin ...` in PR #140.
+- Result: The player `/kvk` surface is available for Phase 2B, and command registration validation, canonical command reference, smoke tests, and operator documentation now reflect `/kvk_admin`.
 
 The previous targets and personal stats payload findings are now programme work rather than deferred optimisations:
 
@@ -352,6 +341,6 @@ The previous targets and personal stats payload findings are now programme work 
 
 ## 15. Approval Questions
 
-1. Should Phase 2A use `/kvk_admin ...` or `/ops kvk_*` for the admin/operator commands?
+1. Resolved: Phase 2A uses `/kvk_admin ...` for the admin/operator commands.
 2. For Acclaim/contribution, which exact SQL output object should be treated as the player-card source of truth?
 3. Should Phase 2B expose ranking type as a required slash option, a defaulted slash option, or an interactive select after `/kvk rankings`?
