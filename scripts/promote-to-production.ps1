@@ -243,11 +243,19 @@ function Get-GitObjectIdOrNull {
     [string]$Path
   )
 
-  $objectId = git rev-parse "${RefName}:$Path" 2>$null
+  $treeEntry = git ls-tree $RefName -- $Path
   if ($LASTEXITCODE -ne 0) {
     return $null
   }
-  return ($objectId | Select-Object -First 1)
+  $line = ($treeEntry | Select-Object -First 1)
+  if ([string]::IsNullOrWhiteSpace($line)) {
+    return $null
+  }
+  $match = [regex]::Match($line, "^\d+\s+\w+\s+([0-9a-fA-F]+)\t")
+  if (-not $match.Success) {
+    throw "Could not parse git tree entry for '$Path' at '$RefName': $line"
+  }
+  return $match.Groups[1].Value
 }
 
 function Resolve-PromotionPatchFiles {
