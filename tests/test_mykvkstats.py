@@ -228,10 +228,18 @@ async def test_multi_account_builds_selector(monkeypatch):
     created = {}
 
     class StubMyKVKStatsSelectView:
-        def __init__(self, ctx=None, accounts=None, author_id=None, timeout=300):
+        def __init__(
+            self,
+            ctx=None,
+            accounts=None,
+            author_id=None,
+            use_visual_card=False,
+            timeout=300,
+        ):
             created["ctx"] = ctx
             created["accounts"] = accounts
             created["author_id"] = author_id
+            created["use_visual_card"] = use_visual_card
 
     monkeypatch.setattr(C, "MyKVKStatsSelectView", StubMyKVKStatsSelectView)
 
@@ -241,6 +249,7 @@ async def test_multi_account_builds_selector(monkeypatch):
 
     await handler(ctx)
     assert created.get("accounts"), "Expected MyKVKStatsSelectView to be initialized with accounts"
+    assert created.get("use_visual_card") is False
     assert (
         ctx.interaction.edited
     ), "Expected edit_original_response to be called for multi-account path"

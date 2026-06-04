@@ -128,3 +128,67 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     assert calls[6][1]["sort_by"] == "parsed:Overall"
     assert calls[6][1]["limit"] == 10
     assert ctx.responded == [("Unknown ranking type.", True)]
+
+
+@pytest.mark.asyncio
+async def test_kvk_stats_multi_account_selector_uses_visual_card(monkeypatch):
+    import commands.kvk_cmds as kvk_cmds
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        return None
+
+    async def fake_account_summary(_user_id):
+        return kvk_cmds.governor_account_service.summarize_accounts(
+            {
+                "Main": {"GovernorID": "123", "GovernorName": "MainGov"},
+                "Alt 1": {"GovernorID": "456", "GovernorName": "AltGov"},
+            }
+        )
+
+    async def fake_last_kvk_map():
+        return {}
+
+    created = {}
+
+    class StubMyKVKStatsSelectView:
+        def __init__(
+            self,
+            *,
+            ctx,
+            accounts,
+            author_id,
+            use_visual_card=False,
+        ):
+            created["ctx"] = ctx
+            created["accounts"] = accounts
+            created["author_id"] = author_id
+            created["use_visual_card"] = use_visual_card
+            self._last_kvk_map = None
+
+    class DummyInteraction:
+        def __init__(self):
+            self.edits = []
+
+        async def edit_original_response(self, **kwargs):
+            self.edits.append(kwargs)
+            return SimpleNamespace(id="edited")
+
+    ctx = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        interaction=DummyInteraction(),
+        bot=SimpleNamespace(),
+    )
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.governor_account_service,
+        "get_account_summary_for_user",
+        fake_account_summary,
+    )
+    monkeypatch.setattr(kvk_cmds.kvk_personal_service, "load_last_kvk_map", fake_last_kvk_map)
+    monkeypatch.setattr(kvk_cmds, "MyKVKStatsSelectView", StubMyKVKStatsSelectView)
+
+    await kvk_cmds._send_personal_kvk_stats(ctx)
+
+    assert created["use_visual_card"] is True
+    assert ctx.interaction.edits[-1]["view"]._last_kvk_map == {}

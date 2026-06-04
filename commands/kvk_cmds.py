@@ -160,7 +160,12 @@ async def _send_personal_kvk_stats(ctx: discord.ApplicationContext) -> None:
             ordered_accounts[slot] = accounts[slot]
 
     try:
-        view = MyKVKStatsSelectView(ctx=ctx, accounts=ordered_accounts, author_id=ctx.user.id)
+        view = MyKVKStatsSelectView(
+            ctx=ctx,
+            accounts=ordered_accounts,
+            author_id=ctx.user.id,
+            use_visual_card=True,
+        )
         view._last_kvk_map = last_kvk_map
     except Exception as exc:
         logger.exception("[/kvk stats] MyKVKStatsSelectView init failed")

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from kvk.models.kvk_stats_card import KvkStatsCardPayload, KvkTargetProgress
 from ui.views.kvk_stats_card_views import build_history_embed, build_more_stats_embed
 
@@ -76,3 +78,20 @@ def test_history_embed_includes_last_kvk_summary():
 
     assert embed.title == "Historic KVK Data - Card Tester"
     assert any(field.name == "Last KVK Summary - KVK 53" for field in embed.fields)
+
+
+def test_history_embed_filters_zero_summary_and_personal_best_rows():
+    payload = replace(
+        _payload(),
+        history_summary={"Autarch": 0, "KVK Played": 0, "Highest Acclaim": 0},
+        personal_bests={"Most Kills": 0, "Most Deads": 0, "Most Heal": 0},
+        last_kvk_summary={},
+        matchmaking_snapshot={},
+    )
+
+    embed = build_history_embed(payload)
+    field_names = [field.name for field in embed.fields]
+
+    assert "Summary" not in field_names
+    assert "Personal Bests" not in field_names
+    assert field_names == ["Last KVK Summary"]

@@ -53,7 +53,8 @@ def _compact(value: int | float | None) -> str:
 def _pct(value: float | None) -> str:
     if value is None:
         return "N/A"
-    return f"{value:.1f}%".rstrip("0").rstrip(".").replace(".%", "%")
+    number = f"{value:.1f}".rstrip("0").rstrip(".")
+    return f"{number}%"
 
 
 def _text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:

@@ -105,6 +105,7 @@ class MyKVKStatsSelectView(discord.ui.View):
         accounts: dict,
         author_id: int,
         bot=None,
+        use_visual_card: bool = False,
         timeout: int = 120,
     ):
         super().__init__(timeout=timeout)
@@ -113,6 +114,7 @@ class MyKVKStatsSelectView(discord.ui.View):
         self.accounts = accounts
         self._bot = bot if bot is not None else getattr(ctx, "bot", None)
         self._last_kvk_map: dict = {}
+        self.use_visual_card = use_visual_card
 
         # Build options in canonical order
         options: list[discord.SelectOption] = []
@@ -164,9 +166,14 @@ class MyKVKStatsSelectView(discord.ui.View):
         gid = normalize_governor_id(self.select.values[0])
 
         try:
-            row = await asyncio.to_thread(load_stat_row, gid)
+            if self.use_visual_card:
+                from services import kvk_personal_service
+
+                row = await kvk_personal_service.load_kvk_personal_stats(gid)
+            else:
+                row = await asyncio.to_thread(load_stat_row, gid)
         except Exception as e:
-            logger.exception("[MyKVKStatsSelectView] load_stat_row failed governor_id=%s", gid)
+            logger.exception("[MyKVKStatsSelectView] load stats failed governor_id=%s", gid)
             try:
                 if _is_admin(interaction.user):
                     await interaction.followup.send(
@@ -196,6 +203,47 @@ class MyKVKStatsSelectView(discord.ui.View):
                     row["last_kvk"] = lk
         except Exception:
             logger.exception("[MyKVKStatsSelectView] failed attaching last_kvk for %s", gid)
+
+        if self.use_visual_card:
+            try:
+                from commands.kvk_stats_card_posting import post_kvk_stats_output
+
+                posted, _ = await post_kvk_stats_output(
+                    bot=self._bot,
+                    ctx=self.ctx,
+                    row=row,
+                    user=interaction.user,
+                    use_fallback_chain=True,
+                )
+            except Exception as e:
+                logger.exception(
+                    "[MyKVKStatsSelectView] post_kvk_stats_output failed governor_id=%s", gid
+                )
+                try:
+                    if _is_admin(interaction.user):
+                        await interaction.followup.send(
+                            f"Failed to build stats: `{type(e).__name__}: {e}`",
+                            ephemeral=True,
+                        )
+                except Exception:
+                    pass
+                return
+
+            try:
+                if _is_admin(interaction.user):
+                    if posted:
+                        await interaction.followup.send(
+                            "Posted stats. If you can't see them in this channel, check the bot's send permissions.",
+                            ephemeral=True,
+                        )
+                    else:
+                        await interaction.followup.send(
+                            "Couldn't post publicly and couldn't DM the user. Admins: check bot/channel permissions.",
+                            ephemeral=True,
+                        )
+            except Exception:
+                pass
+            return
 
         try:
             from embed_utils import build_stats_embed

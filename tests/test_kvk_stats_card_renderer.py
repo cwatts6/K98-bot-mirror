@@ -8,7 +8,7 @@ from kvk.models.kvk_stats_card import (
     KvkStatsCardPayload,
     KvkTargetProgress,
 )
-from kvk.rendering.kvk_stats_card_renderer import render_kvk_stats_card
+from kvk.rendering.kvk_stats_card_renderer import _pct, render_kvk_stats_card
 
 
 def _payload() -> KvkStatsCardPayload:
@@ -58,3 +58,8 @@ def test_render_kvk_stats_card_outputs_png_with_expected_size():
     image = Image.open(BytesIO(rendered.image_bytes.getvalue()))
     assert image.format == "PNG"
     assert image.size == (1180, 640)
+
+
+def test_pct_formats_compact_whole_percentages():
+    assert _pct(95.0) == "95%"
+    assert _pct(95.5) == "95.5%"

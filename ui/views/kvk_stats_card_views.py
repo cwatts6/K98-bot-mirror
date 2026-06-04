@@ -31,6 +31,14 @@ def _line(label: str, value: str) -> str:
     return f"**{label}:** {value}"
 
 
+def _nonzero_items(values: dict) -> list[tuple[str, int | float | str]]:
+    return [
+        (label, value)
+        for label, value in values.items()
+        if value not in (None, "", 0, 0.0)
+    ]
+
+
 def build_more_stats_embed(payload: KvkStatsCardPayload) -> discord.Embed:
     embed = discord.Embed(
         title=f"More KVK Stats - {payload.governor_name}",
@@ -77,20 +85,18 @@ def build_history_embed(payload: KvkStatsCardPayload) -> discord.Embed:
         description=f"{payload.display_kvk_label} | {payload.display_mode}",
         color=discord.Color.green(),
     )
-    if payload.history_summary:
+    history_summary = _nonzero_items(payload.history_summary)
+    personal_bests = _nonzero_items(payload.personal_bests)
+    if history_summary:
         embed.add_field(
             name="Summary",
-            value="\n".join(
-                _line(label, _compact(value)) for label, value in payload.history_summary.items()
-            ),
+            value="\n".join(_line(label, _compact(value)) for label, value in history_summary),
             inline=False,
         )
-    if payload.personal_bests:
+    if personal_bests:
         embed.add_field(
             name="Personal Bests",
-            value="\n".join(
-                _line(label, _compact(value)) for label, value in payload.personal_bests.items()
-            ),
+            value="\n".join(_line(label, _compact(value)) for label, value in personal_bests),
             inline=False,
         )
     if payload.last_kvk_summary:

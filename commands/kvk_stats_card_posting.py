@@ -89,7 +89,14 @@ async def post_kvk_stats_output(
         return False, "none"
     try:
         if files:
-            await channel.send(embeds=embeds, files=files)
+            try:
+                await channel.send(embeds=embeds, files=files)
+            except Exception:
+                logger.exception(
+                    "kvk_stats_legacy_file_send_failed governor_id=%s retrying_embeds_only=True",
+                    row.get("GovernorID"),
+                )
+                await channel.send(embeds=embeds)
         else:
             await channel.send(embeds=embeds)
         return True, "orig_channel"
