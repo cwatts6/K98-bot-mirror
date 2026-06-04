@@ -85,4 +85,3 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: low
 - Dependencies: Keep this separate from Phase 6F unless a later pinned-calendar persistence task is approved.
-
