@@ -55,9 +55,7 @@ async def post_kvk_stats_output(
     try:
         card = await _build_card(row)
     except Exception:
-        logger.exception(
-            "kvk_stats_card_build_failed governor_id=%s", row.get("GovernorID")
-        )
+        logger.exception("kvk_stats_card_build_failed governor_id=%s", row.get("GovernorID"))
         card = None
 
     if card is not None:
@@ -78,7 +76,9 @@ async def post_kvk_stats_output(
     try:
         embeds, files = _legacy_output(row, user)
     except Exception:
-        logger.exception("kvk_stats_legacy_embed_build_failed governor_id=%s", row.get("GovernorID"))
+        logger.exception(
+            "kvk_stats_legacy_embed_build_failed governor_id=%s", row.get("GovernorID")
+        )
         raise
 
     if use_fallback_chain:

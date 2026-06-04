@@ -29,9 +29,7 @@ def fetch_kvk_stats_card_context(kvk_no: int | None, governor_id: str) -> dict[s
         try:
             gov_int = int(str(governor_id).strip())
         except (TypeError, ValueError):
-            logger.debug(
-                "kvk_stats_card_context_invalid_governor_id governor_id=%r", governor_id
-            )
+            logger.debug("kvk_stats_card_context_invalid_governor_id governor_id=%r", governor_id)
             return context
 
         cur.execute(

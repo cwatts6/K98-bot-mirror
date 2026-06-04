@@ -32,11 +32,7 @@ def _line(label: str, value: str) -> str:
 
 
 def _nonzero_items(values: dict) -> list[tuple[str, int | float | str]]:
-    return [
-        (label, value)
-        for label, value in values.items()
-        if value not in (None, "", 0, 0.0)
-    ]
+    return [(label, value) for label, value in values.items() if value not in (None, "", 0, 0.0)]
 
 
 def build_more_stats_embed(payload: KvkStatsCardPayload) -> discord.Embed:
@@ -51,7 +47,9 @@ def build_more_stats_embed(payload: KvkStatsCardPayload) -> discord.Embed:
         inline=False,
     )
     if payload.pass_stats:
-        passes = "\n".join(_line(label, _compact(value)) for label, value in payload.pass_stats.items())
+        passes = "\n".join(
+            _line(label, _compact(value)) for label, value in payload.pass_stats.items()
+        )
     else:
         passes = "No pass stats available."
     embed.add_field(name="Passes", value=passes, inline=False)
@@ -210,7 +208,9 @@ class KvkStatsCardView(discord.ui.View):
         await self._show_main(interaction)
 
     @discord.ui.button(label="More Stats", style=discord.ButtonStyle.secondary)
-    async def more_stats(self, _button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def more_stats(
+        self, _button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         await self._show_more_stats(interaction)
 
     @discord.ui.button(label="History", style=discord.ButtonStyle.secondary)

@@ -139,7 +139,9 @@ async def load_kvk_stats_card_context(kvk_no: int | None, governor_id: str) -> K
 async def build_kvk_stats_card_payload(
     row: dict[str, Any], *, context: KvkStatsCardContext | None = None
 ) -> KvkStatsCardPayload:
-    governor_id = _str_from_variants(row, ["GovernorID", "Governor ID", "Gov_ID"], default="Unknown")
+    governor_id = _str_from_variants(
+        row, ["GovernorID", "Governor ID", "Gov_ID"], default="Unknown"
+    )
     governor_name = _str_from_variants(
         row, ["GovernorName", "Governor_Name", "Governor Name"], default="Unknown"
     )
@@ -163,22 +165,20 @@ async def build_kvk_stats_card_payload(
     )
     if kill_target_percent is None and not is_exempt:
         kill_target_percent = _pct(kills_gain, kill_target)
-    progress_color, progress_quote = kill_progress_policy(
-        kill_target_percent, is_exempt=is_exempt
-    )
+    progress_color, progress_quote = kill_progress_policy(kill_target_percent, is_exempt=is_exempt)
 
     deads = _int_from_variants(row, ["Deads_Delta", "Deads Delta", "Deads"], default=0)
     dead_target = _int_from_variants(row, ["Dead_Target", "Dead Target", "DeadTarget"], default=0)
-    dead_target_percent = None if is_exempt else _float_from_variants(
-        row, ["% of Dead Target", "% of Dead_Target"]
+    dead_target_percent = (
+        None if is_exempt else _float_from_variants(row, ["% of Dead Target", "% of Dead_Target"])
     )
     if dead_target_percent is None and not is_exempt:
         dead_target_percent = _pct(deads, dead_target)
 
     dkp = _int_from_variants(row, ["DKP_SCORE", "DKP Score", "DKP_Score"], default=0)
     dkp_target = _int_from_variants(row, ["DKP_Target", "DKP Target", "DKPTarget"], default=0)
-    dkp_target_percent = None if is_exempt else _float_from_variants(
-        row, ["% of DKP Target", "% of DKP_Target"]
+    dkp_target_percent = (
+        None if is_exempt else _float_from_variants(row, ["% of DKP Target", "% of DKP_Target"])
     )
     if dkp_target_percent is None and not is_exempt:
         dkp_target_percent = _pct(dkp, dkp_target)
@@ -252,7 +252,9 @@ async def build_kvk_stats_card_payload(
         },
         last_kvk_summary=_last_kvk_summary(last_kvk),
         matchmaking_snapshot={
-            "MM KP": _int_from_variants(row, ["Starting_KillPoints", "Starting KillPoints"], default=0),
+            "MM KP": _int_from_variants(
+                row, ["Starting_KillPoints", "Starting KillPoints"], default=0
+            ),
             "MM Kills": _int_from_variants(
                 row, ["Starting_T4&T5_KILLS", "Starting T4&T5 Kills"], default=0
             ),

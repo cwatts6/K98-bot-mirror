@@ -161,11 +161,15 @@ def render_kvk_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard 
     initials_font = _fit_font(draw, initials, max_width=52, size=30, min_size=18, bold=True)
     draw.text((88, 184), initials, anchor="mm", fill=GOLD, font=initials_font)
 
-    name_font = _fit_font(draw, payload.governor_name, max_width=470, size=43, min_size=25, bold=True)
+    name_font = _fit_font(
+        draw, payload.governor_name, max_width=470, size=43, min_size=25, bold=True
+    )
     _draw_text(draw, (155, 142), payload.governor_name, fill=TEXT, font=name_font, bold=True)
     _draw_text(draw, (155, 190), str(payload.governor_id), fill=TEXT, font=_font(24, bold=True))
     if payload.display_camp:
-        camp_font = _fit_font(draw, payload.display_camp, max_width=180, size=24, min_size=16, bold=True)
+        camp_font = _fit_font(
+            draw, payload.display_camp, max_width=180, size=24, min_size=16, bold=True
+        )
         draw.rounded_rectangle((155, 228, 315, 266), radius=8, fill=(122, 73, 248, 230))
         _draw_text(draw, (170, 234), payload.display_camp, fill=TEXT, font=camp_font, bold=True)
 
@@ -175,7 +179,9 @@ def render_kvk_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard 
     _draw_text(draw, (805, 188), rank_value, fill=TEXT, font=_font(54, bold=True), bold=True)
 
     col_w = 300
-    _metric(draw, x=45, y=305, w=col_w, title="KP Gain", value=_compact(payload.kp_gain), color=GREEN)
+    _metric(
+        draw, x=45, y=305, w=col_w, title="KP Gain", value=_compact(payload.kp_gain), color=GREEN
+    )
     _metric(
         draw,
         x=350,
