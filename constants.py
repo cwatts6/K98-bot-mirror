@@ -181,7 +181,7 @@ KVK_BANNER_MAP = {
     "heroic anthem": "https://i.ibb.co/9kB99Swt/kvk-banner-heroic-anthem-slim1.png",
     "desert conquest": "https://your-link-for-desert.png",
     "strife of the eight": "https://your-link-for-strife.png",
-    "tides": "https://i.ibb.co/Pv6bxrsd/tides-of-war.jpg",
+    "tides of war": "https://i.ibb.co/Pv6bxrsd/tides-of-war.jpg",
     "koab": "https://i.ibb.co/gMPWkkZX/KOAB.png",
     "storm of stratagems": "https://i.ibb.co/sJdSFQN9/stratagems.jpg",
     "invictus": "https://i.ibb.co/Fqh6bhRK/alliance-invictus.png",

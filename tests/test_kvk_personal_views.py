@@ -215,7 +215,7 @@ async def test_post_lookup_actions_interaction_check_allows_correct_user():
 
 
 # ---------------------------------------------------------------------------
-# PostLookupActions — btn_stats calls load_kvk_personal_stats + post_stats_embeds
+# PostLookupActions — btn_stats calls load_kvk_personal_stats + build_stats_embed
 # ---------------------------------------------------------------------------
 
 

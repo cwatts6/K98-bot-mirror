@@ -36,26 +36,47 @@ async def post_stats_embeds(
     Returns:
         (posted: bool, channel_used: str) — whether posting succeeded and which channel was used.
     """
+    files = [file] if file is not None else None
+    return await post_stats_message(bot, ctx, embeds=embeds, files=files)
+
+
+async def post_stats_message(
+    bot,
+    ctx: discord.ApplicationContext,
+    *,
+    content: str | None = None,
+    embeds: list | None = None,
+    files: list | None = None,
+    view=None,
+) -> tuple[bool, str]:
+    """Post a KVK personal stats message through the existing fallback channel chain."""
     from bot_config import KVK_PLAYER_STATS_CHANNEL_ID, NOTIFY_CHANNEL_ID
 
     def _rewind_file() -> None:
-        """Rewind a file's fp to position 0 so it can be resent on fallback."""
-        if file is None:
+        """Rewind attached file streams so they can be resent on fallback."""
+        if not files:
             return
-        fp = getattr(file, "fp", None)
-        if fp is not None and hasattr(fp, "seek"):
-            try:
-                fp.seek(0)
-            except Exception:
-                pass
+        for item in files:
+            fp = getattr(item, "fp", None)
+            if fp is not None and hasattr(fp, "seek"):
+                try:
+                    fp.seek(0)
+                except Exception:
+                    pass
 
     async def _send_to(ch: discord.abc.Messageable, *, label: str) -> bool:
         _rewind_file()
         try:
-            if file is not None:
-                await ch.send(embeds=embeds, files=[file])
-            else:
-                await ch.send(embeds=embeds)
+            kwargs = {
+                "content": content,
+                "embeds": embeds or None,
+                "files": files or None,
+                "view": view,
+            }
+            kwargs = {key: value for key, value in kwargs.items() if value is not None}
+            message = await ch.send(**kwargs)
+            if view is not None and hasattr(view, "message"):
+                view.message = message
             logger.info("[kvk_personal_posting] post_stats_embeds posted to %s", label)
             return True
         except discord.Forbidden:

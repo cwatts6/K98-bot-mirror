@@ -31,7 +31,11 @@ from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
 from kvk.services import kvk_admin_service
 from profile_cache import autocomplete_choices
 from registry.account_slots import ACCOUNT_ORDER
-from services import governor_account_service, kvk_history_service, stats_export_service
+from services import (
+    governor_account_service,
+    kvk_history_service,
+    stats_export_service,
+)
 from stats_alerts.embeds.kvk import send_kvk_embed
 from stats_alerts.honors import get_latest_honor_top, purge_latest_honor_scan
 from stats_alerts.interface import send_stats_update_embed

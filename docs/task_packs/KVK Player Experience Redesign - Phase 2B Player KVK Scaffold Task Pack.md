@@ -6,7 +6,43 @@
 - Date: `2026-06-03`
 - Task type: `feature / command-surface migration scaffold`
 - One-pass approved: `no`
-- Status: `ready for implementation`
+- Status: `complete - delivered, merged in mirror PR #141, and promoted to production`
+
+## Delivery Update
+
+Phase 2B is complete as of 2026-06-04.
+
+Delivered result:
+
+- Added the player-facing `/kvk` command group in `commands/kvk_cmds.py`.
+- Registered `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings`.
+- Implemented `/kvk rankings type` as a required option with `kvk`, `honor`, and `prekvk`
+  choices.
+- Preserved legacy player commands in parallel for rollout safety.
+- Preserved existing SQL, import, recompute, export, Google Sheets, and visual-output semantics.
+- Updated command registration governance, smoke expectations, tests, and canonical command docs.
+- Addressed review feedback so channel-denied `/kvk rankings` requests do not get recorded as
+  successful usage-tracked executions.
+
+Validation evidence from delivery:
+
+```powershell
+.\.venv\Scripts\python.exe -m py_compile commands\kvk_cmds.py
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe -m ruff check commands\kvk_cmds.py tests\test_kvk_cmds.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_kvk_cmds.py tests\test_mykvkstats.py tests\test_kvk_personal_views.py tests\test_mykvktargets.py tests\test_kvk_ui_rebuild_options.py tests\test_build_kvkrankings_embed.py tests\test_kvkrankingview.py tests\test_honor_rankings_view.py tests\test_prekvk_report_command.py tests\test_prekvk_report_views.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_validate_command_registration.py tests\test_command_governance_config.py tests\test_command_inventory.py tests\test_command_registration_smoke.py
+```
+
+Full-suite note: the initial full pytest run reached `1631 passed, 2 skipped` with one unrelated
+local mirror-governance failure caused by missing `.github/workflows/command-governance.yml` in the
+scrubbed mirror. The mirror publish configuration was corrected afterward so
+`command-governance.yml` is mirrored while production-only workflows remain excluded, and
+`tests\test_command_governance_config.py` passed.
 
 ## 2. Objective
 
@@ -125,11 +161,15 @@ Run Codex Security before PR handoff because user-facing commands, permissions, 
 ## 11. Acceptance Criteria
 
 - [x] Phase 2A is complete; `/kvk` is available for the player scaffold.
-- [ ] `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` are registered.
-- [ ] `/kvk rankings` supports `kvk`, `honor`, and `prekvk` modes.
-- [ ] `/kvk rankings type` is implemented as a required slash option.
-- [ ] `/kvk stats` preserves private selection and public selected stat output.
-- [ ] Legacy commands remain live.
-- [ ] No generated card work is mixed into this scaffold.
-- [ ] No SQL/import/export/recompute semantics change.
-- [ ] Targets service/DAL payload cleanup is started or explicitly scoped into the next targets phase.
+- [x] `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` are registered.
+- [x] `/kvk rankings` supports `kvk`, `honor`, and `prekvk` modes.
+- [x] `/kvk rankings type` is implemented as a required slash option.
+- [x] `/kvk stats` preserves private selection and public selected stat output.
+- [x] Legacy commands remain live.
+- [x] No generated card work is mixed into this scaffold.
+- [x] No SQL/import/export/recompute semantics change.
+- [x] Targets service/DAL payload cleanup is started or explicitly scoped into the next targets phase.
+
+Targets follow-up: Phase 2B kept the command scaffold thin while preserving the existing target
+states and formulas. Deeper targets service/DAL payload cleanup remains part of the programme and
+should be picked up in the modern targets phase or a focused pre-Phase 4 cleanup pack.

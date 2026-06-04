@@ -1,6 +1,8 @@
 import asyncio
+from collections.abc import Awaitable, Callable
 import inspect
 import types
+from typing import Any, cast
 
 import pytest
 
@@ -50,7 +52,9 @@ class DummyCtx:
         self.channel = DummyChannel()
 
 
-def _get_registered_command_impl(module, command_name: str):
+def _get_registered_command_impl(
+    module, command_name: str
+) -> Callable[[Any], Awaitable[Any]] | None:
     """
     Register the commands into a fake bot and return the unwrapped inner coroutine
     implementation for the given command_name.
@@ -100,7 +104,7 @@ def _get_registered_command_impl(module, command_name: str):
     ):
         fn = fn.__call__
 
-    return fn
+    return cast(Callable[[Any], Awaitable[Any]], fn)
 
 
 async def test_no_registered_accounts_shows_registration_prompt(monkeypatch):
@@ -177,7 +181,7 @@ async def test_single_account_sends_public_embed(monkeypatch):
     monkeypatch.setattr(C, "normalize_governor_id", lambda v: str(v))
     # Make load_stat_row sync but called via await asyncio.to_thread inside handler
     monkeypatch.setattr(C, "load_stat_row", lambda gid: {"GovernorID": gid, "val": 1})
-    monkeypatch.setattr(C, "build_stats_embed", lambda row, user: ("embed_obj", "file_obj"))
+    monkeypatch.setattr(C, "build_stats_embed", lambda row, user: (["embed_obj"], "file_obj"))
     monkeypatch.setattr(
         C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
     )
@@ -188,6 +192,9 @@ async def test_single_account_sends_public_embed(monkeypatch):
 
     await handler(ctx)
     assert ctx.channel.sent, "Expected channel.send to be called for single-account public path"
+    send_kwargs = ctx.channel.sent[0]["kwargs"]
+    assert send_kwargs["embeds"] == ["embed_obj"]
+    assert send_kwargs["files"] == ["file_obj"]
 
 
 async def test_multi_account_builds_selector(monkeypatch):

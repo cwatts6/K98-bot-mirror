@@ -226,7 +226,9 @@ Old `/kvk ...` admin paths were intentionally removed from the active command su
 
 ### Phase 2B — New `/kvk` Player Command Group Scaffold
 
-Create the new `/kvk` player group in parallel with existing commands.
+Status: complete. Delivered, merged in mirror PR #141, and promoted to production.
+
+Created the new `/kvk` player group in parallel with existing commands.
 
 Initial subcommands:
 
@@ -237,16 +239,22 @@ Initial subcommands:
 /kvk rankings
 ```
 
-The first scaffold should reuse existing services and output behaviour as much as possible. The goal is safe command-surface migration, not visual redesign.
+The first scaffold reused existing services and output behaviour as much as possible. The goal was safe command-surface migration, not visual redesign.
 
 Legacy commands remain live.
 
-Approved Phase 2B details:
+Delivered Phase 2B details:
 
-- `/kvk rankings` should include KVK, honor, and PreKvK modes from the first scaffold.
-- `/kvk stats` should keep private account selection while posting selected single-account stats publicly.
-- KVK targets service/DAL cleanup belongs inside this programme.
-- Acclaim/contribution metrics belong inside this programme after source-of-truth validation.
+- `/kvk rankings` includes KVK, honor, and PreKvK modes from the first scaffold.
+- `/kvk rankings type` is a required slash option with `kvk`, `honor`, and `prekvk` choices.
+- `/kvk stats` keeps private account selection while posting selected single-account stats publicly.
+- Legacy `/mykvkstats`, `/mykvktargets`, `/mykvkhistory`, `/kvk_rankings`,
+  `/honor_rankings`, and `/prekvk report` paths remain live during rollout.
+- No generated-card work, SQL/import/export/recompute behaviour, or Google Sheets contract changes
+  were mixed into the scaffold.
+- KVK targets service/DAL cleanup remains inside this programme and should be handled in the
+  modern targets phase or a focused cleanup pack before that phase.
+- Acclaim/contribution metrics remain inside this programme after source-of-truth validation.
 
 ### Phase 3 — Modern `/kvk stats` Visual Card
 
@@ -410,7 +418,9 @@ Do not include these in the early phases unless separately approved:
 Proceed with:
 
 ```text
-KVK Player Experience Redesign - Phase 2B Player /kvk Scaffold
+KVK Player Experience Redesign - Phase 3 Modern /kvk stats Visual Card
 ```
 
-Phase 1 audit/design and Phase 2A admin collision resolution are complete. Phase 2B can now scaffold the player `/kvk` group while preserving the legacy flat player commands.
+Phase 1 audit/design, Phase 2A admin collision resolution, and Phase 2B player `/kvk` scaffold are
+complete. Phase 3 should build the modern `/kvk stats` visual card on top of the delivered command
+surface while preserving the legacy flat player commands during rollout.

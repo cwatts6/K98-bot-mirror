@@ -1,6 +1,6 @@
 # KVK Player Experience Redesign — Phase 2 New `/kvk` Player Command Group Scaffold Task Pack Draft
 
-> Superseded: this combined Phase 2 draft is replaced by the approved split into Phase 2A admin collision resolution and Phase 2B player `/kvk` scaffold. Phase 2A has now delivered `/kvk_admin` in PR #140; use the Phase 2B task pack for current scaffold work. Keep this file only as historical planning context unless it is archived or removed later.
+> Superseded: this combined Phase 2 draft is replaced by the approved split into Phase 2A admin collision resolution and Phase 2B player `/kvk` scaffold. Phase 2A delivered `/kvk_admin` in PR #140, and Phase 2B delivered the player `/kvk` scaffold in PR #141. Keep this file only as historical planning context unless it is archived or removed later.
 
 ## 1. Task Header
 
@@ -9,7 +9,7 @@
 - Owner/context: K98 Bot KVK player command migration programme
 - Task type: `feature / command-surface refactor / UX migration scaffold`
 - One-pass approved: `no`
-- Status: `superseded - Phase 2A complete; use the Phase 2B task pack for current work`
+- Status: `superseded - Phase 2A and Phase 2B complete`
 
 ## 2. Required Reading
 

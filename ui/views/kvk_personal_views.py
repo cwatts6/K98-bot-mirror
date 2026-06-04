@@ -501,8 +501,6 @@ class PostLookupActions(View):
                 logger.exception("[PostLookupActions] failed attaching last_kvk for %s", gid)
 
             embeds, file = build_stats_embed(row, interaction.user)
-            # Send directly to the channel — this is always a brand-new public message
-            # and is unaffected by the ephemeral nature of the button's parent message.
             channel = interaction.channel
             if channel is not None:
                 try:
@@ -513,7 +511,6 @@ class PostLookupActions(View):
                     return
                 except Exception:
                     logger.exception("[PostLookupActions] channel.send failed governor_id=%s", gid)
-            # Fallback: if channel is unavailable post as ephemeral followup
             send_kwargs: dict = {"embeds": embeds, "ephemeral": True}
             if file is not None:
                 send_kwargs["files"] = [file]

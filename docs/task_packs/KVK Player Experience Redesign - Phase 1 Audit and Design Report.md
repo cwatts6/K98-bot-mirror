@@ -8,6 +8,11 @@ Phase 2A completion update: admin/operator KVK commands have now moved from `/kv
 `/kvk_admin ...` in PR #140. The collision identified by this audit is resolved, and `/kvk`
 is available for the Phase 2B player scaffold.
 
+Phase 2B completion update: the player `/kvk` scaffold is complete, merged in mirror PR #141, and
+promoted to production. The active player command surface now includes `/kvk stats`,
+`/kvk targets`, `/kvk history`, and `/kvk rankings type:<kvk|honor|prekvk>` while legacy flat
+commands remain live during rollout.
+
 ## 1. Summary
 
 The programme goal is sound: the current KVK player experience is valuable but fragmented across flat legacy commands, mixed modules, and inconsistent output styles. The target should be a coherent player journey around:
@@ -19,15 +24,20 @@ The programme goal is sound: the current KVK player experience is valuable but f
 
 The key design correction from the initial programme pack was that `/kvk` already existed as an admin/operator command group in `commands/stats_cmds.py`, with subcommands such as `export_all`, `recompute`, `list_scans`, `refresh_stats_cache`, `test_export`, `test_embed`, and `window_preview`. Phase 2 could not simply add player subcommands under that `/kvk` group without mixing player and operator journeys. Phase 2A has now delivered the recommended path: `/kvk` is reserved for players, and the admin/operator commands live under `/kvk_admin`.
 
-Approved Phase 2 direction:
+Approved Phase 2 direction and delivery status:
 
 1. Split Phase 2 into Phase 2A admin collision resolution and Phase 2B player `/kvk` scaffold.
-2. Keep all legacy flat commands live during migration.
+   Complete.
+2. Keep all legacy flat commands live during migration. Complete through Phase 2B.
 3. Include all three `/kvk rankings` modes in the Phase 2B scaffold: `kvk`, `honor`, and `prekvk`.
-4. Preserve `/kvk stats` visibility semantics: account selection is private, but selected single-account stats post publicly.
-5. Include Acclaim/contribution metrics in the programme once SQL source, naming, and display rules are validated.
+   Complete.
+4. Preserve `/kvk stats` visibility semantics: account selection is private, but selected
+   single-account stats post publicly. Complete.
+5. Include Acclaim/contribution metrics in the programme once SQL source, naming, and display
+   rules are validated. Still pending for a later phase.
 6. Treat KVK targets service/DAL cleanup as in-programme work, not deferred out of the redesign.
-7. Define a KVK stats service payload dataclass before Phase 3 visual rendering.
+   Still pending for the targets visual/service phase or a focused cleanup pack.
+7. Define a KVK stats service payload dataclass before Phase 3 visual rendering. Next action.
 
 ## 2. Current Command Inventory
 
@@ -173,7 +183,8 @@ SQL repo objects and patterns validated by search:
 
 Boundary findings:
 
-- Phase 2B can mostly reuse existing command/service/view functions, but many current player flows still call utility modules directly from command handlers.
+- Phase 2B reused existing command/service/view functions for the delivered scaffold, but many
+  current player flows still call utility modules directly from command handlers.
 - `player_stats_cache.py` still contains embedded SQL and dynamic per-KVK table naming. It is a cache/data module rather than a command/view, so this is not a command-layer blocker, but Phase 3+ should avoid adding more renderer or command dependency on this shape.
 - `target_utils.py` contains SQL-backed lookup/fallback logic and Discord response helpers in one module. This cleanup is now in-programme: create a KVK targets service payload contract and DAL boundary before modern target rendering.
 

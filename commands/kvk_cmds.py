@@ -10,9 +10,9 @@ from discord.ext import commands as ext_commands
 from account_picker import safe_build_unique_gov_options
 from bot_config import GUILD_ID, KVK_PLAYER_STATS_CHANNEL_ID, KVK_TARGET_CHANNEL_ID
 from build_KVKrankings_embed import build_kvkrankings_embed
+from commands.kvk_stats_card_posting import post_kvk_stats_output
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import channel_only, track_usage
-from embed_utils import build_stats_embed
 from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
 from kvk_ui import make_kvk_targets_view
 from prekvk import report_service
@@ -135,24 +135,18 @@ async def _send_personal_kvk_stats(ctx: discord.ApplicationContext) -> None:
             logger.exception("[/kvk stats] failed attaching last_kvk for %s", governor_id)
 
         try:
-            embeds, file = build_stats_embed(row, ctx.user)
+            await post_kvk_stats_output(
+                bot=getattr(ctx, "bot", None),
+                ctx=ctx,
+                row=row,
+                user=ctx.user,
+            )
         except Exception as exc:
-            logger.exception("[/kvk stats] build_stats_embed failed")
+            logger.exception("[/kvk stats] post_kvk_stats_output failed")
             await ctx.interaction.edit_original_response(
                 content=f"Failed to build stats: `{type(exc).__name__}: {exc}`"
             )
             return
-
-        try:
-            if file is not None:
-                await ctx.channel.send(embeds=embeds, files=[file])
-            else:
-                await ctx.channel.send(embeds=embeds)
-        except Exception:
-            try:
-                await ctx.channel.send(embeds=embeds)
-            except Exception:
-                logger.exception("[/kvk stats] failed to send stats embed(s) to channel")
 
         try:
             await ctx.interaction.edit_original_response(content=" ", view=None)
