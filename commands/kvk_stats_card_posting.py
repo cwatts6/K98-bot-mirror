@@ -25,11 +25,26 @@ def _card_enabled() -> bool:
     }
 
 
-async def _build_card(row: dict) -> tuple[discord.File, KvkStatsCardView] | None:
+async def _read_avatar_bytes(user) -> bytes | None:
+    avatar = getattr(user, "display_avatar", None) or getattr(user, "avatar", None)
+    if avatar is None:
+        return None
+    try:
+        if hasattr(avatar, "with_size"):
+            avatar = avatar.with_size(128)
+        if hasattr(avatar, "read"):
+            return await avatar.read()
+    except Exception:
+        logger.debug("kvk_stats_card_avatar_read_failed user_id=%s", getattr(user, "id", None))
+    return None
+
+
+async def _build_card(row: dict, user) -> tuple[discord.File, KvkStatsCardView] | None:
     if not _card_enabled():
         return None
     payload = await build_kvk_stats_card_payload(row)
-    rendered = await asyncio.to_thread(render_kvk_stats_card, payload)
+    avatar_bytes = await _read_avatar_bytes(user)
+    rendered = await asyncio.to_thread(render_kvk_stats_card, payload, avatar_bytes=avatar_bytes)
     if rendered is None:
         return None
     file = discord.File(BytesIO(rendered.image_bytes.getvalue()), filename=rendered.filename)
@@ -53,7 +68,7 @@ async def post_kvk_stats_output(
 ) -> tuple[bool, str]:
     """Post the modern KVK stats card, falling back to the legacy embeds on failure."""
     try:
-        card = await _build_card(row)
+        card = await _build_card(row, user)
     except Exception:
         logger.exception("kvk_stats_card_build_failed governor_id=%s", row.get("GovernorID"))
         card = None

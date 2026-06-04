@@ -49,7 +49,11 @@ def _payload() -> KvkStatsCardPayload:
 
 
 def test_render_kvk_stats_card_outputs_png_with_expected_size():
-    rendered = render_kvk_stats_card(_payload())
+    avatar = Image.new("RGB", (128, 128), (30, 90, 180))
+    avatar_buf = BytesIO()
+    avatar.save(avatar_buf, format="PNG")
+
+    rendered = render_kvk_stats_card(_payload(), avatar_bytes=avatar_buf.getvalue())
 
     assert rendered is not None
     assert rendered.filename == "kvk_stats_58744139.png"

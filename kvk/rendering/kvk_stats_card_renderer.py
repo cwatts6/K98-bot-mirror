@@ -16,15 +16,11 @@ WIDTH = 1180
 HEIGHT = 640
 TEXT = (255, 255, 255)
 MUTED = (210, 214, 222)
-DIM = (164, 170, 181)
 GREEN = (52, 211, 153)
 BLUE = (164, 220, 255)
 RED = (255, 87, 118)
 PURPLE = (168, 85, 247)
 GOLD = (255, 211, 87)
-ORANGE = (234, 128, 24)
-PANEL = (15, 12, 10, 118)
-PANEL_SOFT = (255, 255, 255, 28)
 
 
 def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
@@ -90,10 +86,6 @@ def _draw_text(
     text_renderer._draw_text(draw, xy, text, fill=fill, font=font, bold=bold)
 
 
-def _draw_panel(draw: ImageDraw.ImageDraw, xy: tuple[int, int, int, int]) -> None:
-    draw.rounded_rectangle(xy, radius=8, fill=PANEL, outline=PANEL_SOFT, width=1)
-
-
 def _metric(
     draw: ImageDraw.ImageDraw,
     *,
@@ -105,16 +97,59 @@ def _metric(
     color: tuple[int, int, int],
     sub: str | None = None,
 ) -> None:
-    _draw_text(draw, (x, y), title.upper(), fill=TEXT, font=_font(23, bold=True), bold=True)
-    value_font = _fit_font(draw, value, max_width=w, size=50, min_size=31, bold=True)
-    _draw_text(draw, (x, y + 38), value, fill=color, font=value_font, bold=True)
+    _draw_text(draw, (x, y), title.upper(), fill=TEXT, font=_font(21, bold=True), bold=True)
+    value_font = _fit_font(draw, value, max_width=w, size=44, min_size=29, bold=True)
+    _draw_text(draw, (x, y + 34), value, fill=color, font=value_font, bold=True)
     if sub:
-        sub_font = _fit_font(draw, sub, max_width=w, size=21, min_size=14, bold=True)
-        _draw_text(draw, (x, y + 92), sub, fill=MUTED, font=sub_font, bold=True)
+        sub_font = _fit_font(draw, sub, max_width=w, size=18, min_size=13, bold=True)
+        _draw_text(draw, (x, y + 82), sub, fill=MUTED, font=sub_font, bold=True)
+
+
+def _side_metric(
+    draw: ImageDraw.ImageDraw,
+    *,
+    x: int,
+    y: int,
+    w: int,
+    title: str,
+    value: str,
+    color: tuple[int, int, int],
+) -> None:
+    _draw_text(draw, (x, y), title.upper(), fill=TEXT, font=_font(19, bold=True), bold=True)
+    value_font = _fit_font(draw, value, max_width=w, size=31, min_size=22, bold=True)
+    _draw_text(draw, (x, y + 27), value, fill=color, font=value_font, bold=True)
+
+
+def _draw_avatar(
+    canvas: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    *,
+    governor_name: str,
+    avatar_bytes: bytes | None,
+) -> None:
+    x0, y0, x1, y1 = box
+    size = x1 - x0
+    if avatar_bytes:
+        try:
+            avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA").resize((size, size))
+            mask = Image.new("L", (size, size), 0)
+            mask_draw = ImageDraw.Draw(mask)
+            mask_draw.ellipse((0, 0, size - 1, size - 1), fill=255)
+            canvas.paste(avatar, (x0, y0), mask)
+            draw.ellipse(box, outline=(188, 196, 216), width=3)
+            return
+        except Exception:
+            pass
+
+    draw.ellipse(box, fill=(38, 44, 58, 220), outline=(188, 196, 216), width=3)
+    initials = "".join(part[:1] for part in governor_name.split()[:2]).upper() or "K"
+    initials_font = _fit_font(draw, initials, max_width=52, size=30, min_size=18, bold=True)
+    draw.text((x0 + size / 2, y0 + size / 2), initials, anchor="mm", fill=GOLD, font=initials_font)
 
 
 def _progress(draw: ImageDraw.ImageDraw, payload: KvkStatsCardPayload) -> None:
-    x, y, w, h = 40, 548, 670, 18
+    x, y, w, h = 40, 556, 760, 18
     color = _hex_color(payload.kill_progress.color_hex)
     draw.rounded_rectangle((x, y, x + w, y + h), radius=8, fill=(66, 58, 48))
     pct = max(0.0, min(float(payload.kill_progress.percent or 0.0), 100.0))
@@ -122,11 +157,13 @@ def _progress(draw: ImageDraw.ImageDraw, payload: KvkStatsCardPayload) -> None:
     if fill_w:
         draw.rounded_rectangle((x, y, x + fill_w, y + h), radius=8, fill=color)
     label = f"Kills Target Progress  {_pct(payload.kill_progress.percent)} - {payload.kill_progress.quote}"
-    font = _fit_font(draw, label, max_width=900, size=25, min_size=17, bold=True)
-    _draw_text(draw, (40, 510), label, fill=color, font=font, bold=True)
+    font = _fit_font(draw, label, max_width=780, size=23, min_size=16, bold=True)
+    _draw_text(draw, (40, 518), label, fill=color, font=font, bold=True)
 
 
-def render_kvk_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard | None:
+def render_kvk_stats_card(
+    payload: KvkStatsCardPayload, *, avatar_bytes: bytes | None = None
+) -> RenderedKvkStatsCard | None:
     if not BACKGROUND.exists():
         return None
 
@@ -140,52 +177,48 @@ def render_kvk_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard 
     canvas = Image.alpha_composite(background, overlay)
     draw = ImageDraw.Draw(canvas, "RGBA")
 
-    _draw_text(draw, (40, 46), "MY KVK", fill=GOLD, font=_font(25, bold=True), bold=True)
-    context = [payload.display_kvk_label, payload.display_mode]
+    title_parts = [payload.display_mode]
+    if payload.display_camp:
+        title_parts.append(payload.display_camp)
+    title = " | ".join(title_parts)
+    title_font = _fit_font(draw, title, max_width=650, size=28, min_size=20, bold=True)
+    _draw_text(draw, (40, 46), title, fill=GOLD, font=title_font, bold=True)
+
+    context = [payload.display_kvk_label]
     if payload.kingdom:
         context.append(f"Kingdom {payload.kingdom}")
-    if payload.display_camp:
-        context.append(payload.display_camp)
-    updated = f"Last updated {payload.last_refresh or 'unknown'}"
     _draw_text(
         draw,
         (40, 92),
-        f"{updated}  |  {'  |  '.join(context)}",
+        "  |  ".join(context),
         fill=TEXT,
-        font=_font(23),
+        font=_font(22),
     )
 
-    avatar_box = (48, 145, 128, 225)
-    draw.ellipse(avatar_box, fill=(38, 44, 58, 220), outline=(188, 196, 216), width=3)
-    initials = "".join(part[:1] for part in payload.governor_name.split()[:2]).upper() or "K"
-    initials_font = _fit_font(draw, initials, max_width=52, size=30, min_size=18, bold=True)
-    draw.text((88, 184), initials, anchor="mm", fill=GOLD, font=initials_font)
+    avatar_box = (48, 135, 128, 215)
+    _draw_avatar(
+        canvas, draw, avatar_box, governor_name=payload.governor_name, avatar_bytes=avatar_bytes
+    )
 
     name_font = _fit_font(
         draw, payload.governor_name, max_width=470, size=43, min_size=25, bold=True
     )
-    _draw_text(draw, (155, 142), payload.governor_name, fill=TEXT, font=name_font, bold=True)
-    _draw_text(draw, (155, 190), str(payload.governor_id), fill=TEXT, font=_font(24, bold=True))
-    if payload.display_camp:
-        camp_font = _fit_font(
-            draw, payload.display_camp, max_width=180, size=24, min_size=16, bold=True
-        )
-        draw.rounded_rectangle((155, 228, 315, 266), radius=8, fill=(122, 73, 248, 230))
-        _draw_text(draw, (170, 234), payload.display_camp, fill=TEXT, font=camp_font, bold=True)
+    _draw_text(draw, (155, 135), payload.governor_name, fill=TEXT, font=name_font, bold=True)
+    _draw_text(draw, (155, 183), str(payload.governor_id), fill=TEXT, font=_font(24, bold=True))
 
-    _draw_panel(draw, (780, 135, 1090, 252))
-    _draw_text(draw, (805, 155), "RANK", fill=TEXT, font=_font(28, bold=True), bold=True)
+    rank_x = 940
+    _draw_text(draw, (rank_x, 56), "RANK", fill=TEXT, font=_font(25, bold=True), bold=True)
     rank_value = f"#{payload.kvk_rank}" if payload.kvk_rank not in (None, "") else "N/A"
-    _draw_text(draw, (805, 188), rank_value, fill=TEXT, font=_font(54, bold=True), bold=True)
+    _draw_text(draw, (rank_x, 88), rank_value, fill=TEXT, font=_font(50, bold=True), bold=True)
 
-    col_w = 300
+    col_w = 230
     _metric(
-        draw, x=45, y=305, w=col_w, title="KP Gain", value=_compact(payload.kp_gain), color=GREEN
+        draw, x=45, y=265, w=col_w, title="KP Gain", value=_compact(payload.kp_gain), color=GREEN
     )
     _metric(
         draw,
-        x=350,
-        y=305,
+        x=320,
+        y=265,
         w=col_w,
         title="MM Power",
         value=_compact(payload.matchmaking_power),
@@ -193,8 +226,8 @@ def render_kvk_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard 
     )
     _metric(
         draw,
-        x=700,
-        y=305,
+        x=595,
+        y=265,
         w=col_w,
         title="Power Loss",
         value=_compact(abs(payload.power_loss) if payload.power_loss is not None else None),
@@ -203,7 +236,7 @@ def render_kvk_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard 
     _metric(
         draw,
         x=45,
-        y=420,
+        y=395,
         w=col_w,
         title="Kills Gain",
         value=f"{_compact(payload.kills_gain)}",
@@ -212,8 +245,8 @@ def render_kvk_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard 
     )
     _metric(
         draw,
-        x=350,
-        y=420,
+        x=320,
+        y=395,
         w=col_w,
         title="Deads",
         value=_compact(payload.deads),
@@ -222,8 +255,8 @@ def render_kvk_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard 
     )
     _metric(
         draw,
-        x=700,
-        y=420,
+        x=595,
+        y=395,
         w=col_w,
         title="Tanking Score",
         value=_pct(payload.tanking_score_percent),
@@ -231,42 +264,45 @@ def render_kvk_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard 
         color=PURPLE if payload.tanking_score_percent is not None else MUTED,
     )
 
-    right_x = 805
-    _draw_text(draw, (right_x, 280), "KP LOSS", fill=TEXT, font=_font(22, bold=True), bold=True)
-    _draw_text(
+    right_x = 890
+    side_w = 230
+    _side_metric(
         draw,
-        (right_x, 310),
-        _compact(payload.kp_loss),
-        fill=(255, 126, 126),
-        font=_font(36, bold=True),
-        bold=True,
+        x=right_x,
+        y=228,
+        w=side_w,
+        title="KP Loss",
+        value=_compact(payload.kp_loss),
+        color=(255, 126, 126),
     )
-    _draw_text(draw, (right_x, 365), "HEALED", fill=TEXT, font=_font(22, bold=True), bold=True)
-    _draw_text(
+    _side_metric(
         draw,
-        (right_x, 395),
-        _compact(payload.healed),
-        fill=BLUE,
-        font=_font(36, bold=True),
-        bold=True,
+        x=right_x,
+        y=330,
+        w=side_w,
+        title="Healed",
+        value=_compact(payload.healed),
+        color=BLUE,
     )
-    _draw_text(draw, (right_x, 450), "ACCLAIM", fill=TEXT, font=_font(22, bold=True), bold=True)
-    _draw_text(
+    _side_metric(
         draw,
-        (right_x, 480),
-        _compact(payload.acclaim),
-        fill=GOLD,
-        font=_font(36, bold=True),
-        bold=True,
+        x=right_x,
+        y=432,
+        w=side_w,
+        title="Acclaim",
+        value=_compact(payload.acclaim),
+        color=GOLD,
     )
 
     _progress(draw, payload)
+    updated = f"Last updated {payload.last_refresh or 'unknown'}"
+    footer_font = _fit_font(draw, updated, max_width=365, size=20, min_size=15, bold=True)
     _draw_text(
         draw,
-        (756, 596),
-        "powered by PROKINGDOMS.COM",
-        fill=GOLD,
-        font=_font(22, bold=True),
+        (775, 596),
+        updated,
+        fill=MUTED,
+        font=footer_font,
         bold=True,
     )
 
