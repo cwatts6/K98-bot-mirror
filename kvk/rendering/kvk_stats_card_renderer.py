@@ -53,6 +53,16 @@ def _pct(value: float | None) -> str:
     return f"{number}%"
 
 
+def _progress_scale(percent: float | None) -> list[int]:
+    value = max(0.0, float(percent or 0.0))
+    upper = 100
+    if value > 125:
+        upper = 150
+    elif value > 100:
+        upper = 125
+    return list(range(0, upper + 1, 25))
+
+
 def _text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:
     return int(draw.textbbox((0, 0), text, font=font)[2])
 
@@ -105,21 +115,6 @@ def _metric(
         _draw_text(draw, (x, y + 82), sub, fill=MUTED, font=sub_font, bold=True)
 
 
-def _side_metric(
-    draw: ImageDraw.ImageDraw,
-    *,
-    x: int,
-    y: int,
-    w: int,
-    title: str,
-    value: str,
-    color: tuple[int, int, int],
-) -> None:
-    _draw_text(draw, (x, y), title.upper(), fill=TEXT, font=_font(19, bold=True), bold=True)
-    value_font = _fit_font(draw, value, max_width=w, size=31, min_size=22, bold=True)
-    _draw_text(draw, (x, y + 27), value, fill=color, font=value_font, bold=True)
-
-
 def _draw_avatar(
     canvas: Image.Image,
     draw: ImageDraw.ImageDraw,
@@ -149,16 +144,26 @@ def _draw_avatar(
 
 
 def _progress(draw: ImageDraw.ImageDraw, payload: KvkStatsCardPayload) -> None:
-    x, y, w, h = 40, 556, 760, 18
+    x, y, w, h = 40, 544, 760, 18
     color = _hex_color(payload.kill_progress.color_hex)
+    ticks = _progress_scale(payload.kill_progress.percent)
+    scale_max = ticks[-1]
     draw.rounded_rectangle((x, y, x + w, y + h), radius=8, fill=(66, 58, 48))
-    pct = max(0.0, min(float(payload.kill_progress.percent or 0.0), 100.0))
-    fill_w = int(w * pct / 100.0)
+    pct = max(0.0, min(float(payload.kill_progress.percent or 0.0), float(scale_max)))
+    fill_w = int(w * pct / scale_max)
     if fill_w:
         draw.rounded_rectangle((x, y, x + fill_w, y + h), radius=8, fill=color)
+    tick_font = _font(15, bold=True)
+    for tick in ticks:
+        tick_x = x + int(w * tick / scale_max)
+        draw.line((tick_x, y - 4, tick_x, y + h + 4), fill=(255, 255, 255, 150), width=2)
+        tick_label = f"{tick}%"
+        label_width = _text_width(draw, tick_label, tick_font)
+        label_x = max(x, min(x + w - label_width, tick_x - label_width // 2))
+        _draw_text(draw, (label_x, y + 26), tick_label, fill=MUTED, font=tick_font, bold=True)
     label = f"Kills Target Progress  {_pct(payload.kill_progress.percent)} - {payload.kill_progress.quote}"
     font = _fit_font(draw, label, max_width=780, size=23, min_size=16, bold=True)
-    _draw_text(draw, (40, 518), label, fill=color, font=font, bold=True)
+    _draw_text(draw, (40, 504), label, fill=color, font=font, bold=True)
 
 
 def render_kvk_stats_card(
@@ -212,13 +217,12 @@ def render_kvk_stats_card(
     _draw_text(draw, (rank_x, 88), rank_value, fill=TEXT, font=_font(50, bold=True), bold=True)
 
     col_w = 230
-    _metric(
-        draw, x=45, y=265, w=col_w, title="KP Gain", value=_compact(payload.kp_gain), color=GREEN
-    )
+    col_x = (45, 315, 585, 855)
+    row_y = (260, 390)
     _metric(
         draw,
-        x=320,
-        y=265,
+        x=col_x[0],
+        y=row_y[0],
         w=col_w,
         title="MM Power",
         value=_compact(payload.matchmaking_power),
@@ -226,17 +230,8 @@ def render_kvk_stats_card(
     )
     _metric(
         draw,
-        x=595,
-        y=265,
-        w=col_w,
-        title="Power Loss",
-        value=_compact(abs(payload.power_loss) if payload.power_loss is not None else None),
-        color=RED,
-    )
-    _metric(
-        draw,
-        x=45,
-        y=395,
+        x=col_x[1],
+        y=row_y[0],
         w=col_w,
         title="Kills Gain",
         value=f"{_compact(payload.kills_gain)}",
@@ -245,8 +240,8 @@ def render_kvk_stats_card(
     )
     _metric(
         draw,
-        x=320,
-        y=395,
+        x=col_x[2],
+        y=row_y[0],
         w=col_w,
         title="Deads",
         value=_compact(payload.deads),
@@ -255,40 +250,46 @@ def render_kvk_stats_card(
     )
     _metric(
         draw,
-        x=595,
-        y=395,
+        x=col_x[3],
+        y=row_y[0],
+        w=col_w,
+        title="Healed",
+        value=_compact(payload.healed),
+        color=BLUE,
+    )
+    _metric(
+        draw,
+        x=col_x[0],
+        y=row_y[1],
+        w=col_w,
+        title="KP Gain",
+        value=_compact(payload.kp_gain),
+        color=GREEN,
+    )
+    _metric(
+        draw,
+        x=col_x[1],
+        y=row_y[1],
+        w=col_w,
+        title="KP Loss",
+        value=_compact(payload.kp_loss),
+        color=(255, 126, 126),
+    )
+    _metric(
+        draw,
+        x=col_x[2],
+        y=row_y[1],
         w=col_w,
         title="Tanking Score",
         value=_pct(payload.tanking_score_percent),
         sub=payload.playstyle or "Not enough data",
         color=PURPLE if payload.tanking_score_percent is not None else MUTED,
     )
-
-    right_x = 890
-    side_w = 230
-    _side_metric(
+    _metric(
         draw,
-        x=right_x,
-        y=228,
-        w=side_w,
-        title="KP Loss",
-        value=_compact(payload.kp_loss),
-        color=(255, 126, 126),
-    )
-    _side_metric(
-        draw,
-        x=right_x,
-        y=330,
-        w=side_w,
-        title="Healed",
-        value=_compact(payload.healed),
-        color=BLUE,
-    )
-    _side_metric(
-        draw,
-        x=right_x,
-        y=432,
-        w=side_w,
+        x=col_x[3],
+        y=row_y[1],
+        w=col_w,
         title="Acclaim",
         value=_compact(payload.acclaim),
         color=GOLD,
