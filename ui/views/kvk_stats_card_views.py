@@ -134,9 +134,7 @@ def build_history_embed(payload: KvkStatsCardPayload) -> discord.Embed:
     if matchmaking_snapshot:
         embed.add_field(
             name="Matchmaking Snapshot",
-            value="\n".join(
-                _line(label, _compact(value)) for label, value in matchmaking_snapshot
-            ),
+            value="\n".join(_line(label, _compact(value)) for label, value in matchmaking_snapshot),
             inline=False,
         )
     embed.set_footer(text="Use Main Card to return to the visual card.")
