@@ -86,5 +86,9 @@ statsupdate-*.json
 *.swp
 *.swo
 
-# ---- Don't mirror GitHub Actions workflows to the public mirror ----
-.github/workflows/**
+# ---- Don't mirror production-only GitHub Actions workflows to the public mirror ----
+# command-governance.yml is mirrored because local tests and command-governance checks assert it.
+.github/workflows/_sanity.yml
+.github/workflows/gitleaks.yml
+.github/workflows/publish-mirror.yml
+.github/workflows/quality.yml
