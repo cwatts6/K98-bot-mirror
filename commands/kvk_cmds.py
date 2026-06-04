@@ -74,9 +74,7 @@ async def _open_governor_lookup(interaction: discord.Interaction) -> None:
         await interaction.response.send_modal(GovNameModal(author_id=interaction.user.id))
     except Exception:
         try:
-            message = (
-                "Use **/mygovernorid** and start typing your governor name to find your Governor ID."
-            )
+            message = "Use **/mygovernorid** and start typing your governor name to find your Governor ID."
             if not interaction.response.is_done():
                 await interaction.response.send_message(message, ephemeral=True)
             else:
