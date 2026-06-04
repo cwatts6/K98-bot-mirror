@@ -83,9 +83,13 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     async def fake_prekvk_report(**kwargs):
         calls.append(("prekvk", kwargs))
 
-    async def fake_channel_guarded(ctx_arg, channel_id, *, admin_override, callback):
-        calls.append(("guard", channel_id, admin_override, callback.__name__))
+    async def fake_channel_guarded(ctx_arg, channel_id, *, admin_override, command_name, callback):
+        calls.append(("guard", channel_id, admin_override, command_name, callback.__name__))
         await callback(ctx_arg)
+
+    async def fake_tracked(ctx=None, *, command_name, callback):
+        calls.append(("tracked", command_name, callback.__name__))
+        await callback(ctx)
 
     async def fake_respond(message, *, ephemeral=False):
         ctx.responded.append((message, ephemeral))
@@ -94,6 +98,7 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     monkeypatch.setattr(kvk_cmds, "_send_kvk_rankings", fake_kvk)
     monkeypatch.setattr(kvk_cmds, "_send_honor_rankings", fake_honor)
     monkeypatch.setattr(kvk_cmds, "_run_channel_guarded", fake_channel_guarded)
+    monkeypatch.setattr(kvk_cmds, "_run_tracked", fake_tracked)
     monkeypatch.setattr(kvk_cmds, "safe_defer", fake_defer)
     monkeypatch.setattr(kvk_cmds, "send_prekvk_report", fake_prekvk_report)
     monkeypatch.setattr(
@@ -107,13 +112,19 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     await handler(ctx, "prekvk")
     await handler(ctx, "bad")
 
-    assert calls[0][0:3] == ("guard", kvk_cmds.KVK_PLAYER_STATS_CHANNEL_ID, True)
+    assert calls[0][0:4] == ("guard", kvk_cmds.KVK_PLAYER_STATS_CHANNEL_ID, True, "kvk rankings")
     assert calls[1] == ("kvk", ctx)
-    assert calls[2][0:3] == ("guard", kvk_cmds.KVK_PLAYER_STATS_CHANNEL_ID, False)
+    assert calls[2][0:4] == (
+        "guard",
+        kvk_cmds.KVK_PLAYER_STATS_CHANNEL_ID,
+        False,
+        "kvk rankings",
+    )
     assert calls[3] == ("honor", ctx)
-    assert calls[4] == ("defer", True, ctx)
-    assert calls[5][0] == "prekvk"
-    assert calls[5][1]["ctx"] is ctx
-    assert calls[5][1]["sort_by"] == "parsed:Overall"
-    assert calls[5][1]["limit"] == 10
+    assert calls[4] == ("tracked", "kvk rankings", "_send_prekvk_rankings")
+    assert calls[5] == ("defer", True, ctx)
+    assert calls[6][0] == "prekvk"
+    assert calls[6][1]["ctx"] is ctx
+    assert calls[6][1]["sort_by"] == "parsed:Overall"
+    assert calls[6][1]["limit"] == 10
     assert ctx.responded == [("Unknown ranking type.", True)]

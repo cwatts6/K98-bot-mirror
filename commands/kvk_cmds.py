@@ -382,14 +382,39 @@ async def _send_honor_rankings(ctx: discord.ApplicationContext) -> None:
     await ctx.followup.send(embed=embed, view=view, ephemeral=False)
 
 
+async def _send_prekvk_rankings(ctx: discord.ApplicationContext) -> None:
+    await safe_defer(ctx, ephemeral=True)
+    await send_prekvk_report(
+        ctx=ctx,
+        kvk_no=None,
+        sort_by=report_service.parse_report_sort("Overall"),
+        limit=10,
+    )
+
+
+async def _run_tracked(
+    ctx: discord.ApplicationContext,
+    *,
+    command_name: str,
+    callback: Callable[[discord.ApplicationContext], Awaitable[None]],
+) -> None:
+    @track_usage(command_name)
+    async def tracked(inner_ctx: discord.ApplicationContext) -> None:
+        await callback(inner_ctx)
+
+    await tracked(ctx)
+
+
 async def _run_channel_guarded(
     ctx: discord.ApplicationContext,
     channel_id: int,
     *,
     admin_override: bool,
+    command_name: str,
     callback: Callable[[discord.ApplicationContext], Awaitable[None]],
 ) -> None:
     @channel_only(channel_id, admin_override=admin_override)
+    @track_usage(command_name)
     async def guarded(inner_ctx: discord.ApplicationContext) -> None:
         await callback(inner_ctx)
 
@@ -464,7 +489,6 @@ def register_kvk(bot: ext_commands.Bot) -> None:
     )
     @versioned("v1.00")
     @safe_command
-    @track_usage()
     async def kvk_rankings(
         ctx: discord.ApplicationContext,
         ranking_type_option: str = discord.Option(
@@ -481,6 +505,7 @@ def register_kvk(bot: ext_commands.Bot) -> None:
                 ctx,
                 KVK_PLAYER_STATS_CHANNEL_ID,
                 admin_override=True,
+                command_name="kvk rankings",
                 callback=_send_kvk_rankings,
             )
             return
@@ -489,16 +514,15 @@ def register_kvk(bot: ext_commands.Bot) -> None:
                 ctx,
                 KVK_PLAYER_STATS_CHANNEL_ID,
                 admin_override=False,
+                command_name="kvk rankings",
                 callback=_send_honor_rankings,
             )
             return
         if ranking_type == "prekvk":
-            await safe_defer(ctx, ephemeral=True)
-            await send_prekvk_report(
+            await _run_tracked(
                 ctx=ctx,
-                kvk_no=None,
-                sort_by=report_service.parse_report_sort("Overall"),
-                limit=10,
+                command_name="kvk rankings",
+                callback=_send_prekvk_rankings,
             )
             return
         await ctx.respond("Unknown ranking type.", ephemeral=True)
