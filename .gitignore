@@ -194,3 +194,7 @@ data/imports/
 
 # Optional local tooling
 tools/rg.exe
+
+# Local Codex agent/security scratch artifacts
+.codex/
+.codex_security_scans/
