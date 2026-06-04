@@ -1,7 +1,7 @@
-﻿# Codex Task Pack â€“ SQL Emergency Readiness, Hotfix Rehearsal & Rollback Standards
+﻿# Codex Task Pack – SQL Emergency Readiness, Hotfix Rehearsal & Rollback Standards
 
 **Task Name:** SQL Emergency Readiness, Hotfix Rehearsal & Rollback Standards
-**Programme:** SQL Git Promotion Framework â€“ Phase 2A
+**Programme:** SQL Git Promotion Framework – Phase 2A
 **Date:** 2026-06-02
 **Owner/Context:** K98 SQL Repository Modernisation Initiative
 **Task Type:** Tooling / Documentation / Operational Resilience / DevOps
@@ -298,7 +298,7 @@ These are valuable later phases, but Phase 2A should remain focused on emergency
 
 ## 6. Codex Skills To Use
 
-Use the repoâ€™s available skills and standards. At minimum:
+Use the repo’s available skills and standards. At minimum:
 
 | Skill | Decision | Notes |
 |---|---|---|
@@ -317,7 +317,7 @@ If a skill is unavailable, document that and follow the matching reference docs 
 
 This task must be delivered in controlled stages. Stop for owner review after Stage 2 unless the owner has explicitly approved one-pass implementation.
 
-### Stage 1 â€” Audit Current Phase 1 Assets
+### Stage 1 — Audit Current Phase 1 Assets
 
 Audit current SQL repo state and document:
 
@@ -332,7 +332,7 @@ Audit current SQL repo state and document:
 
 Output: short audit note in Codex response before implementation or in a temporary planning section.
 
-### Stage 2 â€” Design Proposed Phase 2A Changes
+### Stage 2 — Design Proposed Phase 2A Changes
 
 Propose the final file/folder changes before implementation.
 
@@ -350,13 +350,13 @@ Must include:
 
 Stop for approval unless one-pass approval is explicitly granted.
 
-### Stage 3 â€” Implement Documentation And Templates
+### Stage 3 — Implement Documentation And Templates
 
 Implement approved documentation/templates.
 
 Required outputs are listed in Section 10.
 
-### Stage 4 â€” Implement Minimal Tooling Enhancements
+### Stage 4 — Implement Minimal Tooling Enhancements
 
 Only implement tooling changes that directly support this phase.
 
@@ -370,7 +370,7 @@ Examples:
 
 Do not expand into full CI.
 
-### Stage 5 â€” Rehearse Emergency Hotfix Workflow
+### Stage 5 — Rehearse Emergency Hotfix Workflow
 
 Run a safe, controlled, non-destructive rehearsal.
 
@@ -392,9 +392,9 @@ Rationale: a dedicated object makes drift detection easy and avoids touching rea
 
 The final rehearsal must leave Git and Production reconciled.
 
-### Stage 6 â€” Validate And Final Review
+### Stage 6 — Validate And Final Review
 
-Run the repoâ€™s relevant validation commands and produce final evidence.
+Run the repo’s relevant validation commands and produce final evidence.
 
 Final response must include:
 
@@ -413,33 +413,33 @@ Codex should implement or update the following structure, adjusting only if the 
 
 ```text
 K98-bot-SQL-Server
-â”‚
-â”œâ”€ docs/
-â”‚  â”œâ”€ SQL_PROMOTION_GUIDE.md                 # update with detailed step-by-step guide sections
-â”‚  â”œâ”€ SQL_RELEASE_CHECKLIST.md               # update with hotfix/rehearsal/rollback checks
-â”‚  â”œâ”€ SQL_HOTFIX_GUIDE.md                    # optional, only if guide becomes too large
-â”‚  â”œâ”€ SQL_DATA_MIGRATION_GUARDRAILS.md       # required unless folded into migrations/README.md
-â”‚  â””â”€ adr/
-â”‚     â””â”€ 002-sql-emergency-hotfix-and-rollback-standards.md
-â”‚
-â”œâ”€ migrations/
-â”‚  â”œâ”€ README.md                              # update rollback metadata standards
-â”‚  â””â”€ rollback/
-â”‚     â”œâ”€ README.md                           # required rollback conventions
-â”‚     â””â”€ _rollback_template.sql              # required template
-â”‚
-â”œâ”€ reports/
-â”‚  â””â”€ hotfix/
-â”‚     â”œâ”€ README.md                           # required folder convention
-â”‚     â”œâ”€ hotfix_template.md                  # required incident template
-â”‚     â””â”€ rehearsal_YYYYMMDD_HHMM_<short_name>.md  # created during validation/rehearsal
-â”‚
-â”œâ”€ deploy/
-â”‚  â”œâ”€ sql_deploy_config.example.json         # optional/required if thresholds are made configurable
-â”‚  â”œâ”€ Validate-SqlRepo.ps1                   # update if validation additions are approved
-â”‚  â””â”€ Test-SqlBackupReadiness.ps1            # update if config support is approved
-â”‚
-â””â”€ deploy_manifest.example.json              # update if manifest fields now include rollback/data-safety fields
+│
+├─ docs/
+│  ├─ SQL_PROMOTION_GUIDE.md                 # update with detailed step-by-step guide sections
+│  ├─ SQL_RELEASE_CHECKLIST.md               # update with hotfix/rehearsal/rollback checks
+│  ├─ SQL_HOTFIX_GUIDE.md                    # optional, only if guide becomes too large
+│  ├─ SQL_DATA_MIGRATION_GUARDRAILS.md       # required unless folded into migrations/README.md
+│  └─ adr/
+│     └─ 002-sql-emergency-hotfix-and-rollback-standards.md
+│
+├─ migrations/
+│  ├─ README.md                              # update rollback metadata standards
+│  └─ rollback/
+│     ├─ README.md                           # required rollback conventions
+│     └─ _rollback_template.sql              # required template
+│
+├─ reports/
+│  └─ hotfix/
+│     ├─ README.md                           # required folder convention
+│     ├─ hotfix_template.md                  # required incident template
+│     └─ rehearsal_YYYYMMDD_HHMM_<short_name>.md  # created during validation/rehearsal
+│
+├─ deploy/
+│  ├─ sql_deploy_config.example.json         # optional/required if thresholds are made configurable
+│  ├─ Validate-SqlRepo.ps1                   # update if validation additions are approved
+│  └─ Test-SqlBackupReadiness.ps1            # update if config support is approved
+│
+└─ deploy_manifest.example.json              # update if manifest fields now include rollback/data-safety fields
 ```
 
 If Codex chooses not to add a separate `docs/SQL_HOTFIX_GUIDE.md`, then `docs/SQL_PROMOTION_GUIDE.md` must still contain all detailed step-by-step instructions listed in Section 11.
@@ -450,7 +450,7 @@ If Codex chooses not to add a separate `docs/SQL_HOTFIX_GUIDE.md`, then `docs/SQ
 
 Codex must make, document, and justify these decisions.
 
-### Decision 1 â€” Hotfix Evidence Location
+### Decision 1 — Hotfix Evidence Location
 
 Preferred:
 
@@ -460,7 +460,7 @@ reports/hotfix/
 
 Reason: hotfixes are operational incidents with evidence, commands, timestamps, and follow-up notes. They should not be mixed into general docs.
 
-### Decision 2 â€” Hotfix Template Location
+### Decision 2 — Hotfix Template Location
 
 Preferred:
 
@@ -474,7 +474,7 @@ Optional supporting guide:
 docs/SQL_HOTFIX_GUIDE.md
 ```
 
-### Decision 3 â€” Rollback File Convention
+### Decision 3 — Rollback File Convention
 
 Preferred:
 
@@ -489,7 +489,7 @@ migrations/20260602_003_add_example_column.sql
 migrations/rollback/20260602_003_add_example_column_rollback.sql
 ```
 
-### Decision 4 â€” Rollback Classification
+### Decision 4 — Rollback Classification
 
 Allowed values:
 
@@ -509,7 +509,7 @@ Meanings:
 | `Forward Fix Only` | Do not roll back; correct with a new migration. |
 | `Not Possible` | Change cannot safely be reversed without restore or bespoke recovery. |
 
-### Decision 5 â€” Data Safety Classification
+### Decision 5 — Data Safety Classification
 
 Add or document optional migration header fields:
 
@@ -523,7 +523,7 @@ PostValidationQuery: optional
 
 Codex may adjust names if the existing migration header standard suggests a better convention.
 
-### Decision 6 â€” Rehearsal Object
+### Decision 6 — Rehearsal Object
 
 Preferred safe rehearsal object:
 
@@ -537,7 +537,7 @@ The rehearsal must be deliberately isolated from bot runtime behaviour.
 
 ## 10. Required Deliverables
 
-### Deliverable 1 â€” Hotfix Reports Folder Convention
+### Deliverable 1 — Hotfix Reports Folder Convention
 
 Create or update:
 
@@ -562,7 +562,7 @@ reports/hotfix/hotfix_YYYYMMDD_HHMM_<short_description>.md
 reports/hotfix/rehearsal_YYYYMMDD_HHMM_<short_description>.md
 ```
 
-### Deliverable 2 â€” SQL Hotfix Incident Template
+### Deliverable 2 — SQL Hotfix Incident Template
 
 Create:
 
@@ -644,7 +644,7 @@ Deferred optimisations:
 
 The template must be detailed enough that the owner can fill it in during a real incident.
 
-### Deliverable 3 â€” Detailed SQL Promotion Guide Updates
+### Deliverable 3 — Detailed SQL Promotion Guide Updates
 
 Update:
 
@@ -670,9 +670,9 @@ At minimum add or rewrite these sections:
 12. Post-hotfix drift verification.
 13. Final incident report completion.
 
-The guide must be written for practical use during stress. Avoid vague instructions like â€œcheck backupsâ€ unless followed by exact commands and what good/bad output looks like.
+The guide must be written for practical use during stress. Avoid vague instructions like “check backups” unless followed by exact commands and what good/bad output looks like.
 
-### Deliverable 4 â€” SQL Release Checklist Updates
+### Deliverable 4 — SQL Release Checklist Updates
 
 Update:
 
@@ -692,7 +692,7 @@ Add checklist blocks for:
 - Drift evidence captured.
 - Hotfix report completed.
 
-### Deliverable 5 â€” Rollback README
+### Deliverable 5 — Rollback README
 
 Create or update:
 
@@ -713,7 +713,7 @@ Must define:
 - How rollback relates to restore-from-backup.
 - How rollback relates to forward-fix.
 
-### Deliverable 6 â€” Rollback Script Template
+### Deliverable 6 — Rollback Script Template
 
 Create:
 
@@ -764,9 +764,9 @@ END CATCH;
 GO
 ```
 
-Codex must adapt this to the repoâ€™s existing SQL style if needed.
+Codex must adapt this to the repo’s existing SQL style if needed.
 
-### Deliverable 7 â€” Migration Header Standard Update
+### Deliverable 7 — Migration Header Standard Update
 
 Update `migrations/README.md` so future migrations include rollback and data safety metadata.
 
@@ -794,7 +794,7 @@ RelatedSQLPR: optional
 
 Document what each field means and when it is mandatory.
 
-### Deliverable 8 â€” Data Migration Guardrails
+### Deliverable 8 — Data Migration Guardrails
 
 Create:
 
@@ -830,7 +830,7 @@ For high-risk data migrations, require:
 10. Bot impact assessment where relevant.
 ```
 
-### Deliverable 9 â€” Backup Threshold Policy Or Config
+### Deliverable 9 — Backup Threshold Policy Or Config
 
 Either update the docs to make backup thresholds explicit, or implement a simple config file if practical.
 
@@ -861,7 +861,7 @@ Example:
 
 If implementing config support is too invasive, document the thresholds clearly and defer script config support.
 
-### Deliverable 10 â€” Validation Enhancements
+### Deliverable 10 — Validation Enhancements
 
 Where practical, update:
 
@@ -880,7 +880,7 @@ Add warnings/errors for:
 
 Keep validation useful but not brittle. Warnings are acceptable for this phase unless the repo standard already supports hard failures.
 
-### Deliverable 11 â€” Controlled Hotfix Rehearsal Report
+### Deliverable 11 — Controlled Hotfix Rehearsal Report
 
 Create a rehearsal report under:
 
@@ -901,7 +901,7 @@ The report must document:
 - Final drift status.
 - Lessons learned.
 
-### Deliverable 12 â€” ADR For Emergency Hotfix And Rollback Standards
+### Deliverable 12 — ADR For Emergency Hotfix And Rollback Standards
 
 Create:
 
@@ -1226,7 +1226,7 @@ Run:
 .\deploy\Validate-SqlRepo.ps1
 ```
 
-If validation fails due to existing unrelated issues, document the failure and separate it from this taskâ€™s changes.
+If validation fails due to existing unrelated issues, document the failure and separate it from this task’s changes.
 
 ### Backup Readiness Validation
 
@@ -1268,7 +1268,7 @@ Unable to run in current environment; exact owner commands provided
 
 ### Security Validation
 
-Run the repoâ€™s security review process if available.
+Run the repo’s security review process if available.
 
 At minimum confirm:
 

@@ -270,13 +270,29 @@ function Resolve-PromotionPatchFiles {
     [string]$ProductionBaseRef
   )
 
-  $nameStatusLines = @(git diff --name-status "$MirrorBaseRef..$SourceRef")
+  $nameStatusLines = @(git diff --name-status -M -C "$MirrorBaseRef..$SourceRef")
   if ($LASTEXITCODE -ne 0) {
     throw "Could not list changed files for $MirrorBaseRef..$SourceRef."
   }
 
   $promotedFiles = New-Object System.Collections.Generic.List[string]
   $omittedFiles = New-Object System.Collections.Generic.List[string]
+  $promotedSet = @{}
+
+  function Add-PromotedFile {
+    param([string]$Path)
+    if (-not [string]::IsNullOrWhiteSpace($Path) -and -not $promotedSet.ContainsKey($Path)) {
+      $promotedSet[$Path] = $true
+      $promotedFiles.Add($Path)
+    }
+  }
+
+  function Add-OmittedFile {
+    param([string]$Path)
+    if (-not [string]::IsNullOrWhiteSpace($Path)) {
+      $omittedFiles.Add($Path)
+    }
+  }
 
   foreach ($line in $nameStatusLines) {
     if ([string]::IsNullOrWhiteSpace($line)) {
@@ -285,25 +301,92 @@ function Resolve-PromotionPatchFiles {
 
     $parts = @($line -split "`t")
     $status = $parts[0]
+    $statusKind = $status.Substring(0, 1)
+
+    if ($statusKind -in @("R", "C")) {
+      if ($parts.Count -lt 3) {
+        throw "Could not parse rename/copy status line: $line"
+      }
+      $oldPath = $parts[1]
+      $newPath = $parts[2]
+      $sourceNewObject = Get-GitObjectIdOrNull -RefName $SourceRef -Path $newPath
+      $productionOldObject = Get-GitObjectIdOrNull -RefName $ProductionBaseRef -Path $oldPath
+      $productionNewObject = Get-GitObjectIdOrNull -RefName $ProductionBaseRef -Path $newPath
+
+      if ($statusKind -eq "R") {
+        $baseOldObject = Get-GitObjectIdOrNull -RefName $MirrorBaseRef -Path $oldPath
+        if ($null -eq $productionOldObject -and $productionNewObject -eq $sourceNewObject) {
+          Add-OmittedFile "$oldPath -> $newPath"
+          continue
+        }
+        if ($productionOldObject -eq $baseOldObject -and $null -eq $productionNewObject) {
+          Add-PromotedFile $oldPath
+          Add-PromotedFile $newPath
+          continue
+        }
+        throw "Promotion conflict: rename '$oldPath' -> '$newPath' is already partially or differently applied on production/main. Reconcile the mirror branch or production base before promotion."
+      }
+
+      if ($null -eq $productionNewObject) {
+        Add-PromotedFile $oldPath
+        Add-PromotedFile $newPath
+        continue
+      }
+      if ($productionNewObject -eq $sourceNewObject) {
+        Add-OmittedFile $newPath
+        continue
+      }
+      throw "Promotion conflict: copied path '$newPath' already exists with different content on production/main. Reconcile the mirror branch or production base before promotion."
+    }
+
     $path = $parts[-1]
     if ([string]::IsNullOrWhiteSpace($path)) {
       continue
     }
 
-    $isAdded = $status -eq "A"
-    if ($isAdded) {
-      $sourceObject = Get-GitObjectIdOrNull -RefName $SourceRef -Path $path
-      $productionObject = Get-GitObjectIdOrNull -RefName $ProductionBaseRef -Path $path
-      if ($null -ne $productionObject) {
-        if ($sourceObject -eq $productionObject) {
-          $omittedFiles.Add($path)
-          continue
-        }
-        throw "Promotion conflict: '$path' is added in the mirror branch but already exists with different content on production/main. Reconcile the mirror branch or production base before promotion."
+    $sourceObject = Get-GitObjectIdOrNull -RefName $SourceRef -Path $path
+    $baseObject = Get-GitObjectIdOrNull -RefName $MirrorBaseRef -Path $path
+    $productionObject = Get-GitObjectIdOrNull -RefName $ProductionBaseRef -Path $path
+
+    if ($statusKind -eq "A") {
+      if ($null -eq $productionObject) {
+        Add-PromotedFile $path
+        continue
       }
+      if ($productionObject -eq $sourceObject) {
+        Add-OmittedFile $path
+        continue
+      }
+      throw "Promotion conflict: '$path' is added in the mirror branch but already exists with different content on production/main. Reconcile the mirror branch or production base before promotion."
     }
 
-    $promotedFiles.Add($path)
+    if ($statusKind -eq "M") {
+      if ($productionObject -eq $sourceObject) {
+        Add-OmittedFile $path
+        continue
+      }
+      if ($productionObject -eq $baseObject) {
+        Add-PromotedFile $path
+        continue
+      }
+      throw "Promotion conflict: '$path' is modified in the mirror branch but production/main does not match either the mirror base or desired source content. Reconcile the mirror branch or production base before promotion."
+    }
+
+    if ($statusKind -eq "D") {
+      if ($null -eq $productionObject) {
+        Add-OmittedFile $path
+        continue
+      }
+      if ($productionObject -eq $baseObject) {
+        Add-PromotedFile $path
+        continue
+      }
+      throw "Promotion conflict: '$path' is deleted in the mirror branch but production/main has different content. Reconcile the mirror branch or production base before promotion."
+    }
+
+    foreach ($pathPart in $parts[1..($parts.Count - 1)]) {
+      Add-PromotedFile $pathPart
+    }
   }
 
   return [pscustomobject]@{
