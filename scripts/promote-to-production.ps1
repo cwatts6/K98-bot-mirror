@@ -234,6 +234,76 @@ function Invoke-ValidationAndEnsureClean {
   Assert-StagedFilesWithinPromotedSet -PromotedFiles $PromotedFiles -Context "after git diff --check"
 }
 
+function Get-GitObjectIdOrNull {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RefName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+  )
+
+  $objectId = git rev-parse "${RefName}:$Path" 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    return $null
+  }
+  return ($objectId | Select-Object -First 1)
+}
+
+function Resolve-PromotionPatchFiles {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$SourceRef,
+
+    [Parameter(Mandatory = $true)]
+    [string]$MirrorBaseRef,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ProductionBaseRef
+  )
+
+  $nameStatusLines = @(git diff --name-status "$MirrorBaseRef..$SourceRef")
+  if ($LASTEXITCODE -ne 0) {
+    throw "Could not list changed files for $MirrorBaseRef..$SourceRef."
+  }
+
+  $promotedFiles = New-Object System.Collections.Generic.List[string]
+  $omittedFiles = New-Object System.Collections.Generic.List[string]
+
+  foreach ($line in $nameStatusLines) {
+    if ([string]::IsNullOrWhiteSpace($line)) {
+      continue
+    }
+
+    $parts = @($line -split "`t")
+    $status = $parts[0]
+    $path = $parts[-1]
+    if ([string]::IsNullOrWhiteSpace($path)) {
+      continue
+    }
+
+    $isAdded = $status -eq "A"
+    if ($isAdded) {
+      $sourceObject = Get-GitObjectIdOrNull -RefName $SourceRef -Path $path
+      $productionObject = Get-GitObjectIdOrNull -RefName $ProductionBaseRef -Path $path
+      if ($null -ne $productionObject) {
+        if ($sourceObject -eq $productionObject) {
+          $omittedFiles.Add($path)
+          continue
+        }
+        throw "Promotion conflict: '$path' is added in the mirror branch but already exists with different content on production/main. Reconcile the mirror branch or production base before promotion."
+      }
+    }
+
+    $promotedFiles.Add($path)
+  }
+
+  return [pscustomobject]@{
+    PromotedFiles = @($promotedFiles)
+    OmittedFiles = @($omittedFiles)
+  }
+}
+
 $scriptDir = Split-Path -Parent $PSCommandPath
 $repoRoot = Split-Path -Parent $scriptDir
 $repoRoot = (Resolve-Path -LiteralPath $repoRoot).Path
@@ -269,9 +339,17 @@ try {
   Assert-GitRefExists -RefName $mirrorMainRef -ErrorMessage "Mirror base 'origin/main' does not exist."
   Assert-GitRefExists -RefName $productionMainRef -ErrorMessage "Production base 'production/main' does not exist. Fetch or configure the production remote."
 
-  $changedFiles = @(git diff --name-only "origin/main..origin/$SourceBranch")
-  if ($LASTEXITCODE -ne 0) {
-    throw "Could not list changed files for origin/main..origin/$SourceBranch."
+  $patchFiles = Resolve-PromotionPatchFiles -SourceRef $sourceRef -MirrorBaseRef $mirrorMainRef -ProductionBaseRef $productionMainRef
+  $changedFiles = @($patchFiles.PromotedFiles)
+  $omittedFiles = @($patchFiles.OmittedFiles)
+  if ($omittedFiles.Count -gt 0) {
+    Write-Host "Omitting file(s) already present with identical content on production/main:"
+    foreach ($path in $omittedFiles) {
+      Write-Host "  $path"
+    }
+  }
+  if ($changedFiles.Count -eq 0) {
+    throw "No promotable file changes remain after omitting files already present on production/main."
   }
   $archiveChanges = @($changedFiles | Where-Object { $_ -match '^(archive/|archive\\)' })
   if ($archiveChanges.Count -gt 0 -and -not $AllowArchiveChanges) {
@@ -279,7 +357,7 @@ try {
   }
 
   Write-Host "Creating patch from mirror file delta..."
-  Invoke-Native -FilePath "git" -Arguments @("diff", "--binary", "origin/main..origin/$SourceBranch", "--output", $patchPath)
+  Invoke-Native -FilePath "git" -Arguments (@("diff", "--binary", "origin/main..origin/$SourceBranch", "--output", $patchPath, "--") + $changedFiles)
   $patchInfo = Get-Item -LiteralPath $patchPath
   if ($patchInfo.Length -eq 0) {
     throw "Patch is empty for origin/main..origin/$SourceBranch. Nothing to promote."
