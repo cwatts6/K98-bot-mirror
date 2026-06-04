@@ -86,7 +86,7 @@ def test_history_embed_filters_zero_summary_and_personal_best_rows():
         history_summary={"Autarch": 0, "KVK Played": 0, "Highest Acclaim": 0},
         personal_bests={"Most Kills": 0, "Most Deads": 0, "Most Heal": 0},
         last_kvk_summary={},
-        matchmaking_snapshot={},
+        matchmaking_snapshot={"MM KP": 0, "MM Kills": 0, "MM Deads": None},
     )
 
     embed = build_history_embed(payload)
@@ -94,4 +94,5 @@ def test_history_embed_filters_zero_summary_and_personal_best_rows():
 
     assert "Summary" not in field_names
     assert "Personal Bests" not in field_names
+    assert "Matchmaking Snapshot" not in field_names
     assert field_names == ["Last KVK Summary"]

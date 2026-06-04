@@ -135,7 +135,7 @@ async def _send_personal_kvk_stats(ctx: discord.ApplicationContext) -> None:
             logger.exception("[/kvk stats] failed attaching last_kvk for %s", governor_id)
 
         try:
-            await post_kvk_stats_output(
+            posted, channel_used = await post_kvk_stats_output(
                 bot=getattr(ctx, "bot", None),
                 ctx=ctx,
                 row=row,
@@ -145,6 +145,21 @@ async def _send_personal_kvk_stats(ctx: discord.ApplicationContext) -> None:
             logger.exception("[/kvk stats] post_kvk_stats_output failed")
             await ctx.interaction.edit_original_response(
                 content=f"Failed to build stats: `{type(exc).__name__}: {exc}`"
+            )
+            return
+
+        if not posted:
+            logger.warning(
+                "[/kvk stats] post_kvk_stats_output returned false channel_used=%s governor_id=%s",
+                channel_used,
+                governor_id,
+            )
+            await ctx.interaction.edit_original_response(
+                content=(
+                    "Could not post your KVK stats publicly. "
+                    "Please check bot/channel permissions or try again later."
+                ),
+                view=None,
             )
             return
 

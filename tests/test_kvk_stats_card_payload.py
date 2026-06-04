@@ -61,6 +61,24 @@ async def test_build_payload_handles_zero_kp_without_tanking_score():
     assert payload.playstyle is None
 
 
+@pytest.mark.asyncio
+async def test_build_payload_preserves_zero_healed_value():
+    payload = await build_kvk_stats_card_payload(
+        {
+            "GovernorID": "123",
+            "GovernorName": "Zero Heal",
+            "KillPointsDelta": 100,
+            "HealedTroopsDelta": 0,
+        },
+        context=KvkStatsCardContext(kvk_name="Tides of War"),
+    )
+
+    assert payload.healed == 0
+    assert payload.kp_loss == 0
+    assert payload.tanking_score_percent == 0
+    assert payload.playstyle == "Sniping Kills"
+
+
 def test_kill_progress_policy_preserves_existing_threshold_quotes():
     assert kill_progress_policy(101) == ("#FFD700", "Smashed it! Don't stop!!")
     assert kill_progress_policy(86) == ("#006400", "So close, push now!")

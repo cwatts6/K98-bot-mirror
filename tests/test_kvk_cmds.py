@@ -192,3 +192,57 @@ async def test_kvk_stats_multi_account_selector_uses_visual_card(monkeypatch):
 
     assert created["use_visual_card"] is True
     assert ctx.interaction.edits[-1]["view"]._last_kvk_map == {}
+
+
+@pytest.mark.asyncio
+async def test_kvk_stats_single_account_keeps_error_when_post_fails(monkeypatch):
+    import commands.kvk_cmds as kvk_cmds
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        return None
+
+    async def fake_account_summary(_user_id):
+        return kvk_cmds.governor_account_service.summarize_accounts(
+            {"Main": {"GovernorID": "123", "GovernorName": "MainGov"}}
+        )
+
+    async def fake_last_kvk_map():
+        return {}
+
+    async def fake_load_stats(governor_id):
+        return {"GovernorID": governor_id, "GovernorName": "MainGov"}
+
+    async def fake_post_stats_output(**_kwargs):
+        return False, "none"
+
+    class DummyInteraction:
+        def __init__(self):
+            self.edits = []
+
+        async def edit_original_response(self, **kwargs):
+            self.edits.append(kwargs)
+            return SimpleNamespace(id="edited")
+
+    ctx = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        interaction=DummyInteraction(),
+        bot=SimpleNamespace(),
+    )
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.governor_account_service,
+        "get_account_summary_for_user",
+        fake_account_summary,
+    )
+    monkeypatch.setattr(kvk_cmds.kvk_personal_service, "load_last_kvk_map", fake_last_kvk_map)
+    monkeypatch.setattr(
+        kvk_cmds.kvk_personal_service,
+        "load_kvk_personal_stats",
+        fake_load_stats,
+    )
+    monkeypatch.setattr(kvk_cmds, "post_kvk_stats_output", fake_post_stats_output)
+
+    await kvk_cmds._send_personal_kvk_stats(ctx)
+
+    assert "Could not post your KVK stats publicly" in ctx.interaction.edits[-1]["content"]

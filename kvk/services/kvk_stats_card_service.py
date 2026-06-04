@@ -40,6 +40,20 @@ def _int_from_variants(row: dict[str, Any], keys: list[str], default: int = 0) -
     return default
 
 
+def _optional_int_from_variants(row: dict[str, Any], keys: list[str]) -> int | None:
+    for key in keys:
+        if key not in row:
+            continue
+        value = row.get(key)
+        if value in (None, ""):
+            continue
+        try:
+            return int(float(str(value).replace(",", "").strip()))
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def _float_from_variants(row: dict[str, Any], keys: list[str]) -> float | None:
     for key in keys:
         if key not in row:
@@ -183,11 +197,11 @@ async def build_kvk_stats_card_payload(
     if dkp_target_percent is None and not is_exempt:
         dkp_target_percent = _pct(dkp, dkp_target)
 
-    healed = _int_from_variants(
-        row, ["HealedTroopsDelta", "Healed Troops Delta", "Healed_Troops_Delta"], default=0
+    healed = _optional_int_from_variants(
+        row, ["HealedTroopsDelta", "Healed Troops Delta", "Healed_Troops_Delta"]
     )
-    kp_loss = healed * 20 if healed else None
-    tanking_score_percent = _pct(kp_loss or 0, kp_gain) if kp_loss is not None and kp_gain else None
+    kp_loss = healed * 20 if healed is not None else None
+    tanking_score_percent = _pct(kp_loss, kp_gain) if kp_loss is not None and kp_gain else None
 
     pass_stats = {
         key: value
@@ -223,7 +237,7 @@ async def build_kvk_stats_card_payload(
         dead_target=dead_target,
         dead_target_percent=dead_target_percent,
         power_loss=_int_from_variants(row, ["Power_Delta", "Power Delta"], default=0) or None,
-        healed=healed or None,
+        healed=healed,
         kp_loss=kp_loss,
         tanking_score_percent=tanking_score_percent,
         playstyle=_playstyle(tanking_score_percent),
