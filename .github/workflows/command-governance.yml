@@ -3,22 +3,23 @@ name: Command Governance
 on:
   pull_request:
     paths:
-      - ".github/workflows/command-governance.yml"
-      - ".pre-commit-config.yaml"
+      - "commands/**"
       - "Commands.py"
       - "DL_bot.py"
-      - "commands/**"
       - "scripts/validate_command_registration.py"
-      - "tests/test_command_governance_config.py"
+      - "commands/command_inventory.py"
       - "tests/test_validate_command_registration.py"
       - "tests/test_command_inventory.py"
       - "tests/test_command_registration_smoke.py"
+      - "tests/test_command_governance_config.py"
+      - "docs/reference/canonical_command_reference.md"
+      - ".github/pull_request_template.md"
+      - ".github/workflows/command-governance.yml"
   workflow_dispatch:
 
 jobs:
   command-governance:
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -27,28 +28,19 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+        run: python -m pip install -r requirements.txt
 
       - name: Validate command registration
         run: python scripts/validate_command_registration.py
 
       - name: Write command inventory artifact
-        run: >
-          python scripts/validate_command_registration.py
-          --format markdown
-          --output command-registration-inventory.md
+        run: python scripts/validate_command_registration.py --format markdown --output command-registration-inventory.md
 
-      - name: Run focused command governance tests
-        run: >
-          python -m pytest -q
-          tests/test_command_governance_config.py
-          tests/test_validate_command_registration.py
-          tests/test_command_inventory.py
-          tests/test_command_registration_smoke.py
+      - name: Run command governance tests
+        run: python -m pytest -q tests/test_validate_command_registration.py tests/test_command_inventory.py tests/test_command_registration_smoke.py tests/test_command_governance_config.py
 
       - name: Upload command inventory artifact
         uses: actions/upload-artifact@v4
