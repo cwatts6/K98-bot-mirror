@@ -3,6 +3,29 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Phase 4 Completed Item
+- Area: `commands/ark_cmds.py`, `docs/ark/`, Ark command tests
+- Type: architecture
+- Description: Phase 4 grouped all Ark commands under `/ark`, including `/ark reminder_prefs` and `/ark report_players`, while preserving permissions, options, versions, usage tracking, response visibility, modal/view flows, and command-cache semantics.
+- Resolution: Added the `/ark` command group, updated Ark command docs/tests and command-platform docs, and added a post-merge Discord briefing note.
+- Validation: Command registration reports `primary=62 grouped_subcommands_detected=43 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=62` in implementation validation.
+
+## Command Platform Audit & Optimisation Programme
+
+- Command Platform Phase 7, Governance And CI Guardrails, was completed in PR 139
+  (`codex/command-platform-phase-7-governance`), merged, pushed to production on 2026-06-02, and
+  closed the Command Platform Audit & Optimisation Programme.
+- The resolved command-limit drift item covered `commands/` and
+  `scripts/validate_command_registration.py`. Batch 1 command grouping had reduced the primary
+  command surface from 100 to 82, Phase 3 reduced it to 75, Phase 4 reduced it to 62, and Phase 5A
+  reduced it to the final active baseline of
+  `primary=39 grouped_subcommands_detected=76 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39`.
+- Phase 7 added approved top-level command baseline enforcement, JSON/Markdown command inventory
+  artifact output, focused command-governance CI, pre-commit command registration validation, and
+  command-change checklist material for task packs, PRs, and promotion review.
+- Player self-service workflow redesign and public calendar/KVK calendar redesign remain active
+  separate deferred optimisation programmes, not additional command-platform phases.
+
 ## Stats Commands Full Optimisation
 
 - Stats Commands Full Optimisation & Standardisation was implemented, merged, production promoted, and smoke-tested via PR #78.
@@ -30,3 +53,14 @@ This file preserves resolved deferred-optimisation notes that used to live in
 - MGE Process Polish Phase 2 was implemented, production deployed, and smoke-tested via PR #75.
 - `mge/mge_signup_service.py` self-signup account resolution now uses `registry_service.get_user_accounts()` instead of the legacy registry dict shape. Admin-add reverse owner lookup remains on `get_discord_user_for_governor()`.
 - `mge/mge_publish_service.py` no longer performs direct Discord message fetch/send/edit/delete/DM IO. Publish, republish, reminder refresh, unpublish, award DM, and board refresh paths now route Discord operations through `mge/mge_publish_discord_adapter.py`.
+
+
+
+### Deferred Optimisation
+- Area: `commands/`, command documentation, `scripts/validate_command_registration.py`
+- Type: architecture
+- Description: The wider command-surface end state remains separate from startup lifecycle ownership. Grouping or retiring slash-command surfaces can reduce Discord's 100-command sync risk, but it affects public/operator command paths, documentation, tests, and rollout communication.
+- Suggested Fix: Scope a standalone command-surface optimisation programme after the Phase 6 lifecycle slices. Group or retire command paths by domain only with operator-approved UX rules, update docs and tests for renamed paths, preserve permissions and autocomplete behaviour, and keep `scripts/validate_command_registration.py` enforcing command-count guardrails. Treat this as a separate wider task, not a startup lifecycle PR.
+- Impact: high
+- Risk: medium
+- Dependencies: Operator approval for command path changes; command lifecycle admin tooling convergence can happen first but is not required for command-surface grouping.

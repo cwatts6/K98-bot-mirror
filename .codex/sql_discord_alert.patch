@@ -1,0 +1,166 @@
+diff --git a/deploy/Invoke-NightlyProdSchemaExport.ps1 b/deploy/Invoke-NightlyProdSchemaExport.ps1
+index 808c112..ad78ae8 100644
+--- a/deploy/Invoke-NightlyProdSchemaExport.ps1
++++ b/deploy/Invoke-NightlyProdSchemaExport.ps1
+@@ -4,7 +4,8 @@ param(
+     [string]$RepoPath = "C:\K98-bot-SQL-Server",
+     [string]$BotRepoPath = "C:\discord_file_downloader",
+     [string]$ExportBranchPrefix = "export/prod-schema",
+-    [switch]$NoGitCommitPush
++    [switch]$NoGitCommitPush,
++    [string]$DiscordWebhookUrl = $env:SQL_SCHEMA_DISCORD_WEBHOOK_URL
+ )
+ 
+ $ErrorActionPreference = "Stop"
+@@ -23,6 +24,56 @@ function Import-K98BotDevEnvironment {
+     }
+ }
+ 
++function Send-K98NightlyExportDiscordAlert {
++    param(
++        [Parameter(Mandatory=$true)][string]$RepoRoot,
++        [Parameter(Mandatory=$true)][string]$Status,
++        [Parameter(Mandatory=$true)][string]$Message,
++        [string]$RecommendedAction,
++        [string]$ExportBranch
++    )
++
++    if ([string]::IsNullOrWhiteSpace($DiscordWebhookUrl)) {
++        Write-K98JsonLog -RepoRoot $RepoRoot -LogName "export.jsonl" -Event @{
++            script = "Invoke-NightlyProdSchemaExport.ps1"
++            operation = "discord_failure_alert"
++            status = "Skipped"
++            reason = "SQL_SCHEMA_DISCORD_WEBHOOK_URL is not configured."
++            export_branch = $ExportBranch
++        }
++        return
++    }
++
++    $lines = @(
++        "SQL nightly schema export $Status on $env:COMPUTERNAME",
++        "Database: $DatabaseName",
++        "Export branch: $ExportBranch",
++        "Error: $Message"
++    )
++    if (-not [string]::IsNullOrWhiteSpace($RecommendedAction)) {
++        $lines += "Action: $RecommendedAction"
++    }
++
++    $payload = @{ content = ($lines -join "`n") } | ConvertTo-Json -Compress
++
++    try {
++        Invoke-RestMethod `
++            -Uri $DiscordWebhookUrl `
++            -Method Post `
++            -Body $payload `
++            -ContentType "application/json" `
++            -ErrorAction Stop | Out-Null
++
++        Write-K98JsonLog -RepoRoot $RepoRoot -LogName "export.jsonl" -Event @{
++            script = "Invoke-NightlyProdSchemaExport.ps1"
++            operation = "discord_failure_alert"
++            status = "Succeeded"
++            export_branch = $ExportBranch
++        }
++    }
++    catch {
++        Write-K98JsonLog -RepoRoot $RepoRoot -LogName "export.jsonl" -Event @{
++            script = "Invoke-NightlyProdSchemaExport.ps1"
++            operation = "discord_failure_alert"
++            status = "Failed"
++            export_branch = $ExportBranch
++            error_message = $_.Exception.Message
++        }
++    }
++}
++
+ $repoRoot = (Resolve-Path $RepoPath).ProviderPath
+ $started = Get-Date
+ $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+@@ -84,21 +135,31 @@ try {
+     Write-Host "Nightly SQL schema export completed. Export branch: $exportBranch"
+ }
+ catch {
++    $failureMessage = $_.Exception.Message
++    $recommendedAction = "Fix the nightly export failure before relying on drift evidence."
+     Write-K98JsonLog -RepoRoot $repoRoot -LogName "export.jsonl" -Event @{
+         script = "Invoke-NightlyProdSchemaExport.ps1"
+         operation = "nightly_export_finish"
+         status = "Failed"
+         server = $ServerName
+         database = $DatabaseName
+         export_branch = $exportBranch
+-        error_message = $_.Exception.Message
++        error_message = $failureMessage
+         duration_ms = [int]((Get-Date) - $started).TotalMilliseconds
+-        recommended_action = "Fix the nightly export failure before relying on drift evidence."
++        recommended_action = $recommendedAction
+     }
++    Send-K98NightlyExportDiscordAlert `
++        -RepoRoot $repoRoot `
++        -Status "FAILED" `
++        -Message $failureMessage `
++        -RecommendedAction $recommendedAction `
++        -ExportBranch $exportBranch
+     throw
+ }
+ finally {
+     try {
+         Invoke-K98Git -RepoRoot $repoRoot -Arguments @("switch", "main") | Out-Null
+         Invoke-K98Git -RepoRoot $repoRoot -Arguments @("pull", "--ff-only", "origin", "main") | Out-Null
+     }
+     catch {
++        $cleanupMessage = $_.Exception.Message
++        $cleanupAction = "Manually switch C:\K98-bot-SQL-Server back to main and check git status."
+         Write-K98JsonLog -RepoRoot $repoRoot -LogName "export.jsonl" -Event @{
+             script = "Invoke-NightlyProdSchemaExport.ps1"
+             operation = "nightly_export_cleanup"
+@@ -106,9 +167,15 @@ finally {
+             attempted_branch = "main"
+-            error_message = $_.Exception.Message
+-            recommended_action = "Manually switch C:\K98-bot-SQL-Server back to main and check git status."
++            error_message = $cleanupMessage
++            recommended_action = $cleanupAction
+         }
++        Send-K98NightlyExportDiscordAlert `
++            -RepoRoot $repoRoot `
++            -Status "CLEANUP FAILED" `
++            -Message $cleanupMessage `
++            -RecommendedAction $cleanupAction `
++            -ExportBranch $exportBranch
+     }
+ }
+diff --git a/docs/SQL_PROMOTION_GUIDE.md b/docs/SQL_PROMOTION_GUIDE.md
+index 0730c74..ab205f0 100644
+--- a/docs/SQL_PROMOTION_GUIDE.md
++++ b/docs/SQL_PROMOTION_GUIDE.md
+@@ -221,6 +221,7 @@ The new nightly workflow:
+ 6. Commits and pushes only the export branch when schema changes exist.
+ 7. Switches the local SQL repo back to `main`.
+ 8. Writes structured export logs.
++9. Sends a Discord alert on export or cleanup failure when `SQL_SCHEMA_DISCORD_WEBHOOK_URL` is configured for the scheduled-task account.
+ 
+ ### Replace The Scheduled Task
+ 
+@@ -286,6 +287,10 @@ Use the same Windows account that already connects to SQL Server with Windows Au
+ push credentials available for the SQL repo.
+ 
++To restore failure-only Discord notifications, set `SQL_SCHEMA_DISCORD_WEBHOOK_URL` for the same
++Windows account that runs the scheduled task. Do not paste webhook URLs into scripts, docs, config
++files, logs, hotfix reports, or PR comments.
++
+ If the old task name is uncertain, disable it manually in Task Scheduler only after confirming its
+ action points to `Export-SqlSchemaAndPush.ps1`.
+ 
+diff --git a/docs/SQL_RELEASE_CHECKLIST.md b/docs/SQL_RELEASE_CHECKLIST.md
+index 3850e4c..0a36d72 100644
+--- a/docs/SQL_RELEASE_CHECKLIST.md
++++ b/docs/SQL_RELEASE_CHECKLIST.md
+@@ -103,6 +103,7 @@ Use this checklist for production SQL deployments.
+ - [ ] New task action points to `deploy\Invoke-NightlyProdSchemaExport.ps1`.
+ - [ ] Manual task run completed successfully.
+ - [ ] SQL repo returned to clean `main` after the task.
++- [ ] Failure-only Discord alert environment variable is configured for the scheduled-task account if operator notification is required.
+ - [ ] Any pushed `export/prod-schema-*` branch was reviewed or intentionally left for drift review.
+ 
+ ## Nightly Export Monitoring

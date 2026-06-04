@@ -1,4 +1,9 @@
 Codex Task Pack - Command Platform Audit & Optimisation Programme
+
+Status: complete. The programme was closed by Phase 7 in PR 139
+(`codex/command-platform-phase-7-governance`), merged and pushed to production on 2026-06-02.
+This file is archived as the completed programme record.
+
 1. Task Header
 Task name: Command Platform Audit & Optimisation Programme
 Date: 2026-05-28
@@ -302,7 +307,7 @@ preserved grouped usage-log identities, restored CrystalTech service imports, aw
 `/stats player` embed rendering, and chunked long `/kvk list_scans` output below Discord content
 limits.
 
-Remaining roadmap:
+Completed roadmap:
 
 Phase 5
 
@@ -315,13 +320,17 @@ production
 
 Phase 6
 
-Canonical Command Documentation: next active command-platform phase
+Canonical Command Documentation: complete, merged, marked complete, and pushed to production in
+PR 137
 
 Phase 7
 
-Future Governance And CI Guardrails
+Governance And CI Guardrails: complete, merged, pushed to production in PR 139, and closed the
+Command Platform Audit & Optimisation Programme
 
-Codex may create additional phases if justified.
+No additional Command Platform Audit & Optimisation Programme phases are planned. Player
+self-service workflow redesign and public calendar/KVK calendar redesign remain separate deferred
+optimisation programmes.
 
 9. Codex Skills
 Skill	Decision

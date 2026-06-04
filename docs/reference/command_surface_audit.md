@@ -52,14 +52,16 @@ Command Platform Phase 6, Canonical Command Documentation, was completed in PR 1
 production. It created `canonical_command_reference.md` as the maintained current command
 reference and updated stale active command docs and smoke references.
 
-Phase 7 governance and CI guardrails are the final planned command-platform programme phase. Player
-self-service and generic public calendar/KVK calendar redesign remain deferred outside this
-command-count programme.
+Command Platform Phase 7, Governance And CI Guardrails, was completed in PR 139
+(`codex/command-platform-phase-7-governance`), merged, and pushed to production. Phase 7 guardrails
+enforce the approved top-level command baseline in `scripts/validate_command_registration.py`, wire
+command registration validation into local pre-commit and focused CI, produce JSON/Markdown
+inventory artifacts, and require future top-level command additions to update the canonical command
+reference with operator-approved rationale.
 
-Phase 7 guardrails enforce the approved top-level command baseline in
-`scripts/validate_command_registration.py`, wire command registration validation into local
-pre-commit and focused CI, and require future top-level command additions to update the canonical
-command reference with operator-approved rationale.
+Phase 7 closed the Command Platform Audit & Optimisation Programme. Player self-service and
+generic public calendar/KVK calendar redesign remain deferred outside this command-count
+programme.
 
 This file remains the historical command-surface audit and migration record.
 
@@ -171,10 +173,9 @@ admin, CrystalTech admin, honor purge, location admin/leadership, and activity l
 commands. It was delivered in PR 136, smoke tested successfully, merged, and pushed to
 production.
 
-Remaining command-surface batches are staged in `docs/reference/deferred_optimisations.md` and the
-command-platform programme docs. Recommended order:
-
-1. Phase 7: Future governance and CI guardrails.
+Remaining command-surface redesign work is staged in `docs/reference/deferred_optimisations.md` as
+separate optimisation programmes, not additional Command Platform Audit & Optimisation Programme
+phases.
 
 The previously considered player self-service grouping is deferred because commands such as
 `/register_governor`, `/modify_registration`, `/my_registrations`, `/mygovernorid`,

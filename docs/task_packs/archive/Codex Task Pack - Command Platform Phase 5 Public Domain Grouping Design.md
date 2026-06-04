@@ -1,5 +1,9 @@
 # Codex Task Pack - Command Platform Phase 5 Public Domain Grouping Design
 
+> Status: complete. Delivered in PR 135 (`codex/command-platform-phase-5a-design-docs`), merged,
+> pushed to production in production PR 444, and later archived after Command Platform Phase 7
+> closed the programme.
+
 ## 1. Task Header
 
 - Task name: Command Platform Phase 5 - Public Domain Grouping Design

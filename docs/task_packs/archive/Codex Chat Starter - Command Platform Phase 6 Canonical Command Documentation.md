@@ -3,8 +3,8 @@
 Archived starter for completed Command Platform Phase 6.
 
 Phase 6 was delivered in PR 137 (`codex/command-platform-phase-6-canonical-docs`), merged, marked
-complete, and pushed to production on 2026-06-02. Use the Phase 7 starter for the next and final
-command-platform programme phase.
+complete, and pushed to production on 2026-06-02. Phase 7 was later delivered in PR 139 and closed
+the Command Platform Audit & Optimisation Programme.
 
 Historical starter content follows.
 

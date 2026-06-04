@@ -1,0 +1,35 @@
+diff --git a/deploy/Invoke-NightlyProdSchemaExport.ps1 b/deploy/Invoke-NightlyProdSchemaExport.ps1
+index 0d6c386..039015e 100644
+--- a/deploy/Invoke-NightlyProdSchemaExport.ps1
++++ b/deploy/Invoke-NightlyProdSchemaExport.ps1
+@@ -29,7 +29,6 @@ function Send-K98NightlyExportDiscordAlert {
+         [Parameter(Mandatory=$true)][string]$RepoRoot,
+         [Parameter(Mandatory=$true)][string]$Status,
+-        [Parameter(Mandatory=$true)][string]$Message,
+         [string]$RecommendedAction,
+         [string]$ExportBranch
+     )
+@@ -49,7 +48,7 @@ function Send-K98NightlyExportDiscordAlert {
+         "SQL nightly schema export $Status on $env:COMPUTERNAME",
+         "Database: $DatabaseName",
+         "Export branch: $ExportBranch",
+-        "Error: $Message"
++        "Details: check C:\K98-bot-SQL-Server\logs\export.jsonl on the SQL operations machine."
+     )
+     if (-not [string]::IsNullOrWhiteSpace($RecommendedAction)) {
+         $lines += "Action: $RecommendedAction"
+@@ -162,7 +161,6 @@ catch {
+         -RepoRoot $repoRoot `
+         -Status "FAILED" `
+-        -Message $failureMessage `
+         -RecommendedAction $recommendedAction `
+         -ExportBranch $exportBranch
+     throw
+@@ -184,7 +182,6 @@ finally {
+         Send-K98NightlyExportDiscordAlert `
+             -RepoRoot $repoRoot `
+             -Status "CLEANUP FAILED" `
+-            -Message $cleanupMessage `
+             -RecommendedAction $cleanupAction `
+             -ExportBranch $exportBranch
+     }

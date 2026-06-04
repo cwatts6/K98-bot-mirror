@@ -1,6 +1,11 @@
 # Codex Chat Starter - Command Platform Phase 7 Governance And CI Guardrails
 
-Use this starter to begin the final planned Command Platform Audit & Optimisation Programme phase.
+> Status: complete. Phase 7 was delivered in PR 139
+> (`codex/command-platform-phase-7-governance`), merged, pushed to production on 2026-06-02, and
+> closed the Command Platform Audit & Optimisation Programme. This starter is archived as a
+> historical record and should not be reused to start new work.
+
+Historical starter content for the final Command Platform Audit & Optimisation Programme phase.
 
 Source programme documents:
 

@@ -1,0 +1,9 @@
+diff --git a/.gitignore b/.gitignore
+index 321f62a..bf10947 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -4,3 +4,4 @@ reports/*
+ !reports/.gitkeep
+ exports/*
+ !exports/.gitkeep
++deploy/sql_deploy_config.json

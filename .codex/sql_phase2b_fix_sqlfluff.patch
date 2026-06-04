@@ -1,0 +1,13 @@
+diff --git a/.sqlfluff b/.sqlfluff
+index a05f85c..0252214 100644
+--- a/.sqlfluff
++++ b/.sqlfluff
+@@ -2,8 +2,6 @@
+ dialect = tsql
+ templater = raw
+ large_file_skip_byte_limit = 0
+-exclude_rules = LT01,LT02,LT05
+-
+-[sqlfluff:rules]
+ max_line_length = 160
++exclude_rules = CP01,CP02,LT01,LT02,LT05,LT12

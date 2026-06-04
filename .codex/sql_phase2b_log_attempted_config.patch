@@ -1,0 +1,17 @@
+diff --git a/deploy/Test-SqlBackupReadiness.ps1 b/deploy/Test-SqlBackupReadiness.ps1
+index 6529c3a..360f8af 100644
+--- a/deploy/Test-SqlBackupReadiness.ps1
++++ b/deploy/Test-SqlBackupReadiness.ps1
+@@ -55,10 +55,11 @@ function Import-K98BackupPolicyConfig {
+     if ([string]::IsNullOrWhiteSpace($Path)) {
+         return
+     }
++    $script:AppliedBackupPolicyConfigPath = $Path
+     if (-not (Test-Path $Path)) {
+         throw "Backup policy config not found: $Path"
+     }
+-    $script:AppliedBackupPolicyConfigPath = (Resolve-Path $Path).ProviderPath
++    $script:AppliedBackupPolicyConfigPath = (Resolve-Path $Path).ProviderPath
+ 
+     $config = Get-Content -Raw -Path $Path | ConvertFrom-Json -ErrorAction Stop
+     $script:MaxFullBackupAgeHours = [int](Get-K98ConfigValue -Config $config -Path @("backup_policy", "max_full_backup_age_hours") -Default $script:MaxFullBackupAgeHours)

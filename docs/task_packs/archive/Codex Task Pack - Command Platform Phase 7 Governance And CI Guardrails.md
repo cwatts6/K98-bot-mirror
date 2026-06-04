@@ -1,5 +1,10 @@
 # Codex Task Pack - Command Platform Phase 7 Governance And CI Guardrails
 
+> Status: complete. Delivered in PR 139
+> (`codex/command-platform-phase-7-governance`), merged, pushed to production on 2026-06-02, and
+> closed the Command Platform Audit & Optimisation Programme. This file is archived as an execution
+> record.
+
 ## 1. Task Header
 
 - Task name: Command Platform Phase 7 - Governance And CI Guardrails
@@ -7,7 +12,7 @@
 - Owner/context: Command Platform Audit & Optimisation Programme
 - Task type: governance / validation tooling / CI preparation
 - One-pass approved: no
-- Status: final planned command-platform phase
+- Status: complete; final command-platform programme phase
 
 ## 2. Required Reading
 
@@ -118,9 +123,9 @@ should preserve that headroom through governance rather than more command moveme
 - Should Phase 7 close the programme after guardrails land?
   - Decision: yes.
 
-Recommended answer for the final question: yes. Phase 7 is the final planned command-platform
-programme phase. Player self-service workflow redesign and public calendar/KVK calendar redesign
-should remain separate deferred optimisation programmes.
+Final answer for the programme: yes. Phase 7 closed the Command Platform Audit & Optimisation
+Programme. Player self-service workflow redesign and public calendar/KVK calendar redesign remain
+separate deferred optimisation programmes.
 
 ## 8. Suggested Validation
 

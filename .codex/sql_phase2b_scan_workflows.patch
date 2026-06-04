@@ -1,0 +1,24 @@
+diff --git a/.github/workflows/sql-validation.yml b/.github/workflows/sql-validation.yml
+index eac07cf..e5db6e3 100644
+--- a/.github/workflows/sql-validation.yml
++++ b/.github/workflows/sql-validation.yml
+@@ -50,15 +50,17 @@ jobs:
+             "docs\adr\*.md",
+             "migrations\*.sql",
+             "migrations\rollback\*.sql",
+-            "*.json"
++            "*.json",
++            ".github\workflows\*.yml"
+           )
+           $pattern = "(?i)(Password\s*=|Pwd\s*=|User\s+ID\s*=|AccessToken|DiscordWebhook|ClientSecret|ConnectionString)"
+           $allowed = @(
+             "deploy\SqlDeploy.Common.ps1",
+             "deploy\Validate-SqlRepo.ps1"
+           )
+           $matches = Select-String -Path $paths -Pattern $pattern -ErrorAction SilentlyContinue |
+-            Where-Object { $allowed -notcontains $_.Path.Substring((Get-Location).Path.Length + 1) }
++            Where-Object { $allowed -notcontains $_.Path.Substring((Get-Location).Path.Length + 1) } |
++            Where-Object { $_.Line -notmatch '^\s*\$pattern\s*=' }
+ 
+           if ($matches) {
+             $matches | ForEach-Object {

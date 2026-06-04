@@ -49,6 +49,13 @@ production. It created `canonical_command_reference.md` as the maintained curren
 reference, updated stale active command docs and smoke references, and prepared Phase 7 governance
 and CI guardrails as the final programme phase.
 
+Phase 7, Governance And CI Guardrails, was completed in PR 139
+(`codex/command-platform-phase-7-governance`), merged, and pushed to production. It added approved
+top-level command baseline enforcement to `scripts/validate_command_registration.py`,
+JSON/Markdown command inventory artifact output, local pre-commit command registration validation,
+focused command-governance CI, and command-change checklist material. Phase 7 closed the Command
+Platform Audit & Optimisation Programme.
+
 ## Audit Baseline
 
 Static command registration validation after Phase 5A delivery reports:
@@ -534,26 +541,33 @@ Validation:
 - `python -m pytest -q tests/test_validate_command_registration.py tests/test_command_inventory.py tests/test_command_registration_smoke.py`
 - `python -m pre_commit run -a`
 
-### Phase 7 - Future Governance And CI Guardrails
+### Phase 7 - Governance And CI Guardrails
 
-Status: in implementation as the final planned phase.
+Status: complete. Delivered in PR 139 (`codex/command-platform-phase-7-governance`), merged, and
+pushed to production.
 
 Goal: prevent command-limit drift after the programme ends.
 
-Scope:
+Delivered scope:
 
 - CI enforcement around validator output.
 - Pre-commit enforcement around command registration validation.
 - Approved top-level command baseline enforcement in `scripts/validate_command_registration.py`.
-- Optional JSON/Markdown command inventory artifacts from validation.
+- JSON/Markdown command inventory artifacts from validation.
 - Command design checklist for task packs and PRs.
 - Near-limit risk reporting, grouped summary reporting, duplicate-risk reporting, and command
   drift reporting.
 
 Validation:
 
-- Validator tests.
-- CI/pre-commit integration checks where applicable.
+- `scripts/validate_command_registration.py`
+- `scripts/validate_deferred_items.py`
+- `scripts/select_tests.py`
+- `scripts/smoke_imports.py`
+- `scripts/validate_architecture_boundaries.py`
+- focused command-governance tests
+- `pre_commit run -a`
+- full pytest
 
 ## Recommended Execution Order
 
@@ -564,9 +578,9 @@ Validation:
 5. Phase 5: Public Domain Grouping Design.
 6. Phase 5A: Admin/Leadership/Operator Domain Grouping.
 7. Phase 6: Canonical Command Documentation.
-8. Phase 7: Future Governance And CI Guardrails.
+8. Phase 7: Governance And CI Guardrails.
 
-With Phase 6 delivered, merged, marked complete, and pushed to production, Phase 7 governance and
-CI guardrails are the final planned command-platform programme phase. Player self-service workflow
-redesign and public calendar/KVK calendar redesign remain deferred into separate optimisation
-tasks rather than continued as simple command grouping inside this programme.
+The Command Platform Audit & Optimisation Programme is complete as of Phase 7. Player
+self-service workflow redesign and public calendar/KVK calendar redesign remain deferred into
+separate optimisation programmes rather than continued as simple command grouping inside this
+programme.

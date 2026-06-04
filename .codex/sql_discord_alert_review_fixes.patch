@@ -1,0 +1,140 @@
+diff --git a/deploy/Invoke-NightlyProdSchemaExport.ps1 b/deploy/Invoke-NightlyProdSchemaExport.ps1
+index 295da9e..ecff50e 100644
+--- a/deploy/Invoke-NightlyProdSchemaExport.ps1
++++ b/deploy/Invoke-NightlyProdSchemaExport.ps1
+@@ -25,6 +25,22 @@ function Import-K98BotDevEnvironment {
+     }
+ }
+ 
++function ConvertTo-K98RedactedAlertError {
++    param([AllowNull()][string]$Message)
++
++    if ([string]::IsNullOrWhiteSpace($Message)) {
++        return $Message
++    }
++
++    $redacted = $Message -replace "https?://\S+", "[redacted-url]"
++    $redacted = $redacted -replace "(?i)(discord(?:app)?\.com/api/webhooks/)[^\s'\""]+", '$1[redacted]'
++    return $redacted
++}
++
+ function Send-K98NightlyExportDiscordAlert {
+     param(
+         [Parameter(Mandatory=$true)][string]$RepoRoot,
+@@ -35,50 +51,65 @@ function Send-K98NightlyExportDiscordAlert {
+         [string]$ExportBranch
+     )
+ 
+-    if ([string]::IsNullOrWhiteSpace($DiscordAlertUrl)) {
+-        Write-K98JsonLog -RepoRoot $RepoRoot -LogName "export.jsonl" -Event @{
+-            script = "Invoke-NightlyProdSchemaExport.ps1"
+-            operation = "discord_failure_alert"
+-            status = "Skipped"
+-            reason = "SQL_SCHEMA_DISCORD_WEBHOOK_URL is not configured."
+-            export_branch = $ExportBranch
++    try {
++        if ([string]::IsNullOrWhiteSpace($DiscordAlertUrl)) {
++            Write-K98JsonLog -RepoRoot $RepoRoot -LogName "export.jsonl" -Event @{
++                script = "Invoke-NightlyProdSchemaExport.ps1"
++                operation = "discord_failure_alert"
++                status = "Skipped"
++                reason = "SQL_SCHEMA_DISCORD_WEBHOOK_URL is not configured."
++                export_branch = $ExportBranch
++            }
++            return
+         }
+-        return
+-    }
+ 
+-    $lines = @(
+-        "SQL nightly schema export $Status on $env:COMPUTERNAME",
+-        "Database: $DatabaseName",
+-        "Export branch: $ExportBranch",
+-        "Details: check C:\K98-bot-SQL-Server\logs\export.jsonl on the SQL operations machine."
+-    )
+-    if (-not [string]::IsNullOrWhiteSpace($RecommendedAction)) {
+-        $lines += "Action: $RecommendedAction"
+-    }
++        $exportLogPath = Join-Path (Join-Path $RepoRoot "logs") "export.jsonl"
++        $lines = @(
++            "SQL nightly schema export $Status on $env:COMPUTERNAME",
++            "Database: $DatabaseName",
++            "Export branch: $ExportBranch",
++            "Details: check $exportLogPath on the SQL operations machine."
++        )
++        if (-not [string]::IsNullOrWhiteSpace($RecommendedAction)) {
++            $lines += "Action: $RecommendedAction"
++        }
+ 
+-    $payload = @{ content = ($lines -join "`n") } | ConvertTo-Json -Compress
++        $payload = @{ content = ($lines -join "`n") } | ConvertTo-Json -Compress
+ 
+-    try {
+-        Invoke-RestMethod `
+-            -Uri $DiscordAlertUrl `
+-            -Method Post `
+-            -Body $payload `
+-            -ContentType "application/json" `
+-            -ErrorAction Stop | Out-Null
++        try {
++            Invoke-RestMethod `
++                -Uri $DiscordAlertUrl `
++                -Method Post `
++                -Body $payload `
++                -ContentType "application/json" `
++                -ErrorAction Stop | Out-Null
+ 
+-        Write-K98JsonLog -RepoRoot $RepoRoot -LogName "export.jsonl" -Event @{
+-            script = "Invoke-NightlyProdSchemaExport.ps1"
+-            operation = "discord_failure_alert"
+-            status = "Succeeded"
+-            export_branch = $ExportBranch
++            Write-K98JsonLog -RepoRoot $RepoRoot -LogName "export.jsonl" -Event @{
++                script = "Invoke-NightlyProdSchemaExport.ps1"
++                operation = "discord_failure_alert"
++                status = "Succeeded"
++                export_branch = $ExportBranch
++            }
+         }
+-    }
+-    catch {
+-        Write-K98JsonLog -RepoRoot $RepoRoot -LogName "export.jsonl" -Event @{
+-            script = "Invoke-NightlyProdSchemaExport.ps1"
+-            operation = "discord_failure_alert"
+-            status = "Failed"
+-            export_branch = $ExportBranch
+-            error_message = $_.Exception.Message
++        catch {
++            Write-K98JsonLog -RepoRoot $RepoRoot -LogName "export.jsonl" -Event @{
++                script = "Invoke-NightlyProdSchemaExport.ps1"
++                operation = "discord_failure_alert"
++                status = "Failed"
++                export_branch = $ExportBranch
++                error_message = ConvertTo-K98RedactedAlertError -Message $_.Exception.Message
++            }
+         }
+     }
++    catch {
++        try {
++            Write-Host "WARN: Discord failure alert could not be recorded: $(ConvertTo-K98RedactedAlertError -Message $_.Exception.Message)"
++        }
++        catch {
++            Write-Host "WARN: Discord failure alert could not be recorded."
++        }
++    }
+ }
+ 
+ $repoRoot = (Resolve-Path $RepoPath).ProviderPath
+diff --git a/docs/SQL_RELEASE_CHECKLIST.md b/docs/SQL_RELEASE_CHECKLIST.md
+index 171b10d..9fce618 100644
+--- a/docs/SQL_RELEASE_CHECKLIST.md
++++ b/docs/SQL_RELEASE_CHECKLIST.md
+@@ -106,7 +106,7 @@ Use this checklist for production SQL deployments.
+ - [ ] New task action points to `deploy\Invoke-NightlyProdSchemaExport.ps1`.
+ - [ ] Manual task run completed successfully.
+ - [ ] SQL repo returned to clean `main` after the task.
+-- [ ] Failure-only Discord alert environment variable is configured for the scheduled-task account if operator notification is required.
++- [ ] `SQL_SCHEMA_DISCORD_WEBHOOK_URL` is configured for the scheduled-task account if failure-only Discord notification is required.
+ - [ ] Any pushed `export/prod-schema-*` branch was reviewed or intentionally left for drift review.
+ 
+ ## Nightly Export Monitoring

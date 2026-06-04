@@ -1,0 +1,628 @@
+diff --git a/.github/workflows/sql-validation.yml b/.github/workflows/sql-validation.yml
+new file mode 100644
+index 0000000..c3a6b1f
+--- /dev/null
++++ b/.github/workflows/sql-validation.yml
+@@ -0,0 +1,104 @@
++name: SQL validation
++
++on:
++  pull_request:
++    branches:
++      - main
++  push:
++    branches:
++      - main
++      - "codex/**"
++
++jobs:
++  validate:
++    name: SQL repo validation
++    runs-on: windows-latest
++    steps:
++      - name: Check out repository
++        uses: actions/checkout@v4
++
++      - name: Run SQL repository validator
++        shell: pwsh
++        run: .\deploy\Validate-SqlRepo.ps1
++
++      - name: Parse PowerShell deployment scripts
++        shell: pwsh
++        run: |
++          $scripts = Get-ChildItem -Path .\deploy -Filter *.ps1 -File
++          foreach ($script in $scripts) {
++            $tokens = $null
++            $errors = $null
++            [System.Management.Automation.Language.Parser]::ParseFile(
++              $script.FullName,
++              [ref]$tokens,
++              [ref]$errors
++            ) | Out-Null
++            if ($errors.Count -gt 0) {
++              Write-Host "PowerShell parser errors in $($script.FullName):"
++              $errors | ForEach-Object { Write-Host $_.Message }
++              exit 1
++            }
++          }
++
++      - name: Scan committed files for credential patterns
++        shell: pwsh
++        run: |
++          $paths = @(
++            "deploy\*.ps1",
++            "docs\*.md",
++            "docs\adr\*.md",
++            "migrations\*.sql",
++            "migrations\rollback\*.sql",
++            "*.json",
++            ".github\workflows\*.yml"
++          )
++          $pattern = "(?i)(Password\s*=|Pwd\s*=|User\s+ID\s*=|AccessToken|DiscordWebhook|ClientSecret|ConnectionString)"
++          $allowed = @(
++            "deploy\SqlDeploy.Common.ps1",
++            "deploy\Validate-SqlRepo.ps1"
++          )
++          $matches = Select-String -Path $paths -Pattern $pattern -ErrorAction SilentlyContinue |
++            Where-Object { $allowed -notcontains $_.Path.Substring((Get-Location).Path.Length + 1) }
++
++          if ($matches) {
++            $matches | ForEach-Object {
++              Write-Host "Potential credential pattern: $($_.Path):$($_.LineNumber)"
++            }
++            exit 1
++          }
++
++      - name: Validate documentation links and referenced repo paths
++        shell: pwsh
++        run: |
++          $docs = Get-ChildItem -Path .\docs -Filter *.md -File -Recurse
++          $missing = New-Object System.Collections.Generic.List[string]
++          $pattern = '(?<![A-Za-z]):?`?((?:deploy|docs|migrations|sql_schema|reports|logs|exports)[\\/][^`\s)]+)'
++          foreach ($doc in $docs) {
++            $text = Get-Content -Raw -Path $doc.FullName
++            foreach ($match in [regex]::Matches($text, $pattern)) {
++              $raw = $match.Groups[1].Value.TrimEnd(".", ",", ":", ";")
++              if ($raw.Contains("*") -or $raw.Contains("<") -or $raw.Contains(">")) {
++                continue
++              }
++              $candidate = Join-Path (Get-Location) ($raw -replace "/", "\")
++              if (-not (Test-Path $candidate)) {
++                $missing.Add("$($doc.Name) references missing path: $raw")
++              }
++            }
++          }
++          if ($missing.Count -gt 0) {
++            $missing | ForEach-Object { Write-Host $_ }
++            exit 1
++          }
++
++      - name: Prove nightly export avoids direct main pushes
++        shell: pwsh
++        run: |
++          $nightly = Get-Content -Raw -Path .\deploy\Invoke-NightlyProdSchemaExport.ps1
++          $export = Get-Content -Raw -Path .\deploy\Export-ProdSchemaSnapshot.ps1
++          if ($nightly -notmatch 'export/prod-schema') {
++            throw "Nightly export does not use the expected export/prod-schema branch prefix."
++          }
++          if ($nightly -match '-AllowMain') {
++            throw "Nightly export wrapper must not pass -AllowMain."
++          }
++          if ($export -notmatch 'if \(\$branch -eq "main" -and -not \$AllowMain\)') {
++            throw "Export script no longer contains the normal main-branch protection."
++          }
++          if ($export -notmatch '-Reason is required when -AllowMain is used') {
++            throw "Export script no longer requires a reason for -AllowMain."
++          }
++
++      - name: SQLFluff advisory lint
++        shell: pwsh
++        continue-on-error: true
++        run: |
++          python -m pip install sqlfluff
++          sqlfluff lint --dialect tsql migrations/**/*.sql migrations/rollback/**/*.sql
+diff --git a/.sqlfluff b/.sqlfluff
+new file mode 100644
+index 0000000..a05f85c
+--- /dev/null
++++ b/.sqlfluff
+@@ -0,0 +1,8 @@
++[sqlfluff]
++dialect = tsql
++templater = raw
++large_file_skip_byte_limit = 0
++exclude_rules = LT01,LT02,LT05
++
++[sqlfluff:rules]
++max_line_length = 160
+diff --git a/deploy/Test-NightlyExportHealth.ps1 b/deploy/Test-NightlyExportHealth.ps1
+new file mode 100644
+index 0000000..6b9c78b
+--- /dev/null
++++ b/deploy/Test-NightlyExportHealth.ps1
+@@ -0,0 +1,154 @@
++param(
++    [string]$RepoPath,
++    [string]$TaskName = "K98 SQL Nightly Schema Export",
++    [int]$MaxExportAgeHours = 30,
++    [switch]$SkipScheduledTaskCheck,
++    [switch]$WarnOnly
++)
++
++. "$PSScriptRoot\SqlDeploy.Common.ps1"
++
++if ([string]::IsNullOrWhiteSpace($RepoPath)) {
++    $RepoPath = Get-K98RepoRoot
++}
++
++$repoRoot = (Resolve-Path $RepoPath).ProviderPath
++$started = Get-Date
++$issues = New-Object System.Collections.Generic.List[string]
++$warnings = New-Object System.Collections.Generic.List[string]
++
++function Add-NightlyExportIssue {
++    param([string]$Message)
++    $issues.Add($Message)
++}
++
++function Add-NightlyExportWarning {
++    param([string]$Message)
++    $warnings.Add($Message)
++}
++
++function ConvertFrom-K98JsonLine {
++    param([Parameter(Mandatory=$true)][string]$Line)
++
++    try {
++        return $Line | ConvertFrom-Json -ErrorAction Stop
++    }
++    catch {
++        Add-NightlyExportWarning "Ignoring malformed export log line: $($_.Exception.Message)"
++        return $null
++    }
++}
++
++try {
++    $logPath = Join-Path (Join-Path $repoRoot "logs") "export.jsonl"
++    $latestFinish = $null
++    $latestCleanupFailure = $null
++
++    if (-not (Test-Path $logPath)) {
++        Add-NightlyExportIssue "Export log not found: $logPath"
++    }
++    else {
++        $events = Get-Content -Path $logPath |
++            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
++            ForEach-Object { ConvertFrom-K98JsonLine -Line $_ } |
++            Where-Object { $null -ne $_ }
++
++        $latestFinish = $events |
++            Where-Object {
++                $_.script -eq "Invoke-NightlyProdSchemaExport.ps1" -and
++                $_.operation -eq "nightly_export_finish"
++            } |
++            Sort-Object { [DateTime]$_.timestamp_utc } -Descending |
++            Select-Object -First 1
++
++        $latestCleanupFailure = $events |
++            Where-Object {
++                $_.script -eq "Invoke-NightlyProdSchemaExport.ps1" -and
++                $_.operation -eq "nightly_export_cleanup" -and
++                $_.status -eq "Failed"
++            } |
++            Sort-Object { [DateTime]$_.timestamp_utc } -Descending |
++            Select-Object -First 1
++
++        if ($null -eq $latestFinish) {
++            Add-NightlyExportIssue "No nightly_export_finish event found in export log."
++        }
++        else {
++            $latestFinishUtc = ([DateTime]$latestFinish.timestamp_utc).ToUniversalTime()
++            $ageHours = ([DateTime]::UtcNow - $latestFinishUtc).TotalHours
++            if ($latestFinish.status -ne "Succeeded") {
++                Add-NightlyExportIssue "Latest nightly export status is $($latestFinish.status): $($latestFinish.error_message)"
++            }
++            if ($ageHours -gt $MaxExportAgeHours) {
++                Add-NightlyExportIssue ("Latest nightly export is older than {0} hour(s): {1:o}" -f $MaxExportAgeHours, $latestFinishUtc)
++            }
++        }
++
++        if ($null -ne $latestCleanupFailure) {
++            Add-NightlyExportWarning "Latest export cleanup failure requires manual branch/status review: $($latestCleanupFailure.error_message)"
++        }
++    }
++
++    $taskState = $null
++    $taskLastRunTime = $null
++    $taskLastTaskResult = $null
++    if (-not $SkipScheduledTaskCheck) {
++        try {
++            $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
++            $taskInfo = Get-ScheduledTaskInfo -TaskName $TaskName -ErrorAction Stop
++            $taskState = $task.State
++            $taskLastRunTime = $taskInfo.LastRunTime
++            $taskLastTaskResult = $taskInfo.LastTaskResult
++
++            if ($task.State -eq "Disabled") {
++                Add-NightlyExportIssue "Scheduled task is disabled: $TaskName"
++            }
++            if ($taskInfo.LastTaskResult -ne 0) {
++                Add-NightlyExportIssue "Scheduled task LastTaskResult is $($taskInfo.LastTaskResult) for $TaskName"
++            }
++        }
++        catch {
++            Add-NightlyExportWarning "Scheduled task check skipped or unavailable for '$TaskName': $($_.Exception.Message)"
++        }
++    }
++
++    $status = "Succeeded"
++    if ($issues.Count -gt 0) {
++        if ($WarnOnly) {
++            $status = "Warning"
++        }
++        else {
++            $status = "Failed"
++        }
++    }
++    elseif ($warnings.Count -gt 0) {
++        $status = "Warning"
++    }
++
++    Write-K98JsonLog -RepoRoot $repoRoot -LogName "export.jsonl" -Event @{
++        script = "Test-NightlyExportHealth.ps1"
++        operation = "nightly_export_health"
++        status = $status
++        task_name = $TaskName
++        task_state = $taskState
++        task_last_run_time = $taskLastRunTime
++        task_last_task_result = $taskLastTaskResult
++        max_export_age_hours = $MaxExportAgeHours
++        latest_export_status = if ($latestFinish) { $latestFinish.status } else { $null }
++        latest_export_timestamp_utc = if ($latestFinish) { $latestFinish.timestamp_utc } else { $null }
++        issue_count = $issues.Count
++        warning_count = $warnings.Count
++        duration_ms = [int]((Get-Date) - $started).TotalMilliseconds
++        recommended_action = "If failed, inspect Task Scheduler, logs/export.jsonl, git branch/status, and the latest export branch."
++    }
++
++    Write-Host "Nightly export health: $status"
++    if ($latestFinish) {
++        Write-Host "Latest nightly export: $($latestFinish.status) at $($latestFinish.timestamp_utc)"
++    }
++    Write-Host "Scheduled task: $TaskName"
++    if ($null -ne $taskLastTaskResult) {
++        Write-Host "LastTaskResult: $taskLastTaskResult"
++    }
++    foreach ($issue in $issues) { Write-Host "ERROR: $issue" }
++    foreach ($warning in $warnings) { Write-Host "WARN: $warning" }
++
++    if ($issues.Count -gt 0 -and -not $WarnOnly) {
++        exit 1
++    }
++}
++catch {
++    Write-K98JsonLog -RepoRoot $repoRoot -LogName "export.jsonl" -Event @{
++        script = "Test-NightlyExportHealth.ps1"
++        operation = "nightly_export_health"
++        status = "Failed"
++        error_message = $_.Exception.Message
++    }
++    throw
++}
+diff --git a/deploy/Test-SqlBackupReadiness.ps1 b/deploy/Test-SqlBackupReadiness.ps1
+index 522c438..c0e3941 100644
+--- a/deploy/Test-SqlBackupReadiness.ps1
++++ b/deploy/Test-SqlBackupReadiness.ps1
+@@ -6,6 +6,7 @@ param(
+     [int]$MaxFullBackupAgeHours = 24,
+     [int]$MaxDiffBackupAgeHours = 8,
+     [int]$MaxLogBackupAgeMinutes = 30,
++    [string]$ConfigPath,
+     [switch]$WarnOnly
+ )
+ 
+@@ -18,6 +19,53 @@ $started = Get-Date
+ $issues = New-Object System.Collections.Generic.List[string]
+ $warnings = New-Object System.Collections.Generic.List[string]
+ 
++function Get-K98ConfigValue {
++    param(
++        [Parameter(Mandatory=$true)]$Config,
++        [Parameter(Mandatory=$true)][string[]]$Path,
++        [Parameter(Mandatory=$true)]$Default
++    )
++
++    $current = $Config
++    foreach ($part in $Path) {
++        if ($null -eq $current -or -not ($current.PSObject.Properties.Name -contains $part)) {
++            return $Default
++        }
++        $current = $current.$part
++    }
++    if ($null -eq $current) {
++        return $Default
++    }
++    return $current
++}
++
++function Import-K98BackupPolicyConfig {
++    param([string]$Path)
++
++    if ([string]::IsNullOrWhiteSpace($Path)) {
++        $candidate = Join-Path (Join-Path $repoRoot "deploy") "sql_deploy_config.json"
++        if (Test-Path $candidate) {
++            $Path = $candidate
++        }
++    }
++    if ([string]::IsNullOrWhiteSpace($Path)) {
++        return
++    }
++    if (-not (Test-Path $Path)) {
++        throw "Backup policy config not found: $Path"
++    }
++
++    $config = Get-Content -Raw -Path $Path | ConvertFrom-Json -ErrorAction Stop
++    $script:MaxFullBackupAgeHours = [int](Get-K98ConfigValue -Config $config -Path @("backup_policy", "max_full_backup_age_hours") -Default $script:MaxFullBackupAgeHours)
++    $script:MaxDiffBackupAgeHours = [int](Get-K98ConfigValue -Config $config -Path @("backup_policy", "max_differential_backup_age_hours") -Default $script:MaxDiffBackupAgeHours)
++    $script:MaxLogBackupAgeMinutes = [int](Get-K98ConfigValue -Config $config -Path @("backup_policy", "max_log_backup_age_minutes") -Default $script:MaxLogBackupAgeMinutes)
++    $script:BackupPath = [string](Get-K98ConfigValue -Config $config -Path @("backup_policy", "backup_path") -Default $script:BackupPath)
++    $warnOnlyValue = Get-K98ConfigValue -Config $config -Path @("backup_policy", "warn_only") -Default $null
++    if ($null -ne $warnOnlyValue) {
++        $script:WarnOnly = [bool]$warnOnlyValue
++    }
++}
++
++Import-K98BackupPolicyConfig -Path $ConfigPath
++
+ function Get-BackupRowValue {
+     param(
+         [Parameter(Mandatory=$true)]$Row,
+@@ -134,6 +182,7 @@ GROUP BY [type];
+         differential_backup = $diffBackup
+         log_backup = $logBackup
+         issue_count = $issues.Count
++        backup_policy_config = $ConfigPath
+         warning_count = $warnings.Count
+         duration_ms = [int]((Get-Date) - $started).TotalMilliseconds
+     }
+diff --git a/deploy/sql_deploy_config.example.json b/deploy/sql_deploy_config.example.json
+new file mode 100644
+index 0000000..97d7dc4
+--- /dev/null
++++ b/deploy/sql_deploy_config.example.json
+@@ -0,0 +1,15 @@
++{
++  "backup_policy": {
++    "server_name": "MINI_AMD",
++    "database_name": "ROK_TRACKER",
++    "backup_path": "C:\\sql_backup",
++    "max_full_backup_age_hours": 24,
++    "max_differential_backup_age_hours": 8,
++    "max_log_backup_age_minutes": 30,
++    "warn_only": false,
++    "differential_backup_policy": "warning_only",
++    "notes": "Current policy blocks stale full/log backups but treats missing or stale differential backups as warnings. Copy this file to sql_deploy_config.json for local overrides; do not commit environment-specific secrets."
++  },
++  "nightly_export_health": {
++    "max_export_age_hours": 30
++  }
++}
+diff --git a/docs/SQL_PROMOTION_GUIDE.md b/docs/SQL_PROMOTION_GUIDE.md
+index bb8885f..540069a 100644
+--- a/docs/SQL_PROMOTION_GUIDE.md
++++ b/docs/SQL_PROMOTION_GUIDE.md
+@@ -91,6 +91,22 @@ Open a PR into SQL repo `main`. The PR should include:
+ - bot dependency notes
+ - validation output
+ 
++### SQL PR Validation
++
++SQL pull requests run the `SQL validation` GitHub Actions workflow. The workflow is read-only with
++respect to Production SQL and must not require live `MINI_AMD` connectivity.
++
++Blocking checks:
++
++- `deploy/Validate-SqlRepo.ps1`
++- PowerShell parser validation for `deploy/*.ps1`
++- practical committed-file credential pattern scanning
++- documentation path sanity checks
++- scripted proof that nightly exports do not normally push directly to `main`
++
++SQLFluff runs as an advisory check for migration and rollback scripts using the `tsql` dialect. It
++is intentionally warning-only during Phase 2B while the team tunes rules and avoids style churn in
++generated `sql_schema/` snapshots. Treat SQLFluff warnings as review prompts, not automatic merge
++blockers, until the policy is explicitly changed.
++
+ ### 6. Deploy From Merged Main
+ 
+ On the bot machine:
+@@ -294,6 +310,22 @@ If the task fails, leave the old task disabled until the failure is understood. D
+ 
+ ## Backup Readiness
+ 
++Backup threshold policy is explicit and configurable. Default thresholds remain compatible with
++the proven production behavior:
++
++- full backup: 24 hours, blocking when stale or missing
++- differential backup: 8 hours, warning-only when stale or missing
++- log backup: 30 minutes when recovery model is `FULL` or `BULK_LOGGED`, blocking when stale or missing
++
++The example policy lives at:
++
++```powershell
++deploy\sql_deploy_config.example.json
++```
++
++Copy it to `deploy\sql_deploy_config.json` only for local/operator-specific overrides. Do not
++commit environment-specific secrets. Use `-ConfigPath` with `Test-SqlBackupReadiness.ps1` when an
++operator-approved policy file should override script defaults.
++
+ Backups are checked through SQL Server `msdb` history and supported by files under
+ `C:\sql_backup`.
+ 
+@@ -313,6 +345,12 @@ If backup readiness cannot be verified, stop and resolve it before deployment un
+ approves a documented emergency exception.
+ 
++### Nightly Export Health Monitoring
++
++Use the monitor script after scheduled-task installation, after a failed export, and during
++operator checks:
++
++```powershell
++.\deploy\Test-NightlyExportHealth.ps1 `
++  -RepoPath C:\K98-bot-SQL-Server `
++  -TaskName "K98 SQL Nightly Schema Export"
++```
++
++The monitor inspects `logs/export.jsonl` for the latest nightly finish event and checks scheduled
++task state/result when Task Scheduler is available. A failed or stale nightly export means drift
++evidence may be missing; inspect Task Scheduler, `logs/export.jsonl`, Git branch/status, and the
++latest `export/prod-schema-*` branch before relying on nightly export evidence.
++
++For an operator dashboard or future agent, run this script in warning-only mode and consume the
++structured `nightly_export_health` event appended to `logs/export.jsonl`.
++
+ ## Rollback And Recovery
+ 
+ Not every SQL migration can be safely auto-rolled back.
+@@ -802,6 +840,17 @@ Restore strategy depends on SQL Server recovery model and the available backup c
+ 
+ ### Backup Threshold Policy
+ 
++Current policy:
++
++- stale or missing full backups block deployment
++- stale or missing log backups block deployment when recovery model requires log backups
++- stale or missing differential backups warn but do not block deployment
++
++This matches the Phase 2A rehearsal, where backup readiness succeeded with a differential-age
++warning. If the owner changes this policy, update `deploy\sql_deploy_config.example.json`, the
++release checklist, and deployment notes together. Use explicit command parameters or `-ConfigPath`
++for temporary overrides and record the reason in the deployment or hotfix report.
++
+ Current script defaults:
+ 
+ - full backup max age: 24 hours
+@@ -884,3 +933,19 @@ for the deployment machine, test the same account in SSMS, and check SQL Server
+ 
+ Use an export branch. Direct export to `main` defeats the Git-first model.
++
++## Future Optional Validation
++
++Phase 2B includes SQLFluff as an advisory migration linter. The following validation options remain
++optional later-phase candidates:
++
++- SqlPackage / DACPAC validation: useful for structural model validation or non-production
++  database comparisons once tool installation and artifact policy are approved.
++- tSQLt: useful for stored procedure/function unit tests after a DEV or UAT SQL Server exists.
++  Do not install tSQLt objects in Production for PR validation.
++- TSQLLint: possible fallback if SQLFluff proves unsuitable, but not the first-choice dependency
++  for this repo.
++
++Normal PR CI must remain read-only and must not require live Production SQL access.
+diff --git a/docs/SQL_RELEASE_CHECKLIST.md b/docs/SQL_RELEASE_CHECKLIST.md
+index 67a3262..619d214 100644
+--- a/docs/SQL_RELEASE_CHECKLIST.md
++++ b/docs/SQL_RELEASE_CHECKLIST.md
+@@ -4,6 +4,18 @@ Use this checklist for production SQL deployments.
+ 
+ ## Pre-Deployment
+ 
++- [ ] SQL PR GitHub Actions validation passed.
++- [ ] `deploy/Validate-SqlRepo.ps1` passed locally or in CI.
++- [ ] PowerShell parser validation passed for changed deployment scripts.
++- [ ] SQLFluff advisory warnings were reviewed for changed migration/rollback scripts.
++- [ ] Credential-pattern scan did not report committed secrets.
++- [ ] Documentation path checks passed or missing references were corrected.
++- [ ] Nightly export main-branch protection proof passed in CI.
++- [ ] Optional later validators were considered when risk warranted them:
++  - SqlPackage / DACPAC structural validation
++  - tSQLt tests in a non-production SQL environment
++  - TSQLLint fallback if SQLFluff is unsuitable
++- [ ] Any skipped optional validator has a short PR note.
+ - [ ] Bot-machine shell was bootstrapped from `C:\discord_file_downloader`.
+ - [ ] SQL PR is reviewed and merged into `main`.
+ - [ ] Deployment is being run on the bot machine.
+@@ -15,7 +27,9 @@ Use this checklist for production SQL deployments.
+ - [ ] Migration file and rollback notes are reviewed.
+ - [ ] Bot dependency order is understood.
+ - [ ] Backup readiness passes for full, differential, and log backups.
++- [ ] Differential backup warnings are recorded and accepted under the current warning-only policy.
+ - [ ] External backup copy cadence is healthy.
++- [ ] Any backup threshold override uses an approved config/parameter and is recorded in deployment notes.
+ - [ ] Smoke test plan is ready.
+ 
+ ## Rollback Review
+@@ -94,3 +108,13 @@ Use this checklist for production SQL deployments.
+ - [ ] SQL repo returned to clean `main` after the task.
+ - [ ] Any pushed `export/prod-schema-*` branch was reviewed or intentionally left for drift review.
++
++## Nightly Export Monitoring
++
++- [ ] `deploy/Test-NightlyExportHealth.ps1` reports success after task installation or changes.
++- [ ] Latest `nightly_export_finish` event in `logs/export.jsonl` is recent and succeeded.
++- [ ] Scheduled task `LastTaskResult` is `0` when Task Scheduler is available.
++- [ ] Failed or stale nightly export has an owner-visible follow-up note.
++- [ ] SQL repo branch/status was checked after a failed export.
++- [ ] Old direct-to-main export task remains disabled.
+diff --git a/docs/adr/003-sql-ci-backup-policy-and-export-monitoring.md b/docs/adr/003-sql-ci-backup-policy-and-export-monitoring.md
+new file mode 100644
+index 0000000..23e85c3
+--- /dev/null
++++ b/docs/adr/003-sql-ci-backup-policy-and-export-monitoring.md
+@@ -0,0 +1,50 @@
++# ADR 003: SQL CI, Backup Policy, And Export Monitoring
++
++## Status
++
++Accepted for Phase 2B implementation.
++
++## Context
++
++Phase 1 established Git-first SQL deployment, backup readiness checks, drift exports, and
++structured logs. Phase 2A proved the emergency hotfix and rollback evidence path.
++
++The next operational risks are unsafe SQL pull requests, noisy backup-threshold interpretation,
++and failed nightly schema exports that are only visible when an operator inspects logs or Task
++Scheduler manually.
++
++## Decision
++
++SQL pull requests will run read-only GitHub Actions validation. CI calls the repository validator
++instead of duplicating migration rules in workflow YAML. CI also parses PowerShell deployment
++scripts, scans practical credential patterns, checks documentation paths, and proves that the
++nightly export wrapper does not normally push directly to `main`.
++
++SQLFluff is introduced as an advisory T-SQL linter for migration and rollback scripts only. It is
++not yet a blocking gate because exported schema snapshots are generated and SQLFluff rule tuning
++needs review against real K98 migrations.
++
++Backup thresholds remain compatible with the proven production policy:
++
++- full backup freshness is blocking
++- transaction log backup freshness is blocking when the recovery model requires log backups
++- differential backup freshness is warning-only
++
++A config example documents those values and can be copied to a local uncommitted config file for
++operator-approved overrides.
++
++Nightly export health is checked by a separate monitoring script that reads structured export logs
++and scheduled-task state when available. It does not deploy SQL, alter scheduled tasks, or push Git
++branches.
++
++## Options Considered
++
++- Make SQLFluff blocking immediately. Rejected for Phase 2B because generated SQL snapshots and
++  existing style conventions need tuning first.
++- Add SqlPackage / DACPAC validation now. Deferred until tool installation, artifact policy, and
++  non-production validation targets are approved.
++- Add tSQLt now. Deferred until a DEV or UAT SQL Server exists; Production must not host PR test
++  objects.
++- Add TSQLLint now. Deferred as an optional fallback if SQLFluff proves unsuitable.
++
++## Consequences
++
++- PRs get automated structural validation without live Production SQL access.
++- SQLFluff warnings are visible to reviewers but do not block merges during the pilot.
++- Backup warnings are deliberate policy outcomes rather than surprise noise.
++- Failed or stale nightly exports have a direct operator check and future agent hook.
