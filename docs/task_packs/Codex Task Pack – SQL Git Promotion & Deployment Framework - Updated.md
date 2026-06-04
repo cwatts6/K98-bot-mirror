@@ -1,12 +1,12 @@
-# Codex Task Pack – SQL Git Promotion & Deployment Framework
+﻿# Codex Task Pack â€“ SQL Git Promotion & Deployment Framework
 
-**Task Name:** SQL Git Promotion & Deployment Framework  
-**Date:** 2026-06-02  
-**Owner/Context:** K98 SQL Repository Modernisation Initiative  
-**Task Type:** Tooling / Architecture / DevOps / Documentation  
-**Priority:** High  
-**Risk Level:** High  
-**One-Pass Approved:** No  
+**Task Name:** SQL Git Promotion & Deployment Framework
+**Date:** 2026-06-02
+**Owner/Context:** K98 SQL Repository Modernisation Initiative
+**Task Type:** Tooling / Architecture / DevOps / Documentation
+**Priority:** High
+**Risk Level:** High
+**One-Pass Approved:** No
 
 ---
 
@@ -313,7 +313,7 @@ Production runtime context:
 - SQL Server: SQL Server 2022.
 - Database: `ROK_TRACKER`.
 - Current repository: `K98-bot-SQL-Server`.
-- Current workflow includes Production → Git schema export using `Export-SqlSchemaAndPush.ps1`.
+- Current workflow includes Production â†’ Git schema export using `Export-SqlSchemaAndPush.ps1`.
 
 Codex must confirm any environment details that are not directly discoverable before proposing implementation.
 
@@ -326,8 +326,8 @@ Transform the SQL repository from a passive schema backup repository into a full
 The completed solution must:
 
 - Support PR-driven SQL development.
-- Support controlled Git → Production SQL deployments.
-- Preserve Production → Git schema exports as a drift-detection and recovery mechanism.
+- Support controlled Git â†’ Production SQL deployments.
+- Preserve Production â†’ Git schema exports as a drift-detection and recovery mechanism.
 - Eliminate the risk of production schema exports overwriting active development work.
 - Introduce a formal SQL promotion guide with step-by-step instructions, rollback procedures, troubleshooting, and operational guardrails.
 - Add backup validation before production deployment.
@@ -344,21 +344,21 @@ Current state:
 
 ```text
 Production SQL Server
-        ↓
+        â†“
 Export-SqlSchemaAndPush.ps1
-        ↓
+        â†“
 Git Repository
 ```
 
 The SQL repository currently acts primarily as a schema snapshot.
 
-### Problem 1 — Git Is Not the Authoritative Deployment Source
+### Problem 1 â€” Git Is Not the Authoritative Deployment Source
 
 Developers may modify SQL directly in Production, and the next export may overwrite or confuse Git history.
 
 This creates risk because Git records what Production became, not necessarily what was intentionally reviewed and promoted.
 
-### Problem 2 — No Controlled Deployment Process Exists
+### Problem 2 â€” No Controlled Deployment Process Exists
 
 Current deployment resembles:
 
@@ -379,19 +379,19 @@ Validation
 Rollback
 ```
 
-### Problem 3 — No SQL Promotion Guide Exists
+### Problem 3 â€” No SQL Promotion Guide Exists
 
 The bot workflow is highly repeatable because the process is documented and standardised.
 
 The SQL repository currently relies too heavily on tribal knowledge.
 
-### Problem 4 — Production Export Can Clash With Active Development
+### Problem 4 â€” Production Export Can Clash With Active Development
 
 The current export process is useful as a recovery and audit mechanism, but it must not behave like an uncontrolled source-of-truth sync into `main`.
 
 Exports should create reviewable drift evidence, not silently overwrite active development branches.
 
-### Problem 5 — Future Agent Monitoring Needs Better Signals
+### Problem 5 â€” Future Agent Monitoring Needs Better Signals
 
 The long-term K98 platform direction includes agents that can monitor logs, detect issues, highlight optimisation opportunities, and identify operational risk.
 
@@ -407,13 +407,13 @@ Current assumed model:
 
 ```text
 Local SQL Repo
-        ↓
+        â†“
 GitHub SQL Repo
-        ↓
+        â†“
 Production SQL Server
-        ↓
+        â†“
 Production Schema Export
-        ↓
+        â†“
 GitHub SQL Repo / Drift Branch
 ```
 
@@ -458,9 +458,9 @@ Create:
 
 ```text
 Git
- ↓
+ â†“
 Deploy Script
- ↓
+ â†“
 Production SQL
 ```
 
@@ -501,7 +501,7 @@ Create structured log outputs for deployment, export, drift, and validation oper
 
 ---
 
-### Out of Scope — Phase 2
+### Out of Scope â€” Phase 2
 
 The following are not required in this task, but the design should not block them later:
 
@@ -512,7 +512,7 @@ The following are not required in this task, but the design should not block the
 - Multiple SQL environments such as DEV / UAT / PROD.
 - Automated schema drift remediation.
 
-### Out of Scope — Phase 3
+### Out of Scope â€” Phase 3
 
 - Fully automated rollback generation.
 - Fully automated production hotfix reconciliation.
@@ -540,7 +540,7 @@ Codex should also use any project-standard documentation, deferred optimisation,
 
 This task must be delivered in controlled stages.
 
-### Stage 1 — Audit Current SQL Repository
+### Stage 1 â€” Audit Current SQL Repository
 
 Audit current state and stop for approval.
 
@@ -554,7 +554,7 @@ Must include:
 - Current SQL object layout.
 - Current gaps against the bot promotion standard.
 
-### Stage 2 — Design Proposed Workflow
+### Stage 2 â€” Design Proposed Workflow
 
 Design target workflow and stop for approval.
 
@@ -568,7 +568,7 @@ Must include:
 - Interaction with bot promotion.
 - Initial backup and recovery model.
 
-### Stage 3 — Design Migration Framework
+### Stage 3 â€” Design Migration Framework
 
 Design migration framework and stop for approval.
 
@@ -582,15 +582,15 @@ Must include:
 - Roll-forward and rollback expectations.
 - Idempotency expectations.
 
-### Stage 4 — Implement Scripts and Documentation
+### Stage 4 â€” Implement Scripts and Documentation
 
 Implement approved scripts, documentation, and guardrails.
 
-### Stage 5 — Validate Workflow
+### Stage 5 â€” Validate Workflow
 
 Validate the full workflow using safe test migrations / dry-run modes where possible.
 
-### Stage 6 — Final Review
+### Stage 6 â€” Final Review
 
 Produce final review output including risks, validation evidence, and future enhancements.
 
@@ -677,42 +677,42 @@ Target structure:
 
 ```text
 K98-bot-SQL-Server
-│
-├─ sql_schema/
-│  ├─ tables/
-│  ├─ views/
-│  ├─ stored_procedures/
-│  ├─ functions/
-│  ├─ types/
-│  └─ indexes/
-│
-├─ migrations/
-│  ├─ 20260602_001_example.sql
-│  ├─ 20260602_002_example.sql
-│  └─ README.md
-│
-├─ deploy/
-│  ├─ Deploy-SqlMigration.ps1
-│  ├─ Export-ProdSchemaSnapshot.ps1
-│  ├─ Compare-ProdSchema.ps1
-│  ├─ Invoke-DriftCheck.ps1
-│  ├─ Validate-SqlRepo.ps1
-│  ├─ Test-SqlBackupReadiness.ps1
-│  └─ New-SqlMigration.ps1
-│
-├─ docs/
-│  ├─ SQL_PROMOTION_GUIDE.md
-│  ├─ SQL_RELEASE_CHECKLIST.md
-│  └─ adr/
-│     └─ 001-git-first-sql-deployment.md
-│
-├─ logs/
-│  ├─ deployment.jsonl
-│  ├─ drift.jsonl
-│  ├─ export.jsonl
-│  └─ validation.jsonl
-│
-└─ deploy_manifest.example.json
+â”‚
+â”œâ”€ sql_schema/
+â”‚  â”œâ”€ tables/
+â”‚  â”œâ”€ views/
+â”‚  â”œâ”€ stored_procedures/
+â”‚  â”œâ”€ functions/
+â”‚  â”œâ”€ types/
+â”‚  â””â”€ indexes/
+â”‚
+â”œâ”€ migrations/
+â”‚  â”œâ”€ 20260602_001_example.sql
+â”‚  â”œâ”€ 20260602_002_example.sql
+â”‚  â””â”€ README.md
+â”‚
+â”œâ”€ deploy/
+â”‚  â”œâ”€ Deploy-SqlMigration.ps1
+â”‚  â”œâ”€ Export-ProdSchemaSnapshot.ps1
+â”‚  â”œâ”€ Compare-ProdSchema.ps1
+â”‚  â”œâ”€ Invoke-DriftCheck.ps1
+â”‚  â”œâ”€ Validate-SqlRepo.ps1
+â”‚  â”œâ”€ Test-SqlBackupReadiness.ps1
+â”‚  â””â”€ New-SqlMigration.ps1
+â”‚
+â”œâ”€ docs/
+â”‚  â”œâ”€ SQL_PROMOTION_GUIDE.md
+â”‚  â”œâ”€ SQL_RELEASE_CHECKLIST.md
+â”‚  â””â”€ adr/
+â”‚     â””â”€ 001-git-first-sql-deployment.md
+â”‚
+â”œâ”€ logs/
+â”‚  â”œâ”€ deployment.jsonl
+â”‚  â”œâ”€ drift.jsonl
+â”‚  â”œâ”€ export.jsonl
+â”‚  â””â”€ validation.jsonl
+â”‚
+â””â”€ deploy_manifest.example.json
 ```
 
 Codex may adjust exact folder names to match the current repo, but must explain any deviation.
@@ -758,13 +758,13 @@ Production export remains available, but changes role:
 
 ```text
 Production SQL
-        ↓
+        â†“
 Export Snapshot
-        ↓
+        â†“
 Dedicated Drift / Export Branch
-        ↓
+        â†“
 Review
-        ↓
+        â†“
 Reconcile if required
 ```
 
@@ -824,11 +824,11 @@ Codex must document when idempotency is expected and when it is not appropriate.
 
 ## 12. Required Deliverables
 
-### Deliverable 1 — Migration Framework
+### Deliverable 1 â€” Migration Framework
 
 Create the migration folder structure, naming standard, metadata standard, and authoring guidance.
 
-### Deliverable 2 — Migration History Table
+### Deliverable 2 â€” Migration History Table
 
 Create a migration history table.
 
@@ -851,7 +851,7 @@ CREATE TABLE dbo.SchemaMigrationHistory
 
 Codex may improve the schema but must explain the final design.
 
-### Deliverable 3 — Deployment Run History Table
+### Deliverable 3 â€” Deployment Run History Table
 
 Create a deployment run history table.
 
@@ -875,7 +875,7 @@ CREATE TABLE dbo.DeploymentRunHistory
 
 Codex may improve the schema but must explain the final design.
 
-### Deliverable 4 — Production Deployment Script
+### Deliverable 4 â€” Production Deployment Script
 
 Create:
 
@@ -899,7 +899,7 @@ Capabilities:
 - Support dry-run / validation-only mode if practical.
 - Produce structured JSONL logs.
 
-### Deliverable 5 — Backup Readiness Script
+### Deliverable 5 â€” Backup Readiness Script
 
 Create:
 
@@ -918,7 +918,7 @@ The script should check and report:
 
 If exact production backup policy is unknown, Codex must document assumptions and make thresholds configurable.
 
-### Deliverable 6 — Drift Export Script
+### Deliverable 6 â€” Drift Export Script
 
 Refactor:
 
@@ -942,7 +942,7 @@ Requirements:
 - Must clearly distinguish snapshot output from migration scripts.
 - Must protect active development work.
 
-### Deliverable 7 — Schema Comparison Tooling
+### Deliverable 7 â€” Schema Comparison Tooling
 
 Create:
 
@@ -967,7 +967,7 @@ The report should summarise:
 - Whether drift appears expected or unexpected.
 - Recommended next action.
 
-### Deliverable 8 — Drift Check Tooling
+### Deliverable 8 â€” Drift Check Tooling
 
 Create:
 
@@ -977,7 +977,7 @@ deploy/Invoke-DriftCheck.ps1
 
 This should orchestrate export + comparison + report generation.
 
-### Deliverable 9 — SQL Repo Validation Script
+### Deliverable 9 â€” SQL Repo Validation Script
 
 Create:
 
@@ -999,7 +999,7 @@ Validation should include, where practical:
 
 This does not need to be perfect, but it must provide a useful pre-PR and pre-deployment safety layer.
 
-### Deliverable 10 — Deployment Manifest
+### Deliverable 10 â€” Deployment Manifest
 
 Create an example deployment manifest:
 
@@ -1027,7 +1027,7 @@ Example structure:
 
 Codex should decide whether this remains an example only or becomes an optional deployment input.
 
-### Deliverable 11 — SQL Promotion Guide
+### Deliverable 11 â€” SQL Promotion Guide
 
 Create:
 
@@ -1037,7 +1037,7 @@ docs/SQL_PROMOTION_GUIDE.md
 
 Requirements are detailed in Section 13.
 
-### Deliverable 12 — SQL Release Checklist
+### Deliverable 12 â€” SQL Release Checklist
 
 Create:
 
@@ -1047,7 +1047,7 @@ docs/SQL_RELEASE_CHECKLIST.md
 
 This should be a concise tick-box operational checklist for real deployments.
 
-### Deliverable 13 — Architecture Decision Record
+### Deliverable 13 â€” Architecture Decision Record
 
 Create:
 
@@ -1066,7 +1066,7 @@ Must document:
 - Why direct production changes are discouraged.
 - Consequences and follow-up work.
 
-### Deliverable 14 — Structured Logging
+### Deliverable 14 â€” Structured Logging
 
 Ensure deployment/export/drift/validation scripts write structured logs suitable for future monitoring agents:
 
@@ -1525,35 +1525,35 @@ At completion, the SQL repository should operate using the same principles as th
 
 ```text
 Feature Branch
-     ↓
+     â†“
 PR Review
-     ↓
+     â†“
 Merge
-     ↓
+     â†“
 Backup Readiness Check
-     ↓
+     â†“
 Controlled Promotion
-     ↓
+     â†“
 Production Validation
-     ↓
+     â†“
 Drift Verification
-     ↓
+     â†“
 Structured Logging
-     ↓
+     â†“
 Cleanup
 ```
 
-while still preserving a Production → Git export path for recovery, auditing, and schema drift detection:
+while still preserving a Production â†’ Git export path for recovery, auditing, and schema drift detection:
 
 ```text
 Production SQL
-     ↓
+     â†“
 Export Snapshot
-     ↓
+     â†“
 Drift Branch
-     ↓
+     â†“
 Review
-     ↓
+     â†“
 Reconcile if Required
 ```
 
