@@ -129,7 +129,7 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
             "bulk_import_registrations_dryrun": "bulk_import_dryrun",
             "bulk_import_registrations": "bulk_import",
         },
-        "kvk": {
+        "kvk_admin": {
             "test_kvk_export": "test_export",
             "refresh_stats_cache": "refresh_stats_cache",
             "kvk_export_all": "export_all",
@@ -157,6 +157,8 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
     }
 
     assert len(names) == 39
+    assert "kvk_admin" in names
+    assert "kvk" not in names
     assert moved_to_ops.isdisjoint(names)
     assert moved_to_ops.issubset(grouped["ops"])
     assert set(moved_to_ark).isdisjoint(names)

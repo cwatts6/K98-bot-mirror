@@ -84,8 +84,8 @@ def _split_discord_content(content: str, *, max_chars: int = 1900) -> list[str]:
 def register_stats(bot_instance: ext_commands.Bot) -> None:
     global bot
     bot = bot_instance
-    kvk_group = discord.SlashCommandGroup(
-        "kvk",
+    kvk_admin_group = discord.SlashCommandGroup(
+        "kvk_admin",
         "KVK admin controls",
         guild_ids=[GUILD_ID],
     )
@@ -100,7 +100,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         guild_ids=[GUILD_ID],
     )
 
-    @kvk_group.command(
+    @kvk_admin_group.command(
         name="test_export",
         description="🧪 Admin: Test KVK Google Sheets export without performing an import",
         guild_ids=[GUILD_ID],
@@ -410,7 +410,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             view=view,
         )
 
-    @kvk_group.command(
+    @kvk_admin_group.command(
         name="refresh_stats_cache",
         description="Admin only: Refresh player stats cache",
         guild_ids=[GUILD_ID],
@@ -993,7 +993,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             except Exception:
                 view.message = None
 
-    @kvk_group.command(
+    @kvk_admin_group.command(
         name="export_all",
         description="Export all-kingdom KVK tabs",
         guild_ids=[GUILD_ID],
@@ -1062,7 +1062,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 f"💥 Export failed for KVK `{kvk_no}`. Check logs.", ephemeral=True
             )
 
-    @kvk_group.command(
+    @kvk_admin_group.command(
         name="recompute",
         description="Recompute windowed outputs for the current KVK",
         guild_ids=[GUILD_ID],
@@ -1085,7 +1085,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         except Exception as e:
             await ctx.followup.send(f"💥 {type(e).__name__}: {e}", ephemeral=True)
 
-    @kvk_group.command(
+    @kvk_admin_group.command(
         name="list_scans",
         description="List recent scans for a KVK",
         guild_ids=[GUILD_ID],
@@ -1114,7 +1114,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         except Exception as e:
             await ctx.followup.send(f"❌ {type(e).__name__}: {e}", ephemeral=True)
 
-    @kvk_group.command(
+    @kvk_admin_group.command(
         name="test_embed",
         description="🧪 Post the KVK daily embed in test mode",
         guild_ids=[GUILD_ID],
@@ -1158,7 +1158,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 f"❌ Failed to send test embed:\n`{type(e).__name__}: {e}`", ephemeral=True
             )
 
-    @kvk_group.command(
+    @kvk_admin_group.command(
         name="window_preview",
         description="Show KVK windows with scan edges, scan counts, and row counts",
         guild_ids=[GUILD_ID],
@@ -1279,6 +1279,6 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         embed = discord.Embed(title=title, description=desc, color=color)
         await ctx.followup.send(embed=embed, ephemeral=True)
 
-    bot.add_application_command(kvk_group)
+    bot.add_application_command(kvk_admin_group)
     bot.add_application_command(stats_group)
     bot.add_application_command(honor_group)

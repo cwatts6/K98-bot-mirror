@@ -1,8 +1,9 @@
 # Canonical Command Reference
 
-Last updated: 2026-06-02
+Last updated: 2026-06-04
 
-This is the maintained command reference for the K98 bot after Command Platform Phase 5A. Use
+This is the maintained command reference for the K98 bot after the completed Command Platform
+Audit & Optimisation Programme. Use
 this document for current command paths, ownership, permissions, visibility, and command-surface
 governance. Historical migration notes remain in `command_platform_audit.md` and
 `command_surface_audit.md`.
@@ -29,7 +30,7 @@ Grouped command summary:
 | `/events` | 2 |
 | `/honor` | 1 |
 | `/inventory` | 2 |
-| `/kvk` | 7 |
+| `/kvk_admin` | 7 |
 | `/location` | 2 |
 | `/mge` | 6 |
 | `/ops` | 25 |
@@ -63,7 +64,7 @@ The approved top-level command baseline is enforced by `APPROVED_TOP_LEVEL_COMMA
 
 ```text
 activity, ark, calendar, calendar_next_event, calendar_reminder_config, crystaltech, events,
-export_inventory, honor, honor_rankings, inventory, inventory_preferences, kvk, kvk_rankings,
+export_inventory, honor, honor_rankings, inventory, inventory_preferences, kvk_admin, kvk_rankings,
 location, mge, modify_registration, modify_subscription, my_registrations, my_stats,
 my_stats_export, mygovernorid, myinventory, mykvkcrystaltech, mykvkhistory, mykvkstats,
 mykvktargets, next_kvk_event, next_kvk_fight, ops, ping, player_profile, prekvk,
@@ -175,19 +176,19 @@ Legend:
 | Registry | `/registry bulk_export` | `commands/registry_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Registry bulk export. |
 | Registry | `/registry bulk_import_dryrun` | `commands/registry_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Registry import preview. |
 | Registry | `/registry bulk_import` | `commands/registry_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Registry import apply. |
-| Stats/KVK | `/kvk test_export` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | KVK export test. |
+| Stats/KVK | `/kvk_admin test_export` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk test_export` in Phase 2A | KVK export test. |
 | Stats/KVK | `/mykvkstats` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral | Standard | Defer player self-service redesign | Personal KVK stats. |
-| Stats/KVK | `/kvk refresh_stats_cache` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Refreshes stats cache. |
+| Stats/KVK | `/kvk_admin refresh_stats_cache` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk refresh_stats_cache` in Phase 2A | Refreshes stats cache. |
 | Stats/KVK | `/my_stats` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator | User-selectable | Standard | Defer player self-service redesign | Personal stats report. |
 | Stats/KVK | `/my_stats_export` | `commands/stats_cmds.py` | Flat | Public command-level access | Ephemeral | Standard | Defer player self-service redesign | Personal stats export. |
 | Stats/KVK | `/stats player` | `commands/stats_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve | Leadership player stats lookup. |
 | Stats/KVK | `/mykvkhistory` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | User-selectable | Standard | Defer player self-service redesign | Personal KVK history. |
 | Stats/KVK | `/kvk_rankings` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator | Public | Standard | Defer public ranking UX | KVK rankings. |
-| Stats/KVK | `/kvk export_all` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | KVK Google Sheets export. |
-| Stats/KVK | `/kvk recompute` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Recompute KVK outputs. |
-| Stats/KVK | `/kvk list_scans` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Recent scan diagnostics. |
-| Stats/KVK | `/kvk test_embed` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | KVK embed test. |
-| Stats/KVK | `/kvk window_preview` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | KVK window preview. |
+| Stats/KVK | `/kvk_admin export_all` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk export_all` in Phase 2A | KVK Google Sheets export. |
+| Stats/KVK | `/kvk_admin recompute` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk recompute` in Phase 2A | Recompute KVK outputs. |
+| Stats/KVK | `/kvk_admin list_scans` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk list_scans` in Phase 2A | Recent scan diagnostics. |
+| Stats/KVK | `/kvk_admin test_embed` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk test_embed` in Phase 2A | KVK embed test. |
+| Stats/KVK | `/kvk_admin window_preview` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk window_preview` in Phase 2A | KVK window preview. |
 | Subscriptions | `/subscribe` | `commands/subscriptions_cmds.py` | Flat | Public command-level access | Ephemeral | Standard | Defer player self-service redesign | Player subscription signup. |
 | Subscriptions | `/modify_subscription` | `commands/subscriptions_cmds.py` | Flat | Public command-level access | Ephemeral | Standard | Defer player self-service redesign | Player subscription edit. |
 | Subscriptions | `/unsubscribe` | `commands/subscriptions_cmds.py` | Flat | Public command-level access | Ephemeral | Standard | Defer player self-service redesign | Player unsubscribe. |
@@ -203,6 +204,8 @@ Legend:
 - Phase 5A grouped approved admin, leadership, and operator paths under `/activity`,
   `/crystaltech`, `/events`, `/honor`, `/inventory`, `/kvk`, `/location`, `/ops`, `/registry`,
   `/stats`, and `/subscriptions`.
+- KVK Player Experience Redesign Phase 2A moved KVK admin/operator commands from `/kvk` to
+  `/kvk_admin`, leaving `/kvk` available for the player KVK scaffold.
 - Player self-service paths remain flat pending a dedicated workflow redesign.
 - Public calendar and KVK calendar paths remain flat pending a dedicated UX redesign.
 - `/ping` remains flat for simple health/debug discoverability.

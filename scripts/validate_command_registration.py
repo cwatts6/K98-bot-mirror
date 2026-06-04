@@ -48,7 +48,7 @@ APPROVED_TOP_LEVEL_COMMANDS = frozenset(
         "honor_rankings",
         "inventory",
         "inventory_preferences",
-        "kvk",
+        "kvk_admin",
         "kvk_rankings",
         "location",
         "mge",
