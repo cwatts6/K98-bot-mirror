@@ -58,7 +58,7 @@ Target later admin command group:
 /kvk_admin export_all
 /kvk_admin list_scans
 /kvk_admin window_preview
-/kvk_admin refresh_cache
+/kvk_admin refresh_stats_cache
 /kvk_admin diagnostics
 ```
 
