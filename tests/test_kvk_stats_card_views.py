@@ -86,7 +86,7 @@ def test_history_embed_includes_last_kvk_summary():
 
     assert embed.title == "Historic KVK Data - Card Tester"
     assert any(field.name == "Last KVK Summary - KVK 53" for field in embed.fields)
-    assert any(field.name == "Matchmaking Snapshot" for field in embed.fields)
+    assert all(field.name != "Matchmaking Snapshot" for field in embed.fields)
 
 
 def test_history_embed_filters_zero_summary_and_personal_best_rows():
@@ -103,7 +103,8 @@ def test_history_embed_filters_zero_summary_and_personal_best_rows():
 
     assert "Summary" not in field_names
     assert "Personal Bests" not in field_names
-    assert field_names == ["Last KVK Summary", "Matchmaking Snapshot"]
+    assert "Matchmaking Snapshot" not in field_names
+    assert field_names == ["Last KVK Summary"]
 
 
 class _Response:

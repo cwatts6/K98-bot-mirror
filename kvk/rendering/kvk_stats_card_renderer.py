@@ -591,9 +591,6 @@ def render_kvk_history_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCar
         label: _compact(value) for label, value in _nonzero_items(payload.history_summary)
     }
     bests_map = {label: _compact(value) for label, value in _nonzero_items(payload.personal_bests)}
-    matchmaking_snapshot = {
-        label: _compact(value) for label, value in _nonzero_items(payload.matchmaking_snapshot)
-    }
 
     col_w = 230
     col_x = (45, 315, 585, 855)
@@ -626,16 +623,6 @@ def render_kvk_history_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCar
     )
     _metric(
         draw,
-        x=col_x[3],
-        y=195,
-        w=col_w,
-        title="Matchmaking KP",
-        value=matchmaking_snapshot.get("MM KP", "N/A"),
-        color=GOLD,
-    )
-
-    _metric(
-        draw,
         x=col_x[0],
         y=325,
         w=col_w,
@@ -661,16 +648,6 @@ def render_kvk_history_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCar
         value=bests_map.get("Most Heal", "N/A"),
         color=BLUE,
     )
-    _metric(
-        draw,
-        x=col_x[3],
-        y=325,
-        w=col_w,
-        title="Matchmaking Kills",
-        value=matchmaking_snapshot.get("MM Kills", "N/A"),
-        color=GREEN,
-    )
-
     if payload.last_kvk_summary:
         _metric(
             draw,
