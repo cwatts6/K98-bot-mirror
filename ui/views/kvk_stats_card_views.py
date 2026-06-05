@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 from io import BytesIO
 import logging
 
 import discord
 
 from kvk.models.kvk_stats_card import KvkStatsCardPayload, RenderedKvkStatsCard
+from kvk.rendering.kvk_stats_card_renderer import (
+    render_kvk_history_card,
+    render_kvk_more_stats_card,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +90,6 @@ def build_history_embed(payload: KvkStatsCardPayload) -> discord.Embed:
     )
     history_summary = _nonzero_items(payload.history_summary)
     personal_bests = _nonzero_items(payload.personal_bests)
-    matchmaking_snapshot = _nonzero_items(payload.matchmaking_snapshot)
     if history_summary:
         embed.add_field(
             name="Summary",
@@ -131,12 +135,6 @@ def build_history_embed(payload: KvkStatsCardPayload) -> discord.Embed:
     else:
         embed.add_field(name="Last KVK Summary", value="No history data available.", inline=False)
 
-    if matchmaking_snapshot:
-        embed.add_field(
-            name="Matchmaking Snapshot",
-            value="\n".join(_line(label, _compact(value)) for label, value in matchmaking_snapshot),
-            inline=False,
-        )
     embed.set_footer(text="Use Main Card to return to the visual card.")
     return embed
 
@@ -153,10 +151,25 @@ class KvkStatsCardView(discord.ui.View):
         self.payload = payload
         self._image_bytes = rendered.image_bytes.getvalue()
         self._filename = rendered.filename
+        self._more_stats_bytes: bytes | None = None
+        self._more_stats_filename: str | None = None
+        self._history_bytes: bytes | None = None
+        self._history_filename: str | None = None
         self.message: discord.Message | None = None
 
     def _file(self) -> discord.File:
         return discord.File(BytesIO(self._image_bytes), filename=self._filename)
+
+    def _cached_file(self, *, kind: str) -> discord.File | None:
+        if kind == "more":
+            if self._more_stats_bytes is None or self._more_stats_filename is None:
+                return None
+            return discord.File(BytesIO(self._more_stats_bytes), filename=self._more_stats_filename)
+        if kind == "history":
+            if self._history_bytes is None or self._history_filename is None:
+                return None
+            return discord.File(BytesIO(self._history_bytes), filename=self._history_filename)
+        return None
 
     async def _edit_host_message(self, interaction: discord.Interaction, **kwargs) -> None:
         try:
@@ -182,6 +195,28 @@ class KvkStatsCardView(discord.ui.View):
         )
 
     async def _show_more_stats(self, interaction: discord.Interaction) -> None:
+        try:
+            if self._more_stats_bytes is None or self._more_stats_filename is None:
+                rendered = await asyncio.to_thread(render_kvk_more_stats_card, self.payload)
+                if rendered is not None:
+                    self._more_stats_bytes = rendered.image_bytes.getvalue()
+                    self._more_stats_filename = rendered.filename
+            file = self._cached_file(kind="more")
+            if file is not None:
+                await self._edit_host_message(
+                    interaction,
+                    content=None,
+                    embeds=[],
+                    attachments=[],
+                    files=[file],
+                    view=self,
+                )
+                return
+        except Exception:
+            logger.exception(
+                "kvk_more_stats_card_render_or_send_failed governor_id=%s",
+                self.payload.governor_id,
+            )
         await self._edit_host_message(
             interaction,
             content=None,
@@ -191,6 +226,28 @@ class KvkStatsCardView(discord.ui.View):
         )
 
     async def _show_history(self, interaction: discord.Interaction) -> None:
+        try:
+            if self._history_bytes is None or self._history_filename is None:
+                rendered = await asyncio.to_thread(render_kvk_history_card, self.payload)
+                if rendered is not None:
+                    self._history_bytes = rendered.image_bytes.getvalue()
+                    self._history_filename = rendered.filename
+            file = self._cached_file(kind="history")
+            if file is not None:
+                await self._edit_host_message(
+                    interaction,
+                    content=None,
+                    embeds=[],
+                    attachments=[],
+                    files=[file],
+                    view=self,
+                )
+                return
+        except Exception:
+            logger.exception(
+                "kvk_history_card_render_or_send_failed governor_id=%s",
+                self.payload.governor_id,
+            )
         await self._edit_host_message(
             interaction,
             content=None,

@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from io import BytesIO
+from types import SimpleNamespace
+
+import pytest
 
 from kvk.models.kvk_stats_card import KvkStatsCardPayload, KvkTargetProgress
-from ui.views.kvk_stats_card_views import build_history_embed, build_more_stats_embed
+from ui.views.kvk_stats_card_views import (
+    KvkStatsCardView,
+    build_history_embed,
+    build_more_stats_embed,
+)
 
 
 def _payload() -> KvkStatsCardPayload:
@@ -78,6 +86,7 @@ def test_history_embed_includes_last_kvk_summary():
 
     assert embed.title == "Historic KVK Data - Card Tester"
     assert any(field.name == "Last KVK Summary - KVK 53" for field in embed.fields)
+    assert all(field.name != "Matchmaking Snapshot" for field in embed.fields)
 
 
 def test_history_embed_filters_zero_summary_and_personal_best_rows():
@@ -86,7 +95,7 @@ def test_history_embed_filters_zero_summary_and_personal_best_rows():
         history_summary={"Autarch": 0, "KVK Played": 0, "Highest Acclaim": 0},
         personal_bests={"Most Kills": 0, "Most Deads": 0, "Most Heal": 0},
         last_kvk_summary={},
-        matchmaking_snapshot={"MM KP": 0, "MM Kills": 0, "MM Deads": None},
+        matchmaking_snapshot={"MM KP": 100_000_000},
     )
 
     embed = build_history_embed(payload)
@@ -96,3 +105,80 @@ def test_history_embed_filters_zero_summary_and_personal_best_rows():
     assert "Personal Bests" not in field_names
     assert "Matchmaking Snapshot" not in field_names
     assert field_names == ["Last KVK Summary"]
+
+
+class _Response:
+    def is_done(self):
+        return False
+
+    async def defer(self):
+        return None
+
+
+class _Message:
+    def __init__(self):
+        self.edits = []
+
+    async def edit(self, **kwargs):
+        self.edits.append(kwargs)
+
+
+def _interaction(message: _Message):
+    return SimpleNamespace(response=_Response(), message=message)
+
+
+@pytest.mark.asyncio
+async def test_more_stats_button_prefers_rendered_card(monkeypatch):
+    import ui.views.kvk_stats_card_views as views
+
+    def fake_render(_payload):
+        return SimpleNamespace(
+            filename="more.png",
+            image_bytes=BytesIO(b"more-card-bytes"),
+        )
+
+    monkeypatch.setattr(views, "render_kvk_more_stats_card", fake_render)
+    rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main-card-bytes"))
+    view = KvkStatsCardView(payload=_payload(), rendered=rendered)
+    message = _Message()
+
+    await view._show_more_stats(_interaction(message))
+
+    assert message.edits[-1]["embeds"] == []
+    assert message.edits[-1]["files"][0].filename == "more.png"
+
+
+@pytest.mark.asyncio
+async def test_more_stats_button_falls_back_to_embed_when_card_unavailable(monkeypatch):
+    import ui.views.kvk_stats_card_views as views
+
+    monkeypatch.setattr(views, "render_kvk_more_stats_card", lambda _payload: None)
+    rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main-card-bytes"))
+    view = KvkStatsCardView(payload=_payload(), rendered=rendered)
+    message = _Message()
+
+    await view._show_more_stats(_interaction(message))
+
+    assert "files" not in message.edits[-1]
+    assert message.edits[-1]["embeds"][0].title == "More KVK Stats - Card Tester"
+
+
+@pytest.mark.asyncio
+async def test_history_button_prefers_rendered_card(monkeypatch):
+    import ui.views.kvk_stats_card_views as views
+
+    def fake_render(_payload):
+        return SimpleNamespace(
+            filename="history.png",
+            image_bytes=BytesIO(b"history-card-bytes"),
+        )
+
+    monkeypatch.setattr(views, "render_kvk_history_card", fake_render)
+    rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main-card-bytes"))
+    view = KvkStatsCardView(payload=_payload(), rendered=rendered)
+    message = _Message()
+
+    await view._show_history(_interaction(message))
+
+    assert message.edits[-1]["embeds"] == []
+    assert message.edits[-1]["files"][0].filename == "history.png"

@@ -258,17 +258,42 @@ Delivered Phase 2B details:
 
 ### Phase 3 — Modern `/kvk stats` Visual Card
 
-Build the first modern KVK visual card for `/kvk stats`.
+Status: complete. Delivered in mirror PR #142 and promoted to the production rollout branch.
 
-This phase establishes reusable card-generation primitives, KVK branding, metric tile patterns, and testable output contracts.
+Built the first modern KVK visual card for `/kvk stats`.
 
-Before rendering, define a KVK stats service payload dataclass that normalizes governor identity, scan freshness, KVK rank, metric deltas, targets, Acclaim/contribution where approved, and warning states. Keep cache access in data/service layers and test payload construction separately from image rendering.
+Delivered details:
 
-### Phase 4 — Modern `/kvk targets` and `/kvk history`
+- `/kvk stats` now uses a Pillow-generated visual card.
+- `/mykvkstats` intentionally remains on the original legacy embed path so both outputs can run in parallel during validation and communication.
+- The card established reusable card-generation primitives, KVK branding, metric tile patterns, asset handling, a renderer-independent payload contract, and tested fallback behaviour.
+- Multiple registered governors route through the selected-account card posting path.
+- `Main Card`, `More Stats`, and `History` buttons are available on the new `/kvk stats` output.
+- SQL import, recompute, export, Google Sheets contracts, and KVK calculations were not changed.
 
-Apply the visual language to targets and history.
+### Phase 3B - Stats Card Polish and Secondary Cards
 
-Targets should emphasise progress and next action. History should emphasise comparability across KVKs and may remain table-first until chart/card generation is justified.
+Status: ready for task execution.
+
+Polish the delivered `/kvk stats` main card and extend the Phase 3 visual language to the attached
+`More Stats` and `History` views.
+
+Planned scope:
+
+- reduce main-card compact stat values to one decimal place
+- select card background by KVK mode from `KVK_NAME`
+- support `Tides of War` and `Heroic Anthem` card backgrounds
+- add trophy/rank visual polish
+- make kills target progress ticks scale dynamically for high performers, including around `225%`
+- review and improve `More Stats` and `History` information order
+- build Pillow-rendered `More Stats` and `History` cards if the audit confirms they fit in one PR
+- keep `/mykvkstats` legacy during parallel validation
+
+### Phase 4 - Modern `/kvk targets` and Full `/kvk history`
+
+Apply the visual language to `/kvk targets` and the full `/kvk history` command.
+
+Targets should emphasise progress and next action. The full history command should emphasise comparability across KVKs and may remain table-first until chart/card generation is justified. Phase 3B only covers the compact History view attached to `/kvk stats`.
 
 ### Phase 5 — Unified `/kvk rankings` Visual/UX Polish
 
@@ -418,9 +443,11 @@ Do not include these in the early phases unless separately approved:
 Proceed with:
 
 ```text
-KVK Player Experience Redesign - Phase 3 Modern /kvk stats Visual Card
+KVK Player Experience Redesign - Phase 3B Stats Card Polish and Secondary Cards
 ```
 
 Phase 1 audit/design, Phase 2A admin collision resolution, and Phase 2B player `/kvk` scaffold are
-complete. Phase 3 should build the modern `/kvk stats` visual card on top of the delivered command
-surface while preserving the legacy flat player commands during rollout.
+complete. Phase 3 has delivered the modern `/kvk stats` visual card while preserving the legacy
+`/mykvkstats` embed during rollout. Phase 3B should polish the delivered card, add KVK mode-specific
+background selection, improve high-progress target scaling, and move the attached `More Stats` and
+`History` views toward Pillow-rendered cards.

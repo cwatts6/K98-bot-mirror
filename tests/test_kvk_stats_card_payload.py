@@ -14,6 +14,7 @@ async def test_build_payload_includes_kvk_mode_and_camp():
     row = {
         "Gov_ID": "58744139",
         "Governor_Name": "Toraki",
+        "Rank": 8,
         "KVK_NO": 54,
         "KVK_RANK": 23,
         "LAST_REFRESH": "2026-06-03T07:53:00+00:00",
@@ -38,6 +39,8 @@ async def test_build_payload_includes_kvk_mode_and_camp():
     assert payload.display_mode == "Tides of War"
     assert payload.kingdom == 1978
     assert payload.display_camp == "Wind"
+    assert payload.kingdom_rank == 8
+    assert payload.kvk_rank == 23
     assert payload.kp_loss == 639_013_000
     assert payload.playstyle == "Sniping Kills"
     assert payload.kill_progress.percent == pytest.approx(95.5512)

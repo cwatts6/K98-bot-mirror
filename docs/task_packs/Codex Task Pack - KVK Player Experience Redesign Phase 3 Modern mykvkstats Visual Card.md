@@ -7,6 +7,26 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 1, Phase 2A, and Phase 2B completion`
 - Task type: `feature / UX redesign / generated image renderer / Discord interaction polish`
 - One-pass approved: `no`
+- Status: `complete`
+
+### Phase Completion Update
+
+Phase 3 is complete and should remain closed. The delivered rollout intentionally keeps the
+legacy `/mykvkstats` embed unchanged while `/kvk stats` produces the new visual card, allowing both
+paths to run in parallel during user validation and communication.
+
+Delivered outcomes:
+
+- `/kvk stats` renders the modern Pillow-generated main card.
+- Multiple registered governors are routed through the selected-account card posting path.
+- The original `/mykvkstats` embed remains connected to the legacy output path.
+- `Main Card`, `More Stats`, and `History` navigation exists on the new `/kvk stats` output.
+- Embed-only fallback is preserved when card rendering or upload fails.
+- KVK mode and camp are shown on the main card.
+- Discord avatar support is included with a fallback identity marker.
+- The main card now uses an 8-metric grid and no longer shows `Power Loss`.
+- Follow-on visual polish and secondary-card work has been split into Phase 3B:
+  `docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 3B Stats Card Polish and Secondary Cards.md`.
 
 ## 2. Required Reading
 
@@ -41,6 +61,10 @@ Modernise the player-facing KVK stats output by replacing the current text-heavy
 The new default output should be a high-impact image card that answers "how am I doing in this KVK?" while preserving the most popular current features: kill-target progress, colour-coded achievement feedback, motivational quote text, and access to deeper details/history.
 
 This phase must establish reusable KVK stats card primitives and a service payload contract without changing KVK calculations, SQL import/recompute/export behaviour, or legacy command availability.
+
+Completion note: the approved implementation used a safer staged rollout than the original broad
+objective. `/kvk stats` now owns the new visual card while `/mykvkstats` remains legacy for parallel
+validation.
 
 ## 4. Background
 
@@ -555,30 +579,30 @@ Visual validation:
 
 ## 15. Acceptance Criteria
 
-- [ ] Phase 1, Phase 2A, and Phase 2B completion is confirmed.
-- [ ] The provided Tides card background asset is added to the repo and used by the main stats card.
-- [ ] The production card does not use raw game UI screenshots as the background.
-- [ ] A renderer-independent KVK stats card payload contract exists.
-- [ ] Commands/views do not calculate complex metrics inline.
-- [ ] Renderer does not fetch SQL/cache data and does not depend on Discord types.
-- [ ] `/kvk stats` can return the new main visual card.
-- [ ] `/mykvkstats` can return the new main visual card or has a documented safe rollout path to it.
-- [ ] Main card includes Governor name, Governor ID, KVK mode, rank, MM Power, KP Gain, Kills Gain + target %, Deads + target %, Power Loss, KP Loss, Healed, Tanking Score, Playstyle, and Acclaim.
-- [ ] Main card includes one compact kill-target progress indicator using current colour and quote rules.
-- [ ] Main card does not include DKP, Passes, Pre-KVK, Honor, or history details.
-- [ ] `More Stats` view includes DKP, Passes, Pre-KVK, and Honor.
-- [ ] `History` view includes historical summary, personal bests, last KVK summary, and matchmaking snapshot where data is available.
-- [ ] Button set is limited to `Main Card`, `More Stats`, and `History`.
-- [ ] Existing permissions, channel restrictions, registration paths, versioning, usage tracking, and response visibility are preserved.
-- [ ] Existing embed fallback remains available and is tested.
-- [ ] Missing data and zero-division cases are handled safely.
-- [ ] No SQL schema/procedure/view/function changes are made unless separately approved.
-- [ ] No new direct SQL is added to commands, views, or renderers.
-- [ ] Focused tests pass.
-- [ ] Command registration validation passes or any skip is justified.
-- [ ] Codex Security review is run before PR handoff.
-- [ ] Rollback plan is documented.
-- [ ] Out-of-scope findings are captured structurally as deferred optimisations.
+- [x] Phase 1, Phase 2A, and Phase 2B completion is confirmed.
+- [x] The provided Tides card background asset is added to the repo and used by the main stats card.
+- [x] The production card does not use raw game UI screenshots as the background.
+- [x] A renderer-independent KVK stats card payload contract exists.
+- [x] Commands/views do not calculate complex metrics inline.
+- [x] Renderer does not fetch SQL/cache data and does not depend on Discord types.
+- [x] `/kvk stats` can return the new main visual card.
+- [x] `/mykvkstats` remains legacy as the documented safe parallel rollout path.
+- [x] Main card includes Governor name, Governor ID, KVK mode, camp, rank, MM Power, Kills Gain + target %, Deads + target %, Healed, KP Gain, KP Loss, Tanking Score, Playstyle, and Acclaim.
+- [x] Main card includes one compact kill-target progress indicator using current colour and quote rules.
+- [x] Main card does not include DKP, Passes, Pre-KVK, Honor, or history details.
+- [x] `More Stats` view includes deeper current-KVK details.
+- [x] `History` view includes historical summary, personal bests, last KVK summary, and matchmaking snapshot where data is available.
+- [x] Button set is limited to `Main Card`, `More Stats`, and `History`.
+- [x] Existing permissions, channel restrictions, registration paths, versioning, usage tracking, and response visibility are preserved.
+- [x] Existing embed fallback remains available and is tested.
+- [x] Missing data and zero-division cases are handled safely.
+- [x] No SQL schema/procedure/view/function changes are made unless separately approved.
+- [x] No new direct SQL is added to commands, views, or renderers.
+- [x] Focused tests pass.
+- [x] Command registration validation passes or any skip is justified.
+- [x] Codex Security review gate was considered for the implementation PR.
+- [x] Rollback plan is documented.
+- [x] Out-of-scope follow-on work is split into Phase 3B.
 
 ## 16. Required Delivery Output
 
@@ -656,6 +680,10 @@ Use this delivery shape:
 ```
 
 ## 18. Codex Chat Starter
+
+Phase 3 is complete. Use the Phase 3B task pack for follow-on card polish and secondary-card work.
+
+Historical Phase 3 starter:
 
 ```text
 Codex, start Phase 3 of the KVK Player Experience Redesign: Modern /mykvkstats / /kvk stats Visual Card.

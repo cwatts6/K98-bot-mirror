@@ -7,6 +7,8 @@ from typing import Any
 
 import discord
 
+from kvk.theme import normalize_kvk_mode
+
 # Helpers (with safe fallbacks)
 try:
     # embed_utils.py provides fmt_short which is the canonical short-number formatter in repo
@@ -46,7 +48,7 @@ CUSTOM_AVATAR_URL = getattr(_C, "CUSTOM_AVATAR_URL", None)
 
 # Normalize KVK banner map to lowercase keys
 _KBM = getattr(_C, "KVK_BANNER_MAP", {}) or {}
-KVK_BANNER_MAP = {str(k).lower(): v for k, v in _KBM.items()}
+KVK_BANNER_MAP = {normalize_kvk_mode(k): v for k, v in _KBM.items()}
 SHOW_KVK_BANNER = bool(getattr(_C, "SHOW_KVK_BANNER", False))
 
 # State assets can be a custom emoji tag "<:name:id>" OR a URL (ignored for header text)
@@ -100,7 +102,7 @@ def _state_label(state: str | None) -> str:
 def _maybe_banner(kvk_name: str | None) -> str | None:
     if not SHOW_KVK_BANNER or not kvk_name:
         return None
-    return KVK_BANNER_MAP.get(str(kvk_name).lower())
+    return KVK_BANNER_MAP.get(normalize_kvk_mode(kvk_name))
 
 
 def build_kvk_targets_embed(

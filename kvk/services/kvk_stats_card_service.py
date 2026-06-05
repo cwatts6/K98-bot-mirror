@@ -221,6 +221,7 @@ async def build_kvk_stats_card_payload(
         last_refresh=_date_display(row.get("LAST_REFRESH")),
         status=status,
         kvk_rank=row.get("KVK_RANK") or None,
+        kingdom_rank=row.get("Rank") or None,
         matchmaking_power=matchmaking_power or None,
         kp_gain=kp_gain,
         kills_gain=kills_gain,

@@ -6,11 +6,20 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from kvk.models.kvk_stats_card import KvkStatsCardPayload, RenderedKvkStatsCard
+from kvk.theme import normalize_kvk_mode
 from prekvk import report_image_renderer as text_renderer
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSET_DIR = ROOT / "assets" / "kvk" / "cards"
-BACKGROUND = ASSET_DIR / "Tides_Stats_Card.png"
+DEFAULT_BACKGROUND = ASSET_DIR / "Default_card.jpg"
+HISTORY_BACKGROUND = ASSET_DIR / "History_stats_card.jpg"
+TIDES_BACKGROUND = ASSET_DIR / "Tides_Stats_Card.png"
+MODE_BACKGROUNDS = {
+    "tides of war": TIDES_BACKGROUND,
+    "heroic anthem": ASSET_DIR / "Heroic_Anthem_Stats_Card.jpg",
+    "storm of stratagems": ASSET_DIR / "Storm_of_Stratagems_Stats_card.png",
+    "songs of troy": ASSET_DIR / "Songs_of_Troy_Stats_card.jpg",
+}
 
 WIDTH = 1180
 HEIGHT = 640
@@ -41,7 +50,7 @@ def _compact(value: int | float | None) -> str:
     abs_val = abs(val)
     for limit, suffix in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")):
         if abs_val >= limit:
-            out = f"{val / limit:.3f}".rstrip("0").rstrip(".")
+            out = f"{val / limit:.1f}".rstrip("0").rstrip(".")
             return f"{out}{suffix}"
     return f"{int(val):,}"
 
@@ -55,12 +64,35 @@ def _pct(value: float | None) -> str:
 
 def _progress_scale(percent: float | None) -> list[int]:
     value = max(0.0, float(percent or 0.0))
-    upper = 100
-    if value > 125:
-        upper = 150
-    elif value > 100:
-        upper = 125
-    return list(range(0, upper + 1, 25))
+    if value <= 100:
+        return list(range(0, 101, 25))
+    if value <= 150:
+        upper = int(((value + 24.999) // 25) * 25)
+        return list(range(0, max(125, upper) + 1, 25))
+    upper = int(((value + 49.999) // 50) * 50)
+    ticks = list(range(0, 151, 25))
+    ticks.extend(range(200, max(200, upper) + 1, 50))
+    return ticks
+
+
+def _background_for_mode(kvk_name: str | None) -> Path | None:
+    mode_path = MODE_BACKGROUNDS.get(normalize_kvk_mode(kvk_name))
+    for path in (mode_path, DEFAULT_BACKGROUND, TIDES_BACKGROUND):
+        if path is not None and path.exists():
+            return path
+    return None
+
+
+def _history_background() -> Path | None:
+    for path in (HISTORY_BACKGROUND, DEFAULT_BACKGROUND, TIDES_BACKGROUND):
+        if path.exists():
+            return path
+    return None
+
+
+def _load_background(path: Path) -> Image.Image:
+    background = Image.open(path).convert("RGBA")
+    return background.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
 
 
 def _text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:
@@ -113,6 +145,128 @@ def _metric(
     if sub:
         sub_font = _fit_font(draw, sub, max_width=w, size=18, min_size=13, bold=True)
         _draw_text(draw, (x, y + 82), sub, fill=MUTED, font=sub_font, bold=True)
+
+
+def _panel(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[int, int, int, int],
+    *,
+    fill: tuple[int, int, int, int] = (10, 18, 32, 155),
+) -> None:
+    draw.rounded_rectangle(xy, radius=14, fill=fill, outline=(255, 255, 255, 45), width=1)
+
+
+def _section_title(draw: ImageDraw.ImageDraw, xy: tuple[int, int], title: str) -> None:
+    _draw_text(draw, xy, title.upper(), fill=GOLD, font=_font(22, bold=True), bold=True)
+
+
+def _draw_kv_lines(
+    draw: ImageDraw.ImageDraw,
+    lines: list[tuple[str, str]],
+    *,
+    x: int,
+    y: int,
+    width: int,
+    row_gap: int = 31,
+) -> None:
+    label_font = _font(18, bold=True)
+    for idx, (label, value) in enumerate(lines):
+        row_y = y + idx * row_gap
+        label_text = f"{label}:"
+        _draw_text(draw, (x, row_y), label_text, fill=MUTED, font=label_font, bold=True)
+        value_text = str(value)
+        fit_value_font = _fit_font(
+            draw, value_text, max_width=width - 150, size=20, min_size=15, bold=True
+        )
+        value_x = x + width - _text_width(draw, value_text, fit_value_font)
+        _draw_text(draw, (value_x, row_y), value_text, fill=TEXT, font=fit_value_font, bold=True)
+
+
+def _nonzero_items(values: dict) -> list[tuple[str, int | float | str]]:
+    return [(label, value) for label, value in values.items() if value not in (None, "", 0, 0.0)]
+
+
+def _draw_card_header(
+    draw: ImageDraw.ImageDraw,
+    payload: KvkStatsCardPayload,
+    *,
+    title: str,
+    accent: tuple[int, int, int] = GOLD,
+) -> None:
+    _draw_text(draw, (42, 38), title.upper(), fill=accent, font=_font(34, bold=True), bold=True)
+    name_font = _fit_font(
+        draw, payload.governor_name, max_width=520, size=34, min_size=23, bold=True
+    )
+    _draw_text(draw, (42, 84), payload.governor_name, fill=TEXT, font=name_font, bold=True)
+    context = [payload.display_kvk_label, payload.display_mode]
+    if payload.display_camp:
+        context.append(payload.display_camp)
+    if payload.kingdom:
+        context.append(f"Kingdom {payload.kingdom}")
+    context_text = "  |  ".join(context)
+    font = _fit_font(draw, context_text, max_width=820, size=20, min_size=15, bold=True)
+    _draw_text(draw, (42, 126), context_text, fill=MUTED, font=font, bold=True)
+
+
+def _draw_small_progress(
+    draw: ImageDraw.ImageDraw,
+    *,
+    x: int,
+    y: int,
+    w: int,
+    percent: float | None,
+    color: tuple[int, int, int],
+) -> None:
+    draw.rounded_rectangle((x, y, x + w, y + 15), radius=7, fill=(57, 65, 81, 220))
+    pct = max(0.0, min(float(percent or 0.0), 100.0))
+    fill_w = int(w * pct / 100.0)
+    if fill_w:
+        draw.rounded_rectangle((x, y, x + fill_w, y + 15), radius=7, fill=color)
+
+
+def _rank_value(value: int | str | None) -> str:
+    if value in (None, ""):
+        return "N/A"
+    return f"#{value}"
+
+
+def _pass_window(payload: KvkStatsCardPayload, pass_no: int) -> tuple[int, int]:
+    return (
+        int(payload.pass_stats.get(f"Pass {pass_no} Kills", 0) or 0),
+        int(payload.pass_stats.get(f"Pass {pass_no} Deads", 0) or 0),
+    )
+
+
+def _draw_scaled_progress(
+    draw: ImageDraw.ImageDraw,
+    *,
+    x: int,
+    y: int,
+    w: int,
+    title: str,
+    value_text: str,
+    percent: float | None,
+    color: tuple[int, int, int],
+) -> None:
+    ticks = _progress_scale(percent)
+    scale_max = ticks[-1]
+    label = f"{title}  {value_text}"
+    font = _fit_font(draw, label, max_width=w, size=23, min_size=16, bold=True)
+    _draw_text(draw, (x, y), label, fill=color, font=font, bold=True)
+    bar_y = y + 40
+    draw.rounded_rectangle((x, bar_y, x + w, bar_y + 18), radius=8, fill=(66, 58, 48))
+    pct = max(0.0, min(float(percent or 0.0), float(scale_max)))
+    fill_w = int(w * pct / scale_max)
+    if fill_w:
+        draw.rounded_rectangle((x, bar_y, x + fill_w, bar_y + 18), radius=8, fill=color)
+    tick_font = _font(15, bold=True)
+    for tick in ticks:
+        tick_x = x + int(w * tick / scale_max)
+        draw.line((tick_x, bar_y - 4, tick_x, bar_y + 22), fill=(255, 255, 255, 150), width=2)
+        tick_label = f"{tick}%"
+        label_width = _text_width(draw, tick_label, tick_font)
+        label_x = max(x, min(x + w - label_width, tick_x - label_width // 2))
+        _draw_text(draw, (label_x, bar_y + 27), tick_label, fill=MUTED, font=tick_font, bold=True)
 
 
 def _draw_avatar(
@@ -169,11 +323,11 @@ def _progress(draw: ImageDraw.ImageDraw, payload: KvkStatsCardPayload) -> None:
 def render_kvk_stats_card(
     payload: KvkStatsCardPayload, *, avatar_bytes: bytes | None = None
 ) -> RenderedKvkStatsCard | None:
-    if not BACKGROUND.exists():
+    background_path = _background_for_mode(payload.kvk_name)
+    if background_path is None:
         return None
 
-    background = Image.open(BACKGROUND).convert("RGBA")
-    background = background.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+    background = _load_background(background_path)
     overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     odraw = ImageDraw.Draw(overlay, "RGBA")
     odraw.rounded_rectangle((0, 0, WIDTH - 1, HEIGHT - 1), radius=22, fill=(0, 0, 0, 75))
@@ -212,8 +366,10 @@ def render_kvk_stats_card(
     _draw_text(draw, (155, 183), str(payload.governor_id), fill=TEXT, font=_font(24, bold=True))
 
     rank_x = 940
-    _draw_text(draw, (rank_x, 56), "RANK", fill=TEXT, font=_font(25, bold=True), bold=True)
-    rank_value = f"#{payload.kvk_rank}" if payload.kvk_rank not in (None, "") else "N/A"
+    _draw_text(
+        draw, (rank_x, 56), "\U0001f3c6 RANK", fill=TEXT, font=_font(25, bold=True), bold=True
+    )
+    rank_value = _rank_value(payload.kingdom_rank or payload.kvk_rank)
     _draw_text(draw, (rank_x, 88), rank_value, fill=TEXT, font=_font(50, bold=True), bold=True)
 
     col_w = 230
@@ -312,3 +468,244 @@ def render_kvk_stats_card(
     buf.seek(0)
     filename = f"kvk_stats_{payload.governor_id}.png"
     return RenderedKvkStatsCard(filename=filename, image_bytes=buf)
+
+
+def render_kvk_more_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard | None:
+    background_path = _background_for_mode(payload.kvk_name)
+    if background_path is None:
+        return None
+
+    background = _load_background(background_path)
+    overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    odraw = ImageDraw.Draw(overlay, "RGBA")
+    odraw.rounded_rectangle((0, 0, WIDTH - 1, HEIGHT - 1), radius=22, fill=(0, 0, 0, 95))
+    odraw.rectangle((0, 0, WIDTH, 168), fill=(0, 0, 0, 95))
+    canvas = Image.alpha_composite(background, overlay)
+    draw = ImageDraw.Draw(canvas, "RGBA")
+
+    _draw_card_header(draw, payload, title="More KVK Stats")
+
+    rank_x = 930
+    _draw_text(
+        draw,
+        (rank_x, 50),
+        "\U0001f3c6 KVK RANK",
+        fill=TEXT,
+        font=_font(22, bold=True),
+        bold=True,
+    )
+    _draw_text(
+        draw,
+        (rank_x, 82),
+        _rank_value(payload.kvk_rank),
+        fill=TEXT,
+        font=_font(46, bold=True),
+        bold=True,
+    )
+
+    col_w = 230
+    col_x = (45, 315, 585, 855)
+    pass_y = 205
+    for idx, pass_no in enumerate((4, 6, 7, 8)):
+        kills, deads = _pass_window(payload, pass_no)
+        _metric(
+            draw,
+            x=col_x[idx],
+            y=pass_y,
+            w=col_w,
+            title=f"Pass {pass_no}",
+            value=f"{_compact(kills)} / {_compact(deads)}",
+            color=GREEN if kills else MUTED,
+            sub="Kills / Deads",
+        )
+
+    row2_y = 345
+    _metric(
+        draw,
+        x=col_x[0],
+        y=row2_y,
+        w=col_w,
+        title="Pre-KVK",
+        value=(
+            f"{payload.prekvk_rank} / {_compact(payload.prekvk_points)}"
+            if payload.prekvk_rank
+            else f"N/A / {_compact(payload.prekvk_points)}"
+        ),
+        color=BLUE if payload.prekvk_rank else MUTED,
+        sub="Rank / Points",
+    )
+    _metric(
+        draw,
+        x=col_x[1],
+        y=row2_y,
+        w=col_w,
+        title="Honor",
+        value=(
+            f"{payload.honor_rank} / {_compact(payload.honor_points)}"
+            if payload.honor_rank
+            else f"N/A / {_compact(payload.honor_points)}"
+        ),
+        color=GOLD if payload.honor_rank else MUTED,
+        sub="Rank / Points",
+    )
+
+    dkp_label = f"{_compact(payload.dkp)} / {_compact(payload.dkp_target)} | {_pct(payload.dkp_target_percent)}"
+    _draw_scaled_progress(
+        draw,
+        x=40,
+        y=498,
+        w=760,
+        title="DKP Progress",
+        value_text=dkp_label,
+        percent=payload.dkp_target_percent,
+        color=GOLD,
+    )
+
+    updated = f"Last updated {payload.last_refresh or 'unknown'}"
+    footer_font = _fit_font(draw, updated, max_width=365, size=20, min_size=15, bold=True)
+    _draw_text(draw, (775, 596), updated, fill=MUTED, font=footer_font, bold=True)
+    buf = BytesIO()
+    canvas.convert("RGB").save(buf, format="PNG", optimize=True)
+    buf.seek(0)
+    return RenderedKvkStatsCard(
+        filename=f"kvk_more_stats_{payload.governor_id}.png", image_bytes=buf
+    )
+
+
+def render_kvk_history_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard | None:
+    background_path = _history_background()
+    if background_path is None:
+        return None
+
+    background = _load_background(background_path)
+    overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    odraw = ImageDraw.Draw(overlay, "RGBA")
+    odraw.rounded_rectangle((0, 0, WIDTH - 1, HEIGHT - 1), radius=22, fill=(0, 0, 0, 105))
+    odraw.rectangle((0, 0, WIDTH, 168), fill=(0, 0, 0, 98))
+    canvas = Image.alpha_composite(background, overlay)
+    draw = ImageDraw.Draw(canvas, "RGBA")
+
+    _draw_card_header(draw, payload, title="KVK History", accent=(164, 220, 255))
+
+    summary = [(label, _compact(value)) for label, value in _nonzero_items(payload.history_summary)]
+    bests = [(label, _compact(value)) for label, value in _nonzero_items(payload.personal_bests)]
+
+    col_w = 230
+    col_x = (45, 315, 585, 855)
+    summary_map = dict(summary)
+    bests_map = dict(bests)
+    _metric(
+        draw,
+        x=col_x[0],
+        y=195,
+        w=col_w,
+        title="Autarch",
+        value=summary_map.get("Autarch", "N/A"),
+        color=GOLD,
+    )
+    _metric(
+        draw,
+        x=col_x[1],
+        y=195,
+        w=col_w,
+        title="KVK Played",
+        value=summary_map.get("KVK Played", "N/A"),
+        color=BLUE,
+    )
+    _metric(
+        draw,
+        x=col_x[2],
+        y=195,
+        w=col_w,
+        title="Highest Acclaim",
+        value=summary_map.get("Highest Acclaim", "N/A"),
+        color=GOLD,
+    )
+
+    _metric(
+        draw,
+        x=col_x[0],
+        y=325,
+        w=col_w,
+        title="Most Kills",
+        value=bests_map.get("Most Kills", "N/A"),
+        color=GREEN,
+    )
+    _metric(
+        draw,
+        x=col_x[1],
+        y=325,
+        w=col_w,
+        title="Most Deads",
+        value=bests_map.get("Most Deads", "N/A"),
+        color=RED,
+    )
+    _metric(
+        draw,
+        x=col_x[2],
+        y=325,
+        w=col_w,
+        title="Most Heal",
+        value=bests_map.get("Most Heal", "N/A"),
+        color=BLUE,
+    )
+
+    if payload.last_kvk_summary:
+        _metric(
+            draw,
+            x=col_x[0],
+            y=455,
+            w=col_w,
+            title="Last KVK Kills",
+            value=_compact(payload.last_kvk_summary.get("Kills")),
+            color=GREEN,
+            sub=(
+                f"{_compact(payload.last_kvk_summary.get('Kill Target'))} target | "
+                f"{_pct(payload.last_kvk_summary.get('Kill Percent'))}"
+            ),
+        )
+        _metric(
+            draw,
+            x=col_x[1],
+            y=455,
+            w=col_w,
+            title="Last KVK Deads",
+            value=_compact(payload.last_kvk_summary.get("Deads")),
+            color=RED,
+            sub=(
+                f"{_compact(payload.last_kvk_summary.get('Dead Target'))} target | "
+                f"{_pct(payload.last_kvk_summary.get('Dead Percent'))}"
+            ),
+        )
+        _metric(
+            draw,
+            x=col_x[2],
+            y=455,
+            w=col_w,
+            title="Last KVK DKP",
+            value=_compact(payload.last_kvk_summary.get("DKP")),
+            color=GOLD,
+            sub=(
+                f"{_compact(payload.last_kvk_summary.get('DKP Target'))} target | "
+                f"{_pct(payload.last_kvk_summary.get('DKP Percent'))}"
+            ),
+        )
+        _metric(
+            draw,
+            x=col_x[3],
+            y=455,
+            w=col_w,
+            title="Last KVK Acclaim",
+            value=_compact(payload.last_kvk_summary.get("Acclaim")),
+            color=GOLD,
+        )
+    else:
+        _draw_text(draw, (45, 470), "No history data available.", fill=MUTED, font=_font(26))
+
+    updated = f"Last updated {payload.last_refresh or 'unknown'}"
+    footer_font = _fit_font(draw, updated, max_width=365, size=20, min_size=15, bold=True)
+    _draw_text(draw, (775, 596), updated, fill=MUTED, font=footer_font, bold=True)
+    buf = BytesIO()
+    canvas.convert("RGB").save(buf, format="PNG", optimize=True)
+    buf.seek(0)
+    return RenderedKvkStatsCard(filename=f"kvk_history_{payload.governor_id}.png", image_bytes=buf)
