@@ -115,6 +115,23 @@ def _fit_font(
     return font
 
 
+def _fit_shared_font(
+    draw: ImageDraw.ImageDraw,
+    values: list[str],
+    *,
+    max_width: int,
+    size: int,
+    min_size: int,
+    bold: bool = False,
+) -> ImageFont.ImageFont:
+    text = max(values or [""], key=len)
+    font = text_renderer._font_for_text(text, size, bold=bold)
+    while size > min_size and any(_text_width(draw, value, font) > max_width for value in values):
+        size -= 1
+        font = text_renderer._font_for_text(text, size, bold=bold)
+    return font
+
+
 def _draw_text(
     draw: ImageDraw.ImageDraw,
     xy: tuple[int, int],
@@ -128,6 +145,21 @@ def _draw_text(
     text_renderer._draw_text(draw, xy, text, fill=fill, font=font, bold=bold)
 
 
+def _draw_centered_text(
+    draw: ImageDraw.ImageDraw,
+    *,
+    center_x: int,
+    y: int,
+    text: str,
+    fill=TEXT,
+    font: ImageFont.ImageFont | None = None,
+    bold: bool = False,
+) -> None:
+    font = font or _font(20, bold=bold)
+    x = center_x - (_text_width(draw, text, font) // 2)
+    _draw_text(draw, (x, y), text, fill=fill, font=font, bold=bold)
+
+
 def _metric(
     draw: ImageDraw.ImageDraw,
     *,
@@ -138,9 +170,10 @@ def _metric(
     value: str,
     color: tuple[int, int, int],
     sub: str | None = None,
+    value_font: ImageFont.ImageFont | None = None,
 ) -> None:
     _draw_text(draw, (x, y), title.upper(), fill=TEXT, font=_font(21, bold=True), bold=True)
-    value_font = _fit_font(draw, value, max_width=w, size=44, min_size=29, bold=True)
+    value_font = value_font or _fit_font(draw, value, max_width=w, size=44, min_size=29, bold=True)
     _draw_text(draw, (x, y + 34), value, fill=color, font=value_font, bold=True)
     if sub:
         sub_font = _fit_font(draw, sub, max_width=w, size=18, min_size=13, bold=True)
@@ -234,8 +267,23 @@ def _main_rank_value(payload: KvkStatsCardPayload) -> str:
     return _rank_value(payload.kvk_rank)
 
 
-def _overall_kvk_rank_value() -> str:
-    return "TBC"
+def _overall_kvk_rank_value(payload: KvkStatsCardPayload) -> str:
+    if payload.overall_kvk_rank in (None, 0):
+        return "TBC"
+    return _rank_value(payload.overall_kvk_rank)
+
+
+def _overall_kvk_rank_context(payload: KvkStatsCardPayload) -> str | None:
+    if payload.overall_kvk_rank in (None, 0):
+        return None
+    parts: list[str] = []
+    if payload.overall_kvk_total_governors:
+        parts.append(f"Total {_compact(payload.overall_kvk_total_governors).lower()}")
+    if payload.overall_kvk_percentile is not None:
+        parts.append(f"Top {_pct(payload.overall_kvk_percentile)}")
+    if not parts:
+        return None
+    return " / ".join(parts)
 
 
 def _pass_window(payload: KvkStatsCardPayload, pass_no: int) -> tuple[int, int]:
@@ -373,12 +421,26 @@ def render_kvk_stats_card(
     _draw_text(draw, (155, 135), payload.governor_name, fill=TEXT, font=name_font, bold=True)
     _draw_text(draw, (155, 183), str(payload.governor_id), fill=TEXT, font=_font(24, bold=True))
 
-    rank_x = 940
-    _draw_text(
-        draw, (rank_x, 56), "\U0001f3c6 RANK", fill=TEXT, font=_font(25, bold=True), bold=True
+    rank_center_x = 995
+    _draw_centered_text(
+        draw,
+        center_x=rank_center_x,
+        y=56,
+        text="\U0001f3c6 RANK",
+        fill=TEXT,
+        font=_font(25, bold=True),
+        bold=True,
     )
     rank_value = _main_rank_value(payload)
-    _draw_text(draw, (rank_x, 88), rank_value, fill=TEXT, font=_font(50, bold=True), bold=True)
+    _draw_centered_text(
+        draw,
+        center_x=rank_center_x,
+        y=88,
+        text=rank_value,
+        fill=TEXT,
+        font=_font(50, bold=True),
+        bold=True,
+    )
 
     col_w = 230
     col_x = (45, 315, 585, 855)
@@ -493,23 +555,57 @@ def render_kvk_more_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStats
 
     _draw_card_header(draw, payload, title="More KVK Stats")
 
-    rank_x = 930
-    rank_label_x = 875
-    rank_label = "\U0001f3c6 OVERALL KVK RANK"
+    rank_center_x = 1008
+    rank_label = "KVK OVERALL RANK"
     rank_font = _fit_font(draw, rank_label, max_width=265, size=22, min_size=16, bold=True)
-    _draw_text(draw, (rank_label_x, 50), rank_label, fill=TEXT, font=rank_font, bold=True)
-    _draw_text(
+    _draw_centered_text(
         draw,
-        (rank_x, 82),
-        _overall_kvk_rank_value(),
+        center_x=rank_center_x,
+        y=50,
+        text=rank_label,
         fill=TEXT,
-        font=_font(46, bold=True),
+        font=rank_font,
         bold=True,
     )
+    _draw_centered_text(
+        draw,
+        center_x=rank_center_x,
+        y=82,
+        text=_overall_kvk_rank_value(payload),
+        fill=TEXT,
+        font=_fit_font(
+            draw,
+            _overall_kvk_rank_value(payload),
+            max_width=160,
+            size=46,
+            min_size=30,
+            bold=True,
+        ),
+        bold=True,
+    )
+    rank_context = _overall_kvk_rank_context(payload)
+    if rank_context:
+        _draw_centered_text(
+            draw,
+            center_x=rank_center_x,
+            y=128,
+            text=rank_context,
+            fill=GOLD,
+            font=_fit_font(draw, rank_context, max_width=280, size=20, min_size=15, bold=True),
+            bold=True,
+        )
 
     col_w = 230
     col_x = (45, 315, 585, 855)
     pass_y = 205
+    pass_values = [
+        f"{_compact(kills)} / {_compact(deads)}"
+        for pass_no in (4, 6, 7, 8)
+        for kills, deads in [_pass_window(payload, pass_no)]
+    ]
+    pass_value_font = _fit_shared_font(
+        draw, pass_values, max_width=col_w, size=44, min_size=29, bold=True
+    )
     for idx, pass_no in enumerate((4, 6, 7, 8)):
         kills, deads = _pass_window(payload, pass_no)
         _metric(
@@ -521,6 +617,7 @@ def render_kvk_more_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStats
             value=f"{_compact(kills)} / {_compact(deads)}",
             color=GREEN if kills else MUTED,
             sub="Kills / Deads",
+            value_font=pass_value_font,
         )
 
     row2_y = 345

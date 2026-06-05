@@ -7,6 +7,28 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 3 visual card rollout`
 - Task type: `feature / UX polish / generated image renderer / Discord interaction polish`
 - One-pass approved: `no`
+- Status: `complete - delivered in mirror PR #143 and promoted to production`
+
+### Phase Completion Update
+
+Phase 3B is complete as of 2026-06-05.
+
+Delivered result:
+
+- Main-card compact values use one-decimal formatting.
+- KVK mode card backgrounds are selected through shared mode normalization and asset fallback logic.
+- Main-card rank displays the existing `KVK_RANK` value from the stats payload.
+- More Stats top-right `Overall KVK Rank` is intentionally shown as `TBC` until Phase 3C adds the durable SQL-backed rank source.
+- More Stats and History are Pillow-rendered secondary cards attached to `/kvk stats`.
+- More Stats includes pass-window kills/deads, Pre-KVK rank/points, Honor rank/points, and DKP progress.
+- History includes Autarch, KVK Played, Highest Acclaim, personal bests, and last KVK summary metrics; matchmaking snapshot data is intentionally excluded.
+- Dynamic progress scales support high performers, including values around `225%`.
+- Secondary-card interaction callbacks defer before rendering.
+- `/mykvkstats` remains on the legacy embed path.
+
+Follow-on work has been split into Phase 3C:
+
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 3C Overall Rank and Card Polish.md`
 
 ## 2. Required Reading
 

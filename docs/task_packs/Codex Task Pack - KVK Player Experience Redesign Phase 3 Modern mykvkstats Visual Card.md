@@ -25,8 +25,10 @@ Delivered outcomes:
 - KVK mode and camp are shown on the main card.
 - Discord avatar support is included with a fallback identity marker.
 - The main card now uses an 8-metric grid and no longer shows `Power Loss`.
-- Follow-on visual polish and secondary-card work has been split into Phase 3B:
+- Follow-on visual polish and secondary-card work was completed in Phase 3B:
   `docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 3B Stats Card Polish and Secondary Cards.md`.
+- Remaining overall-rank data contract and card polish work has been split into Phase 3C:
+  `docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 3C Overall Rank and Card Polish.md`.
 
 ## 2. Required Reading
 
@@ -681,7 +683,8 @@ Use this delivery shape:
 
 ## 18. Codex Chat Starter
 
-Phase 3 is complete. Use the Phase 3B task pack for follow-on card polish and secondary-card work.
+Phase 3 and Phase 3B are complete. Use the Phase 3C task pack for the overall KVK rank data
+contract and follow-on card polish work.
 
 Historical Phase 3 starter:
 

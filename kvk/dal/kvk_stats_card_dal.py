@@ -60,4 +60,31 @@ def fetch_kvk_stats_card_context(kvk_no: int | None, governor_id: str) -> dict[s
             context["kingdom"] = data.get("kingdom")
             context["camp_id"] = data.get("campid")
             context["camp_name"] = data.get("camp_name")
+
+        try:
+            cur.execute(
+                """
+                SELECT TOP 1
+                    overall_kvk_rank,
+                    overall_kvk_total_governors,
+                    overall_kvk_percentile
+                FROM KVK.vw_Player_Overall_KVK_Rank
+                WHERE KVK_NO = ?
+                  AND governor_id = ?
+                """,
+                (int(kvk_no), gov_int),
+            )
+            row = cur.fetchone()
+            if row:
+                data = cursor_row_to_dict(cur, row)
+                context["overall_kvk_rank"] = data.get("overall_kvk_rank")
+                context["overall_kvk_total_governors"] = data.get("overall_kvk_total_governors")
+                context["overall_kvk_percentile"] = data.get("overall_kvk_percentile")
+        except Exception:
+            logger.warning(
+                "kvk_stats_card_overall_rank_unavailable kvk_no=%s governor_id=%s",
+                kvk_no,
+                governor_id,
+                exc_info=True,
+            )
     return context

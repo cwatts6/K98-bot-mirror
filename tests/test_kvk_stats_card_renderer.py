@@ -3,17 +3,21 @@ from __future__ import annotations
 from dataclasses import replace
 from io import BytesIO
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from kvk.models.kvk_stats_card import (
     KvkStatsCardPayload,
     KvkTargetProgress,
 )
 from kvk.rendering.kvk_stats_card_renderer import (
+    GOLD,
     _background_for_mode,
     _compact,
+    _fit_shared_font,
+    _hex_color,
     _history_background,
     _main_rank_value,
+    _overall_kvk_rank_context,
     _overall_kvk_rank_value,
     _pct,
     _progress_scale,
@@ -147,8 +151,38 @@ def test_main_rank_does_not_fall_back_to_power_rank():
     assert _main_rank_value(payload) == "N/A"
 
 
-def test_overall_kvk_rank_is_placeholder_until_phase_3c_data_contract():
-    assert _overall_kvk_rank_value() == "TBC"
+def test_overall_kvk_rank_uses_placeholder_when_missing():
+    assert _overall_kvk_rank_value(replace(_payload(), overall_kvk_rank=None)) == "TBC"
+
+
+def test_overall_kvk_rank_formats_payload_rank():
+    assert _overall_kvk_rank_value(replace(_payload(), overall_kvk_rank=41)) == "#41"
+
+
+def test_overall_kvk_rank_formats_population_context():
+    payload = replace(
+        _payload(),
+        overall_kvk_rank=41,
+        overall_kvk_total_governors=8_734,
+        overall_kvk_percentile=0.47,
+    )
+
+    assert _overall_kvk_rank_value(payload) == "#41"
+    assert _overall_kvk_rank_context(payload) == "Total 8.7k / Top 0.5%"
+
+
+def test_progress_gold_is_shared_between_payload_and_renderer():
+    assert _hex_color("#FFD357") == GOLD
+
+
+def test_shared_font_fits_all_pass_values_to_one_size():
+    image = Image.new("RGB", (400, 120), "black")
+    draw = ImageDraw.Draw(image)
+    values = ["14.3M / 1.1M", "4.6M / 0", "123.4M / 12.2M"]
+
+    font = _fit_shared_font(draw, values, max_width=230, size=44, min_size=29, bold=True)
+
+    assert all(draw.textbbox((0, 0), value, font=font)[2] <= 230 for value in values)
 
 
 def test_history_background_uses_history_card_asset():

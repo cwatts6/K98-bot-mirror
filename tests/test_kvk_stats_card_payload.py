@@ -32,7 +32,14 @@ async def test_build_payload_includes_kvk_mode_and_camp():
         "KvKPlayed": 8,
         "MostKvKKill": 1_200_000_000,
     }
-    context = KvkStatsCardContext(kvk_name="Tides of War", kingdom=1978, camp_name="Wind")
+    context = KvkStatsCardContext(
+        kvk_name="Tides of War",
+        kingdom=1978,
+        camp_name="Wind",
+        overall_kvk_rank=41,
+        overall_kvk_total_governors=8_734,
+        overall_kvk_percentile=0.47,
+    )
 
     payload = await build_kvk_stats_card_payload(row, context=context)
 
@@ -41,6 +48,9 @@ async def test_build_payload_includes_kvk_mode_and_camp():
     assert payload.display_camp == "Wind"
     assert payload.kingdom_rank == 8
     assert payload.kvk_rank == 23
+    assert payload.overall_kvk_rank == 41
+    assert payload.overall_kvk_total_governors == 8_734
+    assert payload.overall_kvk_percentile == pytest.approx(0.47)
     assert payload.kp_loss == 639_013_000
     assert payload.playstyle == "Sniping Kills"
     assert payload.kill_progress.percent == pytest.approx(95.5512)
@@ -83,7 +93,7 @@ async def test_build_payload_preserves_zero_healed_value():
 
 
 def test_kill_progress_policy_preserves_existing_threshold_quotes():
-    assert kill_progress_policy(101) == ("#FFD700", "Smashed it! Don't stop!!")
+    assert kill_progress_policy(101) == ("#FFD357", "Smashed it! Don't stop!!")
     assert kill_progress_policy(86) == ("#006400", "So close, push now!")
     assert kill_progress_policy(10) == ("#8B0000", "FIGHT NOW!!")
     assert kill_progress_policy(None, is_exempt=True) == (

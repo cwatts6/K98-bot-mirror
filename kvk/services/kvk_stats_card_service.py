@@ -14,6 +14,8 @@ from kvk.models.kvk_stats_card import (
 
 logger = logging.getLogger(__name__)
 
+PROGRESS_GOLD_HEX = "#FFD357"
+
 PASS_KEYS = (
     "Pass 4 Kills",
     "Pass 6 Kills",
@@ -87,7 +89,7 @@ def kill_progress_policy(percent: float | None, *, is_exempt: bool = False) -> t
         return "#666666", "No targets assigned this KVK"
     value = float(percent or 0.0)
     if value >= 100:
-        return "#FFD700", "Smashed it! Don't stop!!"
+        return PROGRESS_GOLD_HEX, "Smashed it! Don't stop!!"
     if value >= 85:
         return "#006400", "So close, push now!"
     if value >= 70:
@@ -134,6 +136,15 @@ def _build_context(raw: dict[str, Any] | None) -> KvkStatsCardContext:
         kingdom=_int_from_variants(raw, ["kingdom", "Kingdom"], default=0) or None,
         camp_id=_int_from_variants(raw, ["camp_id", "campid", "CampID"], default=0) or None,
         camp_name=_str_from_variants(raw, ["camp_name", "CampName"], default="") or None,
+        overall_kvk_rank=_int_from_variants(raw, ["overall_kvk_rank", "OverallKvkRank"], default=0)
+        or None,
+        overall_kvk_total_governors=_int_from_variants(
+            raw, ["overall_kvk_total_governors", "OverallKvkTotalGovernors"], default=0
+        )
+        or None,
+        overall_kvk_percentile=_float_from_variants(
+            raw, ["overall_kvk_percentile", "OverallKvkPercentile"]
+        ),
     )
 
 
@@ -246,6 +257,9 @@ async def build_kvk_stats_card_payload(
         dkp=dkp,
         dkp_target=dkp_target,
         dkp_target_percent=dkp_target_percent,
+        overall_kvk_rank=context.overall_kvk_rank,
+        overall_kvk_total_governors=context.overall_kvk_total_governors,
+        overall_kvk_percentile=context.overall_kvk_percentile,
         pass_stats=pass_stats,
         prekvk_rank=_int_from_variants(row, ["PreKvk_Rank", "PreKvk Rank"], default=0) or None,
         prekvk_points=_int_from_variants(row, ["Max_PreKvk_Points", "Max PreKvk Points"], default=0)

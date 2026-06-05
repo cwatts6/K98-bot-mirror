@@ -24,7 +24,10 @@ Player self-service workflow redesign and public calendar/KVK calendar UX redesi
 deferred optimisation programmes, not additional command-platform phases.
 
 KVK Player Experience Redesign is active. Phase 1 audit/design, Phase 2A Admin Collision
-Resolution, and Phase 2B Player `/kvk` Scaffold are complete. Phase 2A moved admin/operator
-commands from `/kvk ...` to `/kvk_admin ...` in PR 140. Phase 2B added the player `/kvk stats`,
-`/kvk targets`, `/kvk history`, and `/kvk rankings` scaffold in PR 141, then was promoted to
-production. Use the programme pack to scope Phase 3, the modern `/kvk stats` visual card.
+Resolution, Phase 2B Player `/kvk` Scaffold, Phase 3 Modern `/kvk stats` Visual Card, and Phase
+3B Stats Card Polish and Secondary Cards are complete. Phase 2A moved admin/operator commands from
+`/kvk ...` to `/kvk_admin ...` in PR 140. Phase 2B added the player `/kvk stats`, `/kvk targets`,
+`/kvk history`, and `/kvk rankings` scaffold in PR 141, then was promoted to production. Phase 3
+and Phase 3B delivered the modern `/kvk stats` image-card rollout, mode-specific card backgrounds,
+secondary More Stats and History cards, and production promotion. Use the programme pack and the
+Phase 3C task pack for the next overall-rank data contract and card polish phase.

@@ -36,6 +36,20 @@ def _line(label: str, value: str) -> str:
     return f"**{label}:** {value}"
 
 
+def _overall_rank_text(payload: KvkStatsCardPayload) -> str:
+    if not payload.overall_kvk_rank:
+        return "TBC"
+    value = f"#{payload.overall_kvk_rank}"
+    context: list[str] = []
+    if payload.overall_kvk_total_governors:
+        context.append(f"Total {_compact(payload.overall_kvk_total_governors).lower()}")
+    if payload.overall_kvk_percentile is not None:
+        context.append(f"Top {_pct(payload.overall_kvk_percentile)}")
+    if context:
+        value = f"{value}\n{' / '.join(context)}"
+    return value
+
+
 def _nonzero_items(values: dict) -> list[tuple[str, int | float | str]]:
     return [(label, value) for label, value in values.items() if value not in (None, "", 0, 0.0)]
 
@@ -45,6 +59,11 @@ def build_more_stats_embed(payload: KvkStatsCardPayload) -> discord.Embed:
         title=f"More KVK Stats - {payload.governor_name}",
         description=f"{payload.display_kvk_label} | {payload.display_mode}",
         color=discord.Color.blurple(),
+    )
+    embed.add_field(
+        name="KVK Overall Rank",
+        value=_overall_rank_text(payload),
+        inline=False,
     )
     embed.add_field(
         name="DKP",

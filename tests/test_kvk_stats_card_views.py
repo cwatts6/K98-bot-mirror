@@ -48,6 +48,9 @@ def _payload() -> KvkStatsCardPayload:
         dkp=25_000_000,
         dkp_target=50_000_000,
         dkp_target_percent=50.0,
+        overall_kvk_rank=42,
+        overall_kvk_total_governors=8_734,
+        overall_kvk_percentile=0.48,
         pass_stats={"Pass 4 Kills": 1_000},
         prekvk_rank=7,
         prekvk_points=123_456,
@@ -78,6 +81,8 @@ def test_more_stats_embed_uses_payload_context():
 
     assert embed.title == "More KVK Stats - Card Tester"
     assert embed.description == "KVK 54 | Tides of War"
+    assert embed.fields[0].name == "KVK Overall Rank"
+    assert embed.fields[0].value == "#42\nTotal 8.7k / Top 0.5%"
     assert any(field.name == "Passes" for field in embed.fields)
 
 

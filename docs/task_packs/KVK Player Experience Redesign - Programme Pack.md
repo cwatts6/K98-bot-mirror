@@ -273,21 +273,39 @@ Delivered details:
 
 ### Phase 3B - Stats Card Polish and Secondary Cards
 
+Status: complete. Delivered in mirror PR #143 and promoted to production.
+
+Polished the delivered `/kvk stats` main card and extended the Phase 3 visual language to the
+attached `More Stats` and `History` views.
+
+Delivered details:
+
+- Main-card compact stat values now use one decimal place.
+- Card backgrounds are selected by KVK mode from `KVK_NAME`, with fallback/default handling.
+- `Tides of War`, `Heroic Anthem`, `Storm of Stratagems`, and `Songs of Troy` card backgrounds are supported where assets exist.
+- The main card rank marker uses the existing `KVK_RANK` value from the stats payload.
+- The More Stats card shows `Overall KVK Rank` as `TBC` until Phase 3C provides a durable SQL-backed source.
+- Kills and DKP progress ticks scale dynamically for high performers, including values around `225%`.
+- `More Stats` and compact `History` are now Pillow-rendered secondary cards attached to `/kvk stats`.
+- Matchmaking snapshot data is intentionally excluded from the compact History card.
+- `/mykvkstats` remains legacy during parallel validation.
+
+### Phase 3C - Overall KVK Rank Data Contract and Card Polish
+
 Status: ready for task execution.
 
-Polish the delivered `/kvk stats` main card and extend the Phase 3 visual language to the attached
-`More Stats` and `History` views.
+Create the durable data contract required to replace the More Stats `Overall KVK Rank` placeholder,
+then polish the remaining Phase 3B card issues found during production smoke testing.
 
 Planned scope:
 
-- reduce main-card compact stat values to one decimal place
-- select card background by KVK mode from `KVK_NAME`
-- support `Tides of War` and `Heroic Anthem` card backgrounds
-- add trophy/rank visual polish
-- make kills target progress ticks scale dynamically for high performers, including around `225%`
-- review and improve `More Stats` and `History` information order
-- build Pillow-rendered `More Stats` and `History` cards if the audit confirms they fit in one PR
-- keep `/mykvkstats` legacy during parallel validation
+- create a SQL view over `KVK.KVK_Player_Windowed` that derives overall KVK rank for `WindowName = 'Full'`
+- rank by `kp_gain_recalc DESC` with a deterministic tie-breaker such as `governor_id ASC`
+- retrieve the derived overall rank through bot DAL/service code and populate the More Stats card
+- keep the main card rank sourced from existing `KVK_RANK`
+- make More Stats row typography consistent, especially Pass 4 versus Pass 6 value sizing
+- audit the History card `Highest Acclaim` versus `Last KVK Acclaim` source/rounding discrepancy before agreeing any data or formatting fix
+- update tests, SQL validation evidence, and visual samples
 
 ### Phase 4 - Modern `/kvk targets` and Full `/kvk history`
 
@@ -443,11 +461,12 @@ Do not include these in the early phases unless separately approved:
 Proceed with:
 
 ```text
-KVK Player Experience Redesign - Phase 3B Stats Card Polish and Secondary Cards
+KVK Player Experience Redesign - Phase 3C Overall KVK Rank Data Contract and Card Polish
 ```
 
 Phase 1 audit/design, Phase 2A admin collision resolution, and Phase 2B player `/kvk` scaffold are
 complete. Phase 3 has delivered the modern `/kvk stats` visual card while preserving the legacy
-`/mykvkstats` embed during rollout. Phase 3B should polish the delivered card, add KVK mode-specific
-background selection, improve high-progress target scaling, and move the attached `More Stats` and
-`History` views toward Pillow-rendered cards.
+`/mykvkstats` embed during rollout. Phase 3B has polished the card, added KVK mode-specific
+background selection, improved high-progress target scaling, and moved the attached `More Stats`
+and `History` views to Pillow-rendered cards. Phase 3C should add the SQL-backed overall KVK rank
+source for the More Stats card and address the remaining typography/acclaim-source review items.
