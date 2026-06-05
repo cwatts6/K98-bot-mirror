@@ -142,8 +142,8 @@ def _build_context(raw: dict[str, Any] | None) -> KvkStatsCardContext:
             raw, ["overall_kvk_total_governors", "OverallKvkTotalGovernors"], default=0
         )
         or None,
-        overall_kvk_percentile=_float_from_variants(
-            raw, ["overall_kvk_percentile", "OverallKvkPercentile"]
+        overall_kvk_top_percent=_float_from_variants(
+            raw, ["overall_kvk_top_percent", "OverallKvkTopPercent"]
         ),
     )
 
@@ -259,7 +259,7 @@ async def build_kvk_stats_card_payload(
         dkp_target_percent=dkp_target_percent,
         overall_kvk_rank=context.overall_kvk_rank,
         overall_kvk_total_governors=context.overall_kvk_total_governors,
-        overall_kvk_percentile=context.overall_kvk_percentile,
+        overall_kvk_top_percent=context.overall_kvk_top_percent,
         pass_stats=pass_stats,
         prekvk_rank=_int_from_variants(row, ["PreKvk_Rank", "PreKvk Rank"], default=0) or None,
         prekvk_points=_int_from_variants(row, ["Max_PreKvk_Points", "Max PreKvk Points"], default=0)

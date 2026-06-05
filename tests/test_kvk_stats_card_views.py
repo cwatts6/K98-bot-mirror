@@ -50,7 +50,7 @@ def _payload() -> KvkStatsCardPayload:
         dkp_target_percent=50.0,
         overall_kvk_rank=42,
         overall_kvk_total_governors=8_734,
-        overall_kvk_percentile=0.48,
+        overall_kvk_top_percent=0.48,
         pass_stats={"Pass 4 Kills": 1_000},
         prekvk_rank=7,
         prekvk_points=123_456,

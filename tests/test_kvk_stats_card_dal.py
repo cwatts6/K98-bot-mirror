@@ -46,7 +46,7 @@ def test_fetch_context_includes_overall_kvk_rank(monkeypatch):
             {
                 "overall_kvk_rank": 41,
                 "overall_kvk_total_governors": 8734,
-                "overall_kvk_percentile": 0.47,
+                "overall_kvk_top_percent": 0.47,
             },
         ]
     )
@@ -61,7 +61,7 @@ def test_fetch_context_includes_overall_kvk_rank(monkeypatch):
     assert context["camp_name"] == "Wind"
     assert context["overall_kvk_rank"] == 41
     assert context["overall_kvk_total_governors"] == 8734
-    assert context["overall_kvk_percentile"] == 0.47
+    assert context["overall_kvk_top_percent"] == 0.47
     assert any("vw_Player_Overall_KVK_Rank" in sql for sql, _params in cursor.executed)
 
 

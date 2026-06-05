@@ -164,7 +164,7 @@ def test_overall_kvk_rank_formats_population_context():
         _payload(),
         overall_kvk_rank=41,
         overall_kvk_total_governors=8_734,
-        overall_kvk_percentile=0.47,
+        overall_kvk_top_percent=0.47,
     )
 
     assert _overall_kvk_rank_value(payload) == "#41"

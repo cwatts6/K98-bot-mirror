@@ -43,8 +43,8 @@ def _overall_rank_text(payload: KvkStatsCardPayload) -> str:
     context: list[str] = []
     if payload.overall_kvk_total_governors:
         context.append(f"Total {_compact(payload.overall_kvk_total_governors).lower()}")
-    if payload.overall_kvk_percentile is not None:
-        context.append(f"Top {_pct(payload.overall_kvk_percentile)}")
+    if payload.overall_kvk_top_percent is not None:
+        context.append(f"Top {_pct(payload.overall_kvk_top_percent)}")
     if context:
         value = f"{value}\n{' / '.join(context)}"
     return value

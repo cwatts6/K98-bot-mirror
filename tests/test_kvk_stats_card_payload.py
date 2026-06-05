@@ -38,7 +38,7 @@ async def test_build_payload_includes_kvk_mode_and_camp():
         camp_name="Wind",
         overall_kvk_rank=41,
         overall_kvk_total_governors=8_734,
-        overall_kvk_percentile=0.47,
+        overall_kvk_top_percent=0.47,
     )
 
     payload = await build_kvk_stats_card_payload(row, context=context)
@@ -50,7 +50,7 @@ async def test_build_payload_includes_kvk_mode_and_camp():
     assert payload.kvk_rank == 23
     assert payload.overall_kvk_rank == 41
     assert payload.overall_kvk_total_governors == 8_734
-    assert payload.overall_kvk_percentile == pytest.approx(0.47)
+    assert payload.overall_kvk_top_percent == pytest.approx(0.47)
     assert payload.kp_loss == 639_013_000
     assert payload.playstyle == "Sniping Kills"
     assert payload.kill_progress.percent == pytest.approx(95.5512)

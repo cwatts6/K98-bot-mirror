@@ -13,7 +13,7 @@ class KvkStatsCardContext:
     camp_name: str | None = None
     overall_kvk_rank: int | None = None
     overall_kvk_total_governors: int | None = None
-    overall_kvk_percentile: float | None = None
+    overall_kvk_top_percent: float | None = None
 
 
 @dataclass(frozen=True)
@@ -57,7 +57,7 @@ class KvkStatsCardPayload:
     kingdom_rank: int | str | None = None
     overall_kvk_rank: int | None = None
     overall_kvk_total_governors: int | None = None
-    overall_kvk_percentile: float | None = None
+    overall_kvk_top_percent: float | None = None
     pass_stats: dict[str, int] = field(default_factory=dict)
     prekvk_rank: int | None = None
     prekvk_points: int | None = None
