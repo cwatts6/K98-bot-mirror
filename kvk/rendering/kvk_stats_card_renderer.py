@@ -587,7 +587,9 @@ def render_kvk_history_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCar
 
     _draw_card_header(draw, payload, title="KVK History", accent=(164, 220, 255))
 
-    summary_map = {label: _compact(value) for label, value in _nonzero_items(payload.history_summary)}
+    summary_map = {
+        label: _compact(value) for label, value in _nonzero_items(payload.history_summary)
+    }
     bests_map = {label: _compact(value) for label, value in _nonzero_items(payload.personal_bests)}
     matchmaking_snapshot = {
         label: _compact(value) for label, value in _nonzero_items(payload.matchmaking_snapshot)
