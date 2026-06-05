@@ -62,7 +62,10 @@ def test_fetch_context_includes_overall_kvk_rank(monkeypatch):
     assert context["overall_kvk_rank"] == 41
     assert context["overall_kvk_total_governors"] == 8734
     assert context["overall_kvk_top_percent"] == 0.47
-    assert any("vw_Player_Overall_KVK_Rank" in sql for sql, _params in cursor.executed)
+    rank_query = next(
+        sql for sql, _params in cursor.executed if "vw_Player_Overall_KVK_Rank" in sql
+    )
+    assert "ORDER BY overall_kvk_rank ASC" in rank_query
 
 
 def test_fetch_context_preserves_existing_context_when_rank_view_missing(monkeypatch, caplog):

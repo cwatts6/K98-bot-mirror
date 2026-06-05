@@ -6,8 +6,15 @@ import re
 
 import pytest
 
-SQL_REPO = Path(os.environ.get("K98_SQL_REPO", r"C:\K98-bot-SQL-Server"))
+K98_SQL_REPO_ENV = os.environ.get("K98_SQL_REPO")
+SQL_REPO = Path(K98_SQL_REPO_ENV) if K98_SQL_REPO_ENV else Path(r"C:\K98-bot-SQL-Server")
 SQL_SCHEMA = SQL_REPO / "sql_schema"
+
+
+def _running_in_ci() -> bool:
+    return any(
+        os.environ.get(name) for name in ("CI", "GITHUB_ACTIONS", "BUILD_BUILDID", "TF_BUILD")
+    )
 
 
 def _normalise_sql(sql: str) -> str:
@@ -19,8 +26,13 @@ def _normalise_sql(sql: str) -> str:
 def _read_sql_file(name: str) -> str:
     path = SQL_SCHEMA / name
     if not path.exists():
-        if "K98_SQL_REPO" in os.environ:
-            pytest.fail(f"SQL repo file not available: {path}")
+        if not K98_SQL_REPO_ENV:
+            pytest.skip(
+                "SQL contract tests require the external SQL repository; "
+                f"set K98_SQL_REPO to enable them. Missing expected file: {path}"
+            )
+        if _running_in_ci():
+            pytest.fail(f"SQL repo file not available in CI: {path}")
         pytest.skip(f"SQL repo file not available: {path}")
     return path.read_text(encoding="utf-8-sig")
 

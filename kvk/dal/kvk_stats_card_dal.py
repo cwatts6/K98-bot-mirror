@@ -71,6 +71,7 @@ def fetch_kvk_stats_card_context(kvk_no: int | None, governor_id: str) -> dict[s
                 FROM KVK.vw_Player_Overall_KVK_Rank
                 WHERE KVK_NO = ?
                   AND governor_id = ?
+                ORDER BY overall_kvk_rank ASC
                 """,
                 (int(kvk_no), gov_int),
             )
