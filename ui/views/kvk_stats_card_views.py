@@ -171,12 +171,15 @@ class KvkStatsCardView(discord.ui.View):
             return discord.File(BytesIO(self._history_bytes), filename=self._history_filename)
         return None
 
-    async def _edit_host_message(self, interaction: discord.Interaction, **kwargs) -> None:
+    async def _defer_interaction(self, interaction: discord.Interaction) -> None:
         try:
             if not interaction.response.is_done():
                 await interaction.response.defer()
         except Exception:
             pass
+
+    async def _edit_host_message(self, interaction: discord.Interaction, **kwargs) -> None:
+        await self._defer_interaction(interaction)
         message = getattr(interaction, "message", None)
         if message is not None:
             self.message = message
@@ -195,6 +198,7 @@ class KvkStatsCardView(discord.ui.View):
         )
 
     async def _show_more_stats(self, interaction: discord.Interaction) -> None:
+        await self._defer_interaction(interaction)
         try:
             if self._more_stats_bytes is None or self._more_stats_filename is None:
                 rendered = await asyncio.to_thread(render_kvk_more_stats_card, self.payload)
@@ -226,6 +230,7 @@ class KvkStatsCardView(discord.ui.View):
         )
 
     async def _show_history(self, interaction: discord.Interaction) -> None:
+        await self._defer_interaction(interaction)
         try:
             if self._history_bytes is None or self._history_filename is None:
                 rendered = await asyncio.to_thread(render_kvk_history_card, self.payload)

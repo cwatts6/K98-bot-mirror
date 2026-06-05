@@ -45,7 +45,7 @@ Follow-up user review identified these Phase 3B improvements:
 
 - Compact values should display fewer decimals, for example `124.1M` instead of `124.135M`.
 - Card background should change by KVK mode from `dbo.KVK_Details.KVK_NAME`.
-- `assets/kvk/cards/heroic_anthem_stats_card.jpg` has been added locally and should be used for Heroic Anthem mode.
+- `assets/kvk/cards/Heroic_Anthem_Stats_Card.jpg` has been added locally and should be used for Heroic Anthem mode.
 - Rank needs a trophy emoji or suitable trophy visual marker.
 - Kills target progress ticks should scale beyond `150%` for high performers, including players around `225%`.
 - `More Stats` and `History` should become Pillow-rendered cards rather than remaining plain embed-style detail views.
@@ -58,7 +58,7 @@ Follow-up user review identified these Phase 3B improvements:
 - Reduce compact stat formatting on the main card to one decimal place for `M`, `B`, and similar large values where appropriate.
 - Add KVK mode background selection using the existing `KVK_NAME`/mode value from the Phase 3 payload or service layer.
 - Use `Tides_Stats_Card.png` for `Tides of War`.
-- Use `heroic_anthem_stats_card.jpg` for `Heroic Anthem`.
+- Use `Heroic_Anthem_Stats_Card.jpg` for `Heroic Anthem`.
 - Preserve a safe fallback background when KVK mode is missing, unknown, or the mapped asset is unavailable.
 - Add a trophy emoji or suitable trophy marker next to the rank label without disrupting the rank layout.
 - Make kills target progress bar ticks dynamic for high progress values, including values above `150%` and around `225%`.
@@ -204,7 +204,7 @@ Review and document:
 - Use a normalized mapping so small text variations do not break background selection.
 - Required mappings:
   - `Tides of War` -> `assets/kvk/cards/Tides_Stats_Card.png`
-  - `Heroic Anthem` -> `assets/kvk/cards/heroic_anthem_stats_card.jpg`
+  - `Heroic Anthem` -> `assets/kvk/cards/Heroic_Anthem_Stats_Card.jpg`
 - Unknown or missing KVK mode should fall back to the current Tides card or an explicit default background without failing the command.
 - Renderer tests should cover known, unknown, and missing mode values.
 
@@ -239,7 +239,8 @@ Review and document:
 
 - Convert the `History` view to a Pillow-rendered card if the audit confirms it is PR-sized.
 - Preserve current data content unless an ordering change is explicitly part of this task.
-- Improve visual hierarchy with grouped sections, for example historical summary, personal bests, last KVK summary, and matchmaking snapshot.
+- Improve visual hierarchy with grouped sections, for example historical summary, personal bests, and last KVK summary.
+- Exclude matchmaking snapshot data from the History card; it is not historical context for this view.
 - Filter falsey/empty values so the card does not present zero-filled placeholders as meaningful history.
 - Use clear empty states and keep `Main Card` navigation available.
 
@@ -340,7 +341,7 @@ Visual validation:
 - [ ] `/mykvkstats` remains on the original legacy embed path.
 - [ ] Main-card compact stat values use one decimal place.
 - [ ] Tides of War mode uses the Tides background.
-- [ ] Heroic Anthem mode uses `heroic_anthem_stats_card.jpg`.
+- [ ] Heroic Anthem mode uses `Heroic_Anthem_Stats_Card.jpg`.
 - [ ] Unknown/missing mode falls back safely.
 - [ ] Rank includes a trophy emoji or suitable trophy marker.
 - [ ] Kills target progress ticks scale dynamically for high performers, including around `225%`.
@@ -451,7 +452,7 @@ Main-card polish requirements:
 - compact stat values should use one decimal place, e.g. 124.1M and 18.9M
 - background selection should use KVK mode from dbo.KVK_Details.KVK_NAME
 - Tides of War uses Tides_Stats_Card.png
-- Heroic Anthem uses heroic_anthem_stats_card.jpg
+- Heroic Anthem uses Heroic_Anthem_Stats_Card.jpg
 - add a trophy emoji or suitable trophy marker next to Rank
 - progress ticks should scale dynamically for high performers, including around 225%
 

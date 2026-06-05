@@ -108,10 +108,16 @@ def test_history_embed_filters_zero_summary_and_personal_best_rows():
 
 
 class _Response:
+    def __init__(self, events: list[str] | None = None):
+        self._done = False
+        self.events = events if events is not None else []
+
     def is_done(self):
-        return False
+        return self._done
 
     async def defer(self):
+        self.events.append("defer")
+        self._done = True
         return None
 
 
@@ -123,8 +129,8 @@ class _Message:
         self.edits.append(kwargs)
 
 
-def _interaction(message: _Message):
-    return SimpleNamespace(response=_Response(), message=message)
+def _interaction(message: _Message, events: list[str] | None = None):
+    return SimpleNamespace(response=_Response(events), message=message)
 
 
 @pytest.mark.asyncio
@@ -146,6 +152,29 @@ async def test_more_stats_button_prefers_rendered_card(monkeypatch):
 
     assert message.edits[-1]["embeds"] == []
     assert message.edits[-1]["files"][0].filename == "more.png"
+
+
+@pytest.mark.asyncio
+async def test_more_stats_button_defers_before_render(monkeypatch):
+    import ui.views.kvk_stats_card_views as views
+
+    events: list[str] = []
+
+    def fake_render(_payload):
+        events.append("render")
+        return SimpleNamespace(
+            filename="more.png",
+            image_bytes=BytesIO(b"more-card-bytes"),
+        )
+
+    monkeypatch.setattr(views, "render_kvk_more_stats_card", fake_render)
+    rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main-card-bytes"))
+    view = KvkStatsCardView(payload=_payload(), rendered=rendered)
+    message = _Message()
+
+    await view._show_more_stats(_interaction(message, events))
+
+    assert events[:2] == ["defer", "render"]
 
 
 @pytest.mark.asyncio
@@ -182,3 +211,26 @@ async def test_history_button_prefers_rendered_card(monkeypatch):
 
     assert message.edits[-1]["embeds"] == []
     assert message.edits[-1]["files"][0].filename == "history.png"
+
+
+@pytest.mark.asyncio
+async def test_history_button_defers_before_render(monkeypatch):
+    import ui.views.kvk_stats_card_views as views
+
+    events: list[str] = []
+
+    def fake_render(_payload):
+        events.append("render")
+        return SimpleNamespace(
+            filename="history.png",
+            image_bytes=BytesIO(b"history-card-bytes"),
+        )
+
+    monkeypatch.setattr(views, "render_kvk_history_card", fake_render)
+    rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main-card-bytes"))
+    view = KvkStatsCardView(payload=_payload(), rendered=rendered)
+    message = _Message()
+
+    await view._show_history(_interaction(message, events))
+
+    assert events[:2] == ["defer", "render"]
