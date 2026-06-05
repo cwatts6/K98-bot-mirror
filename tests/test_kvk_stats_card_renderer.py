@@ -13,6 +13,8 @@ from kvk.rendering.kvk_stats_card_renderer import (
     _background_for_mode,
     _compact,
     _history_background,
+    _main_rank_value,
+    _overall_kvk_rank_value,
     _pct,
     _progress_scale,
     render_kvk_history_card,
@@ -131,6 +133,22 @@ def test_background_selection_uses_mode_specific_assets_and_default():
     assert _background_for_mode("Songs of Troy").name == "Songs_of_Troy_Stats_card.jpg"
     assert _background_for_mode("Unknown Mode").name == "Default_card.jpg"
     assert _background_for_mode(None).name == "Default_card.jpg"
+
+
+def test_main_rank_uses_kvk_rank_not_power_rank():
+    payload = replace(_payload(), kvk_rank=23, kingdom_rank=8)
+
+    assert _main_rank_value(payload) == "#23"
+
+
+def test_main_rank_does_not_fall_back_to_power_rank():
+    payload = replace(_payload(), kvk_rank=None, kingdom_rank=8)
+
+    assert _main_rank_value(payload) == "N/A"
+
+
+def test_overall_kvk_rank_is_placeholder_until_phase_3c_data_contract():
+    assert _overall_kvk_rank_value() == "TBC"
 
 
 def test_history_background_uses_history_card_asset():

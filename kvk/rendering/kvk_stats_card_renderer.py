@@ -230,6 +230,14 @@ def _rank_value(value: int | str | None) -> str:
     return f"#{value}"
 
 
+def _main_rank_value(payload: KvkStatsCardPayload) -> str:
+    return _rank_value(payload.kvk_rank)
+
+
+def _overall_kvk_rank_value() -> str:
+    return "TBC"
+
+
 def _pass_window(payload: KvkStatsCardPayload, pass_no: int) -> tuple[int, int]:
     return (
         int(payload.pass_stats.get(f"Pass {pass_no} Kills", 0) or 0),
@@ -369,7 +377,7 @@ def render_kvk_stats_card(
     _draw_text(
         draw, (rank_x, 56), "\U0001f3c6 RANK", fill=TEXT, font=_font(25, bold=True), bold=True
     )
-    rank_value = _rank_value(payload.kingdom_rank or payload.kvk_rank)
+    rank_value = _main_rank_value(payload)
     _draw_text(draw, (rank_x, 88), rank_value, fill=TEXT, font=_font(50, bold=True), bold=True)
 
     col_w = 230
@@ -486,18 +494,14 @@ def render_kvk_more_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStats
     _draw_card_header(draw, payload, title="More KVK Stats")
 
     rank_x = 930
-    _draw_text(
-        draw,
-        (rank_x, 50),
-        "\U0001f3c6 KVK RANK",
-        fill=TEXT,
-        font=_font(22, bold=True),
-        bold=True,
-    )
+    rank_label_x = 875
+    rank_label = "\U0001f3c6 OVERALL KVK RANK"
+    rank_font = _fit_font(draw, rank_label, max_width=265, size=22, min_size=16, bold=True)
+    _draw_text(draw, (rank_label_x, 50), rank_label, fill=TEXT, font=rank_font, bold=True)
     _draw_text(
         draw,
         (rank_x, 82),
-        _rank_value(payload.kvk_rank),
+        _overall_kvk_rank_value(),
         fill=TEXT,
         font=_font(46, bold=True),
         bold=True,

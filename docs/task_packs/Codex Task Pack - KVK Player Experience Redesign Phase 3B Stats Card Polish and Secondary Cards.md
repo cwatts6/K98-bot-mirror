@@ -211,6 +211,8 @@ Review and document:
 ### 12.3 Rank Marker
 
 - Add a trophy emoji or suitable trophy marker next to the rank label.
+- Main-card `Rank` must display the existing `KVK_RANK` value from the stats payload.
+- More Stats `Overall KVK Rank` should display `TBC` until Phase 3C introduces a durable SQL-backed overall KVK rank source.
 - Keep rank readable and avoid reintroducing a boxed badge.
 - Ensure the marker renders with the configured font fallback or use a safe text/icon fallback if emoji support is unreliable.
 
@@ -344,6 +346,8 @@ Visual validation:
 - [ ] Heroic Anthem mode uses `Heroic_Anthem_Stats_Card.jpg`.
 - [ ] Unknown/missing mode falls back safely.
 - [ ] Rank includes a trophy emoji or suitable trophy marker.
+- [ ] Main-card rank uses `KVK_RANK`.
+- [ ] More Stats overall KVK rank is marked `TBC` until Phase 3C data support is available.
 - [ ] Kills target progress ticks scale dynamically for high performers, including around `225%`.
 - [ ] Bar fill reflects progress within the selected scale.
 - [ ] `More Stats` ordering and visual hierarchy are reviewed and improved.
