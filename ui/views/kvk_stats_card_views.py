@@ -90,6 +90,7 @@ def build_history_embed(payload: KvkStatsCardPayload) -> discord.Embed:
     )
     history_summary = _nonzero_items(payload.history_summary)
     personal_bests = _nonzero_items(payload.personal_bests)
+    matchmaking_snapshot = _nonzero_items(payload.matchmaking_snapshot)
     if history_summary:
         embed.add_field(
             name="Summary",
@@ -134,6 +135,12 @@ def build_history_embed(payload: KvkStatsCardPayload) -> discord.Embed:
         )
     else:
         embed.add_field(name="Last KVK Summary", value="No history data available.", inline=False)
+    if matchmaking_snapshot:
+        embed.add_field(
+            name="Matchmaking Snapshot",
+            value="\n".join(_line(label, _compact(value)) for label, value in matchmaking_snapshot),
+            inline=False,
+        )
 
     embed.set_footer(text="Use Main Card to return to the visual card.")
     return embed

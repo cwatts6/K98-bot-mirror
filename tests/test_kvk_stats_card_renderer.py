@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from io import BytesIO
 
 from PIL import Image
@@ -147,3 +148,12 @@ def test_secondary_cards_render_pngs():
     assert history is not None
     assert history.filename == "kvk_history_58744139.png"
     assert Image.open(BytesIO(history.image_bytes.getvalue())).size == (1180, 640)
+
+
+def test_history_card_snapshot_metrics_affect_rendered_output():
+    with_snapshot = render_kvk_history_card(_payload())
+    without_snapshot = render_kvk_history_card(replace(_payload(), matchmaking_snapshot={}))
+
+    assert with_snapshot is not None
+    assert without_snapshot is not None
+    assert with_snapshot.image_bytes.getvalue() != without_snapshot.image_bytes.getvalue()
