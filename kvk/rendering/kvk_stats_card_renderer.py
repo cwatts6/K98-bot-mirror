@@ -587,16 +587,14 @@ def render_kvk_history_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCar
 
     _draw_card_header(draw, payload, title="KVK History", accent=(164, 220, 255))
 
-    summary = [(label, _compact(value)) for label, value in _nonzero_items(payload.history_summary)]
-    bests = [(label, _compact(value)) for label, value in _nonzero_items(payload.personal_bests)]
+    summary_map = {label: _compact(value) for label, value in _nonzero_items(payload.history_summary)}
+    bests_map = {label: _compact(value) for label, value in _nonzero_items(payload.personal_bests)}
     matchmaking_snapshot = {
         label: _compact(value) for label, value in _nonzero_items(payload.matchmaking_snapshot)
     }
 
     col_w = 230
     col_x = (45, 315, 585, 855)
-    summary_map = dict(summary)
-    bests_map = dict(bests)
     _metric(
         draw,
         x=col_x[0],
@@ -629,7 +627,7 @@ def render_kvk_history_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCar
         x=col_x[3],
         y=195,
         w=col_w,
-        title="MM KP",
+        title="Matchmaking KP",
         value=matchmaking_snapshot.get("MM KP", "N/A"),
         color=GOLD,
     )
@@ -666,7 +664,7 @@ def render_kvk_history_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCar
         x=col_x[3],
         y=325,
         w=col_w,
-        title="MM Kills",
+        title="Matchmaking Kills",
         value=matchmaking_snapshot.get("MM Kills", "N/A"),
         color=GREEN,
     )
