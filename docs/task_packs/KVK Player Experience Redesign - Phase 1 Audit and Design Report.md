@@ -13,6 +13,12 @@ promoted to production. The active player command surface now includes `/kvk sta
 `/kvk targets`, `/kvk history`, and `/kvk rankings type:<kvk|honor|prekvk>` while legacy flat
 commands remain live during rollout.
 
+Phase 3 completion update: `/kvk stats` now uses the modern generated card flow delivered across
+PRs #142, #143, and #144. The rollout includes the main stats card, More Stats and compact History
+cards, SQL-backed overall KVK rank context with total governors and top-percent copy, mode-specific
+backgrounds, high-progress scale handling, and embed fallbacks. The legacy `/mykvkstats` path
+remains live during parallel validation.
+
 ## 1. Summary
 
 The programme goal is sound: the current KVK player experience is valuable but fragmented across flat legacy commands, mixed modules, and inconsistent output styles. The target should be a coherent player journey around:
@@ -34,10 +40,12 @@ Approved Phase 2 direction and delivery status:
 4. Preserve `/kvk stats` visibility semantics: account selection is private, but selected
    single-account stats post publicly. Complete.
 5. Include Acclaim/contribution metrics in the programme once SQL source, naming, and display
-   rules are validated. Still pending for a later phase.
+   rules are validated. Phase 3 displays Acclaim in the stats card where the current payload
+   contract supports it; broader target/history semantics remain subject to phase-specific SQL
+   validation.
 6. Treat KVK targets service/DAL cleanup as in-programme work, not deferred out of the redesign.
    Still pending for the targets visual/service phase or a focused cleanup pack.
-7. Define a KVK stats service payload dataclass before Phase 3 visual rendering. Next action.
+7. Define a KVK stats service payload dataclass before Phase 3 visual rendering. Complete.
 
 ## 2. Current Command Inventory
 

@@ -292,26 +292,46 @@ Delivered details:
 
 ### Phase 3C - Overall KVK Rank Data Contract and Card Polish
 
-Status: ready for task execution.
+Status: complete. Delivered in mirror PR #144 and pushed to production. Companion SQL PR #14 was
+deployed and tested successfully before the bot rollout.
 
-Create the durable data contract required to replace the More Stats `Overall KVK Rank` placeholder,
-then polish the remaining Phase 3B card issues found during production smoke testing.
+Delivered details:
 
-Planned scope:
+- Added SQL-backed overall KVK rank data via `KVK.vw_Player_Overall_KVK_Rank`.
+- The SQL contract exposes `overall_kvk_rank`, `overall_kvk_total_governors`, and
+  `overall_kvk_top_percent`.
+- Bot DAL/service/payload code reads the rank context through the KVK stats card layers, with a
+  safe fallback when the SQL view is unavailable.
+- More Stats now presents the rank context as:
 
-- create a SQL view over `KVK.KVK_Player_Windowed` that derives overall KVK rank for `WindowName = 'Full'`
-- rank by `kp_gain_recalc DESC` with a deterministic tie-breaker such as `governor_id ASC`
-- retrieve the derived overall rank through bot DAL/service code and populate the More Stats card
-- keep the main card rank sourced from existing `KVK_RANK`
-- make More Stats row typography consistent, especially Pass 4 versus Pass 6 value sizing
-- audit the History card `Highest Acclaim` versus `Last KVK Acclaim` source/rounding discrepancy before agreeing any data or formatting fix
-- update tests, SQL validation evidence, and visual samples
+```text
+KVK Overall Rank
+#41
+Total 8.7k / Top 0.5%
+```
+
+- Main-card `Rank` remains sourced from existing `KVK_RANK`.
+- Rank/title alignment was cleaned up on the main and More Stats cards.
+- More Stats pass-window row values now use a shared fitted font size.
+- Kills and DKP progress gold now share the same card gold.
+- SQL review learnings were applied: the top-percent metric is named by meaning rather than as a
+  conventional percentile, the DAL `TOP 1` lookup is deterministically ordered, and external SQL
+  contract tests skip locally but fail in CI when the configured SQL file is missing.
 
 ### Phase 4 - Modern `/kvk targets` and Full `/kvk history`
 
-Apply the visual language to `/kvk targets` and the full `/kvk history` command.
+Status: ready for task execution.
 
-Targets should emphasise progress and next action. The full history command should emphasise comparability across KVKs and may remain table-first until chart/card generation is justified. Phase 3B only covers the compact History view attached to `/kvk stats`.
+Apply the Phase 3 visual language to `/kvk targets` and the full `/kvk history` command.
+
+Targets should emphasise progress, remaining work, explanations for missing/exempt targets, and a
+clear next action. The full history command should emphasise comparability across KVKs and may
+remain table-first where that is more readable than a dense card. Phase 3B only covered the compact
+History view attached to `/kvk stats`; Phase 4 should decide the full-command output deliberately.
+
+Use:
+
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4 Modern Targets and Full History.md`
 
 ### Phase 5 — Unified `/kvk rankings` Visual/UX Polish
 
@@ -461,12 +481,14 @@ Do not include these in the early phases unless separately approved:
 Proceed with:
 
 ```text
-KVK Player Experience Redesign - Phase 3C Overall KVK Rank Data Contract and Card Polish
+KVK Player Experience Redesign - Phase 4 Modern Targets and Full History
 ```
 
 Phase 1 audit/design, Phase 2A admin collision resolution, and Phase 2B player `/kvk` scaffold are
 complete. Phase 3 has delivered the modern `/kvk stats` visual card while preserving the legacy
 `/mykvkstats` embed during rollout. Phase 3B has polished the card, added KVK mode-specific
 background selection, improved high-progress target scaling, and moved the attached `More Stats`
-and `History` views to Pillow-rendered cards. Phase 3C should add the SQL-backed overall KVK rank
-source for the More Stats card and address the remaining typography/acclaim-source review items.
+and `History` views to Pillow-rendered cards. Phase 3C has delivered the SQL-backed overall KVK
+rank source, total-governor/top-percent context, rank alignment, progress-gold consistency, and
+review hardening. Phase 4 should now modernise `/kvk targets` and the full `/kvk history` path
+while preserving legacy commands during rollout.

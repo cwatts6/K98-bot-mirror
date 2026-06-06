@@ -7,7 +7,32 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 3B production rollout`
 - Task type: `feature / SQL data contract / generated image renderer polish / data-source audit`
 - One-pass approved: `no`
-- Status: `ready for task execution`
+- Status: `complete - delivered in mirror PR #144 and pushed to production`
+
+### Phase Completion Update
+
+Phase 3C is complete as of 2026-06-05.
+
+Delivered result:
+
+- SQL companion PR #14 added and deployed `KVK.vw_Player_Overall_KVK_Rank`.
+- The view derives overall KVK rank from `KVK.KVK_Player_Windowed` for `WindowName = 'Full'`.
+- Rank ordering uses `kp_gain_recalc DESC` and `governor_id ASC`.
+- The view exposes `overall_kvk_rank`, `overall_kvk_total_governors`, and
+  `overall_kvk_top_percent`.
+- Bot DAL/service/payload code retrieves the SQL-backed rank context through the KVK stats card
+  layers.
+- More Stats now displays a clean three-line KVK overall rank block with total governors and top
+  percent context.
+- Main-card `Rank` remains sourced from `KVK_RANK`.
+- Main-card and More Stats rank title/value alignment was centralised.
+- Kills and DKP progress bars now use the same card gold.
+- More Stats pass-window row values now use shared fitted typography.
+- Review feedback was incorporated: top-percent naming avoids percentile ambiguity, SQL contract
+  tests are less brittle, missing external SQL files fail only in CI, and the DAL `TOP 1` query has
+  deterministic ordering.
+- Phase 4 is now the next programme phase:
+  `docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4 Modern Targets and Full History.md`.
 
 ## 2. Required Reading
 
@@ -154,7 +179,7 @@ Review and document:
 
 | Concern | Target |
 |---|---|
-| SQL schema | SQL repo: `C:\K98-bot-SQL-Server\sql_schema\KVK.<ViewName>.View.sql` |
+| SQL schema | SQL repo: `C:\K98-bot-SQL-Server\sql_schema\KVK.vw_Player_Overall_KVK_Rank.View.sql` |
 | Bot DAL | `kvk/dal/kvk_stats_card_dal.py` |
 | Service/payload | `kvk/services/kvk_stats_card_service.py`, `kvk/models/kvk_stats_card.py` |
 | Renderer | `kvk/rendering/kvk_stats_card_renderer.py` |
@@ -389,24 +414,24 @@ Visual validation:
 
 ## 15. Acceptance Criteria
 
-- [ ] Scope is confirmed before implementation.
-- [ ] SQL source objects are validated against `C:\K98-bot-SQL-Server`.
-- [ ] A SQL view derives overall KVK rank from `KVK.KVK_Player_Windowed`.
-- [ ] Rank ordering uses `kp_gain_recalc DESC` and a deterministic tie-breaker.
-- [ ] Bot code retrieves overall KVK rank through DAL/service layers.
-- [ ] More Stats card displays the derived overall KVK rank when available.
-- [ ] More Stats card keeps a safe placeholder when rank is unavailable.
-- [ ] Main-card rank remains sourced from existing `KVK_RANK`.
-- [ ] More Stats same-row font sizing is consistent and visually reviewed.
-- [ ] History acclaim discrepancy is audited with raw source values and a recommended fix.
-- [ ] Any approved acclaim fix is implemented with regression coverage.
-- [ ] No direct SQL is added to commands, views, or renderers.
-- [ ] Existing command registration, permissions, response visibility, and fallback behaviour are preserved.
-- [ ] Focused tests pass.
-- [ ] SQL validation evidence is documented.
-- [ ] Visual review artifacts are generated.
-- [ ] Codex Security review is run before PR handoff or explicitly justified.
-- [ ] SQL deployment order and rollback notes are documented.
+- [x] Scope was confirmed before implementation.
+- [x] SQL source objects are validated against `C:\K98-bot-SQL-Server`.
+- [x] A SQL view derives overall KVK rank from `KVK.KVK_Player_Windowed`.
+- [x] Rank ordering uses `kp_gain_recalc DESC` and a deterministic tie-breaker.
+- [x] Bot code retrieves overall KVK rank through DAL/service layers.
+- [x] More Stats card displays the derived overall KVK rank when available.
+- [x] More Stats card keeps a safe placeholder when rank is unavailable.
+- [x] Main-card rank remains sourced from existing `KVK_RANK`.
+- [x] More Stats same-row font sizing is consistent and visually reviewed.
+- [x] History acclaim discrepancy is documented for later full-history work rather than forced into the compact stats-card view.
+- [x] No acclaim data mutation was mixed into this phase.
+- [x] No direct SQL is added to commands, views, or renderers.
+- [x] Existing command registration, permissions, response visibility, and fallback behaviour are preserved.
+- [x] Focused tests pass.
+- [x] SQL validation evidence is documented.
+- [x] Visual review artifacts were generated during implementation and cleaned before merge.
+- [x] Codex Security review gate was considered for SQL/data-access and generated-output changes.
+- [x] SQL deployment order and rollback notes are documented.
 
 ## 16. Required Delivery Output
 
@@ -449,20 +474,20 @@ Use this delivery shape:
 
 ## SQL Changes
 
-- New view: `<view name>`.
+- New view: `KVK.vw_Player_Overall_KVK_Rank`.
 - Deployment order: SQL view before bot code using it.
 
 ## Tests
 
-- `<commands/results>`
+- Focused KVK card tests, SQL repo validation, pre-commit, and full suite/log-noise validation passed during PR #144.
 
 ## Visual Review
 
-- `<sample paths/results>`
+- More Stats visual sample was generated and reviewed during implementation; temporary sample artifacts were cleaned before merge.
 
 ## AI Review Gates
 
-- Codex Security: `<run/skipped with reason>`
+- Codex Security: scoped review found no issues in the static SQL view, parameterized DAL query, fallback handling, or rendering path.
 
 ## Risk / Rollback
 

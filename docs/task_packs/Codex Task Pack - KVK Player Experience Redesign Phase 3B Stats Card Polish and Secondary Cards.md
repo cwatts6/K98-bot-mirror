@@ -26,9 +26,13 @@ Delivered result:
 - Secondary-card interaction callbacks defer before rendering.
 - `/mykvkstats` remains on the legacy embed path.
 
-Follow-on work has been split into Phase 3C:
+Follow-on work was completed in Phase 3C:
 
 `docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 3C Overall Rank and Card Polish.md`
+
+The next active programme phase is Phase 4:
+
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4 Modern Targets and Full History.md`
 
 ## 2. Required Reading
 

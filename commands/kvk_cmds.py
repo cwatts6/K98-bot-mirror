@@ -11,6 +11,7 @@ from account_picker import safe_build_unique_gov_options
 from bot_config import GUILD_ID, KVK_PLAYER_STATS_CHANNEL_ID, KVK_TARGET_CHANNEL_ID
 from build_KVKrankings_embed import build_kvkrankings_embed
 from commands.kvk_stats_card_posting import post_kvk_stats_output
+from commands.kvk_targets_card_posting import post_kvk_targets_output
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import channel_only, track_usage
 from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
@@ -209,7 +210,11 @@ async def _send_personal_kvk_targets(
         last_kvk_map = {}
 
     if governor_id and governor_id.strip().isdigit():
-        await run_target_lookup(ctx.interaction, governor_id.strip(), ephemeral=only_me)
+        try:
+            await post_kvk_targets_output(ctx.interaction, governor_id.strip(), ephemeral=only_me)
+        except Exception:
+            logger.exception("[/kvk targets] modern target output failed; falling back")
+            await run_target_lookup(ctx.interaction, governor_id.strip(), ephemeral=only_me)
         try:
             await ctx.interaction.edit_original_response(content=" ", view=None)
         except Exception:
@@ -230,7 +235,11 @@ async def _send_personal_kvk_targets(
 
     options = safe_build_unique_gov_options(account_summary)
     if options and len(options) == 1:
-        await run_target_lookup(ctx.interaction, options[0].value, ephemeral=only_me)
+        try:
+            await post_kvk_targets_output(ctx.interaction, options[0].value, ephemeral=only_me)
+        except Exception:
+            logger.exception("[/kvk targets] modern target output failed; falling back")
+            await run_target_lookup(ctx.interaction, options[0].value, ephemeral=only_me)
         try:
             await ctx.interaction.edit_original_response(content=" ", view=None)
         except Exception:
@@ -240,7 +249,11 @@ async def _send_personal_kvk_targets(
     async def _on_select(
         interaction: discord.Interaction, selected_governor_id: str, ephemeral: bool
     ) -> None:
-        await run_target_lookup(interaction, selected_governor_id, ephemeral=ephemeral)
+        try:
+            await post_kvk_targets_output(interaction, selected_governor_id, ephemeral=ephemeral)
+        except Exception:
+            logger.exception("[/kvk targets] selected modern target output failed; falling back")
+            await run_target_lookup(interaction, selected_governor_id, ephemeral=ephemeral)
 
     if options:
         try:
