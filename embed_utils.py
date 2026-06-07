@@ -1534,15 +1534,7 @@ def build_stats_embed(governor_data, discord_user) -> tuple[list[discord.Embed],
         dt = parse_last_refresh_utc(val)
         if dt is not None:
             return dt.strftime("%d %B %Y %H:%M UTC")
-        if isinstance(val, datetime):
-            return val.strftime("%d %B %Y")
-        try:
-            s = str(val)
-            if s.endswith("Z"):
-                s = s.replace("Z", "+00:00")
-            return datetime.fromisoformat(s).strftime("%d %B %Y")
-        except Exception:
-            return "—"
+        return "—"
 
     last_refresh_str = _fmt_last_refresh(last_refresh)
 
