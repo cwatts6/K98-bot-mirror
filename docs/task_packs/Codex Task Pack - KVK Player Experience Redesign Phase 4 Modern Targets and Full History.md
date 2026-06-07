@@ -7,20 +7,72 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 3C production rollout`
 - Task type: `feature / UX redesign / generated image renderer / Discord interaction polish / service-DAL cleanup`
 - One-pass approved: `no`
-- Status: `in progress - Phase 4A targets optimisation approved`
+- Status: `complete - Phase 4A targets optimisation delivered in mirror PR #145 and promoted to production`
 
 ### Phase Split Update
 
-Implementation is split after the initial audit:
+Implementation was split after the initial audit:
 
 - Phase 4A: fully optimise `/kvk targets` first, including target service/DAL/payload cleanup,
   modern generated target card output, clear progress/remaining-work states, and tested fallback
-  behaviour.
+  behaviour. This is complete.
 - Phase 4B: defer full `/kvk history` redesign until it can be scoped separately around the best
   data contract and presentation model for long-history comparison.
 
-Legacy `/mykvktargets` and `/mykvkhistory` remain live during the split. `/kvk history` remains on
-the existing chart/table/CSV journey until Phase 4B is approved.
+Legacy `/mykvktargets` and `/mykvkhistory` remain live after Phase 4A. `/kvk history` and
+`/mykvkhistory` remain on the existing chart/table/CSV journey until Phase 4B is audited,
+optioneered, approved, and implemented.
+
+Do not continue history work from this combined Phase 4 pack. Use:
+
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
+
+### Phase 4A Delivery Update
+
+Phase 4A was completed in mirror PR #145 and promoted to production.
+
+Delivered user-facing behaviour:
+
+- `/kvk targets` now renders a modern generated targets card aligned with the Phase 3 stats-card
+  visual language.
+- `/mykvktargets` remains on the legacy output path for parallel rollout.
+- The targets card uses the same mode-specific KVK background approach as the stats and secondary
+  cards.
+- Header layout now matches the stats card pattern: KVK context, camp where available, MM power,
+  Discord avatar, governor name, and Governor ID.
+- The card presents a clean 4-column target row and 4-column Last KVK comparison row.
+- Kills, deads, DKP, and acclaim use the shared stats-card colour language: green, red, purple,
+  and gold.
+- Acclaim target is a placeholder until acclaim targets exist; it displays `TBC` plus supporting
+  copy.
+- Last KVK comparison values use actual / target / percent where targets exist.
+- The Last KVK note uses performance-aware copy and colours only the note body by outcome.
+- Footer shows target refresh time and source state.
+
+Delivered architecture:
+
+- Added renderer-independent target payload/model code.
+- Added target DAL/service boundaries for card output.
+- Kept command code thin and preserved fallback behaviour.
+- Added generated-card rendering with embed fallback.
+- Kept `/mykvktargets` live and unchanged.
+- Added focused service, renderer, posting, and command tests.
+- Ignored local `.codex_artifacts/` generated preview output.
+
+Validated delivery:
+
+- Focused target tests passed.
+- Full test suite passed during PR validation.
+- Pre-commit, architecture validation, deferred-item validation, smoke imports, and command
+  registration validation passed.
+
+Still to do:
+
+- Phase 4B: audit and redesign the full `/kvk history` / `/mykvkhistory` journey.
+- Decide whether history should remain chart/table-first, become a hybrid summary plus detailed
+  chart/table/export flow, or use a different interaction model.
+- Preserve long-history readability, CSV export, account controls, metric controls, and existing
+  useful affordances unless the approved Phase 4B design replaces them deliberately.
 
 ## 2. Required Reading
 
@@ -523,32 +575,12 @@ Use this delivery shape:
 - Rollback: revert `/kvk targets` and/or `/kvk history` wiring to the existing embed/table output while leaving legacy paths live.
 ```
 
-## 18. Codex Chat Starter
+## 18. Historical Codex Chat Starter
 
 ```text
-Codex, start Phase 4 of the KVK Player Experience Redesign: Modern Targets and Full History.
+This pack is closed as the Phase 4A targets execution record.
 
-Phase 3C is complete, merged, and pushed to production. SQL-backed overall KVK rank context is live
-for the More Stats card. Keep /kvk stats and /mykvkstats behaviour stable while working on targets
-and history.
+Do not start new history work from this file. Use:
 
-Before implementation, read:
-- AGENTS.md
-- README-DEV.md
-- docs/reference/README.md
-- docs/task_packs/KVK Player Experience Redesign - Programme Pack.md
-- docs/task_packs/KVK Player Experience Redesign - Phase 1 Audit and Design Report.md
-- docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4 Modern Targets and Full History.md
-
-Use the K98 repo workflow and required skills. First audit /kvk targets, /mykvktargets, /kvk
-history, and /mykvkhistory. Validate target and history source contracts against
-C:\K98-bot-SQL-Server before implementation.
-
-Targets should emphasise progress, remaining work, completion state, missing/exempt explanations,
-and next action. Full history should emphasise comparability across KVKs and may stay table-first or
-become a hybrid if that is clearer than forcing a dense image card.
-
-Do not remove legacy commands, change command registration, change KVK import/recompute/export, or
-add direct SQL to commands/views/renderers. Preserve permissions, visibility, account selection,
-fallback behaviour, and deployment safety.
+docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md
 ```

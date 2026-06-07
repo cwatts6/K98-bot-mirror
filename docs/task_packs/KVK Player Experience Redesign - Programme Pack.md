@@ -318,20 +318,48 @@ Total 8.7k / Top 0.5%
   conventional percentile, the DAL `TOP 1` lookup is deterministically ordered, and external SQL
   contract tests skip locally but fail in CI when the configured SQL file is missing.
 
-### Phase 4 - Modern `/kvk targets` and Full `/kvk history`
+### Phase 4A - Modern `/kvk targets`
 
-Status: ready for task execution.
+Status: complete. Delivered in mirror PR #145 and promoted to production.
 
-Apply the Phase 3 visual language to `/kvk targets` and the full `/kvk history` command.
+Applied the Phase 3 visual language to `/kvk targets` while preserving `/mykvktargets` as the
+legacy output path.
 
-Targets should emphasise progress, remaining work, explanations for missing/exempt targets, and a
-clear next action. The full history command should emphasise comparability across KVKs and may
-remain table-first where that is more readable than a dense card. Phase 3B only covered the compact
-History view attached to `/kvk stats`; Phase 4 should decide the full-command output deliberately.
+Delivered details:
+
+- Added renderer-independent target payload/model code.
+- Added KVK target DAL/service/card-posting boundaries.
+- Added a Pillow-rendered targets card with embed fallback.
+- Matched the stats-card header, KVK-mode backgrounds, metric colours, footer freshness/state
+  treatment, and performance-note style.
+- Presented target values and Last KVK actual / target / percent comparisons in a clean 4-column
+  grid.
+- Kept Acclaim target as a `TBC` placeholder with next-KVK supporting copy.
+- Preserved account selection, visibility, fallback behaviour, command registration, and legacy
+  `/mykvktargets`.
+- Added focused service, renderer, posting, and command tests.
+- Ignored local `.codex_artifacts/` preview output.
+
+Execution record:
+
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4 Modern Targets and Full History.md`
+
+### Phase 4B - Full `/kvk history` Audit and Optioneering
+
+Status: ready for audit and analysis.
+
+The full `/kvk history` / `/mykvkhistory` journey remains on the existing chart, table image, CSV
+export, account selector, metric-button, custom-picker, and range-button output. This is a more
+complex data-analysis workflow than the targets card, so Phase 4B should audit current behaviour
+and compare options before implementation.
+
+The card approach may work for summary data, but the graph may need a different treatment. Phase
+4B should compare chart-first polish, hybrid summary-card plus detail flow, modern chart/table
+wrapper, data-first interactive browser, and data-contract-first options.
 
 Use:
 
-`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4 Modern Targets and Full History.md`
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
 
 ### Phase 5 — Unified `/kvk rankings` Visual/UX Polish
 
@@ -481,7 +509,7 @@ Do not include these in the early phases unless separately approved:
 Proceed with:
 
 ```text
-KVK Player Experience Redesign - Phase 4 Modern Targets and Full History
+KVK Player Experience Redesign - Phase 4B History Audit and Optioneering
 ```
 
 Phase 1 audit/design, Phase 2A admin collision resolution, and Phase 2B player `/kvk` scaffold are
@@ -490,5 +518,7 @@ complete. Phase 3 has delivered the modern `/kvk stats` visual card while preser
 background selection, improved high-progress target scaling, and moved the attached `More Stats`
 and `History` views to Pillow-rendered cards. Phase 3C has delivered the SQL-backed overall KVK
 rank source, total-governor/top-percent context, rank alignment, progress-gold consistency, and
-review hardening. Phase 4 should now modernise `/kvk targets` and the full `/kvk history` path
-while preserving legacy commands during rollout.
+review hardening. Phase 4A has delivered modern `/kvk targets` in PR #145 and promoted it to
+production. Phase 4B should now audit and optioneer the full `/kvk history` and `/mykvkhistory`
+journey before implementation, preserving legacy commands and existing chart/table/CSV
+functionality until an option is approved.
