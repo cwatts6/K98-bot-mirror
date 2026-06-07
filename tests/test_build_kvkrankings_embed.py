@@ -463,7 +463,35 @@ def test_build_embed_title_map():
 
 
 def test_build_embed_last_refresh_from_rows():
-    """Last refresh uses max value from rows."""
+    """Last refresh uses max parsed datetime value from included rows."""
+    rows = [
+        {
+            "GovernorID": "1",
+            "Starting Power": 100_000_000,
+            "LAST_REFRESH": "2026-02-08T01:00:00+00:00",
+            "STATUS": "INCLUDED",
+        },
+        {
+            "GovernorID": "2",
+            "Starting Power": 200_000_000,
+            "LAST_REFRESH": "2026-02-08T23:15:00+00:00",
+            "STATUS": "INCLUDED",
+        },
+        {
+            "GovernorID": "3",
+            "Starting Power": 300_000_000,
+            "LAST_REFRESH": "2026-02-09T00:01:00+00:00",
+            "STATUS": "EXEMPT",
+        },
+    ]
+    embed = build_kvkrankings_embed(rows, "power", 10)
+
+    assert embed.footer.text is not None
+    assert "2026-02-08 23:15 UTC" in embed.footer.text
+
+
+def test_build_embed_last_refresh_accepts_date_only_values():
+    """Date-only LAST_REFRESH values still display acceptably."""
     rows = [
         {
             "GovernorID": "1",
@@ -477,17 +505,11 @@ def test_build_embed_last_refresh_from_rows():
             "LAST_REFRESH": "2026-02-08",
             "STATUS": "INCLUDED",
         },
-        {
-            "GovernorID": "3",
-            "Starting Power": 300_000_000,
-            "LAST_REFRESH": "2026-02-06",
-            "STATUS": "INCLUDED",
-        },
     ]
     embed = build_kvkrankings_embed(rows, "power", 10)
 
     assert embed.footer.text is not None
-    assert "2026-02-08" in embed.footer.text  # Max date
+    assert "2026-02-08 00:00 UTC" in embed.footer.text
 
 
 def test_build_embed_no_last_refresh():

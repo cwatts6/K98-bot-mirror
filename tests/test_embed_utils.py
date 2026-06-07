@@ -6,6 +6,34 @@ import pytest
 pytest_plugins = ("pytest_asyncio",)
 
 
+def test_build_stats_embed_formats_last_refresh_with_utc_time(monkeypatch):
+    import io
+
+    import embed_utils
+
+    monkeypatch.setattr(embed_utils, "_load_last_kvk_for_governor", lambda _governor_id: None)
+    monkeypatch.setattr(embed_utils, "generate_progress_dial", lambda *_a, **_k: io.BytesIO(b"png"))
+
+    user = types.SimpleNamespace(mention="@Tester", display_avatar=None)
+    embeds, _file = embed_utils.build_stats_embed(
+        {
+            "GovernorID": "123",
+            "GovernorName": "Tester",
+            "KVK_NO": 54,
+            "KVK_RANK": 1,
+            "Starting Power": 100_000_000,
+            "T4&T5_Kills": 50_000_000,
+            "Kill Target": 100_000_000,
+            "LAST_REFRESH": "2026-06-03T07:53:12+00:00",
+            "STATUS": "INCLUDED",
+        },
+        user,
+    )
+
+    last_updated = next(field.value for field in embeds[1].fields if "Last Updated" in field.name)
+    assert "03 June 2026 07:53 UTC" in last_updated
+
+
 @pytest.mark.asyncio
 async def test_send_embed_safe_attaches_large_log(monkeypatch):
     """

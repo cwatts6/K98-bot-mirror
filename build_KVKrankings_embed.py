@@ -8,7 +8,7 @@ import unicodedata
 import discord
 
 # Import project standard formatter
-from utils import fmt_short
+from utils import fmt_short, parse_last_refresh_utc
 
 # Optional color/emoji fallbacks (use your constants if available)
 try:
@@ -398,8 +398,20 @@ def _get_last_refresh(rows: list[dict]) -> str | None:
     Returns:
         Max LAST_REFRESH value as string, or None if not available
     """
-    try:
-        candidates = [str(r.get("LAST_REFRESH") or "") for r in rows if r.get("LAST_REFRESH")]
-        return max(candidates) if candidates else None
-    except Exception:
-        return None
+    parsed_candidates = []
+    fallback_candidates = []
+    for row in rows:
+        raw = row.get("LAST_REFRESH")
+        if not raw:
+            continue
+        dt = parse_last_refresh_utc(raw)
+        if dt is not None:
+            parsed_candidates.append(dt)
+        else:
+            fallback_candidates.append(str(raw))
+
+    if parsed_candidates:
+        return max(parsed_candidates).strftime("%Y-%m-%d %H:%M UTC")
+    if fallback_candidates:
+        return max(fallback_candidates)
+    return None

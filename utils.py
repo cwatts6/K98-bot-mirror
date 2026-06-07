@@ -148,7 +148,7 @@ def normalize_governor_id(value) -> str:
         return s
 
 
-def _parse_last_refresh_utc(value) -> datetime | None:
+def parse_last_refresh_utc(value) -> datetime | None:
     """
     Best-effort parse of LAST_REFRESH into an aware UTC datetime.
 
@@ -174,6 +174,9 @@ def _parse_last_refresh_utc(value) -> datetime | None:
         return None
 
 
+_parse_last_refresh_utc = parse_last_refresh_utc
+
+
 def score_player_stats_rec(rec: dict | None) -> tuple[int, float, str]:
     """
     Canonical scoring function for deduplicating player stats rows.
@@ -189,7 +192,7 @@ def score_player_stats_rec(rec: dict | None) -> tuple[int, float, str]:
     inc = 1 if rec.get("STATUS") == "INCLUDED" else 0
 
     raw = rec.get("LAST_REFRESH") or ""
-    dt = _parse_last_refresh_utc(raw)
+    dt = parse_last_refresh_utc(raw)
     # Use timestamp as numeric sort key; None -> 0.0 (old/unknown)
     ts = float(dt.timestamp()) if dt is not None else 0.0
 

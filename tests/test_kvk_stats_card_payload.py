@@ -51,6 +51,7 @@ async def test_build_payload_includes_kvk_mode_and_camp():
     assert payload.overall_kvk_rank == 41
     assert payload.overall_kvk_total_governors == 8_734
     assert payload.overall_kvk_top_percent == pytest.approx(0.47)
+    assert payload.last_refresh == "2026-06-03 07:53 UTC"
     assert payload.kp_loss == 639_013_000
     assert payload.playstyle == "Sniping Kills"
     assert payload.kill_progress.percent == pytest.approx(95.5512)

@@ -32,7 +32,7 @@ from file_utils import (
     read_summary_log_rows,
 )
 from generate_progress_image import generate_exempt_dial, generate_progress_dial
-from utils import fmt_short, format_countdown, utcnow
+from utils import fmt_short, format_countdown, parse_last_refresh_utc, utcnow
 
 # --- Emoji & color fallbacks ---
 try:
@@ -1531,6 +1531,9 @@ def build_stats_embed(governor_data, discord_user) -> tuple[list[discord.Embed],
     last_refresh = governor_data.get("LAST_REFRESH", "—")
 
     def _fmt_last_refresh(val):
+        dt = parse_last_refresh_utc(val)
+        if dt is not None:
+            return dt.strftime("%d %B %Y %H:%M UTC")
         if isinstance(val, datetime):
             return val.strftime("%d %B %Y")
         try:
