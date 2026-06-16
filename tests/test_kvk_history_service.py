@@ -32,6 +32,7 @@ def test_select_last_started_kvks_uses_latest_started_window():
 
 
 def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
+    large_kills = 9_007_199_254_740_993
     rows = [
         {
             "Gov_ID": 2441482,
@@ -58,7 +59,7 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
             "KVK_NO": 15,
             "KVK_RANK": 8,
             "Kingdom_Rank": 18,
-            "T4T5_Kills": 200,
+            "T4T5_Kills": str(large_kills),
             "KillPct": 100.0,
             "Deads": 7,
             "DeadPct": 70.0,
@@ -92,6 +93,7 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
     assert payload.last3_rows[1].row_present is False
     assert payload.last3_rows[1].kills is None
     assert payload.last3_rows[2].acclaim == 0
+    assert payload.last3_rows[2].kills == large_kills
     assert payload.history_summary["Highest Acclaim"] == 0
     assert payload.trends["rank"].direction == "up"
     assert payload.trends["acclaim"].direction == "insufficient"

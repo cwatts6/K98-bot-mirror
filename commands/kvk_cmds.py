@@ -352,7 +352,7 @@ async def _send_kvk_history(
             on_select_governor=_on_select_empty,
             heading="Select an account to view its KVK history:",  # architecture-check: allow
             show_register_btn=True,
-            ephemeral=ephemeral,
+            ephemeral=True,
             lookup_callback=_open_governor_lookup,
             register_callback=_open_registration_flow,
         )

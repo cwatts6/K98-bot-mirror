@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from decimal import Decimal, InvalidOperation
 import logging
 import re
 from typing import Any
@@ -192,9 +193,23 @@ def select_last_started_kvks(started_kvks: Iterable[Any], count: int = 3) -> tup
 def _optional_int(value: Any) -> int | None:
     if value in (None, ""):
         return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, Decimal):
+        return int(value)
+    if isinstance(value, float):
+        return int(value)
+    cleaned = str(value).replace(",", "").strip()
+    if not cleaned:
+        return None
     try:
-        return int(float(str(value).replace(",", "").strip()))
-    except (TypeError, ValueError):
+        return int(cleaned)
+    except ValueError:
+        try:
+            return int(Decimal(cleaned))
+        except (InvalidOperation, ValueError):
+            return None
+    except TypeError:
         return None
 
 

@@ -390,6 +390,48 @@ async def test_kvk_history_multi_account_uses_account_picker(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_kvk_history_no_accounts_picker_matches_ephemeral_message(monkeypatch):
+    import commands.kvk_cmds as kvk_cmds
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        return None
+
+    async def fake_account_summary(_user_id):
+        return SimpleNamespace(ok=True, error=None, ordered_accounts={})
+
+    created = {}
+
+    class StubAccountPickerView:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+
+    class DummyFollowup:
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, **kwargs):
+            self.sent.append(kwargs)
+
+    ctx = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        followup=DummyFollowup(),
+    )
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.governor_account_service,
+        "get_account_summary_for_user",
+        fake_account_summary,
+    )
+    monkeypatch.setattr(kvk_cmds, "AccountPickerView", StubAccountPickerView)
+
+    await kvk_cmds._send_kvk_history(ctx, ephemeral=False, governor_id=None)
+
+    assert created["ephemeral"] is True
+    assert ctx.followup.sent[-1]["ephemeral"] is True
+
+
+@pytest.mark.asyncio
 async def test_kvk_history_explicit_governor_uses_single_history_view(monkeypatch):
     import commands.kvk_cmds as kvk_cmds
 
