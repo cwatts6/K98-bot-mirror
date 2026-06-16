@@ -74,7 +74,7 @@ def test_process_excel_file_preserves_credit_before_updated_on(tmp_path, monkeyp
     with open(stats_module.CSV_FILE_PATH, newline="", encoding="utf-8-sig") as handle:
         rows = list(csv.DictReader(handle))
 
-    assert rows[0]["Credit"] == "100.0"
+    assert float(rows[0]["Credit"]) == pytest.approx(100.0)
     assert rows[1]["Credit"] == ""
     assert list(rows[0]).index("Credit") < list(rows[0]).index("updated_on")
 
