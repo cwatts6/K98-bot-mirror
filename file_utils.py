@@ -1879,22 +1879,15 @@ async def run_maintenance_subprocess(
             logger.debug("[MAINT] failed to register offload in registry", exc_info=True)
 
         try:
-            await asyncio.wait_for(proc.wait(), timeout=timeout)
+            out_b, err_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except TimeoutError:
             try:
                 proc.kill()
             except Exception:
                 pass
-            try:
-                await proc.wait()
-            except Exception:
-                pass
             out_b, err_b = b"", b""
             try:
-                if proc.stdout:
-                    out_b = await proc.stdout.read()
-                if proc.stderr:
-                    err_b = await proc.stderr.read()
+                out_b, err_b = await proc.communicate()
             except Exception:
                 pass
             out = (
@@ -1919,14 +1912,6 @@ async def run_maintenance_subprocess(
             return False, f"Timed out after {timeout}s. Output:\n{out}"
 
         # Process finished normally
-        out_b, err_b = b"", b""
-        try:
-            if proc.stdout:
-                out_b = await proc.stdout.read()
-            if proc.stderr:
-                err_b = await proc.stderr.read()
-        except Exception:
-            pass
         out = (out_b or b"").decode("utf-8", errors="replace")
         err = (err_b or b"").decode("utf-8", errors="replace")
         combined = out + "\n" + err

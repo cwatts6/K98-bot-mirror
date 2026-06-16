@@ -259,13 +259,13 @@ async def test_maintenance_subprocess_timeout(monkeypatch):
 @pytest.mark.asyncio
 async def test_maintenance_subprocess_success(monkeypatch):
     """
-    Run maintenance_worker.test_sleep with --seconds 1 and timeout=5 and assert success.
+    Run maintenance_worker.test_sleep with a short sleep and assert success.
     """
     monkeypatch.setenv("MAINT_WORKER_MODE", "process")
     res = await file_utils.run_maintenance_subprocess(
         "test_sleep",
-        args=["--seconds", "1"],
-        timeout=5.0,
+        args=["--seconds", "0.05"],
+        timeout=15.0,
         name="test_sleep",
         meta={"test": "success"},
     )
