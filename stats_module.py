@@ -59,6 +59,26 @@ def _robust_move(src, dst):
             pass
 
 
+def _ensure_credit_column(df: pd.DataFrame) -> tuple[pd.DataFrame, bool, int]:
+    credit_present = "Credit" in df.columns
+
+    if not credit_present:
+        if "updated_on" in df.columns:
+            df.insert(df.columns.get_loc("updated_on"), "Credit", pd.NA)
+        else:
+            df["Credit"] = pd.NA
+
+    if "updated_on" in df.columns and "Credit" in df.columns:
+        columns = list(df.columns)
+        if columns.index("Credit") > columns.index("updated_on"):
+            columns.remove("Credit")
+            columns.insert(columns.index("updated_on"), "Credit")
+            df = df.loc[:, columns]
+
+    non_null = int(pd.to_numeric(df["Credit"], errors="coerce").notna().sum())
+    return df, credit_present, non_null
+
+
 # === Excel Processing ===
 def process_excel_file(source_filepath):
     if not os.path.isfile(source_filepath):
@@ -70,6 +90,14 @@ def process_excel_file(source_filepath):
         with pd.ExcelFile(source_filepath, engine="openpyxl") as xf:
             latest_sheet = xf.sheet_names[-1]
             df = pd.read_excel(xf, sheet_name=latest_sheet, engine="openpyxl")
+
+        df, credit_present, credit_non_null = _ensure_credit_column(df)
+        logger.info(
+            "[EXCEL] Credit column present=%s non_null=%d rows=%d",
+            credit_present,
+            credit_non_null,
+            len(df),
+        )
 
         if "updated_on" not in df.columns:
             timestamp = utcnow().strftime("%d%b%y-%Hh%Mm")

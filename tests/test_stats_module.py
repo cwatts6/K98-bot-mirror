@@ -1,6 +1,8 @@
 # tests/test_stats_module.py
 import asyncio
+import csv
 
+import pandas as pd
 import pytest
 
 import file_utils
@@ -46,3 +48,60 @@ async def test_run_stats_copy_archive_contract_monkeypatched(monkeypatch):
 
     # Expect canonical keys to exist
     assert "excel" in steps and "archive" in steps and "sql" in steps
+
+
+def test_process_excel_file_preserves_credit_before_updated_on(tmp_path, monkeypatch):
+    source_path = tmp_path / "upload.xlsx"
+    download_dir = tmp_path / "downloads"
+    archive_dir = download_dir / "archive"
+    download_dir.mkdir()
+
+    pd.DataFrame(
+        {
+            "Governor ID": [123, 456],
+            "Name": ["A", "B"],
+            "Credit": [100, None],
+        }
+    ).to_excel(source_path, index=False)
+
+    monkeypatch.setattr(stats_module, "DOWNLOAD_FOLDER", str(download_dir))
+    monkeypatch.setattr(stats_module, "ARCHIVE_DIR_1", str(archive_dir))
+    monkeypatch.setattr(stats_module, "CSV_FILE_PATH", str(download_dir / "stats.csv"))
+
+    success, message, _ = stats_module.process_excel_file(str(source_path))
+
+    assert success, message
+    with open(stats_module.CSV_FILE_PATH, newline="", encoding="utf-8-sig") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert rows[0]["Credit"] == "100.0"
+    assert rows[1]["Credit"] == ""
+    assert list(rows[0]).index("Credit") < list(rows[0]).index("updated_on")
+
+
+def test_process_excel_file_adds_blank_credit_for_legacy_upload(tmp_path, monkeypatch):
+    source_path = tmp_path / "legacy.xlsx"
+    download_dir = tmp_path / "downloads"
+    archive_dir = download_dir / "archive"
+    download_dir.mkdir()
+
+    pd.DataFrame(
+        {
+            "Governor ID": [123],
+            "Name": ["A"],
+        }
+    ).to_excel(source_path, index=False)
+
+    monkeypatch.setattr(stats_module, "DOWNLOAD_FOLDER", str(download_dir))
+    monkeypatch.setattr(stats_module, "ARCHIVE_DIR_1", str(archive_dir))
+    monkeypatch.setattr(stats_module, "CSV_FILE_PATH", str(download_dir / "stats.csv"))
+
+    success, message, _ = stats_module.process_excel_file(str(source_path))
+
+    assert success, message
+    with open(stats_module.CSV_FILE_PATH, newline="", encoding="utf-8-sig") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert "Credit" in rows[0]
+    assert rows[0]["Credit"] == ""
+    assert list(rows[0]).index("Credit") < list(rows[0]).index("updated_on")

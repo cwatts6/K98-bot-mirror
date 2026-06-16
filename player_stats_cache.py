@@ -79,6 +79,7 @@ _CANONICAL_FIELD_CANDIDATES: dict[str, list[str]] = {
     "AOOAvgKill": ["AOOAvgKill", "AOO Avg Kill", "AOOAvgKill"],
     "AOOAvgDead": ["AOOAvgDead", "AOO Avg Dead", "AOOAvgDead"],
     "AOOAvgHeal": ["AOOAvgHeal", "AOO Avg Heal", "AOOAvgHeal"],
+    "Conduct": ["Conduct", "Credit"],
     # t4/t5 kills
     "Starting_T4&T5_KILLS": [
         "Starting_T4&T5_KILLS",
@@ -202,6 +203,7 @@ _FLOAT_KEYS = {
     "% of Kill Target",
     "% of Dead Target",
     "% of DKP Target",
+    "Conduct",
 }
 
 # Keys that should be coerced to str
@@ -494,6 +496,15 @@ def _map_row(row: pyodbc.Row, cols: list[str]) -> dict[str, Any] | None:
         col = _find_first_col(lookup, _CANONICAL_FIELD_CANDIDATES.get(canonical, []))
         return round(_to_float(d.get(col, 0.0)), 2) if col else 0.0
 
+    def goptf(canonical: str) -> float | None:
+        col = _find_first_col(lookup, _CANONICAL_FIELD_CANDIDATES.get(canonical, []))
+        if not col:
+            return None
+        value = d.get(col)
+        if value is None or value == "":
+            return None
+        return round(_to_float(value), 2)
+
     def gs(canonical: str) -> str:
         col = _find_first_col(lookup, _CANONICAL_FIELD_CANDIDATES.get(canonical, []))
         return _to_str(d.get(col, "")) if col else ""
@@ -520,6 +531,7 @@ def _map_row(row: pyodbc.Row, cols: list[str]) -> dict[str, Any] | None:
         "AOOAvgKill": gi("AOOAvgKill"),
         "AOOAvgDead": gi("AOOAvgDead"),
         "AOOAvgHeal": gi("AOOAvgHeal"),
+        "Conduct": goptf("Conduct"),
         "Starting_T4&T5_KILLS": gi("Starting_T4&T5_KILLS"),
         "T4_KILLS": gi("T4_KILLS"),
         "T5_KILLS": gi("T5_KILLS"),
@@ -595,6 +607,15 @@ def _map_excel_row(
         col = _find_first_col(lookup, _CANONICAL_FIELD_CANDIDATES.get(canonical, []))
         return round(_to_float(d.get(col, 0.0)), 2) if col else 0.0
 
+    def goptf(canonical: str) -> float | None:
+        col = _find_first_col(lookup, _CANONICAL_FIELD_CANDIDATES.get(canonical, []))
+        if not col:
+            return None
+        value = d.get(col)
+        if value is None or value == "":
+            return None
+        return round(_to_float(value), 2)
+
     def gs(canonical: str) -> str:
         col = _find_first_col(lookup, _CANONICAL_FIELD_CANDIDATES.get(canonical, []))
         return _to_str(d.get(col, "")) if col else ""
@@ -618,6 +639,7 @@ def _map_excel_row(
         "AOOAvgKill": gi("AOOAvgKill"),
         "AOOAvgDead": gi("AOOAvgDead"),
         "AOOAvgHeal": gi("AOOAvgHeal"),
+        "Conduct": goptf("Conduct"),
         "Starting_T4&T5_KILLS": gi("Starting_T4&T5_KILLS"),
         "T4_KILLS": gi("T4_KILLS"),
         "T5_KILLS": gi("T5_KILLS"),

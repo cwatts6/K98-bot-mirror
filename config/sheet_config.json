@@ -24,7 +24,7 @@
     "sort": null,
     "order": null,
     "dates": [],
-	"format_numbers": []
+	"format_numbers": ["Conduct"]
   },
   {
     "query": "SELECT * FROM STATS_FOR_UPLOAD",
@@ -33,7 +33,7 @@
     "sort": 1,
     "order": "ASCENDING",
     "dates": ["LAST_REFRESH"],
-	"format_numbers": ["Rank", "KVK_RANK", "Governor ID", "Power", "Power Delta", "T4_Kills", "T5_Kills", "T4&T5_Kills", "OFF_SEASON_KILLS", "Kill Target", "Deads", "OFF_SEASON_DEADS", "T4_Deads", "T5_Deads", "Dead Target", "DKP_SCORE", "DKP Target", "Helps", "RSS_Assist", "RSS_Gathered", "Pass 4 Kills", "Pass 6 Kills", "Pass7 Kills", "Pass 8 Kills", "Pass 4 Deads", "Pass 6 Deads", "Pass 7 Deads", "Pass 8 Deads", "KVK_NO", "HealedTroops", "RangedPoints", "Civilization", "KvKPlayed", "MostKvKKill", "MostKvKDead", "MostKvKHeal", "Acclaim", "HighestAcclaim", "AOOJoined", "AOOWon", "AOOAvgKill", "AOOAvgDead", "AOOAvgHeal"]
+	"format_numbers": ["Rank", "KVK_RANK", "Governor ID", "Power", "Power Delta", "T4_Kills", "T5_Kills", "T4&T5_Kills", "OFF_SEASON_KILLS", "Kill Target", "Deads", "OFF_SEASON_DEADS", "T4_Deads", "T5_Deads", "Dead Target", "DKP_SCORE", "DKP Target", "Helps", "RSS_Assist", "RSS_Gathered", "Pass 4 Kills", "Pass 6 Kills", "Pass7 Kills", "Pass 8 Kills", "Pass 4 Deads", "Pass 6 Deads", "Pass 7 Deads", "Pass 8 Deads", "KVK_NO", "HealedTroops", "RangedPoints", "Civilization", "KvKPlayed", "MostKvKKill", "MostKvKDead", "MostKvKHeal", "Acclaim", "HighestAcclaim", "AOOJoined", "AOOWon", "AOOAvgKill", "AOOAvgDead", "AOOAvgHeal", "Conduct"]
   },
   {
     "query": "SELECT * FROM RALLY_EXPORT",
