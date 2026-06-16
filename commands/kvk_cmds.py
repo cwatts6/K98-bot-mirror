@@ -7,7 +7,7 @@ import logging
 import discord
 from discord.ext import commands as ext_commands
 
-from account_picker import safe_build_unique_gov_options
+from account_picker import AccountPickerView, safe_build_unique_gov_options
 from bot_config import GUILD_ID, KVK_PLAYER_STATS_CHANNEL_ID, KVK_TARGET_CHANNEL_ID
 from build_KVKrankings_embed import build_kvkrankings_embed
 from commands.kvk_stats_card_posting import post_kvk_stats_output
@@ -321,24 +321,61 @@ async def _send_kvk_history(
 
     if governor_id:
         try:
-            from kvk_history_utils import fetch_history_for_governors
-
-            df_lookup = await asyncio.to_thread(fetch_history_for_governors, [governor_id])
-            governor_name = None
-            for column in ("GovernorName", "Gov_Name", "Name"):
-                if column in df_lookup.columns and not df_lookup[column].dropna().empty:
-                    governor_name = str(df_lookup[column].dropna().iloc[0])
-                    break
-            governor_name = governor_name or str(governor_id)
+            payload = await asyncio.to_thread(
+                kvk_history_service.build_kvk_history_payload, governor_id
+            )
+            governor_name = payload.governor_name or str(governor_id)
         except Exception:
             governor_name = str(governor_id)
         account_map = {"Lookup": {"GovernorID": int(governor_id), "GovernorName": governor_name}}
     elif not account_map:
+
+        async def _on_select_empty(
+            interaction: discord.Interaction, selected_governor_id: str, selected_ephemeral: bool
+        ) -> None:
+            await _post_kvk_history_view(
+                interaction,
+                user=interaction.user,
+                account_map={
+                    "Lookup": {
+                        "GovernorID": int(selected_governor_id),
+                        "GovernorName": selected_governor_id,
+                    }
+                },
+                default_id=selected_governor_id,
+                ephemeral=selected_ephemeral,
+            )
+
+        view = AccountPickerView(
+            ctx=ctx,
+            options=[],
+            on_select_governor=_on_select_empty,
+            heading="Select an account to view its KVK history:",  # architecture-check: allow
+            show_register_btn=True,
+            ephemeral=ephemeral,
+            lookup_callback=_open_governor_lookup,
+            register_callback=_open_registration_flow,
+        )
         await ctx.followup.send(
-            "You haven't registered any accounts yet. Use `/register_governor` or pass a Governor ID here.",
+            content="You haven't registered any accounts yet. Use the options below or pass a Governor ID.",
+            view=view,
             ephemeral=True,
         )
         return
+
+    options = safe_build_unique_gov_options(account_summary if account_summary.ok else account_map)
+
+    async def _on_select_history(
+        interaction: discord.Interaction, selected_governor_id: str, selected_ephemeral: bool
+    ) -> None:
+        selected_map = _history_account_map_for_selection(account_map, selected_governor_id)
+        await _post_kvk_history_view(
+            interaction,
+            user=interaction.user,
+            account_map=selected_map,
+            default_id=selected_governor_id,
+            ephemeral=selected_ephemeral,
+        )
 
     default_id = (
         str(governor_id)
@@ -352,14 +389,58 @@ async def _send_kvk_history(
         )
         return
 
-    view = KVKHistoryView(
+    if not governor_id and len(options) > 1:
+        view = AccountPickerView(
+            ctx=ctx,
+            options=options,
+            on_select_governor=_on_select_history,
+            heading="Select an account to view its KVK history:",  # architecture-check: allow
+            show_register_btn=True,
+            ephemeral=ephemeral,
+            lookup_callback=_open_governor_lookup,
+            register_callback=_open_registration_flow,
+        )
+        await ctx.followup.send(
+            content="Select an account to view its KVK history:",  # architecture-check: allow
+            view=view,
+            ephemeral=ephemeral,
+        )
+        return
+
+    await _post_kvk_history_view(
+        ctx,
         user=ctx.user,
-        account_map=account_map,
-        selected_ids=[default_id],
-        allow_all=True,
+        account_map=_history_account_map_for_selection(account_map, default_id),
+        default_id=default_id,
         ephemeral=ephemeral,
     )
-    await view.initial_send(ctx)
+
+
+def _history_account_map_for_selection(
+    account_map: dict[str, dict], governor_id: str
+) -> dict[str, dict]:
+    for label, meta in account_map.items():
+        if str(meta.get("GovernorID")) == str(governor_id):
+            return {label: meta}
+    return {"Lookup": {"GovernorID": int(governor_id), "GovernorName": str(governor_id)}}
+
+
+async def _post_kvk_history_view(
+    target: discord.ApplicationContext | discord.Interaction,
+    *,
+    user: discord.User | discord.Member,
+    account_map: dict[str, dict],
+    default_id: str,
+    ephemeral: bool,
+) -> None:
+    view = KVKHistoryView(
+        user=user,
+        account_map=account_map,
+        selected_ids=[str(default_id)],
+        allow_all=False,
+        ephemeral=ephemeral,
+    )
+    await view.initial_send(target)
 
 
 async def _send_kvk_rankings(ctx: discord.ApplicationContext) -> None:

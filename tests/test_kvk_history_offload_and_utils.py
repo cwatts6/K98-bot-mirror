@@ -47,6 +47,54 @@ def test_builders_do_not_mutate_and_csv_defensive(tmp_path):
     # header should include the primary column names
     assert "Gov_ID" in csv_text
     assert "KVK_NO" in csv_text
+    assert "KVK_RANK" in csv_text
+    assert "Acclaim" in csv_text
+
+
+def test_build_history_csv_exports_rank_and_acclaim_without_zero_fill():
+    df = pd.DataFrame(
+        [
+            {
+                "Gov_ID": 1,
+                "Governor_Name": "A",
+                "KVK_NO": 15,
+                "Kingdom_Rank": 8,
+                "KVK_RANK": 4,
+                "T4_KILLS": 1,
+                "T5_KILLS": 2,
+                "T4T5_Kills": 3,
+                "Kill_Target": 10,
+                "KillPct": 30.0,
+                "Deads": 4,
+                "Dead_Target": 8,
+                "DeadPct": 50.0,
+                "DKP_SCORE": 100,
+                "DKP_Target": 200,
+                "DKPPct": 50.0,
+                "Acclaim": None,
+                "HighestAcclaim": None,
+                "KvKPlayed": 1,
+                "MostKvKKill": 3,
+                "MostKvKDead": 4,
+                "MostKvKHeal": None,
+                "P4_Kills": 0,
+                "P6_Kills": 0,
+                "P7_Kills": 0,
+                "P8_Kills": 0,
+                "P4_Deads": 0,
+                "P6_Deads": 0,
+                "P7_Deads": 0,
+                "P8_Deads": 0,
+            }
+        ]
+    )
+
+    _filename, csv_bytes = khu.build_history_csv(df, "history.csv")
+    csv_text = csv_bytes.decode("utf-8")
+
+    assert "Kingdom_Rank,KVK_RANK" in csv_text
+    assert "A,15,8,4" in csv_text
+    assert ",,1,3" in csv_text
 
 
 @pytest.mark.asyncio

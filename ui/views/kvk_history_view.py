@@ -22,6 +22,7 @@ from kvk_history_utils import (
     build_dual_axis_chart,
     build_history_csv,
     build_history_table_image,
+    fetch_history_export_for_governors,
     fetch_history_for_governors,
 )
 from services import kvk_history_service
@@ -410,7 +411,9 @@ class KVKHistoryView(discord.ui.View):
 
             # Offload CSV build to avoid blocking the event loop
             df_raw = await _offload_callable(
-                fetch_history_for_governors, list(overlay_labels.keys()), name="fetch_history"
+                fetch_history_export_for_governors,
+                list(overlay_labels.keys()),
+                name="fetch_history_export",
             )
             df = _extract_dataframe(df_raw)
             csv_raw = await _offload_callable(

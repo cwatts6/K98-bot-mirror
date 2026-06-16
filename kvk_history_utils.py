@@ -92,6 +92,11 @@ def fetch_history_for_governors(governor_ids) -> pd.DataFrame:
     return kvk_history_service.fetch_history_for_governors(governor_ids)
 
 
+def fetch_history_export_for_governors(governor_ids) -> pd.DataFrame:
+    """Null-preserving expanded export wrapper for KVK history CSV."""
+    return kvk_history_service.fetch_history_export_for_governors(governor_ids)
+
+
 # ---------- Metric dictionary & chart ----------
 
 LEFT_METRICS = {
@@ -366,27 +371,7 @@ def build_history_csv(df: pd.DataFrame, filename: str) -> tuple[str, bytes]:
     Returns (filename, bytes).
     Defensive: if df is empty or missing columns, return header-only CSV.
     """
-    cols = [
-        "Gov_ID",
-        "Governor_Name",
-        "KVK_NO",
-        "T4_KILLS",
-        "T5_KILLS",
-        "T4T5_Kills",
-        "KillPct",
-        "Deads",
-        "DeadPct",
-        "DKP_SCORE",
-        "DKPPct",
-        "P4_Kills",
-        "P6_Kills",
-        "P7_Kills",
-        "P8_Kills",
-        "P4_Deads",
-        "P6_Deads",
-        "P7_Deads",
-        "P8_Deads",
-    ]
+    cols = kvk_history_service.HISTORY_EXPORT_COLUMNS
     try:
         if df is None or df.empty:
             out = pd.DataFrame(columns=cols)

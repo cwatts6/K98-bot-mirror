@@ -111,3 +111,53 @@ def fetch_history_rows_for_governors(governor_ids: list[int]) -> list[dict[str, 
         rows = cur.fetchall()
         cols = [c[0] for c in cur.description]
     return [dict(zip(cols, row, strict=False)) for row in rows]
+
+
+def fetch_modern_history_rows_for_governors(governor_ids: list[int]) -> list[dict[str, Any]]:
+    """Fetch null-preserving KVK history rows for the modern history payload/export."""
+    if not governor_ids:
+        return []
+
+    placeholders = ",".join(["?"] * len(governor_ids))
+    sql = f"""
+        SELECT
+            CAST([Rank] AS INT)          AS Kingdom_Rank,
+            CAST([KVK_RANK] AS INT)      AS KVK_RANK,
+            CAST([Gov_ID] AS BIGINT)     AS Gov_ID,
+            [Governor_Name],
+            CAST([KVK_NO] AS INT)        AS KVK_NO,
+            CAST([T4_KILLS] AS BIGINT)   AS T4_KILLS,
+            CAST([T5_KILLS] AS BIGINT)   AS T5_KILLS,
+            CAST([T4&T5_Kills] AS BIGINT) AS T4T5_Kills,
+            CAST([Kill Target] AS BIGINT) AS Kill_Target,
+            CAST([% of Kill target] AS DECIMAL(9,2)) AS KillPct,
+            CAST([Deads_Delta] AS BIGINT) AS Deads,
+            CAST([Dead_Target] AS BIGINT) AS Dead_Target,
+            CAST([% of Dead Target] AS DECIMAL(9,2)) AS DeadPct,
+            CAST([DKP_SCORE] AS BIGINT)  AS DKP_SCORE,
+            CAST([DKP Target] AS BIGINT) AS DKP_Target,
+            CAST([% of DKP Target] AS DECIMAL(9,2)) AS DKPPct,
+            CAST([Acclaim] AS BIGINT)    AS Acclaim,
+            CAST([HighestAcclaim] AS BIGINT) AS HighestAcclaim,
+            CAST([KvKPlayed] AS INT)     AS KvKPlayed,
+            CAST([MostKvKKill] AS BIGINT) AS MostKvKKill,
+            CAST([MostKvKDead] AS BIGINT) AS MostKvKDead,
+            CAST([MostKvKHeal] AS BIGINT) AS MostKvKHeal,
+            CAST([Pass 4 Kills] AS BIGINT) AS P4_Kills,
+            CAST([Pass 6 Kills] AS BIGINT) AS P6_Kills,
+            CAST([Pass 7 Kills] AS BIGINT) AS P7_Kills,
+            CAST([Pass 8 Kills] AS BIGINT) AS P8_Kills,
+            CAST([Pass 4 Deads] AS BIGINT) AS P4_Deads,
+            CAST([Pass 6 Deads] AS BIGINT) AS P6_Deads,
+            CAST([Pass 7 Deads] AS BIGINT) AS P7_Deads,
+            CAST([Pass 8 Deads] AS BIGINT) AS P8_Deads
+        FROM dbo.v_EXCEL_FOR_KVK_Started
+        WHERE [Gov_ID] IN ({placeholders})
+        ORDER BY [Gov_ID], [KVK_NO]
+    """
+    with get_conn_with_retries() as cn:
+        cur = cn.cursor()
+        cur.execute(sql, governor_ids)
+        rows = cur.fetchall()
+        cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, row, strict=False)) for row in rows]

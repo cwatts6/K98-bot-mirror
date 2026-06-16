@@ -338,3 +338,102 @@ async def test_kvk_targets_single_account_uses_modern_output(monkeypatch):
     await kvk_cmds._send_personal_kvk_targets(ctx, None, False)
 
     assert called == {"governor_id": "987", "ephemeral": False}
+
+
+@pytest.mark.asyncio
+async def test_kvk_history_multi_account_uses_account_picker(monkeypatch):
+    import commands.kvk_cmds as kvk_cmds
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        return None
+
+    async def fake_account_summary(_user_id):
+        return kvk_cmds.governor_account_service.summarize_accounts(
+            {
+                "Main": {"GovernorID": "123", "GovernorName": "MainGov"},
+                "Alt 1": {"GovernorID": "456", "GovernorName": "AltGov"},
+            }
+        )
+
+    created = {}
+
+    class StubAccountPickerView:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+
+    class DummyFollowup:
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, **kwargs):
+            self.sent.append(kwargs)
+
+    ctx = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        followup=DummyFollowup(),
+    )
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.governor_account_service,
+        "get_account_summary_for_user",
+        fake_account_summary,
+    )
+    monkeypatch.setattr(kvk_cmds, "AccountPickerView", StubAccountPickerView)
+
+    await kvk_cmds._send_kvk_history(ctx, ephemeral=True, governor_id=None)
+
+    assert created["heading"] == "Select an account to view its KVK history:"
+    assert created["ephemeral"] is True
+    assert len(created["options"]) == 2
+    assert ctx.followup.sent[-1]["view"].__class__ is StubAccountPickerView
+
+
+@pytest.mark.asyncio
+async def test_kvk_history_explicit_governor_uses_single_history_view(monkeypatch):
+    import commands.kvk_cmds as kvk_cmds
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        return None
+
+    async def fake_account_summary(_user_id):
+        return SimpleNamespace(ok=False, error="down", ordered_accounts={})
+
+    created = {}
+
+    class StubHistoryView:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+
+        async def initial_send(self, target):
+            created["target"] = target
+
+    class DummyFollowup:
+        async def send(self, **_kwargs):
+            return None
+
+    ctx = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        followup=DummyFollowup(),
+    )
+
+    payload = SimpleNamespace(governor_name="Lookup Gov")
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.governor_account_service,
+        "get_account_summary_for_user",
+        fake_account_summary,
+    )
+    monkeypatch.setattr(
+        kvk_cmds.kvk_history_service, "build_kvk_history_payload", lambda _gid: payload
+    )
+    monkeypatch.setattr(kvk_cmds, "KVKHistoryView", StubHistoryView)
+
+    await kvk_cmds._send_kvk_history(ctx, ephemeral=False, governor_id=789)
+
+    assert created["account_map"] == {"Lookup": {"GovernorID": 789, "GovernorName": "Lookup Gov"}}
+    assert created["selected_ids"] == ["789"]
+    assert created["allow_all"] is False
+    assert created["ephemeral"] is False
+    assert created["target"] is ctx

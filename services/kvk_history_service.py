@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 
 from kvk.dal import kvk_history_dal
+from kvk.models.kvk_history_payload import KvkHistoryPayload, KvkHistoryRow, KvkHistoryTrend
 from registry.account_slots import ACCOUNT_ORDER
 
 logger = logging.getLogger(__name__)
@@ -38,10 +39,48 @@ HISTORY_COLUMNS = [
 
 NUMERIC_HISTORY_COLUMNS = [c for c in HISTORY_COLUMNS if c != "Governor_Name"]
 
+HISTORY_EXPORT_COLUMNS = [
+    "Gov_ID",
+    "Governor_Name",
+    "KVK_NO",
+    "Kingdom_Rank",
+    "KVK_RANK",
+    "T4_KILLS",
+    "T5_KILLS",
+    "T4T5_Kills",
+    "Kill_Target",
+    "KillPct",
+    "Deads",
+    "Dead_Target",
+    "DeadPct",
+    "DKP_SCORE",
+    "DKP_Target",
+    "DKPPct",
+    "Acclaim",
+    "HighestAcclaim",
+    "KvKPlayed",
+    "MostKvKKill",
+    "MostKvKDead",
+    "MostKvKHeal",
+    "P4_Kills",
+    "P6_Kills",
+    "P7_Kills",
+    "P8_Kills",
+    "P4_Deads",
+    "P6_Deads",
+    "P7_Deads",
+    "P8_Deads",
+]
+
 
 def empty_history_frame() -> pd.DataFrame:
     """Return an empty history dataframe with the canonical schema."""
     return pd.DataFrame(columns=HISTORY_COLUMNS)
+
+
+def empty_history_export_frame() -> pd.DataFrame:
+    """Return an empty modern history export dataframe with the canonical schema."""
+    return pd.DataFrame(columns=HISTORY_EXPORT_COLUMNS)
 
 
 def normalize_governor_ids(governor_ids: Iterable[Any] | Any) -> list[int]:
@@ -133,6 +172,174 @@ def pick_default_governor_id(account_map: Mapping[str, Mapping[str, Any]]) -> st
 
 def get_started_kvks() -> list[int]:
     return kvk_history_dal.get_started_kvks()
+
+
+def select_last_started_kvks(started_kvks: Iterable[Any], count: int = 3) -> tuple[int, ...]:
+    """Return the latest started KVK numbers, preserving missing-data semantics elsewhere."""
+    normalized: set[int] = set()
+    for raw in started_kvks or []:
+        try:
+            kvk_no = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if kvk_no > 0:
+            normalized.add(kvk_no)
+    if count <= 0:
+        return tuple()
+    return tuple(sorted(normalized)[-count:])
+
+
+def _optional_int(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(float(str(value).replace(",", "").strip()))
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_float(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(str(value).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _history_row_from_source(kvk_no: int, source: Mapping[str, Any] | None) -> KvkHistoryRow:
+    if not source:
+        return KvkHistoryRow(kvk_no=kvk_no, row_present=False)
+    return KvkHistoryRow(
+        kvk_no=kvk_no,
+        row_present=True,
+        kvk_rank=_optional_int(source.get("KVK_RANK")),
+        kingdom_rank=_optional_int(source.get("Kingdom_Rank")),
+        kills=_optional_int(source.get("T4T5_Kills")),
+        kill_target_percent=_optional_float(source.get("KillPct")),
+        deads=_optional_int(source.get("Deads")),
+        dead_target_percent=_optional_float(source.get("DeadPct")),
+        dkp=_optional_int(source.get("DKP_SCORE")),
+        dkp_target_percent=_optional_float(source.get("DKPPct")),
+        acclaim=_optional_int(source.get("Acclaim")),
+    )
+
+
+def _max_optional(rows: Iterable[Mapping[str, Any]], key: str) -> int | None:
+    values = [_optional_int(row.get(key)) for row in rows]
+    present = [value for value in values if value is not None]
+    return max(present) if present else None
+
+
+def _trend(
+    metric: str, rows: Iterable[KvkHistoryRow], attr: str, *, lower_is_better: bool = False
+) -> KvkHistoryTrend:
+    values = [
+        getattr(row, attr) for row in rows if row.row_present and getattr(row, attr) is not None
+    ]
+    numeric = [float(value) for value in values]
+    if not numeric:
+        return KvkHistoryTrend(metric=metric, average=None, direction="missing")
+    average = sum(numeric) / len(numeric)
+    if len(numeric) < 2:
+        return KvkHistoryTrend(
+            metric=metric,
+            average=average,
+            direction="insufficient",
+            first_value=numeric[0],
+            last_value=numeric[-1],
+            value_count=len(numeric),
+        )
+    first = numeric[0]
+    last = numeric[-1]
+    if last == first:
+        direction = "flat"
+    elif (last < first and lower_is_better) or (last > first and not lower_is_better):
+        direction = "up"
+    else:
+        direction = "down"
+    return KvkHistoryTrend(
+        metric=metric,
+        average=average,
+        direction=direction,
+        first_value=first,
+        last_value=last,
+        value_count=len(numeric),
+    )
+
+
+def fetch_history_export_for_governors(governor_ids: Iterable[Any] | Any) -> pd.DataFrame:
+    """Return a null-preserving, expanded history dataframe for CSV export."""
+    ids = normalize_governor_ids(governor_ids)
+    if not ids:
+        return empty_history_export_frame()
+
+    rows = kvk_history_dal.fetch_modern_history_rows_for_governors(ids)
+    df = pd.DataFrame.from_records(rows, columns=HISTORY_EXPORT_COLUMNS)
+    if df.empty:
+        return empty_history_export_frame()
+    return df.sort_values(["Gov_ID", "KVK_NO"], ignore_index=True)
+
+
+def build_kvk_history_payload(governor_id: Any) -> KvkHistoryPayload:
+    """Build the renderer-independent modern KVK history payload for one governor."""
+    ids = normalize_governor_ids([governor_id])
+    gid = ids[0] if ids else 0
+    started_kvks = tuple(get_started_kvks())
+    last3_kvks = select_last_started_kvks(started_kvks, 3)
+
+    if gid <= 0:
+        return KvkHistoryPayload(
+            governor_id=str(governor_id or "unknown"),
+            governor_name="Unknown governor",
+            started_kvks=started_kvks,
+            last3_kvks=last3_kvks,
+            rows=tuple(_history_row_from_source(kvk, None) for kvk in started_kvks),
+            last3_rows=tuple(_history_row_from_source(kvk, None) for kvk in last3_kvks),
+        )
+
+    source_rows = kvk_history_dal.fetch_modern_history_rows_for_governors([gid])
+    rows_by_kvk: dict[int, Mapping[str, Any]] = {}
+    for row in source_rows:
+        kvk_no = _optional_int(row.get("KVK_NO"))
+        if kvk_no is not None:
+            rows_by_kvk[kvk_no] = row
+
+    governor_name = str(gid)
+    for row in source_rows:
+        name = row.get("Governor_Name")
+        if name not in (None, ""):
+            governor_name = str(name)
+            break
+
+    all_kvks = started_kvks or tuple(sorted(rows_by_kvk))
+    rows = tuple(_history_row_from_source(kvk, rows_by_kvk.get(kvk)) for kvk in all_kvks)
+    last3_rows = tuple(_history_row_from_source(kvk, rows_by_kvk.get(kvk)) for kvk in last3_kvks)
+
+    summary = {
+        "KVK Played": _max_optional(source_rows, "KvKPlayed"),
+        "Highest Acclaim": _max_optional(source_rows, "HighestAcclaim"),
+        "Most Kills": _max_optional(source_rows, "MostKvKKill"),
+        "Most Deads": _max_optional(source_rows, "MostKvKDead"),
+        "Most Heal": _max_optional(source_rows, "MostKvKHeal"),
+    }
+    trends = {
+        "rank": _trend("rank", last3_rows, "kvk_rank", lower_is_better=True),
+        "kills": _trend("kills", last3_rows, "kills"),
+        "deads": _trend("deads", last3_rows, "deads"),
+        "dkp": _trend("dkp", last3_rows, "dkp"),
+        "acclaim": _trend("acclaim", last3_rows, "acclaim"),
+    }
+    return KvkHistoryPayload(
+        governor_id=str(gid),
+        governor_name=governor_name,
+        started_kvks=all_kvks,
+        last3_kvks=last3_kvks,
+        rows=rows,
+        last3_rows=last3_rows,
+        history_summary=summary,
+        trends=trends,
+    )
 
 
 def fetch_history_for_governors(governor_ids: Iterable[Any] | Any) -> pd.DataFrame:

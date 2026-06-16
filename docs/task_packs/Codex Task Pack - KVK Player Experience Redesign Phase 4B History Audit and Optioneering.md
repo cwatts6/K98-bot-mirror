@@ -5,9 +5,9 @@
 - Task name: `KVK Player Experience Redesign - Phase 4B History Audit and Optioneering`
 - Date: `2026-06-06`
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 4A targets rollout`
-- Task type: `feature discovery / UX audit / architecture scope / Discord interaction design`
+- Task type: `feature discovery / UX audit / architecture scope / Discord interaction design / staged implementation plan`
 - One-pass approved: `no`
-- Status: `ready for audit and analysis`
+- Status: `audit complete - approved staged implementation direction; next phase is 4Bi`
 
 ## 2. Required Reading
 
@@ -36,12 +36,19 @@ For SQL-facing work, validate schema, procedure, view, index, and `ProcConfig` d
 
 ## 3. Objective
 
-Audit and redesign the full `/kvk history` and `/mykvkhistory` player journey. The first delivery
-stage is analysis and optioneering only: understand the existing data, chart, table, account
-selection, metric-selection, and export behaviours before choosing an output model.
+Audit and redesign the full KVK history player journey, then implement it in controlled
+sub-phases.
 
-The final solution should help players understand historical KVK performance clearly, without
-forcing all data into a card if a chart/table/hybrid journey is more effective.
+The approved direction is:
+
+- `/kvk stats` should be the live current-KVK performance journey.
+- `/kvk history` should become the modern past-performance and trend-analysis journey.
+- `/mykvkhistory` should retain the legacy chart/table/CSV output during player validation so the
+  modern no-graph journey can be compared safely against the existing graph journey.
+
+The final solution should help players understand historical KVK performance clearly, using modern
+cards for the common player questions and CSV export for deeper data review. Do not force graph
+output into the modern `/kvk history` path unless player validation proves it is still needed.
 
 ## 4. Background
 
@@ -56,12 +63,104 @@ History was deliberately deferred because the existing output is a different kin
 - CSV export.
 - Last 3 / Last 6 / Last 10 table-range controls.
 
-The user-provided current-output screenshot should be used as design input. It shows the existing
-layout and confirms that the graph is central to the current history experience, but may not fit
-the same card treatment as the stats and targets cards.
+The user-provided current-output screenshot and the completed audit should be used as design input.
+The current output is graph-first, but the approved product direction is to test whether players
+prefer a clearer card-based past-performance journey without graphs.
 
-The compact History card attached to `/kvk stats` is already modernised. Phase 4B is only about the
-full history command journey.
+The compact History card attached to `/kvk stats` is already modernised, but Phase 4B should move
+that historical context into `/kvk history`. After Phase 4B, `/kvk stats` should keep only current
+KVK-focused cards: `Main Card` and `More Stats`.
+
+## 4A. Phase 4B Audit Decision Update
+
+Audit and optioneering have completed. The approved approach is a staged modern history redesign:
+
+- Make `/kvk history` the modern card-based history journey.
+- Keep `/mykvkhistory` on the existing chart/table/CSV output for side-by-side player testing.
+- Do not add `/kvk history_chart` initially; the legacy `/mykvkhistory` path already preserves the
+  graph journey during validation.
+- Retain explicit `governor_id` lookup on `/kvk history` so admin/leadership can inspect other
+  players.
+- Use the same player account picker pattern as `/kvk stats` and `/kvk targets` where practical.
+- Keep CSV export and expand it where useful so Last 6, Last 10, Last 12, and full history needs are
+  serviced by export data rather than by overloading the default card.
+- Define `last 3 KVKs` as the current started KVK plus the previous two started KVKs. For example,
+  if KVK 15 has started, last 3 is KVK 13, KVK 14, and KVK 15. If KVK 15 has not started, last 3 is
+  KVK 12, KVK 13, and KVK 14.
+- Treat missing metrics as missing, not zero, especially for Acclaim because Acclaim only exists for
+  recent KVKs.
+- Exclude Honor and PreKVK history from Phase 4B.
+- Show Acclaim as a raw KVK metric for now. Do not show `Acclaim vs Target%` until a real
+  per-KVK acclaim target contract exists.
+
+New background assets added for Phase 4B cards:
+
+| Asset | Intended Use |
+|---|---|
+| `assets/kvk/cards/history_card1.PNG` | Main `/kvk history` Last 3 KVK performance card. |
+| `assets/kvk/cards/history_card2.PNG` | Moved history-summary card formerly attached to `/kvk stats`. |
+| `assets/kvk/cards/history_card3.PNG` | History Trends card. |
+
+## 4B. Approved Sub-Phase Plan
+
+### Phase 4Bi - History Payload, Data Contract, Picker, Export, And Test Foundation
+
+Build the renderer-independent history payload/service boundary before visual redesign.
+
+Required outcomes:
+
+- Add or refine history service/model code that returns Discord-free, renderer-independent payloads.
+- Preserve SQL access in DAL/service layers only.
+- Validate and document the history SQL contract against `C:\K98-bot-SQL-Server`.
+- Expand bot-side data shape to support rank, kills, kill target percent, deads, dead target
+  percent, DKP, DKP target percent, Acclaim, history summary values, and trend inputs.
+- Preserve missing/null distinction for metrics, especially Acclaim.
+- Select last 3 KVKs using started-KVK logic.
+- Keep `/mykvkhistory` legacy.
+- Prepare `/kvk history` to use the same account picker style as `/kvk stats` and `/kvk targets`,
+  while retaining explicit `governor_id` lookup.
+- Preserve and expand CSV export so deeper history ranges are available outside the card view.
+- Add missing service, DAL, view, picker, export, and command tests.
+- No final card redesign is required in 4Bi unless it is needed as a small proof-of-wiring.
+
+### Phase 4Bii - Modern `/kvk history` Last 3 Card And Stats History Move
+
+Switch `/kvk history` to the modern card journey while keeping `/mykvkhistory` legacy.
+
+Required outcomes:
+
+- Implement the main `/kvk history` Last 3 KVK card using `history_card1.PNG`.
+- Main card title should show `GovernorName` and Governor ID as a smaller/subtitle treatment, with
+  Discord avatar/emoji identity treatment where available.
+- Title right side should show average kills, average kill target percent, and a trend indicator
+  for the same last 3 KVKs.
+- Each row should represent one KVK and show:
+  - KVK number
+  - rank
+  - kills and kill target percent
+  - deads and dead target percent
+  - DKP and DKP target percent
+  - Acclaim, shown as missing where unavailable
+- Move the existing compact `/kvk stats` History card into `/kvk history`, using
+  `history_card2.PNG`.
+- Remove the `History` button from `/kvk stats`, leaving `Main Card` and `More Stats`.
+- Preserve fallback behaviour and player-test safety.
+
+### Phase 4Biii - Trends Card, Switching, And Final Polish
+
+Add the trend-analysis layer and polish the modern history journey.
+
+Required outcomes:
+
+- Implement the History Trends card using `history_card3.PNG`.
+- Trends card should include rank, kills, deads, DKP, and Acclaim.
+- For each metric, show average over last 3 started KVKs and trend direction.
+- Trend logic must treat missing values as missing rather than zero.
+- Add final switch/button behavior between History, Summary, Trends, and Export as approved during
+  implementation.
+- Generate visual samples for single-account and lookup flows.
+- Decide after player testing whether graph output remains only in `/mykvkhistory` or needs a
+  modern advanced path later.
 
 ## 5. Scope
 
@@ -72,27 +171,32 @@ full history command journey.
   and range buttons.
 - Validate the current history data contract and SQL source objects.
 - Identify which metrics are available, reliable, readable, and useful.
-- Compare output options before implementation.
-- Produce a recommended solution design with trade-offs and a staged implementation plan.
+- Implement the approved staged modern `/kvk history` model after Phase 4Bi scope confirmation.
 - Preserve existing command paths during design and rollout.
-- Preserve CSV export unless a better approved replacement exists.
-- Preserve account selection and multi-account overlay behaviour unless an approved design replaces
-  it.
-- Decide how the full history command should relate to the compact `/kvk stats` History card.
+- Preserve `/mykvkhistory` as the legacy graph/table/CSV path during player validation.
+- Preserve and expand CSV export.
+- Preserve explicit Governor ID lookup on `/kvk history`.
+- Introduce account-picker parity with `/kvk stats` and `/kvk targets` where practical.
+- Move the compact `/kvk stats` History card into `/kvk history`.
+- Keep `/kvk stats` focused on current KVK output after the move.
+- Use the three new history background assets under `assets/kvk/cards/`.
 - Identify test coverage and visual/manual validation needed for the chosen option.
 
 ### Out of Scope
 
-- No immediate implementation before audit and option approval.
+- No immediate implementation beyond the approved sub-phase being executed.
 - No removal or deprecation of `/mykvkhistory`.
 - No removal of CSV export without explicit approval.
+- No new `/kvk history_chart` command in Phase 4B.
 - No new top-level command or command group.
 - No broad `/kvk rankings` redesign; that remains Phase 5.
 - No changes to KVK import, recompute, export, Google Sheets tab names, or cache refresh semantics
   unless a defect is found and separately approved.
 - No website implementation.
 - No direct SQL in command modules, Discord views, or renderers.
-- No predictive trend or "on track" modelling unless separately approved.
+- No predictive "on track" modelling.
+- No Honor or PreKVK history in Phase 4B.
+- No `Acclaim vs Target%` display until acclaim targets exist in an approved SQL/data contract.
 
 ## 6. Source Deferred Items
 
@@ -141,20 +245,21 @@ Likely audit candidates:
 
 ## 8. Mandatory Workflow
 
-Phase 4B must start with audit and analysis:
+Phase 4B audit and option approval are complete. Continue with sub-phases:
 
-1. Audit current `/kvk history` and `/mykvkhistory` behaviour, then stop for review.
-2. Validate SQL/data contracts against `C:\K98-bot-SQL-Server`, then stop if ambiguity exists.
-3. Produce output options with trade-offs, including at least the options in section 12.
-4. Recommend one solution or staged solution.
-5. Stop for approval before implementation.
-6. Implement only the approved option.
-7. Add or update focused tests.
-8. Generate visual/manual review samples for chart/table/card changes.
-9. Run focused validation and selected broader validation.
-10. Run or document the Codex Security review gate.
+1. Start Phase 4Bi in a new chat from this task pack.
+2. Re-read the required repo guidance and this updated Phase 4B pack.
+3. Validate SQL/data contracts against `C:\K98-bot-SQL-Server`.
+4. Implement only Phase 4Bi scope unless the operator explicitly expands scope.
+5. Stop after 4Bi with payload/data/picker/export/test evidence before building final cards.
+6. Start Phase 4Bii only after 4Bi is reviewed and approved.
+7. Start Phase 4Biii only after the Last 3 card and stats History move are validated.
+8. Add or update focused tests in every implementation sub-phase.
+9. Generate visual/manual review samples for all card changes.
+10. Run focused validation and selected broader validation.
+11. Run or document the Codex Security review gate for implementation PRs.
 
-Do not proceed directly from audit into implementation without explicit approval.
+Do not implement multiple sub-phases in one PR unless the operator explicitly approves that scope.
 
 ## 9. Audit Requirements
 
@@ -184,13 +289,13 @@ Review and document:
 
 | Concern | Target |
 |---|---|
-| Slash commands | Keep existing `/kvk history` and `/mykvkhistory`; no new command group. |
-| Service/payload | Prefer renderer-independent service/payload boundaries if output composition changes. |
+| Slash commands | `/kvk history` becomes modern; `/mykvkhistory` remains legacy chart/table/CSV. No new command group. |
+| Service/payload | Add renderer-independent history payload/service boundaries in Phase 4Bi. |
 | DAL | Keep SQL/data access in `kvk/dal/` or service-owned data access; no SQL in commands/views/renderers. |
-| View | `ui/views/kvk_history_view.py` owns controls and interaction flow only. |
-| Chart/table rendering | Keep rendering helpers separate from SQL and Discord state. |
-| Export | Preserve CSV export and test generated filename/content behaviour. |
-| Assets | Use `assets/kvk/cards/` only if a card or wrapper image is approved. |
+| View | Modern `/kvk history` view owns controls and interaction flow only; legacy view remains available for `/mykvkhistory`. |
+| Chart/table rendering | Keep legacy chart/table for `/mykvkhistory`; modern `/kvk history` should not depend on chart output. |
+| Export | Preserve and expand CSV export; test generated filename/content behaviour. |
+| Assets | Use `history_card1.PNG`, `history_card2.PNG`, and `history_card3.PNG` under `assets/kvk/cards/`. |
 | Tests | Focused tests under `tests/` for service, view, output shape, export, and selected rendering. |
 | Docs | Update programme/task-pack docs after delivery. |
 
@@ -207,6 +312,9 @@ Review and document:
 - `ui/views/kvk_history_view.py`
 - `ui/views/kvk_stats_card_views.py`
 - `kvk/rendering/kvk_stats_card_renderer.py`
+- `assets/kvk/cards/history_card1.PNG`
+- `assets/kvk/cards/history_card2.PNG`
+- `assets/kvk/cards/history_card3.PNG`
 - `tests/test_kvk_history_service.py`
 - `tests/test_kvk_history_offload_and_utils.py`
 - `tests/test_kvk_cmds.py`
@@ -219,10 +327,14 @@ Review and document:
 Decide after audit. Likely candidates if implementation is approved:
 
 - `services/kvk_history_service.py`
+- `kvk/dal/kvk_history_dal.py`
+- `commands/kvk_history_card_posting.py` or equivalent if needed
+- `kvk/rendering/kvk_history_renderer.py`
 - `kvk_history_utils.py`
 - `embed_kvk_history.py`
 - `ui/views/kvk_history_view.py`
 - `commands/kvk_cmds.py` only if visible command behaviour changes
+- `ui/views/kvk_stats_card_views.py` when removing/moving the stats History button
 - focused history tests
 - programme/task-pack docs
 
@@ -233,8 +345,12 @@ Only if the approved option needs them:
 - `kvk/models/kvk_history_payload.py`
 - `kvk/services/kvk_history_card_service.py`
 - `kvk/rendering/kvk_history_renderer.py`
+- `commands/kvk_history_card_posting.py`
+- `ui/views/kvk_history_card_views.py`
 - `tests/test_kvk_history_renderer.py`
 - `tests/test_kvk_history_payload.py`
+- `tests/test_kvk_history_card_views.py`
+- `tests/test_kvk_history_export.py`
 
 ## 12. Optioneering Requirements
 
@@ -257,22 +373,24 @@ Trade-offs:
 - Less visual alignment with stats/targets.
 - Existing chart/table image limitations remain.
 
-### Option B - Hybrid Summary Card Plus Existing Detail Flow
+### Option B - Hybrid Summary Card Plus Existing Detail Flow - Approved Direction
 
-Add a modern summary card for the selected governor/account and preserve the existing chart/table
-and CSV detail flow. The summary card could show last KVK, personal bests, KVK count, standout
-metrics, and trend direction, while the existing graph/table remains the detailed analysis view.
+Approved with a modification: `/kvk history` becomes the modern card-based journey and
+`/mykvkhistory` preserves the existing chart/table/CSV detail flow during player validation.
+CSV export remains the deeper data path for longer ranges. The existing graph is not moved into a
+new `/kvk history_chart` command in Phase 4B.
 
 Best when:
 
 - The card is useful for quick understanding.
-- The graph/table remains necessary for real comparison.
+- The legacy graph/table remains available for comparison through `/mykvkhistory`.
 - Visual alignment matters but data density is too high for one card.
 
 Trade-offs:
 
 - More moving parts and more tests.
-- Needs careful interaction design so players know where detail lives.
+- Needs careful rollout communication so players understand `/kvk history` is the modern path and
+  `/mykvkhistory` is the legacy graph path during testing.
 
 ### Option C - Modern Chart/Table Wrapper
 
@@ -324,17 +442,26 @@ Trade-offs:
 
 Answer before implementation:
 
-- Which metrics should Phase 4B display by default?
-- Should the default remain `T4&T5 Kills` vs `% of Kill target`?
-- Should deads and DKP each continue to pair with their own `% of target` right axis?
-- Should Acclaim appear in full history now, later, or never?
-- Should KVK rank or overall rank history be included?
-- Should honor and PreKVK history remain outside this command?
-- Should pass-window kills/deads remain custom-only or become selectable presets?
-- Should multiple selected governors remain capped at three overlays?
-- What is the right empty-state for KVKs with no row versus zero-filled started KVKs?
+- Which metrics should Phase 4B display by default? Approved baseline: rank, kills, kill target
+  percent, deads, dead target percent, DKP, DKP target percent, and Acclaim.
+- Should the default remain `T4&T5 Kills` vs `% of Kill target`? No for modern `/kvk history`;
+  graph defaults remain only in legacy `/mykvkhistory`.
+- Should deads and DKP each continue to pair with their own `% of target` right axis? Only in
+  legacy chart output; modern card rows show metric plus percent directly.
+- Should Acclaim appear in full history now, later, or never? Yes as raw Acclaim where available;
+  show missing where unavailable.
+- Should KVK rank or overall rank history be included? Include KVK rank in last-3 rows and trend
+  card. Do not invent a new overall-rank source for history without SQL validation.
+- Should honor and PreKVK history remain outside this command? Yes, outside Phase 4B.
+- Should pass-window kills/deads remain custom-only or become selectable presets? Exclude from
+  modern cards; preserve in legacy/export if already available.
+- Should multiple selected governors remain capped at three overlays? Modern card is single
+  selected governor by default. Legacy `/mykvkhistory` can preserve overlay behaviour.
+- What is the right empty-state for KVKs with no row versus zero-filled started KVKs? The new
+  payload must distinguish missing row, missing metric, and true zero.
 - Which labels need renaming to avoid confusion between highest-ever, last-KVK, target percent, and
-  current-KVK stats?
+  current-KVK stats? Move historical labels from `/kvk stats` to `/kvk history`; keep `/kvk stats`
+  current-focused.
 
 ## 14. Implementation Requirements
 
@@ -344,12 +471,74 @@ Once an option is approved:
 - Put data shaping and comparison rules in service/model code.
 - Keep SQL/data access in DAL/service layers.
 - Keep renderers free of SQL and Discord objects.
-- Preserve existing account selection, visibility, metric controls, and CSV export unless the
-  approved option says otherwise.
-- Preserve fallback behaviour if chart/card/table generation fails.
-- Keep chart/table/card output readable on Discord mobile.
+- Preserve `/mykvkhistory` legacy chart/table/CSV output.
+- Modernise `/kvk history` using card output and richer CSV export.
+- Preserve fallback behaviour if card/export generation fails.
+- Keep card output readable on Discord mobile.
 - Add or update focused tests for every changed behaviour.
-- Generate visual samples for at least one single-account and one multi-account history.
+- Generate visual samples for at least one registered-account path and one explicit Governor ID
+  lookup path.
+
+### 14.1 Approved `/kvk history` Card Model
+
+Modern `/kvk history` should expose these cards:
+
+1. `History` / Last 3 KVK performance card using `history_card1.PNG`.
+2. `Summary` card using `history_card2.PNG`, moving the existing compact History content away from
+   `/kvk stats`.
+3. `Trends` card using `history_card3.PNG`.
+
+Implementation may choose exact button labels, but labels should make the distinction clear:
+`History`, `Summary`, `Trends`, and `Export` are the preferred starting point.
+
+### 14.2 Main History Card Design
+
+The main card should show the current selected governor's last 3 started KVKs.
+
+Header:
+
+- Governor name.
+- Governor ID as smaller subtitle/subscript-style text.
+- Discord avatar/emoji identity treatment where available.
+- Right-hand summary block with average kills, average kill target percent, and trend indicator
+  across the same last 3 KVKs.
+
+Rows:
+
+- One row per KVK.
+- Show KVK number, rank, kills plus kill target percent, deads plus dead target percent, DKP plus
+  DKP target percent, and Acclaim.
+- Show Acclaim as missing when unavailable. Do not display zero unless the SQL row contains a true
+  zero.
+
+### 14.3 Summary Card Design
+
+Move the current `/kvk stats` History card content into `/kvk history`:
+
+- KVK count.
+- Highest Acclaim.
+- Most kills.
+- Most deads.
+- Last KVK comparison.
+
+Do not duplicate this content on `/kvk stats` after the move.
+
+### 14.4 Trends Card Design
+
+The Trends card should include:
+
+- rank
+- kills
+- deads
+- DKP
+- Acclaim
+
+For each metric:
+
+- show average over the last 3 started KVKs where values exist
+- show trend direction
+- treat missing values as missing, not zero
+- avoid predictive "on track" wording
 
 ## 15. Command Surface Governance
 
@@ -368,10 +557,14 @@ Classify each issue found during audit:
 
 | Issue | Decision | Reason |
 |---|---|---|
-| Full history may be too dense for a single stats-card-style image | decide during optioneering | Readability and graph utility matter more than visual uniformity. |
-| History view may own too much output composition | audit first | Extract only if approved option requires clearer service/payload boundaries. |
-| CSV export remains useful | preserve by default | Removal would reduce current functionality. |
+| Full history may be too dense for a single stats-card-style image | split into History, Summary, and Trends cards | Readability matters more than forcing all history into one image. |
+| History view may own too much output composition | fix in Phase 4Bi | Renderer-independent payload/service boundary is approved. |
+| CSV export remains useful | preserve and expand | CSV services longer ranges and detailed data instead of keeping Last 6/10/12 in the default card. |
 | Legacy `/mykvkhistory` still lives | not applicable | Parallel rollout is intentional. |
+| Modern `/kvk history_chart` split | do not create in Phase 4B | Legacy `/mykvkhistory` preserves graph testing without new command-surface weight. |
+| Acclaim target percentage | defer | Acclaim targets do not exist yet. |
+| Honor and PreKVK history | exclude | Not relevant to individual KVK performance cards for this phase. |
+| `/kvk stats` History button | move to `/kvk history` in Phase 4Bii | Stats should be current KVK; history should own past performance. |
 | `/kvk rankings` polish | defer | Phase 5 owns rankings. |
 
 Add further rows based on actual findings. Deferred items must use the structured format from
@@ -382,18 +575,23 @@ Add further rows based on actual findings. Deferred items must use the structure
 Cover or justify:
 
 - `/kvk history` happy path.
-- `/mykvkhistory` happy path.
+- `/mykvkhistory` legacy happy path remains unchanged.
 - registered-account and explicit Governor ID paths.
 - empty history / missing governor path.
-- single-account chart/table output.
-- multi-account overlay output.
-- metric preset buttons.
-- custom metric picker.
-- Last 3 / Last 6 / Last 10 table range buttons.
+- same account picker style as `/kvk stats` and `/kvk targets` where implemented.
+- single-governor modern card output.
+- legacy chart/table output remains covered for `/mykvkhistory`.
+- legacy metric preset buttons, custom metric picker, and Last 3 / Last 6 / Last 10 range buttons
+  remain covered where legacy code is retained.
 - CSV export content and filename.
-- fallback behaviour when chart/table/card generation fails.
+- expanded CSV export includes deeper history data where approved.
+- fallback behaviour when card/export generation fails.
 - command registration unchanged.
 - renderer/payload output shape if a new payload or renderer is added.
+- `/kvk stats` no longer shows the History button after the move.
+- Acclaim missing/null handling.
+- last 3 started-KVK selection.
+- trend calculation excludes missing values.
 
 Suggested focused tests after audit:
 
@@ -428,18 +626,20 @@ For docs-only audit/optioneering output, runtime pytest may be skipped with a do
 
 Audit/optioneering acceptance:
 
-- [ ] Current `/kvk history` and `/mykvkhistory` behaviours are mapped.
-- [ ] Current data contract and SQL source objects are validated or ambiguities are documented.
-- [ ] Current screenshot/output is used as design input.
-- [ ] At least four viable output options are compared with trade-offs.
-- [ ] A recommended option or staged solution is proposed.
-- [ ] Implementation plan is separated from audit findings.
-- [ ] No implementation occurs before approval.
+- [x] Current `/kvk history` and `/mykvkhistory` behaviours are mapped.
+- [x] Current data contract and SQL source objects are validated or ambiguities are documented.
+- [x] Current screenshot/output is used as design input.
+- [x] At least four viable output options are compared with trade-offs.
+- [x] A recommended staged solution is proposed and approved.
+- [x] Implementation plan is separated into Phase 4Bi, 4Bii, and 4Biii.
+- [x] No implementation occurred before approval.
 
 Implementation acceptance, after approval:
 
 - [ ] Approved output model is implemented without removing legacy commands.
-- [ ] Existing useful controls/export remain or are deliberately replaced.
+- [ ] `/kvk history` uses the modern card model.
+- [ ] `/mykvkhistory` retains the old chart/table/CSV journey during player testing.
+- [ ] Existing useful export behaviour remains or is deliberately replaced with richer export data.
 - [ ] Output is readable on Discord mobile.
 - [ ] Commands/views remain thin.
 - [ ] No new direct SQL exists in command, view, or renderer modules.
@@ -517,15 +717,22 @@ For the implementation stage, use:
 ## 21. Codex Chat Starter
 
 ```text
-Codex, start Phase 4B of the KVK Player Experience Redesign: History Audit and Optioneering.
+Codex, start Phase 4Bi of the KVK Player Experience Redesign: History Payload, Data Contract,
+Picker, Export, and Test Foundation.
 
-Phase 4A targets is complete, merged, and promoted to production. Do not change targets except to
-preserve compatibility. The task is to audit /kvk history and /mykvkhistory, validate the history
-data contract, use the current screenshot/output as design input, and produce solution options
-before implementation.
+Phase 4A targets is complete, merged, and promoted to production. Phase 4B audit and optioneering
+are complete. The approved product model is:
 
-First stage only: audit and analysis, then optioneering. Do not implement until the option is
-approved.
+- /kvk stats = current KVK performance only, eventually Main Card + More Stats.
+- /kvk history = modern past-performance and trends card journey.
+- /mykvkhistory = legacy graph/table/CSV journey retained during player testing.
+- No /kvk history_chart command in Phase 4B.
+- CSV export remains and should service deeper/full-history data needs.
+- Last 3 KVKs means current started KVK plus the previous two started KVKs.
+- If KVK 15 has started, last 3 is KVK 13, 14, and 15.
+- Missing metrics must stay missing, not become zero, especially Acclaim.
+- Acclaim is raw value only for now; no Acclaim target percent until acclaim targets exist.
+- Honor and PreKVK history are out of Phase 4B.
 
 Read:
 - AGENTS.md
@@ -534,7 +741,20 @@ Read:
 - docs/task_packs/KVK Player Experience Redesign - Programme Pack.md
 - docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md
 
-Review:
+Phase 4Bi scope only:
+
+- Build renderer-independent history payload/service boundary.
+- Validate SQL/data contracts against C:\K98-bot-SQL-Server.
+- Prepare modern /kvk history to use the same account picker style as /kvk stats and /kvk targets
+  where practical.
+- Retain explicit governor_id lookup for admin/leadership inspection.
+- Keep /mykvkhistory legacy and unchanged.
+- Preserve and expand CSV export.
+- Add missing tests for data contract, started-KVK selection, missing/null handling, picker/lookup
+  flow, export shape, and command registration.
+- Do not build final visual cards unless needed for a small wiring proof.
+
+Review these likely files:
 - commands/kvk_cmds.py
 - commands/stats_cmds.py
 - services/kvk_history_service.py
@@ -542,12 +762,11 @@ Review:
 - kvk_history_utils.py
 - embed_kvk_history.py
 - ui/views/kvk_history_view.py
+- ui/views/kvk_stats_card_views.py
 - existing history tests
+- assets/kvk/cards/history_card1.PNG
+- assets/kvk/cards/history_card2.PNG
+- assets/kvk/cards/history_card3.PNG
 
-Validate SQL assumptions against C:\K98-bot-SQL-Server.
-
-The card approach may work for summary data, but the graph may need a different treatment. Compare
-chart-first, hybrid summary-plus-detail, modern wrapper, data-first interactive browser, and
-data-contract-first options. Preserve CSV/export/account controls unless the approved design
-deliberately replaces them.
+Do not proceed into Phase 4Bii or 4Biii without approval after Phase 4Bi validation.
 ```

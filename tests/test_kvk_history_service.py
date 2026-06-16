@@ -24,3 +24,99 @@ def test_fetch_history_empty_ids_returns_canonical_schema():
 
     assert list(df.columns) == kvk_history_service.HISTORY_COLUMNS
     assert df.empty
+
+
+def test_select_last_started_kvks_uses_latest_started_window():
+    assert kvk_history_service.select_last_started_kvks([12, 13, 14, 15]) == (13, 14, 15)
+    assert kvk_history_service.select_last_started_kvks([15, "13", "bad", 14]) == (13, 14, 15)
+
+
+def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
+    rows = [
+        {
+            "Gov_ID": 2441482,
+            "Governor_Name": "Tester",
+            "KVK_NO": 13,
+            "KVK_RANK": 10,
+            "Kingdom_Rank": 20,
+            "T4T5_Kills": 100,
+            "KillPct": 80.0,
+            "Deads": 5,
+            "DeadPct": 50.0,
+            "DKP_SCORE": 1000,
+            "DKPPct": 60.0,
+            "Acclaim": None,
+            "HighestAcclaim": None,
+            "KvKPlayed": 2,
+            "MostKvKKill": 100,
+            "MostKvKDead": 5,
+            "MostKvKHeal": None,
+        },
+        {
+            "Gov_ID": 2441482,
+            "Governor_Name": "Tester",
+            "KVK_NO": 15,
+            "KVK_RANK": 8,
+            "Kingdom_Rank": 18,
+            "T4T5_Kills": 200,
+            "KillPct": 100.0,
+            "Deads": 7,
+            "DeadPct": 70.0,
+            "DKP_SCORE": 2000,
+            "DKPPct": 90.0,
+            "Acclaim": 0,
+            "HighestAcclaim": 0,
+            "KvKPlayed": 3,
+            "MostKvKKill": 200,
+            "MostKvKDead": 7,
+            "MostKvKHeal": None,
+        },
+    ]
+
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal, "get_started_kvks", lambda: [13, 14, 15]
+    )
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal,
+        "fetch_modern_history_rows_for_governors",
+        lambda ids: rows,
+    )
+
+    payload = kvk_history_service.build_kvk_history_payload(2441482)
+
+    assert payload.governor_name == "Tester"
+    assert payload.last3_kvks == (13, 14, 15)
+    assert [row.kvk_no for row in payload.last3_rows] == [13, 14, 15]
+    assert payload.last3_rows[0].row_present is True
+    assert payload.last3_rows[0].acclaim is None
+    assert payload.last3_rows[1].row_present is False
+    assert payload.last3_rows[1].kills is None
+    assert payload.last3_rows[2].acclaim == 0
+    assert payload.history_summary["Highest Acclaim"] == 0
+    assert payload.trends["rank"].direction == "up"
+    assert payload.trends["acclaim"].direction == "insufficient"
+
+
+def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypatch):
+    rows = [
+        {
+            "Gov_ID": 1,
+            "Governor_Name": "A",
+            "KVK_NO": 15,
+            "Kingdom_Rank": 5,
+            "KVK_RANK": 3,
+            "Acclaim": None,
+        }
+    ]
+
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal,
+        "fetch_modern_history_rows_for_governors",
+        lambda ids: rows,
+    )
+
+    df = kvk_history_service.fetch_history_export_for_governors([1])
+
+    assert list(df.columns) == kvk_history_service.HISTORY_EXPORT_COLUMNS
+    assert df.loc[0, "KVK_RANK"] == 3
+    assert df.loc[0, "Acclaim"] is None
