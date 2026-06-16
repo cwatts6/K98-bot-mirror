@@ -230,6 +230,53 @@ def test_map_row_uses_canonical_normalize_governor_id(monkeypatch):
     assert mod._map_row(row3, cols) is None
 
 
+def test_map_row_maps_conduct_from_conduct_or_credit_and_preserves_blank_as_none():
+    import player_stats_cache as mod
+
+    class FakeRow:
+        def __init__(self, values):
+            self._values = values
+
+        def __getitem__(self, idx):
+            return self._values[idx]
+
+    conduct_row = FakeRow(["123", "Name", "88.25"])
+    conduct_out = mod._map_row(conduct_row, ["Governor ID", "Governor_Name", "Conduct"])
+    assert conduct_out["Conduct"] == pytest.approx(88.25)
+
+    credit_row = FakeRow(["123", "Name", "99.5"])
+    credit_out = mod._map_row(credit_row, ["Governor ID", "Governor_Name", "Credit"])
+    assert credit_out["Conduct"] == pytest.approx(99.5)
+
+    blank_row = FakeRow(["123", "Name", ""])
+    blank_out = mod._map_row(blank_row, ["Governor ID", "Governor_Name", "Credit"])
+    assert blank_out["Conduct"] is None
+
+    missing_row = FakeRow(["123", "Name"])
+    missing_out = mod._map_row(missing_row, ["Governor ID", "Governor_Name"])
+    assert missing_out["Conduct"] is None
+
+
+def test_map_excel_row_maps_conduct_from_credit_and_preserves_blank_as_none():
+    import player_stats_cache as mod
+
+    class FakeRow:
+        def __init__(self, values):
+            self._values = values
+
+        def __getitem__(self, idx):
+            return self._values[idx]
+
+    credit_row = FakeRow(["123", "Name", 77.75])
+    credit_out = mod._map_excel_row(credit_row, ["Governor ID", "Governor_Name", "Credit"], 15)
+    assert credit_out["Conduct"] == pytest.approx(77.75)
+    assert credit_out["KVK_NO"] == 15
+
+    blank_row = FakeRow(["123", "Name", None])
+    blank_out = mod._map_excel_row(blank_row, ["Governor ID", "Governor_Name", "Conduct"], 15)
+    assert blank_out["Conduct"] is None
+
+
 def test_score_player_stats_rec_prefers_newer_datetime(monkeypatch):
     # Test the shared scoring helper directly (Phase 3)
     import utils
