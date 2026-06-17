@@ -517,12 +517,9 @@ def render_kvk_history_summary_card(
 TREND_METRIC_LAYOUT = (
     ("Rank", "rank", GOLD, "rank"),
     ("Kills", "kills", GREEN, "number"),
-    ("Kill Target", "kill_target_percent", GOLD, "percent"),
     ("Deads", "deads", RED, "number"),
-    ("Dead Target", "dead_target_percent", RED, "percent"),
     ("Healed", "heals", BLUE, "number"),
     ("DKP", "dkp", PURPLE, "number"),
-    ("DKP Target", "dkp_target_percent", PURPLE, "percent"),
     ("Acclaim", "acclaim", GOLD, "number"),
     ("KillPoints", "kill_points", GREEN, "number"),
     ("Tanking Score", "tanking_score", BLUE, "score"),
@@ -550,7 +547,6 @@ def _draw_trend_metric(
     detail = _trend_detail(trend, kind)
     detail_font = _fit_font(draw, detail, max_width=w - 58, size=21, min_size=15, bold=True)
 
-    draw.line((x, y + 66, x + w, y + 66), fill=(255, 255, 255, 34), width=1)
     _draw_trend_indicator(draw, x=x, y=y + 12, direction=direction, color=color)
     text_x = x + 56
     _draw_text(draw, (text_x, y + 6), title_text, fill=TEXT, font=title_font, bold=True)
@@ -605,8 +601,8 @@ def render_kvk_history_trends_card(
     )
     left_x = 46
     right_x = 612
-    y0 = 216
-    row_gap = 68
+    y0 = 224
+    row_gap = 86
     for idx, (title, key, accent, kind) in enumerate(TREND_METRIC_LAYOUT):
         col = idx % 2
         row = idx // 2

@@ -270,3 +270,36 @@ def test_healed_trend_treats_lower_values_as_improved(monkeypatch):
     payload = kvk_history_service.build_kvk_history_payload(2441482)
 
     assert payload.trends["heals"].direction == "up"
+
+
+def test_number_trend_direction_matches_compact_display_precision(monkeypatch):
+    rows = [
+        {
+            "Gov_ID": 2441482,
+            "Governor_Name": "Tester",
+            "KVK_NO": 13,
+            "Deads": 1_080_000,
+        },
+        {
+            "Gov_ID": 2441482,
+            "Governor_Name": "Tester",
+            "KVK_NO": 14,
+            "Deads": 1_120_000,
+        },
+    ]
+
+    monkeypatch.setattr(kvk_history_service.kvk_history_dal, "get_started_kvks", lambda: [13, 14])
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal,
+        "fetch_modern_history_rows_for_governors",
+        lambda ids: rows,
+    )
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal,
+        "fetch_history_summary_metric_ranks",
+        lambda gid: [],
+    )
+
+    payload = kvk_history_service.build_kvk_history_payload(2441482)
+
+    assert payload.trends["deads"].direction == "flat"

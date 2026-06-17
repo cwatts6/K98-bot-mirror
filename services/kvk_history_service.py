@@ -356,6 +356,20 @@ def _summary_tanking_metric(rows: Iterable[Mapping[str, Any]]) -> KvkHistorySumm
     return KvkHistorySummaryMetric(value=best_value, kvk_no=best_kvk)
 
 
+def _trend_compare_value(metric: str, value: float) -> float:
+    if metric == "rank":
+        return float(int(value + 0.5))
+    if metric == "tanking_score":
+        return round(value * 100, 1)
+    if metric.endswith("_percent"):
+        return round(value, 1)
+    abs_value = abs(value)
+    for limit in (1_000_000_000, 1_000_000, 1_000):
+        if abs_value >= limit:
+            return round(value / limit, 1)
+    return float(int(value))
+
+
 def _trend(
     metric: str, rows: Iterable[KvkHistoryRow], attr: str, *, lower_is_better: bool = False
 ) -> KvkHistoryTrend:
@@ -377,9 +391,13 @@ def _trend(
         )
     first = numeric[0]
     last = numeric[-1]
-    if last == first:
+    compare_first = _trend_compare_value(metric, first)
+    compare_last = _trend_compare_value(metric, last)
+    if compare_last == compare_first:
         direction = "flat"
-    elif (last < first and lower_is_better) or (last > first and not lower_is_better):
+    elif (compare_last < compare_first and lower_is_better) or (
+        compare_last > compare_first and not lower_is_better
+    ):
         direction = "up"
     else:
         direction = "down"

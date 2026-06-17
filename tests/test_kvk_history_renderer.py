@@ -191,12 +191,9 @@ def test_history_trends_layout_includes_phase_4biii_metrics():
     assert labels == [
         "Rank",
         "Kills",
-        "Kill Target",
         "Deads",
-        "Dead Target",
         "Healed",
         "DKP",
-        "DKP Target",
         "Acclaim",
         "KillPoints",
         "Tanking Score",
