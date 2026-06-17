@@ -500,7 +500,7 @@ def build_kvk_history_payload(governor_id: Any) -> KvkHistoryPayload:
         "dead_target_percent": _trend(
             "dead_target_percent", rows, "dead_target_percent", lower_is_better=True
         ),
-        "heals": _trend("heals", rows, "heals"),
+        "heals": _trend("heals", rows, "heals", lower_is_better=True),
         "dkp": _trend("dkp", rows, "dkp"),
         "dkp_target_percent": _trend("dkp_target_percent", rows, "dkp_target_percent"),
         "acclaim": _trend("acclaim", rows, "acclaim"),

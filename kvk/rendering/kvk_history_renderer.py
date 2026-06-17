@@ -142,30 +142,29 @@ def _draw_trend_indicator(
     color: tuple[int, int, int],
 ) -> None:
     if direction == "up":
-        draw.line((x, y + 34, x + 26, y + 8, x + 52, y + 8), fill=color, width=6)
-        draw.polygon(
-            [(x + 52, y + 8), (x + 38, y), (x + 42, y + 17)],
-            fill=color,
-        )
+        points = [(x + 2, y + 27), (x + 18, y + 11), (x + 39, y + 11)]
+        draw.line(points, fill=color, width=4, joint="curve")
+        draw.polygon([(x + 39, y + 11), (x + 29, y + 5), (x + 32, y + 18)], fill=color)
+        draw.ellipse((x - 1, y + 24, x + 5, y + 30), fill=color)
         return
     if direction == "down":
-        draw.line((x, y + 8, x + 26, y + 34, x + 52, y + 34), fill=color, width=6)
-        draw.polygon(
-            [(x + 52, y + 34), (x + 38, y + 42), (x + 42, y + 25)],
-            fill=color,
-        )
+        points = [(x + 2, y + 8), (x + 18, y + 24), (x + 39, y + 24)]
+        draw.line(points, fill=color, width=4, joint="curve")
+        draw.polygon([(x + 39, y + 24), (x + 29, y + 18), (x + 32, y + 31)], fill=color)
+        draw.ellipse((x - 1, y + 5, x + 5, y + 11), fill=color)
         return
     if direction == "flat":
-        draw.line((x, y + 22, x + 54, y + 22), fill=color, width=6)
+        draw.line((x + 2, y + 17, x + 39, y + 17), fill=color, width=4)
+        draw.ellipse((x - 1, y + 14, x + 5, y + 20), fill=color)
         return
-    draw.ellipse((x + 17, y + 12, x + 37, y + 32), fill=color)
+    draw.ellipse((x + 13, y + 10, x + 27, y + 24), fill=color)
 
 
 def _trend_value(value: float | None, kind: str) -> str:
     if value is None:
         return "N/A"
     if kind == "rank":
-        return f"#{int(round(value))}"
+        return f"#{int(float(value) + 0.5)}"
     if kind in {"percent", "score"}:
         return _pct(float(value) * 100 if kind == "score" else float(value))
     return _compact(value)
@@ -179,7 +178,11 @@ def _trend_detail(trend: KvkHistoryTrend, kind: str) -> str:
     first = _trend_value(trend.first_value, kind)
     last = _trend_value(trend.last_value, kind)
     avg = _trend_value(trend.average, kind)
-    return f"{first} to {last} | Avg {avg}"
+    return f"{first} to {last}, Avg {avg}"
+
+
+def _trend_history_count(payload: KvkHistoryPayload) -> int:
+    return sum(1 for row in payload.rows if row.row_present)
 
 
 def _draw_header(
@@ -539,17 +542,27 @@ def _draw_trend_metric(
 ) -> None:
     direction = trend.direction
     color = _trend_color(direction)
-    title_font = _fit_font(draw, title.upper(), max_width=w - 68, size=18, min_size=13, bold=True)
+    title_text = title.upper()
+    title_font = _fit_font(draw, title_text, max_width=150, size=20, min_size=15, bold=True)
     value = _trend_text(direction)
-    value_font = _fit_font(draw, value, max_width=124, size=21, min_size=15, bold=True)
+    title_width = draw.textbbox((0, 0), title_text, font=title_font)[2]
+    value_font = _fit_font(draw, value, max_width=150, size=22, min_size=16, bold=True)
     detail = _trend_detail(trend, kind)
-    detail_font = _fit_font(draw, detail, max_width=w - 206, size=14, min_size=10, bold=True)
+    detail_font = _fit_font(draw, detail, max_width=w - 58, size=21, min_size=15, bold=True)
 
-    draw.rounded_rectangle((x, y, x + w, y + 56), radius=8, fill=(0, 0, 0, 72))
-    _draw_trend_indicator(draw, x=x + 11, y=y + 7, direction=direction, color=color)
-    _draw_text(draw, (x + 76, y + 7), title.upper(), fill=TEXT, font=title_font, bold=True)
-    _draw_text(draw, (x + 76, y + 28), value, fill=color, font=value_font, bold=True)
-    _draw_text(draw, (x + 196, y + 33), detail, fill=accent, font=detail_font, bold=True)
+    draw.line((x, y + 66, x + w, y + 66), fill=(255, 255, 255, 34), width=1)
+    _draw_trend_indicator(draw, x=x, y=y + 12, direction=direction, color=color)
+    text_x = x + 56
+    _draw_text(draw, (text_x, y + 6), title_text, fill=TEXT, font=title_font, bold=True)
+    _draw_text(
+        draw,
+        (text_x + title_width + 14, y + 6),
+        value,
+        fill=color,
+        font=value_font,
+        bold=True,
+    )
+    _draw_text(draw, (text_x, y + 35), detail, fill=accent, font=detail_font, bold=True)
 
 
 def render_kvk_history_trends_card(
@@ -567,19 +580,33 @@ def render_kvk_history_trends_card(
         accent=PURPLE,
         avatar_bytes=avatar_bytes,
     )
+    count = _trend_history_count(payload)
+    count_label = "KVKS WITH DATA"
+    count_value = f"{count}"
+    _draw_text(draw, (860, 54), count_label, fill=TEXT, font=_font(18, bold=True), bold=True)
+    _draw_text(
+        draw,
+        (860, 82),
+        count_value,
+        fill=GOLD,
+        font=_font(46, bold=True),
+        bold=True,
+    )
+    suffix = "KVK" if count == 1 else "KVKs"
+    _draw_text(draw, (920, 98), suffix, fill=MUTED, font=_font(19, bold=True), bold=True)
 
     _draw_text(
         draw,
         (46, 184),
-        "Performance movement across collected KVK history",
+        "Trends across all collected KVK history",
         fill=GOLD,
         font=_font(23, bold=True),
         bold=True,
     )
     left_x = 46
     right_x = 612
-    y0 = 218
-    row_gap = 61
+    y0 = 216
+    row_gap = 68
     for idx, (title, key, accent, kind) in enumerate(TREND_METRIC_LAYOUT):
         col = idx % 2
         row = idx // 2
@@ -594,7 +621,7 @@ def render_kvk_history_trends_card(
             draw,
             x=x,
             y=y,
-            w=520,
+            w=500,
             title=title,
             trend=trend,
             accent=accent,

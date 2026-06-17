@@ -18,6 +18,8 @@ from kvk.rendering.kvk_history_renderer import (
     TREND_METRIC_LAYOUT,
     _last3_display_rows,
     _summary_display_value,
+    _trend_detail,
+    _trend_history_count,
     _trend_label,
     _trend_text,
     _trend_value,
@@ -213,6 +215,20 @@ def test_history_trend_down_copy_is_performance_oriented():
 
 def test_history_trend_rank_average_rounds_instead_of_truncating():
     assert _trend_value(7.9, "rank") == "#8"
+
+
+def test_history_trend_rank_average_rounds_half_up():
+    assert _trend_value(6.5, "rank") == "#7"
+
+
+def test_history_trend_detail_uses_readable_two_line_copy():
+    trend = KvkHistoryTrend("rank", 4.4, "up", 6, 3, 3)
+
+    assert _trend_detail(trend, "rank") == "#6 to #3, Avg #4"
+
+
+def test_history_trend_history_count_uses_present_rows():
+    assert _trend_history_count(_payload()) == 2
 
 
 def test_last3_text_fallback_preserves_missing_acclaim():

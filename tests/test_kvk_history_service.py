@@ -157,7 +157,7 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
     assert payload.history_summary_metrics["Lowest Tanking Score"].overall_rank == 11
     assert payload.trends["rank"].direction == "up"
     assert payload.trends["acclaim"].direction == "insufficient"
-    assert payload.trends["heals"].direction == "up"
+    assert payload.trends["heals"].direction == "down"
     assert payload.trends["kill_points"].direction == "up"
     assert payload.trends["tanking_score"].direction == "up"
     assert payload.trends["tanking_score"].first_value == 10.0
@@ -237,3 +237,36 @@ def test_payload_keeps_last3_kills_trend_separate_from_all_history(monkeypatch):
 
     assert payload.trends["kills"].direction == "down"
     assert payload.trends["last3_kills"].direction == "up"
+
+
+def test_healed_trend_treats_lower_values_as_improved(monkeypatch):
+    rows = [
+        {
+            "Gov_ID": 2441482,
+            "Governor_Name": "Tester",
+            "KVK_NO": 13,
+            "HealedTroopsDelta": 300,
+        },
+        {
+            "Gov_ID": 2441482,
+            "Governor_Name": "Tester",
+            "KVK_NO": 14,
+            "HealedTroopsDelta": 200,
+        },
+    ]
+
+    monkeypatch.setattr(kvk_history_service.kvk_history_dal, "get_started_kvks", lambda: [13, 14])
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal,
+        "fetch_modern_history_rows_for_governors",
+        lambda ids: rows,
+    )
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal,
+        "fetch_history_summary_metric_ranks",
+        lambda gid: [],
+    )
+
+    payload = kvk_history_service.build_kvk_history_payload(2441482)
+
+    assert payload.trends["heals"].direction == "up"
