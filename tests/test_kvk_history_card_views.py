@@ -45,6 +45,14 @@ class _Message:
         self.edits.append(kwargs)
 
 
+class _Followup:
+    def __init__(self):
+        self.messages = []
+
+    async def send(self, content=None, **kwargs):
+        self.messages.append({"content": content, **kwargs})
+
+
 def _view() -> KvkHistoryCardView:
     rendered = RenderedKvkHistoryCard(
         filename="history.png",
@@ -94,3 +102,62 @@ async def test_history_button_restores_main_card():
 
     assert message.edits[-1]["files"][0].filename == "history.png"
     assert message.edits[-1]["embeds"] == []
+
+
+@pytest.mark.asyncio
+async def test_export_csv_sends_ephemeral_file(monkeypatch):
+    import ui.views.kvk_history_card_views as views
+
+    captured_ids = []
+
+    def fake_fetch(governor_ids):
+        captured_ids.extend(governor_ids)
+        return "history-frame"
+
+    def fake_csv(df, filename):
+        assert df == "history-frame"
+        assert filename == "kvk_history.csv"
+        return "history.csv", b"Governor,KVK\nTester,15\n"
+
+    monkeypatch.setattr(views.kvk_history_service, "fetch_history_export_for_governors", fake_fetch)
+    monkeypatch.setattr(views, "build_history_csv", fake_csv)
+
+    view = _view()
+    followup = _Followup()
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        response=_Response(),
+        followup=followup,
+    )
+
+    await view._export_csv(interaction)
+
+    assert captured_ids == ["2441482"]
+    assert followup.messages[-1]["content"] == "Here's your CSV export."
+    assert followup.messages[-1]["ephemeral"] is True
+    assert followup.messages[-1]["file"].filename == "history.csv"
+
+
+@pytest.mark.asyncio
+async def test_export_csv_sends_ephemeral_failure_message(monkeypatch):
+    import ui.views.kvk_history_card_views as views
+
+    def fake_fetch(_governor_ids):
+        raise RuntimeError("export unavailable")
+
+    monkeypatch.setattr(views.kvk_history_service, "fetch_history_export_for_governors", fake_fetch)
+
+    view = _view()
+    followup = _Followup()
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        response=_Response(),
+        followup=followup,
+    )
+
+    await view._export_csv(interaction)
+
+    assert followup.messages[-1] == {
+        "content": "Failed to build CSV export.",
+        "ephemeral": True,
+    }

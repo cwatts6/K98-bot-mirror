@@ -336,12 +336,6 @@ async def _send_kvk_history(
             await _post_kvk_history_view(
                 interaction,
                 user=interaction.user,
-                account_map={
-                    "Lookup": {
-                        "GovernorID": int(selected_governor_id),
-                        "GovernorName": selected_governor_id,
-                    }
-                },
                 default_id=selected_governor_id,
                 ephemeral=selected_ephemeral,
             )
@@ -368,11 +362,9 @@ async def _send_kvk_history(
     async def _on_select_history(
         interaction: discord.Interaction, selected_governor_id: str, selected_ephemeral: bool
     ) -> None:
-        selected_map = _history_account_map_for_selection(account_map, selected_governor_id)
         await _post_kvk_history_view(
             interaction,
             user=interaction.user,
-            account_map=selected_map,
             default_id=selected_governor_id,
             ephemeral=selected_ephemeral,
         )
@@ -410,26 +402,15 @@ async def _send_kvk_history(
     await _post_kvk_history_view(
         ctx,
         user=ctx.user,
-        account_map=_history_account_map_for_selection(account_map, default_id),
         default_id=default_id,
         ephemeral=ephemeral,
     )
-
-
-def _history_account_map_for_selection(
-    account_map: dict[str, dict], governor_id: str
-) -> dict[str, dict]:
-    for label, meta in account_map.items():
-        if str(meta.get("GovernorID")) == str(governor_id):
-            return {label: meta}
-    return {"Lookup": {"GovernorID": int(governor_id), "GovernorName": str(governor_id)}}
 
 
 async def _post_kvk_history_view(
     target: discord.ApplicationContext | discord.Interaction,
     *,
     user: discord.User | discord.Member,
-    account_map: dict[str, dict],
     default_id: str,
     ephemeral: bool,
 ) -> None:

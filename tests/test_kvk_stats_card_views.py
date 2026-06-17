@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -9,7 +8,6 @@ import pytest
 from kvk.models.kvk_stats_card import KvkStatsCardPayload, KvkTargetProgress
 from ui.views.kvk_stats_card_views import (
     KvkStatsCardView,
-    build_history_embed,
     build_more_stats_embed,
 )
 
@@ -84,32 +82,6 @@ def test_more_stats_embed_uses_payload_context():
     assert embed.fields[0].name == "KVK Overall Rank"
     assert embed.fields[0].value == "#42\nTotal 8.7k / Top 0.5%"
     assert any(field.name == "Passes" for field in embed.fields)
-
-
-def test_history_embed_includes_last_kvk_summary():
-    embed = build_history_embed(_payload())
-
-    assert embed.title == "Historic KVK Data - Card Tester"
-    assert any(field.name == "Last KVK Summary - KVK 53" for field in embed.fields)
-    assert all(field.name != "Matchmaking Snapshot" for field in embed.fields)
-
-
-def test_history_embed_filters_zero_summary_and_personal_best_rows():
-    payload = replace(
-        _payload(),
-        history_summary={"Autarch": 0, "KVK Played": 0, "Highest Acclaim": 0},
-        personal_bests={"Most Kills": 0, "Most Deads": 0, "Most Heal": 0},
-        last_kvk_summary={},
-        matchmaking_snapshot={"MM KP": 100_000_000},
-    )
-
-    embed = build_history_embed(payload)
-    field_names = [field.name for field in embed.fields]
-
-    assert "Summary" not in field_names
-    assert "Personal Bests" not in field_names
-    assert "Matchmaking Snapshot" not in field_names
-    assert field_names == ["Last KVK Summary"]
 
 
 @pytest.mark.asyncio

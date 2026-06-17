@@ -47,10 +47,6 @@ def _overall_rank_text(payload: KvkStatsCardPayload) -> str:
     return value
 
 
-def _nonzero_items(values: dict) -> list[tuple[str, int | float | str]]:
-    return [(label, value) for label, value in values.items() if value not in (None, "", 0, 0.0)]
-
-
 def build_more_stats_embed(payload: KvkStatsCardPayload) -> discord.Embed:
     embed = discord.Embed(
         title=f"More KVK Stats - {payload.governor_name}",
@@ -94,63 +90,6 @@ def build_more_stats_embed(payload: KvkStatsCardPayload) -> discord.Embed:
         ),
         inline=True,
     )
-    embed.set_footer(text="Use Main Card to return to the visual card.")
-    return embed
-
-
-def build_history_embed(payload: KvkStatsCardPayload) -> discord.Embed:
-    embed = discord.Embed(
-        title=f"Historic KVK Data - {payload.governor_name}",
-        description=f"{payload.display_kvk_label} | {payload.display_mode}",
-        color=discord.Color.green(),
-    )
-    history_summary = _nonzero_items(payload.history_summary)
-    personal_bests = _nonzero_items(payload.personal_bests)
-    if history_summary:
-        embed.add_field(
-            name="Summary",
-            value="\n".join(_line(label, _compact(value)) for label, value in history_summary),
-            inline=False,
-        )
-    if personal_bests:
-        embed.add_field(
-            name="Personal Bests",
-            value="\n".join(_line(label, _compact(value)) for label, value in personal_bests),
-            inline=False,
-        )
-    if payload.last_kvk_summary:
-        last_no = payload.last_kvk_summary.get("KVK_NO") or "Last"
-        embed.add_field(
-            name=f"Last KVK Summary - KVK {last_no}",
-            value="\n".join(
-                [
-                    _line(
-                        "Kills",
-                        f"{_compact(payload.last_kvk_summary.get('Kills'))} / "
-                        f"{_compact(payload.last_kvk_summary.get('Kill Target'))} - "
-                        f"{_pct(payload.last_kvk_summary.get('Kill Percent'))}",
-                    ),
-                    _line(
-                        "Deads",
-                        f"{_compact(payload.last_kvk_summary.get('Deads'))} / "
-                        f"{_compact(payload.last_kvk_summary.get('Dead Target'))} - "
-                        f"{_pct(payload.last_kvk_summary.get('Dead Percent'))}",
-                    ),
-                    _line(
-                        "DKP",
-                        f"{_compact(payload.last_kvk_summary.get('DKP'))} / "
-                        f"{_compact(payload.last_kvk_summary.get('DKP Target'))} - "
-                        f"{_pct(payload.last_kvk_summary.get('DKP Percent'))}",
-                    ),
-                    _line("KP", _compact(payload.last_kvk_summary.get("KP"))),
-                    _line("Acclaim", _compact(payload.last_kvk_summary.get("Acclaim"))),
-                ]
-            ),
-            inline=False,
-        )
-    else:
-        embed.add_field(name="Last KVK Summary", value="No history data available.", inline=False)
-
     embed.set_footer(text="Use Main Card to return to the visual card.")
     return embed
 
