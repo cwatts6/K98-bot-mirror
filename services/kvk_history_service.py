@@ -492,6 +492,7 @@ def build_kvk_history_payload(governor_id: Any) -> KvkHistoryPayload:
     }
     summary = {label: metric.value for label, metric in summary_metrics.items()}
     trends = {
+        "last3_kills": _trend("last3_kills", last3_rows, "kills"),
         "rank": _trend("rank", rows, "kvk_rank", lower_is_better=True),
         "kills": _trend("kills", rows, "kills"),
         "kill_target_percent": _trend("kill_target_percent", rows, "kill_target_percent"),

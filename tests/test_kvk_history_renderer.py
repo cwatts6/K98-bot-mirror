@@ -18,6 +18,9 @@ from kvk.rendering.kvk_history_renderer import (
     TREND_METRIC_LAYOUT,
     _last3_display_rows,
     _summary_display_value,
+    _trend_label,
+    _trend_text,
+    _trend_value,
     build_last3_text_fallback,
     render_kvk_history_last3_card,
     render_kvk_history_summary_card,
@@ -96,7 +99,10 @@ def _payload() -> KvkHistoryPayload:
         },
         trends={
             "rank": KvkHistoryTrend("rank", 7.5, "up", 10, 5, 2),
-            "kills": KvkHistoryTrend("kills", 125_000_000, "up", 100_000_000, 150_000_000, 2),
+            "last3_kills": KvkHistoryTrend(
+                "last3_kills", 125_000_000, "up", 100_000_000, 150_000_000, 2
+            ),
+            "kills": KvkHistoryTrend("kills", 125_000_000, "down", 200_000_000, 150_000_000, 2),
             "kill_target_percent": KvkHistoryTrend(
                 "kill_target_percent", 100.0, "up", 80.0, 120.0, 2
             ),
@@ -193,6 +199,20 @@ def test_history_trends_layout_includes_phase_4biii_metrics():
         "KillPoints",
         "Tanking Score",
     ]
+
+
+def test_history_header_uses_last3_kills_trend_when_all_history_differs():
+    label, _color = _trend_label(_payload())
+
+    assert label == "Up"
+
+
+def test_history_trend_down_copy_is_performance_oriented():
+    assert _trend_text("down") == "Declined"
+
+
+def test_history_trend_rank_average_rounds_instead_of_truncating():
+    assert _trend_value(7.9, "rank") == "#8"
 
 
 def test_last3_text_fallback_preserves_missing_acclaim():

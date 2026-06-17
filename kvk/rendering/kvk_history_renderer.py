@@ -91,7 +91,7 @@ def _average(values: list[int | float | None]) -> float | None:
 
 
 def _trend_label(payload: KvkHistoryPayload) -> tuple[str, tuple[int, int, int]]:
-    trend = payload.trends.get("kills")
+    trend = payload.trends.get("last3_kills") or payload.trends.get("kills")
     direction = getattr(trend, "direction", "missing")
     if direction == "up":
         return "Up", GREEN
@@ -105,7 +105,7 @@ def _trend_label(payload: KvkHistoryPayload) -> tuple[str, tuple[int, int, int]]
 
 
 def _trend_direction(payload: KvkHistoryPayload) -> str:
-    trend = payload.trends.get("kills")
+    trend = payload.trends.get("last3_kills") or payload.trends.get("kills")
     return getattr(trend, "direction", "missing")
 
 
@@ -113,7 +113,7 @@ def _trend_text(direction: str) -> str:
     if direction == "up":
         return "Improved"
     if direction == "down":
-        return "Lower"
+        return "Declined"
     if direction == "flat":
         return "Flat"
     if direction == "insufficient":
@@ -165,7 +165,7 @@ def _trend_value(value: float | None, kind: str) -> str:
     if value is None:
         return "N/A"
     if kind == "rank":
-        return f"#{int(value)}"
+        return f"#{int(round(value))}"
     if kind in {"percent", "score"}:
         return _pct(float(value) * 100 if kind == "score" else float(value))
     return _compact(value)

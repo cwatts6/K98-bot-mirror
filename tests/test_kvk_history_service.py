@@ -189,3 +189,51 @@ def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypa
     assert df.loc[0, "Governor_Name"] == "A"
     assert df.loc[0, "KVK_RANK"] == 3
     assert df.loc[0, "Acclaim"] is None
+
+
+def test_payload_keeps_last3_kills_trend_separate_from_all_history(monkeypatch):
+    rows = [
+        {
+            "Gov_ID": 2441482,
+            "Governor_Name": "Tester",
+            "KVK_NO": 10,
+            "T4T5_Kills": 300,
+        },
+        {
+            "Gov_ID": 2441482,
+            "Governor_Name": "Tester",
+            "KVK_NO": 13,
+            "T4T5_Kills": 100,
+        },
+        {
+            "Gov_ID": 2441482,
+            "Governor_Name": "Tester",
+            "KVK_NO": 14,
+            "T4T5_Kills": 200,
+        },
+        {
+            "Gov_ID": 2441482,
+            "Governor_Name": "Tester",
+            "KVK_NO": 15,
+            "T4T5_Kills": 250,
+        },
+    ]
+
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal, "get_started_kvks", lambda: [10, 13, 14, 15]
+    )
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal,
+        "fetch_modern_history_rows_for_governors",
+        lambda ids: rows,
+    )
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal,
+        "fetch_history_summary_metric_ranks",
+        lambda gid: [],
+    )
+
+    payload = kvk_history_service.build_kvk_history_payload(2441482)
+
+    assert payload.trends["kills"].direction == "down"
+    assert payload.trends["last3_kills"].direction == "up"
