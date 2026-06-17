@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 3C production rollout`
 - Task type: `feature / UX redesign / generated image renderer / Discord interaction polish / service-DAL cleanup`
 - One-pass approved: `no`
-- Status: `complete - Phase 4A targets optimisation delivered in mirror PR #145 and promoted to production`
+- Status: `complete - Phase 4A targets optimisation delivered in mirror PR #145 and promoted to production; history work moved to Phase 4B, with Phase 4Bi/4Bii now delivered and Phase 4Biii remaining`
 
 ### Phase Split Update
 
@@ -16,12 +16,14 @@ Implementation was split after the initial audit:
 - Phase 4A: fully optimise `/kvk targets` first, including target service/DAL/payload cleanup,
   modern generated target card output, clear progress/remaining-work states, and tested fallback
   behaviour. This is complete.
-- Phase 4B: defer full `/kvk history` redesign until it can be scoped separately around the best
-  data contract and presentation model for long-history comparison.
+- Phase 4B: full `/kvk history` redesign was scoped separately. Phase 4Bi delivered the
+  renderer-independent history payload/data/export foundation in PR #148. Phase 4Bii delivered the
+  modern Last 3 and Summary cards and has been merged/pushed to production. Phase 4Biii remains
+  for the Trends card and final polish.
 
-Legacy `/mykvktargets` and `/mykvkhistory` remain live after Phase 4A. `/kvk history` and
-`/mykvkhistory` remain on the existing chart/table/CSV journey until Phase 4B is audited,
-optioneered, approved, and implemented.
+Legacy `/mykvktargets` and `/mykvkhistory` remain live. `/kvk history` is now the modern
+card-based history journey, while `/mykvkhistory` remains the legacy graph/table/CSV journey for
+player comparison.
 
 Do not continue history work from this combined Phase 4 pack. Use:
 
@@ -68,11 +70,13 @@ Validated delivery:
 
 Still to do:
 
-- Phase 4B: audit and redesign the full `/kvk history` / `/mykvkhistory` journey.
-- Decide whether history should remain chart/table-first, become a hybrid summary plus detailed
-  chart/table/export flow, or use a different interaction model.
-- Preserve long-history readability, CSV export, account controls, metric controls, and existing
-  useful affordances unless the approved Phase 4B design replaces them deliberately.
+- Phase 4Biii: add the `/kvk history` Trends card using `history_card3.PNG` and polish the final
+  modern history navigation.
+- Preserve the delivered Phase 4Bii baseline: Last 3 card, redesigned Summary card, blank
+  handling for historically uncollected Acclaim/healed values, overall Summary ranks, and the
+  delivered tanking-score formula.
+- Keep `/mykvkhistory` as the legacy graph/table/CSV path unless a later phase explicitly changes
+  that rollout decision.
 
 ## 2. Required Reading
 

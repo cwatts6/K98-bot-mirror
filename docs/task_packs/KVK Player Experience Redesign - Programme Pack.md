@@ -346,9 +346,11 @@ Execution record:
 
 ### Phase 4B - Full `/kvk history` Audit, Optioneering, And Modern History Rollout
 
-Status: audit complete, Phase 4Bi delivered, and Phase 4Bii implemented in the current bot branch.
+Status: audit complete, Phase 4Bi delivered, and Phase 4Bii delivered, merged, and pushed to
+production.
 Phase 4Bi was delivered in mirror PR #148, smoke tested successfully, merged, and pushed to
-production. Phase 4Bii is pending PR handoff, merge, and production promotion.
+production. Phase 4Bii completed the modern `/kvk history` Last 3 and Summary journey and has
+also been promoted to production.
 
 The full `/kvk history` / `/mykvkhistory` journey has completed audit and optioneering. The
 approved staged direction is:
@@ -374,20 +376,43 @@ Delivered Phase 4Bi details:
 - Addressed review and smoke-test hardening, including exact BIGINT-safe parsing, no-account
   picker ephemeral consistency, and trimming SQL-padded governor names in display/export paths.
 
-Delivered Phase 4Bii branch details:
+Delivered Phase 4Bii details:
 
-- Built the modern `/kvk history` Last 3 KVK card using `history_card1.PNG`.
-- Moved the compact stats History summary into `/kvk history` using `history_card2.PNG`.
+- Built the modern `/kvk history` Last 3 KVK card using `history_card1.PNG`, with newest-started
+  KVK first, the title `Last 3 KVKs`, card-native text styling, and a visual kills-trend indicator.
+- Last 3 rows now show KVK, rank, kills, deads, healed, DKP, and acclaim. Missing or historically
+  uncollected acclaim/healed values stay blank instead of displaying misleading zeroes.
+- Moved and redesigned the compact stats History summary into `/kvk history` using
+  `history_card2.PNG`.
+- Summary now uses a 3x4 record layout: Highest Rank, Autarchs, KVK Played, Highest Acclaim; Most
+  Kills, Most KillPoints, Most Deads, Most Heals; Most DKP, Lowest Tanking Score, Most Pre-KVK,
+  and Most Honor.
+- Summary record values include the KVK achieved in, and rankable records also include overall
+  rank across all players/every KVK where available. Highest Rank, Autarchs, and KVK Played remain
+  personal-context metrics without overall rank.
+- Lowest Tanking Score is displayed as a percent and is calculated as
+  `(HealedTroopsDelta * 20) / KillPointsDelta`, skipping rows where kill points or healed troops
+  are missing or zero.
 - Added modern History, Summary, and Export CSV controls for `/kvk history`.
+- Hardened Summary/History button switching for ephemeral responses and deleted/missing host
+  messages, and ensured export success/failure paths are user-visible.
 - Removed the `History` button from `/kvk stats`, leaving `Main Card` and `More Stats`.
 - Preserved `/mykvkhistory` on the legacy chart/table/CSV journey during validation.
 - Completed the Codex Security diff scan with no reportable findings.
 
-Next Phase 4Biii scope, after Phase 4Bii validation:
+Next Phase 4Biii scope:
 
 - Build the Trends card using `history_card3.PNG`.
-- Add approved switching/polish for final history-card navigation.
-- Keep missing values missing in trend logic and avoid predictive wording.
+- Add the `Trends` control to the delivered `/kvk history` card view, preserving the existing
+  History, Summary, and Export CSV behaviour.
+- Use the Phase 4Bi/4Bii data contract and metric semantics: blank historical acclaim/healed
+  values stay blank, tanking score ignores missing/zero kill points and healed troops, and the
+  Summary card record/rank model should not be rebuilt unless a defect is found.
+- Focus Trends on non-duplicative over-time signals for the delivered history metrics, especially
+  rank, kills, kill target percent, deads, dead target percent, healed, DKP, DKP target percent,
+  acclaim where collected, KillPointsDelta, and tanking score where calculable.
+- Avoid predictive wording and do not reintroduce graph/table output into `/kvk history`; the
+  legacy graph/table/CSV path remains `/mykvkhistory`.
 
 Use:
 
@@ -554,5 +579,7 @@ review hardening. Phase 4A has delivered modern `/kvk targets` in PR #145 and pr
 production. Phase 4B audit and optioneering are complete, and Phase 4Bi has delivered the
 history payload/data-contract/picker/export foundation in PR #148, smoke tested and pushed to
 production. Phase 4Bii has implemented the modern `/kvk history` Last 3 card, moved the compact
-history summary into `/kvk history`, and removed the History button from `/kvk stats`. Start
-Phase 4Biii next only after Phase 4Bii validation and PR handoff are complete.
+history summary into `/kvk history`, added the expanded Summary records/ranks/tanking-score model,
+blanked historically uncollected acclaim/healed values, removed the History button from
+`/kvk stats`, and has been merged and pushed to production. Start Phase 4Biii next from the
+delivered modern history baseline.

@@ -90,12 +90,13 @@ def _view() -> KvkHistoryCardView:
 
 
 @pytest.mark.asyncio
-async def test_history_card_view_buttons_are_phase_4bii_scope():
+async def test_history_card_view_buttons_include_trends():
     view = _view()
 
     assert [getattr(child, "label", None) for child in view.children] == [
         "History",
         "Summary",
+        "Trends",
         "Export CSV",
     ]
 
@@ -125,6 +126,33 @@ async def test_history_button_restores_main_card():
     await view._show_history(interaction)
 
     assert message.edits[-1]["files"][0].filename == "history.png"
+    assert message.edits[-1]["embeds"] == []
+
+
+@pytest.mark.asyncio
+async def test_trends_button_switches_to_trends_card(monkeypatch):
+    import ui.views.kvk_history_card_views as views
+
+    def fake_render(payload, *, avatar_bytes=None):
+        assert payload.governor_id == "2441482"
+        assert avatar_bytes is None
+        return RenderedKvkHistoryCard(
+            filename="trends.png",
+            image_bytes=BytesIO(b"trend-bytes"),
+        )
+
+    monkeypatch.setattr(views, "render_kvk_history_trends_card", fake_render)
+    view = _view()
+    message = _Message()
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        response=_Response(),
+        message=message,
+    )
+
+    await view._show_trends(interaction)
+
+    assert message.edits[-1]["files"][0].filename == "trends.png"
     assert message.edits[-1]["embeds"] == []
 
 

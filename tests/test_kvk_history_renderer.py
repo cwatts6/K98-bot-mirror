@@ -13,12 +13,15 @@ from kvk.models.kvk_history_payload import (
 from kvk.rendering.kvk_history_renderer import (
     HISTORY_LAST3_BACKGROUND,
     HISTORY_SUMMARY_BACKGROUND,
+    HISTORY_TRENDS_BACKGROUND,
     SUMMARY_METRIC_LAYOUT,
+    TREND_METRIC_LAYOUT,
     _last3_display_rows,
     _summary_display_value,
     build_last3_text_fallback,
     render_kvk_history_last3_card,
     render_kvk_history_summary_card,
+    render_kvk_history_trends_card,
 )
 
 
@@ -36,6 +39,8 @@ def _payload() -> KvkHistoryPayload:
             dkp_target_percent=70.0,
             acclaim=None,
             heals=None,
+            kill_points=44_000_000,
+            tanking_score=None,
         ),
         KvkHistoryRow(kvk_no=14, row_present=False),
         KvkHistoryRow(
@@ -50,6 +55,8 @@ def _payload() -> KvkHistoryPayload:
             dkp_target_percent=110.0,
             acclaim=12_000,
             heals=36_800_000,
+            kill_points=55_000_000,
+            tanking_score=0.85,
         ),
     )
     return KvkHistoryPayload(
@@ -87,13 +94,34 @@ def _payload() -> KvkHistoryPayload:
             "Most Pre-KVK": KvkHistorySummaryMetric(900_000, 15, 10),
             "Most Honor": KvkHistorySummaryMetric(800_000, 15, 11),
         },
-        trends={"kills": KvkHistoryTrend(metric="kills", average=125_000_000, direction="up")},
+        trends={
+            "rank": KvkHistoryTrend("rank", 7.5, "up", 10, 5, 2),
+            "kills": KvkHistoryTrend("kills", 125_000_000, "up", 100_000_000, 150_000_000, 2),
+            "kill_target_percent": KvkHistoryTrend(
+                "kill_target_percent", 100.0, "up", 80.0, 120.0, 2
+            ),
+            "deads": KvkHistoryTrend("deads", 1_500_000, "down", 1_000_000, 2_000_000, 2),
+            "dead_target_percent": KvkHistoryTrend(
+                "dead_target_percent", 75.0, "down", 50.0, 100.0, 2
+            ),
+            "heals": KvkHistoryTrend(
+                "heals", 36_800_000, "insufficient", 36_800_000, 36_800_000, 1
+            ),
+            "dkp": KvkHistoryTrend("dkp", 250_000_000, "up", 200_000_000, 300_000_000, 2),
+            "dkp_target_percent": KvkHistoryTrend("dkp_target_percent", 90.0, "up", 70.0, 110.0, 2),
+            "acclaim": KvkHistoryTrend("acclaim", 12_000, "insufficient", 12_000, 12_000, 1),
+            "kill_points": KvkHistoryTrend(
+                "kill_points", 49_500_000, "up", 44_000_000, 55_000_000, 2
+            ),
+            "tanking_score": KvkHistoryTrend("tanking_score", 0.85, "insufficient", 0.85, 0.85, 1),
+        },
     )
 
 
 def test_history_background_assets_are_used():
     assert HISTORY_LAST3_BACKGROUND.name == "history_card1.PNG"
     assert HISTORY_SUMMARY_BACKGROUND.name == "history_card2.PNG"
+    assert HISTORY_TRENDS_BACKGROUND.name == "history_card3.PNG"
 
 
 def test_history_last3_card_renders_png():
@@ -118,6 +146,14 @@ def test_history_summary_card_renders_png():
     assert Image.open(BytesIO(rendered.image_bytes.getvalue())).size == (1180, 640)
 
 
+def test_history_trends_card_renders_png():
+    rendered = render_kvk_history_trends_card(_payload())
+
+    assert rendered is not None
+    assert rendered.filename == "kvk_history_trends_2441482.png"
+    assert Image.open(BytesIO(rendered.image_bytes.getvalue())).size == (1180, 640)
+
+
 def test_history_summary_tanking_score_displays_as_percent():
     assert _summary_display_value(0.85, "score") == "85%"
 
@@ -138,6 +174,24 @@ def test_history_summary_layout_matches_requested_metric_order():
         "Lowest Tanking Score",
         "Most Pre-KVK",
         "Most Honor",
+    ]
+
+
+def test_history_trends_layout_includes_phase_4biii_metrics():
+    labels = [title for title, _key, _color, _kind in TREND_METRIC_LAYOUT]
+
+    assert labels == [
+        "Rank",
+        "Kills",
+        "Kill Target",
+        "Deads",
+        "Dead Target",
+        "Healed",
+        "DKP",
+        "DKP Target",
+        "Acclaim",
+        "KillPoints",
+        "Tanking Score",
     ]
 
 

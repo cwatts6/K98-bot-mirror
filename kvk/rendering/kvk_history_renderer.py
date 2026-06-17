@@ -9,6 +9,7 @@ from kvk.models.kvk_history_payload import (
     KvkHistoryPayload,
     KvkHistoryRow,
     KvkHistorySummaryMetric,
+    KvkHistoryTrend,
     RenderedKvkHistoryCard,
 )
 from kvk.rendering.kvk_stats_card_renderer import (
@@ -34,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ASSET_DIR = ROOT / "assets" / "kvk" / "cards"
 HISTORY_LAST3_BACKGROUND = ASSET_DIR / "history_card1.PNG"
 HISTORY_SUMMARY_BACKGROUND = ASSET_DIR / "history_card2.PNG"
+HISTORY_TRENDS_BACKGROUND = ASSET_DIR / "history_card3.PNG"
 DEFAULT_BACKGROUND = ASSET_DIR / "Default_card.jpg"
 TIDES_BACKGROUND = ASSET_DIR / "Tides_Stats_Card.png"
 
@@ -107,6 +109,30 @@ def _trend_direction(payload: KvkHistoryPayload) -> str:
     return getattr(trend, "direction", "missing")
 
 
+def _trend_text(direction: str) -> str:
+    if direction == "up":
+        return "Improved"
+    if direction == "down":
+        return "Lower"
+    if direction == "flat":
+        return "Flat"
+    if direction == "insufficient":
+        return "New"
+    return "Missing"
+
+
+def _trend_color(direction: str) -> tuple[int, int, int]:
+    if direction == "up":
+        return GREEN
+    if direction == "down":
+        return RED
+    if direction == "flat":
+        return GOLD
+    if direction == "insufficient":
+        return BLUE
+    return MUTED
+
+
 def _draw_trend_indicator(
     draw: ImageDraw.ImageDraw,
     *,
@@ -133,6 +159,27 @@ def _draw_trend_indicator(
         draw.line((x, y + 22, x + 54, y + 22), fill=color, width=6)
         return
     draw.ellipse((x + 17, y + 12, x + 37, y + 32), fill=color)
+
+
+def _trend_value(value: float | None, kind: str) -> str:
+    if value is None:
+        return "N/A"
+    if kind == "rank":
+        return f"#{int(value)}"
+    if kind in {"percent", "score"}:
+        return _pct(float(value) * 100 if kind == "score" else float(value))
+    return _compact(value)
+
+
+def _trend_detail(trend: KvkHistoryTrend, kind: str) -> str:
+    if trend.value_count <= 0:
+        return "No collected values"
+    if trend.value_count < 2:
+        return f"Only {_trend_value(trend.last_value, kind)} collected"
+    first = _trend_value(trend.first_value, kind)
+    last = _trend_value(trend.last_value, kind)
+    avg = _trend_value(trend.average, kind)
+    return f"{first} to {last} | Avg {avg}"
 
 
 def _draw_header(
@@ -462,6 +509,102 @@ def render_kvk_history_summary_card(
     footer_font = _fit_font(draw, footer, max_width=430, size=18, min_size=14, bold=True)
     _draw_text(draw, (705, 594), footer, fill=MUTED, font=footer_font, bold=True)
     return _save(canvas, f"kvk_history_summary_{payload.governor_id}.png")
+
+
+TREND_METRIC_LAYOUT = (
+    ("Rank", "rank", GOLD, "rank"),
+    ("Kills", "kills", GREEN, "number"),
+    ("Kill Target", "kill_target_percent", GOLD, "percent"),
+    ("Deads", "deads", RED, "number"),
+    ("Dead Target", "dead_target_percent", RED, "percent"),
+    ("Healed", "heals", BLUE, "number"),
+    ("DKP", "dkp", PURPLE, "number"),
+    ("DKP Target", "dkp_target_percent", PURPLE, "percent"),
+    ("Acclaim", "acclaim", GOLD, "number"),
+    ("KillPoints", "kill_points", GREEN, "number"),
+    ("Tanking Score", "tanking_score", BLUE, "score"),
+)
+
+
+def _draw_trend_metric(
+    draw: ImageDraw.ImageDraw,
+    *,
+    x: int,
+    y: int,
+    w: int,
+    title: str,
+    trend: KvkHistoryTrend,
+    accent: tuple[int, int, int],
+    kind: str,
+) -> None:
+    direction = trend.direction
+    color = _trend_color(direction)
+    title_font = _fit_font(draw, title.upper(), max_width=w - 68, size=18, min_size=13, bold=True)
+    value = _trend_text(direction)
+    value_font = _fit_font(draw, value, max_width=124, size=21, min_size=15, bold=True)
+    detail = _trend_detail(trend, kind)
+    detail_font = _fit_font(draw, detail, max_width=w - 206, size=14, min_size=10, bold=True)
+
+    draw.rounded_rectangle((x, y, x + w, y + 56), radius=8, fill=(0, 0, 0, 72))
+    _draw_trend_indicator(draw, x=x + 11, y=y + 7, direction=direction, color=color)
+    _draw_text(draw, (x + 76, y + 7), title.upper(), fill=TEXT, font=title_font, bold=True)
+    _draw_text(draw, (x + 76, y + 28), value, fill=color, font=value_font, bold=True)
+    _draw_text(draw, (x + 196, y + 33), detail, fill=accent, font=detail_font, bold=True)
+
+
+def render_kvk_history_trends_card(
+    payload: KvkHistoryPayload, *, avatar_bytes: bytes | None = None
+) -> RenderedKvkHistoryCard | None:
+    background = _background_path(HISTORY_TRENDS_BACKGROUND)
+    if background is None:
+        return None
+    canvas, draw = _card_canvas(background)
+    _draw_header(
+        canvas,
+        draw,
+        payload,
+        title="KVK Trends",
+        accent=PURPLE,
+        avatar_bytes=avatar_bytes,
+    )
+
+    _draw_text(
+        draw,
+        (46, 184),
+        "Performance movement across collected KVK history",
+        fill=GOLD,
+        font=_font(23, bold=True),
+        bold=True,
+    )
+    left_x = 46
+    right_x = 612
+    y0 = 218
+    row_gap = 61
+    for idx, (title, key, accent, kind) in enumerate(TREND_METRIC_LAYOUT):
+        col = idx % 2
+        row = idx // 2
+        x = left_x if col == 0 else right_x
+        y = y0 + row * row_gap
+        trend = payload.trends.get(key) or KvkHistoryTrend(
+            metric=key,
+            average=None,
+            direction="missing",
+        )
+        _draw_trend_metric(
+            draw,
+            x=x,
+            y=y,
+            w=520,
+            title=title,
+            trend=trend,
+            accent=accent,
+            kind=kind,
+        )
+
+    footer = f"Generated {payload.generated_at_utc:%Y-%m-%d %H:%M UTC}"
+    footer_font = _fit_font(draw, footer, max_width=430, size=18, min_size=14, bold=True)
+    _draw_text(draw, (705, 594), footer, fill=MUTED, font=footer_font, bold=True)
+    return _save(canvas, f"kvk_history_trends_{payload.governor_id}.png")
 
 
 def build_last3_text_fallback(payload: KvkHistoryPayload) -> str:

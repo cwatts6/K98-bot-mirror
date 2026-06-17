@@ -157,6 +157,12 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
     assert payload.history_summary_metrics["Lowest Tanking Score"].overall_rank == 11
     assert payload.trends["rank"].direction == "up"
     assert payload.trends["acclaim"].direction == "insufficient"
+    assert payload.trends["heals"].direction == "up"
+    assert payload.trends["kill_points"].direction == "up"
+    assert payload.trends["tanking_score"].direction == "up"
+    assert payload.trends["tanking_score"].first_value == 10.0
+    assert payload.trends["tanking_score"].last_value == 4.0
+    assert payload.trends["tanking_score"].value_count == 2
 
 
 def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypatch):

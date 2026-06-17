@@ -11,6 +11,7 @@ from kvk.models.kvk_history_payload import KvkHistoryPayload, RenderedKvkHistory
 from kvk.rendering.kvk_history_renderer import (
     build_last3_text_fallback,
     render_kvk_history_summary_card,
+    render_kvk_history_trends_card,
 )
 from kvk_history_utils import build_history_csv
 from services import kvk_history_service
@@ -36,6 +37,8 @@ class KvkHistoryCardView(discord.ui.View):
         self._history_filename = rendered.filename
         self._summary_bytes: bytes | None = None
         self._summary_filename: str | None = None
+        self._trends_bytes: bytes | None = None
+        self._trends_filename: str | None = None
         self.message: discord.Message | None = None
 
     def _history_file(self) -> discord.File:
@@ -164,6 +167,47 @@ class KvkHistoryCardView(discord.ui.View):
             view=self,
         )
 
+    async def _show_trends(self, interaction: discord.Interaction) -> None:
+        if not await self._check_user(interaction):
+            return
+        await self._defer_interaction(interaction)
+        try:
+            if self._trends_bytes is None or self._trends_filename is None:
+                rendered = await asyncio.to_thread(
+                    render_kvk_history_trends_card,
+                    self.payload,
+                    avatar_bytes=self.avatar_bytes,
+                )
+                if rendered is not None:
+                    self._trends_bytes = rendered.image_bytes.getvalue()
+                    self._trends_filename = rendered.filename
+            trends_bytes = self._trends_bytes
+            trends_filename = self._trends_filename
+            if trends_bytes is not None and trends_filename is not None:
+                await self._edit_host_message(
+                    interaction,
+                    build_kwargs=lambda: {
+                        "content": None,
+                        "embeds": [],
+                        "attachments": [],
+                        "files": [discord.File(BytesIO(trends_bytes), filename=trends_filename)],
+                        "view": self,
+                    },
+                )
+                return
+        except Exception:
+            logger.exception(
+                "kvk_history_trends_card_render_or_send_failed governor_id=%s",
+                self.payload.governor_id,
+            )
+        await self._edit_host_message(
+            interaction,
+            content=build_last3_text_fallback(self.payload),
+            embeds=[],
+            attachments=[],
+            view=self,
+        )
+
     async def _export_csv(self, interaction: discord.Interaction) -> None:
         if not await self._check_user(interaction):
             return
@@ -194,6 +238,10 @@ class KvkHistoryCardView(discord.ui.View):
     @discord.ui.button(label="Summary", style=discord.ButtonStyle.secondary)
     async def summary(self, _button: discord.ui.Button, interaction: discord.Interaction) -> None:
         await self._show_summary(interaction)
+
+    @discord.ui.button(label="Trends", style=discord.ButtonStyle.secondary)
+    async def trends(self, _button: discord.ui.Button, interaction: discord.Interaction) -> None:
+        await self._show_trends(interaction)
 
     @discord.ui.button(label="Export CSV", style=discord.ButtonStyle.secondary)
     async def export_csv(

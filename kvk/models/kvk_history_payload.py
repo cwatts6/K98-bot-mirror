@@ -19,6 +19,8 @@ class KvkHistoryRow:
     dkp_target_percent: float | None = None
     acclaim: int | None = None
     heals: int | None = None
+    kill_points: int | None = None
+    tanking_score: float | None = None
 
 
 @dataclass(frozen=True)

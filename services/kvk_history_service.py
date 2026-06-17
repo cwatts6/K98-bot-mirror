@@ -266,6 +266,8 @@ def _history_row_from_source(kvk_no: int, source: Mapping[str, Any] | None) -> K
         dkp_target_percent=_optional_float(source.get("DKPPct")),
         acclaim=_positive_optional_int(source.get("Acclaim")),
         heals=_positive_optional_int(source.get("HealedTroopsDelta")),
+        kill_points=_optional_int(source.get("KillPointsDelta")),
+        tanking_score=_tanking_score(source),
     )
 
 
@@ -490,11 +492,19 @@ def build_kvk_history_payload(governor_id: Any) -> KvkHistoryPayload:
     }
     summary = {label: metric.value for label, metric in summary_metrics.items()}
     trends = {
-        "rank": _trend("rank", last3_rows, "kvk_rank", lower_is_better=True),
-        "kills": _trend("kills", last3_rows, "kills"),
-        "deads": _trend("deads", last3_rows, "deads"),
-        "dkp": _trend("dkp", last3_rows, "dkp"),
-        "acclaim": _trend("acclaim", last3_rows, "acclaim"),
+        "rank": _trend("rank", rows, "kvk_rank", lower_is_better=True),
+        "kills": _trend("kills", rows, "kills"),
+        "kill_target_percent": _trend("kill_target_percent", rows, "kill_target_percent"),
+        "deads": _trend("deads", rows, "deads", lower_is_better=True),
+        "dead_target_percent": _trend(
+            "dead_target_percent", rows, "dead_target_percent", lower_is_better=True
+        ),
+        "heals": _trend("heals", rows, "heals"),
+        "dkp": _trend("dkp", rows, "dkp"),
+        "dkp_target_percent": _trend("dkp_target_percent", rows, "dkp_target_percent"),
+        "acclaim": _trend("acclaim", rows, "acclaim"),
+        "kill_points": _trend("kill_points", rows, "kill_points"),
+        "tanking_score": _trend("tanking_score", rows, "tanking_score", lower_is_better=True),
     }
     return KvkHistoryPayload(
         governor_id=str(gid),
