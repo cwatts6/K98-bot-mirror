@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 4A targets rollout`
 - Task type: `feature discovery / UX audit / architecture scope / Discord interaction design / staged implementation plan`
 - One-pass approved: `no`
-- Status: `audit complete - approved staged implementation direction; next phase is 4Bi`
+- Status: `Phase 4Bii implemented in current bot branch; pending PR handoff, merge, and production promotion`
 
 ## 2. Required Reading
 
@@ -101,9 +101,97 @@ New background assets added for Phase 4B cards:
 | `assets/kvk/cards/history_card2.PNG` | Moved history-summary card formerly attached to `/kvk stats`. |
 | `assets/kvk/cards/history_card3.PNG` | History Trends card. |
 
+## 4A.1 Phase 4Bi Delivery Update - 2026-06-17
+
+Phase 4Bi is complete. It was delivered in mirror PR #148 on branch
+`codex/phase-4bi-history-foundation`, smoke tested successfully, merged, and pushed to production.
+
+Delivered scope:
+
+- Added renderer-independent history payload models and service shaping.
+- Added the expanded, null-preserving modern history data/export contract.
+- Validated the SQL-facing history contract against `dbo.v_EXCEL_FOR_KVK_Started`, backed by
+  `dbo.v_EXCEL_FOR_KVK_All` and `dbo.KVK_Details`.
+- Preserved SQL access in `kvk/dal/kvk_history_dal.py` and service layers only.
+- Selected Last 3 KVKs from started-KVK logic.
+- Preserved missing/null distinction for modern payload rows, including Acclaim.
+- Prepared `/kvk history` for shared single-governor picker flow while retaining explicit
+  `governor_id` lookup.
+- Kept `/mykvkhistory` on the legacy chart/table/CSV journey for player comparison.
+- Preserved and expanded CSV export with the modern history column set.
+- Included the Phase 4B task-pack/archive updates and the three history card assets.
+- Addressed code-review hardening for exact BIGINT-safe integer parsing and no-account picker
+  ephemeral consistency.
+- Addressed smoke-test feedback by trimming SQL-padded governor names in history display/export
+  paths.
+
+Validated smoke-test result:
+
+- `/kvk history` with registered accounts works as before.
+- `/kvk history governor_id:<id>` now displays trimmed governor names in the legend and data table.
+- `/mykvkhistory` remains unchanged and works as expected.
+- `/kvk history` CSV export succeeds and emits trimmed governor names.
+- Channel and permission behaviour tested successfully.
+- No runtime log errors observed during smoke testing.
+
+Validation evidence from PR #148:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests\test_kvk_history_service.py tests\test_kvk_cmds.py tests\test_kvk_history_offload_and_utils.py tests\test_validate_command_registration.py
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+git diff --check
+```
+
+Known unrelated validation note:
+
+- `tests/test_ui_imports.py` has an existing unrelated failure because the test stubs `utils`
+  without `parse_last_refresh_utc`, causing `build_KVKrankings_embed.py` import failure. This is
+  outside the history Phase 4Bi delivery surface.
+
+Phase 4Bii is now implemented in the current bot branch.
+
+## 4A.2 Phase 4Bii Implementation Update - 2026-06-17
+
+Phase 4Bii has been implemented in the current bot branch and is pending PR handoff, merge, and
+production promotion.
+
+Delivered scope:
+
+- Added a dedicated modern history renderer for `KvkHistoryPayload`.
+- Built the main `/kvk history` Last 3 started-KVK card using `history_card1.PNG`.
+- Added the moved history Summary card using `history_card2.PNG`.
+- Added modern `/kvk history` controls for `History`, `Summary`, and `Export CSV`.
+- Preserved CSV export using the Phase 4Bi expanded, null-preserving export contract.
+- Rewired `/kvk history` to the modern card journey for registered-account and explicit
+  `governor_id` flows.
+- Kept `/mykvkhistory` on the legacy chart/table/CSV journey.
+- Removed the `History` button from `/kvk stats`, leaving `Main Card` and `More Stats`.
+- Removed the now-dead stats-side history renderer to avoid two competing history-card sources.
+- Updated command-surface documentation for `/kvk history` and `/mykvkhistory`.
+- Generated visual samples under `.codex_artifacts/` for registered-account and explicit lookup
+  Last 3/Summary paths.
+
+Validation evidence from this branch:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests\test_kvk_history_renderer.py tests\test_kvk_history_card_views.py tests\test_kvk_cmds.py tests\test_kvk_stats_card_views.py tests\test_kvk_stats_card_renderer.py tests\test_kvk_history_service.py
+```
+
+Codex Security diff scan completed with no reportable findings:
+
+`C:\Users\cwatt\AppData\Local\Temp\codex-security-scans\discord_file_downloader\109ee068_20260617T095053\report.md`
+
+Phase 4Biii remains out of scope until Phase 4Bii validation and PR handoff are complete.
+
 ## 4B. Approved Sub-Phase Plan
 
 ### Phase 4Bi - History Payload, Data Contract, Picker, Export, And Test Foundation
+
+Status: complete. Delivered in mirror PR #148, smoke tested, merged, and pushed to production.
 
 Build the renderer-independent history payload/service boundary before visual redesign.
 
@@ -124,6 +212,8 @@ Required outcomes:
 - No final card redesign is required in 4Bi unless it is needed as a small proof-of-wiring.
 
 ### Phase 4Bii - Modern `/kvk history` Last 3 Card And Stats History Move
+
+Status: implemented in current bot branch; pending PR handoff, merge, and production promotion.
 
 Switch `/kvk history` to the modern card journey while keeping `/mykvkhistory` legacy.
 
@@ -247,12 +337,13 @@ Likely audit candidates:
 
 Phase 4B audit and option approval are complete. Continue with sub-phases:
 
-1. Start Phase 4Bi in a new chat from this task pack.
+1. Start Phase 4Bii in a new chat from this task pack.
 2. Re-read the required repo guidance and this updated Phase 4B pack.
 3. Validate SQL/data contracts against `C:\K98-bot-SQL-Server`.
-4. Implement only Phase 4Bi scope unless the operator explicitly expands scope.
-5. Stop after 4Bi with payload/data/picker/export/test evidence before building final cards.
-6. Start Phase 4Bii only after 4Bi is reviewed and approved.
+4. Treat Phase 4Bi as complete and use its payload/data/export foundation.
+5. Implement only Phase 4Bii scope unless the operator explicitly expands scope.
+6. Stop after 4Bii with visual output, stats History move, and test evidence before building the
+   Trends card.
 7. Start Phase 4Biii only after the Last 3 card and stats History move are validated.
 8. Add or update focused tests in every implementation sub-phase.
 9. Generate visual/manual review samples for all card changes.
@@ -634,19 +725,32 @@ Audit/optioneering acceptance:
 - [x] Implementation plan is separated into Phase 4Bi, 4Bii, and 4Biii.
 - [x] No implementation occurred before approval.
 
+Phase 4Bi implementation acceptance:
+
+- [x] Renderer-independent history payload/model foundation is delivered.
+- [x] Modern history SQL/export contract is DAL/service-owned.
+- [x] Last 3 started-KVK selection is implemented.
+- [x] Missing/null metric distinction is preserved for modern payload rows.
+- [x] `/kvk history` is prepared for shared account picker flow and explicit lookup.
+- [x] `/mykvkhistory` remains legacy.
+- [x] CSV export is preserved and expanded.
+- [x] Focused tests and validation passed.
+- [x] Smoke-test feedback for SQL-padded governor names is fixed.
+- [x] PR #148 was merged and pushed to production.
+
 Implementation acceptance, after approval:
 
-- [ ] Approved output model is implemented without removing legacy commands.
-- [ ] `/kvk history` uses the modern card model.
-- [ ] `/mykvkhistory` retains the old chart/table/CSV journey during player testing.
-- [ ] Existing useful export behaviour remains or is deliberately replaced with richer export data.
-- [ ] Output is readable on Discord mobile.
-- [ ] Commands/views remain thin.
-- [ ] No new direct SQL exists in command, view, or renderer modules.
-- [ ] Focused tests pass.
-- [ ] Visual/manual review samples are generated where output changes.
-- [ ] Codex Security review is run or explicitly skipped based on risk triggers.
-- [ ] Programme/task-pack docs are updated after delivery.
+- [x] Approved output model is implemented without removing legacy commands.
+- [x] `/kvk history` uses the modern card model.
+- [x] `/mykvkhistory` retains the old chart/table/CSV journey during player testing.
+- [x] Existing useful export behaviour remains or is deliberately replaced with richer export data.
+- [x] Output is readable on Discord mobile.
+- [x] Commands/views remain thin.
+- [x] No new direct SQL exists in command, view, or renderer modules.
+- [x] Focused tests pass.
+- [x] Visual/manual review samples are generated where output changes.
+- [x] Codex Security review is run or explicitly skipped based on risk triggers.
+- [x] Programme/task-pack docs are updated after delivery.
 
 ## 19. Required Delivery Output
 
@@ -714,14 +818,17 @@ For the implementation stage, use:
 - Rollback: preserve or restore the existing chart/table/CSV output while keeping legacy commands live.
 ```
 
-## 21. Codex Chat Starter
+## 21. Codex Chat Starter - Phase 4Bii
 
 ```text
-Codex, start Phase 4Bi of the KVK Player Experience Redesign: History Payload, Data Contract,
-Picker, Export, and Test Foundation.
+Codex, start Phase 4Bii of the KVK Player Experience Redesign: Modern /kvk history Last 3 Card
+and Stats History Move.
 
 Phase 4A targets is complete, merged, and promoted to production. Phase 4B audit and optioneering
-are complete. The approved product model is:
+are complete. Phase 4Bi is complete, smoke tested, merged in mirror PR #148, and pushed to
+production.
+
+The approved product model is:
 
 - /kvk stats = current KVK performance only, eventually Main Card + More Stats.
 - /kvk history = modern past-performance and trends card journey.
@@ -741,7 +848,7 @@ Read:
 - docs/task_packs/KVK Player Experience Redesign - Programme Pack.md
 - docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md
 
-Phase 4Bi scope only:
+Phase 4Bi delivered foundation:
 
 - Build renderer-independent history payload/service boundary.
 - Validate SQL/data contracts against C:\K98-bot-SQL-Server.
@@ -752,7 +859,23 @@ Phase 4Bi scope only:
 - Preserve and expand CSV export.
 - Add missing tests for data contract, started-KVK selection, missing/null handling, picker/lookup
   flow, export shape, and command registration.
-- Do not build final visual cards unless needed for a small wiring proof.
+
+Phase 4Bii scope only:
+
+- Implement the main /kvk history Last 3 KVK card using assets/kvk/cards/history_card1.PNG.
+- Use the Phase 4Bi payload/service/export foundation; do not rebuild the data contract unless a
+  defect is found.
+- Main card title should show GovernorName and Governor ID as a smaller/subtitle treatment.
+- Title right side should show average kills, average kill target percent, and a trend indicator
+  for the same last 3 KVKs.
+- Each row should show KVK number, rank, kills and kill target percent, deads and dead target
+  percent, DKP and DKP target percent, and Acclaim, with missing Acclaim shown as missing.
+- Move the existing compact /kvk stats History card into /kvk history using history_card2.PNG.
+- Remove the History button from /kvk stats, leaving Main Card and More Stats.
+- Keep /mykvkhistory legacy and unchanged.
+- Preserve CSV export.
+- Generate visual samples for registered-account and explicit governor_id lookup paths.
+- Add focused renderer/view/command/service tests for the card journey and stats History move.
 
 Review these likely files:
 - commands/kvk_cmds.py
@@ -768,5 +891,5 @@ Review these likely files:
 - assets/kvk/cards/history_card2.PNG
 - assets/kvk/cards/history_card3.PNG
 
-Do not proceed into Phase 4Bii or 4Biii without approval after Phase 4Bi validation.
+Do not proceed into Phase 4Biii without approval after Phase 4Bii validation.
 ```

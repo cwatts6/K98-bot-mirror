@@ -432,7 +432,7 @@ async def test_kvk_history_no_accounts_picker_matches_ephemeral_message(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_kvk_history_explicit_governor_uses_single_history_view(monkeypatch):
+async def test_kvk_history_explicit_governor_uses_modern_history_output(monkeypatch):
     import commands.kvk_cmds as kvk_cmds
 
     async def fake_safe_defer(_ctx, *, ephemeral=False):
@@ -440,15 +440,6 @@ async def test_kvk_history_explicit_governor_uses_single_history_view(monkeypatc
 
     async def fake_account_summary(_user_id):
         return SimpleNamespace(ok=False, error="down", ordered_accounts={})
-
-    created = {}
-
-    class StubHistoryView:
-        def __init__(self, **kwargs):
-            created.update(kwargs)
-
-        async def initial_send(self, target):
-            created["target"] = target
 
     class DummyFollowup:
         async def send(self, **_kwargs):
@@ -458,6 +449,14 @@ async def test_kvk_history_explicit_governor_uses_single_history_view(monkeypatc
         user=SimpleNamespace(id=42),
         followup=DummyFollowup(),
     )
+
+    calls = {}
+
+    async def fake_post(target, *, user, governor_id, ephemeral):
+        calls["target"] = target
+        calls["user"] = user
+        calls["governor_id"] = governor_id
+        calls["ephemeral"] = ephemeral
 
     payload = SimpleNamespace(governor_name="Lookup Gov")
 
@@ -470,12 +469,13 @@ async def test_kvk_history_explicit_governor_uses_single_history_view(monkeypatc
     monkeypatch.setattr(
         kvk_cmds.kvk_history_service, "build_kvk_history_payload", lambda _gid: payload
     )
-    monkeypatch.setattr(kvk_cmds, "KVKHistoryView", StubHistoryView)
+    monkeypatch.setattr(kvk_cmds, "post_kvk_history_output", fake_post)
 
     await kvk_cmds._send_kvk_history(ctx, ephemeral=False, governor_id=789)
 
-    assert created["account_map"] == {"Lookup": {"GovernorID": 789, "GovernorName": "Lookup Gov"}}
-    assert created["selected_ids"] == ["789"]
-    assert created["allow_all"] is False
-    assert created["ephemeral"] is False
-    assert created["target"] is ctx
+    assert calls == {
+        "target": ctx,
+        "user": ctx.user,
+        "governor_id": "789",
+        "ephemeral": False,
+    }

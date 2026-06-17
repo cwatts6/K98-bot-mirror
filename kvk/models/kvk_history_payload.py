@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from io import BytesIO
 
 
 @dataclass(frozen=True)
@@ -44,3 +45,9 @@ class KvkHistoryPayload:
     @property
     def has_history(self) -> bool:
         return any(row.row_present for row in self.rows)
+
+
+@dataclass(frozen=True)
+class RenderedKvkHistoryCard:
+    filename: str
+    image_bytes: BytesIO

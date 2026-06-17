@@ -10,6 +10,7 @@ from discord.ext import commands as ext_commands
 from account_picker import AccountPickerView, safe_build_unique_gov_options
 from bot_config import GUILD_ID, KVK_PLAYER_STATS_CHANNEL_ID, KVK_TARGET_CHANNEL_ID
 from build_KVKrankings_embed import build_kvkrankings_embed
+from commands.kvk_history_card_posting import post_kvk_history_output
 from commands.kvk_stats_card_posting import post_kvk_stats_output
 from commands.kvk_targets_card_posting import post_kvk_targets_output
 from core.interaction_safety import safe_command, safe_defer
@@ -21,7 +22,6 @@ from registry.account_slots import ACCOUNT_ORDER
 from services import governor_account_service, kvk_history_service, kvk_personal_service
 from stats_alerts.honors import get_latest_honor_top
 from target_utils import run_target_lookup
-from ui.views.kvk_history_view import KVKHistoryView
 from ui.views.kvk_personal_views import MyKVKStatsSelectView
 from ui.views.prekvk_report_views import send_prekvk_report
 from ui.views.registry_views import GovNameModal, MyRegsActionView, RegisterStartView
@@ -433,14 +433,12 @@ async def _post_kvk_history_view(
     default_id: str,
     ephemeral: bool,
 ) -> None:
-    view = KVKHistoryView(
+    await post_kvk_history_output(
+        target,
         user=user,
-        account_map=account_map,
-        selected_ids=[str(default_id)],
-        allow_all=False,
+        governor_id=default_id,
         ephemeral=ephemeral,
     )
-    await view.initial_send(target)
 
 
 async def _send_kvk_rankings(ctx: discord.ApplicationContext) -> None:
@@ -574,7 +572,7 @@ def register_kvk(bot: ext_commands.Bot) -> None:
 
     @kvk_group.command(
         name="history",
-        description="View your KVK-by-KVK history as a chart and table.",
+        description="View your modern KVK history cards.",
     )
     @channel_only(KVK_PLAYER_STATS_CHANNEL_ID, admin_override=False)
     @versioned("v1.00")

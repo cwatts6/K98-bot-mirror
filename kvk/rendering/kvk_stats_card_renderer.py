@@ -12,7 +12,6 @@ from prekvk import report_image_renderer as text_renderer
 ROOT = Path(__file__).resolve().parents[2]
 ASSET_DIR = ROOT / "assets" / "kvk" / "cards"
 DEFAULT_BACKGROUND = ASSET_DIR / "Default_card.jpg"
-HISTORY_BACKGROUND = ASSET_DIR / "History_stats_card.jpg"
 TIDES_BACKGROUND = ASSET_DIR / "Tides_Stats_Card.png"
 MODE_BACKGROUNDS = {
     "tides of war": TIDES_BACKGROUND,
@@ -79,13 +78,6 @@ def _background_for_mode(kvk_name: str | None) -> Path | None:
     mode_path = MODE_BACKGROUNDS.get(normalize_kvk_mode(kvk_name))
     for path in (mode_path, DEFAULT_BACKGROUND, TIDES_BACKGROUND):
         if path is not None and path.exists():
-            return path
-    return None
-
-
-def _history_background() -> Path | None:
-    for path in (HISTORY_BACKGROUND, DEFAULT_BACKGROUND, TIDES_BACKGROUND):
-        if path.exists():
             return path
     return None
 
@@ -671,140 +663,3 @@ def render_kvk_more_stats_card(payload: KvkStatsCardPayload) -> RenderedKvkStats
     return RenderedKvkStatsCard(
         filename=f"kvk_more_stats_{payload.governor_id}.png", image_bytes=buf
     )
-
-
-def render_kvk_history_card(payload: KvkStatsCardPayload) -> RenderedKvkStatsCard | None:
-    background_path = _history_background()
-    if background_path is None:
-        return None
-
-    background = _load_background(background_path)
-    overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
-    odraw = ImageDraw.Draw(overlay, "RGBA")
-    odraw.rounded_rectangle((0, 0, WIDTH - 1, HEIGHT - 1), radius=22, fill=(0, 0, 0, 105))
-    odraw.rectangle((0, 0, WIDTH, 168), fill=(0, 0, 0, 98))
-    canvas = Image.alpha_composite(background, overlay)
-    draw = ImageDraw.Draw(canvas, "RGBA")
-
-    _draw_card_header(draw, payload, title="KVK History", accent=(164, 220, 255))
-
-    summary_map = {
-        label: _compact(value) for label, value in _nonzero_items(payload.history_summary)
-    }
-    bests_map = {label: _compact(value) for label, value in _nonzero_items(payload.personal_bests)}
-
-    col_w = 230
-    col_x = (45, 315, 585, 855)
-    _metric(
-        draw,
-        x=col_x[0],
-        y=195,
-        w=col_w,
-        title="Autarch",
-        value=summary_map.get("Autarch", "N/A"),
-        color=GOLD,
-    )
-    _metric(
-        draw,
-        x=col_x[1],
-        y=195,
-        w=col_w,
-        title="KVK Played",
-        value=summary_map.get("KVK Played", "N/A"),
-        color=BLUE,
-    )
-    _metric(
-        draw,
-        x=col_x[2],
-        y=195,
-        w=col_w,
-        title="Highest Acclaim",
-        value=summary_map.get("Highest Acclaim", "N/A"),
-        color=GOLD,
-    )
-    _metric(
-        draw,
-        x=col_x[0],
-        y=325,
-        w=col_w,
-        title="Most Kills",
-        value=bests_map.get("Most Kills", "N/A"),
-        color=GREEN,
-    )
-    _metric(
-        draw,
-        x=col_x[1],
-        y=325,
-        w=col_w,
-        title="Most Deads",
-        value=bests_map.get("Most Deads", "N/A"),
-        color=RED,
-    )
-    _metric(
-        draw,
-        x=col_x[2],
-        y=325,
-        w=col_w,
-        title="Most Heal",
-        value=bests_map.get("Most Heal", "N/A"),
-        color=BLUE,
-    )
-    if payload.last_kvk_summary:
-        _metric(
-            draw,
-            x=col_x[0],
-            y=455,
-            w=col_w,
-            title="Last KVK Kills",
-            value=_compact(payload.last_kvk_summary.get("Kills")),
-            color=GREEN,
-            sub=(
-                f"{_compact(payload.last_kvk_summary.get('Kill Target'))} target | "
-                f"{_pct(payload.last_kvk_summary.get('Kill Percent'))}"
-            ),
-        )
-        _metric(
-            draw,
-            x=col_x[1],
-            y=455,
-            w=col_w,
-            title="Last KVK Deads",
-            value=_compact(payload.last_kvk_summary.get("Deads")),
-            color=RED,
-            sub=(
-                f"{_compact(payload.last_kvk_summary.get('Dead Target'))} target | "
-                f"{_pct(payload.last_kvk_summary.get('Dead Percent'))}"
-            ),
-        )
-        _metric(
-            draw,
-            x=col_x[2],
-            y=455,
-            w=col_w,
-            title="Last KVK DKP",
-            value=_compact(payload.last_kvk_summary.get("DKP")),
-            color=GOLD,
-            sub=(
-                f"{_compact(payload.last_kvk_summary.get('DKP Target'))} target | "
-                f"{_pct(payload.last_kvk_summary.get('DKP Percent'))}"
-            ),
-        )
-        _metric(
-            draw,
-            x=col_x[3],
-            y=455,
-            w=col_w,
-            title="Last KVK Acclaim",
-            value=_compact(payload.last_kvk_summary.get("Acclaim")),
-            color=GOLD,
-        )
-    else:
-        _draw_text(draw, (45, 470), "No history data available.", fill=MUTED, font=_font(26))
-
-    updated = f"Last updated {payload.last_refresh or 'unknown'}"
-    footer_font = _fit_font(draw, updated, max_width=365, size=20, min_size=15, bold=True)
-    _draw_text(draw, (775, 596), updated, fill=MUTED, font=footer_font, bold=True)
-    buf = BytesIO()
-    canvas.convert("RGB").save(buf, format="PNG", optimize=True)
-    buf.seek(0)
-    return RenderedKvkStatsCard(filename=f"kvk_history_{payload.governor_id}.png", image_bytes=buf)

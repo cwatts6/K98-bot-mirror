@@ -344,18 +344,50 @@ Execution record:
 
 `docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4 Modern Targets and Full History.md`
 
-### Phase 4B - Full `/kvk history` Audit and Optioneering
+### Phase 4B - Full `/kvk history` Audit, Optioneering, And Modern History Rollout
 
-Status: ready for audit and analysis.
+Status: audit complete, Phase 4Bi delivered, and Phase 4Bii implemented in the current bot branch.
+Phase 4Bi was delivered in mirror PR #148, smoke tested successfully, merged, and pushed to
+production. Phase 4Bii is pending PR handoff, merge, and production promotion.
 
-The full `/kvk history` / `/mykvkhistory` journey remains on the existing chart, table image, CSV
-export, account selector, metric-button, custom-picker, and range-button output. This is a more
-complex data-analysis workflow than the targets card, so Phase 4B should audit current behaviour
-and compare options before implementation.
+The full `/kvk history` / `/mykvkhistory` journey has completed audit and optioneering. The
+approved staged direction is:
 
-The card approach may work for summary data, but the graph may need a different treatment. Phase
-4B should compare chart-first polish, hybrid summary-card plus detail flow, modern chart/table
-wrapper, data-first interactive browser, and data-contract-first options.
+- `/kvk history` becomes the modern card-based past-performance and trend-analysis journey.
+- `/mykvkhistory` remains the legacy graph/table/CSV journey during player validation.
+- CSV export remains the deeper detail path.
+- No `/kvk history_chart` command is added in Phase 4B.
+
+Delivered Phase 4Bi details:
+
+- Added renderer-independent KVK history payload models and service shaping.
+- Added the expanded, null-preserving modern history DAL/export contract.
+- Validated the existing SQL history source through `dbo.v_EXCEL_FOR_KVK_Started`.
+- Prepared `/kvk history` for shared single-governor account picker flow and explicit
+  `governor_id` lookup.
+- Kept `/mykvkhistory` unchanged on the legacy chart/table/CSV path.
+- Preserved and expanded CSV export for deeper history review.
+- Included the three history card background assets:
+  - `assets/kvk/cards/history_card1.PNG`
+  - `assets/kvk/cards/history_card2.PNG`
+  - `assets/kvk/cards/history_card3.PNG`
+- Addressed review and smoke-test hardening, including exact BIGINT-safe parsing, no-account
+  picker ephemeral consistency, and trimming SQL-padded governor names in display/export paths.
+
+Delivered Phase 4Bii branch details:
+
+- Built the modern `/kvk history` Last 3 KVK card using `history_card1.PNG`.
+- Moved the compact stats History summary into `/kvk history` using `history_card2.PNG`.
+- Added modern History, Summary, and Export CSV controls for `/kvk history`.
+- Removed the `History` button from `/kvk stats`, leaving `Main Card` and `More Stats`.
+- Preserved `/mykvkhistory` on the legacy chart/table/CSV journey during validation.
+- Completed the Codex Security diff scan with no reportable findings.
+
+Next Phase 4Biii scope, after Phase 4Bii validation:
+
+- Build the Trends card using `history_card3.PNG`.
+- Add approved switching/polish for final history-card navigation.
+- Keep missing values missing in trend logic and avoid predictive wording.
 
 Use:
 
@@ -509,7 +541,7 @@ Do not include these in the early phases unless separately approved:
 Proceed with:
 
 ```text
-KVK Player Experience Redesign - Phase 4B History Audit and Optioneering
+KVK Player Experience Redesign - Phase 4Biii History Trends Card And Final Polish
 ```
 
 Phase 1 audit/design, Phase 2A admin collision resolution, and Phase 2B player `/kvk` scaffold are
@@ -519,6 +551,8 @@ background selection, improved high-progress target scaling, and moved the attac
 and `History` views to Pillow-rendered cards. Phase 3C has delivered the SQL-backed overall KVK
 rank source, total-governor/top-percent context, rank alignment, progress-gold consistency, and
 review hardening. Phase 4A has delivered modern `/kvk targets` in PR #145 and promoted it to
-production. Phase 4B should now audit and optioneer the full `/kvk history` and `/mykvkhistory`
-journey before implementation, preserving legacy commands and existing chart/table/CSV
-functionality until an option is approved.
+production. Phase 4B audit and optioneering are complete, and Phase 4Bi has delivered the
+history payload/data-contract/picker/export foundation in PR #148, smoke tested and pushed to
+production. Phase 4Bii has implemented the modern `/kvk history` Last 3 card, moved the compact
+history summary into `/kvk history`, and removed the History button from `/kvk stats`. Start
+Phase 4Biii next only after Phase 4Bii validation and PR handoff are complete.

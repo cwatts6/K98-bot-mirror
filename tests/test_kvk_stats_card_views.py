@@ -112,6 +112,16 @@ def test_history_embed_filters_zero_summary_and_personal_best_rows():
     assert field_names == ["Last KVK Summary"]
 
 
+@pytest.mark.asyncio
+async def test_stats_card_view_exposes_current_kvk_buttons_only():
+    rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main-card-bytes"))
+    view = KvkStatsCardView(payload=_payload(), rendered=rendered)
+
+    labels = [getattr(child, "label", None) for child in view.children]
+
+    assert labels == ["Main Card", "More Stats"]
+
+
 class _Response:
     def __init__(self, events: list[str] | None = None):
         self._done = False
@@ -195,47 +205,3 @@ async def test_more_stats_button_falls_back_to_embed_when_card_unavailable(monke
 
     assert "files" not in message.edits[-1]
     assert message.edits[-1]["embeds"][0].title == "More KVK Stats - Card Tester"
-
-
-@pytest.mark.asyncio
-async def test_history_button_prefers_rendered_card(monkeypatch):
-    import ui.views.kvk_stats_card_views as views
-
-    def fake_render(_payload):
-        return SimpleNamespace(
-            filename="history.png",
-            image_bytes=BytesIO(b"history-card-bytes"),
-        )
-
-    monkeypatch.setattr(views, "render_kvk_history_card", fake_render)
-    rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main-card-bytes"))
-    view = KvkStatsCardView(payload=_payload(), rendered=rendered)
-    message = _Message()
-
-    await view._show_history(_interaction(message))
-
-    assert message.edits[-1]["embeds"] == []
-    assert message.edits[-1]["files"][0].filename == "history.png"
-
-
-@pytest.mark.asyncio
-async def test_history_button_defers_before_render(monkeypatch):
-    import ui.views.kvk_stats_card_views as views
-
-    events: list[str] = []
-
-    def fake_render(_payload):
-        events.append("render")
-        return SimpleNamespace(
-            filename="history.png",
-            image_bytes=BytesIO(b"history-card-bytes"),
-        )
-
-    monkeypatch.setattr(views, "render_kvk_history_card", fake_render)
-    rendered = SimpleNamespace(filename="main.png", image_bytes=BytesIO(b"main-card-bytes"))
-    view = KvkStatsCardView(payload=_payload(), rendered=rendered)
-    message = _Message()
-
-    await view._show_history(_interaction(message, events))
-
-    assert events[:2] == ["defer", "render"]

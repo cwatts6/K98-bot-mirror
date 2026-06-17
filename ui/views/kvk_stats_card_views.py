@@ -7,10 +7,7 @@ import logging
 import discord
 
 from kvk.models.kvk_stats_card import KvkStatsCardPayload, RenderedKvkStatsCard
-from kvk.rendering.kvk_stats_card_renderer import (
-    render_kvk_history_card,
-    render_kvk_more_stats_card,
-)
+from kvk.rendering.kvk_stats_card_renderer import render_kvk_more_stats_card
 
 logger = logging.getLogger(__name__)
 
@@ -172,8 +169,6 @@ class KvkStatsCardView(discord.ui.View):
         self._filename = rendered.filename
         self._more_stats_bytes: bytes | None = None
         self._more_stats_filename: str | None = None
-        self._history_bytes: bytes | None = None
-        self._history_filename: str | None = None
         self.message: discord.Message | None = None
 
     def _file(self) -> discord.File:
@@ -184,10 +179,6 @@ class KvkStatsCardView(discord.ui.View):
             if self._more_stats_bytes is None or self._more_stats_filename is None:
                 return None
             return discord.File(BytesIO(self._more_stats_bytes), filename=self._more_stats_filename)
-        if kind == "history":
-            if self._history_bytes is None or self._history_filename is None:
-                return None
-            return discord.File(BytesIO(self._history_bytes), filename=self._history_filename)
         return None
 
     async def _defer_interaction(self, interaction: discord.Interaction) -> None:
@@ -248,38 +239,6 @@ class KvkStatsCardView(discord.ui.View):
             view=self,
         )
 
-    async def _show_history(self, interaction: discord.Interaction) -> None:
-        await self._defer_interaction(interaction)
-        try:
-            if self._history_bytes is None or self._history_filename is None:
-                rendered = await asyncio.to_thread(render_kvk_history_card, self.payload)
-                if rendered is not None:
-                    self._history_bytes = rendered.image_bytes.getvalue()
-                    self._history_filename = rendered.filename
-            file = self._cached_file(kind="history")
-            if file is not None:
-                await self._edit_host_message(
-                    interaction,
-                    content=None,
-                    embeds=[],
-                    attachments=[],
-                    files=[file],
-                    view=self,
-                )
-                return
-        except Exception:
-            logger.exception(
-                "kvk_history_card_render_or_send_failed governor_id=%s",
-                self.payload.governor_id,
-            )
-        await self._edit_host_message(
-            interaction,
-            content=None,
-            embeds=[build_history_embed(self.payload)],
-            attachments=[],
-            view=self,
-        )
-
     @discord.ui.button(label="Main Card", style=discord.ButtonStyle.primary)
     async def main_card(self, _button: discord.ui.Button, interaction: discord.Interaction) -> None:
         await self._show_main(interaction)
@@ -289,10 +248,6 @@ class KvkStatsCardView(discord.ui.View):
         self, _button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
         await self._show_more_stats(interaction)
-
-    @discord.ui.button(label="History", style=discord.ButtonStyle.secondary)
-    async def history(self, _button: discord.ui.Button, interaction: discord.Interaction) -> None:
-        await self._show_history(interaction)
 
     async def on_timeout(self) -> None:
         for item in self.children:

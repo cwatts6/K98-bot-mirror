@@ -15,13 +15,11 @@ from kvk.rendering.kvk_stats_card_renderer import (
     _compact,
     _fit_shared_font,
     _hex_color,
-    _history_background,
     _main_rank_value,
     _overall_kvk_rank_context,
     _overall_kvk_rank_value,
     _pct,
     _progress_scale,
-    render_kvk_history_card,
     render_kvk_more_stats_card,
     render_kvk_stats_card,
 )
@@ -185,27 +183,9 @@ def test_shared_font_fits_all_pass_values_to_one_size():
     assert all(draw.textbbox((0, 0), value, font=font)[2] <= 230 for value in values)
 
 
-def test_history_background_uses_history_card_asset():
-    assert _history_background().name == "History_stats_card.jpg"
-
-
-def test_secondary_cards_render_pngs():
+def test_more_stats_card_renders_png():
     more = render_kvk_more_stats_card(_payload())
-    history = render_kvk_history_card(_payload())
 
     assert more is not None
     assert more.filename == "kvk_more_stats_58744139.png"
     assert Image.open(BytesIO(more.image_bytes.getvalue())).size == (1180, 640)
-
-    assert history is not None
-    assert history.filename == "kvk_history_58744139.png"
-    assert Image.open(BytesIO(history.image_bytes.getvalue())).size == (1180, 640)
-
-
-def test_history_card_ignores_matchmaking_snapshot():
-    with_snapshot = render_kvk_history_card(_payload())
-    without_snapshot = render_kvk_history_card(replace(_payload(), matchmaking_snapshot={}))
-
-    assert with_snapshot is not None
-    assert without_snapshot is not None
-    assert with_snapshot.image_bytes.getvalue() == without_snapshot.image_bytes.getvalue()
