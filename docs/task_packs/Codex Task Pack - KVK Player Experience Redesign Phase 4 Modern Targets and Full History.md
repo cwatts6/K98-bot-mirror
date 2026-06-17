@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 3C production rollout`
 - Task type: `feature / UX redesign / generated image renderer / Discord interaction polish / service-DAL cleanup`
 - One-pass approved: `no`
-- Status: `complete - Phase 4A targets optimisation delivered in mirror PR #145 and promoted to production; history work moved to Phase 4B, with Phase 4Bi/4Bii now delivered and Phase 4Biii remaining`
+- Status: `complete - Phase 4A targets optimisation delivered in mirror PR #145 and promoted to production; history work moved to Phase 4B, with Phase 4Bi/4Bii/4Biii now delivered and Phase 4Biv remaining`
 
 ### Phase Split Update
 
@@ -18,8 +18,9 @@ Implementation was split after the initial audit:
   behaviour. This is complete.
 - Phase 4B: full `/kvk history` redesign was scoped separately. Phase 4Bi delivered the
   renderer-independent history payload/data/export foundation in PR #148. Phase 4Bii delivered the
-  modern Last 3 and Summary cards and has been merged/pushed to production. Phase 4Biii remains
-  for the Trends card and final polish.
+  modern Last 3 and Summary cards and has been merged/pushed to production. Phase 4Biii delivered
+  the Trends card and final visual/metric polish. Phase 4Biv remains for selector removal and CSV
+  export polish.
 
 Legacy `/mykvktargets` and `/mykvkhistory` remain live. `/kvk history` is now the modern
 card-based history journey, while `/mykvkhistory` remains the legacy graph/table/CSV journey for

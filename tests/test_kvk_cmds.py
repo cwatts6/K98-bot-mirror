@@ -63,6 +63,16 @@ def test_kvk_rankings_type_option_is_required():
     assert 'choices=["kvk", "honor", "prekvk"]' in source
 
 
+def test_kvk_history_keeps_governor_id_option_without_ephemeral_option(monkeypatch):
+    _module, group, _bot = _register_kvk(monkeypatch)
+    handler = _unwrap(group.commands["history"])
+
+    params = inspect.signature(handler).parameters
+
+    assert "governor_id" in params
+    assert "ephemeral" not in params
+
+
 @pytest.mark.asyncio
 async def test_kvk_rankings_routes_all_modes(monkeypatch):
     kvk_cmds, group, _bot = _register_kvk(monkeypatch)
@@ -341,11 +351,11 @@ async def test_kvk_targets_single_account_uses_modern_output(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_kvk_history_multi_account_uses_account_picker(monkeypatch):
+async def test_kvk_history_multi_account_uses_private_account_picker_and_public_card(monkeypatch):
     import commands.kvk_cmds as kvk_cmds
 
     async def fake_safe_defer(_ctx, *, ephemeral=False):
-        return None
+        calls["defer"] = ephemeral
 
     async def fake_account_summary(_user_id):
         return kvk_cmds.governor_account_service.summarize_accounts(
@@ -356,6 +366,7 @@ async def test_kvk_history_multi_account_uses_account_picker(monkeypatch):
         )
 
     created = {}
+    calls = {}
 
     class StubAccountPickerView:
         def __init__(self, **kwargs):
@@ -373,6 +384,12 @@ async def test_kvk_history_multi_account_uses_account_picker(monkeypatch):
         followup=DummyFollowup(),
     )
 
+    async def fake_post(target, *, user, governor_id, ephemeral):
+        calls["target"] = target
+        calls["user"] = user
+        calls["governor_id"] = governor_id
+        calls["ephemeral"] = ephemeral
+
     monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
     monkeypatch.setattr(
         kvk_cmds.governor_account_service,
@@ -380,13 +397,23 @@ async def test_kvk_history_multi_account_uses_account_picker(monkeypatch):
         fake_account_summary,
     )
     monkeypatch.setattr(kvk_cmds, "AccountPickerView", StubAccountPickerView)
+    monkeypatch.setattr(kvk_cmds, "post_kvk_history_output", fake_post)
 
-    await kvk_cmds._send_kvk_history(ctx, ephemeral=True, governor_id=None)
+    await kvk_cmds._send_kvk_history(ctx, governor_id=None)
 
+    assert calls["defer"] is True
     assert created["heading"] == "Select an account to view its KVK history:"
     assert created["ephemeral"] is True
     assert len(created["options"]) == 2
     assert ctx.followup.sent[-1]["view"].__class__ is StubAccountPickerView
+
+    interaction = SimpleNamespace(user=SimpleNamespace(id=42))
+    await created["on_select_governor"](interaction, "456", True)
+
+    assert calls["target"] is interaction
+    assert calls["user"] is interaction.user
+    assert calls["governor_id"] == "456"
+    assert calls["ephemeral"] is False
 
 
 @pytest.mark.asyncio
@@ -394,12 +421,13 @@ async def test_kvk_history_no_accounts_picker_matches_ephemeral_message(monkeypa
     import commands.kvk_cmds as kvk_cmds
 
     async def fake_safe_defer(_ctx, *, ephemeral=False):
-        return None
+        calls["defer"] = ephemeral
 
     async def fake_account_summary(_user_id):
         return SimpleNamespace(ok=True, error=None, ordered_accounts={})
 
     created = {}
+    calls = {}
 
     class StubAccountPickerView:
         def __init__(self, **kwargs):
@@ -425,10 +453,90 @@ async def test_kvk_history_no_accounts_picker_matches_ephemeral_message(monkeypa
     )
     monkeypatch.setattr(kvk_cmds, "AccountPickerView", StubAccountPickerView)
 
-    await kvk_cmds._send_kvk_history(ctx, ephemeral=False, governor_id=None)
+    await kvk_cmds._send_kvk_history(ctx, governor_id=None)
 
+    assert calls["defer"] is True
     assert created["ephemeral"] is True
     assert ctx.followup.sent[-1]["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+async def test_kvk_history_registry_unavailable_defers_privately(monkeypatch):
+    import commands.kvk_cmds as kvk_cmds
+
+    calls = {}
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        calls["defer"] = ephemeral
+
+    async def fake_account_summary(_user_id):
+        return SimpleNamespace(ok=False, error="down", ordered_accounts={})
+
+    class DummyFollowup:
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, *args, **kwargs):
+            self.sent.append((args, kwargs))
+
+    ctx = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        followup=DummyFollowup(),
+    )
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.governor_account_service,
+        "get_account_summary_for_user",
+        fake_account_summary,
+    )
+
+    await kvk_cmds._send_kvk_history(ctx, governor_id=None)
+
+    assert calls["defer"] is True
+    assert ctx.followup.sent[-1][1]["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+async def test_kvk_history_single_account_defers_publicly(monkeypatch):
+    import commands.kvk_cmds as kvk_cmds
+
+    calls = {}
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        calls["defer"] = ephemeral
+
+    async def fake_account_summary(_user_id):
+        return kvk_cmds.governor_account_service.summarize_accounts(
+            {"Main": {"GovernorID": "123", "GovernorName": "MainGov"}}
+        )
+
+    async def fake_post(target, *, user, governor_id, ephemeral):
+        calls["target"] = target
+        calls["user"] = user
+        calls["governor_id"] = governor_id
+        calls["ephemeral"] = ephemeral
+
+    ctx = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        followup=SimpleNamespace(),
+    )
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.governor_account_service,
+        "get_account_summary_for_user",
+        fake_account_summary,
+    )
+    monkeypatch.setattr(kvk_cmds, "post_kvk_history_output", fake_post)
+
+    await kvk_cmds._send_kvk_history(ctx, governor_id=None)
+
+    assert calls["defer"] is False
+    assert calls["target"] is ctx
+    assert calls["user"] is ctx.user
+    assert calls["governor_id"] == "123"
+    assert calls["ephemeral"] is False
 
 
 @pytest.mark.asyncio
@@ -436,10 +544,10 @@ async def test_kvk_history_explicit_governor_uses_modern_history_output(monkeypa
     import commands.kvk_cmds as kvk_cmds
 
     async def fake_safe_defer(_ctx, *, ephemeral=False):
-        return None
+        calls["defer"] = ephemeral
 
     async def fake_account_summary(_user_id):
-        return SimpleNamespace(ok=False, error="down", ordered_accounts={})
+        raise AssertionError("explicit governor_id should not require registry lookup")
 
     class DummyFollowup:
         async def send(self, **_kwargs):
@@ -458,22 +566,18 @@ async def test_kvk_history_explicit_governor_uses_modern_history_output(monkeypa
         calls["governor_id"] = governor_id
         calls["ephemeral"] = ephemeral
 
-    payload = SimpleNamespace(governor_name="Lookup Gov")
-
     monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
     monkeypatch.setattr(
         kvk_cmds.governor_account_service,
         "get_account_summary_for_user",
         fake_account_summary,
     )
-    monkeypatch.setattr(
-        kvk_cmds.kvk_history_service, "build_kvk_history_payload", lambda _gid: payload
-    )
     monkeypatch.setattr(kvk_cmds, "post_kvk_history_output", fake_post)
 
-    await kvk_cmds._send_kvk_history(ctx, ephemeral=False, governor_id=789)
+    await kvk_cmds._send_kvk_history(ctx, governor_id=789)
 
     assert calls == {
+        "defer": False,
         "target": ctx,
         "user": ctx.user,
         "governor_id": "789",

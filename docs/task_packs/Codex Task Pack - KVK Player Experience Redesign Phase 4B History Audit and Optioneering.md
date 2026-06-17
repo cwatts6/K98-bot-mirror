@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 4A targets rollout`
 - Task type: `feature discovery / UX audit / architecture scope / Discord interaction design / staged implementation plan`
 - One-pass approved: `no`
-- Status: `Phase 4Bi and Phase 4Bii delivered, merged, and pushed to production; Phase 4Biii remains outstanding`
+- Status: `Phase 4Bi, Phase 4Bii, and Phase 4Biii delivered, merged, deployed, and smoke tested; Phase 4Biv remains outstanding`
 
 ## 2. Required Reading
 
@@ -218,7 +218,41 @@ Codex Security diff scan completed with no reportable findings:
 
 `C:\Users\cwatt\AppData\Local\Temp\codex-security-scans\discord_file_downloader\109ee068_20260617T095053\report.md`
 
-Phase 4Biii is the remaining Phase 4B implementation scope.
+## 4A.3 Phase 4Biii Implementation Update - 2026-06-17
+
+Phase 4Biii has been delivered, merged in both the mirror and production repositories, deployed to
+production, and smoke tested successfully.
+
+Delivered scope:
+
+- Added the `/kvk history` Trends card using `assets/kvk/cards/history_card3.PNG`.
+- Added a `Trends` button to the modern `/kvk history` card view while preserving `History`,
+  `Summary`, and `Export CSV`.
+- Kept `/kvk history` card-based only. No graph/table output was added to the modern path, and
+  `/mykvkhistory` remains the legacy graph/table/CSV journey during player validation.
+- Trends explicitly covers all collected KVK history and shows the count of KVKs with available
+  data in the card header.
+- Trends uses non-duplicative metrics: Rank, Kills, Deads, Healed, DKP, Acclaim, KillPoints, and
+  Tanking Score.
+- Removed Kill Target, Dead Target, and DKP Target trend rows after player review because target
+  changes over time can make percentage movement look like player-performance movement.
+- Preserved missing-value semantics: missing historical Acclaim and healed values remain blank
+  rather than being coerced to zero.
+- Healed and Tanking Score both treat lower values as better.
+- Trend direction compares using the same rounded/compact precision displayed on the card, so
+  visually identical values display as `Flat`.
+- Preserved the Phase 4Bii Summary model and Last 3 card. The Last 3 header kills trend remains
+  scoped to Last 3, while the Trends card uses all collected history.
+- Improved Trends card readability by removing black boxes and divider lines, using clearer
+  two-line metric text, and tightening the trend indicator design.
+- Generated visual review samples for registered-account and explicit `governor_id` lookup flows.
+
+Validation evidence from Phase 4Biii included focused history service, renderer, card-view,
+posting, and command tests; architecture/deferred/select-tests/smoke-import validators;
+pre-commit; full pytest where practical; and Codex Security review for the Discord interaction,
+SQL-backed data, image/file output, and export-adjacent surfaces.
+
+Phase 4Biv is the remaining Phase 4B implementation scope.
 
 ## 4B. Approved Sub-Phase Plan
 
@@ -278,6 +312,8 @@ Required outcomes:
 
 ### Phase 4Biii - Trends Card, Switching, And Final Polish
 
+Status: complete. Delivered, merged, deployed to production, and smoke tested.
+
 Add the remaining trend-analysis layer and final polish to the already-delivered modern history
 journey.
 
@@ -287,9 +323,10 @@ Required outcomes:
 - Add the `Trends` button to the existing modern `/kvk history` card view without regressing
   `History`, `Summary`, or `Export CSV`.
 - Trends should build on the delivered metrics rather than duplicating the Last 3 or Summary card.
-  Consider rank, kills, kill target percent, deads, dead target percent, healed troops where
-  collected, DKP, DKP target percent, Acclaim where collected, KillPointsDelta, and tanking score
-  where calculable.
+  The delivered metric set is rank, kills, deads, healed troops where collected, DKP, Acclaim
+  where collected, KillPointsDelta, and tanking score where calculable. Kill target, dead target,
+  and DKP target percentage rows were considered but removed after player review because target
+  changes over time made the trends confusing.
 - Trend logic must treat missing values as missing rather than zero. In particular, historical
   acclaim and healed-troop zeroes should stay blank/missing unless confirmed as true data.
 - Tanking trend logic must use the delivered formula and exclusions:
@@ -300,6 +337,54 @@ Required outcomes:
 - Generate visual samples for single-account and lookup flows.
 - Decide after player testing whether graph output remains only in `/mykvkhistory` or needs a
   modern advanced path later.
+
+### Phase 4Biv - History Selector Removal And CSV Export Polish
+
+Remove the last inconsistency in the `/kvk history` command flow and align CSV export with the
+modern card data that players now see.
+
+Required outcomes:
+
+- Remove the ephemeral registered-account selector from `/kvk history` so the command behaves
+  consistently with `/kvk stats` and `/kvk targets`.
+- Preserve explicit lookup through `/kvk history governor_id:<id>` for admin/leadership support,
+  player support, and direct inspection workflows.
+- Preserve all existing modern card controls after lookup/posting: `History`, `Summary`, `Trends`,
+  and `Export CSV`.
+- Preserve `/mykvkhistory` unchanged as the legacy graph/table/CSV path.
+- Audit the `/kvk history` CSV export against:
+  - the deployed command output;
+  - the local `HISTORY_EXPORT_COLUMNS` contract in `services/kvk_history_service.py`;
+  - the attached sample `kvk_history (1).csv`, which lacks Healed and KillPoints columns.
+- Ensure the export includes the data now shown by the modern cards. At minimum, verify and include:
+  - `HealedTroopsDelta`
+  - `KillPointsDelta`
+- Also check whether to include or improve naming for:
+  - derived Tanking Score, using the delivered `(HealedTroopsDelta * 20) / KillPointsDelta`
+    formula and exclusions;
+  - `Max_PreKvk_Points`;
+  - `Max_HonorPoints`;
+  - any other Summary/Trends source fields needed to reconcile card values to export data.
+- Preserve missing/null semantics in export. Do not convert historically missing Acclaim or healed
+  values to zero.
+- Keep export as the deeper/full-history data path rather than adding graph/table output to
+  `/kvk history`.
+
+Validation expectations:
+
+- Add or update focused command tests covering registered-account `/kvk history` without the
+  ephemeral selector.
+- Add or update focused command tests covering `/kvk history governor_id:<id>`.
+- Add or update view/posting tests to ensure `History`, `Summary`, `Trends`, and `Export CSV`
+  still work after selector removal.
+- Add or update export tests for the CSV column set, missing-value handling, and any derived
+  Tanking Score export field if added.
+- Generate a fresh CSV export sample for registered-account/default lookup and explicit
+  `governor_id` lookup.
+- Run focused history command, view, service, posting, and export tests plus the standard
+  architecture/deferred/select-tests/smoke-imports/command-registration validators.
+- Run or document Codex Security review because this phase touches Discord interactions,
+  SQL-backed data, file/CSV output, and user-controlled command input.
 
 ## 5. Scope
 
@@ -315,7 +400,9 @@ Required outcomes:
 - Preserve `/mykvkhistory` as the legacy graph/table/CSV path during player validation.
 - Preserve and expand CSV export.
 - Preserve explicit Governor ID lookup on `/kvk history`.
-- Introduce account-picker parity with `/kvk stats` and `/kvk targets` where practical.
+- Align account-selection behaviour with `/kvk stats` and `/kvk targets` by removing the
+  ephemeral selector from `/kvk history` in Phase 4Biv while retaining explicit `governor_id`
+  lookup.
 - Move the compact `/kvk stats` History card into `/kvk history`.
 - Keep `/kvk stats` focused on current KVK output after the move.
 - Preserve the Phase 4Bii Summary record model, including Highest Rank, Autarchs, KVK Played,
@@ -388,16 +475,16 @@ Likely audit candidates:
 
 ## 8. Mandatory Workflow
 
-Phase 4B audit and option approval are complete. Phase 4Bi and 4Bii are delivered. Continue with
-the remaining sub-phase:
+Phase 4B audit and option approval are complete. Phase 4Bi, 4Bii, and 4Biii are delivered.
+Continue with the remaining sub-phase:
 
-1. Start Phase 4Biii in a new chat from this task pack.
+1. Start Phase 4Biv in a new chat from this task pack.
 2. Re-read the required repo guidance and this updated Phase 4B pack.
 3. Validate SQL/data contracts against `C:\K98-bot-SQL-Server`.
-4. Treat Phase 4Bi and Phase 4Bii as complete and use their payload, export, Last 3, Summary,
-   view-switching, and missing-value foundations.
-5. Implement only Phase 4Biii scope unless the operator explicitly expands scope.
-6. Do not rebuild the delivered Last 3 card, Summary record model, CSV export, or `/kvk stats`
+4. Treat Phase 4Bi, Phase 4Bii, and Phase 4Biii as complete and use their payload, export, Last 3,
+   Summary, Trends, view-switching, and missing-value foundations.
+5. Implement only Phase 4Biv scope unless the operator explicitly expands scope.
+6. Do not rebuild the delivered Last 3 card, Summary record model, Trends card, or `/kvk stats`
    History removal unless a defect is found.
 7. Keep `/mykvkhistory` as the legacy graph/table/CSV path.
 8. Add or update focused tests in every implementation sub-phase.
@@ -470,28 +557,27 @@ Review and document:
 
 ### Modify
 
-For Phase 4Biii, likely candidates are:
+For Phase 4Biv, likely candidates are:
 
 - `services/kvk_history_service.py`
 - `kvk/dal/kvk_history_dal.py` only if the delivered data contract is missing a required trend
   field
 - `commands/kvk_history_card_posting.py` or equivalent if needed
-- `kvk/rendering/kvk_history_renderer.py`
-- `kvk/models/kvk_history_payload.py`
+- `commands/kvk_cmds.py`
 - `ui/views/kvk_history_card_views.py`
-- focused history renderer, service, card-view, and command tests
+- focused history service, export, card-view, posting, and command tests
 - programme/task-pack docs
 
 ### Create
 
-Phase 4Bi/4Bii already created the main modern history modules. In Phase 4Biii, create only
-missing trend-specific tests or helper/model types if the existing modules cannot express the
-trend payload cleanly:
+Phase 4Bi/4Bii/4Biii already created the main modern history modules. In Phase 4Biv, create only
+missing selector/export-specific tests or helper/model types if the existing modules cannot
+express the export contract cleanly:
 
-- `tests/test_kvk_history_renderer.py`
-- `tests/test_kvk_history_payload.py` if payload types change
 - `tests/test_kvk_history_card_views.py`
 - `tests/test_kvk_history_service.py`
+- `tests/test_kvk_history_card_posting.py`
+- `tests/test_kvk_cmds.py`
 
 ## 12. Optioneering Requirements
 
@@ -640,7 +726,7 @@ Modern `/kvk history` should expose these cards:
 
 Implementation may choose exact button labels, but labels should make the distinction clear:
 `History`, `Summary`, `Trends`, and `Export CSV` are the preferred starting point. Phase 4Bii
-delivered `History`, `Summary`, and `Export CSV`; Phase 4Biii should add `Trends`.
+delivered `History`, `Summary`, and `Export CSV`; Phase 4Biii delivered `Trends`.
 
 ### 14.2 Main History Card Design
 
@@ -681,19 +767,21 @@ Do not duplicate this content on `/kvk stats` after the move.
 
 ### 14.4 Trends Card Design
 
-The Trends card should include:
+Phase 4Biii delivered the Trends card. Preserve this delivered model unless a defect is found.
 
-- rank
-- kills
-- kill target percent
-- deads
-- dead target percent
-- healed troops where collected
+The delivered Trends card includes:
+
+- Rank
+- Kills
+- Deads
+- Healed
 - DKP
-- DKP target percent
-- Acclaim where collected
-- KillPointsDelta where it adds useful signal
-- tanking score where calculable
+- Acclaim
+- KillPoints
+- Tanking Score
+
+Target-percent rows were removed after player review because target changes over time can make
+percentage trend movement misleading.
 
 For each metric:
 
@@ -702,6 +790,7 @@ For each metric:
 - treat missing values as missing, not zero
 - use the delivered tanking-score formula and exclusions
 - avoid predictive "on track" wording
+- compare trend direction at the same rounded/compact precision displayed on the card
 
 ## 15. Command Surface Governance
 
@@ -841,16 +930,34 @@ Phase 4Bii implementation acceptance:
 - [x] Codex Security review is run or explicitly skipped based on risk triggers.
 - [x] Programme/task-pack docs are updated after delivery.
 
-Phase 4Biii implementation acceptance, outstanding:
+Phase 4Biii implementation acceptance:
 
-- [ ] Trends card is implemented using `history_card3.PNG`.
-- [ ] Trends button is added without regressing History, Summary, or Export CSV.
-- [ ] Trend metrics build on the delivered Last 3/Summary data rather than duplicating those cards.
-- [ ] Trend logic preserves missing/uncollected Acclaim and healed values as missing.
-- [ ] Tanking trend logic uses the delivered percent formula and exclusions.
+- [x] Trends card is implemented using `history_card3.PNG`.
+- [x] Trends button is added without regressing History, Summary, or Export CSV.
+- [x] Trend metrics build on the delivered Last 3/Summary data rather than duplicating those cards.
+- [x] Trend logic preserves missing/uncollected Acclaim and healed values as missing.
+- [x] Tanking trend logic uses the delivered percent formula and exclusions.
+- [x] Healed trend logic treats lower values as better.
+- [x] Target-percent rows are removed from Trends after player review.
+- [x] Trend direction compares at displayed precision so visually identical values display as Flat.
+- [x] `/mykvkhistory` remains legacy graph/table/CSV.
+- [x] Focused service, renderer, view, command, and validation tests pass.
+- [x] Visual/manual review samples are generated for registered-account and explicit lookup flows.
+- [x] Codex Security review is run or explicitly skipped based on risk triggers.
+
+Phase 4Biv implementation acceptance, outstanding:
+
+- [ ] `/kvk history` no longer shows an ephemeral registered-account selector in the default
+  registered-player path.
+- [ ] `/kvk history governor_id:<id>` remains available and tested.
+- [ ] History, Summary, Trends, and Export CSV controls still work after selector removal.
+- [ ] CSV export includes Healed and KillPoints data required to reconcile delivered card output.
+- [ ] Export audit decides whether derived Tanking Score, Pre-KVK, Honor, or clearer column names
+  should be added.
+- [ ] Missing/uncollected historical values remain blank/null rather than zero.
 - [ ] `/mykvkhistory` remains legacy graph/table/CSV.
-- [ ] Focused service, renderer, view, command, and validation tests pass.
-- [ ] Visual/manual review samples are generated for registered-account and explicit lookup flows.
+- [ ] Focused command, service/export, view/posting, and validation tests pass.
+- [ ] Fresh CSV export samples are generated for registered/default and explicit lookup paths.
 - [ ] Codex Security review is run or explicitly skipped based on risk triggers.
 
 ## 19. Required Delivery Output
@@ -922,9 +1029,12 @@ For the implementation stage, use:
 ## 21. Historical Codex Chat Starter - Phase 4Bii
 
 Superseded. Phase 4Bii is delivered, merged, and pushed to production. Use the Phase 4Biii starter
-below for the next implementation chat.
+below only for delivery history.
 
-## 22. Codex Chat Starter - Phase 4Biii
+## 22. Historical Codex Chat Starter - Phase 4Biii
+
+Superseded. Phase 4Biii is delivered, merged in both mirror and production, deployed to
+production, and smoke tested. Use the Phase 4Biv starter below for the next implementation chat.
 
 ```text
 Codex, start Phase 4Biii of the KVK Player Experience Redesign: History Trends Card And Final
@@ -1015,4 +1125,85 @@ Validation to plan:
 - full pytest before PR handoff if practical
 - Codex Security review because this touches Discord interactions, SQL-backed data, file/image
   output, and export-adjacent history code
+```
+
+## 23. Codex Chat Starter - Phase 4Biv
+
+```text
+Codex, start Phase 4Biv of the KVK Player Experience Redesign: History Selector Removal And CSV
+Export Polish.
+
+Phase 4A targets is complete, merged, and promoted to production. Phase 4B audit and optioneering
+are complete. Phase 4Bi, 4Bii, and 4Biii are complete, smoke tested, merged in mirror and
+production, and deployed to production.
+
+The delivered product model is:
+
+- /kvk stats = current KVK performance only, with Main Card and More Stats.
+- /kvk history = modern card journey for past-performance review.
+- /kvk history has History, Summary, Trends, and Export CSV controls.
+- /mykvkhistory = legacy graph/table/CSV journey retained during player testing.
+- No /kvk history_chart command in Phase 4B.
+- CSV export remains the deeper/full-history data path.
+
+Read:
+- AGENTS.md
+- README-DEV.md
+- docs/reference/README.md
+- docs/task_packs/KVK Player Experience Redesign - Programme Pack.md
+- docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md
+
+Delivered Phase 4B baseline:
+
+- Renderer-independent history payload/service/DAL/export foundation exists.
+- /kvk history uses the modern Last 3 KVK card with history_card1.PNG.
+- /kvk history Summary uses history_card2.PNG and the delivered 12-record layout.
+- /kvk history Trends uses history_card3.PNG and shows all collected KVK history, KVK data count,
+  and the delivered Trends metrics: Rank, Kills, Deads, Healed, DKP, Acclaim, KillPoints, and
+  Tanking Score.
+- Trends target-percent rows were removed after player review.
+- Missing or historically uncollected Acclaim and healed values stay blank, not zero.
+- Healed and Tanking Score treat lower values as better.
+- Trend direction compares at displayed precision.
+- /kvk stats no longer has a History button.
+- /mykvkhistory remains legacy and unchanged.
+
+Phase 4Biv scope only:
+
+1. Remove the ephemeral registered-account selector from /kvk history so the default registered
+   account path is consistent with /kvk stats and /kvk targets.
+2. Preserve /kvk history governor_id:<id> explicit lookup.
+3. Preserve History, Summary, Trends, and Export CSV behaviour after selector removal.
+4. Enhance /kvk history CSV export to match the new card data. At minimum, verify and include
+   HealedTroopsDelta and KillPointsDelta. Also check whether derived Tanking Score,
+   Max_PreKvk_Points, Max_HonorPoints, or clearer player-facing column names should be included.
+5. Compare the deployed/current export, local HISTORY_EXPORT_COLUMNS, and the attached
+   kvk_history (1).csv sample because the sample export is missing Healed and KillPoints.
+6. Preserve missing/null semantics; do not convert historical missing Acclaim or healed values to
+   zero.
+7. Keep graph/table output only in /mykvkhistory.
+
+Likely files:
+- commands/kvk_cmds.py
+- commands/kvk_history_card_posting.py
+- services/kvk_history_service.py
+- kvk/dal/kvk_history_dal.py only if the existing export contract lacks required fields
+- ui/views/kvk_history_card_views.py
+- tests/test_kvk_history_service.py
+- tests/test_kvk_history_card_views.py
+- tests/test_kvk_history_card_posting.py
+- tests/test_kvk_cmds.py
+
+Validation to plan:
+- focused KVK history command/view/posting/service/export tests
+- fresh CSV export samples for registered/default and explicit governor_id lookup paths
+- scripts/validate_architecture_boundaries.py
+- scripts/validate_deferred_items.py
+- scripts/select_tests.py
+- scripts/smoke_imports.py
+- scripts/validate_command_registration.py
+- pre-commit
+- full pytest before PR handoff if practical
+- Codex Security review because this touches Discord interactions, SQL-backed data, file/CSV
+  output, and user-controlled lookup input
 ```

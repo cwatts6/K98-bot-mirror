@@ -376,11 +376,12 @@ def build_history_csv(df: pd.DataFrame, filename: str) -> tuple[str, bytes]:
         if df is None or df.empty:
             out = pd.DataFrame(columns=cols)
         else:
-            missing = [c for c in cols if c not in df.columns]
+            prepared = kvk_history_service.add_history_export_derived_columns(df)
+            missing = [c for c in cols if c not in prepared.columns]
             if missing:
                 out = pd.DataFrame(columns=cols)
             else:
-                out = df[cols].sort_values(["Gov_ID", "KVK_NO"]).copy()
+                out = prepared[cols].sort_values(["Gov_ID", "KVK_NO"]).copy()
     except Exception:
         out = pd.DataFrame(columns=cols)
 

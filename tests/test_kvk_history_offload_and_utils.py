@@ -99,8 +99,11 @@ def test_build_history_csv_exports_rank_and_acclaim_without_zero_fill():
 
     assert "Kingdom_Rank,KVK_RANK" in csv_text
     assert "A,15,8,4" in csv_text
-    assert ",,1,1,3,4,,7,8,5,6" in csv_text
-    assert "Max_PreKvk_Points,Max_HonorPoints" in csv_text
+    assert ",,1,1,3,4,,7,8,1750.0,5,6" in csv_text
+    assert (
+        "HealedTroopsDelta,KillPointsDelta,TankingScorePct,Max_PreKvk_Points,Max_HonorPoints"
+        in csv_text
+    )
 
 
 @pytest.mark.asyncio

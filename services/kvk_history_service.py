@@ -71,6 +71,7 @@ HISTORY_EXPORT_COLUMNS = [
     "MostKvKHeal",
     "HealedTroopsDelta",
     "KillPointsDelta",
+    "TankingScorePct",
     "Max_PreKvk_Points",
     "Max_HonorPoints",
     "P4_Kills",
@@ -201,7 +202,14 @@ def select_last_started_kvks(started_kvks: Iterable[Any], count: int = 3) -> tup
 
 
 def _optional_int(value: Any) -> int | None:
-    if value in (None, ""):
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if value == "":
         return None
     if isinstance(value, int):
         return value
@@ -224,7 +232,14 @@ def _optional_int(value: Any) -> int | None:
 
 
 def _optional_float(value: Any) -> float | None:
-    if value in (None, ""):
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if value == "":
         return None
     try:
         return float(str(value).replace(",", "").strip())
@@ -340,6 +355,26 @@ def _tanking_score(row: Mapping[str, Any]) -> float | None:
     return (heals * 20) / kill_points
 
 
+def _export_tanking_score_pct(row: Mapping[str, Any]) -> float | None:
+    score = _tanking_score(row)
+    if score is None:
+        return None
+    return score * 100
+
+
+def add_history_export_derived_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a copy with derived export-only columns while preserving blank values."""
+    if df is None or df.empty:
+        return empty_history_export_frame()
+
+    out = df.copy()
+    if {"HealedTroopsDelta", "KillPointsDelta"}.issubset(out.columns):
+        out["TankingScorePct"] = out.apply(_export_tanking_score_pct, axis=1)
+    elif "TankingScorePct" not in out.columns:
+        out["TankingScorePct"] = None
+    return out
+
+
 def _summary_tanking_metric(rows: Iterable[Mapping[str, Any]]) -> KvkHistorySummaryMetric:
     best_value: float | None = None
     best_kvk: int | None = None
@@ -421,6 +456,7 @@ def fetch_history_export_for_governors(governor_ids: Iterable[Any] | Any) -> pd.
     df = pd.DataFrame.from_records(rows, columns=HISTORY_EXPORT_COLUMNS)
     if df.empty:
         return empty_history_export_frame()
+    df = add_history_export_derived_columns(df)
     df["Governor_Name"] = df["Governor_Name"].map(_trim_export_name)
     return df.sort_values(["Gov_ID", "KVK_NO"], ignore_index=True)
 

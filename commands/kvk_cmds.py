@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Awaitable, Callable
 import logging
 
@@ -305,13 +304,20 @@ async def _send_personal_kvk_targets(
         await ctx.followup.send(hint, ephemeral=only_me)
 
 
-async def _send_kvk_history(
-    ctx: discord.ApplicationContext, ephemeral: bool, governor_id: int | None
-) -> None:
-    await safe_defer(ctx, ephemeral=ephemeral)
+async def _send_kvk_history(ctx: discord.ApplicationContext, governor_id: int | None) -> None:
+    if governor_id:
+        await safe_defer(ctx, ephemeral=False)
+        await _post_kvk_history_view(
+            ctx,
+            user=ctx.user,
+            default_id=str(governor_id),
+            ephemeral=False,
+        )
+        return
 
     account_summary = await governor_account_service.get_account_summary_for_user(ctx.user.id)
-    if not account_summary.ok and not governor_id:
+    if not account_summary.ok:
+        await safe_defer(ctx, ephemeral=True)
         await ctx.followup.send(
             f"Registry is temporarily unavailable: `{account_summary.error}`",
             ephemeral=True,
@@ -319,25 +325,17 @@ async def _send_kvk_history(
         return
     account_map = kvk_history_service.build_ordered_account_map(account_summary.ordered_accounts)
 
-    if governor_id:
-        try:
-            payload = await asyncio.to_thread(
-                kvk_history_service.build_kvk_history_payload, governor_id
-            )
-            governor_name = payload.governor_name or str(governor_id)
-        except Exception:
-            governor_name = str(governor_id)
-        account_map = {"Lookup": {"GovernorID": int(governor_id), "GovernorName": governor_name}}
-    elif not account_map:
+    if not account_map:
+        await safe_defer(ctx, ephemeral=True)
 
         async def _on_select_empty(
-            interaction: discord.Interaction, selected_governor_id: str, selected_ephemeral: bool
+            interaction: discord.Interaction, selected_governor_id: str, _selected_ephemeral: bool
         ) -> None:
             await _post_kvk_history_view(
                 interaction,
                 user=interaction.user,
                 default_id=selected_governor_id,
-                ephemeral=selected_ephemeral,
+                ephemeral=False,
             )
 
         view = AccountPickerView(
@@ -360,13 +358,13 @@ async def _send_kvk_history(
     options = safe_build_unique_gov_options(account_summary if account_summary.ok else account_map)
 
     async def _on_select_history(
-        interaction: discord.Interaction, selected_governor_id: str, selected_ephemeral: bool
+        interaction: discord.Interaction, selected_governor_id: str, _selected_ephemeral: bool
     ) -> None:
         await _post_kvk_history_view(
             interaction,
             user=interaction.user,
             default_id=selected_governor_id,
-            ephemeral=selected_ephemeral,
+            ephemeral=False,
         )
 
     default_id = (
@@ -375,6 +373,7 @@ async def _send_kvk_history(
         else kvk_history_service.pick_default_governor_id(account_map)
     )
     if not default_id:
+        await safe_defer(ctx, ephemeral=True)
         await ctx.followup.send(
             "I couldn't find a valid Governor ID in your registered accounts.",
             ephemeral=True,
@@ -382,28 +381,30 @@ async def _send_kvk_history(
         return
 
     if not governor_id and len(options) > 1:
+        await safe_defer(ctx, ephemeral=True)
         view = AccountPickerView(
             ctx=ctx,
             options=options,
             on_select_governor=_on_select_history,
             heading="Select an account to view its KVK history:",  # architecture-check: allow
             show_register_btn=True,
-            ephemeral=ephemeral,
+            ephemeral=True,
             lookup_callback=_open_governor_lookup,
             register_callback=_open_registration_flow,
         )
         await ctx.followup.send(
             content="Select an account to view its KVK history:",  # architecture-check: allow
             view=view,
-            ephemeral=ephemeral,
+            ephemeral=True,
         )
         return
 
+    await safe_defer(ctx, ephemeral=False)
     await _post_kvk_history_view(
         ctx,
         user=ctx.user,
         default_id=default_id,
-        ephemeral=ephemeral,
+        ephemeral=False,
     )
 
 
@@ -561,12 +562,11 @@ def register_kvk(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def kvk_history(
         ctx: discord.ApplicationContext,
-        ephemeral: bool = discord.Option(bool, "Only show to me", required=False, default=False),
         governor_id: int | None = discord.Option(
             int, "Governor ID (optional)", required=False, default=None
         ),
     ) -> None:
-        await _send_kvk_history(ctx, ephemeral, governor_id)
+        await _send_kvk_history(ctx, governor_id)
 
     @kvk_group.command(
         name="rankings",

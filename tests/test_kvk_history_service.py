@@ -174,6 +174,8 @@ def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypa
             "Kingdom_Rank": 5,
             "KVK_RANK": 3,
             "Acclaim": None,
+            "HealedTroopsDelta": 7,
+            "KillPointsDelta": 8,
         }
     ]
 
@@ -189,6 +191,23 @@ def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypa
     assert df.loc[0, "Governor_Name"] == "A"
     assert df.loc[0, "KVK_RANK"] == 3
     assert df.loc[0, "Acclaim"] is None
+    assert df.loc[0, "HealedTroopsDelta"] == 7
+    assert df.loc[0, "KillPointsDelta"] == 8
+    assert df.loc[0, "TankingScorePct"] == 1750.0
+
+
+def test_history_export_tanking_score_pct_stays_blank_for_missing_or_zero_values():
+    df = kvk_history_service.add_history_export_derived_columns(
+        kvk_history_service.empty_history_export_frame().assign(
+            Gov_ID=[1, 1],
+            Governor_Name=["A", "A"],
+            KVK_NO=[14, 15],
+            HealedTroopsDelta=[None, 0],
+            KillPointsDelta=[8, 8],
+        )
+    )
+
+    assert df["TankingScorePct"].isna().all()
 
 
 def test_payload_keeps_last3_kills_trend_separate_from_all_history(monkeypatch):
