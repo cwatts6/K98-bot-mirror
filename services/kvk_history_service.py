@@ -222,6 +222,17 @@ def _optional_float(value: Any) -> float | None:
         return None
 
 
+def _trim_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _trim_export_name(value: Any) -> Any:
+    return value.strip() if isinstance(value, str) else value
+
+
 def _history_row_from_source(kvk_no: int, source: Mapping[str, Any] | None) -> KvkHistoryRow:
     if not source:
         return KvkHistoryRow(kvk_no=kvk_no, row_present=False)
@@ -293,6 +304,7 @@ def fetch_history_export_for_governors(governor_ids: Iterable[Any] | Any) -> pd.
     df = pd.DataFrame.from_records(rows, columns=HISTORY_EXPORT_COLUMNS)
     if df.empty:
         return empty_history_export_frame()
+    df["Governor_Name"] = df["Governor_Name"].map(_trim_export_name)
     return df.sort_values(["Gov_ID", "KVK_NO"], ignore_index=True)
 
 
@@ -322,9 +334,9 @@ def build_kvk_history_payload(governor_id: Any) -> KvkHistoryPayload:
 
     governor_name = str(gid)
     for row in source_rows:
-        name = row.get("Governor_Name")
-        if name not in (None, ""):
-            governor_name = str(name)
+        name = _trim_text(row.get("Governor_Name"))
+        if name is not None:
+            governor_name = name
             break
 
     all_kvks = started_kvks or tuple(sorted(rows_by_kvk))

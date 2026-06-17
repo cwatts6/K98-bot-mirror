@@ -36,7 +36,7 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
     rows = [
         {
             "Gov_ID": 2441482,
-            "Governor_Name": "Tester",
+            "Governor_Name": "   Tester   ",
             "KVK_NO": 13,
             "KVK_RANK": 10,
             "Kingdom_Rank": 20,
@@ -103,7 +103,7 @@ def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypa
     rows = [
         {
             "Gov_ID": 1,
-            "Governor_Name": "A",
+            "Governor_Name": "   A   ",
             "KVK_NO": 15,
             "Kingdom_Rank": 5,
             "KVK_RANK": 3,
@@ -120,5 +120,6 @@ def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypa
     df = kvk_history_service.fetch_history_export_for_governors([1])
 
     assert list(df.columns) == kvk_history_service.HISTORY_EXPORT_COLUMNS
+    assert df.loc[0, "Governor_Name"] == "A"
     assert df.loc[0, "KVK_RANK"] == 3
     assert df.loc[0, "Acclaim"] is None

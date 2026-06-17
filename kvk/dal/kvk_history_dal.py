@@ -84,7 +84,7 @@ def fetch_history_rows_for_governors(governor_ids: list[int]) -> list[dict[str, 
     sql = f"""
         SELECT
             CAST([Gov_ID] AS BIGINT)      AS Gov_ID,
-            [Governor_Name],
+            LTRIM(RTRIM([Governor_Name])) AS Governor_Name,
             CAST([KVK_NO] AS INT)         AS KVK_NO,
             CAST([T4_KILLS] AS BIGINT)    AS T4_KILLS,
             CAST([T5_KILLS] AS BIGINT)    AS T5_KILLS,
@@ -124,7 +124,7 @@ def fetch_modern_history_rows_for_governors(governor_ids: list[int]) -> list[dic
             CAST([Rank] AS INT)          AS Kingdom_Rank,
             CAST([KVK_RANK] AS INT)      AS KVK_RANK,
             CAST([Gov_ID] AS BIGINT)     AS Gov_ID,
-            [Governor_Name],
+            LTRIM(RTRIM([Governor_Name])) AS Governor_Name,
             CAST([KVK_NO] AS INT)        AS KVK_NO,
             CAST([T4_KILLS] AS BIGINT)   AS T4_KILLS,
             CAST([T5_KILLS] AS BIGINT)   AS T5_KILLS,
