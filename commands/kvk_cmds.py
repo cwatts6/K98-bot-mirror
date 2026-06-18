@@ -452,7 +452,6 @@ async def _send_current_rankings(ctx: discord.ApplicationContext, *, mode: str) 
         metric=payload.metric,
         limit=payload.limit,
     )
-    embed = build_current_rankings_embed(payload)
     try:
         rendered = await asyncio.to_thread(render_kvk_rankings_top10_card, payload)
     except Exception:
@@ -469,6 +468,7 @@ async def _send_current_rankings(ctx: discord.ApplicationContext, *, mode: str) 
                 "[/kvk rankings %s] card send failed; falling back to embed", payload.mode
             )
 
+    embed = build_current_rankings_embed(payload)
     view.message = await ctx.followup.send(embed=embed, view=view, ephemeral=False)
 
 

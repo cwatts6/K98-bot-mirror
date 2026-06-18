@@ -231,7 +231,11 @@ async def test_current_rankings_sends_kvk_top10_visual_card_when_available(monke
         fake_payload,
     )
     monkeypatch.setattr(kvk_cmds, "CurrentRankingsBrowserView", StubView)
-    monkeypatch.setattr(kvk_cmds, "build_current_rankings_embed", lambda payload: "embed")
+    monkeypatch.setattr(
+        kvk_cmds,
+        "build_current_rankings_embed",
+        lambda _payload: pytest.fail("embed should not be built on card success"),
+    )
     monkeypatch.setattr(
         kvk_cmds,
         "render_kvk_rankings_top10_card",

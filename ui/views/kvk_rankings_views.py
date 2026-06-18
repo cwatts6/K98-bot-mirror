@@ -173,35 +173,50 @@ class CurrentRankingsBrowserView(discord.ui.View):
                 limit=self.limit,
             )
             self._sync_from_payload(payload)
-            embed = build_current_rankings_embed(payload)
             file = await _top10_card_file(payload)
             message = getattr(interaction, "message", None)
-            if message is not None:
+            if file is not None and message is not None:
                 self.message = message
                 try:
-                    if file is not None:
-                        await message.edit(
-                            content=None,
-                            embeds=[],
-                            attachments=[],
-                            files=[file],
-                            view=self,
-                        )
-                    else:
-                        await message.edit(embed=embed, attachments=[], view=self)
+                    await message.edit(
+                        content=None,
+                        embeds=[],
+                        attachments=[],
+                        files=[file],
+                        view=self,
+                    )
                     return
                 except Exception:
                     logger.debug("kvk_current_rankings_host_message_edit_failed", exc_info=True)
-            if file is not None:
-                await interaction.edit_original_response(
-                    content=None,
-                    embeds=[],
-                    attachments=[],
-                    files=[file],
-                    view=self,
-                )
-            else:
-                await interaction.edit_original_response(embed=embed, attachments=[], view=self)
+            if file is not None and message is None:
+                try:
+                    await interaction.edit_original_response(
+                        content=None,
+                        embeds=[],
+                        attachments=[],
+                        files=[file],
+                        view=self,
+                    )
+                    return
+                except Exception:
+                    logger.debug(
+                        "kvk_current_rankings_original_card_edit_failed",
+                        exc_info=True,
+                    )
+
+            embed = build_current_rankings_embed(payload)
+            if message is not None:
+                self.message = message
+                try:
+                    await message.edit(embed=embed, attachments=[], view=self)
+                    return
+                except Exception:
+                    logger.debug("kvk_current_rankings_host_message_edit_failed", exc_info=True)
+            await interaction.edit_original_response(
+                attachments=[],
+                embed=embed,
+                view=self,
+            )
         except Exception:
             logger.exception(
                 "kvk_current_rankings_refresh_failed mode=%s metric=%s limit=%s",

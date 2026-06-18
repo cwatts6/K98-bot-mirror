@@ -157,6 +157,11 @@ async def test_current_rankings_browser_refresh_swaps_top10_kvk_embed_for_card(m
         fake_payload,
     )
     monkeypatch.setattr(kvk_rankings_views, "_top10_card_file", fake_card_file)
+    monkeypatch.setattr(
+        kvk_rankings_views,
+        "build_current_rankings_embed",
+        lambda _payload: pytest.fail("embed should not be built on card success"),
+    )
 
     interaction = _channel_interaction(channel_id=100, message=message)
 

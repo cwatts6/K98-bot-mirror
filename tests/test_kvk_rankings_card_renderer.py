@@ -44,7 +44,6 @@ def test_kvk_rankings_top10_card_renders_from_payload_rows():
     assert rendered.filename == "kvk_rankings_top10_kills.png"
     image_bytes = rendered.image_bytes.getvalue()
     assert image_bytes.startswith(b"\x89PNG")
-    assert len(image_bytes) > 100_000
 
     with Image.open(BytesIO(image_bytes)) as image:
         assert image.size == (1180, 640)

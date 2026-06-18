@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
+from io import BytesIO
 from typing import Any
 
 PRIMARY_RANKING_LIMITS = (10, 25, 50)
@@ -68,4 +69,4 @@ class RankingPayload:
 @dataclass(frozen=True)
 class RenderedRankingCard:
     filename: str
-    image_bytes: Any
+    image_bytes: BytesIO
