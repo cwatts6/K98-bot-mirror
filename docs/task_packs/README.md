@@ -26,8 +26,8 @@ deferred optimisation programmes, not additional command-platform phases.
 KVK Player Experience Redesign is active. Phase 1 audit/design, Phase 2A Admin Collision
 Resolution, Phase 2B Player `/kvk` Scaffold, Phase 3 Modern `/kvk stats` Visual Card, Phase 3B
 Stats Card Polish and Secondary Cards, Phase 3C Overall Rank and Card Polish, Phase 4A Modern
-`/kvk targets`, the full Phase 4B modern `/kvk history` rollout, and Phase 5A rankings hub
-foundation are complete.
+`/kvk targets`, the full Phase 4B modern `/kvk history` rollout, Phase 5A rankings hub foundation,
+and Phase 5B unified current-ranking browser are complete.
 Phase 2A moved admin/operator commands from `/kvk ...` to `/kvk_admin ...` in PR 140. Phase 2B
 added the player `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` scaffold in PR
 141, then was promoted to production. Phase 3, Phase 3B, and Phase 3C delivered the modern
@@ -43,13 +43,18 @@ production smoke testing. Phase 5A delivered the `/kvk rankings type:records` KD
 Top 10 single-KVK records foundation, shared rankings payload/DAL/service/rendering pieces,
 Top 10/25/50 primary control policy, command reference updates, and review hardening in mirror
 PR 152 and production PR 461. Phase 5A was smoke tested successfully and pushed to production.
+Phase 5B delivered the shared `/kvk rankings` current-browser foundation for KVK, Honor, and
+PreKvK in mirror PR 153 and production PR 462, including mode/metric selectors, Top 10/25/50
+controls, no primary Top 100, PreKvK unified embed output under `/kvk rankings`, preservation of
+the image-based legacy `/prekvk report`, Honor mode guard hardening, and production smoke-tested
+table layout polish.
 
-Phase 5A is complete. Use the Phase 5 task pack and the Phase 5B chat starter for the next active
-sub-phase: unified current KVK/Honor/PreKvK ranking browser delivery. The Phase 4B task pack
-remains as the history delivery record:
+Phase 5B is complete. Use the Phase 5 task pack and the Phase 5C chat starter for the next active
+sub-phase: Top 10 visual ranking cards. The Phase 4B task pack remains as the history delivery
+record:
 
 `Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
 
 Next starter:
 
-`Codex Chat Starter - KVK Player Experience Redesign Phase 5B Unified Current Ranking Browser.md`
+`Codex Chat Starter - KVK Player Experience Redesign Phase 5C Top 10 Visual Ranking Cards.md`

@@ -451,8 +451,8 @@ Use:
 
 ### Phase 5 — Unified `/kvk rankings` Visual/UX Polish
 
-Status: in progress. Phase 5A is complete, smoke tested, merged to mirror in PR #152, promoted
-through production PR #461, and pushed to production.
+Status: in progress. Phase 5A and Phase 5B are complete, smoke tested, merged to mirror, promoted
+through production, and pushed to production.
 
 Phase 5A delivered the first rankings hub foundation:
 
@@ -473,9 +473,29 @@ Phase 5A delivered the first rankings hub foundation:
   not a primary player button.
 - Legacy ranking commands remain live.
 
-The next sub-phase is Phase 5B: unify the current KVK, Honor, and PreKvK ranking browser while
-preserving the delivered Hall of Fame records mode. Image output remains optional until the unified
-embed/browser behaviour is stable.
+Phase 5B delivered the unified current-ranking browser foundation in mirror PR #153 and production
+PR #462:
+
+- `/kvk rankings type:kvk`, `honor`, and `prekvk` now use the shared ranking payload/service,
+  unified embed renderer, and `CurrentRankingsBrowserView`.
+- The public browser has mode and metric selectors plus Top 10, Top 25, and Top 50 controls.
+- Top 100 remains out of the primary player controls.
+- `/kvk rankings type:prekvk` now uses the unified public embed browser, while legacy
+  `/prekvk report` remains the image-based report flow.
+- `/kvk rankings type:records` remains the Phase 5A Hall of Fame Top 10 records mode and was not
+  expanded to Top 25/50/100.
+- Legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` remain live during rollout.
+- Honor mode's stricter no-admin-override channel gate is enforced both at command entry and when
+  switching modes inside the shared browser.
+- KVK current-ranking output was smoke-polished to reuse the legacy fixed-width table budget so
+  Top 10 rows stay one line per row in Discord.
+- PreKvK unified output shows `Showing: Top N` instead of implying a full total when only a limited
+  report payload is available.
+- SQL/cache assumptions were validated against the SQL source repository, and Codex Security found
+  no validated findings.
+
+The next sub-phase is Phase 5C: add Top 10 visual spotlight cards for the highest-value ranking
+views while preserving the stable unified embed browser and all legacy commands.
 
 ### Phase 6 — Admin Command Hardening And Legacy Operator Cleanup
 
@@ -641,6 +661,8 @@ the stale command-level selector option, preserved explicit governor lookup, pol
 with healed, KillPoints, PreKVK, Honor, and derived `TankingScorePct` data, preserved null
 semantics, and passed production smoke testing. Phase 4 is complete. Phase 5A has delivered the
 `/kvk rankings type:records` Hall of Fame foundation and pushed it to production after smoke
-testing. Start the next chat from the Phase 5B starter:
+testing. Phase 5B has delivered the unified current-ranking browser in mirror PR #153 and
+production PR #462, passed production smoke testing, and preserved the legacy ranking paths. Start
+the next chat from the Phase 5C starter:
 
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5B Unified Current Ranking Browser.md`
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5C Top 10 Visual Ranking Cards.md`
