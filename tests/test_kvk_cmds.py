@@ -329,7 +329,7 @@ async def test_hall_of_fame_rankings_binds_view_to_followup_message(monkeypatch)
 
     async def fake_payload(**kwargs):
         created["payload_kwargs"] = kwargs
-        return SimpleNamespace(limit=10)
+        return SimpleNamespace(mode="records", limit=10, rows=[])
 
     class StubView:
         def __init__(self, *, metric, limit):
@@ -365,6 +365,128 @@ async def test_hall_of_fame_rankings_binds_view_to_followup_message(monkeypatch)
     assert created["send_kwargs"]["ephemeral"] is False
     assert created["view"].message is sent_message
     assert created["view"].message is not original_response
+
+
+@pytest.mark.asyncio
+async def test_hall_of_fame_rankings_sends_visual_card_when_available(monkeypatch):
+    import commands.kvk_cmds as kvk_cmds
+
+    sent_message = object()
+    created = {}
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        created["defer"] = ephemeral
+
+    async def fake_payload(**kwargs):
+        created["payload_kwargs"] = kwargs
+        return SimpleNamespace(
+            mode="records",
+            metric="kills",
+            limit=10,
+            rows=[object()],
+        )
+
+    class StubView:
+        def __init__(self, *, metric, limit):
+            self.metric = metric
+            self.limit = limit
+            self.message = None
+            created["view"] = self
+
+    class Followup:
+        async def send(self, **kwargs):
+            created["send_kwargs"] = kwargs
+            return sent_message
+
+    rendered = SimpleNamespace(
+        filename="kvk_hall_of_fame_top10_kills.png",
+        image_bytes=BytesIO(b"fake-png"),
+    )
+    ctx = SimpleNamespace(followup=Followup())
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.kvk_rankings_service,
+        "build_hall_of_fame_payload",
+        fake_payload,
+    )
+    monkeypatch.setattr(kvk_cmds, "HallOfFameRecordsView", StubView)
+    monkeypatch.setattr(
+        kvk_cmds,
+        "render_hall_of_fame_top10_card",
+        lambda _payload: rendered,
+    )
+    monkeypatch.setattr(
+        kvk_cmds,
+        "build_hall_of_fame_embed",
+        lambda _payload: pytest.fail("embed should not be built on card success"),
+    )
+
+    await kvk_cmds._send_hall_of_fame_rankings(ctx)
+
+    assert created["defer"] is False
+    assert created["payload_kwargs"]["limit"] == 10
+    assert created["send_kwargs"]["file"].filename == "kvk_hall_of_fame_top10_kills.png"
+    assert rendered.image_bytes.tell() == 0
+    assert "embed" not in created["send_kwargs"]
+    assert created["send_kwargs"]["view"] is created["view"]
+    assert created["send_kwargs"]["ephemeral"] is False
+    assert created["view"].message is sent_message
+
+
+@pytest.mark.asyncio
+async def test_hall_of_fame_rankings_falls_back_to_embed_when_card_send_fails(monkeypatch):
+    import commands.kvk_cmds as kvk_cmds
+
+    created = {"sends": []}
+    sent_message = object()
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        created["defer"] = ephemeral
+
+    async def fake_payload(**_kwargs):
+        return SimpleNamespace(mode="records", metric="kills", limit=10, rows=[object()])
+
+    class StubView:
+        def __init__(self, *, metric, limit):
+            self.metric = metric
+            self.limit = limit
+            self.message = None
+            created["view"] = self
+
+    class Followup:
+        async def send(self, **kwargs):
+            created["sends"].append(kwargs)
+            if "file" in kwargs:
+                raise RuntimeError("discord upload failed")
+            return sent_message
+
+    rendered = SimpleNamespace(
+        filename="kvk_hall_of_fame_top10_kills.png",
+        image_bytes=BytesIO(b"fake-png"),
+    )
+    ctx = SimpleNamespace(followup=Followup())
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.kvk_rankings_service,
+        "build_hall_of_fame_payload",
+        fake_payload,
+    )
+    monkeypatch.setattr(kvk_cmds, "HallOfFameRecordsView", StubView)
+    monkeypatch.setattr(kvk_cmds, "build_hall_of_fame_embed", lambda payload: "embed")
+    monkeypatch.setattr(
+        kvk_cmds,
+        "render_hall_of_fame_top10_card",
+        lambda _payload: rendered,
+    )
+
+    await kvk_cmds._send_hall_of_fame_rankings(ctx)
+
+    assert "file" in created["sends"][0]
+    assert created["sends"][1]["embed"] == "embed"
+    assert created["sends"][1]["view"] is created["view"]
+    assert created["view"].message is sent_message
 
 
 @pytest.mark.asyncio

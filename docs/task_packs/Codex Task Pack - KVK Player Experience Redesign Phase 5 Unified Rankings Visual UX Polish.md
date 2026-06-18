@@ -102,10 +102,9 @@ Next Phase 5 sub-phase:
   lifetime totals.
 - Do not add Hall of Fame Top 25/50/100 controls.
 - Do not remove legacy commands.
-- Keep Honor and PreKvK Top 10 visual cards as explicit later-slice candidates unless Phase 5D
-  audit recommends including one and the operator approves it.
-- Keep My Rank/export and legacy-ranking consolidation in the Phase 5 delivery plan after visual
-  records work.
+- Make Honor and PreKvK Top 10 visual cards the next visual completion slice in Phase 5E.
+- Keep My Rank/export and legacy-ranking consolidation in the Phase 5 delivery plan after the
+  visual-card slices, now starting in Phase 5F unless later scope changes are approved.
 - Continue to capture all deferred optimisations that remain part of "rankings done right" so they
   can be delivered in later Phase 5 sub-phases rather than lost.
 
@@ -710,17 +709,24 @@ The working recommendation is:
    - Use records-specific backgrounds and shared card primitives.
    - Keep records Top 10 only; do not add records Top 25, Top 50, or Top 100 controls.
    - Preserve current KVK Top 10 cards, compact browser output, embed fallback, and legacy commands.
-   - Decide whether Honor or PreKvK Top 10 visual cards belong in a later Phase 5 visual slice or
-     should remain deferred.
+   - Preserve Honor and PreKvK for the next visual-card slice rather than expanding 5D.
 
-5. **Phase 5E: My Rank / Find Me and export polish**
+5. **Phase 5E: Honor and PreKvK Top 10 visual cards**
+   - Audit Honor and PreKvK card value, freshness wording, support values, and visual hierarchy.
+   - Add visual Top 10 cards for one or both modes using the shared ranking payloads.
+   - Preserve Honor's no-admin-override KVK stats channel gate.
+   - Preserve legacy `/prekvk report` as image-based unless a later approved phase explicitly
+     changes it.
+   - Keep Top 25 and Top 50 on the compact unified browser unless separately approved.
+
+6. **Phase 5F: My Rank / Find Me and export polish**
    - Add private local-position view for registered governors.
    - Add full-list CSV/export if Top 100 is removed.
    - Add records export/detail output only if useful after the Top 10 card is validated.
    - Consider legacy redirect only after usage review and separate approval.
 
-6. **Phase 5F+: Remaining rankings deferred optimisation closure**
-   - Deliver any structured Phase 5 deferred optimisations that remain after 5B-5E.
+7. **Phase 5G+: Remaining rankings deferred optimisation closure**
+   - Deliver any structured Phase 5 deferred optimisations that remain after 5B-5F.
    - Add extra sub-phases rather than leaving known rankings UX, architecture, export, or visual
      debt unresolved at the end of Phase 5.
 
@@ -1160,7 +1166,7 @@ Start with audit and optioneering only unless explicitly approved to implement:
 3. Review usage logs for Top 10/25/50/100 if available.
 4. Audit all-time records feasibility across historical KVK SQL/data sources, including missing/null handling for healed and acclaim.
 5. Propose a unified Ranking Hub design with mode/metric selectors, Top 10/25/50 controls, Top 100/export decision, Hall of Fame records mode, and a possible My Rank / Find Me flow.
-6. Recommend staged implementation, likely: 5A audit/foundation, 5B Hall of Fame records foundation, 5C unified current-ranking browser, 5D Top 10 visual cards, 5E My Rank/export polish.
+6. Recommend staged implementation, likely: 5A audit/foundation, 5B Hall of Fame records foundation, 5C unified current-ranking browser, 5D Top 10 visual cards, 5E Honor/PreKvK cards, 5F My Rank/export polish.
 7. Stop for approval before implementation.
 
 Do not remove legacy commands. Do not add a new top-level command. Do not put SQL in command/view/renderer modules. Do not create `/kvk records` in Phase 5 unless separately approved; prefer `/kvk rankings type:records` or equivalent if the records mode is approved. Capture out-of-scope findings as structured deferred optimisations.

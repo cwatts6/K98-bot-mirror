@@ -15,7 +15,9 @@ from kvk.models.kvk_rankings import (
     RankingPayload,
 )
 from kvk.rendering.kvk_rankings_card_renderer import (
+    can_render_hall_of_fame_top10_card,
     can_render_kvk_rankings_top10_card,
+    render_hall_of_fame_top10_card,
     render_kvk_rankings_top10_card,
 )
 from kvk.rendering.kvk_rankings_embed import (
@@ -38,6 +40,24 @@ async def _top10_card_file(payload: RankingPayload) -> discord.File | None:
         logger.exception(
             "kvk_current_rankings_card_render_failed mode=%s metric=%s limit=%s",
             payload.mode,
+            payload.metric,
+            payload.limit,
+        )
+        return None
+    if rendered is None:
+        return None
+    rendered.image_bytes.seek(0)
+    return discord.File(rendered.image_bytes, filename=rendered.filename)
+
+
+async def _records_top10_card_file(payload: RankingPayload) -> discord.File | None:
+    if not can_render_hall_of_fame_top10_card(payload):
+        return None
+    try:
+        rendered = await asyncio.to_thread(render_hall_of_fame_top10_card, payload)
+    except Exception:
+        logger.exception(
+            "kvk_records_card_render_failed metric=%s limit=%s",
             payload.metric,
             payload.limit,
         )
@@ -334,16 +354,43 @@ class HallOfFameRecordsView(discord.ui.View):
                 limit=self.limit,
             )
             self._sync_controls()
-            embed = build_hall_of_fame_embed(payload)
+            file = await _records_top10_card_file(payload)
             message = getattr(interaction, "message", None)
+            if file is not None and message is not None:
+                self.message = message
+                try:
+                    await message.edit(
+                        content=None,
+                        embeds=[],
+                        attachments=[],
+                        files=[file],
+                        view=self,
+                    )
+                    return
+                except Exception:
+                    logger.debug("kvk_records_host_message_card_edit_failed", exc_info=True)
+            if file is not None and message is None:
+                try:
+                    await interaction.edit_original_response(
+                        content=None,
+                        embeds=[],
+                        attachments=[],
+                        files=[file],
+                        view=self,
+                    )
+                    return
+                except Exception:
+                    logger.debug("kvk_records_original_card_edit_failed", exc_info=True)
+
+            embed = build_hall_of_fame_embed(payload)
             if message is not None:
                 self.message = message
                 try:
-                    await message.edit(embed=embed, view=self)
+                    await message.edit(embed=embed, attachments=[], view=self)
                     return
                 except Exception:
                     logger.debug("kvk_records_host_message_edit_failed", exc_info=True)
-            await interaction.edit_original_response(embed=embed, view=self)
+            await interaction.edit_original_response(attachments=[], embed=embed, view=self)
         except Exception:
             logger.exception(
                 "kvk_records_refresh_failed metric=%s limit=%s",

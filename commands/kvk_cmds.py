@@ -16,7 +16,9 @@ from core.interaction_safety import safe_command, safe_defer
 from decoraters import channel_only, track_usage
 from kvk.models.kvk_rankings import HallOfFameMetric
 from kvk.rendering.kvk_rankings_card_renderer import (
+    can_render_hall_of_fame_top10_card,
     can_render_kvk_rankings_top10_card,
+    render_hall_of_fame_top10_card,
     render_kvk_rankings_top10_card,
 )
 from kvk.rendering.kvk_rankings_embed import (
@@ -499,6 +501,22 @@ async def _send_hall_of_fame_rankings(ctx: discord.ApplicationContext) -> None:
         )
         return
     view = HallOfFameRecordsView(metric=metric, limit=payload.limit)
+    rendered = None
+    if can_render_hall_of_fame_top10_card(payload):
+        try:
+            rendered = await asyncio.to_thread(render_hall_of_fame_top10_card, payload)
+        except Exception:
+            logger.exception("[/kvk rankings records] render_hall_of_fame_top10_card failed")
+
+    if rendered is not None:
+        rendered.image_bytes.seek(0)
+        file = discord.File(rendered.image_bytes, filename=rendered.filename)
+        try:
+            view.message = await ctx.followup.send(file=file, view=view, ephemeral=False)
+            return
+        except Exception:
+            logger.exception("[/kvk rankings records] card send failed; falling back to embed")
+
     embed = build_hall_of_fame_embed(payload)
     view.message = await ctx.followup.send(embed=embed, view=view, ephemeral=False)
 
