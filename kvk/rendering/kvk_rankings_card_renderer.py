@@ -346,14 +346,13 @@ def _records_context_line(payload: RankingPayload) -> str:
 
 
 def _records_count_label(payload: RankingPayload) -> str:
-    return f"{len(payload.rows[: payload.limit])} RECORDS"
+    return f"TOP {payload.limit}"
 
 
-def _records_holder_label(payload: RankingPayload) -> str:
-    governor_ids = {row.governor_id for row in payload.rows[: payload.limit] if row.governor_id}
-    count = len(governor_ids)
-    noun = "governor" if count == 1 else "governors"
-    return f"{count} {noun}"
+def _records_total_label(payload: RankingPayload) -> str:
+    count = payload.total_rows if payload.total_rows is not None else len(payload.rows)
+    noun = "record" if count == 1 else "records"
+    return f"from {count:,} {noun}"
 
 
 def _draw_record_podium(
@@ -496,7 +495,7 @@ def render_hall_of_fame_top10_card(payload: RankingPayload) -> RenderedRankingCa
         draw,
         right_x=1138,
         y=84,
-        text=_records_holder_label(payload),
+        text=_records_total_label(payload),
         max_width=270,
         size=23,
         min_size=16,

@@ -527,7 +527,11 @@ def build_hall_of_fame_payload_from_rows(
     normalized_limit = normalize_ranking_limit(limit)
     metric_label = HALL_OF_FAME_METRIC_LABELS[metric]
     ranking_rows: list[RankingRow] = []
-    for raw in (rows or [])[:normalized_limit]:
+    raw_rows = rows or []
+    total_rows = None
+    if raw_rows:
+        total_rows = _to_int(raw_rows[0].get("TotalRecordsCount"), len(raw_rows))
+    for raw in raw_rows[:normalized_limit]:
         rank = _to_int(raw.get("RecordRank"), len(ranking_rows) + 1)
         governor_id = _to_int(raw.get("GovernorID"))
         governor_name = str(raw.get("GovernorName") or governor_id or "Unknown").strip()
@@ -552,6 +556,7 @@ def build_hall_of_fame_payload_from_rows(
         limit=normalized_limit,
         rows=ranking_rows,
         source_note="Single-KVK performances across started KVKs",
+        total_rows=total_rows,
     )
 
 

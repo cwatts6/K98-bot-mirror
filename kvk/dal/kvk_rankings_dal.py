@@ -53,7 +53,8 @@ def fetch_hall_of_fame_records(
                 GovernorName,
                 KVK_NO,
                 KVK_NAME,
-                MetricValue
+                MetricValue,
+                COUNT_BIG(*) OVER() AS TotalRecordsCount
             FROM RecordRows
         )
         SELECT TOP (?)
@@ -62,7 +63,8 @@ def fetch_hall_of_fame_records(
             GovernorName,
             KVK_NO,
             KVK_NAME,
-            MetricValue
+            MetricValue,
+            TotalRecordsCount
         FROM Ranked
         ORDER BY RecordRank ASC, MetricValue DESC, KVK_NO DESC, GovernorID ASC;
     """

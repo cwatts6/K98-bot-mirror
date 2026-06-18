@@ -298,6 +298,7 @@ def test_build_hall_of_fame_payload_from_rows_preserves_single_kvk_records():
             "KVK_NO": 17,
             "KVK_NAME": "Light vs Dark",
             "MetricValue": Decimal("1234567.00"),
+            "TotalRecordsCount": 42,
         },
         {
             "RecordRank": 2,
@@ -321,6 +322,7 @@ def test_build_hall_of_fame_payload_from_rows_preserves_single_kvk_records():
     assert [row.governor_id for row in payload.rows] == [123, 123]
     assert payload.rows[0].kvk_name == "Light vs Dark"
     assert payload.rows[0].value == 1_234_567
+    assert payload.total_rows == 42
 
 
 @pytest.mark.asyncio
@@ -337,6 +339,7 @@ async def test_build_hall_of_fame_payload_fetches_dal_rows(monkeypatch):
                 "GovernorName": "Bob",
                 "KVK_NO": 15,
                 "MetricValue": 5000,
+                "TotalRecordsCount": 18,
             }
         ]
 
@@ -353,3 +356,4 @@ async def test_build_hall_of_fame_payload_fetches_dal_rows(monkeypatch):
     assert payload.rows[0].governor_name == "Bob"
     assert payload.metric_label == "Honor"
     assert payload.limit == 10
+    assert payload.total_rows == 18
