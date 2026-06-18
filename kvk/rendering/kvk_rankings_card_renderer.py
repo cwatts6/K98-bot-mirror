@@ -207,6 +207,23 @@ def _draw_shadowed_right_fitted(
     _draw_shadowed_text(draw, (x, y), text, fill=fill, font=font, bold=bold)
 
 
+def _draw_shadowed_center_fitted(
+    draw: ImageDraw.ImageDraw,
+    *,
+    center_x: int,
+    y: int,
+    text: str,
+    max_width: int,
+    size: int,
+    min_size: int,
+    fill: tuple[int, int, int],
+    bold: bool = True,
+) -> None:
+    font = _fit_font(draw, text, max_width=max_width, size=size, min_size=min_size, bold=bold)
+    x = center_x - (_text_width(draw, text, font) // 2)
+    _draw_shadowed_text(draw, (x, y), text, fill=fill, font=font, bold=bold)
+
+
 def _draw_top_card(
     draw: ImageDraw.ImageDraw,
     *,
@@ -365,36 +382,42 @@ def _draw_record_podium(
 ) -> None:
     x0, y0, x1, _y1 = box
     width = x1 - x0
-    _draw_shadowed_text(
+    center_x = x0 + (width // 2)
+    _draw_shadowed_center_fitted(
         draw,
-        (x0, y0),
-        f"#{row.rank}",
+        center_x=center_x,
+        y=y0,
+        text=f"#{row.rank}",
+        max_width=width,
+        size=47,
+        min_size=32,
         fill=accent,
-        font=_font(47, bold=True),
-        bold=True,
     )
-    _draw_shadowed_fitted(
+    _draw_shadowed_center_fitted(
         draw,
-        (x0, y0 + 48),
-        row.governor_name,
+        center_x=center_x,
+        y=y0 + 48,
+        text=row.governor_name,
         max_width=width,
         size=32,
         min_size=20,
         fill=TEXT,
     )
-    _draw_shadowed_fitted(
+    _draw_shadowed_center_fitted(
         draw,
-        (x0, y0 + 88),
-        _format_cell_value(payload.metric, row.value),
+        center_x=center_x,
+        y=y0 + 88,
+        text=_format_cell_value(payload.metric, row.value),
         max_width=width,
         size=45,
         min_size=26,
         fill=_record_metric_color(payload.metric),
     )
-    _draw_shadowed_fitted(
+    _draw_shadowed_center_fitted(
         draw,
-        (x0, y0 + 142),
-        _record_kvk_label(row),
+        center_x=center_x,
+        y=y0 + 142,
+        text=_record_kvk_label(row),
         max_width=width,
         size=18,
         min_size=13,
