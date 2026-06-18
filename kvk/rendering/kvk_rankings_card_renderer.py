@@ -30,9 +30,6 @@ ASSET_DIR = ROOT / "assets" / "kvk" / "cards"
 KVK_RANKINGS_BACKGROUND = ASSET_DIR / "KVK_Rankings_Background.png"
 DEFAULT_BACKGROUND = ASSET_DIR / "Default_card.jpg"
 
-PANEL_FILL = (8, 14, 25, 172)
-PANEL_FILL_STRONG = (6, 10, 18, 204)
-PANEL_OUTLINE = (255, 255, 255, 42)
 AMBER = (255, 183, 77)
 
 
@@ -41,17 +38,6 @@ def _background_path() -> Path | None:
         if path.exists():
             return path
     return None
-
-
-def _panel(
-    draw: ImageDraw.ImageDraw,
-    box: tuple[int, int, int, int],
-    *,
-    fill: tuple[int, int, int, int] = PANEL_FILL,
-    outline: tuple[int, int, int, int] = PANEL_OUTLINE,
-    radius: int = 16,
-) -> None:
-    draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=1)
 
 
 def _metric_color(metric: str) -> tuple[int, int, int]:
@@ -148,13 +134,12 @@ def _draw_top_card(
     accent: tuple[int, int, int],
 ) -> None:
     x0, y0, x1, y1 = box
-    _panel(draw, box, fill=PANEL_FILL_STRONG, radius=18)
     rank_label = f"#{row.rank}"
-    _draw_text(draw, (x0 + 22, y0 + 18), rank_label, fill=accent, font=_font(34, bold=True))
-    name_max = x1 - x0 - 44
+    _draw_text(draw, (x0, y0), rank_label, fill=accent, font=_font(34, bold=True))
+    name_max = x1 - x0
     _draw_fitted(
         draw,
-        (x0 + 22, y0 + 62),
+        (x0, y0 + 46),
         row.governor_name,
         max_width=name_max,
         size=31,
@@ -163,10 +148,10 @@ def _draw_top_card(
     value = _primary_value(payload, row)
     _draw_fitted(
         draw,
-        (x0 + 22, y0 + 96),
+        (x0, y0 + 86),
         value,
         max_width=name_max,
-        size=35,
+        size=40,
         min_size=22,
         fill=_metric_color(payload.metric),
     )
@@ -174,7 +159,7 @@ def _draw_top_card(
     if support:
         _draw_fitted(
             draw,
-            (x0 + 22, y1 - 38),
+            (x0, y0 + 132),
             support,
             max_width=name_max,
             size=18,
@@ -191,24 +176,24 @@ def _draw_row(
     box: tuple[int, int, int, int],
 ) -> None:
     x0, y0, x1, y1 = box
-    _panel(draw, box, radius=12)
     rank = f"#{row.rank}"
-    _draw_text(draw, (x0 + 16, y0 + 12), rank, fill=GOLD, font=_font(23, bold=True))
+    draw.line((x0, y0, x1, y0), fill=(255, 211, 87, 80), width=2)
+    _draw_text(draw, (x0, y0 + 10), rank, fill=GOLD, font=_font(23, bold=True))
     _draw_fitted(
         draw,
-        (x0 + 76, y0 + 8),
+        (x0 + 60, y0 + 8),
         row.governor_name,
-        max_width=230,
+        max_width=260,
         size=22,
         min_size=16,
     )
     value = _primary_value(payload, row)
     _draw_right_fitted(
         draw,
-        right_x=x1 - 18,
+        right_x=x1,
         y=y0 + 8,
         text=value,
-        max_width=142,
+        max_width=150,
         size=23,
         min_size=16,
         fill=_metric_color(payload.metric),
@@ -217,9 +202,9 @@ def _draw_row(
     if support:
         _draw_fitted(
             draw,
-            (x0 + 76, y1 - 23),
+            (x0 + 60, y1 - 22),
             support,
-            max_width=x1 - x0 - 96,
+            max_width=x1 - x0 - 60,
             size=15,
             min_size=11,
             fill=MUTED,
@@ -260,16 +245,16 @@ def render_kvk_rankings_top10_card(payload: RankingPayload) -> RenderedRankingCa
     canvas = _load_background(background)
     overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     odraw = ImageDraw.Draw(overlay, "RGBA")
-    odraw.rounded_rectangle((0, 0, WIDTH - 1, HEIGHT - 1), radius=22, fill=(0, 0, 0, 52))
-    odraw.rectangle((0, 0, WIDTH, 135), fill=(0, 0, 0, 118))
-    odraw.rectangle((0, 130, WIDTH, HEIGHT), fill=(0, 0, 0, 82))
+    odraw.rounded_rectangle((0, 0, WIDTH - 1, HEIGHT - 1), radius=22, fill=(0, 0, 0, 82))
+    odraw.rectangle((0, 0, WIDTH, 140), fill=(0, 0, 0, 82))
+    odraw.rectangle((0, 330, WIDTH, HEIGHT), fill=(0, 0, 0, 92))
     canvas = Image.alpha_composite(canvas, overlay)
     draw = ImageDraw.Draw(canvas, "RGBA")
 
-    _draw_text(draw, (42, 32), "KVK RANKINGS", fill=GOLD, font=_font(38, bold=True), bold=True)
+    _draw_text(draw, (42, 38), "KVK Rankings", fill=GOLD, font=_font(34, bold=True), bold=True)
     _draw_fitted(
         draw,
-        (42, 82),
+        (42, 84),
         _context_line(payload),
         max_width=830,
         size=22,
@@ -279,7 +264,7 @@ def render_kvk_rankings_top10_card(payload: RankingPayload) -> RenderedRankingCa
     _draw_right_fitted(
         draw,
         right_x=1138,
-        y=38,
+        y=40,
         text=f"TOP {payload.limit}",
         max_width=250,
         size=48,
@@ -289,7 +274,7 @@ def render_kvk_rankings_top10_card(payload: RankingPayload) -> RenderedRankingCa
     _draw_right_fitted(
         draw,
         right_x=1138,
-        y=91,
+        y=92,
         text=payload.metric_label,
         max_width=250,
         size=21,
@@ -299,9 +284,9 @@ def render_kvk_rankings_top10_card(payload: RankingPayload) -> RenderedRankingCa
 
     top_rows = payload.rows[:3]
     top_boxes = (
-        (405, 155, 775, 338),
-        (42, 155, 372, 338),
-        (808, 155, 1138, 338),
+        (405, 165, 775, 322),
+        (42, 178, 370, 322),
+        (810, 178, 1138, 322),
     )
     top_accents = (GOLD, BLUE, AMBER)
     for row, box, accent in zip(top_rows, top_boxes, top_accents, strict=False):
@@ -310,7 +295,7 @@ def render_kvk_rankings_top10_card(payload: RankingPayload) -> RenderedRankingCa
     rest_rows = payload.rows[3:10]
     row_boxes: list[tuple[int, int, int, int]] = []
     left_x, right_x = 42, 604
-    y_start, row_h, gap = 363, 52, 8
+    y_start, row_h, gap = 350, 55, 7
     for idx in range(7):
         column_x = left_x if idx < 4 else right_x
         y = y_start + (idx if idx < 4 else idx - 4) * (row_h + gap)
