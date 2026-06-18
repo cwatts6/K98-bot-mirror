@@ -7,6 +7,7 @@ from typing import Any
 
 
 PRIMARY_RANKING_LIMITS = (10, 25, 50)
+HALL_OF_FAME_RECORD_LIMIT = 10
 
 
 class HallOfFameMetric(StrEnum):
@@ -52,4 +53,3 @@ class RankingPayload:
     rows: list[RankingRow] = field(default_factory=list)
     generated_at_utc: datetime = field(default_factory=lambda: datetime.now(UTC))
     source_note: str | None = None
-

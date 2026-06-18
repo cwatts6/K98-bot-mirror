@@ -33,17 +33,18 @@ def test_build_hall_of_fame_embed_mentions_record_rules():
 
 
 @pytest.mark.asyncio
-async def test_hall_of_fame_records_view_exposes_metric_and_primary_limit_controls():
-    view = HallOfFameRecordsView(metric=HallOfFameMetric.KILLS, limit=10)
+async def test_hall_of_fame_records_view_exposes_metric_selector_only():
+    view = HallOfFameRecordsView(metric=HallOfFameMetric.KILLS, limit=50)
 
     labels = [getattr(item, "label", None) for item in view.children]
     custom_ids = [getattr(item, "custom_id", None) for item in view.children]
 
-    assert "Top 10" in labels
-    assert "Top 25" in labels
-    assert "Top 50" in labels
+    assert "Top 10" not in labels
+    assert "Top 25" not in labels
+    assert "Top 50" not in labels
     assert "Top 100" not in labels
-    assert "kvk_records_top_10" in custom_ids
+    assert "kvk_records_top_10" not in custom_ids
+    assert view.limit == 10
     assert len(view.metric_select.options) == 8
 
 
@@ -59,7 +60,7 @@ async def test_hall_of_fame_records_view_refresh_edits_component_message(monkeyp
     view = HallOfFameRecordsView(metric=HallOfFameMetric.HONOR, limit=25)
 
     async def fake_payload(**kwargs):
-        assert kwargs == {"metric": HallOfFameMetric.HONOR, "limit": 25}
+        assert kwargs == {"metric": HallOfFameMetric.HONOR, "limit": 10}
         return payload
 
     class Response:

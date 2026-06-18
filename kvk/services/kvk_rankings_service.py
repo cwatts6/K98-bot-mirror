@@ -7,6 +7,7 @@ from typing import Any
 from kvk.dal import kvk_rankings_dal
 from kvk.models.kvk_rankings import (
     HALL_OF_FAME_METRIC_LABELS,
+    HALL_OF_FAME_RECORD_LIMIT,
     PRIMARY_RANKING_LIMITS,
     HallOfFameMetric,
     RankingPayload,
@@ -23,6 +24,10 @@ def normalize_ranking_limit(value: int | None, *, default: int = 10) -> int:
     if requested in PRIMARY_RANKING_LIMITS:
         return requested
     return default if default in PRIMARY_RANKING_LIMITS else PRIMARY_RANKING_LIMITS[0]
+
+
+def normalize_hall_of_fame_limit(_value: int | None = None) -> int:
+    return HALL_OF_FAME_RECORD_LIMIT
 
 
 def parse_hall_of_fame_metric(value: str | None) -> HallOfFameMetric:
@@ -147,7 +152,7 @@ async def build_hall_of_fame_payload(
     limit: int = 10,
 ) -> RankingPayload:
     parsed_metric = metric if isinstance(metric, HallOfFameMetric) else parse_hall_of_fame_metric(metric)
-    normalized_limit = normalize_ranking_limit(limit)
+    normalized_limit = normalize_hall_of_fame_limit(limit)
     rows = await asyncio.to_thread(
         kvk_rankings_dal.fetch_hall_of_fame_records,
         parsed_metric,

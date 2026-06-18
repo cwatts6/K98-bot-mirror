@@ -13,6 +13,13 @@ def test_normalize_ranking_limit_allows_primary_limits_only():
     assert kvk_rankings_service.normalize_ranking_limit(100) == 10
 
 
+def test_normalize_hall_of_fame_limit_is_top_10_only():
+    assert kvk_rankings_service.normalize_hall_of_fame_limit(None) == 10
+    assert kvk_rankings_service.normalize_hall_of_fame_limit(10) == 10
+    assert kvk_rankings_service.normalize_hall_of_fame_limit(25) == 10
+    assert kvk_rankings_service.normalize_hall_of_fame_limit(50) == 10
+
+
 def test_parse_hall_of_fame_metric_accepts_aliases():
     assert kvk_rankings_service.parse_hall_of_fame_metric("kp") == HallOfFameMetric.KILL_POINTS
     assert kvk_rankings_service.parse_hall_of_fame_metric("PreKvK Points") == HallOfFameMetric.PREKVK
@@ -76,7 +83,7 @@ async def test_build_hall_of_fame_payload_fetches_dal_rows(monkeypatch):
         limit=25,
     )
 
-    assert calls == {"metric": HallOfFameMetric.HONOR, "limit": 25}
+    assert calls == {"metric": HallOfFameMetric.HONOR, "limit": 10}
     assert payload.rows[0].governor_name == "Bob"
     assert payload.metric_label == "Honor"
-
+    assert payload.limit == 10

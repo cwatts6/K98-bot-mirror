@@ -6,7 +6,6 @@ import discord
 
 from kvk.models.kvk_rankings import (
     HALL_OF_FAME_METRIC_LABELS,
-    PRIMARY_RANKING_LIMITS,
     HallOfFameMetric,
 )
 from kvk.rendering.kvk_rankings_embed import build_hall_of_fame_embed
@@ -25,7 +24,7 @@ class HallOfFameRecordsView(discord.ui.View):
     ) -> None:
         super().__init__(timeout=timeout)
         self.metric = metric
-        self.limit = kvk_rankings_service.normalize_ranking_limit(limit)
+        self.limit = kvk_rankings_service.normalize_hall_of_fame_limit(limit)
         self.message: discord.Message | None = None
 
         self.metric_select = discord.ui.Select(
@@ -40,28 +39,11 @@ class HallOfFameRecordsView(discord.ui.View):
         )
         self.metric_select.callback = self.on_metric_change
         self.add_item(self.metric_select)
-
-        for option_limit in PRIMARY_RANKING_LIMITS:
-            button = discord.ui.Button(
-                label=f"Top {option_limit}",
-                style=discord.ButtonStyle.secondary,
-                custom_id=f"kvk_records_top_{option_limit}",
-                row=1,
-            )
-            button.callback = self._make_limit_handler(option_limit)
-            self.add_item(button)
         self._sync_controls()
 
     def _sync_controls(self) -> None:
         for option in self.metric_select.options:
             option.default = option.value == self.metric.value
-        for item in self.children:
-            if isinstance(item, discord.ui.Button) and item.label and item.label.startswith("Top "):
-                item.style = (
-                    discord.ButtonStyle.primary
-                    if item.label == f"Top {self.limit}"
-                    else discord.ButtonStyle.secondary
-                )
 
     async def _refresh(self, interaction: discord.Interaction) -> None:
         try:
@@ -105,13 +87,6 @@ class HallOfFameRecordsView(discord.ui.View):
         )
         await self._refresh(interaction)
 
-    def _make_limit_handler(self, limit: int):
-        async def _handler(interaction: discord.Interaction) -> None:
-            self.limit = kvk_rankings_service.normalize_ranking_limit(limit)
-            await self._refresh(interaction)
-
-        return _handler
-
     async def on_timeout(self) -> None:
         for item in self.children:
             item.disabled = True
@@ -120,4 +95,3 @@ class HallOfFameRecordsView(discord.ui.View):
                 await self.message.edit(view=self)
         except Exception:
             logger.debug("kvk_records_view_timeout_edit_failed", exc_info=True)
-
