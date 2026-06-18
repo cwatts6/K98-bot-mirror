@@ -27,7 +27,8 @@ KVK Player Experience Redesign is active. Phase 1 audit/design, Phase 2A Admin C
 Resolution, Phase 2B Player `/kvk` Scaffold, Phase 3 Modern `/kvk stats` Visual Card, Phase 3B
 Stats Card Polish and Secondary Cards, Phase 3C Overall Rank and Card Polish, Phase 4A Modern
 `/kvk targets`, the full Phase 4B modern `/kvk history` rollout, Phase 5A rankings hub foundation,
-and Phase 5B unified current-ranking browser are complete.
+Phase 5B unified current-ranking browser, and Phase 5C current KVK Top 10 visual ranking card are
+complete.
 Phase 2A moved admin/operator commands from `/kvk ...` to `/kvk_admin ...` in PR 140. Phase 2B
 added the player `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` scaffold in PR
 141, then was promoted to production. Phase 3, Phase 3B, and Phase 3C delivered the modern
@@ -48,13 +49,18 @@ PreKvK in mirror PR 153 and production PR 462, including mode/metric selectors, 
 controls, no primary Top 100, PreKvK unified embed output under `/kvk rankings`, preservation of
 the image-based legacy `/prekvk report`, Honor mode guard hardening, and production smoke-tested
 table layout polish.
+Phase 5C delivered the current KVK Top 10 visual ranking card in mirror PR 154 and production PR
+463, including Kills default, KVK card metrics for Kills, % Kill Target, Deads, DKP, Acclaim, and
+Tanking Score, embed fallback, Top 25/50 compact browser preservation, Top 100 exclusion, legacy
+command preservation, image-based legacy `/prekvk report` preservation, production smoke testing,
+and visual polish.
 
-Phase 5B is complete. Use the Phase 5 task pack and the Phase 5C chat starter for the next active
-sub-phase: Top 10 visual ranking cards. The Phase 4B task pack remains as the history delivery
-record:
+Phase 5C is complete. Use the Phase 5 task pack and the Phase 5D chat starter for the next active
+sub-phase: Hall of Fame records Top 10 visual cards. The Phase 4B task pack remains as the history
+delivery record:
 
 `Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
 
 Next starter:
 
-`Codex Chat Starter - KVK Player Experience Redesign Phase 5C Top 10 Visual Ranking Cards.md`
+`Codex Chat Starter - KVK Player Experience Redesign Phase 5D Hall of Fame Records Visual Cards.md`

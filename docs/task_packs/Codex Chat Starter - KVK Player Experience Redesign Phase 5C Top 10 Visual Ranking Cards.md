@@ -1,12 +1,19 @@
 # Codex Chat Starter - KVK Player Experience Redesign Phase 5C Top 10 Visual Ranking Cards
 
-Phase 5A and Phase 5B are complete.
+Phase 5A, Phase 5B, and Phase 5C are complete.
+
+This starter is now a historical execution record. For the next Phase 5 delivery chat, use:
+
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5D Hall of Fame Records Visual Cards.md`
 
 - Phase 5A: mirror PR #152 and production PR #461 delivered
   `/kvk rankings type:records` as the KD98 Hall of Fame Top 10 all-time single-KVK records
   foundation.
 - Phase 5B: mirror PR #153 and production PR #462 delivered the unified current-ranking browser
   for KVK, Honor, and PreKvK rankings. It was pushed to production and smoke tested successfully.
+- Phase 5C: mirror PR #154 and production PR #463 delivered the current KVK Top 10 visual ranking
+  card. It was pushed to production, smoke tested successfully, and polished through production
+  feedback.
 
 Source programme documents:
 
@@ -33,6 +40,8 @@ Delivered Phase 5B baseline:
 - The unified KVK embed table uses the legacy fixed-width one-line row budget after production
   smoke polish.
 - Remaining known Phase 5 debt is captured structurally:
+  - Hall of Fame records visual cards.
+  - Honor and PreKvK Top 10 visual-card decision.
   - registry-aware private My Rank / local-position or export flow
   - legacy ranking command consolidation/deprecation after usage evidence
 

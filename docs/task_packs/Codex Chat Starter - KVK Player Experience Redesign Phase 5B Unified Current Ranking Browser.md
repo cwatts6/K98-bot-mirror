@@ -1,8 +1,8 @@
 # Codex Chat Starter - KVK Player Experience Redesign Phase 5B Unified Current Ranking Browser
 
 Status: historical. Phase 5B was delivered in mirror PR #153 and production PR #462, pushed to
-production, and smoke tested successfully. Use
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5C Top 10 Visual Ranking Cards.md`
+production, and smoke tested successfully. Phase 5C is also complete. Use
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5D Hall of Fame Records Visual Cards.md`
 for the next active Phase 5 chat.
 
 Phase 5A was completed in mirror PR #152 and production PR #461, pushed to production, and smoke

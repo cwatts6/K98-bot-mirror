@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 4 completion`
 - Task type: `feature / UX redesign / Discord interaction polish / renderer-service-DAL cleanup / staged implementation plan`
 - One-pass approved: `no`
-- Status: `Phase 5A and Phase 5B complete; Phase 5C ready for next-chat delivery`
+- Status: `Phase 5A, Phase 5B, and Phase 5C complete; Phase 5D ready for next-chat delivery`
 
 ## Phase 5A Completion Note
 
@@ -61,13 +61,51 @@ Delivered Phase 5B scope:
 - Ran focused tests, full tests, standard validators, pre-commit, and Codex Security. Production
   smoke testing passed.
 
+## Phase 5C Completion Note
+
+Phase 5C is complete. It was delivered in mirror PR #154, promoted through production PR #463,
+pushed to production, and smoke tested successfully.
+
+Delivered Phase 5C scope:
+
+- Added a Pillow-rendered Top 10 visual spotlight card for `/kvk rankings type:kvk`.
+- Limited the first visual-card slice to current KVK Top 10 rankings to preserve the Phase 5B
+  unified browser foundation.
+- Preserved embed fallback for render/send failures.
+- Kept Top 25 and Top 50 on the compact unified embed browser.
+- Kept Top 100 out of the primary player controls.
+- Kept Power available for Top 25/50 compact analysis, but removed Power from the Top 10 card
+  metric set because the card is intended to spotlight performance, not the "kills ordered by
+  power" diagnostic view.
+- Defaulted current KVK rankings to Kills.
+- Added Top 10 card metrics for Kills, % Kill Target, Deads, DKP, Acclaim, and Tanking Score.
+- Implemented Tanking Score with the same current/history semantics: lower is better, and rows
+  must have positive KillPoints and positive healed troops.
+- Added KVK ranking card assets under `assets/kvk/cards/` and aligned the card styling with the
+  delivered `/kvk stats` visual language.
+- Polished the card through production smoke feedback: removed dense dividers and low-value header
+  text, removed player-irrelevant source wording, right-aligned the footer, improved top-three rank
+  emphasis, changed low-contrast DKP/Tanking colours, and selected metric-specific supporting
+  values.
+- Preserved `/kvk rankings type:records` exactly as the Phase 5A Hall of Fame Top 10 embed mode.
+- Preserved legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report`.
+- Preserved the image-based legacy `/prekvk report`.
+- Added focused renderer/service/view/command coverage plus visual sample generation and
+  inspection.
+
 Next Phase 5 sub-phase:
 
-- Phase 5C should add Top 10 visual spotlight cards for the highest-value ranking outputs while
-  preserving the stable Phase 5B unified browser.
-- Preserve delivered Hall of Fame records behaviour during Phase 5C.
+- Phase 5D should add the Hall of Fame records Top 10 visual card layer, starting with records
+  mode rather than broadening the current-ranking card surface again.
+- Preserve the delivered current KVK Top 10 card and Phase 5B unified browser behaviour.
+- Keep records Top 10 only and clearly label records as all-time single-KVK performances, not
+  lifetime totals.
 - Do not add Hall of Fame Top 25/50/100 controls.
 - Do not remove legacy commands.
+- Keep Honor and PreKvK Top 10 visual cards as explicit later-slice candidates unless Phase 5D
+  audit recommends including one and the operator approves it.
+- Keep My Rank/export and legacy-ranking consolidation in the Phase 5 delivery plan after visual
+  records work.
 - Continue to capture all deferred optimisations that remain part of "rankings done right" so they
   can be delivered in later Phase 5 sub-phases rather than lost.
 
@@ -653,22 +691,36 @@ The working recommendation is:
    - Hardened Honor browser mode switching so it cannot bypass the stricter channel gate.
    - Smoke-polished KVK table layout to keep Top 10 rows one line per row.
 
-3. **Phase 5C: Top 10 visual spotlight cards**
-   - Generate Top 10 visual cards for the most socially valuable current ranking output, starting
-     with KVK current rankings unless the new audit recommends a narrower first slice.
-   - Generate Hall of Fame cards for all-time record categories after confirming records-card
-     wording and sparse-metric handling.
-   - Use KVK-mode or records-specific backgrounds and shared card primitives.
-   - Keep the Phase 5B unified embed output as fallback and as the Top 25/Top 50 browser.
+3. **Phase 5C: Current KVK Top 10 visual spotlight card**
+   - Complete. Delivered in mirror PR #154 and production PR #463, then smoke tested and polished
+     in production.
+   - Added current KVK Top 10 visual ranking cards for Kills, % Kill Target, Deads, DKP, Acclaim,
+     and Tanking Score.
+   - Defaulted KVK rankings to Kills.
+   - Kept Power for Top 25/50 compact browser analysis, but removed it from the Top 10 card metric
+     set.
+   - Preserved Top 25/50 compact browser output, embed fallback, Top 100 exclusion, records Top 10
+     only, legacy commands, and image-based legacy `/prekvk report`.
 
-4. **Phase 5D: My Rank / Find Me and export polish**
+4. **Phase 5D: Hall of Fame records Top 10 visual cards**
+   - Generate Hall of Fame cards for all-time single-KVK record categories after confirming
+     records-card wording and sparse-metric handling.
+   - Use the delivered records payload/DAL/service rows rather than recalculating records in the
+     renderer.
+   - Use records-specific backgrounds and shared card primitives.
+   - Keep records Top 10 only; do not add records Top 25, Top 50, or Top 100 controls.
+   - Preserve current KVK Top 10 cards, compact browser output, embed fallback, and legacy commands.
+   - Decide whether Honor or PreKvK Top 10 visual cards belong in a later Phase 5 visual slice or
+     should remain deferred.
+
+5. **Phase 5E: My Rank / Find Me and export polish**
    - Add private local-position view for registered governors.
    - Add full-list CSV/export if Top 100 is removed.
    - Add records export/detail output only if useful after the Top 10 card is validated.
    - Consider legacy redirect only after usage review and separate approval.
 
-5. **Phase 5E+: Remaining rankings deferred optimisation closure**
-   - Deliver any structured Phase 5 deferred optimisations that remain after 5B-5D.
+6. **Phase 5F+: Remaining rankings deferred optimisation closure**
+   - Deliver any structured Phase 5 deferred optimisations that remain after 5B-5E.
    - Add extra sub-phases rather than leaving known rankings UX, architecture, export, or visual
      debt unresolved at the end of Phase 5.
 
@@ -979,7 +1031,7 @@ Implementation acceptance:
 - [x] Output is readable on Discord mobile for the Phase 5B embed browser after smoke polish.
 - [x] Focused tests pass.
 - [x] Standard validators pass or skips are documented.
-- [ ] Visual review artifacts are generated when image output changes.
+- [x] Visual review artifacts are generated when image output changes.
 - [x] Codex Security review is run or explicitly skipped based on risk triggers.
 - [x] Deferred optimisations are captured structurally.
 - [x] Programme/task-pack docs are updated after delivery.
@@ -1074,8 +1126,8 @@ For implementation stages:
 
 ## 23. Codex Chat Starter
 
-Historical starter for Phase 5A. Phase 5A and Phase 5B are complete; use
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5C Top 10 Visual Ranking Cards.md`
+Historical starter for Phase 5A. Phase 5A, Phase 5B, and Phase 5C are complete; use
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5D Hall of Fame Records Visual Cards.md`
 for the next delivery chat.
 
 ```text

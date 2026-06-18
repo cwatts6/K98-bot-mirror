@@ -494,8 +494,27 @@ PR #462:
 - SQL/cache assumptions were validated against the SQL source repository, and Codex Security found
   no validated findings.
 
-The next sub-phase is Phase 5C: add Top 10 visual spotlight cards for the highest-value ranking
-views while preserving the stable unified embed browser and all legacy commands.
+Phase 5C delivered the current KVK Top 10 visual ranking card in mirror PR #154 and production
+PR #463:
+
+- `/kvk rankings type:kvk` now has a generated Top 10 spotlight card for current KVK rankings.
+- The card supports Kills, % Kill Target, Deads, DKP, Acclaim, and Tanking Score.
+- Current KVK rankings now default to Kills.
+- Power remains available for Top 25/50 compact browser analysis, but is not a Top 10 card metric.
+- Tanking Score ranks lower scores first and requires positive KillPoints and positive healed
+  troops, matching the history-card semantics.
+- Top 25 and Top 50 remain compact embed/browser output.
+- Renderer failures fall back to the unified embed output.
+- Top 100 remains out of primary player controls.
+- Records remain Top 10 only and continue to use the Phase 5A embed path until the records visual
+  card sub-phase.
+- Legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` remain live.
+- Legacy `/prekvk report` remains image-based.
+- Production smoke testing and visual polish are complete.
+
+The next sub-phase is Phase 5D: add Hall of Fame records Top 10 visual cards while preserving the
+stable current KVK card, Phase 5B unified browser, records Top 10-only policy, and all legacy
+commands.
 
 ### Phase 6 — Admin Command Hardening And Legacy Operator Cleanup
 
@@ -662,7 +681,11 @@ with healed, KillPoints, PreKVK, Honor, and derived `TankingScorePct` data, pres
 semantics, and passed production smoke testing. Phase 4 is complete. Phase 5A has delivered the
 `/kvk rankings type:records` Hall of Fame foundation and pushed it to production after smoke
 testing. Phase 5B has delivered the unified current-ranking browser in mirror PR #153 and
-production PR #462, passed production smoke testing, and preserved the legacy ranking paths. Start
-the next chat from the Phase 5C starter:
+production PR #462, passed production smoke testing, and preserved the legacy ranking paths.
+Phase 5C has delivered the current KVK Top 10 visual ranking card in mirror PR #154 and production
+PR #463, including Kills default, KVK card metrics for Kills, % Kill Target, Deads, DKP, Acclaim,
+and Tanking Score, embed fallback, Top 25/50 compact browser preservation, Top 100 exclusion,
+legacy command preservation, production smoke testing, and visual polish. Start the next chat from
+the Phase 5D starter:
 
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5C Top 10 Visual Ranking Cards.md`
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5D Hall of Fame Records Visual Cards.md`

@@ -6,6 +6,24 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
+- Area: `/kvk rankings type:records`, `kvk/rendering/kvk_rankings_card_renderer.py`, `kvk/dal/kvk_rankings_dal.py`, `ui/views/kvk_rankings_views.py`
+- Type: consistency
+- Description: Phase 5C delivered the current KVK Top 10 visual ranking card, but Hall of Fame records still use the compact embed output. Records are one of the most shareable ranking journeys and need a visual Top 10 card layer before Phase 5 can be considered visually complete.
+- Suggested Fix: Scope Phase 5D to add Hall of Fame records Top 10 visual cards using the existing records payload/DAL/service rows. Keep records Top 10 only, preserve repeated-governor single-KVK records, exclude missing historical metrics, use a records-specific background, and retain embed fallback for render/send failures.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 5A records foundation, Phase 5C card renderer primitives, historical records SQL contract validation, and operator approval for the first records-card metric slice.
+
+### Deferred Optimisation
+- Area: `/kvk rankings type:honor`, `/kvk rankings type:prekvk`, `ui/views/kvk_rankings_views.py`, `prekvk/report_image_renderer.py`
+- Type: consistency
+- Description: Phase 5C intentionally limited visual-card delivery to current KVK Top 10 cards. Honor and PreKvK Top 10 rankings still use the unified compact embed browser under `/kvk rankings`, while legacy `/prekvk report` remains image-based. The programme still needs an explicit decision on whether Honor and PreKvK should receive Top 10 visual cards in Phase 5 or remain embed/browser-first.
+- Suggested Fix: After Phase 5D records cards, audit Honor and PreKvK visual-card value, data freshness context, and metric-specific support values. Either scope a focused Phase 5 visual-card slice for one or both modes, or explicitly keep them on compact embed output and document why.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 5B unified current-ranking browser validation, Phase 5C current KVK card feedback, Phase 5D records-card outcome, Honor channel-gate preservation, and PreKvK image-report preservation.
+
+### Deferred Optimisation
 - Area: `/kvk rankings` current-ranking browser, registry/account lookup, `kvk/services/kvk_rankings_service.py`, `ui/views/kvk_rankings_views.py`
 - Type: architecture
 - Description: Phase 5B establishes a unified current-ranking browser for KVK, Honor, and PreKvK with primary Top 10/25/50 controls, but it intentionally does not add deeper Top 100 player controls or a personalised "my rank" lookup. Players outside the public Top 50 still need a coherent way to find their own current position without expanding the main browser surface.
