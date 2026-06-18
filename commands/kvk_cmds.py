@@ -15,13 +15,16 @@ from commands.kvk_targets_card_posting import post_kvk_targets_output
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import channel_only, track_usage
 from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
+from kvk.models.kvk_rankings import HallOfFameMetric
+from kvk.rendering.kvk_rankings_embed import build_hall_of_fame_embed
+from kvk.services import kvk_rankings_service
 from kvk_ui import make_kvk_targets_view
 from prekvk import report_service
 from registry.account_slots import ACCOUNT_ORDER
 from services import governor_account_service, kvk_history_service, kvk_personal_service
-from stats_alerts.honors import get_latest_honor_top
 from target_utils import run_target_lookup
 from ui.views.kvk_personal_views import MyKVKStatsSelectView
+from ui.views.kvk_rankings_views import HallOfFameRecordsView
 from ui.views.prekvk_report_views import send_prekvk_report
 from ui.views.registry_views import GovNameModal, MyRegsActionView, RegisterStartView
 from ui.views.stats_views import KVKRankingView
@@ -454,18 +457,31 @@ async def _send_kvk_rankings(ctx: discord.ApplicationContext) -> None:
 async def _send_honor_rankings(ctx: discord.ApplicationContext) -> None:
     await safe_defer(ctx, ephemeral=False)
     try:
-        rows = await get_latest_honor_top(10)
+        payload = await kvk_rankings_service.build_honor_rankings_payload(limit=10)
     except Exception:
         logger.exception("[/kvk rankings honor] get_latest_honor_top failed")
-        rows = []
+        payload = kvk_rankings_service.build_honor_rankings_payload_from_rows([], limit=10)
 
-    if not rows:
+    if not payload.rows:
         await ctx.followup.send("No honor data found for the latest KVK.", ephemeral=False)
         return
 
-    embed = build_honor_rankings_embed(rows, limit=10)
+    embed = build_honor_rankings_embed([row.raw for row in payload.rows], limit=payload.limit)
     view = HonorRankingView()
     await ctx.followup.send(embed=embed, view=view, ephemeral=False)
+
+
+async def _send_hall_of_fame_rankings(ctx: discord.ApplicationContext) -> None:
+    await safe_defer(ctx, ephemeral=False)
+    metric = HallOfFameMetric.KILLS
+    payload = await kvk_rankings_service.build_hall_of_fame_payload(metric=metric, limit=10)
+    view = HallOfFameRecordsView(metric=metric, limit=payload.limit)
+    embed = build_hall_of_fame_embed(payload)
+    message = await ctx.followup.send(embed=embed, view=view, ephemeral=False)
+    try:
+        view.message = await ctx.interaction.original_response()
+    except Exception:
+        view.message = message
 
 
 async def _send_prekvk_rankings(ctx: discord.ApplicationContext) -> None:
@@ -478,19 +494,6 @@ async def _send_prekvk_rankings(ctx: discord.ApplicationContext) -> None:
     )
 
 
-async def _run_tracked(
-    ctx: discord.ApplicationContext,
-    *,
-    command_name: str,
-    callback: Callable[[discord.ApplicationContext], Awaitable[None]],
-) -> None:
-    @track_usage(command_name)
-    async def tracked(inner_ctx: discord.ApplicationContext) -> None:
-        await callback(inner_ctx)
-
-    await tracked(ctx)
-
-
 async def _run_channel_guarded(
     ctx: discord.ApplicationContext,
     channel_id: int,
@@ -499,8 +502,9 @@ async def _run_channel_guarded(
     command_name: str,
     callback: Callable[[discord.ApplicationContext], Awaitable[None]],
 ) -> None:
+    _ = command_name
+
     @channel_only(channel_id, admin_override=admin_override)
-    @track_usage(command_name)
     async def guarded(inner_ctx: discord.ApplicationContext) -> None:
         await callback(inner_ctx)
 
@@ -570,7 +574,7 @@ def register_kvk(bot: ext_commands.Bot) -> None:
 
     @kvk_group.command(
         name="rankings",
-        description="Browse KVK, honor, or PreKvK rankings.",
+        description="Browse KVK, honor, PreKvK, or records rankings.",
     )
     @channel_only(KVK_PLAYER_STATS_CHANNEL_ID, admin_override=True)
     @versioned("v1.01")
@@ -583,7 +587,7 @@ def register_kvk(bot: ext_commands.Bot) -> None:
             name="type",
             description="Ranking type",
             required=True,
-            choices=["kvk", "honor", "prekvk"],
+            choices=["kvk", "honor", "prekvk", "records"],
         ),
     ) -> None:
         ranking_type = (ranking_type_option or "").strip().lower()
@@ -606,10 +610,15 @@ def register_kvk(bot: ext_commands.Bot) -> None:
             )
             return
         if ranking_type == "prekvk":
-            await _run_tracked(
-                ctx=ctx,
+            await _send_prekvk_rankings(ctx)
+            return
+        if ranking_type == "records":
+            await _run_channel_guarded(
+                ctx,
+                KVK_PLAYER_STATS_CHANNEL_ID,
+                admin_override=True,
                 command_name="kvk rankings",
-                callback=_send_prekvk_rankings,
+                callback=_send_hall_of_fame_rankings,
             )
             return
         await ctx.respond("Unknown ranking type.", ephemeral=True)

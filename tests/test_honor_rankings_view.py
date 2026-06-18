@@ -1,4 +1,5 @@
 import discord
+import pytest
 
 import honor_rankings_view as hrv
 
@@ -31,3 +32,14 @@ def test_build_honor_rankings_embed_formats_rows_and_normalizes_name():
     shown_field = next((f for f in embed.fields if f.name == "Shown"), None)
     assert shown_field is not None
     assert "Top 2" in shown_field.value
+
+
+@pytest.mark.asyncio
+async def test_honor_rankings_view_uses_primary_limit_buttons_only():
+    view = hrv.HonorRankingView()
+    labels = [getattr(item, "label", None) for item in view.children]
+
+    assert "Top 10" in labels
+    assert "Top 25" in labels
+    assert "Top 50" in labels
+    assert "Top 100" not in labels

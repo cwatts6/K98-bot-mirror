@@ -7,15 +7,9 @@ Updated fixtures and expectations to reflect:
 - Medal emojis removed; top ranks indicated by "*1", "*2", "*3"
 """
 
-import sys
-import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-utils_stub = types.ModuleType("utils")
-utils_stub.fmt_short = lambda v: str(v)
-sys.modules.setdefault("utils", utils_stub)
 
 # Import the view class
 from ui.views.stats_views import KVKRankingView
@@ -138,26 +132,16 @@ async def test_prev_page_does_not_go_below_1(large_cache):
 
 
 @pytest.mark.asyncio
-async def test_changing_to_top_100_adds_pagination(large_cache):
-    """Changing from Top 10 to Top 100 adds pagination buttons."""
+async def test_primary_limit_buttons_exclude_top_100(large_cache):
+    """Top 100 remains supported internally, but is not a primary button."""
     view = KVKRankingView(large_cache, limit=10)
 
-    # Initially no pagination
-    assert not hasattr(view, "prev_btn")
+    labels = [getattr(child, "label", None) for child in view.children]
 
-    interaction = AsyncMock()
-    interaction.response.is_done = AsyncMock(return_value=False)
-
-    with patch("ui.views.stats_views.build_kvkrankings_embed") as mock_embed:
-        mock_embed.return_value = MagicMock(footer=MagicMock(text="test"), description="test")
-
-        # Change to Top 100
-        handler = view._make_limit_handler(100)
-        await handler(interaction)
-
-    # Should now have pagination (large_cache contains 100 eligible rows)
-    assert hasattr(view, "prev_btn")
-    assert hasattr(view, "next_btn")
+    assert "Top 10" in labels
+    assert "Top 25" in labels
+    assert "Top 50" in labels
+    assert "Top 100" not in labels
 
 
 @pytest.mark.asyncio
@@ -325,17 +309,13 @@ async def test_full_interaction_flow(large_cache):
     with patch("ui.views.stats_views.build_kvkrankings_embed") as mock_embed:
         mock_embed.return_value = MagicMock(footer=MagicMock(text="test"), description="test")
 
-        # Change to Top 100
-        handler = view._make_limit_handler(100)
+        # Change to Top 50 through the primary controls
+        handler = view._make_limit_handler(50)
         await handler(interaction)
 
-        assert view.limit == 100
+        assert view.limit == 50
         assert view.page == 1  # Reset
-        assert hasattr(view, "prev_btn")  # Pagination added
-
-        # Go to page 2
-        await view._on_next_page(interaction)
-        assert view.page == 2
+        assert not hasattr(view, "prev_btn")
 
         # Change back to Top 10
         handler = view._make_limit_handler(10)

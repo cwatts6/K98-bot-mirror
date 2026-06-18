@@ -7,7 +7,7 @@ from typing import Any
 import discord
 
 from prekvk import report_service
-from prekvk.models import PREKVK_REPORT_LIMITS, PreKvkReportPayload, PreKvkReportSort
+from prekvk.models import PREKVK_PRIMARY_REPORT_LIMITS, PreKvkReportPayload, PreKvkReportSort
 from prekvk.report_image_renderer import render_prekvk_report
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ class PreKvkReportView(discord.ui.View):
         )
         self.sort_select.callback = self.on_sort_change
         self.add_item(self.sort_select)
-        for option_limit in PREKVK_REPORT_LIMITS:
+        for option_limit in PREKVK_PRIMARY_REPORT_LIMITS:
             button = discord.ui.Button(
                 label=f"Top {option_limit}",
                 style=discord.ButtonStyle.secondary,

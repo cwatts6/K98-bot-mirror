@@ -15,6 +15,7 @@ class PreKvkReportSort(StrEnum):
 
 
 PREKVK_REPORT_LIMITS = (10, 25, 50, 100)
+PREKVK_PRIMARY_REPORT_LIMITS = (10, 25, 50)
 
 
 @dataclass(frozen=True)

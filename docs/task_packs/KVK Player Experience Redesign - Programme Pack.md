@@ -346,12 +346,14 @@ Execution record:
 
 ### Phase 4B - Full `/kvk history` Audit, Optioneering, And Modern History Rollout
 
-Status: audit complete; Phase 4Bi, Phase 4Bii, and Phase 4Biii delivered, merged, deployed, and
-smoke tested in production. Phase 4Biv remains as a final minor enhancement pass.
+Status: complete. Phase 4B audit, optioneering, and all implementation sub-phases are delivered,
+merged in mirror and production, pushed to production, and smoke tested successfully.
 Phase 4Bi was delivered in mirror PR #148, smoke tested successfully, merged, and pushed to
 production. Phase 4Bii completed the modern `/kvk history` Last 3 and Summary journey and has
 also been promoted to production. Phase 4Biii added the Trends card journey, was smoke tested,
-merged in both mirror and production, and deployed to production.
+merged in both mirror and production, and deployed to production. Phase 4Biv removed the
+command-level history selector inconsistency, polished CSV export data, was smoke tested, merged in
+mirror and production, and pushed to production.
 
 The full `/kvk history` / `/mykvkhistory` journey has completed audit and optioneering. The
 approved staged direction is:
@@ -420,19 +422,28 @@ Delivered Phase 4Biii details:
 - No graph/table output was added to `/kvk history`; `/mykvkhistory` remains the legacy
   graph/table/CSV path during player validation.
 
-Next Phase 4Biv scope:
+Delivered Phase 4Biv details:
 
-- Remove the ephemeral registered-account selector from `/kvk history` so the command aligns with
-  `/kvk stats` and `/kvk targets`, while preserving `/kvk history governor_id:<id>` explicit
-  lookup for admin/leadership review and support workflows.
-- Enhance `/kvk history` CSV export to match the data now presented by the modern cards. At
-  minimum, verify and include `HealedTroopsDelta` and `KillPointsDelta`; also check whether
-  derived Tanking Score, `Max_PreKvk_Points`, `Max_HonorPoints`, and any other Summary/Trends
-  source columns should be included or renamed for player readability.
-- Validate the current deployed export against the attached sample CSV, because the sample export
-  lacks Healed and KillPoints even though the local modern service contract now includes those
-  fields.
-- Preserve `/mykvkhistory` unchanged and keep graph/table output only on the legacy path.
+- Removed the `/kvk history` command-level ephemeral selector option, aligning the default
+  registered-account path with `/kvk stats` and `/kvk targets`.
+- Preserved explicit `/kvk history governor_id:<id>` lookup for admin, leadership, support, and
+  direct inspection workflows.
+- Preserved private account-selection/error handling where a private picker or private guidance is
+  still needed, while selected/default single-account history output posts publicly.
+- Preserved modern `History`, `Summary`, `Trends`, and `Export CSV` controls.
+- Audited the deployed/current CSV export, local `HISTORY_EXPORT_COLUMNS`, and the sample
+  `kvk_history (1).csv` that lacked healed and KillPoints data.
+- Confirmed the export includes `HealedTroopsDelta`, `KillPointsDelta`, `Max_PreKvk_Points`, and
+  `Max_HonorPoints`, and added derived `TankingScorePct` while preserving existing raw export
+  column names.
+- Preserved missing/null semantics so historically uncollected Acclaim and healed values remain
+  blank/null rather than zero.
+- Preserved `/mykvkhistory` unchanged as the legacy graph/table/CSV path.
+- Addressed review feedback for private defer visibility before account-picker/error followups,
+  vectorized `TankingScorePct` export calculation, and simplified redundant picker branching.
+- Validation included focused command/export tests, the focused history suite, standard
+  architecture/deferred/select-tests/smoke-imports/command-registration validators, pre-commit,
+  full pytest, Codex Security review, and successful production smoke testing.
 
 Use:
 
@@ -586,7 +597,7 @@ Do not include these in the early phases unless separately approved:
 Proceed with:
 
 ```text
-KVK Player Experience Redesign - Phase 4Biv History Selector Removal And CSV Export Polish
+KVK Player Experience Redesign - Phase 5 Unified /kvk rankings Visual/UX Polish
 ```
 
 Phase 1 audit/design, Phase 2A admin collision resolution, and Phase 2B player `/kvk` scaffold are
@@ -603,5 +614,8 @@ history summary into `/kvk history`, added the expanded Summary records/ranks/ta
 blanked historically uncollected acclaim/healed values, removed the History button from
 `/kvk stats`, and has been merged and pushed to production. Phase 4Biii has delivered the Trends
 card, added Trends switching, clarified all-history trend scope with KVK count, removed confusing
-target-percent trend rows, and deployed to production after smoke testing. Start Phase 4Biv next
-from the delivered modern history baseline.
+target-percent trend rows, and deployed to production after smoke testing. Phase 4Biv has removed
+the stale command-level selector option, preserved explicit governor lookup, polished CSV export
+with healed, KillPoints, PreKVK, Honor, and derived `TankingScorePct` data, preserved null
+semantics, and passed production smoke testing. Phase 4 is complete; start Phase 5 from the
+delivered `/kvk rankings` scaffold.

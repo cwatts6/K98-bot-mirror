@@ -6,7 +6,7 @@ from typing import Any
 
 import discord
 
-from stats_alerts.honors import get_latest_honor_top
+from kvk.services import kvk_rankings_service
 from utils import utcnow
 
 logger = logging.getLogger(__name__)
@@ -81,10 +81,6 @@ class HonorRankingView(discord.ui.View):
     async def top50(self, button: discord.ui.Button, interaction: discord.Interaction):
         await self._refresh(interaction, 50, selected_button=button)
 
-    @discord.ui.button(label="Top 100", style=discord.ButtonStyle.secondary)
-    async def top100(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await self._refresh(interaction, 100, selected_button=button)
-
     async def _refresh(
         self,
         interaction: discord.Interaction,
@@ -96,14 +92,14 @@ class HonorRankingView(discord.ui.View):
         Fetch Top-N and update the message embed/view.
         """
         try:
-            rows = await get_latest_honor_top(limit)
+            payload = await kvk_rankings_service.build_honor_rankings_payload(limit=limit)
         except Exception:
             logger.exception("[HONOR] get_latest_honor_top failed")
             # Use ephemeral so the channel isn't spammed on failure
             await interaction.response.send_message("Failed loading honor data.", ephemeral=True)
             return
 
-        if not rows:
+        if not payload.rows:
             await interaction.response.send_message(
                 "No honor data found for the latest KVK.", ephemeral=True
             )
@@ -116,7 +112,10 @@ class HonorRankingView(discord.ui.View):
                     item.style = discord.ButtonStyle.secondary
             selected_button.style = discord.ButtonStyle.primary
 
-        embed = build_honor_rankings_embed(rows, limit=limit)
+        embed = build_honor_rankings_embed(
+            [row.raw for row in payload.rows],
+            limit=payload.limit,
+        )
 
         # Prefer to reuse the central responder helper if available (more robust)
         try:

@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 4A targets rollout`
 - Task type: `feature discovery / UX audit / architecture scope / Discord interaction design / staged implementation plan`
 - One-pass approved: `no`
-- Status: `Phase 4Bi, Phase 4Bii, and Phase 4Biii delivered, merged, deployed, and smoke tested; Phase 4Biv remains outstanding`
+- Status: `complete - Phase 4Bi, Phase 4Bii, Phase 4Biii, and Phase 4Biv delivered, merged in mirror and production, pushed to production, and smoke tested`
 
 ## 2. Required Reading
 
@@ -252,7 +252,51 @@ posting, and command tests; architecture/deferred/select-tests/smoke-import vali
 pre-commit; full pytest where practical; and Codex Security review for the Discord interaction,
 SQL-backed data, image/file output, and export-adjacent surfaces.
 
-Phase 4Biv is the remaining Phase 4B implementation scope.
+Phase 4Biv is complete. Phase 4B is now complete.
+
+## 4A.4 Phase 4Biv Implementation Update - 2026-06-17
+
+Phase 4Biv has been delivered, merged in both the mirror and production repositories, pushed to
+production, and smoke tested successfully.
+
+Delivered scope:
+
+- Removed the `/kvk history` command-level ephemeral selector option. The default
+  registered-account path now aligns with `/kvk stats` and `/kvk targets`.
+- Preserved explicit `/kvk history governor_id:<id>` lookup for admin, leadership, support, and
+  direct inspection workflows.
+- Preserved private picker/error handling for branches that still need private account selection
+  or private guidance, while selected/default single-account history cards post publicly.
+- Preserved the modern `History`, `Summary`, `Trends`, and `Export CSV` controls after selector
+  removal.
+- Audited the deployed/current export, the local `HISTORY_EXPORT_COLUMNS` contract, and the
+  attached `kvk_history (1).csv` sample that lacked healed and KillPoints data.
+- Confirmed the CSV export includes `HealedTroopsDelta`, `KillPointsDelta`,
+  `Max_PreKvk_Points`, and `Max_HonorPoints`.
+- Added derived `TankingScorePct` to the CSV export while preserving existing raw export column
+  names.
+- Preserved missing/null semantics: historically uncollected Acclaim and healed values remain
+  blank/null rather than zero.
+- Kept graph/table output only on `/mykvkhistory`; `/kvk history` remains the modern card and CSV
+  journey.
+- Addressed code-review hardening by deferring privately before private picker/error followups,
+  vectorizing `TankingScorePct` export calculation, and removing redundant picker-branch noise.
+
+Validation evidence from Phase 4Biv:
+
+- Focused command/export tests passed: 28 tests.
+- Focused history command, posting, service, and view suite passed: 42 tests.
+- Standard validators passed:
+  - `scripts/validate_architecture_boundaries.py`
+  - `scripts/validate_deferred_items.py`
+  - `scripts/select_tests.py`
+  - `scripts/smoke_imports.py`
+  - `scripts/validate_command_registration.py`
+- `pre-commit` passed.
+- Full pytest passed: 1725 passed, 2 skipped.
+- Codex Security diff review completed for the Discord interaction, SQL-backed data, file/CSV
+  output, and user-controlled lookup-input surface.
+- Production smoke testing passed after mirror and production merge/push.
 
 ## 4B. Approved Sub-Phase Plan
 
@@ -339,6 +383,9 @@ Required outcomes:
   modern advanced path later.
 
 ### Phase 4Biv - History Selector Removal And CSV Export Polish
+
+Status: complete. Delivered, merged in mirror and production, pushed to production, and smoke
+tested.
 
 Remove the last inconsistency in the `/kvk history` command flow and align CSV export with the
 modern card data that players now see.
@@ -475,22 +522,22 @@ Likely audit candidates:
 
 ## 8. Mandatory Workflow
 
-Phase 4B audit and option approval are complete. Phase 4Bi, 4Bii, and 4Biii are delivered.
-Continue with the remaining sub-phase:
+Phase 4B audit and option approval are complete. Phase 4Bi, 4Bii, 4Biii, and 4Biv are delivered.
+This task pack is now a delivery record.
 
-1. Start Phase 4Biv in a new chat from this task pack.
-2. Re-read the required repo guidance and this updated Phase 4B pack.
-3. Validate SQL/data contracts against `C:\K98-bot-SQL-Server`.
-4. Treat Phase 4Bi, Phase 4Bii, and Phase 4Biii as complete and use their payload, export, Last 3,
-   Summary, Trends, view-switching, and missing-value foundations.
-5. Implement only Phase 4Biv scope unless the operator explicitly expands scope.
-6. Do not rebuild the delivered Last 3 card, Summary record model, Trends card, or `/kvk stats`
-   History removal unless a defect is found.
-7. Keep `/mykvkhistory` as the legacy graph/table/CSV path.
-8. Add or update focused tests in every implementation sub-phase.
-9. Generate visual/manual review samples for all card changes.
-10. Run focused validation and selected broader validation.
-11. Run or document the Codex Security review gate for implementation PRs.
+For any future KVK history work:
+
+1. Re-read the required repo guidance and this completed Phase 4B pack.
+2. Treat Phase 4Bi, Phase 4Bii, Phase 4Biii, and Phase 4Biv as complete production baselines.
+3. Preserve the delivered payload, export, Last 3, Summary, Trends, view-switching, explicit
+   lookup, account-selection visibility, and missing-value foundations unless a new approved scope
+   says otherwise.
+4. Keep `/mykvkhistory` as the legacy graph/table/CSV path until a later approved phase changes
+   that rollout decision.
+5. Add or update focused tests for any future history changes.
+6. Run focused validation and selected broader validation.
+7. Run or document the Codex Security review gate for implementation PRs touching Discord
+   interactions, SQL-backed data, file/CSV output, or user-controlled input.
 
 Do not implement multiple sub-phases in one PR unless the operator explicitly approves that scope.
 
@@ -945,20 +992,20 @@ Phase 4Biii implementation acceptance:
 - [x] Visual/manual review samples are generated for registered-account and explicit lookup flows.
 - [x] Codex Security review is run or explicitly skipped based on risk triggers.
 
-Phase 4Biv implementation acceptance, outstanding:
+Phase 4Biv implementation acceptance:
 
-- [ ] `/kvk history` no longer shows an ephemeral registered-account selector in the default
+- [x] `/kvk history` no longer shows an ephemeral registered-account selector in the default
   registered-player path.
-- [ ] `/kvk history governor_id:<id>` remains available and tested.
-- [ ] History, Summary, Trends, and Export CSV controls still work after selector removal.
-- [ ] CSV export includes Healed and KillPoints data required to reconcile delivered card output.
-- [ ] Export audit decides whether derived Tanking Score, Pre-KVK, Honor, or clearer column names
+- [x] `/kvk history governor_id:<id>` remains available and tested.
+- [x] History, Summary, Trends, and Export CSV controls still work after selector removal.
+- [x] CSV export includes Healed and KillPoints data required to reconcile delivered card output.
+- [x] Export audit decides whether derived Tanking Score, Pre-KVK, Honor, or clearer column names
   should be added.
-- [ ] Missing/uncollected historical values remain blank/null rather than zero.
-- [ ] `/mykvkhistory` remains legacy graph/table/CSV.
-- [ ] Focused command, service/export, view/posting, and validation tests pass.
-- [ ] Fresh CSV export samples are generated for registered/default and explicit lookup paths.
-- [ ] Codex Security review is run or explicitly skipped based on risk triggers.
+- [x] Missing/uncollected historical values remain blank/null rather than zero.
+- [x] `/mykvkhistory` remains legacy graph/table/CSV.
+- [x] Focused command, service/export, view/posting, and validation tests pass.
+- [x] Fresh CSV export samples are generated for registered/default and explicit lookup paths.
+- [x] Codex Security review is run or explicitly skipped based on risk triggers.
 
 ## 19. Required Delivery Output
 
@@ -1034,7 +1081,8 @@ below only for delivery history.
 ## 22. Historical Codex Chat Starter - Phase 4Biii
 
 Superseded. Phase 4Biii is delivered, merged in both mirror and production, deployed to
-production, and smoke tested. Use the Phase 4Biv starter below for the next implementation chat.
+production, and smoke tested. Phase 4Biv is also complete; the Phase 4Biv starter below is kept
+only as a historical delivery record.
 
 ```text
 Codex, start Phase 4Biii of the KVK Player Experience Redesign: History Trends Card And Final
@@ -1127,11 +1175,13 @@ Validation to plan:
   output, and export-adjacent history code
 ```
 
-## 23. Codex Chat Starter - Phase 4Biv
+## 23. Historical Codex Chat Starter - Phase 4Biv
+
+Historical record only. Phase 4Biv is complete, merged in mirror and production, pushed to
+production, and smoke tested successfully.
 
 ```text
-Codex, start Phase 4Biv of the KVK Player Experience Redesign: History Selector Removal And CSV
-Export Polish.
+Historical Phase 4Biv starter used for delivery: History Selector Removal And CSV Export Polish.
 
 Phase 4A targets is complete, merged, and promoted to production. Phase 4B audit and optioneering
 are complete. Phase 4Bi, 4Bii, and 4Biii are complete, smoke tested, merged in mirror and

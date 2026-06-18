@@ -60,7 +60,7 @@ def test_kvk_rankings_type_option_is_required():
 
     assert 'name="type"' in source
     assert "required=True" in source
-    assert 'choices=["kvk", "honor", "prekvk"]' in source
+    assert 'choices=["kvk", "honor", "prekvk", "records"]' in source
 
 
 def test_kvk_history_keeps_governor_id_option_without_ephemeral_option(monkeypatch):
@@ -93,13 +93,12 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     async def fake_prekvk_report(**kwargs):
         calls.append(("prekvk", kwargs))
 
+    async def fake_records(ctx_arg):
+        calls.append(("records", ctx_arg))
+
     async def fake_channel_guarded(ctx_arg, channel_id, *, admin_override, command_name, callback):
         calls.append(("guard", channel_id, admin_override, command_name, callback.__name__))
         await callback(ctx_arg)
-
-    async def fake_tracked(ctx=None, *, command_name, callback):
-        calls.append(("tracked", command_name, callback.__name__))
-        await callback(ctx)
 
     async def fake_respond(message, *, ephemeral=False):
         ctx.responded.append((message, ephemeral))
@@ -107,8 +106,8 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     ctx.respond = fake_respond
     monkeypatch.setattr(kvk_cmds, "_send_kvk_rankings", fake_kvk)
     monkeypatch.setattr(kvk_cmds, "_send_honor_rankings", fake_honor)
+    monkeypatch.setattr(kvk_cmds, "_send_hall_of_fame_rankings", fake_records)
     monkeypatch.setattr(kvk_cmds, "_run_channel_guarded", fake_channel_guarded)
-    monkeypatch.setattr(kvk_cmds, "_run_tracked", fake_tracked)
     monkeypatch.setattr(kvk_cmds, "safe_defer", fake_defer)
     monkeypatch.setattr(kvk_cmds, "send_prekvk_report", fake_prekvk_report)
     monkeypatch.setattr(
@@ -120,6 +119,7 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     await handler(ctx, "kvk")
     await handler(ctx, "honor")
     await handler(ctx, "prekvk")
+    await handler(ctx, "records")
     await handler(ctx, "bad")
 
     assert calls[0][0:4] == ("guard", kvk_cmds.KVK_PLAYER_STATS_CHANNEL_ID, True, "kvk rankings")
@@ -131,12 +131,18 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
         "kvk rankings",
     )
     assert calls[3] == ("honor", ctx)
-    assert calls[4] == ("tracked", "kvk rankings", "_send_prekvk_rankings")
-    assert calls[5] == ("defer", True, ctx)
-    assert calls[6][0] == "prekvk"
-    assert calls[6][1]["ctx"] is ctx
-    assert calls[6][1]["sort_by"] == "parsed:Overall"
-    assert calls[6][1]["limit"] == 10
+    assert calls[4] == ("defer", True, ctx)
+    assert calls[5][0] == "prekvk"
+    assert calls[5][1]["ctx"] is ctx
+    assert calls[5][1]["sort_by"] == "parsed:Overall"
+    assert calls[5][1]["limit"] == 10
+    assert calls[6][0:4] == (
+        "guard",
+        kvk_cmds.KVK_PLAYER_STATS_CHANNEL_ID,
+        True,
+        "kvk rankings",
+    )
+    assert calls[7] == ("records", ctx)
     assert ctx.responded == [("Unknown ranking type.", True)]
 
 

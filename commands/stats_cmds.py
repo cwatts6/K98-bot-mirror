@@ -29,6 +29,7 @@ from embed_utils import build_stats_embed
 from gsheet_module import run_kvk_export_test, run_kvk_proc_exports_with_alerts
 from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
 from kvk.services import kvk_admin_service
+from kvk.services import kvk_rankings_service
 from profile_cache import autocomplete_choices
 from registry.account_slots import ACCOUNT_ORDER
 from services import (
@@ -37,7 +38,7 @@ from services import (
     stats_export_service,
 )
 from stats_alerts.embeds.kvk import send_kvk_embed
-from stats_alerts.honors import get_latest_honor_top, purge_latest_honor_scan
+from stats_alerts.honors import purge_latest_honor_scan
 from stats_alerts.interface import send_stats_update_embed
 from stats_alerts.kvk_meta import is_currently_kvk
 from stats_cache_helpers import load_last_kvk_map
@@ -963,8 +964,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
 
         Features:
         - 5 sort metrics: Power, Kills, % Kill Target, Deads, DKP
-        - 4 limit options: Top 10, 25, 50, 100
-        - Automatic pagination for Top 100 (50 per page)
+        - 3 primary limit options: Top 10, 25, 50
         - Excel-style sort indicator (▼) on active column
 
         Users can change sort metric and limit via dropdown/buttons.
@@ -1235,7 +1235,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     @track_usage()
     async def honor_rankings(ctx: discord.ApplicationContext):
         """
-        /honor_rankings - show Top 10 honor by default and let user switch Top 10/25/50/100 with buttons.
+        /honor_rankings - show Top 10 honor by default and let user switch Top 10/25/50 with buttons.
         """
         # Defer to allow DB fetch
         await safe_defer(ctx, ephemeral=False)
@@ -1243,17 +1243,25 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         initial_limit = 10
 
         try:
-            rows = await get_latest_honor_top(initial_limit)
+            payload = await kvk_rankings_service.build_honor_rankings_payload(
+                limit=initial_limit
+            )
         except Exception:
             logger.exception("[HONOR] get_latest_honor_top failed")
-            rows = []
+            payload = kvk_rankings_service.build_honor_rankings_payload_from_rows(
+                [],
+                limit=initial_limit,
+            )
 
-        if not rows:
+        if not payload.rows:
             # graceful response if DB has no honor data
             await ctx.followup.send("No honor data found for the latest KVK.", ephemeral=False)
             return
 
-        embed = build_honor_rankings_embed(rows, limit=initial_limit)
+        embed = build_honor_rankings_embed(
+            [row.raw for row in payload.rows],
+            limit=payload.limit,
+        )
         view = HonorRankingView()
         await ctx.followup.send(embed=embed, view=view, ephemeral=False)
 

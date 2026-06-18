@@ -17,7 +17,8 @@ async def test_prekvk_report_view_exposes_sort_and_limit_controls():
     custom_ids = [getattr(item, "custom_id", None) for item in view.children]
 
     assert "prekvk_report_top_10" in custom_ids
-    assert "prekvk_report_top_100" in custom_ids
+    assert "prekvk_report_top_50" in custom_ids
+    assert "prekvk_report_top_100" not in custom_ids
     assert view.sort_select.placeholder == "Sort by"
 
 

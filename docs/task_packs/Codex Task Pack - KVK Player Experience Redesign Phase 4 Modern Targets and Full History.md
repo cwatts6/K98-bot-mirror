@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 3C production rollout`
 - Task type: `feature / UX redesign / generated image renderer / Discord interaction polish / service-DAL cleanup`
 - One-pass approved: `no`
-- Status: `complete - Phase 4A targets optimisation delivered in mirror PR #145 and promoted to production; history work moved to Phase 4B, with Phase 4Bi/4Bii/4Biii now delivered and Phase 4Biv remaining`
+- Status: `complete - Phase 4A targets optimisation and Phase 4B modern history rollout delivered, promoted to production, and smoke tested`
 
 ### Phase Split Update
 
@@ -19,8 +19,8 @@ Implementation was split after the initial audit:
 - Phase 4B: full `/kvk history` redesign was scoped separately. Phase 4Bi delivered the
   renderer-independent history payload/data/export foundation in PR #148. Phase 4Bii delivered the
   modern Last 3 and Summary cards and has been merged/pushed to production. Phase 4Biii delivered
-  the Trends card and final visual/metric polish. Phase 4Biv remains for selector removal and CSV
-  export polish.
+  the Trends card and final visual/metric polish. Phase 4Biv removed the command-level history
+  selector inconsistency and polished CSV export data. Phase 4B is complete.
 
 Legacy `/mykvktargets` and `/mykvkhistory` remain live. `/kvk history` is now the modern
 card-based history journey, while `/mykvkhistory` remains the legacy graph/table/CSV journey for
@@ -29,6 +29,9 @@ player comparison.
 Do not continue history work from this combined Phase 4 pack. Use:
 
 `docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
+
+Phase 4 is complete. The next programme phase is Phase 5, focused on unified `/kvk rankings`
+visual/UX polish.
 
 ### Phase 4A Delivery Update
 
@@ -69,14 +72,19 @@ Validated delivery:
 - Pre-commit, architecture validation, deferred-item validation, smoke imports, and command
   registration validation passed.
 
-Still to do:
+Phase 4B delivery summary:
 
-- Phase 4Biii: add the `/kvk history` Trends card using `history_card3.PNG` and polish the final
-  modern history navigation.
-- Preserve the delivered Phase 4Bii baseline: Last 3 card, redesigned Summary card, blank
-  handling for historically uncollected Acclaim/healed values, overall Summary ranks, and the
-  delivered tanking-score formula.
-- Keep `/mykvkhistory` as the legacy graph/table/CSV path unless a later phase explicitly changes
+- `/kvk history` is now the modern card journey for past-performance review, with `History`,
+  `Summary`, `Trends`, and `Export CSV` controls.
+- `/kvk history governor_id:<id>` remains available for admin, leadership, support, and direct
+  inspection workflows.
+- `/kvk history` default registered-account behaviour is aligned with `/kvk stats` and
+  `/kvk targets`; private picker/error handling is preserved only where private interaction is
+  needed.
+- CSV export remains the deeper/full-history data path and includes healed, KillPoints, PreKVK,
+  Honor, and derived `TankingScorePct` data while preserving existing raw export column names.
+- Missing or historically uncollected Acclaim and healed values remain blank/null rather than zero.
+- `/mykvkhistory` remains the legacy graph/table/CSV path unless a later phase explicitly changes
   that rollout decision.
 
 ## 2. Required Reading
@@ -496,24 +504,24 @@ Visual validation if image output changes:
 
 ## 15. Acceptance Criteria
 
-- [ ] Scope is confirmed before implementation.
-- [ ] Target and history source objects are validated against `C:\K98-bot-SQL-Server`.
-- [ ] `/kvk targets` has a renderer-independent payload/service boundary.
-- [ ] No new direct SQL exists in command, view, or renderer modules.
-- [ ] Target output clearly shows progress, remaining work, completion state, and missing/exempt explanations.
-- [ ] Target output preserves existing permissions, channel restrictions, account selection, and visibility behaviour.
-- [ ] `/mykvktargets` remains live.
-- [ ] Full `/kvk history` output is deliberately modernised as card, table-first, or hybrid according to audit findings.
-- [ ] Full history preserves long-history accessibility and existing useful detail/export behaviour.
-- [ ] Highest-ever and last-KVK history labels are clear and not misleading.
-- [ ] `/mykvkhistory` remains live.
-- [ ] Existing command registration and command-surface baselines are preserved.
-- [ ] Fallback behaviour remains useful if generated output fails.
-- [ ] Focused tests pass.
-- [ ] Visual review artifacts are generated when image output changes.
-- [ ] Codex Security review is run before PR handoff or explicitly justified.
-- [ ] Deferred optimisations are captured structurally.
-- [ ] Programme/task-pack docs are updated after delivery.
+- [x] Scope is confirmed before implementation.
+- [x] Target and history source objects are validated against `C:\K98-bot-SQL-Server`.
+- [x] `/kvk targets` has a renderer-independent payload/service boundary.
+- [x] No new direct SQL exists in command, view, or renderer modules.
+- [x] Target output clearly shows progress, remaining work, completion state, and missing/exempt explanations.
+- [x] Target output preserves existing permissions, channel restrictions, account selection, and visibility behaviour.
+- [x] `/mykvktargets` remains live.
+- [x] Full `/kvk history` output is deliberately modernised as card, table-first, or hybrid according to audit findings.
+- [x] Full history preserves long-history accessibility and existing useful detail/export behaviour.
+- [x] Highest-ever and last-KVK history labels are clear and not misleading.
+- [x] `/mykvkhistory` remains live.
+- [x] Existing command registration and command-surface baselines are preserved.
+- [x] Fallback behaviour remains useful if generated output fails.
+- [x] Focused tests pass.
+- [x] Visual review artifacts are generated when image output changes.
+- [x] Codex Security review is run before PR handoff or explicitly justified.
+- [x] Deferred optimisations are captured structurally.
+- [x] Programme/task-pack docs are updated after delivery.
 
 ## 16. Required Delivery Output
 

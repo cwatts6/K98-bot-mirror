@@ -1,11 +1,5 @@
 # tests/test_stats_views_smoke.py
 import asyncio
-import sys
-import types
-
-utils_stub = types.ModuleType("utils")
-utils_stub.fmt_short = lambda v: str(v)
-sys.modules.setdefault("utils", utils_stub)
 
 from ui.views.stats_views import KVKRankingView
 
@@ -21,6 +15,11 @@ def test_stats_views_kvkrankingview_instantiates():
         view = KVKRankingView(cache, metric="power", limit=10)
         assert view.metric == "power"
         assert view.limit == 10
-        assert len(view.children) >= 5
+        labels = [
+            getattr(child, "label", None)
+            for child in view.children
+            if getattr(child, "label", None)
+        ]
+        assert labels == ["Top 10", "Top 25", "Top 50"]
 
     asyncio.run(_run())

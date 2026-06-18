@@ -57,6 +57,7 @@ def test_import_all_ui_view_modules_and_instantiate_core_views(monkeypatch, tmp_
     utils_stub.normalize_governor_id = lambda v: str(v).strip()
     utils_stub.make_cid = lambda scope, uid: f"{scope}:{uid}:abc123"
     utils_stub.fmt_short = lambda v: str(v)
+    utils_stub.parse_last_refresh_utc = lambda _v: None
     utils_stub.utcnow = lambda: datetime.now(UTC)
 
     const_stub = types.ModuleType("constants")

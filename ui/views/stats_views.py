@@ -12,6 +12,7 @@ import logging
 import discord
 
 from build_KVKrankings_embed import build_kvkrankings_embed, filter_rows_for_leaderboard
+from kvk.models.kvk_rankings import PRIMARY_RANKING_LIMITS
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +23,7 @@ class KVKRankingView(discord.ui.View):
 
     Features:
     - 5 sort metrics: Power, Kills, % Kill Target, Deads, DKP
-    - 4 limit options: Top 10, 25, 50, 100
-    - Automatic pagination for Top 100 (2 pages, 50 per page)
+    - 3 primary limit options: Top 10, 25, 50
     - Excel-style sort indicator (▼) on active column
 
     Attributes:
@@ -88,8 +88,8 @@ class KVKRankingView(discord.ui.View):
         self.add_item(self.metric_select)
 
     def _add_limit_buttons(self):
-        """Add limit buttons (Top 10/25/50/100) to row 1."""
-        for n in (10, 25, 50, 100):
+        """Add primary limit buttons (Top 10/25/50) to row 1."""
+        for n in PRIMARY_RANKING_LIMITS:
             btn = discord.ui.Button(
                 label=f"Top {n}",
                 style=(
