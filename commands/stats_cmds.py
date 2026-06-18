@@ -28,8 +28,7 @@ from embed_my_stats import SliceButtons, build_embeds
 from embed_utils import build_stats_embed
 from gsheet_module import run_kvk_export_test, run_kvk_proc_exports_with_alerts
 from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
-from kvk.services import kvk_admin_service
-from kvk.services import kvk_rankings_service
+from kvk.services import kvk_admin_service, kvk_rankings_service
 from profile_cache import autocomplete_choices
 from registry.account_slots import ACCOUNT_ORDER
 from services import (
@@ -1243,9 +1242,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         initial_limit = 10
 
         try:
-            payload = await kvk_rankings_service.build_honor_rankings_payload(
-                limit=initial_limit
-            )
+            payload = await kvk_rankings_service.build_honor_rankings_payload(limit=initial_limit)
         except Exception:
             logger.exception("[HONOR] get_latest_honor_top failed")
             payload = kvk_rankings_service.build_honor_rankings_payload_from_rows(

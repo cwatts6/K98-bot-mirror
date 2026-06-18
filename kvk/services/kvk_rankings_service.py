@@ -151,7 +151,9 @@ async def build_hall_of_fame_payload(
     metric: HallOfFameMetric | str = HallOfFameMetric.KILLS,
     limit: int = 10,
 ) -> RankingPayload:
-    parsed_metric = metric if isinstance(metric, HallOfFameMetric) else parse_hall_of_fame_metric(metric)
+    parsed_metric = (
+        metric if isinstance(metric, HallOfFameMetric) else parse_hall_of_fame_metric(metric)
+    )
     normalized_limit = normalize_hall_of_fame_limit(limit)
     rows = await asyncio.to_thread(
         kvk_rankings_dal.fetch_hall_of_fame_records,

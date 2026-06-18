@@ -22,7 +22,9 @@ def test_normalize_hall_of_fame_limit_is_top_10_only():
 
 def test_parse_hall_of_fame_metric_accepts_aliases():
     assert kvk_rankings_service.parse_hall_of_fame_metric("kp") == HallOfFameMetric.KILL_POINTS
-    assert kvk_rankings_service.parse_hall_of_fame_metric("PreKvK Points") == HallOfFameMetric.PREKVK
+    assert (
+        kvk_rankings_service.parse_hall_of_fame_metric("PreKvK Points") == HallOfFameMetric.PREKVK
+    )
 
 
 def test_build_hall_of_fame_payload_from_rows_preserves_single_kvk_records():
@@ -76,7 +78,9 @@ async def test_build_hall_of_fame_payload_fetches_dal_rows(monkeypatch):
             }
         ]
 
-    monkeypatch.setattr(kvk_rankings_service.kvk_rankings_dal, "fetch_hall_of_fame_records", fake_fetch)
+    monkeypatch.setattr(
+        kvk_rankings_service.kvk_rankings_dal, "fetch_hall_of_fame_records", fake_fetch
+    )
 
     payload = await kvk_rankings_service.build_hall_of_fame_payload(
         metric="honor",

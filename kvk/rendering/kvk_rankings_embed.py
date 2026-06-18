@@ -55,4 +55,3 @@ def build_hall_of_fame_embed(
         footer_parts.append(payload.source_note)
     embed.set_footer(text=" | ".join(footer_parts))
     return embed
-

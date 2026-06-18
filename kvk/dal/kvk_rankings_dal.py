@@ -7,7 +7,6 @@ from typing import Any
 from file_utils import cursor_row_to_dict, get_conn_with_retries
 from kvk.models.kvk_rankings import HallOfFameMetric
 
-
 _HALL_OF_FAME_SQL_EXPRESSIONS: dict[HallOfFameMetric, str] = {
     HallOfFameMetric.KILLS: "src.[T4&T5_Kills]",
     HallOfFameMetric.KILL_POINTS: "src.[KillPointsDelta]",
@@ -71,4 +70,3 @@ def fetch_hall_of_fame_records(
         cur = cn.cursor()
         cur.execute(sql, [normalized_limit])
         return [cursor_row_to_dict(cur, row) for row in cur.fetchall()]
-

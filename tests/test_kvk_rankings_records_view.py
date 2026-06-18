@@ -88,7 +88,9 @@ async def test_hall_of_fame_records_view_refresh_edits_component_message(monkeyp
             "edit_original_response": wrong_target,
         },
     )()
-    monkeypatch.setattr(kvk_rankings_views.kvk_rankings_service, "build_hall_of_fame_payload", fake_payload)
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_service, "build_hall_of_fame_payload", fake_payload
+    )
 
     await view._refresh(interaction)
 

@@ -82,9 +82,7 @@ class HallOfFameRecordsView(discord.ui.View):
                 logger.debug("kvk_records_refresh_error_response_failed", exc_info=True)
 
     async def on_metric_change(self, interaction: discord.Interaction) -> None:
-        self.metric = kvk_rankings_service.parse_hall_of_fame_metric(
-            self.metric_select.values[0]
-        )
+        self.metric = kvk_rankings_service.parse_hall_of_fame_metric(self.metric_select.values[0])
         await self._refresh(interaction)
 
     async def on_timeout(self) -> None:

@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-
 PRIMARY_RANKING_LIMITS = (10, 25, 50)
 HALL_OF_FAME_RECORD_LIMIT = 10
 
