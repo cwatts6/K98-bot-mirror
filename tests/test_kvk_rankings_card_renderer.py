@@ -7,7 +7,9 @@ from PIL import Image
 from kvk.models.kvk_rankings import RankingPayload, RankingRow
 from kvk.rendering.kvk_rankings_card_renderer import (
     _records_context_line,
+    _records_count_label,
     _records_darkening_overlay,
+    _records_holder_label,
     _support_text,
     render_hall_of_fame_top10_card,
     render_kvk_rankings_top10_card,
@@ -123,6 +125,23 @@ def test_hall_of_fame_top10_card_context_mentions_single_kvk_records():
     payload = _records_payload()
 
     assert _records_context_line(payload) == "Top 10 all-time single-KVK KillPoints"
+
+
+def test_hall_of_fame_top10_card_summary_counts_records_and_unique_governors():
+    payload = RankingPayload(
+        mode="records",
+        metric="kills",
+        metric_label="Kills",
+        limit=10,
+        rows=[
+            RankingRow(rank=1, governor_id=101, governor_name="One", value=100),
+            RankingRow(rank=2, governor_id=101, governor_name="One", value=90),
+            RankingRow(rank=3, governor_id=202, governor_name="Two", value=80),
+        ],
+    )
+
+    assert _records_count_label(payload) == "3 RECORDS"
+    assert _records_holder_label(payload) == "2 governors"
 
 
 def test_hall_of_fame_darkening_overlay_is_cached_and_symmetric():

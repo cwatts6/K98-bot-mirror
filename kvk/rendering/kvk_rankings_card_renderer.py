@@ -345,6 +345,17 @@ def _records_context_line(payload: RankingPayload) -> str:
     return f"Top {payload.limit} all-time single-KVK {payload.metric_label}"
 
 
+def _records_count_label(payload: RankingPayload) -> str:
+    return f"{len(payload.rows[: payload.limit])} RECORDS"
+
+
+def _records_holder_label(payload: RankingPayload) -> str:
+    governor_ids = {row.governor_id for row in payload.rows[: payload.limit] if row.governor_id}
+    count = len(governor_ids)
+    noun = "governor" if count == 1 else "governors"
+    return f"{count} {noun}"
+
+
 def _draw_record_podium(
     draw: ImageDraw.ImageDraw,
     *,
@@ -475,19 +486,19 @@ def render_hall_of_fame_top10_card(payload: RankingPayload) -> RenderedRankingCa
         draw,
         right_x=1138,
         y=34,
-        text="RECORDS",
+        text=_records_count_label(payload),
         max_width=270,
-        size=44,
-        min_size=30,
+        size=38,
+        min_size=26,
         fill=TEXT,
     )
     _draw_shadowed_right_fitted(
         draw,
         right_x=1138,
         y=84,
-        text=payload.metric_label,
+        text=_records_holder_label(payload),
         max_width=270,
-        size=24,
+        size=23,
         min_size=16,
         fill=accent,
     )
@@ -513,20 +524,18 @@ def render_hall_of_fame_top10_card(payload: RankingPayload) -> RenderedRankingCa
     for row, box in zip(rest_rows, row_boxes, strict=False):
         _draw_record_row(draw, payload=payload, row=row, box=box)
 
-    footer_text = (
-        "Single-KVK performances only  |  Repeat governors allowed  |  Missing metrics excluded"
-    )
-    _draw_shadowed_right_fitted(
-        draw,
-        right_x=1138,
-        y=610,
-        text=footer_text,
-        max_width=1096,
-        size=16,
-        min_size=11,
-        fill=MUTED,
-        bold=False,
-    )
+    if payload.freshness_label:
+        _draw_shadowed_right_fitted(
+            draw,
+            right_x=1138,
+            y=610,
+            text=f"Updated {payload.freshness_label}",
+            max_width=420,
+            size=15,
+            min_size=11,
+            fill=MUTED,
+            bold=False,
+        )
 
     buf = BytesIO()
     canvas.convert("RGB").save(buf, format="PNG", optimize=True)
