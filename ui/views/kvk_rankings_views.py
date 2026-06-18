@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from io import BytesIO
 import logging
 
 import discord
@@ -13,6 +15,7 @@ from kvk.models.kvk_rankings import (
     HallOfFameMetric,
     RankingPayload,
 )
+from kvk.rendering.kvk_rankings_card_renderer import render_kvk_rankings_top10_card
 from kvk.rendering.kvk_rankings_embed import (
     build_current_rankings_embed,
     build_hall_of_fame_embed,
@@ -22,6 +25,22 @@ from kvk.services import kvk_rankings_service
 logger = logging.getLogger(__name__)
 
 _CURRENT_RANKING_ADMIN_OVERRIDE_MODES = {"kvk", "prekvk"}
+
+
+async def _top10_card_file(payload: RankingPayload) -> discord.File | None:
+    try:
+        rendered = await asyncio.to_thread(render_kvk_rankings_top10_card, payload)
+    except Exception:
+        logger.exception(
+            "kvk_current_rankings_card_render_failed mode=%s metric=%s limit=%s",
+            payload.mode,
+            payload.metric,
+            payload.limit,
+        )
+        return None
+    if rendered is None:
+        return None
+    return discord.File(BytesIO(rendered.image_bytes.getvalue()), filename=rendered.filename)
 
 
 def _is_kvk_stats_channel_interaction(interaction: discord.Interaction) -> bool:
@@ -155,15 +174,34 @@ class CurrentRankingsBrowserView(discord.ui.View):
             )
             self._sync_from_payload(payload)
             embed = build_current_rankings_embed(payload)
+            file = await _top10_card_file(payload)
             message = getattr(interaction, "message", None)
             if message is not None:
                 self.message = message
                 try:
-                    await message.edit(embed=embed, view=self)
+                    if file is not None:
+                        await message.edit(
+                            content=None,
+                            embeds=[],
+                            attachments=[],
+                            files=[file],
+                            view=self,
+                        )
+                    else:
+                        await message.edit(embed=embed, attachments=[], view=self)
                     return
                 except Exception:
                     logger.debug("kvk_current_rankings_host_message_edit_failed", exc_info=True)
-            await interaction.edit_original_response(embed=embed, view=self)
+            if file is not None:
+                await interaction.edit_original_response(
+                    content=None,
+                    embeds=[],
+                    attachments=[],
+                    files=[file],
+                    view=self,
+                )
+            else:
+                await interaction.edit_original_response(embed=embed, attachments=[], view=self)
         except Exception:
             logger.exception(
                 "kvk_current_rankings_refresh_failed mode=%s metric=%s limit=%s",

@@ -63,3 +63,9 @@ class RankingPayload:
     total_pages: int = 1
     total_rows: int | None = None
     empty_message: str | None = None
+
+
+@dataclass(frozen=True)
+class RenderedRankingCard:
+    filename: str
+    image_bytes: Any

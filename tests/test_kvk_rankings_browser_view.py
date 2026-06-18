@@ -114,6 +114,62 @@ async def test_current_rankings_browser_refresh_edits_component_message(monkeypa
 
 
 @pytest.mark.asyncio
+async def test_current_rankings_browser_refresh_swaps_top10_kvk_embed_for_card(monkeypatch):
+    monkeypatch.setattr(kvk_rankings_views, "KVK_PLAYER_STATS_CHANNEL_ID", 100)
+    payload = RankingPayload(
+        mode="kvk",
+        mode_label="KVK",
+        metric="kills",
+        metric_label="Kills",
+        limit=10,
+        rows=[
+            RankingRow(
+                rank=1,
+                governor_id=123,
+                governor_name="Alpha",
+                value=1000,
+                supporting_values={"Kills": 1000},
+            )
+        ],
+    )
+    view = CurrentRankingsBrowserView(mode="kvk", metric="kills", limit=10)
+    fake_file = object()
+
+    async def fake_payload(**kwargs):
+        assert kwargs == {"mode": "kvk", "metric": "kills", "limit": 10}
+        return payload
+
+    async def fake_card_file(card_payload):
+        assert card_payload is payload
+        return fake_file
+
+    class Message:
+        def __init__(self):
+            self.kwargs = None
+
+        async def edit(self, **kwargs):
+            self.kwargs = kwargs
+
+    message = Message()
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_service,
+        "build_current_rankings_payload",
+        fake_payload,
+    )
+    monkeypatch.setattr(kvk_rankings_views, "_top10_card_file", fake_card_file)
+
+    interaction = _channel_interaction(channel_id=100, message=message)
+
+    await view._refresh(interaction)
+
+    assert message.kwargs["content"] is None
+    assert message.kwargs["embeds"] == []
+    assert message.kwargs["attachments"] == []
+    assert message.kwargs["files"] == [fake_file]
+    assert message.kwargs["view"] is view
+
+
+@pytest.mark.asyncio
 async def test_current_rankings_browser_refresh_failure_is_private(monkeypatch):
     monkeypatch.setattr(kvk_rankings_views, "KVK_PLAYER_STATS_CHANNEL_ID", 100)
     view = CurrentRankingsBrowserView(mode="kvk", metric="power", limit=10)

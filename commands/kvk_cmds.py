@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
+from io import BytesIO
 import logging
 
 import discord
@@ -14,6 +16,7 @@ from commands.kvk_targets_card_posting import post_kvk_targets_output
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import channel_only, track_usage
 from kvk.models.kvk_rankings import HallOfFameMetric
+from kvk.rendering.kvk_rankings_card_renderer import render_kvk_rankings_top10_card
 from kvk.rendering.kvk_rankings_embed import (
     build_current_rankings_embed,
     build_hall_of_fame_embed,
@@ -450,6 +453,22 @@ async def _send_current_rankings(ctx: discord.ApplicationContext, *, mode: str) 
         limit=payload.limit,
     )
     embed = build_current_rankings_embed(payload)
+    try:
+        rendered = await asyncio.to_thread(render_kvk_rankings_top10_card, payload)
+    except Exception:
+        logger.exception("[/kvk rankings %s] render_kvk_rankings_top10_card failed", payload.mode)
+        rendered = None
+
+    if rendered is not None:
+        file = discord.File(BytesIO(rendered.image_bytes.getvalue()), filename=rendered.filename)
+        try:
+            view.message = await ctx.followup.send(file=file, view=view, ephemeral=False)
+            return
+        except Exception:
+            logger.exception(
+                "[/kvk rankings %s] card send failed; falling back to embed", payload.mode
+            )
+
     view.message = await ctx.followup.send(embed=embed, view=view, ephemeral=False)
 
 
