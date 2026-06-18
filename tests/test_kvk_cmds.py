@@ -96,8 +96,8 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     async def fake_records(ctx_arg):
         calls.append(("records", ctx_arg))
 
-    async def fake_channel_guarded(ctx_arg, channel_id, *, admin_override, command_name, callback):
-        calls.append(("guard", channel_id, admin_override, command_name, callback.__name__))
+    async def fake_channel_guarded(ctx_arg, channel_id, *, admin_override, _command_name, callback):
+        calls.append(("guard", channel_id, admin_override, _command_name, callback.__name__))
         await callback(ctx_arg)
 
     async def fake_respond(message, *, ephemeral=False):
@@ -144,6 +144,57 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     )
     assert calls[7] == ("records", ctx)
     assert ctx.responded == [("Unknown ranking type.", True)]
+
+
+@pytest.mark.asyncio
+async def test_hall_of_fame_rankings_binds_view_to_followup_message(monkeypatch):
+    import commands.kvk_cmds as kvk_cmds
+
+    sent_message = object()
+    original_response = object()
+    created = {}
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        created["defer"] = ephemeral
+
+    async def fake_payload(**kwargs):
+        created["payload_kwargs"] = kwargs
+        return SimpleNamespace(limit=10)
+
+    class StubView:
+        def __init__(self, *, metric, limit):
+            self.metric = metric
+            self.limit = limit
+            self.message = None
+            created["view"] = self
+
+    class Followup:
+        async def send(self, **kwargs):
+            created["send_kwargs"] = kwargs
+            return sent_message
+
+    class Interaction:
+        async def original_response(self):
+            return original_response
+
+    ctx = SimpleNamespace(followup=Followup(), interaction=Interaction())
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.kvk_rankings_service,
+        "build_hall_of_fame_payload",
+        fake_payload,
+    )
+    monkeypatch.setattr(kvk_cmds, "HallOfFameRecordsView", StubView)
+    monkeypatch.setattr(kvk_cmds, "build_hall_of_fame_embed", lambda payload: "embed")
+
+    await kvk_cmds._send_hall_of_fame_rankings(ctx)
+
+    assert created["defer"] is False
+    assert created["send_kwargs"]["view"] is created["view"]
+    assert created["send_kwargs"]["ephemeral"] is False
+    assert created["view"].message is sent_message
+    assert created["view"].message is not original_response
 
 
 @pytest.mark.asyncio

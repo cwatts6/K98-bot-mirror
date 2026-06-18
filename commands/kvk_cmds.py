@@ -477,11 +477,7 @@ async def _send_hall_of_fame_rankings(ctx: discord.ApplicationContext) -> None:
     payload = await kvk_rankings_service.build_hall_of_fame_payload(metric=metric, limit=10)
     view = HallOfFameRecordsView(metric=metric, limit=payload.limit)
     embed = build_hall_of_fame_embed(payload)
-    message = await ctx.followup.send(embed=embed, view=view, ephemeral=False)
-    try:
-        view.message = await ctx.interaction.original_response()
-    except Exception:
-        view.message = message
+    view.message = await ctx.followup.send(embed=embed, view=view, ephemeral=False)
 
 
 async def _send_prekvk_rankings(ctx: discord.ApplicationContext) -> None:
@@ -499,11 +495,9 @@ async def _run_channel_guarded(
     channel_id: int,
     *,
     admin_override: bool,
-    command_name: str,
+    _command_name: str,
     callback: Callable[[discord.ApplicationContext], Awaitable[None]],
 ) -> None:
-    _ = command_name
-
     @channel_only(channel_id, admin_override=admin_override)
     async def guarded(inner_ctx: discord.ApplicationContext) -> None:
         await callback(inner_ctx)
@@ -596,7 +590,7 @@ def register_kvk(bot: ext_commands.Bot) -> None:
                 ctx,
                 KVK_PLAYER_STATS_CHANNEL_ID,
                 admin_override=True,
-                command_name="kvk rankings",
+                _command_name="kvk rankings",
                 callback=_send_kvk_rankings,
             )
             return
@@ -605,7 +599,7 @@ def register_kvk(bot: ext_commands.Bot) -> None:
                 ctx,
                 KVK_PLAYER_STATS_CHANNEL_ID,
                 admin_override=False,
-                command_name="kvk rankings",
+                _command_name="kvk rankings",
                 callback=_send_honor_rankings,
             )
             return
@@ -617,7 +611,7 @@ def register_kvk(bot: ext_commands.Bot) -> None:
                 ctx,
                 KVK_PLAYER_STATS_CHANNEL_ID,
                 admin_override=True,
-                command_name="kvk rankings",
+                _command_name="kvk rankings",
                 callback=_send_hall_of_fame_rankings,
             )
             return
