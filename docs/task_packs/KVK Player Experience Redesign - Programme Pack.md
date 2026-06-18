@@ -451,9 +451,31 @@ Use:
 
 ### Phase 5 — Unified `/kvk rankings` Visual/UX Polish
 
-Polish the already-scaffolded KVK, honor, and PreKVK ranking browser.
+Status: in progress. Phase 5A is complete, smoke tested, merged to mirror in PR #152, promoted
+through production PR #461, and pushed to production.
 
-Support dropdowns/buttons for ranking type and pagination. Keep image output optional until embed pagination is stable.
+Phase 5A delivered the first rankings hub foundation:
+
+- `/kvk rankings type:records` now exposes the KD98 Hall of Fame under the existing `/kvk rankings`
+  command surface, with no new top-level command.
+- Hall of Fame records show Top 10 all-time single-KVK performances, not lifetime totals.
+- Supported first-release record metrics are Kills, KillPoints, Deads, DKP, Healed, Acclaim,
+  Honor, and PreKvK where the existing history source returns qualifying values.
+- Records allow the same governor to appear more than once when they hold multiple all-time
+  performances.
+- Records remain Top 10 only in the first release; there are no Top 25, Top 50, or Top 100 record
+  controls.
+- Missing/uncollected historical metrics are excluded by the SQL-backed DAL filter rather than
+  displayed as misleading zero records.
+- Shared ranking constants, payload models, Hall of Fame service/DAL boundaries, embed rendering,
+  and view refresh/error handling were added under `kvk/` and `ui/views/`.
+- KVK and Honor ranking primary controls now use the Top 10, Top 25, and Top 50 policy; Top 100 is
+  not a primary player button.
+- Legacy ranking commands remain live.
+
+The next sub-phase is Phase 5B: unify the current KVK, Honor, and PreKvK ranking browser while
+preserving the delivered Hall of Fame records mode. Image output remains optional until the unified
+embed/browser behaviour is stable.
 
 ### Phase 6 — Admin Command Hardening And Legacy Operator Cleanup
 
@@ -617,5 +639,8 @@ card, added Trends switching, clarified all-history trend scope with KVK count, 
 target-percent trend rows, and deployed to production after smoke testing. Phase 4Biv has removed
 the stale command-level selector option, preserved explicit governor lookup, polished CSV export
 with healed, KillPoints, PreKVK, Honor, and derived `TankingScorePct` data, preserved null
-semantics, and passed production smoke testing. Phase 4 is complete; start Phase 5 from the
-delivered `/kvk rankings` scaffold.
+semantics, and passed production smoke testing. Phase 4 is complete. Phase 5A has delivered the
+`/kvk rankings type:records` Hall of Fame foundation and pushed it to production after smoke
+testing. Start the next chat from the Phase 5B starter:
+
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5B Unified Current Ranking Browser.md`

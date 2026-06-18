@@ -7,7 +7,40 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 4 completion`
 - Task type: `feature / UX redesign / Discord interaction polish / renderer-service-DAL cleanup / staged implementation plan`
 - One-pass approved: `no`
-- Status: `ready for Codex audit and optioneering`
+- Status: `Phase 5A complete; Phase 5B ready for next-chat delivery`
+
+## Phase 5A Completion Note
+
+Phase 5A is complete. It was delivered in mirror PR #152, promoted through production PR #461,
+pushed to production, and smoke tested successfully.
+
+Delivered Phase 5A scope:
+
+- Added `/kvk rankings type:records` under the existing `/kvk rankings` command surface.
+- Preserved the no-new-top-level-command rule and kept legacy ranking commands live.
+- Added the KD98 Hall of Fame first release as Top 10 all-time single-KVK performances.
+- Supported Hall of Fame metrics: Kills, KillPoints, Deads, DKP, Healed, Acclaim, Honor, and
+  PreKvK where source data produces qualifying values.
+- Kept records Top 10 only; no Top 25, Top 50, or Top 100 record controls were added.
+- Allowed repeated appearances by the same governor because records are single-KVK performances,
+  not unique-player lifetime standings.
+- Added `kvk.models.kvk_rankings`, `kvk.services.kvk_rankings_service`,
+  `kvk.dal.kvk_rankings_dal`, `kvk.rendering.kvk_rankings_embed`, and
+  `ui.views.kvk_rankings_views` as the first shared rankings hub foundation.
+- Added Hall of Fame error/fallback handling and view timeout hardening.
+- Updated canonical command docs for the visible `records` type choice.
+- Removed Top 100 from primary KVK/Honor player controls while preserving internal/deeper support
+  where existing paths still need it.
+
+Next Phase 5 sub-phase:
+
+- Phase 5B should unify the current KVK, Honor, and PreKvK ranking browser around the shared
+  ranking payload/control model.
+- Preserve delivered Hall of Fame records behaviour during Phase 5B.
+- Do not add Hall of Fame Top 25/50/100 controls.
+- Do not remove legacy commands.
+- Continue to capture all deferred optimisations that remain part of "rankings done right" so they
+  can be delivered in later Phase 5 sub-phases rather than lost.
 
 ## 2. Required Reading
 
@@ -64,12 +97,15 @@ set of legacy data-dump embeds. Phase 3 delivered modern `/kvk stats`; Phase 4A 
 `/kvk targets`; Phase 4B delivered modern `/kvk history`. Phase 5 is now the remaining core player
 journey: rankings.
 
-The delivered `/kvk rankings` scaffold currently supports ranking types `kvk`, `honor`, and
-`prekvk`. Current implementation paths are uneven:
+The delivered `/kvk rankings` scaffold now supports ranking types `kvk`, `honor`, `prekvk`, and
+`records`. Current implementation paths are still uneven:
 
 - KVK rankings use `build_KVKrankings_embed.py` and `ui/views/stats_views.py::KVKRankingView`.
 - Honor rankings use `honor_rankings_view.py::HonorRankingView` and independent embed output.
 - PreKvK rankings use `ui/views/prekvk_report_views.py::PreKvkReportView` and an existing image renderer.
+- Hall of Fame records use `kvk.services.kvk_rankings_service`,
+  `kvk.dal.kvk_rankings_dal`, `kvk.rendering.kvk_rankings_embed`, and
+  `ui/views/kvk_rankings_views.py::HallOfFameRecordsView`.
 - `/kvk rankings type` routes to separate handlers in `commands/kvk_cmds.py`.
 
 Current player observation:
@@ -77,7 +113,7 @@ Current player observation:
 - Top 10, Top 25, and Top 50 are used frequently.
 - Top 100 appears unused or low-value for normal Discord use.
 - Rankings are popular because they are social, competitive, and checked repeatedly; the design must support repeated daily use without becoming noisy.
-- There is a strong product opportunity to add an all-time `Hall of Fame` / records mode showing the greatest single-KVK performances ever recorded for the kingdom. This would turn historical data into a highly engaging player achievement surface rather than only a private history lookup.
+- Phase 5A acted on the strong product opportunity to add an all-time `Hall of Fame` / records mode showing the greatest single-KVK performances ever recorded for the kingdom. Later Phase 5 work should now protect and polish that journey while unifying the current ranking browser.
 
 The key product challenge is that rankings are essentially tables, but players do not experience
 them as tables. They use them to answer social and competitive questions:
@@ -246,8 +282,8 @@ journey.
 - Audit legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` paths where still active.
 - Audit existing ranking usage logs if available, especially Top 10/25/50/100 and ranking type usage.
 - Confirm whether Top 100 is unused enough to remove from primary controls.
-- Audit whether to add a `records` / `hall_of_fame` ranking type under `/kvk rankings` for all-time single-KVK performance records.
-- Validate all-time record source data across every collected KVK, including missing/null semantics for historically unavailable fields such as acclaim and healed troops.
+- Preserve the delivered `records` ranking type under `/kvk rankings` for all-time single-KVK performance records.
+- Preserve all-time record missing/null semantics for historically unavailable fields such as acclaim and healed troops.
 - Design a unified ranking payload/model that can support KVK, Honor, PreKvK, and all-time record rows.
 - Build or propose a service boundary for ranking data shaping and filtering.
 - Keep command/view code thin and avoid direct SQL in commands/views/renderers.
@@ -256,7 +292,7 @@ journey.
 - Modernise the KVK ranking browser controls and output shape.
 - Modernise Honor ranking controls and output shape so it feels part of the same browser.
 - Integrate PreKvK ranking/report controls into the same UX model where practical without regressing the existing image renderer.
-- Add Hall of Fame / all-time Top 10 record cards if the SQL/data contract is validated.
+- Preserve Hall of Fame / all-time Top 10 records; add visual cards only in the later card phase unless Phase 5B explicitly expands scope.
 - Add `My Rank` / local-position experience if feasible within existing registry and data contracts.
 - Add or improve CSV/export/full-list behaviour if Top 100 is removed from primary controls.
 - Add focused tests for ranking service/payload, view interactions, command routing, filtering, sorting, pagination, and fallback behaviour.
@@ -382,14 +418,14 @@ Review and document:
 
 | Concern | Target |
 |---|---|
-| Slash command | Preserve `/kvk rankings`; add `type:records` / `hall_of_fame` only after audit approval. |
+| Slash command | Preserve `/kvk rankings` with delivered `type:records`; do not add a new top-level records command. |
 | Legacy commands | Preserve `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` during rollout. |
 | Service/payload | Add or refine renderer-independent ranking payload/model code for current rankings and all-time records. |
 | DAL/cache | Keep SQL/cache access in service/DAL/cache layers, not views/renderers. |
 | Views | Shared ranking browser view owns interaction flow only. |
 | Renderer | Top 10 card renderer can use Pillow; embed/table renderer consumes same payload. |
 | Export | Full-list/deeper output should be CSV/export rather than primary Top 100 UI. |
-| Records/Hall of Fame | Add a records service/data contract for all-time single-KVK performances if SQL validation supports it. |
+| Records/Hall of Fame | Preserve the delivered records service/data contract for all-time single-KVK performances; keep records Top 10 only. |
 | Assets | Use existing KVK card background provider or create ranking/records-specific assets under `assets/kvk/cards/` only if needed. |
 | Tests | Focused tests under `tests/` for service, payload, sorting, filtering, pagination, command routing, renderer, and export. |
 | Docs | Programme/task-pack docs and canonical command reference if visible behaviour changes. |
@@ -530,10 +566,10 @@ Trade-offs:
 - Less engaging for players.
 
 
-### Option F - Hall of Fame / All-Time Records Mode - Recommended Phase 5B Addition
+### Option F - Hall of Fame / All-Time Records Mode - Delivered Phase 5A Foundation
 
-Add a `records` or `hall_of_fame` ranking mode showing Top 10 all-time single-KVK performances
-across every collected KVK.
+Phase 5A added a `records` ranking mode showing Top 10 all-time single-KVK performances across
+collected KVK history.
 
 Best when:
 
@@ -549,49 +585,50 @@ Trade-offs:
   be clearly explained.
 - May need a distinct card design language from current live rankings.
 
-Starting recommendation:
+Follow-on recommendation:
 
-- Include this in Phase 5 as a scoped Hall of Fame sub-phase.
-- Keep it under `/kvk rankings` initially by adding a new `type` choice after audit approval.
-- Render Top 10 records as a visual card first; do not build Top 25/50 all-time records unless
-  player usage later proves demand.
+- Keep it under `/kvk rankings type:records`.
+- Preserve the first-release Top 10-only control model.
+- Render Top 10 records as a visual card in the later card phase; do not build Top 25/50 all-time
+  records unless player usage later proves demand and the operator approves it.
 
 ## 14. Approved Starting Recommendation For Codex To Test
 
 The working recommendation is:
 
-1. **Phase 5A: Audit, data contract, and unified browser design**
-   - No runtime implementation until approval.
-   - Confirm current usage and Top 100 value.
-   - Define shared ranking payload/service.
-   - Audit all-time record data feasibility across every collected KVK.
-   - Recommend exact output model and sub-phase split.
+1. **Phase 5A: Audit, data contract, Hall of Fame foundation, and first control policy**
+   - Complete. Delivered in mirror PR #152 and production PR #461, then smoke tested in production.
+   - Added `/kvk rankings type:records` under the existing command surface.
+   - Built the Top 10 KD98 Hall of Fame single-KVK records foundation.
+   - Validated first-release records against the existing historical KVK source path.
+   - Added shared ranking payload/model/service/DAL/rendering foundations for records.
+   - Removed Top 100 from primary KVK/Honor player controls.
 
-2. **Phase 5B: KD98 Hall of Fame / all-time records foundation**
-   - Add or design the `records` / `hall_of_fame` ranking type under `/kvk rankings` after approval.
-   - Build the data contract for Top 10 single-KVK performance records.
-   - Initial metrics to validate: kills, KillPoints, deads, DKP, healed, acclaim, honor, and PreKvK.
-   - Preserve missing/null semantics for historically uncollected values.
-   - Allow repeated appearances by the same governor unless the audit recommends a separate unique-player view.
-
-3. **Phase 5C: Unified current-ranking embed browser**
+2. **Phase 5B: Unified current-ranking embed browser**
    - Shared mode/metric/Top-N controls for current KVK, Honor, and PreKvK rankings.
    - Primary Top-N buttons: Top 10, Top 25, Top 50.
-   - Remove Top 100 from primary controls unless audit disproves the user observation.
+   - Keep Top 100 out of primary controls; provide export/advanced handling only if approved.
    - Add consistent footer/filter/source/freshness information.
+   - Preserve delivered Hall of Fame records mode and keep it Top 10 only.
    - Preserve legacy commands.
+   - Deliver deferred ranking-browser consistency items that are part of the current-ranking UX.
 
-4. **Phase 5D: Top 10 visual spotlight cards**
+3. **Phase 5C: Top 10 visual spotlight cards**
    - Generated Top 10 card for the most socially valuable current ranking output.
    - Generated Hall of Fame card for all-time record categories.
    - Use KVK-mode or records-specific background and shared card primitives.
    - Keep embed fallback.
 
-5. **Phase 5E: My Rank / Find Me and export polish**
+4. **Phase 5D: My Rank / Find Me and export polish**
    - Add private local-position view for registered governors.
    - Add full-list CSV/export if Top 100 is removed.
    - Add records export/detail output only if useful after the Top 10 card is validated.
    - Consider legacy redirect only after usage review and separate approval.
+
+5. **Phase 5E+: Remaining rankings deferred optimisation closure**
+   - Deliver any structured Phase 5 deferred optimisations that remain after 5B-5D.
+   - Add extra sub-phases rather than leaving known rankings UX, architecture, export, or visual
+     debt unresolved at the end of Phase 5.
 
 Do not merge these sub-phases into one PR unless explicitly approved.
 
@@ -769,7 +806,7 @@ Design notes:
 - [ ] No new grouped subcommand unless separately approved.
 - [ ] Preserve `/kvk rankings` registration.
 - [ ] Preserve existing `/kvk rankings type` choices unless visible option changes are explicitly approved.
-- [ ] If adding `records` / `hall_of_fame` as a new choice, update command registration validation, command docs, usage tracking expectations, and smoke-test references.
+- [x] `records` is now a visible `/kvk rankings type` choice; command docs, registration tests, usage routing, and smoke-test references were updated in Phase 5A.
 - [ ] Preserve legacy ranking commands during rollout.
 - [ ] Preserve or explicitly update `@versioned()`, `@safe_command`, `@track_usage()`, channel guards, admin override differences, visibility behaviour, autocomplete/options, usage-log identity, and command-cache behaviour.
 - [ ] If any command description or visible behaviour changes, update `docs/reference/canonical_command_reference.md`.
@@ -781,11 +818,11 @@ Classify each issue found during audit:
 
 | Issue | Decision | Reason |
 |---|---|---|
-| KVK ranking builder mixes formatting, filtering, sorting, and Discord embed output | likely fix in Phase 5B | Shared ranking payload is needed before a smart browser or card renderer. |
-| Honor ranking has separate Top-N/button/output implementation | likely fix or wrap in Phase 5B | Ranking modes should feel unified. |
+| KVK ranking builder mixes formatting, filtering, sorting, and Discord embed output | fix in Phase 5B where practical | Shared ranking payload is needed before a smart browser or card renderer. |
+| Honor ranking has separate Top-N/button/output implementation | fix or wrap in Phase 5B | Ranking modes should feel unified. |
 | PreKvK already has image renderer but independent flow | preserve and integrate carefully | Do not regress working output; align controls where practical. |
 | Top 100 appears unused | likely remove from primary player UI | Replace with My Rank and/or export unless usage data contradicts. |
-| All-time records are not currently exposed | add as Phase 5B if SQL contract supports it | High-excitement feature that turns historical data into a Hall of Fame journey. |
+| All-time records are now exposed as `/kvk rankings type:records` | preserve in Phase 5B | Phase 5A delivered Top 10 Hall of Fame records; later visual/export polish can build on it without expanding first-release controls. |
 | Ranking default metric is Power | audit | Power may not be the most meaningful KVK leaderboard default. |
 | My Rank is absent | likely add if feasible | Better player value than a long Top 100 table. |
 | Pass-window / movement / trend rankings | defer unless approved | Risk of data-contract expansion and confusing semantics. |
@@ -876,8 +913,8 @@ Audit/optioneering acceptance:
 - [ ] Current data contracts and SQL/cache source objects are validated or ambiguities documented.
 - [ ] Current usage evidence for Top 10/25/50/100 is reviewed where available.
 - [ ] Top 100 recommendation is explicitly documented.
-- [ ] Hall of Fame / all-time records feasibility is audited against SQL/data contracts.
-- [ ] Records command-placement recommendation is documented: `type:records` / `hall_of_fame` versus future separate command.
+- [x] Hall of Fame / all-time records feasibility is audited against SQL/data contracts for the first release.
+- [x] Records command placement is delivered as `/kvk rankings type:records`; no new top-level command.
 - [ ] At least four viable output options are compared with trade-offs.
 - [ ] A recommended staged solution is proposed.
 - [ ] No implementation occurs before approval unless explicitly approved.
@@ -887,7 +924,7 @@ Implementation acceptance:
 - [ ] `/kvk rankings` feels like one coherent browser across KVK, Honor, and PreKvK.
 - [ ] Top 10, Top 25, and Top 50 are fast, readable, and stable.
 - [ ] Top 100 is removed from primary player controls or retained with evidence-backed justification.
-- [ ] Hall of Fame / all-time records mode is implemented or explicitly deferred with reason after SQL validation.
+- [x] Hall of Fame / all-time records mode is implemented as the Phase 5A Top 10 foundation.
 - [ ] All-time records clearly show single-KVK performance context and do not imply lifetime totals.
 - [ ] Historical missing/uncollected record metrics are excluded or labelled safely.
 - [ ] `My Rank` / local-position flow is implemented or explicitly deferred with reason.
@@ -993,6 +1030,10 @@ For implementation stages:
 ```
 
 ## 23. Codex Chat Starter
+
+Historical starter for Phase 5A. Phase 5A is complete; use
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5B Unified Current Ranking Browser.md`
+for the next delivery chat.
 
 ```text
 Codex, start Phase 5 of the KVK Player Experience Redesign: Unified /kvk rankings Visual/UX Polish.
