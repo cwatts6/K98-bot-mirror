@@ -8,27 +8,22 @@ from discord.ext import commands as ext_commands
 
 from account_picker import AccountPickerView, safe_build_unique_gov_options
 from bot_config import GUILD_ID, KVK_PLAYER_STATS_CHANNEL_ID, KVK_TARGET_CHANNEL_ID
-from build_KVKrankings_embed import build_kvkrankings_embed
 from commands.kvk_history_card_posting import post_kvk_history_output
 from commands.kvk_stats_card_posting import post_kvk_stats_output
 from commands.kvk_targets_card_posting import post_kvk_targets_output
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import channel_only, track_usage
-from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
 from kvk.models.kvk_rankings import HallOfFameMetric
-from kvk.rendering.kvk_rankings_embed import build_hall_of_fame_embed
+from kvk.rendering.kvk_rankings_embed import build_current_rankings_embed, build_hall_of_fame_embed
 from kvk.services import kvk_rankings_service
 from kvk_ui import make_kvk_targets_view
-from prekvk import report_service
 from registry.account_slots import ACCOUNT_ORDER
 from services import governor_account_service, kvk_history_service, kvk_personal_service
 from target_utils import run_target_lookup
 from ui.views.kvk_personal_views import MyKVKStatsSelectView
-from ui.views.kvk_rankings_views import HallOfFameRecordsView
-from ui.views.prekvk_report_views import send_prekvk_report
+from ui.views.kvk_rankings_views import CurrentRankingsBrowserView, HallOfFameRecordsView
 from ui.views.registry_views import GovNameModal, MyRegsActionView, RegisterStartView
-from ui.views.stats_views import KVKRankingView
-from utils import load_stat_cache, normalize_governor_id
+from utils import normalize_governor_id
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
@@ -426,49 +421,38 @@ async def _post_kvk_history_view(
     )
 
 
-async def _send_kvk_rankings(ctx: discord.ApplicationContext) -> None:
+async def _send_current_rankings(ctx: discord.ApplicationContext, *, mode: str) -> None:
     await safe_defer(ctx, ephemeral=False)
 
-    cache = load_stat_cache()
-    rows = [row for key, row in cache.items() if key != "_meta"]
-    if not rows:
+    try:
+        payload = await kvk_rankings_service.build_current_rankings_payload(
+            mode=mode,
+            metric=None,
+            limit=10,
+        )
+    except Exception:
+        logger.exception("[/kvk rankings %s] build_current_rankings_payload failed", mode)
         await ctx.followup.send(
-            "No stats cache available yet. Try again after the next scan/export.",
+            "Rankings are temporarily unavailable. Please try again later.",
             ephemeral=False,
         )
         return
 
-    view = KVKRankingView(cache, metric="power", limit=10, timeout=120.0)
-    embed = build_kvkrankings_embed(rows, "power", 10, page=1)
-    if not embed.footer or not embed.footer.text:
-        last_ref = cache.get("_meta", {}).get("generated_at") or "unknown"
-        embed.set_footer(text=f"Last refreshed: {last_ref}")
+    view = CurrentRankingsBrowserView(
+        mode=payload.mode,
+        metric=payload.metric,
+        limit=payload.limit,
+    )
+    embed = build_current_rankings_embed(payload)
+    view.message = await ctx.followup.send(embed=embed, view=view, ephemeral=False)
 
-    response = await ctx.followup.send(embed=embed, view=view)
-    try:
-        view.message = await ctx.interaction.original_response()
-    except Exception:
-        try:
-            view.message = await response.original_response()
-        except Exception:
-            view.message = None
+
+async def _send_kvk_rankings(ctx: discord.ApplicationContext) -> None:
+    await _send_current_rankings(ctx, mode="kvk")
 
 
 async def _send_honor_rankings(ctx: discord.ApplicationContext) -> None:
-    await safe_defer(ctx, ephemeral=False)
-    try:
-        payload = await kvk_rankings_service.build_honor_rankings_payload(limit=10)
-    except Exception:
-        logger.exception("[/kvk rankings honor] get_latest_honor_top failed")
-        payload = kvk_rankings_service.build_honor_rankings_payload_from_rows([], limit=10)
-
-    if not payload.rows:
-        await ctx.followup.send("No honor data found for the latest KVK.", ephemeral=False)
-        return
-
-    embed = build_honor_rankings_embed([row.raw for row in payload.rows], limit=payload.limit)
-    view = HonorRankingView()
-    await ctx.followup.send(embed=embed, view=view, ephemeral=False)
+    await _send_current_rankings(ctx, mode="honor")
 
 
 async def _send_hall_of_fame_rankings(ctx: discord.ApplicationContext) -> None:
@@ -489,13 +473,7 @@ async def _send_hall_of_fame_rankings(ctx: discord.ApplicationContext) -> None:
 
 
 async def _send_prekvk_rankings(ctx: discord.ApplicationContext) -> None:
-    await safe_defer(ctx, ephemeral=True)
-    await send_prekvk_report(
-        ctx=ctx,
-        kvk_no=None,
-        sort_by=report_service.parse_report_sort("Overall"),
-        limit=10,
-    )
+    await _send_current_rankings(ctx, mode="prekvk")
 
 
 async def _run_channel_guarded(

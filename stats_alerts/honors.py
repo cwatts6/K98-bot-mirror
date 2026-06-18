@@ -40,8 +40,16 @@ async def get_latest_honor_top(n: int = 3) -> list[dict[str, Any]]:
         JOIN latest_kvk k ON k.KVK_NO = s.KVK_NO
         GROUP BY s.KVK_NO
     )
-    SELECT TOP ({n_i}) a.GovernorName, a.GovernorID, a.HonorPoints
+    SELECT TOP ({n_i})
+           a.KVK_NO,
+           a.ScanID,
+           s.ScanTimestampUTC,
+           s.SourceFileName,
+           a.GovernorName,
+           a.GovernorID,
+           a.HonorPoints
     FROM dbo.KVK_Honor_AllPlayers_Raw a
+    JOIN dbo.KVK_Honor_Scan s ON s.KVK_NO = a.KVK_NO AND s.ScanID = a.ScanID
     JOIN last_scan l ON l.KVK_NO = a.KVK_NO AND l.ScanID = a.ScanID
     ORDER BY a.HonorPoints DESC, a.GovernorID ASC;
     """
@@ -59,15 +67,35 @@ async def get_latest_honor_top(n: int = 3) -> list[dict[str, Any]]:
                     pts = int(r.get("HonorPoints", 0))
                 else:
                     # tuple-like fallback
-                    name = r[0]
-                    gid = int(r[1])
-                    pts = int(r[2])
-                out.append({"GovernorName": name, "GovernorID": gid, "HonorPoints": pts})
+                    name = r[4]
+                    gid = int(r[5])
+                    pts = int(r[6])
+                out.append(
+                    {
+                        "KVK_NO": r.get("KVK_NO") if isinstance(r, dict) else r[0],
+                        "ScanID": r.get("ScanID") if isinstance(r, dict) else r[1],
+                        "ScanTimestampUTC": (
+                            r.get("ScanTimestampUTC") if isinstance(r, dict) else r[2]
+                        ),
+                        "SourceFileName": r.get("SourceFileName") if isinstance(r, dict) else r[3],
+                        "GovernorName": name,
+                        "GovernorID": gid,
+                        "HonorPoints": pts,
+                    }
+                )
             except Exception:
                 # Best-effort fallback
                 try:
                     out.append(
                         {
+                            "KVK_NO": r.get("KVK_NO") if isinstance(r, dict) else None,
+                            "ScanID": r.get("ScanID") if isinstance(r, dict) else None,
+                            "ScanTimestampUTC": (
+                                r.get("ScanTimestampUTC") if isinstance(r, dict) else None
+                            ),
+                            "SourceFileName": (
+                                r.get("SourceFileName") if isinstance(r, dict) else None
+                            ),
                             "GovernorName": (
                                 r.get("GovernorName", "Unknown")
                                 if isinstance(r, dict)

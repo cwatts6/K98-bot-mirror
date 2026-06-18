@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
 from kvk.dal import kvk_rankings_dal
 from kvk.models.kvk_rankings import (
+    CURRENT_RANKING_MODES,
     HALL_OF_FAME_METRIC_LABELS,
     HALL_OF_FAME_RECORD_LIMIT,
     PRIMARY_RANKING_LIMITS,
@@ -13,7 +16,46 @@ from kvk.models.kvk_rankings import (
     RankingPayload,
     RankingRow,
 )
+from prekvk import report_service
+from prekvk.models import PreKvkReportPayload, PreKvkReportRow, PreKvkReportSort
 from stats_alerts.honors import get_latest_honor_top
+from utils import load_stat_cache, parse_last_refresh_utc
+
+KVK_RANKING_METRIC_LABELS: dict[str, str] = {
+    "power": "Power",
+    "kills": "Kills (T4+T5)",
+    "pct_kill_target": "% Kill Target",
+    "deads": "Deads",
+    "dkp": "DKP",
+}
+
+PREKVK_RANKING_METRIC_LABELS: dict[str, str] = {
+    PreKvkReportSort.OVERALL.value: "Overall",
+    PreKvkReportSort.STAGE1.value: "Stage 1",
+    PreKvkReportSort.STAGE2.value: "Stage 2",
+    PreKvkReportSort.STAGE3.value: "Stage 3",
+}
+
+CURRENT_RANKING_METRIC_LABELS: dict[str, dict[str, str]] = {
+    "kvk": KVK_RANKING_METRIC_LABELS,
+    "honor": {"honor": "Honor"},
+    "prekvk": PREKVK_RANKING_METRIC_LABELS,
+}
+
+CURRENT_RANKING_MODE_LABELS: dict[str, str] = {
+    "kvk": "KVK",
+    "honor": "Honor",
+    "prekvk": "PreKvK",
+}
+
+DEFAULT_CURRENT_RANKING_METRICS: dict[str, str] = {
+    "kvk": "power",
+    "honor": "honor",
+    "prekvk": PreKvkReportSort.OVERALL.value,
+}
+
+KVK_RANKING_FILTERS = ("STATUS = INCLUDED", "Starting Power >= 40M")
+KVK_MIN_POWER = 40_000_000
 
 
 def normalize_ranking_limit(value: int | None, *, default: int = 10) -> int:
@@ -28,6 +70,31 @@ def normalize_ranking_limit(value: int | None, *, default: int = 10) -> int:
 
 def normalize_hall_of_fame_limit(_value: int | None = None) -> int:
     return HALL_OF_FAME_RECORD_LIMIT
+
+
+def parse_current_ranking_mode(value: str | None) -> str:
+    normalized = (value or "kvk").strip().lower()
+    if normalized not in CURRENT_RANKING_MODES:
+        raise ValueError("Unknown current ranking mode.")
+    return normalized
+
+
+def normalize_current_ranking_metric(mode: str, metric: str | None = None) -> str:
+    parsed_mode = parse_current_ranking_mode(mode)
+    default = DEFAULT_CURRENT_RANKING_METRICS[parsed_mode]
+    normalized = (metric or default).strip().lower().replace(" ", "_")
+    aliases = {
+        "kp": "killpoints",
+        "%_kill_target": "pct_kill_target",
+        "kill_target": "pct_kill_target",
+        "stage_1": PreKvkReportSort.STAGE1.value,
+        "stage_2": PreKvkReportSort.STAGE2.value,
+        "stage_3": PreKvkReportSort.STAGE3.value,
+    }
+    normalized = aliases.get(normalized, normalized)
+    if normalized in CURRENT_RANKING_METRIC_LABELS[parsed_mode]:
+        return normalized
+    return default
 
 
 def parse_hall_of_fame_metric(value: str | None) -> HallOfFameMetric:
@@ -74,6 +141,161 @@ def _to_value(value: Any) -> int | float:
     return int(numeric) if numeric.is_integer() else numeric
 
 
+def _to_float(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None or value == "":
+            return default
+        if isinstance(value, Decimal):
+            return float(value)
+        return float(value)
+    except Exception:
+        return default
+
+
+def _display_name(raw: dict[str, Any], *, id_keys: tuple[str, ...] = ("GovernorID",)) -> str:
+    raw_name = raw.get("GovernorName") or raw.get("Governor_Name")
+    if raw_name and str(raw_name).strip():
+        return str(raw_name).strip()
+    for key in id_keys:
+        value = raw.get(key)
+        if value not in (None, ""):
+            return str(_to_int(value) or value)
+    return "Unknown"
+
+
+def _row_governor_id(raw: dict[str, Any]) -> int:
+    return _to_int(raw.get("GovernorID") or raw.get("Gov_ID"))
+
+
+def _kvk_power(row: dict[str, Any]) -> int:
+    return _to_int(row.get("Starting Power") or row.get("Power"))
+
+
+def _kvk_kills(row: dict[str, Any]) -> int:
+    total = _to_int(row.get("T4&T5_Kills"))
+    if total == 0:
+        total = _to_int(row.get("T4_Kills")) + _to_int(row.get("T5_Kills"))
+    return total
+
+
+def _kvk_deads(row: dict[str, Any]) -> int:
+    return _to_int(row.get("Deads_Delta") or row.get("Deads"))
+
+
+def _kvk_dkp(row: dict[str, Any]) -> float:
+    return _to_float(row.get("DKP_SCORE") or row.get("DKP Score"))
+
+
+def _kvk_pct_kill_target(row: dict[str, Any]) -> float:
+    return _to_float(row.get("% of Kill Target") or row.get("% of Kill target"))
+
+
+def _kvk_metric_getter(metric: str) -> Callable[[dict[str, Any]], int | float]:
+    getters: dict[str, Callable[[dict[str, Any]], int | float]] = {
+        "power": _kvk_power,
+        "kills": _kvk_kills,
+        "pct_kill_target": _kvk_pct_kill_target,
+        "deads": _kvk_deads,
+        "dkp": _kvk_dkp,
+    }
+    return getters.get(metric, _kvk_power)
+
+
+def _latest_refresh_label(rows: list[dict[str, Any]]) -> str | None:
+    parsed: list[datetime] = []
+    fallback: list[str] = []
+    for row in rows:
+        raw = row.get("LAST_REFRESH") or row.get("ScanTimestampUTC")
+        if not raw:
+            continue
+        dt = parse_last_refresh_utc(raw)
+        if dt is not None:
+            parsed.append(dt)
+        else:
+            fallback.append(str(raw))
+    if parsed:
+        return max(parsed).strftime("%Y-%m-%d %H:%M UTC")
+    if fallback:
+        return max(fallback)
+    return None
+
+
+def _filter_kvk_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in rows
+        if str(row.get("STATUS", "")).upper() == "INCLUDED" and _kvk_power(row) >= KVK_MIN_POWER
+    ]
+
+
+def build_kvk_rankings_payload_from_rows(
+    rows: list[dict[str, Any]] | None,
+    *,
+    metric: str = "power",
+    limit: int = 10,
+) -> RankingPayload:
+    normalized_metric = normalize_current_ranking_metric("kvk", metric)
+    normalized_limit = normalize_ranking_limit(limit)
+    raw_rows = list(rows or [])
+    filtered = _filter_kvk_rows(raw_rows)
+    getter = _kvk_metric_getter(normalized_metric)
+    sorted_rows = sorted(
+        filtered,
+        key=lambda row: (-getter(row), -_kvk_power(row), _row_governor_id(row)),
+    )
+    ranking_rows: list[RankingRow] = []
+    for index, raw in enumerate(sorted_rows[:normalized_limit], start=1):
+        ranking_rows.append(
+            RankingRow(
+                rank=index,
+                governor_id=_row_governor_id(raw),
+                governor_name=_display_name(raw, id_keys=("GovernorID", "Gov_ID")),
+                value=getter(raw),
+                supporting_values={
+                    "Power": _kvk_power(raw),
+                    "Kills": _kvk_kills(raw),
+                    "% K/T": _kvk_pct_kill_target(raw),
+                    "Deads": _kvk_deads(raw),
+                    "DKP": _kvk_dkp(raw),
+                },
+                raw=dict(raw),
+            )
+        )
+    source_state = "fresh"
+    if not raw_rows:
+        source_state = "unavailable"
+    elif not ranking_rows:
+        source_state = "empty"
+    return RankingPayload(
+        mode="kvk",
+        mode_label=CURRENT_RANKING_MODE_LABELS["kvk"],
+        metric=normalized_metric,
+        metric_label=KVK_RANKING_METRIC_LABELS[normalized_metric],
+        limit=normalized_limit,
+        rows=ranking_rows,
+        source_note="Stats cache",
+        source_state=source_state,
+        freshness_label=_latest_refresh_label(filtered or raw_rows),
+        filters=KVK_RANKING_FILTERS,
+        total_rows=len(filtered),
+        empty_message=(
+            "No KVK ranking rows match the current included-player filters."
+            if raw_rows
+            else "No stats cache available yet. Try again after the next scan/export."
+        ),
+    )
+
+
+async def build_kvk_rankings_payload(
+    *,
+    metric: str = "power",
+    limit: int = 10,
+) -> RankingPayload:
+    cache = await asyncio.to_thread(load_stat_cache)
+    rows = [row for key, row in cache.items() if key != "_meta"]
+    return build_kvk_rankings_payload_from_rows(rows, metric=metric, limit=limit)
+
+
 def build_honor_rankings_payload_from_rows(
     rows: list[dict[str, Any]] | None,
     *,
@@ -90,16 +312,25 @@ def build_honor_rankings_payload_from_rows(
                 governor_id=governor_id,
                 governor_name=name,
                 value=_to_int(raw.get("HonorPoints")),
+                kvk_no=_to_int(raw.get("KVK_NO")) if raw.get("KVK_NO") not in (None, "") else None,
+                supporting_values={"Honor": _to_int(raw.get("HonorPoints"))},
                 raw=dict(raw),
             )
         )
+    first = (rows or [{}])[0] if rows else {}
     return RankingPayload(
         mode="honor",
+        mode_label=CURRENT_RANKING_MODE_LABELS["honor"],
         metric="honor",
         metric_label="Honor",
         limit=normalized_limit,
         rows=ranking_rows,
+        kvk_no=_to_int(first.get("KVK_NO")) if first.get("KVK_NO") not in (None, "") else None,
+        freshness_label=_latest_refresh_label(list(rows or [])),
         source_note="Latest imported honor scan",
+        source_state="fresh" if ranking_rows else "empty",
+        total_rows=len(rows or []),
+        empty_message="No honor data found for the latest KVK.",
     )
 
 
@@ -107,6 +338,99 @@ async def build_honor_rankings_payload(*, limit: int = 10) -> RankingPayload:
     normalized_limit = normalize_ranking_limit(limit)
     rows = await get_latest_honor_top(normalized_limit)
     return build_honor_rankings_payload_from_rows(rows, limit=normalized_limit)
+
+
+def _prekvk_value(row: PreKvkReportRow, metric: str) -> int:
+    if metric == PreKvkReportSort.STAGE1.value:
+        return int(row.stage1_points or 0)
+    if metric == PreKvkReportSort.STAGE2.value:
+        return int(row.stage2_points or 0)
+    if metric == PreKvkReportSort.STAGE3.value:
+        return int(row.stage3_points or 0)
+    return int(row.overall_points or 0)
+
+
+def build_prekvk_rankings_payload_from_report(
+    payload: PreKvkReportPayload,
+) -> RankingPayload:
+    metric = normalize_current_ranking_metric("prekvk", payload.sort_by.value)
+    ranking_rows = [
+        RankingRow(
+            rank=row.rank,
+            governor_id=int(row.governor_id),
+            governor_name=row.governor_name,
+            value=_prekvk_value(row, metric),
+            kvk_no=payload.kvk_no,
+            supporting_values={
+                "Power": row.power,
+                "Stage 1": row.stage1_points,
+                "Stage 2": row.stage2_points,
+                "Stage 3": row.stage3_points,
+                "Overall": row.overall_points,
+            },
+            raw={
+                "GovernorID": row.governor_id,
+                "GovernorName": row.governor_name,
+                "Power": row.power,
+                "Stage1Points": row.stage1_points,
+                "Stage2Points": row.stage2_points,
+                "Stage3Points": row.stage3_points,
+                "OverallPoints": row.overall_points,
+            },
+        )
+        for row in payload.rows
+    ]
+    filters: tuple[str, ...] = ()
+    if not payload.has_stage_data:
+        filters = ("Legacy total-only import",)
+    return RankingPayload(
+        mode="prekvk",
+        mode_label=CURRENT_RANKING_MODE_LABELS["prekvk"],
+        metric=metric,
+        metric_label=PREKVK_RANKING_METRIC_LABELS[metric],
+        limit=payload.limit,
+        rows=ranking_rows,
+        kvk_no=payload.kvk_no,
+        freshness_label=_latest_refresh_label(
+            [{"ScanTimestampUTC": payload.scan_timestamp_utc}] if payload.scan_timestamp_utc else []
+        ),
+        source_note=payload.source_filename or "Latest PreKvK import",
+        source_state="fresh" if ranking_rows else "empty",
+        filters=filters,
+        total_rows=len(ranking_rows),
+        empty_message=f"No PreKvK import found for KVK {payload.kvk_no}.",
+    )
+
+
+async def build_prekvk_rankings_payload(
+    *,
+    metric: str = PreKvkReportSort.OVERALL.value,
+    limit: int = 10,
+) -> RankingPayload:
+    normalized_metric = normalize_current_ranking_metric("prekvk", metric)
+    sort_by = report_service.parse_report_sort(normalized_metric)
+    payload = await report_service.build_prekvk_report_payload(
+        kvk_no=None,
+        sort_by=sort_by,
+        limit=normalize_ranking_limit(limit),
+    )
+    return build_prekvk_rankings_payload_from_report(payload)
+
+
+async def build_current_rankings_payload(
+    *,
+    mode: str,
+    metric: str | None = None,
+    limit: int = 10,
+) -> RankingPayload:
+    parsed_mode = parse_current_ranking_mode(mode)
+    normalized_metric = normalize_current_ranking_metric(parsed_mode, metric)
+    normalized_limit = normalize_ranking_limit(limit)
+    if parsed_mode == "kvk":
+        return await build_kvk_rankings_payload(metric=normalized_metric, limit=normalized_limit)
+    if parsed_mode == "honor":
+        return await build_honor_rankings_payload(limit=normalized_limit)
+    return await build_prekvk_rankings_payload(metric=normalized_metric, limit=normalized_limit)
 
 
 def build_hall_of_fame_payload_from_rows(

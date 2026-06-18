@@ -87,11 +87,8 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     async def fake_honor(ctx_arg):
         calls.append(("honor", ctx_arg))
 
-    async def fake_defer(ctx_arg, *, ephemeral=False):
-        calls.append(("defer", ephemeral, ctx_arg))
-
-    async def fake_prekvk_report(**kwargs):
-        calls.append(("prekvk", kwargs))
+    async def fake_prekvk(ctx_arg):
+        calls.append(("prekvk", ctx_arg))
 
     async def fake_records(ctx_arg):
         calls.append(("records", ctx_arg))
@@ -106,15 +103,9 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     ctx.respond = fake_respond
     monkeypatch.setattr(kvk_cmds, "_send_kvk_rankings", fake_kvk)
     monkeypatch.setattr(kvk_cmds, "_send_honor_rankings", fake_honor)
+    monkeypatch.setattr(kvk_cmds, "_send_prekvk_rankings", fake_prekvk)
     monkeypatch.setattr(kvk_cmds, "_send_hall_of_fame_rankings", fake_records)
     monkeypatch.setattr(kvk_cmds, "_run_channel_guarded", fake_channel_guarded)
-    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_defer)
-    monkeypatch.setattr(kvk_cmds, "send_prekvk_report", fake_prekvk_report)
-    monkeypatch.setattr(
-        kvk_cmds.report_service,
-        "parse_report_sort",
-        lambda value: f"parsed:{value}",
-    )
 
     await handler(ctx, "kvk")
     await handler(ctx, "honor")
@@ -131,19 +122,67 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
         "kvk rankings",
     )
     assert calls[3] == ("honor", ctx)
-    assert calls[4] == ("defer", True, ctx)
-    assert calls[5][0] == "prekvk"
-    assert calls[5][1]["ctx"] is ctx
-    assert calls[5][1]["sort_by"] == "parsed:Overall"
-    assert calls[5][1]["limit"] == 10
-    assert calls[6][0:4] == (
+    assert calls[4] == ("prekvk", ctx)
+    assert calls[5][0:4] == (
         "guard",
         kvk_cmds.KVK_PLAYER_STATS_CHANNEL_ID,
         True,
         "kvk rankings",
     )
-    assert calls[7] == ("records", ctx)
+    assert calls[6] == ("records", ctx)
     assert ctx.responded == [("Unknown ranking type.", True)]
+
+
+@pytest.mark.asyncio
+async def test_current_rankings_sends_unified_browser(monkeypatch):
+    import commands.kvk_cmds as kvk_cmds
+
+    created = {}
+    sent_message = object()
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        created["defer"] = ephemeral
+
+    async def fake_payload(**kwargs):
+        created["payload_kwargs"] = kwargs
+        return SimpleNamespace(
+            mode="prekvk",
+            metric="overall",
+            limit=10,
+        )
+
+    class StubView:
+        def __init__(self, *, mode, metric, limit):
+            self.mode = mode
+            self.metric = metric
+            self.limit = limit
+            self.message = None
+            created["view"] = self
+
+    class Followup:
+        async def send(self, **kwargs):
+            created["send_kwargs"] = kwargs
+            return sent_message
+
+    ctx = SimpleNamespace(followup=Followup())
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.kvk_rankings_service,
+        "build_current_rankings_payload",
+        fake_payload,
+    )
+    monkeypatch.setattr(kvk_cmds, "CurrentRankingsBrowserView", StubView)
+    monkeypatch.setattr(kvk_cmds, "build_current_rankings_embed", lambda payload: "embed")
+
+    await kvk_cmds._send_current_rankings(ctx, mode="prekvk")
+
+    assert created["defer"] is False
+    assert created["payload_kwargs"] == {"mode": "prekvk", "metric": None, "limit": 10}
+    assert created["send_kwargs"]["embed"] == "embed"
+    assert created["send_kwargs"]["view"] is created["view"]
+    assert created["send_kwargs"]["ephemeral"] is False
+    assert created["view"].message is sent_message
 
 
 @pytest.mark.asyncio

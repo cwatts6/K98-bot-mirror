@@ -7,6 +7,7 @@ from typing import Any
 
 PRIMARY_RANKING_LIMITS = (10, 25, 50)
 HALL_OF_FAME_RECORD_LIMIT = 10
+CURRENT_RANKING_MODES = ("kvk", "honor", "prekvk")
 
 
 class HallOfFameMetric(StrEnum):
@@ -40,6 +41,7 @@ class RankingRow:
     value: int | float
     kvk_no: int | None = None
     kvk_name: str | None = None
+    supporting_values: dict[str, int | float | str | None] = field(default_factory=dict)
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -52,3 +54,12 @@ class RankingPayload:
     rows: list[RankingRow] = field(default_factory=list)
     generated_at_utc: datetime = field(default_factory=lambda: datetime.now(UTC))
     source_note: str | None = None
+    source_state: str = "fresh"
+    mode_label: str | None = None
+    kvk_no: int | None = None
+    freshness_label: str | None = None
+    filters: tuple[str, ...] = ()
+    page: int = 1
+    total_pages: int = 1
+    total_rows: int | None = None
+    empty_message: str | None = None
