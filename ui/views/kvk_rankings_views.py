@@ -28,7 +28,7 @@ from kvk.rendering.kvk_rankings_embed import (
     build_hall_of_fame_embed,
     build_my_rank_embed,
 )
-from kvk.services import kvk_rankings_service
+from kvk.services import kvk_rankings_export_service, kvk_rankings_service
 
 logger = logging.getLogger(__name__)
 
@@ -337,6 +337,15 @@ class CurrentRankingsBrowserView(discord.ui.View):
         my_rank_button.callback = self.on_my_rank
         self.add_item(my_rank_button)
 
+        export_button = discord.ui.Button(
+            label="Full List CSV",
+            style=discord.ButtonStyle.secondary,
+            custom_id="kvk_rankings_current_export_csv",
+            row=2,
+        )
+        export_button.callback = self.on_export_csv
+        self.add_item(export_button)
+
     def _sync_from_payload(self, payload: RankingPayload) -> None:
         self.mode = kvk_rankings_service.parse_current_ranking_mode(payload.mode)
         self.metric = kvk_rankings_service.normalize_current_ranking_metric(
@@ -516,6 +525,73 @@ class CurrentRankingsBrowserView(discord.ui.View):
                 )
             except Exception:
                 logger.debug("kvk_current_rankings_my_rank_response_failed", exc_info=True)
+
+    async def on_export_csv(self, interaction: discord.Interaction) -> None:
+        if not await self._ensure_interaction_allowed_for_mode(interaction, self.mode):
+            return
+        await _defer_private(interaction)
+        try:
+            export = await kvk_rankings_export_service.build_current_rankings_csv_export(
+                mode=self.mode,
+                metric=self.metric,
+                limit=self.limit,
+            )
+        except Exception:
+            logger.exception(
+                "kvk_current_rankings_csv_export_failed mode=%s metric=%s limit=%s",
+                self.mode,
+                self.metric,
+                self.limit,
+            )
+            try:
+                await interaction.followup.send(
+                    "CSV export failed to build. Please try again.",
+                    ephemeral=True,
+                )
+            except Exception:
+                logger.debug("kvk_current_rankings_csv_export_error_response_failed", exc_info=True)
+            return
+
+        if export.row_count <= 0:
+            await interaction.followup.send(
+                export.payload.empty_message or "No ranking rows are available to export.",
+                ephemeral=True,
+            )
+            return
+
+        if export.is_oversized():
+            await interaction.followup.send(
+                "CSV export is too large for Discord upload. Please try again after the next refresh.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            export.csv_bytes.seek(0)
+            await interaction.followup.send(
+                content=f"CSV export ready: {export.row_count:,} ranked rows.",
+                file=discord.File(export.csv_bytes, filename=export.filename),
+                ephemeral=True,
+            )
+        except Exception:
+            logger.exception(
+                "kvk_current_rankings_csv_export_upload_failed mode=%s metric=%s limit=%s rows=%s bytes=%s",
+                self.mode,
+                self.metric,
+                self.limit,
+                export.row_count,
+                export.byte_count,
+            )
+            try:
+                await interaction.followup.send(
+                    "CSV export failed to upload. Please try again.",
+                    ephemeral=True,
+                )
+            except Exception:
+                logger.debug(
+                    "kvk_current_rankings_csv_export_upload_response_failed",
+                    exc_info=True,
+                )
 
     async def on_timeout(self) -> None:
         for item in self.children:

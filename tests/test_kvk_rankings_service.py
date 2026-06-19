@@ -1,9 +1,13 @@
+import csv
+from datetime import UTC, datetime
 from decimal import Decimal
+import io
 
 import pytest
 
 from kvk.models.kvk_rankings import HallOfFameMetric, RankingPayload, RankingRow
-from kvk.services import kvk_rankings_service
+from kvk.rendering import kvk_rankings_csv
+from kvk.services import kvk_rankings_export_service, kvk_rankings_service
 from prekvk.models import PreKvkReportPayload, PreKvkReportRow, PreKvkReportSort
 from services import governor_account_service
 
@@ -233,6 +237,127 @@ def test_build_kvk_rankings_payload_can_keep_full_internal_rank_set():
     assert internal_payload.limit == 10
     assert internal_payload.rows[-1].rank == 11
     assert internal_payload.total_rows == 11
+
+
+def test_current_rankings_csv_export_uses_full_payload_context_and_safe_cells():
+    payload = RankingPayload(
+        mode="kvk",
+        mode_label="KVK",
+        metric="kills",
+        metric_label="Kills",
+        limit=10,
+        generated_at_utc=datetime(2026, 6, 19, 12, 30, 5, tzinfo=UTC),
+        freshness_label="2026-06-19 12:00 UTC",
+        source_note="+1198_honor.csv",
+        filters=("@filter", "STATUS = INCLUDED"),
+        total_rows=1,
+        rows=[
+            RankingRow(
+                rank=1,
+                governor_id=123,
+                governor_name="=Bad\nName",
+                value=1000,
+                supporting_values={
+                    "Power": 100_000_000,
+                    "Kills": 1000,
+                    "% K/T": 125,
+                    "Deads": 50,
+                    "DKP": 10_000,
+                    "Acclaim": 500,
+                    "Tanking Score": 20,
+                    "Kill Points": 2000,
+                    "Healed": 100,
+                },
+            )
+        ],
+    )
+
+    export = kvk_rankings_export_service.build_current_rankings_csv_export_from_payload(payload)
+    text = export.csv_bytes.getvalue().decode("utf-8-sig")
+    rows = list(csv.DictReader(io.StringIO(text)))
+
+    assert export.filename == "kvk_rankings_full_list_kvk_kills_20260619_123005.csv"
+    assert export.row_count == 1
+    assert rows[0]["Mode"] == "KVK"
+    assert rows[0]["Metric"] == "Kills"
+    assert rows[0]["GeneratedAtUTC"] == "2026-06-19T12:30:05Z"
+    assert rows[0]["Freshness"] == "2026-06-19 12:00 UTC"
+    assert rows[0]["Source"] == "'+1198_honor.csv"
+    assert rows[0]["Filters"] == "'@filter; STATUS = INCLUDED"
+    assert rows[0]["GovernorID"] == "123"
+    assert rows[0]["GovernorName"] == "'=Bad Name"
+    assert rows[0]["SelectedValue"] == "1000"
+    assert rows[0]["PercentKillTarget"] == "125"
+    assert rows[0]["TankingScore"] == "20"
+    assert rows[0]["KillPoints"] == "2000"
+
+
+def test_current_rankings_csv_headers_are_mode_specific():
+    base_kwargs = {
+        "metric": "honor",
+        "metric_label": "Honor",
+        "limit": 10,
+        "rows": [],
+    }
+
+    honor_headers = kvk_rankings_csv.current_rankings_csv_headers(
+        RankingPayload(mode="honor", mode_label="Honor", **base_kwargs)
+    )
+    prekvk_headers = kvk_rankings_csv.current_rankings_csv_headers(
+        RankingPayload(
+            mode="prekvk",
+            mode_label="PreKvK",
+            metric="overall",
+            metric_label="Overall",
+            limit=10,
+            rows=[],
+        )
+    )
+
+    assert honor_headers[-2:] == ("Honor", "KVK")
+    assert prekvk_headers[-5:] == ("Power", "Stage1", "Stage2", "Stage3", "Overall")
+
+
+@pytest.mark.asyncio
+async def test_build_current_rankings_csv_export_fetches_full_payload(monkeypatch):
+    calls = {}
+    payload = RankingPayload(
+        mode="prekvk",
+        mode_label="PreKvK",
+        metric="stage1",
+        metric_label="Stage 1",
+        limit=25,
+        rows=[
+            RankingRow(
+                rank=1,
+                governor_id=456,
+                governor_name="Pre",
+                value=500,
+                supporting_values={"Stage 1": 500},
+            )
+        ],
+    )
+
+    async def fake_payload(**kwargs):
+        calls.update(kwargs)
+        return payload
+
+    monkeypatch.setattr(kvk_rankings_service, "build_current_rankings_payload", fake_payload)
+
+    export = await kvk_rankings_export_service.build_current_rankings_csv_export(
+        mode="prekvk",
+        metric="stage1",
+        limit=25,
+    )
+
+    assert calls == {
+        "mode": "prekvk",
+        "metric": "stage1",
+        "limit": 25,
+        "include_all": True,
+    }
+    assert export.row_count == 1
+    assert export.filename.startswith("kvk_rankings_full_list_prekvk_stage1_")
 
 
 def test_build_honor_rankings_payload_preserves_scan_context():

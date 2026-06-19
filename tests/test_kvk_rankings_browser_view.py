@@ -50,7 +50,7 @@ async def test_current_rankings_browser_exposes_mode_metric_and_primary_limits()
     view = CurrentRankingsBrowserView(mode="prekvk", metric="stage2", limit=25)
 
     labels = _labels(view)
-    assert labels == ["Top 10", "Top 25", "Top 50", "My Rank"]
+    assert labels == ["Top 10", "Top 25", "Top 50", "My Rank", "Full List CSV"]
     assert "Top 100" not in labels
     assert view.mode_select is not None
     assert [option.value for option in view.mode_select.options] == ["kvk", "honor", "prekvk"]
@@ -435,6 +435,201 @@ async def test_current_rankings_browser_my_rank_sends_private_account_selector(m
     assert isinstance(selector_view, kvk_rankings_views.CurrentRankingsMyRankAccountView)
     select = selector_view.children[0]
     assert [option.value for option in select.options] == ["123", "456"]
+
+
+@pytest.mark.asyncio
+async def test_current_rankings_browser_export_csv_sends_private_file(monkeypatch):
+    monkeypatch.setattr(kvk_rankings_views, "KVK_PLAYER_STATS_CHANNEL_ID", 100)
+    view = CurrentRankingsBrowserView(mode="prekvk", metric="stage1", limit=25)
+    sent = []
+    csv_bytes = BytesIO(b"rank,governor\n1,Pre")
+
+    class Export:
+        filename = "kvk_rankings_full_list_prekvk_stage1_20260619_120000.csv"
+        row_count = 1
+        payload = SimpleNamespace(empty_message=None)
+        byte_count = len(csv_bytes.getvalue())
+
+        def __init__(self):
+            self.csv_bytes = csv_bytes
+
+        def is_oversized(self):
+            return False
+
+    async def fake_export(**kwargs):
+        assert kwargs == {
+            "mode": "prekvk",
+            "metric": "stage1",
+            "limit": 25,
+        }
+        return Export()
+
+    class Followup:
+        async def send(self, content=None, **kwargs):
+            sent.append((content, kwargs))
+
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_export_service,
+        "build_current_rankings_csv_export",
+        fake_export,
+    )
+    monkeypatch.setattr(
+        kvk_rankings_views.discord,
+        "File",
+        lambda fp, *, filename: SimpleNamespace(fp=fp, filename=filename),
+    )
+
+    interaction = _channel_interaction(channel_id=100, user_id=200, followup=Followup())
+
+    await view.on_export_csv(interaction)
+
+    assert interaction.response.defer_kwargs == {"ephemeral": True}
+    assert sent[0][0] == "CSV export ready: 1 ranked rows."
+    assert sent[0][1]["ephemeral"] is True
+    assert sent[0][1]["file"].filename == Export.filename
+    assert csv_bytes.tell() == 0
+
+
+@pytest.mark.asyncio
+async def test_current_rankings_browser_blocks_honor_export_outside_stats_channel_for_admin(
+    monkeypatch,
+):
+    monkeypatch.setattr(kvk_rankings_views, "KVK_PLAYER_STATS_CHANNEL_ID", 100)
+    monkeypatch.setattr(kvk_rankings_views, "_is_admin", lambda _user: True)
+    fetched = False
+
+    async def fake_export(**_kwargs):
+        nonlocal fetched
+        fetched = True
+        raise AssertionError("honor export should not be fetched outside stats channel")
+
+    view = CurrentRankingsBrowserView(mode="honor", metric="honor", limit=10)
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_export_service,
+        "build_current_rankings_csv_export",
+        fake_export,
+    )
+
+    interaction = _channel_interaction(channel_id=999, user_id=1)
+
+    await view.on_export_csv(interaction)
+
+    assert fetched is False
+    assert interaction.response.sent
+    assert "<#100>" in interaction.response.sent[0][0]
+    assert interaction.response.sent[0][1]["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+async def test_current_rankings_browser_export_csv_reports_empty_payload(monkeypatch):
+    monkeypatch.setattr(kvk_rankings_views, "KVK_PLAYER_STATS_CHANNEL_ID", 100)
+    view = CurrentRankingsBrowserView(mode="kvk", metric="kills", limit=10)
+    sent = []
+
+    class Export:
+        row_count = 0
+        payload = SimpleNamespace(empty_message="No rows to export.")
+
+        def is_oversized(self):
+            return False
+
+    async def fake_export(**_kwargs):
+        return Export()
+
+    class Followup:
+        async def send(self, content=None, **kwargs):
+            sent.append((content, kwargs))
+
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_export_service,
+        "build_current_rankings_csv_export",
+        fake_export,
+    )
+
+    interaction = _channel_interaction(channel_id=100, followup=Followup())
+
+    await view.on_export_csv(interaction)
+
+    assert sent == [("No rows to export.", {"ephemeral": True})]
+
+
+@pytest.mark.asyncio
+async def test_current_rankings_browser_export_csv_reports_oversized_payload(monkeypatch):
+    monkeypatch.setattr(kvk_rankings_views, "KVK_PLAYER_STATS_CHANNEL_ID", 100)
+    view = CurrentRankingsBrowserView(mode="kvk", metric="kills", limit=10)
+    sent = []
+
+    class Export:
+        row_count = 1
+        payload = SimpleNamespace(empty_message=None)
+
+        def is_oversized(self):
+            return True
+
+    async def fake_export(**_kwargs):
+        return Export()
+
+    class Followup:
+        async def send(self, content=None, **kwargs):
+            sent.append((content, kwargs))
+
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_export_service,
+        "build_current_rankings_csv_export",
+        fake_export,
+    )
+
+    interaction = _channel_interaction(channel_id=100, followup=Followup())
+
+    await view.on_export_csv(interaction)
+
+    assert "too large" in sent[0][0]
+    assert sent[0][1]["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+async def test_current_rankings_browser_export_csv_reports_upload_failure(monkeypatch):
+    monkeypatch.setattr(kvk_rankings_views, "KVK_PLAYER_STATS_CHANNEL_ID", 100)
+    view = CurrentRankingsBrowserView(mode="kvk", metric="kills", limit=10)
+    sent = []
+
+    class Export:
+        filename = "rankings.csv"
+        row_count = 1
+        payload = SimpleNamespace(empty_message=None)
+        csv_bytes = BytesIO(b"csv")
+        byte_count = 3
+
+        def is_oversized(self):
+            return False
+
+    async def fake_export(**_kwargs):
+        return Export()
+
+    class Followup:
+        async def send(self, content=None, **kwargs):
+            sent.append((content, kwargs))
+            if "file" in kwargs:
+                raise RuntimeError("upload failed")
+
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_export_service,
+        "build_current_rankings_csv_export",
+        fake_export,
+    )
+    monkeypatch.setattr(
+        kvk_rankings_views.discord,
+        "File",
+        lambda fp, *, filename: SimpleNamespace(fp=fp, filename=filename),
+    )
+
+    interaction = _channel_interaction(channel_id=100, followup=Followup())
+
+    await view.on_export_csv(interaction)
+
+    assert "CSV export ready" in sent[0][0]
+    assert sent[0][1]["ephemeral"] is True
+    assert sent[1] == ("CSV export failed to upload. Please try again.", {"ephemeral": True})
 
 
 @pytest.mark.asyncio
