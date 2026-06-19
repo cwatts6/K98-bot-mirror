@@ -1,3 +1,4 @@
+from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
@@ -228,6 +229,51 @@ async def test_current_rankings_card_file_skips_ineligible_payload(monkeypatch):
     )
 
     assert await _top10_card_file(payload) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("mode", "metric", "filename"),
+    [
+        ("honor", "honor", "kvk_rankings_honor_top10_honor.png"),
+        ("prekvk", "overall", "kvk_rankings_prekvk_top10_overall.png"),
+    ],
+)
+async def test_current_rankings_card_file_accepts_honor_and_prekvk_top10(
+    monkeypatch,
+    mode,
+    metric,
+    filename,
+):
+    payload = RankingPayload(
+        mode=mode,
+        mode_label=mode.title(),
+        metric=metric,
+        metric_label=metric.title(),
+        limit=10,
+        rows=[
+            RankingRow(
+                rank=1,
+                governor_id=123,
+                governor_name="Alpha",
+                value=1000,
+                supporting_values={},
+            )
+        ],
+    )
+    rendered = SimpleNamespace(filename=filename, image_bytes=BytesIO(b"fake-png"))
+
+    monkeypatch.setattr(
+        kvk_rankings_views,
+        "render_kvk_rankings_top10_card",
+        lambda card_payload: rendered if card_payload is payload else None,
+    )
+
+    file = await _top10_card_file(payload)
+
+    assert file is not None
+    assert file.filename == filename
+    assert rendered.image_bytes.tell() == 0
 
 
 @pytest.mark.asyncio

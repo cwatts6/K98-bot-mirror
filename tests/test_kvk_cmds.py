@@ -261,6 +261,86 @@ async def test_current_rankings_sends_kvk_top10_visual_card_when_available(monke
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("mode", "metric", "filename"),
+    [
+        ("honor", "honor", "kvk_rankings_honor_top10_honor.png"),
+        ("prekvk", "overall", "kvk_rankings_prekvk_top10_overall.png"),
+    ],
+)
+async def test_current_rankings_sends_honor_and_prekvk_top10_visual_cards(
+    monkeypatch,
+    mode,
+    metric,
+    filename,
+):
+    import commands.kvk_cmds as kvk_cmds
+
+    created = {}
+    sent_message = object()
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        created["defer"] = ephemeral
+
+    async def fake_payload(**kwargs):
+        created["payload_kwargs"] = kwargs
+        return SimpleNamespace(
+            mode=mode,
+            metric=metric,
+            limit=10,
+            rows=[object()],
+        )
+
+    class StubView:
+        def __init__(self, *, mode, metric, limit):
+            self.mode = mode
+            self.metric = metric
+            self.limit = limit
+            self.message = None
+            created["view"] = self
+
+    class Followup:
+        async def send(self, **kwargs):
+            created["send_kwargs"] = kwargs
+            return sent_message
+
+    rendered = SimpleNamespace(
+        filename=filename,
+        image_bytes=BytesIO(b"fake-png"),
+    )
+    ctx = SimpleNamespace(followup=Followup())
+
+    monkeypatch.setattr(kvk_cmds, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(
+        kvk_cmds.kvk_rankings_service,
+        "build_current_rankings_payload",
+        fake_payload,
+    )
+    monkeypatch.setattr(kvk_cmds, "CurrentRankingsBrowserView", StubView)
+    monkeypatch.setattr(
+        kvk_cmds,
+        "build_current_rankings_embed",
+        lambda _payload: pytest.fail("embed should not be built on card success"),
+    )
+    monkeypatch.setattr(
+        kvk_cmds,
+        "render_kvk_rankings_top10_card",
+        lambda _payload: rendered,
+    )
+
+    await kvk_cmds._send_current_rankings(ctx, mode=mode)
+
+    assert created["defer"] is False
+    assert created["payload_kwargs"] == {"mode": mode, "metric": None, "limit": 10}
+    assert created["send_kwargs"]["file"].filename == filename
+    assert rendered.image_bytes.tell() == 0
+    assert "embed" not in created["send_kwargs"]
+    assert created["send_kwargs"]["view"] is created["view"]
+    assert created["send_kwargs"]["ephemeral"] is False
+    assert created["view"].message is sent_message
+
+
+@pytest.mark.asyncio
 async def test_current_rankings_falls_back_to_embed_when_card_send_fails(monkeypatch):
     import commands.kvk_cmds as kvk_cmds
 

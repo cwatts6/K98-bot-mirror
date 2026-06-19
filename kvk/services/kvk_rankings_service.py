@@ -394,7 +394,13 @@ def build_honor_rankings_payload_from_rows(
                 governor_name=name,
                 value=_to_int(raw.get("HonorPoints")),
                 kvk_no=_to_int(raw.get("KVK_NO")) if raw.get("KVK_NO") not in (None, "") else None,
-                supporting_values={"Honor": _to_int(raw.get("HonorPoints"))},
+                supporting_values={
+                    "Honor": _to_int(raw.get("HonorPoints")),
+                    "Governor ID": str(governor_id) if governor_id else None,
+                    "KVK": (
+                        _to_int(raw.get("KVK_NO")) if raw.get("KVK_NO") not in (None, "") else None
+                    ),
+                },
                 raw=dict(raw),
             )
         )

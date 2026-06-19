@@ -225,6 +225,8 @@ def test_build_honor_rankings_payload_preserves_scan_context():
     assert payload.freshness_label == "2026-06-18 08:30 UTC"
     assert payload.rows[0].governor_name == "123"
     assert payload.rows[0].supporting_values["Honor"] == 5000
+    assert payload.rows[0].supporting_values["Governor ID"] == "123"
+    assert payload.rows[0].supporting_values["KVK"] == 17
 
 
 def test_build_prekvk_rankings_payload_from_report_uses_report_rows():

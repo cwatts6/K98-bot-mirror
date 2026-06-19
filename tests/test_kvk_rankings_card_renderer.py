@@ -6,6 +6,7 @@ from PIL import Image
 
 from kvk.models.kvk_rankings import RankingPayload, RankingRow
 from kvk.rendering.kvk_rankings_card_renderer import (
+    _context_line,
     _records_context_line,
     _records_count_label,
     _records_darkening_overlay,
@@ -16,12 +17,20 @@ from kvk.rendering.kvk_rankings_card_renderer import (
 )
 
 
-def _payload(*, mode: str = "kvk", limit: int = 10, rows: int = 10) -> RankingPayload:
+def _payload(
+    *,
+    mode: str = "kvk",
+    metric: str = "kills",
+    metric_label: str = "Kills",
+    limit: int = 10,
+    rows: int = 10,
+) -> RankingPayload:
+    mode_label = {"kvk": "KVK", "honor": "Honor", "prekvk": "PreKvK"}.get(mode, "KVK")
     return RankingPayload(
         mode=mode,
-        mode_label="KVK",
-        metric="kills",
-        metric_label="Kills",
+        mode_label=mode_label,
+        metric=metric,
+        metric_label=metric_label,
         limit=limit,
         kvk_no=3,
         total_rows=63,
@@ -42,6 +51,12 @@ def _payload(*, mode: str = "kvk", limit: int = 10, rows: int = 10) -> RankingPa
                     "Tanking Score": 80.0 + idx,
                     "Kill Points": 200_000_000 - (idx * 1_000_000),
                     "Healed": 10_000_000 - (idx * 100_000),
+                    "Governor ID": str(1000 + idx),
+                    "KVK": 3,
+                    "Stage 1": 1_500_000 - (idx * 10_000),
+                    "Stage 2": 1_300_000 - (idx * 10_000),
+                    "Stage 3": 1_100_000 - (idx * 10_000),
+                    "Overall": 3_900_000 - (idx * 30_000),
                 },
             )
             for idx in range(1, rows + 1)
@@ -82,9 +97,25 @@ def test_kvk_rankings_top10_card_renders_from_payload_rows():
         assert image.size == (1180, 640)
 
 
-def test_kvk_rankings_top10_card_only_handles_current_kvk_top10():
+def test_current_rankings_top10_card_renders_honor_and_prekvk_modes():
+    honor = render_kvk_rankings_top10_card(
+        _payload(mode="honor", metric="honor", metric_label="Honor")
+    )
+    prekvk = render_kvk_rankings_top10_card(
+        _payload(mode="prekvk", metric="overall", metric_label="Overall")
+    )
+
+    assert honor is not None
+    assert honor.filename == "kvk_rankings_honor_top10_honor.png"
+    assert honor.image_bytes.getvalue().startswith(b"\x89PNG")
+    assert prekvk is not None
+    assert prekvk.filename == "kvk_rankings_prekvk_top10_overall.png"
+    assert prekvk.image_bytes.getvalue().startswith(b"\x89PNG")
+
+
+def test_kvk_rankings_top10_card_only_handles_current_top10_modes():
     assert render_kvk_rankings_top10_card(_payload(limit=25)) is None
-    assert render_kvk_rankings_top10_card(_payload(mode="honor")) is None
+    assert render_kvk_rankings_top10_card(_records_payload()) is None
     assert render_kvk_rankings_top10_card(_payload(rows=0)) is None
 
 
@@ -101,6 +132,18 @@ def test_kvk_rankings_top10_card_metric_support_texts_match_card_copy():
 
     assert _support_text(acclaim_payload, row) == "Kills 148.8M  |  Healed 9.9M"
     assert _support_text(tanking_payload, row) == "Kill Points 199M  |  Healed 9.9M"
+
+
+def test_current_rankings_top10_card_mode_specific_context_and_support_copy():
+    honor_payload = _payload(mode="honor", metric="honor", metric_label="Honor")
+    prekvk_payload = _payload(mode="prekvk", metric="overall", metric_label="Overall")
+
+    assert _context_line(honor_payload) == "Top 10  |  Honor  |  Latest honor scan  |  KVK 3"
+    assert _support_text(honor_payload, honor_payload.rows[0]) == "Governor ID 1001  |  KVK 3"
+    assert _context_line(prekvk_payload) == "Top 10  |  Overall  |  Latest PreKvK import  |  KVK 3"
+    assert _support_text(prekvk_payload, prekvk_payload.rows[0]) == (
+        "Stage 1 1.5M  |  Stage 2 1.3M"
+    )
 
 
 def test_hall_of_fame_top10_card_renders_from_records_payload_rows():

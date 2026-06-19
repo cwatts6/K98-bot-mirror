@@ -28,8 +28,15 @@ from kvk.rendering.kvk_stats_card_renderer import (
 ROOT = Path(__file__).resolve().parents[2]
 ASSET_DIR = ROOT / "assets" / "kvk" / "cards"
 KVK_RANKINGS_BACKGROUND = ASSET_DIR / "KVK_Rankings_Background.png"
+HONOR_RANKINGS_BACKGROUND = ASSET_DIR / "Honor_Rankings_Background.png"
+PREKVK_RANKINGS_BACKGROUND = ASSET_DIR / "Pre_KVK_Rankings_Background.png"
 HALL_OF_FAME_BACKGROUND = ASSET_DIR / "Hall_of_Fame_Kingdom_Records_Background.png"
 DEFAULT_BACKGROUND = ASSET_DIR / "Default_card.jpg"
+CURRENT_RANKING_BACKGROUNDS = {
+    "kvk": KVK_RANKINGS_BACKGROUND,
+    "honor": HONOR_RANKINGS_BACKGROUND,
+    "prekvk": PREKVK_RANKINGS_BACKGROUND,
+}
 
 AMBER = (255, 183, 77)
 METRIC_BLUE = (76, 151, 255)
@@ -39,15 +46,18 @@ BRIGHT_AMBER = (255, 198, 74)
 RANK_SHADOW = (18, 10, 5, 155)
 
 
-def _background_path() -> Path | None:
-    for path in (KVK_RANKINGS_BACKGROUND, DEFAULT_BACKGROUND):
+def _background_path(mode: str = "kvk") -> Path | None:
+    mode_background = CURRENT_RANKING_BACKGROUNDS.get(mode, KVK_RANKINGS_BACKGROUND)
+    for path in (mode_background, DEFAULT_BACKGROUND):
         if path.exists():
             return path
     return None
 
 
 def can_render_kvk_rankings_top10_card(payload: RankingPayload) -> bool:
-    return payload.mode == "kvk" and payload.limit == 10 and bool(payload.rows)
+    return (
+        payload.mode in CURRENT_RANKING_BACKGROUNDS and payload.limit == 10 and bool(payload.rows)
+    )
 
 
 def can_render_hall_of_fame_top10_card(payload: RankingPayload) -> bool:
@@ -55,6 +65,10 @@ def can_render_hall_of_fame_top10_card(payload: RankingPayload) -> bool:
 
 
 def _metric_color(metric: str) -> tuple[int, int, int]:
+    if metric in {"honor", "overall"}:
+        return BRIGHT_BLUE
+    if metric in {"stage1", "stage2", "stage3"}:
+        return BRIGHT_GOLD
     if metric in {"kills"}:
         return GREEN
     if metric in {"deads"}:
@@ -104,6 +118,16 @@ def _primary_value(payload: RankingPayload, row: RankingRow) -> str:
 
 
 def _support_keys(payload: RankingPayload) -> tuple[str, str]:
+    if payload.mode == "honor":
+        return ("Governor ID", "KVK")
+    if payload.mode == "prekvk":
+        by_prekvk_metric = {
+            "overall": ("Stage 1", "Stage 2"),
+            "stage1": ("Overall", "Power"),
+            "stage2": ("Overall", "Stage 1"),
+            "stage3": ("Overall", "Stage 2"),
+        }
+        return by_prekvk_metric.get(payload.metric, ("Overall", "Power"))
     by_metric = {
         "power": ("Kills", "DKP"),
         "kills": ("Power", "DKP"),
@@ -244,7 +268,7 @@ def _draw_top_card(
         row.governor_name,
         max_width=name_max,
         size=39,
-        min_size=24,
+        min_size=18,
     )
     value = _primary_value(payload, row)
     _draw_fitted(
@@ -313,6 +337,10 @@ def _draw_row(
 
 def _context_line(payload: RankingPayload) -> str:
     bits = [f"Top {payload.limit}", payload.metric_label]
+    if payload.mode == "honor":
+        bits.append("Latest honor scan")
+    elif payload.mode == "prekvk":
+        bits.append("Latest PreKvK import")
     if payload.kvk_no is not None:
         bits.append(f"KVK {payload.kvk_no}")
     return "  |  ".join(bits)
@@ -322,11 +350,27 @@ def _footer(payload: RankingPayload) -> str:
     parts: list[str] = []
     if payload.freshness_label:
         parts.append(f"Last refreshed {payload.freshness_label}")
+    if payload.source_note and payload.mode in {"honor", "prekvk"}:
+        parts.append(payload.source_note)
     if payload.filters:
         parts.append("Filters: " + ", ".join(payload.filters))
     if not parts:
         parts.append(f"Generated {payload.generated_at_utc:%Y-%m-%d %H:%M UTC}")
     return "  |  ".join(parts)
+
+
+def _current_rankings_title(payload: RankingPayload) -> str:
+    if payload.mode == "honor":
+        return "Honor Rankings"
+    if payload.mode == "prekvk":
+        return "PreKvK Rankings"
+    return "KVK Rankings"
+
+
+def _current_card_filename(payload: RankingPayload) -> str:
+    if payload.mode == "kvk":
+        return f"kvk_rankings_top10_{payload.metric}.png"
+    return f"kvk_rankings_{payload.mode}_top10_{payload.metric}.png"
 
 
 def _records_background_path() -> Path | None:
@@ -569,11 +613,11 @@ def render_hall_of_fame_top10_card(payload: RankingPayload) -> RenderedRankingCa
 
 
 def render_kvk_rankings_top10_card(payload: RankingPayload) -> RenderedRankingCard | None:
-    """Render the current KVK Top 10 spotlight card from an already-shaped ranking payload."""
+    """Render a current-ranking Top 10 spotlight card from an already-shaped ranking payload."""
     if not can_render_kvk_rankings_top10_card(payload):
         return None
 
-    background = _background_path()
+    background = _background_path(payload.mode)
     if background is None:
         return None
 
@@ -586,7 +630,14 @@ def render_kvk_rankings_top10_card(payload: RankingPayload) -> RenderedRankingCa
     canvas = Image.alpha_composite(canvas, overlay)
     draw = ImageDraw.Draw(canvas, "RGBA")
 
-    _draw_text(draw, (42, 38), "KVK Rankings", fill=GOLD, font=_font(34, bold=True), bold=True)
+    _draw_text(
+        draw,
+        (42, 38),
+        _current_rankings_title(payload),
+        fill=GOLD,
+        font=_font(34, bold=True),
+        bold=True,
+    )
     _draw_fitted(
         draw,
         (42, 84),
@@ -654,6 +705,6 @@ def render_kvk_rankings_top10_card(payload: RankingPayload) -> RenderedRankingCa
     canvas.convert("RGB").save(buf, format="PNG", optimize=True)
     buf.seek(0)
     return RenderedRankingCard(
-        filename=f"kvk_rankings_top10_{payload.metric}.png",
+        filename=_current_card_filename(payload),
         image_bytes=buf,
     )
