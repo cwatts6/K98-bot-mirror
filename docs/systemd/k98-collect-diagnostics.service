@@ -1,0 +1,23 @@
+[Unit]
+Description=K98 - Collect runtime diagnostics (one-shot)
+Documentation=man:systemd-sysv-generator(8)
+After=network.target
+
+[Service]
+Type=oneshot
+User=botuser
+Group=botuser
+WorkingDirectory=/opt/k98-bot
+
+# Adjust ExecStart to point to your python virtualenv and desired output path
+ExecStart=/opt/k98-bot/venv/bin/python /opt/k98-bot/scripts/collect_diagnostics.py --output /var/tmp/k98-diagnostics.tar.gz --service k98-bot
+
+# Keep environment file consistent with main service. This should be the same file used by k98-bot.service
+EnvironmentFile=/etc/k98-bot/.env
+
+# Safety limits
+TimeoutStartSec=120
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
