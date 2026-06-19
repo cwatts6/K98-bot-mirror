@@ -199,3 +199,4 @@ tools/rg.exe
 .codex/
 .codex_artifacts/
 .codex_security_scans/
+.codex-security-scans/
