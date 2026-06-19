@@ -451,8 +451,8 @@ Use:
 
 ### Phase 5 — Unified `/kvk rankings` Visual/UX Polish
 
-Status: in progress. Phase 5A and Phase 5B are complete, smoke tested, merged to mirror, promoted
-through production, and pushed to production.
+Status: in progress. Phase 5A through Phase 5D are complete, smoke tested, merged to mirror,
+promoted through production, and pushed to production.
 
 Phase 5A delivered the first rankings hub foundation:
 
@@ -512,9 +512,28 @@ PR #463:
 - Legacy `/prekvk report` remains image-based.
 - Production smoke testing and visual polish are complete.
 
-The next sub-phase is Phase 5D: add Hall of Fame records Top 10 visual cards while preserving the
-stable current KVK card, Phase 5B unified browser, records Top 10-only policy, and all legacy
-commands.
+Phase 5D delivered the Hall of Fame records Top 10 visual cards in mirror PR #155 and production
+PR #464:
+
+- `/kvk rankings type:records` now renders a generated Hall of Fame Top 10 visual card for every
+  existing records metric.
+- Records card wording clearly presents all-time single-KVK performances, not lifetime totals.
+- The card uses the existing Hall of Fame ranking payload/service/DAL rows and does not
+  recalculate record semantics in the renderer.
+- The top-right summary shows the selected Top 10 against the metric-specific qualifying records
+  count from `dbo.v_EXCEL_FOR_KVK_Started`.
+- Records remain Top 10 only; no Top 25, Top 50, or Top 100 record controls were added.
+- Repeated-governor record appearances remain allowed.
+- Missing/uncollected historical metrics remain excluded and are not ranked as zero.
+- Card render/send failures fall back to the existing Hall of Fame embed.
+- Current KVK Top 10 cards, the Phase 5B unified browser, Top 25/50 compact current-ranking
+  output, Top 100 exclusion, legacy ranking commands, and image-based legacy `/prekvk report` were
+  preserved.
+- Production smoke testing and visual polish are complete.
+
+The next sub-phase is Phase 5E: add Honor and PreKvK Top 10 visual cards while preserving the
+stable current KVK card, records card, Phase 5B unified browser, Top 25/50 compact browser output,
+Honor no-admin-override channel gate, legacy commands, and image-based legacy `/prekvk report`.
 
 ### Phase 6 — Admin Command Hardening And Legacy Operator Cleanup
 
@@ -685,7 +704,10 @@ production PR #462, passed production smoke testing, and preserved the legacy ra
 Phase 5C has delivered the current KVK Top 10 visual ranking card in mirror PR #154 and production
 PR #463, including Kills default, KVK card metrics for Kills, % Kill Target, Deads, DKP, Acclaim,
 and Tanking Score, embed fallback, Top 25/50 compact browser preservation, Top 100 exclusion,
-legacy command preservation, production smoke testing, and visual polish. Start the next chat from
-the Phase 5D starter:
+legacy command preservation, production smoke testing, and visual polish. Phase 5D has delivered
+the Hall of Fame records Top 10 visual cards in mirror PR #155 and production PR #464, including
+all records metrics, metric-specific qualifying record counts, records Top 10-only controls,
+embed fallback, and successful production smoke testing. Start the next chat from the Phase 5E
+starter:
 
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5D Hall of Fame Records Visual Cards.md`
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5E Honor and PreKvK Visual Ranking Cards.md`

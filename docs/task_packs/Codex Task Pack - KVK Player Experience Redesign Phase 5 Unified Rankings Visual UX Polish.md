@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 4 completion`
 - Task type: `feature / UX redesign / Discord interaction polish / renderer-service-DAL cleanup / staged implementation plan`
 - One-pass approved: `no`
-- Status: `Phase 5A, Phase 5B, and Phase 5C complete; Phase 5D ready for next-chat delivery`
+- Status: `Phase 5A, Phase 5B, Phase 5C, and Phase 5D complete; Phase 5E ready for next-chat delivery`
 
 ## Phase 5A Completion Note
 
@@ -93,16 +93,46 @@ Delivered Phase 5C scope:
 - Added focused renderer/service/view/command coverage plus visual sample generation and
   inspection.
 
+## Phase 5D Completion Note
+
+Phase 5D is complete. It was delivered in mirror PR #155, promoted through production PR #464,
+pushed to production, and smoke tested successfully.
+
+Delivered Phase 5D scope:
+
+- Added a Pillow-rendered Top 10 Hall of Fame visual card for `/kvk rankings type:records`.
+- Supported all existing Hall of Fame records metrics: Kills, KillPoints, Deads, DKP, Healed,
+  Acclaim, Honor, and PreKvK where source data produces qualifying values.
+- Used the existing Hall of Fame ranking payload/service/DAL rows rather than recalculating
+  source-of-truth record semantics in the renderer.
+- Added metric-specific qualifying record totals from the Hall of Fame DAL so cards can show
+  `Top 10 from N records` for the selected metric.
+- Kept records Top 10 only; no Hall of Fame Top 25, Top 50, or Top 100 controls were added.
+- Preserved repeated-governor record appearances because records remain single-KVK performances,
+  not unique-player lifetime standings.
+- Preserved missing/uncollected historical metric exclusion and did not rank missing values as
+  zero.
+- Preserved embed fallback for records card render/send failures.
+- Preserved the Phase 5C current KVK Top 10 card, Phase 5B unified browser, Top 25/50 compact
+  browser output, Top 100 exclusion, legacy ranking commands, and image-based legacy
+  `/prekvk report`.
+- Polished the card through smoke-test feedback: removed developer-note footer wording, replaced
+  duplicate header copy with metric-specific record totals, cached the darkening overlay, fixed
+  symmetric shading, and centered the top-three podium text.
+- Generated and inspected local visual samples, ran focused tests, standard validators,
+  pre-commit, full pytest during PR handoff, and Codex Security with no reportable findings.
+
 Next Phase 5 sub-phase:
 
-- Phase 5D should add the Hall of Fame records Top 10 visual card layer, starting with records
-  mode rather than broadening the current-ranking card surface again.
-- Preserve the delivered current KVK Top 10 card and Phase 5B unified browser behaviour.
-- Keep records Top 10 only and clearly label records as all-time single-KVK performances, not
-  lifetime totals.
-- Do not add Hall of Fame Top 25/50/100 controls.
-- Do not remove legacy commands.
-- Make Honor and PreKvK Top 10 visual cards the next visual completion slice in Phase 5E.
+- Phase 5E should add Honor and PreKvK Top 10 visual card layers using the shared ranking payloads.
+- Preserve the delivered current KVK Top 10 card, records Top 10 card, and Phase 5B unified
+  browser behaviour.
+- Keep Top 25 and Top 50 on the compact browser unless a later approved visual sub-phase expands
+  them.
+- Keep Top 100 out of primary player controls.
+- Preserve Honor's no-admin-override KVK stats channel gate.
+- Preserve legacy commands during rollout.
+- Preserve image-based legacy `/prekvk report`.
 - Keep My Rank/export and legacy-ranking consolidation in the Phase 5 delivery plan after the
   visual-card slices, now starting in Phase 5F unless later scope changes are approved.
 - Continue to capture all deferred optimisations that remain part of "rankings done right" so they
@@ -702,16 +732,20 @@ The working recommendation is:
      only, legacy commands, and image-based legacy `/prekvk report`.
 
 4. **Phase 5D: Hall of Fame records Top 10 visual cards**
-   - Generate Hall of Fame cards for all-time single-KVK record categories after confirming
-     records-card wording and sparse-metric handling.
-   - Use the delivered records payload/DAL/service rows rather than recalculating records in the
+   - Complete. Delivered in mirror PR #155 and production PR #464, then smoke tested and polished
+     in production.
+   - Added Hall of Fame cards for all existing all-time single-KVK record categories.
+   - Used the delivered records payload/DAL/service rows rather than recalculating records in the
      renderer.
-   - Use records-specific backgrounds and shared card primitives.
-   - Keep records Top 10 only; do not add records Top 25, Top 50, or Top 100 controls.
-   - Preserve current KVK Top 10 cards, compact browser output, embed fallback, and legacy commands.
-   - Preserve Honor and PreKvK for the next visual-card slice rather than expanding 5D.
+   - Added metric-specific qualifying record counts for `Top 10 from N records` wording.
+   - Kept records Top 10 only; no records Top 25, Top 50, or Top 100 controls were added.
+   - Preserved current KVK Top 10 cards, compact browser output, embed fallback, legacy commands,
+     repeated-governor appearances, missing historical metric exclusion, and image-based legacy
+     `/prekvk report`.
+   - Preserved Honor and PreKvK for the next visual-card slice rather than expanding 5D.
 
 5. **Phase 5E: Honor and PreKvK Top 10 visual cards**
+   - Next active sub-phase.
    - Audit Honor and PreKvK card value, freshness wording, support values, and visual hierarchy.
    - Add visual Top 10 cards for one or both modes using the shared ranking payloads.
    - Preserve Honor's no-admin-override KVK stats channel gate.
@@ -1132,8 +1166,8 @@ For implementation stages:
 
 ## 23. Codex Chat Starter
 
-Historical starter for Phase 5A. Phase 5A, Phase 5B, and Phase 5C are complete; use
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5D Hall of Fame Records Visual Cards.md`
+Historical starter for Phase 5A. Phase 5A, Phase 5B, Phase 5C, and Phase 5D are complete; use
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5E Honor and PreKvK Visual Ranking Cards.md`
 for the next delivery chat.
 
 ```text

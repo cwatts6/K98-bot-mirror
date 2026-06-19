@@ -8,11 +8,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `/kvk rankings type:honor`, `/kvk rankings type:prekvk`, `ui/views/kvk_rankings_views.py`, `prekvk/report_image_renderer.py`
 - Type: consistency
-- Description: Phase 5C delivered current KVK Top 10 cards and Phase 5D delivers Hall of Fame records cards, leaving Honor and PreKvK Top 10 rankings as the remaining visual gap in `/kvk rankings`. They still use the unified compact embed browser, while legacy `/prekvk report` remains image-based.
+- Description: Phase 5C delivered current KVK Top 10 cards and Phase 5D delivered Hall of Fame records cards, leaving Honor and PreKvK Top 10 rankings as the remaining visual gap in `/kvk rankings`. They still use the unified compact embed browser, while legacy `/prekvk report` remains image-based.
 - Suggested Fix: Scope Phase 5E as the Honor and PreKvK Top 10 visual-card slice. Audit data freshness context, metric-specific support values, Honor channel-gate preservation, and PreKvK report-image coexistence before implementing cards for one or both modes.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5B unified current-ranking browser validation, Phase 5C current KVK card feedback, Phase 5D records-card delivery, Honor channel-gate preservation, and PreKvK image-report preservation.
+- Dependencies: Phase 5B unified current-ranking browser validation, Phase 5C current KVK card feedback, completed Phase 5D records-card delivery, Honor channel-gate preservation, and PreKvK image-report preservation.
 
 ### Deferred Optimisation
 - Area: `/kvk rankings` current-ranking browser, registry/account lookup, `kvk/services/kvk_rankings_service.py`, `ui/views/kvk_rankings_views.py`
