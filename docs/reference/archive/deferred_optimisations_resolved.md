@@ -3,6 +3,25 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Phase 5G Completed Items
+- Area: `/kvk rankings type:honor`, `kvk/rendering/kvk_rankings_embed.py`
+- Type: consistency
+- Description: Phase 5E smoke testing found that Honor Top 25 and Top 50 compact browser output listed the correct ranked governors but no ranking values were displayed.
+- Resolution: Phase 5G added an Honor compact value column so Top 25 and Top 50 embed/browser rows display the selected Honor value, then smoke-test polish made compact row fitting display-width aware for names with wide/special characters. The Honor Top 10 visual card, Honor no-admin-override channel gate, and legacy `/honor_rankings` were preserved.
+- Validation: Focused compact embed tests cover Honor Top 25 value rendering and fixed-width row alignment, including wide-character governor names.
+
+- Area: `/kvk rankings type:prekvk`, `kvk/rendering/kvk_rankings_embed.py`
+- Type: consistency
+- Description: Phase 5E smoke testing found that PreKvK Top 25 and Top 50 compact browser output had column alignment drift similar to the earlier KVK Top 25/50 issue. Long names and multi-metric columns could wrap or shift values onto confusing lines.
+- Resolution: Phase 5G tightened PreKvK compact fixed-width formatting with short stage headers, preserved near-billion value units by normalising rounded `1000.0M` output to `1.0B`, and made compact row fitting display-width aware for names with wide/special characters. Overall, Stage 1, Stage 2, Stage 3, Power, freshness/source footer, and image-based legacy `/prekvk report` were preserved.
+- Validation: Focused compact embed tests cover PreKvK Top 50 fixed-width row shape, long-name truncation, near-billion Power values, and wide-character governor names.
+
+- Area: `/kvk rankings type:kvk`, `kvk/rendering/kvk_rankings_card_renderer.py`
+- Type: consistency
+- Description: Phase 5E smoke testing confirmed the current KVK Top 10 visual card still left-aligned the top-three podium text, while Records, Honor, and PreKvK cards centered podium ranks/names/values.
+- Resolution: Phase 5G moved the current KVK Top 10 podium into the shared centered rendering path while preserving existing KVK card metrics, support values, footer/filter wording, and embed fallback.
+- Validation: Focused renderer tests verify the KVK podium uses centered text rendering, and a local card sample was generated for visual inspection.
+
 ### Phase 5F-1 Completed Item
 - Area: `/kvk rankings` current-ranking browser, registry/account lookup, `kvk/services/kvk_rankings_service.py`, `ui/views/kvk_rankings_views.py`
 - Type: architecture

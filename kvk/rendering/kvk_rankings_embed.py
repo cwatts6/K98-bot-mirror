@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+import unicodedata
 
 import discord
 
@@ -31,16 +32,48 @@ def _format_cell_value(label: str, value: Any) -> str:
     if isinstance(value, str):
         return value
     try:
-        return fmt_short(value)
+        formatted = fmt_short(value)
     except Exception:
         return str(value)
+    if formatted == "1000.0M":
+        return "1.0B"
+    return formatted
+
+
+def _char_display_width(char: str) -> int:
+    if unicodedata.combining(char):
+        return 0
+    if unicodedata.category(char) in {"Cf", "Mn", "Me"}:
+        return 0
+    if unicodedata.east_asian_width(char) in {"F", "W"}:
+        return 2
+    return 1
+
+
+def _display_width(value: Any) -> int:
+    return sum(_char_display_width(char) for char in str(value))
+
+
+def _truncate_to_display_width(text: str, width: int) -> str:
+    if _display_width(text) <= width:
+        return text
+    target = max(1, width - 1)
+    used = 0
+    chars: list[str] = []
+    for char in text:
+        char_width = _char_display_width(char)
+        if used + char_width > target:
+            break
+        chars.append(char)
+        used += char_width
+    return "".join(chars).rstrip() + "."
 
 
 def _fit_cell(value: Any, width: int, *, right: bool = False) -> str:
     text = " ".join(str(value).replace("`", "'").split())
-    if len(text) > width:
-        text = text[: max(1, width - 1)].rstrip() + "."
-    return text.rjust(width) if right else text.ljust(width)
+    text = _truncate_to_display_width(text, width)
+    padding = max(0, width - _display_width(text))
+    return (" " * padding + text) if right else (text + " " * padding)
 
 
 def _clean_rank_text(value: Any) -> str:
@@ -69,14 +102,16 @@ def _ranking_columns(payload: RankingPayload) -> tuple[_TableColumn, ...]:
         return tuple(columns[metric] for metric in dict.fromkeys(order) if metric in columns)
     if payload.mode == "prekvk":
         columns = {
-            "power": _TableColumn("Power", "Power", 7),
-            "stage1": _TableColumn("Stage 1", "Stage 1", 7),
-            "stage2": _TableColumn("Stage 2", "Stage 2", 7),
-            "stage3": _TableColumn("Stage 3", "Stage 3", 7),
+            "power": _TableColumn("Power", "Power", 6),
+            "stage1": _TableColumn("S1", "Stage 1", 6),
+            "stage2": _TableColumn("S2", "Stage 2", 6),
+            "stage3": _TableColumn("S3", "Stage 3", 6),
             "overall": _TableColumn("Overall", "Overall", 7),
         }
         order = (payload.metric, "power", "stage1", "stage2", "stage3", "overall")
         return tuple(columns[metric] for metric in dict.fromkeys(order) if metric in columns)
+    if payload.mode == "honor":
+        return (_TableColumn("Honor", "Honor", 8),)
     return ()
 
 

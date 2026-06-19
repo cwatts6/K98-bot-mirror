@@ -1,5 +1,28 @@
 # Codex Chat Starter - KVK Player Experience Redesign Phase 5F-2 CSV Full-List Export
 
+Status: complete. Phase 5F-2 was delivered in mirror PR #159 and production PR #467, pushed to
+production, smoke tested successfully, and polished through review/smoke-test feedback.
+
+Delivered summary:
+
+- Added private `Full List CSV` export for current KVK, Honor, and PreKvK rankings.
+- Preserved Top 100 exclusion, My Rank, Top 10 visual cards, Top 25/50 compact browser output,
+  records Top 10-only controls, Honor channel gating, legacy ranking commands, and image-based
+  legacy `/prekvk report`.
+- Generated CSV in memory with deterministic filenames, formula-leading cell escaping, private
+  failure handling, and clean leaderboard-only columns.
+- Final CSV columns:
+  - Honor: `Rank`, `GovernorID`, `GovernorName`, `Honor`, `KVK`.
+  - KVK: `Rank`, `GovernorID`, `GovernorName`, `Power`, `Kills`, `PercentKillTarget`, `Deads`,
+    `DKP`, `Acclaim`, `TankingScore`, `KillPoints`, `Healed`.
+  - PreKvK: `Rank`, `GovernorID`, `GovernorName`, `Power`, `Stage1`, `Stage2`, `Stage3`,
+    `Overall`.
+- Restored KVK Top 10 `Kill Points` and `Healed` metric selection.
+
+Next starter, now completed by Phase 5G:
+
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5G Rankings Wrap-up Polish.md`
+
 Phase 5A, Phase 5B, Phase 5C, Phase 5D, Phase 5E, and Phase 5F-1 are complete.
 
 - Phase 5A: mirror PR #152 and production PR #461 delivered
@@ -155,12 +178,13 @@ Scope:
 21. Capture any out-of-scope findings structurally.
 
 Known out-of-scope follow-up already captured:
-- Phase 5G wrap-up polish:
-  - Honor Top 25/Top 50 compact output is missing values.
-  - PreKvK Top 25/Top 50 compact output needs fixed-width column alignment.
-  - Current KVK Top 10 card podium ranks/text should be centered to match Records, Honor, and
-    PreKvK.
-- Phase 5H performance optimisation:
+- Phase 5G wrap-up polish is complete:
+  - Honor Top 25/Top 50 compact output displays values.
+  - PreKvK Top 25/Top 50 compact output uses fixed-width alignment.
+  - Compact rows preserve near-billion value units and align wide/special-character governor
+    names by display width.
+  - Current KVK Top 10 card podium ranks/text are centered to match Records, Honor, and PreKvK.
+- Phase 5H performance optimisation remains active:
   - Ranking-card render/load latency should be profiled and optimised before Phase 5 closes.
 - Legacy-ranking consolidation/deprecation remains separate and requires usage evidence plus
   rollout approval.
@@ -235,5 +259,5 @@ Acceptance criteria:
 - No SQL is added to command, view, renderer, or export formatting modules.
 - Focused tests and standard validators pass.
 - Codex Security is run or explicitly justified.
-- Remaining Phase 5G/5H deferred work stays captured structurally.
+- Remaining Phase 5H deferred work stays captured structurally.
 ```

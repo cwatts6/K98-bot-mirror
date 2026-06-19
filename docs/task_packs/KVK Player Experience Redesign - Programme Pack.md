@@ -451,9 +451,11 @@ Use:
 
 ### Phase 5 — Unified `/kvk rankings` Visual/UX Polish
 
-Status: in progress. Phase 5A through Phase 5E and Phase 5F-1 are complete, smoke tested, merged
-to mirror, promoted through production, and pushed to production. Phase 5F-2 CSV/full-list export
-is the next active slice.
+Status: in progress. Phase 5A through Phase 5G are complete. Phase 5A through Phase 5F-2 were
+smoke tested, merged to mirror, promoted through production, and pushed to production. Phase 5G
+wrap-up visual/browser polish has delivered the remaining compact-output and podium-alignment
+items and passed smoke testing. Phase 5H ranking-card performance optimisation is the only
+remaining active Phase 5 delivery slice before closure.
 
 Phase 5A delivered the first rankings hub foundation:
 
@@ -557,10 +559,36 @@ Phase 5F-1 delivered private My Rank / Find Me in mirror PR #158 and production 
   browser refresh, and My Rank interaction time.
 - Production smoke testing is complete.
 
-The next sub-phase is Phase 5F-2: add private CSV/full-list export for current KVK, Honor, and
-PreKvK rankings as the deeper access path replacing primary Top 100, while preserving My Rank,
-Top 10 visual cards, Top 25/50 compact browser output, records Top 10-only controls, Honor channel
-gating, legacy commands, and image-based legacy `/prekvk report`.
+Phase 5F-2 delivered private CSV/full-list export in mirror PR #159 and production PR #467:
+
+- `/kvk rankings` current modes now provide a private `Full List CSV` action for KVK, Honor, and
+  PreKvK rankings.
+- Full-list CSV export is the deeper access path for players and leadership without reintroducing
+  Top 100 as a primary player control.
+- CSV generation uses the shared current-ranking payload/service path with `include_all=True` and
+  keeps ranking semantics service-owned.
+- Exports are generated in memory, use deterministic filenames, escape spreadsheet
+  formula-leading text cells, avoid temporary files, and handle empty, oversized, build-failure,
+  and Discord upload-failure paths with private user-visible errors.
+- CSV columns were smoke-polished to clean leaderboard-only shapes:
+  - Honor: `Rank`, `GovernorID`, `GovernorName`, `Honor`, `KVK`.
+  - KVK: `Rank`, `GovernorID`, `GovernorName`, `Power`, `Kills`, `PercentKillTarget`, `Deads`,
+    `DKP`, `Acclaim`, `TankingScore`, `KillPoints`, `Healed`.
+  - PreKvK: `Rank`, `GovernorID`, `GovernorName`, `Power`, `Stage1`, `Stage2`, `Stage3`,
+    `Overall`.
+- KVK Top 10 metric selection was restored for `Kill Points` and `Healed`.
+- Honor's no-admin-override KVK stats channel gate remains preserved at command entry, browser
+  refresh, and export interaction time.
+- Private My Rank, current KVK/Honor/PreKvK/records Top 10 cards, Top 25/50 compact browser
+  output, records Top 10-only controls, legacy ranking commands, and image-based legacy
+  `/prekvk report` were preserved.
+- Production smoke testing is complete.
+
+Phase 5G delivered wrap-up polish for the remaining current-ranking browser/card deferred items:
+Honor Top 25/50 compact values, PreKvK Top 25/50 fixed-width alignment, near-billion value unit
+preservation, display-width-aware compact rows for wide/special-character governor names, and
+current KVK Top 10 podium centering. Phase 5H remains reserved for ranking-card render/load
+performance profiling and optimisation.
 
 ### Phase 6 — Admin Command Hardening And Legacy Operator Cleanup
 
@@ -731,12 +759,21 @@ production PR #462, passed production smoke testing, and preserved the legacy ra
 Phase 5C has delivered the current KVK Top 10 visual ranking card in mirror PR #154 and production
 PR #463, including Kills default, KVK card metrics for Kills, % Kill Target, Deads, DKP, Acclaim,
 and Tanking Score, embed fallback, Top 25/50 compact browser preservation, Top 100 exclusion,
-legacy command preservation, production smoke testing, and visual polish. Phase 5D has delivered
+legacy command preservation, production smoke testing, and visual polish.
+Phase 5D has delivered
 the Hall of Fame records Top 10 visual cards in mirror PR #155 and production PR #464, including
 all records metrics, metric-specific qualifying record counts, records Top 10-only controls,
 embed fallback, and successful production smoke testing. Phase 5E has delivered Honor and PreKvK
 Top 10 visual cards in mirror PR #156 and production PR #465. Phase 5F-1 has delivered private
-My Rank / Find Me in mirror PR #158 and production PR #466, with production smoke testing passed.
-Start the next chat from the Phase 5F-2 starter:
+My Rank / Find Me in mirror PR #158 and production PR #466. Phase 5F-2 has delivered private
+Full List CSV export in mirror PR #159 and production PR #467, with production smoke testing
+passed, CSV column polish complete, and KVK Top 10 `Kill Points` / `Healed` metric selection
+restored. Phase 5G has delivered Honor compact values, PreKvK compact alignment, wide/special-name
+alignment polish, and KVK Top 10 podium centering. Use the Phase 5G starter as the completed
+execution record:
 
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5F CSV Full-List Export.md`
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5G Rankings Wrap-up Polish.md`
+
+Use the Phase 5H starter for the remaining ranking-card performance optimisation slice:
+
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`

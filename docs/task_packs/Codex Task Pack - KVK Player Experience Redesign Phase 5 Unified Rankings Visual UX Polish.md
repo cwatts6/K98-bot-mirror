@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 4 completion`
 - Task type: `feature / UX redesign / Discord interaction polish / renderer-service-DAL cleanup / staged implementation plan`
 - One-pass approved: `no`
-- Status: `Phase 5A through Phase 5E and Phase 5F-1 complete; Phase 5F-2 CSV/full-list export ready for next-chat delivery`
+- Status: `Phase 5A through Phase 5G complete; Phase 5H ranking-card performance optimisation is the only remaining active Phase 5 delivery slice`
 
 ## Phase 5A Completion Note
 
@@ -165,29 +165,58 @@ Delivered Phase 5F-1 scope:
   embed text, breaking mention tokens in messages/embeds, and handling large multi-account
   selector input without blocking valid registered accounts.
 
-Next Phase 5 sub-phase:
+## Phase 5F-2 Completion Note
 
-- Phase 5F-2 should deliver the CSV/full-list export path that replaces primary Top 100 access.
-- Start with audit/scope and a proposed implementation plan, then confirm the approved slice
-  before coding unless the operator explicitly approves one-pass delivery.
-- Limit first export delivery to current KVK, Honor, and PreKvK rankings unless records export is
-  explicitly approved.
-- Keep CSV/full-list responses private by default.
-- Preserve the delivered private My Rank flow.
-- Preserve current KVK, Honor, PreKvK, and Hall of Fame Top 10 visual cards.
-- Preserve Top 25 and Top 50 compact browser output.
-- Keep Top 100 out of primary player controls.
-- Preserve records Top 10 only.
-- Preserve Honor's no-admin-override KVK stats channel gate at command entry, browser refresh, and
-  export interactions.
-- Preserve legacy commands during rollout.
-- Preserve image-based legacy `/prekvk report`.
-- Keep SQL/data access in service/DAL/cache layers. Do not put SQL in command, view, renderer, or
-  export formatting modules.
-- Treat CSV/file generation and user-controlled ranking names as security-sensitive: escape CSV
-  formula-leading cells, avoid temp files unless justified, and run or justify Codex Security.
-- Continue to capture all deferred optimisations that remain part of "rankings done right" so they
-  can be delivered in later Phase 5 sub-phases rather than lost.
+Phase 5F-2 is complete. It was delivered in mirror PR #159, promoted through production PR #467,
+pushed to production, and smoke tested successfully.
+
+Delivered Phase 5F-2 scope:
+
+- Added a private `Full List CSV` action to the current `/kvk rankings` browser for KVK, Honor,
+  and PreKvK modes.
+- Used existing current-ranking payload/service support with `include_all=True` so export ranking
+  semantics remain service-owned.
+- Kept records export out of scope; records remain Top 10 only.
+- Kept Top 100 out of primary player controls.
+- Preserved private My Rank / Find Me, current KVK/Honor/PreKvK/records Top 10 cards, Top 25/50
+  compact browser output, legacy ranking commands, and image-based legacy `/prekvk report`.
+- Preserved Honor's no-admin-override KVK stats channel gate at command entry, browser refresh,
+  and export interaction time.
+- Added in-memory CSV generation with deterministic filenames, UTF-8 BOM output,
+  formula-leading text escaping, newline normalization, private empty/oversized/build/upload
+  failure handling, and no temporary files.
+- Polished CSV column shape after smoke testing so exports contain leaderboard data only:
+  - Honor: `Rank`, `GovernorID`, `GovernorName`, `Honor`, `KVK`.
+  - KVK: `Rank`, `GovernorID`, `GovernorName`, `Power`, `Kills`, `PercentKillTarget`, `Deads`,
+    `DKP`, `Acclaim`, `TankingScore`, `KillPoints`, `Healed`.
+  - PreKvK: `Rank`, `GovernorID`, `GovernorName`, `Power`, `Stage1`, `Stage2`, `Stage3`,
+    `Overall`.
+- Removed per-row export metadata columns (`Mode`, `Metric`, `GeneratedAtUTC`, `Freshness`,
+  `Source`, `Filters`) and the duplicate `SelectedValue` column after smoke-test review.
+- Restored KVK Top 10 metric selection for `Kill Points` and `Healed`, with service sorting
+  support for both metrics.
+- Addressed review feedback around runtime-safe `isinstance`, zero-copy `BytesIO` byte counting,
+  streamed row writing, and singular/plural export success wording.
+- Validation included focused KVK rankings service/browser tests, command/UI/import smoke tests,
+  standard architecture/deferred/select-tests/smoke-imports/command-registration validators,
+  pre-commit, full pytest, Codex Security fallback scan for the main implementation, and
+  successful production smoke testing.
+
+Phase 5G completion note:
+
+- Phase 5G delivered the remaining rankings wrap-up polish captured during Phase 5E/5F.
+- Honor Top 25/Top 50 compact browser output now displays ranking values.
+- PreKvK Top 25/Top 50 compact browser output now uses tighter fixed-width formatting with short
+  stage headers.
+- Compact Top 25/Top 50 rows preserve near-billion value units and align wide/special-character
+  governor names by display width.
+- Current KVK Top 10 card podium ranks/names/values are centered to match Records, Honor, and
+  PreKvK.
+- The delivered CSV export, My Rank, Top 10 cards, Top 25/50 controls, Top 100 exclusion, records
+  Top 10 only, Honor channel gate, legacy commands, and image-based legacy `/prekvk report` were
+  preserved.
+- Phase 5H remains separate for ranking-card render/load latency profiling and optimisation.
+- Phase 5G deferred items were moved out of the active backlog and recorded in resolved history.
 
 ## 2. Required Reading
 
@@ -813,18 +842,26 @@ The working recommendation is:
    - Preserved records Top 10 only and kept Top 100 out of primary controls.
 
 7. **Phase 5F-2: CSV/full-list export polish**
-   - Next active sub-phase.
-   - Add private full-list CSV/export for current KVK, Honor, and PreKvK rankings as the deeper
+   - Complete. Delivered in mirror PR #159 and production PR #467, then smoke tested and polished
+     in production.
+   - Added private full-list CSV/export for current KVK, Honor, and PreKvK rankings as the deeper
      access path replacing primary Top 100.
-   - Preserve My Rank, Top 10 visual cards, Top 25/50 compact browser output, records Top 10 only,
-     Honor channel gating, and legacy commands.
-   - Add records export/detail output only if explicitly approved after audit.
-   - Consider legacy redirect only after usage review and separate approval.
+   - Preserved My Rank, Top 10 visual cards, Top 25/50 compact browser output, records Top 10
+     only, Honor channel gating, and legacy commands.
+   - Kept records export/detail output out of scope.
 
-8. **Phase 5G+: Remaining rankings deferred optimisation closure**
-   - Deliver any structured Phase 5 deferred optimisations that remain after 5B-5F.
-   - Add extra sub-phases rather than leaving known rankings UX, architecture, export, or visual
-     debt unresolved at the end of Phase 5.
+8. **Phase 5G: Remaining rankings wrap-up polish**
+   - Delivered.
+   - Restored Honor Top 25/50 compact values.
+   - Applied fixed-width alignment polish to PreKvK Top 25/50 compact output.
+   - Preserved near-billion value units and display-width alignment for wide/special-character
+     governor names.
+   - Centered current KVK Top 10 podium text to match the other delivered ranking cards.
+   - Preserved all Phase 5F-2 export behaviour.
+
+9. **Phase 5H: Ranking-card performance optimisation**
+   - Profile and optimise ranking-card render/load latency after Phase 5G visual/browser polish.
+   - Keep this separate from Phase 5G unless explicitly approved.
 
 Do not merge these sub-phases into one PR unless explicitly approved.
 
@@ -1125,7 +1162,7 @@ Implementation acceptance:
 - [x] All-time records clearly show single-KVK performance context and do not imply lifetime totals.
 - [x] Historical missing/uncollected record metrics are excluded or labelled safely.
 - [x] `My Rank` / local-position flow is implemented or explicitly deferred with reason.
-- [ ] CSV/full-list export exists as the deeper current-ranking access path without adding Top 100
+- [x] CSV/full-list export exists as the deeper current-ranking access path without adding Top 100
   back to primary player controls.
 - [x] Legacy ranking commands remain live during rollout.
 - [x] No new direct SQL exists in command, view, or renderer modules.
@@ -1230,8 +1267,11 @@ For implementation stages:
 
 ## 23. Codex Chat Starter
 
-Historical starter for Phase 5A. Phase 5A through Phase 5E and Phase 5F-1 are complete; use
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5F CSV Full-List Export.md`
+Historical starter for Phase 5A. Phase 5A through Phase 5G are complete; the Phase 5G execution
+starter is
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5G Rankings Wrap-up Polish.md`
+and Phase 5H is the only remaining active Phase 5 delivery slice. Use
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`
 for the next delivery chat.
 
 ```text

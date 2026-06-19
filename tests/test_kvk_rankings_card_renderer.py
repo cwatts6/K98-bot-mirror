@@ -7,6 +7,7 @@ from PIL import Image
 from kvk.models.kvk_rankings import RankingPayload, RankingRow
 from kvk.rendering.kvk_rankings_card_renderer import (
     _context_line,
+    _draw_top_card,
     _footer,
     _records_context_line,
     _records_count_label,
@@ -168,6 +169,41 @@ def test_current_rankings_top10_card_honor_and_prekvk_footer_only_shows_freshnes
 
     assert _footer(honor_payload) == "Last refreshed 2026-06-18 12:00 UTC"
     assert _footer(prekvk_payload) == "Last refreshed 2026-06-18 12:00 UTC"
+
+
+def test_current_kvk_top10_podium_uses_centered_text_path(monkeypatch):
+    calls = []
+
+    def fake_centered(*_args, **kwargs):
+        calls.append(kwargs)
+
+    def fail_legacy(*_args, **_kwargs):
+        raise AssertionError("KVK podium should use centered text rendering")
+
+    monkeypatch.setattr(
+        "kvk.rendering.kvk_rankings_card_renderer._draw_shadowed_center_fitted",
+        fake_centered,
+    )
+    monkeypatch.setattr("kvk.rendering.kvk_rankings_card_renderer._draw_fitted", fail_legacy)
+    monkeypatch.setattr("kvk.rendering.kvk_rankings_card_renderer._draw_text", fail_legacy)
+
+    payload = _payload(mode="kvk", metric="kills", metric_label="Kills", rows=1)
+    row = payload.rows[0]
+    _draw_top_card(
+        object(),
+        payload=payload,
+        row=row,
+        box=(100, 150, 400, 348),
+        accent=(255, 255, 0),
+    )
+
+    assert [call["text"] for call in calls] == [
+        "#1",
+        row.governor_name,
+        "148.8M",
+        "Power 90M  |  DKP 114.1M",
+    ]
+    assert {call["center_x"] for call in calls} == {250}
 
 
 def test_hall_of_fame_top10_card_renders_from_records_payload_rows():

@@ -44,7 +44,6 @@ BRIGHT_GOLD = (255, 232, 91)
 BRIGHT_BLUE = (170, 230, 255)
 CURRENT_RANKING_BLUE = (92, 190, 230)
 BRIGHT_AMBER = (255, 198, 74)
-RANK_SHADOW = (18, 10, 5, 155)
 
 
 def _background_path(mode: str = "kvk") -> Path | None:
@@ -259,84 +258,47 @@ def _draw_top_card(
     box: tuple[int, int, int, int],
     accent: tuple[int, int, int],
 ) -> None:
-    x0, y0, x1, y1 = box
+    x0, y0, x1, _y1 = box
     width = x1 - x0
-    if payload.mode in {"honor", "prekvk"}:
-        center_x = x0 + (width // 2)
-        _draw_shadowed_center_fitted(
-            draw,
-            center_x=center_x,
-            y=y0,
-            text=f"#{row.rank}",
-            max_width=width,
-            size=48,
-            min_size=32,
-            fill=accent,
-        )
-        _draw_shadowed_center_fitted(
-            draw,
-            center_x=center_x,
-            y=y0 + 52,
-            text=row.governor_name,
-            max_width=width,
-            size=39,
-            min_size=18,
-            fill=TEXT,
-        )
-        _draw_shadowed_center_fitted(
-            draw,
-            center_x=center_x,
-            y=y0 + 102,
-            text=_primary_value(payload, row),
-            max_width=width,
-            size=52,
-            min_size=28,
-            fill=_metric_color(payload.metric),
-        )
-        support = _support_text(payload, row)
-        if support:
-            _draw_shadowed_center_fitted(
-                draw,
-                center_x=center_x,
-                y=y0 + 162,
-                text=support,
-                max_width=width,
-                size=21,
-                min_size=14,
-                fill=MUTED,
-            )
-        return
-
-    rank_label = f"#{row.rank}"
-    rank_font = _font(48, bold=True)
-    _draw_text(draw, (x0 + 2, y0 + 3), rank_label, fill=RANK_SHADOW, font=rank_font)
-    _draw_text(draw, (x0, y0), rank_label, fill=accent, font=rank_font, bold=True)
-    name_max = width
-    _draw_fitted(
+    center_x = x0 + (width // 2)
+    _draw_shadowed_center_fitted(
         draw,
-        (x0, y0 + 52),
-        row.governor_name,
-        max_width=name_max,
+        center_x=center_x,
+        y=y0,
+        text=f"#{row.rank}",
+        max_width=width,
+        size=48,
+        min_size=32,
+        fill=accent,
+    )
+    _draw_shadowed_center_fitted(
+        draw,
+        center_x=center_x,
+        y=y0 + 52,
+        text=row.governor_name,
+        max_width=width,
         size=39,
         min_size=18,
+        fill=TEXT,
     )
-    value = _primary_value(payload, row)
-    _draw_fitted(
+    _draw_shadowed_center_fitted(
         draw,
-        (x0, y0 + 102),
-        value,
-        max_width=name_max,
+        center_x=center_x,
+        y=y0 + 102,
+        text=_primary_value(payload, row),
+        max_width=width,
         size=52,
         min_size=28,
         fill=_metric_color(payload.metric),
     )
     support = _support_text(payload, row)
     if support:
-        _draw_fitted(
+        _draw_shadowed_center_fitted(
             draw,
-            (x0, y0 + 162),
-            support,
-            max_width=name_max,
+            center_x=center_x,
+            y=y0 + 162,
+            text=support,
+            max_width=width,
             size=21,
             min_size=14,
             fill=MUTED,

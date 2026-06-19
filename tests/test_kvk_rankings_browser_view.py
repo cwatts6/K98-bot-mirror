@@ -10,7 +10,11 @@ from kvk.models.kvk_rankings import (
     RankingPayload,
     RankingRow,
 )
-from kvk.rendering.kvk_rankings_embed import build_current_rankings_embed, build_my_rank_embed
+from kvk.rendering.kvk_rankings_embed import (
+    _display_width,
+    build_current_rankings_embed,
+    build_my_rank_embed,
+)
 from ui.views import kvk_rankings_views
 from ui.views.kvk_rankings_views import CurrentRankingsBrowserView, _top10_card_file
 
@@ -882,6 +886,174 @@ def test_current_rankings_embed_uses_top_label_without_true_total():
 
     assert "Showing: Top 10" in embed.footer.text
     assert "Showing: 1 of 1" not in embed.footer.text
+
+
+def test_current_rankings_embed_honor_compact_rows_display_values():
+    payload = RankingPayload(
+        mode="honor",
+        mode_label="Honor",
+        metric="honor",
+        metric_label="Honor",
+        limit=25,
+        total_rows=50,
+        rows=[
+            RankingRow(
+                rank=1,
+                governor_id=123,
+                governor_name="Honor Player",
+                value=9_876_543,
+                supporting_values={"Honor": 9_876_543, "KVK": 17},
+            )
+        ],
+    )
+
+    embed = build_current_rankings_embed(payload)
+    table_lines = embed.description.removeprefix("```\n").removesuffix("\n```").splitlines()
+
+    assert table_lines[0] == "Rank Name           Honor"
+    assert "9.9M" in table_lines[2]
+    assert {len(line) for line in table_lines} == {len(table_lines[0])}
+    assert "Showing: 1 of 50" in embed.footer.text
+
+
+def test_current_rankings_embed_prekvk_compact_rows_are_fixed_width():
+    payload = RankingPayload(
+        mode="prekvk",
+        mode_label="PreKvK",
+        metric="overall",
+        metric_label="Overall",
+        limit=50,
+        total_rows=None,
+        rows=[
+            RankingRow(
+                rank=1,
+                governor_id=123,
+                governor_name="A Very Long PreKvK Player Name",
+                value=3_900_000,
+                supporting_values={
+                    "Power": 125_000_000,
+                    "Stage 1": 1_500_000,
+                    "Stage 2": 1_300_000,
+                    "Stage 3": 1_100_000,
+                    "Overall": 3_900_000,
+                },
+            ),
+            RankingRow(
+                rank=25,
+                governor_id=456,
+                governor_name="Short",
+                value=750,
+                supporting_values={
+                    "Power": 999_999_999,
+                    "Stage 1": 100,
+                    "Stage 2": 250,
+                    "Stage 3": 400,
+                    "Overall": 750,
+                },
+            ),
+        ],
+    )
+
+    embed = build_current_rankings_embed(payload)
+    table_lines = embed.description.removeprefix("```\n").removesuffix("\n```").splitlines()
+
+    assert table_lines[0] == "Rank Name        Overall  Power     S1     S2     S3"
+    assert "A Very Lon." in table_lines[2]
+    assert "3.9M 125.0M   1.5M   1.3M   1.1M" in table_lines[2]
+    assert "750   1.0B    100    250    400" in table_lines[3]
+    assert "1000." not in table_lines[3]
+    assert all(len(line) <= 52 for line in table_lines)
+    assert {len(line) for line in table_lines} == {len(table_lines[0])}
+
+
+def test_current_rankings_embed_compact_rows_align_wide_name_characters():
+    payload = RankingPayload(
+        mode="prekvk",
+        mode_label="PreKvK",
+        metric="overall",
+        metric_label="Overall",
+        limit=50,
+        rows=[
+            RankingRow(
+                rank=1,
+                governor_id=123,
+                governor_name="Foxツ",
+                value=11_400_000,
+                supporting_values={
+                    "Power": 77_000_000,
+                    "Stage 1": 7_000,
+                    "Stage 2": 2_000_000,
+                    "Stage 3": 9_400_000,
+                    "Overall": 11_400_000,
+                },
+            ),
+            RankingRow(
+                rank=2,
+                governor_id=456,
+                governor_name="ツ Laki 〰",
+                value=7_500_000,
+                supporting_values={
+                    "Power": 91_000_000,
+                    "Stage 1": 63_000,
+                    "Stage 2": 2_000_000,
+                    "Stage 3": 5_400_000,
+                    "Overall": 7_500_000,
+                },
+            ),
+            RankingRow(
+                rank=3,
+                governor_id=789,
+                governor_name="Plain",
+                value=6_000_000,
+                supporting_values={
+                    "Power": 92_100_000,
+                    "Stage 1": 616_000,
+                    "Stage 2": 560_000,
+                    "Stage 3": 4_800_000,
+                    "Overall": 6_000_000,
+                },
+            ),
+        ],
+    )
+
+    embed = build_current_rankings_embed(payload)
+    table_lines = embed.description.removeprefix("```\n").removesuffix("\n```").splitlines()
+
+    assert {_display_width(line) for line in table_lines} == {_display_width(table_lines[0])}
+    assert "Foxツ" in table_lines[2]
+    assert "ツ Laki" in table_lines[3]
+
+
+def test_current_rankings_embed_honor_rows_align_wide_name_characters():
+    payload = RankingPayload(
+        mode="honor",
+        mode_label="Honor",
+        metric="honor",
+        metric_label="Honor",
+        limit=25,
+        rows=[
+            RankingRow(
+                rank=1,
+                governor_id=123,
+                governor_name="Viperツ",
+                value=900_000,
+                supporting_values={"Honor": 900_000},
+            ),
+            RankingRow(
+                rank=2,
+                governor_id=456,
+                governor_name="Plain",
+                value=850_000,
+                supporting_values={"Honor": 850_000},
+            ),
+        ],
+    )
+
+    embed = build_current_rankings_embed(payload)
+    table_lines = embed.description.removeprefix("```\n").removesuffix("\n```").splitlines()
+
+    assert {_display_width(line) for line in table_lines} == {_display_width(table_lines[0])}
+    assert "Viperツ" in table_lines[2]
 
 
 def test_my_rank_embed_includes_private_rank_context():

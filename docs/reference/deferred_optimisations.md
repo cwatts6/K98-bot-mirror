@@ -6,33 +6,6 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `/kvk rankings type:honor`, `kvk/rendering/kvk_rankings_embed.py`
-- Type: consistency
-- Description: Phase 5E smoke testing found that Honor Top 25 and Top 50 compact browser output lists the correct ranked governors but no ranking values are displayed.
-- Suggested Fix: Scope Phase 5G wrap-up polish to restore Honor value-column rendering for Top 25 and Top 50 compact output while preserving the Honor Top 10 visual card, Honor no-admin-override channel gate, and legacy `/honor_rankings`.
-- Impact: medium
-- Risk: low
-- Dependencies: Phase 5B unified browser, Phase 5E Honor Top 10 visual-card production rollout, focused compact-embed renderer tests.
-
-### Deferred Optimisation
-- Area: `/kvk rankings type:prekvk`, `kvk/rendering/kvk_rankings_embed.py`
-- Type: consistency
-- Description: Phase 5E smoke testing found that PreKvK Top 25 and Top 50 compact browser output has column alignment drift similar to the earlier KVK Top 25/50 issue. Long names and multi-metric columns can wrap or shift values onto confusing lines.
-- Suggested Fix: Scope Phase 5G wrap-up polish to apply fixed-width column formatting to PreKvK compact rows, mirroring the KVK compact fixed-width approach where appropriate while preserving Overall, Stage 1, Stage 2, Stage 3, Power, freshness/source footer, and image-based legacy `/prekvk report`.
-- Impact: medium
-- Risk: low
-- Dependencies: Phase 5B unified browser, Phase 5E PreKvK Top 10 visual-card production rollout, focused PreKvK compact-output tests and mobile-like screenshot review.
-
-### Deferred Optimisation
-- Area: `/kvk rankings type:kvk`, `kvk/rendering/kvk_rankings_card_renderer.py`
-- Type: consistency
-- Description: Phase 5E smoke testing confirmed the current KVK Top 10 visual card still left-aligns the top-three podium text, while Records, Honor, and PreKvK cards now center podium ranks/names/values. The visual language is therefore inconsistent across ranking cards.
-- Suggested Fix: Scope Phase 5G wrap-up polish to center current KVK Top 10 podium text using the shared centered podium helper/path, preserving existing KVK card metrics, support values, footer/filter wording, and embed fallback.
-- Impact: low
-- Risk: low
-- Dependencies: Phase 5C current KVK card production rollout, Phase 5E centered podium rendering for Honor/PreKvK, focused visual sample inspection.
-
-### Deferred Optimisation
 - Area: `kvk/rendering/kvk_rankings_card_renderer.py`, ranking-card render/send path
 - Type: performance
 - Description: Phase 5E smoke testing found that visual ranking cards can take multiple seconds to render/load in Discord. The full ranking visual surface now exists, so render latency should be profiled before Phase 5 closes.
