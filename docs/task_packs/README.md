@@ -28,7 +28,8 @@ Resolution, Phase 2B Player `/kvk` Scaffold, Phase 3 Modern `/kvk stats` Visual 
 Stats Card Polish and Secondary Cards, Phase 3C Overall Rank and Card Polish, Phase 4A Modern
 `/kvk targets`, the full Phase 4B modern `/kvk history` rollout, Phase 5A rankings hub foundation,
 Phase 5B unified current-ranking browser, Phase 5C current KVK Top 10 visual ranking card, and
-Phase 5D Hall of Fame records Top 10 visual cards are complete.
+Phase 5D Hall of Fame records Top 10 visual cards, Phase 5E Honor and PreKvK Top 10 visual cards,
+and Phase 5F-1 private My Rank / Find Me are complete.
 Phase 2A moved admin/operator commands from `/kvk ...` to `/kvk_admin ...` in PR 140. Phase 2B
 added the player `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` scaffold in PR
 141, then was promoted to production. Phase 3, Phase 3B, and Phase 3C delivered the modern
@@ -58,13 +59,19 @@ Phase 5D delivered the Hall of Fame records Top 10 visual cards in mirror PR 155
 464, including all existing records metrics, single-KVK record wording, metric-specific qualifying
 record counts, records Top 10-only controls, embed fallback, repeated-governor preservation,
 missing historical metric exclusion, production smoke testing, and visual polish.
+Phase 5E delivered Honor and PreKvK Top 10 visual cards in mirror PR 156 and production PR 465,
+preserving current KVK cards, Hall of Fame cards, Top 25/50 compact browser output, records Top
+10-only controls, Honor channel gating, legacy commands, and image-based legacy `/prekvk report`.
+Phase 5F-1 delivered private My Rank / Find Me in mirror PR 158 and production PR 466 for current
+KVK, Honor, and PreKvK rankings, with single-account, multi-account, not-ranked, no-account, and
+missing-data paths smoke tested successfully in production.
 
-Phase 5D is complete. Use the Phase 5 task pack and the Phase 5E chat starter for the next active
-sub-phase: Honor and PreKvK Top 10 visual ranking cards. The Phase 4B task pack remains as the
-history delivery record:
+Phase 5F-1 is complete. Use the Phase 5 task pack and the Phase 5F-2 chat starter for the next
+active sub-phase: CSV/full-list export for current KVK, Honor, and PreKvK rankings. The Phase 4B
+task pack remains as the history delivery record:
 
 `Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
 
 Next starter:
 
-`Codex Chat Starter - KVK Player Experience Redesign Phase 5E Honor and PreKvK Visual Ranking Cards.md`
+`Codex Chat Starter - KVK Player Experience Redesign Phase 5F CSV Full-List Export.md`

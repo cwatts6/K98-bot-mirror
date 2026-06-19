@@ -451,8 +451,9 @@ Use:
 
 ### Phase 5 — Unified `/kvk rankings` Visual/UX Polish
 
-Status: in progress. Phase 5A through Phase 5D are complete, smoke tested, merged to mirror,
-promoted through production, and pushed to production.
+Status: in progress. Phase 5A through Phase 5E and Phase 5F-1 are complete, smoke tested, merged
+to mirror, promoted through production, and pushed to production. Phase 5F-2 CSV/full-list export
+is the next active slice.
 
 Phase 5A delivered the first rankings hub foundation:
 
@@ -531,9 +532,35 @@ PR #464:
   preserved.
 - Production smoke testing and visual polish are complete.
 
-The next sub-phase is Phase 5E: add Honor and PreKvK Top 10 visual cards while preserving the
-stable current KVK card, records card, Phase 5B unified browser, Top 25/50 compact browser output,
-Honor no-admin-override channel gate, legacy commands, and image-based legacy `/prekvk report`.
+Phase 5E delivered the Honor and PreKvK Top 10 visual cards in mirror PR #156 and production
+PR #465:
+
+- `/kvk rankings type:honor` and `/kvk rankings type:prekvk` now render generated Top 10 visual
+  cards.
+- The cards use shared current-ranking payloads and preserve service-owned ranking semantics.
+- Current KVK Top 10 cards, Hall of Fame records Top 10 cards, Top 25/50 compact browser output,
+  records Top 10-only controls, Top 100 exclusion, legacy ranking commands, and image-based legacy
+  `/prekvk report` were preserved.
+- Honor mode's no-admin-override KVK stats channel gate remains preserved.
+- Production smoke testing and review/smoke-test polish are complete.
+
+Phase 5F-1 delivered private My Rank / Find Me in mirror PR #158 and production PR #466:
+
+- `/kvk rankings` current modes now provide a private My Rank flow for registered governors in
+  KVK, Honor, and PreKvK rankings.
+- Single-account, multi-account, not-ranked, no-account, and missing-data paths are handled.
+- My Rank output includes the selected governor's local rank, selected value, nearby rows, and
+  useful gap/context details.
+- Records remain Top 10 only and do not expose My Rank.
+- Top 100 remains out of primary player controls.
+- Honor mode's no-admin-override KVK stats channel gate remains preserved at command entry,
+  browser refresh, and My Rank interaction time.
+- Production smoke testing is complete.
+
+The next sub-phase is Phase 5F-2: add private CSV/full-list export for current KVK, Honor, and
+PreKvK rankings as the deeper access path replacing primary Top 100, while preserving My Rank,
+Top 10 visual cards, Top 25/50 compact browser output, records Top 10-only controls, Honor channel
+gating, legacy commands, and image-based legacy `/prekvk report`.
 
 ### Phase 6 — Admin Command Hardening And Legacy Operator Cleanup
 
@@ -707,7 +734,9 @@ and Tanking Score, embed fallback, Top 25/50 compact browser preservation, Top 1
 legacy command preservation, production smoke testing, and visual polish. Phase 5D has delivered
 the Hall of Fame records Top 10 visual cards in mirror PR #155 and production PR #464, including
 all records metrics, metric-specific qualifying record counts, records Top 10-only controls,
-embed fallback, and successful production smoke testing. Start the next chat from the Phase 5E
-starter:
+embed fallback, and successful production smoke testing. Phase 5E has delivered Honor and PreKvK
+Top 10 visual cards in mirror PR #156 and production PR #465. Phase 5F-1 has delivered private
+My Rank / Find Me in mirror PR #158 and production PR #466, with production smoke testing passed.
+Start the next chat from the Phase 5F-2 starter:
 
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5E Honor and PreKvK Visual Ranking Cards.md`
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5F CSV Full-List Export.md`
