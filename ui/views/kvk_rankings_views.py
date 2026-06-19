@@ -33,6 +33,7 @@ from kvk.services import kvk_rankings_service
 logger = logging.getLogger(__name__)
 
 _CURRENT_RANKING_ADMIN_OVERRIDE_MODES = {"kvk", "prekvk"}
+_MY_RANK_SELECT_PAGE_SIZE = 25
 
 
 async def _top10_card_file(payload: RankingPayload) -> discord.File | None:
@@ -138,6 +139,9 @@ class _MyRankAccountSelect(discord.ui.Select):
         self,
         owner: CurrentRankingsMyRankAccountView,
         choices: Sequence[RankingAccountChoice],
+        *,
+        placeholder: str,
+        row: int,
     ) -> None:
         self.owner = owner
         options = [
@@ -148,13 +152,14 @@ class _MyRankAccountSelect(discord.ui.Select):
                     f"Governor ID {choice.governor_id_str}",
                 ),
             )
-            for choice in choices[:25]
+            for choice in choices
         ]
         super().__init__(
-            placeholder="Choose a registered governor",
+            placeholder=placeholder,
             min_values=1,
             max_values=1,
             options=options,
+            row=row,
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
@@ -177,7 +182,26 @@ class CurrentRankingsMyRankAccountView(discord.ui.View):
         self.mode = mode
         self.metric = metric
         self.limit = limit
-        self.add_item(_MyRankAccountSelect(self, choices))
+        chunks = [
+            choices[index : index + _MY_RANK_SELECT_PAGE_SIZE]
+            for index in range(0, len(choices), _MY_RANK_SELECT_PAGE_SIZE)
+        ]
+        for index, chunk in enumerate(chunks):
+            start = index * _MY_RANK_SELECT_PAGE_SIZE + 1
+            end = start + len(chunk) - 1
+            placeholder = (
+                "Choose a registered governor"
+                if len(chunks) == 1
+                else f"Choose account {start}-{end}"
+            )
+            self.add_item(
+                _MyRankAccountSelect(
+                    self,
+                    chunk,
+                    placeholder=placeholder,
+                    row=index,
+                )
+            )
 
     async def on_account_selected(
         self,

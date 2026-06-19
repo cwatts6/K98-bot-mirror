@@ -43,6 +43,10 @@ def _fit_cell(value: Any, width: int, *, right: bool = False) -> str:
     return text.rjust(width) if right else text.ljust(width)
 
 
+def _clean_rank_text(value: Any) -> str:
+    return " ".join(str(value).replace("`", "'").split())
+
+
 @dataclass(frozen=True)
 class _TableColumn:
     label: str
@@ -150,7 +154,7 @@ def build_current_rankings_embed(
 def _my_rank_neighbor_line(row: RankingRow | None) -> str:
     if row is None:
         return "None"
-    return f"#{row.rank} {row.governor_name} - {_format_value(row.value)}"
+    return f"#{row.rank} {_clean_rank_text(row.governor_name)} - {_format_value(row.value)}"
 
 
 def build_my_rank_embed(
@@ -173,7 +177,8 @@ def build_my_rank_embed(
     embed = discord.Embed(
         title=title,
         description=(
-            f"**{row.governor_name}** (`{row.governor_id}`) is " f"**#{row.rank}{total_suffix}**."
+            f"**{_clean_rank_text(row.governor_name)}** (`{row.governor_id}`) is "
+            f"**#{row.rank}{total_suffix}**."
         ),
         color=color if isinstance(color, int) else color,
     )

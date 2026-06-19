@@ -437,6 +437,36 @@ async def test_current_rankings_browser_my_rank_sends_private_account_selector(m
 
 
 @pytest.mark.asyncio
+async def test_current_rankings_my_rank_account_selector_includes_all_registered_accounts():
+    choices = tuple(
+        RankingAccountChoice(
+            slot=f"Slot {index}",
+            governor_id=1000 + index,
+            governor_id_str=str(1000 + index),
+            governor_name=f"Governor {index}",
+        )
+        for index in range(26)
+    )
+
+    view = kvk_rankings_views.CurrentRankingsMyRankAccountView(
+        requester_id=200,
+        mode="kvk",
+        metric="kills",
+        limit=10,
+        choices=choices,
+    )
+
+    selects = list(view.children)
+
+    assert len(selects) == 2
+    assert len(selects[0].options) == 25
+    assert len(selects[1].options) == 1
+    assert [option.value for select in selects for option in select.options] == [
+        str(1000 + index) for index in range(26)
+    ]
+
+
+@pytest.mark.asyncio
 async def test_current_rankings_my_rank_account_selector_is_bound_to_requester(monkeypatch):
     view = kvk_rankings_views.CurrentRankingsMyRankAccountView(
         requester_id=200,
@@ -649,3 +679,25 @@ def test_my_rank_embed_includes_private_rank_context():
     assert "**#12 of 50**" in embed.description
     assert "Private result" in embed.footer.text
     assert embed.fields[1].name == "Gap to next"
+
+
+def test_my_rank_embed_normalizes_governor_names():
+    result = MyRankLookupResult(
+        status="found",
+        mode="kvk",
+        metric="kills",
+        metric_label="Kills",
+        mode_label="KVK",
+        message="found",
+        row=RankingRow(rank=12, governor_id=123, governor_name="Bad\n`Name`", value=1000),
+        row_above=RankingRow(rank=11, governor_id=111, governor_name="Ahead\n`Name`", value=1200),
+        row_below=RankingRow(rank=13, governor_id=222, governor_name="Behind\n`Name`", value=900),
+        total_rows=50,
+    )
+
+    embed = build_my_rank_embed(result)
+
+    assert "Bad 'Name'" in embed.description
+    assert "`Name`" not in embed.description
+    assert "Ahead 'Name'" in embed.fields[1].value
+    assert "Behind 'Name'" in embed.fields[2].value
