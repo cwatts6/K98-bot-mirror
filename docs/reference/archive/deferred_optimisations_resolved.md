@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Phase 5F-1 Completed Item
+- Area: `/kvk rankings` current-ranking browser, registry/account lookup, `kvk/services/kvk_rankings_service.py`, `ui/views/kvk_rankings_views.py`
+- Type: architecture
+- Description: Phase 5B established a unified current-ranking browser for KVK, Honor, and PreKvK with primary Top 10/25/50 controls, but it intentionally did not add deeper Top 100 player controls or a personalised "my rank" lookup. Phase 5E delivered Honor and PreKvK visual cards, leaving Phase 5F to provide a coherent way for players outside the public Top 50 to find their own current position without expanding the main browser surface.
+- Resolution: Phase 5F-1 added a registry-aware private My Rank flow for current KVK, Honor, and PreKvK rankings. Ranking position lookup stays service-owned, multi-account users receive a private account selector, unregistered/not-ranked/missing-source states return private messages, and Top 100 remains absent from primary player controls.
+- Validation: Focused service and browser tests cover registered users, unregistered/unauthorised selected accounts, multi-account selection, not-ranked governors, missing source data, internal full-rank lookup paths, Honor channel-gate preservation, and Top 100 exclusion.
+
 ### Phase 4 Completed Item
 - Area: `commands/ark_cmds.py`, `docs/ark/`, Ark command tests
 - Type: architecture

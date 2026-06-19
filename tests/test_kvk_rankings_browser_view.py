@@ -3,8 +3,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from kvk.models.kvk_rankings import RankingPayload, RankingRow
-from kvk.rendering.kvk_rankings_embed import build_current_rankings_embed
+from kvk.models.kvk_rankings import (
+    MyRankLookupResult,
+    RankingAccountChoice,
+    RankingPayload,
+    RankingRow,
+)
+from kvk.rendering.kvk_rankings_embed import build_current_rankings_embed, build_my_rank_embed
 from ui.views import kvk_rankings_views
 from ui.views.kvk_rankings_views import CurrentRankingsBrowserView, _top10_card_file
 
@@ -17,11 +22,13 @@ def _channel_interaction(*, channel_id=100, user_id=200, message=None, followup=
     class Response:
         def __init__(self):
             self.sent = []
+            self.defer_kwargs = None
 
         def is_done(self):
             return False
 
-        async def defer(self):
+        async def defer(self, **kwargs):
+            self.defer_kwargs = kwargs
             return None
 
         async def send_message(self, content=None, **kwargs):
@@ -42,7 +49,7 @@ async def test_current_rankings_browser_exposes_mode_metric_and_primary_limits()
     view = CurrentRankingsBrowserView(mode="prekvk", metric="stage2", limit=25)
 
     labels = _labels(view)
-    assert labels == ["Top 10", "Top 25", "Top 50"]
+    assert labels == ["Top 10", "Top 25", "Top 50", "My Rank"]
     assert "Top 100" not in labels
     assert view.mode_select is not None
     assert [option.value for option in view.mode_select.options] == ["kvk", "honor", "prekvk"]
@@ -336,6 +343,207 @@ async def test_current_rankings_browser_blocks_honor_switch_outside_stats_channe
     assert interaction.response.sent[0][1]["ephemeral"] is True
 
 
+@pytest.mark.asyncio
+async def test_current_rankings_browser_my_rank_sends_private_embed(monkeypatch):
+    monkeypatch.setattr(kvk_rankings_views, "KVK_PLAYER_STATS_CHANNEL_ID", 100)
+    view = CurrentRankingsBrowserView(mode="kvk", metric="kills", limit=10)
+    sent = []
+    result = MyRankLookupResult(
+        status="found",
+        mode="kvk",
+        metric="kills",
+        metric_label="Kills",
+        mode_label="KVK",
+        message="found",
+        row=RankingRow(rank=12, governor_id=123, governor_name="Ranked", value=1000),
+    )
+    embed = object()
+
+    async def fake_lookup(**kwargs):
+        assert kwargs == {
+            "discord_user_id": 200,
+            "mode": "kvk",
+            "metric": "kills",
+            "limit": 10,
+        }
+        return result
+
+    class Followup:
+        async def send(self, content=None, **kwargs):
+            sent.append((content, kwargs))
+
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_service,
+        "build_my_rank_lookup_result",
+        fake_lookup,
+    )
+    monkeypatch.setattr(kvk_rankings_views, "build_my_rank_embed", lambda lookup: embed)
+
+    interaction = _channel_interaction(channel_id=100, user_id=200, followup=Followup())
+
+    await view.on_my_rank(interaction)
+
+    assert interaction.response.defer_kwargs == {"ephemeral": True}
+    assert sent == [(None, {"embed": embed, "ephemeral": True})]
+
+
+@pytest.mark.asyncio
+async def test_current_rankings_browser_my_rank_sends_private_account_selector(monkeypatch):
+    monkeypatch.setattr(kvk_rankings_views, "KVK_PLAYER_STATS_CHANNEL_ID", 100)
+    view = CurrentRankingsBrowserView(mode="prekvk", metric="stage1", limit=25)
+    sent = []
+    result = MyRankLookupResult(
+        status="multi_account",
+        mode="prekvk",
+        metric="stage1",
+        metric_label="Stage 1",
+        mode_label="PreKvK",
+        message="Choose an account.",
+        account_choices=(
+            RankingAccountChoice("Main", 123, "123", "Main"),
+            RankingAccountChoice("Alt", 456, "456", "Alt"),
+        ),
+    )
+
+    async def fake_lookup(**kwargs):
+        assert kwargs == {
+            "discord_user_id": 200,
+            "mode": "prekvk",
+            "metric": "stage1",
+            "limit": 25,
+        }
+        return result
+
+    class Followup:
+        async def send(self, content=None, **kwargs):
+            sent.append((content, kwargs))
+
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_service,
+        "build_my_rank_lookup_result",
+        fake_lookup,
+    )
+
+    interaction = _channel_interaction(channel_id=100, user_id=200, followup=Followup())
+
+    await view.on_my_rank(interaction)
+
+    assert sent[0][0] == "Choose an account."
+    assert sent[0][1]["ephemeral"] is True
+    selector_view = sent[0][1]["view"]
+    assert isinstance(selector_view, kvk_rankings_views.CurrentRankingsMyRankAccountView)
+    select = selector_view.children[0]
+    assert [option.value for option in select.options] == ["123", "456"]
+
+
+@pytest.mark.asyncio
+async def test_current_rankings_my_rank_account_selector_is_bound_to_requester(monkeypatch):
+    view = kvk_rankings_views.CurrentRankingsMyRankAccountView(
+        requester_id=200,
+        mode="kvk",
+        metric="kills",
+        limit=10,
+        choices=(RankingAccountChoice("Main", 123, "123", "Main"),),
+    )
+
+    async def fake_lookup(**_kwargs):
+        raise AssertionError("non-requester should not trigger lookup")
+
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_service,
+        "build_my_rank_lookup_result",
+        fake_lookup,
+    )
+
+    interaction = _channel_interaction(channel_id=100, user_id=999)
+
+    await view.on_account_selected(interaction, "123")
+
+    assert interaction.response.sent
+    assert "Only the requester" in interaction.response.sent[0][0]
+    assert interaction.response.sent[0][1]["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+async def test_current_rankings_my_rank_account_selector_sends_private_result(monkeypatch):
+    sent = []
+    result = MyRankLookupResult(
+        status="found",
+        mode="kvk",
+        metric="kills",
+        metric_label="Kills",
+        mode_label="KVK",
+        message="found",
+        row=RankingRow(rank=12, governor_id=123, governor_name="Ranked", value=1000),
+    )
+    embed = object()
+    view = kvk_rankings_views.CurrentRankingsMyRankAccountView(
+        requester_id=200,
+        mode="kvk",
+        metric="kills",
+        limit=10,
+        choices=(RankingAccountChoice("Main", 123, "123", "Main"),),
+    )
+
+    async def fake_lookup(**kwargs):
+        assert kwargs == {
+            "discord_user_id": 200,
+            "mode": "kvk",
+            "metric": "kills",
+            "limit": 10,
+            "governor_id": "123",
+        }
+        return result
+
+    class Followup:
+        async def send(self, content=None, **kwargs):
+            sent.append((content, kwargs))
+
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_service,
+        "build_my_rank_lookup_result",
+        fake_lookup,
+    )
+    monkeypatch.setattr(kvk_rankings_views, "build_my_rank_embed", lambda lookup: embed)
+
+    interaction = _channel_interaction(channel_id=100, user_id=200, followup=Followup())
+
+    await view.on_account_selected(interaction, "123")
+
+    assert interaction.response.defer_kwargs == {"ephemeral": True}
+    assert sent == [(None, {"embed": embed, "ephemeral": True})]
+
+
+@pytest.mark.asyncio
+async def test_current_rankings_browser_blocks_honor_my_rank_outside_stats_channel_for_admin(
+    monkeypatch,
+):
+    monkeypatch.setattr(kvk_rankings_views, "KVK_PLAYER_STATS_CHANNEL_ID", 100)
+    monkeypatch.setattr(kvk_rankings_views, "_is_admin", lambda _user: True)
+    fetched = False
+
+    async def fake_lookup(**_kwargs):
+        nonlocal fetched
+        fetched = True
+        raise AssertionError("honor my rank should not be fetched outside stats channel")
+
+    view = CurrentRankingsBrowserView(mode="honor", metric="honor", limit=10)
+    monkeypatch.setattr(
+        kvk_rankings_views.kvk_rankings_service,
+        "build_my_rank_lookup_result",
+        fake_lookup,
+    )
+
+    interaction = _channel_interaction(channel_id=999, user_id=1)
+
+    await view.on_my_rank(interaction)
+
+    assert fetched is False
+    assert interaction.response.sent
+    assert "<#100>" in interaction.response.sent[0][0]
+    assert interaction.response.sent[0][1]["ephemeral"] is True
+
+
 def test_current_rankings_embed_collapses_control_characters_in_rows():
     payload = RankingPayload(
         mode="prekvk",
@@ -418,3 +626,26 @@ def test_current_rankings_embed_uses_top_label_without_true_total():
 
     assert "Showing: Top 10" in embed.footer.text
     assert "Showing: 1 of 1" not in embed.footer.text
+
+
+def test_my_rank_embed_includes_private_rank_context():
+    result = MyRankLookupResult(
+        status="found",
+        mode="kvk",
+        metric="kills",
+        metric_label="Kills",
+        mode_label="KVK",
+        message="found",
+        row=RankingRow(rank=12, governor_id=123, governor_name="Ranked", value=1000),
+        row_above=RankingRow(rank=11, governor_id=111, governor_name="Ahead", value=1200),
+        row_below=RankingRow(rank=13, governor_id=222, governor_name="Behind", value=900),
+        total_rows=50,
+        gap_to_next_value=200,
+    )
+
+    embed = build_my_rank_embed(result)
+
+    assert "My Rank - KVK Kills" == embed.title
+    assert "**#12 of 50**" in embed.description
+    assert "Private result" in embed.footer.text
+    assert embed.fields[1].name == "Gap to next"

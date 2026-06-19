@@ -13,11 +13,14 @@ from kvk.models.kvk_rankings import (
     HALL_OF_FAME_RECORD_LIMIT,
     PRIMARY_RANKING_LIMITS,
     HallOfFameMetric,
+    MyRankLookupResult,
+    RankingAccountChoice,
     RankingPayload,
     RankingRow,
 )
 from prekvk import report_service
 from prekvk.models import PreKvkReportPayload, PreKvkReportRow, PreKvkReportSort
+from services import governor_account_service
 from stats_alerts.honors import get_latest_honor_top
 from utils import load_stat_cache, parse_last_refresh_utc
 
@@ -68,6 +71,7 @@ DEFAULT_CURRENT_RANKING_METRICS: dict[str, str] = {
 
 KVK_RANKING_FILTERS = ("STATUS = INCLUDED", "Starting Power >= 40M")
 KVK_MIN_POWER = 40_000_000
+INTERNAL_RANK_LOOKUP_LIMIT = 10_000
 
 
 def normalize_ranking_limit(value: int | None, *, default: int = 10) -> int:
@@ -298,6 +302,7 @@ def build_kvk_rankings_payload_from_rows(
     *,
     metric: str = "kills",
     limit: int = 10,
+    include_all: bool = False,
 ) -> RankingPayload:
     normalized_limit = normalize_ranking_limit(limit)
     normalized_metric = normalize_current_ranking_metric("kvk", metric, limit=normalized_limit)
@@ -319,7 +324,8 @@ def build_kvk_rankings_payload_from_rows(
         key=sort_key,
     )
     ranking_rows: list[RankingRow] = []
-    for index, raw in enumerate(sorted_rows[:normalized_limit], start=1):
+    selected_rows = sorted_rows if include_all else sorted_rows[:normalized_limit]
+    for index, raw in enumerate(selected_rows, start=1):
         ranking_rows.append(
             RankingRow(
                 rank=index,
@@ -371,20 +377,28 @@ async def build_kvk_rankings_payload(
     *,
     metric: str = "kills",
     limit: int = 10,
+    include_all: bool = False,
 ) -> RankingPayload:
     cache = await asyncio.to_thread(load_stat_cache)
     rows = [row for key, row in cache.items() if key != "_meta"]
-    return build_kvk_rankings_payload_from_rows(rows, metric=metric, limit=limit)
+    return build_kvk_rankings_payload_from_rows(
+        rows,
+        metric=metric,
+        limit=limit,
+        include_all=include_all,
+    )
 
 
 def build_honor_rankings_payload_from_rows(
     rows: list[dict[str, Any]] | None,
     *,
     limit: int = 10,
+    include_all: bool = False,
 ) -> RankingPayload:
     normalized_limit = normalize_ranking_limit(limit)
     ranking_rows: list[RankingRow] = []
-    for index, raw in enumerate((rows or [])[:normalized_limit], start=1):
+    selected_rows = list(rows or []) if include_all else list(rows or [])[:normalized_limit]
+    for index, raw in enumerate(selected_rows, start=1):
         governor_id = _to_int(raw.get("GovernorID"))
         name = str(raw.get("GovernorName") or governor_id or "Unknown").strip() or "Unknown"
         ranking_rows.append(
@@ -421,10 +435,19 @@ def build_honor_rankings_payload_from_rows(
     )
 
 
-async def build_honor_rankings_payload(*, limit: int = 10) -> RankingPayload:
+async def build_honor_rankings_payload(
+    *,
+    limit: int = 10,
+    include_all: bool = False,
+) -> RankingPayload:
     normalized_limit = normalize_ranking_limit(limit)
-    rows = await get_latest_honor_top(normalized_limit)
-    return build_honor_rankings_payload_from_rows(rows, limit=normalized_limit)
+    fetch_limit = INTERNAL_RANK_LOOKUP_LIMIT if include_all else normalized_limit
+    rows = await get_latest_honor_top(fetch_limit)
+    return build_honor_rankings_payload_from_rows(
+        rows,
+        limit=normalized_limit,
+        include_all=include_all,
+    )
 
 
 def _prekvk_value(row: PreKvkReportRow, metric: str) -> int:
@@ -439,8 +462,13 @@ def _prekvk_value(row: PreKvkReportRow, metric: str) -> int:
 
 def build_prekvk_rankings_payload_from_report(
     payload: PreKvkReportPayload,
+    *,
+    display_limit: int | None = None,
 ) -> RankingPayload:
     metric = normalize_current_ranking_metric("prekvk", payload.sort_by.value)
+    normalized_limit = (
+        normalize_ranking_limit(display_limit) if display_limit is not None else payload.limit
+    )
     ranking_rows = [
         RankingRow(
             rank=row.rank,
@@ -475,7 +503,7 @@ def build_prekvk_rankings_payload_from_report(
         mode_label=CURRENT_RANKING_MODE_LABELS["prekvk"],
         metric=metric,
         metric_label=PREKVK_RANKING_METRIC_LABELS[metric],
-        limit=payload.limit,
+        limit=normalized_limit,
         rows=ranking_rows,
         kvk_no=payload.kvk_no,
         freshness_label=_latest_refresh_label(
@@ -493,15 +521,20 @@ async def build_prekvk_rankings_payload(
     *,
     metric: str = PreKvkReportSort.OVERALL.value,
     limit: int = 10,
+    include_all: bool = False,
 ) -> RankingPayload:
     normalized_metric = normalize_current_ranking_metric("prekvk", metric)
+    normalized_limit = normalize_ranking_limit(limit)
     sort_by = report_service.parse_report_sort(normalized_metric)
     payload = await report_service.build_prekvk_report_payload(
         kvk_no=None,
         sort_by=sort_by,
-        limit=normalize_ranking_limit(limit),
+        limit=None if include_all else normalized_limit,
     )
-    return build_prekvk_rankings_payload_from_report(payload)
+    return build_prekvk_rankings_payload_from_report(
+        payload,
+        display_limit=normalized_limit if include_all else None,
+    )
 
 
 async def build_current_rankings_payload(
@@ -509,6 +542,7 @@ async def build_current_rankings_payload(
     mode: str,
     metric: str | None = None,
     limit: int = 10,
+    include_all: bool = False,
 ) -> RankingPayload:
     parsed_mode = parse_current_ranking_mode(mode)
     normalized_limit = normalize_ranking_limit(limit)
@@ -518,10 +552,278 @@ async def build_current_rankings_payload(
         limit=normalized_limit,
     )
     if parsed_mode == "kvk":
-        return await build_kvk_rankings_payload(metric=normalized_metric, limit=normalized_limit)
+        return await build_kvk_rankings_payload(
+            metric=normalized_metric,
+            limit=normalized_limit,
+            include_all=include_all,
+        )
     if parsed_mode == "honor":
-        return await build_honor_rankings_payload(limit=normalized_limit)
-    return await build_prekvk_rankings_payload(metric=normalized_metric, limit=normalized_limit)
+        return await build_honor_rankings_payload(
+            limit=normalized_limit,
+            include_all=include_all,
+        )
+    return await build_prekvk_rankings_payload(
+        metric=normalized_metric,
+        limit=normalized_limit,
+        include_all=include_all,
+    )
+
+
+def _my_rank_labels(mode: str, metric: str | None, limit: int) -> tuple[str, str, str, str]:
+    parsed_mode = parse_current_ranking_mode(mode)
+    normalized_limit = normalize_ranking_limit(limit)
+    normalized_metric = normalize_current_ranking_metric(
+        parsed_mode,
+        metric,
+        limit=normalized_limit,
+    )
+    mode_label = CURRENT_RANKING_MODE_LABELS[parsed_mode]
+    metric_label = current_ranking_metric_labels(parsed_mode, limit=normalized_limit)[
+        normalized_metric
+    ]
+    return parsed_mode, normalized_metric, mode_label, metric_label
+
+
+def _ranking_account_choices(
+    summary: governor_account_service.AccountResolutionSummary,
+) -> tuple[RankingAccountChoice, ...]:
+    choices: list[RankingAccountChoice] = []
+    seen: set[int] = set()
+    for account in summary.resolved_accounts:
+        if account.governor_id in seen:
+            continue
+        seen.add(account.governor_id)
+        choices.append(
+            RankingAccountChoice(
+                slot=account.slot,
+                governor_id=account.governor_id,
+                governor_id_str=account.governor_id_str,
+                governor_name=account.governor_name,
+            )
+        )
+    return tuple(choices)
+
+
+def _my_rank_result(
+    *,
+    status: str,
+    mode: str,
+    metric: str,
+    mode_label: str,
+    metric_label: str,
+    message: str,
+    payload: RankingPayload | None = None,
+    row: RankingRow | None = None,
+    row_above: RankingRow | None = None,
+    row_below: RankingRow | None = None,
+    governor_id: int | None = None,
+    governor_name: str | None = None,
+    account_choices: tuple[RankingAccountChoice, ...] = (),
+    total_rows: int | None = None,
+    gap_to_next_value: int | float | None = None,
+) -> MyRankLookupResult:
+    return MyRankLookupResult(
+        status=status,
+        mode=mode,
+        metric=metric,
+        metric_label=metric_label,
+        mode_label=mode_label,
+        message=message,
+        payload=payload,
+        row=row,
+        row_above=row_above,
+        row_below=row_below,
+        governor_id=governor_id,
+        governor_name=governor_name,
+        account_choices=account_choices,
+        total_rows=total_rows,
+        gap_to_next_value=gap_to_next_value,
+    )
+
+
+def _parse_positive_governor_id(value: int | str | None) -> int | None:
+    try:
+        governor_id = int(str(value).strip())
+    except Exception:
+        return None
+    return governor_id if governor_id > 0 else None
+
+
+def _is_lower_better_rank(mode: str, metric: str) -> bool:
+    return mode == "kvk" and metric == "tanking_score"
+
+
+def _gap_to_next_rank(
+    row: RankingRow,
+    row_above: RankingRow | None,
+    *,
+    mode: str,
+    metric: str,
+) -> int | float | None:
+    if row_above is None:
+        return None
+    try:
+        gap = (
+            float(row.value) - float(row_above.value)
+            if _is_lower_better_rank(mode, metric)
+            else float(row_above.value) - float(row.value)
+        )
+    except Exception:
+        return None
+    if gap < 0:
+        gap = 0
+    return int(gap) if gap.is_integer() else gap
+
+
+def _ranked_row_index(rows: list[RankingRow], governor_id: int) -> int | None:
+    for index, row in enumerate(rows):
+        if row.governor_id == governor_id:
+            return index
+    return None
+
+
+async def build_my_rank_lookup_result(
+    *,
+    discord_user_id: int,
+    mode: str,
+    metric: str | None = None,
+    limit: int = 10,
+    governor_id: int | str | None = None,
+) -> MyRankLookupResult:
+    """Resolve one registered governor's private current-rank result."""
+
+    parsed_mode, normalized_metric, mode_label, metric_label = _my_rank_labels(
+        mode,
+        metric,
+        limit,
+    )
+    normalized_limit = normalize_ranking_limit(limit)
+    summary = await governor_account_service.get_account_summary_for_user(discord_user_id)
+    if not summary.ok:
+        return _my_rank_result(
+            status="unavailable",
+            mode=parsed_mode,
+            metric=normalized_metric,
+            mode_label=mode_label,
+            metric_label=metric_label,
+            message="Registry lookup is temporarily unavailable. Please try again shortly.",
+        )
+    if not summary.governor_ids:
+        return _my_rank_result(
+            status="no_accounts",
+            mode=parsed_mode,
+            metric=normalized_metric,
+            mode_label=mode_label,
+            metric_label=metric_label,
+            message="You do not have any registered governor accounts yet. Use `/register_governor` first.",
+        )
+
+    selected_governor_id = _parse_positive_governor_id(governor_id)
+    if selected_governor_id is None:
+        if len(summary.governor_ids) > 1:
+            return _my_rank_result(
+                status="multi_account",
+                mode=parsed_mode,
+                metric=normalized_metric,
+                mode_label=mode_label,
+                metric_label=metric_label,
+                message="Choose which registered governor to find in this ranking.",
+                account_choices=_ranking_account_choices(summary),
+            )
+        selected_governor_id = summary.governor_ids[0]
+    elif not summary.contains_governor_id(selected_governor_id):
+        return _my_rank_result(
+            status="not_registered",
+            mode=parsed_mode,
+            metric=normalized_metric,
+            mode_label=mode_label,
+            metric_label=metric_label,
+            message="That governor is not registered to your Discord account.",
+            governor_id=selected_governor_id,
+        )
+
+    governor_name = summary.governor_name_for_id(
+        selected_governor_id, fallback=str(selected_governor_id)
+    )
+    try:
+        payload = await build_current_rankings_payload(
+            mode=parsed_mode,
+            metric=normalized_metric,
+            limit=normalized_limit,
+            include_all=True,
+        )
+    except Exception:
+        return _my_rank_result(
+            status="unavailable",
+            mode=parsed_mode,
+            metric=normalized_metric,
+            mode_label=mode_label,
+            metric_label=metric_label,
+            message="Rankings are temporarily unavailable. Please try again after the next refresh.",
+            governor_id=selected_governor_id,
+            governor_name=governor_name,
+        )
+
+    total_rows = payload.total_rows if payload.total_rows is not None else len(payload.rows)
+    if not payload.rows:
+        return _my_rank_result(
+            status="unavailable",
+            mode=payload.mode,
+            metric=payload.metric,
+            mode_label=payload.mode_label or mode_label,
+            metric_label=payload.metric_label,
+            message=payload.empty_message or "No current ranking data is available yet.",
+            payload=payload,
+            governor_id=selected_governor_id,
+            governor_name=governor_name,
+            total_rows=total_rows,
+        )
+
+    row_index = _ranked_row_index(payload.rows, selected_governor_id)
+    if row_index is None:
+        return _my_rank_result(
+            status="not_ranked",
+            mode=payload.mode,
+            metric=payload.metric,
+            mode_label=payload.mode_label or mode_label,
+            metric_label=payload.metric_label,
+            message=(
+                f"{governor_name} (`{selected_governor_id}`) is not ranked for "
+                f"{payload.mode_label or mode_label} {payload.metric_label}."
+            ),
+            payload=payload,
+            governor_id=selected_governor_id,
+            governor_name=governor_name,
+            total_rows=total_rows,
+        )
+
+    row = payload.rows[row_index]
+    row_above = payload.rows[row_index - 1] if row_index > 0 else None
+    row_below = payload.rows[row_index + 1] if row_index + 1 < len(payload.rows) else None
+    return _my_rank_result(
+        status="found",
+        mode=payload.mode,
+        metric=payload.metric,
+        mode_label=payload.mode_label or mode_label,
+        metric_label=payload.metric_label,
+        message=(
+            f"{row.governor_name} (`{row.governor_id}`) is ranked #{row.rank} "
+            f"for {payload.mode_label or mode_label} {payload.metric_label}."
+        ),
+        payload=payload,
+        row=row,
+        row_above=row_above,
+        row_below=row_below,
+        governor_id=row.governor_id,
+        governor_name=row.governor_name,
+        total_rows=total_rows,
+        gap_to_next_value=_gap_to_next_rank(
+            row,
+            row_above,
+            mode=payload.mode,
+            metric=payload.metric,
+        ),
+    )
 
 
 def build_hall_of_fame_payload_from_rows(

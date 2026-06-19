@@ -70,3 +70,30 @@ class RankingPayload:
 class RenderedRankingCard:
     filename: str
     image_bytes: BytesIO
+
+
+@dataclass(frozen=True)
+class RankingAccountChoice:
+    slot: str
+    governor_id: int
+    governor_id_str: str
+    governor_name: str
+
+
+@dataclass(frozen=True)
+class MyRankLookupResult:
+    status: str
+    mode: str
+    metric: str
+    metric_label: str
+    mode_label: str
+    message: str
+    payload: RankingPayload | None = None
+    row: RankingRow | None = None
+    row_above: RankingRow | None = None
+    row_below: RankingRow | None = None
+    governor_id: int | None = None
+    governor_name: str | None = None
+    account_choices: tuple[RankingAccountChoice, ...] = ()
+    total_rows: int | None = None
+    gap_to_next_value: int | float | None = None

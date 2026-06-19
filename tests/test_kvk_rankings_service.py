@@ -2,9 +2,10 @@ from decimal import Decimal
 
 import pytest
 
-from kvk.models.kvk_rankings import HallOfFameMetric
+from kvk.models.kvk_rankings import HallOfFameMetric, RankingPayload, RankingRow
 from kvk.services import kvk_rankings_service
 from prekvk.models import PreKvkReportPayload, PreKvkReportRow, PreKvkReportSort
+from services import governor_account_service
 
 
 def test_normalize_ranking_limit_allows_primary_limits_only():
@@ -203,6 +204,37 @@ def test_build_kvk_rankings_payload_empty_cache_is_unavailable():
     assert "No stats cache" in (payload.empty_message or "")
 
 
+def test_build_kvk_rankings_payload_can_keep_full_internal_rank_set():
+    rows = [
+        {
+            "GovernorID": str(index),
+            "GovernorName": f"Player {index}",
+            "Starting Power": 50_000_000 + index,
+            "T4&T5_Kills": 10_000 - index,
+            "STATUS": "INCLUDED",
+        }
+        for index in range(1, 12)
+    ]
+
+    public_payload = kvk_rankings_service.build_kvk_rankings_payload_from_rows(
+        rows,
+        metric="kills",
+        limit=10,
+    )
+    internal_payload = kvk_rankings_service.build_kvk_rankings_payload_from_rows(
+        rows,
+        metric="kills",
+        limit=10,
+        include_all=True,
+    )
+
+    assert len(public_payload.rows) == 10
+    assert len(internal_payload.rows) == 11
+    assert internal_payload.limit == 10
+    assert internal_payload.rows[-1].rank == 11
+    assert internal_payload.total_rows == 11
+
+
 def test_build_honor_rankings_payload_preserves_scan_context():
     payload = kvk_rankings_service.build_honor_rankings_payload_from_rows(
         [
@@ -227,6 +259,32 @@ def test_build_honor_rankings_payload_preserves_scan_context():
     assert payload.rows[0].supporting_values["Honor"] == 5000
     assert payload.rows[0].supporting_values["Governor ID"] == "123"
     assert payload.rows[0].supporting_values["KVK"] == 17
+
+
+@pytest.mark.asyncio
+async def test_build_honor_rankings_payload_fetches_internal_lookup_limit(monkeypatch):
+    calls = []
+
+    async def fake_honor_top(limit):
+        calls.append(limit)
+        return [
+            {
+                "GovernorID": index,
+                "GovernorName": f"Honor {index}",
+                "HonorPoints": 1000 - index,
+            }
+            for index in range(12)
+        ]
+
+    monkeypatch.setattr(kvk_rankings_service, "get_latest_honor_top", fake_honor_top)
+
+    payload = await kvk_rankings_service.build_honor_rankings_payload(
+        limit=10,
+        include_all=True,
+    )
+
+    assert calls == [kvk_rankings_service.INTERNAL_RANK_LOOKUP_LIMIT]
+    assert len(payload.rows) == 12
 
 
 def test_build_prekvk_rankings_payload_from_report_uses_report_rows():
@@ -289,6 +347,226 @@ async def test_build_current_rankings_payload_dispatches_prekvk(monkeypatch):
     assert payload.mode == "prekvk"
     assert payload.metric == "stage3"
     assert payload.limit == 10
+
+
+@pytest.mark.asyncio
+async def test_build_current_rankings_payload_dispatches_prekvk_full_lookup(monkeypatch):
+    calls = {}
+
+    async def fake_report(**kwargs):
+        calls.update(kwargs)
+        return PreKvkReportPayload(
+            kvk_no=17,
+            sort_by=PreKvkReportSort.OVERALL,
+            limit=3,
+            rows=[
+                PreKvkReportRow(
+                    rank=index,
+                    governor_id=index,
+                    governor_name=f"Pre {index}",
+                    power=50_000_000,
+                    stage1_points=0,
+                    stage2_points=0,
+                    stage3_points=0,
+                    overall_points=100 - index,
+                )
+                for index in range(1, 4)
+            ],
+        )
+
+    monkeypatch.setattr(
+        kvk_rankings_service.report_service,
+        "build_prekvk_report_payload",
+        fake_report,
+    )
+
+    payload = await kvk_rankings_service.build_current_rankings_payload(
+        mode="prekvk",
+        metric="overall",
+        limit=10,
+        include_all=True,
+    )
+
+    assert calls["limit"] is None
+    assert len(payload.rows) == 3
+    assert payload.limit == 10
+
+
+@pytest.mark.asyncio
+async def test_build_my_rank_lookup_result_finds_registered_single_account(monkeypatch):
+    async def fake_summary(user_id):
+        assert user_id == 42
+        return governor_account_service.summarize_accounts(
+            {
+                "Main": {
+                    "GovernorID": "123",
+                    "GovernorName": "Ranked",
+                }
+            }
+        )
+
+    async def fake_payload(**kwargs):
+        assert kwargs == {
+            "mode": "kvk",
+            "metric": "kills",
+            "limit": 10,
+            "include_all": True,
+        }
+        return RankingPayload(
+            mode="kvk",
+            mode_label="KVK",
+            metric="kills",
+            metric_label="Kills",
+            limit=10,
+            total_rows=3,
+            rows=[
+                RankingRow(rank=1, governor_id=111, governor_name="Ahead", value=100),
+                RankingRow(rank=2, governor_id=123, governor_name="Ranked", value=80),
+                RankingRow(rank=3, governor_id=222, governor_name="Behind", value=50),
+            ],
+        )
+
+    monkeypatch.setattr(
+        kvk_rankings_service.governor_account_service,
+        "get_account_summary_for_user",
+        fake_summary,
+    )
+    monkeypatch.setattr(kvk_rankings_service, "build_current_rankings_payload", fake_payload)
+
+    result = await kvk_rankings_service.build_my_rank_lookup_result(
+        discord_user_id=42,
+        mode="kvk",
+        metric="kills",
+        limit=10,
+    )
+
+    assert result.status == "found"
+    assert result.row is not None
+    assert result.row.rank == 2
+    assert result.row_above is not None
+    assert result.row_above.governor_id == 111
+    assert result.row_below is not None
+    assert result.row_below.governor_id == 222
+    assert result.gap_to_next_value == 20
+    assert result.total_rows == 3
+
+
+@pytest.mark.asyncio
+async def test_build_my_rank_lookup_result_prompts_for_multi_account(monkeypatch):
+    fetched = False
+
+    async def fake_summary(_user_id):
+        return governor_account_service.summarize_accounts(
+            {
+                "Main": {"GovernorID": "123", "GovernorName": "Main"},
+                "Alt": {"GovernorID": "456", "GovernorName": "Alt"},
+            }
+        )
+
+    async def fake_payload(**_kwargs):
+        nonlocal fetched
+        fetched = True
+        raise AssertionError("payload should not be fetched before account selection")
+
+    monkeypatch.setattr(
+        kvk_rankings_service.governor_account_service,
+        "get_account_summary_for_user",
+        fake_summary,
+    )
+    monkeypatch.setattr(kvk_rankings_service, "build_current_rankings_payload", fake_payload)
+
+    result = await kvk_rankings_service.build_my_rank_lookup_result(
+        discord_user_id=42,
+        mode="honor",
+    )
+
+    assert fetched is False
+    assert result.status == "multi_account"
+    assert [choice.governor_id for choice in result.account_choices] == [123, 456]
+
+
+@pytest.mark.asyncio
+async def test_build_my_rank_lookup_result_rejects_unregistered_selected_account(monkeypatch):
+    async def fake_summary(_user_id):
+        return governor_account_service.summarize_accounts(
+            {"Main": {"GovernorID": "123", "GovernorName": "Main"}}
+        )
+
+    monkeypatch.setattr(
+        kvk_rankings_service.governor_account_service,
+        "get_account_summary_for_user",
+        fake_summary,
+    )
+
+    result = await kvk_rankings_service.build_my_rank_lookup_result(
+        discord_user_id=42,
+        mode="kvk",
+        governor_id="999",
+    )
+
+    assert result.status == "not_registered"
+    assert "not registered" in result.message
+
+
+@pytest.mark.asyncio
+async def test_build_my_rank_lookup_result_reports_not_ranked_and_missing_data(monkeypatch):
+    async def fake_summary(_user_id):
+        return governor_account_service.summarize_accounts(
+            {"Main": {"GovernorID": "123", "GovernorName": "Main"}}
+        )
+
+    payloads = [
+        RankingPayload(
+            mode="prekvk",
+            mode_label="PreKvK",
+            metric="stage2",
+            metric_label="Stage 2",
+            limit=25,
+            total_rows=1,
+            rows=[RankingRow(rank=1, governor_id=999, governor_name="Other", value=50)],
+        ),
+        RankingPayload(
+            mode="prekvk",
+            mode_label="PreKvK",
+            metric="stage2",
+            metric_label="Stage 2",
+            limit=25,
+            rows=[],
+            empty_message="No PreKvK import found.",
+        ),
+    ]
+
+    async def fake_payload(**kwargs):
+        assert kwargs["mode"] == "prekvk"
+        assert kwargs["metric"] == "stage2"
+        assert kwargs["limit"] == 25
+        assert kwargs["include_all"] is True
+        return payloads.pop(0)
+
+    monkeypatch.setattr(
+        kvk_rankings_service.governor_account_service,
+        "get_account_summary_for_user",
+        fake_summary,
+    )
+    monkeypatch.setattr(kvk_rankings_service, "build_current_rankings_payload", fake_payload)
+
+    not_ranked = await kvk_rankings_service.build_my_rank_lookup_result(
+        discord_user_id=42,
+        mode="prekvk",
+        metric="stage2",
+        limit=25,
+    )
+    missing = await kvk_rankings_service.build_my_rank_lookup_result(
+        discord_user_id=42,
+        mode="prekvk",
+        metric="stage2",
+        limit=25,
+    )
+
+    assert not_ranked.status == "not_ranked"
+    assert not_ranked.total_rows == 1
+    assert missing.status == "unavailable"
+    assert missing.message == "No PreKvK import found."
 
 
 def test_build_hall_of_fame_payload_from_rows_preserves_single_kvk_records():

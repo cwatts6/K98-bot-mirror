@@ -6,22 +6,40 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `/kvk rankings type:honor`, `/kvk rankings type:prekvk`, `ui/views/kvk_rankings_views.py`, `prekvk/report_image_renderer.py`
+- Area: `/kvk rankings type:honor`, `kvk/rendering/kvk_rankings_embed.py`
 - Type: consistency
-- Description: Phase 5C delivered current KVK Top 10 cards and Phase 5D delivered Hall of Fame records cards, leaving Honor and PreKvK Top 10 rankings as the remaining visual gap in `/kvk rankings`. They still use the unified compact embed browser, while legacy `/prekvk report` remains image-based.
-- Suggested Fix: Scope Phase 5E as the Honor and PreKvK Top 10 visual-card slice. Audit data freshness context, metric-specific support values, Honor channel-gate preservation, and PreKvK report-image coexistence before implementing cards for one or both modes.
+- Description: Phase 5E smoke testing found that Honor Top 25 and Top 50 compact browser output lists the correct ranked governors but no ranking values are displayed.
+- Suggested Fix: Scope Phase 5G wrap-up polish to restore Honor value-column rendering for Top 25 and Top 50 compact output while preserving the Honor Top 10 visual card, Honor no-admin-override channel gate, and legacy `/honor_rankings`.
 - Impact: medium
-- Risk: medium
-- Dependencies: Phase 5B unified current-ranking browser validation, Phase 5C current KVK card feedback, completed Phase 5D records-card delivery, Honor channel-gate preservation, and PreKvK image-report preservation.
+- Risk: low
+- Dependencies: Phase 5B unified browser, Phase 5E Honor Top 10 visual-card production rollout, focused compact-embed renderer tests.
 
 ### Deferred Optimisation
-- Area: `/kvk rankings` current-ranking browser, registry/account lookup, `kvk/services/kvk_rankings_service.py`, `ui/views/kvk_rankings_views.py`
-- Type: architecture
-- Description: Phase 5B establishes a unified current-ranking browser for KVK, Honor, and PreKvK with primary Top 10/25/50 controls, but it intentionally does not add deeper Top 100 player controls or a personalised "my rank" lookup. Phase 5E is now reserved for Honor and PreKvK visual cards, so players outside the public Top 50 still need a later coherent way to find their own current position without expanding the main browser surface.
-- Suggested Fix: Scope Phase 5F for a registry-aware private "my rank" or export-style flow. Use service/DAL/cache boundaries for account lookup and ranking position calculation, show nearby rows and gap-to-next context when useful, preserve public browser simplicity, and add focused tests for registered/unregistered users, multi-account users, unavailable source data, and non-primary limits.
+- Area: `/kvk rankings type:prekvk`, `kvk/rendering/kvk_rankings_embed.py`
+- Type: consistency
+- Description: Phase 5E smoke testing found that PreKvK Top 25 and Top 50 compact browser output has column alignment drift similar to the earlier KVK Top 25/50 issue. Long names and multi-metric columns can wrap or shift values onto confusing lines.
+- Suggested Fix: Scope Phase 5G wrap-up polish to apply fixed-width column formatting to PreKvK compact rows, mirroring the KVK compact fixed-width approach where appropriate while preserving Overall, Stage 1, Stage 2, Stage 3, Power, freshness/source footer, and image-based legacy `/prekvk report`.
+- Impact: medium
+- Risk: low
+- Dependencies: Phase 5B unified browser, Phase 5E PreKvK Top 10 visual-card production rollout, focused PreKvK compact-output tests and mobile-like screenshot review.
+
+### Deferred Optimisation
+- Area: `/kvk rankings type:kvk`, `kvk/rendering/kvk_rankings_card_renderer.py`
+- Type: consistency
+- Description: Phase 5E smoke testing confirmed the current KVK Top 10 visual card still left-aligns the top-three podium text, while Records, Honor, and PreKvK cards now center podium ranks/names/values. The visual language is therefore inconsistent across ranking cards.
+- Suggested Fix: Scope Phase 5G wrap-up polish to center current KVK Top 10 podium text using the shared centered podium helper/path, preserving existing KVK card metrics, support values, footer/filter wording, and embed fallback.
+- Impact: low
+- Risk: low
+- Dependencies: Phase 5C current KVK card production rollout, Phase 5E centered podium rendering for Honor/PreKvK, focused visual sample inspection.
+
+### Deferred Optimisation
+- Area: `kvk/rendering/kvk_rankings_card_renderer.py`, ranking-card render/send path
+- Type: performance
+- Description: Phase 5E smoke testing found that visual ranking cards can take multiple seconds to render/load in Discord. The full ranking visual surface now exists, so render latency should be profiled before Phase 5 closes.
+- Suggested Fix: Scope Phase 5H as a dedicated ranking-card performance optimisation phase. Profile background loading, overlay generation, font loading/fitting, text drawing, PNG optimisation, in-memory file handling, and Discord send-path latency. Cache reusable backgrounds, overlays, fonts, and computed layout primitives where safe, and preserve visual fidelity plus embed fallback.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5B unified current-ranking browser validation, registry/account lookup contract review, and operator approval for any new private interaction or export behavior.
+- Dependencies: Phase 5C KVK cards, Phase 5D records cards, Phase 5E Honor/PreKvK cards, visual sample comparison, focused renderer tests, and performance timing evidence.
 
 ### Deferred Optimisation
 - Area: `build_KVKrankings_embed.py`, `ui/views/stats_views.py`, `honor_rankings_view.py`, `commands/stats_cmds.py`, legacy ranking commands

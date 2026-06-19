@@ -5,7 +5,7 @@ from typing import Any
 
 import discord
 
-from kvk.models.kvk_rankings import RankingPayload
+from kvk.models.kvk_rankings import MyRankLookupResult, RankingPayload, RankingRow
 from utils import fmt_short
 
 try:
@@ -143,6 +143,75 @@ def build_current_rankings_embed(
         footer_parts.append("Filters: " + ", ".join(payload.filters))
     if payload.source_state not in {"fresh", "empty"}:
         footer_parts.append(f"Source: {payload.source_state}")
+    embed.set_footer(text=" | ".join(footer_parts))
+    return embed
+
+
+def _my_rank_neighbor_line(row: RankingRow | None) -> str:
+    if row is None:
+        return "None"
+    return f"#{row.rank} {row.governor_name} - {_format_value(row.value)}"
+
+
+def build_my_rank_embed(
+    result: MyRankLookupResult,
+    *,
+    color: discord.Color | int = DEFAULT_COLOR,
+) -> discord.Embed:
+    row = result.row
+    title = f"My Rank - {result.mode_label} {result.metric_label}"
+    if row is None:
+        embed = discord.Embed(
+            title=title,
+            description=result.message,
+            color=color if isinstance(color, int) else color,
+        )
+        embed.set_footer(text="Private result")
+        return embed
+
+    total_suffix = f" of {result.total_rows}" if result.total_rows is not None else ""
+    embed = discord.Embed(
+        title=title,
+        description=(
+            f"**{row.governor_name}** (`{row.governor_id}`) is " f"**#{row.rank}{total_suffix}**."
+        ),
+        color=color if isinstance(color, int) else color,
+    )
+    embed.add_field(name="Your value", value=_format_value(row.value), inline=True)
+    if result.gap_to_next_value is not None:
+        embed.add_field(
+            name="Gap to next",
+            value=_format_value(result.gap_to_next_value),
+            inline=True,
+        )
+    embed.add_field(
+        name="Next rank",
+        value=(
+            _my_rank_neighbor_line(result.row_above)
+            if result.row_above is not None
+            else "You are at the top."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Behind you",
+        value=(
+            _my_rank_neighbor_line(result.row_below)
+            if result.row_below is not None
+            else "No ranked row below you."
+        ),
+        inline=False,
+    )
+
+    footer_parts = ["Private result", f"Sorted by: {result.metric_label}"]
+    payload = result.payload
+    if payload is not None:
+        if payload.freshness_label:
+            footer_parts.append(f"Last refreshed: {payload.freshness_label}")
+        if payload.source_note:
+            footer_parts.append(payload.source_note)
+        if payload.filters:
+            footer_parts.append("Filters: " + ", ".join(payload.filters))
     embed.set_footer(text=" | ".join(footer_parts))
     return embed
 

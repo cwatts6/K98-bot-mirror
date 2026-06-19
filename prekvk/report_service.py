@@ -145,9 +145,8 @@ def build_report_payload_from_rows(
     raw_rows: list[dict[str, Any]],
     *,
     sort_by: PreKvkReportSort = PreKvkReportSort.OVERALL,
-    limit: int = 10,
+    limit: int | None = 10,
 ) -> PreKvkReportPayload:
-    normalized_limit = normalize_report_limit(limit)
     scan_id = None
     scan_timestamp_utc = None
     source_filename = None
@@ -159,7 +158,13 @@ def build_report_payload_from_rows(
             if scan_id is not None or scan_timestamp_utc is not None or source_filename:
                 break
     rows = _rows_from_raw(raw_rows)
-    ranked = _rank_rows(rows, sort_by)[:normalized_limit]
+    ranked_all = _rank_rows(rows, sort_by)
+    if limit is None:
+        normalized_limit = len(ranked_all)
+        ranked = ranked_all
+    else:
+        normalized_limit = normalize_report_limit(limit)
+        ranked = ranked_all[:normalized_limit]
     return PreKvkReportPayload(
         kvk_no=int(kvk_no),
         sort_by=sort_by,
@@ -184,7 +189,7 @@ async def build_prekvk_report_payload(
     *,
     kvk_no: int | None = None,
     sort_by: PreKvkReportSort = PreKvkReportSort.OVERALL,
-    limit: int = 10,
+    limit: int | None = 10,
 ) -> PreKvkReportPayload:
     resolved_kvk_no = (
         int(kvk_no) if kvk_no is not None else await asyncio.to_thread(resolve_current_kvk_no)
