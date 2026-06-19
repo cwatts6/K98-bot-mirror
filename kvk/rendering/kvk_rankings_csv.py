@@ -8,7 +8,6 @@ from typing import Any
 
 from kvk.models.kvk_rankings import RankingPayload, RankingRow
 
-
 _FORMULA_PREFIXES = ("=", "+", "-", "@")
 _FILENAME_SAFE_RE = re.compile(r"[^a-z0-9_]+")
 
@@ -100,7 +99,7 @@ def _csv_text_cell(value: Any) -> str:
 def _csv_cell(value: Any) -> Any:
     if value is None:
         return ""
-    if isinstance(value, bool | int | float):
+    if isinstance(value, (bool, int, float)):
         return value
     return _csv_text_cell(value)
 

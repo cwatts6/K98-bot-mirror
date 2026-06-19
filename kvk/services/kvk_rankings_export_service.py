@@ -22,7 +22,7 @@ class CurrentRankingsCsvExport:
 
     @property
     def byte_count(self) -> int:
-        return len(self.csv_bytes.getvalue())
+        return self.csv_bytes.getbuffer().nbytes
 
     def is_oversized(self, *, max_bytes: int = DISCORD_CSV_UPLOAD_MAX_BYTES) -> bool:
         return self.byte_count > max_bytes
