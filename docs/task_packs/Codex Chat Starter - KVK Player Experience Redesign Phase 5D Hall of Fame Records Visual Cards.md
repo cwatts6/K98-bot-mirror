@@ -1,8 +1,8 @@
 # Codex Chat Starter - KVK Player Experience Redesign Phase 5D Hall of Fame Records Visual Cards
 
 Status: Phase 5D is complete. This starter is retained as the Phase 5D execution record.
-Use `docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5E Honor and PreKvK Visual Ranking Cards.md`
-for the next active sub-phase.
+Phase 5E is also complete. Start the next active sub-phase from
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5F My Rank and Export Polish.md`.
 
 Phase 5A, Phase 5B, Phase 5C, and Phase 5D are complete.
 
@@ -49,9 +49,10 @@ Delivered Phase 5C baseline:
 - Legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` commands remain live.
 - Legacy `/prekvk report` remains image-based.
 - Remaining known Phase 5 delivery work is captured structurally and must not be lost:
-  - Honor and PreKvK Top 10 visual cards in Phase 5E.
   - Registry-aware private My Rank / local-position or export flow in Phase 5F.
   - Full-list/export path if Top 100 remains out of primary controls.
+  - Phase 5G compact-output and card-alignment wrap-up polish from Phase 5E smoke testing.
+  - Phase 5H ranking-card performance optimisation before Phase 5 closes.
   - Legacy ranking command consolidation/deprecation after usage evidence and rollout approval.
 
 ## Copy/Paste Starter

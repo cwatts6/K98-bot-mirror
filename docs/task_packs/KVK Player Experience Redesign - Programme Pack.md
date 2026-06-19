@@ -451,7 +451,7 @@ Use:
 
 ### Phase 5 — Unified `/kvk rankings` Visual/UX Polish
 
-Status: in progress. Phase 5A through Phase 5D are complete, smoke tested, merged to mirror,
+Status: in progress. Phase 5A through Phase 5E are complete, smoke tested, merged to mirror,
 promoted through production, and pushed to production.
 
 Phase 5A delivered the first rankings hub foundation:
@@ -531,9 +531,30 @@ PR #464:
   preserved.
 - Production smoke testing and visual polish are complete.
 
-The next sub-phase is Phase 5E: add Honor and PreKvK Top 10 visual cards while preserving the
-stable current KVK card, records card, Phase 5B unified browser, Top 25/50 compact browser output,
-Honor no-admin-override channel gate, legacy commands, and image-based legacy `/prekvk report`.
+Phase 5E delivered the Honor and PreKvK Top 10 visual cards in mirror PR #156 and production
+PR #465:
+
+- `/kvk rankings type:honor` now renders a generated Honor Top 10 visual card.
+- `/kvk rankings type:prekvk` now renders a generated PreKvK Top 10 visual card.
+- The cards use shared current-ranking payloads and renderer primitives; renderers do not
+  recalculate source-of-truth ranking semantics.
+- Honor card output preserves latest Honor scan context and the no-admin-override KVK stats
+  channel gate.
+- PreKvK card output preserves latest PreKvK import context and the image-based legacy
+  `/prekvk report`.
+- Top 25 and Top 50 remain compact unified browser output for KVK, Honor, and PreKvK.
+- Current KVK Top 10 cards, Hall of Fame records Top 10 cards, records Top 10-only controls,
+  Top 100 exclusion, legacy ranking commands, and embed fallback were preserved.
+- Review and smoke-test polish added clearer current-ranking renderer helper names, centered
+  Honor/PreKvK podium text, simplified card header/footer copy, removed duplicate Honor top-right
+  copy, made PreKvK top-right show the selected metric only, and darkened Honor/PreKvK metric
+  blue for readability.
+- Phase 5E was merged to mirror and production, pushed to prod, and smoke tested successfully.
+
+The next sub-phase is Phase 5F: add My Rank / Find Me and export polish while preserving the
+delivered Phase 5A-5E ranking browser and visual cards. Phase 5G should close the compact-output
+and KVK-card polish issues discovered during Phase 5E smoke testing. Phase 5H should address
+ranking-card render/load performance before Phase 5 closes.
 
 ### Phase 6 — Admin Command Hardening And Legacy Operator Cleanup
 
@@ -707,7 +728,8 @@ and Tanking Score, embed fallback, Top 25/50 compact browser preservation, Top 1
 legacy command preservation, production smoke testing, and visual polish. Phase 5D has delivered
 the Hall of Fame records Top 10 visual cards in mirror PR #155 and production PR #464, including
 all records metrics, metric-specific qualifying record counts, records Top 10-only controls,
-embed fallback, and successful production smoke testing. Start the next chat from the Phase 5E
-starter:
+embed fallback, and successful production smoke testing. Phase 5E has delivered the Honor and
+PreKvK Top 10 visual cards in mirror PR #156 and production PR #465, including production
+smoke-test polish and successful prod rollout. Start the next chat from the Phase 5F starter:
 
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5E Honor and PreKvK Visual Ranking Cards.md`
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5F My Rank and Export Polish.md`

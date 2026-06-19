@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 4 completion`
 - Task type: `feature / UX redesign / Discord interaction polish / renderer-service-DAL cleanup / staged implementation plan`
 - One-pass approved: `no`
-- Status: `Phase 5A, Phase 5B, Phase 5C, and Phase 5D complete; Phase 5E ready for next-chat delivery`
+- Status: `Phase 5A through Phase 5E complete; Phase 5F ready for next-chat delivery`
 
 ## Phase 5A Completion Note
 
@@ -122,21 +122,47 @@ Delivered Phase 5D scope:
 - Generated and inspected local visual samples, ran focused tests, standard validators,
   pre-commit, full pytest during PR handoff, and Codex Security with no reportable findings.
 
+## Phase 5E Completion Note
+
+Phase 5E is complete. It was delivered in mirror PR #156, promoted through production PR #465,
+merged to production, pushed to prod, and smoke tested successfully.
+
+Delivered Phase 5E scope:
+
+- Added Pillow-rendered Top 10 visual cards for `/kvk rankings type:honor` and
+  `/kvk rankings type:prekvk`.
+- Reused the shared current-ranking payload and card renderer primitives rather than
+  recalculating ranking semantics in the renderer.
+- Added mode-specific card backgrounds, titles, support values, filenames, and source/freshness
+  wording for Honor and PreKvK.
+- Preserved the Phase 5B unified browser, including compact Top 25 and Top 50 output for KVK,
+  Honor, and PreKvK.
+- Preserved Honor's no-admin-override KVK stats channel gate at command entry and browser refresh.
+- Preserved the image-based legacy `/prekvk report`.
+- Preserved current KVK Top 10 cards from Phase 5C and Hall of Fame records Top 10 cards from
+  Phase 5D.
+- Preserved records Top 10 only, Top 100 exclusion, legacy ranking commands, and embed fallback
+  for card render/send failures.
+- Addressed review feedback by introducing clearer current-ranking renderer helper names while
+  keeping backwards-compatible KVK-named wrappers.
+- Addressed smoke-test polish for Honor and PreKvK cards: centered podium text, simplified
+  header/subscript copy, removed duplicate Honor top-right copy, changed PreKvK top-right to the
+  selected metric only, darkened blue metric text, and reduced the footer to last-refresh context.
+- Generated and inspected local Honor and PreKvK visual samples, ran focused tests, standard
+  validators, pre-commit, full pytest during handoff, and Codex Security. The security scan
+  produced no reportable findings.
+
 Next Phase 5 sub-phase:
 
-- Phase 5E should add Honor and PreKvK Top 10 visual card layers using the shared ranking payloads.
-- Preserve the delivered current KVK Top 10 card, records Top 10 card, and Phase 5B unified
-  browser behaviour.
-- Keep Top 25 and Top 50 on the compact browser unless a later approved visual sub-phase expands
-  them.
-- Keep Top 100 out of primary player controls.
+- Phase 5F should add a registry-aware private My Rank / Find Me or export-style current-ranking
+  flow now that the full Top 10 visual surface is delivered.
+- Keep Top 100 out of primary player controls; prefer My Rank and/or export for deeper access.
+- Preserve Phase 5B-5E ranking browser/card behaviour.
 - Preserve Honor's no-admin-override KVK stats channel gate.
 - Preserve legacy commands during rollout.
 - Preserve image-based legacy `/prekvk report`.
-- Keep My Rank/export and legacy-ranking consolidation in the Phase 5 delivery plan after the
-  visual-card slices, now starting in Phase 5F unless later scope changes are approved.
-- Continue to capture all deferred optimisations that remain part of "rankings done right" so they
-  can be delivered in later Phase 5 sub-phases rather than lost.
+- Keep the Phase 5G wrap-up polish issues and the card-performance phase captured structurally so
+  they can be delivered before Phase 5 closes.
 
 ## 2. Required Reading
 
@@ -745,22 +771,37 @@ The working recommendation is:
    - Preserved Honor and PreKvK for the next visual-card slice rather than expanding 5D.
 
 5. **Phase 5E: Honor and PreKvK Top 10 visual cards**
-   - Next active sub-phase.
-   - Audit Honor and PreKvK card value, freshness wording, support values, and visual hierarchy.
-   - Add visual Top 10 cards for one or both modes using the shared ranking payloads.
-   - Preserve Honor's no-admin-override KVK stats channel gate.
-   - Preserve legacy `/prekvk report` as image-based unless a later approved phase explicitly
-     changes it.
-   - Keep Top 25 and Top 50 on the compact unified browser unless separately approved.
+   - Complete. Delivered in mirror PR #156 and production PR #465, then smoke tested and polished
+     in production.
+   - Added Honor and PreKvK Top 10 visual cards using the shared current-ranking payloads.
+   - Preserved Honor's no-admin-override KVK stats channel gate.
+   - Preserved legacy `/prekvk report` as image-based.
+   - Kept Top 25 and Top 50 on the compact unified browser.
+   - Preserved current KVK cards, records cards, records Top 10-only behaviour, Top 100 exclusion,
+     legacy commands, and embed fallback.
 
 6. **Phase 5F: My Rank / Find Me and export polish**
+   - Next active sub-phase.
    - Add private local-position view for registered governors.
    - Add full-list CSV/export if Top 100 is removed.
    - Add records export/detail output only if useful after the Top 10 card is validated.
    - Consider legacy redirect only after usage review and separate approval.
 
-7. **Phase 5G+: Remaining rankings deferred optimisation closure**
-   - Deliver any structured Phase 5 deferred optimisations that remain after 5B-5F.
+7. **Phase 5G: Rankings wrap-up polish**
+   - Restore missing values in Honor Top 25 and Top 50 compact output.
+   - Apply fixed-width column formatting to PreKvK Top 25 and Top 50 compact output.
+   - Center current KVK Top 10 visual-card podium ranks/text to match Records, Honor, and PreKvK.
+   - Keep the scope to compact-output and visual consistency fixes discovered during Phase 5E
+     smoke testing.
+
+8. **Phase 5H: Ranking-card performance optimisation**
+   - Profile and optimise ranking-card render/load latency before Phase 5 closes.
+   - Review reusable asset/background/font/overlay caching, PNG optimisation cost, font fitting,
+     and Discord send-path behaviour.
+   - Preserve render/send fallback behaviour and visual output fidelity.
+
+9. **Phase 5I+: Remaining rankings deferred optimisation closure**
+   - Deliver any structured Phase 5 deferred optimisations that remain after 5F-5H.
    - Add extra sub-phases rather than leaving known rankings UX, architecture, export, or visual
      debt unresolved at the end of Phase 5.
 
@@ -1166,8 +1207,8 @@ For implementation stages:
 
 ## 23. Codex Chat Starter
 
-Historical starter for Phase 5A. Phase 5A, Phase 5B, Phase 5C, and Phase 5D are complete; use
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5E Honor and PreKvK Visual Ranking Cards.md`
+Historical starter for Phase 5A. Phase 5A through Phase 5E are complete; use
+`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5F My Rank and Export Polish.md`
 for the next delivery chat.
 
 ```text
