@@ -426,12 +426,12 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
 
         await safe_defer(ctx, ephemeral=True)
 
-        from player_stats_cache import (
-            build_lastkvk_player_stats_cache,
-            build_player_stats_cache,
-        )
-
         try:
+            from player_stats_cache import (
+                build_lastkvk_player_stats_cache,
+                build_player_stats_cache,
+            )
+
             result = await kvk_admin_service.refresh_stats_caches(
                 build_player_stats_cache=build_player_stats_cache,
                 build_lastkvk_player_stats_cache=build_lastkvk_player_stats_cache,
@@ -958,36 +958,24 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=True)
 
-        # Resolve current KVK if not provided
-        if kvk_no == 0:
-            try:
-                kvk_no = await asyncio.to_thread(kvk_admin_service.resolve_kvk_no, kvk_no)
-            except Exception:
-                logger.exception("[/kvk_admin export_all] Could not resolve current KVK")
-                kvk_no = 0
-            if kvk_no == 0:
-                await ctx.followup.send(
-                    "❌ Could not resolve the current KVK window.", ephemeral=True
-                )
-                return
-
         # Default sheet name from constants (allows slash arg override)
         sheet_name = kvk_admin_service.normalize_sheet_name(sheet_name, KVK_SHEET_NAME)
 
         await ctx.followup.send(f"⏳ Exporting KVK `{kvk_no}` to **{sheet_name}**…", ephemeral=True)
 
         try:
-            ok = await asyncio.to_thread(
-                run_kvk_proc_exports_with_alerts,
-                SERVER,
-                DATABASE,
-                USERNAME,
-                PASSWORD,
-                kvk_no,
-                sheet_name,
-                CREDENTIALS_FILE,
-                ctx.channel,
-                ctx.bot.loop,
+            result = await asyncio.to_thread(
+                kvk_admin_service.run_export_all,
+                kvk_no=kvk_no,
+                sheet_name=sheet_name,
+                server=SERVER,
+                database=DATABASE,
+                username=USERNAME,
+                password=PASSWORD,
+                credentials_file=CREDENTIALS_FILE,
+                alert_channel=ctx.channel,
+                event_loop=ctx.bot.loop,
+                runner=run_kvk_proc_exports_with_alerts,
             )
         except Exception as e:
             logger.exception("[/kvk_admin export_all] export failed")
@@ -997,13 +985,13 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             )
             return
 
-        if ok:
+        if result.ok:
             await ctx.followup.send(
-                f"✅ Exported KVK `{kvk_no}` to **{sheet_name}**.", ephemeral=True
+                f"✅ Exported KVK `{result.kvk_no}` to **{result.sheet_name}**.", ephemeral=True
             )
         else:
             await ctx.followup.send(
-                f"💥 Export failed for KVK `{kvk_no}`. Check logs.", ephemeral=True
+                f"💥 Export failed for KVK `{result.kvk_no}`. Check logs.", ephemeral=True
             )
 
     @kvk_admin_group.command(

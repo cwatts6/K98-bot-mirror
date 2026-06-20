@@ -5,11 +5,13 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import logging
 import time
 from typing import Any
 
 from kvk.dal import kvk_admin_dal
 
+logger = logging.getLogger(__name__)
 DISCORD_EMBED_FIELD_VALUE_LIMIT = 1024
 
 
@@ -234,6 +236,7 @@ async def _run_cache_builder(
     try:
         result = await builder()
     except Exception as exc:
+        logger.exception("[KVK ADMIN] %s refresh failed", label)
         return KvkCacheBuildOutcome(
             label=label,
             count=None,

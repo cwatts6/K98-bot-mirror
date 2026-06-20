@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import logging
 
 import pytest
 
@@ -55,24 +56,64 @@ def test_run_export_test_shapes_metadata(monkeypatch) -> None:
     assert "Written: 2" in result.sections[0].lines
 
 
+def test_run_export_all_resolves_kvk_and_invokes_runner(monkeypatch) -> None:
+    monkeypatch.setattr(kvk_admin_service, "resolve_kvk_no", lambda kvk_no=None: 42)
+    captured = {}
+
+    def fake_runner(*args):
+        captured["args"] = args
+        return True
+
+    result = kvk_admin_service.run_export_all(
+        kvk_no=0,
+        sheet_name="KVK",
+        server="server",
+        database="database",
+        username="user",
+        password="pass",
+        credentials_file="creds.json",
+        alert_channel="channel",
+        event_loop="loop",
+        runner=fake_runner,
+    )
+
+    assert result.kvk_no == 42
+    assert result.sheet_name == "KVK"
+    assert result.ok is True
+    assert captured["args"] == (
+        "server",
+        "database",
+        "user",
+        "pass",
+        42,
+        "KVK",
+        "creds.json",
+        "channel",
+        "loop",
+    )
+
+
 @pytest.mark.asyncio
-async def test_refresh_stats_caches_reports_partial_failure() -> None:
+async def test_refresh_stats_caches_reports_partial_failure(caplog) -> None:
     async def build_main():
         return {"_meta": {"count": 10}}
 
     async def build_last():
         raise RuntimeError("cache unavailable")
 
-    result = await kvk_admin_service.refresh_stats_caches(
-        build_player_stats_cache=build_main,
-        build_lastkvk_player_stats_cache=build_last,
-    )
+    with caplog.at_level(logging.ERROR, logger="kvk.services.kvk_admin_service"):
+        result = await kvk_admin_service.refresh_stats_caches(
+            build_player_stats_cache=build_main,
+            build_lastkvk_player_stats_cache=build_last,
+        )
     message = kvk_admin_service.format_cache_refresh_message(result)
 
     assert result.main.count == 10
     assert result.last_kvk.error == "RuntimeError: cache unavailable"
     assert "Success: Player stats cache refreshed (10 records)" in message
     assert "Warning: Last-KVK cache build failed" in message
+    assert "Last-KVK cache refresh failed" in caplog.text
+    assert "Traceback" in caplog.text
 
 
 def test_load_embed_test_context_uses_utc_label_and_checker() -> None:
