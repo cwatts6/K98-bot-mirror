@@ -6,15 +6,6 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `kvk/rendering/kvk_rankings_card_renderer.py`, ranking-card render/send path
-- Type: performance
-- Description: Phase 5E smoke testing found that visual ranking cards can take multiple seconds to render/load in Discord. The full ranking visual surface now exists, so render latency should be profiled before Phase 5 closes.
-- Suggested Fix: Scope Phase 5H as a dedicated ranking-card performance optimisation phase. Profile background loading, overlay generation, font loading/fitting, text drawing, PNG optimisation, in-memory file handling, and Discord send-path latency. Cache reusable backgrounds, overlays, fonts, and computed layout primitives where safe, and preserve visual fidelity plus embed fallback.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 5C KVK cards, Phase 5D records cards, Phase 5E Honor/PreKvK cards, visual sample comparison, focused renderer tests, and performance timing evidence.
-
-### Deferred Optimisation
 - Area: `build_KVKrankings_embed.py`, `ui/views/stats_views.py`, `honor_rankings_view.py`, `commands/stats_cmds.py`, legacy ranking commands
 - Type: refactor
 - Description: Phase 5B preserves the legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` paths during rollout. The legacy KVK and Honor ranking commands therefore still retain older builders/views and duplicated presentation semantics while the unified `/kvk rankings` path uses the shared current-ranking payload/browser foundation.

@@ -44,6 +44,7 @@ BRIGHT_GOLD = (255, 232, 91)
 BRIGHT_BLUE = (170, 230, 255)
 CURRENT_RANKING_BLUE = (92, 190, 230)
 BRIGHT_AMBER = (255, 198, 74)
+PNG_COMPRESS_LEVEL = 6
 
 
 def _background_path(mode: str = "kvk") -> Path | None:
@@ -52,6 +53,20 @@ def _background_path(mode: str = "kvk") -> Path | None:
         if path.exists():
             return path
     return None
+
+
+@lru_cache(maxsize=8)
+def _ranking_background(path: Path) -> Image.Image:
+    return _load_background(path)
+
+
+def _save_png(canvas: Image.Image, buf: BytesIO) -> None:
+    canvas.convert("RGB").save(
+        buf,
+        format="PNG",
+        optimize=False,
+        compress_level=PNG_COMPRESS_LEVEL,
+    )
 
 
 def can_render_current_rankings_top10_card(payload: RankingPayload) -> bool:
@@ -405,6 +420,16 @@ def _records_darkening_overlay() -> Image.Image:
     return overlay
 
 
+@lru_cache(maxsize=1)
+def _current_rankings_overlay() -> Image.Image:
+    overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay, "RGBA")
+    draw.rounded_rectangle((0, 0, WIDTH - 1, HEIGHT - 1), radius=22, fill=(0, 0, 0, 82))
+    draw.rectangle((0, 0, WIDTH, 140), fill=(0, 0, 0, 82))
+    draw.rectangle((0, 330, WIDTH, HEIGHT), fill=(0, 0, 0, 92))
+    return overlay
+
+
 def _record_kvk_label(row: RankingRow) -> str:
     if row.kvk_no is None:
         return "KVK unknown"
@@ -536,7 +561,7 @@ def render_hall_of_fame_top10_card(payload: RankingPayload) -> RenderedRankingCa
     if background is None:
         return None
 
-    canvas = _load_background(background)
+    canvas = _ranking_background(background)
     canvas = Image.alpha_composite(canvas, _records_darkening_overlay())
     draw = ImageDraw.Draw(canvas, "RGBA")
 
@@ -615,7 +640,7 @@ def render_hall_of_fame_top10_card(payload: RankingPayload) -> RenderedRankingCa
         )
 
     buf = BytesIO()
-    canvas.convert("RGB").save(buf, format="PNG", optimize=True)
+    _save_png(canvas, buf)
     buf.seek(0)
     return RenderedRankingCard(
         filename=f"kvk_hall_of_fame_top10_{payload.metric}.png",
@@ -632,13 +657,8 @@ def render_current_rankings_top10_card(payload: RankingPayload) -> RenderedRanki
     if background is None:
         return None
 
-    canvas = _load_background(background)
-    overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
-    odraw = ImageDraw.Draw(overlay, "RGBA")
-    odraw.rounded_rectangle((0, 0, WIDTH - 1, HEIGHT - 1), radius=22, fill=(0, 0, 0, 82))
-    odraw.rectangle((0, 0, WIDTH, 140), fill=(0, 0, 0, 82))
-    odraw.rectangle((0, 330, WIDTH, HEIGHT), fill=(0, 0, 0, 92))
-    canvas = Image.alpha_composite(canvas, overlay)
+    canvas = _ranking_background(background)
+    canvas = Image.alpha_composite(canvas, _current_rankings_overlay())
     draw = ImageDraw.Draw(canvas, "RGBA")
 
     _draw_text(
@@ -726,7 +746,7 @@ def render_current_rankings_top10_card(payload: RankingPayload) -> RenderedRanki
         )
 
     buf = BytesIO()
-    canvas.convert("RGB").save(buf, format="PNG", optimize=True)
+    _save_png(canvas, buf)
     buf.seek(0)
     return RenderedRankingCard(
         filename=_current_card_filename(payload),

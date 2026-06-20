@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Phase 5H Completed Item
+- Area: `kvk/rendering/kvk_rankings_card_renderer.py`, ranking-card render/send path
+- Type: performance
+- Description: Phase 5E smoke testing found that visual ranking cards can take multiple seconds to render/load in Discord. The full ranking visual surface now exists, so render latency needed profiling before Phase 5 closed.
+- Resolution: Phase 5H profiled representative current KVK, Honor, PreKvK, and Hall of Fame records Top 10 card renders, then cached resized ranking-card backgrounds, cached the current-card overlay, reused the existing cached records overlay, and switched ranking-card PNG output away from Pillow's expensive `optimize=True` path while keeping PNG output and embed fallback behaviour unchanged.
+- Validation: Baseline medians across eight warm renders were KVK 1375.3 ms, Honor 1458.6 ms, PreKvK 1282.0 ms, and records 1449.4 ms. Final medians were KVK 95.6 ms, Honor 105.9 ms, PreKvK 259.3 ms, and records 319.1 ms. Focused renderer tests passed and local visual samples were generated for all four card families.
+
 ### Phase 5G Completed Items
 - Area: `/kvk rankings type:honor`, `kvk/rendering/kvk_rankings_embed.py`
 - Type: consistency

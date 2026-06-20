@@ -6,9 +6,12 @@ from PIL import Image
 
 from kvk.models.kvk_rankings import RankingPayload, RankingRow
 from kvk.rendering.kvk_rankings_card_renderer import (
+    _background_path,
     _context_line,
+    _current_rankings_overlay,
     _draw_top_card,
     _footer,
+    _ranking_background,
     _records_context_line,
     _records_count_label,
     _records_darkening_overlay,
@@ -256,3 +259,30 @@ def test_hall_of_fame_darkening_overlay_is_cached_and_symmetric():
     for y in (0, height // 2, height - 1):
         assert overlay.getpixel((0, y)) == overlay.getpixel((width - 1, y))
         assert overlay.getpixel((1, y)) == overlay.getpixel((width - 2, y))
+
+
+def test_current_rankings_overlay_is_cached():
+    overlay = _current_rankings_overlay()
+
+    assert _current_rankings_overlay() is overlay
+    assert overlay.size == (1180, 640)
+
+
+def test_ranking_background_cache_is_reused_without_mutation():
+    _ranking_background.cache_clear()
+    payload = _payload()
+    background = _background_path(payload.mode)
+    assert background is not None
+
+    assert render_current_rankings_top10_card(payload) is not None
+    cached_image = _ranking_background(background)
+    sampled_pixel = cached_image.getpixel((10, 10))
+
+    cached = _ranking_background.cache_info()
+    assert cached.misses == 1
+    assert render_current_rankings_top10_card(payload) is not None
+
+    cached = _ranking_background.cache_info()
+    assert cached.hits == 2
+    assert cached.misses == 1
+    assert cached_image.getpixel((10, 10)) == sampled_pixel
