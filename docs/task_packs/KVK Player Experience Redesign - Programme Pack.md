@@ -609,15 +609,52 @@ commands remain live until a separately approved deprecation/removal phase.
 
 ### Phase 6 — Admin Command Hardening And Legacy Operator Cleanup
 
-Harden the delivered `/kvk_admin` operator command surface after Phase 2A.
+Status: complete. Delivered in mirror PR #162 and production PR #470. Phase 6 implementation,
+review-fix validation, and manual Discord smoke testing are complete.
 
-This phase should preserve all permissions, channel restrictions, logging, and existing service/DAL ownership.
+Hardened the delivered `/kvk_admin` operator command surface after Phase 2A while preserving all
+permissions, channel restrictions, logging, response visibility, command registration, service/DAL
+ownership, SQL/import/recompute/export semantics, stats cache behaviour, and Google Sheets
+contracts.
+
+Delivered details:
+
+- Kept the `/kvk_admin` surface at the existing seven subcommands:
+  `test_export`, `refresh_stats_cache`, `recompute`, `export_all`, `list_scans`, `window_preview`,
+  and `test_embed`.
+- Moved remaining operator orchestration and result shaping for export tests, cache refresh,
+  export-all, scan listing/window preview support, and test-embed context handling into
+  `kvk.services.kvk_admin_service`.
+- Preserved command handlers as Discord boundary code for deferral, permissions, service calls,
+  and response rendering.
+- Added focused service result models and regression coverage for admin export, cache refresh,
+  current-KVK resolution, zero-count cache outcomes, and test-embed routing.
+- Preserved cache-builder exception tracebacks in service logs while keeping user-facing
+  cache-refresh outcomes readable.
+- Resolved current KVK before `/kvk_admin export_all` progress output so operator messages show
+  the actual export window instead of `0`.
+- Passed the computed `is_kvk` route through `/kvk_admin test_embed` so the test command exercises
+  the intended stats-update embed path.
+- Cleaned stale active operator documentation that still referred to removed admin `/kvk ...`
+  paths.
+
+No active Phase 6 admin/operator deferred optimisations remain. The remaining legacy ranking
+command consolidation item has been promoted into Phase 7 as planned rollout/deprecation work.
 
 Execution task pack:
 
-`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 6 Admin Command Hardening And Legacy Operator Cleanup.md`
+`docs/task_packs/archive/Codex Task Pack - KVK Player Experience Redesign Phase 6 Admin Command Hardening And Legacy Operator Cleanup.md`
 
 ### Phase 7 — Legacy Command Deprecation and Removal
+
+Status: prepared for execution after Phase 6 closeout and smoke-test success.
+
+Phase 7 owns the legacy player ranking command consolidation/deprecation item that was retained
+after Phase 5 and explicitly kept out of Phase 6 admin hardening.
+
+Execution task pack:
+
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 7 Legacy Command Deprecation And Removal.md`
 
 After a usage-review period:
 
@@ -756,14 +793,14 @@ Do not include these in the early phases unless separately approved:
 Proceed with:
 
 ```text
-KVK Player Experience Redesign - Phase 6 Admin Command Hardening And Legacy Operator Cleanup
+KVK Player Experience Redesign - Phase 7 Legacy Command Deprecation And Removal
 ```
 
-Phase 1 through Phase 5 are complete. Phase 6 should audit and harden the delivered
-`/kvk_admin` operator command surface while preserving permissions, channel restrictions, logging,
-service/DAL ownership, SQL/import/recompute/export semantics, Google Sheets behaviour, and the
-player `/kvk` surface.
+Phase 1 through Phase 6 are complete. Phase 7 should audit legacy player ranking command usage and
+prepare the approved deprecation, redirect/help, compatibility-shim, or removal path for
+`/kvk_rankings`, `/honor_rankings`, and `/prekvk report` while preserving the unified
+`/kvk rankings` surface and all existing ranking semantics until operator approval is recorded.
 
-Use the Phase 6 task pack as the next active execution record:
+Use the Phase 7 task pack as the next active execution record:
 
-`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 6 Admin Command Hardening And Legacy Operator Cleanup.md`
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 7 Legacy Command Deprecation And Removal.md`

@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign after Phase 5 rankings closure`
 - Task type: `audit / command hardening / refactor / documentation cleanup`
 - One-pass approved: `no`
-- Status: `next active KVK Player Experience Redesign phase`
+- Status: `complete; delivered in mirror PR #162 and production PR #470; archived 2026-06-20`
 
 ## 2. Required Reading
 
@@ -43,7 +43,8 @@ modernised through Phase 5. The phase should make the admin/operator commands ea
 and safer to operate without changing KVK import, recompute, export, Google Sheets, ranking, stats,
 targets, history, or player-facing behaviour.
 
-Start with audit/scope only. Implementation should be broken into PR-sized slices after approval.
+Completed as the final active development hardening phase before rollout/deprecation work.
+Implementation stayed within the approved PR-sized Phase 6 scope.
 
 ## 4. Background
 
@@ -130,6 +131,10 @@ Related but out-of-scope active deferred item:
 ```
 
 Do not implement that item in Phase 6 unless the operator explicitly expands scope.
+
+Phase 6 closeout note: the related legacy-ranking deferred item was not implemented in this phase.
+It has been promoted into the Phase 7 task pack and removed from the active deferred optimisation
+backlog. No active Phase 6 admin/operator deferred optimisations remain.
 
 ## 7. Codex Skills To Use
 
@@ -317,7 +322,46 @@ Use this delivery shape:
 For documentation-only work, state that no runtime code, SQL, helper reuse, or restart behaviour
 changed.
 
-## 17. PR Summary Template
+## 17. Completion Record
+
+### Summary
+
+Phase 6 hardened the `/kvk_admin` operator command boundary without changing the visible command
+surface, SQL contracts, Google Sheets contracts, import/recompute/export semantics, player `/kvk`
+flows, or legacy player ranking paths.
+
+### Delivered
+
+- Kept `/kvk_admin` at the existing seven subcommands.
+- Moved admin export, cache-refresh, export-all, scan/window support, and test-embed context
+  shaping into `kvk.services.kvk_admin_service`.
+- Preserved command-layer ownership for Discord deferral, permissions, service calls, and response
+  rendering.
+- Added service result models and focused tests for export orchestration, cache-refresh outcomes,
+  current-KVK resolution, zero-count cache-build counts, and test-embed routing.
+- Preserved cache-builder traceback logging while returning readable operator outcomes.
+- Resolved current KVK before export-all progress output.
+- Passed computed `is_kvk` through the test-embed send path.
+- Cleaned active operator docs for stale removed admin `/kvk ...` command references.
+
+### Validation
+
+- Focused pytest for `tests/test_stats_cmds.py` and `tests/test_kvk_admin_service.py`.
+- Command registration validation.
+- Architecture and deferred-item validators.
+- `scripts/select_tests.py`.
+- Pre-commit.
+- Full pytest during Phase 6 PR preparation.
+- Codex Security diff review during Phase 6 PR preparation.
+- User-reported manual Discord smoke tests completed successfully before closeout.
+
+### Deferred Optimisations
+
+No active Phase 6 admin/operator deferred optimisations remain. The legacy player ranking
+consolidation/deprecation item has been promoted into Phase 7 and is no longer listed as active
+backlog.
+
+## 18. PR Summary Template
 
 ```md
 ## Summary

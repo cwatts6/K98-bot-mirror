@@ -1293,9 +1293,10 @@ an archived execution record. The completed Phase 5H execution starter is:
 
 `docs/task_packs/archive/Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`
 
-Use the active Phase 6 task pack for the next KVK Player Experience Redesign delivery slice:
+Phase 6 has now completed and is archived. Use the active Phase 7 task pack for the next KVK
+Player Experience Redesign delivery slice:
 
-`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 6 Admin Command Hardening And Legacy Operator Cleanup.md`
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 7 Legacy Command Deprecation And Removal.md`
 
 ```text
 Codex, start Phase 5 of the KVK Player Experience Redesign: Unified /kvk rankings Visual/UX Polish.

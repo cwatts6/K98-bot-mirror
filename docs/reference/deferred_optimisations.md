@@ -6,15 +6,6 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `build_KVKrankings_embed.py`, `ui/views/stats_views.py`, `honor_rankings_view.py`, `commands/stats_cmds.py`, legacy player ranking command compatibility paths
-- Type: refactor
-- Description: Phase 5 intentionally preserved the legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` paths during rollout. With Phase 5 complete, the legacy KVK and Honor ranking commands still retain older builders/views and duplicated presentation semantics while the unified `/kvk rankings` path uses the shared current-ranking payload/browser foundation. This is tracked as future Phase 7 rollout/deprecation work, not remaining Phase 5 delivery debt.
-- Suggested Fix: After the unified browser has production usage evidence, scope the approved Phase 7 legacy-ranking consolidation or deprecation phase. Decide whether flat legacy commands should redirect to the unified service/renderer, remain as compatibility shims, or be retired with announcement support; preserve image-based `/prekvk report` unless a later approved visual phase replaces it.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 5 completion, command usage telemetry, user-facing rollout messaging, operator approval for Phase 7, and focused regression tests for each retained legacy path.
-
-### Deferred Optimisation
 - Area: `tests/test_ark_preference_service.py`, `tests/test_ark_bans_enforcement.py`, `tests/test_lock_timeout.py`, `tests/test_calendar_service.py`, `tests/test_calendar_pipeline.py`, remaining slow full-suite pytest paths
 - Type: performance
 - Description: After PR 107 resolved the original slow pytest offenders, the new duration audit `C:\Users\cwatt\Downloads\.codex_pytest_audit-new.log` shows the remaining full-suite outliers are concentrated in Ark preference/ban negative paths, lock-timeout coverage, calendar failure-path retries, live queue persistence, maintenance subprocess timeout/success coverage, and one inventory vision import case. The slowest current timings are `tests/test_ark_preference_service.py::test_set_preference_rejects_unknown_governor` at 7.33s, `tests/test_ark_bans_enforcement.py::test_admin_add_allows_when_override_on` at 5.23s, `tests/test_lock_timeout.py::test_remove_view_tracker_entry_returns_false_when_locked` at 5.06s, `tests/test_lock_timeout.py::test_save_view_tracker_raises_on_lock` at 5.06s, `tests/test_calendar_service.py::test_refresh_full_stops_on_sync_failure` at 3.02s, and `tests/test_calendar_pipeline.py::test_pipeline_stops_on_sync_failure` at 3.01s.

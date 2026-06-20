@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Phase 7 Promoted Item
+- Area: `build_KVKrankings_embed.py`, `ui/views/stats_views.py`, `honor_rankings_view.py`, `commands/stats_cmds.py`, legacy player ranking command compatibility paths
+- Type: refactor
+- Description: Phase 5 intentionally preserved the legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` paths during rollout. With Phase 5 complete, the legacy KVK and Honor ranking commands still retain older builders/views and duplicated presentation semantics while the unified `/kvk rankings` path uses the shared current-ranking payload/browser foundation.
+- Resolution: Promoted from the active deferred optimisation backlog into `docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 7 Legacy Command Deprecation And Removal.md` after Phase 6 admin hardening was delivered and manually smoke tested. This is not recorded as implemented code; Phase 7 now owns the approved audit, usage-review, redirect/help, compatibility-shim, or retirement decision.
+- Validation: `docs/reference/deferred_optimisations.md` no longer contains an active KVK Phase 6 or Phase 7 programme item. Phase 6 closeout documents that no active admin/operator deferred optimisations remain.
+
 ### Phase 5H Completed Item
 - Area: `kvk/rendering/kvk_rankings_card_renderer.py`, ranking-card render/send path
 - Type: performance

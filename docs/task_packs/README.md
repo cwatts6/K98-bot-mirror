@@ -23,11 +23,12 @@ material.
 Player self-service workflow redesign and public calendar/KVK calendar UX redesign remain separate
 deferred optimisation programmes, not additional command-platform phases.
 
-KVK Player Experience Redesign is active and entering Phase 6. Phase 1 audit/design, Phase 2A
+KVK Player Experience Redesign is active and preparing Phase 7. Phase 1 audit/design, Phase 2A
 Admin Collision Resolution, Phase 2B Player `/kvk` Scaffold, Phase 3 Modern `/kvk stats` Visual
 Card, Phase 3B Stats Card Polish and Secondary Cards, Phase 3C Overall Rank and Card Polish,
 Phase 4A Modern `/kvk targets`, the full Phase 4B modern `/kvk history` rollout, and Phase 5A
-through Phase 5H unified `/kvk rankings` delivery are complete.
+through Phase 5H unified `/kvk rankings` delivery, and Phase 6 admin command hardening are
+complete.
 Phase 2A moved admin/operator commands from `/kvk ...` to `/kvk_admin ...` in PR 140. Phase 2B
 added the player `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` scaffold in PR
 141, then was promoted to production. Phase 3, Phase 3B, and Phase 3C delivered the modern
@@ -77,9 +78,15 @@ PreKvK, and Hall of Fame records Top 10 visual cards. Smoke testing confirmed th
 solid and noticeable across all visual cards. No active Phase 5 delivery deferred optimisations
 remain. The retained legacy-ranking consolidation/deprecation item is future Phase 7 rollout work,
 not a Phase 5 closure blocker.
+Phase 6 delivered `/kvk_admin` operator hardening in mirror PR 162 and production PR 470,
+preserving the existing seven subcommands, permissions, channel restrictions, command
+registration, service/DAL boundaries, SQL/import/recompute/export semantics, stats cache
+behaviour, and Google Sheets contracts. Manual smoke testing completed successfully, and no active
+Phase 6 admin/operator deferred optimisations remain. The retained legacy-ranking
+consolidation/deprecation item has now been promoted into the Phase 7 task pack.
 
-Completed KVK Player Experience Redesign Phase 1 through Phase 5 execution records are archived
-under `archive/`. The programme pack remains active because Phase 6 and Phase 7 are still planned.
+Completed KVK Player Experience Redesign Phase 1 through Phase 6 execution records are archived
+under `archive/`. The programme pack remains active because Phase 7 is still planned.
 The Phase 4B task pack remains as the history delivery record in the archive:
 
 `archive/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
@@ -90,4 +97,4 @@ Latest completed starter:
 
 Next active task pack:
 
-`Codex Task Pack - KVK Player Experience Redesign Phase 6 Admin Command Hardening And Legacy Operator Cleanup.md`
+`Codex Task Pack - KVK Player Experience Redesign Phase 7 Legacy Command Deprecation And Removal.md`
