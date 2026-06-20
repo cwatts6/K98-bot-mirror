@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
 import logging
 import time
 
@@ -152,7 +151,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         Admin-only command to run the export pipeline for a KVK without requiring an import.
         Returns structured metadata about which spreadsheets/tabs would be created/written.
         """
-        logger.info("[COMMAND] /test_kvk_export invoked by %s (kvk_no=%s)", ctx.user, kvk_no)
+        logger.info("[COMMAND] /kvk_admin test_export invoked by %s (kvk_no=%s)", ctx.user, kvk_no)
 
         # Single ack (ephemeral)
         try:
@@ -165,13 +164,13 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             try:
                 kvk_no = await asyncio.to_thread(kvk_admin_service.resolve_kvk_no, None)
             except Exception as e:
-                logger.exception("[COMMAND] /test_kvk_export could not resolve KVK")
+                logger.exception("[COMMAND] /kvk_admin test_export could not resolve KVK")
                 await ctx.interaction.edit_original_response(
                     content=f"❌ Could not resolve the current KVK window: `{type(e).__name__}: {e}`"
                 )
                 return
 
-        sheet_name = (sheet_name or KVK_SHEET_NAME).strip() or KVK_SHEET_NAME
+        sheet_name = kvk_admin_service.normalize_sheet_name(sheet_name, KVK_SHEET_NAME)
 
         # Let the invoker know we're starting
         try:
@@ -181,45 +180,45 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         except Exception:
             pass
 
-        start_ts = datetime.utcnow()
-
         try:
             # Run the test export in a thread (blocking IO / network)
-            meta = await asyncio.to_thread(
-                run_kvk_export_test,
-                SERVER,
-                DATABASE,
-                USERNAME,
-                PASSWORD,
-                int(kvk_no),
-                sheet_name,
-                CREDENTIALS_FILE,
-                create_primary,
-                export_pass4,
-                export_altar,
-                export_pass7,
+            result = await asyncio.to_thread(
+                kvk_admin_service.run_export_test,
+                kvk_no=kvk_no,
+                sheet_name=sheet_name,
+                server=SERVER,
+                database=DATABASE,
+                username=USERNAME,
+                password=PASSWORD,
+                credentials_file=CREDENTIALS_FILE,
+                create_primary=create_primary,
+                export_pass4=export_pass4,
+                export_altar=export_altar,
+                export_pass7=export_pass7,
+                runner=run_kvk_export_test,
             )
         except Exception as e:
-            logger.exception("[COMMAND] /test_kvk_export crashed")
+            logger.exception("[COMMAND] /kvk_admin test_export crashed")
             await ctx.interaction.edit_original_response(
                 content=f"💥 Test export failed unexpectedly: `{type(e).__name__}: {e}`"
             )
             return
 
-        dur = (datetime.utcnow() - start_ts).total_seconds()
+        dur = result.duration_seconds
 
         # Build a helpful embed summarising the metadata returned by run_kvk_export_test()
         try:
             embed = discord.Embed(
                 title=f"🧪 KVK Export Test — KVK {kvk_no}",
-                description=f"Test run completed in `{dur:.1f}s`.",
+                description=f"Test run completed in `{result.duration_seconds:.1f}s`.",
                 color=discord.Color.green(),
             )
 
-            embed.add_field(name="KVK", value=str(kvk_no), inline=True)
-            embed.add_field(name="Primary sheet", value=sheet_name, inline=True)
+            embed.add_field(name="KVK", value=str(result.kvk_no), inline=True)
+            embed.add_field(name="Primary sheet", value=result.sheet_name, inline=True)
             embed.add_field(name="Triggered by", value=f"<@{ctx.user.id}>", inline=True)
 
+            meta = result.meta
             # Primary metadata (if present)
             primary = meta.get("primary") if isinstance(meta, dict) else None
             if primary:
@@ -276,7 +275,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             try:
                 await ctx.followup.send(embed=embed, ephemeral=True)
             except Exception:
-                logger.exception("[COMMAND] /test_kvk_export failed to send result embed")
+                logger.exception("[COMMAND] /kvk_admin test_export failed to send result embed")
 
     @bot.slash_command(
         name="mykvkstats",
@@ -427,94 +426,36 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
 
         await safe_defer(ctx, ephemeral=True)
 
+        from player_stats_cache import (
+            build_lastkvk_player_stats_cache,
+            build_player_stats_cache,
+        )
+
         try:
-            # Build the main player stats cache (existing behaviour)
-            main_started = datetime.now(UTC)
-            from player_stats_cache import (
-                build_lastkvk_player_stats_cache,
-                build_player_stats_cache,
+            result = await kvk_admin_service.refresh_stats_caches(
+                build_player_stats_cache=build_player_stats_cache,
+                build_lastkvk_player_stats_cache=build_lastkvk_player_stats_cache,
             )
-
-            main_result = None
-            main_count = None
-            main_error = None
-            try:
-                main_result = await build_player_stats_cache()
-                if isinstance(main_result, int):
-                    main_count = main_result
-                elif isinstance(main_result, dict):
-                    # prefer top-level "_meta".count if present, otherwise "count"
-                    main_count = (main_result.get("_meta") or {}).get("count") or main_result.get(
-                        "count"
-                    )
-            except Exception as e:
-                main_error = f"{type(e).__name__}: {e}"
-                logger.exception("[/refresh_stats_cache] build_player_stats_cache failed")
-
-            main_dur = (datetime.now(UTC) - main_started).total_seconds()
-
-            # Build the last-KVK cache (best-effort, report separately)
-            last_started = datetime.now(UTC)
-            last_result = None
-            last_count = None
-            last_error = None
-            try:
-                last_result = await build_lastkvk_player_stats_cache()
-                if isinstance(last_result, dict):
-                    # last_result expected shape: { "_meta": {...}, "<GovernorID>": {...}, ... }
-                    last_count = (last_result.get("_meta") or {}).get("count") or last_result.get(
-                        "count"
-                    )
-            except Exception as e:
-                last_error = f"{type(e).__name__}: {e}"
-                logger.exception("[/refresh_stats_cache] build_lastkvk_player_stats_cache failed")
-
-            last_dur = (datetime.now(UTC) - last_started).total_seconds()
-
-            # Compose human-friendly message summarising both builds
-            parts = []
-            if main_error:
-                parts.append(f"❌ Player stats cache build failed: `{main_error}`")
-            else:
-                if main_count is not None:
-                    parts.append(
-                        f"✅ Player stats cache refreshed ({main_count} records) ⏱ {main_dur:.1f}s"
-                    )
-                else:
-                    parts.append(f"✅ Player stats cache refreshed ⏱ {main_dur:.1f}s")
-
-            if last_error:
-                parts.append(
-                    f"⚠️ Last-KVK cache build failed (non-fatal): `{last_error}` — the main cache is available."
-                )
-            else:
-                if last_count is not None:
-                    parts.append(
-                        f"✅ Last-KVK cache refreshed ({last_count} records) ⏱ {last_dur:.1f}s"
-                    )
-                else:
-                    parts.append(f"✅ Last-KVK cache refreshed ⏱ {last_dur:.1f}s")
-
-            # Final combined message
-            msg = " \n".join(parts)
-            logger.info("[/refresh_stats_cache] %s", msg.replace("\n", " | "))
-
+            msg = kvk_admin_service.format_cache_refresh_message(result)
+            logger.info("[/kvk_admin refresh_stats_cache] %s", msg.replace("\n", " | "))
             await ctx.interaction.edit_original_response(content=msg)
-
+            return
         except Exception as e:
-            logger.exception("[/refresh_stats_cache] failed")
+            logger.exception("[/kvk_admin refresh_stats_cache] failed")
             try:
                 await ctx.interaction.edit_original_response(
-                    content=f"❌ Failed to refresh cache:\n```{type(e).__name__}: {e}```"
+                    content=f"Failed to refresh cache: `{type(e).__name__}: {e}`"
                 )
             except Exception:
-                # If editing the original response failed, try to send a followup
                 try:
                     await ctx.followup.send(
-                        f"❌ Failed to refresh cache: `{type(e).__name__}: {e}`", ephemeral=True
+                        f"Failed to refresh cache: `{type(e).__name__}: {e}`", ephemeral=True
                     )
                 except Exception:
-                    logger.exception("[/refresh_stats_cache] failed to report error to user")
+                    logger.exception(
+                        "[/kvk_admin refresh_stats_cache] failed to report error to user"
+                    )
+            return
 
     @bot.slash_command(
         name="my_stats",
@@ -1022,7 +963,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             try:
                 kvk_no = await asyncio.to_thread(kvk_admin_service.resolve_kvk_no, kvk_no)
             except Exception:
-                logger.exception("[/kvk_export_all] Could not resolve current KVK")
+                logger.exception("[/kvk_admin export_all] Could not resolve current KVK")
                 kvk_no = 0
             if kvk_no == 0:
                 await ctx.followup.send(
@@ -1031,7 +972,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 return
 
         # Default sheet name from constants (allows slash arg override)
-        sheet_name = (sheet_name or KVK_SHEET_NAME).strip() or KVK_SHEET_NAME
+        sheet_name = kvk_admin_service.normalize_sheet_name(sheet_name, KVK_SHEET_NAME)
 
         await ctx.followup.send(f"⏳ Exporting KVK `{kvk_no}` to **{sheet_name}**…", ephemeral=True)
 
@@ -1049,7 +990,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 ctx.bot.loop,
             )
         except Exception as e:
-            logger.exception("[/kvk_export_all] export failed")
+            logger.exception("[/kvk_admin export_all] export failed")
             await ctx.followup.send(
                 f"💥 Export failed for KVK `{kvk_no}`: `{type(e).__name__}: {e}`",
                 ephemeral=True,
@@ -1137,10 +1078,16 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     ):
         await safe_defer(ctx, ephemeral=True)
 
-        ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-
-        # Whether the season is currently KVK (for the send_stats_update_embed path)
-        is_kvk = await asyncio.to_thread(is_currently_kvk, SERVER, DATABASE, USERNAME, PASSWORD)
+        context = await asyncio.to_thread(
+            kvk_admin_service.load_embed_test_context,
+            is_currently_kvk_checker=is_currently_kvk,
+            server=SERVER,
+            database=DATABASE,
+            username=USERNAME,
+            password=PASSWORD,
+        )
+        ts = context.timestamp_label
+        is_kvk = context.is_kvk
 
         try:
             if post_here:
@@ -1156,7 +1103,7 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                 f"✅ Sent KVK test embed to {where} (is_kvk={is_kvk}).", ephemeral=True
             )
         except Exception as e:
-            logger.exception("[/test_kvk_embed] failed")
+            logger.exception("[/kvk_admin test_embed] failed")
             await ctx.followup.send(
                 f"❌ Failed to send test embed:\n`{type(e).__name__}: {e}`", ephemeral=True
             )

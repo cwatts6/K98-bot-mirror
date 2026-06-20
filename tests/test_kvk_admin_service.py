@@ -2,8 +2,97 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
+
 from kvk.dal import kvk_admin_dal
 from kvk.services import kvk_admin_service
+
+
+def test_normalize_sheet_name_uses_default_for_blank_values() -> None:
+    assert kvk_admin_service.normalize_sheet_name("", "Default") == "Default"
+    assert kvk_admin_service.normalize_sheet_name("  Custom  ", "Default") == "Custom"
+
+
+def test_run_export_test_shapes_metadata(monkeypatch) -> None:
+    monkeypatch.setattr(kvk_admin_service, "resolve_kvk_no", lambda kvk_no=None: 99)
+
+    def fake_runner(*args):
+        assert args[4] == 99
+        return {
+            "primary": {
+                "written_tabs": ["A", "B"],
+                "skipped_tabs": ["Empty"],
+                "spreadsheet_url": "https://example.invalid/sheet",
+            },
+            "additional": {
+                "PASS4": {
+                    "created": True,
+                    "written_tabs": ["P4"],
+                    "spreadsheet_url": "https://example.invalid/pass4",
+                }
+            },
+        }
+
+    result = kvk_admin_service.run_export_test(
+        kvk_no=0,
+        sheet_name="KVK",
+        server="server",
+        database="database",
+        username="user",
+        password="pass",
+        credentials_file="creds.json",
+        create_primary=True,
+        export_pass4=True,
+        export_altar=False,
+        export_pass7=False,
+        runner=fake_runner,
+    )
+
+    assert result.kvk_no == 99
+    assert result.sheet_name == "KVK"
+    assert result.duration_seconds >= 0
+    assert [section.name for section in result.sections] == ["Primary result", "PASS4"]
+    assert "Written: 2" in result.sections[0].lines
+
+
+@pytest.mark.asyncio
+async def test_refresh_stats_caches_reports_partial_failure() -> None:
+    async def build_main():
+        return {"_meta": {"count": 10}}
+
+    async def build_last():
+        raise RuntimeError("cache unavailable")
+
+    result = await kvk_admin_service.refresh_stats_caches(
+        build_player_stats_cache=build_main,
+        build_lastkvk_player_stats_cache=build_last,
+    )
+    message = kvk_admin_service.format_cache_refresh_message(result)
+
+    assert result.main.count == 10
+    assert result.last_kvk.error == "RuntimeError: cache unavailable"
+    assert "Success: Player stats cache refreshed (10 records)" in message
+    assert "Warning: Last-KVK cache build failed" in message
+
+
+def test_load_embed_test_context_uses_utc_label_and_checker() -> None:
+    captured = {}
+
+    def checker(server, database, username, password):
+        captured["args"] = (server, database, username, password)
+        return True
+
+    context = kvk_admin_service.load_embed_test_context(
+        is_currently_kvk_checker=checker,
+        server="server",
+        database="database",
+        username="user",
+        password="pass",
+    )
+
+    assert captured["args"] == ("server", "database", "user", "pass")
+    assert context.is_kvk is True
+    assert context.timestamp_label.endswith(" UTC")
 
 
 def test_window_preview_sql_brackets_rowcount_alias() -> None:

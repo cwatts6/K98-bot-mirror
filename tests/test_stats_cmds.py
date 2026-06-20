@@ -7,9 +7,11 @@ from commands.stats_cmds import _split_discord_content
 
 IN_SCOPE_KVK_ADMIN_COMMANDS = {
     "test_kvk_export",
+    "refresh_stats_cache",
     "kvk_export_all",
     "kvk_recompute",
     "kvk_list_scans",
+    "test_kvk_embed",
     "kvk_window_preview",
 }
 

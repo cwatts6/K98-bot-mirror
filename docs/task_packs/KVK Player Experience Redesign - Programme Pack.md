@@ -644,10 +644,13 @@ After a usage-review period:
 
 ### Admin/operator commands to audit
 
-- `/kvk_recompute`
-- `/kvk_export_all`
-- `/kvk_list_scans`
-- `/kvk_window_preview`
+- `/kvk_admin test_export`
+- `/kvk_admin refresh_stats_cache`
+- `/kvk_admin recompute`
+- `/kvk_admin export_all`
+- `/kvk_admin list_scans`
+- `/kvk_admin window_preview`
+- `/kvk_admin test_embed`
 - any KVK cache/diagnostic/import/export commands
 
 ### Likely modules to audit
