@@ -1,8 +1,10 @@
 # Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation
 
-Status: next active Phase 5 slice after Phase 5G smoke-test completion.
+Status: completed execution starter. Phase 5H delivered ranking-card render/load performance
+optimisation, smoke testing confirmed the improvement across all visual cards, and Phase 5 is now
+complete.
 
-Phase 5A through Phase 5G are complete.
+Phase 5A through Phase 5H are complete.
 
 - Phase 5A: mirror PR #152 and production PR #461 delivered
   `/kvk rankings type:records` as the KD98 Hall of Fame Top 10 all-time single-KVK records
@@ -22,6 +24,9 @@ Phase 5A through Phase 5G are complete.
 - Phase 5G: mirror PR #160 delivered rankings wrap-up polish: Honor compact values, PreKvK compact
   fixed-width alignment, near-billion value unit preservation, display-width-aware compact rows for
   wide/special governor-name characters, and centered current KVK Top 10 card podium text.
+- Phase 5H: mirror PR #161 and production PR #468 delivered ranking-card performance
+  optimisation for current KVK, Honor, PreKvK, and Hall of Fame Top 10 visual cards. Smoke testing
+  confirmed a solid and noticeable improvement across all visual cards.
 
 Source programme documents:
 
@@ -48,6 +53,8 @@ Current delivered context:
   no-admin-override KVK stats channel gate.
 - Legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` commands remain live.
 - Legacy `/prekvk report` remains image-based.
+- Phase 5H performance work is closed; the remaining legacy-ranking consolidation/deprecation
+  deferred item is future Phase 7 rollout work, not a Phase 5 blocker.
 
 ## Copy/Paste Starter
 

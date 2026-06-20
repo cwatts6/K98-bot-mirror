@@ -23,14 +23,11 @@ material.
 Player self-service workflow redesign and public calendar/KVK calendar UX redesign remain separate
 deferred optimisation programmes, not additional command-platform phases.
 
-KVK Player Experience Redesign is active. Phase 1 audit/design, Phase 2A Admin Collision
-Resolution, Phase 2B Player `/kvk` Scaffold, Phase 3 Modern `/kvk stats` Visual Card, Phase 3B
-Stats Card Polish and Secondary Cards, Phase 3C Overall Rank and Card Polish, Phase 4A Modern
-`/kvk targets`, the full Phase 4B modern `/kvk history` rollout, Phase 5A rankings hub foundation,
-Phase 5B unified current-ranking browser, Phase 5C current KVK Top 10 visual ranking card, Phase
-5D Hall of Fame records Top 10 visual cards, Phase 5E Honor and PreKvK Top 10 visual cards, Phase
-5F-1 private My Rank / Find Me, Phase 5F-2 CSV/full-list export, and Phase 5G rankings wrap-up
-polish are complete.
+KVK Player Experience Redesign is active and entering Phase 6. Phase 1 audit/design, Phase 2A
+Admin Collision Resolution, Phase 2B Player `/kvk` Scaffold, Phase 3 Modern `/kvk stats` Visual
+Card, Phase 3B Stats Card Polish and Secondary Cards, Phase 3C Overall Rank and Card Polish,
+Phase 4A Modern `/kvk targets`, the full Phase 4B modern `/kvk history` rollout, and Phase 5A
+through Phase 5H unified `/kvk rankings` delivery are complete.
 Phase 2A moved admin/operator commands from `/kvk ...` to `/kvk_admin ...` in PR 140. Phase 2B
 added the player `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` scaffold in PR
 141, then was promoted to production. Phase 3, Phase 3B, and Phase 3C delivered the modern
@@ -75,17 +72,22 @@ compact alignment, near-billion value unit preservation, display-width-aware row
 wide/special-character governor names, and current KVK Top 10 podium centering, while preserving
 My Rank, Full List CSV, Top 10 cards, Top 25/50 controls, Top 100 exclusion, records Top 10-only
 behavior, Honor gating, legacy ranking commands, and image-based legacy `/prekvk report`.
+Phase 5H delivered ranking-card render/load performance optimisation for current KVK, Honor,
+PreKvK, and Hall of Fame records Top 10 visual cards. Smoke testing confirmed the improvement was
+solid and noticeable across all visual cards. No active Phase 5 delivery deferred optimisations
+remain. The retained legacy-ranking consolidation/deprecation item is future Phase 7 rollout work,
+not a Phase 5 closure blocker.
 
-Phase 5G is complete. Phase 5H ranking-card performance optimisation is the only remaining active
-Phase 5 delivery slice before closure. The Phase 4B task pack remains as the history delivery
-record:
+Completed KVK Player Experience Redesign Phase 1 through Phase 5 execution records are archived
+under `archive/`. The programme pack remains active because Phase 6 and Phase 7 are still planned.
+The Phase 4B task pack remains as the history delivery record in the archive:
 
-`Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
+`archive/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
 
 Latest completed starter:
 
-`Codex Chat Starter - KVK Player Experience Redesign Phase 5G Rankings Wrap-up Polish.md`
+`archive/Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`
 
-Next starter:
+Next active task pack:
 
-`Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`
+`Codex Task Pack - KVK Player Experience Redesign Phase 6 Admin Command Hardening And Legacy Operator Cleanup.md`

@@ -1,7 +1,7 @@
 # Codex Chat Starter - KVK Player Experience Redesign Phase 5G Rankings Wrap-up Polish
 
-Status: completed execution starter. Phase 5A through Phase 5G are complete; Phase 5H ranking-card
-performance optimisation is the only remaining active Phase 5 delivery slice.
+Status: completed execution starter. Phase 5A through Phase 5H are complete; Phase 5H ranking-card
+performance optimisation delivered the final Phase 5 slice.
 
 Phase 5A through Phase 5F-2 were complete when this starter was created.
 Phase 5G was completed in mirror PR #160 after smoke-test polish confirmed Honor Top 25/50 values,
@@ -65,7 +65,7 @@ Delivered Phase 5F-2 baseline:
 - Legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` commands remain live.
 - Legacy `/prekvk report` remains image-based.
 
-Next starter:
+Next starter, now completed by Phase 5H:
 
 `docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`
 

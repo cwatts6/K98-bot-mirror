@@ -342,7 +342,7 @@ Delivered details:
 
 Execution record:
 
-`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4 Modern Targets and Full History.md`
+`docs/task_packs/archive/Codex Task Pack - KVK Player Experience Redesign Phase 4 Modern Targets and Full History.md`
 
 ### Phase 4B - Full `/kvk history` Audit, Optioneering, And Modern History Rollout
 
@@ -447,15 +447,14 @@ Delivered Phase 4Biv details:
 
 Use:
 
-`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
+`docs/task_packs/archive/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
 
 ### Phase 5 — Unified `/kvk rankings` Visual/UX Polish
 
-Status: in progress. Phase 5A through Phase 5G are complete. Phase 5A through Phase 5F-2 were
-smoke tested, merged to mirror, promoted through production, and pushed to production. Phase 5G
-wrap-up visual/browser polish has delivered the remaining compact-output and podium-alignment
-items and passed smoke testing. Phase 5H ranking-card performance optimisation is the only
-remaining active Phase 5 delivery slice before closure.
+Status: complete. Phase 5A through Phase 5H are delivered and smoke tested. Phase 5A through
+Phase 5F-2 were smoke tested, merged to mirror, promoted through production, and pushed to
+production. Phase 5G delivered the remaining compact-output and podium-alignment polish. Phase 5H
+delivered the final ranking-card performance optimisation slice.
 
 Phase 5A delivered the first rankings hub foundation:
 
@@ -587,14 +586,36 @@ Phase 5F-2 delivered private CSV/full-list export in mirror PR #159 and producti
 Phase 5G delivered wrap-up polish for the remaining current-ranking browser/card deferred items:
 Honor Top 25/50 compact values, PreKvK Top 25/50 fixed-width alignment, near-billion value unit
 preservation, display-width-aware compact rows for wide/special-character governor names, and
-current KVK Top 10 podium centering. Phase 5H remains reserved for ranking-card render/load
-performance profiling and optimisation.
+current KVK Top 10 podium centering.
+
+Phase 5H delivered ranking-card render/load performance optimisation:
+
+- Representative current KVK, Honor, PreKvK, and Hall of Fame records Top 10 card render timings
+  were measured before and after optimisation.
+- Ranking-card rendering now caches resized card backgrounds and the reusable current-card overlay,
+  reuses the existing cached records overlay, and avoids Pillow's expensive PNG `optimize=True`
+  path for ranking cards.
+- Local median render timings improved from roughly 1.3-1.5s per card to roughly 0.1-0.3s per card
+  across the four representative card families.
+- Ranking semantics, service/DAL contracts, command/view controls, SQL/cache behaviour, My Rank,
+  CSV export, records Top 10-only behaviour, compact Top 25/50 output, Honor gating, legacy
+  ranking commands, and image-based legacy `/prekvk report` were preserved.
+- The Phase 5H performance deferred item was moved out of the active backlog and recorded in
+  resolved history.
+
+No active Phase 5 delivery deferred optimisations remain. The retained legacy-ranking
+consolidation/deprecation item is intentionally future Phase 7 rollout work because legacy ranking
+commands remain live until a separately approved deprecation/removal phase.
 
 ### Phase 6 — Admin Command Hardening And Legacy Operator Cleanup
 
 Harden the delivered `/kvk_admin` operator command surface after Phase 2A.
 
 This phase should preserve all permissions, channel restrictions, logging, and existing service/DAL ownership.
+
+Execution task pack:
+
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 6 Admin Command Hardening And Legacy Operator Cleanup.md`
 
 ### Phase 7 — Legacy Command Deprecation and Removal
 
@@ -732,48 +753,14 @@ Do not include these in the early phases unless separately approved:
 Proceed with:
 
 ```text
-KVK Player Experience Redesign - Phase 5 Unified /kvk rankings Visual/UX Polish
+KVK Player Experience Redesign - Phase 6 Admin Command Hardening And Legacy Operator Cleanup
 ```
 
-Phase 1 audit/design, Phase 2A admin collision resolution, and Phase 2B player `/kvk` scaffold are
-complete. Phase 3 has delivered the modern `/kvk stats` visual card while preserving the legacy
-`/mykvkstats` embed during rollout. Phase 3B has polished the card, added KVK mode-specific
-background selection, improved high-progress target scaling, and moved the attached `More Stats`
-and `History` views to Pillow-rendered cards. Phase 3C has delivered the SQL-backed overall KVK
-rank source, total-governor/top-percent context, rank alignment, progress-gold consistency, and
-review hardening. Phase 4A has delivered modern `/kvk targets` in PR #145 and promoted it to
-production. Phase 4B audit and optioneering are complete, and Phase 4Bi has delivered the
-history payload/data-contract/picker/export foundation in PR #148, smoke tested and pushed to
-production. Phase 4Bii has implemented the modern `/kvk history` Last 3 card, moved the compact
-history summary into `/kvk history`, added the expanded Summary records/ranks/tanking-score model,
-blanked historically uncollected acclaim/healed values, removed the History button from
-`/kvk stats`, and has been merged and pushed to production. Phase 4Biii has delivered the Trends
-card, added Trends switching, clarified all-history trend scope with KVK count, removed confusing
-target-percent trend rows, and deployed to production after smoke testing. Phase 4Biv has removed
-the stale command-level selector option, preserved explicit governor lookup, polished CSV export
-with healed, KillPoints, PreKVK, Honor, and derived `TankingScorePct` data, preserved null
-semantics, and passed production smoke testing. Phase 4 is complete. Phase 5A has delivered the
-`/kvk rankings type:records` Hall of Fame foundation and pushed it to production after smoke
-testing. Phase 5B has delivered the unified current-ranking browser in mirror PR #153 and
-production PR #462, passed production smoke testing, and preserved the legacy ranking paths.
-Phase 5C has delivered the current KVK Top 10 visual ranking card in mirror PR #154 and production
-PR #463, including Kills default, KVK card metrics for Kills, % Kill Target, Deads, DKP, Acclaim,
-and Tanking Score, embed fallback, Top 25/50 compact browser preservation, Top 100 exclusion,
-legacy command preservation, production smoke testing, and visual polish.
-Phase 5D has delivered
-the Hall of Fame records Top 10 visual cards in mirror PR #155 and production PR #464, including
-all records metrics, metric-specific qualifying record counts, records Top 10-only controls,
-embed fallback, and successful production smoke testing. Phase 5E has delivered Honor and PreKvK
-Top 10 visual cards in mirror PR #156 and production PR #465. Phase 5F-1 has delivered private
-My Rank / Find Me in mirror PR #158 and production PR #466. Phase 5F-2 has delivered private
-Full List CSV export in mirror PR #159 and production PR #467, with production smoke testing
-passed, CSV column polish complete, and KVK Top 10 `Kill Points` / `Healed` metric selection
-restored. Phase 5G has delivered Honor compact values, PreKvK compact alignment, wide/special-name
-alignment polish, and KVK Top 10 podium centering. Use the Phase 5G starter as the completed
-execution record:
+Phase 1 through Phase 5 are complete. Phase 6 should audit and harden the delivered
+`/kvk_admin` operator command surface while preserving permissions, channel restrictions, logging,
+service/DAL ownership, SQL/import/recompute/export semantics, Google Sheets behaviour, and the
+player `/kvk` surface.
 
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5G Rankings Wrap-up Polish.md`
+Use the Phase 6 task pack as the next active execution record:
 
-Use the Phase 5H starter for the remaining ranking-card performance optimisation slice:
-
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 6 Admin Command Hardening And Legacy Operator Cleanup.md`

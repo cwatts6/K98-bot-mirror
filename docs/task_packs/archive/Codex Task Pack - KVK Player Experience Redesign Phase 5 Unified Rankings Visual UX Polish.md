@@ -7,7 +7,7 @@
 - Owner/context: `K98 Bot KVK Player Experience Redesign programme after Phase 4 completion`
 - Task type: `feature / UX redesign / Discord interaction polish / renderer-service-DAL cleanup / staged implementation plan`
 - One-pass approved: `no`
-- Status: `Phase 5A through Phase 5G complete; Phase 5H ranking-card performance optimisation is the only remaining active Phase 5 delivery slice`
+- Status: `complete; Phase 5A through Phase 5H are delivered, smoke tested, and Phase 5 is closed`
 
 ## Phase 5A Completion Note
 
@@ -217,6 +217,27 @@ Phase 5G completion note:
   preserved.
 - Phase 5H remains separate for ranking-card render/load latency profiling and optimisation.
 - Phase 5G deferred items were moved out of the active backlog and recorded in resolved history.
+
+Phase 5H completion note:
+
+- Phase 5H delivered the final rankings performance optimisation slice in mirror PR #161 and
+  production PR #468 after Phase 5G smoke testing.
+- Representative current KVK, Honor, PreKvK, and Hall of Fame records Top 10 card render timings
+  were measured before and after optimisation.
+- Ranking-card rendering now caches resized card backgrounds and the reusable current-card overlay,
+  reuses the existing cached records overlay, and avoids Pillow's expensive PNG `optimize=True`
+  path for ranking cards.
+- Local median render timings improved from roughly 1.3-1.5s per card to roughly 0.1-0.3s per card
+  across the four representative card families.
+- Visual samples for current KVK, Honor, PreKvK, and Hall of Fame records cards were generated and
+  inspected after the optimisation.
+- Ranking semantics, service/DAL contracts, command/view controls, SQL/cache behaviour, My Rank,
+  CSV export, records Top 10-only behaviour, compact Top 25/50 output, Honor gating, legacy
+  ranking commands, and image-based legacy `/prekvk report` were preserved.
+- The Phase 5H performance deferred item was moved out of the active backlog and recorded in
+  resolved history.
+- No active Phase 5 delivery deferred optimisations remain. The retained legacy-ranking
+  consolidation/deprecation item is future Phase 7 rollout work, not a Phase 5 closure blocker.
 
 ## 2. Required Reading
 
@@ -1267,12 +1288,14 @@ For implementation stages:
 
 ## 23. Codex Chat Starter
 
-Historical starter for Phase 5A. Phase 5A through Phase 5G are complete; the Phase 5G execution
-starter is
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5G Rankings Wrap-up Polish.md`
-and Phase 5H is the only remaining active Phase 5 delivery slice. Use
-`docs/task_packs/Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`
-for the next delivery chat.
+Historical starter for Phase 5A. Phase 5A through Phase 5H are complete, and this task pack is now
+an archived execution record. The completed Phase 5H execution starter is:
+
+`docs/task_packs/archive/Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`
+
+Use the active Phase 6 task pack for the next KVK Player Experience Redesign delivery slice:
+
+`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 6 Admin Command Hardening And Legacy Operator Cleanup.md`
 
 ```text
 Codex, start Phase 5 of the KVK Player Experience Redesign: Unified /kvk rankings Visual/UX Polish.

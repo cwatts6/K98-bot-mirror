@@ -6,13 +6,13 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `build_KVKrankings_embed.py`, `ui/views/stats_views.py`, `honor_rankings_view.py`, `commands/stats_cmds.py`, legacy ranking commands
+- Area: `build_KVKrankings_embed.py`, `ui/views/stats_views.py`, `honor_rankings_view.py`, `commands/stats_cmds.py`, legacy player ranking command compatibility paths
 - Type: refactor
-- Description: Phase 5B preserves the legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` paths during rollout. The legacy KVK and Honor ranking commands therefore still retain older builders/views and duplicated presentation semantics while the unified `/kvk rankings` path uses the shared current-ranking payload/browser foundation.
-- Suggested Fix: After the unified browser has production usage evidence, scope a dedicated legacy-ranking consolidation or deprecation phase. Decide whether flat legacy commands should redirect to the unified service/renderer, remain as compatibility shims, or be retired with announcement support; preserve image-based `/prekvk report` unless a later approved visual phase replaces it.
+- Description: Phase 5 intentionally preserved the legacy `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` paths during rollout. With Phase 5 complete, the legacy KVK and Honor ranking commands still retain older builders/views and duplicated presentation semantics while the unified `/kvk rankings` path uses the shared current-ranking payload/browser foundation. This is tracked as future Phase 7 rollout/deprecation work, not remaining Phase 5 delivery debt.
+- Suggested Fix: After the unified browser has production usage evidence, scope the approved Phase 7 legacy-ranking consolidation or deprecation phase. Decide whether flat legacy commands should redirect to the unified service/renderer, remain as compatibility shims, or be retired with announcement support; preserve image-based `/prekvk report` unless a later approved visual phase replaces it.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5B production smoke results, command usage telemetry, user-facing rollout messaging, and focused regression tests for each retained legacy path.
+- Dependencies: Phase 5 completion, command usage telemetry, user-facing rollout messaging, operator approval for Phase 7, and focused regression tests for each retained legacy path.
 
 ### Deferred Optimisation
 - Area: `tests/test_ark_preference_service.py`, `tests/test_ark_bans_enforcement.py`, `tests/test_lock_timeout.py`, `tests/test_calendar_service.py`, `tests/test_calendar_pipeline.py`, remaining slow full-suite pytest paths
