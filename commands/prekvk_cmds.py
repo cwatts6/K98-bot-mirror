@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID
+from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import track_usage
 from prekvk import report_service
@@ -49,6 +50,17 @@ def register_prekvk(bot: ext_commands.Bot) -> None:
         ),
     ) -> None:
         await safe_defer(ctx, ephemeral=True)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/prekvk report",
+                new_path="/kvk rankings type:prekvk",
+                detail="PreKvK rankings now live in the unified KVK rankings browser.",
+            ),
+            ephemeral=True,
+        )
+        return
+
         try:
             parsed_sort = report_service.parse_report_sort(sort_by)
             await send_prekvk_report(

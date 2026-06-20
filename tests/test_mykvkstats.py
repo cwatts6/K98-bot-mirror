@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Awaitable, Callable
 import inspect
 import types
@@ -9,7 +8,6 @@ import pytest
 pytestmark = pytest.mark.asyncio
 
 
-# Lightweight fakes used in multiple tests
 class DummyUser:
     def __init__(self, uid):
         self.id = uid
@@ -24,24 +22,12 @@ class DummyFollowup:
         return types.SimpleNamespace(id="followup_msg")
 
 
-class DummyChannel:
-    def __init__(self):
-        self.sent = []
-
-    async def send(self, *args, **kwargs):
-        self.sent.append({"args": args, "kwargs": kwargs})
-        return types.SimpleNamespace(id="channel_msg")
-
-
 class DummyInteraction:
     def __init__(self):
-        self.response = types.SimpleNamespace(is_done=lambda: False)
         self.followup = DummyFollowup()
-        self.edited = []
 
     async def edit_original_response(self, content=None, view=None):
-        self.edited.append({"content": content, "view": view})
-        return types.SimpleNamespace(id="edited")
+        return types.SimpleNamespace(id="edited", content=content, view=view)
 
 
 class DummyCtx:
@@ -49,16 +35,9 @@ class DummyCtx:
         self.user = DummyUser(user_id)
         self.interaction = DummyInteraction()
         self.followup = self.interaction.followup
-        self.channel = DummyChannel()
 
 
-def _get_registered_command_impl(
-    module, command_name: str
-) -> Callable[[Any], Awaitable[Any]] | None:
-    """
-    Register the commands into a fake bot and return the unwrapped inner coroutine
-    implementation for the given command_name.
-    """
+def _get_registered_command_impl(module, command_name: str) -> Callable[..., Awaitable[Any]] | None:
     fake_bot = types.SimpleNamespace()
     fake_bot.registered = {}
 
@@ -79,7 +58,6 @@ def _get_registered_command_impl(
     fake_bot.tree = types.SimpleNamespace()
     fake_bot.tree.command = lambda **kw: lambda f: f
 
-    # Call the appropriate register function to populate the fake bot
     if hasattr(module, "register_commands"):
         module.register_commands(fake_bot)
     elif hasattr(module, "register_stats"):
@@ -89,14 +67,9 @@ def _get_registered_command_impl(
     if fn is None:
         return None
 
-    # Unwrap decorators to reach the innermost async implementation
-    try:
-        while hasattr(fn, "__wrapped__"):
-            fn = fn.__wrapped__
-    except Exception:
-        pass
+    while hasattr(fn, "__wrapped__"):
+        fn = fn.__wrapped__
 
-    # Use callable(...) check per B004 recommendation and inspect the object's __call__
     if (
         not inspect.iscoroutinefunction(fn)
         and callable(fn)
@@ -104,152 +77,52 @@ def _get_registered_command_impl(
     ):
         fn = fn.__call__
 
-    return cast(Callable[[Any], Awaitable[Any]], fn)
+    return cast(Callable[..., Awaitable[Any]], fn)
 
 
-async def test_no_registered_accounts_shows_registration_prompt(monkeypatch):
+@pytest.mark.parametrize(
+    ("command_name", "replacement", "ephemeral"),
+    [
+        ("mykvkstats", "/kvk stats", True),
+        ("mykvkhistory", "/kvk history", True),
+        ("kvk_rankings", "/kvk rankings type:kvk", False),
+        ("honor_rankings", "/kvk rankings type:honor", False),
+    ],
+)
+async def test_legacy_stats_commands_send_deprecation_redirect(
+    monkeypatch, command_name, replacement, ephemeral
+):
     import commands.stats_cmds as C
 
-    # Fake load_last_kvk_map as async (the real code awaits it)
-    async def fake_load_last_kvk_map():
-        return {}
+    defer_calls = []
 
-    async def fake_get_account_summary_for_user(_user_id):
-        return C.governor_account_service.summarize_accounts({})
+    async def fake_safe_defer(ctx, ephemeral=True):
+        defer_calls.append(ephemeral)
 
-    # Provide an async-to-thread shim so `await asyncio.to_thread(load_registry)` works
-    async def fake_to_thread(fn, *a, **k):
-        return fn(*a, **k)
-
-    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
+    monkeypatch.setattr(C, "safe_defer", fake_safe_defer, raising=False)
     monkeypatch.setattr(
         C.governor_account_service,
         "get_account_summary_for_user",
-        fake_get_account_summary_for_user,
+        lambda _user_id: pytest.fail("deprecated command should not load accounts"),
     )
-    monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
     monkeypatch.setattr(
-        C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
+        C, "load_stat_cache", lambda: pytest.fail("deprecated command should not load cache")
     )
-
-    # Replace MyRegsActionView with a minimal stub that records set_message_ref calls
-    class StubMyRegsActionView:
-        def __init__(self, *, author_id, has_regs, timeout=120):
-            self.author_id = author_id
-            self.has_regs = has_regs
-            self._message = None
-
-        def set_message_ref(self, message):
-            self._message = message
-
-    monkeypatch.setattr(C, "MyRegsActionView", StubMyRegsActionView)
+    monkeypatch.setattr(
+        C.kvk_rankings_service,
+        "build_honor_rankings_payload",
+        lambda **_kwargs: pytest.fail("deprecated command should not load rankings"),
+    )
 
     ctx = DummyCtx(user_id=10)
-    handler = _get_registered_command_impl(C, "mykvkstats")
-    assert (
-        handler is not None
-    ), "mykvkstats command not registered; ensure register_commands was called"
-
-    # The inner function expects ctx only
-    await handler(ctx)
-    assert (
-        ctx.interaction.edited
-    ), "Expected edit_original_response to be called in no-accounts path"
-
-
-async def test_single_account_sends_public_embed(monkeypatch):
-    import commands.stats_cmds as C
-
-    async def fake_load_last_kvk_map():
-        return {}
-
-    async def fake_get_account_summary_for_user(_user_id):
-        return C.governor_account_service.summarize_accounts(
-            {"Main": {"GovernorID": "123", "GovernorName": "X"}}
-        )
-
-    async def fake_to_thread(fn, *a, **k):
-        return fn(*a, **k)
-
-    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(
-        C.governor_account_service,
-        "get_account_summary_for_user",
-        fake_get_account_summary_for_user,
-    )
-    monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
-    monkeypatch.setattr(C, "normalize_governor_id", lambda v: str(v))
-    # Make load_stat_row sync but called via await asyncio.to_thread inside handler
-    monkeypatch.setattr(C, "load_stat_row", lambda gid: {"GovernorID": gid, "val": 1})
-    monkeypatch.setattr(C, "build_stats_embed", lambda row, user: (["embed_obj"], "file_obj"))
-    monkeypatch.setattr(
-        C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
-    )
-
-    ctx = DummyCtx(user_id=11)
-    handler = _get_registered_command_impl(C, "mykvkstats")
+    handler = _get_registered_command_impl(C, command_name)
     assert handler is not None
 
     await handler(ctx)
-    assert ctx.channel.sent, "Expected channel.send to be called for single-account public path"
-    send_kwargs = ctx.channel.sent[0]["kwargs"]
-    assert send_kwargs["embeds"] == ["embed_obj"]
-    assert send_kwargs["files"] == ["file_obj"]
 
-
-async def test_multi_account_builds_selector(monkeypatch):
-    import commands.stats_cmds as C
-
-    async def fake_load_last_kvk_map():
-        return {}
-
-    async def fake_get_account_summary_for_user(_user_id):
-        return C.governor_account_service.summarize_accounts(
-            {
-                "Main": {"GovernorID": 1, "GovernorName": "A"},
-                "Alt 1": {"GovernorID": 2, "GovernorName": "B"},
-            }
-        )
-
-    async def fake_to_thread(fn, *a, **k):
-        return fn(*a, **k)
-
-    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    monkeypatch.setattr(
-        C.governor_account_service,
-        "get_account_summary_for_user",
-        fake_get_account_summary_for_user,
-    )
-    monkeypatch.setattr(C, "load_last_kvk_map", fake_load_last_kvk_map)
-    monkeypatch.setattr(
-        C, "safe_defer", lambda ctx, ephemeral=True: asyncio.sleep(0), raising=False
-    )
-
-    created = {}
-
-    class StubMyKVKStatsSelectView:
-        def __init__(
-            self,
-            ctx=None,
-            accounts=None,
-            author_id=None,
-            use_visual_card=False,
-            timeout=300,
-        ):
-            created["ctx"] = ctx
-            created["accounts"] = accounts
-            created["author_id"] = author_id
-            created["use_visual_card"] = use_visual_card
-
-    monkeypatch.setattr(C, "MyKVKStatsSelectView", StubMyKVKStatsSelectView)
-
-    ctx = DummyCtx(user_id=12)
-    handler = _get_registered_command_impl(C, "mykvkstats")
-    assert handler is not None
-
-    await handler(ctx)
-    assert created.get("accounts"), "Expected MyKVKStatsSelectView to be initialized with accounts"
-    assert created.get("use_visual_card") is False
-    assert (
-        ctx.interaction.edited
-    ), "Expected edit_original_response to be called for multi-account path"
+    assert defer_calls == [ephemeral]
+    assert ctx.followup.sent
+    message = ctx.followup.sent[0]["args"][0]
+    assert "deprecated" in message
+    assert replacement in message
+    assert ctx.followup.sent[0]["kwargs"]["ephemeral"] is ephemeral

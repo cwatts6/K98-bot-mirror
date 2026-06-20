@@ -21,6 +21,7 @@ from bot_config import (
     NOTIFY_CHANNEL_ID,
 )
 from commands.crystaltech_flow import run_crystaltech_flow as run_crystaltech_flow_service
+from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from commands.player_profile_flow import send_profile_to_channel as send_profile_to_channel_service
 from decoraters import (
     admin_or_leadership_in_allowed_channels,
@@ -183,6 +184,18 @@ def register_commands(bot_instance):
             default=False,  # public by default
         ),
     ):
+        await safe_defer(ctx, ephemeral=True)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/mykvktargets",
+                new_path="/kvk targets",
+                detail="The new command uses the modern KVK target card and keeps the same optional Governor ID flow.",
+            ),
+            ephemeral=True,
+        )
+        return
+
         await safe_defer(ctx, ephemeral=only_me)
 
         # Load last-KVK cache once (centralized helper)

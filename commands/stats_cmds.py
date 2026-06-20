@@ -14,6 +14,7 @@ from bot_config import (
     STATS_ALERT_CHANNEL_ID,
 )
 from build_KVKrankings_embed import build_kvkrankings_embed
+from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from constants import CREDENTIALS_FILE, DATABASE, KVK_SHEET_NAME, PASSWORD, SERVER, USERNAME
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import (
@@ -287,6 +288,18 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     @safe_command
     @track_usage()
     async def mykvkstats(ctx: discord.ApplicationContext):
+        await safe_defer(ctx, ephemeral=True)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/mykvkstats",
+                new_path="/kvk stats",
+                detail="The new command uses the modern KVK stats card and account selector.",
+            ),
+            ephemeral=True,
+        )
+        return
+
         # We always keep the selector private to the caller
         await safe_defer(ctx, ephemeral=True)
 
@@ -829,6 +842,18 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             int, "Governor ID (optional)", required=False, default=None
         ),
     ):
+        await safe_defer(ctx, ephemeral=True)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/mykvkhistory",
+                new_path="/kvk history",
+                detail="The new command includes History, Summary, Trends, and CSV export controls.",
+            ),
+            ephemeral=True,
+        )
+        return
+
         await safe_defer(ctx, ephemeral=ephemeral)
 
         account_summary = await governor_account_service.get_account_summary_for_user(ctx.user.id)
@@ -897,6 +922,18 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     @safe_command
     @track_usage()
     async def kvk_rankings(ctx: discord.ApplicationContext):
+        await safe_defer(ctx, ephemeral=False)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/kvk_rankings",
+                new_path="/kvk rankings type:kvk",
+                detail="The new rankings browser includes visual Top 10 cards, Top 25/50 views, My Rank, and CSV export.",
+            ),
+            ephemeral=False,
+        )
+        return
+
         """
         Show KVK leaderboard with multi-column view.
 
@@ -1180,6 +1217,18 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
     @safe_command
     @track_usage()
     async def honor_rankings(ctx: discord.ApplicationContext):
+        await safe_defer(ctx, ephemeral=False)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/honor_rankings",
+                new_path="/kvk rankings type:honor",
+                detail="Honor rankings now live in the unified KVK rankings browser.",
+            ),
+            ephemeral=False,
+        )
+        return
+
         """
         /honor_rankings - show Top 10 honor by default and let user switch Top 10/25/50 with buttons.
         """
