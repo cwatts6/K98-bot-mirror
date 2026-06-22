@@ -1,5 +1,8 @@
 # Codex Task Pack - Player Self-Service Command Centre Phase 1 Audit and Design Only
 
+Status: completed execution pack. Phase 1 produced the audit/design report and recommended the
+Phase 2 `/me` command shell foundation. This pack is retained as a historical record.
+
 ## 1. Task Header
 
 - Task name: `Player Self-Service Command Centre Phase 1 Audit and Design Only`

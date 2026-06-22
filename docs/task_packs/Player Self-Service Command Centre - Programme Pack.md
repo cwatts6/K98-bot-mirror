@@ -9,6 +9,27 @@
 - One-pass approved: No
 - Headline: **Every player now has a personal command centre.**
 
+## Current Programme Status
+
+Status as of 2026-06-22:
+
+- Phase 1 audit and design is complete and archived as a historical execution record.
+- Phase 2 `/me` command shell and navigation foundation is delivered in mirror PR #164 and
+  production PR #472, smoke tested successfully, and awaiting manual merge/promotion.
+- The delivered `/me` surface is intentionally read-only: dashboard, accounts, reminders,
+  preferences, exports, navigation buttons, dashboard Quick Launch guidance, and legacy command
+  preservation are in place.
+- Next active implementation phase: Phase 3 Modern Account Centre.
+
+Phase 2 manual smoke evidence:
+
+- `/me dashboard` responds privately and shows the expected dashboard sections and controls.
+- Quick Launch works and shows guidance for KVK stats, KVK targets, KVK history, KVK rankings,
+  inventory, and exports.
+- `/me exports` opens the exports page with page navigation only; the dashboard Quick Launch menu
+  remains dashboard-only by design.
+- Existing legacy commands still work.
+
 ## 2. Programme Vision
 
 Create a premium, app-like player self-service layer inside Discord that lets every player manage their identity, accounts, reminders, preferences, and personal outputs from one coherent place.
@@ -268,7 +289,7 @@ The visual card should be calm and uncluttered. It should not contain every acco
 
 ### Phase 1 — Audit and Design Only
 
-Status: proposed first task pack.
+Status: complete and archived.
 
 Audit the current player self-service commands, views, services, storage, usage, docs, tests, and player journeys before implementation.
 
@@ -291,6 +312,8 @@ No runtime code changes.
 
 ### Phase 2 — `/me` Command Shell and Navigation Foundation
 
+Status: delivered, smoke tested, and awaiting manual merge/promotion.
+
 Create the new `/me` command group and safe navigation shell in parallel with legacy commands.
 
 Likely target commands:
@@ -303,9 +326,24 @@ Likely target commands:
 /me exports
 ```
 
-This phase should prove command registration, permissions, response visibility, navigation, fallback behaviour, and basic service boundaries before deeper visual or data work.
+Delivered scope:
+
+- `/me dashboard`, `/me accounts`, `/me reminders`, `/me preferences`, and `/me exports`
+- read-only player self-service summary service
+- private dashboard embed with account, reminder, and preference status
+- page navigation buttons with ownership checks and timeout handling
+- dashboard Quick Launch guidance for KVK outputs, inventory, and exports
+- command governance and canonical command reference updates
+- focused command, service, view, inventory preference, and command-registration tests
+- player/operator briefing
+
+This phase proved command registration, permissions, response visibility, navigation, fallback
+behaviour, and basic service boundaries before deeper account/reminder mutation or generated
+visual-card work.
 
 ### Phase 3 — Modern Account Centre
+
+Status: next active phase.
 
 Replace fragmented account behaviours with one account centre journey.
 
@@ -327,6 +365,9 @@ Likely deliverables:
 - slot management
 - main/default account behaviour proposal or implementation if approved
 - admin support implications documented
+
+Phase 3 should build on the delivered `/me accounts` read-only shell rather than replacing it.
+Legacy account commands must remain live until redirects are separately approved.
 
 ### Phase 4 — Modern Reminder Centre
 
@@ -352,7 +393,8 @@ Likely deliverables:
 
 ### Phase 5 — Visual `/me dashboard` Card and First-Pass Preferences
 
-Build the premium dashboard card and lightweight preferences hub once the data contract and navigation have been proven.
+Build the premium dashboard card and extend the lightweight preferences hub once the data contract
+and navigation have been proven.
 
 Likely deliverables:
 
@@ -362,14 +404,15 @@ Likely deliverables:
 - reminder setup status
 - preference status chips
 - quick launch controls
-- inventory visibility preference surfaced or managed
+- inventory visibility preference management if approved
 - output privacy preference proposal or implementation if supported
 
-Phase 1 may choose to move the visual card earlier if the audit shows the data contract is already stable enough.
+Phase 2 already surfaces inventory visibility status in `/me preferences`. Phase 5 should avoid
+repeating that work and focus on generated-card quality plus any approved preference mutation.
 
 ### Phase 6 — Exports Launchpad and Player Output Links
 
-Create a guided personal exports and output launchpad without redesigning all export logic.
+Extend the delivered `/me exports` launchpad without redesigning all export logic.
 
 Likely deliverables:
 
@@ -379,6 +422,10 @@ Likely deliverables:
 - personal output guidance
 - format explanations
 - privacy and file-delivery warnings
+
+Phase 2 already delivered first-pass export guidance. Phase 6 should only add direct export
+actions if existing service-backed authorization, private file delivery, and Discord interaction
+safety are preserved.
 
 ### Phase 7 — Legacy Redirects, Briefing, and Cleanup
 
@@ -577,10 +624,12 @@ Do not include these in the first build unless separately approved:
 
 ## 18. Suggested Next Action
 
-Start Phase 1:
+Start Phase 3:
 
 ```text
-Codex Task Pack - Player Self-Service Command Centre Phase 1 Audit and Design Only.md
+Codex Task Pack - Player Self-Service Command Centre Phase 3 Modern Account Centre.md
 ```
 
-Phase 1 should produce the design report and recommended implementation sequence before any code changes are approved.
+Phase 3 should turn the delivered read-only `/me accounts` shell into a service-backed account
+centre for lookup, registration, modification, removal, and account review while preserving all
+legacy account commands until redirects are separately approved.

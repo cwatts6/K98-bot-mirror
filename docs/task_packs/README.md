@@ -23,6 +23,19 @@ material.
 Player self-service workflow redesign and public calendar/KVK calendar UX redesign remain separate
 deferred optimisation programmes, not additional command-platform phases.
 
+Player Self-Service Command Centre status:
+
+- Phase 1 audit/design is complete and archived.
+- Phase 2 `/me` Command Shell and Navigation Foundation is delivered in mirror PR #164 and
+  production PR #472, smoke tested successfully, and awaiting manual merge/promotion.
+- The active next phase is Phase 3 Modern Account Centre.
+- Active Phase 3 files:
+  - `Codex Task Pack - Player Self-Service Command Centre Phase 3 Modern Account Centre.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre Phase 3 Modern Account Centre.md`
+- Active programme file:
+  - `Player Self-Service Command Centre - Programme Pack.md`
+- Completed Phase 1/2 execution records are archived under `archive/`.
+
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
 merge/promotion. Phase 1 audit/design, Phase 2A
 Admin Collision Resolution, Phase 2B Player `/kvk` Scaffold, Phase 3 Modern `/kvk stats` Visual
@@ -103,6 +116,6 @@ Latest completed starter:
 
 Next active work:
 
-No new Phase 8 task pack is open. Final removal of the temporary deprecated command paths is
-captured as a deferred cleanup item for execution after the no-feedback window and operator
-approval.
+Player Self-Service Command Centre Phase 3 Modern Account Centre is active. KVK final removal of
+temporary deprecated command paths remains captured as a deferred cleanup item for execution after
+the no-feedback window and operator approval.

@@ -1,5 +1,8 @@
 # Player Self-Service Command Centre - Phase 1 Audit and Design Report
 
+Status: completed Phase 1 report. The active programme pack now tracks delivered Phase 2 status
+and Phase 3 next work; this report remains the historical audit/design source.
+
 ## 1. Executive Summary
 
 Phase 1 recommends introducing a new player-owned `/me` command group as the personal

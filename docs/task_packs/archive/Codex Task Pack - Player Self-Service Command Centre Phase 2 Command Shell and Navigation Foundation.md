@@ -1,5 +1,9 @@
 # Codex Task Pack - Player Self-Service Command Centre Phase 2 Command Shell and Navigation Foundation
 
+Status: completed execution pack. Phase 2 delivered the `/me` command shell and navigation
+foundation in mirror PR #164 and production PR #472, passed manual smoke testing, and is retained
+here as a historical record while manual merge/promotion completes.
+
 ## 1. Task Header
 
 - Task name: `Player Self-Service Command Centre Phase 2 Command Shell and Navigation Foundation`
