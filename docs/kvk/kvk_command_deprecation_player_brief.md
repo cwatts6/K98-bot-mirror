@@ -16,7 +16,7 @@ What changed:
 - `/mykvkhistory` is now `/kvk history`
 - `/kvk_rankings` is now `/kvk rankings type:kvk`
 - `/honor_rankings` is now `/kvk rankings type:honor`
-- `/prekvk report` is now `/kvk rankings type:prekvk`
+- `/prekvk report` is now `/kvk rankings type:prekvk` in the KVK stats channel
 
 What is better in the new commands:
 

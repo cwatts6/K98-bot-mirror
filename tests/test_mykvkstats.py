@@ -5,8 +5,6 @@ from typing import Any, cast
 
 import pytest
 
-pytestmark = pytest.mark.asyncio
-
 
 class DummyUser:
     def __init__(self, uid):
@@ -89,6 +87,7 @@ def _get_registered_command_impl(module, command_name: str) -> Callable[..., Awa
         ("honor_rankings", "/kvk rankings type:honor", False),
     ],
 )
+@pytest.mark.asyncio
 async def test_legacy_stats_commands_send_deprecation_redirect(
     monkeypatch, command_name, replacement, ephemeral
 ):
@@ -105,14 +104,6 @@ async def test_legacy_stats_commands_send_deprecation_redirect(
         "get_account_summary_for_user",
         lambda _user_id: pytest.fail("deprecated command should not load accounts"),
     )
-    monkeypatch.setattr(
-        C, "load_stat_cache", lambda: pytest.fail("deprecated command should not load cache")
-    )
-    monkeypatch.setattr(
-        C.kvk_rankings_service,
-        "build_honor_rankings_payload",
-        lambda **_kwargs: pytest.fail("deprecated command should not load rankings"),
-    )
 
     ctx = DummyCtx(user_id=10)
     handler = _get_registered_command_impl(C, command_name)
@@ -126,3 +117,14 @@ async def test_legacy_stats_commands_send_deprecation_redirect(
     assert "deprecated" in message
     assert replacement in message
     assert ctx.followup.sent[0]["kwargs"]["ephemeral"] is ephemeral
+
+
+def test_deprecated_stats_commands_do_not_keep_inline_legacy_dependencies():
+    import commands.stats_cmds as C
+
+    source = inspect.getsource(C.register_stats)
+
+    assert "load_stat_cache" not in source
+    assert "build_honor_rankings_payload" not in source
+    assert "MyKVKStatsSelectView" not in source
+    assert "KVKRankingView" not in source

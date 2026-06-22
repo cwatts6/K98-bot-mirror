@@ -4,8 +4,6 @@ import types
 
 import pytest
 
-pytestmark = pytest.mark.asyncio
-
 
 class DummyUser:
     def __init__(self, uid):
@@ -76,6 +74,7 @@ def _get_registered_command_impl(module, command_name: str):
     return fn
 
 
+@pytest.mark.asyncio
 async def test_mykvktargets_sends_deprecation_redirect(monkeypatch):
     import commands.telemetry_cmds as C
 
@@ -85,11 +84,6 @@ async def test_mykvktargets_sends_deprecation_redirect(monkeypatch):
         defer_calls.append(ephemeral)
 
     monkeypatch.setattr(C, "safe_defer", fake_safe_defer, raising=False)
-    monkeypatch.setattr(
-        C,
-        "run_target_lookup",
-        lambda *_args, **_kwargs: pytest.fail("deprecated command should not load targets"),
-    )
     monkeypatch.setattr(
         C,
         "get_account_summary_for_user",
@@ -110,6 +104,16 @@ async def test_mykvktargets_sends_deprecation_redirect(monkeypatch):
     assert ctx.followup.sent[0]["ephemeral"] is True
 
 
+def test_deprecated_mykvktargets_does_not_keep_inline_legacy_dependencies():
+    import commands.telemetry_cmds as C
+
+    source = inspect.getsource(C.register_commands)
+
+    assert "run_target_lookup" not in source
+    assert "make_kvk_targets_view" not in source
+
+
+@pytest.mark.asyncio
 async def test_crystaltech_single_registered_account_auto_opens(monkeypatch):
     import commands.telemetry_cmds as C
     from services.governor_account_service import summarize_accounts
@@ -139,6 +143,7 @@ async def test_crystaltech_single_registered_account_auto_opens(monkeypatch):
     assert called == {"gid": "333", "ephemeral": True}
 
 
+@pytest.mark.asyncio
 async def test_crystaltech_multi_account_builds_summary_selector(monkeypatch):
     import commands.telemetry_cmds as C
     from services.governor_account_service import AccountResolutionSummary, summarize_accounts

@@ -13,7 +13,6 @@ from bot_config import (
     KVK_PLAYER_STATS_CHANNEL_ID,
     STATS_ALERT_CHANNEL_ID,
 )
-from build_KVKrankings_embed import build_kvkrankings_embed
 from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from constants import CREDENTIALS_FILE, DATABASE, KVK_SHEET_NAME, PASSWORD, SERVER, USERNAME
 from core.interaction_safety import safe_command, safe_defer
@@ -25,36 +24,22 @@ from decoraters import (
     track_usage,
 )
 from embed_my_stats import SliceButtons, build_embeds
-from embed_utils import build_stats_embed
 from gsheet_module import run_kvk_export_test, run_kvk_proc_exports_with_alerts
-from honor_rankings_view import HonorRankingView, build_honor_rankings_embed
-from kvk.services import kvk_admin_service, kvk_rankings_service
+from kvk.services import kvk_admin_service
 from profile_cache import autocomplete_choices
-from registry.account_slots import ACCOUNT_ORDER
 from services import (
     governor_account_service,
-    kvk_history_service,
     stats_export_service,
 )
 from stats_alerts.embeds.kvk import send_kvk_embed
 from stats_alerts.honors import purge_latest_honor_scan
 from stats_alerts.interface import send_stats_update_embed
 from stats_alerts.kvk_meta import is_currently_kvk
-from stats_cache_helpers import load_last_kvk_map
 from stats_service import get_stats_payload
-from ui.views.kvk_history_view import KVKHistoryView
-from ui.views.kvk_personal_views import MyKVKStatsSelectView
-from ui.views.registry_views import MyRegsActionView
-from ui.views.stats_views import KVKRankingView
-from utils import load_stat_cache, load_stat_row, normalize_governor_id
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
 bot: ext_commands.Bot | None = None
-# ACCOUNT_ORDER imported from account_picker — single canonical definition.
-
-
-# MyKVKStatsSelectView is defined canonically in ui.views.kvk_personal_views and imported above.
 
 
 def _split_discord_content(content: str, *, max_chars: int = 1900) -> list[str]:
@@ -299,132 +284,6 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             ephemeral=True,
         )
         return
-
-        # We always keep the selector private to the caller
-        await safe_defer(ctx, ephemeral=True)
-
-        account_summary = await governor_account_service.get_account_summary_for_user(ctx.user.id)
-        if not account_summary.ok:
-            await ctx.interaction.edit_original_response(
-                content=f"❌ Could not load registry: `{account_summary.error}`"
-            )
-            return
-
-        if not account_summary.governor_ids:
-            # Reuse your existing action view as a nice fallback
-            view = MyRegsActionView(author_id=ctx.user.id, has_regs=False)
-            msg = await ctx.interaction.edit_original_response(
-                content="You don’t have any Governor accounts registered yet. Use the options below:",
-                view=view,
-            )
-            view.set_message_ref(msg)
-            return
-
-        accounts = account_summary.ordered_accounts
-
-        # Best-effort: load last-KVK cache via the TTL-backed in-process cache helper.
-        last_kvk_map = {}
-        try:
-            last_kvk_map = await load_last_kvk_map()
-            if not isinstance(last_kvk_map, dict):
-                last_kvk_map = {}
-        except Exception:
-            logger.exception("[/mykvkstats] load_last_kvk_map failed")
-            last_kvk_map = {}
-
-        # Single-account path → post PUBLIC embed immediately
-        if len(accounts) == 1:
-            ((_, info),) = accounts.items()
-            gid = normalize_governor_id(info.get("GovernorID"))
-            if not gid:
-                await ctx.interaction.edit_original_response(
-                    content="❌ Your registration has no valid Governor ID."
-                )
-                return
-
-            try:
-                # Offload potential IO-bound stat row load
-                row = await asyncio.to_thread(load_stat_row, gid)
-            except Exception as e:
-                logger.exception("[/mykvkstats] load_stat_row failed")
-                await ctx.interaction.edit_original_response(
-                    content=f"❌ Could not load stats: `{type(e).__name__}: {e}`"
-                )
-                return
-
-            if not row:
-                await ctx.interaction.edit_original_response(
-                    content=f"❌ Stats not found for Governor ID `{gid}`."
-                )
-                return
-
-            # Attach last-KVK row (if available) to the loaded stat row so embed builders can use it
-            try:
-                lk = last_kvk_map.get(str(gid))
-                if lk:
-                    # shallow attach; embed builders expect governor_data['last_kvk']
-                    row["last_kvk"] = lk
-            except Exception:
-                logger.exception("[/mykvkstats] Failed to attach last_kvk for %s", gid)
-
-            try:
-                embeds, file = build_stats_embed(row, ctx.user)
-                # build_stats_embed returns (list[discord.Embed], discord.File)
-            except Exception as e:
-                logger.exception("[/mykvkstats] build_stats_embed failed")
-                await ctx.interaction.edit_original_response(
-                    content=f"❌ Failed to build stats: `{type(e).__name__}: {e}`"
-                )
-                return
-
-            # PUBLIC post (send all embeds together)
-            try:
-                if file is not None:
-                    await ctx.channel.send(embeds=embeds, files=[file])
-                else:
-                    await ctx.channel.send(embeds=embeds)
-            except Exception:
-                # fallback: send embeds only if file send fails
-                try:
-                    await ctx.channel.send(embeds=embeds)
-                except Exception:
-                    logger.exception("[/mykvkstats] failed to send stats embed(s) to channel")
-
-            # Silence the ephemeral placeholder instead of confirming
-            try:
-                await ctx.interaction.edit_original_response(content=" ", view=None)
-            except Exception:
-                pass
-            return
-
-        # Multi-account path → ephemeral dropdown + helper buttons
-        try:
-            # Keep preferred ordering first, then append any remaining slots deterministically
-            ordered_accounts = {slot: accounts[slot] for slot in ACCOUNT_ORDER if slot in accounts}
-            # append remaining keys not in ACCOUNT_ORDER in sorted order
-            remaining = [s for s in sorted(accounts.keys()) if s not in ordered_accounts]
-            for s in remaining:
-                ordered_accounts[s] = accounts[s]
-            view = MyKVKStatsSelectView(ctx=ctx, accounts=ordered_accounts, author_id=ctx.user.id)
-            # Attach last_kvk_map to the view so callbacks can reuse it when they load stat rows.
-            # (The view callback should check for `self._last_kvk_map` and attach when building embeds.)
-            try:
-                view._last_kvk_map = last_kvk_map
-            except Exception:
-                # non-fatal; view may not accept new attrs in some contexts, but that's unlikely
-                pass
-        except Exception as e:
-            logger.exception("[/mykvkstats] MyKVKStatsSelectView init failed")
-            await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to build account selector: `{type(e).__name__}: {e}`"
-            )
-            return
-
-        await ctx.interaction.edit_original_response(
-            # architecture-check: allow
-            content="Select an account below to view your stats:",
-            view=view,
-        )
 
     @kvk_admin_group.command(
         name="refresh_stats_cache",
@@ -854,64 +713,6 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         )
         return
 
-        await safe_defer(ctx, ephemeral=ephemeral)
-
-        account_summary = await governor_account_service.get_account_summary_for_user(ctx.user.id)
-        if not account_summary.ok and not governor_id:
-            await ctx.followup.send(
-                f"Registry is temporarily unavailable: `{account_summary.error}`",
-                ephemeral=True,
-            )
-            return
-        account_map = kvk_history_service.build_ordered_account_map(
-            account_summary.ordered_accounts
-        )  # {label: {GovernorID, GovernorName}}
-
-        # If a Governor ID is provided, build a minimal map for it (works even with no registry)
-        if governor_id:
-            # Best-effort name discovery; fall back to the ID string
-            try:
-                from kvk_history_utils import fetch_history_for_governors
-
-                df_lookup = fetch_history_for_governors([governor_id])
-                gov_name = None
-                for col in ("GovernorName", "Gov_Name", "Name"):
-                    if col in df_lookup.columns and not df_lookup[col].dropna().empty:
-                        gov_name = str(df_lookup[col].dropna().iloc[0])
-                        break
-                gov_name = gov_name or str(governor_id)
-            except Exception:
-                gov_name = str(governor_id)
-            account_map = {"Lookup": {"GovernorID": int(governor_id), "GovernorName": gov_name}}
-        elif not account_map:
-            await ctx.followup.send(
-                "❌ You haven't registered any accounts yet. Use `/register_governor` or pass a Governor ID here.",
-                ephemeral=True,
-            )
-            return
-
-        # Start on the provided governor_id when present, else Main/first
-        default_id = (
-            str(governor_id)
-            if governor_id
-            else kvk_history_service.pick_default_governor_id(account_map)
-        )
-        if not default_id:
-            await ctx.followup.send(
-                "❌ I couldn't find a valid Governor ID in your registered accounts.",
-                ephemeral=True,
-            )
-            return
-
-        view = KVKHistoryView(
-            user=ctx.user,
-            account_map=account_map,
-            selected_ids=[default_id],  # start with just Main (or first)
-            allow_all=True,
-            ephemeral=ephemeral,  # <- pass through the user's choice
-        )
-        await view.initial_send(ctx)
-
     @bot.slash_command(
         name="kvk_rankings",
         description="Leaderboard for current KVK: Power, Kills, % Kill Target, Deads, or DKP.",
@@ -933,46 +734,6 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             ephemeral=False,
         )
         return
-
-        """
-        Show KVK leaderboard with multi-column view.
-
-        Default: Power (highest to lowest), Top 10, Page 1
-
-        Features:
-        - 5 sort metrics: Power, Kills, % Kill Target, Deads, DKP
-        - 3 primary limit options: Top 10, 25, 50
-        - Excel-style sort indicator (▼) on active column
-
-        Users can change sort metric and limit via dropdown/buttons.
-        """
-        await safe_defer(ctx, ephemeral=False)
-
-        cache = load_stat_cache()
-        rows = [r for k, r in cache.items() if k != "_meta"]
-        if not rows:
-            await ctx.followup.send(
-                "⚠️ No stats cache available yet. Try again after the next scan/export."
-            )
-            return
-
-        # Default: Power sort, Top 10, Page 1
-        view = KVKRankingView(cache, metric="power", limit=10, timeout=120.0)
-        embed = build_kvkrankings_embed(rows, "power", 10, page=1)
-
-        # Fallback footer if helper didn't set one
-        if not embed.footer or not embed.footer.text:
-            last_ref = cache.get("_meta", {}).get("generated_at") or "unknown"
-            embed.set_footer(text=f"Last refreshed: {last_ref}")
-
-        resp = await ctx.followup.send(embed=embed, view=view)
-        try:
-            view.message = await ctx.interaction.original_response()
-        except Exception:
-            try:
-                view.message = await resp.original_response()
-            except Exception:
-                view.message = None
 
     @kvk_admin_group.command(
         name="export_all",
@@ -1228,35 +989,6 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             ephemeral=False,
         )
         return
-
-        """
-        /honor_rankings - show Top 10 honor by default and let user switch Top 10/25/50 with buttons.
-        """
-        # Defer to allow DB fetch
-        await safe_defer(ctx, ephemeral=False)
-
-        initial_limit = 10
-
-        try:
-            payload = await kvk_rankings_service.build_honor_rankings_payload(limit=initial_limit)
-        except Exception:
-            logger.exception("[HONOR] get_latest_honor_top failed")
-            payload = kvk_rankings_service.build_honor_rankings_payload_from_rows(
-                [],
-                limit=initial_limit,
-            )
-
-        if not payload.rows:
-            # graceful response if DB has no honor data
-            await ctx.followup.send("No honor data found for the latest KVK.", ephemeral=False)
-            return
-
-        embed = build_honor_rankings_embed(
-            [row.raw for row in payload.rows],
-            limit=payload.limit,
-        )
-        view = HonorRankingView()
-        await ctx.followup.send(embed=embed, view=view, ephemeral=False)
 
     @honor_group.command(
         name="purge_last",

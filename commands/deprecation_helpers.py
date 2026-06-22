@@ -14,7 +14,7 @@ class CommandRedirect:
 
 def build_deprecated_command_message(redirect: CommandRedirect) -> str:
     message = (
-        f"`{redirect.old_path}` is deprecated and no longer returns the old report.\n"
+        f"`{redirect.old_path}` is deprecated and no longer returns the old output.\n"
         f"Please use `{redirect.new_path}` instead."
     )
     if redirect.detail:

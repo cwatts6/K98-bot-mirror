@@ -19,6 +19,8 @@ def test_prekvk_report_command_is_public_read_only_surface():
     assert "@is_admin_and_notify_channel()" not in source
     assert "import_prekvk_bytes" not in source
     assert "handle_prekvk_upload" not in source
+    assert "report_service" not in source
+    assert "send_prekvk_report" not in source
 
 
 @pytest.mark.asyncio
@@ -65,20 +67,6 @@ async def test_prekvk_report_sends_deprecation_redirect(monkeypatch):
 
     monkeypatch.setattr(C.discord, "SlashCommandGroup", fake_group_factory)
     monkeypatch.setattr(C, "safe_defer", fake_safe_defer)
-    monkeypatch.setattr(
-        C.report_service,
-        "parse_report_sort",
-        lambda _sort: (_ for _ in ()).throw(
-            AssertionError("deprecated command should not parse report sort")
-        ),
-    )
-    monkeypatch.setattr(
-        C,
-        "send_prekvk_report",
-        lambda **_kwargs: (_ for _ in ()).throw(
-            AssertionError("deprecated command should not send report")
-        ),
-    )
 
     C.register_prekvk(fake_bot)
     assert fake_group is not None
@@ -93,4 +81,5 @@ async def test_prekvk_report_sends_deprecation_redirect(monkeypatch):
     assert ctx.followup.sent
     assert "deprecated" in ctx.followup.sent[0]["content"]
     assert "/kvk rankings type:prekvk" in ctx.followup.sent[0]["content"]
+    assert "Run it in <#" in ctx.followup.sent[0]["content"]
     assert ctx.followup.sent[0]["ephemeral"] is True
