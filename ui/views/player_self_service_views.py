@@ -288,7 +288,9 @@ class PlayerSelfServiceView(discord.ui.View):
         ):
             self.add_item(PlayerSelfServiceQuickLaunchSelect())
 
-    async def _show_page(self, interaction: discord.Interaction, page: PlayerSelfServicePage) -> None:
+    async def _show_page(
+        self, interaction: discord.Interaction, page: PlayerSelfServicePage
+    ) -> None:
         try:
             await interaction.response.defer(ephemeral=True)
         except Exception:

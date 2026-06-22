@@ -101,7 +101,9 @@ async def test_dashboard_view_has_three_primary_buttons_and_quick_launch() -> No
     labels = [getattr(child, "label", None) for child in view.children]
     assert labels[:3] == ["Accounts", "Reminders", "Preferences"]
     assert "Dashboard" not in labels
-    assert any(isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children)
+    assert any(
+        isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
+    )
 
 
 @pytest.mark.asyncio
