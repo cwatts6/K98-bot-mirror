@@ -24,7 +24,7 @@ The vision should answer:
 - What will be meaningfully better when the programme is complete?
 - Who benefits?
 - What product or engineering standard should this set?
-- How does this prepare for future work?
+- How does this prepare for named later phases or approved follow-up tasks?
 
 ## 3. Why This Programme Exists
 

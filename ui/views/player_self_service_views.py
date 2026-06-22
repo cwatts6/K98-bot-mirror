@@ -290,6 +290,16 @@ class PlayerSelfServiceView(discord.ui.View):
 
     async def _show_page(self, interaction: discord.Interaction, page: PlayerSelfServicePage) -> None:
         try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception:
+            logger.debug(
+                "player_self_service_navigation_defer_failed user_id=%s page=%s",
+                self.author_id,
+                page,
+                exc_info=True,
+            )
+
+        try:
             summary = await self.summary_loader(self.author_id)
         except Exception:
             logger.exception(
@@ -297,10 +307,13 @@ class PlayerSelfServiceView(discord.ui.View):
                 self.author_id,
                 page,
             )
-            await interaction.response.send_message(
-                "Personal status is temporarily unavailable. Please try again in a moment.",
-                ephemeral=True,
-            )
+            try:
+                await interaction.followup.send(
+                    "Personal status is temporarily unavailable. Please try again in a moment.",
+                    ephemeral=True,
+                )
+            except Exception:
+                logger.debug("player_self_service_view_error_followup_failed", exc_info=True)
             return
 
         view = PlayerSelfServiceView(
@@ -312,7 +325,8 @@ class PlayerSelfServiceView(discord.ui.View):
         )
         embed = build_page_embed(page, summary, display_name=self.display_name)
         try:
-            await interaction.response.edit_message(embed=embed, view=view)
+            edited = await interaction.edit_original_response(embed=embed, view=view)
+            view.set_message_ref(getattr(interaction, "message", None) or edited)
         except Exception:
             logger.debug("player_self_service_edit_message_failed", exc_info=True)
             sent = await interaction.followup.send(embed=embed, view=view, ephemeral=True)
@@ -420,7 +434,28 @@ async def send_player_self_service_page(
 ) -> None:
     await safe_defer(ctx, ephemeral=True)
     display_name = _display_name(getattr(ctx, "user", None))
-    summary = await summary_loader(int(ctx.user.id))
+    try:
+        summary = await summary_loader(int(ctx.user.id))
+    except Exception:
+        logger.exception(
+            "player_self_service_initial_summary_failed user_id=%s page=%s",
+            getattr(getattr(ctx, "user", None), "id", None),
+            page,
+        )
+        try:
+            await ctx.interaction.edit_original_response(
+                content="Personal status is temporarily unavailable. Please try again in a moment.",
+                embed=None,
+                view=None,
+            )
+        except Exception:
+            logger.debug("player_self_service_initial_error_edit_failed", exc_info=True)
+            await ctx.followup.send(
+                "Personal status is temporarily unavailable. Please try again in a moment.",
+                ephemeral=True,
+            )
+        return
+
     view = PlayerSelfServiceView(
         author_id=int(ctx.user.id),
         display_name=display_name,

@@ -49,12 +49,16 @@ class _Response:
     def __init__(self) -> None:
         self.sent = []
         self.edited = []
+        self.deferred = []
 
     async def send_message(self, *args, **kwargs):
         self.sent.append((args, kwargs))
 
     async def edit_message(self, **kwargs):
         self.edited.append(kwargs)
+
+    async def defer(self, **kwargs):
+        self.deferred.append(kwargs)
 
 
 class _Followup:
@@ -72,6 +76,12 @@ class _Interaction:
         self.user = SimpleNamespace(id=user_id)
         self.response = _Response()
         self.followup = _Followup()
+        self.message = SimpleNamespace(id=123, edits=[])
+        self.original_edits = []
+
+    async def edit_original_response(self, **kwargs):
+        self.original_edits.append(kwargs)
+        return SimpleNamespace(id=456)
 
 
 def test_dashboard_embed_is_status_first_and_compact() -> None:
@@ -105,8 +115,11 @@ async def test_view_rejects_non_owner() -> None:
 
 @pytest.mark.asyncio
 async def test_view_navigation_loads_summary_and_edits_message() -> None:
+    order = []
+
     async def loader(user_id: int):
         assert user_id == 42
+        order.append("loader")
         return _summary()
 
     view = views.PlayerSelfServiceView(
@@ -115,12 +128,42 @@ async def test_view_navigation_loads_summary_and_edits_message() -> None:
         summary_loader=loader,
     )
     interaction = _Interaction()
+    original_defer = interaction.response.defer
+
+    async def defer(**kwargs):
+        order.append("defer")
+        await original_defer(**kwargs)
+
+    interaction.response.defer = defer
 
     await view._show_page(interaction, views.PAGE_REMINDERS)
 
-    edited = interaction.response.edited[-1]
+    edited = interaction.original_edits[-1]
+    assert order == ["defer", "loader"]
+    assert interaction.response.deferred[-1]["ephemeral"] is True
     assert edited["embed"].title == "Reminder Centre"
     assert isinstance(edited["view"], views.PlayerSelfServiceView)
+    assert edited["view"].message is interaction.message
+
+
+@pytest.mark.asyncio
+async def test_view_navigation_failure_after_defer_uses_private_followup() -> None:
+    async def loader(_user_id: int):
+        raise RuntimeError("registry down")
+
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        summary_loader=loader,
+    )
+    interaction = _Interaction()
+
+    await view._show_page(interaction, views.PAGE_ACCOUNTS)
+
+    assert interaction.response.deferred[-1]["ephemeral"] is True
+    args, kwargs, _message = interaction.followup.sent[-1]
+    assert "temporarily unavailable" in args[0]
+    assert kwargs["ephemeral"] is True
 
 
 @pytest.mark.asyncio
@@ -145,3 +188,44 @@ def test_exports_embed_warns_file_exports_are_private() -> None:
 
     assert embed.title == "Exports"
     assert "file exports are delivered privately" in embed.fields[1].value
+
+
+@pytest.mark.asyncio
+async def test_initial_page_summary_failure_edits_deferred_response(monkeypatch) -> None:
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        calls.append(("defer", ephemeral))
+
+    async def loader(_user_id: int):
+        calls.append(("loader", None))
+        raise RuntimeError("inventory down")
+
+    class Interaction:
+        def __init__(self):
+            self.edits = []
+
+        async def edit_original_response(self, **kwargs):
+            self.edits.append(kwargs)
+
+    class Followup:
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, *args, **kwargs):
+            self.sent.append((args, kwargs))
+
+    calls = []
+    ctx = SimpleNamespace(
+        user=SimpleNamespace(id=42, display_name="Tester"),
+        interaction=Interaction(),
+        followup=Followup(),
+    )
+
+    monkeypatch.setattr(views, "safe_defer", fake_safe_defer)
+
+    await views.send_player_self_service_page(ctx, summary_loader=loader)
+
+    assert calls == [("defer", True), ("loader", None)]
+    assert "temporarily unavailable" in ctx.interaction.edits[-1]["content"]
+    assert ctx.interaction.edits[-1]["embed"] is None
+    assert ctx.interaction.edits[-1]["view"] is None
+    assert ctx.followup.sent == []
