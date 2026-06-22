@@ -2,8 +2,8 @@
 
 Last updated: 2026-06-22
 
-Status: Phase 2 is delivered and smoke tested. `/me` is ready as a private read-only command
-centre for merge/promotion; Phase 3 will add modern account-centre actions.
+Status: Phase 3 adds modern `/me accounts` account-centre actions while preserving the Phase 2
+private command-centre shell and all legacy account commands.
 
 ## Player Briefing
 
@@ -17,15 +17,16 @@ Use it to check:
 - your inventory visibility preference
 - where to go for KVK stats, targets, history, rankings, inventory, and exports
 
-The first version is read-only. Existing commands such as `/register_governor`,
+The account centre now supports account review, Governor ID lookup, registration, replacement,
+and removal with confirmation. Existing commands such as `/register_governor`,
 `/modify_registration`, `/my_registrations`, `/mygovernorid`, `/subscribe`,
 `/modify_subscription`, `/unsubscribe`, `/inventory_preferences`, `/my_stats_export`, and
 `/export_inventory` still work.
 
 ## Operator Briefing
 
-Phase 2 introduced `/me` in parallel with legacy commands. It does not remove, redirect, or mutate
-existing account, reminder, preference, export, KVK, stats, or inventory behavior.
+Phase 3 extends `/me accounts` in parallel with legacy commands. It does not remove, redirect, or
+change reminder, preference, export, KVK, stats, or inventory behavior.
 
 The approved command group is:
 
@@ -51,7 +52,7 @@ Rollout checks:
 - Confirm legacy player commands remain registered and usable.
 - Monitor `/me` usage before approving any later legacy redirects.
 
-Smoke-test result:
+Phase 2 smoke-test result:
 
 - `/me dashboard` responded privately with expected controls.
 - Dashboard Quick Launch showed guidance for each linked command family.
@@ -59,11 +60,12 @@ Smoke-test result:
   dashboard-only by design.
 - Existing commands continued working.
 
-Next phase:
+Phase 3 account-centre checks:
 
-- Phase 3 Modern Account Centre will add service-backed account review, Governor ID lookup,
-  registration, modification/replacement, and removal with confirmation.
-- Legacy account commands remain live during Phase 3.
+- Confirm `/me accounts` is private.
+- Confirm players can look up Governor IDs from the account centre.
+- Confirm register, replace, and remove flows use confirmation before writing.
+- Confirm legacy account commands remain registered and usable.
 
 Later mutation gates:
 

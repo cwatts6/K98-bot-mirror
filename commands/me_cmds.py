@@ -37,10 +37,10 @@ def register_me(bot: ext_commands.Bot) -> None:
 
     @me_group.command(
         name="accounts",
-        description="Review your private account setup status",
+        description="Open your private account centre",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.00")
+    @versioned("v1.01")
     @safe_command
     @track_usage()
     async def me_accounts(ctx: discord.ApplicationContext) -> None:

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from player_self_service.account_service import AccountCentreState
 from player_self_service.service import (
     AccountStatus,
     ExportStatus,
@@ -11,7 +12,10 @@ from player_self_service.service import (
     PreferenceStatus,
     ReminderStatus,
 )
-from ui.views import player_self_service_views as views
+from ui.views import (
+    player_self_service_account_views as account_views,
+    player_self_service_views as views,
+)
 
 
 def _summary() -> PlayerSelfServiceSummary:
@@ -50,15 +54,27 @@ class _Response:
         self.sent = []
         self.edited = []
         self.deferred = []
+        self.modals = []
+        self._done = False
 
     async def send_message(self, *args, **kwargs):
         self.sent.append((args, kwargs))
+        self._done = True
 
     async def edit_message(self, **kwargs):
         self.edited.append(kwargs)
+        self._done = True
 
     async def defer(self, **kwargs):
         self.deferred.append(kwargs)
+        self._done = True
+
+    async def send_modal(self, modal):
+        self.modals.append(modal)
+        self._done = True
+
+    def is_done(self):
+        return self._done
 
 
 class _Followup:
@@ -94,6 +110,14 @@ def test_dashboard_embed_is_status_first_and_compact() -> None:
     assert "/register_governor" not in embed.fields[0].value
 
 
+def test_accounts_embed_invites_service_backed_controls() -> None:
+    embed = views.build_accounts_embed(_summary(), display_name="Tester")
+
+    assert embed.title == "Account Centre"
+    assert "Use the controls below" in embed.fields[1].value
+    assert "/modify_registration" not in embed.fields[1].value
+
+
 @pytest.mark.asyncio
 async def test_dashboard_view_has_three_primary_buttons_and_quick_launch() -> None:
     view = views.PlayerSelfServiceView(author_id=42, display_name="Tester")
@@ -107,8 +131,74 @@ async def test_dashboard_view_has_three_primary_buttons_and_quick_launch() -> No
 
 
 @pytest.mark.asyncio
+async def test_accounts_view_has_account_actions_without_quick_launch() -> None:
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_ACCOUNTS,
+    )
+
+    labels = [getattr(child, "label", None) for child in view.children]
+    assert {"Find ID", "Register", "Replace", "Remove"}.issubset(set(labels))
+    assert not any(
+        isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
+    )
+
+
+@pytest.mark.asyncio
 async def test_view_rejects_non_owner() -> None:
     view = views.PlayerSelfServiceView(author_id=42, display_name="Tester")
+    interaction = _Interaction(user_id=99)
+
+    assert await view.interaction_check(interaction) is False
+    assert interaction.response.sent[-1][1]["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+async def test_register_button_opens_free_slot_selector(monkeypatch) -> None:
+    async def fake_state(_user_id: int):
+        return AccountCentreState(
+            ok=True,
+            linked_count=0,
+            main_label="not set",
+            registered_slots=(),
+            free_slots=("Main", "Alt 1"),
+        )
+
+    monkeypatch.setattr(views.account_service, "build_account_centre_state", fake_state)
+
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_ACCOUNTS,
+    )
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:account:register"
+    )
+
+    await button.callback(interaction)
+
+    _args, kwargs, _message = interaction.followup.sent[-1]
+    slot_view = kwargs["view"]
+    assert kwargs["ephemeral"] is True
+    assert isinstance(slot_view, account_views.AccountSlotSelectView)
+    select = next(
+        child for child in slot_view.children if isinstance(child, account_views.AccountSlotSelect)
+    )
+    assert [option.value for option in select.options] == ["Main", "Alt 1"]
+
+
+@pytest.mark.asyncio
+async def test_account_slot_select_rejects_non_owner() -> None:
+    view = account_views.AccountSlotSelectView(
+        author_id=42,
+        display_name="Tester",
+        action="register",
+        slots=("Main",),
+    )
     interaction = _Interaction(user_id=99)
 
     assert await view.interaction_check(interaction) is False

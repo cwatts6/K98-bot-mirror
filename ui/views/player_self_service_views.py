@@ -8,9 +8,15 @@ import logging
 import discord
 
 from core.interaction_safety import safe_defer
+from player_self_service import account_service
+from player_self_service.account_service import AccountCentreState
 from player_self_service.service import (
     PlayerSelfServiceSummary,
     build_player_self_service_summary,
+)
+from ui.views.player_self_service_account_views import (
+    AccountLookupModal,
+    AccountSlotSelectView,
 )
 
 logger = logging.getLogger(__name__)
@@ -125,7 +131,7 @@ def build_accounts_embed(
             [
                 f"Recommended action: {accounts.next_action}",
                 f"Account names: {names}",
-                "Detailed register, modify, and remove flows stay in the existing account tools for this phase.",
+                "Use the controls below to look up, register, replace, or remove accounts.",
             ]
         ),
         inline=False,
@@ -280,6 +286,12 @@ class PlayerSelfServiceView(discord.ui.View):
             for child in list(self.children):
                 if isinstance(child, discord.ui.Button) and child.custom_id == "me:dashboard":
                     self.remove_item(child)
+        if self.page != PAGE_ACCOUNTS:
+            for child in list(self.children):
+                if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
+                    "me:account:"
+                ):
+                    self.remove_item(child)
         for child in self.children:
             if isinstance(child, discord.ui.Button):
                 child.disabled = child.custom_id == f"me:{self.page}"
@@ -389,6 +401,149 @@ class PlayerSelfServiceView(discord.ui.View):
     ) -> None:
         await self._show_page(interaction, PAGE_DASHBOARD)
 
+    async def _load_account_state(
+        self, interaction: discord.Interaction
+    ) -> AccountCentreState | None:
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+        except TypeError:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer()
+            except Exception:
+                logger.debug("player_self_service_account_action_defer_failed", exc_info=True)
+        except Exception:
+            logger.debug("player_self_service_account_action_defer_failed", exc_info=True)
+
+        try:
+            state = await account_service.build_account_centre_state(self.author_id)
+        except Exception:
+            logger.exception(
+                "player_self_service_account_state_failed user_id=%s page=%s",
+                self.author_id,
+                self.page,
+            )
+            await interaction.followup.send(
+                "Account data is temporarily unavailable. Please try again in a moment.",
+                ephemeral=True,
+            )
+            return None
+
+        if not state.ok:
+            await interaction.followup.send(
+                "Account data is temporarily unavailable. Please try again in a moment.",
+                ephemeral=True,
+            )
+            return None
+        return state
+
+    @discord.ui.button(
+        label="Find ID",
+        style=discord.ButtonStyle.secondary,
+        custom_id="me:account:lookup",
+        row=1,
+    )
+    async def account_lookup_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        await interaction.response.send_modal(AccountLookupModal(author_id=self.author_id))
+
+    @discord.ui.button(
+        label="Register",
+        style=discord.ButtonStyle.success,
+        custom_id="me:account:register",
+        row=1,
+    )
+    async def account_register_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        state = await self._load_account_state(interaction)
+        if state is None:
+            return
+        if not state.can_register:
+            await interaction.followup.send(
+                "All account slots are already in use.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send(
+            "Choose the slot for the new account.",
+            view=AccountSlotSelectView(
+                author_id=self.author_id,
+                display_name=self.display_name,
+                action="register",
+                slots=state.free_slots,
+            ),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(
+        label="Replace",
+        style=discord.ButtonStyle.primary,
+        custom_id="me:account:replace",
+        row=2,
+    )
+    async def account_replace_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        state = await self._load_account_state(interaction)
+        if state is None:
+            return
+        if not state.can_modify:
+            await interaction.followup.send(
+                "You do not have any registered accounts to replace yet.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send(
+            "Choose the account slot to replace.",
+            view=AccountSlotSelectView(
+                author_id=self.author_id,
+                display_name=self.display_name,
+                action="replace",
+                slots=state.registered_slots,
+            ),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(
+        label="Remove",
+        style=discord.ButtonStyle.danger,
+        custom_id="me:account:remove",
+        row=2,
+    )
+    async def account_remove_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        state = await self._load_account_state(interaction)
+        if state is None:
+            return
+        if not state.can_remove:
+            await interaction.followup.send(
+                "You do not have any registered accounts to remove.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send(
+            "Choose the account slot to remove.",
+            view=AccountSlotSelectView(
+                author_id=self.author_id,
+                display_name=self.display_name,
+                action="remove",
+                slots=state.registered_slots,
+            ),
+            ephemeral=True,
+        )
+
     async def on_timeout(self) -> None:
         for child in self.children:
             child.disabled = True
@@ -414,7 +569,7 @@ class PlayerSelfServiceQuickLaunchSelect(discord.ui.Select):
             min_values=1,
             max_values=1,
             options=options,
-            row=2,
+            row=4,
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
