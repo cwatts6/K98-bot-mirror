@@ -23,7 +23,8 @@ material.
 Player self-service workflow redesign and public calendar/KVK calendar UX redesign remain separate
 deferred optimisation programmes, not additional command-platform phases.
 
-KVK Player Experience Redesign is active and preparing Phase 7. Phase 1 audit/design, Phase 2A
+KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
+merge/promotion. Phase 1 audit/design, Phase 2A
 Admin Collision Resolution, Phase 2B Player `/kvk` Scaffold, Phase 3 Modern `/kvk stats` Visual
 Card, Phase 3B Stats Card Polish and Secondary Cards, Phase 3C Overall Rank and Card Polish,
 Phase 4A Modern `/kvk targets`, the full Phase 4B modern `/kvk history` rollout, and Phase 5A
@@ -84,9 +85,14 @@ registration, service/DAL boundaries, SQL/import/recompute/export semantics, sta
 behaviour, and Google Sheets contracts. Manual smoke testing completed successfully, and no active
 Phase 6 admin/operator deferred optimisations remain. The retained legacy-ranking
 consolidation/deprecation item has now been promoted into the Phase 7 task pack.
+Phase 7 delivered tested deprecated redirects for `/mykvkstats`, `/mykvktargets`,
+`/mykvkhistory`, `/kvk_rankings`, `/honor_rankings`, and `/prekvk report`, plus channel-limit
+consistency for the canonical `/kvk` commands. Final removal of the deprecated command paths is
+tracked in `docs/reference/deferred_optimisations.md` after the agreed no-feedback window.
 
-Completed KVK Player Experience Redesign Phase 1 through Phase 6 execution records are archived
-under `archive/`. The programme pack remains active because Phase 7 is still planned.
+Completed KVK Player Experience Redesign Phase 1 through Phase 7 execution records are archived
+under `archive/`. The programme pack remains active until the Phase 7 PRs are merged and the
+later final-removal cleanup is explicitly approved.
 The Phase 4B task pack remains as the history delivery record in the archive:
 
 `archive/Codex Task Pack - KVK Player Experience Redesign Phase 4B History Audit and Optioneering.md`
@@ -95,6 +101,8 @@ Latest completed starter:
 
 `archive/Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`
 
-Next active task pack:
+Next active work:
 
-`Codex Task Pack - KVK Player Experience Redesign Phase 7 Legacy Command Deprecation And Removal.md`
+No new Phase 8 task pack is open. Final removal of the temporary deprecated command paths is
+captured as a deferred cleanup item for execution after the no-feedback window and operator
+approval.

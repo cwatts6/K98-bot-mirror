@@ -8,7 +8,9 @@ Purpose: describe the KVK honor upload/import path and reporting surfaces.
 - `honor_importer.py` parses and ingests honor workbooks.
 - `stats_alerts/honors.py` reads latest honor rankings for embeds/commands.
 - `honor_rankings_view.py` builds interactive ranking views.
-- `commands/stats_cmds.py` exposes `/honor_rankings` and `/honor_purge_last`.
+- `commands.kvk_cmds` exposes the canonical `/kvk rankings type:honor` player surface.
+- `commands/stats_cmds.py` temporarily retains `/honor_rankings` as a deprecated redirect and
+  exposes `/honor purge_last` for admin cleanup.
 
 ## Accepted Upload Names
 
@@ -30,7 +32,8 @@ Separators around `1198` and `honor` may be underscore, space, or hyphen.
 3. The workbook is read and parsed by `parse_honor_xlsx`.
 4. Blocking parse/ingest work is offloaded through the common offload helper.
 5. `ingest_honor_snapshot` writes SQL-backed snapshot rows and emits telemetry.
-6. Ranking commands/views read the latest scan through `stats_alerts/honors.py`.
+6. Ranking services/views read the latest scan through the KVK rankings service path; the legacy
+   `/honor_rankings` command only redirects players to `/kvk rankings type:honor`.
 
 ## Validation And Tests
 

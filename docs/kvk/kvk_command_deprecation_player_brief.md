@@ -1,6 +1,7 @@
 # KVK Command Update Briefing
 
-Share after the Phase 7 deprecation redirect PR is deployed.
+Phase 7 redirect behaviour has been tested successfully. Share after the Phase 7 deprecation
+redirect PR is deployed.
 
 ## Discord Message
 
@@ -17,6 +18,12 @@ What changed:
 - `/kvk_rankings` is now `/kvk rankings type:kvk`
 - `/honor_rankings` is now `/kvk rankings type:honor`
 - `/prekvk report` is now `/kvk rankings type:prekvk` in the KVK stats channel
+
+Channel guide:
+
+- `/kvk targets` opens in the KVK targets channel.
+- `/kvk stats`, `/kvk history`, and `/kvk rankings` open in the KVK stats channel.
+- Admins can use the new KVK commands outside those channels when needed.
 
 What is better in the new commands:
 

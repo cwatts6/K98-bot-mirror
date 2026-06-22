@@ -1,6 +1,6 @@
 # Canonical Command Reference
 
-Last updated: 2026-06-19
+Last updated: 2026-06-22
 
 This is the maintained command reference for the K98 bot after the completed Command Platform
 Audit & Optimisation Programme. Use
@@ -163,8 +163,8 @@ Legend:
 | Ops | `/ops usage_detail` | `commands/admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve | Usage analytics detail. |
 | Player/KVK | `/kvk stats` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator with admin override | Private selector; selected single-account stats post public | Standard | Canonical player KVK stats command | Player KVK stats journey. |
 | Player/KVK | `/kvk targets` | `commands/kvk_cmds.py` | Grouped | KVK target channel decorator with admin override | User-selectable | Standard | Canonical player KVK targets command | Player KVK targets journey. |
-| Player/KVK | `/kvk history` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator | Private picker/error handling where needed; selected/default single-account history posts public; preserves `governor_id` lookup | Standard | Canonical player KVK history command | Player KVK History, Summary, Trends, and CSV export journey. |
-| Player/KVK | `/kvk rankings` | `commands/kvk_cmds.py` | Grouped | Mode-specific legacy gates: KVK stats channel with admin override for `kvk`, `prekvk`, and `records`; KVK stats channel without admin override for `honor` | Public unified browser for KVK, Honor, PreKvK, and records; private My Rank follow-ups for registered users | Standard | Canonical player ranking browser | Required `type` option supports `kvk`, `honor`, `prekvk`, and `records`; current KVK, Honor, PreKvK, and Hall of Fame records Top 10 render visual cards with embed fallback, records remain Top 10 only, current Top 25/50 remain compact browser output, and current KVK/Honor/PreKvK include a private My Rank button without adding Top 100 to primary controls. |
+| Player/KVK | `/kvk history` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator with admin override | Private picker/error handling where needed; selected/default single-account history posts public; preserves `governor_id` lookup | Standard | Canonical player KVK history command | Player KVK History, Summary, Trends, and CSV export journey. |
+| Player/KVK | `/kvk rankings` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator with admin override for all ranking types | Public unified browser for KVK, Honor, PreKvK, and records; private My Rank follow-ups for registered users | Standard | Canonical player ranking browser | Required `type` option supports `kvk`, `honor`, `prekvk`, and `records`; current KVK, Honor, PreKvK, and Hall of Fame records Top 10 render visual cards with embed fallback, records remain Top 10 only, current Top 25/50 remain compact browser output, and current KVK/Honor/PreKvK include a private My Rank button without adding Top 100 to primary controls. |
 | Player/KVK | `/mykvktargets` | `commands/telemetry_cmds.py` | Flat | KVK target channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk targets`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Player/KVK | `/mygovernorid` | `commands/telemetry_cmds.py` | Flat | Public command-level access | Ephemeral | Standard | Defer player self-service redesign | Governor ID lookup. |
 | Player/KVK | `/player_profile` | `commands/telemetry_cmds.py` | Flat | Admin or leadership in allowed channels | Ephemeral | Standard | Defer profile workflow review | Leadership profile lookup. |
@@ -188,7 +188,7 @@ Legend:
 | Stats/KVK | `/my_stats_export` | `commands/stats_cmds.py` | Flat | Public command-level access | Ephemeral | Standard | Defer player self-service redesign | Personal stats export. |
 | Stats/KVK | `/stats player` | `commands/stats_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve | Leadership player stats lookup. |
 | Stats/KVK | `/mykvkhistory` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk history`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
-| Stats/KVK | `/kvk_rankings` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator | Public redirect | Standard | Deprecated redirect to `/kvk rankings type:kvk`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
+| Stats/KVK | `/kvk_rankings` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Public redirect | Standard | Deprecated redirect to `/kvk rankings type:kvk`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_admin export_all` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk export_all` in Phase 2A | KVK Google Sheets export. |
 | Stats/KVK | `/kvk_admin recompute` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk recompute` in Phase 2A | Recompute KVK outputs. |
 | Stats/KVK | `/kvk_admin list_scans` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk list_scans` in Phase 2A | Recent scan diagnostics. |
@@ -217,6 +217,9 @@ Legend:
   `/mykvkhistory`, `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` into temporary
   deprecated redirect/help responses. The old command paths remain registered only for migration
   guidance and should be removed after the agreed no-feedback window.
+- Phase 7 follow-up channel consistency aligned `/kvk targets` to `KVK_TARGET_CHANNEL_ID` with
+  admin override and `/kvk stats`, `/kvk history`, and all `/kvk rankings` types to
+  `KVK_PLAYER_STATS_CHANNEL_ID` with admin override.
 - Player self-service paths remain flat pending a dedicated workflow redesign.
 - Public calendar and KVK calendar paths remain flat pending a dedicated UX redesign.
 - `/ping` remains flat for simple health/debug discoverability.

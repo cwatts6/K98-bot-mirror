@@ -4,8 +4,9 @@ This folder keeps completed task packs and chat starters for historical referenc
 
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,
-PreKvK schema standardisation, completed KVK_ALL phase initiation statements, and the DL_bot
-upload-routing and startup/lifecycle programmes.
+PreKvK schema standardisation, completed KVK Player Experience Redesign execution phases,
+completed KVK_ALL phase initiation statements, and the DL_bot upload-routing and startup/lifecycle
+programmes.
 
 The DL_bot upload-routing and startup/lifecycle optimisation programme is complete through
 Phase 6L:

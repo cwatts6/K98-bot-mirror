@@ -647,21 +647,39 @@ Execution task pack:
 
 ### Phase 7 — Legacy Command Deprecation and Removal
 
-Status: prepared for execution after Phase 6 closeout and smoke-test success.
+Status: complete. Delivered in mirror PR #163 and production PR #471. Automated validation,
+manual redirect smoke testing, and channel-consistency smoke testing are complete. The PRs are
+ready for manual merge/promotion.
 
-Phase 7 owns the legacy player ranking command consolidation/deprecation item that was retained
-after Phase 5 and explicitly kept out of Phase 6 admin hardening.
+Phase 7 delivered the approved legacy command deprecation slice that was retained after Phase 5
+and explicitly kept out of Phase 6 admin hardening.
+
+Delivered details:
+
+- `/mykvkstats` now redirects to `/kvk stats`.
+- `/mykvktargets` now redirects to `/kvk targets`.
+- `/mykvkhistory` now redirects to `/kvk history`.
+- `/kvk_rankings` now redirects to `/kvk rankings type:kvk`.
+- `/honor_rankings` now redirects to `/kvk rankings type:honor`.
+- `/prekvk report` now redirects to `/kvk rankings type:prekvk` and tells players to use the KVK
+  stats channel.
+- The old inline implementation blocks were removed from the deprecated command handlers so the
+  active behaviour is redirect-only.
+- The deprecation message now uses neutral "old output" wording so it fits report and non-report
+  commands.
+- `/kvk targets` is limited to `KVK_TARGET_CHANNEL_ID` with admin override.
+- `/kvk stats`, `/kvk history`, and all `/kvk rankings` types are limited to
+  `KVK_PLAYER_STATS_CHANNEL_ID` with admin override.
+- The player briefing and canonical command reference were updated.
+- Full pytest, pre-commit, architecture/deferred/select-tests validators, smoke imports, command
+  registration validation, and Discord smoke testing passed.
+
+Final removal of the deprecated command paths is not part of this PR. It is captured as an active
+deferred cleanup item for execution after the agreed no-feedback window and operator approval.
 
 Execution task pack:
 
-`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 7 Legacy Command Deprecation And Removal.md`
-
-After a usage-review period:
-
-1. announce new commands
-2. change old commands to redirect/help responses
-3. monitor usage
-4. remove old paths only after approval
+`docs/task_packs/archive/Codex Task Pack - KVK Player Experience Redesign Phase 7 Legacy Command Deprecation And Removal.md`
 
 ## 9. Likely Source Commands and Areas
 
@@ -768,7 +786,7 @@ The programme is complete when:
 - rankings are unified behind a coherent browser
 - admin KVK commands are separated from player KVK commands
 - Acclaim/contribution metrics are included where the approved SQL output contract supports them
-- legacy commands are safely deprecated or removed after approval
+- legacy commands are safely deprecated and final removal is tracked after the no-feedback window
 - command registration validation remains green
 - all data/SQL assumptions are validated against the SQL repo
 - no new direct SQL exists in command/view layers
@@ -790,17 +808,16 @@ Do not include these in the early phases unless separately approved:
 
 ## 14. Suggested Next Action
 
-Proceed with:
+Manual next step:
 
 ```text
-KVK Player Experience Redesign - Phase 7 Legacy Command Deprecation And Removal
+Merge and promote the Phase 7 mirror and production PRs after review approval.
 ```
 
-Phase 1 through Phase 6 are complete. Phase 7 should audit legacy player ranking command usage and
-prepare the approved deprecation, redirect/help, compatibility-shim, or removal path for
-`/kvk_rankings`, `/honor_rankings`, and `/prekvk report` while preserving the unified
-`/kvk rankings` surface and all existing ranking semantics until operator approval is recorded.
+Phase 1 through Phase 7 are complete. After the Phase 7 PRs are merged, post the player briefing,
+monitor the no-feedback window, and then run the deferred final-removal cleanup only with operator
+approval.
 
-Use the Phase 7 task pack as the next active execution record:
+The final-removal cleanup is tracked in:
 
-`docs/task_packs/Codex Task Pack - KVK Player Experience Redesign Phase 7 Legacy Command Deprecation And Removal.md`
+`docs/reference/deferred_optimisations.md`
