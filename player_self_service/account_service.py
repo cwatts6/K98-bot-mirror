@@ -148,7 +148,9 @@ def build_state_from_summary(summary: AccountResolutionSummary) -> AccountCentre
         ok=True,
         linked_count=len(summary.resolved_accounts),
         main_label=main_label,
-        registered_slots=tuple(_slot_from_resolved(account) for account in summary.resolved_accounts),
+        registered_slots=tuple(
+            _slot_from_resolved(account) for account in summary.resolved_accounts
+        ),
         free_slots=tuple(summary.free_slots()),
     )
 
@@ -197,7 +199,11 @@ async def _resolve_exact_governor(
     if result.status == "found" and result.governor_id:
         return result.governor_id, result.governor_name or "Unknown", None
     if result.status == "matches":
-        return None, None, "Multiple possible governors matched. Use Find Governor ID first, then enter the exact ID."
+        return (
+            None,
+            None,
+            "Multiple possible governors matched. Use Find Governor ID first, then enter the exact ID.",
+        )
     return None, None, result.message or "Governor not found."
 
 
@@ -397,10 +403,29 @@ async def confirm_remove(
     discord_user_id: int,
     confirmation: AccountConfirmation,
     *,
+    account_loader: AccountLoader = get_account_summary_for_user,
     writer: RemoveWriter = registry_service.remove_governor,
 ) -> AccountMutationResult:
-    if confirmation.action != "remove":
+    if confirmation.action != "remove" or not confirmation.current_governor_id:
         return AccountMutationResult(ok=False, message="Invalid removal confirmation.")
+    summary = await account_loader(int(discord_user_id))
+    if not summary.ok:
+        return AccountMutationResult(
+            ok=False,
+            message="Account data is temporarily unavailable. Please try again in a moment.",
+        )
+    current = summary.ordered_accounts.get(confirmation.account_type)
+    if not current:
+        return AccountMutationResult(
+            ok=False,
+            message=f"`{confirmation.account_type}` is no longer registered.",
+        )
+    current_gid = str(current.get("GovernorID") or current.get("GovernorId") or "").strip()
+    if current_gid != str(confirmation.current_governor_id or "").strip():
+        return AccountMutationResult(
+            ok=False,
+            message="This removal confirmation is stale. Reopen Account Centre and try again.",
+        )
     ok, err = await asyncio.to_thread(
         writer,
         int(discord_user_id),

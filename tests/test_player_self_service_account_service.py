@@ -227,6 +227,65 @@ async def test_confirm_register_hands_off_to_registry_writer() -> None:
     assert calls[0][1]["created_by"] == 42
 
 
+@pytest.mark.asyncio
+async def test_confirm_remove_revalidates_current_governor_before_writer() -> None:
+    calls = []
+    confirmation = account_service.AccountConfirmation(
+        action="remove",
+        account_type="Main",
+        current_governor_id="111",
+        current_governor_name="Old Gov",
+    )
+
+    async def account_loader(_user_id: int):
+        return summarize_accounts({"Main": {"GovernorID": "222", "GovernorName": "New Gov"}})
+
+    def writer(*args, **kwargs):
+        calls.append((args, kwargs))
+        return True, None
+
+    result = await account_service.confirm_remove(
+        42,
+        confirmation,
+        account_loader=account_loader,
+        writer=writer,
+    )
+
+    assert result.ok is False
+    assert "stale" in result.message
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_confirm_remove_hands_off_to_registry_writer_after_revalidation() -> None:
+    calls = []
+    confirmation = account_service.AccountConfirmation(
+        action="remove",
+        account_type="Main",
+        current_governor_id="111",
+        current_governor_name="Main Gov",
+    )
+
+    async def account_loader(_user_id: int):
+        return summarize_accounts({"Main": {"GovernorID": "111", "GovernorName": "Main Gov"}})
+
+    def writer(*args, **kwargs):
+        calls.append((args, kwargs))
+        return True, None
+
+    result = await account_service.confirm_remove(
+        42,
+        confirmation,
+        account_loader=account_loader,
+        writer=writer,
+    )
+
+    assert result.ok is True
+    assert "Removed Main" in result.message
+    assert calls[0][0] == (42, "Main")
+    assert calls[0][1]["removed_by"] == 42
+
+
 def test_account_service_has_no_ui_framework_dependency() -> None:
     source = Path("player_self_service/account_service.py").read_text(encoding="utf-8")
     framework_name = "dis" + "cord"

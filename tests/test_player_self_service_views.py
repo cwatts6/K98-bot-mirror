@@ -119,6 +119,24 @@ def test_accounts_embed_invites_service_backed_controls() -> None:
 
 
 @pytest.mark.asyncio
+async def test_account_slot_select_view_preserves_twenty_sixth_slot() -> None:
+    slots = tuple(f"Slot {index}" for index in range(1, 27))
+
+    view = account_views.AccountSlotSelectView(
+        author_id=42,
+        display_name="Tester",
+        action="replace",
+        slots=slots,
+    )
+
+    selects = [
+        child for child in view.children if isinstance(child, account_views.AccountSlotSelect)
+    ]
+    assert [len(select.options) for select in selects] == [25, 1]
+    assert selects[-1].options[-1].value == "Slot 26"
+
+
+@pytest.mark.asyncio
 async def test_dashboard_view_has_three_primary_buttons_and_quick_launch() -> None:
     view = views.PlayerSelfServiceView(author_id=42, display_name="Tester")
 
@@ -289,6 +307,59 @@ async def test_view_navigation_failure_after_defer_uses_private_followup() -> No
     args, kwargs, _message = interaction.followup.sent[-1]
     assert "temporarily unavailable" in args[0]
     assert kwargs["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+async def test_account_completion_navigation_defer_type_error_falls_back() -> None:
+    order = []
+
+    async def loader(_user_id: int):
+        order.append("loader")
+        return _summary()
+
+    view = account_views.AccountCompletionView(
+        author_id=42,
+        display_name="Tester",
+        message="Done",
+        summary_loader=loader,
+    )
+    interaction = _Interaction()
+    original_defer = interaction.response.defer
+
+    async def defer(**kwargs):
+        if "ephemeral" in kwargs:
+            order.append("defer-ephemeral")
+            raise TypeError("ephemeral is not supported")
+        order.append("defer-fallback")
+        await original_defer(**kwargs)
+
+    interaction.response.defer = defer
+
+    await view._show_page(interaction, views.PAGE_ACCOUNTS)
+
+    assert order == ["defer-ephemeral", "defer-fallback", "loader"]
+    assert interaction.response.deferred[-1] == {}
+    assert interaction.original_edits[-1]["embed"].title == "Account Centre"
+
+
+@pytest.mark.asyncio
+async def test_account_completion_navigation_sets_message_ref() -> None:
+    async def loader(_user_id: int):
+        return _summary()
+
+    view = account_views.AccountCompletionView(
+        author_id=42,
+        display_name="Tester",
+        message="Done",
+        summary_loader=loader,
+    )
+    interaction = _Interaction()
+
+    await view._show_page(interaction, views.PAGE_DASHBOARD)
+
+    new_view = interaction.original_edits[-1]["view"]
+    assert isinstance(new_view, views.PlayerSelfServiceView)
+    assert new_view.message is interaction.message
 
 
 @pytest.mark.asyncio

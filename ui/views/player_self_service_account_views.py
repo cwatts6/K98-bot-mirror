@@ -43,6 +43,8 @@ class AccountSlotSelect(discord.ui.Select):
         *,
         action: AccountAction,
         slots: tuple[str, ...] | tuple[AccountSlot, ...],
+        chunk_index: int = 0,
+        total_chunks: int = 1,
     ) -> None:
         options = [
             discord.SelectOption(
@@ -50,13 +52,18 @@ class AccountSlotSelect(discord.ui.Select):
                 value=slot.slot if isinstance(slot, AccountSlot) else str(slot),
                 description=_account_option_description(slot),
             )
-            for slot in slots[:25]
+            for slot in slots
         ]
-        placeholder = {
+        base_placeholder = {
             "register": "Choose an empty slot",
             "replace": "Choose a slot to replace",
             "remove": "Choose a slot to remove",
         }[action]
+        placeholder = (
+            f"{base_placeholder} ({chunk_index + 1}/{total_chunks})"
+            if total_chunks > 1
+            else base_placeholder
+        )
         super().__init__(
             placeholder=placeholder,
             min_values=1,
@@ -90,7 +97,17 @@ class AccountSlotSelectView(discord.ui.View):
         self.author_id = int(author_id)
         self.display_name = display_name
         self.action = action
-        self.add_item(AccountSlotSelect(action=action, slots=slots))
+        slot_chunks = tuple(slots[index : index + 25] for index in range(0, len(slots), 25))
+        total_chunks = len(slot_chunks)
+        for index, chunk in enumerate(slot_chunks):
+            self.add_item(
+                AccountSlotSelect(
+                    action=action,
+                    slots=chunk,
+                    chunk_index=index,
+                    total_chunks=total_chunks,
+                )
+            )
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user and int(interaction.user.id) == self.author_id:
@@ -338,7 +355,25 @@ class AccountCompletionView(discord.ui.View):
         return False
 
     async def _show_page(self, interaction: discord.Interaction, page: str) -> None:
-        await interaction.response.defer(ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except TypeError:
+            try:
+                await interaction.response.defer()
+            except Exception:
+                logger.debug(
+                    "player_self_service_account_completion_defer_failed user_id=%s page=%s",
+                    self.author_id,
+                    page,
+                    exc_info=True,
+                )
+        except Exception:
+            logger.debug(
+                "player_self_service_account_completion_defer_failed user_id=%s page=%s",
+                self.author_id,
+                page,
+                exc_info=True,
+            )
         try:
             summary = await self.summary_loader(self.author_id)
         except Exception:
@@ -365,7 +400,8 @@ class AccountCompletionView(discord.ui.View):
             summary_loader=self.summary_loader,
         )
         embed = build_page_embed(page, summary, display_name=self.display_name)
-        await interaction.edit_original_response(content=None, embed=embed, view=view)
+        edited = await interaction.edit_original_response(content=None, embed=embed, view=view)
+        view.set_message_ref(getattr(interaction, "message", None) or edited)
 
     @discord.ui.button(label="Account Centre", style=discord.ButtonStyle.primary)
     async def accounts_button(
