@@ -74,6 +74,16 @@ def test_kvk_history_keeps_governor_id_option_without_ephemeral_option(monkeypat
     assert "ephemeral" not in params
 
 
+def test_kvk_commands_use_consistent_channel_limits():
+    import commands.kvk_cmds as kvk_cmds
+
+    source = inspect.getsource(kvk_cmds.register_kvk)
+
+    assert "@channel_only(KVK_TARGET_CHANNEL_ID, admin_override=True)" in source
+    assert source.count("@channel_only(KVK_PLAYER_STATS_CHANNEL_ID, admin_override=True)") == 3
+    assert "admin_override=False" not in source
+
+
 @pytest.mark.asyncio
 async def test_kvk_rankings_routes_all_modes(monkeypatch):
     kvk_cmds, group, _bot = _register_kvk(monkeypatch)
@@ -119,7 +129,7 @@ async def test_kvk_rankings_routes_all_modes(monkeypatch):
     assert calls[2][0:4] == (
         "guard",
         kvk_cmds.KVK_PLAYER_STATS_CHANNEL_ID,
-        False,
+        True,
         "kvk rankings",
     )
     assert calls[3] == ("honor", ctx)

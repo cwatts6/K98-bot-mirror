@@ -633,7 +633,7 @@ def register_kvk(bot: ext_commands.Bot) -> None:
             await _run_channel_guarded(
                 ctx,
                 KVK_PLAYER_STATS_CHANNEL_ID,
-                admin_override=False,
+                admin_override=True,
                 _command_name="kvk rankings",
                 callback=_send_honor_rankings,
             )
