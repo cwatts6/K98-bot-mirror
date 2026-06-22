@@ -156,10 +156,14 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
         "activity": {"activity_top": "top"},
     }
 
-    assert len(names) == 40
+    assert len(names) == 41
     assert "kvk" in names
     assert "kvk_admin" in names
+    assert "me" in names
     assert {"stats", "targets", "history", "rankings"}.issubset(grouped["kvk"])
+    assert {"dashboard", "accounts", "reminders", "preferences", "exports"}.issubset(
+        grouped["me"]
+    )
     assert moved_to_ops.isdisjoint(names)
     assert moved_to_ops.issubset(grouped["ops"])
     assert set(moved_to_ark).isdisjoint(names)
@@ -169,7 +173,7 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
         assert set(mapping.values()).issubset(grouped[group_name])
     assert len(grouped["ops"]) == 25
     assert len(grouped["ark"]) == 14
-    assert sum(len(commands) for commands in grouped.values()) == 80
+    assert sum(len(commands) for commands in grouped.values()) == 85
     assert "calendar" in names
     assert "honor_rankings" in names
     assert "player_profile" in names

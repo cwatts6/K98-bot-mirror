@@ -66,6 +66,24 @@ async def test_resolve_visibility_defaults_private_when_preference_read_fails(mo
 
 
 @pytest.mark.asyncio
+async def test_read_visibility_preference_reports_failure_without_defaulting(monkeypatch):
+    def _fetch(_user_id):
+        raise RuntimeError("table missing")
+
+    monkeypatch.setattr(
+        reporting_service.inventory_reporting_dal,
+        "fetch_visibility_preference",
+        _fetch,
+    )
+
+    result = await reporting_service.read_visibility_preference(123)
+
+    assert result.ok is False
+    assert result.visibility is None
+    assert "RuntimeError" in (result.error or "")
+
+
+@pytest.mark.asyncio
 async def test_resolve_visibility_falls_back_to_private_when_write_fails(monkeypatch):
     def _upsert(_user_id, _visibility):
         raise RuntimeError("db error")

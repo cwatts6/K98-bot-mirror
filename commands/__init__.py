@@ -11,6 +11,7 @@ from .events_cmds import register_events
 from .inventory_cmds import register_inventory
 from .kvk_cmds import register_kvk
 from .location_cmds import register_location
+from .me_cmds import register_me
 from .mge_cmds import register_mge
 from .prekvk_cmds import register_prekvk
 from .registry_cmds import register_registry
@@ -28,6 +29,7 @@ def register_all(bot: ext_commands.Bot) -> None:
     register_inventory(bot)
     register_kvk(bot)
     register_location(bot)
+    register_me(bot)
     register_mge(bot)
     register_prekvk(bot)
     register_registry(bot)

@@ -52,6 +52,7 @@ APPROVED_TOP_LEVEL_COMMANDS = frozenset(
         "kvk_admin",
         "kvk_rankings",
         "location",
+        "me",
         "mge",
         "modify_registration",
         "modify_subscription",

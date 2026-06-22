@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
@@ -38,6 +39,13 @@ REPORT_RANGE_DAYS = {
 }
 
 
+@dataclass(frozen=True, slots=True)
+class InventoryVisibilityPreferenceRead:
+    ok: bool
+    visibility: InventoryReportVisibility | None = None
+    error: str | None = None
+
+
 def parse_report_range(value: str | None) -> InventoryReportRange:
     normalized = (value or InventoryReportRange.ONE_MONTH.value).strip().upper()
     for item in InventoryReportRange:
@@ -73,6 +81,13 @@ def parse_visibility(value: str | None) -> InventoryReportVisibility | None:
 async def get_visibility_preference_or_none(
     discord_user_id: int,
 ) -> InventoryReportVisibility | None:
+    result = await read_visibility_preference(discord_user_id)
+    return result.visibility if result.ok else None
+
+
+async def read_visibility_preference(
+    discord_user_id: int,
+) -> InventoryVisibilityPreferenceRead:
     try:
         pref = await asyncio.to_thread(
             inventory_reporting_dal.fetch_visibility_preference,
@@ -80,14 +95,17 @@ async def get_visibility_preference_or_none(
         )
     except asyncio.CancelledError:
         raise
-    except Exception:
+    except Exception as exc:
         logger.exception(
             "inventory_report_visibility_pref_read_failed user_id=%s defaulting=%s",
             discord_user_id,
             InventoryReportVisibility.ONLY_ME.value,
         )
-        return None
-    return pref
+        return InventoryVisibilityPreferenceRead(
+            ok=False,
+            error=f"{type(exc).__name__}: {exc}",
+        )
+    return InventoryVisibilityPreferenceRead(ok=True, visibility=pref)
 
 
 async def get_visibility_preference(discord_user_id: int) -> InventoryReportVisibility:

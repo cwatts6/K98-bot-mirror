@@ -51,6 +51,7 @@ def test_register_commands_smoke(monkeypatch):
     assert "kvk_admin" in registered_top_level
     assert "kvk" in registered_top_level
     assert "location" in registered_top_level
+    assert "me" in registered_top_level
     assert "ops" in registered_top_level
     assert "mge" in registered_top_level
     assert "prekvk" in registered_top_level
