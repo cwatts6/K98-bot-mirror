@@ -296,6 +296,8 @@ async def _build_page_response(
             summary,
             display_name=display_name,
         )
+    except asyncio.CancelledError:
+        raise
     except Exception:
         logger.exception(
             "player_self_service_dashboard_card_render_failed user_id=%s",
@@ -334,6 +336,8 @@ async def _edit_original_with_image_fallback(
         return await target.edit_original_response(
             **_edit_kwargs(embed=embed, view=view, files=files)
         )
+    except asyncio.CancelledError:
+        raise
     except Exception:
         if not files:
             raise
@@ -415,6 +419,8 @@ class PlayerSelfServiceView(discord.ui.View):
         except TypeError:
             try:
                 await interaction.response.defer()
+            except asyncio.CancelledError:
+                raise
             except Exception:
                 logger.debug(
                     "player_self_service_navigation_defer_failed user_id=%s page=%s",
@@ -422,6 +428,8 @@ class PlayerSelfServiceView(discord.ui.View):
                     page,
                     exc_info=True,
                 )
+        except asyncio.CancelledError:
+            raise
         except Exception:
             logger.debug(
                 "player_self_service_navigation_defer_failed user_id=%s page=%s",
@@ -432,6 +440,8 @@ class PlayerSelfServiceView(discord.ui.View):
 
         try:
             summary = await self.summary_loader(self.author_id)
+        except asyncio.CancelledError:
+            raise
         except Exception:
             logger.exception(
                 "player_self_service_view_summary_failed user_id=%s page=%s",
@@ -443,6 +453,8 @@ class PlayerSelfServiceView(discord.ui.View):
                     "Personal status is temporarily unavailable. Please try again in a moment.",
                     ephemeral=True,
                 )
+            except asyncio.CancelledError:
+                raise
             except Exception:
                 logger.debug("player_self_service_view_error_followup_failed", exc_info=True)
             return
@@ -466,6 +478,8 @@ class PlayerSelfServiceView(discord.ui.View):
                 files=files,
             )
             view.set_message_ref(getattr(interaction, "message", None) or edited)
+        except asyncio.CancelledError:
+            raise
         except Exception:
             logger.debug("player_self_service_edit_message_failed", exc_info=True)
             _reset_files(files)

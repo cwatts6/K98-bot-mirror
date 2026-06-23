@@ -119,7 +119,9 @@ def _section(
     action: str,
 ) -> None:
     _panel(draw, (x, y, x + w, y + h))
-    _draw_text(draw, (x + 24, y + 22), title.upper(), fill=MUTED, font=_font(21, bold=True), bold=True)
+    _draw_text(
+        draw, (x + 24, y + 22), title.upper(), fill=MUTED, font=_font(21, bold=True), bold=True
+    )
     _badge(draw, (x + w - 150, y + 18), status, fill=status_color)
 
     cursor_y = y + 74

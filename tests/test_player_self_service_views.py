@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -178,6 +179,23 @@ async def test_dashboard_page_response_falls_back_to_embed_when_card_render_fail
 
 
 @pytest.mark.asyncio
+async def test_dashboard_page_response_propagates_card_render_cancellation(
+    monkeypatch,
+) -> None:
+    def fake_render(*_args, **_kwargs):
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr(views.dashboard_card, "render_dashboard_card", fake_render)
+
+    with pytest.raises(asyncio.CancelledError):
+        await views._build_page_response(
+            views.PAGE_DASHBOARD,
+            _summary(),
+            display_name="Tester",
+        )
+
+
+@pytest.mark.asyncio
 async def test_dashboard_image_send_failure_retries_embed_only() -> None:
     class Target:
         def __init__(self) -> None:
@@ -208,6 +226,26 @@ async def test_dashboard_image_send_failure_retries_embed_only() -> None:
     assert target.calls[0]["files"]
     assert "files" not in target.calls[1]
     assert getattr(target.calls[1]["embed"].image, "url", None) is None
+
+
+@pytest.mark.asyncio
+async def test_dashboard_image_send_cancellation_is_not_retried() -> None:
+    class Target:
+        async def edit_original_response(self, **_kwargs):
+            raise asyncio.CancelledError()
+
+    embed = views.build_dashboard_embed(_summary(), display_name="Tester")
+
+    with pytest.raises(asyncio.CancelledError):
+        await views._edit_original_with_image_fallback(
+            Target(),
+            page=views.PAGE_DASHBOARD,
+            summary=_summary(),
+            display_name="Tester",
+            view=views.PlayerSelfServiceView(author_id=42, display_name="Tester"),
+            embed=embed,
+            files=[SimpleNamespace(filename="me_dashboard_42.png")],
+        )
 
 
 def test_accounts_embed_invites_service_backed_controls() -> None:
@@ -699,6 +737,28 @@ async def test_view_navigation_loads_summary_and_edits_message() -> None:
     assert edited["embed"].title == "Reminder Centre"
     assert isinstance(edited["view"], views.PlayerSelfServiceView)
     assert edited["view"].message is interaction.message
+
+
+@pytest.mark.asyncio
+async def test_view_navigation_propagates_edit_cancellation(monkeypatch) -> None:
+    async def loader(_user_id: int):
+        return _summary()
+
+    async def fake_edit(*_args, **_kwargs):
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr(views, "_edit_original_with_image_fallback", fake_edit)
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        summary_loader=loader,
+    )
+    interaction = _Interaction()
+
+    with pytest.raises(asyncio.CancelledError):
+        await view._show_page(interaction, views.PAGE_REMINDERS)
+
+    assert interaction.followup.sent == []
 
 
 @pytest.mark.asyncio

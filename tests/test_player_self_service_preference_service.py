@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import pytest
@@ -80,3 +81,16 @@ async def test_save_inventory_visibility_reports_writer_failure(caplog) -> None:
     assert result.inventory_visibility is None
     assert "could not be saved" in result.message
     assert "player_self_service_inventory_visibility_save_failed user_id=42" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_save_inventory_visibility_propagates_cancellation() -> None:
+    async def writer(_user_id, _visibility):
+        raise asyncio.CancelledError()
+
+    with pytest.raises(asyncio.CancelledError):
+        await preference_service.save_inventory_visibility(
+            42,
+            InventoryReportVisibility.PUBLIC,
+            writer=writer,
+        )
