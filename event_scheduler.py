@@ -444,15 +444,9 @@ def get_event_thumbnail(event_type: str) -> str:
     return thumbs.get(typ, "https://i.ibb.co/0jM8R7GW/kvk-mistakes.jpg")
 
 
-def make_event_id(event):
-    """
-    Canonical event id builder.
-
-    Uses the centralized serializer to ensure the start_time portion of the id
-    is always in the same canonical ISO UTC string format across the codebase.
-    """
-    raw_type = (event.get("type") or "").lower()
-    typ = {
+def _normalized_event_type(event: dict) -> str:
+    raw = (event.get("type") or "").lower().strip()
+    return {
         "next ruins": "ruins",
         "ruins": "ruins",
         "next altar fight": "altars",
@@ -460,7 +454,35 @@ def make_event_id(event):
         "altars": "altars",
         "chronicle": "chronicle",
         "major": "major",
-    }.get(raw_type, raw_type)
+    }.get(raw, raw)
+
+
+def is_fight_event(event: dict) -> bool:
+    event_type = _normalized_event_type(event)
+    event_text = " ".join(
+        str(event.get(key) or "").upper() for key in ("name", "title", "description")
+    )
+    return event_type == "altars" or (event_type == "major" and "FIGHT" in event_text)
+
+
+def subscription_matches_event(subscribed_types: list[str], event: dict) -> bool:
+    selected = {str(event_type).lower().strip() for event_type in subscribed_types}
+    event_type = _normalized_event_type(event)
+    if "all" in selected:
+        return event_type in {"ruins", "altars", "major"}
+    if event_type in selected:
+        return True
+    return "fights" in selected and is_fight_event(event)
+
+
+def make_event_id(event):
+    """
+    Canonical event id builder.
+
+    Uses the centralized serializer to ensure the start_time portion of the id
+    is always in the same canonical ISO UTC string format across the codebase.
+    """
+    typ = _normalized_event_type(event)
 
     name_tok = (
         str(event.get("name") or event.get("title") or "").strip().lower().replace(" ", "_")[:64]
@@ -1083,10 +1105,9 @@ async def schedule_event_reminders(bot, notify_channel_id, test_mode=False, test
         logger.debug("[DM_REMINDER_SCHEDULER] Loaded %d subscribers", len(subscribers))
 
         for event in all_events:
-            raw_type = (event["type"] or "").lower().strip()
-            if raw_type not in {"ruins", "altars", "major", "chronicle"}:
+            event_type = _normalized_event_type(event)
+            if event_type not in {"ruins", "altars", "major", "chronicle"}:
                 continue
-            event_type = raw_type  # already normalized by the loader
 
             event_id = make_event_id(event)
             start_time = ensure_aware_utc(event["start_time"])
@@ -1128,15 +1149,7 @@ async def schedule_event_reminders(bot, notify_channel_id, test_mode=False, test
                 subscribed_types = config.get("subscriptions", [])
                 reminder_times = config.get("reminder_times", DEFAULT_REMINDER_TIMES)
 
-                expanded_types = set(subscribed_types)
-                if "fights" in expanded_types:
-                    expanded_types.update(["altars", "major"])
-                if "all" in expanded_types:
-                    expanded_types.update(
-                        ["ruins", "altars", "major"]
-                    )  # (add "chronicle" if you want)
-
-                if event_type not in expanded_types:
+                if not subscription_matches_event(subscribed_types, event):
                     continue
 
                 for rt in reminder_times:

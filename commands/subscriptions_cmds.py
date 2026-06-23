@@ -18,6 +18,7 @@ from dm_tracker_utils import (
 )
 from event_scheduler import dm_scheduled_tracker, dm_sent_tracker
 from reminder_task_registry import active_task_count, cancel_user_reminder_tasks
+from player_self_service.reminder_service import normalize_event_types
 from subscription_tracker import (
     get_all_subscribers,
     get_user_config,
@@ -102,10 +103,8 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
                 return
 
             original_types = types.copy()
-            if "all" in types:
-                types = ["all"]
-            elif "fights" in types:
-                types = [t for t in types if t not in ("altars", "major")]
+            types, _adjusted_types = normalize_event_types(tuple(types))
+            types = list(types)
             try:
                 set_user_config(view.uid, view.username, types, times)
             except Exception as e:
@@ -274,10 +273,8 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
                 return
 
             original_types = types.copy()
-            if "all" in types:
-                types = ["all"]
-            elif "fights" in types:
-                types = [t for t in types if t not in ("altars", "major")]
+            types, _adjusted_types = normalize_event_types(tuple(types))
+            types = list(types)
 
             try:
                 set_user_config(view.uid, view.username, types, times)

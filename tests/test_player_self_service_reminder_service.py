@@ -54,14 +54,29 @@ async def test_build_reminder_centre_state_uses_event_loop_thread() -> None:
 
 def test_normalize_event_types_prevents_duplicate_reminders() -> None:
     all_types, all_adjusted = reminder_service.normalize_event_types(("ruins", "all", "major"))
-    fight_types, fight_adjusted = reminder_service.normalize_event_types(
+    full_coverage_types, full_coverage_adjusted = reminder_service.normalize_event_types(
         ("ruins", "altars", "major", "fights")
+    )
+    fight_and_altar_types, fight_and_altar_adjusted = reminder_service.normalize_event_types(
+        ("altars", "fights")
+    )
+    major_and_fights_types, major_and_fights_adjusted = reminder_service.normalize_event_types(
+        ("major", "fights")
+    )
+    ruins_and_fights_types, ruins_and_fights_adjusted = reminder_service.normalize_event_types(
+        ("ruins", "fights")
     )
 
     assert all_types == ("all",)
     assert all_adjusted is True
-    assert fight_types == ("fights",)
-    assert fight_adjusted is True
+    assert full_coverage_types == ("all",)
+    assert full_coverage_adjusted is True
+    assert fight_and_altar_types == ("fights",)
+    assert fight_and_altar_adjusted is True
+    assert major_and_fights_types == ("major", "fights")
+    assert major_and_fights_adjusted is False
+    assert ruins_and_fights_types == ("ruins", "fights")
+    assert ruins_and_fights_adjusted is False
 
 
 def test_subscription_tracker_save_failure_propagates(monkeypatch, tmp_path) -> None:

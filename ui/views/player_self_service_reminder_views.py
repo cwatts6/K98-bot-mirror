@@ -29,7 +29,7 @@ def _option_desc(key: str) -> str:
         "ruins": "Ruins events",
         "altars": "Altar fights",
         "major": "Major timeline events",
-        "fights": "Covers ruins, altars, and major fights",
+        "fights": "Altars plus major events marked FIGHT",
         "all": "Every KVK event type",
     }.get(key, "")
 

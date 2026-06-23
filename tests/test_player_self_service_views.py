@@ -290,7 +290,7 @@ async def test_reminder_manage_button_opens_selector_with_existing_state(monkeyp
 
 
 @pytest.mark.asyncio
-async def test_reminder_event_select_refreshes_fights_as_exclusive_choice() -> None:
+async def test_reminder_event_select_refreshes_full_coverage_as_all() -> None:
     state = ReminderCentreState(
         ok=True,
         subscribed=True,
@@ -314,16 +314,80 @@ async def test_reminder_event_select_refreshes_fights_as_exclusive_choice() -> N
 
     await select.callback(interaction)
 
-    assert view.selected_types == ["fights"]
+    assert view.selected_types == ["all"]
     assert interaction.response.edited[-1]["view"] is view
     defaults = {option.value: option.default for option in select.options}
     assert defaults == {
         "ruins": False,
         "altars": False,
         "major": False,
-        "fights": True,
-        "all": False,
+        "fights": False,
+        "all": True,
     }
+
+
+@pytest.mark.asyncio
+async def test_reminder_event_select_keeps_major_with_fights() -> None:
+    state = ReminderCentreState(
+        ok=True,
+        subscribed=True,
+        event_types=("ruins",),
+        reminder_times=("24h",),
+        event_summary="ruins",
+        time_summary="24h",
+    )
+    view = reminder_views.ReminderSetupView(
+        author_id=42,
+        username="Tester",
+        state=state,
+        display_name="Tester",
+    )
+    select = next(
+        child for child in view.children if isinstance(child, reminder_views.ReminderEventSelect)
+    )
+    select._selected_values = ["major", "fights"]
+    select._interaction = SimpleNamespace(data={})
+    interaction = _Interaction()
+
+    await select.callback(interaction)
+
+    assert view.selected_types == ["major", "fights"]
+    assert interaction.response.deferred
+    defaults = {option.value: option.default for option in select.options}
+    assert defaults["major"] is True
+    assert defaults["fights"] is True
+
+
+@pytest.mark.asyncio
+async def test_reminder_event_select_refreshes_altars_into_fights() -> None:
+    state = ReminderCentreState(
+        ok=True,
+        subscribed=True,
+        event_types=("ruins",),
+        reminder_times=("24h",),
+        event_summary="ruins",
+        time_summary="24h",
+    )
+    view = reminder_views.ReminderSetupView(
+        author_id=42,
+        username="Tester",
+        state=state,
+        display_name="Tester",
+    )
+    select = next(
+        child for child in view.children if isinstance(child, reminder_views.ReminderEventSelect)
+    )
+    select._selected_values = ["altars", "fights"]
+    select._interaction = SimpleNamespace(data={})
+    interaction = _Interaction()
+
+    await select.callback(interaction)
+
+    assert view.selected_types == ["fights"]
+    assert interaction.response.edited[-1]["view"] is view
+    defaults = {option.value: option.default for option in select.options}
+    assert defaults["altars"] is False
+    assert defaults["fights"] is True
 
 
 @pytest.mark.asyncio

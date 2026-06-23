@@ -49,9 +49,7 @@ def load_subscriptions() -> None:
                     types = []
                 if not isinstance(times, list):
                     times = []
-                types = sorted(
-                    {t for t in (str(x).lower().strip() for x in types) if t in VALID_TYPES}
-                )
+                types = _dedupe_event_types(types)
                 times = sorted(
                     {
                         t
@@ -125,10 +123,27 @@ def get_user_config(user_id: int | str) -> dict | None:
     return subscriptions.get(str(user_id))  # type: ignore[union-attr]
 
 
-def _validated_types(types: list[str] | None) -> list[str]:
+def _dedupe_event_types(types: list[str] | None) -> list[str]:
     if not types:
         return []
-    return sorted({t for t in (str(x).lower().strip() for x in types) if t in VALID_TYPES})
+    selected = {str(x).lower().strip() for x in types}
+    ordered = [event_type for event_type in VALID_TYPES if event_type in selected]
+    if "all" in ordered:
+        return ["all"]
+
+    covered = set(ordered)
+    if "fights" in covered:
+        covered.add("altars")
+    if {"ruins", "altars", "major"}.issubset(covered):
+        return ["all"]
+
+    if "fights" in ordered:
+        ordered = [event_type for event_type in ordered if event_type != "altars"]
+    return ordered
+
+
+def _validated_types(types: list[str] | None) -> list[str]:
+    return _dedupe_event_types(types)
 
 
 def _validated_times(times: list[str] | None) -> list[str]:
@@ -266,13 +281,7 @@ def _canon_types(types):
         can = _TYPE_ALIASES.get(key)
         if can and can in VALID_TYPES:
             out.append(can)
-    # exclusivity: 'all' wins; 'fights' supersedes altars/major to avoid dupes
-    out = sorted(set(out))
-    if "all" in out:
-        return ["all"]
-    if "fights" in out:
-        out = [x for x in out if x not in ("altars", "major")] + ["fights"]
-    return sorted(set(out))
+    return _dedupe_event_types(out)
 
 
 def _canon_times(times):

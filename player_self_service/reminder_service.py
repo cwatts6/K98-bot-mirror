@@ -88,17 +88,23 @@ def _ordered_valid(values: list[Any] | tuple[Any, ...], valid: tuple[str, ...]) 
     return tuple(item for item in valid if item in selected)
 
 
+def _covers_all_kvk_event_types(event_types: tuple[str, ...]) -> bool:
+    covered = set(event_types)
+    if "fights" in covered:
+        covered.add("altars")
+    return {"ruins", "altars", "major"}.issubset(covered)
+
+
 def normalize_event_types(values: list[Any] | tuple[Any, ...]) -> tuple[tuple[str, ...], bool]:
     ordered = _ordered_valid(values, tuple(VALID_TYPES))
-    adjusted = False
     if "all" in ordered:
-        adjusted = ordered != ("all",)
-        return ("all",), adjusted
+        return ("all",), ordered != ("all",)
+    if _covers_all_kvk_event_types(ordered):
+        return ("all",), ordered != ("all",)
     if "fights" in ordered:
-        filtered = tuple(value for value in ordered if value not in {"ruins", "altars", "major"})
-        adjusted = filtered != ordered
-        ordered = filtered
-    return ordered, adjusted
+        filtered = tuple(value for value in ordered if value != "altars")
+        return filtered, filtered != ordered
+    return ordered, False
 
 
 def normalize_reminder_times(values: list[Any] | tuple[Any, ...]) -> tuple[str, ...]:
