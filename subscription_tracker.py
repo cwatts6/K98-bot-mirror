@@ -97,6 +97,7 @@ def save_subscriptions() -> None:
                 os.remove(tmp)
         except Exception:
             pass
+        raise
 
 
 def get_user_config(user_id: int | str) -> dict | None:

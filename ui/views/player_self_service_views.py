@@ -8,8 +8,9 @@ import logging
 import discord
 
 from core.interaction_safety import safe_defer
-from player_self_service import account_service
+from player_self_service import account_service, reminder_service
 from player_self_service.account_service import AccountCentreState
+from player_self_service.reminder_service import ReminderCentreState
 from player_self_service.service import (
     PlayerSelfServiceSummary,
     build_player_self_service_summary,
@@ -17,6 +18,10 @@ from player_self_service.service import (
 from ui.views.player_self_service_account_views import (
     AccountLookupModal,
     AccountSlotSelectView,
+)
+from ui.views.player_self_service_reminder_views import (
+    ReminderSetupView,
+    ReminderUnsubscribeConfirmView,
 )
 
 logger = logging.getLogger(__name__)
@@ -166,9 +171,14 @@ def build_reminders_embed(
         value=_field_value(
             [
                 f"Recommended action: {reminders.next_action}",
-                "Subscribe, update, and unsubscribe actions remain in the existing reminder tools for this phase.",
+                "Use the controls below to manage event types and reminder times.",
             ]
         ),
+        inline=False,
+    )
+    embed.add_field(
+        name="DM Check",
+        value="A confirmation DM is sent after changes. If it does not arrive, check server DM settings.",
         inline=False,
     )
     return embed
@@ -290,6 +300,12 @@ class PlayerSelfServiceView(discord.ui.View):
             for child in list(self.children):
                 if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
                     "me:account:"
+                ):
+                    self.remove_item(child)
+        if self.page != PAGE_REMINDERS:
+            for child in list(self.children):
+                if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
+                    "me:reminder:"
                 ):
                     self.remove_item(child)
         for child in self.children:
@@ -540,6 +556,113 @@ class PlayerSelfServiceView(discord.ui.View):
                 display_name=self.display_name,
                 action="remove",
                 slots=state.registered_slots,
+            ),
+            ephemeral=True,
+        )
+
+    async def _load_reminder_state(
+        self, interaction: discord.Interaction
+    ) -> ReminderCentreState | None:
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+        except TypeError:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer()
+            except Exception:
+                logger.debug("player_self_service_reminder_action_defer_failed", exc_info=True)
+        except Exception:
+            logger.debug("player_self_service_reminder_action_defer_failed", exc_info=True)
+
+        try:
+            state = await reminder_service.build_reminder_centre_state(self.author_id)
+        except Exception:
+            logger.exception(
+                "player_self_service_reminder_state_failed user_id=%s page=%s",
+                self.author_id,
+                self.page,
+            )
+            await interaction.followup.send(
+                "Reminder data is temporarily unavailable. Please try again in a moment.",
+                ephemeral=True,
+            )
+            return None
+
+        if not state.ok:
+            await interaction.followup.send(
+                "Reminder data is temporarily unavailable. Please try again in a moment.",
+                ephemeral=True,
+            )
+            return None
+        return state
+
+    @discord.ui.button(
+        label="Manage",
+        style=discord.ButtonStyle.success,
+        custom_id="me:reminder:manage",
+        row=1,
+    )
+    async def reminder_manage_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        state = await self._load_reminder_state(interaction)
+        if state is None:
+            return
+        if not state.can_manage:
+            await interaction.followup.send(
+                "Reminder data is temporarily unavailable. Please try again in a moment.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send(
+            "Choose your KVK event types and reminder times.",
+            view=ReminderSetupView(
+                author_id=self.author_id,
+                username=str(getattr(interaction, "user", "") or self.display_name),
+                state=state,
+                display_name=self.display_name,
+            ),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(
+        label="Unsubscribe",
+        style=discord.ButtonStyle.danger,
+        custom_id="me:reminder:unsubscribe",
+        row=2,
+    )
+    async def reminder_unsubscribe_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        state = await self._load_reminder_state(interaction)
+        if state is None:
+            return
+        if not state.can_unsubscribe:
+            await interaction.followup.send(
+                "You are not currently subscribed to KVK event reminders.",
+                ephemeral=True,
+            )
+            return
+        confirmation, error = await reminder_service.prepare_unsubscribe_confirmation(
+            self.author_id,
+        )
+        if error or confirmation is None:
+            await interaction.followup.send(
+                error or "Could not prepare unsubscribe confirmation.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send(
+            confirmation.body,
+            view=ReminderUnsubscribeConfirmView(
+                author_id=self.author_id,
+                display_name=self.display_name,
+                confirmation=confirmation,
             ),
             ephemeral=True,
         )

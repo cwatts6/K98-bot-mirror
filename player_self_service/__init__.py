@@ -7,6 +7,12 @@ from .account_service import (
     AccountMutationResult,
     AccountSlot,
 )
+from .reminder_service import (
+    ReminderCentreState,
+    ReminderMessage,
+    ReminderMutationResult,
+    ReminderUnsubscribeConfirmation,
+)
 from .service import (
     AccountStatus,
     ExportStatus,
@@ -26,6 +32,10 @@ __all__ = [
     "ExportStatus",
     "PlayerSelfServiceSummary",
     "PreferenceStatus",
+    "ReminderCentreState",
+    "ReminderMessage",
+    "ReminderMutationResult",
     "ReminderStatus",
+    "ReminderUnsubscribeConfirmation",
     "build_player_self_service_summary",
 ]

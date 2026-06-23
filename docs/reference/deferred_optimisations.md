@@ -51,6 +51,15 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 3 Modern Account Centre smoke tested successfully and merged/deployed or otherwise operator-approved for follow-up; operator approval for account-centre UX optimisation after Phase 4 reminder centre or another approved process-simplification phase.
 
 ### Deferred Optimisation
+- Area: `commands/subscriptions_cmds.py`, `player_self_service/reminder_service.py`, `ui/views/subscription_views.py`
+- Type: refactor
+- Description: Phase 4 adds a service-backed `/me reminders` centre while intentionally leaving legacy `/subscribe`, `/modify_subscription`, and `/unsubscribe` command handlers live and behavior-compatible. Those legacy handlers still own duplicated validation, normalization, DM confirmation wording, and unsubscribe cleanup orchestration that now has a cleaner service-owned equivalent.
+- Suggested Fix: After Phase 4 is smoke tested and operator-approved, scope a follow-up consolidation that routes the legacy reminder commands through `player_self_service/reminder_service.py` without changing their registered paths or user-visible behavior. Keep duplicate subscription protection, DM confirmation behavior, unsubscribe tracker cleanup, scheduler/restart behavior, and focused legacy command/view tests green before considering later redirects or removal.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 4 Modern Reminder Centre merged, smoke tested, and accepted; operator decision on whether legacy paths should be service-rerouted before any redirect/removal phase.
+
+### Deferred Optimisation
 - Area: `commands/calendar_cmds.py`, `commands/events_cmds.py`, `ui/views/calendar.py`, `ui/views/events_views.py`, public calendar/KVK calendar docs/tests
 - Type: architecture
 - Description: Generic public calendar and KVK calendar commands have inconsistent naming, visibility, scope, and interaction behavior. `/calendar` is an ephemeral calendar overview; `/calendar_next_event` is ephemeral and shows one next calendar event; `/next_kvk_fight` is public and shows one fight with controls for the next three fights; `/next_kvk_event` is public and shows one event with controls for the next five events. There is also no clearly named `/kvk_calendar` or equivalent KVK calendar overview, so grouping these commands now would tidy paths without resolving the user-facing model.

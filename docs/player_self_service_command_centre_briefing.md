@@ -1,9 +1,9 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-06-22
+Last updated: 2026-06-23
 
-Status: Phase 3 Modern Account Centre is delivered and smoke tested successfully. Phase 4 Modern
-Reminder Centre is the next active implementation phase.
+Status: Phase 4 Modern Reminder Centre is implemented for local validation. Phase 3 Modern
+Account Centre was smoke tested successfully on 2026-06-22.
 
 ## Player Briefing
 
@@ -17,16 +17,17 @@ Use it to check:
 - your inventory visibility preference
 - where to go for KVK stats, targets, history, rankings, inventory, and exports
 
-The account centre now supports account review, Governor ID lookup, registration, replacement,
-and removal with confirmation. Existing commands such as `/register_governor`,
+The account centre supports account review, Governor ID lookup, registration, replacement,
+and removal with confirmation. The reminder centre supports private reminder review, setup,
+updates, and unsubscribe with confirmation. Existing commands such as `/register_governor`,
 `/modify_registration`, `/my_registrations`, `/mygovernorid`, `/subscribe`,
 `/modify_subscription`, `/unsubscribe`, `/inventory_preferences`, `/my_stats_export`, and
 `/export_inventory` still work.
 
 ## Operator Briefing
 
-Phase 3 extends `/me accounts` in parallel with legacy commands. It does not remove, redirect, or
-change reminder, preference, export, KVK, stats, or inventory behavior.
+Phase 4 extends `/me reminders` in parallel with legacy reminder commands. It does not remove,
+redirect, or change `/subscribe`, `/modify_subscription`, or `/unsubscribe`.
 
 The approved command group is:
 
@@ -83,12 +84,13 @@ Phase 4 reminder-centre checks:
 
 - Confirm `/me reminders` remains private.
 - Confirm players can review current reminder setup.
-- Confirm subscribe, modify, and unsubscribe flows are service-backed.
+- Confirm players can subscribe and update event types/timings through the Manage flow.
 - Confirm unsubscribe requires confirmation.
 - Confirm legacy reminder commands remain registered and usable.
+- Confirm reminder changes send a best-effort confirmation DM and preserve scheduler/tracker
+  behavior.
 
 Later mutation gates:
 
-- Reminder writes wait for reminder centre service ownership.
 - Preference writes require an existing service-backed persistence path.
 - Dashboard quick launch must not bypass existing channel or visibility rules.

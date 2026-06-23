@@ -5,6 +5,11 @@ from types import SimpleNamespace
 import pytest
 
 from player_self_service.account_service import AccountCentreState
+from player_self_service.reminder_service import (
+    ReminderCentreState,
+    ReminderMessage,
+    ReminderMutationResult,
+)
 from player_self_service.service import (
     AccountStatus,
     ExportStatus,
@@ -14,6 +19,7 @@ from player_self_service.service import (
 )
 from ui.views import (
     player_self_service_account_views as account_views,
+    player_self_service_reminder_views as reminder_views,
     player_self_service_views as views,
 )
 
@@ -89,7 +95,7 @@ class _Followup:
 
 class _Interaction:
     def __init__(self, user_id: int = 42) -> None:
-        self.user = SimpleNamespace(id=user_id)
+        self.user = _User(user_id)
         self.response = _Response()
         self.followup = _Followup()
         self.message = SimpleNamespace(id=123, edits=[])
@@ -98,6 +104,19 @@ class _Interaction:
     async def edit_original_response(self, **kwargs):
         self.original_edits.append(kwargs)
         return SimpleNamespace(id=456)
+
+
+class _User:
+    def __init__(self, user_id: int = 42) -> None:
+        self.id = user_id
+        self.sent = []
+
+    def __str__(self) -> str:
+        return f"user-{self.id}"
+
+    async def send(self, *args, **kwargs):
+        self.sent.append((args, kwargs))
+        return None
 
 
 def test_dashboard_embed_is_status_first_and_compact() -> None:
@@ -116,6 +135,14 @@ def test_accounts_embed_invites_service_backed_controls() -> None:
     assert embed.title == "Account Centre"
     assert "Use the controls below" in embed.fields[1].value
     assert "/modify_registration" not in embed.fields[1].value
+
+
+def test_reminders_embed_invites_service_backed_controls() -> None:
+    embed = views.build_reminders_embed(_summary(), display_name="Tester")
+
+    assert embed.title == "Reminder Centre"
+    assert "Use the controls below" in embed.fields[1].value
+    assert "/modify_subscription" not in embed.fields[1].value
 
 
 @pytest.mark.asyncio
@@ -158,6 +185,22 @@ async def test_accounts_view_has_account_actions_without_quick_launch() -> None:
 
     labels = [getattr(child, "label", None) for child in view.children]
     assert {"Find ID", "Register", "Replace", "Remove"}.issubset(set(labels))
+    assert not any(
+        isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
+    )
+
+
+@pytest.mark.asyncio
+async def test_reminders_view_has_reminder_actions_without_quick_launch() -> None:
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_REMINDERS,
+    )
+
+    labels = [getattr(child, "label", None) for child in view.children]
+    assert {"Manage", "Unsubscribe"}.issubset(set(labels))
+    assert "Register" not in labels
     assert not any(
         isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
     )
@@ -210,6 +253,75 @@ async def test_register_button_opens_free_slot_selector(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_reminder_manage_button_opens_selector_with_existing_state(monkeypatch) -> None:
+    async def fake_state(_user_id: int):
+        return ReminderCentreState(
+            ok=True,
+            subscribed=True,
+            event_types=("all",),
+            reminder_times=("24h", "1h"),
+            event_summary="all KVK events",
+            time_summary="24h, 1h",
+        )
+
+    monkeypatch.setattr(views.reminder_service, "build_reminder_centre_state", fake_state)
+
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_REMINDERS,
+    )
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:reminder:manage"
+    )
+
+    await button.callback(interaction)
+
+    _args, kwargs, _message = interaction.followup.sent[-1]
+    setup_view = kwargs["view"]
+    assert kwargs["ephemeral"] is True
+    assert isinstance(setup_view, reminder_views.ReminderSetupView)
+    assert setup_view.selected_types == ["all"]
+    assert setup_view.selected_reminders == ["24h", "1h"]
+
+
+@pytest.mark.asyncio
+async def test_reminder_unsubscribe_button_requires_active_subscription(monkeypatch) -> None:
+    async def fake_state(_user_id: int):
+        return ReminderCentreState(
+            ok=True,
+            subscribed=False,
+            event_types=(),
+            reminder_times=(),
+            event_summary="not subscribed",
+            time_summary="not set",
+        )
+
+    monkeypatch.setattr(views.reminder_service, "build_reminder_centre_state", fake_state)
+
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_REMINDERS,
+    )
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:reminder:unsubscribe"
+    )
+
+    await button.callback(interaction)
+
+    args, kwargs, _message = interaction.followup.sent[-1]
+    assert "not currently subscribed" in args[0]
+    assert kwargs["ephemeral"] is True
+
+
+@pytest.mark.asyncio
 async def test_account_slot_select_rejects_non_owner() -> None:
     view = account_views.AccountSlotSelectView(
         author_id=42,
@@ -221,6 +333,56 @@ async def test_account_slot_select_rejects_non_owner() -> None:
 
     assert await view.interaction_check(interaction) is False
     assert interaction.response.sent[-1][1]["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+async def test_reminder_setup_save_calls_service_and_sends_dm(monkeypatch) -> None:
+    calls = []
+
+    async def fake_save(user_id, username, selected_types, selected_times):
+        calls.append((user_id, username, tuple(selected_types), tuple(selected_times)))
+        return ReminderMutationResult(
+            ok=True,
+            action="update",
+            message="Updated reminders.",
+            event_types=("ruins",),
+            reminder_times=("24h",),
+            dm_message=ReminderMessage(
+                title="Updated",
+                description="Saved.",
+                color=1,
+                fields=(("Event Types", "ruins"),),
+                footer="Done.",
+            ),
+        )
+
+    monkeypatch.setattr(reminder_views.reminder_service, "save_reminder_preferences", fake_save)
+    state = ReminderCentreState(
+        ok=True,
+        subscribed=True,
+        event_types=("ruins",),
+        reminder_times=("24h",),
+        event_summary="ruins",
+        time_summary="24h",
+    )
+    view = reminder_views.ReminderSetupView(
+        author_id=42,
+        username="Tester",
+        state=state,
+        display_name="Tester",
+    )
+    interaction = _Interaction()
+    button = next(
+        child for child in view.children if getattr(child, "custom_id", None) == "me:reminder:save"
+    )
+
+    await button.callback(interaction)
+
+    assert calls == [(42, "Tester", ("ruins",), ("24h",))]
+    assert interaction.user.sent
+    edited = interaction.original_edits[-1]
+    assert "confirmation DM was sent" in edited["content"]
+    assert isinstance(edited["view"], reminder_views.ReminderCompletionView)
 
 
 @pytest.mark.asyncio
