@@ -7,6 +7,10 @@ from .account_service import (
     AccountMutationResult,
     AccountSlot,
 )
+from .preference_service import (
+    PreferenceMutationResult,
+    save_inventory_visibility,
+)
 from .reminder_service import (
     ReminderCentreState,
     ReminderMessage,
@@ -31,6 +35,7 @@ __all__ = [
     "AccountStatus",
     "ExportStatus",
     "PlayerSelfServiceSummary",
+    "PreferenceMutationResult",
     "PreferenceStatus",
     "ReminderCentreState",
     "ReminderMessage",
@@ -38,4 +43,5 @@ __all__ = [
     "ReminderStatus",
     "ReminderUnsubscribeConfirmation",
     "build_player_self_service_summary",
+    "save_inventory_visibility",
 ]

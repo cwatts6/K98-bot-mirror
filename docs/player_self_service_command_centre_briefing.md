@@ -2,8 +2,9 @@
 
 Last updated: 2026-06-23
 
-Status: Phase 4 Modern Reminder Centre is delivered and smoke tested successfully. Phase 5 Visual
-Dashboard Card and Preferences Hub is the next active task-pack phase.
+Status: Phase 5 Visual Dashboard Card and Preferences Hub is implemented for local validation.
+The dashboard now has a generated private visual card with embed fallback, and `/me preferences`
+can update inventory visibility through the existing service-backed persistence path.
 
 ## Player Briefing
 
@@ -17,17 +18,22 @@ Use it to check:
 - your inventory visibility preference
 - where to go for KVK stats, targets, history, rankings, inventory, and exports
 
+The dashboard includes a visual summary card when image rendering succeeds. If image rendering or
+delivery fails, the bot falls back to the private embed dashboard.
+
 The account centre supports account review, Governor ID lookup, registration, replacement,
 and removal with confirmation. The reminder centre supports private reminder review, setup,
-updates, and unsubscribe with confirmation. Existing commands such as `/register_governor`,
+updates, and unsubscribe with confirmation. `/me preferences` can update inventory report
+visibility between private and public output. Existing commands such as `/register_governor`,
 `/modify_registration`, `/my_registrations`, `/mygovernorid`, `/subscribe`,
 `/modify_subscription`, `/unsubscribe`, `/inventory_preferences`, `/my_stats_export`, and
 `/export_inventory` still work.
 
 ## Operator Briefing
 
-Phase 4 extends `/me reminders` in parallel with legacy reminder commands. It does not remove,
-redirect, or change `/subscribe`, `/modify_subscription`, or `/unsubscribe`.
+Phase 5 extends `/me dashboard` and `/me preferences` in parallel with legacy self-service
+commands. It does not remove, redirect, or change `/inventory_preferences`, `/subscribe`,
+`/modify_subscription`, `/unsubscribe`, or account legacy commands.
 
 The approved command group is:
 
@@ -48,8 +54,10 @@ grouped_subcommands_detected=85
 
 Rollout checks:
 
-- Confirm `/me dashboard` is private and understandable as a status dashboard.
+- Confirm `/me dashboard` is private and shows the generated card when rendering succeeds.
+- Confirm dashboard falls back to the private embed if image rendering or delivery fails.
 - Confirm account, reminder, preference, and export pages remain private.
+- Confirm `/me preferences` saves inventory visibility through the existing service-backed path.
 - Confirm legacy player commands remain registered and usable.
 - Monitor `/me` usage before approving any later legacy redirects.
 
@@ -96,9 +104,10 @@ Phase 4 reminder-centre checks:
   - `Fights`: altar fights plus major events marked `FIGHT`.
   - overlapping choices are normalized to avoid duplicate DMs.
 
-Later mutation gates:
+Phase 5 dashboard/preference checks:
 
-- Phase 5 dashboard-card work must preserve the existing private `/me dashboard` controls and use
-  a safe embed fallback if card rendering fails.
-- Preference writes require an existing service-backed persistence path.
-- Dashboard quick launch must not bypass existing channel or visibility rules.
+- Dashboard Quick Launch remains dashboard-only and must not bypass existing channel or visibility
+  rules.
+- Inventory visibility writes use the existing inventory reporting service/DAL path.
+- No additional preference categories should be exposed until a reliable service-backed
+  persistence path exists.

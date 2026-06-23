@@ -51,6 +51,24 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 3 Modern Account Centre smoke tested successfully and merged/deployed or otherwise operator-approved for follow-up; operator approval for account-centre UX optimisation after Phase 4 reminder centre or another approved process-simplification phase.
 
 ### Deferred Optimisation
+- Area: `player_self_service/dashboard_card.py`, `kvk/rendering/`, `prekvk/report_image_renderer.py`, visual card renderers
+- Type: refactor
+- Description: Phase 5 adds a focused `/me dashboard` card renderer that reuses existing font helpers, but the bot now has several Pillow renderers with similar panel, badge, fit-text, fallback-font, and attachment-output patterns across KVK, PreKvK, inventory, and player self-service. Consolidating those helpers during Phase 5 would expand the visual dashboard PR beyond its acceptance criteria.
+- Suggested Fix: Scope a shared visual-card rendering helper pass that extracts stable text fitting, panel/badge primitives, PNG export wrappers, and glyph-safe font selection into a shared rendering utility. Migrate one renderer at a time with screenshot/PNG dimension tests and preserve existing card filenames, fallback behavior, and player-name Unicode handling.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 5 dashboard card is validated in production; existing KVK, PreKvK, inventory, and dashboard renderer tests are green before any shared-helper extraction.
+
+### Deferred Optimisation
+- Area: `/me preferences`, `player_self_service/preference_service.py`, inventory/stats/export preference surfaces
+- Type: architecture
+- Description: Phase 5 intentionally exposes only inventory report visibility because it already has a service-backed persistence path. Other possible preference categories such as default stats output privacy, export format defaults, preferred account behavior, local-time/timezone, or notification preferences do not yet share a reliable persistence contract and product model inside `/me preferences`.
+- Suggested Fix: Run a preferences-hub design pass that inventories existing preference-like state, validates SQL or JSON persistence contracts, decides which settings belong in `/me preferences`, and adds service-backed mutations only where privacy, restart safety, and legacy command compatibility are preserved. Avoid adding controls that only explain future possibilities.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 5 inventory visibility controls are smoke tested; operator approval for additional preference categories and any required SQL/persistence changes.
+
+### Deferred Optimisation
 - Area: `commands/subscriptions_cmds.py`, `player_self_service/reminder_service.py`, `ui/views/subscription_views.py`
 - Type: refactor
 - Description: Phase 4 adds a service-backed `/me reminders` centre while intentionally leaving legacy `/subscribe`, `/modify_subscription`, and `/unsubscribe` command handlers live and behavior-compatible. Those legacy handlers still own duplicated validation, normalization, DM confirmation wording, and unsubscribe cleanup orchestration that now has a cleaner service-owned equivalent.

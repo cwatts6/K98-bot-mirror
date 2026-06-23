@@ -107,6 +107,27 @@ async def test_resolve_visibility_falls_back_to_private_when_write_fails(monkeyp
 
 
 @pytest.mark.asyncio
+async def test_write_visibility_preference_reports_failure(monkeypatch):
+    def _upsert(_user_id, _visibility):
+        raise RuntimeError("db error")
+
+    monkeypatch.setattr(
+        reporting_service.inventory_reporting_dal,
+        "upsert_visibility_preference",
+        _upsert,
+    )
+
+    result = await reporting_service.write_visibility_preference(
+        123,
+        InventoryReportVisibility.ONLY_ME,
+    )
+
+    assert result.ok is False
+    assert result.visibility is None
+    assert "RuntimeError" in (result.error or "")
+
+
+@pytest.mark.asyncio
 async def test_build_inventory_report_payload_groups_resources_and_speedups(monkeypatch):
     now = datetime.now(UTC)
 

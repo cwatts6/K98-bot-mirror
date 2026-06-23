@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
 
+from inventory.models import InventoryReportVisibility
 from player_self_service.account_service import AccountCentreState
+from player_self_service.preference_service import PreferenceMutationResult
 from player_self_service.reminder_service import (
     ReminderCentreState,
     ReminderMessage,
@@ -130,6 +133,83 @@ def test_dashboard_embed_is_status_first_and_compact() -> None:
     assert "/register_governor" not in embed.fields[0].value
 
 
+@pytest.mark.asyncio
+async def test_dashboard_page_response_includes_generated_card(monkeypatch) -> None:
+    calls = []
+
+    def fake_render(summary, *, display_name):
+        calls.append((summary.discord_user_id, display_name))
+        return views.dashboard_card.RenderedDashboardCard(
+            filename="me_dashboard_42.png",
+            image_bytes=BytesIO(b"png"),
+        )
+
+    monkeypatch.setattr(views.dashboard_card, "render_dashboard_card", fake_render)
+
+    embed, files = await views._build_page_response(
+        views.PAGE_DASHBOARD,
+        _summary(),
+        display_name="Tester",
+    )
+
+    assert calls == [(42, "Tester")]
+    assert embed.image.url == "attachment://me_dashboard_42.png"
+    assert [file.filename for file in files] == ["me_dashboard_42.png"]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_page_response_falls_back_to_embed_when_card_render_fails(
+    monkeypatch,
+) -> None:
+    def fake_render(*_args, **_kwargs):
+        raise RuntimeError("no pillow today")
+
+    monkeypatch.setattr(views.dashboard_card, "render_dashboard_card", fake_render)
+
+    embed, files = await views._build_page_response(
+        views.PAGE_DASHBOARD,
+        _summary(),
+        display_name="Tester",
+    )
+
+    assert embed.title == "K98 Personal Command Centre"
+    assert files == []
+    assert getattr(embed.image, "url", None) is None
+
+
+@pytest.mark.asyncio
+async def test_dashboard_image_send_failure_retries_embed_only() -> None:
+    class Target:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def edit_original_response(self, **kwargs):
+            self.calls.append(kwargs)
+            if kwargs.get("files"):
+                raise RuntimeError("attachment rejected")
+            return SimpleNamespace(id=999)
+
+    embed = views.build_dashboard_embed(_summary(), display_name="Tester")
+    embed.set_image(url="attachment://me_dashboard_42.png")
+    target = Target()
+
+    message = await views._edit_original_with_image_fallback(
+        target,
+        page=views.PAGE_DASHBOARD,
+        summary=_summary(),
+        display_name="Tester",
+        view=views.PlayerSelfServiceView(author_id=42, display_name="Tester"),
+        embed=embed,
+        files=[SimpleNamespace(filename="me_dashboard_42.png")],
+    )
+
+    assert message.id == 999
+    assert len(target.calls) == 2
+    assert target.calls[0]["files"]
+    assert "files" not in target.calls[1]
+    assert getattr(target.calls[1]["embed"].image, "url", None) is None
+
+
 def test_accounts_embed_invites_service_backed_controls() -> None:
     embed = views.build_accounts_embed(_summary(), display_name="Tester")
 
@@ -144,6 +224,14 @@ def test_reminders_embed_invites_service_backed_controls() -> None:
     assert embed.title == "Reminder Centre"
     assert "Use the controls below" in embed.fields[1].value
     assert "/modify_subscription" not in embed.fields[1].value
+
+
+def test_preferences_embed_invites_service_backed_visibility_controls() -> None:
+    embed = views.build_preferences_embed(_summary(), display_name="Tester")
+
+    assert embed.title == "Preferences"
+    assert "Use the controls below" in embed.fields[1].value
+    assert "/inventory_preferences" not in embed.fields[1].value
 
 
 @pytest.mark.asyncio
@@ -202,6 +290,22 @@ async def test_reminders_view_has_reminder_actions_without_quick_launch() -> Non
     labels = [getattr(child, "label", None) for child in view.children]
     assert {"Manage", "Unsubscribe"}.issubset(set(labels))
     assert "Register" not in labels
+    assert not any(
+        isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
+    )
+
+
+@pytest.mark.asyncio
+async def test_preferences_view_has_inventory_visibility_actions_without_quick_launch() -> None:
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_PREFERENCES,
+    )
+
+    labels = [getattr(child, "label", None) for child in view.children]
+    assert {"Set Private", "Set Public"}.issubset(set(labels))
+    assert "Manage" not in labels
     assert not any(
         isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
     )
@@ -287,6 +391,46 @@ async def test_reminder_manage_button_opens_selector_with_existing_state(monkeyp
     assert isinstance(setup_view, reminder_views.ReminderSetupView)
     assert setup_view.selected_types == ["all"]
     assert setup_view.selected_reminders == ["24h", "1h"]
+
+
+@pytest.mark.asyncio
+async def test_preference_public_button_saves_visibility_and_refreshes(monkeypatch) -> None:
+    calls = []
+
+    async def fake_save(user_id: int, visibility: InventoryReportVisibility):
+        calls.append((user_id, visibility))
+        return PreferenceMutationResult(
+            ok=True,
+            message="Inventory report visibility saved as public.",
+            inventory_visibility="public",
+        )
+
+    async def loader(user_id: int):
+        assert user_id == 42
+        return _summary()
+
+    monkeypatch.setattr(views.preference_service, "save_inventory_visibility", fake_save)
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_PREFERENCES,
+        summary_loader=loader,
+    )
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:preference:public"
+    )
+
+    await button.callback(interaction)
+
+    assert calls == [(42, InventoryReportVisibility.PUBLIC)]
+    args, kwargs, _message = interaction.followup.sent[-1]
+    assert "saved as public" in args[0]
+    assert kwargs["ephemeral"] is True
+    assert interaction.original_edits[-1]["embed"].title == "Preferences"
+    assert isinstance(interaction.original_edits[-1]["view"], views.PlayerSelfServiceView)
 
 
 @pytest.mark.asyncio

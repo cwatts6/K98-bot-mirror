@@ -234,13 +234,18 @@ async def test_show_report_rejects_reused_selector(monkeypatch):
 async def test_preference_view_saves_visibility(monkeypatch):
     saved = {}
 
-    async def _resolve_visibility(**kwargs):
-        saved.update(kwargs)
+    async def _write_visibility_preference(user_id, visibility):
+        saved["discord_user_id"] = user_id
+        saved["selected_visibility"] = visibility
+        return inventory_report_views.reporting_service.InventoryVisibilityPreferenceWrite(
+            ok=True,
+            visibility=visibility,
+        )
 
     monkeypatch.setattr(
         inventory_report_views.reporting_service,
-        "resolve_visibility",
-        _resolve_visibility,
+        "write_visibility_preference",
+        _write_visibility_preference,
     )
     view = InventoryPreferenceView(requester_id=42)
 
@@ -269,6 +274,46 @@ async def test_preference_view_saves_visibility(monkeypatch):
     assert saved["discord_user_id"] == 42
     assert saved["selected_visibility"] == InventoryReportVisibility.PUBLIC
     assert "/inventory_preferences" in saved["content"]
+
+
+@pytest.mark.asyncio
+async def test_preference_view_does_not_claim_failed_private_save(monkeypatch):
+    saved = {}
+
+    async def _write_visibility_preference(_user_id, _visibility):
+        return inventory_report_views.reporting_service.InventoryVisibilityPreferenceWrite(ok=False)
+
+    monkeypatch.setattr(
+        inventory_report_views.reporting_service,
+        "write_visibility_preference",
+        _write_visibility_preference,
+    )
+    view = InventoryPreferenceView(requester_id=42)
+
+    class _Response:
+        async def defer(self, **_kwargs):
+            return None
+
+    class _Followup:
+        async def send(self, content=None, **kwargs):
+            saved["content"] = content
+            saved.update(kwargs)
+
+    interaction = type(
+        "_Interaction",
+        (),
+        {
+            "user": type("_User", (), {"id": 42})(),
+            "response": _Response(),
+            "followup": _Followup(),
+        },
+    )()
+
+    await view._save(interaction, InventoryReportVisibility.ONLY_ME)
+
+    assert "could not be saved" in saved["content"]
+    assert saved["ephemeral"] is True
+    assert all(not getattr(item, "disabled", False) for item in view.children)
 
 
 @pytest.mark.asyncio

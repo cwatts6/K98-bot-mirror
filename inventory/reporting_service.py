@@ -46,6 +46,13 @@ class InventoryVisibilityPreferenceRead:
     error: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class InventoryVisibilityPreferenceWrite:
+    ok: bool
+    visibility: InventoryReportVisibility | None = None
+    error: str | None = None
+
+
 def parse_report_range(value: str | None) -> InventoryReportRange:
     normalized = (value or InventoryReportRange.ONE_MONTH.value).strip().upper()
     for item in InventoryReportRange:
@@ -114,27 +121,46 @@ async def get_visibility_preference(discord_user_id: int) -> InventoryReportVisi
     return pref or InventoryReportVisibility.ONLY_ME
 
 
+async def write_visibility_preference(
+    discord_user_id: int,
+    visibility: InventoryReportVisibility,
+) -> InventoryVisibilityPreferenceWrite:
+    try:
+        await asyncio.to_thread(
+            inventory_reporting_dal.upsert_visibility_preference,
+            int(discord_user_id),
+            visibility,
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "inventory_report_visibility_pref_write_failed user_id=%s selected=%s",
+            discord_user_id,
+            visibility.value,
+        )
+        return InventoryVisibilityPreferenceWrite(
+            ok=False,
+            error=f"{type(exc).__name__}: {exc}",
+        )
+    return InventoryVisibilityPreferenceWrite(ok=True, visibility=visibility)
+
+
 async def resolve_visibility(
     *, discord_user_id: int, selected_visibility: InventoryReportVisibility | None
 ) -> InventoryReportVisibility:
-    if selected_visibility is not None:
-        try:
-            await asyncio.to_thread(
-                inventory_reporting_dal.upsert_visibility_preference,
-                int(discord_user_id),
-                selected_visibility,
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception(
-                "inventory_report_visibility_pref_write_failed user_id=%s selected=%s — falling back to private",
-                discord_user_id,
-                selected_visibility.value,
-            )
-            return InventoryReportVisibility.ONLY_ME
-        return selected_visibility
-    return await get_visibility_preference(discord_user_id)
+    if selected_visibility is None:
+        return await get_visibility_preference(discord_user_id)
+
+    result = await write_visibility_preference(discord_user_id, selected_visibility)
+    if not result.ok:
+        logger.warning(
+            "inventory_report_visibility_pref_write_defaulted_private user_id=%s selected=%s",
+            discord_user_id,
+            selected_visibility.value,
+        )
+        return InventoryReportVisibility.ONLY_ME
+    return result.visibility or selected_visibility
 
 
 async def resolve_governor_for_report(

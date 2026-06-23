@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 import logging
+from typing import Any
 
 import discord
 
 from core.interaction_safety import safe_defer
-from player_self_service import account_service, reminder_service
+from inventory.models import InventoryReportVisibility
+from player_self_service import (
+    account_service,
+    dashboard_card,
+    preference_service,
+    reminder_service,
+)
 from player_self_service.account_service import AccountCentreState
 from player_self_service.reminder_service import ReminderCentreState
 from player_self_service.service import (
@@ -210,7 +218,7 @@ def build_preferences_embed(
         value=_field_value(
             [
                 f"Recommended action: {preferences.next_action}",
-                "Preference writes stay in existing service-backed tools for this phase.",
+                "Use the controls below to update inventory report visibility.",
             ]
         ),
         inline=False,
@@ -264,6 +272,83 @@ def build_page_embed(
     return build_dashboard_embed(summary, display_name=display_name)
 
 
+def _reset_files(files: list[discord.File] | None) -> None:
+    for file in files or []:
+        try:
+            file.reset(seek=True)
+        except Exception:
+            logger.debug("player_self_service_file_reset_failed", exc_info=True)
+
+
+async def _build_page_response(
+    page: PlayerSelfServicePage,
+    summary: PlayerSelfServiceSummary,
+    *,
+    display_name: str,
+) -> tuple[discord.Embed, list[discord.File]]:
+    embed = build_page_embed(page, summary, display_name=display_name)
+    if page != PAGE_DASHBOARD:
+        return embed, []
+
+    try:
+        rendered = await asyncio.to_thread(
+            dashboard_card.render_dashboard_card,
+            summary,
+            display_name=display_name,
+        )
+    except Exception:
+        logger.exception(
+            "player_self_service_dashboard_card_render_failed user_id=%s",
+            summary.discord_user_id,
+        )
+        return embed, []
+
+    file = discord.File(rendered.image_bytes, filename=rendered.filename)
+    embed.set_image(url=f"attachment://{rendered.filename}")
+    return embed, [file]
+
+
+def _edit_kwargs(
+    *,
+    embed: discord.Embed,
+    view: discord.ui.View,
+    files: list[discord.File],
+) -> dict[str, object]:
+    kwargs: dict[str, object] = {"embed": embed, "view": view, "attachments": []}
+    if files:
+        kwargs["files"] = files
+    return kwargs
+
+
+async def _edit_original_with_image_fallback(
+    target: Any,
+    *,
+    page: PlayerSelfServicePage,
+    summary: PlayerSelfServiceSummary,
+    display_name: str,
+    view: discord.ui.View,
+    embed: discord.Embed,
+    files: list[discord.File],
+) -> object:
+    try:
+        return await target.edit_original_response(
+            **_edit_kwargs(embed=embed, view=view, files=files)
+        )
+    except Exception:
+        if not files:
+            raise
+        logger.exception(
+            "player_self_service_dashboard_card_send_failed user_id=%s",
+            summary.discord_user_id,
+        )
+        fallback_embed = build_page_embed(page, summary, display_name=display_name)
+        return await target.edit_original_response(
+            embed=fallback_embed,
+            view=view,
+            attachments=[],
+        )
+
+
 class PlayerSelfServiceView(discord.ui.View):
     def __init__(
         self,
@@ -306,6 +391,12 @@ class PlayerSelfServiceView(discord.ui.View):
             for child in list(self.children):
                 if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
                     "me:reminder:"
+                ):
+                    self.remove_item(child)
+        if self.page != PAGE_PREFERENCES:
+            for child in list(self.children):
+                if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
+                    "me:preference:"
                 ):
                     self.remove_item(child)
         for child in self.children:
@@ -363,13 +454,26 @@ class PlayerSelfServiceView(discord.ui.View):
             summary_loader=self.summary_loader,
             timeout=self.timeout or 180,
         )
-        embed = build_page_embed(page, summary, display_name=self.display_name)
+        embed, files = await _build_page_response(page, summary, display_name=self.display_name)
         try:
-            edited = await interaction.edit_original_response(embed=embed, view=view)
+            edited = await _edit_original_with_image_fallback(
+                interaction,
+                page=page,
+                summary=summary,
+                display_name=self.display_name,
+                view=view,
+                embed=embed,
+                files=files,
+            )
             view.set_message_ref(getattr(interaction, "message", None) or edited)
         except Exception:
             logger.debug("player_self_service_edit_message_failed", exc_info=True)
-            sent = await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+            _reset_files(files)
+            sent = await interaction.followup.send(
+                embed=build_page_embed(page, summary, display_name=self.display_name),
+                view=view,
+                ephemeral=True,
+            )
             view.set_message_ref(sent)
 
     @discord.ui.button(label="Accounts", style=discord.ButtonStyle.primary, custom_id="me:accounts")
@@ -667,6 +771,84 @@ class PlayerSelfServiceView(discord.ui.View):
             ephemeral=True,
         )
 
+    async def _save_inventory_visibility(
+        self,
+        interaction: discord.Interaction,
+        visibility: InventoryReportVisibility,
+    ) -> None:
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+        except TypeError:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer()
+            except Exception:
+                logger.debug("player_self_service_preference_defer_failed", exc_info=True)
+        except Exception:
+            logger.debug("player_self_service_preference_defer_failed", exc_info=True)
+
+        result = await preference_service.save_inventory_visibility(
+            self.author_id,
+            visibility,
+        )
+        await interaction.followup.send(result.message, ephemeral=True)
+        if not result.ok:
+            return
+
+        try:
+            summary = await self.summary_loader(self.author_id)
+        except Exception:
+            logger.exception(
+                "player_self_service_preference_refresh_failed user_id=%s",
+                self.author_id,
+            )
+            return
+
+        view = PlayerSelfServiceView(
+            author_id=self.author_id,
+            display_name=self.display_name,
+            page=PAGE_PREFERENCES,
+            summary_loader=self.summary_loader,
+            timeout=self.timeout or 180,
+        )
+        embed = build_preferences_embed(summary, display_name=self.display_name)
+        try:
+            edited = await interaction.edit_original_response(
+                embed=embed,
+                view=view,
+                attachments=[],
+            )
+            view.set_message_ref(getattr(interaction, "message", None) or edited)
+        except Exception:
+            logger.debug("player_self_service_preference_refresh_edit_failed", exc_info=True)
+
+    @discord.ui.button(
+        label="Set Private",
+        style=discord.ButtonStyle.primary,
+        custom_id="me:preference:private",
+        row=3,
+    )
+    async def preference_private_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        await self._save_inventory_visibility(interaction, InventoryReportVisibility.ONLY_ME)
+
+    @discord.ui.button(
+        label="Set Public",
+        style=discord.ButtonStyle.secondary,
+        custom_id="me:preference:public",
+        row=3,
+    )
+    async def preference_public_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        await self._save_inventory_visibility(interaction, InventoryReportVisibility.PUBLIC)
+
     async def on_timeout(self) -> None:
         for child in self.children:
             child.disabled = True
@@ -752,6 +934,14 @@ async def send_player_self_service_page(
         page=page,
         summary_loader=summary_loader,
     )
-    embed = build_page_embed(page, summary, display_name=display_name)
-    message = await ctx.interaction.edit_original_response(embed=embed, view=view)
+    embed, files = await _build_page_response(page, summary, display_name=display_name)
+    message = await _edit_original_with_image_fallback(
+        ctx.interaction,
+        page=page,
+        summary=summary,
+        display_name=display_name,
+        view=view,
+        embed=embed,
+        files=files,
+    )
     view.set_message_ref(message)

@@ -308,10 +308,17 @@ class InventoryPreferenceView(discord.ui.View):
             )
             return
         await interaction.response.defer(ephemeral=True)
-        await reporting_service.resolve_visibility(
-            discord_user_id=self.requester_id,
-            selected_visibility=visibility,
+        result = await reporting_service.write_visibility_preference(
+            self.requester_id,
+            visibility,
         )
+        if not result.ok or result.visibility != visibility:
+            await interaction.followup.send(
+                "Inventory report preference could not be saved. "
+                "Your previous setting is unchanged. Please try again in a moment.",
+                ephemeral=True,
+            )
+            return
         for item in self.children:
             item.disabled = True
         self.stop()
