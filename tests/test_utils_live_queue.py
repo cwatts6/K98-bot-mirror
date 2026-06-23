@@ -1,0 +1,236 @@
+import asyncio
+import json
+
+import pytest
+
+import utils
+
+pytestmark = pytest.mark.asyncio
+
+
+async def test_save_and_load_structure(tmp_path, monkeypatch):
+    """
+    Unit test: verify save_live_queue writes the expected shape and load_live_queue
+    repopulates live_queue['jobs'] and live_queue['message_meta'].
+    """
+    temp_file = tmp_path / "queue_cache.json"
+    monkeypatch.setattr(utils, "QUEUE_CACHE_FILE", str(temp_file))
+
+    # Prepare live_queue with jobs and a fake message_meta
+    async with utils.live_queue_lock:
+        utils.live_queue["jobs"] = [{"filename": "a.txt", "status": "ok"}]
+        utils.live_queue["message"] = None
+        utils.live_queue["message_meta"] = {
+            "channel_id": 111,
+            "message_id": 222,
+            "message_created": None,
+        }
+
+    # Save to disk
+    utils.save_live_queue()
+    assert temp_file.exists()
+
+    # Clear in-memory and call load_live_queue
+    async with utils.live_queue_lock:
+        utils.live_queue["jobs"] = []
+        utils.live_queue["message"] = None
+        utils.live_queue["message_meta"] = None
+
+    # Call load_live_queue (it schedules the apply into the running loop)
+    utils.load_live_queue()
+    # allow scheduled apply() to run
+    await asyncio.sleep(0.1)
+
+    # Validate
+    async with utils.live_queue_lock:
+        assert utils.live_queue["jobs"] == [{"filename": "a.txt", "status": "ok"}]
+        assert utils.live_queue["message_meta"] == {
+            "channel_id": 111,
+            "message_id": 222,
+            "message_created": None,
+        }
+
+
+async def test_load_live_queue_async_applies_before_return(tmp_path, monkeypatch):
+    temp_file = tmp_path / "queue_cache.json"
+    monkeypatch.setattr(utils, "QUEUE_CACHE_FILE", str(temp_file))
+    temp_file.write_text(
+        json.dumps(
+            {
+                "jobs": [{"filename": "queued.csv", "status": "queued"}],
+                "message_meta": {"channel_id": "111", "message_id": "222"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    async with utils.live_queue_lock:
+        utils.live_queue["jobs"] = []
+        utils.live_queue["message_meta"] = None
+
+    loaded = await utils.load_live_queue_async()
+
+    assert loaded is True
+    async with utils.live_queue_lock:
+        assert utils.live_queue["jobs"] == [{"filename": "queued.csv", "status": "queued"}]
+        assert utils.live_queue["message_meta"] == {
+            "channel_id": 111,
+            "message_id": 222,
+            "message_created": None,
+        }
+
+
+async def test_load_live_queue_async_clears_invalid_message_meta(tmp_path, monkeypatch):
+    temp_file = tmp_path / "queue_cache.json"
+    monkeypatch.setattr(utils, "QUEUE_CACHE_FILE", str(temp_file))
+    temp_file.write_text(
+        json.dumps(
+            {
+                "jobs": [{"filename": "queued.csv", "status": "queued"}],
+                "message_meta": {"channel_id": "not-an-int", "message_id": 222},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = await utils.load_live_queue_async()
+
+    assert loaded is True
+    async with utils.live_queue_lock:
+        assert utils.live_queue["jobs"] == [{"filename": "queued.csv", "status": "queued"}]
+        assert utils.live_queue["message_meta"] is None
+
+
+async def test_save_live_queue_async_uses_atomic_json_writer(tmp_path, monkeypatch):
+    temp_file = tmp_path / "queue_cache.json"
+    monkeypatch.setattr(utils, "QUEUE_CACHE_FILE", str(temp_file))
+    writes = []
+
+    def fake_write(payload):
+        writes.append(payload)
+
+    monkeypatch.setattr(utils, "_write_live_queue_payload", fake_write)
+
+    async with utils.live_queue_lock:
+        utils.live_queue["jobs"] = [{"filename": "a.txt", "status": "ok"}]
+        utils.live_queue["message_meta"] = {"channel_id": 111, "message_id": 222}
+
+    saved = await utils.save_live_queue_async()
+
+    assert saved is True
+    assert writes == [
+        {
+            "jobs": [{"filename": "a.txt", "status": "ok"}],
+            "message_meta": {"channel_id": 111, "message_id": 222},
+        }
+    ]
+
+
+async def test_save_live_queue_async_propagates_write_failure(monkeypatch):
+    def fail_write(_payload):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(utils, "_write_live_queue_payload", fail_write)
+
+    with pytest.raises(OSError, match="disk full"):
+        await utils.save_live_queue_async()
+
+
+async def test_save_live_queue_sync_wrapper_does_not_use_async_lock(monkeypatch):
+    writes = []
+
+    class ExplodingLock:
+        async def __aenter__(self):
+            raise AssertionError("sync save should not await live_queue_lock")
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    def fake_write(payload):
+        writes.append(payload)
+
+    monkeypatch.setattr(utils, "live_queue_lock", ExplodingLock())
+    monkeypatch.setattr(utils, "_write_live_queue_payload", fake_write)
+    utils.live_queue["jobs"] = [{"filename": "threaded.csv", "status": "queued"}]
+    utils.live_queue["message_meta"] = {"channel_id": 111, "message_id": 222}
+
+    saved = await asyncio.to_thread(utils.save_live_queue)
+
+    assert saved is True
+    assert writes == [
+        {
+            "jobs": [{"filename": "threaded.csv", "status": "queued"}],
+            "message_meta": {"channel_id": 111, "message_id": 222},
+        }
+    ]
+
+
+async def test_update_live_queue_embed_rehydrate(monkeypatch):
+    """
+    Integration-style test that simulates rehydration:
+    - live_queue has message_meta but message is None.
+    - bot.get_channel returns a fake channel whose fetch_message returns a fake message.
+    - After calling update_live_queue_embed, live_queue['message'] should be set to the fake message.
+    """
+
+    class FakeMessage:
+        def __init__(self, mid, created_at=None):
+            self.id = mid
+            self.created_at = created_at
+
+        async def edit(self, *, embed=None):
+            # simulate edit success
+            self._edited = True
+            return self
+
+    class FakeChannel:
+        def __init__(self, cid, fake_message):
+            self.id = cid
+            self._fake_message = fake_message
+
+        async def fetch_message(self, mid):
+            if mid == self._fake_message.id:
+                return self._fake_message
+            raise Exception("NotFound")
+
+        async def send(self, embed=None):
+            # simulate send returning a message
+            return self._fake_message
+
+    class FakeBot:
+        def __init__(self, channel):
+            self._channel = channel
+
+        def get_channel(self, cid):
+            # return cached object only if same id
+            if cid == self._channel.id:
+                return self._channel
+            return None
+
+        async def fetch_channel(self, cid):
+            if cid == self._channel.id:
+                return self._channel
+            raise Exception("NotFound")
+
+    fake_msg = FakeMessage(mid=999)
+    fake_chan = FakeChannel(cid=123, fake_message=fake_msg)
+    fake_bot = FakeBot(channel=fake_chan)
+
+    # Prepare live_queue state
+    async with utils.live_queue_lock:
+        utils.live_queue["jobs"] = []
+        utils.live_queue["message"] = None
+        utils.live_queue["message_meta"] = {
+            "channel_id": 123,
+            "message_id": 999,
+            "message_created": None,
+        }
+
+    # Call update_live_queue_embed (this will try to rehydrate)
+    await utils.update_live_queue_embed(fake_bot, notify_channel_id=123)
+
+    # Validate that message was rehydrated
+    async with utils.live_queue_lock:
+        assert utils.live_queue["message"] is fake_msg
+        assert utils.live_queue["message_meta"]["channel_id"] == 123
+        assert utils.live_queue["message_meta"]["message_id"] == 999
