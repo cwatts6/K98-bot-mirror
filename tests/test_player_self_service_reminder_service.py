@@ -60,7 +60,7 @@ def test_normalize_event_types_prevents_duplicate_reminders() -> None:
 
     assert all_types == ("all",)
     assert all_adjusted is True
-    assert fight_types == ("ruins", "fights")
+    assert fight_types == ("fights",)
     assert fight_adjusted is True
 
 

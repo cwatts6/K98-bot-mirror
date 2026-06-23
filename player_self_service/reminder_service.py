@@ -95,7 +95,7 @@ def normalize_event_types(values: list[Any] | tuple[Any, ...]) -> tuple[tuple[st
         adjusted = ordered != ("all",)
         return ("all",), adjusted
     if "fights" in ordered:
-        filtered = tuple(value for value in ordered if value not in {"altars", "major"})
+        filtered = tuple(value for value in ordered if value not in {"ruins", "altars", "major"})
         adjusted = filtered != ordered
         ordered = filtered
     return ordered, adjusted

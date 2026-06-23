@@ -29,9 +29,21 @@ def _option_desc(key: str) -> str:
         "ruins": "Ruins events",
         "altars": "Altar fights",
         "major": "Major timeline events",
-        "fights": "All fights without duplicate altar/major reminders",
+        "fights": "Covers ruins, altars, and major fights",
         "all": "Every KVK event type",
     }.get(key, "")
+
+
+def _event_options(selected: tuple[str, ...]) -> list[discord.SelectOption]:
+    return [
+        discord.SelectOption(
+            label=event_type,
+            value=event_type,
+            description=_option_desc(event_type),
+            default=event_type in selected,
+        )
+        for event_type in VALID_TYPES
+    ]
 
 
 def _dm_embed(message: ReminderMessage) -> discord.Embed:
@@ -62,15 +74,7 @@ async def _defer_private(interaction: discord.Interaction) -> None:
 
 class ReminderEventSelect(discord.ui.Select):
     def __init__(self, *, selected: tuple[str, ...]) -> None:
-        options = [
-            discord.SelectOption(
-                label=event_type,
-                value=event_type,
-                description=_option_desc(event_type),
-                default=event_type in selected,
-            )
-            for event_type in VALID_TYPES
-        ]
+        options = _event_options(selected)
         super().__init__(
             placeholder="Choose event types",
             min_values=1,
@@ -87,7 +91,12 @@ class ReminderEventSelect(discord.ui.Select):
                 ephemeral=True,
             )
             return
-        view.selected_types = list(self.values)
+        selected_types, adjusted = reminder_service.normalize_event_types(tuple(self.values))
+        view.selected_types = list(selected_types)
+        self.options = _event_options(selected_types)
+        if adjusted:
+            await interaction.response.edit_message(view=view)
+            return
         await interaction.response.defer()
 
 
