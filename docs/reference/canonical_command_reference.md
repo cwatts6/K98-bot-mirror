@@ -229,9 +229,11 @@ Legend:
 - Player Self-Service Command Centre Phase 2 added `/me` with five private subcommands:
   `dashboard`, `accounts`, `reminders`, `preferences`, and `exports`. Phase 3 turned
   `/me accounts` into the modern account centre for lookup, registration, replacement, and removal
-  with confirmation and was smoke tested successfully on 2026-06-22. Phase 4 turns
-  `/me reminders` into the modern reminder centre while legacy reminder commands remain live.
-  Existing legacy self-service commands remain registered in parallel.
+  with confirmation and was smoke tested successfully on 2026-06-22. Phase 4 turned
+  `/me reminders` into the modern reminder centre for setup review, subscribe/update, and
+  unsubscribe confirmation while preserving legacy reminder commands. Phase 4 was smoke tested
+  successfully after the reminder event-category normalization fix. Existing legacy self-service
+  commands remain registered in parallel.
 - Legacy player self-service paths remain registered in parallel while the `/me` workflow rolls out.
 - Public calendar and KVK calendar paths remain flat pending a dedicated UX redesign.
 - `/ping` remains flat for simple health/debug discoverability.

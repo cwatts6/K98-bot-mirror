@@ -1,6 +1,7 @@
 # Codex Chat Starter - Player Self-Service Command Centre Phase 4 Modern Reminder Centre
 
-Status: active starter for the next Player Self-Service Command Centre phase.
+Status: complete. Phase 4 was delivered in mirror PR #166 and production PR #474, smoke tested
+successfully by the operator, and archived as the Phase 4 execution starter.
 
 Phase 1 audit/design is complete and archived.
 

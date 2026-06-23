@@ -2,8 +2,8 @@
 
 Last updated: 2026-06-23
 
-Status: Phase 4 Modern Reminder Centre is implemented for local validation. Phase 3 Modern
-Account Centre was smoke tested successfully on 2026-06-22.
+Status: Phase 4 Modern Reminder Centre is delivered and smoke tested successfully. Phase 5 Visual
+Dashboard Card and Preferences Hub is the next active task-pack phase.
 
 ## Player Briefing
 
@@ -49,7 +49,7 @@ grouped_subcommands_detected=85
 Rollout checks:
 
 - Confirm `/me dashboard` is private and understandable as a status dashboard.
-- Confirm account, reminder, preference, and export pages are read-only.
+- Confirm account, reminder, preference, and export pages remain private.
 - Confirm legacy player commands remain registered and usable.
 - Monitor `/me` usage before approving any later legacy redirects.
 
@@ -89,8 +89,16 @@ Phase 4 reminder-centre checks:
 - Confirm legacy reminder commands remain registered and usable.
 - Confirm reminder changes send a best-effort confirmation DM and preserve scheduler/tracker
   behavior.
+- Confirm reminder event categories use the delivered logic:
+  - `Ruins`: non-fight ruins events.
+  - `Altars`: altar fights.
+  - `Major`: all major timeline events.
+  - `Fights`: altar fights plus major events marked `FIGHT`.
+  - overlapping choices are normalized to avoid duplicate DMs.
 
 Later mutation gates:
 
+- Phase 5 dashboard-card work must preserve the existing private `/me dashboard` controls and use
+  a safe embed fallback if card rendering fails.
 - Preference writes require an existing service-backed persistence path.
 - Dashboard quick launch must not bypass existing channel or visibility rules.

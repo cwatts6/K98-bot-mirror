@@ -57,7 +57,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Suggested Fix: After Phase 4 is smoke tested and operator-approved, scope a follow-up consolidation that routes the legacy reminder commands through `player_self_service/reminder_service.py` without changing their registered paths or user-visible behavior. Keep duplicate subscription protection, DM confirmation behavior, unsubscribe tracker cleanup, scheduler/restart behavior, and focused legacy command/view tests green before considering later redirects or removal.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 4 Modern Reminder Centre merged, smoke tested, and accepted; operator decision on whether legacy paths should be service-rerouted before any redirect/removal phase.
+- Dependencies: Phase 4 Modern Reminder Centre delivered and smoke tested successfully; operator decision on whether legacy paths should be service-rerouted before any redirect/removal phase.
 
 ### Deferred Optimisation
 - Area: `commands/calendar_cmds.py`, `commands/events_cmds.py`, `ui/views/calendar.py`, `ui/views/events_views.py`, public calendar/KVK calendar docs/tests

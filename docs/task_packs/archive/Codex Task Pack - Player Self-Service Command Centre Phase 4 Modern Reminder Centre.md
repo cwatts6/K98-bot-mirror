@@ -7,6 +7,7 @@
 - Owner/context: Player Self-Service Command Centre programme after Phase 3 Modern Account Centre delivery and smoke test
 - Task type: `Discord command feature | player UX consolidation | reminder workflow service extraction`
 - One-pass approved: `no`
+- Status: `complete - delivered in mirror PR #166 and production PR #474, smoke tested successfully`
 
 ## 2. Required Reading
 

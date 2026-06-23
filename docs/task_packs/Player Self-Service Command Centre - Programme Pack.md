@@ -11,17 +11,21 @@
 
 ## Current Programme Status
 
-Status as of 2026-06-22:
+Status as of 2026-06-23:
 
 - Phase 1 audit and design is complete and archived as a historical execution record.
 - Phase 2 `/me` command shell and navigation foundation is delivered in mirror PR #164 and
   production PR #472, smoke tested successfully, and awaiting manual merge/promotion.
 - Phase 3 Modern Account Centre is delivered in mirror PR #165, smoke tested successfully by the
   operator on 2026-06-22, and awaiting manual merge/push.
+- Phase 4 Modern Reminder Centre is delivered in mirror PR #166 and production PR #474, smoke
+  tested successfully by the operator, and awaiting manual merge/promotion where still needed.
 - The delivered `/me` surface now includes a private command-centre shell plus account-centre
-  lookup, registration, replacement, removal with confirmation, and return navigation. Legacy
-  account commands remain live.
-- Next active implementation phase: Phase 4 Modern Reminder Centre.
+  lookup, registration, replacement, removal with confirmation, reminder review, reminder
+  subscribe/update, unsubscribe confirmation, and return navigation. Legacy account and reminder
+  commands remain live.
+- Next active implementation phase: Phase 5 Visual `/me dashboard` Card and First-Pass
+  Preferences.
 
 Phase 2 manual smoke evidence:
 
@@ -50,6 +54,18 @@ Phase 3 process-learning for later phases:
   flows.
 - Every later phase should actively optimise player process: fewer buttons, fewer repeated inputs,
   fewer memory steps, and no legacy-command-shaped button piles.
+
+Phase 4 manual smoke evidence:
+
+- `/me reminders` remained private and opened the modern reminder centre.
+- Players could review current reminder setup.
+- Subscribe/update through event and timing selectors worked.
+- Unsubscribe required confirmation.
+- Legacy reminder commands remained registered and usable.
+- Final reminder category logic matched the intended KVK model: `Ruins` means non-fight ruins,
+  `Altars` means altar fights, `Major` means all major events, and `Fights` means altar fights
+  plus major events marked `FIGHT`, with overlapping selections normalized to prevent duplicate
+  reminder DMs.
 
 ## 2. Programme Vision
 
@@ -399,7 +415,8 @@ Known follow-up from Phase 3 smoke:
 
 ### Phase 4 — Modern Reminder Centre
 
-Status: next active phase.
+Status: delivered in mirror PR #166 and production PR #474, smoke tested successfully by the
+operator, and awaiting manual merge/promotion where still needed.
 
 Replace fragmented reminder behaviours with one reminder centre journey.
 
@@ -411,18 +428,24 @@ Target consolidation:
 /unsubscribe
 ```
 
-Likely deliverables:
+Delivered scope:
 
 - current subscription summary
 - event type selector
 - reminder time selector
 - unsubscribe flow
-- DM availability/troubleshooting guidance
-- sent/scheduled reminder status where safe
-- duplicate reminder and restart-safety considerations
+- best-effort confirmation DM after successful save/unsubscribe
+- service-backed reminder state and mutation models
+- reminder selector normalization to avoid duplicate DMs
+- scheduler matching fix for `Fights` event semantics
 - process simplification review so players do not repeat selections or copy values between steps
 
+Legacy `/subscribe`, `/modify_subscription`, and `/unsubscribe` remain registered and usable until
+redirects or removal are separately approved.
+
 ### Phase 5 — Visual `/me dashboard` Card and First-Pass Preferences
+
+Status: next active phase.
 
 Build the premium dashboard card and extend the lightweight preferences hub once the data contract
 and navigation have been proven.
@@ -655,12 +678,13 @@ Do not include these in the first build unless separately approved:
 
 ## 18. Suggested Next Action
 
-Start Phase 4:
+Start Phase 5:
 
 ```text
-Codex Task Pack - Player Self-Service Command Centre Phase 4 Modern Reminder Centre.md
+Codex Task Pack - Player Self-Service Command Centre Phase 5 Visual Dashboard Card and Preferences Hub.md
 ```
 
-Phase 4 should turn the delivered read-only `/me reminders` shell into a service-backed reminder
-centre for reminder review, subscription, modification, unsubscribe confirmation, and return
-navigation while preserving all legacy reminder commands until redirects are separately approved.
+Phase 5 should turn the delivered private `/me dashboard` shell into a premium generated visual
+dashboard card and extend `/me preferences` only where existing service-backed preference
+persistence makes mutation safe. It should preserve delivered account/reminder flows, dashboard
+Quick Launch, and all legacy commands until redirects are separately approved.

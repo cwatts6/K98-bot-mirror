@@ -30,13 +30,15 @@ Player Self-Service Command Centre status:
   production PR #472, smoke tested successfully, and awaiting manual merge/promotion.
 - Phase 3 Modern Account Centre is delivered in mirror PR #165, smoke tested successfully by the
   operator on 2026-06-22, and awaiting manual merge/push.
-- The active next phase is Phase 4 Modern Reminder Centre.
-- Active Phase 4 files:
-  - `Codex Task Pack - Player Self-Service Command Centre Phase 4 Modern Reminder Centre.md`
-  - `Codex Chat Starter - Player Self-Service Command Centre Phase 4 Modern Reminder Centre.md`
+- Phase 4 Modern Reminder Centre is delivered in mirror PR #166 and production PR #474, smoke
+  tested successfully by the operator, and awaiting manual merge/promotion where still needed.
+- The active next phase is Phase 5 Visual Dashboard Card and Preferences Hub.
+- Active Phase 5 files:
+  - `Codex Task Pack - Player Self-Service Command Centre Phase 5 Visual Dashboard Card and Preferences Hub.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre Phase 5 Visual Dashboard Card and Preferences Hub.md`
 - Active programme file:
   - `Player Self-Service Command Centre - Programme Pack.md`
-- Completed Phase 1/2/3 execution records are archived under `archive/`.
+- Completed Phase 1/2/3/4 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
 merge/promotion. Phase 1 audit/design, Phase 2A
@@ -118,6 +120,6 @@ Latest completed starter:
 
 Next active work:
 
-Player Self-Service Command Centre Phase 4 Modern Reminder Centre is active. KVK final removal of
-temporary deprecated command paths remains captured as a deferred cleanup item for execution after
-the no-feedback window and operator approval.
+Player Self-Service Command Centre Phase 5 Visual Dashboard Card and Preferences Hub is active.
+KVK final removal of temporary deprecated command paths remains captured as a deferred cleanup item
+for execution after the no-feedback window and operator approval.
