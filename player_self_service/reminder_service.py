@@ -233,9 +233,7 @@ async def save_reminder_preferences(
         adjusted,
     )
     verb = "Subscribed" if action == "subscribe" else "Updated reminders"
-    message = (
-        f"{verb}: events {_format_list(event_types)}; times {_format_list(reminder_times)}."
-    )
+    message = f"{verb}: events {_format_list(event_types)}; times {_format_list(reminder_times)}."
     if adjusted:
         message += " Some selections were adjusted to avoid duplicate reminders."
 
@@ -369,7 +367,9 @@ def _build_saved_dm_message(
     reminder_times: tuple[str, ...],
     adjusted: bool,
 ) -> ReminderMessage:
-    title = "Subscribed to Event Reminders" if action == "subscribe" else "Reminder Preferences Updated"
+    title = (
+        "Subscribed to Event Reminders" if action == "subscribe" else "Reminder Preferences Updated"
+    )
     fields = (
         ("Event Types", _format_list(event_types)),
         ("Reminder Times", _format_list(reminder_times)),

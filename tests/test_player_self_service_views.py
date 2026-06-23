@@ -9,6 +9,7 @@ from player_self_service.reminder_service import (
     ReminderCentreState,
     ReminderMessage,
     ReminderMutationResult,
+    ReminderUnsubscribeConfirmation,
 )
 from player_self_service.service import (
     AccountStatus,
@@ -383,6 +384,43 @@ async def test_reminder_setup_save_calls_service_and_sends_dm(monkeypatch) -> No
     edited = interaction.original_edits[-1]
     assert "confirmation DM was sent" in edited["content"]
     assert isinstance(edited["view"], reminder_views.ReminderCompletionView)
+
+
+@pytest.mark.asyncio
+async def test_reminder_unsubscribe_failure_allows_confirm_retry(monkeypatch) -> None:
+    calls = []
+
+    async def fake_confirm(user_id, confirmation):
+        calls.append((user_id, confirmation))
+        return ReminderMutationResult(
+            ok=False,
+            action="unsubscribe",
+            message="Failed to unsubscribe. Please try again in a moment.",
+        )
+
+    monkeypatch.setattr(reminder_views.reminder_service, "confirm_unsubscribe", fake_confirm)
+    confirmation = ReminderUnsubscribeConfirmation(
+        event_types=("ruins",),
+        reminder_times=("24h",),
+    )
+    view = reminder_views.ReminderUnsubscribeConfirmView(
+        author_id=42,
+        display_name="Tester",
+        confirmation=confirmation,
+    )
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:reminder:unsubscribe:confirm"
+    )
+
+    await button.callback(interaction)
+    await button.callback(interaction)
+
+    assert calls == [(42, confirmation), (42, confirmation)]
+    assert view._confirmed is False
+    assert len(interaction.followup.sent) == 2
 
 
 @pytest.mark.asyncio

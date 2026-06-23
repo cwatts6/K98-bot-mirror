@@ -184,7 +184,9 @@ class ReminderSetupView(discord.ui.View):
         if dm_sent:
             content += " A confirmation DM was sent."
         else:
-            content += " Saved, but I could not send a confirmation DM. Check your server DM settings."
+            content += (
+                " Saved, but I could not send a confirmation DM. Check your server DM settings."
+            )
         view = ReminderCompletionView(
             author_id=self.author_id,
             display_name=self.display_name,
@@ -252,6 +254,7 @@ class ReminderUnsubscribeConfirmView(discord.ui.View):
         await _defer_private(interaction)
         result = await reminder_service.confirm_unsubscribe(self.author_id, self.confirmation)
         if not result.ok:
+            self._confirmed = False
             await interaction.followup.send(result.message, ephemeral=True)
             return
 

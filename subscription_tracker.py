@@ -1,6 +1,7 @@
 ﻿# subscription_tracker.py
 from __future__ import annotations
 
+import copy
 from datetime import UTC, datetime
 import json
 import logging
@@ -100,6 +101,24 @@ def save_subscriptions() -> None:
         raise
 
 
+def _subscription_snapshot() -> dict[str, dict]:
+    assert isinstance(subscriptions, dict)
+    return copy.deepcopy(subscriptions)
+
+
+def _restore_subscriptions(snapshot: dict[str, dict]) -> None:
+    global subscriptions
+    subscriptions = snapshot
+
+
+def _save_or_restore(snapshot: dict[str, dict]) -> None:
+    try:
+        save_subscriptions()
+    except Exception:
+        _restore_subscriptions(snapshot)
+        raise
+
+
 def get_user_config(user_id: int | str) -> dict | None:
     """Return a user's config or None."""
     _ensure_loaded()
@@ -132,6 +151,7 @@ def set_user_config(
     """
     _ensure_loaded()
     uid = str(user_id)
+    snapshot = _subscription_snapshot()
 
     # Initialize record
     cfg = subscriptions.get(uid, {"username": str(username), "subscriptions": [], "reminder_times": []})  # type: ignore[union-attr]
@@ -144,7 +164,7 @@ def set_user_config(
         cfg["reminder_times"] = _validated_times(reminder_times)
 
     subscriptions[uid] = cfg  # type: ignore[union-attr]
-    save_subscriptions()
+    _save_or_restore(snapshot)
 
 
 def remove_user(user_id: int | str) -> bool:
@@ -152,8 +172,9 @@ def remove_user(user_id: int | str) -> bool:
     _ensure_loaded()
     uid = str(user_id)
     if uid in subscriptions:  # type: ignore[union-attr]
+        snapshot = _subscription_snapshot()
         subscriptions.pop(uid)  # type: ignore[union-attr]
-        save_subscriptions()
+        _save_or_restore(snapshot)
         return True
     return False
 
@@ -162,8 +183,9 @@ def update_user_reminder_times(user_id: int | str, times: list[str]) -> bool:
     _ensure_loaded()
     uid = str(user_id)
     if uid in subscriptions:  # type: ignore[union-attr]
+        snapshot = _subscription_snapshot()
         subscriptions[uid]["reminder_times"] = _validated_times(times)  # type: ignore[union-attr]
-        save_subscriptions()
+        _save_or_restore(snapshot)
         return True
     return False
 
@@ -172,8 +194,9 @@ def update_user_event_types(user_id: int | str, event_types: list[str]) -> bool:
     _ensure_loaded()
     uid = str(user_id)
     if uid in subscriptions:  # type: ignore[union-attr]
+        snapshot = _subscription_snapshot()
         subscriptions[uid]["subscriptions"] = _validated_types(event_types)  # type: ignore[union-attr]
-        save_subscriptions()
+        _save_or_restore(snapshot)
         return True
     return False
 
@@ -338,6 +361,7 @@ def migrate_subscriptions(
     after_count = len(fixed)
 
     if not dry_run:
+        snapshot = _subscription_snapshot()
         # backup
         try:
             # use timezone-aware UTC per project standard
@@ -351,7 +375,7 @@ def migrate_subscriptions(
 
         # write & refresh in-memory
         subscriptions = fixed
-        save_subscriptions()
+        _save_or_restore(snapshot)
         _ensure_loaded()
 
     summary = (

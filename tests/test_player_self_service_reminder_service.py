@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 
 import pytest
@@ -33,9 +34,7 @@ async def test_build_reminder_centre_state_reports_invalid_shape() -> None:
 
 
 def test_normalize_event_types_prevents_duplicate_reminders() -> None:
-    all_types, all_adjusted = reminder_service.normalize_event_types(
-        ("ruins", "all", "major")
-    )
+    all_types, all_adjusted = reminder_service.normalize_event_types(("ruins", "all", "major"))
     fight_types, fight_adjusted = reminder_service.normalize_event_types(
         ("ruins", "altars", "major", "fights")
     )
@@ -58,6 +57,73 @@ def test_subscription_tracker_save_failure_propagates(monkeypatch, tmp_path) -> 
 
     with pytest.raises(OSError):
         subscription_tracker.set_user_config(42, "Tester", ["ruins"], ["24h"])
+
+    assert subscription_tracker.subscriptions == {}
+
+
+def test_subscription_tracker_update_failure_restores_existing_config(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    subscription_path = tmp_path / "subscription_tracker.json"
+    original = {
+        "42": {
+            "username": "Tester",
+            "subscriptions": ["ruins"],
+            "reminder_times": ["24h"],
+        }
+    }
+    monkeypatch.setattr(subscription_tracker, "SUBSCRIPTION_FILE", str(subscription_path))
+    monkeypatch.setattr(
+        subscription_tracker,
+        "subscriptions",
+        copy.deepcopy(original),
+        raising=False,
+    )
+
+    def fail_replace(_src, _dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(subscription_tracker.os, "replace", fail_replace)
+
+    with pytest.raises(OSError):
+        subscription_tracker.update_user_event_types(42, ["all"])
+    assert subscription_tracker.subscriptions == original
+
+    with pytest.raises(OSError):
+        subscription_tracker.update_user_reminder_times(42, ["1h"])
+    assert subscription_tracker.subscriptions == original
+
+
+def test_subscription_tracker_remove_failure_restores_existing_config(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    subscription_path = tmp_path / "subscription_tracker.json"
+    original = {
+        "42": {
+            "username": "Tester",
+            "subscriptions": ["ruins"],
+            "reminder_times": ["24h"],
+        }
+    }
+    monkeypatch.setattr(subscription_tracker, "SUBSCRIPTION_FILE", str(subscription_path))
+    monkeypatch.setattr(
+        subscription_tracker,
+        "subscriptions",
+        copy.deepcopy(original),
+        raising=False,
+    )
+
+    def fail_replace(_src, _dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(subscription_tracker.os, "replace", fail_replace)
+
+    with pytest.raises(OSError):
+        subscription_tracker.remove_user(42)
+
+    assert subscription_tracker.subscriptions == original
 
 
 @pytest.mark.asyncio
