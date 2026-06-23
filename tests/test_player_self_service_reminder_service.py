@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
+import threading
 
 import pytest
 
@@ -31,6 +32,24 @@ async def test_build_reminder_centre_state_reports_invalid_shape() -> None:
 
     assert state.ok is False
     assert state.error == "invalid reminder config shape"
+
+
+@pytest.mark.asyncio
+async def test_build_reminder_centre_state_uses_event_loop_thread() -> None:
+    loop_thread = threading.get_ident()
+    loader_threads = []
+
+    def config_loader(_uid):
+        loader_threads.append(threading.get_ident())
+        return None
+
+    state = await reminder_service.build_reminder_centre_state(
+        42,
+        config_loader=config_loader,
+    )
+
+    assert state.ok is True
+    assert loader_threads == [loop_thread]
 
 
 def test_normalize_event_types_prevents_duplicate_reminders() -> None:
@@ -148,6 +167,34 @@ async def test_save_reminder_preferences_subscribes_with_existing_writer_path() 
     assert result.reminder_times == ("24h", "1h")
     assert calls == [(42, "Tester", ["ruins", "altars"], ["24h", "1h"])]
     assert result.dm_message is not None
+
+
+@pytest.mark.asyncio
+async def test_save_reminder_preferences_keeps_tracker_access_on_event_loop_thread() -> None:
+    loop_thread = threading.get_ident()
+    call_threads = []
+
+    def config_loader(_uid):
+        call_threads.append(("loader", threading.get_ident()))
+        return None
+
+    def writer(*_args):
+        call_threads.append(("writer", threading.get_ident()))
+
+    result = await reminder_service.save_reminder_preferences(
+        42,
+        "Tester",
+        ("ruins",),
+        ("24h",),
+        config_loader=config_loader,
+        writer=writer,
+    )
+
+    assert result.ok is True
+    assert call_threads == [
+        ("loader", loop_thread),
+        ("writer", loop_thread),
+    ]
 
 
 @pytest.mark.asyncio
@@ -269,6 +316,43 @@ async def test_confirm_unsubscribe_cleans_trackers_before_removing_config() -> N
         ("remove", 42),
     ]
     assert result.dm_message is not None
+
+
+@pytest.mark.asyncio
+async def test_confirm_unsubscribe_keeps_tracker_access_on_event_loop_thread() -> None:
+    loop_thread = threading.get_ident()
+    calls = []
+    confirmation = reminder_service.ReminderUnsubscribeConfirmation(
+        event_types=("ruins",),
+        reminder_times=("24h",),
+    )
+
+    def config_loader(_uid):
+        calls.append(("loader", threading.get_ident()))
+        return {"subscriptions": ["ruins"], "reminder_times": ["24h"]}
+
+    async def task_canceller(_uid):
+        calls.append(("cancel", threading.get_ident()))
+        return 1
+
+    result = await reminder_service.confirm_unsubscribe(
+        42,
+        confirmation,
+        config_loader=config_loader,
+        remover=lambda _uid: calls.append(("remove", threading.get_ident())) or True,
+        task_canceller=task_canceller,
+        scheduled_purger=lambda _uid: calls.append(("scheduled", threading.get_ident())) or 2,
+        sent_purger=lambda _uid: calls.append(("sent", threading.get_ident())) or 3,
+    )
+
+    assert result.ok is True
+    assert calls == [
+        ("loader", loop_thread),
+        ("cancel", loop_thread),
+        ("scheduled", loop_thread),
+        ("sent", loop_thread),
+        ("remove", loop_thread),
+    ]
 
 
 @pytest.mark.asyncio

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import logging
@@ -171,7 +170,7 @@ async def build_reminder_centre_state(
     *,
     config_loader: ConfigLoader = get_user_config,
 ) -> ReminderCentreState:
-    config = await asyncio.to_thread(config_loader, int(discord_user_id))
+    config = config_loader(int(discord_user_id))
     return _state_from_config(config)
 
 
@@ -206,8 +205,7 @@ async def save_reminder_preferences(
 
     action: ReminderAction = "update" if state.subscribed else "subscribe"
     try:
-        await asyncio.to_thread(
-            writer,
+        writer(
             int(discord_user_id),
             str(username),
             list(event_types),
@@ -313,9 +311,9 @@ async def confirm_unsubscribe(
 
     try:
         cancelled = await task_canceller(int(discord_user_id))
-        scheduled_removed = await asyncio.to_thread(scheduled_purger, int(discord_user_id))
-        sent_removed = await asyncio.to_thread(sent_purger, int(discord_user_id))
-        removed = await asyncio.to_thread(remover, int(discord_user_id))
+        scheduled_removed = scheduled_purger(int(discord_user_id))
+        sent_removed = sent_purger(int(discord_user_id))
+        removed = remover(int(discord_user_id))
     except Exception:
         logger.exception(
             "player_self_service_reminders_unsubscribe_failed user_id=%s",
