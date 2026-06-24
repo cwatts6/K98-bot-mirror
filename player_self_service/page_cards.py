@@ -203,7 +203,9 @@ def _account_action_detail(summary: PlayerSelfServiceSummary) -> str:
 def _reminder_action_detail(summary: PlayerSelfServiceSummary) -> str:
     if summary.reminders.state.strip().lower() in {"off", "not subscribed"}:
         return "Choose KVK event types and reminder times; selections save automatically."
-    return "Change KVK event types or times; selections save automatically. Remove All unsubscribes."
+    return (
+        "Change KVK event types or times; selections save automatically. Remove All unsubscribes."
+    )
 
 
 def _preference_actions(summary: PlayerSelfServiceSummary) -> str:

@@ -98,6 +98,4 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
     )
     assert _page_copy("reminders", summary)[2] == "Actions available: Manage"
     assert "save automatically" in _page_copy("reminders", summary)[3]
-    assert _page_copy("preferences", summary)[2] == (
-        "Actions available: Set Private, Update VIP"
-    )
+    assert _page_copy("preferences", summary)[2] == ("Actions available: Set Private, Update VIP")

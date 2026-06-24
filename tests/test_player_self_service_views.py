@@ -1065,9 +1065,7 @@ async def test_reminder_setup_event_select_autosaves_and_sends_dm(monkeypatch) -
     )
     interaction = _Interaction()
     select = next(
-        child
-        for child in view.children
-        if isinstance(child, reminder_views.ReminderEventSelect)
+        child for child in view.children if isinstance(child, reminder_views.ReminderEventSelect)
     )
     select._selected_values = ["ruins"]
     select._interaction = SimpleNamespace(data={})
@@ -1080,9 +1078,7 @@ async def test_reminder_setup_event_select_autosaves_and_sends_dm(monkeypatch) -
     assert "Saved automatically" in edited["content"]
     assert "confirmation DM was sent" in edited["content"]
     assert isinstance(edited["view"], reminder_views.ReminderSetupView)
-    assert all(
-        getattr(child, "custom_id", None) != "me:reminder:save" for child in view.children
-    )
+    assert all(getattr(child, "custom_id", None) != "me:reminder:save" for child in view.children)
 
 
 @pytest.mark.asyncio
@@ -1120,9 +1116,7 @@ async def test_reminder_autosave_refreshes_visible_reminder_card(monkeypatch) ->
     )
     interaction = _Interaction()
     select = next(
-        child
-        for child in view.children
-        if isinstance(child, reminder_views.ReminderTimeSelect)
+        child for child in view.children if isinstance(child, reminder_views.ReminderTimeSelect)
     )
     select._selected_values = ["24h"]
     select._interaction = SimpleNamespace(data={})
