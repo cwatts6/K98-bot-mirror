@@ -128,29 +128,43 @@ def _badge(draw: ImageDraw.ImageDraw, *, x: int, y: int, text: str) -> None:
     label = _status_label(text)
     width = 210
     font = _fit(draw, label, width=width - 44, size=30, min_size=18, bold=True)
-    label_width = _text_width(draw, label, font)
-    title = "STATUS"
-    title_font = _font(18, bold=True)
-    title_width = _text_width(draw, title, title_font)
-    text_renderer._draw_text(
-        draw,
-        (x + (width - title_width) // 2, y - 30),
-        title,
-        fill=MUTED,
-        font=title_font,
-        bold=True,
-    )
     draw.rounded_rectangle((x, y, x + width, y + 54), radius=27, fill=color + (210,))
     bbox = draw.textbbox((0, 0), label, font=font)
+    label_width = bbox[2] - bbox[0]
     label_height = bbox[3] - bbox[1]
     text_renderer._draw_text(
         draw,
-        (x + (width - label_width) // 2, y + (54 - label_height) // 2 - 2),
+        (
+            x + (width - label_width) // 2 - bbox[0],
+            y + (54 - label_height) // 2 - bbox[1],
+        ),
         label,
         fill=DARK_TEXT,
         font=font,
         bold=True,
     )
+
+
+def _wrap_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    *,
+    width: int,
+    font: ImageFont.ImageFont,
+) -> tuple[str, ...]:
+    words = _clean(text, fallback="-").split(" ")
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if not current or _text_width(draw, candidate, font) <= width:
+            current = candidate
+            continue
+        lines.append(current)
+        current = word
+    if current:
+        lines.append(current)
+    return tuple(lines) or ("-",)
 
 
 def _draw_wrapped_lines(
@@ -166,9 +180,14 @@ def _draw_wrapped_lines(
     cursor_y = y
     for line in lines:
         text = _clean(line, fallback="-")
-        font = _fit(draw, text, width=width, size=size, min_size=20, bold=True)
-        _draw_text(draw, (x, cursor_y), text, font=font, bold=True)
-        cursor_y += gap
+        font = text_renderer._font_for_text(text, size, bold=True)
+        wrapped = _wrap_text(draw, text, width=width, font=font)
+        if len(wrapped) == 1:
+            font = _fit(draw, text, width=width, size=size, min_size=28, bold=True)
+            wrapped = (text,)
+        for wrapped_line in wrapped:
+            _draw_text(draw, (x, cursor_y), wrapped_line, font=font, bold=True)
+            cursor_y += gap
 
 
 def _account_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:

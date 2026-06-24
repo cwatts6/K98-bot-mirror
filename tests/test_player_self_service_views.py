@@ -1020,6 +1020,37 @@ async def test_reminder_setup_disables_remove_all_when_unsubscribed() -> None:
 
 
 @pytest.mark.asyncio
+async def test_reminder_setup_timeout_disables_child_controls() -> None:
+    state = ReminderCentreState(
+        ok=True,
+        subscribed=True,
+        event_types=("ruins",),
+        reminder_times=("24h",),
+        event_summary="ruins",
+        time_summary="24h",
+    )
+    view = reminder_views.ReminderSetupView(
+        author_id=42,
+        username="Tester",
+        state=state,
+        display_name="Tester",
+    )
+    edits = []
+
+    class Message:
+        async def edit(self, **kwargs):
+            edits.append(kwargs)
+
+    view.set_message_ref(Message())
+
+    await view.on_timeout()
+
+    assert all(child.disabled for child in view.children)
+    assert "expired" in edits[-1]["content"]
+    assert edits[-1]["view"] is view
+
+
+@pytest.mark.asyncio
 async def test_account_slot_select_rejects_non_owner() -> None:
     view = account_views.AccountSlotSelectView(
         author_id=42,

@@ -723,18 +723,20 @@ class PlayerSelfServiceView(discord.ui.View):
                 ephemeral=True,
             )
             return
-        await interaction.followup.send(
+        setup_view = ReminderSetupView(
+            author_id=self.author_id,
+            username=str(getattr(interaction, "user", "") or self.display_name),
+            state=state,
+            display_name=self.display_name,
+            host_message=getattr(interaction, "message", None),
+            summary_loader=self.summary_loader,
+        )
+        sent = await interaction.followup.send(
             "Choose your KVK event types and reminder times.",
-            view=ReminderSetupView(
-                author_id=self.author_id,
-                username=str(getattr(interaction, "user", "") or self.display_name),
-                state=state,
-                display_name=self.display_name,
-                host_message=getattr(interaction, "message", None),
-                summary_loader=self.summary_loader,
-            ),
+            view=setup_view,
             ephemeral=True,
         )
+        setup_view.set_message_ref(sent)
 
     async def _save_inventory_visibility(
         self,

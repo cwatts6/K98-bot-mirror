@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 import logging
+from typing import Any
 
 import discord
 
@@ -209,11 +210,12 @@ class ReminderSetupView(discord.ui.View):
         summary_loader: SummaryLoader = build_player_self_service_summary,
         timeout: float = 180,
     ) -> None:
-        super().__init__(timeout=timeout)
+        super().__init__(timeout=timeout, disable_on_timeout=True)
         self.author_id = int(author_id)
         self.username = username
         self.display_name = display_name
         self.host_message = host_message
+        self._message_ref: Any | None = None
         self.summary_loader = summary_loader
         self.selected_types = list(state.event_types)
         self.selected_reminders = list(state.reminder_times or tuple(DEFAULT_REMINDER_TIMES))
@@ -228,6 +230,21 @@ class ReminderSetupView(discord.ui.View):
             if getattr(child, "custom_id", None) == "me:reminder:remove_all":
                 child.disabled = not self.can_unsubscribe
 
+    def set_message_ref(self, message: Any | None) -> None:
+        self._message_ref = message
+        if (
+            message is not None
+            and hasattr(message, "flags")
+            and hasattr(message, "channel")
+        ):
+            try:
+                self._message = message
+            except Exception:
+                logger.debug(
+                    "player_self_service_reminder_internal_message_ref_failed",
+                    exc_info=True,
+                )
+
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user and int(interaction.user.id) == self.author_id:
             return True
@@ -236,6 +253,17 @@ class ReminderSetupView(discord.ui.View):
             ephemeral=True,
         )
         return False
+
+    async def on_timeout(self) -> None:
+        await super().on_timeout()
+        try:
+            if self._message_ref is not None:
+                await self._message_ref.edit(
+                    content="This private reminder menu has expired. Run `/me reminders` again.",
+                    view=self,
+                )
+        except Exception:
+            logger.debug("player_self_service_reminder_timeout_edit_failed", exc_info=True)
 
     async def autosave_selection(
         self,
