@@ -14,6 +14,7 @@ from inventory.models import InventoryReportVisibility
 from player_self_service import (
     account_service,
     dashboard_card,
+    page_cards,
     preference_service,
     reminder_service,
 )
@@ -23,13 +24,10 @@ from player_self_service.service import (
     PlayerSelfServiceSummary,
     build_player_self_service_summary,
 )
-from ui.views.player_self_service_account_views import (
-    AccountLookupModal,
-    AccountSlotSelectView,
-)
+from ui.views.inventory_report_views import send_inventory_vip_preference_prompt
+from ui.views.player_self_service_account_views import AccountManageView
 from ui.views.player_self_service_reminder_views import (
     ReminderSetupView,
-    ReminderUnsubscribeConfirmView,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,6 +119,12 @@ def build_dashboard_card_embed(filename: str) -> discord.Embed:
     return embed
 
 
+def build_card_embed(filename: str) -> discord.Embed:
+    embed = discord.Embed(color=discord.Color.blurple())
+    embed.set_image(url=f"attachment://{filename}")
+    return embed
+
+
 def build_accounts_embed(
     summary: PlayerSelfServiceSummary,
     *,
@@ -150,7 +154,7 @@ def build_accounts_embed(
             [
                 f"Recommended action: {accounts.next_action}",
                 f"Account names: {names}",
-                "Use the controls below to look up, register, replace, or remove accounts.",
+                "Use Manage to look up, register, replace, or remove accounts.",
             ]
         ),
         inline=False,
@@ -185,7 +189,7 @@ def build_reminders_embed(
         value=_field_value(
             [
                 f"Recommended action: {reminders.next_action}",
-                "Use the controls below to manage event types and reminder times.",
+                "Use Manage to update event types, reminder times, or unsubscribe.",
             ]
         ),
         inline=False,
@@ -224,7 +228,7 @@ def build_preferences_embed(
         value=_field_value(
             [
                 f"Recommended action: {preferences.next_action}",
-                "Use the controls below to update inventory report visibility.",
+                "Use the controls below to update inventory visibility or VIP level.",
             ]
         ),
         inline=False,
@@ -293,26 +297,36 @@ async def _build_page_response(
     display_name: str,
 ) -> tuple[discord.Embed, list[discord.File]]:
     fallback_embed = build_page_embed(page, summary, display_name=display_name)
-    if page != PAGE_DASHBOARD:
-        return fallback_embed, []
-
     try:
-        rendered = await asyncio.to_thread(
-            dashboard_card.render_dashboard_card,
-            summary,
-            display_name=display_name,
-        )
+        if page == PAGE_DASHBOARD:
+            rendered = await asyncio.to_thread(
+                dashboard_card.render_dashboard_card,
+                summary,
+                display_name=display_name,
+            )
+        else:
+            rendered = await asyncio.to_thread(
+                page_cards.render_page_card,
+                page,
+                summary,
+                display_name=display_name,
+            )
     except asyncio.CancelledError:
         raise
     except Exception:
         logger.exception(
-            "player_self_service_dashboard_card_render_failed user_id=%s",
+            "player_self_service_card_render_failed user_id=%s page=%s",
             summary.discord_user_id,
+            page,
         )
         return fallback_embed, []
 
     file = discord.File(rendered.image_bytes, filename=rendered.filename)
-    embed = build_dashboard_card_embed(rendered.filename)
+    embed = (
+        build_dashboard_card_embed(rendered.filename)
+        if page == PAGE_DASHBOARD
+        else build_card_embed(rendered.filename)
+    )
     return embed, [file]
 
 
@@ -353,8 +367,9 @@ async def _edit_original_with_image_fallback(
         if not files:
             raise
         logger.exception(
-            "player_self_service_dashboard_card_send_failed user_id=%s",
+            "player_self_service_card_send_failed user_id=%s page=%s",
             summary.discord_user_id,
+            page,
         )
         fallback_embed = build_page_embed(page, summary, display_name=display_name)
         return await target.edit_original_response(
@@ -585,25 +600,12 @@ class PlayerSelfServiceView(discord.ui.View):
         return state
 
     @discord.ui.button(
-        label="Find ID",
-        style=discord.ButtonStyle.secondary,
-        custom_id="me:account:lookup",
-        row=1,
-    )
-    async def account_lookup_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        await interaction.response.send_modal(AccountLookupModal(author_id=self.author_id))
-
-    @discord.ui.button(
-        label="Register",
+        label="Manage",
         style=discord.ButtonStyle.success,
-        custom_id="me:account:register",
+        custom_id="me:account:manage",
         row=1,
     )
-    async def account_register_button(
+    async def account_manage_button(
         self,
         button: discord.ui.Button,
         interaction: discord.Interaction,
@@ -611,81 +613,14 @@ class PlayerSelfServiceView(discord.ui.View):
         state = await self._load_account_state(interaction)
         if state is None:
             return
-        if not state.can_register:
-            await interaction.followup.send(
-                "All account slots are already in use.",
-                ephemeral=True,
-            )
-            return
         await interaction.followup.send(
-            "Choose the slot for the new account.",
-            view=AccountSlotSelectView(
+            "Choose what you want to manage.",
+            view=AccountManageView(
                 author_id=self.author_id,
                 display_name=self.display_name,
-                action="register",
-                slots=state.free_slots,
-            ),
-            ephemeral=True,
-        )
-
-    @discord.ui.button(
-        label="Replace",
-        style=discord.ButtonStyle.primary,
-        custom_id="me:account:replace",
-        row=2,
-    )
-    async def account_replace_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        state = await self._load_account_state(interaction)
-        if state is None:
-            return
-        if not state.can_modify:
-            await interaction.followup.send(
-                "You do not have any registered accounts to replace yet.",
-                ephemeral=True,
-            )
-            return
-        await interaction.followup.send(
-            "Choose the account slot to replace.",
-            view=AccountSlotSelectView(
-                author_id=self.author_id,
-                display_name=self.display_name,
-                action="replace",
-                slots=state.registered_slots,
-            ),
-            ephemeral=True,
-        )
-
-    @discord.ui.button(
-        label="Remove",
-        style=discord.ButtonStyle.danger,
-        custom_id="me:account:remove",
-        row=2,
-    )
-    async def account_remove_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        state = await self._load_account_state(interaction)
-        if state is None:
-            return
-        if not state.can_remove:
-            await interaction.followup.send(
-                "You do not have any registered accounts to remove.",
-                ephemeral=True,
-            )
-            return
-        await interaction.followup.send(
-            "Choose the account slot to remove.",
-            view=AccountSlotSelectView(
-                author_id=self.author_id,
-                display_name=self.display_name,
-                action="remove",
-                slots=state.registered_slots,
+                state=state,
+                host_message=getattr(interaction, "message", None),
+                summary_loader=self.summary_loader,
             ),
             ephemeral=True,
         )
@@ -754,45 +689,8 @@ class PlayerSelfServiceView(discord.ui.View):
                 username=str(getattr(interaction, "user", "") or self.display_name),
                 state=state,
                 display_name=self.display_name,
-            ),
-            ephemeral=True,
-        )
-
-    @discord.ui.button(
-        label="Unsubscribe",
-        style=discord.ButtonStyle.danger,
-        custom_id="me:reminder:unsubscribe",
-        row=2,
-    )
-    async def reminder_unsubscribe_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        state = await self._load_reminder_state(interaction)
-        if state is None:
-            return
-        if not state.can_unsubscribe:
-            await interaction.followup.send(
-                "You are not currently subscribed to KVK event reminders.",
-                ephemeral=True,
-            )
-            return
-        confirmation, error = await reminder_service.prepare_unsubscribe_confirmation(
-            self.author_id,
-        )
-        if error or confirmation is None:
-            await interaction.followup.send(
-                error or "Could not prepare unsubscribe confirmation.",
-                ephemeral=True,
-            )
-            return
-        await interaction.followup.send(
-            confirmation.body,
-            view=ReminderUnsubscribeConfirmView(
-                author_id=self.author_id,
-                display_name=self.display_name,
-                confirmation=confirmation,
+                host_message=getattr(interaction, "message", None),
+                summary_loader=self.summary_loader,
             ),
             ephemeral=True,
         )
@@ -844,12 +742,20 @@ class PlayerSelfServiceView(discord.ui.View):
             summary_loader=self.summary_loader,
             timeout=self.timeout or 180,
         )
-        embed = build_preferences_embed(summary, display_name=self.display_name)
+        embed, files = await _build_page_response(
+            PAGE_PREFERENCES,
+            summary,
+            display_name=self.display_name,
+        )
         try:
-            edited = await interaction.edit_original_response(
-                embed=embed,
+            edited = await _edit_original_with_image_fallback(
+                interaction,
+                page=PAGE_PREFERENCES,
+                summary=summary,
+                display_name=self.display_name,
                 view=view,
-                attachments=[],
+                embed=embed,
+                files=files,
             )
             view.set_message_ref(getattr(interaction, "message", None) or edited)
         except asyncio.CancelledError:
@@ -882,6 +788,38 @@ class PlayerSelfServiceView(discord.ui.View):
         interaction: discord.Interaction,
     ) -> None:
         await self._save_inventory_visibility(interaction, InventoryReportVisibility.PUBLIC)
+
+    @discord.ui.button(
+        label="Update VIP",
+        style=discord.ButtonStyle.secondary,
+        custom_id="me:preference:vip",
+        row=3,
+    )
+    async def preference_vip_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+        except TypeError:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.debug("player_self_service_preference_vip_defer_failed", exc_info=True)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug("player_self_service_preference_vip_defer_failed", exc_info=True)
+
+        await send_inventory_vip_preference_prompt(
+            interaction=interaction,
+            requester_id=self.author_id,
+        )
 
     async def on_timeout(self) -> None:
         for child in self.children:

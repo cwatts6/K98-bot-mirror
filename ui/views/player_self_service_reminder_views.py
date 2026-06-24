@@ -77,6 +77,56 @@ async def _defer_private(interaction: discord.Interaction) -> None:
         logger.debug("player_self_service_reminder_defer_failed", exc_info=True)
 
 
+async def _refresh_host_page(
+    *,
+    host_message: object | None,
+    author_id: int,
+    display_name: str,
+    summary_loader: SummaryLoader,
+) -> None:
+    if host_message is None or not hasattr(host_message, "edit"):
+        return
+    try:
+        summary = await summary_loader(int(author_id))
+        from ui.views.player_self_service_views import (
+            PAGE_REMINDERS,
+            PlayerSelfServiceView,
+            _build_page_response,
+            _edit_original_with_image_fallback,
+        )
+
+        view = PlayerSelfServiceView(
+            author_id=int(author_id),
+            display_name=display_name,
+            page=PAGE_REMINDERS,
+            summary_loader=summary_loader,
+        )
+        embed, files = await _build_page_response(
+            PAGE_REMINDERS,
+            summary,
+            display_name=display_name,
+        )
+
+        class _MessageTarget:
+            async def edit_original_response(self, **kwargs):
+                return await host_message.edit(**kwargs)
+
+        edited = await _edit_original_with_image_fallback(
+            _MessageTarget(),
+            page=PAGE_REMINDERS,
+            summary=summary,
+            display_name=display_name,
+            view=view,
+            embed=embed,
+            files=files,
+        )
+        view.set_message_ref(edited or host_message)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.debug("player_self_service_reminder_host_refresh_failed", exc_info=True)
+
+
 class ReminderEventSelect(discord.ui.Select):
     def __init__(self, *, selected: tuple[str, ...]) -> None:
         options = _event_options(selected)
@@ -144,17 +194,25 @@ class ReminderSetupView(discord.ui.View):
         username: str,
         state: ReminderCentreState,
         display_name: str,
+        host_message: object | None = None,
+        summary_loader: SummaryLoader = build_player_self_service_summary,
         timeout: float = 180,
     ) -> None:
         super().__init__(timeout=timeout)
         self.author_id = int(author_id)
         self.username = username
         self.display_name = display_name
+        self.host_message = host_message
+        self.summary_loader = summary_loader
         self.selected_types = list(state.event_types)
         self.selected_reminders = list(state.reminder_times or tuple(DEFAULT_REMINDER_TIMES))
+        self.can_unsubscribe = state.can_unsubscribe
         self._saving = False
         self.add_item(ReminderEventSelect(selected=tuple(self.selected_types)))
         self.add_item(ReminderTimeSelect(selected=tuple(self.selected_reminders)))
+        for child in self.children:
+            if getattr(child, "custom_id", None) == "me:reminder:remove_all":
+                child.disabled = not self.can_unsubscribe
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user and int(interaction.user.id) == self.author_id:
@@ -201,10 +259,17 @@ class ReminderSetupView(discord.ui.View):
             content += (
                 " Saved, but I could not send a confirmation DM. Check your server DM settings."
             )
+        await _refresh_host_page(
+            host_message=self.host_message,
+            author_id=self.author_id,
+            display_name=self.display_name,
+            summary_loader=self.summary_loader,
+        )
         view = ReminderCompletionView(
             author_id=self.author_id,
             display_name=self.display_name,
             message=content,
+            summary_loader=self.summary_loader,
         )
         try:
             await interaction.edit_original_response(content=content, embed=None, view=view)
@@ -212,6 +277,59 @@ class ReminderSetupView(discord.ui.View):
             logger.debug("player_self_service_reminder_save_edit_failed", exc_info=True)
             await interaction.followup.send(content, view=view, ephemeral=True)
         self.stop()
+
+    @discord.ui.button(
+        label="Remove All",
+        style=discord.ButtonStyle.danger,
+        custom_id="me:reminder:remove_all",
+        row=2,
+    )
+    async def remove_all_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        if not self.can_unsubscribe:
+            await interaction.response.send_message(
+                "You are not currently subscribed to KVK event reminders.",
+                ephemeral=True,
+            )
+            return
+        await _defer_private(interaction)
+        confirmation, error = await reminder_service.prepare_unsubscribe_confirmation(
+            self.author_id,
+        )
+        if error or confirmation is None:
+            await interaction.followup.send(
+                error or "Could not prepare unsubscribe confirmation.",
+                ephemeral=True,
+            )
+            return
+        try:
+            await interaction.edit_original_response(
+                content=confirmation.body,
+                embed=None,
+                view=ReminderUnsubscribeConfirmView(
+                    author_id=self.author_id,
+                    display_name=self.display_name,
+                    confirmation=confirmation,
+                    host_message=self.host_message,
+                    summary_loader=self.summary_loader,
+                ),
+            )
+        except Exception:
+            logger.debug("player_self_service_reminder_remove_all_edit_failed", exc_info=True)
+            await interaction.followup.send(
+                confirmation.body,
+                view=ReminderUnsubscribeConfirmView(
+                    author_id=self.author_id,
+                    display_name=self.display_name,
+                    confirmation=confirmation,
+                    host_message=self.host_message,
+                    summary_loader=self.summary_loader,
+                ),
+                ephemeral=True,
+            )
 
     async def _send_dm(
         self,
@@ -234,12 +352,16 @@ class ReminderUnsubscribeConfirmView(discord.ui.View):
         author_id: int,
         display_name: str,
         confirmation: ReminderUnsubscribeConfirmation,
+        host_message: object | None = None,
+        summary_loader: SummaryLoader = build_player_self_service_summary,
         timeout: float = 120,
     ) -> None:
         super().__init__(timeout=timeout)
         self.author_id = int(author_id)
         self.display_name = display_name
         self.confirmation = confirmation
+        self.host_message = host_message
+        self.summary_loader = summary_loader
         self._confirmed = False
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -278,10 +400,17 @@ class ReminderUnsubscribeConfirmView(discord.ui.View):
             content += " A confirmation DM was sent."
         else:
             content += " I could not send a confirmation DM, but you are unsubscribed."
+        await _refresh_host_page(
+            host_message=self.host_message,
+            author_id=self.author_id,
+            display_name=self.display_name,
+            summary_loader=self.summary_loader,
+        )
         view = ReminderCompletionView(
             author_id=self.author_id,
             display_name=self.display_name,
             message=content,
+            summary_loader=self.summary_loader,
         )
         try:
             await interaction.edit_original_response(content=content, embed=None, view=view)

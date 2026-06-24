@@ -42,28 +42,10 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 5A admin/leadership/operator grouping is complete; requires operator approval, SQL-backed usage review, user-facing briefing, and a fresh task pack.
 
 ### Deferred Optimisation
-- Area: `player_self_service/account_service.py`, `ui/views/player_self_service_account_views.py`, `/me accounts` player workflow
-- Type: consistency
-- Description: Phase 3 smoke testing showed that the path from `Find ID` to `Register` is still too manual. A player can search by name or partial name and receive a Governor ID, but then must click into register/replace separately and remember or manually re-enter the 9-digit ID. This preserves a legacy-command style memory step inside the otherwise modern account centre.
-- Suggested Fix: Scope a later account-centre UX optimisation that lets lookup results carry forward into register and replace flows. Options include lookup-result action buttons, a select menu of matches that opens slot selection with the selected Governor ID already bound, or a combined register/replace flow that accepts a name search and then confirms the selected Governor before write. Preserve duplicate/claim protection, stale confirmation checks, service-owned confirmation models, and Discord select-option limits.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 3 Modern Account Centre smoke tested successfully and merged/deployed or otherwise operator-approved for follow-up; operator approval for account-centre UX optimisation after Phase 4 reminder centre or another approved process-simplification phase.
-
-### Deferred Optimisation
-- Area: `/me accounts`, `/me reminders`, `/me preferences`, `/me exports`, `ui/views/player_self_service_views.py`, `ui/views/player_self_service_account_views.py`, `ui/views/player_self_service_reminder_views.py`, `player_self_service/dashboard_card.py`
-- Type: architecture
-- Description: Phase 5 smoke testing confirmed that `/me dashboard` works, but the wider self-service centre still mixes a visual dashboard card with embed-only subpages and exposes too many top-level account/reminder controls. `/me accounts` recommends `Manage` but presents separate `Find ID`, `Register`, `Replace`, and `Remove` buttons, while `/me reminders` has a separate unsubscribe path instead of a single guided manage journey. The switch from card to embed on subpages also makes the UX feel inconsistent, and reminder updates can leave an older dashboard card visible above the reminder centre until the player returns to the dashboard.
-- Suggested Fix: Scope a dedicated Phase 6 guided management and visual-card pass. Convert Accounts, Reminders, Preferences, and Exports pages to generated cards with safe embed fallbacks. Replace account button sprawl with one primary `Manage` flow that can find a Governor ID, carry the selected result into register/replace, and remove accounts with confirmation. Replace reminder top-level manage/unsubscribe split with one `Manage` flow that supports save/update and remove-all/unsubscribe actions, and define whether save completion should refresh the active card, replace the page, or route players back through a refreshed dashboard. Align dashboard `Next: Manage` labels with the actual page-level primary actions, preserve legacy command compatibility, and cover card render/fallback plus guided-flow regression tests.
-- Impact: high
-- Risk: medium
-- Dependencies: Phase 5 dashboard card and preferences hub smoke tested successfully; use `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre Phase 6 Guided Management Cards and Workflow Simplification.md`; preserve Phase 3 account safety checks and Phase 4 reminder semantics.
-
-### Deferred Optimisation
 - Area: `/me dashboard`, `/me exports`, `ui/views/player_self_service_views.py`, player self-service Quick Launch controls
 - Type: consistency
-- Description: Phase 5 preserved dashboard Quick Launch as dashboard-only guidance and intentionally kept `/me exports` as a private exports page without the dashboard Quick Launch menu. Smoke feedback raised the product question of whether Quick Launch should later become a richer launch surface for KVK stats, targets, history, rankings, inventory, and exports. Pulling that into Phase 5 or Phase 6 would mix navigation strategy with the current dashboard/subpage card and Manage-flow simplification work.
-- Suggested Fix: Scope Quick Launch expansion in the planned Phase 7 Exports Launchpad and Quick Launch Expansion phase. Decide whether Quick Launch remains a dashboard-only select, adds direct export actions, or becomes a reusable launch section on selected pages. Preserve existing channel/visibility rules for target commands, private file-delivery constraints, dashboard-only behavior unless explicitly changed, and `/me exports` privacy expectations. Cover command/view tests and manual smoke for every added launch path.
+- Description: Phase 6 gives `/me exports` a private generated card but intentionally does not turn it into a full export launchpad or add dashboard Quick Launch controls to the exports page. Smoke feedback raised the product question of whether Quick Launch should later become a richer launch surface for KVK stats, targets, history, rankings, inventory, and exports. Pulling that into Phase 6 would mix export product design with the current dashboard/subpage card and Manage-flow simplification work.
+- Suggested Fix: Scope Quick Launch expansion and export launchpad design in a later phase. Decide whether Quick Launch remains a dashboard-only select, adds direct export actions, or becomes a reusable launch section on selected pages. Preserve existing channel/visibility rules for target commands, private file-delivery constraints, dashboard-only behavior unless explicitly changed, and `/me exports` privacy expectations. Cover command/view tests and manual smoke for every added launch path.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 6 guided management cards complete and smoke tested; export authorization/private delivery paths validated before adding direct actions.
@@ -80,11 +62,20 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `/me preferences`, `player_self_service/preference_service.py`, inventory/stats/export preference surfaces
 - Type: architecture
-- Description: Phase 5 intentionally exposes only inventory report visibility because it already has a service-backed persistence path. Other possible preference categories such as default stats output privacy, export format defaults, preferred account behavior, local-time/timezone, or notification preferences do not yet share a reliable persistence contract and product model inside `/me preferences`.
-- Suggested Fix: Run a preferences-hub design pass that inventories existing preference-like state, validates SQL or JSON persistence contracts, decides which settings belong in `/me preferences`, and adds service-backed mutations only where privacy, restart safety, and legacy command compatibility are preserved. Avoid adding controls that only explain future possibilities.
+- Description: Phase 6 brings `/me preferences` to parity with `/inventory_preferences` for inventory visibility and Governor VIP updates by reusing existing inventory service-backed persistence. Other possible preference categories such as default stats output privacy, export format defaults, preferred account behavior, local-time/timezone, or notification preferences still do not share a reliable persistence contract and product model inside `/me preferences`.
+- Suggested Fix: Run a preferences-hub design pass that inventories existing preference-like state, validates SQL or JSON persistence contracts, decides which additional settings belong in `/me preferences`, and adds service-backed mutations only where privacy, restart safety, and legacy command compatibility are preserved. Avoid adding controls that only explain future possibilities.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5 inventory visibility controls are smoke tested; operator approval for additional preference categories and any required SQL/persistence changes.
+- Dependencies: Phase 6 preference card and VIP parity are smoke tested; operator approval for additional preference categories and any required SQL/persistence changes.
+
+### Deferred Optimisation
+- Area: `/me reminders`, `commands/calendar_cmds.py`, `event_calendar/reminder_prefs.py`, `event_calendar/reminder_prefs_store.py`, `ui/views/reminder_config.py`, calendar reminder state files
+- Type: architecture
+- Description: Phase 6 simplifies `/me reminders` for KVK event reminder subscriptions only. Calendar reminders remain managed through `/calendar_reminder_config` and use distinct event-calendar preference/state code, but from a player perspective KVK event reminders and calendar reminders are two sides of the same reminder experience. Players can reasonably have KVK reminders, calendar reminders, or both, so the reminder centre will still feel incomplete after the KVK subscription flow is modernised.
+- Suggested Fix: Scope a later unified reminder-centre phase that audits KVK subscription reminders and calendar reminders together, maps both persistence models, and designs one `/me reminders` surface that can review and manage both without merging their storage unsafely. Preserve KVK reminder semantics, calendar reminder timezone/lead-time semantics, restart-sensitive scheduled work, and legacy command compatibility. Add focused tests for mixed reminder states and manual smoke covering users with KVK-only, calendar-only, both, and neither.
+- Impact: high
+- Risk: medium
+- Dependencies: Phase 6 KVK reminder manage flow smoke tested; calendar reminder service/state contracts validated before implementation.
 
 ### Deferred Optimisation
 - Area: `commands/subscriptions_cmds.py`, `player_self_service/reminder_service.py`, `ui/views/subscription_views.py`

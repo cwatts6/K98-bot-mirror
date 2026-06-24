@@ -1,14 +1,10 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-06-23
+Last updated: 2026-06-24
 
-Status: Phase 5 Visual Dashboard Card and Preferences Hub is complete. The dashboard now has a
-generated private visual card with embed fallback, and `/me preferences` can update inventory
-report visibility through the existing service-backed persistence path.
-
-Next phase: Phase 6 Guided Management Cards and Workflow Simplification. This should convert the
-remaining `/me` subpages to generated cards and simplify Accounts and Reminders around one primary
-`Manage` journey each.
+Status: Phase 6 Guided Management Cards and Workflow Simplification is in implementation. The
+dashboard keeps the Phase 5 generated private visual card with embed fallback. Accounts, Reminders,
+Preferences, and Exports are moving to generated private visual cards with safe embed fallback.
 
 ## Player Briefing
 
@@ -27,12 +23,14 @@ delivery fails, the bot falls back to the private embed dashboard. Dashboard Qui
 available only on the dashboard page.
 
 The account centre supports account review, Governor ID lookup, registration, replacement,
-and removal with confirmation. The reminder centre supports private reminder review, setup,
-updates, and unsubscribe with confirmation. `/me preferences` can update inventory report
-visibility between private and public output. Existing commands such as `/register_governor`,
-`/modify_registration`, `/my_registrations`, `/mygovernorid`, `/subscribe`,
-`/modify_subscription`, `/unsubscribe`, `/inventory_preferences`, `/my_stats_export`, and
-`/export_inventory` still work.
+and removal with confirmation through one primary Manage journey. Lookup results can continue into
+register or replace without asking the player to remember or re-enter the selected Governor ID. The
+reminder centre supports private KVK event reminder review, setup, updates, and remove-all/
+unsubscribe with confirmation through one primary Manage journey. `/me preferences` can update
+inventory report visibility between private and public output and can open the existing Governor
+VIP update flow. Existing commands such as `/register_governor`, `/modify_registration`,
+`/my_registrations`, `/mygovernorid`, `/subscribe`, `/modify_subscription`, `/unsubscribe`,
+`/inventory_preferences`, `/my_stats_export`, and `/export_inventory` still work.
 
 ## Operator Briefing
 
@@ -65,6 +63,8 @@ Rollout checks:
 - Confirm account, reminder, preference, and export pages remain private.
 - Confirm `/me preferences` saves inventory report visibility through the existing service-backed
   path.
+- Confirm `/me preferences` can open the existing Governor VIP update flow and that VIP writes
+  remain owned by the inventory profile service path.
 - Confirm dashboard Quick Launch remains dashboard-only and `/me exports` does not gain the
   dashboard Quick Launch menu.
 - Confirm legacy player commands remain registered and usable.
@@ -87,13 +87,13 @@ Phase 3 smoke-test result:
 - Review-feedback hardening preserved interaction defer fallback, timeout message references, all
   26 account slots, and stale-removal confirmation safety.
 
-Known follow-up from Phase 3 smoke:
+Known follow-up from Phase 3 smoke, addressed in Phase 6:
 
 - The player path from `Find ID` to `Register` still has too much friction. A player can look up a
   Governor ID by name or partial name, but then needs another click and must remember or manually
   re-enter the 9-digit ID to register the account.
-- Capture this for a later account-centre optimisation: selected lookup results should carry into
-  register/replace flows instead of asking the player to copy or remember the ID.
+- Selected lookup results now carry into register/replace slot selection instead of asking the
+  player to copy or remember the ID.
 - Apply the same product principle to later phases: fewer buttons, fewer repeated inputs, fewer
   memory steps.
 
@@ -143,3 +143,7 @@ Phase 6 planning notes:
   fallback.
 - Discord image areas cannot be clicked directly; use native buttons/selects aligned to the card
   sections instead.
+- Phase 6 reminder work is limited to KVK event reminder subscriptions. Calendar reminders remain
+  a distinct code path through `/calendar_reminder_config`, but should be revisited in a later
+  unified reminder-centre phase because players experience KVK and calendar reminders as one
+  reminder domain.

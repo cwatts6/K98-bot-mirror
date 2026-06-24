@@ -360,25 +360,9 @@ class InventoryPreferenceView(discord.ui.View):
             )
             return
         await interaction.response.defer(ephemeral=True)
-        governors = await reporting_service.get_registered_governors_for_user(self.requester_id)
-        if not governors:
-            await interaction.followup.send(
-                "I do not see any governors registered to you. Use `/register_governor` first.",
-                ephemeral=True,
-            )
-            return
-        profiles = await asyncio.gather(
-            *(profile_service.fetch_inventory_profile(g.governor_id) for g in governors)
-        )
-        profiles_by_governor_id = {p.governor_id: p for p in profiles}
-        await interaction.followup.send(
-            "Choose a governor and VIP level:",
-            view=InventoryVipPreferenceView(
-                requester_id=self.requester_id,
-                governors=governors,
-                profiles_by_governor_id=profiles_by_governor_id,
-            ),
-            ephemeral=True,
+        await send_inventory_vip_preference_prompt(
+            interaction=interaction,
+            requester_id=self.requester_id,
         )
 
 
@@ -606,6 +590,33 @@ async def send_inventory_preference_prompt(ctx: discord.ApplicationContext) -> N
     await ctx.followup.send(
         "Choose how `/myinventory` should post your reports, or update a governor VIP level.",
         view=InventoryPreferenceView(requester_id=int(ctx.user.id)),
+        ephemeral=True,
+    )
+
+
+async def send_inventory_vip_preference_prompt(
+    *,
+    interaction: discord.Interaction,
+    requester_id: int,
+) -> None:
+    governors = await reporting_service.get_registered_governors_for_user(int(requester_id))
+    if not governors:
+        await interaction.followup.send(
+            "I do not see any governors registered to you. Use `/register_governor` first.",
+            ephemeral=True,
+        )
+        return
+    profiles = await asyncio.gather(
+        *(profile_service.fetch_inventory_profile(g.governor_id) for g in governors)
+    )
+    profiles_by_governor_id = {p.governor_id: p for p in profiles}
+    await interaction.followup.send(
+        "Choose a governor and VIP level:",
+        view=InventoryVipPreferenceView(
+            requester_id=int(requester_id),
+            governors=governors,
+            profiles_by_governor_id=profiles_by_governor_id,
+        ),
         ephemeral=True,
     )
 

@@ -44,7 +44,7 @@ primary `Manage` journey each.
 Phase 6 should make the UI feel intentional:
 
 - dashboard card first
-- card-based subpages
+- card-based subpages. the target is visuals similar in style to the kvk rankings cards created. there are assets available to use as the background for the cards assets/me/cards/
 - one obvious account management path
 - one obvious reminder management path
 - no stale visible card state after player mutations
@@ -135,6 +135,16 @@ Important Phase 4 reminder semantics to preserve:
 - Fallback embeds must be complete enough to use if image rendering fails.
 - No persistence writes may be added to commands or views.
 - No setting should be shown as mutable unless the save path already exists and is service-backed.
+
+Account flow:
+There are 3 main scenarios to incorporate
+1. A user wants to register / add a new account	
+1a. If they dont know the GovernorID but know the whole or part of the account name they will want to Search using the Find ID and then select the Governor (ID) they want to register / add
+1b. They know the GovernorID and want to be guided through the process of redistering a new account so that only available slots are displayed for them to pick from
+2. They want to replace an account registered (maybe they are moving accounts around or want to promote an account from farm to alt), agan they want to be guided through the process of selecting the account to replace and then adding the new account using the GovernorID, with appropriatte confirmation steps
+3. They want to remove a registered account (the account may have migrated or been sold) again they want to be guided through the process of selecting the account to remove, with appropriatte confirmation steps
+
+** through out all the flows we need to check the GovernorID can only be registered once so checks should be in place to ensure its not already registered. there are other checks also required please audit and validate those
 
 ## 7. Codex Skills To Use
 

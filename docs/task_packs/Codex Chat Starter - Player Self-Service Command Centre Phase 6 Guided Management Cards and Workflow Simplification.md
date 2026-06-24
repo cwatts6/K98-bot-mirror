@@ -162,7 +162,7 @@ Scope:
 1. Start with audit/scope only unless I explicitly approve one-pass implementation.
 2. Map current `/me accounts`, `/me reminders`, `/me preferences`, and `/me exports` page data,
    views, fallback behavior, and button/select budget.
-3. Design generated subpage cards with safe embed fallback.
+3. Design generated subpage cards with safe embed fallback. The target is visuals similar in style to the kvk rankings cards created. There are assets available to use as the background for the cards assets/me/cards/
 4. Replace account button sprawl with one guided `Manage` flow where safe.
 5. Replace reminder Manage/Unsubscribe split with one guided `Manage` flow where safe.
 6. Define refresh behavior so visible dashboard/subpage cards do not show stale state after
@@ -174,6 +174,16 @@ Scope:
 10. Do not add preference writes unless an existing service-backed persistence path is reused.
 11. Capture out-of-scope export redesign, preference expansion, legacy redirect/removal, and
    renderer-helper consolidation structurally.
+
+Account flow:
+There are 3 main scenarios to incorporate
+1. A user wants to register / add a new account	
+1a. If they dont know the GovernorID but know the whole or part of the account name they will want to Search using the Find ID and then select the Governor (ID) they want to register / add
+1b. They know the GovernorID and want to be guided through the process of redistering a new account so that only available slots are displayed for them to pick from
+2. They want to replace an account registered (maybe they are moving accounts around or want to promote an account from farm to alt), agan they want to be guided through the process of selecting the account to replace and then adding the new account using the GovernorID, with appropriatte confirmation steps
+3. They want to remove a registered account (the account may have migrated or been sold) again they want to be guided through the process of selecting the account to remove, with appropriatte confirmation steps
+
+** through out all the flows we need to check the GovernorID can only be registered once so checks should be in place to ensure its not already registered. there are other checks also required please audit and validate those
 
 Likely files:
 - commands/me_cmds.py

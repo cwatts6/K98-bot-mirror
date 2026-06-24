@@ -7,7 +7,11 @@ from types import SimpleNamespace
 import pytest
 
 from inventory.models import InventoryReportVisibility
-from player_self_service.account_service import AccountCentreState
+from player_self_service.account_service import (
+    AccountCentreState,
+    AccountConfirmation,
+    AccountMutationResult,
+)
 from player_self_service.preference_service import PreferenceMutationResult
 from player_self_service.reminder_service import (
     ReminderCentreState,
@@ -111,6 +115,15 @@ class _Interaction:
         return SimpleNamespace(id=456)
 
 
+class _EditableMessage:
+    def __init__(self) -> None:
+        self.edits = []
+
+    async def edit(self, **kwargs):
+        self.edits.append(kwargs)
+        return self
+
+
 class _User:
     def __init__(self, user_id: int = 42) -> None:
         self.id = user_id
@@ -176,6 +189,50 @@ async def test_dashboard_page_response_falls_back_to_embed_when_card_render_fail
     )
 
     assert embed.title == "K98 Personal Command Centre"
+    assert files == []
+    assert getattr(embed.image, "url", None) is None
+
+
+@pytest.mark.asyncio
+async def test_subpage_response_includes_generated_card(monkeypatch) -> None:
+    calls = []
+
+    def fake_render(page, summary, *, display_name):
+        calls.append((page, summary.discord_user_id, display_name))
+        return views.page_cards.RenderedPageCard(
+            filename="me_accounts_42.png",
+            image_bytes=BytesIO(b"png"),
+        )
+
+    monkeypatch.setattr(views.page_cards, "render_page_card", fake_render)
+
+    embed, files = await views._build_page_response(
+        views.PAGE_ACCOUNTS,
+        _summary(),
+        display_name="Tester",
+    )
+
+    assert calls == [(views.PAGE_ACCOUNTS, 42, "Tester")]
+    assert embed.title is None
+    assert embed.fields == []
+    assert embed.image.url == "attachment://me_accounts_42.png"
+    assert [file.filename for file in files] == ["me_accounts_42.png"]
+
+
+@pytest.mark.asyncio
+async def test_subpage_response_falls_back_to_embed_when_card_render_fails(monkeypatch) -> None:
+    def fake_render(*_args, **_kwargs):
+        raise RuntimeError("asset unavailable")
+
+    monkeypatch.setattr(views.page_cards, "render_page_card", fake_render)
+
+    embed, files = await views._build_page_response(
+        views.PAGE_REMINDERS,
+        _summary(),
+        display_name="Tester",
+    )
+
+    assert embed.title == "Reminder Centre"
     assert files == []
     assert getattr(embed.image, "url", None) is None
 
@@ -254,7 +311,7 @@ def test_accounts_embed_invites_service_backed_controls() -> None:
     embed = views.build_accounts_embed(_summary(), display_name="Tester")
 
     assert embed.title == "Account Centre"
-    assert "Use the controls below" in embed.fields[1].value
+    assert "Use Manage" in embed.fields[1].value
     assert "/modify_registration" not in embed.fields[1].value
 
 
@@ -262,7 +319,7 @@ def test_reminders_embed_invites_service_backed_controls() -> None:
     embed = views.build_reminders_embed(_summary(), display_name="Tester")
 
     assert embed.title == "Reminder Centre"
-    assert "Use the controls below" in embed.fields[1].value
+    assert "Use Manage" in embed.fields[1].value
     assert "/modify_subscription" not in embed.fields[1].value
 
 
@@ -270,7 +327,7 @@ def test_preferences_embed_invites_service_backed_visibility_controls() -> None:
     embed = views.build_preferences_embed(_summary(), display_name="Tester")
 
     assert embed.title == "Preferences"
-    assert "Use the controls below" in embed.fields[1].value
+    assert "VIP level" in embed.fields[1].value
     assert "/inventory_preferences" not in embed.fields[1].value
 
 
@@ -313,7 +370,8 @@ async def test_accounts_view_has_account_actions_without_quick_launch() -> None:
     )
 
     labels = [getattr(child, "label", None) for child in view.children]
-    assert {"Find ID", "Register", "Replace", "Remove"}.issubset(set(labels))
+    assert "Manage" in labels
+    assert not {"Find ID", "Register", "Replace", "Remove"}.intersection(set(labels))
     assert not any(
         isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
     )
@@ -328,7 +386,8 @@ async def test_reminders_view_has_reminder_actions_without_quick_launch() -> Non
     )
 
     labels = [getattr(child, "label", None) for child in view.children]
-    assert {"Manage", "Unsubscribe"}.issubset(set(labels))
+    assert "Manage" in labels
+    assert "Unsubscribe" not in labels
     assert "Register" not in labels
     assert not any(
         isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
@@ -344,7 +403,7 @@ async def test_preferences_view_has_inventory_visibility_actions_without_quick_l
     )
 
     labels = [getattr(child, "label", None) for child in view.children]
-    assert {"Set Private", "Set Public"}.issubset(set(labels))
+    assert {"Set Private", "Set Public", "Update VIP"}.issubset(set(labels))
     assert "Manage" not in labels
     assert not any(
         isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
@@ -361,7 +420,7 @@ async def test_view_rejects_non_owner() -> None:
 
 
 @pytest.mark.asyncio
-async def test_register_button_opens_free_slot_selector(monkeypatch) -> None:
+async def test_account_manage_button_opens_guided_menu(monkeypatch) -> None:
     async def fake_state(_user_id: int):
         return AccountCentreState(
             ok=True,
@@ -380,21 +439,119 @@ async def test_register_button_opens_free_slot_selector(monkeypatch) -> None:
     )
     interaction = _Interaction()
     button = next(
+        child for child in view.children if getattr(child, "custom_id", None) == "me:account:manage"
+    )
+
+    await button.callback(interaction)
+
+    _args, kwargs, _message = interaction.followup.sent[-1]
+    manage_view = kwargs["view"]
+    assert kwargs["ephemeral"] is True
+    assert isinstance(manage_view, account_views.AccountManageView)
+    select = next(
+        child
+        for child in manage_view.children
+        if isinstance(child, account_views.AccountManageActionSelect)
+    )
+    assert [option.value for option in select.options] == ["lookup", "register"]
+
+
+@pytest.mark.asyncio
+async def test_account_manage_register_selection_opens_free_slot_selector() -> None:
+    state = AccountCentreState(
+        ok=True,
+        linked_count=0,
+        main_label="not set",
+        registered_slots=(),
+        free_slots=("Main", "Alt 1"),
+    )
+    view = account_views.AccountManageView(author_id=42, display_name="Tester", state=state)
+    select = next(
         child
         for child in view.children
-        if getattr(child, "custom_id", None) == "me:account:register"
+        if isinstance(child, account_views.AccountManageActionSelect)
+    )
+    select._selected_values = ["register"]
+    select._interaction = SimpleNamespace(data={})
+    interaction = _Interaction()
+
+    await select.callback(interaction)
+
+    _args, kwargs, _message = interaction.followup.sent[-1]
+    slot_view = kwargs["view"]
+    assert isinstance(slot_view, account_views.AccountSlotSelectView)
+    slot_select = next(
+        child for child in slot_view.children if isinstance(child, account_views.AccountSlotSelect)
+    )
+    assert [option.value for option in slot_select.options] == ["Main", "Alt 1"]
+
+
+@pytest.mark.asyncio
+async def test_account_lookup_result_register_carries_governor_id(monkeypatch) -> None:
+    async def fake_state(_user_id: int):
+        return AccountCentreState(
+            ok=True,
+            linked_count=0,
+            main_label="not set",
+            registered_slots=(),
+            free_slots=("Main",),
+        )
+
+    monkeypatch.setattr(account_views.account_service, "build_account_centre_state", fake_state)
+    view = account_views.AccountLookupResultActionView(
+        author_id=42,
+        display_name="Tester",
+        governor_id="123456789",
+        governor_name="FoundGov",
+    )
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:account:lookup:register"
     )
 
     await button.callback(interaction)
 
     _args, kwargs, _message = interaction.followup.sent[-1]
     slot_view = kwargs["view"]
-    assert kwargs["ephemeral"] is True
     assert isinstance(slot_view, account_views.AccountSlotSelectView)
-    select = next(
-        child for child in slot_view.children if isinstance(child, account_views.AccountSlotSelect)
+    assert slot_view.governor_query == "123456789"
+
+
+@pytest.mark.asyncio
+async def test_account_confirmation_refreshes_visible_account_card(monkeypatch) -> None:
+    async def fake_confirm(_user_id, _discord_name, _confirmation):
+        return AccountMutationResult(ok=True, message="Registered Main as FoundGov (123456789).")
+
+    async def loader(_user_id: int):
+        return _summary()
+
+    monkeypatch.setattr(account_views.account_service, "confirm_register", fake_confirm)
+    host_message = _EditableMessage()
+    view = account_views.AccountConfirmationView(
+        author_id=42,
+        display_name="Tester",
+        confirmation=AccountConfirmation(
+            action="register",
+            account_type="Main",
+            governor_id="123456789",
+            governor_name="FoundGov",
+        ),
+        host_message=host_message,
+        summary_loader=loader,
     )
-    assert [option.value for option in select.options] == ["Main", "Alt 1"]
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:account:confirm"
+    )
+
+    await button.callback(interaction)
+
+    assert host_message.edits[-1]["embed"].image.url.startswith("attachment://me_accounts_")
+    assert [file.filename for file in host_message.edits[-1]["files"]] == ["me_accounts_42.png"]
 
 
 @pytest.mark.asyncio
@@ -431,6 +588,10 @@ async def test_reminder_manage_button_opens_selector_with_existing_state(monkeyp
     assert isinstance(setup_view, reminder_views.ReminderSetupView)
     assert setup_view.selected_types == ["all"]
     assert setup_view.selected_reminders == ["24h", "1h"]
+    assert any(
+        getattr(child, "custom_id", None) == "me:reminder:remove_all"
+        for child in setup_view.children
+    )
 
 
 @pytest.mark.asyncio
@@ -469,8 +630,35 @@ async def test_preference_public_button_saves_visibility_and_refreshes(monkeypat
     args, kwargs, _message = interaction.followup.sent[-1]
     assert "saved as public" in args[0]
     assert kwargs["ephemeral"] is True
-    assert interaction.original_edits[-1]["embed"].title == "Preferences"
+    assert interaction.original_edits[-1]["embed"].image.url.startswith(
+        "attachment://me_preferences_"
+    )
     assert isinstance(interaction.original_edits[-1]["view"], views.PlayerSelfServiceView)
+
+
+@pytest.mark.asyncio
+async def test_preference_vip_button_reuses_inventory_vip_prompt(monkeypatch) -> None:
+    calls = []
+
+    async def fake_prompt(*, interaction, requester_id):
+        calls.append((interaction, requester_id))
+        await interaction.followup.send("Choose a governor and VIP level:", ephemeral=True)
+
+    monkeypatch.setattr(views, "send_inventory_vip_preference_prompt", fake_prompt)
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_PREFERENCES,
+    )
+    interaction = _Interaction()
+    button = next(
+        child for child in view.children if getattr(child, "custom_id", None) == "me:preference:vip"
+    )
+
+    await button.callback(interaction)
+
+    assert calls == [(interaction, 42)]
+    assert interaction.followup.sent[-1][0][0] == "Choose a governor and VIP level:"
 
 
 @pytest.mark.asyncio
@@ -700,36 +888,29 @@ async def test_reminder_event_select_refreshes_altars_into_fights() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reminder_unsubscribe_button_requires_active_subscription(monkeypatch) -> None:
-    async def fake_state(_user_id: int):
-        return ReminderCentreState(
-            ok=True,
-            subscribed=False,
-            event_types=(),
-            reminder_times=(),
-            event_summary="not subscribed",
-            time_summary="not set",
-        )
-
-    monkeypatch.setattr(views.reminder_service, "build_reminder_centre_state", fake_state)
-
-    view = views.PlayerSelfServiceView(
-        author_id=42,
-        display_name="Tester",
-        page=views.PAGE_REMINDERS,
+async def test_reminder_setup_disables_remove_all_when_unsubscribed() -> None:
+    state = ReminderCentreState(
+        ok=True,
+        subscribed=False,
+        event_types=(),
+        reminder_times=(),
+        event_summary="not subscribed",
+        time_summary="not set",
     )
-    interaction = _Interaction()
+    view = reminder_views.ReminderSetupView(
+        author_id=42,
+        username="Tester",
+        state=state,
+        display_name="Tester",
+    )
+
     button = next(
         child
         for child in view.children
-        if getattr(child, "custom_id", None) == "me:reminder:unsubscribe"
+        if getattr(child, "custom_id", None) == "me:reminder:remove_all"
     )
 
-    await button.callback(interaction)
-
-    args, kwargs, _message = interaction.followup.sent[-1]
-    assert "not currently subscribed" in args[0]
-    assert kwargs["ephemeral"] is True
+    assert button.disabled is True
 
 
 @pytest.mark.asyncio
@@ -794,6 +975,50 @@ async def test_reminder_setup_save_calls_service_and_sends_dm(monkeypatch) -> No
     edited = interaction.original_edits[-1]
     assert "confirmation DM was sent" in edited["content"]
     assert isinstance(edited["view"], reminder_views.ReminderCompletionView)
+
+
+@pytest.mark.asyncio
+async def test_reminder_save_refreshes_visible_reminder_card(monkeypatch) -> None:
+    async def fake_save(_user_id, _username, _selected_types, _selected_times):
+        return ReminderMutationResult(
+            ok=True,
+            action="update",
+            message="Updated reminders.",
+            event_types=("ruins",),
+            reminder_times=("24h",),
+            dm_message=None,
+        )
+
+    async def loader(_user_id: int):
+        return _summary()
+
+    monkeypatch.setattr(reminder_views.reminder_service, "save_reminder_preferences", fake_save)
+    state = ReminderCentreState(
+        ok=True,
+        subscribed=True,
+        event_types=("ruins",),
+        reminder_times=("24h",),
+        event_summary="ruins",
+        time_summary="24h",
+    )
+    host_message = _EditableMessage()
+    view = reminder_views.ReminderSetupView(
+        author_id=42,
+        username="Tester",
+        state=state,
+        display_name="Tester",
+        host_message=host_message,
+        summary_loader=loader,
+    )
+    interaction = _Interaction()
+    button = next(
+        child for child in view.children if getattr(child, "custom_id", None) == "me:reminder:save"
+    )
+
+    await button.callback(interaction)
+
+    assert host_message.edits[-1]["embed"].image.url.startswith("attachment://me_reminders_")
+    assert [file.filename for file in host_message.edits[-1]["files"]] == ["me_reminders_42.png"]
 
 
 @pytest.mark.asyncio
@@ -862,9 +1087,9 @@ async def test_view_navigation_loads_summary_and_edits_message() -> None:
     assert order == ["defer", "loader"]
     assert interaction.response.deferred[-1]["ephemeral"] is True
     assert edited["content"] is None
-    assert edited["embed"].title == "Reminder Centre"
+    assert edited["embed"].image.url.startswith("attachment://me_reminders_")
     assert edited["attachments"] == []
-    assert "files" not in edited
+    assert [file.filename for file in edited["files"]] == ["me_reminders_42.png"]
     assert isinstance(edited["view"], views.PlayerSelfServiceView)
     assert edited["view"].message is interaction.message
 
@@ -974,7 +1199,7 @@ async def test_account_completion_navigation_defer_type_error_falls_back() -> No
 
     assert order == ["defer-ephemeral", "defer-fallback", "loader"]
     assert interaction.response.deferred[-1] == {}
-    assert interaction.original_edits[-1]["embed"].title == "Account Centre"
+    assert interaction.original_edits[-1]["embed"].image.url.startswith("attachment://me_accounts_")
 
 
 @pytest.mark.asyncio
