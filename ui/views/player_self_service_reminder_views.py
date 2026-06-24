@@ -47,6 +47,18 @@ def _event_options(selected: tuple[str, ...]) -> list[discord.SelectOption]:
     ]
 
 
+def _time_options(selected: tuple[str, ...]) -> list[discord.SelectOption]:
+    return [
+        discord.SelectOption(
+            label=reminder_time,
+            value=reminder_time,
+            description=f"{reminder_time.upper()} reminder",
+            default=reminder_time in selected,
+        )
+        for reminder_time in DEFAULT_REMINDER_TIMES
+    ]
+
+
 def _dm_embed(message: ReminderMessage) -> discord.Embed:
     embed = discord.Embed(
         title=message.title,
@@ -80,11 +92,12 @@ async def _defer_private(interaction: discord.Interaction) -> None:
 async def _refresh_host_page(
     *,
     host_message: object | None,
+    interaction: discord.Interaction | None = None,
     author_id: int,
     display_name: str,
     summary_loader: SummaryLoader,
 ) -> None:
-    if host_message is None or not hasattr(host_message, "edit"):
+    if host_message is None:
         return
     try:
         summary = await summary_loader(int(author_id))
@@ -110,6 +123,10 @@ async def _refresh_host_page(
 
         class _MessageTarget:
             async def edit_original_response(self, **kwargs):
+                if interaction is not None and hasattr(interaction.followup, "edit_message"):
+                    return await interaction.followup.edit_message(host_message.id, **kwargs)
+                if not hasattr(host_message, "edit"):
+                    return None
                 return await host_message.edit(**kwargs)
 
         edited = await _edit_original_with_image_fallback(
@@ -122,6 +139,11 @@ async def _refresh_host_page(
             files=files,
         )
         view.set_message_ref(edited or host_message)
+    except discord.NotFound:
+        logger.debug(
+            "player_self_service_reminder_host_refresh_message_missing user_id=%s",
+            author_id,
+        )
     except asyncio.CancelledError:
         raise
     except Exception:
@@ -155,20 +177,11 @@ class ReminderEventSelect(discord.ui.Select):
 
 class ReminderTimeSelect(discord.ui.Select):
     def __init__(self, *, selected: tuple[str, ...]) -> None:
-        options = [
-            discord.SelectOption(
-                label=reminder_time,
-                value=reminder_time,
-                description=f"{reminder_time.upper()} reminder",
-                default=reminder_time in selected,
-            )
-            for reminder_time in DEFAULT_REMINDER_TIMES
-        ]
         super().__init__(
             placeholder="Choose reminder times",
             min_values=1,
-            max_values=len(options),
-            options=options,
+            max_values=len(DEFAULT_REMINDER_TIMES),
+            options=_time_options(selected),
             row=1,
         )
 
@@ -253,8 +266,16 @@ class ReminderSetupView(discord.ui.View):
             content += " A confirmation DM was sent."
         elif result.dm_message is not None:
             content += " I could not send a confirmation DM. Check your server DM settings."
+        self.selected_types = list(result.event_types)
+        self.selected_reminders = list(result.reminder_times)
+        for child in self.children:
+            if isinstance(child, ReminderEventSelect):
+                child.options = _event_options(tuple(self.selected_types))
+            if isinstance(child, ReminderTimeSelect):
+                child.options = _time_options(tuple(self.selected_reminders))
         await _refresh_host_page(
             host_message=self.host_message,
+            interaction=interaction,
             author_id=self.author_id,
             display_name=self.display_name,
             summary_loader=self.summary_loader,

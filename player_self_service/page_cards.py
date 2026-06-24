@@ -18,10 +18,11 @@ HEIGHT = 924
 TEXT = (246, 250, 255)
 MUTED = (190, 206, 226)
 BLUE = (96, 165, 250)
-GREEN = (74, 222, 128)
+GREEN = (45, 178, 96)
 GOLD = (250, 204, 21)
 RED = (248, 113, 113)
 SHADOW = (2, 6, 14)
+DARK_TEXT = (7, 16, 28)
 
 _CARD_DIR = Path(__file__).resolve().parent.parent / "assets" / "me" / "cards"
 _BACKGROUND_BY_PAGE = {
@@ -128,11 +129,25 @@ def _badge(draw: ImageDraw.ImageDraw, *, x: int, y: int, text: str) -> None:
     width = 210
     font = _fit(draw, label, width=width - 44, size=30, min_size=18, bold=True)
     label_width = _text_width(draw, label, font)
-    draw.rounded_rectangle((x, y, x + width, y + 50), radius=25, fill=color + (125,))
-    _draw_text(
+    title = "STATUS"
+    title_font = _font(18, bold=True)
+    title_width = _text_width(draw, title, title_font)
+    text_renderer._draw_text(
         draw,
-        (x + (width - label_width) // 2, y + 10),
+        (x + (width - title_width) // 2, y - 30),
+        title,
+        fill=MUTED,
+        font=title_font,
+        bold=True,
+    )
+    draw.rounded_rectangle((x, y, x + width, y + 54), radius=27, fill=color + (210,))
+    bbox = draw.textbbox((0, 0), label, font=font)
+    label_height = bbox[3] - bbox[1]
+    text_renderer._draw_text(
+        draw,
+        (x + (width - label_width) // 2, y + (54 - label_height) // 2 - 2),
         label,
+        fill=DARK_TEXT,
         font=font,
         bold=True,
     )
@@ -158,7 +173,7 @@ def _draw_wrapped_lines(
 
 def _account_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     accounts = summary.accounts
-    names = ", ".join(accounts.account_names[:4]) if accounts.account_names else "None shown"
+    names = ", ".join(accounts.account_names) if accounts.account_names else "None shown"
     return (
         f"Main: {accounts.main_label}",
         f"Linked accounts: {accounts.linked_count}",
@@ -180,7 +195,7 @@ def _preference_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     preferences = summary.preferences
     return (
         f"Inventory visibility: {preferences.inventory_visibility}",
-        "VIP level: available through Update VIP",
+        f"VIP levels: {preferences.vip_summary}",
     )
 
 

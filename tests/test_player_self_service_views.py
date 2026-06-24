@@ -95,11 +95,16 @@ class _Response:
 class _Followup:
     def __init__(self) -> None:
         self.sent = []
+        self.edited = []
 
     async def send(self, *args, **kwargs):
         message = SimpleNamespace(edits=[])
         self.sent.append((args, kwargs, message))
         return message
+
+    async def edit_message(self, message_id, **kwargs):
+        self.edited.append((message_id, kwargs))
+        return SimpleNamespace(id=message_id)
 
 
 class _Interaction:
@@ -117,6 +122,7 @@ class _Interaction:
 
 class _EditableMessage:
     def __init__(self) -> None:
+        self.id = 789
         self.edits = []
 
     async def edit(self, **kwargs):
@@ -1123,8 +1129,10 @@ async def test_reminder_autosave_refreshes_visible_reminder_card(monkeypatch) ->
 
     await select.callback(interaction)
 
-    assert host_message.edits[-1]["embed"].image.url.startswith("attachment://me_reminders_")
-    assert [file.filename for file in host_message.edits[-1]["files"]] == ["me_reminders_42.png"]
+    message_id, edit = interaction.followup.edited[-1]
+    assert message_id == host_message.id
+    assert edit["embed"].image.url.startswith("attachment://me_reminders_")
+    assert [file.filename for file in edit["files"]] == ["me_reminders_42.png"]
 
 
 @pytest.mark.asyncio
@@ -1197,7 +1205,7 @@ async def test_view_navigation_loads_summary_and_edits_message() -> None:
     assert edited["attachments"] == []
     assert [file.filename for file in edited["files"]] == ["me_reminders_42.png"]
     assert isinstance(edited["view"], views.PlayerSelfServiceView)
-    assert edited["view"].message is interaction.message
+    assert edited["view"]._message_ref is interaction.message
 
 
 @pytest.mark.asyncio
@@ -1329,7 +1337,7 @@ async def test_account_completion_navigation_sets_message_ref() -> None:
     assert [file.filename for file in edited["files"]] == ["me_dashboard_42.png"]
     new_view = interaction.original_edits[-1]["view"]
     assert isinstance(new_view, views.PlayerSelfServiceView)
-    assert new_view.message is interaction.message
+    assert new_view._message_ref is interaction.message
 
 
 @pytest.mark.asyncio

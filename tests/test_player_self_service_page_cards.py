@@ -37,6 +37,7 @@ def _summary() -> PlayerSelfServiceSummary:
             inventory_visibility="private",
             exports_summary="available through private export tools",
             next_action="Review preferences",
+            vip_summary="Main Gov - 19",
         ),
         exports=ExportStatus(
             stats_export="stats export available",
@@ -99,3 +100,38 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
     assert _page_copy("reminders", summary)[2] == "Actions available: Manage"
     assert "save automatically" in _page_copy("reminders", summary)[3]
     assert _page_copy("preferences", summary)[2] == ("Actions available: Set Private, Update VIP")
+
+
+def test_page_card_account_and_vip_lines_show_full_summary() -> None:
+    summary = PlayerSelfServiceSummary(
+        discord_user_id=42,
+        accounts=AccountStatus(
+            state="multiple",
+            linked_count=5,
+            linked_label="multiple linked",
+            main_state="set",
+            main_label="Main Gov (111)",
+            next_action="Manage",
+            account_names=("Main", "Alt 1", "Alt 2", "Farm 1", "Farm 2"),
+        ),
+        reminders=ReminderStatus(
+            state="off",
+            event_summary="not subscribed",
+            time_summary="not set",
+            next_action="Set up",
+        ),
+        preferences=PreferenceStatus(
+            inventory_visibility="private",
+            exports_summary="available through private export tools",
+            next_action="Review preferences",
+            vip_summary="Main - 19, Alt 1 - 15",
+        ),
+        exports=ExportStatus(
+            stats_export="stats export available",
+            inventory_export="inventory export available for approved records",
+            privacy_note="file exports are delivered privately",
+        ),
+    )
+
+    assert "Farm 2" in _page_copy("accounts", summary)[4][2]
+    assert _page_copy("preferences", summary)[4][1] == "VIP levels: Main - 19, Alt 1 - 15"

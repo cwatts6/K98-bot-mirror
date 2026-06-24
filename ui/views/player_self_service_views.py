@@ -215,7 +215,7 @@ def build_preferences_embed(
         value=_field_value(
             [
                 f"Inventory visibility: {preferences.inventory_visibility}",
-                "VIP level: available through Update VIP",
+                f"VIP levels: {preferences.vip_summary}",
             ]
         ),
         inline=False,
@@ -361,6 +361,8 @@ async def _edit_original_with_image_fallback(
         return await target.edit_original_response(
             **_edit_kwargs(embed=embed, view=view, files=files)
         )
+    except discord.NotFound:
+        raise
     except asyncio.CancelledError:
         raise
     except Exception:
@@ -391,18 +393,27 @@ class PlayerSelfServiceView(discord.ui.View):
         summary_loader: SummaryLoader = build_player_self_service_summary,
         timeout: float = 180,
     ):
-        super().__init__(timeout=timeout)
+        super().__init__(timeout=timeout, disable_on_timeout=True)
         self.author_id = int(author_id)
         self.display_name = display_name
         self.page = page
         self.summary = summary
         self.summary_loader = summary_loader
-        self.message: discord.Message | None = None
+        self._message_ref: discord.Message | None = None
         self._expired = False
         self._apply_page_state()
 
     def set_message_ref(self, message: discord.Message | None) -> None:
-        self.message = message
+        self._message_ref = message
+        if (
+            message is not None
+            and hasattr(message, "flags")
+            and hasattr(message, "channel")
+        ):
+            try:
+                self._message = message
+            except Exception:
+                logger.debug("player_self_service_internal_message_ref_failed", exc_info=True)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if self._expired:
@@ -853,11 +864,10 @@ class PlayerSelfServiceView(discord.ui.View):
 
     async def on_timeout(self) -> None:
         self._expired = True
-        for child in self.children:
-            child.disabled = True
+        await super().on_timeout()
         try:
-            if self.message:
-                await self.message.edit(
+            if self._message_ref:
+                await self._message_ref.edit(
                     content="This private /me menu has expired. Run `/me dashboard` again.",
                     view=self,
                 )

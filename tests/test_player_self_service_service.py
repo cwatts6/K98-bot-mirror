@@ -117,11 +117,16 @@ async def test_build_summary_uses_read_only_loaders() -> None:
         calls.append(("preference", user_id))
         return SimpleNamespace(ok=True, visibility=InventoryReportVisibility.PUBLIC)
 
+    async def vip_profile_loader(governor_id):
+        calls.append(("vip", governor_id))
+        return SimpleNamespace(vip_level_label="VIP 19")
+
     summary = await service.build_player_self_service_summary(
         42,
         account_loader=account_loader,
         reminder_loader=reminder_loader,
         preference_loader=preference_loader,
+        vip_profile_loader=vip_profile_loader,
     )
 
     assert summary.discord_user_id == 42
@@ -131,6 +136,29 @@ async def test_build_summary_uses_read_only_loaders() -> None:
     assert ("account", 42) in calls
     assert ("reminder", 42) in calls
     assert ("preference", 42) in calls
+    assert ("vip", 111) in calls
+    assert summary.preferences.vip_summary == "Main Gov - 19"
+
+
+@pytest.mark.asyncio
+async def test_vip_summary_lists_registered_account_levels() -> None:
+    account_summary = summarize_accounts(
+        {
+            "Main": {"GovernorID": "111", "GovernorName": "Main Gov"},
+            "Alt 1": {"GovernorID": "222", "GovernorName": "Alt Gov"},
+        }
+    )
+
+    async def vip_profile_loader(governor_id):
+        labels = {111: "VIP 19", 222: "Unknown / not set"}
+        return SimpleNamespace(vip_level_label=labels[governor_id])
+
+    summary = await service.summarize_vip_status(
+        account_summary,
+        profile_loader=vip_profile_loader,
+    )
+
+    assert summary == "Main Gov - 19, Alt Gov - not set"
 
 
 def test_player_self_service_service_has_no_ui_framework_dependency() -> None:

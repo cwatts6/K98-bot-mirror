@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from dataclasses import replace
 import logging
 from typing import Any
 
+from inventory import profile_service
 from inventory import reporting_service
 from inventory.models import InventoryReportVisibility
 from services.governor_account_service import (
@@ -47,6 +49,7 @@ class PreferenceStatus:
     inventory_visibility: str
     exports_summary: str
     next_action: str
+    vip_summary: str = "use Update VIP to set account VIP levels"
     error: str | None = None
 
 
@@ -69,6 +72,7 @@ class PlayerSelfServiceSummary:
 AccountLoader = Callable[[int], Awaitable[AccountResolutionSummary]]
 ReminderLoader = Callable[[int], dict[str, Any] | None]
 PreferenceLoader = Callable[[int], Awaitable[Any]]
+VipProfileLoader = Callable[[int], Awaitable[Any]]
 
 
 def summarize_account_status(summary: AccountResolutionSummary) -> AccountStatus:
@@ -225,6 +229,45 @@ async def summarize_preference_status(
     )
 
 
+def _compact_vip_label(value: object) -> str:
+    label = str(value or "").strip()
+    if not label or label.casefold() == "unknown / not set":
+        return "not set"
+    if label.startswith("VIP "):
+        return label.removeprefix("VIP ").replace(" or less", " or less")
+    return label
+
+
+async def summarize_vip_status(
+    account_summary: AccountResolutionSummary,
+    *,
+    profile_loader: VipProfileLoader = profile_service.fetch_inventory_profile,
+) -> str:
+    if not account_summary.ok:
+        return "unavailable"
+    if not account_summary.resolved_accounts:
+        return "register an account, then use Update VIP"
+    try:
+        profiles = await asyncio.gather(
+            *(
+                profile_loader(int(account.governor_id))
+                for account in account_summary.resolved_accounts
+            )
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception("player_self_service_vip_profiles_unavailable")
+        return "temporarily unavailable"
+
+    labels: list[str] = []
+    for account, profile in zip(account_summary.resolved_accounts, profiles, strict=True):
+        name = account.governor_name or account.governor_id_str
+        vip = _compact_vip_label(getattr(profile, "vip_level_label", None))
+        labels.append(f"{name} - {vip}")
+    return ", ".join(labels)
+
+
 def summarize_export_status() -> ExportStatus:
     return ExportStatus(
         stats_export="stats export available",
@@ -239,6 +282,7 @@ async def build_player_self_service_summary(
     account_loader: AccountLoader = get_account_summary_for_user,
     reminder_loader: ReminderLoader = get_user_config,
     preference_loader: PreferenceLoader = reporting_service.read_visibility_preference,
+    vip_profile_loader: VipProfileLoader = profile_service.fetch_inventory_profile,
 ) -> PlayerSelfServiceSummary:
     account_summary_task = account_loader(int(discord_user_id))
     preference_task = summarize_preference_status(
@@ -246,6 +290,11 @@ async def build_player_self_service_summary(
         preference_loader=preference_loader,
     )
     account_summary, preferences = await asyncio.gather(account_summary_task, preference_task)
+    vip_summary = await summarize_vip_status(
+        account_summary,
+        profile_loader=vip_profile_loader,
+    )
+    preferences = replace(preferences, vip_summary=vip_summary)
 
     try:
         reminder_config = await asyncio.to_thread(reminder_loader, int(discord_user_id))
