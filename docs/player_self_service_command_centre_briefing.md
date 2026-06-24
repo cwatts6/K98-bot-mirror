@@ -2,9 +2,10 @@
 
 Last updated: 2026-06-24
 
-Status: Phase 6 Guided Management Cards and Workflow Simplification is in implementation. The
-dashboard keeps the Phase 5 generated private visual card with embed fallback. Accounts, Reminders,
-Preferences, and Exports are moving to generated private visual cards with safe embed fallback.
+Status: Phase 6 Guided Management Cards and Workflow Simplification is delivered and smoke tested.
+The dashboard keeps the Phase 5 generated private visual card with embed fallback. Accounts,
+Reminders, Preferences, and Exports now use generated private visual cards with safe embed
+fallback.
 
 ## Player Briefing
 
@@ -22,21 +23,24 @@ The dashboard includes a visual summary card when image rendering succeeds. If i
 delivery fails, the bot falls back to the private embed dashboard. Dashboard Quick Launch is
 available only on the dashboard page.
 
-The account centre supports account review, Governor ID lookup, registration, replacement,
-and removal with confirmation through one primary Manage journey. Lookup results can continue into
-register or replace without asking the player to remember or re-enter the selected Governor ID. The
-reminder centre supports private KVK event reminder review, setup, updates, and remove-all/
-unsubscribe with confirmation through one primary Manage journey. `/me preferences` can update
-inventory report visibility between private and public output and can open the existing Governor
-VIP update flow. Existing commands such as `/register_governor`, `/modify_registration`,
-`/my_registrations`, `/mygovernorid`, `/subscribe`, `/modify_subscription`, `/unsubscribe`,
-`/inventory_preferences`, `/my_stats_export`, and `/export_inventory` still work.
+The account centre supports account review, Governor ID lookup, registration, replacement, and
+removal with confirmation through one primary Manage journey. Lookup results can continue into
+register or replace without asking the player to remember or re-enter the selected Governor ID.
+The reminder centre supports private KVK event reminder review, setup, automatic updates, and
+remove-all/unsubscribe with confirmation through one primary Manage journey. Calendar reminders
+remain managed separately through `/calendar_reminder_config` until the next reminder-centre phase.
+`/me preferences` can update inventory report visibility between private and public output and can
+open the existing Governor VIP update flow. Existing commands such as `/register_governor`,
+`/modify_registration`, `/my_registrations`, `/mygovernorid`, `/subscribe`,
+`/modify_subscription`, `/unsubscribe`, `/calendar_reminder_config`, `/inventory_preferences`,
+`/my_stats_export`, and `/export_inventory` still work.
 
 ## Operator Briefing
 
-Phase 5 extended `/me dashboard` and `/me preferences` in parallel with legacy self-service
-commands. It did not remove, redirect, or change `/inventory_preferences`, `/subscribe`,
-`/modify_subscription`, `/unsubscribe`, or account legacy commands.
+Phase 6 extended `/me accounts`, `/me reminders`, `/me preferences`, and `/me exports` in
+parallel with legacy self-service commands. It did not remove, redirect, or change
+`/inventory_preferences`, `/subscribe`, `/modify_subscription`, `/unsubscribe`,
+`/calendar_reminder_config`, `/export_inventory`, or account legacy commands.
 
 The approved command group is:
 
@@ -61,10 +65,13 @@ Rollout checks:
 - Confirm dashboard falls back to the private embed if image rendering or delivery fails.
 - Confirm the card is readable on desktop, mobile, and iPad.
 - Confirm account, reminder, preference, and export pages remain private.
+- Confirm account, reminder, preference, and export pages render generated cards or safe fallback
+  embeds.
 - Confirm `/me preferences` saves inventory report visibility through the existing service-backed
   path.
 - Confirm `/me preferences` can open the existing Governor VIP update flow and that VIP writes
   remain owned by the inventory profile service path.
+- Confirm `/me reminders` KVK event type and reminder time selections save automatically.
 - Confirm dashboard Quick Launch remains dashboard-only and `/me exports` does not gain the
   dashboard Quick Launch menu.
 - Confirm legacy player commands remain registered and usable.
@@ -129,21 +136,32 @@ Phase 5 smoke-test result:
 - The card copy is simplified to account status, reminder status, inventory preference status, and
   private export delivery.
 - Accounts, Reminders, and Preferences opened private pages as expected.
-- Reminder changes can still leave an older dashboard card visible above the reminder page until
-  the player returns to Dashboard. This is deferred to Phase 6 with the broader guided-management
-  and card-refresh work.
+- Reminder changes could still leave an older dashboard card visible above the reminder page until
+  the player returned to Dashboard. Phase 6 addressed non-misleading refresh behavior for the
+  guided card pages.
 
-Phase 6 planning notes:
+Phase 6 smoke-test result:
 
-- Replace account button sprawl with a single Account `Manage` journey that can find a Governor
-  ID, carry the selected result into register/replace, and remove accounts with confirmation.
-- Replace reminder top-level `Manage` plus separate `Unsubscribe` controls with one Reminder
-  `Manage` journey that supports save/update and remove-all/unsubscribe actions.
-- Convert Accounts, Reminders, Preferences, and Exports pages to generated cards with safe embed
-  fallback.
-- Discord image areas cannot be clicked directly; use native buttons/selects aligned to the card
-  sections instead.
-- Phase 6 reminder work is limited to KVK event reminder subscriptions. Calendar reminders remain
-  a distinct code path through `/calendar_reminder_config`, but should be revisited in a later
-  unified reminder-centre phase because players experience KVK and calendar reminders as one
-  reminder domain.
+- `/me accounts`, `/me reminders`, `/me preferences`, and `/me exports` rendered generated visual
+  cards with safe embed fallback.
+- Account names and preference VIP levels wrapped readably on the generated cards.
+- Account `Manage` handled Governor ID lookup, carry-forward into register/replace, early
+  duplicate/invalid ID feedback, replacement, and removal confirmation.
+- Reminder `Manage` auto-saved event type and reminder time changes, refreshed the card, preserved
+  Phase 4 KVK reminder semantics, and supported remove-all/unsubscribe confirmation.
+- Main cards and child reminder selector windows timed out gracefully with disabled controls.
+- `/me preferences` used one visibility toggle and opened the existing Governor VIP update flow.
+- `/me exports` remained a private guidance page without dashboard Quick Launch.
+- Legacy account, reminder, inventory preference, calendar reminder, VIP update, and export
+  commands remained live.
+
+Phase 7 planning notes:
+
+- Calendar reminders remain a distinct code path through `/calendar_reminder_config`, but should
+  be revisited through `/me reminders` because players experience KVK and calendar reminders as
+  one reminder domain.
+- `/me dashboard` should be refreshed to match the full-bleed visual style of the Phase 6 Accounts,
+  Reminders, Preferences, and Exports cards while preserving dashboard Quick Launch.
+- If calendar reminder management is too risky for one PR, Phase 7 should still deliver dashboard
+  alignment and read-only calendar reminder status, then defer write controls with a precise
+  blocker.

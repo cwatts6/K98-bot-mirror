@@ -1,6 +1,8 @@
 # Codex Chat Starter - Player Self-Service Command Centre Phase 6 Guided Management Cards and Workflow Simplification
 
-Status: active starter for the next Player Self-Service Command Centre phase.
+Status: historical starter. Phase 6 is delivered and smoke tested. Use
+`docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre Phase 7 Unified Reminder Centre and Dashboard Card Alignment.md`
+for the next active phase.
 
 Phase 1 audit/design is complete and archived.
 

@@ -34,8 +34,13 @@ Player Self-Service Command Centre status:
   tested successfully by the operator.
 - Phase 5 Visual Dashboard Card and Preferences Hub is delivered in production PR #475 and smoke
   tested successfully on desktop, mobile, and iPad.
-- The active next phase is Phase 6 Guided Management Cards and Workflow Simplification.
-- Active Phase 6 files:
+- Phase 6 Guided Management Cards and Workflow Simplification is delivered in mirror PR #168 and
+  smoke tested successfully by the operator on 2026-06-24.
+- The active next phase is Phase 7 Unified Reminder Centre and Dashboard Card Alignment.
+- Active Phase 7 files:
+  - `Codex Task Pack - Player Self-Service Command Centre Phase 7 Unified Reminder Centre and Dashboard Card Alignment.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre Phase 7 Unified Reminder Centre and Dashboard Card Alignment.md`
+- Phase 6 completion record:
   - `Codex Task Pack - Player Self-Service Command Centre Phase 6 Guided Management Cards and Workflow Simplification.md`
   - `Codex Chat Starter - Player Self-Service Command Centre Phase 6 Guided Management Cards and Workflow Simplification.md`
 - Phase 5 completion record:
@@ -125,6 +130,6 @@ Latest completed starter:
 
 Next active work:
 
-Player Self-Service Command Centre Phase 5 Visual Dashboard Card and Preferences Hub is active.
-KVK final removal of temporary deprecated command paths remains captured as a deferred cleanup item
-for execution after the no-feedback window and operator approval.
+Player Self-Service Command Centre Phase 7 Unified Reminder Centre and Dashboard Card Alignment is
+active. KVK final removal of temporary deprecated command paths remains captured as a deferred
+cleanup item for execution after the no-feedback window and operator approval.

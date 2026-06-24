@@ -7,7 +7,7 @@
 - Owner/context: Player Self-Service Command Centre programme after Phase 5 dashboard card and preferences delivery
 - Task type: `Discord command feature | visual card rendering | player workflow simplification`
 - One-pass approved: `no`
-- Status: `ready for next phase`
+- Status: `delivered in mirror PR #168 and smoke tested successfully on 2026-06-24`
 
 ## 2. Required Reading
 
@@ -49,6 +49,27 @@ Phase 6 should make the UI feel intentional:
 - one obvious account management path
 - one obvious reminder management path
 - no stale visible card state after player mutations
+
+Delivery result:
+
+- `/me accounts`, `/me reminders`, `/me preferences`, and `/me exports` received generated visual
+  cards with safe embed fallback.
+- Account management moved behind one primary `Manage` flow with lookup-to-register/replace
+  carry-forward and earlier duplicate/invalid Governor ID feedback.
+- KVK reminder management moved behind one primary `Manage` flow with autosave, card refresh, and
+  remove-all/unsubscribe confirmation.
+- Preferences gained a generated card, single visibility toggle, Governor VIP update access, and
+  VIP-level display.
+- Exports gained a generated private guidance card while preserving the dashboard-only Quick
+  Launch boundary.
+- Main cards and reminder child selector windows timed out gracefully.
+- Legacy self-service commands remained live.
+
+Captured follow-ups:
+
+- Calendar reminders remain separate from KVK event reminders and should be integrated through a
+  later unified `/me reminders` phase.
+- `/me dashboard` should be visually refreshed to match the Phase 6 subpage cards.
 
 ## 4. Background
 

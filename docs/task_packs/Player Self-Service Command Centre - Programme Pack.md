@@ -11,7 +11,7 @@
 
 ## Current Programme Status
 
-Status as of 2026-06-23:
+Status as of 2026-06-24:
 
 - Phase 1 audit and design is complete and archived as a historical execution record.
 - Phase 2 `/me` command shell and navigation foundation is delivered in mirror PR #164 and
@@ -22,12 +22,15 @@ Status as of 2026-06-23:
   tested successfully by the operator.
 - Phase 5 Visual `/me dashboard` Card and First-Pass Preferences is delivered in production PR
   #475 and smoke tested successfully by the operator on desktop, mobile, and iPad.
+- Phase 6 Guided Management Cards and Workflow Simplification is delivered in mirror PR #168 and
+  smoke tested successfully by the operator on 2026-06-24.
 - The delivered `/me` surface now includes a private command-centre shell, a generated dashboard
-  card with safe embed fallback, account-centre lookup/registration/replacement/removal,
-  reminder review/subscribe/update/unsubscribe, inventory report visibility preferences, export
-  guidance, and return navigation. Legacy account, reminder, inventory, and export commands remain
-  live.
-- Next active implementation phase: Phase 6 Guided Management Cards and Workflow Simplification.
+  card with safe embed fallback, generated cards for Accounts, Reminders, Preferences, and
+  Exports, account-centre lookup/register/replace/remove management, KVK reminder autosave and
+  remove-all management, inventory visibility and Governor VIP controls, export guidance, graceful
+  timeout handling, and return navigation. Legacy account, reminder, inventory, calendar reminder,
+  and export commands remain live.
+- Next active implementation phase: Phase 7 Unified Reminder Centre and Dashboard Card Alignment.
 
 Phase 2 manual smoke evidence:
 
@@ -82,6 +85,30 @@ Phase 5 manual smoke evidence:
 - Accounts, Reminders, and Preferences opened private pages as expected.
 - Dashboard Quick Launch remained dashboard-only; `/me exports` continued to open the exports page
   without the dashboard Quick Launch menu.
+
+Phase 6 manual smoke evidence:
+
+- `/me accounts`, `/me reminders`, `/me preferences`, and `/me exports` remained private and
+  rendered generated visual cards with safe embed fallback.
+- Account controls were simplified around one primary `Manage` journey.
+- Account lookup results could continue into register/replace flows without manual Governor ID
+  re-entry.
+- Account duplicate/invalid Governor ID checks were surfaced earlier in the guided flow.
+- Reminder controls were simplified around one primary `Manage` journey.
+- Reminder event-type and reminder-time changes auto-saved, refreshed the card, and preserved the
+  Phase 4 KVK reminder semantics.
+- Reminder remove-all/unsubscribe used confirmation and behaved correctly.
+- Preference controls used a single inventory visibility toggle and opened the existing Governor
+  VIP update path.
+- Preference cards showed account VIP levels where available.
+- Exports gained a generated private card but intentionally remained a guidance page without
+  dashboard Quick Launch.
+- Main `/me` cards and reminder child selector windows timed out gracefully with disabled controls.
+- Legacy account, KVK reminder, inventory preference, VIP update, and export commands remained
+  live.
+- Smoke feedback captured two important follow-ups: calendar reminders remain separate from the
+  KVK reminder centre, and the Phase 5 dashboard card now looks visually out of step with the new
+  Phase 6 subpage cards.
 
 Phase 5 process-learning for later phases:
 
@@ -495,25 +522,62 @@ remain live.
 
 ### Phase 6 — Guided Management Cards and Workflow Simplification
 
-Convert the remaining `/me` pages into a coherent card-based management journey.
+Status: delivered in mirror PR #168 and smoke tested successfully on 2026-06-24.
 
-Likely deliverables:
+Converted the remaining `/me` pages into a coherent card-based management journey.
+
+Delivered scope:
 
 - generated visual cards for `/me accounts`, `/me reminders`, `/me preferences`, and `/me exports`
   with safe embed fallback
-- one primary Account `Manage` flow that can find a Governor ID, carry a selected lookup result
-  into register/replace, and remove accounts with confirmation
-- one primary Reminder `Manage` flow that supports save/update and remove-all/unsubscribe actions
-  without a separate top-level unsubscribe button
-- refresh behavior so dashboard/subpage cards do not remain visibly stale after account or
-  reminder mutations
-- clearer alignment between dashboard `Next:` labels and the page-level primary action
+- one primary Account `Manage` flow for Governor ID lookup, register, replace, and remove
+- selected Governor ID lookup results carried into register/replace slot selection
+- earlier duplicate/invalid Governor ID feedback during account registration and replacement
+- one primary Reminder `Manage` flow for KVK event reminder autosave and remove-all/unsubscribe
+- automatic save/update behavior for reminder event types and reminder times
+- refreshed visible cards after account, reminder, and preference mutations
+- generated Preferences card with inventory visibility toggle and Governor VIP update access
+- generated Exports card preserving private export guidance without dashboard Quick Launch
+- graceful timeout handling for main cards and reminder child selector windows
 - focused card-rendering, interaction, service, and regression tests
 
-Phase 6 must preserve Phase 3 account safety checks, Phase 4 reminder semantics, Phase 5
-dashboard behavior, and all legacy command compatibility.
+Phase 6 preserved Phase 3 account safety checks, Phase 4 KVK reminder semantics, Phase 5
+dashboard behavior, dashboard Quick Launch boundaries, and all legacy command compatibility.
 
-### Phase 7 — Exports Launchpad and Quick Launch Expansion
+Phase 6 follow-ups:
+
+- Calendar reminders remain managed through `/calendar_reminder_config` and should be integrated
+  into a later unified `/me reminders` phase because players experience KVK event reminders and
+  calendar reminders as one reminder domain.
+- The Phase 5 dashboard card now looks visually out of step with the Phase 6 Accounts, Reminders,
+  Preferences, and Exports cards. The dashboard should be refreshed to the same full-bleed visual
+  style while preserving dashboard-only Quick Launch and existing summary data.
+
+### Phase 7 — Unified Reminder Centre and Dashboard Card Alignment
+
+Align the remaining rough edges exposed by the successful Phase 6 smoke test.
+
+Likely deliverables:
+
+- audit KVK event reminder state and calendar reminder preference/state code together
+- design one `/me reminders` card and Manage journey that can review KVK reminders, calendar
+  reminders, or both without merging storage unsafely
+- add calendar reminder status to `/me reminders` with clear wording when calendar reminder
+  management remains in a child flow
+- implement safe calendar reminder management inside `/me reminders` only where persistence,
+  restart safety, and existing calendar semantics are validated
+- refresh `/me dashboard` to visually match the Phase 6 subpage card style
+- preserve dashboard Quick Launch as dashboard-only
+- preserve existing KVK reminder semantics, calendar reminder lead-time/timezone semantics,
+  restart-sensitive scheduled work, and legacy command compatibility
+- focused reminder/calendar service, view, renderer, and command-registration tests
+
+Phase 7 should start with audit/scope unless the operator explicitly approves one-pass
+implementation. If the calendar reminder model proves too risky for one PR, deliver the dashboard
+visual alignment plus read-only calendar reminder status first and defer mutation controls with a
+precise blocker.
+
+### Phase 8 — Exports Launchpad and Quick Launch Expansion
 
 Extend the delivered `/me exports` launchpad without redesigning all export logic.
 
@@ -528,11 +592,11 @@ Likely deliverables:
 - an explicit Quick Launch plan for KVK stats, targets, history, rankings, inventory, and exports
   after the guided management pages are stable
 
-Phase 2 already delivered first-pass export guidance. Phase 7 should only add direct export
-actions if existing service-backed authorization, private file delivery, and Discord interaction
-safety are preserved.
+Phase 2 delivered first-pass export guidance and Phase 6 added a generated export card. Phase 8
+should only add direct export actions if existing service-backed authorization, private file
+delivery, and Discord interaction safety are preserved.
 
-### Phase 8 — Preferences Hub Expansion
+### Phase 9 — Preferences Hub Expansion
 
 Expand `/me preferences` only after the persistence and product model are clear.
 
@@ -546,9 +610,9 @@ Likely deliverables:
 - player-facing copy that avoids "coming soon" controls
 - tests for every new preference write path
 
-Phase 8 should not add preferences that cannot be saved safely.
+Phase 9 should not add preferences that cannot be saved safely.
 
-### Phase 9 — Legacy Redirects, Briefing, and Cleanup
+### Phase 10 — Legacy Redirects, Briefing, and Cleanup
 
 After the new `/me` journeys are validated and player communication is complete, redirect or remove legacy paths only with operator approval.
 
@@ -738,7 +802,7 @@ Do not include these in the first build unless separately approved:
 
 - full `/my_stats` visual redesign
 - full inventory visual redesign
-- public calendar/KVK calendar redesign
+- public calendar/KVK calendar redesign outside the player reminder-centre integration
 - Ark/MGE self-service redesign
 - full website implementation
 - live web dashboard
@@ -752,12 +816,14 @@ Do not include these in the first build unless separately approved:
 
 ## 18. Suggested Next Action
 
-Start Phase 6:
+Start Phase 7:
 
 ```text
-Codex Task Pack - Player Self-Service Command Centre Phase 6 Guided Management Cards and Workflow Simplification.md
+Codex Task Pack - Player Self-Service Command Centre Phase 7 Unified Reminder Centre and Dashboard Card Alignment.md
 ```
 
-Phase 6 should convert `/me` subpages into generated cards and simplify Accounts and Reminders
-around one primary `Manage` journey each. It should preserve the delivered Phase 5 dashboard,
-dashboard Quick Launch, all legacy commands, and the Phase 3/4 safety and reminder semantics.
+Phase 7 should address the highest-value remaining self-service gap: players see KVK event
+reminders and calendar reminders as one reminder domain, while the code currently keeps them
+separate. It should also refresh `/me dashboard` so the command-centre home visually matches the
+delivered Phase 6 subpage cards, while preserving dashboard Quick Launch, legacy commands, KVK
+reminder semantics, calendar reminder semantics, and all service-backed persistence boundaries.
