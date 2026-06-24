@@ -232,11 +232,7 @@ class ReminderSetupView(discord.ui.View):
 
     def set_message_ref(self, message: Any | None) -> None:
         self._message_ref = message
-        if (
-            message is not None
-            and hasattr(message, "flags")
-            and hasattr(message, "channel")
-        ):
+        if message is not None and hasattr(message, "flags") and hasattr(message, "channel"):
             try:
                 self._message = message
             except Exception:
