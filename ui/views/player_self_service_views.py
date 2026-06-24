@@ -120,9 +120,7 @@ def build_dashboard_card_embed(filename: str) -> discord.Embed:
 
 
 def build_card_embed(filename: str) -> discord.Embed:
-    embed = discord.Embed(color=discord.Color.blurple())
-    embed.set_image(url=f"attachment://{filename}")
-    return embed
+    return build_dashboard_card_embed(filename)
 
 
 def build_accounts_embed(

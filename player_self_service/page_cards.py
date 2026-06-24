@@ -113,7 +113,8 @@ def _status_label(value: str) -> str:
 
 def _load_background(page: str) -> Image.Image:
     filename = _BACKGROUND_BY_PAGE[page]
-    background = Image.open(_CARD_DIR / filename).convert("RGBA")
+    with Image.open(_CARD_DIR / filename) as source:
+        background = source.convert("RGBA")
     if background.size != (WIDTH, HEIGHT):
         background = background.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
     overlay = Image.new("RGBA", (WIDTH, HEIGHT), (4, 8, 16, 84))
@@ -206,16 +207,21 @@ def _page_copy(
         return (
             "Account Centre",
             summary.accounts.main_state,
-            "Next: Manage",
+            f"Next: {summary.accounts.next_action}",
             _account_lines(summary),
         )
     if page == "reminders":
-        return "Reminder Centre", summary.reminders.state, "Next: Manage", _reminder_lines(summary)
+        return (
+            "Reminder Centre",
+            summary.reminders.state,
+            f"Next: {summary.reminders.next_action}",
+            _reminder_lines(summary),
+        )
     if page == "preferences":
         return (
             "Preferences",
             summary.preferences.inventory_visibility,
-            "Next: Review preferences",
+            f"Next: {summary.preferences.next_action}",
             _preference_lines(summary),
         )
     if page == "exports":

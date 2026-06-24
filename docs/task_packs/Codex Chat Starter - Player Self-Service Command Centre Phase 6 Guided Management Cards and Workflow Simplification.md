@@ -162,7 +162,8 @@ Scope:
 1. Start with audit/scope only unless I explicitly approve one-pass implementation.
 2. Map current `/me accounts`, `/me reminders`, `/me preferences`, and `/me exports` page data,
    views, fallback behavior, and button/select budget.
-3. Design generated subpage cards with safe embed fallback. The target is visuals similar in style to the kvk rankings cards created. There are assets available to use as the background for the cards assets/me/cards/
+3. Design generated subpage cards with safe embed fallback. The target is visuals similar in style
+   to the `/kvk rankings` cards, using backgrounds from `assets/me/cards/`.
 4. Replace account button sprawl with one guided `Manage` flow where safe.
 5. Replace reminder Manage/Unsubscribe split with one guided `Manage` flow where safe.
 6. Define refresh behavior so visible dashboard/subpage cards do not show stale state after
@@ -176,14 +177,21 @@ Scope:
    renderer-helper consolidation structurally.
 
 Account flow:
-There are 3 main scenarios to incorporate
-1. A user wants to register / add a new account	
-1a. If they dont know the GovernorID but know the whole or part of the account name they will want to Search using the Find ID and then select the Governor (ID) they want to register / add
-1b. They know the GovernorID and want to be guided through the process of redistering a new account so that only available slots are displayed for them to pick from
-2. They want to replace an account registered (maybe they are moving accounts around or want to promote an account from farm to alt), agan they want to be guided through the process of selecting the account to replace and then adding the new account using the GovernorID, with appropriatte confirmation steps
-3. They want to remove a registered account (the account may have migrated or been sold) again they want to be guided through the process of selecting the account to remove, with appropriatte confirmation steps
+There are three main scenarios to incorporate:
 
-** through out all the flows we need to check the GovernorID can only be registered once so checks should be in place to ensure its not already registered. there are other checks also required please audit and validate those
+1. A user wants to register or add a new account.
+   - If they do not know the Governor ID but know all or part of the account name, they should be
+     able to search with Find ID, select the governor result, and continue into registration.
+   - If they know the Governor ID, they should be guided through registration with only available
+     slots displayed.
+2. A user wants to replace a registered account, for example when moving accounts around or
+   promoting a farm account to an alt. They should be guided through selecting the account to
+   replace, adding the new account by Governor ID, and confirming the replacement.
+3. A user wants to remove a registered account, for example after the account migrated or was sold.
+   They should be guided through selecting the account to remove and confirming the removal.
+
+Throughout all flows, validate that a Governor ID can only be registered once. Preserve duplicate
+ownership checks and any other account safety checks identified during audit.
 
 Likely files:
 - commands/me_cmds.py

@@ -5,7 +5,7 @@ from io import BytesIO
 
 from PIL import Image
 
-from player_self_service.page_cards import HEIGHT, WIDTH, render_page_card
+from player_self_service.page_cards import HEIGHT, WIDTH, _page_copy, render_page_card
 from player_self_service.service import (
     AccountStatus,
     ExportStatus,
@@ -61,3 +61,37 @@ def test_render_page_cards_output_pngs_for_remaining_me_pages() -> None:
         image = Image.open(BytesIO(rendered.image_bytes.getvalue()))
         assert image.format == "PNG"
         assert image.size == (WIDTH, HEIGHT)
+
+
+def test_page_card_action_copy_uses_service_summary_next_actions() -> None:
+    summary = PlayerSelfServiceSummary(
+        discord_user_id=42,
+        accounts=AccountStatus(
+            state="none",
+            linked_count=0,
+            linked_label="0 linked",
+            main_state="not set",
+            main_label="not set",
+            next_action="Register",
+        ),
+        reminders=ReminderStatus(
+            state="off",
+            event_summary="not subscribed",
+            time_summary="not set",
+            next_action="Set up",
+        ),
+        preferences=PreferenceStatus(
+            inventory_visibility="unknown",
+            exports_summary="available through private export tools",
+            next_action="Try again",
+        ),
+        exports=ExportStatus(
+            stats_export="stats export available",
+            inventory_export="inventory export available for approved records",
+            privacy_note="file exports are delivered privately",
+        ),
+    )
+
+    assert _page_copy("accounts", summary)[2] == "Next: Register"
+    assert _page_copy("reminders", summary)[2] == "Next: Set up"
+    assert _page_copy("preferences", summary)[2] == "Next: Try again"
