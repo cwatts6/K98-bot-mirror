@@ -13,8 +13,8 @@ from core.interaction_safety import send_or_followup
 from player_self_service import account_service
 from player_self_service.account_service import (
     AccountAction,
-    AccountConfirmation,
     AccountCentreState,
+    AccountConfirmation,
     AccountSlot,
 )
 from player_self_service.service import (
