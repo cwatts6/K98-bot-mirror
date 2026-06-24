@@ -405,11 +405,7 @@ class PlayerSelfServiceView(discord.ui.View):
 
     def set_message_ref(self, message: discord.Message | None) -> None:
         self._message_ref = message
-        if (
-            message is not None
-            and hasattr(message, "flags")
-            and hasattr(message, "channel")
-        ):
+        if message is not None and hasattr(message, "flags") and hasattr(message, "channel"):
             try:
                 self._message = message
             except Exception:

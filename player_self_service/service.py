@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import logging
 from typing import Any
 
-from inventory import profile_service
-from inventory import reporting_service
+from inventory import profile_service, reporting_service
 from inventory.models import InventoryReportVisibility
 from services.governor_account_service import (
     AccountResolutionSummary,
