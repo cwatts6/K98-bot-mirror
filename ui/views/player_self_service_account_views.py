@@ -458,6 +458,33 @@ class AccountLookupResultActionView(discord.ui.View):
             return None
         return state
 
+    async def _precheck_lookup_action(
+        self,
+        interaction: discord.Interaction,
+        *,
+        action: Literal["register", "replace"],
+        account_type: str,
+    ) -> bool:
+        if action == "register":
+            confirmation, error = await account_service.prepare_register_confirmation(
+                self.author_id,
+                account_type,
+                self.governor_id,
+            )
+        else:
+            confirmation, error = await account_service.prepare_replace_confirmation(
+                self.author_id,
+                account_type,
+                self.governor_id,
+            )
+        if error or confirmation is None:
+            await interaction.followup.send(
+                error or "Could not prepare account action.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
     @discord.ui.button(
         label="Register",
         style=discord.ButtonStyle.success,
@@ -476,6 +503,12 @@ class AccountLookupResultActionView(discord.ui.View):
                 "All account slots are already in use.",
                 ephemeral=True,
             )
+            return
+        if not await self._precheck_lookup_action(
+            interaction,
+            action="register",
+            account_type=str(state.free_slots[0]),
+        ):
             return
         await interaction.followup.send(
             f"Choose where to register {self.governor_name} (`{self.governor_id}`).",
@@ -509,6 +542,12 @@ class AccountLookupResultActionView(discord.ui.View):
                 "You do not have any registered accounts to replace yet.",
                 ephemeral=True,
             )
+            return
+        if not await self._precheck_lookup_action(
+            interaction,
+            action="replace",
+            account_type=state.registered_slots[0].slot,
+        ):
             return
         await interaction.followup.send(
             f"Choose which slot to replace with {self.governor_name} (`{self.governor_id}`).",
@@ -679,6 +718,7 @@ async def _refresh_host_page(
             author_id=int(author_id),
             display_name=display_name,
             page=page,
+            summary=summary,
             summary_loader=summary_loader,
         )
         embed, files = await _build_page_response(page, summary, display_name=display_name)
@@ -920,6 +960,7 @@ class AccountCompletionView(discord.ui.View):
             author_id=self.author_id,
             display_name=self.display_name,
             page=page,
+            summary=summary,
             summary_loader=self.summary_loader,
         )
         embed, files = await _build_page_response(page, summary, display_name=self.display_name)

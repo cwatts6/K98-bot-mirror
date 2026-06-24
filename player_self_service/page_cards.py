@@ -17,12 +17,11 @@ HEIGHT = 924
 
 TEXT = (246, 250, 255)
 MUTED = (190, 206, 226)
-PANEL = (13, 22, 36, 186)
-LINE = (115, 139, 176, 170)
 BLUE = (96, 165, 250)
 GREEN = (74, 222, 128)
 GOLD = (250, 204, 21)
 RED = (248, 113, 113)
+SHADOW = (2, 6, 14)
 
 _CARD_DIR = Path(__file__).resolve().parent.parent / "assets" / "me" / "cards"
 _BACKGROUND_BY_PAGE = {
@@ -78,6 +77,8 @@ def _draw_text(
     bold: bool = False,
 ) -> None:
     font = font or _font(28, bold=bold)
+    shadow_xy = (xy[0] + 3, xy[1] + 3)
+    text_renderer._draw_text(draw, shadow_xy, text, fill=SHADOW, font=font, bold=bold)
     text_renderer._draw_text(draw, xy, text, fill=fill, font=font, bold=bold)
 
 
@@ -121,10 +122,6 @@ def _load_background(page: str) -> Image.Image:
     return Image.alpha_composite(background, overlay)
 
 
-def _panel(draw: ImageDraw.ImageDraw, xy: tuple[int, int, int, int]) -> None:
-    draw.rounded_rectangle(xy, radius=18, fill=PANEL, outline=LINE, width=2)
-
-
 def _badge(draw: ImageDraw.ImageDraw, *, x: int, y: int, text: str) -> None:
     color = _status_color(text)
     label = _status_label(text)
@@ -165,8 +162,7 @@ def _account_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     return (
         f"Main: {accounts.main_label}",
         f"Linked accounts: {accounts.linked_count}",
-        f"Known names: {names}",
-        "Manage guides add, replace, remove, and ID lookup.",
+        f"Account Names: {names}",
     )
 
 
@@ -185,8 +181,6 @@ def _preference_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     return (
         f"Inventory visibility: {preferences.inventory_visibility}",
         "VIP level: available through Update VIP",
-        f"Exports: {preferences.exports_summary}",
-        "Preferences reuse existing inventory service storage.",
     )
 
 
@@ -196,36 +190,63 @@ def _export_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
         f"Stats: {exports.stats_export}",
         f"Inventory: {exports.inventory_export}",
         exports.privacy_note,
-        "Dashboard Quick Launch stays dashboard-only.",
+        "This page is private export guidance; dashboard Quick Launch stays dashboard-only.",
     )
+
+
+def _account_action_detail(summary: PlayerSelfServiceSummary) -> str:
+    if summary.accounts.linked_count <= 0:
+        return "Find ID by name, then add a governor to an available account slot."
+    return "Find ID, replace, remove, and add governors when a slot is open."
+
+
+def _reminder_action_detail(summary: PlayerSelfServiceSummary) -> str:
+    if summary.reminders.state.strip().lower() in {"off", "not subscribed"}:
+        return "Choose KVK event types and reminder times; selections save automatically."
+    return "Change KVK event types or times; selections save automatically. Remove All unsubscribes."
+
+
+def _preference_actions(summary: PlayerSelfServiceSummary) -> str:
+    visibility = summary.preferences.inventory_visibility.strip().lower()
+    visibility_action = "Set Public" if visibility == "private" else "Set Private"
+    return f"Actions available: {visibility_action}, Update VIP"
 
 
 def _page_copy(
     page: str, summary: PlayerSelfServiceSummary
-) -> tuple[str, str, str, tuple[str, ...]]:
+) -> tuple[str, str, str, str, tuple[str, ...]]:
     if page == "accounts":
         return (
             "Account Centre",
             summary.accounts.main_state,
-            f"Next: {summary.accounts.next_action}",
+            "Actions available: Manage",
+            _account_action_detail(summary),
             _account_lines(summary),
         )
     if page == "reminders":
         return (
             "Reminder Centre",
             summary.reminders.state,
-            f"Next: {summary.reminders.next_action}",
+            "Actions available: Manage",
+            _reminder_action_detail(summary),
             _reminder_lines(summary),
         )
     if page == "preferences":
         return (
             "Preferences",
             summary.preferences.inventory_visibility,
-            f"Next: {summary.preferences.next_action}",
+            _preference_actions(summary),
+            "Switch inventory visibility or update VIP level.",
             _preference_lines(summary),
         )
     if page == "exports":
-        return "Exports", "private", "Private export paths", _export_lines(summary)
+        return (
+            "Exports",
+            "private",
+            "Actions available: Dashboard, Accounts, Reminders, Preferences",
+            "Export files are still delivered through the existing private export flows.",
+            _export_lines(summary),
+        )
     raise ValueError(f"Unsupported /me page card: {page}")
 
 
@@ -239,25 +260,32 @@ def render_page_card(
     generated_at_utc = generated_at_utc or datetime.now(UTC)
     canvas = _load_background(page)
     draw = ImageDraw.Draw(canvas, "RGBA")
-    title, status, action, lines = _page_copy(page, summary)
+    title, status, action, action_detail, lines = _page_copy(page, summary)
 
-    _panel(draw, (72, 66, WIDTH - 72, 858))
-    _draw_text(draw, (118, 110), title.upper(), fill=MUTED, font=_font(36, bold=True), bold=True)
-    _badge(draw, x=WIDTH - 340, y=104, text=status)
+    _draw_text(draw, (108, 92), title.upper(), fill=MUTED, font=_font(42, bold=True), bold=True)
+    _badge(draw, x=WIDTH - 330, y=90, text=status)
 
     player = _clean(display_name, fallback="player")
-    player_font = _fit(draw, player, width=900, size=64, min_size=32, bold=True)
-    _draw_text(draw, (116, 176), player, font=player_font, bold=True)
+    player_font = _fit(draw, player, width=980, size=70, min_size=34, bold=True)
+    _draw_text(draw, (106, 174), player, font=player_font, bold=True)
 
     updated = generated_at_utc.strftime("%Y-%m-%d %H:%M UTC")
-    _draw_text(draw, (118, 258), updated, fill=MUTED, font=_font(28))
+    timestamp_font = _font(26)
+    timestamp_width = _text_width(draw, updated, timestamp_font)
+    _draw_text(
+        draw,
+        (WIDTH - timestamp_width - 104, HEIGHT - 72),
+        updated,
+        fill=MUTED,
+        font=timestamp_font,
+    )
 
-    draw.line((118, 326, WIDTH - 118, 326), fill=LINE, width=2)
-    _draw_wrapped_lines(draw, x=118, y=374, width=WIDTH - 236, lines=lines)
+    _draw_wrapped_lines(draw, x=108, y=332, width=WIDTH - 216, lines=lines, size=46, gap=66)
 
-    draw.line((118, 756, WIDTH - 118, 756), fill=LINE, width=2)
-    action_font = _fit(draw, action, width=WIDTH - 236, size=44, min_size=26, bold=True)
-    _draw_text(draw, (118, 786), action, fill=BLUE, font=action_font, bold=True)
+    action_font = _fit(draw, action, width=WIDTH - 216, size=44, min_size=26, bold=True)
+    _draw_text(draw, (108, 720), action, fill=BLUE, font=action_font, bold=True)
+    detail_font = _fit(draw, action_detail, width=WIDTH - 216, size=30, min_size=22, bold=False)
+    _draw_text(draw, (108, 778), action_detail, fill=MUTED, font=detail_font)
 
     output = BytesIO()
     canvas.convert("RGB").save(output, format="PNG", optimize=True)

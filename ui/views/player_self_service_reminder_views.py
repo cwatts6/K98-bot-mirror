@@ -99,6 +99,7 @@ async def _refresh_host_page(
             author_id=int(author_id),
             display_name=display_name,
             page=PAGE_REMINDERS,
+            summary=summary,
             summary_loader=summary_loader,
         )
         embed, files = await _build_page_response(
@@ -149,10 +150,7 @@ class ReminderEventSelect(discord.ui.Select):
         selected_types, adjusted = reminder_service.normalize_event_types(tuple(self.values))
         view.selected_types = list(selected_types)
         self.options = _event_options(selected_types)
-        if adjusted:
-            await interaction.response.edit_message(view=view)
-            return
-        await interaction.response.defer()
+        await view.autosave_selection(interaction, adjusted=adjusted)
 
 
 class ReminderTimeSelect(discord.ui.Select):
@@ -183,7 +181,7 @@ class ReminderTimeSelect(discord.ui.Select):
             )
             return
         view.selected_reminders = list(self.values)
-        await interaction.response.defer()
+        await view.autosave_selection(interaction)
 
 
 class ReminderSetupView(discord.ui.View):
@@ -210,6 +208,9 @@ class ReminderSetupView(discord.ui.View):
         self._saving = False
         self.add_item(ReminderEventSelect(selected=tuple(self.selected_types)))
         self.add_item(ReminderTimeSelect(selected=tuple(self.selected_reminders)))
+        for child in list(self.children):
+            if getattr(child, "custom_id", None) == "me:reminder:save":
+                self.remove_item(child)
         for child in self.children:
             if getattr(child, "custom_id", None) == "me:reminder:remove_all":
                 child.disabled = not self.can_unsubscribe
@@ -223,16 +224,11 @@ class ReminderSetupView(discord.ui.View):
         )
         return False
 
-    @discord.ui.button(
-        label="Save",
-        style=discord.ButtonStyle.success,
-        custom_id="me:reminder:save",
-        row=2,
-    )
-    async def save_button(
+    async def autosave_selection(
         self,
-        button: discord.ui.Button,
         interaction: discord.Interaction,
+        *,
+        adjusted: bool = False,
     ) -> None:
         if self._saving:
             await interaction.response.defer()
@@ -252,31 +248,31 @@ class ReminderSetupView(discord.ui.View):
             return
 
         dm_sent = await self._send_dm(interaction, result.dm_message)
-        content = result.message
+        content = f"{result.message} Saved automatically."
         if dm_sent:
             content += " A confirmation DM was sent."
-        else:
-            content += (
-                " Saved, but I could not send a confirmation DM. Check your server DM settings."
-            )
+        elif result.dm_message is not None:
+            content += " I could not send a confirmation DM. Check your server DM settings."
         await _refresh_host_page(
             host_message=self.host_message,
             author_id=self.author_id,
             display_name=self.display_name,
             summary_loader=self.summary_loader,
         )
-        view = ReminderCompletionView(
-            author_id=self.author_id,
-            display_name=self.display_name,
-            message=content,
-            summary_loader=self.summary_loader,
-        )
+        self.can_unsubscribe = True
+        self._saving = False
+        for child in self.children:
+            if getattr(child, "custom_id", None) == "me:reminder:remove_all":
+                child.disabled = False
         try:
-            await interaction.edit_original_response(content=content, embed=None, view=view)
+            await interaction.edit_original_response(content=content, embed=None, view=self)
         except Exception:
-            logger.debug("player_self_service_reminder_save_edit_failed", exc_info=True)
-            await interaction.followup.send(content, view=view, ephemeral=True)
-        self.stop()
+            logger.debug(
+                "player_self_service_reminder_autosave_edit_failed adjusted=%s",
+                adjusted,
+                exc_info=True,
+            )
+            await interaction.followup.send(content, view=self, ephemeral=True)
 
     @discord.ui.button(
         label="Remove All",
@@ -506,6 +502,7 @@ class ReminderCompletionView(discord.ui.View):
             author_id=self.author_id,
             display_name=self.display_name,
             page=page,
+            summary=summary,
             summary_loader=self.summary_loader,
         )
         embed, files = await _build_page_response(page, summary, display_name=self.display_name)

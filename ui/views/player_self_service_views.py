@@ -147,12 +147,11 @@ def build_accounts_embed(
     )
     names = ", ".join(accounts.account_names[:5]) if accounts.account_names else "none shown"
     embed.add_field(
-        name="Next Step",
+        name="Available Actions",
         value=_field_value(
             [
-                f"Recommended action: {accounts.next_action}",
                 f"Account names: {names}",
-                "Use Manage to look up, register, replace, or remove accounts.",
+                "Use Manage to look up IDs, add governors to open slots, replace, or remove accounts.",
             ]
         ),
         inline=False,
@@ -183,11 +182,11 @@ def build_reminders_embed(
         inline=False,
     )
     embed.add_field(
-        name="Next Step",
+        name="Available Actions",
         value=_field_value(
             [
-                f"Recommended action: {reminders.next_action}",
-                "Use Manage to update event types, reminder times, or unsubscribe.",
+                "Manage auto-saves KVK event type and reminder time changes.",
+                "Remove All unsubscribes from KVK event reminders.",
             ]
         ),
         inline=False,
@@ -216,17 +215,17 @@ def build_preferences_embed(
         value=_field_value(
             [
                 f"Inventory visibility: {preferences.inventory_visibility}",
-                f"Exports: {preferences.exports_summary}",
+                "VIP level: available through Update VIP",
             ]
         ),
         inline=False,
     )
     embed.add_field(
-        name="Next Step",
+        name="Available Actions",
         value=_field_value(
             [
-                f"Recommended action: {preferences.next_action}",
-                "Use the controls below to update inventory visibility or VIP level.",
+                "Use the visibility toggle to switch inventory report visibility.",
+                "Use Update VIP to update your inventory VIP level.",
             ]
         ),
         inline=False,
@@ -257,7 +256,10 @@ def build_exports_embed(
     )
     embed.add_field(
         name="Privacy",
-        value=exports.privacy_note,
+        value=(
+            f"{exports.privacy_note}\n"
+            "This page is guidance only; export file delivery stays in the existing private export flows."
+        ),
         inline=False,
     )
     return embed
@@ -385,6 +387,7 @@ class PlayerSelfServiceView(discord.ui.View):
         author_id: int,
         display_name: str,
         page: PlayerSelfServicePage = PAGE_DASHBOARD,
+        summary: PlayerSelfServiceSummary | None = None,
         summary_loader: SummaryLoader = build_player_self_service_summary,
         timeout: float = 180,
     ):
@@ -392,14 +395,22 @@ class PlayerSelfServiceView(discord.ui.View):
         self.author_id = int(author_id)
         self.display_name = display_name
         self.page = page
+        self.summary = summary
         self.summary_loader = summary_loader
         self.message: discord.Message | None = None
+        self._expired = False
         self._apply_page_state()
 
     def set_message_ref(self, message: discord.Message | None) -> None:
         self.message = message
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if self._expired:
+            await interaction.response.send_message(
+                "This private menu has expired. Run `/me dashboard` again.",
+                ephemeral=True,
+            )
+            return False
         if interaction.user and int(interaction.user.id) == self.author_id:
             return True
         await interaction.response.send_message("This private menu is not for you.", ephemeral=True)
@@ -428,6 +439,8 @@ class PlayerSelfServiceView(discord.ui.View):
                     "me:preference:"
                 ):
                     self.remove_item(child)
+        if self.page == PAGE_PREFERENCES:
+            self._apply_preference_toggle_state()
         for child in self.children:
             if isinstance(child, discord.ui.Button):
                 child.disabled = child.custom_id == f"me:{self.page}"
@@ -435,6 +448,28 @@ class PlayerSelfServiceView(discord.ui.View):
             isinstance(child, PlayerSelfServiceQuickLaunchSelect) for child in self.children
         ):
             self.add_item(PlayerSelfServiceQuickLaunchSelect())
+
+    def _apply_preference_toggle_state(self) -> None:
+        visibility = ""
+        if self.summary is not None:
+            visibility = self.summary.preferences.inventory_visibility.strip().lower()
+        for child in self.children:
+            if (
+                isinstance(child, discord.ui.Button)
+                and child.custom_id == "me:preference:visibility"
+            ):
+                if visibility == "private":
+                    child.label = "Set Public"
+                    child.style = discord.ButtonStyle.secondary
+                elif visibility == "public":
+                    child.label = "Set Private"
+                    child.style = discord.ButtonStyle.primary
+                elif visibility == "unknown":
+                    child.label = "Set Visibility"
+                    child.disabled = True
+                else:
+                    child.label = "Set Private"
+                    child.style = discord.ButtonStyle.primary
 
     async def _show_page(
         self, interaction: discord.Interaction, page: PlayerSelfServicePage
@@ -488,6 +523,7 @@ class PlayerSelfServiceView(discord.ui.View):
             author_id=self.author_id,
             display_name=self.display_name,
             page=page,
+            summary=summary,
             summary_loader=self.summary_loader,
             timeout=self.timeout or 180,
         )
@@ -737,6 +773,7 @@ class PlayerSelfServiceView(discord.ui.View):
             author_id=self.author_id,
             display_name=self.display_name,
             page=PAGE_PREFERENCES,
+            summary=summary,
             summary_loader=self.summary_loader,
             timeout=self.timeout or 180,
         )
@@ -762,30 +799,25 @@ class PlayerSelfServiceView(discord.ui.View):
             logger.debug("player_self_service_preference_refresh_edit_failed", exc_info=True)
 
     @discord.ui.button(
-        label="Set Private",
-        style=discord.ButtonStyle.primary,
-        custom_id="me:preference:private",
-        row=3,
-    )
-    async def preference_private_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        await self._save_inventory_visibility(interaction, InventoryReportVisibility.ONLY_ME)
-
-    @discord.ui.button(
-        label="Set Public",
+        label="Set Visibility",
         style=discord.ButtonStyle.secondary,
-        custom_id="me:preference:public",
+        custom_id="me:preference:visibility",
         row=3,
     )
-    async def preference_public_button(
+    async def preference_visibility_button(
         self,
         button: discord.ui.Button,
         interaction: discord.Interaction,
     ) -> None:
-        await self._save_inventory_visibility(interaction, InventoryReportVisibility.PUBLIC)
+        visibility = ""
+        if self.summary is not None:
+            visibility = self.summary.preferences.inventory_visibility.strip().lower()
+        target = (
+            InventoryReportVisibility.PUBLIC
+            if visibility == "private"
+            else InventoryReportVisibility.ONLY_ME
+        )
+        await self._save_inventory_visibility(interaction, target)
 
     @discord.ui.button(
         label="Update VIP",
@@ -820,11 +852,15 @@ class PlayerSelfServiceView(discord.ui.View):
         )
 
     async def on_timeout(self) -> None:
+        self._expired = True
         for child in self.children:
             child.disabled = True
         try:
             if self.message:
-                await self.message.edit(view=self)
+                await self.message.edit(
+                    content="This private /me menu has expired. Run `/me dashboard` again.",
+                    view=self,
+                )
         except Exception:
             logger.debug("player_self_service_timeout_edit_failed", exc_info=True)
 
@@ -902,6 +938,7 @@ async def send_player_self_service_page(
         author_id=int(ctx.user.id),
         display_name=display_name,
         page=page,
+        summary=summary,
         summary_loader=summary_loader,
     )
     embed, files = await _build_page_response(page, summary, display_name=display_name)

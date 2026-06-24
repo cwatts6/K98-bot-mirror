@@ -129,6 +129,19 @@ def _slot_from_resolved(account: ResolvedAccount) -> AccountSlot:
     )
 
 
+def _linked_governor_label(
+    summary: AccountResolutionSummary,
+    governor_id: str | int | None,
+    *,
+    fallback: str,
+) -> str:
+    gid = str(governor_id or "").strip()
+    for account in summary.resolved_accounts:
+        if account.governor_id_str == gid:
+            return f"{account.slot}: {_format_governor(account.governor_name, gid)}"
+    return fallback
+
+
 def build_state_from_summary(summary: AccountResolutionSummary) -> AccountCentreState:
     if not summary.ok:
         return AccountCentreState(
@@ -233,7 +246,12 @@ async def prepare_register_confirmation(
     if lookup_error:
         return None, lookup_error
     if summary.contains_governor_id(governor_id or ""):
-        return None, "That Governor ID is already linked to your account centre."
+        label = _linked_governor_label(
+            summary,
+            governor_id,
+            fallback="another slot",
+        )
+        return None, f"That Governor ID is already linked to your account centre as {label}."
 
     claimed = await asyncio.to_thread(claim_checker, governor_id, int(discord_user_id))
     if claimed:
@@ -279,9 +297,15 @@ async def prepare_replace_confirmation(
 
     current_gid = str(current.get("GovernorID") or "").strip()
     if current_gid == str(governor_id or "").strip():
-        return None, f"`{account_type}` is already linked to that Governor ID."
+        current_label = _format_governor(str(current.get("GovernorName") or ""), current_gid)
+        return None, f"`{account_type}` is already linked to {current_label}."
     if summary.contains_governor_id(governor_id or ""):
-        return None, "That Governor ID is already linked to another slot in your account centre."
+        label = _linked_governor_label(
+            summary,
+            governor_id,
+            fallback="another slot",
+        )
+        return None, f"That Governor ID is already linked to your account centre as {label}."
 
     claimed = await asyncio.to_thread(claim_checker, governor_id, int(discord_user_id))
     if claimed:

@@ -63,7 +63,7 @@ def test_render_page_cards_output_pngs_for_remaining_me_pages() -> None:
         assert image.size == (WIDTH, HEIGHT)
 
 
-def test_page_card_action_copy_uses_service_summary_next_actions() -> None:
+def test_page_card_action_copy_uses_available_action_copy() -> None:
     summary = PlayerSelfServiceSummary(
         discord_user_id=42,
         accounts=AccountStatus(
@@ -92,6 +92,12 @@ def test_page_card_action_copy_uses_service_summary_next_actions() -> None:
         ),
     )
 
-    assert _page_copy("accounts", summary)[2] == "Next: Register"
-    assert _page_copy("reminders", summary)[2] == "Next: Set up"
-    assert _page_copy("preferences", summary)[2] == "Next: Try again"
+    assert _page_copy("accounts", summary)[2] == "Actions available: Manage"
+    assert _page_copy("accounts", summary)[3] == (
+        "Find ID by name, then add a governor to an available account slot."
+    )
+    assert _page_copy("reminders", summary)[2] == "Actions available: Manage"
+    assert "save automatically" in _page_copy("reminders", summary)[3]
+    assert _page_copy("preferences", summary)[2] == (
+        "Actions available: Set Private, Update VIP"
+    )

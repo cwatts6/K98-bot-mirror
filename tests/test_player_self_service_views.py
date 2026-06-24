@@ -319,7 +319,7 @@ def test_reminders_embed_invites_service_backed_controls() -> None:
     embed = views.build_reminders_embed(_summary(), display_name="Tester")
 
     assert embed.title == "Reminder Centre"
-    assert "Use Manage" in embed.fields[1].value
+    assert "Manage auto-saves" in embed.fields[1].value
     assert "/modify_subscription" not in embed.fields[1].value
 
 
@@ -327,7 +327,7 @@ def test_preferences_embed_invites_service_backed_visibility_controls() -> None:
     embed = views.build_preferences_embed(_summary(), display_name="Tester")
 
     assert embed.title == "Preferences"
-    assert "VIP level" in embed.fields[1].value
+    assert "VIP level" in embed.fields[0].value
     assert "/inventory_preferences" not in embed.fields[1].value
 
 
@@ -400,10 +400,12 @@ async def test_preferences_view_has_inventory_visibility_actions_without_quick_l
         author_id=42,
         display_name="Tester",
         page=views.PAGE_PREFERENCES,
+        summary=_summary(),
     )
 
     labels = [getattr(child, "label", None) for child in view.children]
-    assert {"Set Private", "Set Public", "Update VIP"}.issubset(set(labels))
+    assert {"Set Public", "Update VIP"}.issubset(set(labels))
+    assert "Set Private" not in labels
     assert "Manage" not in labels
     assert not any(
         isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
@@ -497,7 +499,23 @@ async def test_account_lookup_result_register_carries_governor_id(monkeypatch) -
             free_slots=("Main",),
         )
 
+    async def fake_prepare(_user_id, _slot, _governor_query):
+        return (
+            AccountConfirmation(
+                action="register",
+                account_type="Main",
+                governor_id="123456789",
+                governor_name="FoundGov",
+            ),
+            None,
+        )
+
     monkeypatch.setattr(account_views.account_service, "build_account_centre_state", fake_state)
+    monkeypatch.setattr(
+        account_views.account_service,
+        "prepare_register_confirmation",
+        fake_prepare,
+    )
     view = account_views.AccountLookupResultActionView(
         author_id=42,
         display_name="Tester",
@@ -517,6 +535,52 @@ async def test_account_lookup_result_register_carries_governor_id(monkeypatch) -
     slot_view = kwargs["view"]
     assert isinstance(slot_view, account_views.AccountSlotSelectView)
     assert slot_view.governor_query == "123456789"
+
+
+@pytest.mark.asyncio
+async def test_account_lookup_result_register_rejects_duplicate_before_slot_picker(
+    monkeypatch,
+) -> None:
+    async def fake_state(_user_id: int):
+        return AccountCentreState(
+            ok=True,
+            linked_count=1,
+            main_label="Main Gov (123456789)",
+            registered_slots=(),
+            free_slots=("Alt 1",),
+        )
+
+    async def fake_prepare(_user_id, _slot, _governor_query):
+        return None, (
+            "That Governor ID is already linked to your account centre as "
+            "Main: Main Gov (123456789)."
+        )
+
+    monkeypatch.setattr(account_views.account_service, "build_account_centre_state", fake_state)
+    monkeypatch.setattr(
+        account_views.account_service,
+        "prepare_register_confirmation",
+        fake_prepare,
+    )
+    view = account_views.AccountLookupResultActionView(
+        author_id=42,
+        display_name="Tester",
+        governor_id="123456789",
+        governor_name="Main Gov",
+    )
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:account:lookup:register"
+    )
+
+    await button.callback(interaction)
+
+    args, kwargs, _message = interaction.followup.sent[-1]
+    assert "already linked" in args[0]
+    assert "Main Gov" in args[0]
+    assert "view" not in kwargs
 
 
 @pytest.mark.asyncio
@@ -595,7 +659,9 @@ async def test_reminder_manage_button_opens_selector_with_existing_state(monkeyp
 
 
 @pytest.mark.asyncio
-async def test_preference_public_button_saves_visibility_and_refreshes(monkeypatch) -> None:
+async def test_preference_visibility_toggle_saves_opposite_visibility_and_refreshes(
+    monkeypatch,
+) -> None:
     calls = []
 
     async def fake_save(user_id: int, visibility: InventoryReportVisibility):
@@ -615,13 +681,14 @@ async def test_preference_public_button_saves_visibility_and_refreshes(monkeypat
         author_id=42,
         display_name="Tester",
         page=views.PAGE_PREFERENCES,
+        summary=_summary(),
         summary_loader=loader,
     )
     interaction = _Interaction()
     button = next(
         child
         for child in view.children
-        if getattr(child, "custom_id", None) == "me:preference:public"
+        if getattr(child, "custom_id", None) == "me:preference:visibility"
     )
 
     await button.callback(interaction)
@@ -787,7 +854,18 @@ async def test_preference_visibility_refresh_edit_cancellation_propagates(
 
 
 @pytest.mark.asyncio
-async def test_reminder_event_select_refreshes_full_coverage_as_all() -> None:
+async def test_reminder_event_select_refreshes_full_coverage_as_all(monkeypatch) -> None:
+    async def fake_save(_user_id, _username, _selected_types, _selected_times):
+        return ReminderMutationResult(
+            ok=True,
+            action="update",
+            message="Updated reminders.",
+            event_types=("all",),
+            reminder_times=("24h",),
+            dm_message=None,
+        )
+
+    monkeypatch.setattr(reminder_views.reminder_service, "save_reminder_preferences", fake_save)
     state = ReminderCentreState(
         ok=True,
         subscribed=True,
@@ -812,7 +890,7 @@ async def test_reminder_event_select_refreshes_full_coverage_as_all() -> None:
     await select.callback(interaction)
 
     assert view.selected_types == ["all"]
-    assert interaction.response.edited[-1]["view"] is view
+    assert interaction.original_edits[-1]["view"] is view
     defaults = {option.value: option.default for option in select.options}
     assert defaults == {
         "ruins": False,
@@ -824,7 +902,18 @@ async def test_reminder_event_select_refreshes_full_coverage_as_all() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reminder_event_select_keeps_major_with_fights() -> None:
+async def test_reminder_event_select_keeps_major_with_fights(monkeypatch) -> None:
+    async def fake_save(_user_id, _username, _selected_types, _selected_times):
+        return ReminderMutationResult(
+            ok=True,
+            action="update",
+            message="Updated reminders.",
+            event_types=("major", "fights"),
+            reminder_times=("24h",),
+            dm_message=None,
+        )
+
+    monkeypatch.setattr(reminder_views.reminder_service, "save_reminder_preferences", fake_save)
     state = ReminderCentreState(
         ok=True,
         subscribed=True,
@@ -849,14 +938,25 @@ async def test_reminder_event_select_keeps_major_with_fights() -> None:
     await select.callback(interaction)
 
     assert view.selected_types == ["major", "fights"]
-    assert interaction.response.deferred
+    assert interaction.original_edits[-1]["view"] is view
     defaults = {option.value: option.default for option in select.options}
     assert defaults["major"] is True
     assert defaults["fights"] is True
 
 
 @pytest.mark.asyncio
-async def test_reminder_event_select_refreshes_altars_into_fights() -> None:
+async def test_reminder_event_select_refreshes_altars_into_fights(monkeypatch) -> None:
+    async def fake_save(_user_id, _username, _selected_types, _selected_times):
+        return ReminderMutationResult(
+            ok=True,
+            action="update",
+            message="Updated reminders.",
+            event_types=("fights",),
+            reminder_times=("24h",),
+            dm_message=None,
+        )
+
+    monkeypatch.setattr(reminder_views.reminder_service, "save_reminder_preferences", fake_save)
     state = ReminderCentreState(
         ok=True,
         subscribed=True,
@@ -881,7 +981,7 @@ async def test_reminder_event_select_refreshes_altars_into_fights() -> None:
     await select.callback(interaction)
 
     assert view.selected_types == ["fights"]
-    assert interaction.response.edited[-1]["view"] is view
+    assert interaction.original_edits[-1]["view"] is view
     defaults = {option.value: option.default for option in select.options}
     assert defaults["altars"] is False
     assert defaults["fights"] is True
@@ -928,7 +1028,7 @@ async def test_account_slot_select_rejects_non_owner() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reminder_setup_save_calls_service_and_sends_dm(monkeypatch) -> None:
+async def test_reminder_setup_event_select_autosaves_and_sends_dm(monkeypatch) -> None:
     calls = []
 
     async def fake_save(user_id, username, selected_types, selected_times):
@@ -964,21 +1064,29 @@ async def test_reminder_setup_save_calls_service_and_sends_dm(monkeypatch) -> No
         display_name="Tester",
     )
     interaction = _Interaction()
-    button = next(
-        child for child in view.children if getattr(child, "custom_id", None) == "me:reminder:save"
+    select = next(
+        child
+        for child in view.children
+        if isinstance(child, reminder_views.ReminderEventSelect)
     )
+    select._selected_values = ["ruins"]
+    select._interaction = SimpleNamespace(data={})
 
-    await button.callback(interaction)
+    await select.callback(interaction)
 
     assert calls == [(42, "Tester", ("ruins",), ("24h",))]
     assert interaction.user.sent
     edited = interaction.original_edits[-1]
+    assert "Saved automatically" in edited["content"]
     assert "confirmation DM was sent" in edited["content"]
-    assert isinstance(edited["view"], reminder_views.ReminderCompletionView)
+    assert isinstance(edited["view"], reminder_views.ReminderSetupView)
+    assert all(
+        getattr(child, "custom_id", None) != "me:reminder:save" for child in view.children
+    )
 
 
 @pytest.mark.asyncio
-async def test_reminder_save_refreshes_visible_reminder_card(monkeypatch) -> None:
+async def test_reminder_autosave_refreshes_visible_reminder_card(monkeypatch) -> None:
     async def fake_save(_user_id, _username, _selected_types, _selected_times):
         return ReminderMutationResult(
             ok=True,
@@ -1011,11 +1119,15 @@ async def test_reminder_save_refreshes_visible_reminder_card(monkeypatch) -> Non
         summary_loader=loader,
     )
     interaction = _Interaction()
-    button = next(
-        child for child in view.children if getattr(child, "custom_id", None) == "me:reminder:save"
+    select = next(
+        child
+        for child in view.children
+        if isinstance(child, reminder_views.ReminderTimeSelect)
     )
+    select._selected_values = ["24h"]
+    select._interaction = SimpleNamespace(data={})
 
-    await button.callback(interaction)
+    await select.callback(interaction)
 
     assert host_message.edits[-1]["embed"].image.url.startswith("attachment://me_reminders_")
     assert [file.filename for file in host_message.edits[-1]["files"]] == ["me_reminders_42.png"]
@@ -1263,6 +1375,18 @@ async def test_view_timeout_disables_controls() -> None:
 
     assert all(child.disabled for child in view.children)
     assert edits[-1]["view"] is view
+    assert "expired" in edits[-1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_expired_view_rejects_click_with_private_message() -> None:
+    view = views.PlayerSelfServiceView(author_id=42, display_name="Tester")
+    await view.on_timeout()
+    interaction = _Interaction()
+
+    assert await view.interaction_check(interaction) is False
+    assert "expired" in interaction.response.sent[-1][0][0]
+    assert interaction.response.sent[-1][1]["ephemeral"] is True
 
 
 def test_exports_embed_warns_file_exports_are_private() -> None:

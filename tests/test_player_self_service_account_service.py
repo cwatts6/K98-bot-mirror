@@ -157,7 +157,8 @@ async def test_prepare_replace_confirmation_rejects_governor_linked_to_other_slo
     )
 
     assert confirmation is None
-    assert "another slot" in error
+    assert "Alt 1" in error
+    assert "Alt Gov" in error
 
 
 @pytest.mark.asyncio
