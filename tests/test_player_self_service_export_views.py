@@ -5,7 +5,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from inventory.models import InventoryExportFile, InventoryExportFormat, InventoryReportView
+from inventory.models import (
+    InventoryExportFile,
+    InventoryExportFormat,
+    InventoryReportView,
+    RegisteredGovernor,
+)
 from services.stats_export_service import StatsExportFile, StatsExportOutcome
 from ui.views import player_self_service_export_views as export_views
 
@@ -18,6 +23,10 @@ class _Response:
 
     async def send_message(self, *args, **kwargs):
         self.sent.append((args, kwargs))
+        self._done = True
+
+    async def edit_message(self, **kwargs):
+        self.sent.append(((), kwargs))
         self._done = True
 
     async def defer(self, **kwargs):
@@ -212,16 +221,125 @@ async def test_inventory_export_adapter_uses_default_private_scope_and_cleanup(
         interaction,
         display_name="Fallback",
         export_format=InventoryExportFormat.CSV,
+        view=InventoryReportView.SPEEDUPS,
+        governor_id=111,
+        lookback_days=180,
     )
 
     assert calls[0]["discord_user_id"] == 42
     assert calls[0]["username"] == "Tester"
     assert calls[0]["export_format"] == InventoryExportFormat.CSV
-    assert calls[0]["view"] == InventoryReportView.ALL
-    assert calls[0]["governor_id"] is None
+    assert calls[0]["view"] == InventoryReportView.SPEEDUPS
+    assert calls[0]["governor_id"] == 111
+    assert calls[0]["lookback_days"] == 180
     assert calls[0]["is_admin"] is False
     assert interaction.followup.sent[0][0] == (
         "Inventory export ready. `5` raw approved row(s), `2` governor(s).",
     )
     assert interaction.followup.sent[0][1]["file"].filename == "inventory.xlsx"
     assert cleaned == [export_file]
+
+
+@pytest.mark.asyncio
+async def test_stats_options_view_passes_selected_format_and_days(monkeypatch) -> None:
+    calls = []
+
+    async def fake_send_stats_export(interaction, *, display_name, requested_format, days):
+        calls.append((interaction.user.id, display_name, requested_format, days))
+
+    monkeypatch.setattr(export_views, "send_stats_export", fake_send_stats_export)
+    view = export_views.StatsExportOptionsView(author_id=42, display_name="Tester")
+    view.selected_format = "GoogleSheets"
+    view.selected_days = 360
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:export:stats_options_download"
+    )
+
+    await button.callback(interaction)
+
+    assert calls == [(42, "Tester", "GoogleSheets", 360)]
+
+
+@pytest.mark.asyncio
+async def test_inventory_options_view_passes_selected_scope(monkeypatch) -> None:
+    calls = []
+
+    async def fake_send_inventory_export(
+        interaction,
+        *,
+        display_name,
+        export_format,
+        view,
+        governor_id,
+        lookback_days,
+    ):
+        calls.append(
+            (
+                interaction.user.id,
+                display_name,
+                export_format,
+                view,
+                governor_id,
+                lookback_days,
+            )
+        )
+
+    monkeypatch.setattr(export_views, "send_inventory_export", fake_send_inventory_export)
+    view = export_views.InventoryExportOptionsView(
+        author_id=42,
+        display_name="Tester",
+        governors=[RegisteredGovernor(111, "MainGov", "Main")],
+    )
+    view.selected_format = InventoryExportFormat.GOOGLE_SHEETS
+    view.selected_view = InventoryReportView.MATERIALS
+    view.selected_governor_id = 111
+    view.selected_days = 360
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:export:inventory_options_download"
+    )
+
+    await button.callback(interaction)
+
+    assert calls == [
+        (
+            42,
+            "Tester",
+            InventoryExportFormat.GOOGLE_SHEETS,
+            InventoryReportView.MATERIALS,
+            111,
+            360,
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_inventory_options_window_loads_registered_governors(monkeypatch) -> None:
+    async def fake_governors(user_id):
+        assert user_id == 42
+        return [RegisteredGovernor(111, "MainGov", "Main")]
+
+    monkeypatch.setattr(
+        export_views.inventory_export_service,
+        "get_registered_governors_for_user",
+        fake_governors,
+    )
+    interaction = _Interaction()
+
+    await export_views.send_inventory_export_options(interaction, display_name="Tester")
+
+    _args, kwargs = interaction.response.sent[0]
+    assert kwargs["ephemeral"] is True
+    option_view = kwargs["view"]
+    assert isinstance(option_view, export_views.InventoryExportOptionsView)
+    governor_select = next(
+        child
+        for child in option_view.children
+        if getattr(child, "custom_id", None) == "me:export:inventory_options_governor"
+    )
+    assert [option.value for option in governor_select.options] == ["all", "111"]

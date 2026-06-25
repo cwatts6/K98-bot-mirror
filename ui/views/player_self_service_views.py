@@ -5,12 +5,14 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 import logging
+from types import SimpleNamespace
 from typing import Any
 
 import discord
 
 from core.interaction_safety import safe_defer
-from inventory.models import InventoryExportFormat, InventoryReportVisibility
+from inventory import reporting_service
+from inventory.models import InventoryReportVisibility
 from player_self_service import (
     account_service,
     dashboard_card,
@@ -25,7 +27,11 @@ from player_self_service.service import (
     build_player_self_service_summary,
 )
 from ui.views import player_self_service_export_views as export_views
-from ui.views.inventory_report_views import send_inventory_vip_preference_prompt
+from ui.views.inventory_report_views import (
+    send_inventory_preference_prompt,
+    send_inventory_vip_preference_prompt,
+    start_myinventory_command,
+)
 from ui.views.player_self_service_account_views import AccountManageView
 from ui.views.player_self_service_reminder_views import (
     ReminderSetupView,
@@ -41,14 +47,6 @@ PAGE_ACCOUNTS = "accounts"
 PAGE_REMINDERS = "reminders"
 PAGE_PREFERENCES = "preferences"
 PAGE_EXPORTS = "exports"
-
-_QUICK_LAUNCH_COPY = {
-    "kvk_stats": ("KVK stats", "Use `/kvk stats` for the modern KVK stats view."),
-    "kvk_targets": ("KVK targets", "Use `/kvk targets` for your target guidance."),
-    "kvk_history": ("KVK history", "Use `/kvk history` for personal KVK history."),
-    "kvk_rankings": ("KVK rankings", "Use `/kvk rankings` for KVK, honor, and records."),
-    "inventory": ("Inventory", "Use `/myinventory` for your latest inventory report."),
-}
 
 
 def _display_name(user: object) -> str:
@@ -265,7 +263,7 @@ def build_exports_embed(
     embed.add_field(
         name="Actions",
         value=_field_value(
-            ["Stats Excel", "Stats CSV", "Inventory Excel", "Inventory CSV"]
+            ["Export Stats", "Export Inventory"]
             if exports.action_state.strip().lower() == "actionable"
             else [exports.action_summary]
         ),
@@ -461,6 +459,13 @@ class PlayerSelfServiceView(discord.ui.View):
                     "me:export:"
                 ):
                     self.remove_item(child)
+        if self.page != PAGE_DASHBOARD:
+            for child in list(self.children):
+                if isinstance(child, discord.ui.Button) and child.custom_id in {
+                    "me:inventory",
+                    "me:exports",
+                }:
+                    self.remove_item(child)
         if self.page == PAGE_PREFERENCES:
             self._apply_preference_toggle_state()
         if self.page == PAGE_EXPORTS:
@@ -470,10 +475,6 @@ class PlayerSelfServiceView(discord.ui.View):
                 if str(child.custom_id or "").startswith("me:export:"):
                     continue
                 child.disabled = child.custom_id == f"me:{self.page}"
-        if self.page == PAGE_DASHBOARD and not any(
-            isinstance(child, PlayerSelfServiceQuickLaunchSelect) for child in self.children
-        ):
-            self.add_item(PlayerSelfServiceQuickLaunchSelect())
 
     def _apply_preference_toggle_state(self) -> None:
         visibility = ""
@@ -641,72 +642,117 @@ class PlayerSelfServiceView(discord.ui.View):
         await self._show_page(interaction, PAGE_DASHBOARD)
 
     @discord.ui.button(
-        label="Stats Excel",
+        label="Inventory",
+        style=discord.ButtonStyle.secondary,
+        custom_id="me:inventory",
+        row=1,
+    )
+    async def dashboard_inventory_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        await self._show_inventory_report_options(interaction)
+
+    @discord.ui.button(
+        label="Exports",
+        style=discord.ButtonStyle.secondary,
+        custom_id="me:exports",
+        row=1,
+    )
+    async def dashboard_exports_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        await self._show_page(interaction, PAGE_EXPORTS)
+
+    @discord.ui.button(
+        label="Export Stats",
         style=discord.ButtonStyle.success,
-        custom_id="me:export:stats_excel",
+        custom_id="me:export:stats",
         row=2,
     )
-    async def export_stats_excel_button(
+    async def export_stats_button(
         self,
         button: discord.ui.Button,
         interaction: discord.Interaction,
     ) -> None:
-        await export_views.send_stats_export(
+        await export_views.send_stats_export_options(
             interaction,
             display_name=self.display_name,
-            requested_format="Excel",
         )
 
     @discord.ui.button(
-        label="Stats CSV",
-        style=discord.ButtonStyle.secondary,
-        custom_id="me:export:stats_csv",
+        label="Export Inventory",
+        style=discord.ButtonStyle.success,
+        custom_id="me:export:inventory",
         row=2,
     )
-    async def export_stats_csv_button(
+    async def export_inventory_button(
         self,
         button: discord.ui.Button,
         interaction: discord.Interaction,
     ) -> None:
-        await export_views.send_stats_export(
+        await export_views.send_inventory_export_options(
             interaction,
             display_name=self.display_name,
-            requested_format="CSV",
         )
 
-    @discord.ui.button(
-        label="Inventory Excel",
-        style=discord.ButtonStyle.success,
-        custom_id="me:export:inventory_excel",
-        row=3,
-    )
-    async def export_inventory_excel_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        await export_views.send_inventory_export(
-            interaction,
-            display_name=self.display_name,
-            export_format=InventoryExportFormat.EXCEL,
-        )
+    async def _show_inventory_report_options(self, interaction: discord.Interaction) -> None:
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+        except TypeError:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.debug("player_self_service_inventory_defer_failed", exc_info=True)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug("player_self_service_inventory_defer_failed", exc_info=True)
 
-    @discord.ui.button(
-        label="Inventory CSV",
-        style=discord.ButtonStyle.secondary,
-        custom_id="me:export:inventory_csv",
-        row=3,
-    )
-    async def export_inventory_csv_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        await export_views.send_inventory_export(
-            interaction,
-            display_name=self.display_name,
-            export_format=InventoryExportFormat.CSV,
-        )
+        ctx_adapter = SimpleNamespace(user=interaction.user, followup=interaction.followup)
+        try:
+            visibility = await reporting_service.get_visibility_preference_or_none(self.author_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "player_self_service_inventory_visibility_failed user_id=%s",
+                self.author_id,
+            )
+            await interaction.followup.send(
+                "Inventory reporting preferences are not available yet. Please contact an admin.",
+                ephemeral=True,
+            )
+            return
+
+        if visibility is None:
+            await send_inventory_preference_prompt(ctx_adapter)
+            return
+
+        try:
+            await start_myinventory_command(ctx=ctx_adapter, visibility=visibility)
+        except PermissionError as exc:
+            await interaction.followup.send(str(exc), ephemeral=True)
+        except ValueError as exc:
+            await interaction.followup.send(str(exc), ephemeral=True)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "player_self_service_inventory_report_failed user_id=%s",
+                self.author_id,
+            )
+            await interaction.followup.send(
+                "Inventory report generation failed. Please try again or contact an admin.",
+                ephemeral=True,
+            )
 
     async def _load_account_state(
         self, interaction: discord.Interaction
@@ -976,45 +1022,6 @@ class PlayerSelfServiceView(discord.ui.View):
                 )
         except Exception:
             logger.debug("player_self_service_timeout_edit_failed", exc_info=True)
-
-
-class PlayerSelfServiceQuickLaunchSelect(discord.ui.Select):
-    def __init__(self) -> None:
-        options = [
-            discord.SelectOption(label="KVK stats", value="kvk_stats"),
-            discord.SelectOption(label="KVK targets", value="kvk_targets"),
-            discord.SelectOption(label="KVK history", value="kvk_history"),
-            discord.SelectOption(label="KVK rankings", value="kvk_rankings"),
-            discord.SelectOption(label="Inventory", value="inventory"),
-            discord.SelectOption(label="Exports", value=PAGE_EXPORTS),
-        ]
-        super().__init__(
-            placeholder="Quick launch",
-            min_values=1,
-            max_values=1,
-            options=options,
-            row=4,
-        )
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        view = self.view
-        if not isinstance(view, PlayerSelfServiceView):
-            await interaction.response.send_message(
-                "This launcher is temporarily unavailable.",
-                ephemeral=True,
-            )
-            return
-
-        value = self.values[0]
-        if value == PAGE_EXPORTS:
-            await view._show_page(interaction, PAGE_EXPORTS)
-            return
-
-        label, copy = _QUICK_LAUNCH_COPY[value]
-        await interaction.response.send_message(
-            f"{label}: {copy} Existing channel and visibility rules still apply.",
-            ephemeral=True,
-        )
 
 
 async def send_player_self_service_page(

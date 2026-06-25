@@ -2,11 +2,13 @@
 
 Last updated: 2026-06-25
 
-Status: Phase 8 Exports Launchpad is delivered in production PR #478 and smoke tested
-successfully on 2026-06-25. The dashboard uses the same full-bleed generated private card style as
-the Phase 6 subpages, with large row-based text directly on the card background. Accounts,
-Reminders, Preferences, and Exports use generated private visual cards with safe embed fallback.
-`/me exports` now provides private default stats and inventory export downloads.
+Status: Phase 9 Quick Launch and Export Options implementation is prepared after Phase 8 Exports
+Launchpad was delivered in production PR #478 and smoke tested successfully on 2026-06-25. The
+dashboard uses the same full-bleed generated private card style as the Phase 6 subpages, with
+large row-based text directly on the card background. Accounts, Reminders, Preferences, and
+Exports use generated private visual cards with safe embed fallback. `/me exports` is now the
+preferred private export route and exposes option windows for Stats and Inventory downloads while
+legacy export commands remain live.
 
 ## Player Briefing
 
@@ -18,11 +20,13 @@ Use it to check:
 - how many accounts are linked
 - whether KVK reminders and calendar reminders are on
 - your inventory visibility preference
-- where to go for KVK stats, targets, history, rankings, inventory, and exports
+- where to manage inventory and exports
 
 The dashboard includes a visual summary card when image rendering succeeds. If image rendering or
-delivery fails, the bot falls back to the private embed dashboard. Dashboard Quick Launch is
-available only on the dashboard page.
+delivery fails, the bot falls back to the private embed dashboard. Phase 9 removes dashboard Quick
+Launch links for `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` because those
+commands have channel and public-output rules that should stay exactly where players already use
+them. The dashboard now keeps only safe private handoffs for Inventory and Exports.
 
 The account centre supports account review, Governor ID lookup, registration, replacement, and
 removal with confirmation through one primary Manage journey. Lookup results can continue into
@@ -31,8 +35,11 @@ The reminder centre supports private KVK event reminder review, setup, automatic
 remove-all/unsubscribe with confirmation through one primary Manage journey. The same Manage
 journey can now open Calendar Settings for calendar reminder event types and lead times.
 `/me preferences` can update inventory report visibility between private and public output and can
-open the existing Governor VIP update flow. `/me exports` can launch default private Stats Excel,
-Stats CSV, Inventory Excel, and Inventory CSV files when the player has a linked account. Existing
+open the existing Governor VIP update flow. `/me exports` can open private option windows for
+Stats and Inventory exports. Stats exports support Excel, CSV, and GoogleSheets formats plus 30,
+60, 90, 180, and 360 day windows, defaulting to Excel and 90 days. Inventory exports support
+format, view, registered-governor scope, and day-window choices using the existing inventory export
+defaults. Existing
 commands such as `/register_governor`, `/modify_registration`, `/my_registrations`,
 `/mygovernorid`, `/subscribe`,
 `/modify_subscription`, `/unsubscribe`, `/calendar_reminder_config`, `/inventory_preferences`,
@@ -40,8 +47,9 @@ commands such as `/register_governor`, `/modify_registration`, `/my_registration
 
 ## Operator Briefing
 
-Phase 8 extends `/me exports` in parallel with legacy self-service commands. It does not remove,
-redirect, or change `/my_stats_export`, `/export_inventory`, `/inventory_preferences`,
+Phase 9 makes `/me exports` the preferred export route in parallel with legacy self-service
+commands. It does not remove, redirect, or change `/my_stats_export`, `/export_inventory`,
+`/inventory_preferences`,
 `/subscribe`, `/modify_subscription`, `/unsubscribe`, `/calendar_reminder_config`, or account
 legacy commands.
 
@@ -77,12 +85,20 @@ Rollout checks:
 - Confirm `/me reminders` shows KVK-only, calendar-only, both, and neither states clearly.
 - Confirm `/me reminders` KVK event type and reminder time selections save automatically.
 - Confirm `/me reminders` Calendar Settings saves calendar reminder event types, lead times, and enabled/disabled state.
-- Confirm `/me exports` can send default Stats Excel, Stats CSV, Inventory Excel, and Inventory CSV
-  files privately for a player with linked accounts and approved inventory data.
+- Confirm `/me exports` shows only `Export Stats` and `Export Inventory` controls.
+- Confirm `Export Stats` opens a private child window with Format and Days selectors, defaults to
+  Excel and 90 days, and sends the selected export privately from Download.
+- Confirm `Export Inventory` opens a private child window with Format, View, Governor, and Days
+  selectors, defaults to the existing inventory export scope, and sends the selected export
+  privately from Download.
+- Confirm Cancel closes each export option window without sending a file.
 - Confirm `/me exports` clearly disables or reports unavailable export actions when account data,
   linked accounts, or approved export data are unavailable.
-- Confirm dashboard Quick Launch remains dashboard-only and `/me exports` does not gain the
-  dashboard Quick Launch menu.
+- Confirm `/me dashboard` has Inventory and Exports buttons, not the old KVK Quick Launch menu.
+- Confirm dashboard Inventory opens the same private `/myinventory` selector/report journey and
+  preserves the player's inventory report visibility setting.
+- Confirm `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` remain invoked through
+  their existing command paths and channel rules.
 - Confirm `/my_stats_export` and `/export_inventory` still work for their existing custom options.
 - Confirm legacy player commands remain registered and usable.
 - Monitor `/me` usage before approving any later legacy redirects.
@@ -183,6 +199,20 @@ Phase 8 implementation notes:
   button; dashboard Quick Launch `Exports` opens the exports card correctly; and legacy export
   commands still work.
 
+Phase 9 implementation notes:
+
+- `/me dashboard` no longer offers dashboard Quick Launch guidance for `/kvk stats`,
+  `/kvk targets`, `/kvk history`, or `/kvk rankings`; those commands keep their existing
+  channel-gated/public-output journeys.
+- `/me dashboard` now offers private Inventory and Exports buttons. Inventory opens the existing
+  `/myinventory` selector/report journey, including the player's current visibility preference.
+  Exports opens `/me exports`.
+- `/me exports` is the preferred export path and now opens option child windows for Stats and
+  Inventory exports instead of showing separate fixed-format buttons.
+- `/my_stats_export` and `/export_inventory` remain registered and live for compatibility. Any
+  redirect, deprecation, or removal still requires a later operator approval and player
+  communication/no-feedback window.
+
 Phase 7 validation notes:
 
 - Calendar reminders still use the event-calendar preference/state files and scheduler, but
@@ -202,8 +232,6 @@ Phase 7 validation notes:
 
 Next phase:
 
-- Start Phase 9 Quick Launch Expansion and Legacy Export Rollout. Preserve dashboard-only guidance
-  unless the audit proves direct launch actions can respect every target command's existing
-  channel, visibility, permission, and privacy rules. Preserve `/my_stats_export` and
-  `/export_inventory` unless the operator explicitly approves a redirect/deprecation step and the
-  player communication path is clear.
+- After Phase 9 smoke, decide whether to keep legacy export commands indefinitely or begin a
+  separately approved communication/no-feedback window before any redirect or removal. Shared
+  visual-card renderer consolidation and export schema/format redesign remain separate work.

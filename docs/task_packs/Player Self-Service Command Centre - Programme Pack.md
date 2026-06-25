@@ -28,14 +28,18 @@ Status as of 2026-06-25:
   #477 and smoke tested successfully by the operator on 2026-06-25.
 - Phase 8 Exports Launchpad is delivered in production PR #478 and smoke tested successfully by
   the operator on 2026-06-25.
+- Phase 9 Quick Launch and Export Options implementation is prepared for review after the
+  operator-approved scope decision on 2026-06-25.
 - The delivered `/me` surface now includes a private command-centre shell, a generated dashboard
   card with safe embed fallback, generated cards for Accounts, Reminders, Preferences, and
   Exports, account-centre lookup/register/replace/remove management, unified KVK/calendar
   reminder status and management, KVK reminder autosave and remove-all management, calendar
-  reminder autosave/remove-all management, inventory visibility and Governor VIP controls, direct
-  private default stats and inventory exports, graceful timeout handling, and return navigation.
-  Legacy account, reminder, inventory, calendar reminder, and export commands remain live.
-- Next active implementation phase: Phase 9 Quick Launch Expansion and Legacy Export Rollout.
+  reminder autosave/remove-all management, inventory visibility and Governor VIP controls,
+  dashboard Inventory/Exports handoffs, option-window based private stats and inventory exports,
+  graceful timeout handling, and return navigation. Legacy account, reminder, inventory,
+  calendar reminder, and export commands remain live.
+- Next active implementation phase after Phase 9 smoke: shared visual-card renderer consolidation
+  or a separately approved legacy export communication/deprecation rollout.
 
 Phase 2 manual smoke evidence:
 
@@ -182,7 +186,7 @@ Run /me dashboard. Everything personal starts there.
 
 | Command | Purpose |
 |---|---|
-| `/me dashboard` | The premium personal home screen: setup status, key identity information, reminder status, and quick launch controls. |
+| `/me dashboard` | The premium personal home screen: setup status, key identity information, reminder status, and safe personal handoff controls. |
 | `/me accounts` | Modern account centre replacing separate lookup/register/review/modify habits. |
 | `/me reminders` | Modern reminder centre replacing separate subscribe/modify/unsubscribe habits. |
 | `/me preferences` | First-pass personal settings hub, including inventory visibility and output privacy defaults. |
@@ -228,7 +232,7 @@ The dashboard should have no more than three primary sections:
 
 1. **Accounts**
 2. **Reminders**
-3. **Preferences / Quick Links**
+3. **Preferences / Personal Actions**
 
 It should show status, not every possible action.
 
@@ -236,7 +240,7 @@ Example dashboard controls:
 
 ```text
 [Accounts] [Reminders] [Preferences]
-Quick Launch: select menu or compact buttons for KVK / Inventory / Exports
+Actions: compact buttons for Inventory / Exports
 ```
 
 ### `/me accounts` should handle account work
@@ -306,7 +310,8 @@ The bot should show:
 - whether they have a main/default account
 - whether reminders are enabled
 - current reminder types and times
-- quick launch buttons/selects for KVK stats, targets, history, rankings, inventory, and exports
+- clear buttons for inventory and exports, while KVK outputs remain in their existing command
+  channels
 
 Success means the player can confirm their setup in under ten seconds.
 
@@ -328,18 +333,15 @@ Success means `/subscribe`, `/modify_subscription`, and `/unsubscribe` become on
 
 ### Journey E — Player launches outputs
 
-A player runs `/me dashboard`, then chooses a quick launch.
+A player runs `/me dashboard`, then chooses Inventory or Exports.
 
-The bot should route them to existing high-quality outputs where possible:
+The bot should route them to the private personal journeys where safe:
 
-- `/kvk stats`
-- `/kvk targets`
-- `/kvk history`
-- `/kvk rankings`
 - `/myinventory`
 - export options
 
-Success means `/me` does not duplicate every feature. It becomes the route map.
+Success means `/me` does not duplicate every feature or bypass KVK channel/public-output rules.
+It becomes the home for private personal setup, inventory, and exports.
 
 ## 8. Visual Direction
 
@@ -354,7 +356,7 @@ Target direction:
 - account completeness indicator
 - reminder status indicator
 - preference status chips
-- quick launch area
+- personal action area
 - clean footer showing data freshness / privacy note
 
 Recommended first visual card shape:
@@ -622,10 +624,10 @@ Phase 8 manual smoke evidence:
 
 Phase 8 follow-ups:
 
-- Quick Launch expansion remains inside this programme and is the next active product/control
-  decision.
-- Legacy export redirect/removal remains inside this programme and should be evaluated after the
-  successful `/me exports` smoke result.
+- Phase 9 resolved the Quick Launch question by removing KVK command targets from the dashboard
+  launch surface and keeping only safe private Inventory and Exports handoffs.
+- Legacy export redirect/removal remains inside this programme and should be evaluated after
+  Phase 9 smoke and player communication planning.
 - Shared visual-card renderer consolidation remains inside this programme, but should follow a
   dedicated helper-consolidation task rather than being mixed into launch/redirect behavior.
 - Export schema and format redesign is not a Player Self-Service phase by default; it should be a
@@ -634,27 +636,50 @@ Phase 8 follow-ups:
 
 ### Phase 9 — Quick Launch Expansion and Legacy Export Rollout
 
-Status: next active phase.
+Status: implementation prepared for review on 2026-06-25.
 
-Decide whether Dashboard Quick Launch should remain guidance-only/dashboard-only or become a
-richer launch surface, and decide the first safe rollout step for legacy export commands after the
-Phase 8 `/me exports` launchpad has been validated.
+Phase 9 decided that Dashboard Quick Launch should not direct-launch `/kvk stats`, `/kvk targets`,
+`/kvk history`, or `/kvk rankings` because those commands have channel-gated and sometimes public
+output behavior that is safer and clearer in their existing command paths. Players already know
+where to use those KVK outputs, so the extra dashboard step does not improve the journey.
 
-Likely deliverables:
+Phase 9 also decided that `/me exports` should become the preferred export route before any legacy
+export redirect/removal is attempted. `/my_stats_export` and `/export_inventory` remain live for
+compatibility until a later operator-approved communication and no-feedback window.
 
-- audit each Quick Launch target's current channel gate, permission model, response visibility,
-  output privacy, and command behavior
-- decide whether Quick Launch remains dashboard-only, expands to direct handoff actions on the
-  dashboard, or becomes a reusable launch section on selected `/me` pages
-- implement only launch actions that preserve each target command's existing channel,
-  visibility, permission, and privacy rules
-- review `/my_stats_export` and `/export_inventory` usage, smoke feedback, and communication needs
-- decide whether legacy export commands should remain live, redirect to `/me exports`, or enter a
-  no-feedback deprecation window
-- preserve all legacy commands unless operator approval explicitly allows redirect/removal
-- update canonical command reference, player/operator briefing, tests, and smoke checklist
+Delivered scope:
+
+- remove KVK command targets from dashboard Quick Launch instead of adding risky direct launch
+  controls
+- add dashboard `Inventory` and `Exports` buttons that stay inside private `/me`/inventory
+  journeys
+- route dashboard Inventory into the existing `/myinventory` selector/report journey, including
+  the player's current inventory visibility preference
+- update `/me exports` to show two primary controls: `Export Stats` and `Export Inventory`
+- add a Stats export option window with Format and Days selectors plus Download/Cancel controls
+- add an Inventory export option window with Format, View, Governor, and Days selectors plus
+  Download/Cancel controls
+- keep export generation, authorization, cleanup, and file delivery inside the existing stats and
+  inventory export services
+- preserve `/my_stats_export` and `/export_inventory` unchanged for compatibility
+- update command reference, briefing, deferred backlog, and focused tests
 
 Do not combine this with export schema/format redesign or broad renderer helper consolidation.
+
+Phase 9 smoke checklist:
+
+- `/me dashboard` remains private and shows Inventory and Exports controls, not the old KVK Quick
+  Launch menu.
+- Dashboard Inventory opens the existing `/myinventory` selection/report flow and respects the
+  player's inventory visibility preference.
+- Dashboard Exports opens `/me exports`.
+- `/me exports` opens private Stats and Inventory option windows.
+- Stats export defaults to Excel and 90 days; Inventory export defaults to existing inventory
+  export defaults.
+- Download sends the selected file privately; Cancel closes the child window without a file.
+- `/my_stats_export` and `/export_inventory` remain registered and usable.
+- `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` remain available only through
+  their existing command paths and channel rules.
 
 ### Phase 10 — Shared Visual-Card Renderer Consolidation
 
@@ -693,8 +718,8 @@ This phase should not add preferences that cannot be saved safely.
 ### Phase 12 — Legacy Redirects, Briefing, and Cleanup
 
 After the new `/me` journeys are validated and player communication is complete, redirect or remove
-remaining legacy paths only with operator approval. Export-specific legacy decisions may start in
-Phase 9 because `/me exports` has now been smoke tested successfully.
+remaining legacy paths only with operator approval. Phase 9 keeps export legacy commands live, so
+any export-specific redirect/removal still needs a later communication/no-feedback rollout.
 
 Likely legacy paths:
 
@@ -720,10 +745,12 @@ Final removal should remain a separate cleanup step after a no-feedback window.
 - New account centre replacing separate registration/review/modify/lookup journeys.
 - New reminder centre replacing separate subscribe/modify/unsubscribe journeys.
 - Card-based subpages and guided Manage flows for accounts, reminders, preferences, and exports.
-- Launch links/buttons/selects into the modern `/kvk` commands.
+- Safe private launch buttons for inventory and exports while modern KVK outputs remain in their
+  existing command paths.
 - First-pass preferences hub for inventory visibility, followed by later approved preference
   expansion where persistence exists.
-- Delivered export launchpad and later Quick Launch/legacy export rollout improvements.
+- Delivered export launchpad, Phase 9 dashboard Inventory/Exports handoffs, and preferred
+  `/me exports` option windows.
 - Shared visual-card renderer/helper consolidation for the `/me` visual-card model and adjacent
   KVK, PreKvK, and inventory renderers after the player self-service card surfaces are stable.
 - Refresh behavior that prevents visible dashboard/subpage cards from showing stale state after
@@ -830,7 +857,8 @@ Likely SQL-backed areas:
 - Do not add `/me` without command registration governance approval because it is a new top-level command group.
 - Preserve `@versioned()`, `@safe_command`, `@track_usage()`, permission decorators, response visibility, autocomplete/options, usage-log identity, and command-cache behaviour.
 - Preserve privacy expectations: account management and reminder preferences should default to private/ephemeral interaction.
-- Ensure any public quick-launch output follows the target command's existing visibility/channel rules.
+- Do not launch public KVK outputs from `/me`; keep public/channel-gated KVK journeys in their
+  existing command paths.
 - Capture out-of-scope findings as structured deferred optimisations.
 
 ## 15. Programme-Level Validation Strategy
@@ -897,24 +925,21 @@ Do not include these in the first build unless separately approved:
 - account ownership dispute tooling
 - shared visual-card renderer/helper consolidation across KVK, PreKvK, inventory, and player
   self-service renderers
-- Quick Launch expansion beyond dashboard-only guidance; this is now assigned to Phase 9 and must
-  begin with a fresh audit of target command channel, visibility, permission, and privacy rules.
 - Legacy export command redirect or removal for `/my_stats_export` and `/export_inventory`; this is
-  now assigned to Phase 9 for audit/decision and still requires operator approval plus player
-  communication before any redirect or removal.
+  remains after Phase 9 and still requires operator approval plus player communication before any
+  redirect or removal.
 - Export schema and format redesign; treat this as a separate export-output programme unless a
   later task explicitly narrows one compatible file-format improvement into this programme.
 
 ## 18. Suggested Next Action
 
-Start Phase 9:
+Smoke test Phase 9, then choose the next approved slice:
 
 ```text
-Codex Task Pack - Player Self-Service Command Centre Phase 9 Quick Launch Expansion and Legacy Export Rollout.md
+Shared visual-card renderer consolidation
+or
+Legacy export communication/deprecation rollout
 ```
 
-Phase 9 should decide the next launch surface and export legacy-command rollout after Phase 8
-validated `/me exports`. Preserve dashboard-only guidance unless the audit proves direct launch
-actions can respect every target command's channel, visibility, permission, and privacy rules.
-Preserve `/my_stats_export` and `/export_inventory` unless the operator explicitly approves a
-redirect/deprecation step and the player communication path is clear.
+Do not redirect or remove `/my_stats_export` or `/export_inventory` without an explicit operator
+approval, player communication, and a no-feedback monitoring window.

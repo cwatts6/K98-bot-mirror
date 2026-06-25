@@ -457,8 +457,8 @@ def _export_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     state = exports.action_state.strip().lower()
     if state == "actionable":
         return (
-            "Stats: Excel / CSV",
-            "Inventory: Excel / CSV",
+            "Stats: Excel / CSV / GoogleSheets",
+            "Inventory: Excel / CSV / GoogleSheets",
         )
     if state == "guidance":
         return (
@@ -608,8 +608,8 @@ def _page_copy(
         return (
             "Personal Command Centre",
             summary.accounts.main_state,
-            "Actions available: Accounts, Reminders, Preferences, Quick Launch",
-            "Quick Launch stays on Dashboard; detailed setup lives on each private page.",
+            "Actions available: Accounts, Reminders, Preferences, Inventory, Exports",
+            "KVK outputs stay in their existing public channels; personal tools open here.",
             _dashboard_lines(summary),
         )
     if page == "accounts":
@@ -644,7 +644,7 @@ def _page_copy(
             "Exports",
             "private" if actionable or guidance_only else summary.exports.action_state,
             (
-                "Actions: Stats, Inventory"
+                "Actions: Export Stats, Export Inventory"
                 if actionable
                 else "Guidance only" if guidance_only else "Actions unavailable"
             ),

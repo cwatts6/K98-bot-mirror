@@ -48,30 +48,21 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Suggested Fix: Scope a shared visual-card rendering helper pass within the Player Self-Service Command Centre follow-up work that extracts stable text fitting, panel/badge primitives, PNG export wrappers, and glyph-safe font selection into a shared rendering utility. Migrate one renderer at a time with screenshot/PNG dimension tests and preserve existing card filenames, fallback behavior, and player-name Unicode handling.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 8 export launchpad delivered and smoke tested; existing KVK, PreKvK, inventory, dashboard, and `/me` subpage renderer tests are green before any shared-helper extraction; avoid mixing this with Phase 9 Quick Launch or legacy export rollout behavior.
-
-### Deferred Optimisation
-- Area: `/me dashboard`, `/me exports`, `ui/views/player_self_service_views.py`, player self-service Quick Launch controls
-- Type: consistency
-- Description: Phase 8 is focused on turning `/me exports` into a direct personal export launchpad. Dashboard Quick Launch currently remains dashboard-only and guidance-only for KVK stats, KVK targets, KVK history, KVK rankings, inventory, and exports so it does not bypass each target command's channel, visibility, permission, or privacy rules.
-- Suggested Fix: Keep Quick Launch expansion inside the Player Self-Service Command Centre programme as a later phase. Audit each target command's current channel gate, default visibility, permission model, and output behavior before deciding whether Quick Launch should remain guidance-only, become a reusable launch section, or add direct handoff actions. Preserve target-command guards and add command/view tests plus manual smoke for every expanded launch path.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 8 export launchpad delivered and smoke tested; explicit operator approval for any Quick Launch expansion beyond dashboard-only guidance.
+- Dependencies: Phase 9 launch/export-option work reviewed and smoke tested; existing KVK, PreKvK, inventory, dashboard, and `/me` subpage renderer tests are green before any shared-helper extraction.
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `/my_stats_export`, `/export_inventory`, player self-service docs/tests
 - Type: cleanup
-- Description: Phase 8 preserves `/my_stats_export` and `/export_inventory` as live legacy commands while `/me exports` becomes the modern launchpad. The legacy paths remain useful compatibility surfaces, but they will eventually need a deliberate redirect, deprecation, or removal decision after the `/me exports` launchpad is validated.
-- Suggested Fix: Keep legacy export redirect/removal inside the Player Self-Service Command Centre programme as a later rollout phase. Review usage and smoke feedback after Phase 8, decide whether each legacy export command should remain live, redirect to `/me exports`, or be removed after a no-feedback window, then update command registration baselines, canonical command reference, player briefing, and focused command tests.
+- Description: Phase 9 keeps `/my_stats_export` and `/export_inventory` live while making `/me exports` the preferred route with Stats and Inventory option windows. The legacy paths remain useful compatibility surfaces, but they still need a deliberate communication, monitoring, redirect, deprecation, or removal decision after Phase 9 is smoke tested.
+- Suggested Fix: Keep legacy export redirect/removal inside the Player Self-Service Command Centre programme as a later rollout phase. Review command usage and player feedback after Phase 9, choose whether each legacy export command should remain live indefinitely, redirect to `/me exports`, or be removed after a no-feedback window, then update command registration baselines, canonical command reference, player briefing, and focused command tests.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 8 export launchpad delivered and smoke tested; operator approval for any redirect/removal; player communication before final removal.
+- Dependencies: Phase 9 `/me exports` option windows smoke tested; operator approval for any redirect/removal; player communication before final removal.
 
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `inventory/export_service.py`, `inventory/dal/`, SQL repo export views/tables, export docs/tests
 - Type: architecture
-- Description: Phase 8 intentionally reuses existing stats and inventory export schemas and file formats so `/me exports` can safely launch current service-backed private exports. A fuller export schema and format redesign would need to decide whether exports should stay raw, add curated summary sheets, change CSV/XLSX headers, add new formats, split personal versus leadership exports, or introduce new SQL views/contracts.
+- Description: Phase 8 and Phase 9 intentionally reuse existing stats and inventory export schemas and file formats so `/me exports` can safely launch current service-backed private exports. A fuller export schema and format redesign would need to decide whether exports should stay raw, add curated summary sheets, change CSV/XLSX headers, add new formats, split personal versus leadership exports, or introduce new SQL views/contracts.
 - Suggested Fix: Treat export schema and format redesign as a separate export-output programme, not as another phase of the Player Self-Service Command Centre. Start with a dedicated audit of current stats, inventory, KVK history, rankings, and registry export consumers; validate SQL contracts in `C:\K98-bot-SQL-Server`; define backwards-compatibility and migration expectations for file consumers; then implement schema or format changes in controlled slices with export-file regression tests.
 - Impact: high
 - Risk: high

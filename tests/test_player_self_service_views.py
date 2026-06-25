@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from inventory.models import InventoryExportFormat, InventoryReportVisibility
+from inventory.models import InventoryReportVisibility
 from player_self_service.account_service import (
     AccountCentreState,
     AccountConfirmation,
@@ -57,8 +57,8 @@ def _summary() -> PlayerSelfServiceSummary:
             next_action="Review preferences",
         ),
         exports=ExportStatus(
-            stats_export="Excel / CSV",
-            inventory_export="Excel / CSV",
+            stats_export="Excel / CSV / GoogleSheets",
+            inventory_export="Excel / CSV / GoogleSheets",
             privacy_note="Private",
         ),
     )
@@ -381,19 +381,19 @@ async def test_account_slot_select_view_preserves_twenty_sixth_slot() -> None:
 
 
 @pytest.mark.asyncio
-async def test_dashboard_view_has_three_primary_buttons_and_quick_launch() -> None:
+async def test_dashboard_view_has_primary_buttons_and_inventory_exports() -> None:
     view = views.PlayerSelfServiceView(author_id=42, display_name="Tester")
 
     labels = [getattr(child, "label", None) for child in view.children]
     assert labels[:3] == ["Accounts", "Reminders", "Preferences"]
+    assert "Inventory" in labels
+    assert "Exports" in labels
     assert "Dashboard" not in labels
-    assert any(
-        isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
-    )
+    assert "Quick launch" not in [getattr(child, "placeholder", None) for child in view.children]
 
 
 @pytest.mark.asyncio
-async def test_accounts_view_has_account_actions_without_quick_launch() -> None:
+async def test_accounts_view_has_account_actions_without_dashboard_launch_buttons() -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -403,13 +403,12 @@ async def test_accounts_view_has_account_actions_without_quick_launch() -> None:
     labels = [getattr(child, "label", None) for child in view.children]
     assert "Manage" in labels
     assert not {"Find ID", "Register", "Replace", "Remove"}.intersection(set(labels))
-    assert not any(
-        isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
-    )
+    assert "Inventory" not in labels
+    assert "Exports" not in labels
 
 
 @pytest.mark.asyncio
-async def test_reminders_view_has_reminder_actions_without_quick_launch() -> None:
+async def test_reminders_view_has_reminder_actions_without_dashboard_launch_buttons() -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -420,13 +419,12 @@ async def test_reminders_view_has_reminder_actions_without_quick_launch() -> Non
     assert "Manage" in labels
     assert "Unsubscribe" not in labels
     assert "Register" not in labels
-    assert not any(
-        isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
-    )
+    assert "Inventory" not in labels
+    assert "Exports" not in labels
 
 
 @pytest.mark.asyncio
-async def test_exports_view_has_export_actions_without_quick_launch() -> None:
+async def test_exports_view_has_option_entry_actions_without_dashboard_launch_buttons() -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -435,13 +433,10 @@ async def test_exports_view_has_export_actions_without_quick_launch() -> None:
     )
 
     labels = [getattr(child, "label", None) for child in view.children]
-    assert "Stats Excel" in labels
-    assert "Stats CSV" in labels
-    assert "Inventory Excel" in labels
-    assert "Inventory CSV" in labels
-    assert not any(
-        isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
-    )
+    assert "Export Stats" in labels
+    assert "Export Inventory" in labels
+    assert "Inventory" not in labels
+    assert "Exports" not in labels
 
 
 @pytest.mark.asyncio
@@ -463,13 +458,17 @@ async def test_exports_view_disables_export_actions_when_unavailable() -> None:
 
 
 @pytest.mark.asyncio
-async def test_exports_stats_buttons_delegate_to_private_export_adapter(monkeypatch) -> None:
+async def test_exports_stats_button_opens_options(monkeypatch) -> None:
     calls = []
 
-    async def fake_send_stats_export(interaction, *, display_name, requested_format, days=90):
-        calls.append((interaction.user.id, display_name, requested_format, days))
+    async def fake_send_stats_export_options(interaction, *, display_name):
+        calls.append((interaction.user.id, display_name))
 
-    monkeypatch.setattr(views.export_views, "send_stats_export", fake_send_stats_export)
+    monkeypatch.setattr(
+        views.export_views,
+        "send_stats_export_options",
+        fake_send_stats_export_options,
+    )
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -480,22 +479,26 @@ async def test_exports_stats_buttons_delegate_to_private_export_adapter(monkeypa
     button = next(
         child
         for child in view.children
-        if getattr(child, "custom_id", None) == "me:export:stats_csv"
+        if getattr(child, "custom_id", None) == "me:export:stats"
     )
 
     await button.callback(interaction)
 
-    assert calls == [(42, "Tester", "CSV", 90)]
+    assert calls == [(42, "Tester")]
 
 
 @pytest.mark.asyncio
-async def test_exports_inventory_buttons_delegate_to_private_export_adapter(monkeypatch) -> None:
+async def test_exports_inventory_button_opens_options(monkeypatch) -> None:
     calls = []
 
-    async def fake_send_inventory_export(interaction, *, display_name, export_format):
-        calls.append((interaction.user.id, display_name, export_format))
+    async def fake_send_inventory_export_options(interaction, *, display_name):
+        calls.append((interaction.user.id, display_name))
 
-    monkeypatch.setattr(views.export_views, "send_inventory_export", fake_send_inventory_export)
+    monkeypatch.setattr(
+        views.export_views,
+        "send_inventory_export_options",
+        fake_send_inventory_export_options,
+    )
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -506,12 +509,48 @@ async def test_exports_inventory_buttons_delegate_to_private_export_adapter(monk
     button = next(
         child
         for child in view.children
-        if getattr(child, "custom_id", None) == "me:export:inventory_excel"
+        if getattr(child, "custom_id", None) == "me:export:inventory"
     )
 
     await button.callback(interaction)
 
-    assert calls == [(42, "Tester", InventoryExportFormat.EXCEL)]
+    assert calls == [(42, "Tester")]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_inventory_button_uses_existing_inventory_selector(monkeypatch) -> None:
+    calls = []
+
+    async def fake_visibility(user_id):
+        calls.append(("visibility", user_id))
+        return InventoryReportVisibility.ONLY_ME
+
+    async def fake_start_myinventory_command(*, ctx, visibility):
+        calls.append(("inventory", ctx.user.id, visibility))
+
+    monkeypatch.setattr(
+        views.reporting_service,
+        "get_visibility_preference_or_none",
+        fake_visibility,
+    )
+    monkeypatch.setattr(
+        views,
+        "start_myinventory_command",
+        fake_start_myinventory_command,
+    )
+    view = views.PlayerSelfServiceView(author_id=42, display_name="Tester")
+    interaction = _Interaction()
+    button = next(
+        child for child in view.children if getattr(child, "custom_id", None) == "me:inventory"
+    )
+
+    await button.callback(interaction)
+
+    assert interaction.response.deferred == [{"ephemeral": True}]
+    assert calls == [
+        ("visibility", 42),
+        ("inventory", 42, InventoryReportVisibility.ONLY_ME),
+    ]
 
 
 @pytest.mark.asyncio
@@ -714,7 +753,7 @@ async def test_calendar_management_remove_all_uses_service(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_preferences_view_has_inventory_visibility_actions_without_quick_launch() -> None:
+async def test_preferences_view_has_inventory_visibility_actions_without_dashboard_launch_buttons() -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -726,9 +765,8 @@ async def test_preferences_view_has_inventory_visibility_actions_without_quick_l
     assert {"Set Public", "Update VIP"}.issubset(set(labels))
     assert "Set Private" not in labels
     assert "Manage" not in labels
-    assert not any(
-        isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
-    )
+    assert "Inventory" not in labels
+    assert "Exports" not in labels
 
 
 @pytest.mark.asyncio
@@ -1742,7 +1780,8 @@ def test_exports_embed_is_compact_and_action_first() -> None:
     assert embed.description == "Private exports for Tester"
     assert [field.name for field in embed.fields] == ["Status", "Actions"]
     assert "Delivery: Private" in embed.fields[0].value
-    assert "Stats Excel" in embed.fields[1].value
+    assert "Export Stats" in embed.fields[1].value
+    assert "Export Inventory" in embed.fields[1].value
     assert "Legacy" not in embed.fields[1].value
 
 

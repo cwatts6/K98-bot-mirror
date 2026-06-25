@@ -5,9 +5,9 @@
 - Task name: `Player Self-Service Command Centre Phase 9 Quick Launch Expansion and Legacy Export Rollout`
 - Date: `2026-06-25`
 - Owner/context: Player Self-Service Command Centre programme after Phase 8 `/me exports` was delivered in production PR #478 and smoke tested successfully
-- Task type: `Discord command feature | launch-surface audit | legacy command rollout design | privacy and channel-rule review`
-- One-pass approved: `no`
-- Status: `ready for next phase`
+- Task type: `Discord command feature | launch-surface audit | export option workflow | legacy command rollout design | privacy and channel-rule review`
+- One-pass approved: `approved after audit/scope discussion on 2026-06-25`
+- Status: `implementation prepared for review`
 
 ## 2. Required Reading
 
@@ -40,13 +40,14 @@ Validate SQL-backed command usage or export assumptions against `C:\K98-bot-SQL-
 Decide the next `/me` launch-surface step after Phase 8 validated private exports, and decide the
 first safe rollout step for legacy export commands.
 
-Phase 9 must not assume Quick Launch can directly run every target command. Start by auditing each
-target command's channel gate, permission model, response visibility, output privacy, required
-arguments, and current interaction timing. Preserve dashboard-only guidance unless the audit proves
-a richer launch surface can preserve those rules.
+Phase 9's approved decision is to remove risky KVK command targets from Dashboard Quick Launch,
+keep those outputs in their existing channel-gated command paths, and add only safe private
+dashboard handoffs for Inventory and Exports.
 
-Phase 9 must also keep `/my_stats_export` and `/export_inventory` live unless the operator
-explicitly approves a redirect/deprecation step and the player communication path is clear.
+Phase 9 also makes `/me exports` the preferred private export route by adding option child windows
+for Stats and Inventory exports. `/my_stats_export` and `/export_inventory` remain live unless a
+later operator-approved communication and no-feedback window explicitly approves redirect or
+removal.
 
 ## 4. Background
 
@@ -62,10 +63,10 @@ Delivered context:
   actions work, outputs are ephemeral/private, `/me dashboard` has no direct export button, Quick
   Launch `Exports` opens the card correctly, and legacy export commands still work.
 
-The next open programme question is whether Quick Launch should remain a dashboard-only guidance
-surface or become more useful without bypassing command-specific rules. The related export rollout
-question is whether `/my_stats_export` and `/export_inventory` should stay live forever, redirect
-to `/me exports`, or enter a measured deprecation/no-feedback window.
+The programme question was resolved during Phase 9 scoping: using Quick Launch to initiate
+`/kvk stats`, `/kvk targets`, `/kvk history`, or `/kvk rankings` has too much risk of bypassing
+channel and public-output expectations while adding little player value. `/me exports` is the
+better place to improve the export journey because it is already private and service-backed.
 
 ## 5. Scope
 
@@ -81,17 +82,24 @@ to `/me exports`, or enter a measured deprecation/no-feedback window.
 - For each target, map channel restrictions, admin overrides, permission decorators, public vs
   private output behavior, required parameters, interaction timing, and whether a launch handoff
   can safely be represented inside `/me`.
-- Decide whether Quick Launch should:
-  - remain dashboard-only guidance,
-  - become richer dashboard actions,
-  - become a reusable launch section on selected `/me` pages,
-  - or split guidance-only and direct-action targets based on safety.
+- Remove KVK command targets from dashboard Quick Launch.
+- Add dashboard `Inventory` and `Exports` buttons only.
+- Route dashboard Inventory into the equivalent existing `/myinventory` selector/report journey,
+  preserving report visibility settings and existing inventory report controls.
+- Route dashboard Exports into `/me exports`.
+- Update `/me exports` to show two controls: `Export Stats` and `Export Inventory`.
+- Add a Stats export child window with Format and Days selectors. Defaults: Format `Excel`, Days
+  `90`. Options: Format `Excel`, `CSV`, `GoogleSheets`; Days `30`, `60`, `90`, `180`, `360`.
+- Add an Inventory export child window with Format, View, Governor, and Days selectors. Defaults
+  must match existing inventory export behavior.
+- Keep Download/Cancel child-window behavior private and simple.
 - Implement only launch controls that preserve every target command's existing channel,
   visibility, permission, privacy, and argument rules.
 - Review `/my_stats_export` and `/export_inventory` usage, smoke feedback, player communication,
   and compatibility needs.
-- Design the first legacy export rollout step: keep live, add guidance, redirect, deprecate with a
-  no-feedback window, or remove later.
+- Design the first legacy export rollout step as: keep live, prefer `/me exports`, and defer any
+  redirect/removal until after player communication and a no-feedback window are separately
+  approved.
 - Preserve `/my_stats_export` and `/export_inventory` unless operator approval explicitly includes
   redirect/removal.
 - Keep `commands/me_cmds.py`, command modules, and views thin.
@@ -118,20 +126,20 @@ to `/me exports`, or enter a measured deprecation/no-feedback window.
 ### Deferred Optimisation
 - Area: `/me dashboard`, `/me exports`, `ui/views/player_self_service_views.py`, player self-service Quick Launch controls
 - Type: consistency
-- Description: Phase 8 delivered `/me exports` while Dashboard Quick Launch remains dashboard-only and guidance-only for KVK stats, KVK targets, KVK history, KVK rankings, inventory, and exports. A richer launch surface could improve discoverability, but only if it preserves each target command's channel, visibility, permission, and privacy rules.
-- Suggested Fix: Audit each target command's current channel gate, default visibility, permission model, required arguments, and output behavior before deciding whether Quick Launch should remain guidance-only, become richer dashboard actions, or become a reusable launch section. Preserve target-command guards and add command/view tests plus manual smoke for every expanded launch path.
+- Description: Phase 8 delivered `/me exports` while Dashboard Quick Launch remained dashboard-only and guidance-only for KVK stats, KVK targets, KVK history, KVK rankings, inventory, and exports. Phase 9 resolves this by removing KVK targets from the dashboard launch surface and keeping only safe private Inventory and Exports handoffs.
+- Suggested Fix: Implement the approved Phase 9 resolution: remove KVK Quick Launch targets, add dashboard Inventory and Exports buttons, preserve target-command guards, and add command/view tests plus manual smoke for the new private handoff paths.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 8 export launchpad delivered and smoke tested; explicit operator approval for any Quick Launch expansion beyond dashboard-only guidance.
+- Dependencies: Phase 8 export launchpad delivered and smoke tested; operator approved the Phase 9 Inventory/Exports-only handoff model.
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `/my_stats_export`, `/export_inventory`, player self-service docs/tests
 - Type: cleanup
-- Description: Phase 8 preserves `/my_stats_export` and `/export_inventory` as live legacy commands while `/me exports` becomes the modern launchpad. The legacy paths remain useful compatibility surfaces, but they need a deliberate redirect, deprecation, or removal decision after the `/me exports` launchpad is validated.
-- Suggested Fix: Review usage and smoke feedback after Phase 8, decide whether each legacy export command should remain live, redirect to `/me exports`, or be removed after a no-feedback window, then update command registration baselines, canonical command reference, player briefing, and focused command tests.
+- Description: Phase 9 keeps `/my_stats_export` and `/export_inventory` live while making `/me exports` the preferred route with Stats and Inventory option windows. The legacy paths remain useful compatibility surfaces, but they need a deliberate communication, monitoring, redirect, deprecation, or removal decision after Phase 9 is smoke tested.
+- Suggested Fix: Review usage and player feedback after Phase 9, decide whether each legacy export command should remain live indefinitely, redirect to `/me exports`, or be removed after a no-feedback window, then update command registration baselines, canonical command reference, player briefing, and focused command tests.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 8 export launchpad delivered and smoke tested; operator approval for any redirect/removal; player communication before final removal.
+- Dependencies: Phase 9 `/me exports` option windows smoke tested; operator approval for any redirect/removal; player communication before final removal.
 
 ### Deferred Optimisation
 - Area: `player_self_service/page_cards.py`, `player_self_service/dashboard_card.py`, `kvk/rendering/`, `prekvk/report_image_renderer.py`, visual card renderers
@@ -170,7 +178,8 @@ to `/me exports`, or enter a measured deprecation/no-feedback window.
 3. Map legacy export command usage and compatibility expectations before designing redirect or
    deprecation behavior.
 4. Propose the safest launch model and legacy export rollout option.
-5. Stop for approval before implementing any redirect/removal or expanded Quick Launch direct action.
+5. Implement the approved Phase 9 slice: dashboard Inventory/Exports handoffs plus `/me exports`
+   option windows.
 6. Preserve existing target command channel, visibility, permission, privacy, and argument rules.
 7. Preserve `/my_stats_export` and `/export_inventory` unless redirect/removal is explicitly
    approved.
@@ -226,12 +235,14 @@ behavior changes.
 ## 11. Manual Smoke Checklist
 
 - `/me dashboard` remains private.
-- Dashboard Quick Launch still opens the expected guidance or approved direct launch behavior.
-- Quick Launch targets preserve their existing channel restrictions, admin overrides, permission
-  rules, output visibility, and privacy behavior.
-- `/me exports` remains private and retains working Stats Excel, Stats CSV, Inventory Excel, and
-  Inventory CSV actions.
-- `/me exports` does not gain dashboard Quick Launch unless explicitly approved.
+- Dashboard no longer includes KVK Quick Launch targets.
+- Dashboard Inventory opens the existing `/myinventory` selector/report journey.
+- Dashboard Exports opens `/me exports`.
+- `/me exports` remains private and opens Stats and Inventory child option windows.
+- Stats export defaults to Excel and 90 days and can send Excel, CSV, and GoogleSheets.
+- Inventory export defaults match existing inventory export behavior and can send selected
+  format/view/governor/day options.
+- Cancel closes each child option window without sending a file.
 - `/my_stats_export` and `/export_inventory` remain live unless redirect/removal is explicitly
   approved.
 - If an export legacy command redirects, the redirect is private, clear, and does not break command
@@ -242,35 +253,36 @@ behavior changes.
 
 ## 12. Acceptance Criteria
 
-- [ ] Phase 9 begins with audit/scope unless one-pass implementation is explicitly approved.
-- [ ] Every Quick Launch target's channel, visibility, permission, privacy, and argument rules are
+- [x] Phase 9 began with audit/scope before operator-approved implementation.
+- [x] Every Quick Launch target's channel, visibility, permission, privacy, and argument rules are
   mapped before direct launch controls are designed.
-- [ ] Dashboard-only Quick Launch remains unchanged unless expansion is explicitly approved and
-  validated.
-- [ ] Any expanded launch path preserves the target command's existing rules.
-- [ ] `/my_stats_export` and `/export_inventory` remain live unless explicit redirect/removal
+- [x] Dashboard KVK Quick Launch is removed rather than expanded into direct KVK launch controls.
+- [x] Expanded launch paths are limited to private Inventory and Exports handoffs.
+- [x] `/my_stats_export` and `/export_inventory` remain live unless explicit redirect/removal
   approval is recorded.
-- [ ] Legacy export rollout includes player communication/no-feedback planning before final removal.
-- [ ] No export schema, file format, SQL, or output redesign is included.
-- [ ] Shared visual-card renderer consolidation remains captured for a later programme phase.
-- [ ] Focused tests and standard validators pass.
-- [ ] Codex Security is run or explicitly justified.
-- [ ] Deferred findings are captured structurally.
+- [x] Legacy export rollout includes player communication/no-feedback planning before final removal.
+- [x] No export schema, file format, SQL, or output redesign is included.
+- [x] Shared visual-card renderer consolidation remains captured for a later programme phase.
+- [x] Focused tests and standard validators pass.
+- [x] Codex Security is run or explicitly justified.
+- [x] Deferred findings are captured structurally.
 
 ## 13. PR Summary Template
 
 ```md
 ## Summary
 
-- Audited Quick Launch targets and legacy export rollout options.
-- <describe approved Quick Launch decision>
-- <describe approved legacy export command decision>
+- Removed risky KVK command targets from dashboard Quick Launch and kept KVK commands in their
+  existing channel-gated paths.
+- Added private dashboard Inventory and Exports handoffs.
+- Made `/me exports` the preferred export route with Stats and Inventory option child windows.
+- Preserved `/my_stats_export` and `/export_inventory` unchanged for compatibility.
 
 ## Changes
 
-- <launch surface implementation or documentation-only decision>
-- <legacy export command handling>
-- <docs/tests>
+- `/me dashboard`: Inventory and Exports buttons only for launch handoffs.
+- `/me exports`: Export Stats and Export Inventory option windows with Download/Cancel.
+- Docs/tests updated for Phase 9 decisions.
 
 ## Tests
 

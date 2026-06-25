@@ -63,7 +63,7 @@ def test_export_status_is_actionable_for_registered_accounts() -> None:
     export_status = service.summarize_export_status(account_status)
 
     assert export_status.action_state == "actionable"
-    assert export_status.stats_export == "Excel / CSV"
+    assert export_status.stats_export == "Excel / CSV / GoogleSheets"
     assert export_status.action_summary == "Ready"
 
 

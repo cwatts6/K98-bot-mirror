@@ -48,8 +48,8 @@ def _summary() -> PlayerSelfServiceSummary:
             next_action="Review preferences",
         ),
         exports=ExportStatus(
-            stats_export="Excel / CSV",
-            inventory_export="Excel / CSV",
+            stats_export="Excel / CSV / GoogleSheets",
+            inventory_export="Excel / CSV / GoogleSheets",
             privacy_note="Private",
         ),
     )
