@@ -24,12 +24,12 @@ from player_self_service.service import (
     PlayerSelfServiceSummary,
     build_player_self_service_summary,
 )
+from ui.views import player_self_service_export_views as export_views
 from ui.views.inventory_report_views import send_inventory_vip_preference_prompt
 from ui.views.player_self_service_account_views import AccountManageView
 from ui.views.player_self_service_reminder_views import (
     ReminderSetupView,
 )
-from ui.views import player_self_service_export_views as export_views
 
 logger = logging.getLogger(__name__)
 

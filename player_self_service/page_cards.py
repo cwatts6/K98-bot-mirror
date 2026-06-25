@@ -601,9 +601,7 @@ def _page_copy(
             (
                 "Actions available: Stats Excel, Stats CSV, Inventory Excel, Inventory CSV"
                 if actionable
-                else "Guidance only"
-                if guidance_only
-                else "Actions unavailable"
+                else "Guidance only" if guidance_only else "Actions unavailable"
             ),
             (
                 "Custom options remain in /my_stats_export and /export_inventory."

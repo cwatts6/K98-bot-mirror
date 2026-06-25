@@ -69,7 +69,9 @@ async def test_stats_export_adapter_uses_service_private_send_and_cleanup(monkey
         return StatsExportOutcome(status="ok", export_file=export_file)
 
     monkeypatch.setattr(export_views.discord, "File", _FakeDiscordFile)
-    monkeypatch.setattr(export_views.stats_export_service, "build_personal_stats_export", fake_build)
+    monkeypatch.setattr(
+        export_views.stats_export_service, "build_personal_stats_export", fake_build
+    )
     monkeypatch.setattr(
         export_views.stats_export_service,
         "cleanup_export_file",
@@ -104,7 +106,9 @@ async def test_stats_export_adapter_reports_service_unavailable(monkeypatch) -> 
     async def fake_build(**_kwargs):
         return StatsExportOutcome(status="no_accounts", message="Register first.")
 
-    monkeypatch.setattr(export_views.stats_export_service, "build_personal_stats_export", fake_build)
+    monkeypatch.setattr(
+        export_views.stats_export_service, "build_personal_stats_export", fake_build
+    )
     interaction = _Interaction()
 
     await export_views.send_stats_export(
