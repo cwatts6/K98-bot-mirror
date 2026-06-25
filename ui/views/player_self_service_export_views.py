@@ -217,7 +217,9 @@ class StatsExportOptionsView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if int(interaction.user.id) == self.author_id:
             return True
-        await interaction.response.send_message("This export window is not for you.", ephemeral=True)
+        await interaction.response.send_message(
+            "This export window is not for you.", ephemeral=True
+        )
         return False
 
     @discord.ui.button(
@@ -323,7 +325,9 @@ class InventoryExportOptionsView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if int(interaction.user.id) == self.author_id:
             return True
-        await interaction.response.send_message("This export window is not for you.", ephemeral=True)
+        await interaction.response.send_message(
+            "This export window is not for you.", ephemeral=True
+        )
         return False
 
     @discord.ui.button(
@@ -363,7 +367,9 @@ class InventoryExportOptionsView(discord.ui.View):
 class InventoryExportFormatSelect(discord.ui.Select):
     def __init__(self, parent_view: InventoryExportOptionsView) -> None:
         options = [
-            discord.SelectOption(label="Excel", value=InventoryExportFormat.EXCEL.value, default=True),
+            discord.SelectOption(
+                label="Excel", value=InventoryExportFormat.EXCEL.value, default=True
+            ),
             discord.SelectOption(label="CSV", value=InventoryExportFormat.CSV.value),
             discord.SelectOption(
                 label="Google Sheets",

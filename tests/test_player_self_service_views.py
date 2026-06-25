@@ -477,9 +477,7 @@ async def test_exports_stats_button_opens_options(monkeypatch) -> None:
     )
     interaction = _Interaction()
     button = next(
-        child
-        for child in view.children
-        if getattr(child, "custom_id", None) == "me:export:stats"
+        child for child in view.children if getattr(child, "custom_id", None) == "me:export:stats"
     )
 
     await button.callback(interaction)
@@ -753,7 +751,9 @@ async def test_calendar_management_remove_all_uses_service(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_preferences_view_has_inventory_visibility_actions_without_dashboard_launch_buttons() -> None:
+async def test_preferences_view_has_inventory_visibility_actions_without_dashboard_launch_buttons() -> (
+    None
+):
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
