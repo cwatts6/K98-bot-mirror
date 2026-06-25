@@ -240,9 +240,7 @@ def _account_action_detail(summary: PlayerSelfServiceSummary) -> str:
 def _reminder_action_detail(summary: PlayerSelfServiceSummary) -> str:
     if summary.reminders.combined_state.strip().lower() == "off":
         return "Choose KVK reminders here or use Calendar Settings for calendar reminders."
-    return (
-        "Manage KVK autosave choices here; Calendar Settings manages calendar reminder offsets."
-    )
+    return "Manage KVK autosave choices here; Calendar Settings manages calendar reminder offsets."
 
 
 def _dashboard_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:

@@ -7,6 +7,7 @@ from datetime import datetime
 from io import BytesIO
 
 from player_self_service.service import PlayerSelfServiceSummary
+
 from . import page_cards
 
 WIDTH = page_cards.WIDTH
