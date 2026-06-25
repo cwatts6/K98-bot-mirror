@@ -36,7 +36,7 @@ remove-all/unsubscribe with confirmation through one primary Manage journey. The
 journey can now open Calendar Settings for calendar reminder event types and lead times.
 `/me preferences` can update inventory report visibility between private and public output and can
 open the existing Governor VIP update flow. `/me exports` can open private option windows for
-Stats and Inventory exports. Stats exports support Excel, CSV, and GoogleSheets formats plus 30,
+Stats and Inventory exports. Stats exports support Excel, CSV, and Google Sheets formats plus 30,
 60, 90, 180, and 360 day windows, defaulting to Excel and 90 days. Inventory exports support
 format, view, registered-governor scope, and day-window choices using the existing inventory export
 defaults. Existing

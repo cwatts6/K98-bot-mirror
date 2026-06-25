@@ -51,8 +51,8 @@ def _summary() -> PlayerSelfServiceSummary:
             vip_summary="Main Gov - 19",
         ),
         exports=ExportStatus(
-            stats_export="Excel / CSV / GoogleSheets",
-            inventory_export="Excel / CSV / GoogleSheets",
+            stats_export="Excel / CSV / Google Sheets",
+            inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
     )
@@ -98,8 +98,8 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
             next_action="Try again",
         ),
         exports=ExportStatus(
-            stats_export="Excel / CSV / GoogleSheets",
-            inventory_export="Excel / CSV / GoogleSheets",
+            stats_export="Excel / CSV / Google Sheets",
+            inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
     )
@@ -118,8 +118,8 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
     assert _page_copy("exports", summary)[2] == "Actions: Export Stats, Export Inventory"
     assert _page_copy("exports", summary)[3] == ""
     assert _page_copy("exports", summary)[4] == (
-        "Stats: Excel / CSV / GoogleSheets",
-        "Inventory: Excel / CSV / GoogleSheets",
+        "Stats: Excel / CSV / Google Sheets",
+        "Inventory: Excel / CSV / Google Sheets",
     )
 
 
@@ -152,8 +152,8 @@ def test_page_card_reminder_copy_treats_incomplete_as_setup() -> None:
             next_action="Review preferences",
         ),
         exports=ExportStatus(
-            stats_export="Excel / CSV / GoogleSheets",
-            inventory_export="Excel / CSV / GoogleSheets",
+            stats_export="Excel / CSV / Google Sheets",
+            inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
     )
@@ -268,8 +268,8 @@ def test_page_card_account_and_vip_lines_show_full_summary() -> None:
             vip_summary="Main - 19, Alt 1 - 15",
         ),
         exports=ExportStatus(
-            stats_export="Excel / CSV / GoogleSheets",
-            inventory_export="Excel / CSV / GoogleSheets",
+            stats_export="Excel / CSV / Google Sheets",
+            inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
     )

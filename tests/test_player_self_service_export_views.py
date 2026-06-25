@@ -322,6 +322,8 @@ async def test_inventory_options_view_passes_selected_scope(monkeypatch) -> None
 async def test_inventory_options_window_loads_registered_governors(monkeypatch) -> None:
     async def fake_governors(user_id):
         assert user_id == 42
+        assert interaction.response.is_done()
+        assert interaction.response.deferred == [{"ephemeral": True}]
         return [RegisteredGovernor(111, "MainGov", "Main")]
 
     monkeypatch.setattr(
@@ -333,7 +335,7 @@ async def test_inventory_options_window_loads_registered_governors(monkeypatch) 
 
     await export_views.send_inventory_export_options(interaction, display_name="Tester")
 
-    _args, kwargs = interaction.response.sent[0]
+    _args, kwargs = interaction.followup.sent[0]
     assert kwargs["ephemeral"] is True
     option_view = kwargs["view"]
     assert isinstance(option_view, export_views.InventoryExportOptionsView)

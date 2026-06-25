@@ -89,7 +89,7 @@ better place to improve the export journey because it is already private and ser
 - Route dashboard Exports into `/me exports`.
 - Update `/me exports` to show two controls: `Export Stats` and `Export Inventory`.
 - Add a Stats export child window with Format and Days selectors. Defaults: Format `Excel`, Days
-  `90`. Options: Format `Excel`, `CSV`, `GoogleSheets`; Days `30`, `60`, `90`, `180`, `360`.
+  `90`. Options: Format `Excel`, `CSV`, `Google Sheets`; Days `30`, `60`, `90`, `180`, `360`.
 - Add an Inventory export child window with Format, View, Governor, and Days selectors. Defaults
   must match existing inventory export behavior.
 - Keep Download/Cancel child-window behavior private and simple.
@@ -239,7 +239,7 @@ behavior changes.
 - Dashboard Inventory opens the existing `/myinventory` selector/report journey.
 - Dashboard Exports opens `/me exports`.
 - `/me exports` remains private and opens Stats and Inventory child option windows.
-- Stats export defaults to Excel and 90 days and can send Excel, CSV, and GoogleSheets.
+- Stats export defaults to Excel and 90 days and can send Excel, CSV, and Google Sheets.
 - Inventory export defaults match existing inventory export behavior and can send selected
   format/view/governor/day options.
 - Cancel closes each child option window without sending a file.

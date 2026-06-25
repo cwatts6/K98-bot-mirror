@@ -257,7 +257,7 @@ class StatsExportFormatSelect(discord.ui.Select):
         options = [
             discord.SelectOption(label="Excel", value="Excel", default=True),
             discord.SelectOption(label="CSV", value="CSV"),
-            discord.SelectOption(label="GoogleSheets", value="GoogleSheets"),
+            discord.SelectOption(label="Google Sheets", value="GoogleSheets"),
         ]
         super().__init__(
             placeholder="Format",
@@ -366,7 +366,7 @@ class InventoryExportFormatSelect(discord.ui.Select):
             discord.SelectOption(label="Excel", value=InventoryExportFormat.EXCEL.value, default=True),
             discord.SelectOption(label="CSV", value=InventoryExportFormat.CSV.value),
             discord.SelectOption(
-                label="GoogleSheets",
+                label="Google Sheets",
                 value=InventoryExportFormat.GOOGLE_SHEETS.value,
             ),
         ]
@@ -483,6 +483,7 @@ async def send_inventory_export_options(
     *,
     display_name: str,
 ) -> None:
+    await _defer_private(interaction)
     try:
         governors = await inventory_export_service.get_registered_governors_for_user(
             int(interaction.user.id)

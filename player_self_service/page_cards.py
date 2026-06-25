@@ -457,8 +457,8 @@ def _export_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     state = exports.action_state.strip().lower()
     if state == "actionable":
         return (
-            "Stats: Excel / CSV / GoogleSheets",
-            "Inventory: Excel / CSV / GoogleSheets",
+            "Stats: Excel / CSV / Google Sheets",
+            "Inventory: Excel / CSV / Google Sheets",
         )
     if state == "guidance":
         return (

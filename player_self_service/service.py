@@ -372,8 +372,8 @@ def summarize_export_status(accounts: AccountStatus) -> ExportStatus:
             action_summary="Register an account first.",
         )
     return ExportStatus(
-        stats_export="Excel / CSV / GoogleSheets",
-        inventory_export="Excel / CSV / GoogleSheets",
+        stats_export="Excel / CSV / Google Sheets",
+        inventory_export="Excel / CSV / Google Sheets",
         privacy_note="Private",
         action_state="actionable",
         action_summary="Ready",
