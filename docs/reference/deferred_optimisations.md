@@ -69,24 +69,6 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 6 preference card and VIP parity are smoke tested; operator approval for additional preference categories and any required SQL/persistence changes.
 
 ### Deferred Optimisation
-- Area: `/me reminders`, `commands/calendar_cmds.py`, `event_calendar/reminder_prefs.py`, `event_calendar/reminder_prefs_store.py`, `ui/views/reminder_config.py`, calendar reminder state files
-- Type: architecture
-- Description: Phase 6 simplifies `/me reminders` for KVK event reminder subscriptions only. Calendar reminders remain managed through `/calendar_reminder_config` and use distinct event-calendar preference/state code, but from a player perspective KVK event reminders and calendar reminders are two sides of the same reminder experience. Players can reasonably have KVK reminders, calendar reminders, or both, so the reminder centre will still feel incomplete after the KVK subscription flow is modernised.
-- Suggested Fix: Promote this into Player Self-Service Phase 7. Audit KVK subscription reminders and calendar reminders together, map both persistence models, and design one `/me reminders` surface that can review and manage both without merging their storage unsafely. Preserve KVK reminder semantics, calendar reminder timezone/lead-time semantics, restart-sensitive scheduled work, and legacy command compatibility. Add focused tests for mixed reminder states and manual smoke covering users with KVK-only, calendar-only, both, and neither.
-- Impact: high
-- Risk: medium
-- Dependencies: Phase 6 KVK reminder manage flow smoke tested; calendar reminder service/state contracts validated before implementation.
-
-### Deferred Optimisation
-- Area: `/me dashboard`, `player_self_service/dashboard_card.py`, `player_self_service/page_cards.py`, `assets/me/cards/`
-- Type: consistency
-- Description: Phase 6 subpage cards for Accounts, Reminders, Preferences, and Exports now use a full-bleed generated visual style with large readable text and native controls aligned to the card sections. Smoke testing confirmed the cards look strong, but it also made the older Phase 5 `/me dashboard` card feel visually out of step with the rest of the command centre.
-- Suggested Fix: Promote this into Player Self-Service Phase 7. Refresh `/me dashboard` to match the Phase 6 card style while preserving dashboard summary data, private response behavior, safe embed fallback, dashboard-only Quick Launch, and existing navigation controls. Add renderer tests and manual smoke on desktop/mobile to confirm readability and no Quick Launch regression.
-- Impact: medium
-- Risk: low
-- Dependencies: Phase 6 generated subpage cards smoke tested; dashboard Quick Launch behavior preserved.
-
-### Deferred Optimisation
 - Area: `commands/subscriptions_cmds.py`, `player_self_service/reminder_service.py`, `ui/views/subscription_views.py`
 - Type: refactor
 - Description: Phase 4 adds a service-backed `/me reminders` centre while intentionally leaving legacy `/subscribe`, `/modify_subscription`, and `/unsubscribe` command handlers live and behavior-compatible. Those legacy handlers still own duplicated validation, normalization, DM confirmation wording, and unsubscribe cleanup orchestration that now has a cleaner service-owned equivalent.

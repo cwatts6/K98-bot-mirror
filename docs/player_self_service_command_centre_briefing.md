@@ -1,10 +1,10 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-06-24
+Last updated: 2026-06-25
 
-Status: Phase 6 Guided Management Cards and Workflow Simplification is delivered and smoke tested.
-The dashboard keeps the Phase 5 generated private visual card with embed fallback. Accounts,
-Reminders, Preferences, and Exports now use generated private visual cards with safe embed
+Status: Phase 7 Unified Reminder Centre and Dashboard Card Alignment is implemented for validation.
+The dashboard now uses the same full-bleed generated private card style as the Phase 6 subpages.
+Accounts, Reminders, Preferences, and Exports use generated private visual cards with safe embed
 fallback.
 
 ## Player Briefing
@@ -15,7 +15,7 @@ Use it to check:
 
 - whether your main account is set
 - how many accounts are linked
-- whether KVK reminders are on
+- whether KVK reminders and calendar reminders are on
 - your inventory visibility preference
 - where to go for KVK stats, targets, history, rankings, inventory, and exports
 
@@ -27,8 +27,8 @@ The account centre supports account review, Governor ID lookup, registration, re
 removal with confirmation through one primary Manage journey. Lookup results can continue into
 register or replace without asking the player to remember or re-enter the selected Governor ID.
 The reminder centre supports private KVK event reminder review, setup, automatic updates, and
-remove-all/unsubscribe with confirmation through one primary Manage journey. Calendar reminders
-remain managed separately through `/calendar_reminder_config` until the next reminder-centre phase.
+remove-all/unsubscribe with confirmation through one primary Manage journey. The same Manage
+journey can now open Calendar Settings for calendar reminder event types and lead times.
 `/me preferences` can update inventory report visibility between private and public output and can
 open the existing Governor VIP update flow. Existing commands such as `/register_governor`,
 `/modify_registration`, `/my_registrations`, `/mygovernorid`, `/subscribe`,
@@ -37,8 +37,8 @@ open the existing Governor VIP update flow. Existing commands such as `/register
 
 ## Operator Briefing
 
-Phase 6 extended `/me accounts`, `/me reminders`, `/me preferences`, and `/me exports` in
-parallel with legacy self-service commands. It did not remove, redirect, or change
+Phase 7 extends `/me reminders` in parallel with legacy self-service commands. It did not remove,
+redirect, or change
 `/inventory_preferences`, `/subscribe`, `/modify_subscription`, `/unsubscribe`,
 `/calendar_reminder_config`, `/export_inventory`, or account legacy commands.
 
@@ -61,7 +61,7 @@ grouped_subcommands_detected=85
 
 Rollout checks:
 
-- Confirm `/me dashboard` is private and shows the generated card when rendering succeeds.
+- Confirm `/me dashboard` is private and shows the full-bleed generated card when rendering succeeds.
 - Confirm dashboard falls back to the private embed if image rendering or delivery fails.
 - Confirm the card is readable on desktop, mobile, and iPad.
 - Confirm account, reminder, preference, and export pages remain private.
@@ -71,7 +71,9 @@ Rollout checks:
   path.
 - Confirm `/me preferences` can open the existing Governor VIP update flow and that VIP writes
   remain owned by the inventory profile service path.
+- Confirm `/me reminders` shows KVK-only, calendar-only, both, and neither states clearly.
 - Confirm `/me reminders` KVK event type and reminder time selections save automatically.
+- Confirm `/me reminders` Calendar Settings saves calendar reminder event types, lead times, and enabled/disabled state.
 - Confirm dashboard Quick Launch remains dashboard-only and `/me exports` does not gain the
   dashboard Quick Launch menu.
 - Confirm legacy player commands remain registered and usable.
@@ -155,13 +157,12 @@ Phase 6 smoke-test result:
 - Legacy account, reminder, inventory preference, calendar reminder, VIP update, and export
   commands remained live.
 
-Phase 7 planning notes:
+Phase 7 validation notes:
 
-- Calendar reminders remain a distinct code path through `/calendar_reminder_config`, but should
-  be revisited through `/me reminders` because players experience KVK and calendar reminders as
-  one reminder domain.
-- `/me dashboard` should be refreshed to match the full-bleed visual style of the Phase 6 Accounts,
-  Reminders, Preferences, and Exports cards while preserving dashboard Quick Launch.
-- If calendar reminder management is too risky for one PR, Phase 7 should still deliver dashboard
-  alignment and read-only calendar reminder status, then defer write controls with a precise
-  blocker.
+- Calendar reminders still use the event-calendar preference/state files and scheduler, but
+  `/me reminders` now surfaces and manages those preferences through the same service-backed save
+  path as `/calendar_reminder_config`.
+- KVK event reminders still use the legacy subscription tracker, scheduled/sent DM trackers, and
+  Phase 4 event semantics. KVK autosave and remove-all behavior should be smoke tested unchanged.
+- `/me dashboard` now matches the full-bleed visual style of the Phase 6 Accounts, Reminders,
+  Preferences, and Exports cards while preserving dashboard-only Quick Launch.

@@ -19,6 +19,7 @@ from .reminder_service import (
 )
 from .service import (
     AccountStatus,
+    CalendarReminderStatus,
     ExportStatus,
     PlayerSelfServiceSummary,
     PreferenceStatus,
@@ -33,6 +34,7 @@ __all__ = [
     "AccountMutationResult",
     "AccountSlot",
     "AccountStatus",
+    "CalendarReminderStatus",
     "ExportStatus",
     "PlayerSelfServiceSummary",
     "PreferenceMutationResult",

@@ -6,8 +6,8 @@ from typing import Any
 
 import discord
 
+from event_calendar import reminder_config_service
 from event_calendar.reminder_prefs import normalize_prefs
-from event_calendar.reminder_prefs_store import set_user_prefs
 from event_calendar.reminder_types import (
     REMINDER_1H,
     REMINDER_3D,
@@ -134,11 +134,13 @@ class ReminderConfigView(discord.ui.View):
         known_event_types: list[str],
         timeout: float = 300.0,
         _state_override: ReminderConfigState | None = None,
+        on_saved=None,
     ):
         super().__init__(timeout=timeout)
         self.owner_user_id = int(owner_user_id)
         self.user_id = int(user_id)
         self.known_event_types = ["all", *sorted({t for t in known_event_types if t})]
+        self.on_saved = on_saved
 
         if _state_override is not None:
             self.state = _state_override
@@ -167,20 +169,19 @@ class ReminderConfigView(discord.ui.View):
             known_event_types=[t for t in self.known_event_types if t != "all"],
             timeout=self.timeout if self.timeout is not None else 300.0,
             _state_override=state,
+            on_saved=self.on_saved,
         )
 
     def is_owner(self, interaction: discord.Interaction) -> bool:
         return bool(interaction.user and interaction.user.id == self.owner_user_id)
 
     def _compose_prefs_payload(self) -> dict[str, Any]:
-        by_event_type: dict[str, list[str]] = {}
-        offsets = sorted(self.state.selected_offsets)
-        for t in sorted(self.state.selected_types):
-            by_event_type[t] = offsets
-        return {
-            "enabled": self.state.enabled,
-            "by_event_type": by_event_type,
-        }
+        return reminder_config_service.compose_prefs_payload(
+            enabled=self.state.enabled,
+            selected_types=self.state.selected_types,
+            selected_offsets=self.state.selected_offsets,
+            known_event_types=[t for t in self.known_event_types if t != "all"],
+        )
 
     @discord.ui.button(label="Enable", style=discord.ButtonStyle.success, custom_id="cfg_enable")
     async def enable_button(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -257,15 +258,16 @@ class ReminderConfigView(discord.ui.View):
             )
             return
 
-        payload = self._compose_prefs_payload()
-        set_user_prefs(self.user_id, payload)
-        logger.info(
-            "[CALENDAR][REMINDER_CFG] saved user_id=%s enabled=%s types=%s offsets=%s",
+        result = reminder_config_service.save_user_calendar_reminder_preferences(
             self.user_id,
-            self.state.enabled,
-            sorted(self.state.selected_types),
-            sorted(self.state.selected_offsets),
+            enabled=self.state.enabled,
+            selected_types=self.state.selected_types,
+            selected_offsets=self.state.selected_offsets,
+            known_event_types=[t for t in self.known_event_types if t != "all"],
         )
+        if not result.ok:
+            await interaction.response.send_message(result.message, ephemeral=True)
+            return
 
         # terminal locked view
         locked = self.clone_with_state(self.state)
@@ -282,6 +284,12 @@ class ReminderConfigView(discord.ui.View):
             view=locked,
         )
         locked.message = interaction.message
+
+        if self.on_saved is not None:
+            try:
+                await self.on_saved(interaction)
+            except Exception:
+                logger.debug("[CALENDAR][REMINDER_CFG] post-save refresh failed", exc_info=True)
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, custom_id="cfg_cancel")
     async def cancel_button(self, button: discord.ui.Button, interaction: discord.Interaction):

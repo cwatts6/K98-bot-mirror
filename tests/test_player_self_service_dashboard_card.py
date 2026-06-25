@@ -96,7 +96,9 @@ def test_dashboard_card_lines_are_mobile_embed_friendly() -> None:
     )
     assert _reminder_lines(summary) == (
         "KVK: all KVK events",
+        "Calendar: not configured",
         "Times: 24h, 4h, 1h",
+        "Lead times: not set",
     )
     assert _preference_lines(summary) == (
         "Inventory: private",

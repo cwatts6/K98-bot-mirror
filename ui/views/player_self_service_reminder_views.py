@@ -10,6 +10,8 @@ from typing import Any
 import discord
 
 from constants import DEFAULT_REMINDER_TIMES, VALID_TYPES
+from event_calendar import reminder_config_service
+from event_calendar.reminder_prefs_store import get_user_prefs
 from player_self_service import reminder_service
 from player_self_service.reminder_service import (
     ReminderCentreState,
@@ -20,6 +22,7 @@ from player_self_service.service import (
     PlayerSelfServiceSummary,
     build_player_self_service_summary,
 )
+from ui.views.reminder_config import ReminderConfigView, build_reminder_config_embed
 
 logger = logging.getLogger(__name__)
 
@@ -320,10 +323,63 @@ class ReminderSetupView(discord.ui.View):
             await interaction.followup.send(content, view=self, ephemeral=True)
 
     @discord.ui.button(
+        label="Calendar Settings",
+        style=discord.ButtonStyle.secondary,
+        custom_id="me:reminder:calendar_settings",
+        row=2,
+    )
+    async def calendar_settings_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        await _defer_private(interaction)
+        known_types = list(reminder_config_service.known_calendar_event_types())
+        if not known_types:
+            known_types = ["all"]
+        try:
+            prefs = get_user_prefs(self.author_id)
+        except Exception:
+            logger.exception(
+                "player_self_service_calendar_reminder_prefs_load_failed user_id=%s",
+                self.author_id,
+            )
+            await interaction.followup.send(
+                "Calendar reminder preferences are temporarily unavailable. Please try again in a moment.",
+                ephemeral=True,
+            )
+            return
+
+        async def _on_saved(saved_interaction: discord.Interaction) -> None:
+            await _refresh_host_page(
+                host_message=self.host_message,
+                interaction=saved_interaction,
+                author_id=self.author_id,
+                display_name=self.display_name,
+                summary_loader=self.summary_loader,
+            )
+
+        config_view = ReminderConfigView(
+            owner_user_id=self.author_id,
+            user_id=self.author_id,
+            initial_prefs=prefs,
+            known_event_types=[event_type for event_type in known_types if event_type != "all"],
+            timeout=300.0,
+            on_saved=_on_saved,
+        )
+        sent = await interaction.followup.send(
+            "Choose calendar reminder event types and lead times, then Save.",
+            embed=build_reminder_config_embed(config_view.state),
+            view=config_view,
+            ephemeral=True,
+        )
+        config_view.message = sent
+
+    @discord.ui.button(
         label="Remove All",
         style=discord.ButtonStyle.danger,
         custom_id="me:reminder:remove_all",
-        row=2,
+        row=3,
     )
     async def remove_all_button(
         self,

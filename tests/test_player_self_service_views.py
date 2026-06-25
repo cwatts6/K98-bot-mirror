@@ -326,6 +326,7 @@ def test_reminders_embed_invites_service_backed_controls() -> None:
 
     assert embed.title == "Reminder Centre"
     assert "Manage auto-saves" in embed.fields[1].value
+    assert "Calendar Settings" in embed.fields[1].value
     assert "/modify_subscription" not in embed.fields[1].value
 
 
@@ -398,6 +399,29 @@ async def test_reminders_view_has_reminder_actions_without_quick_launch() -> Non
     assert not any(
         isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
     )
+
+
+@pytest.mark.asyncio
+async def test_reminder_setup_view_includes_calendar_settings() -> None:
+    state = ReminderCentreState(
+        ok=True,
+        subscribed=True,
+        event_types=("ruins",),
+        reminder_times=("24h",),
+        event_summary="ruins",
+        time_summary="24h",
+    )
+
+    view = reminder_views.ReminderSetupView(
+        author_id=42,
+        username="Tester",
+        state=state,
+        display_name="Tester",
+    )
+
+    labels = [getattr(child, "label", None) for child in view.children]
+    assert "Calendar Settings" in labels
+    assert "Remove All" in labels
 
 
 @pytest.mark.asyncio

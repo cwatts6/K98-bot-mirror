@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from event_calendar.reminder_config_service import CalendarReminderConfigState
 from inventory.models import InventoryReportVisibility
 from player_self_service import service
 from services.governor_account_service import summarize_accounts
@@ -72,6 +73,39 @@ def test_reminder_status_reports_unknown_for_invalid_shape() -> None:
     assert status.error == "invalid reminder config shape"
 
 
+def test_calendar_reminder_status_summarizes_enabled_calendar_prefs() -> None:
+    status = service.summarize_calendar_reminder_status(
+        CalendarReminderConfigState(
+            enabled=True,
+            selected_types=("all",),
+            selected_offsets=("24h", "1h"),
+        )
+    )
+
+    assert status.state == "on"
+    assert status.event_summary == "all calendar events"
+    assert status.time_summary == "24h, 1h"
+    assert status.next_action == "Manage"
+
+
+def test_reminder_status_combined_state_handles_calendar_only() -> None:
+    status = service.ReminderStatus(
+        state="off",
+        event_summary="not subscribed",
+        time_summary="not set",
+        next_action="Set up",
+        calendar=service.CalendarReminderStatus(
+            state="on",
+            event_summary="all calendar events",
+            time_summary="24h",
+            next_action="Manage",
+        ),
+    )
+
+    assert status.combined_state == "on"
+    assert status.combined_next_action == "Manage"
+
+
 @pytest.mark.asyncio
 async def test_preference_status_reads_private_public_unset_and_failure() -> None:
     async def private_loader(_uid):
@@ -121,10 +155,19 @@ async def test_build_summary_uses_read_only_loaders() -> None:
         calls.append(("vip", governor_id))
         return SimpleNamespace(vip_level_label="VIP 19")
 
+    def calendar_reminder_loader(user_id):
+        calls.append(("calendar_reminder", user_id))
+        return CalendarReminderConfigState(
+            enabled=True,
+            selected_types=("raid",),
+            selected_offsets=("24h",),
+        )
+
     summary = await service.build_player_self_service_summary(
         42,
         account_loader=account_loader,
         reminder_loader=reminder_loader,
+        calendar_reminder_loader=calendar_reminder_loader,
         preference_loader=preference_loader,
         vip_profile_loader=vip_profile_loader,
     )
@@ -135,9 +178,11 @@ async def test_build_summary_uses_read_only_loaders() -> None:
     assert summary.preferences.inventory_visibility == "public"
     assert ("account", 42) in calls
     assert ("reminder", 42) in calls
+    assert ("calendar_reminder", 42) in calls
     assert ("preference", 42) in calls
     assert ("vip", 111) in calls
     assert summary.preferences.vip_summary == "Main Gov - 19"
+    assert summary.reminders.calendar.state == "on"
 
 
 @pytest.mark.asyncio

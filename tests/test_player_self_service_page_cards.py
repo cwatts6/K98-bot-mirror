@@ -48,7 +48,7 @@ def _summary() -> PlayerSelfServiceSummary:
 
 
 def test_render_page_cards_output_pngs_for_remaining_me_pages() -> None:
-    for page in ("accounts", "reminders", "preferences", "exports"):
+    for page in ("dashboard", "accounts", "reminders", "preferences", "exports"):
         rendered = render_page_card(
             page,
             _summary(),
@@ -98,7 +98,7 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
         "Find ID by name, then add a governor to an available account slot."
     )
     assert _page_copy("reminders", summary)[2] == "Actions available: Manage"
-    assert "save automatically" in _page_copy("reminders", summary)[3]
+    assert "Calendar Settings" in _page_copy("reminders", summary)[3]
     assert _page_copy("preferences", summary)[2] == ("Actions available: Set Private, Update VIP")
 
 
@@ -135,3 +135,11 @@ def test_page_card_account_and_vip_lines_show_full_summary() -> None:
 
     assert "Farm 2" in _page_copy("accounts", summary)[4][2]
     assert _page_copy("preferences", summary)[4][1] == "VIP levels: Main - 19, Alt 1 - 15"
+
+
+def test_page_card_reminder_lines_include_calendar_status() -> None:
+    lines = _page_copy("reminders", _summary())[4]
+
+    assert "KVK reminders: on" in lines
+    assert "Calendar reminders: off" in lines
+    assert "Calendar lead times: not set" in lines

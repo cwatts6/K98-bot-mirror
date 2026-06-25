@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 import logging
 from typing import Any
 
+from event_calendar.reminder_config_service import (
+    CalendarReminderConfigState,
+    load_user_calendar_reminder_state,
+)
 from inventory import profile_service, reporting_service
 from inventory.models import InventoryReportVisibility
 from services.governor_account_service import (
@@ -34,12 +38,51 @@ class AccountStatus:
 
 
 @dataclass(frozen=True, slots=True)
+class CalendarReminderStatus:
+    state: str
+    event_summary: str
+    time_summary: str
+    next_action: str
+    error: str | None = None
+
+
+def _default_calendar_reminder_status() -> CalendarReminderStatus:
+    return CalendarReminderStatus(
+        state="off",
+        event_summary="not configured",
+        time_summary="not set",
+        next_action="Configure",
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class ReminderStatus:
     state: str
     event_summary: str
     time_summary: str
     next_action: str
     error: str | None = None
+    calendar: CalendarReminderStatus = field(default_factory=_default_calendar_reminder_status)
+
+    @property
+    def combined_state(self) -> str:
+        states = {self.state.strip().lower(), self.calendar.state.strip().lower()}
+        if "unknown" in states:
+            return "unknown"
+        if "incomplete" in states:
+            return "incomplete"
+        if "on" in states:
+            return "on"
+        return "off"
+
+    @property
+    def combined_next_action(self) -> str:
+        state = self.combined_state
+        if state == "unknown":
+            return "Try again"
+        if state == "off":
+            return "Set up"
+        return "Manage"
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +112,7 @@ class PlayerSelfServiceSummary:
 
 AccountLoader = Callable[[int], Awaitable[AccountResolutionSummary]]
 ReminderLoader = Callable[[int], dict[str, Any] | None]
+CalendarReminderLoader = Callable[[int], CalendarReminderConfigState]
 PreferenceLoader = Callable[[int], Awaitable[Any]]
 VipProfileLoader = Callable[[int], Awaitable[Any]]
 
@@ -179,6 +223,46 @@ def summarize_reminder_status(config: dict[str, Any] | None) -> ReminderStatus:
     )
 
 
+def summarize_calendar_reminder_status(
+    state: CalendarReminderConfigState | None,
+) -> CalendarReminderStatus:
+    if state is None:
+        return _default_calendar_reminder_status()
+
+    selected_types = tuple(state.selected_types)
+    selected_offsets = tuple(state.selected_offsets)
+
+    if selected_types == ("all",):
+        event_summary = "all calendar events"
+    elif selected_types:
+        event_summary = ", ".join(selected_types)
+    else:
+        event_summary = "not configured"
+
+    time_summary = ", ".join(selected_offsets) if selected_offsets else "not set"
+
+    if state.enabled and selected_types and selected_offsets:
+        return CalendarReminderStatus(
+            state="on",
+            event_summary=event_summary,
+            time_summary=time_summary,
+            next_action="Manage",
+        )
+    if state.enabled:
+        return CalendarReminderStatus(
+            state="incomplete",
+            event_summary=event_summary,
+            time_summary=time_summary,
+            next_action="Finish setup",
+        )
+    return CalendarReminderStatus(
+        state="off",
+        event_summary=event_summary,
+        time_summary=time_summary,
+        next_action="Configure",
+    )
+
+
 async def summarize_preference_status(
     discord_user_id: int,
     *,
@@ -279,6 +363,7 @@ async def build_player_self_service_summary(
     *,
     account_loader: AccountLoader = get_account_summary_for_user,
     reminder_loader: ReminderLoader = get_user_config,
+    calendar_reminder_loader: CalendarReminderLoader = load_user_calendar_reminder_state,
     preference_loader: PreferenceLoader = reporting_service.read_visibility_preference,
     vip_profile_loader: VipProfileLoader = profile_service.fetch_inventory_profile,
 ) -> PlayerSelfServiceSummary:
@@ -312,6 +397,29 @@ async def build_player_self_service_summary(
         )
     else:
         reminders = summarize_reminder_status(reminder_config)
+
+    try:
+        calendar_state = await asyncio.to_thread(
+            calendar_reminder_loader,
+            int(discord_user_id),
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "player_self_service_calendar_reminders_unavailable user_id=%s",
+            discord_user_id,
+        )
+        calendar = CalendarReminderStatus(
+            state="unknown",
+            event_summary="unknown",
+            time_summary="unknown",
+            next_action="Try again",
+            error=f"{type(exc).__name__}: {exc}",
+        )
+    else:
+        calendar = summarize_calendar_reminder_status(calendar_state)
+    reminders = replace(reminders, calendar=calendar)
 
     return PlayerSelfServiceSummary(
         discord_user_id=int(discord_user_id),

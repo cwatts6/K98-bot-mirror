@@ -26,6 +26,7 @@ DARK_TEXT = (7, 16, 28)
 
 _CARD_DIR = Path(__file__).resolve().parent.parent / "assets" / "me" / "cards"
 _BACKGROUND_BY_PAGE = {
+    "dashboard": "me dashboard.png",
     "accounts": "me accounts.png",
     "reminders": "me reminders.png",
     "preferences": "me preferences.png",
@@ -204,9 +205,11 @@ def _reminder_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     reminders = summary.reminders
     return (
         f"KVK reminders: {reminders.state}",
+        f"Calendar reminders: {reminders.calendar.state}",
         f"Events: {reminders.event_summary}",
-        f"Times: {reminders.time_summary}",
-        "Calendar reminders are separate and planned for a later pass.",
+        f"Calendar events: {reminders.calendar.event_summary}",
+        f"KVK times: {reminders.time_summary}",
+        f"Calendar lead times: {reminders.calendar.time_summary}",
     )
 
 
@@ -235,10 +238,21 @@ def _account_action_detail(summary: PlayerSelfServiceSummary) -> str:
 
 
 def _reminder_action_detail(summary: PlayerSelfServiceSummary) -> str:
-    if summary.reminders.state.strip().lower() in {"off", "not subscribed"}:
-        return "Choose KVK event types and reminder times; selections save automatically."
+    if summary.reminders.combined_state.strip().lower() == "off":
+        return "Choose KVK reminders here or use Calendar Settings for calendar reminders."
     return (
-        "Change KVK event types or times; selections save automatically. Remove All unsubscribes."
+        "Manage KVK autosave choices here; Calendar Settings manages calendar reminder offsets."
+    )
+
+
+def _dashboard_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
+    return (
+        f"Main account: {summary.accounts.main_state}",
+        f"Linked accounts: {summary.accounts.linked_label}",
+        f"KVK reminders: {summary.reminders.state}",
+        f"Calendar reminders: {summary.reminders.calendar.state}",
+        f"Inventory: {summary.preferences.inventory_visibility}",
+        "Exports: private",
     )
 
 
@@ -251,6 +265,14 @@ def _preference_actions(summary: PlayerSelfServiceSummary) -> str:
 def _page_copy(
     page: str, summary: PlayerSelfServiceSummary
 ) -> tuple[str, str, str, str, tuple[str, ...]]:
+    if page == "dashboard":
+        return (
+            "Personal Command Centre",
+            summary.accounts.main_state,
+            "Actions available: Accounts, Reminders, Preferences, Quick Launch",
+            "Quick Launch stays on Dashboard; detailed setup lives on each private page.",
+            _dashboard_lines(summary),
+        )
     if page == "accounts":
         return (
             "Account Centre",
@@ -262,7 +284,7 @@ def _page_copy(
     if page == "reminders":
         return (
             "Reminder Centre",
-            summary.reminders.state,
+            summary.reminders.combined_state,
             "Actions available: Manage",
             _reminder_action_detail(summary),
             _reminder_lines(summary),

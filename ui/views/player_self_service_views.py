@@ -92,8 +92,10 @@ def build_dashboard_embed(
         value=_field_value(
             [
                 f"KVK reminders: {reminders.state}",
-                f"Times: {reminders.time_summary}",
-                f"Next action: {reminders.next_action}",
+                f"Calendar reminders: {reminders.calendar.state}",
+                f"KVK times: {reminders.time_summary}",
+                f"Calendar lead times: {reminders.calendar.time_summary}",
+                f"Next action: {reminders.combined_next_action}",
             ]
         ),
         inline=False,
@@ -177,6 +179,9 @@ def build_reminders_embed(
                 f"KVK reminders: {reminders.state}",
                 f"Events: {reminders.event_summary}",
                 f"Times: {reminders.time_summary}",
+                f"Calendar reminders: {reminders.calendar.state}",
+                f"Calendar events: {reminders.calendar.event_summary}",
+                f"Calendar lead times: {reminders.calendar.time_summary}",
             ]
         ),
         inline=False,
@@ -186,6 +191,7 @@ def build_reminders_embed(
         value=_field_value(
             [
                 "Manage auto-saves KVK event type and reminder time changes.",
+                "Calendar Settings manages calendar reminder event types and lead times.",
                 "Remove All unsubscribes from KVK event reminders.",
             ]
         ),
@@ -732,7 +738,7 @@ class PlayerSelfServiceView(discord.ui.View):
             summary_loader=self.summary_loader,
         )
         sent = await interaction.followup.send(
-            "Choose your KVK event types and reminder times.",
+            "Choose KVK event types and times, or open Calendar Settings for calendar reminders.",
             view=setup_view,
             ephemeral=True,
         )
