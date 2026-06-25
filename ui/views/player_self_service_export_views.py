@@ -8,6 +8,7 @@ from typing import Any
 
 import discord
 
+from file_utils import emit_telemetry_event
 from inventory import export_service as inventory_export_service
 from inventory.models import InventoryExportFormat, InventoryReportView
 from services import stats_export_service
@@ -103,8 +104,6 @@ async def send_stats_export(
             ephemeral=True,
         )
         try:
-            from bot_utils import emit_telemetry_event
-
             emit_telemetry_event(export_file.telemetry)
         except Exception:
             logger.debug("player_self_service_stats_export_telemetry_failed", exc_info=True)
@@ -124,15 +123,11 @@ async def send_stats_export(
         stats_export_service.cleanup_export_file(export_file)
 
 
-def _inventory_export_content(
-    export_file: Any,
-    *,
-    export_format: InventoryExportFormat,
-) -> str:
+def _inventory_export_content(export_file: Any) -> str:
     return (
-        f"Inventory export ready ({export_format.value}). "
-        f"{export_file.row_count} approved row(s), "
-        f"{len(export_file.governor_ids)} governor(s)."
+        "Inventory export ready. "
+        f"`{export_file.row_count}` raw approved row(s), "
+        f"`{len(export_file.governor_ids)}` governor(s)."
     )
 
 
@@ -157,7 +152,7 @@ async def send_inventory_export(
         )
         file = discord.File(str(export_file.path), filename=export_file.filename)
         await interaction.followup.send(
-            _inventory_export_content(export_file, export_format=export_format),
+            _inventory_export_content(export_file),
             file=file,
             ephemeral=True,
         )

@@ -49,6 +49,7 @@ class _FakeDiscordFile:
 async def test_stats_export_adapter_uses_service_private_send_and_cleanup(monkeypatch) -> None:
     calls = []
     cleaned = []
+    telemetry = []
     export_file = StatsExportFile(
         file_path="stats.xlsx",
         temp_dir="tmp",
@@ -74,6 +75,7 @@ async def test_stats_export_adapter_uses_service_private_send_and_cleanup(monkey
         "cleanup_export_file",
         lambda item: cleaned.append(item),
     )
+    monkeypatch.setattr(export_views, "emit_telemetry_event", lambda item: telemetry.append(item))
     interaction = _Interaction()
 
     await export_views.send_stats_export(
@@ -93,6 +95,7 @@ async def test_stats_export_adapter_uses_service_private_send_and_cleanup(monkey
     ]
     assert interaction.followup.sent[0][1]["ephemeral"] is True
     assert interaction.followup.sent[0][1]["file"].filename == "stats.xlsx"
+    assert telemetry == [{"event": "my_stats_export"}]
     assert cleaned == [export_file]
 
 
@@ -158,6 +161,8 @@ async def test_inventory_export_adapter_uses_default_private_scope_and_cleanup(
     assert calls[0]["view"] == InventoryReportView.ALL
     assert calls[0]["governor_id"] is None
     assert calls[0]["is_admin"] is False
-    assert interaction.followup.sent[0][0][0].startswith("Inventory export ready")
+    assert interaction.followup.sent[0][0] == (
+        "Inventory export ready. `5` raw approved row(s), `2` governor(s).",
+    )
     assert interaction.followup.sent[0][1]["file"].filename == "inventory.xlsx"
     assert cleaned == [export_file]
