@@ -421,8 +421,9 @@ def _export_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     return (
         f"Stats: {exports.stats_export}",
         f"Inventory: {exports.inventory_export}",
+        exports.action_summary,
         exports.privacy_note,
-        "This page is private export guidance; dashboard Quick Launch stays dashboard-only.",
+        "Dashboard Quick Launch stays dashboard-only.",
     )
 
 
@@ -591,11 +592,24 @@ def _page_copy(
             _preference_lines(summary),
         )
     if page == "exports":
+        action_state = summary.exports.action_state.strip().lower()
+        actionable = action_state == "actionable"
+        guidance_only = action_state == "guidance"
         return (
             "Exports",
-            "private",
-            "Actions available: Dashboard, Accounts, Reminders, Preferences",
-            "Export files are still delivered through the existing private export flows.",
+            summary.exports.action_state,
+            (
+                "Actions available: Stats Excel, Stats CSV, Inventory Excel, Inventory CSV"
+                if actionable
+                else "Guidance only"
+                if guidance_only
+                else "Actions unavailable"
+            ),
+            (
+                "Custom options remain in /my_stats_export and /export_inventory."
+                if actionable
+                else summary.exports.action_summary
+            ),
             _export_lines(summary),
         )
     raise ValueError(f"Unsupported /me page card: {page}")

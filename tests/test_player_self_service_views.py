@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from inventory.models import InventoryReportVisibility
+from inventory.models import InventoryExportFormat, InventoryReportVisibility
 from player_self_service.account_service import (
     AccountCentreState,
     AccountConfirmation,
@@ -60,6 +60,30 @@ def _summary() -> PlayerSelfServiceSummary:
             stats_export="stats export available",
             inventory_export="inventory export available for approved records",
             privacy_note="file exports are delivered privately",
+        ),
+    )
+
+
+def _no_account_summary() -> PlayerSelfServiceSummary:
+    summary = _summary()
+    return PlayerSelfServiceSummary(
+        discord_user_id=summary.discord_user_id,
+        accounts=AccountStatus(
+            state="none",
+            linked_count=0,
+            linked_label="0 linked",
+            main_state="not set",
+            main_label="not set",
+            next_action="Register",
+        ),
+        reminders=summary.reminders,
+        preferences=summary.preferences,
+        exports=ExportStatus(
+            stats_export="register an account first",
+            inventory_export="register an account first",
+            privacy_note="file exports are delivered privately",
+            action_state="unavailable",
+            action_summary="Register an account before exporting personal files.",
         ),
     )
 
@@ -399,6 +423,95 @@ async def test_reminders_view_has_reminder_actions_without_quick_launch() -> Non
     assert not any(
         isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
     )
+
+
+@pytest.mark.asyncio
+async def test_exports_view_has_export_actions_without_quick_launch() -> None:
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_EXPORTS,
+        summary=_summary(),
+    )
+
+    labels = [getattr(child, "label", None) for child in view.children]
+    assert "Stats Excel" in labels
+    assert "Stats CSV" in labels
+    assert "Inventory Excel" in labels
+    assert "Inventory CSV" in labels
+    assert not any(
+        isinstance(child, views.PlayerSelfServiceQuickLaunchSelect) for child in view.children
+    )
+
+
+@pytest.mark.asyncio
+async def test_exports_view_disables_export_actions_when_unavailable() -> None:
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_EXPORTS,
+        summary=_no_account_summary(),
+    )
+
+    export_buttons = [
+        child
+        for child in view.children
+        if str(getattr(child, "custom_id", "") or "").startswith("me:export:")
+    ]
+    assert export_buttons
+    assert all(child.disabled for child in export_buttons)
+
+
+@pytest.mark.asyncio
+async def test_exports_stats_buttons_delegate_to_private_export_adapter(monkeypatch) -> None:
+    calls = []
+
+    async def fake_send_stats_export(interaction, *, display_name, requested_format, days=90):
+        calls.append((interaction.user.id, display_name, requested_format, days))
+
+    monkeypatch.setattr(views.export_views, "send_stats_export", fake_send_stats_export)
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_EXPORTS,
+        summary=_summary(),
+    )
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:export:stats_csv"
+    )
+
+    await button.callback(interaction)
+
+    assert calls == [(42, "Tester", "CSV", 90)]
+
+
+@pytest.mark.asyncio
+async def test_exports_inventory_buttons_delegate_to_private_export_adapter(monkeypatch) -> None:
+    calls = []
+
+    async def fake_send_inventory_export(interaction, *, display_name, export_format):
+        calls.append((interaction.user.id, display_name, export_format))
+
+    monkeypatch.setattr(views.export_views, "send_inventory_export", fake_send_inventory_export)
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_EXPORTS,
+        summary=_summary(),
+    )
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:export:inventory_excel"
+    )
+
+    await button.callback(interaction)
+
+    assert calls == [(42, "Tester", InventoryExportFormat.EXCEL)]
 
 
 @pytest.mark.asyncio

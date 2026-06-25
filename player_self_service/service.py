@@ -101,6 +101,8 @@ class ExportStatus:
     stats_export: str
     inventory_export: str
     privacy_note: str
+    action_state: str = "actionable"
+    action_summary: str = "Default private exports are available here."
 
 
 @dataclass(frozen=True, slots=True)
@@ -352,11 +354,31 @@ async def summarize_vip_status(
     return ", ".join(labels)
 
 
-def summarize_export_status() -> ExportStatus:
+def summarize_export_status(accounts: AccountStatus) -> ExportStatus:
+    if accounts.state == "unknown":
+        return ExportStatus(
+            stats_export="temporarily unavailable",
+            inventory_export="temporarily unavailable",
+            privacy_note="file exports are delivered privately",
+            action_state="unavailable",
+            action_summary="Account status is unavailable; try again in a moment.",
+        )
+    if accounts.linked_count <= 0:
+        return ExportStatus(
+            stats_export="register an account first",
+            inventory_export="register an account first",
+            privacy_note="file exports are delivered privately",
+            action_state="unavailable",
+            action_summary="Register an account before exporting personal files.",
+        )
     return ExportStatus(
-        stats_export="stats export available",
-        inventory_export="inventory export available for approved records",
+        stats_export="default Excel/CSV available",
+        inventory_export="approved-record Excel/CSV available",
         privacy_note="file exports are delivered privately",
+        action_state="actionable",
+        action_summary=(
+            "Use the buttons for default exports; custom options remain in legacy commands."
+        ),
     )
 
 
@@ -423,10 +445,11 @@ async def build_player_self_service_summary(
         calendar = summarize_calendar_reminder_status(calendar_state)
     reminders = replace(reminders, calendar=calendar)
 
+    accounts = summarize_account_status(account_summary)
     return PlayerSelfServiceSummary(
         discord_user_id=int(discord_user_id),
-        accounts=summarize_account_status(account_summary),
+        accounts=accounts,
         reminders=reminders,
         preferences=preferences,
-        exports=summarize_export_status(),
+        exports=summarize_export_status(accounts),
     )

@@ -636,6 +636,8 @@ Likely legacy paths:
 /modify_subscription
 /unsubscribe
 /inventory_preferences
+/my_stats_export
+/export_inventory
 ```
 
 Final removal should remain a separate cleanup step after a no-feedback window.
@@ -651,6 +653,8 @@ Final removal should remain a separate cleanup step after a no-feedback window.
 - First-pass preferences hub for inventory visibility, followed by later approved preference
   expansion where persistence exists.
 - First-pass export launchpad and later direct export/Quick Launch improvements.
+- Shared visual-card renderer/helper consolidation for the `/me` visual-card model and adjacent
+  KVK, PreKvK, and inventory renderers after the player self-service card surfaces are stable.
 - Refresh behavior that prevents visible dashboard/subpage cards from showing stale state after
   account, reminder, or preference mutations.
 - Legacy redirects and player briefing after validation.
@@ -822,6 +826,12 @@ Do not include these in the first build unless separately approved:
 - account ownership dispute tooling
 - shared visual-card renderer/helper consolidation across KVK, PreKvK, inventory, and player
   self-service renderers
+- Quick Launch expansion beyond dashboard-only guidance; keep it in this programme but require a
+  fresh audit of target command channel, visibility, permission, and privacy rules.
+- Legacy export command redirect or removal for `/my_stats_export` and `/export_inventory`; keep it
+  in this programme and require operator approval plus a no-feedback window.
+- Export schema and format redesign; treat this as a separate export-output programme unless a
+  later task explicitly narrows one compatible file-format improvement into this programme.
 
 ## 18. Suggested Next Action
 

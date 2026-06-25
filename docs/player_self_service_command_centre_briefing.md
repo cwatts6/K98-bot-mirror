@@ -2,11 +2,11 @@
 
 Last updated: 2026-06-25
 
-Status: Phase 7 Unified Reminder Centre and Dashboard Card Alignment is delivered in production
-PR #477 and smoke tested successfully on 2026-06-25. The dashboard now uses the same full-bleed
-generated private card style as the Phase 6 subpages, with large row-based text directly on the
-card background. Accounts, Reminders, Preferences, and Exports use generated private visual cards
-with safe embed fallback.
+Status: Phase 8 Exports Launchpad implementation is in progress after the Phase 7 production
+delivery in PR #477 was smoke tested successfully on 2026-06-25. The dashboard uses the same
+full-bleed generated private card style as the Phase 6 subpages, with large row-based text directly
+on the card background. Accounts, Reminders, Preferences, and Exports use generated private visual
+cards with safe embed fallback.
 
 ## Player Briefing
 
@@ -31,17 +31,19 @@ The reminder centre supports private KVK event reminder review, setup, automatic
 remove-all/unsubscribe with confirmation through one primary Manage journey. The same Manage
 journey can now open Calendar Settings for calendar reminder event types and lead times.
 `/me preferences` can update inventory report visibility between private and public output and can
-open the existing Governor VIP update flow. Existing commands such as `/register_governor`,
-`/modify_registration`, `/my_registrations`, `/mygovernorid`, `/subscribe`,
+open the existing Governor VIP update flow. `/me exports` can launch default private Stats Excel,
+Stats CSV, Inventory Excel, and Inventory CSV files when the player has a linked account. Existing
+commands such as `/register_governor`, `/modify_registration`, `/my_registrations`,
+`/mygovernorid`, `/subscribe`,
 `/modify_subscription`, `/unsubscribe`, `/calendar_reminder_config`, `/inventory_preferences`,
 `/my_stats_export`, and `/export_inventory` still work.
 
 ## Operator Briefing
 
-Phase 7 extends `/me reminders` in parallel with legacy self-service commands. It did not remove,
-redirect, or change
-`/inventory_preferences`, `/subscribe`, `/modify_subscription`, `/unsubscribe`,
-`/calendar_reminder_config`, `/export_inventory`, or account legacy commands.
+Phase 8 extends `/me exports` in parallel with legacy self-service commands. It does not remove,
+redirect, or change `/my_stats_export`, `/export_inventory`, `/inventory_preferences`,
+`/subscribe`, `/modify_subscription`, `/unsubscribe`, `/calendar_reminder_config`, or account
+legacy commands.
 
 The approved command group is:
 
@@ -75,8 +77,13 @@ Rollout checks:
 - Confirm `/me reminders` shows KVK-only, calendar-only, both, and neither states clearly.
 - Confirm `/me reminders` KVK event type and reminder time selections save automatically.
 - Confirm `/me reminders` Calendar Settings saves calendar reminder event types, lead times, and enabled/disabled state.
+- Confirm `/me exports` can send default Stats Excel, Stats CSV, Inventory Excel, and Inventory CSV
+  files privately for a player with linked accounts and approved inventory data.
+- Confirm `/me exports` clearly disables or reports unavailable export actions when account data,
+  linked accounts, or approved export data are unavailable.
 - Confirm dashboard Quick Launch remains dashboard-only and `/me exports` does not gain the
   dashboard Quick Launch menu.
+- Confirm `/my_stats_export` and `/export_inventory` still work for their existing custom options.
 - Confirm legacy player commands remain registered and usable.
 - Monitor `/me` usage before approving any later legacy redirects.
 
@@ -158,6 +165,20 @@ Phase 6 smoke-test result:
 - Legacy account, reminder, inventory preference, calendar reminder, VIP update, and export
   commands remained live.
 
+Phase 8 implementation notes:
+
+- `/me exports` launches only validated default personal exports: Stats Excel, Stats CSV,
+  Inventory Excel, and Inventory CSV.
+- Stats exports reuse `services.stats_export_service.build_personal_stats_export`.
+- Inventory exports reuse `inventory.export_service.build_inventory_export_file` for the player's
+  registered governors, approved records, and default all-inventory view.
+- Export file generation, authorization, SQL/DAL access, and cleanup remain in existing services;
+  the `/me` view layer only adapts Discord button interactions to those services.
+- Quick Launch expansion and legacy export redirect/removal are captured as later Player
+  Self-Service programme work.
+- Export schema and format redesign is captured as a separate export-output programme unless a
+  later approved slice is intentionally narrow and backwards-compatible.
+
 Phase 7 validation notes:
 
 - Calendar reminders still use the event-calendar preference/state files and scheduler, but
@@ -177,7 +198,5 @@ Phase 7 validation notes:
 
 Next phase:
 
-- Phase 8 should focus on `/me exports` as a real launchpad and decide whether Quick Launch should
-  expand beyond the dashboard. Direct export or launch actions should only be added where existing
-  authorization, private file delivery, target command visibility, channel rules, and Discord
-  interaction safety are validated.
+- Finish Phase 8 validation and smoke testing for `/me exports`, then decide the later Player
+  Self-Service phase for Quick Launch expansion and legacy export redirect/removal.

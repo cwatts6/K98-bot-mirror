@@ -10,7 +10,7 @@ from typing import Any
 import discord
 
 from core.interaction_safety import safe_defer
-from inventory.models import InventoryReportVisibility
+from inventory.models import InventoryExportFormat, InventoryReportVisibility
 from player_self_service import (
     account_service,
     dashboard_card,
@@ -29,6 +29,7 @@ from ui.views.player_self_service_account_views import AccountManageView
 from ui.views.player_self_service_reminder_views import (
     ReminderSetupView,
 )
+from ui.views import player_self_service_export_views as export_views
 
 logger = logging.getLogger(__name__)
 
@@ -247,24 +248,26 @@ def build_exports_embed(
     exports = summary.exports
     embed = discord.Embed(
         title="Exports",
-        description=f"Private export guidance for {display_name}",
+        description=f"Private export launchpad for {display_name}",
         color=discord.Color.dark_teal(),
     )
     embed.add_field(
-        name="Available Paths",
+        name="Status",
         value=_field_value(
             [
                 f"Stats: {exports.stats_export}",
                 f"Inventory: {exports.inventory_export}",
+                f"Actions: {exports.action_state}",
             ]
         ),
         inline=False,
     )
     embed.add_field(
-        name="Privacy",
+        name="Private Delivery",
         value=(
             f"{exports.privacy_note}\n"
-            "This page is guidance only; export file delivery stays in the existing private export flows."
+            f"{exports.action_summary}\n"
+            "Legacy `/my_stats_export` and `/export_inventory` remain available for custom options."
         ),
         inline=False,
     )
@@ -452,10 +455,20 @@ class PlayerSelfServiceView(discord.ui.View):
                     "me:preference:"
                 ):
                     self.remove_item(child)
+        if self.page != PAGE_EXPORTS:
+            for child in list(self.children):
+                if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
+                    "me:export:"
+                ):
+                    self.remove_item(child)
         if self.page == PAGE_PREFERENCES:
             self._apply_preference_toggle_state()
+        if self.page == PAGE_EXPORTS:
+            self._apply_export_button_state()
         for child in self.children:
             if isinstance(child, discord.ui.Button):
+                if str(child.custom_id or "").startswith("me:export:"):
+                    continue
                 child.disabled = child.custom_id == f"me:{self.page}"
         if self.page == PAGE_DASHBOARD and not any(
             isinstance(child, PlayerSelfServiceQuickLaunchSelect) for child in self.children
@@ -483,6 +496,17 @@ class PlayerSelfServiceView(discord.ui.View):
                 else:
                     child.label = "Set Private"
                     child.style = discord.ButtonStyle.primary
+
+    def _apply_export_button_state(self) -> None:
+        action_state = ""
+        if self.summary is not None:
+            action_state = self.summary.exports.action_state.strip().lower()
+        disabled = action_state != "actionable"
+        for child in self.children:
+            if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
+                "me:export:"
+            ):
+                child.disabled = disabled
 
     async def _show_page(
         self, interaction: discord.Interaction, page: PlayerSelfServicePage
@@ -564,7 +588,12 @@ class PlayerSelfServiceView(discord.ui.View):
             )
             view.set_message_ref(sent)
 
-    @discord.ui.button(label="Accounts", style=discord.ButtonStyle.primary, custom_id="me:accounts")
+    @discord.ui.button(
+        label="Accounts",
+        style=discord.ButtonStyle.primary,
+        custom_id="me:accounts",
+        row=0,
+    )
     async def accounts_button(
         self,
         button: discord.ui.Button,
@@ -576,6 +605,7 @@ class PlayerSelfServiceView(discord.ui.View):
         label="Reminders",
         style=discord.ButtonStyle.primary,
         custom_id="me:reminders",
+        row=0,
     )
     async def reminders_button(
         self,
@@ -588,6 +618,7 @@ class PlayerSelfServiceView(discord.ui.View):
         label="Preferences",
         style=discord.ButtonStyle.primary,
         custom_id="me:preferences",
+        row=0,
     )
     async def preferences_button(
         self,
@@ -608,6 +639,74 @@ class PlayerSelfServiceView(discord.ui.View):
         interaction: discord.Interaction,
     ) -> None:
         await self._show_page(interaction, PAGE_DASHBOARD)
+
+    @discord.ui.button(
+        label="Stats Excel",
+        style=discord.ButtonStyle.success,
+        custom_id="me:export:stats_excel",
+        row=2,
+    )
+    async def export_stats_excel_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        await export_views.send_stats_export(
+            interaction,
+            display_name=self.display_name,
+            requested_format="Excel",
+        )
+
+    @discord.ui.button(
+        label="Stats CSV",
+        style=discord.ButtonStyle.secondary,
+        custom_id="me:export:stats_csv",
+        row=2,
+    )
+    async def export_stats_csv_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        await export_views.send_stats_export(
+            interaction,
+            display_name=self.display_name,
+            requested_format="CSV",
+        )
+
+    @discord.ui.button(
+        label="Inventory Excel",
+        style=discord.ButtonStyle.success,
+        custom_id="me:export:inventory_excel",
+        row=3,
+    )
+    async def export_inventory_excel_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        await export_views.send_inventory_export(
+            interaction,
+            display_name=self.display_name,
+            export_format=InventoryExportFormat.EXCEL,
+        )
+
+    @discord.ui.button(
+        label="Inventory CSV",
+        style=discord.ButtonStyle.secondary,
+        custom_id="me:export:inventory_csv",
+        row=3,
+    )
+    async def export_inventory_csv_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        await export_views.send_inventory_export(
+            interaction,
+            display_name=self.display_name,
+            export_format=InventoryExportFormat.CSV,
+        )
 
     async def _load_account_state(
         self, interaction: discord.Interaction

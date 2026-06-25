@@ -110,6 +110,9 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
     assert _page_copy("reminders", summary)[2] == "Actions available: Manage"
     assert "manage calendar reminders" in _page_copy("reminders", summary)[3]
     assert _page_copy("preferences", summary)[2] == ("Actions available: Set Private, Update VIP")
+    assert _page_copy("exports", summary)[2] == (
+        "Actions available: Stats Excel, Stats CSV, Inventory Excel, Inventory CSV"
+    )
 
 
 def test_page_card_reminder_copy_treats_incomplete_as_setup() -> None:
@@ -149,6 +152,78 @@ def test_page_card_reminder_copy_treats_incomplete_as_setup() -> None:
 
     assert _page_copy("reminders", summary)[1] == "incomplete"
     assert "Choose KVK reminders" in _page_copy("reminders", summary)[3]
+
+
+def test_page_card_export_copy_handles_unavailable_state() -> None:
+    summary = PlayerSelfServiceSummary(
+        discord_user_id=42,
+        accounts=AccountStatus(
+            state="none",
+            linked_count=0,
+            linked_label="0 linked",
+            main_state="not set",
+            main_label="not set",
+            next_action="Register",
+        ),
+        reminders=ReminderStatus(
+            state="off",
+            event_summary="not subscribed",
+            time_summary="not set",
+            next_action="Set up",
+        ),
+        preferences=PreferenceStatus(
+            inventory_visibility="private",
+            exports_summary="available through private export tools",
+            next_action="Review preferences",
+        ),
+        exports=ExportStatus(
+            stats_export="register an account first",
+            inventory_export="register an account first",
+            privacy_note="file exports are delivered privately",
+            action_state="unavailable",
+            action_summary="Register an account before exporting personal files.",
+        ),
+    )
+
+    assert _page_copy("exports", summary)[1] == "unavailable"
+    assert _page_copy("exports", summary)[2] == "Actions unavailable"
+    assert "Register an account" in _page_copy("exports", summary)[3]
+
+
+def test_page_card_export_copy_handles_guidance_state() -> None:
+    summary = PlayerSelfServiceSummary(
+        discord_user_id=42,
+        accounts=AccountStatus(
+            state="single",
+            linked_count=1,
+            linked_label="1 linked",
+            main_state="set",
+            main_label="Main Gov (111)",
+            next_action="Manage",
+        ),
+        reminders=ReminderStatus(
+            state="off",
+            event_summary="not subscribed",
+            time_summary="not set",
+            next_action="Set up",
+        ),
+        preferences=PreferenceStatus(
+            inventory_visibility="private",
+            exports_summary="available through private export tools",
+            next_action="Review preferences",
+        ),
+        exports=ExportStatus(
+            stats_export="use /my_stats_export",
+            inventory_export="use /export_inventory",
+            privacy_note="file exports are delivered privately",
+            action_state="guidance",
+            action_summary="Use legacy commands for custom export options.",
+        ),
+    )
+
+    assert _page_copy("exports", summary)[1] == "guidance"
+    assert _page_copy("exports", summary)[2] == "Guidance only"
+    assert "legacy commands" in _page_copy("exports", summary)[3]
 
 
 def test_page_card_account_and_vip_lines_show_full_summary() -> None:

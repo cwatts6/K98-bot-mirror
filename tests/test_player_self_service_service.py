@@ -45,6 +45,28 @@ def test_account_status_reports_unknown_when_registry_fails() -> None:
     assert status.error == "SQL down"
 
 
+def test_export_status_is_unavailable_until_account_is_registered() -> None:
+    account_status = service.summarize_account_status(summarize_accounts({}))
+
+    export_status = service.summarize_export_status(account_status)
+
+    assert export_status.action_state == "unavailable"
+    assert export_status.stats_export == "register an account first"
+    assert "Register an account" in export_status.action_summary
+
+
+def test_export_status_is_actionable_for_registered_accounts() -> None:
+    account_status = service.summarize_account_status(
+        summarize_accounts({"Main": {"GovernorID": "111", "GovernorName": "Main Gov"}})
+    )
+
+    export_status = service.summarize_export_status(account_status)
+
+    assert export_status.action_state == "actionable"
+    assert export_status.stats_export == "default Excel/CSV available"
+    assert "legacy commands" in export_status.action_summary
+
+
 def test_reminder_status_for_unsubscribed_player_is_off() -> None:
     status = service.summarize_reminder_status(None)
 
@@ -201,6 +223,7 @@ async def test_build_summary_uses_read_only_loaders() -> None:
     assert ("vip", 111) in calls
     assert summary.preferences.vip_summary == "Main Gov - 19"
     assert summary.reminders.calendar.state == "on"
+    assert summary.exports.action_state == "actionable"
 
 
 @pytest.mark.asyncio
