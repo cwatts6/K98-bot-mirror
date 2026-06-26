@@ -1,6 +1,6 @@
 # Canonical Command Reference
 
-Last updated: 2026-06-25
+Last updated: 2026-06-26
 
 This is the maintained command reference for the K98 bot after the completed Command Platform
 Audit & Optimisation Programme. Use
@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=41 grouped_subcommands_detected=85 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=41
+primary=41 grouped_subcommands_detected=86 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=41
 ```
 
 Grouped command summary:
@@ -33,7 +33,7 @@ Grouped command summary:
 | `/kvk` | 4 |
 | `/kvk_admin` | 7 |
 | `/location` | 2 |
-| `/me` | 5 |
+| `/me` | 6 |
 | `/mge` | 6 |
 | `/ops` | 25 |
 | `/prekvk` | 2 |
@@ -129,7 +129,7 @@ Legend:
 | Honor/KVK | `/honor_rankings` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator | Public redirect | Standard | Deprecated redirect to `/kvk rankings type:honor`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Honor/KVK | `/honor purge_last` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Purges latest honor scan. |
 | Inventory | `/inventory import` | `commands/inventory_cmds.py` | Grouped | Inventory upload channel decorator with admin override | Ephemeral | Standard | Preserve | Imports resources, speedups, or materials screenshots. |
-| Inventory | `/myinventory` | `commands/inventory_cmds.py` | Flat | Public command-level access | Ephemeral prompt; report visibility follows user preference | Standard | Preserve; dashboard Inventory opens equivalent selector/report journey | Player inventory report. Phase 9 exposes this journey from `/me dashboard` without changing output visibility or report controls. |
+| Inventory | `/myinventory` | `commands/inventory_cmds.py` | Flat | Public command-level access | Ephemeral prompt; report visibility follows user preference | Standard | Preserve; `/me inventory` opens summary first, then equivalent selector/report journey | Player inventory report. Phase 10 preserves this journey behind the `/me inventory` Open Report action without changing output visibility, range controls, or report export buttons. |
 | Inventory | `/inventory_preferences` | `commands/inventory_cmds.py` | Flat | Public command-level access | Ephemeral | Standard | Defer player self-service redesign | Report visibility preference. |
 | Inventory | `/export_inventory` | `commands/inventory_cmds.py` | Flat | Service authorization with admin override context | Ephemeral | Standard | Preserve legacy export command while `/me exports` becomes preferred route | Exports approved inventory records. Phase 9 keeps this command live for compatibility; redirect/removal still requires later approval and player communication. |
 | Inventory | `/inventory audit` | `commands/inventory_cmds.py` | Grouped | Admin-only decorator | Ephemeral | Standard | Preserve | Inventory import audit. |
@@ -145,6 +145,7 @@ Legend:
 | Player Self-Service | `/me accounts` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 6 generated card and guided Manage flow smoke tested | Private account centre for account review, Governor ID lookup, registration, replacement, and removal with confirmation through one guided Manage journey. |
 | Player Self-Service | `/me reminders` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 7 unified KVK and calendar reminder centre delivered | Private reminder centre for KVK event reminder review/autosave/remove-all plus calendar reminder status and service-backed calendar reminder configuration. `/calendar_reminder_config` remains live in parallel. |
 | Player Self-Service | `/me preferences` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 6 generated card, inventory visibility toggle, and Governor VIP access smoke tested | Private player preference status with service-backed inventory visibility controls and access to the existing Governor VIP update flow. |
+| Player Self-Service | `/me inventory` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 10 inventory summary card delivered | Private Inventory summary card using latest approved resources, speedups, and materials data for the player's registered governors, with no-data upload guidance and an Open Report handoff to the preserved `/myinventory` journey. |
 | Player Self-Service | `/me exports` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 9 preferred export route with option windows | Private personal export centre with `Export Stats` and `Export Inventory` child option windows. Stats supports Excel, CSV, and Google Sheets formats plus day-window selection. Inventory supports format, view, registered-governor scope, and day-window selection. Legacy `/my_stats_export` and `/export_inventory` remain live for compatibility. |
 | Ops | `/ops summary` | `commands/admin_cmds.py` | Grouped | Public command-level access | Public | Standard | Preserve | Daily file-processing summary. |
 | Ops | `/ops weeksummary` | `commands/admin_cmds.py` | Grouped | Public command-level access | Public | Standard | Preserve | Seven-day file-processing summary. |
@@ -227,7 +228,9 @@ Legend:
   admin override and `/kvk stats`, `/kvk history`, and all `/kvk rankings` types to
   `KVK_PLAYER_STATS_CHANNEL_ID` with admin override.
 - Player Self-Service Command Centre Phase 2 added `/me` with five private subcommands:
-  `dashboard`, `accounts`, `reminders`, `preferences`, and `exports`. Phase 3 turned
+  `dashboard`, `accounts`, `reminders`, `preferences`, and `exports`. Phase 10 later added
+  `inventory` as a sixth private subcommand after the Inventory summary-card scope was approved.
+  Phase 3 turned
   `/me accounts` into the modern account centre for lookup, registration, replacement, and removal
   with confirmation and was smoke tested successfully on 2026-06-22. Phase 4 turned
   `/me reminders` into the modern reminder centre for setup review, subscribe/update, and
@@ -245,8 +248,10 @@ Legend:
   private delivery, and dashboard-only Quick Launch. Phase 9 removes KVK command targets from the
   dashboard launch surface, adds safe private dashboard Inventory and Exports handoffs, and makes
   `/me exports` the preferred export route with Stats and Inventory option windows while keeping
-  `/my_stats_export` and `/export_inventory` live. Existing legacy self-service and calendar
-  reminder commands remain registered in parallel.
+  `/my_stats_export` and `/export_inventory` live. Phase 10 added a matching `/me inventory`
+  generated card using latest approved inventory data and kept `/myinventory` as the detailed
+  report journey. Existing legacy self-service and calendar reminder commands remain registered
+  in parallel.
 - Legacy player self-service paths remain registered in parallel while the `/me` workflow rolls out.
 - Public calendar and KVK calendar paths remain flat pending a dedicated UX redesign.
 - `/ping` remains flat for simple health/debug discoverability.

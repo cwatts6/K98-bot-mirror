@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from event_calendar.reminder_config_service import CalendarReminderConfigState
-from inventory.models import InventoryReportVisibility
+from inventory import reporting_service
+from inventory.models import (
+    InventoryMaterialPoint,
+    InventoryReportVisibility,
+    InventoryResourcePoint,
+    InventorySpeedupPoint,
+)
 from player_self_service import service
 from services.governor_account_service import summarize_accounts
 
@@ -65,6 +72,75 @@ def test_export_status_is_actionable_for_registered_accounts() -> None:
     assert export_status.action_state == "actionable"
     assert export_status.stats_export == "Excel / CSV / Google Sheets"
     assert export_status.action_summary == "Ready"
+
+
+def test_inventory_snapshot_summary_handles_approved_data() -> None:
+    scan = datetime(2026, 6, 25, 12, 0, tzinfo=UTC)
+    snapshot = reporting_service.LatestInventorySnapshot(
+        governors=(
+            service.RegisteredGovernor(111, "Main Gov", "Main"),
+            service.RegisteredGovernor(222, "Alt Gov", "Alt 1"),
+        ),
+        resources=(
+            InventoryResourcePoint(scan_utc=scan, food=100, wood=200, stone=300, gold=400),
+        ),
+        speedups=(
+            InventorySpeedupPoint(
+                scan_utc=scan,
+                building_days=1,
+                research_days=2,
+                training_days=3,
+                healing_days=4,
+                universal_days=5,
+            ),
+        ),
+        materials=(
+            InventoryMaterialPoint(
+                scan_utc=scan,
+                animal_bone_legendary=1,
+                leather_legendary=2,
+                ebony_legendary=3,
+                iron_ore_legendary=4,
+                choice_chest_legendary=5,
+            ),
+        ),
+    )
+
+    status = service.summarize_inventory_snapshot(snapshot, upload_channel_id=123)
+
+    assert status.state == "available"
+    assert status.resources.value == "1K RSS"
+    assert status.resources.detail == "1/2 governors | latest 2026-06-25"
+    assert status.speedups.value == "15d total"
+    assert status.materials.value == "15 legendary"
+    assert "<#123>" in status.upload_guidance
+
+
+def test_inventory_snapshot_summary_handles_no_approved_data() -> None:
+    snapshot = reporting_service.LatestInventorySnapshot(
+        governors=(service.RegisteredGovernor(111, "Main Gov", "Main"),),
+    )
+
+    status = service.summarize_inventory_snapshot(snapshot, upload_channel_id=None)
+
+    assert status.state == "empty"
+    assert status.next_action == "Upload inventory"
+    assert status.resources.value == "No approved data"
+    assert "`/inventory import`" in status.upload_guidance
+
+
+@pytest.mark.asyncio
+async def test_inventory_status_does_not_fetch_without_accounts() -> None:
+    async def snapshot_loader(_governors):
+        raise AssertionError("should not fetch inventory without registered governors")
+
+    status = await service.summarize_inventory_status(
+        summarize_accounts({}),
+        snapshot_loader=snapshot_loader,
+    )
+
+    assert status.state == "none"
+    assert status.next_action == "Register account"
 
 
 def test_reminder_status_for_unsubscribed_player_is_off() -> None:
@@ -195,6 +271,10 @@ async def test_build_summary_uses_read_only_loaders() -> None:
         calls.append(("vip", governor_id))
         return SimpleNamespace(vip_level_label="VIP 19")
 
+    async def inventory_snapshot_loader(governors):
+        calls.append(("inventory", tuple(item.governor_id for item in governors)))
+        return reporting_service.LatestInventorySnapshot(governors=tuple(governors))
+
     def calendar_reminder_loader(user_id):
         calls.append(("calendar_reminder", user_id))
         return CalendarReminderConfigState(
@@ -210,6 +290,7 @@ async def test_build_summary_uses_read_only_loaders() -> None:
         calendar_reminder_loader=calendar_reminder_loader,
         preference_loader=preference_loader,
         vip_profile_loader=vip_profile_loader,
+        inventory_snapshot_loader=inventory_snapshot_loader,
     )
 
     assert summary.discord_user_id == 42
@@ -221,9 +302,11 @@ async def test_build_summary_uses_read_only_loaders() -> None:
     assert ("calendar_reminder", 42) in calls
     assert ("preference", 42) in calls
     assert ("vip", 111) in calls
+    assert ("inventory", (111,)) in calls
     assert summary.preferences.vip_summary == "Main Gov - 19"
     assert summary.reminders.calendar.state == "on"
     assert summary.exports.action_state == "actionable"
+    assert summary.inventory.state == "empty"
 
 
 @pytest.mark.asyncio

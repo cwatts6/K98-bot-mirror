@@ -22,6 +22,8 @@ from player_self_service.reminder_service import (
 from player_self_service.service import (
     AccountStatus,
     ExportStatus,
+    InventoryCategoryStatus,
+    InventoryStatus,
     PlayerSelfServiceSummary,
     PreferenceStatus,
     ReminderStatus,
@@ -60,6 +62,32 @@ def _summary() -> PlayerSelfServiceSummary:
             stats_export="Excel / CSV / Google Sheets",
             inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
+        ),
+        inventory=InventoryStatus(
+            state="available",
+            account_summary="1 registered governor(s) with approved inventory data.",
+            resources=InventoryCategoryStatus(
+                state="available",
+                value="1.2B RSS",
+                detail="1/1 governors | latest 2026-06-25",
+                governor_count=1,
+                latest_scan_label="2026-06-25",
+            ),
+            speedups=InventoryCategoryStatus(
+                state="available",
+                value="365d total",
+                detail="1/1 governors | latest 2026-06-25",
+                governor_count=1,
+                latest_scan_label="2026-06-25",
+            ),
+            materials=InventoryCategoryStatus(
+                state="available",
+                value="42 legendary",
+                detail="1/1 governors | latest 2026-06-25",
+                governor_count=1,
+                latest_scan_label="2026-06-25",
+            ),
+            upload_guidance="Use `/inventory import` in the inventory upload channel.",
         ),
     )
 
@@ -362,6 +390,17 @@ def test_preferences_embed_invites_service_backed_visibility_controls() -> None:
     assert "/inventory_preferences" not in embed.fields[1].value
 
 
+def test_inventory_embed_summarizes_latest_approved_data() -> None:
+    embed = views.build_inventory_embed(_summary(), display_name="Tester")
+
+    assert embed.title == "Inventory"
+    assert "Resources: 1.2B RSS" in embed.fields[0].value
+    assert "Speedups: 365d total" in embed.fields[0].value
+    assert "Materials: 42 legendary" in embed.fields[0].value
+    assert "`/inventory import`" in embed.fields[1].value
+    assert "Open Report" in embed.fields[2].value
+
+
 @pytest.mark.asyncio
 async def test_account_slot_select_view_preserves_twenty_sixth_slot() -> None:
     slots = tuple(f"Slot {index}" for index in range(1, 27))
@@ -479,6 +518,16 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             *nav_row,
             ("Set Public", 2, success, False),
             ("Update VIP", 2, success, False),
+        ],
+    )
+    _assert_button_layout(
+        views.PAGE_INVENTORY,
+        [
+            *top_row,
+            ("Dashboard", 1, secondary, False),
+            ("Inventory", 1, secondary, True),
+            ("Exports", 1, secondary, False),
+            ("Open Report", 2, success, False),
         ],
     )
     _assert_button_layout(
@@ -622,7 +671,31 @@ async def test_exports_inventory_button_opens_options(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_dashboard_inventory_button_uses_existing_inventory_selector(monkeypatch) -> None:
+async def test_dashboard_inventory_button_opens_inventory_page() -> None:
+    async def loader(_user_id: int):
+        return _summary()
+
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        summary_loader=loader,
+    )
+    interaction = _Interaction()
+    button = next(
+        child for child in view.children if getattr(child, "custom_id", None) == "me:inventory"
+    )
+
+    await button.callback(interaction)
+
+    edited = interaction.original_edits[-1]
+    assert interaction.response.deferred == [{"ephemeral": True}]
+    assert edited["embed"].image.url.startswith("attachment://me_inventory_")
+    assert [file.filename for file in edited["files"]] == ["me_inventory_42.png"]
+    assert isinstance(edited["view"], views.PlayerSelfServiceView)
+
+
+@pytest.mark.asyncio
+async def test_inventory_report_button_uses_existing_inventory_selector(monkeypatch) -> None:
     calls = []
 
     async def fake_visibility(user_id):
@@ -642,10 +715,17 @@ async def test_dashboard_inventory_button_uses_existing_inventory_selector(monke
         "start_myinventory_command",
         fake_start_myinventory_command,
     )
-    view = views.PlayerSelfServiceView(author_id=42, display_name="Tester")
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_INVENTORY,
+        summary=_summary(),
+    )
     interaction = _Interaction()
     button = next(
-        child for child in view.children if getattr(child, "custom_id", None) == "me:inventory"
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:inventory:report"
     )
 
     await button.callback(interaction)

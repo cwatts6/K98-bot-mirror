@@ -53,6 +53,14 @@ class InventoryVisibilityPreferenceWrite:
     error: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class LatestInventorySnapshot:
+    governors: tuple[RegisteredGovernor, ...]
+    resources: tuple[InventoryResourcePoint, ...] = ()
+    speedups: tuple[InventorySpeedupPoint, ...] = ()
+    materials: tuple[InventoryMaterialPoint, ...] = ()
+
+
 def parse_report_range(value: str | None) -> InventoryReportRange:
     normalized = (value or InventoryReportRange.ONE_MONTH.value).strip().upper()
     for item in InventoryReportRange:
@@ -187,6 +195,47 @@ async def resolve_governor_for_report(
     if discord_user is not None and _is_admin(discord_user):
         return RegisteredGovernor(int(governor_id), str(governor_id), "Lookup")
     return None
+
+
+async def build_latest_inventory_snapshot(
+    governors: list[RegisteredGovernor] | tuple[RegisteredGovernor, ...],
+) -> LatestInventorySnapshot:
+    resource_points: list[InventoryResourcePoint] = []
+    speedup_points: list[InventorySpeedupPoint] = []
+    material_points: list[InventoryMaterialPoint] = []
+
+    for governor in governors:
+        resource_rows, speedup_rows, material_rows = await asyncio.gather(
+            asyncio.to_thread(
+                inventory_reporting_dal.fetch_latest_resource_rows,
+                int(governor.governor_id),
+            ),
+            asyncio.to_thread(
+                inventory_reporting_dal.fetch_latest_speedup_rows,
+                int(governor.governor_id),
+            ),
+            asyncio.to_thread(
+                inventory_material_dal.fetch_latest_material_rows,
+                int(governor.governor_id),
+            ),
+        )
+
+        grouped_resources = _group_resource_points(resource_rows)
+        grouped_speedups = _group_speedup_points(speedup_rows)
+        grouped_materials = _group_material_points(material_rows)
+        if grouped_resources:
+            resource_points.append(grouped_resources[-1])
+        if grouped_speedups:
+            speedup_points.append(grouped_speedups[-1])
+        if grouped_materials:
+            material_points.append(grouped_materials[-1])
+
+    return LatestInventorySnapshot(
+        governors=tuple(governors),
+        resources=tuple(resource_points),
+        speedups=tuple(speedup_points),
+        materials=tuple(material_points),
+    )
 
 
 def _group_resource_points(rows: list[dict[str, Any]]) -> list[InventoryResourcePoint]:

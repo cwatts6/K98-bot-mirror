@@ -112,6 +112,38 @@ def fetch_resource_rows(governor_id: int, *, lookback_days: int = 370) -> list[d
         conn.close()
 
 
+def fetch_latest_resource_rows(governor_id: int) -> list[dict[str, Any]]:
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            WITH LatestBatch AS (
+                SELECT TOP 1 ImportBatchID
+                FROM dbo.InventoryImportBatch
+                WHERE GovernorID = ?
+                  AND ImportType = N'resources'
+                  AND Status = N'approved'
+                ORDER BY ApprovedAtUtc DESC, ImportBatchID DESC
+            )
+            SELECT r.ImportBatchID,
+                   r.GovernorID,
+                   r.ScanUtc,
+                   r.ResourceType,
+                   r.FromItemsValue,
+                   r.TotalResourcesValue
+            FROM dbo.GovernorResourceInventory AS r
+            INNER JOIN LatestBatch AS b
+                ON b.ImportBatchID = r.ImportBatchID
+            ORDER BY r.ResourceType ASC
+            """,
+            (int(governor_id),),
+        )
+        return _rows_to_dicts(cur)
+    finally:
+        conn.close()
+
+
 def fetch_speedup_rows(governor_id: int, *, lookback_days: int = 370) -> list[dict[str, Any]]:
     since_utc = datetime.now(UTC) - timedelta(days=int(lookback_days))
     conn = _get_conn()
@@ -136,6 +168,39 @@ def fetch_speedup_rows(governor_id: int, *, lookback_days: int = 370) -> list[di
             ORDER BY s.ScanUtc ASC, s.SpeedupType ASC
             """,
             (int(governor_id), since_utc),
+        )
+        return _rows_to_dicts(cur)
+    finally:
+        conn.close()
+
+
+def fetch_latest_speedup_rows(governor_id: int) -> list[dict[str, Any]]:
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            WITH LatestBatch AS (
+                SELECT TOP 1 ImportBatchID
+                FROM dbo.InventoryImportBatch
+                WHERE GovernorID = ?
+                  AND ImportType = N'speedups'
+                  AND Status = N'approved'
+                ORDER BY ApprovedAtUtc DESC, ImportBatchID DESC
+            )
+            SELECT s.ImportBatchID,
+                   s.GovernorID,
+                   s.ScanUtc,
+                   s.SpeedupType,
+                   s.TotalMinutes,
+                   s.TotalHours,
+                   s.TotalDaysDecimal
+            FROM dbo.GovernorSpeedupInventory AS s
+            INNER JOIN LatestBatch AS b
+                ON b.ImportBatchID = s.ImportBatchID
+            ORDER BY s.SpeedupType ASC
+            """,
+            (int(governor_id),),
         )
         return _rows_to_dicts(cur)
     finally:

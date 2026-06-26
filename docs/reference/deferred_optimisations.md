@@ -51,15 +51,6 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 10 Inventory Summary Card delivered or explicitly deferred; existing KVK, PreKvK, inventory, dashboard, and `/me` subpage renderer tests are green before any shared-helper extraction.
 
 ### Deferred Optimisation
-- Area: `/me dashboard`, `/me inventory`, `player_self_service/service.py`, `player_self_service/page_cards.py`, `ui/views/player_self_service_views.py`, inventory report services
-- Type: consistency
-- Description: Phase 9 makes Inventory a visible private `/me` navigation destination, but it still opens the existing `/myinventory` selector/report journey directly instead of showing a matching `/me` Inventory summary card. Smoke testing confirmed the inventory report journey works and cards are produced as expected, but the experience is visually out of sync with Accounts, Reminders, Preferences, and Exports.
-- Suggested Fix: Promote an Inventory Summary Card phase that audits existing approved inventory data sources, adds a private generated Inventory card using `assets/me/cards/me inventory.png`, summarizes resources, speedups, and materials with values, handles no-account/no-data states with upload-channel guidance, and preserves the existing `/myinventory` report journey, report visibility controls, and export buttons.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 9 Inventory handoff smoke tested successfully; SQL/data-source validation before using inventory summary values; operator approval before adding a sixth `/me inventory` subcommand if selected.
-
-### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `/my_stats_export`, `/export_inventory`, player self-service docs/tests
 - Type: cleanup
 - Description: Phase 9 keeps `/my_stats_export` and `/export_inventory` live while making `/me exports` the preferred route with Stats and Inventory option windows. The legacy paths remain useful compatibility surfaces, but they still need a deliberate communication, monitoring, redirect, deprecation, or removal decision after Phase 9 is smoke tested.

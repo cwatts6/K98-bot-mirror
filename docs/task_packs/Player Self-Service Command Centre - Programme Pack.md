@@ -11,7 +11,7 @@
 
 ## Current Programme Status
 
-Status as of 2026-06-25:
+Status as of 2026-06-26:
 
 - Phase 1 audit and design is complete and archived as a historical execution record.
 - Phase 2 `/me` command shell and navigation foundation is delivered in mirror PR #164 and
@@ -30,16 +30,17 @@ Status as of 2026-06-25:
   the operator on 2026-06-25.
 - Phase 9 Quick Launch and Export Options is delivered in production PR #479 and smoke tested
   successfully by the operator on 2026-06-25.
+- Phase 10 Inventory Summary Card is implemented for validation. It adds `/me inventory` as the
+  sixth private `/me` subcommand and keeps the existing `/myinventory` report journey intact.
 - The delivered `/me` surface now includes a private command-centre shell, a generated dashboard
   card with safe embed fallback, generated cards for Accounts, Reminders, Preferences, and
-  Exports, account-centre lookup/register/replace/remove management, unified KVK/calendar
+  Inventory, and Exports, account-centre lookup/register/replace/remove management, unified KVK/calendar
   reminder status and management, KVK reminder autosave and remove-all management, calendar
   reminder autosave/remove-all management, inventory visibility and Governor VIP controls,
-  dashboard Inventory/Exports handoffs, option-window based private stats and inventory exports,
-  graceful timeout handling, and return navigation. Legacy account, reminder, inventory,
-  calendar reminder, and export commands remain live.
-- Next active implementation phase: Phase 10 Inventory Summary Card and `/me inventory`
-  alignment, using the prepared `assets/me/cards/me inventory.png` card background.
+  dashboard Inventory/Exports handoffs, private Inventory summary data, option-window based
+  private stats and inventory exports, graceful timeout handling, and return navigation. Legacy
+  account, reminder, inventory, calendar reminder, and export commands remain live.
+- Next active validation step: Phase 10 local validation and Discord smoke testing.
 
 Phase 2 manual smoke evidence:
 
@@ -179,6 +180,7 @@ Run /me dashboard. Everything personal starts there.
 /me accounts
 /me reminders
 /me preferences
+/me inventory
 /me exports
 ```
 
@@ -190,6 +192,7 @@ Run /me dashboard. Everything personal starts there.
 | `/me accounts` | Modern account centre replacing separate lookup/register/review/modify habits. |
 | `/me reminders` | Modern reminder centre replacing separate subscribe/modify/unsubscribe habits. |
 | `/me preferences` | First-pass personal settings hub, including inventory visibility and output privacy defaults. |
+| `/me inventory` | Private Inventory summary card for latest approved resources, speedups, and materials, with report handoff. |
 | `/me exports` | Guided personal export launchpad for existing stats and inventory export flows. |
 
 ### Legacy command paths to evaluate for consolidation or redirect
@@ -685,35 +688,32 @@ Phase 9 manual smoke evidence:
 
 ### Phase 10 — Inventory Summary Card and `/me inventory` Alignment
 
-Status: next planned Player Self-Service programme phase.
+Status: implemented for validation.
 
 Make Inventory feel like a first-class `/me` destination instead of only a direct handoff into the
 legacy `/myinventory` report/export journey. Phase 9 proved the private dashboard Inventory
 handoff works, but smoke feedback showed it is visually out of step with Accounts, Reminders,
 Preferences, and Exports because there is no matching Inventory summary card.
 
-Likely deliverables:
+Delivered scope:
 
-- audit current inventory data sources, report services, export services, approval rules, and
+- audited current inventory data sources, report services, export services, approval rules, and
   `/myinventory` defaults before designing summary output
-- add an Inventory summary card using `assets/me/cards/me inventory.png` and the established
+- added `/me inventory` as a sixth private `/me` subcommand
+- added an Inventory summary card using `assets/me/cards/me inventory.png` and the established
   generated-card plus safe embed fallback pattern
-- summarize latest approved inventory data across three player-readable rows:
+- summarized latest approved inventory data across three player-readable rows:
   - resources and value
   - speedups and value
   - materials and value
-- handle one-account, multi-account, no-account, and no-approved-inventory-data states without
+- handled one-account, multi-account, no-account, and no-approved-inventory-data states without
   leaking another player's data
-- point players with no inventory data toward the inventory upload channel/process instead of
+- pointed players with no inventory data toward the inventory upload channel/process instead of
   showing an empty or misleading card
-- decide whether to add `/me inventory` as a sixth private subcommand or keep Inventory as a
-  dashboard/page navigation destination only, then update command governance if a subcommand is
-  approved
-- keep the existing `/myinventory` report journey, timescale controls, report visibility behavior,
+- kept the existing `/myinventory` report journey, timescale controls, report visibility behavior,
   and export buttons unchanged
-- keep inventory service/DAL logic Discord-type-free and keep views as interaction adapters
-- update command reference, briefing, tests, and deferred backlog after the approved scope is
-  implemented
+- kept inventory service/DAL logic Discord-type-free and kept views as interaction adapters
+- updated command reference, briefing, tests, and deferred backlog
 
 This phase should not redesign inventory import OCR/review, inventory report schema, export file
 formats, or the broader shared renderer helper layer.
@@ -975,14 +975,13 @@ Do not include these in the first build unless separately approved:
 
 ## 18. Suggested Next Action
 
-Start Phase 10:
+Validate Phase 10:
 
 ```text
 Inventory Summary Card and /me inventory Alignment
 ```
 
-Use `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre Phase 10 Inventory Summary Card.md`
-and its chat starter. Shared renderer consolidation, preferences expansion, and legacy export
-redirect/removal remain later programme phases. Do not redirect or remove `/my_stats_export` or
-`/export_inventory` without an explicit operator approval, player communication, and a no-feedback
-monitoring window.
+Run local validation and Discord smoke testing for the Phase 10 Inventory summary card. Shared
+renderer consolidation, preferences expansion, and legacy export redirect/removal remain later
+programme phases. Do not redirect or remove `/my_stats_export` or `/export_inventory` without an
+explicit operator approval, player communication, and a no-feedback monitoring window.

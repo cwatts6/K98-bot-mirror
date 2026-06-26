@@ -10,6 +10,7 @@ from player_self_service.page_cards import (
     WIDTH,
     _dashboard_rows,
     _font,
+    _inventory_rows,
     _page_copy,
     _reminder_rows,
     _summarize_items_for_width,
@@ -20,6 +21,8 @@ from player_self_service.service import (
     AccountStatus,
     CalendarReminderStatus,
     ExportStatus,
+    InventoryCategoryStatus,
+    InventoryStatus,
     PlayerSelfServiceSummary,
     PreferenceStatus,
     ReminderStatus,
@@ -55,11 +58,37 @@ def _summary() -> PlayerSelfServiceSummary:
             inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
+        inventory=InventoryStatus(
+            state="available",
+            account_summary="1 registered governor(s) with approved inventory data.",
+            resources=InventoryCategoryStatus(
+                state="available",
+                value="1.2B RSS",
+                detail="1/1 governors | latest 2026-06-25",
+                governor_count=1,
+                latest_scan_label="2026-06-25",
+            ),
+            speedups=InventoryCategoryStatus(
+                state="available",
+                value="365d total",
+                detail="1/1 governors | latest 2026-06-25",
+                governor_count=1,
+                latest_scan_label="2026-06-25",
+            ),
+            materials=InventoryCategoryStatus(
+                state="available",
+                value="42 legendary",
+                detail="1/1 governors | latest 2026-06-25",
+                governor_count=1,
+                latest_scan_label="2026-06-25",
+            ),
+            upload_guidance="Use `/inventory import` in the inventory upload channel.",
+        ),
     )
 
 
 def test_render_page_cards_output_pngs_for_remaining_me_pages() -> None:
-    for page in ("dashboard", "accounts", "reminders", "preferences", "exports"):
+    for page in ("dashboard", "accounts", "reminders", "preferences", "inventory", "exports"):
         rendered = render_page_card(
             page,
             _summary(),
@@ -111,6 +140,7 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
     assert _page_copy("reminders", summary)[2] == "Actions available: Manage"
     assert "manage calendar reminders" in _page_copy("reminders", summary)[3]
     assert _page_copy("preferences", summary)[2] == ("Actions available: Set Private, Update VIP")
+    assert _page_copy("inventory", summary)[0] == "Inventory"
     assert _page_copy("exports", summary)[1] == "private"
     assert _page_copy("dashboard", summary)[2] == (
         "Actions available: Accounts, Reminders, Preferences, Inventory, Exports"
@@ -314,6 +344,15 @@ def test_reminder_card_rows_split_kvk_and_calendar() -> None:
     ]
     assert rows[0][0].value == "ON"
     assert rows[1][0].value == "OFF"
+
+
+def test_inventory_card_rows_show_approved_data_categories() -> None:
+    rows = _inventory_rows(_summary())
+
+    assert [row[0].label for row in rows] == ["Resources", "Speedups", "Materials"]
+    assert rows[0][0].value == "1.2B RSS"
+    assert rows[1][0].value == "365d total"
+    assert rows[2][0].value == "42 legendary"
 
 
 def test_calendar_event_summary_compacts_to_two_rows_with_remaining_count() -> None:

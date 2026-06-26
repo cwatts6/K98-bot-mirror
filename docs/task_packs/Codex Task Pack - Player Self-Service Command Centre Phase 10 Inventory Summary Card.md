@@ -7,7 +7,8 @@
 - Owner/context: Player Self-Service Command Centre programme after Phase 9 Quick Launch and Export Options was delivered in production PR #479 and smoke tested successfully
 - Task type: `Discord command feature | inventory summary card | player self-service UX alignment | service/DAL audit | visual card rollout`
 - One-pass approved: `no`
-- Status: `active next task pack`
+- Implementation approved after audit/scope: `yes`
+- Status: `implemented for validation`
 
 ## 2. Required Reading
 
@@ -129,6 +130,8 @@ should point them toward the inventory upload channel/process.
 - Risk: medium
 - Dependencies: Phase 9 Inventory handoff smoke tested successfully; SQL/data-source validation before using inventory summary values; operator approval before adding a sixth `/me inventory` subcommand if selected.
 
+This deferred item has been executed by Phase 10 and removed from the active deferred backlog.
+
 Related deferred items that remain out of Phase 10 unless explicitly approved:
 
 - shared visual-card renderer consolidation
@@ -155,7 +158,8 @@ Related deferred items that remain out of Phase 10 unless explicitly approved:
 3. Validate any SQL-backed object, column, procedure, or view assumptions against `C:\K98-bot-SQL-Server`.
 4. Decide whether `/me inventory` should become a slash subcommand or only a private navigation page.
 5. Design the service-owned inventory summary state and no-data guidance.
-6. Implement the approved Phase 10 slice.
+6. Implement the approved Phase 10 slice: `/me inventory` is the selected sixth private
+   subcommand, with dashboard Inventory navigating to the generated Inventory page.
 7. Preserve existing `/myinventory`, inventory report, inventory export, and visibility behavior.
 8. Add/update focused tests.
 9. Run selected validators and tests.
@@ -197,6 +201,7 @@ docs/task_packs/Player Self-Service Command Centre - Programme Pack.md
 .\.venv\Scripts\python.exe -m pytest -q tests\test_me_cmds.py tests\test_player_self_service_service.py tests\test_player_self_service_views.py tests\test_player_self_service_page_cards.py
 .\.venv\Scripts\python.exe -m pytest -q tests\test_inventory_*.py
 .\.venv\Scripts\python.exe -m pytest -q tests\test_command_registration_smoke.py tests\test_validate_command_registration.py
+.\.venv\Scripts\python.exe -m pytest -q tests
 ```
 
 Run full pytest if Phase 10 adds a new `/me inventory` slash subcommand, changes shared inventory
@@ -205,8 +210,7 @@ summary/report helpers, or changes shared renderer helpers.
 ## 11. Manual Smoke Checklist
 
 - `/me dashboard` remains private.
-- Inventory navigation opens the new private Inventory summary card or approved `/me inventory`
-  page.
+- Inventory navigation opens the new private `/me inventory` summary card page.
 - The Inventory summary card renders with `assets/me/cards/me inventory.png` and falls back to a
   private embed if rendering or attachment delivery fails.
 - Resources, speedups, and materials rows show latest approved values where available.
@@ -222,21 +226,21 @@ summary/report helpers, or changes shared renderer helpers.
 
 ## 12. Acceptance Criteria
 
-- [ ] Phase 10 begins with audit/scope unless one-pass implementation is explicitly approved.
-- [ ] Inventory data sources, approved-data rules, and SQL-backed assumptions are mapped before
+- [x] Phase 10 begins with audit/scope unless one-pass implementation is explicitly approved.
+- [x] Inventory data sources, approved-data rules, and SQL-backed assumptions are mapped before
   card values are designed.
-- [ ] `/me` Inventory behavior is decided explicitly: new `/me inventory` subcommand or navigation
+- [x] `/me` Inventory behavior is decided explicitly: new `/me inventory` subcommand or navigation
   page only.
-- [ ] The Inventory summary card uses `assets/me/cards/me inventory.png`.
-- [ ] Summary rows cover resources, speedups, and materials with values where available.
-- [ ] No-account and no-approved-data states guide players without leaking private data.
-- [ ] Existing `/myinventory` report behavior, timescale controls, visibility preference, and
+- [x] The Inventory summary card uses `assets/me/cards/me inventory.png`.
+- [x] Summary rows cover resources, speedups, and materials with values where available.
+- [x] No-account and no-approved-data states guide players without leaking private data.
+- [x] Existing `/myinventory` report behavior, timescale controls, visibility preference, and
   export buttons are preserved.
-- [ ] No inventory import OCR/review redesign, report schema redesign, export schema redesign, or
+- [x] No inventory import OCR/review redesign, report schema redesign, export schema redesign, or
   shared renderer consolidation is included.
-- [ ] Focused tests and standard validators pass.
+- [x] Focused tests and standard validators pass.
 - [ ] Codex Security is run or explicitly justified.
-- [ ] Deferred findings are captured structurally.
+- [x] Deferred findings are captured structurally.
 
 ## 13. PR Summary Template
 

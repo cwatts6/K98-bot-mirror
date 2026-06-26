@@ -203,6 +203,47 @@ async def test_build_inventory_report_payload_groups_resources_and_speedups(monk
 
 
 @pytest.mark.asyncio
+async def test_build_latest_inventory_snapshot_groups_latest_rows(monkeypatch):
+    now = datetime.now(UTC)
+
+    monkeypatch.setattr(
+        reporting_service.inventory_reporting_dal,
+        "fetch_latest_resource_rows",
+        lambda governor_id: [
+            {"ScanUtc": now, "ResourceType": "food", "TotalResourcesValue": governor_id},
+            {"ScanUtc": now, "ResourceType": "wood", "TotalResourcesValue": 2},
+            {"ScanUtc": now, "ResourceType": "stone", "TotalResourcesValue": 3},
+            {"ScanUtc": now, "ResourceType": "gold", "TotalResourcesValue": 4},
+        ],
+    )
+    monkeypatch.setattr(
+        reporting_service.inventory_reporting_dal,
+        "fetch_latest_speedup_rows",
+        lambda _governor_id: [
+            {"ScanUtc": now, "SpeedupType": "building", "TotalDaysDecimal": 1},
+            {"ScanUtc": now, "SpeedupType": "research", "TotalDaysDecimal": 2},
+            {"ScanUtc": now, "SpeedupType": "training", "TotalDaysDecimal": 3},
+            {"ScanUtc": now, "SpeedupType": "healing", "TotalDaysDecimal": 4},
+            {"ScanUtc": now, "SpeedupType": "universal", "TotalDaysDecimal": 5},
+        ],
+    )
+    monkeypatch.setattr(
+        reporting_service.inventory_material_dal,
+        "fetch_latest_material_rows",
+        lambda _governor_id: [],
+    )
+
+    snapshot = await reporting_service.build_latest_inventory_snapshot(
+        [RegisteredGovernor(111, "Gov", "Main")]
+    )
+
+    assert snapshot.governors[0].governor_id == 111
+    assert snapshot.resources[0].food == 111
+    assert snapshot.speedups[0].universal_days == 5
+    assert snapshot.materials == ()
+
+
+@pytest.mark.asyncio
 async def test_build_inventory_report_payload_includes_stored_vip(monkeypatch):
     now = datetime.now(UTC)
 

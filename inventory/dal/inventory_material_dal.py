@@ -160,6 +160,40 @@ def fetch_material_rows(governor_id: int, *, lookback_days: int = 370) -> list[d
         conn.close()
 
 
+def fetch_latest_material_rows(governor_id: int) -> list[dict[str, Any]]:
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            WITH LatestBatch AS (
+                SELECT TOP 1 ImportBatchID
+                FROM dbo.InventoryImportBatch
+                WHERE GovernorID = ?
+                  AND ImportType = N'materials'
+                  AND Status = N'approved'
+                ORDER BY ApprovedAtUtc DESC, ImportBatchID DESC
+            )
+            SELECT m.ImportBatchID,
+                   m.GovernorID,
+                   m.ScanUtc,
+                   m.MaterialKind,
+                   m.Rarity,
+                   m.Quantity,
+                   m.LegendaryEquivalent,
+                   m.SourceImageIndex
+            FROM dbo.GovernorMaterialInventory AS m
+            INNER JOIN LatestBatch AS b
+                ON b.ImportBatchID = m.ImportBatchID
+            ORDER BY m.MaterialKind ASC, m.Rarity ASC
+            """,
+            (int(governor_id),),
+        )
+        return _rows_to_dicts(cur)
+    finally:
+        conn.close()
+
+
 def fetch_latest_approved_material_values(governor_id: int) -> dict[str, dict[str, int]]:
     conn = _get_conn()
     try:

@@ -47,6 +47,7 @@ PAGE_ACCOUNTS = "accounts"
 PAGE_REMINDERS = "reminders"
 PAGE_PREFERENCES = "preferences"
 PAGE_EXPORTS = "exports"
+PAGE_INVENTORY = "inventory"
 
 
 def _display_name(user: object) -> str:
@@ -272,6 +273,41 @@ def build_exports_embed(
     return embed
 
 
+def build_inventory_embed(
+    summary: PlayerSelfServiceSummary,
+    *,
+    display_name: str,
+) -> discord.Embed:
+    inventory = summary.inventory
+    embed = discord.Embed(
+        title="Inventory",
+        description=f"Private inventory summary for {display_name}",
+        color=discord.Color.blue(),
+    )
+    embed.add_field(
+        name="Latest Approved Data",
+        value=_field_value(
+            [
+                f"Resources: {inventory.resources.value} ({inventory.resources.detail})",
+                f"Speedups: {inventory.speedups.value} ({inventory.speedups.detail})",
+                f"Materials: {inventory.materials.value} ({inventory.materials.detail})",
+            ]
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Status",
+        value=_field_value([inventory.account_summary, inventory.upload_guidance]),
+        inline=False,
+    )
+    embed.add_field(
+        name="Actions",
+        value="Open Report shows the report picker with ranges and export buttons.",
+        inline=False,
+    )
+    return embed
+
+
 def build_page_embed(
     page: PlayerSelfServicePage,
     summary: PlayerSelfServiceSummary,
@@ -286,6 +322,8 @@ def build_page_embed(
         return build_preferences_embed(summary, display_name=display_name)
     if page == PAGE_EXPORTS:
         return build_exports_embed(summary, display_name=display_name)
+    if page == PAGE_INVENTORY:
+        return build_inventory_embed(summary, display_name=display_name)
     return build_dashboard_embed(summary, display_name=display_name)
 
 
@@ -455,6 +493,12 @@ class PlayerSelfServiceView(discord.ui.View):
                     "me:export:"
                 ):
                     self.remove_item(child)
+        if self.page != PAGE_INVENTORY:
+            for child in list(self.children):
+                if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
+                    "me:inventory:"
+                ):
+                    self.remove_item(child)
         if self.page == PAGE_PREFERENCES:
             self._apply_preference_toggle_state()
         if self.page == PAGE_EXPORTS:
@@ -472,6 +516,7 @@ class PlayerSelfServiceView(discord.ui.View):
             "me:reminder:",
             "me:preference:",
             "me:export:",
+            "me:inventory:",
         )
         for child in self.children:
             if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
@@ -656,7 +701,7 @@ class PlayerSelfServiceView(discord.ui.View):
         button: discord.ui.Button,
         interaction: discord.Interaction,
     ) -> None:
-        await self._show_inventory_report_options(interaction)
+        await self._show_page(interaction, PAGE_INVENTORY)
 
     @discord.ui.button(
         label="Exports",
@@ -702,6 +747,19 @@ class PlayerSelfServiceView(discord.ui.View):
             interaction,
             display_name=self.display_name,
         )
+
+    @discord.ui.button(
+        label="Open Report",
+        style=discord.ButtonStyle.success,
+        custom_id="me:inventory:report",
+        row=2,
+    )
+    async def inventory_report_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        await self._show_inventory_report_options(interaction)
 
     async def _show_inventory_report_options(self, interaction: discord.Interaction) -> None:
         try:

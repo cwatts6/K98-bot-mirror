@@ -31,6 +31,7 @@ _BACKGROUND_BY_PAGE = {
     "reminders": "me reminders.png",
     "preferences": "me preferences.png",
     "exports": "me exports.png",
+    "inventory": "me inventory.png",
 }
 
 
@@ -102,9 +103,11 @@ def _status_color(value: str) -> tuple[int, int, int]:
     normalized = value.strip().lower()
     if normalized in {"set", "single", "multiple", "on", "public", "private"}:
         return GREEN
+    if normalized in {"available", "partial"}:
+        return GREEN if normalized == "available" else GOLD
     if normalized in {"none", "not set", "off", "not subscribed"}:
         return GOLD
-    if normalized == "unknown":
+    if normalized in {"empty", "unknown"}:
         return RED
     return BLUE
 
@@ -121,6 +124,12 @@ def _status_label(value: str) -> str:
         return "PUBLIC"
     if normalized == "private":
         return "PRIVATE"
+    if normalized == "available":
+        return "READY"
+    if normalized == "partial":
+        return "PARTIAL"
+    if normalized == "empty":
+        return "UPLOAD"
     if normalized in {"none", "not set", "not subscribed"}:
         return "SETUP"
     if normalized == "unknown":
@@ -472,6 +481,16 @@ def _export_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     )
 
 
+def _inventory_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
+    inventory = summary.inventory
+    return (
+        f"Resources: {inventory.resources.value}",
+        f"Speedups: {inventory.speedups.value}",
+        f"Materials: {inventory.materials.value}",
+        inventory.account_summary,
+    )
+
+
 def _account_action_detail(summary: PlayerSelfServiceSummary) -> str:
     if summary.accounts.linked_count <= 0:
         return "Find ID by name, then add a governor to an available account slot."
@@ -595,6 +614,42 @@ def _reminder_rows(summary: PlayerSelfServiceSummary) -> tuple[tuple[MetricCell,
     )
 
 
+def _inventory_rows(summary: PlayerSelfServiceSummary) -> tuple[tuple[MetricCell, ...], ...]:
+    inventory = summary.inventory
+    return (
+        (
+            MetricCell(
+                "Resources",
+                inventory.resources.value,
+                inventory.resources.detail,
+                value_size=52,
+                value_min_size=30,
+                width_units=3,
+            ),
+        ),
+        (
+            MetricCell(
+                "Speedups",
+                inventory.speedups.value,
+                inventory.speedups.detail,
+                value_size=52,
+                value_min_size=30,
+                width_units=3,
+            ),
+        ),
+        (
+            MetricCell(
+                "Materials",
+                inventory.materials.value,
+                inventory.materials.detail,
+                value_size=52,
+                value_min_size=30,
+                width_units=3,
+            ),
+        ),
+    )
+
+
 def _preference_actions(summary: PlayerSelfServiceSummary) -> str:
     visibility = summary.preferences.inventory_visibility.strip().lower()
     visibility_action = "Set Public" if visibility == "private" else "Set Private"
@@ -635,6 +690,15 @@ def _page_copy(
             _preference_actions(summary),
             "Switch inventory visibility or update VIP level.",
             _preference_lines(summary),
+        )
+    if page == "inventory":
+        inventory = summary.inventory
+        return (
+            "Inventory",
+            inventory.state,
+            f"Actions available: {inventory.next_action}",
+            inventory.upload_guidance if inventory.state in {"empty", "none"} else inventory.account_summary,
+            _inventory_lines(summary),
         )
     if page == "exports":
         action_state = summary.exports.action_state.strip().lower()
@@ -703,6 +767,16 @@ def render_page_card(
             rows=_reminder_rows(summary),
             row_height=154,
             row_gap=26,
+        )
+    elif page == "inventory":
+        _draw_metric_rows(
+            draw,
+            x=108,
+            y=326,
+            width=WIDTH - 216,
+            rows=_inventory_rows(summary),
+            row_height=118,
+            row_gap=30,
         )
     else:
         _draw_wrapped_lines(draw, x=108, y=332, width=WIDTH - 216, lines=lines, size=46, gap=66)

@@ -1,15 +1,13 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-06-25
+Last updated: 2026-06-26
 
-Status: Phase 9 Quick Launch and Export Options is delivered in production PR #479 and smoke
-tested successfully on 2026-06-25. The dashboard uses the same full-bleed generated private card
-style as the Phase 6 subpages, with large row-based text directly on the card background.
-Accounts, Reminders, Preferences, and Exports use generated private visual cards with safe embed
-fallback. `/me exports` is now the preferred private export route and exposes option windows for
-Stats and Inventory downloads while legacy export commands remain live. Phase 10 will make
-Inventory a matching `/me` card surface using the prepared `assets/me/cards/me inventory.png`
-background.
+Status: Phase 10 Inventory Summary Card is implemented for validation. The dashboard uses the
+same full-bleed generated private card style as the Phase 6 subpages, with large row-based text
+directly on the card background. Accounts, Reminders, Preferences, Inventory, and Exports use
+generated private visual cards with safe embed fallback. `/me inventory` summarizes latest
+approved inventory resources, speedups, and materials, and `/me exports` remains the preferred
+private export route while legacy export commands remain live.
 
 ## Player Briefing
 
@@ -36,11 +34,14 @@ The reminder centre supports private KVK event reminder review, setup, automatic
 remove-all/unsubscribe with confirmation through one primary Manage journey. The same Manage
 journey can now open Calendar Settings for calendar reminder event types and lead times.
 `/me preferences` can update inventory report visibility between private and public output and can
-open the existing Governor VIP update flow. `/me exports` can open private option windows for
-Stats and Inventory exports. Stats exports support Excel, CSV, and Google Sheets formats plus 30,
-60, 90, 180, and 360 day windows, defaulting to Excel and 90 days. Inventory exports support
-format, view, registered-governor scope, and day-window choices using the existing inventory export
-defaults. Existing
+open the existing Governor VIP update flow. `/me inventory` shows a private summary of latest
+approved resources, speedups, and materials for your registered governors. If no approved
+inventory data exists yet, it points you toward the inventory upload process. Open Report keeps the
+existing inventory report picker, range controls, visibility behavior, and export buttons.
+`/me exports` can open private option windows for Stats and Inventory exports. Stats exports
+support Excel, CSV, and Google Sheets formats plus 30, 60, 90, 180, and 360 day windows,
+defaulting to Excel and 90 days. Inventory exports support format, view, registered-governor
+scope, and day-window choices using the existing inventory export defaults. Existing
 commands such as `/register_governor`, `/modify_registration`, `/my_registrations`,
 `/mygovernorid`, `/subscribe`,
 `/modify_subscription`, `/unsubscribe`, `/calendar_reminder_config`, `/inventory_preferences`,
@@ -48,8 +49,9 @@ commands such as `/register_governor`, `/modify_registration`, `/my_registration
 
 ## Operator Briefing
 
-Phase 9 makes `/me exports` the preferred export route in parallel with legacy self-service
-commands. It does not remove, redirect, or change `/my_stats_export`, `/export_inventory`,
+Phase 10 adds `/me inventory` as the sixth private `/me` subcommand and makes dashboard Inventory
+open that generated summary card instead of jumping directly into the report selector. It does not
+remove, redirect, or change `/myinventory`, `/my_stats_export`, `/export_inventory`,
 `/inventory_preferences`,
 `/subscribe`, `/modify_subscription`, `/unsubscribe`, `/calendar_reminder_config`, or account
 legacy commands.
@@ -61,6 +63,7 @@ The approved command group is:
 /me accounts
 /me reminders
 /me preferences
+/me inventory
 /me exports
 ```
 
@@ -68,7 +71,7 @@ Expected command-registration impact:
 
 ```text
 primary=41
-grouped_subcommands_detected=85
+grouped_subcommands_detected=86
 ```
 
 Rollout checks:
@@ -76,9 +79,9 @@ Rollout checks:
 - Confirm `/me dashboard` is private and shows the full-bleed generated card when rendering succeeds.
 - Confirm dashboard falls back to the private embed if image rendering or delivery fails.
 - Confirm the card is readable on desktop, mobile, and iPad.
-- Confirm account, reminder, preference, and export pages remain private.
-- Confirm account, reminder, preference, and export pages render generated cards or safe fallback
-  embeds.
+- Confirm account, reminder, preference, inventory, and export pages remain private.
+- Confirm account, reminder, preference, inventory, and export pages render generated cards or safe
+  fallback embeds.
 - Confirm `/me preferences` saves inventory report visibility through the existing service-backed
   path.
 - Confirm `/me preferences` can open the existing Governor VIP update flow and that VIP writes
@@ -96,8 +99,15 @@ Rollout checks:
 - Confirm `/me exports` clearly disables or reports unavailable export actions when account data,
   linked accounts, or approved export data are unavailable.
 - Confirm `/me dashboard` has Inventory and Exports buttons, not the old KVK Quick Launch menu.
-- Confirm dashboard Inventory opens the same private `/myinventory` selector/report journey and
-  preserves the player's inventory report visibility setting.
+- Confirm dashboard Inventory opens the private `/me inventory` summary card.
+- Confirm `/me inventory` uses `assets/me/cards/me inventory.png` and falls back to a private
+  embed if image rendering or delivery fails.
+- Confirm `/me inventory` shows resources, speedups, and materials values from latest approved
+  data where available.
+- Confirm `/me inventory` no-account and no-approved-data states do not leak other player data and
+  point players toward the inventory upload process.
+- Confirm `/me inventory` Open Report opens the same private `/myinventory` selector/report
+  journey and preserves the player's inventory report visibility setting.
 - Confirm `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` remain invoked through
   their existing command paths and channel rules.
 - Confirm `/my_stats_export` and `/export_inventory` still work for their existing custom options.
@@ -217,6 +227,19 @@ Phase 9 implementation notes:
   as expected, but the `/me` Inventory path now needs its own summary card so Inventory is not only
   represented as an export/report handoff.
 
+Phase 10 implementation notes:
+
+- `/me inventory` is now a sixth private `/me` subcommand.
+- Dashboard Inventory opens the `/me inventory` summary card.
+- The Inventory card uses the prepared `assets/me/cards/me inventory.png` background.
+- The card summarizes latest approved resources, speedups, and materials across the player's
+  registered governors.
+- No-account and no-approved-data states stay private and point players toward inventory upload.
+- Open Report preserves the existing `/myinventory` selector, report visibility behavior, range
+  controls, generated report cards, and export buttons.
+- `/inventory import`, `/myinventory`, `/inventory_preferences`, `/export_inventory`, and
+  `/me exports` remain live and behavior-compatible.
+
 Phase 7 validation notes:
 
 - Calendar reminders still use the event-calendar preference/state files and scheduler, but
@@ -236,9 +259,6 @@ Phase 7 validation notes:
 
 Next phase:
 
-- Start Phase 10 Inventory Summary Card and `/me inventory` Alignment. The phase should audit the
-  existing inventory data/report/export paths, create a private Inventory summary card with
-  resources, speedups, and materials rows plus values, point players with no approved inventory
-  data toward the inventory upload channel/process, and preserve the existing `/myinventory`
-  report journey and legacy export commands. Shared visual-card renderer consolidation, legacy
-  export redirect/removal, and export schema/format redesign remain separate later work.
+- Validate Phase 10 locally and through Discord smoke testing. Shared visual-card renderer
+  consolidation, broader preferences expansion, legacy export redirect/removal, and export
+  schema/format redesign remain separate later work.
