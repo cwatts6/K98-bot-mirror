@@ -27,8 +27,8 @@ def test_inventory_renderer_text_helpers_delegate_to_visual_text(monkeypatch):
         calls["font"] = (size, bold)
         return sentinel_font
 
-    def _text_width(draw_arg, text, *, font):
-        calls["text_width"] = (text, font)
+    def _text_width(draw_arg, text, *, font, bold=False):
+        calls["text_width"] = (text, font, bold)
         return 42
 
     def _fit_font(draw_arg, text, *, max_width, size, min_size, bold=False):
@@ -48,7 +48,7 @@ def test_inventory_renderer_text_helpers_delegate_to_visual_text(monkeypatch):
     monkeypatch.setattr(report_image_renderer.visual_text, "draw_text", _draw_text)
 
     assert report_image_renderer._font(19, bold=True) is sentinel_font
-    assert report_image_renderer._text_width(draw, "義🚀", sentinel_font) == 42
+    assert report_image_renderer._text_width(draw, "義🚀", sentinel_font, bold=True) == 42
     assert (
         report_image_renderer._fit_font(
             draw,
@@ -70,7 +70,7 @@ def test_inventory_renderer_text_helpers_delegate_to_visual_text(monkeypatch):
     )
 
     assert calls["font"] == (19, True)
-    assert calls["text_width"] == ("義🚀", sentinel_font)
+    assert calls["text_width"] == ("義🚀", sentinel_font, True)
     assert calls["fit_font"] == ("Long value", 120, 22, 12, True)
     assert drawn == {
         "xy": (10, 12),
@@ -97,6 +97,32 @@ def test_inventory_wrap_text_uses_glyph_safe_width():
 
     assert len(lines) == 1
     assert report_image_renderer._text_width(draw, lines[0], base_font) <= 120
+
+
+def test_inventory_wrap_text_preserves_bold_measurement(monkeypatch):
+    image = Image.new("RGBA", (420, 80))
+    draw = report_image_renderer.ImageDraw.Draw(image)
+    base_font = visual_text.font(18)
+    seen_bold_values = []
+
+    def _fake_width(draw_arg, text, *, font, bold=False):
+        seen_bold_values.append(bold)
+        return 10
+
+    monkeypatch.setattr(report_image_renderer.visual_text, "text_width", _fake_width)
+
+    lines = report_image_renderer._wrap_text(
+        draw,
+        "bold detail",
+        font=base_font,
+        max_width=120,
+        max_lines=1,
+        bold=True,
+    )
+
+    assert lines == ["bold detail"]
+    assert seen_bold_values
+    assert all(seen_bold_values)
 
 
 def test_render_inventory_reports_returns_png_files_for_resources_and_speedups():

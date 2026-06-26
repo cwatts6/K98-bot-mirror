@@ -130,8 +130,14 @@ def _panel(draw: ImageDraw.ImageDraw, xy: tuple[int, int, int, int], fill=PANEL)
     draw.rounded_rectangle(xy, radius=14, fill=fill, outline=(71, 139, 202), width=2)
 
 
-def _text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:
-    return visual_text.text_width(draw, text, font=font)
+def _text_width(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.ImageFont,
+    *,
+    bold: bool = False,
+) -> int:
+    return visual_text.text_width(draw, text, font=font, bold=bold)
 
 
 def _fit_font(
@@ -172,13 +178,14 @@ def _wrap_text(
     font: ImageFont.ImageFont,
     max_width: int,
     max_lines: int = 2,
+    bold: bool = False,
 ) -> list[str]:
     words = text.split()
     lines: list[str] = []
     current = ""
     for word in words:
         candidate = f"{current} {word}".strip()
-        if not current or _text_width(draw, candidate, font) <= max_width:
+        if not current or _text_width(draw, candidate, font, bold=bold) <= max_width:
             current = candidate
             continue
         lines.append(current)
@@ -188,7 +195,7 @@ def _wrap_text(
     if current and len(lines) < max_lines:
         lines.append(current)
     if len(lines) == max_lines and words:
-        while _text_width(draw, lines[-1], font) > max_width and len(lines[-1]) > 1:
+        while _text_width(draw, lines[-1], font, bold=bold) > max_width and len(lines[-1]) > 1:
             lines[-1] = lines[-1][:-2].rstrip() + "."
     return lines or [text]
 
@@ -223,9 +230,16 @@ def _draw_kpi(
     value_box = draw.textbbox(value_xy, value, font=value_font)
     separator_y = min(max(value_box[3] + 14, y1 + 108), y2 - 36)
     draw.line((x1 + 18, separator_y, x2 - 18, separator_y), fill=(65, 127, 187), width=1)
-    max_delta_lines = 1 if _text_width(draw, delta, delta_font) <= content_w else 2
+    max_delta_lines = 1 if _text_width(draw, delta, delta_font, bold=True) <= content_w else 2
     for idx, line in enumerate(
-        _wrap_text(draw, delta, font=delta_font, max_width=content_w, max_lines=max_delta_lines)
+        _wrap_text(
+            draw,
+            delta,
+            font=delta_font,
+            max_width=content_w,
+            max_lines=max_delta_lines,
+            bold=True,
+        )
     ):
         _draw_text(
             draw,
