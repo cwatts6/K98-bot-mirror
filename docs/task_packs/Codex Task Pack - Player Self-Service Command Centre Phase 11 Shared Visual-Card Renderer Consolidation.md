@@ -7,7 +7,7 @@
 - Owner/context: Player Self-Service Command Centre programme after Phase 10 Inventory Summary Card was delivered in production PR #480 and smoke tested successfully
 - Task type: `renderer refactor | visual card consolidation | player self-service polish | deferred optimisation execution`
 - One-pass approved: `no`
-- Status: `prepared for next phase`
+- Status: `implementation started`
 
 ## 2. Required Reading
 
@@ -102,6 +102,23 @@ The active deferred backlog includes:
 - Add focused tests around the migrated renderer family and shared helper behavior.
 - Produce at least one local rendered PNG smoke artifact for visual inspection during handoff.
 - Update docs and deferred backlog after implementation.
+
+### Phase 11 Slice Plan
+
+Phase 11 should remain slice-based for risk control, but it is not complete until all target
+renderer families have moved onto the shared primitive layer where practical:
+
+1. Phase 11A: extract `core.visual_text` and migrate `/me` page cards plus PreKvK compatibility
+   wrappers away from the accidental `prekvk.report_image_renderer` shared-helper role.
+2. Phase 11B: migrate KVK stats, targets, rankings, and history renderers to use the shared text
+   primitives directly while preserving KVK-internal helper contracts and card output.
+3. Phase 11C: migrate Inventory report rendering text primitives to the shared helper while
+   preserving report chart layout, filenames, dimensions, and existing report/export behavior.
+
+KVK and Inventory are captured in `docs/reference/deferred_optimisations.md` as Phase 11 follow-up
+slices so they are not lost after the first helper extraction. Do not close Phase 11 as complete
+until those renderer families are migrated or an explicit operator decision changes the phase
+scope.
 
 ### Out of Scope
 
@@ -210,6 +227,8 @@ Run full `pytest -q tests` if shared helper changes touch more than one renderer
 - [ ] Standard validators pass.
 - [ ] At least one rendered PNG smoke artifact is inspected before handoff.
 - [ ] Deferred backlog is updated to reflect the completed slice or remaining renderer work.
+- [ ] KVK and Inventory renderer migration slices are completed before Phase 11 is closed, unless
+  the operator explicitly re-scopes the phase.
 
 ## 13. PR Summary Template
 

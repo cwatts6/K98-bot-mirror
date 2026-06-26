@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from core import visual_text
 from prekvk import report_image_renderer
 from prekvk.models import PreKvkReportPayload, PreKvkReportRow, PreKvkReportSort
 from prekvk.report_image_renderer import render_prekvk_report
@@ -181,17 +182,17 @@ def test_render_prekvk_report_handles_symbol_names():
 
 
 def test_font_for_text_skips_unsupported_candidate(monkeypatch):
-    report_image_renderer._font_for_text.cache_clear()
+    visual_text.font_for_text.cache_clear()
     used_paths = []
 
     monkeypatch.setattr(
-        report_image_renderer,
-        "_font_candidates_for_text",
+        visual_text,
+        "font_candidates_for_text",
         lambda text, *, bold=False: ["unsupported.ttf", "supported.ttf"],
     )
     monkeypatch.setattr(
-        report_image_renderer,
-        "_font_supports_text",
+        visual_text,
+        "font_supports_text",
         lambda path, text: path == "supported.ttf",
     )
 
@@ -199,11 +200,11 @@ def test_font_for_text_skips_unsupported_candidate(monkeypatch):
         used_paths.append(path)
         return object()
 
-    monkeypatch.setattr(report_image_renderer.ImageFont, "truetype", _fake_truetype)
+    monkeypatch.setattr(visual_text.ImageFont, "truetype", _fake_truetype)
 
-    assert report_image_renderer._font_for_text("\u4e49", 18) is not None
+    assert visual_text.font_for_text("\u4e49", 18) is not None
     assert used_paths == ["supported.ttf"]
-    report_image_renderer._font_for_text.cache_clear()
+    visual_text.font_for_text.cache_clear()
 
 
 def test_font_supports_text_reuses_cached_coverage():

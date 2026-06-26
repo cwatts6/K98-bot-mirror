@@ -736,7 +736,7 @@ Phase 10 manual smoke evidence:
 
 ### Phase 11 — Shared Visual-Card Renderer Consolidation
 
-Status: next prepared Player Self-Service programme phase.
+Status: implementation started.
 
 Consolidate stable visual-card primitives after the `/me` Inventory card fills the last obvious
 page-level visual gap and launch/legacy decisions are not competing for product attention.
@@ -747,10 +747,21 @@ Likely deliverables:
   renderers
 - extract only stable primitives such as text fitting, badges, PNG wrappers, glyph-safe font
   selection, and common fallback handling
-- migrate one renderer at a time
+- migrate one renderer family at a time, with Phase 11 not considered complete until `/me`/PreKvK,
+  KVK, and inventory renderer families are migrated where practical
 - preserve existing card filenames, dimensions, output bytes contracts, fallback behavior, and
   player-name Unicode handling
 - add focused renderer tests and at least one visual/PNG smoke artifact for changed renderers
+
+Approved implementation slicing:
+
+- Phase 11A extracts shared glyph-safe text primitives into `core.visual_text` and migrates `/me`
+  page cards plus PreKvK compatibility wrappers away from the accidental PreKvK-as-shared-helper
+  dependency.
+- Phase 11B must migrate the KVK renderer family (`kvk/rendering/`) to the shared helper while
+  preserving KVK stats, targets, rankings, and history output contracts.
+- Phase 11C must migrate `inventory/report_image_renderer.py` text primitives to the shared helper
+  while preserving report layout, filenames, dimensions, and existing report/export behavior.
 
 ### Phase 12 — Preferences Hub Expansion
 

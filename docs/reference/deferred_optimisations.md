@@ -42,13 +42,22 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 5A admin/leadership/operator grouping is complete; requires operator approval, SQL-backed usage review, user-facing briefing, and a fresh task pack.
 
 ### Deferred Optimisation
-- Area: `player_self_service/dashboard_card.py`, `kvk/rendering/`, `prekvk/report_image_renderer.py`, visual card renderers
+- Area: `kvk/rendering/kvk_stats_card_renderer.py`, `kvk/rendering/kvk_targets_card_renderer.py`, `kvk/rendering/kvk_rankings_card_renderer.py`, `kvk/rendering/kvk_history_renderer.py`
 - Type: refactor
-- Description: The Player Self-Service Command Centre now has multiple generated cards, and the wider bot has several Pillow renderers with similar panel, badge, fit-text, fallback-font, and attachment-output patterns across KVK, PreKvK, inventory, and player self-service. This should remain part of the Player Self-Service Command Centre programme because `/me` established the cross-page card model, but consolidating renderer primitives during Phase 8 would expand the export launchpad PR beyond its acceptance criteria.
-- Suggested Fix: Scope a shared visual-card rendering helper pass within the Player Self-Service Command Centre follow-up work that extracts stable text fitting, panel/badge primitives, PNG export wrappers, and glyph-safe font selection into a shared rendering utility. Migrate one renderer at a time with screenshot/PNG dimension tests and preserve existing card filenames, fallback behavior, and player-name Unicode handling.
+- Description: Phase 11A extracted shared glyph-safe text primitives into `core.visual_text` and migrated `/me` page cards plus PreKvK compatibility wrappers. KVK stats and targets still import those primitives indirectly through `prekvk.report_image_renderer`, while history and rankings import KVK stats helper functions. This leaves the KVK renderer family on the old cross-domain helper path and keeps shared font/fit/draw ownership unclear.
+- Suggested Fix: Complete a Phase 11B KVK renderer migration slice that points KVK stats and targets directly at `core.visual_text`, then rationalises KVK-internal helper ownership for history and rankings without changing card layouts, filenames, dimensions, fallback behavior, public/private posting rules, or Unicode player-name handling. Validate with focused KVK renderer/card posting tests and at least one rendered KVK PNG smoke artifact.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 10 Inventory Summary Card delivered and smoke tested in production PR #480; existing KVK, PreKvK, inventory, dashboard, and `/me` subpage renderer tests are green before any shared-helper extraction.
+- Dependencies: Phase 11A core text helper and `/me`/PreKvK migration complete; existing KVK renderer tests green before migration.
+
+### Deferred Optimisation
+- Area: `inventory/report_image_renderer.py`
+- Type: refactor
+- Description: Phase 11A extracted shared glyph-safe text primitives into `core.visual_text`, but the inventory report renderer still owns local font loading, text measurement, fit-to-width, wrapping, panel drawing, and PNG export helpers. Inventory report cards are visually distinct and should not be forced into the `/me` or KVK layout model, but stable primitives should still use the shared helper before Phase 11 closes.
+- Suggested Fix: Complete a Phase 11C inventory renderer migration slice that adopts `core.visual_text` for font loading, text width, fit-to-width, and wrapping where behavior can be preserved. Keep inventory chart layout, panel styling, filenames, dimensions, report visibility behavior, export buttons, and generated report contracts unchanged. Validate with focused inventory renderer tests and at least one rendered inventory PNG smoke artifact.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 11A core text helper and `/me`/PreKvK migration complete; KVK Phase 11B can run before or after this slice, but both KVK and inventory migrations must be completed before Phase 11 is considered done.
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `/my_stats_export`, `/export_inventory`, player self-service docs/tests

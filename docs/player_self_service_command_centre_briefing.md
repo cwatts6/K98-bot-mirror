@@ -272,9 +272,13 @@ Phase 7 validation notes:
 
 Next phase:
 
-- Start Phase 11 Shared Visual-Card Renderer Consolidation. This is promoted from the active
-  deferred renderer item now that `/me` has stable generated cards for Dashboard, Accounts,
-  Reminders, Preferences, Inventory, and Exports.
+- Phase 11 Shared Visual-Card Renderer Consolidation is now implementation work. Phase 11A
+  extracts shared glyph-safe text primitives into `core.visual_text` and migrates `/me` page cards
+  plus PreKvK compatibility wrappers away from the accidental PreKvK-as-shared-helper dependency.
+- Phase 11B must migrate KVK stats, targets, rankings, and history renderers to the shared helper.
+  Phase 11C must migrate Inventory report rendering text primitives. Phase 11 should not be
+  considered complete until those renderer families are migrated or the operator explicitly
+  re-scopes the phase.
 - Broader preferences expansion and legacy export redirect/removal remain later Player
   Self-Service phases.
 - Export schema/format redesign remains a separate export-output programme unless explicitly

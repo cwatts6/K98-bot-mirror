@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from functools import lru_cache
 from io import BytesIO
-from pathlib import Path
 import unicodedata
 
 from PIL import Image, ImageDraw, ImageFont
 
+from core import visual_text
 from prekvk.models import PreKvkReportPayload, RenderedPreKvkReportImage
 from prekvk.report_service import SORT_LABELS
 
@@ -24,183 +23,21 @@ GOLD = (250, 204, 21)
 BLUE = (96, 165, 250)
 
 
-def _is_variation_selector(codepoint: int) -> bool:
-    return 0xFE00 <= codepoint <= 0xFE0F
-
-
-def _is_emoji_modifier(codepoint: int) -> bool:
-    return 0x1F3FB <= codepoint <= 0x1F3FF
-
-
-def _is_regional_indicator(codepoint: int) -> bool:
-    return 0x1F1E6 <= codepoint <= 0x1F1FF
-
-
-def _is_tag_char(codepoint: int) -> bool:
-    return 0xE0020 <= codepoint <= 0xE007F
-
-
-def _is_combining_or_modifier(ch: str) -> bool:
-    codepoint = ord(ch)
-    return (
-        unicodedata.combining(ch) > 0
-        or _is_variation_selector(codepoint)
-        or _is_emoji_modifier(codepoint)
-        or _is_tag_char(codepoint)
-        or codepoint == 0x20E3
-    )
-
-
-def _text_clusters(text: str) -> list[str]:
-    clusters: list[str] = []
-    idx = 0
-    while idx < len(text):
-        cluster = text[idx]
-        idx += 1
-
-        if _is_regional_indicator(ord(cluster)):
-            if idx < len(text) and _is_regional_indicator(ord(text[idx])):
-                cluster += text[idx]
-                idx += 1
-            clusters.append(cluster)
-            continue
-
-        while idx < len(text):
-            ch = text[idx]
-            codepoint = ord(ch)
-            if _is_combining_or_modifier(ch):
-                cluster += ch
-                idx += 1
-                continue
-            if codepoint == 0x200D and idx + 1 < len(text):
-                cluster += ch + text[idx + 1]
-                idx += 2
-                continue
-            break
-
-        clusters.append(cluster)
-    return clusters
-
-
-def _font_candidates_for_char(ch: str, *, bold: bool = False) -> list[str]:
-    return _font_candidates_for_text(ch, bold=bold)
-
-
-def _font_candidates_for_text(text: str, *, bold: bool = False) -> list[str]:
-    codepoints = [ord(ch) for ch in text]
-    if (
-        any(0x1F000 <= codepoint <= 0x1FAFF for codepoint in codepoints)
-        or any(0x2600 <= codepoint <= 0x27BF for codepoint in codepoints)
-        or any(unicodedata.category(ch) in {"So", "Sk"} for ch in text)
-    ):
-        return [
-            "C:/Windows/Fonts/seguiemj.ttf",
-            "C:/Windows/Fonts/seguisym.ttf",
-        ]
-    if any(0x0E00 <= codepoint <= 0x0E7F for codepoint in codepoints):
-        return [
-            "C:/Windows/Fonts/LeelaUIb.ttf" if bold else "C:/Windows/Fonts/LeelawUI.ttf",
-            "C:/Windows/Fonts/LEELAWAD.TTF",
-        ]
-    if any(0x3400 <= codepoint <= 0x9FFF for codepoint in codepoints):
-        return [
-            "C:/Windows/Fonts/msyhbd.ttc" if bold else "C:/Windows/Fonts/msyh.ttc",
-            "C:/Windows/Fonts/simsun.ttc",
-            "C:/Windows/Fonts/YuGothB.ttc" if bold else "C:/Windows/Fonts/YuGothM.ttc",
-            "C:/Windows/Fonts/msgothic.ttc",
-        ]
-    if any(0x3000 <= codepoint <= 0x30FF for codepoint in codepoints) or any(
-        0xAC00 <= codepoint <= 0xD7AF for codepoint in codepoints
-    ):
-        return [
-            "C:/Windows/Fonts/msyhbd.ttc" if bold else "C:/Windows/Fonts/msyh.ttc",
-            "C:/Windows/Fonts/YuGothB.ttc" if bold else "C:/Windows/Fonts/YuGothM.ttc",
-            "C:/Windows/Fonts/msgothic.ttc",
-            "C:/Windows/Fonts/simsun.ttc",
-            "C:/Windows/Fonts/malgunbd.ttf" if bold else "C:/Windows/Fonts/malgun.ttf",
-        ]
-    return []
-
-
-@lru_cache(maxsize=32)
-def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
-    candidates = [
-        "C:/Windows/Fonts/segoeuib.ttf" if bold else "C:/Windows/Fonts/segoeui.ttf",
-        "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
-    ]
-    for candidate in candidates:
-        try:
-            return ImageFont.truetype(candidate, size=size)
-        except Exception:
-            continue
-    return ImageFont.load_default()
-
-
-@lru_cache(maxsize=512)
-def _font_for_char(ch: str, size: int, *, bold: bool = False) -> ImageFont.ImageFont:
-    return _font_for_text(ch, size, bold=bold)
-
-
-@lru_cache(maxsize=512)
-def _font_for_text(text: str, size: int, *, bold: bool = False) -> ImageFont.ImageFont:
-    for candidate in _font_candidates_for_text(text, bold=bold):
-        if not _font_supports_text(candidate, text):
-            continue
-        try:
-            return ImageFont.truetype(candidate, size=size)
-        except Exception:
-            continue
-    return _font(size, bold=bold)
-
-
-def _cluster_font_size(text: str, base_size: int) -> int:
-    codepoints = [ord(ch) for ch in text]
-    if any(0x0E00 <= codepoint <= 0x0E7F for codepoint in codepoints) or any(
-        0x3000 <= codepoint <= 0x9FFF or 0xAC00 <= codepoint <= 0xD7AF for codepoint in codepoints
-    ):
-        return base_size + 4
-    return base_size
-
-
-def _coverage_codepoints(text: str) -> list[int]:
-    return [
-        ord(ch)
-        for ch in text
-        if ord(ch) != 0x200D and not _is_variation_selector(ord(ch)) and not _is_tag_char(ord(ch))
-    ]
-
-
-@lru_cache(maxsize=512)
-def _font_coverage(font_path: str) -> frozenset[int] | None:
-    if not Path(font_path).exists():
-        return frozenset()
-    try:
-        from fontTools.ttLib import TTCollection, TTFont
-    except Exception:
-        return None
-    try:
-        font_obj = (
-            TTCollection(font_path).fonts[0]
-            if font_path.lower().endswith(".ttc")
-            else TTFont(font_path, lazy=True)
-        )
-        coverage: set[int] = set()
-        for table in font_obj["cmap"].tables:
-            coverage.update(table.cmap.keys())
-        return frozenset(coverage)
-    except Exception:
-        return None
-
-
-@lru_cache(maxsize=512)
-def _font_supports_text(font_path: str, text: str) -> bool:
-    codepoints = _coverage_codepoints(text)
-    if not codepoints:
-        return True
-    coverage = _font_coverage(font_path)
-    if coverage is None:
-        return True
-    return all(codepoint in coverage for codepoint in codepoints)
+_is_variation_selector = visual_text.is_variation_selector
+_is_emoji_modifier = visual_text.is_emoji_modifier
+_is_regional_indicator = visual_text.is_regional_indicator
+_is_tag_char = visual_text.is_tag_char
+_is_combining_or_modifier = visual_text.is_combining_or_modifier
+_text_clusters = visual_text.text_clusters
+_font_candidates_for_char = visual_text.font_candidates_for_char
+_font_candidates_for_text = visual_text.font_candidates_for_text
+_font = visual_text.font
+_font_for_char = visual_text.font_for_char
+_font_for_text = visual_text.font_for_text
+_cluster_font_size = visual_text.cluster_font_size
+_coverage_codepoints = visual_text.coverage_codepoints
+_font_coverage = visual_text.font_coverage
+_font_supports_text = visual_text.font_supports_text
 
 
 def _compact(value: int | None) -> str:
@@ -229,28 +66,13 @@ def _fit_text_to_width(
     font: ImageFont.ImageFont,
     bold: bool = False,
 ) -> str:
-    if _text_width(draw, text, font=font, bold=bold) <= width:
-        return text
-    out = ""
-    suffix = "."
-    for cluster in _text_clusters(text):
-        candidate = f"{out}{cluster}{suffix}"
-        if _text_width(draw, candidate, font=font, bold=bold) > width:
-            break
-        out += cluster
-    return (out.rstrip() + suffix) if out.strip() else suffix
+    return visual_text.fit_text_to_width(draw, text, width=width, base_font=font, bold=bold)
 
 
 def _text_width(
     draw: ImageDraw.ImageDraw, text: str, *, font: ImageFont.ImageFont, bold: bool = False
 ) -> int:
-    width = 0
-    for cluster in _text_clusters(text):
-        base_size = getattr(font, "size", 20)
-        cluster_font = _font_for_text(cluster, _cluster_font_size(cluster, base_size), bold=bold)
-        box = draw.textbbox((0, 0), cluster, font=cluster_font)
-        width += int(box[2] - box[0])
-    return width
+    return visual_text.text_width(draw, text, font=font, bold=bold)
 
 
 def _draw_text(
@@ -262,13 +84,7 @@ def _draw_text(
     fill: tuple[int, int, int],
     bold: bool = False,
 ) -> None:
-    x, y = xy
-    for cluster in _text_clusters(text):
-        base_size = getattr(font, "size", 20)
-        cluster_font = _font_for_text(cluster, _cluster_font_size(cluster, base_size), bold=bold)
-        draw.text((x, y), cluster, fill=fill, font=cluster_font)
-        box = draw.textbbox((0, 0), cluster, font=cluster_font)
-        x += int(box[2] - box[0])
+    visual_text.draw_text(draw, xy, text, fill=fill, font=font, bold=bold)
 
 
 def _cell(

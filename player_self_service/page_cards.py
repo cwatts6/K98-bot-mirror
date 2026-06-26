@@ -9,8 +9,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from core import visual_text
 from player_self_service.service import PlayerSelfServiceSummary
-from prekvk import report_image_renderer as text_renderer
 
 WIDTH = 1702
 HEIGHT = 924
@@ -56,11 +56,11 @@ class MetricCell:
 
 
 def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
-    return text_renderer._font(size, bold=bold)
+    return visual_text.font(size, bold=bold)
 
 
 def _text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:
-    return text_renderer._text_width(draw, text, font=font)
+    return visual_text.text_width(draw, text, font=font)
 
 
 def _fit(
@@ -72,10 +72,10 @@ def _fit(
     min_size: int = 18,
     bold: bool = False,
 ) -> ImageFont.ImageFont:
-    font = text_renderer._font_for_text(text, size, bold=bold)
+    font = visual_text.font_for_text(text, size, bold=bold)
     while size > min_size and _text_width(draw, text, font) > width:
         size -= 1
-        font = text_renderer._font_for_text(text, size, bold=bold)
+        font = visual_text.font_for_text(text, size, bold=bold)
     return font
 
 
@@ -95,8 +95,8 @@ def _draw_text(
 ) -> None:
     font = font or _font(28, bold=bold)
     shadow_xy = (xy[0] + 3, xy[1] + 3)
-    text_renderer._draw_text(draw, shadow_xy, text, fill=SHADOW, font=font, bold=bold)
-    text_renderer._draw_text(draw, xy, text, fill=fill, font=font, bold=bold)
+    visual_text.draw_text(draw, shadow_xy, text, fill=SHADOW, font=font, bold=bold)
+    visual_text.draw_text(draw, xy, text, fill=fill, font=font, bold=bold)
 
 
 def _status_color(value: str) -> tuple[int, int, int]:
@@ -156,7 +156,7 @@ def _badge(draw: ImageDraw.ImageDraw, *, x: int, y: int, text: str) -> None:
     bbox = draw.textbbox((0, 0), label, font=font)
     label_width = bbox[2] - bbox[0]
     label_height = bbox[3] - bbox[1]
-    text_renderer._draw_text(
+    visual_text.draw_text(
         draw,
         (
             x + (width - label_width) // 2 - bbox[0],
@@ -292,7 +292,7 @@ def _fit_cell_value(
     value = _clean(cell.value, fallback="-")
     size = cell.value_size
     while size > cell.value_min_size:
-        font = text_renderer._font_for_text(value, size, bold=True)
+        font = visual_text.font_for_text(value, size, bold=True)
         lines = (
             _summarize_items_for_width(
                 draw,
@@ -310,7 +310,7 @@ def _fit_cell_value(
             return font, lines
         size -= 1
 
-    font = text_renderer._font_for_text(value, cell.value_min_size, bold=True)
+    font = visual_text.font_for_text(value, cell.value_min_size, bold=True)
     if cell.compact_items:
         lines = _summarize_items_for_width(
             draw,
@@ -337,7 +337,7 @@ def _draw_wrapped_lines(
     cursor_y = y
     for line in lines:
         text = _clean(line, fallback="-")
-        font = text_renderer._font_for_text(text, size, bold=True)
+        font = visual_text.font_for_text(text, size, bold=True)
         wrapped = _wrap_text(draw, text, width=width, font=font)
         if len(wrapped) == 1:
             font = _fit(draw, text, width=width, size=size, min_size=28, bold=True)
