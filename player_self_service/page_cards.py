@@ -685,10 +685,10 @@ def _page_copy(
         )
     if page == "preferences":
         return (
-            "Preferences",
+            "Inventory Preferences",
             summary.preferences.inventory_visibility,
             _preference_actions(summary),
-            "Switch inventory visibility or update VIP level.",
+            "Switch inventory report visibility or update inventory VIP levels.",
             _preference_lines(summary),
         )
     if page == "inventory":

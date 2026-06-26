@@ -7,7 +7,7 @@
 - Owner/context: Player Self-Service Command Centre programme after Phase 11 Shared Visual-Card Renderer Consolidation was delivered in production PR #483 and smoke tested successfully
 - Task type: `Discord interaction feature | preferences product model | service-backed persistence | player self-service UX`
 - One-pass approved: `no`
-- Status: `ready for audit/scope; implementation not started`
+- Status: `audit complete; Slice 1 implementation approved for Inventory Preferences copy and docs`
 
 ## 2. Required Reading
 
@@ -117,13 +117,15 @@ Codex should audit these categories, then recommend only the ones that are safe 
 
 | Candidate | Current signal | Phase 12 decision needed |
 | --- | --- | --- |
-| Inventory report visibility | Already service-backed through `inventory.reporting_service` and `/me preferences` | Preserve or refine the existing control without behavior drift. |
-| Inventory VIP levels | Already surfaced from `/me preferences` through the Inventory VIP prompt | Preserve and consider whether status/copy should improve. |
-| Export defaults | `/me exports` has option windows but no obvious saved default model | Audit whether default format/scope preferences exist; defer if not persisted. |
-| Stats output defaults/privacy | Existing stats commands/export paths may have behavior but not a shared player preference model | Audit before proposing any control. |
-| Main account behavior | Account centre has registration/main-account concepts | Audit whether a preference belongs here or remains account management. |
-| Local time/timezone | Calendar/reminder display may depend on local-time helpers | Validate existing persistence before adding a player control. |
-| Notification/reminder preferences | `/me reminders` already owns reminder-specific event/time preferences | Keep reminder-specific configuration in the reminder centre unless a cross-cutting preference is clearly useful. |
+| Inventory report visibility | Already service-backed through `inventory.reporting_service` and `/me preferences` | Deliver in Slice 1; preserve the existing mutation path and legacy `/inventory_preferences`. |
+| Inventory VIP levels | Already surfaced from `/me preferences` through the Inventory VIP prompt | Deliver in Slice 1; preserve the existing Inventory VIP update handoff. |
+| Export defaults | `/me exports` has option windows but no persisted player-default model | Keep out of `/me preferences`; current system defaults are adequate for low-frequency use. |
+| Stats output defaults/privacy | Existing stats export behavior is intentionally ephemeral | Keep out of `/me preferences`; do not add a persisted store. |
+| Main account behavior | Account centre owns registration and main-account behavior | Keep in `/me accounts`; do not treat as a preference setting. |
+| Local time/timezone | Session timezone behavior supports players away from their usual location | Defer stored timezone to Phase 12B for planning insight only; do not replace the current session local-time toggle. |
+| Location country | Useful future planning signal, but no player preference store exists | Defer to Phase 12B as Discord-user-level profile data. |
+| Preferred language | Useful future localization signal, but no player preference store exists | Defer to Phase 12B as Discord-user-level profile data. |
+| Notification/reminder preferences | `/me reminders` already owns reminder-specific event/time preferences | Keep reminder-specific configuration in `/me reminders` and legacy reminder paths. |
 
 ## 7. Architecture Direction
 

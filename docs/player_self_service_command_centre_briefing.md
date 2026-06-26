@@ -40,11 +40,12 @@ register or replace without asking the player to remember or re-enter the select
 The reminder centre supports private KVK event reminder review, setup, automatic updates, and
 remove-all/unsubscribe with confirmation through one primary Manage journey. The same Manage
 journey can now open Calendar Settings for calendar reminder event types and lead times.
-`/me preferences` can update inventory report visibility between private and public output and can
-open the existing Governor VIP update flow. `/me inventory` shows a private summary of latest
-approved resources, speedups, and materials for your registered governors. If no approved
-inventory data exists yet, it points you toward the inventory upload process. Open Report keeps the
-existing inventory report picker, range controls, visibility behavior, and export buttons.
+`/me preferences` is currently an Inventory Preferences page: it can update inventory report
+visibility between private and public output and can open the existing Governor VIP update flow.
+`/me inventory` shows a private summary of latest approved resources, speedups, and materials for
+your registered governors. If no approved inventory data exists yet, it points you toward the
+inventory upload process. Open Report keeps the existing inventory report picker, range controls,
+visibility behavior, and export buttons.
 `/me exports` can open private option windows for Stats and Inventory exports. Stats exports
 support Excel, CSV, and Google Sheets formats plus 30, 60, 90, 180, and 360 day windows,
 defaulting to Excel and 90 days. Inventory exports support format, view, registered-governor
@@ -321,9 +322,10 @@ Phase 11C implementation notes:
 
 Next phase:
 
-- Phase 12 Preferences Hub Expansion is the next planned Player Self-Service slice. The Phase 12
-  task pack and starter are prepared, and implementation should start with an audit/scope pass
-  before adding any new preference controls.
+- Phase 12 Preferences Hub Expansion has started with an audit-led Slice 1 that keeps
+  `/me preferences` focused on the existing service-backed Inventory visibility and VIP controls.
+- A later Phase 12B should scope Discord-user-level timezone, location country, and preferred
+  language persistence before adding card display or Manage controls.
 - Legacy export redirect/removal remains a later Player Self-Service phase.
 - Export schema/format redesign remains a separate export-output programme unless explicitly
   narrowed later.

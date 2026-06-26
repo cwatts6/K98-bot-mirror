@@ -295,13 +295,13 @@ Check DM status / troubleshooting guidance
 
 ### `/me preferences` should stay lightweight
 
-The first pass should focus only on preferences that already exist or are clearly needed:
+The first pass should focus only on preferences that already exist and can be saved safely:
 
 ```text
 Inventory visibility
-Default output privacy where supported
-Preferred account / main account behaviour
-Future: timezone/local-time preferences if the calendar stack supports it
+Inventory VIP levels
+Future: Discord-user-level timezone, location country, and preferred language after a dedicated
+SQL-backed preference/profile store is approved
 ```
 
 ### `/me exports` should be a launchpad, not a rewrite
@@ -822,19 +822,20 @@ Approved implementation slicing:
 
 ### Phase 12 — Preferences Hub Expansion
 
-Status: task pack and starter prepared; implementation not started.
+Status: audit complete; Slice 1 implementation narrows `/me preferences` to the existing
+service-backed Inventory Preferences controls.
 
 Expand `/me preferences` only after the persistence and product model are clear.
 
-Likely deliverables:
+Slice 1 deliverables:
 
-- preference inventory across inventory, stats, exports, account behavior, local time, and
-  notification-like settings
-- SQL/JSON persistence validation for each candidate preference
-- service-backed mutations only where privacy, restart safety, and legacy compatibility are
-  preserved
-- player-facing copy that avoids "coming soon" controls
-- tests for every new preference write path
+- preserve Inventory report visibility and Inventory VIP updates as the only delivered
+  `/me preferences` controls
+- refresh player-facing copy to avoid implying unsaved export, account, reminder, timezone,
+  location, or language preferences
+- document Phase 12B as a separate SQL-backed Discord-user preference/profile store for timezone,
+  location country, and preferred language
+- update focused card/view tests for the delivered copy
 
 This phase should not add preferences that cannot be saved safely.
 

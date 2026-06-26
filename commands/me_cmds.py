@@ -60,7 +60,7 @@ def register_me(bot: ext_commands.Bot) -> None:
 
     @me_group.command(
         name="preferences",
-        description="Review your private player preferences",
+        description="Review your private inventory preferences",
         guild_ids=[GUILD_ID],
     )
     @versioned("v1.00")

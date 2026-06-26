@@ -385,8 +385,9 @@ def test_reminders_embed_invites_service_backed_controls() -> None:
 def test_preferences_embed_invites_service_backed_visibility_controls() -> None:
     embed = views.build_preferences_embed(_summary(), display_name="Tester")
 
-    assert embed.title == "Preferences"
+    assert embed.title == "Inventory Preferences"
     assert "VIP level" in embed.fields[0].value
+    assert "inventory reports are posted" in embed.fields[1].value
     assert "/inventory_preferences" not in embed.fields[1].value
 
 

@@ -139,7 +139,11 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
     )
     assert _page_copy("reminders", summary)[2] == "Actions available: Manage"
     assert "manage calendar reminders" in _page_copy("reminders", summary)[3]
+    assert _page_copy("preferences", summary)[0] == "Inventory Preferences"
     assert _page_copy("preferences", summary)[2] == ("Actions available: Set Private, Update VIP")
+    assert _page_copy("preferences", summary)[3] == (
+        "Switch inventory report visibility or update inventory VIP levels."
+    )
     assert _page_copy("inventory", summary)[0] == "Inventory"
     assert _page_copy("exports", summary)[1] == "private"
     assert _page_copy("dashboard", summary)[2] == (

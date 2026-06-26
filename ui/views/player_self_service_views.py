@@ -212,8 +212,8 @@ def build_preferences_embed(
 ) -> discord.Embed:
     preferences = summary.preferences
     embed = discord.Embed(
-        title="Preferences",
-        description=f"Private preference status for {display_name}",
+        title="Inventory Preferences",
+        description=f"Private inventory preference status for {display_name}",
         color=discord.Color.teal(),
     )
     embed.add_field(
@@ -230,8 +230,8 @@ def build_preferences_embed(
         name="Available Actions",
         value=_field_value(
             [
-                "Use the visibility toggle to switch inventory report visibility.",
-                "Use Update VIP to update your inventory VIP level.",
+                "Use the visibility toggle to choose how inventory reports are posted.",
+                "Use Update VIP to keep inventory capacity assumptions accurate.",
             ]
         ),
         inline=False,
