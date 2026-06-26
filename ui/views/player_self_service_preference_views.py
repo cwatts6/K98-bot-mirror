@@ -23,10 +23,6 @@ logger = logging.getLogger(__name__)
 SummaryLoader = Callable[[int], Awaitable[PlayerSelfServiceSummary]]
 
 
-def _profile_message(profile: UserProfilePreference) -> str:
-    return "\n".join(profile.summary_lines)
-
-
 async def _defer_private(interaction: discord.Interaction) -> None:
     try:
         if not interaction.response.is_done():
