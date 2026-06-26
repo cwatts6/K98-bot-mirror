@@ -1,7 +1,8 @@
 # Codex Chat Starter - Player Self-Service Command Centre Phase 11C Inventory Renderer Migration
 
-Status: active starter for Phase 11C. This is the remaining Phase 11 slice after the delivered
-Phase 11A Shared Visual-Card Renderer Consolidation and Phase 11B KVK Renderer Migration work.
+Status: completed starter for Phase 11C. Phase 11A, Phase 11B, and Phase 11C are now delivered;
+Phase 11 Shared Visual-Card Renderer Consolidation is complete at implementation handoff pending
+normal PR/promotion smoke.
 
 Phase 11A is delivered in mirror PR #173 and production PR #481 and smoke tested successfully on
 2026-06-26. It extracted `core.visual_text`, migrated `/me` page cards to the shared glyph-safe
@@ -17,12 +18,17 @@ and `phase11b_kvk_rankings_smoke.png`, and preserved KVK visual output contracts
 dimensions, fallback behavior, special-character player-name handling, and public/private command
 behavior.
 
-The prior KVK `_text_width` measurement concern is complete in Phase 11B. Phase 11C should focus
-on `inventory/report_image_renderer.py`; do not carry the KVK fitting issue forward as remaining
-work.
+The prior KVK `_text_width` measurement concern was completed in Phase 11B and was not carried
+forward into Phase 11C.
 
-Phase 11 is not complete yet. Phase 11C must migrate the Inventory report renderer unless the
-operator explicitly re-scopes the phase.
+Phase 11C migrated `inventory/report_image_renderer.py` font loading, glyph-safe text width,
+fit-to-width, wrapping, and drawing paths to `core.visual_text` while preserving Inventory-local
+chart, panel, PNG export, filename, report visibility, range-control, export-button, SQL/data,
+and public/private command behavior. The local `phase11c_inventory_resources_smoke.png` artifact
+was rendered and inspected before handoff.
+
+The copy/paste starter below is retained as the historical execution prompt that launched the
+completed Phase 11C slice.
 
 ## Copy/Paste Starter
 

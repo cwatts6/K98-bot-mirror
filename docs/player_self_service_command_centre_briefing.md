@@ -6,7 +6,9 @@ Status: Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirr
 production PR #481, and smoke tested successfully on 2026-06-26. Phase 11B KVK Renderer Migration
 is delivered in production PR #482 and smoke tested successfully on 2026-06-26, moving the KVK
 renderer family to the shared `core.visual_text` primitive path while preserving KVK output
-contracts. The dashboard uses the
+contracts. Phase 11C Inventory Renderer Migration is delivered in this implementation slice,
+moving Inventory report text primitives to `core.visual_text` while preserving report output
+contracts, filenames, visibility behavior, range controls, and export buttons. The dashboard uses the
 same full-bleed generated private card style as the Phase 6 subpages, with large row-based text
 directly on the card background. Accounts, Reminders, Preferences, Inventory, and Exports use
 generated private visual cards with safe embed fallback. `/me inventory` summarizes latest
@@ -302,12 +304,25 @@ Phase 11B implementation notes:
 - Smoke validation preserves KVK image dimensions, filenames, fallback behavior, Unicode/player
   name handling, and public/private command behavior.
 
+Phase 11C implementation notes:
+
+- Inventory report rendering now imports `core.visual_text` directly instead of owning separate
+  font loading, text width, fit-to-width, wrapping, and drawing primitives.
+- Inventory chart layout, panel styling, footer generation, PNG export, filenames, report
+  visibility, range controls, export buttons, fallback/no-data messages, SQL/data contracts, and
+  public/private command behavior remain unchanged.
+- Focused renderer tests cover shared helper ownership, glyph-safe wrapping, PNG dimensions, and
+  special-character governor-name rendering.
+- The local `phase11c_inventory_resources_smoke.png` artifact was rendered and inspected before
+  handoff.
+- Phase 11 is complete at implementation handoff. Operator smoke should still verify
+  `/myinventory`, `/me inventory` Open Report, visibility preference behavior, range controls,
+  export buttons, and safe fallback behavior before production promotion is treated as complete.
+
 Next phase:
 
-- Phase 11C is the active next slice and must migrate Inventory report rendering text primitives.
-  The prior KVK `_text_width` measurement concern is complete in Phase 11B; Phase 11C should focus
-  on `inventory/report_image_renderer.py`. Phase 11 should not be considered complete until the
-  Inventory renderer family is migrated or the operator explicitly re-scopes the phase.
+- Phase 12 Preferences Hub Expansion is the next planned Player Self-Service slice unless the
+  operator chooses a different follow-up.
 - Broader preferences expansion and legacy export redirect/removal remain later Player
   Self-Service phases.
 - Export schema/format redesign remains a separate export-output programme unless explicitly

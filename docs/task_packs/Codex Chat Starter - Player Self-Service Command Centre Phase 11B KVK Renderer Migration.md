@@ -1,7 +1,7 @@
 # Codex Chat Starter - Player Self-Service Command Centre Phase 11B KVK Renderer Migration
 
-Status: completed starter for Phase 11B. Phase 11C Inventory Renderer Migration is the remaining
-Phase 11 slice.
+Status: completed starter for Phase 11B. Phase 11C Inventory Renderer Migration has also been
+delivered, so Phase 11 is complete at implementation handoff.
 
 Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and production
 PR #481 and smoke tested successfully on 2026-06-26. It extracted `core.visual_text`, migrated
@@ -15,8 +15,8 @@ Phase 11B is delivered in production PR #482 and smoke tested successfully by th
 special-character governor names. The KVK `_text_width` measurement concern is complete in Phase
 11B because KVK fitting now measures through the same glyph-safe primitive path used for drawing.
 
-Phase 11 is not complete yet. Phase 11C must migrate the Inventory report renderer unless the
-operator explicitly re-scopes the phase.
+Phase 11C later migrated the Inventory report renderer to the shared text primitive path while
+preserving report output contracts.
 
 ## Copy/Paste Starter
 
@@ -109,8 +109,6 @@ Acceptance criteria:
 - No command, SQL, export schema, preference, or legacy redirect behavior changes are included.
 - Focused KVK renderer/helper tests and standard validators pass.
 - At least one rendered KVK PNG smoke artifact is inspected before handoff.
-- Deferred backlog and Player Self-Service docs identify Phase 11C Inventory migration as the
-  remaining Phase 11 slice.
-- Phase 11 is not marked complete until Inventory report rendering is migrated in Phase 11C or the
-  operator explicitly re-scopes the phase.
+- Deferred backlog and Player Self-Service docs identify Phase 11C Inventory migration as delivered.
+- Phase 11 is marked complete after Inventory report rendering was migrated in Phase 11C.
 ```

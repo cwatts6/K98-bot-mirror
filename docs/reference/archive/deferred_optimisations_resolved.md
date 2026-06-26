@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Phase 11C Completed Item
+- Area: `inventory/report_image_renderer.py`
+- Type: refactor
+- Description: Phase 11A extracted shared glyph-safe text primitives into `core.visual_text`, and Phase 11B migrated the KVK renderer family away from the old PreKvK helper path. The inventory report renderer still owned local font loading, text measurement, fit-to-width, wrapping, panel drawing, and PNG export helpers.
+- Resolution: Phase 11C migrated Inventory report font loading, glyph-safe text width, fit-to-width sizing, wrapping, and text drawing to `core.visual_text` while keeping Inventory-local chart layout, panel styling, footer generation, PNG export, filenames, dimensions, report visibility behavior, range controls, export buttons, and generated report contracts unchanged.
+- Validation: Focused renderer tests cover shared helper ownership, glyph-safe wrapping, filename preservation, PNG dimensions, and special-character governor-name rendering. The local `phase11c_inventory_resources_smoke.png` artifact was rendered and inspected before handoff.
+
 ### Phase 7 Completed Item
 - Area: `build_KVKrankings_embed.py`, `ui/views/stats_views.py`, `honor_rankings_view.py`, `commands/stats_cmds.py`, legacy player ranking command compatibility paths
 - Type: refactor

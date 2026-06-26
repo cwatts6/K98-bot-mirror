@@ -1,5 +1,9 @@
 from datetime import UTC, datetime, timedelta
+from io import BytesIO
 
+from PIL import Image
+
+from core import visual_text
 from inventory import report_image_renderer
 from inventory.models import (
     InventoryGovernorProfile,
@@ -11,6 +15,88 @@ from inventory.models import (
     InventorySpeedupPoint,
 )
 from inventory.report_image_renderer import render_inventory_reports
+
+
+def test_inventory_renderer_text_helpers_delegate_to_visual_text(monkeypatch):
+    image = Image.new("RGBA", (240, 80))
+    draw = report_image_renderer.ImageDraw.Draw(image)
+    sentinel_font = object()
+    calls = {}
+
+    def _font(size, *, bold=False):
+        calls["font"] = (size, bold)
+        return sentinel_font
+
+    def _text_width(draw_arg, text, *, font):
+        calls["text_width"] = (text, font)
+        return 42
+
+    def _fit_font(draw_arg, text, *, max_width, size, min_size, bold=False):
+        calls["fit_font"] = (text, max_width, size, min_size, bold)
+        return sentinel_font
+
+    report_image_renderer._font.cache_clear()
+    monkeypatch.setattr(report_image_renderer.visual_text, "font", _font)
+    monkeypatch.setattr(report_image_renderer.visual_text, "text_width", _text_width)
+    monkeypatch.setattr(report_image_renderer.visual_text, "fit_font", _fit_font)
+
+    drawn = {}
+
+    def _draw_text(draw_arg, xy, text, *, fill, font, bold=False):
+        drawn.update({"xy": xy, "text": text, "fill": fill, "font": font, "bold": bold})
+
+    monkeypatch.setattr(report_image_renderer.visual_text, "draw_text", _draw_text)
+
+    assert report_image_renderer._font(19, bold=True) is sentinel_font
+    assert report_image_renderer._text_width(draw, "義🚀", sentinel_font) == 42
+    assert (
+        report_image_renderer._fit_font(
+            draw,
+            "Long value",
+            max_width=120,
+            size=22,
+            min_size=12,
+            bold=True,
+        )
+        is sentinel_font
+    )
+    report_image_renderer._draw_text(
+        draw,
+        (10.8, 12.2),
+        "Gov",
+        fill=report_image_renderer.TEXT,
+        font=sentinel_font,
+        bold=True,
+    )
+
+    assert calls["font"] == (19, True)
+    assert calls["text_width"] == ("義🚀", sentinel_font)
+    assert calls["fit_font"] == ("Long value", 120, 22, 12, True)
+    assert drawn == {
+        "xy": (10, 12),
+        "text": "Gov",
+        "fill": report_image_renderer.TEXT,
+        "font": sentinel_font,
+        "bold": True,
+    }
+    report_image_renderer._font.cache_clear()
+
+
+def test_inventory_wrap_text_uses_glyph_safe_width():
+    image = Image.new("RGBA", (420, 80))
+    draw = report_image_renderer.ImageDraw.Draw(image)
+    base_font = visual_text.font(18)
+
+    lines = report_image_renderer._wrap_text(
+        draw,
+        "義" * 50,
+        font=base_font,
+        max_width=120,
+        max_lines=1,
+    )
+
+    assert len(lines) == 1
+    assert report_image_renderer._text_width(draw, lines[0], base_font) <= 120
 
 
 def test_render_inventory_reports_returns_png_files_for_resources_and_speedups():
@@ -131,3 +217,24 @@ def test_render_inventory_reports_returns_materials_png():
 
     assert [item.filename for item in rendered] == ["inventory_materials_111_1M.png"]
     assert rendered[0].image_bytes.getvalue().startswith(b"\x89PNG")
+
+
+def test_render_inventory_reports_handles_special_character_governor_name():
+    now = datetime.now(UTC)
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name="義【K98】Nunez 🚀",
+        view=InventoryReportView.RESOURCES,
+        range_key=InventoryReportRange.ONE_MONTH,
+        resources=[
+            InventoryResourcePoint(now - timedelta(days=7), 100, 200, 300, 400),
+            InventoryResourcePoint(now, 200, 300, 400, 500),
+        ],
+        generated_at_utc=now,
+    )
+
+    rendered = render_inventory_reports(payload)
+
+    assert [item.filename for item in rendered] == ["inventory_resources_111_1M.png"]
+    image = Image.open(BytesIO(rendered[0].image_bytes.getvalue()))
+    assert image.size == (report_image_renderer.WIDTH, report_image_renderer.HEIGHT)

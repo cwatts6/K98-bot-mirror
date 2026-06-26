@@ -50,12 +50,12 @@ Player Self-Service Command Centre status:
   by the operator on 2026-06-26, and migrated the KVK renderer family away from the old PreKvK
   helper path. KVK stats, targets, rankings, history, and special-character governor names were
   smoke tested successfully.
-- The active next slice is Phase 11C Inventory Renderer Migration. Phase 11 remains open until
-  Inventory report renderer migration is complete or explicitly re-scoped.
+- Phase 11C Inventory Renderer Migration is delivered in this implementation slice and migrates
+  `inventory/report_image_renderer.py` text primitives to `core.visual_text` while preserving
+  Inventory report output contracts. Phase 11 is complete at implementation handoff.
 - Active Phase 11 files:
   - `Codex Task Pack - Player Self-Service Command Centre Phase 11 Shared Visual-Card Renderer Consolidation.md`
   - `Codex Chat Starter - Player Self-Service Command Centre Phase 11 Shared Visual-Card Renderer Consolidation.md`
-  - `Codex Chat Starter - Player Self-Service Command Centre Phase 11C Inventory Renderer Migration.md`
 - Active programme file:
   - `Player Self-Service Command Centre - Programme Pack.md`
 - Completed Phase 1 through Phase 10 execution records are archived under `archive/`.
@@ -140,7 +140,7 @@ Latest completed starter:
 
 Next active work:
 
-Player Self-Service Command Centre Phase 11C Inventory Renderer Migration is the next active
-renderer-consolidation slice. KVK final removal of temporary deprecated command paths remains
-captured as a deferred cleanup item for execution after the no-feedback window and operator
-approval.
+Player Self-Service Command Centre Phase 12 Preferences Hub Expansion is the next planned
+programme slice unless the operator chooses a different follow-up. KVK final removal of temporary
+deprecated command paths remains captured as a deferred cleanup item for execution after the
+no-feedback window and operator approval.

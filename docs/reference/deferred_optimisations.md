@@ -42,19 +42,6 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 5A admin/leadership/operator grouping is complete; requires operator approval, SQL-backed usage review, user-facing briefing, and a fresh task pack.
 
 ### Deferred Optimisation
-- Area: `inventory/report_image_renderer.py`
-- Type: refactor
-- Description: Phase 11A extracted shared glyph-safe text primitives into `core.visual_text`, and Phase 11B migrated the KVK renderer family away from the old PreKvK helper path, including glyph-safe text width/fitting alignment for KVK stats, targets, and rankings. The inventory report renderer still owns local font loading, text measurement, fit-to-width, wrapping, panel drawing, and PNG export helpers. Inventory report cards are visually distinct and should not be forced into the `/me` or KVK layout model, but stable primitives should still use the shared helper before Phase 11 closes.
-- Suggested Fix: Complete a Phase 11C inventory renderer migration slice that adopts `core.visual_text` for font loading, text width, fit-to-width, and wrapping where behavior can be preserved. Keep inventory chart layout, panel styling, filenames, dimensions, report visibility behavior, export buttons, and generated report contracts unchanged. Validate with focused inventory renderer tests and at least one rendered inventory PNG smoke artifact.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 11A core text helper and `/me`/PreKvK migration delivered in mirror PR #173
-  and production PR #481 and smoke tested successfully on 2026-06-26; Phase 11B KVK renderer
-  migration completed in production PR #482 and was smoke tested successfully on 2026-06-26,
-  including special-character governor names; Inventory migration remains required before Phase 11
-  is considered done.
-
-### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `/my_stats_export`, `/export_inventory`, player self-service docs/tests
 - Type: cleanup
 - Description: Phase 9 keeps `/my_stats_export` and `/export_inventory` live while making `/me exports` the preferred route with Stats and Inventory option windows. The legacy paths remain useful compatibility surfaces, but they still need a deliberate communication, monitoring, redirect, deprecation, or removal decision after Phase 9 is smoke tested.

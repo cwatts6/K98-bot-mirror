@@ -37,10 +37,20 @@ Status as of 2026-06-26:
   production PR #481, smoke tested successfully by the operator on 2026-06-26, and established
   `core.visual_text` as the shared glyph-safe text primitive layer for `/me` page cards and
   PreKvK compatibility wrappers.
-- Phase 11B KVK Renderer Migration is delivered in this implementation slice. It migrates KVK
-  stats and targets directly to `core.visual_text`, keeps history and rankings on KVK-local text
-  wrappers backed by the shared helper, preserves KVK visual-card output contracts, and includes
-  the inspected local `phase11b_kvk_stats_smoke.png` artifact.
+- Phase 11B KVK Renderer Migration is delivered in production PR #482 and smoke tested
+  successfully by the operator on 2026-06-26. It migrated KVK stats and targets directly to
+  `core.visual_text`, kept history and rankings on KVK-local text wrappers backed by the shared
+  helper, preserved KVK visual-card output contracts, and included the inspected local
+  `phase11b_kvk_stats_smoke.png` and `phase11b_kvk_rankings_smoke.png` artifacts.
+- Phase 11C Inventory Renderer Migration is delivered in this implementation slice. It migrates
+  `inventory/report_image_renderer.py` font loading, glyph-safe text width, fit-to-width,
+  wrapping, and drawing paths to `core.visual_text`, while keeping Inventory-local chart, panel,
+  PNG export, filename, report visibility, range-control, and export-button behavior unchanged.
+  Focused tests cover shared helper ownership and special-character governor-name rendering, and
+  the local `phase11c_inventory_resources_smoke.png` artifact was rendered for inspection.
+- Phase 11 Shared Visual-Card Renderer Consolidation is now complete at implementation handoff;
+  operator smoke should still cover `/myinventory` report delivery and `/me inventory` Open Report
+  handoff before production promotion is treated as complete.
 - The delivered `/me` surface now includes a private command-centre shell, a generated dashboard
   card with safe embed fallback, generated cards for Accounts, Reminders, Preferences, and
   Inventory, and Exports, account-centre lookup/register/replace/remove management, unified KVK/calendar
@@ -49,9 +59,9 @@ Status as of 2026-06-26:
   dashboard Inventory/Exports handoffs, private Inventory summary data, option-window based
   private stats and inventory exports, graceful timeout handling, and return navigation. Legacy
   account, reminder, inventory, calendar reminder, and export commands remain live.
-- Next active scope: Phase 11C Inventory Renderer Migration. Phase 11 remains open until the
-  Inventory report renderer family is migrated to the shared primitive layer where practical,
-  unless the operator explicitly re-scopes the phase.
+- Next active programme scope: Phase 12 Preferences Hub Expansion, unless the operator chooses a
+  different follow-up. Legacy redirects/removal and export schema redesign remain separate later
+  decisions.
 
 Phase 2 manual smoke evidence:
 
@@ -745,7 +755,8 @@ Phase 10 manual smoke evidence:
 
 ### Phase 11 — Shared Visual-Card Renderer Consolidation
 
-Status: Phase 11A and Phase 11B delivered and smoke tested; Phase 11C active next.
+Status: Phase 11A, Phase 11B, and Phase 11C delivered; Phase 11 complete at implementation
+handoff pending normal PR/promotion smoke.
 
 Consolidate stable visual-card primitives after the `/me` Inventory card fills the last obvious
 page-level visual gap and launch/legacy decisions are not competing for product attention.
@@ -782,14 +793,18 @@ Phase 11B delivered:
 - preserved KVK card dimensions, filenames, fallback behavior, Unicode/player-name degradation,
   and public/private command behavior
 
-Remaining Phase 11 deliverables:
+Phase 11C delivered:
 
-- migrate one renderer family at a time, with Phase 11 not considered complete until the inventory
-  renderer family is migrated where practical
-- preserve existing card filenames, dimensions, output bytes contracts, fallback behavior, and
-  player-name Unicode handling
-- add focused renderer tests and at least one visual/PNG smoke artifact for each changed renderer
-  family
+- migrated `inventory/report_image_renderer.py` font loading, glyph-safe width measurement,
+  fit-to-width sizing, wrapping, and text drawing to `core.visual_text`
+- kept Inventory report chart, panel, footer, and PNG export ownership local to the Inventory
+  renderer because those helpers define report-specific layout and generated report contracts
+- preserved Inventory report dimensions, filenames, report message content, fallback/no-data
+  behavior, report visibility, range controls, export buttons, SQL/data contracts, and public/private
+  command behavior
+- added focused Inventory renderer tests for shared helper ownership, glyph-safe wrapping,
+  generated filename preservation, PNG dimensions, and special-character governor names
+- rendered and inspected `phase11c_inventory_resources_smoke.png`
 
 Approved implementation slicing:
 
@@ -799,8 +814,9 @@ Approved implementation slicing:
 - Phase 11B delivered the KVK renderer family (`kvk/rendering/`) migration to the shared helper
   while preserving KVK stats, targets, rankings, and history output contracts. The earlier
   `_text_width` measurement concern is complete in Phase 11B, not deferred to Phase 11C.
-- Phase 11C must migrate `inventory/report_image_renderer.py` text primitives to the shared helper
-  while preserving report layout, filenames, dimensions, and existing report/export behavior.
+- Phase 11C delivered the Inventory report renderer migration to the shared helper while preserving
+  report layout, filenames, dimensions, and existing report/export behavior. Phase 11 is now
+  complete unless the operator requests additional renderer families.
 
 ### Phase 12 — Preferences Hub Expansion
 
@@ -1041,17 +1057,14 @@ Do not include these in the first build unless separately approved:
 
 ## 18. Suggested Next Action
 
-Start Phase 11C:
+Start Phase 12 when approved:
 
 ```text
-Inventory Renderer Migration
+Preferences Hub Expansion
 ```
 
-Use `Codex Chat Starter - Player Self-Service Command Centre Phase 11C Inventory Renderer Migration.md`
-to migrate `inventory/report_image_renderer.py` text primitives to `core.visual_text`. Keep
-inventory report layout, dimensions, filenames, fallback behavior, report visibility, export
-buttons, and generated report contracts unchanged.
-Preferences expansion and legacy export redirect/removal remain later programme phases, and export
-schema/format redesign remains a separate export-output programme unless explicitly narrowed
-later. Do not redirect or remove `/my_stats_export` or `/export_inventory` without explicit
-operator approval, player communication, and a no-feedback monitoring window.
+Phase 12 should expand `/me preferences` only after the persistence and product model are clear.
+Legacy export redirect/removal remains a later programme phase, and export schema/format redesign
+remains a separate export-output programme unless explicitly narrowed later. Do not redirect or
+remove `/my_stats_export` or `/export_inventory` without explicit operator approval, player
+communication, and a no-feedback monitoring window.

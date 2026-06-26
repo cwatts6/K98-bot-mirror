@@ -9,6 +9,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
+from core import visual_text
 from inventory.capacity_calculations import (
     rss_healing_capacity,
     rss_training_capacity,
@@ -58,16 +59,7 @@ class RenderedInventoryImage:
 
 @lru_cache(maxsize=32)
 def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    candidates = [
-        "C:/Windows/Fonts/segoeuib.ttf" if bold else "C:/Windows/Fonts/segoeui.ttf",
-        "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
-    ]
-    for candidate in candidates:
-        try:
-            return ImageFont.truetype(candidate, size=size)
-        except Exception:
-            continue
-    return ImageFont.load_default()
+    return visual_text.font(size, bold=bold)
 
 
 def _compact(value: int | float | None, suffix: str = "") -> str:
@@ -118,8 +110,9 @@ def _draw_header(
     avatar_bytes: bytes | None,
 ) -> None:
     _paste_icon(canvas, logo, (44, 32, 116, 104))
-    draw.text((132, 40), title, fill=TEXT, font=_font(34, bold=True))
-    draw.text(
+    _draw_text(draw, (132, 40), title, fill=TEXT, font=_font(34, bold=True), bold=True)
+    _draw_text(
+        draw,
         (132, 82),
         f"{governor_name} ({governor_id})  |  Range {range_key}",
         fill=MUTED,
@@ -138,8 +131,7 @@ def _panel(draw: ImageDraw.ImageDraw, xy: tuple[int, int, int, int], fill=PANEL)
 
 
 def _text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:
-    box = draw.textbbox((0, 0), text, font=font)
-    return int(box[2] - box[0])
+    return visual_text.text_width(draw, text, font=font)
 
 
 def _fit_font(
@@ -151,11 +143,26 @@ def _fit_font(
     min_size: int,
     bold: bool = False,
 ) -> ImageFont.ImageFont:
-    font = _font(size, bold=bold)
-    while size > min_size and _text_width(draw, text, font) > max_width:
-        size -= 1
-        font = _font(size, bold=bold)
-    return font
+    return visual_text.fit_font(
+        draw,
+        text,
+        max_width=max_width,
+        size=size,
+        min_size=min_size,
+        bold=bold,
+    )
+
+
+def _draw_text(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[float, float],
+    text: str,
+    *,
+    fill: tuple[int, int, int] | tuple[int, int, int, int],
+    font: ImageFont.ImageFont,
+    bold: bool = False,
+) -> None:
+    visual_text.draw_text(draw, (int(xy[0]), int(xy[1])), text, fill=fill, font=font, bold=bold)
 
 
 def _wrap_text(
@@ -210,9 +217,9 @@ def _draw_kpi(
     title_font = _fit_font(draw, title, max_width=title_w, size=18, min_size=13, bold=True)
     value_font = _fit_font(draw, value, max_width=content_w, size=34, min_size=24, bold=True)
     delta_font = _fit_font(draw, delta, max_width=content_w, size=20, min_size=11, bold=True)
-    draw.text((title_x, y1 + 20), title, fill=MUTED, font=title_font)
+    _draw_text(draw, (title_x, y1 + 20), title, fill=MUTED, font=title_font, bold=True)
     value_xy = (x1 + 20, y1 + 68)
-    draw.text(value_xy, value, fill=TEXT, font=value_font)
+    _draw_text(draw, value_xy, value, fill=TEXT, font=value_font, bold=True)
     value_box = draw.textbbox(value_xy, value, font=value_font)
     separator_y = min(max(value_box[3] + 14, y1 + 108), y2 - 36)
     draw.line((x1 + 18, separator_y, x2 - 18, separator_y), fill=(65, 127, 187), width=1)
@@ -220,7 +227,14 @@ def _draw_kpi(
     for idx, line in enumerate(
         _wrap_text(draw, delta, font=delta_font, max_width=content_w, max_lines=max_delta_lines)
     ):
-        draw.text((x1 + 20, separator_y + 10 + (idx * 22)), line, fill=delta_color, font=delta_font)
+        _draw_text(
+            draw,
+            (x1 + 20, separator_y + 10 + (idx * 22)),
+            line,
+            fill=delta_color,
+            font=delta_font,
+            bold=True,
+        )
 
 
 def _chart_ticks(min_v: float, max_v: float, *, count: int = 5) -> list[float]:
@@ -265,7 +279,13 @@ def _line_chart(
     x1, y1, x2, y2 = xy
     visible_values = _series_values(series)
     if len(labels) < 2 or not visible_values:
-        draw.text((x1 + 24, y1 + 26), "Trend graph unavailable", fill=MUTED, font=_font(22))
+        _draw_text(
+            draw,
+            (x1 + 24, y1 + 26),
+            "Trend graph unavailable",
+            fill=MUTED,
+            font=_font(22),
+        )
         return
 
     min_v = 0.0
@@ -279,7 +299,7 @@ def _line_chart(
         y = plot[3] - ((tick - min_v) / span) * (plot[3] - plot[1])
         draw.line((plot[0], y, plot[2], y), fill=GRID, width=1)
         label = _axis_label(tick, suffix=y_suffix)
-        draw.text((x1 + 20, y - 9), label, fill=AXIS, font=_font(15))
+        _draw_text(draw, (x1 + 20, y - 9), label, fill=AXIS, font=_font(15))
     draw.line((plot[0], plot[1], plot[0], plot[3]), fill=AXIS, width=2)
     draw.line((plot[0], plot[3], plot[2], plot[3]), fill=AXIS, width=2)
 
@@ -287,7 +307,13 @@ def _line_chart(
     for idx in axis_indices:
         x = plot[0] + (plot[2] - plot[0]) * idx / max(len(labels) - 1, 1)
         draw.line((x, plot[3], x, plot[3] + 6), fill=AXIS, width=1)
-        draw.text((x - 24, plot[3] + 12), _date_axis_label(labels[idx]), fill=AXIS, font=_font(15))
+        _draw_text(
+            draw,
+            (x - 24, plot[3] + 12),
+            _date_axis_label(labels[idx]),
+            fill=AXIS,
+            font=_font(15),
+        )
 
     series_with_colors = list(zip(series.items(), colors, strict=False))
     fill_layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
@@ -317,7 +343,7 @@ def _line_chart(
     legend_x = plot[0]
     for name, color in zip(series.keys(), colors, strict=False):
         draw.rounded_rectangle((legend_x, y2 - 42, legend_x + 22, y2 - 22), radius=4, fill=color)
-        draw.text((legend_x + 30, y2 - 46), name, fill=TEXT, font=_font(17))
+        _draw_text(draw, (legend_x + 30, y2 - 46), name, fill=TEXT, font=_font(17))
         legend_x += 180
 
 
@@ -447,7 +473,8 @@ def render_resources_report(
             [RESOURCE_CHART_COLORS[name] for name in resource_series],
         )
     else:
-        draw.text(
+        _draw_text(
+            draw,
             (56, 526),
             "Latest approved scan only. Trend graph appears after a second approved scan.",
             fill=MUTED,
@@ -550,7 +577,8 @@ def render_speedups_report(
             y_suffix="d",
         )
     else:
-        draw.text(
+        _draw_text(
+            draw,
             (56, 560),
             "Latest approved scan only. Trend graph appears after a second approved scan.",
             fill=MUTED,
@@ -649,7 +677,8 @@ def render_materials_report(
             [MATERIAL_CHART_COLORS[name] for name in series],
         )
     else:
-        draw.text(
+        _draw_text(
+            draw,
             (56, 548),
             "Only one approved Materials import is available. Add another approved import to show trends.",
             fill=MUTED,
@@ -673,13 +702,15 @@ def render_inventory_reports(
 
 def _export(canvas: Image.Image, filename: str) -> RenderedInventoryImage:
     generated = ImageDraw.Draw(canvas)
-    generated.text(
+    _draw_text(
+        generated,
         (44, 944),
         "Generated from approved inventory imports",
         fill=MUTED,
         font=_font(16),
     )
-    generated.text(
+    _draw_text(
+        generated,
         (1110, 944),
         f"{datetime.now(UTC):%Y-%m-%d %H:%M UTC}",
         fill=MUTED,
