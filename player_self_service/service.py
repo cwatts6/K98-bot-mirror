@@ -16,6 +16,7 @@ from event_calendar.reminder_config_service import (
 from inventory import profile_service, reporting_service
 from inventory.models import InventoryReportVisibility, RegisteredGovernor
 from inventory.parsing import format_resource_value
+from player_self_service import profile_preference_service
 from services.governor_account_service import (
     AccountResolutionSummary,
     get_account_summary_for_user,
@@ -95,6 +96,9 @@ class PreferenceStatus:
     exports_summary: str
     next_action: str
     vip_summary: str = "use Update VIP to set account VIP levels"
+    timezone: str = "not set"
+    location_country: str = "not set"
+    preferred_language: str = "not set"
     error: str | None = None
 
 
@@ -159,6 +163,9 @@ AccountLoader = Callable[[int], Awaitable[AccountResolutionSummary]]
 ReminderLoader = Callable[[int], dict[str, Any] | None]
 CalendarReminderLoader = Callable[[int], CalendarReminderConfigState]
 PreferenceLoader = Callable[[int], Awaitable[Any]]
+ProfilePreferenceLoader = Callable[
+    [int], Awaitable[profile_preference_service.UserProfilePreferenceRead]
+]
 VipProfileLoader = Callable[[int], Awaitable[Any]]
 InventorySnapshotLoader = Callable[
     [list[RegisteredGovernor]], Awaitable[reporting_service.LatestInventorySnapshot]
@@ -315,9 +322,15 @@ async def summarize_preference_status(
     discord_user_id: int,
     *,
     preference_loader: PreferenceLoader = reporting_service.read_visibility_preference,
+    profile_preference_loader: ProfilePreferenceLoader = (
+        profile_preference_service.read_user_profile_preference
+    ),
 ) -> PreferenceStatus:
     try:
-        result = await preference_loader(discord_user_id)
+        result, profile_result = await asyncio.gather(
+            preference_loader(discord_user_id),
+            profile_preference_loader(discord_user_id),
+        )
     except asyncio.CancelledError:
         raise
     except Exception as exc:
@@ -332,12 +345,28 @@ async def summarize_preference_status(
             error=f"{type(exc).__name__}: {exc}",
         )
 
+    profile_error = None
+    timezone = "not set"
+    location_country = "not set"
+    preferred_language = "not set"
+    if getattr(profile_result, "ok", False):
+        profile = getattr(profile_result, "profile", None)
+        if profile is not None:
+            timezone = getattr(profile, "timezone_label", "not set")
+            location_country = getattr(profile, "country_label", "not set")
+            preferred_language = getattr(profile, "language_label", "not set")
+    else:
+        profile_error = getattr(profile_result, "error", None) or "profile source unavailable"
+
     ok = bool(getattr(result, "ok", True))
     if not ok:
         return PreferenceStatus(
             inventory_visibility="unknown",
             exports_summary="available through private export tools",
             next_action="Try again",
+            timezone=timezone,
+            location_country=location_country,
+            preferred_language=preferred_language,
             error=getattr(result, "error", None) or "preference source unavailable",
         )
 
@@ -356,6 +385,10 @@ async def summarize_preference_status(
         inventory_visibility=label,
         exports_summary="available through private export tools",
         next_action=next_action,
+        timezone=timezone,
+        location_country=location_country,
+        preferred_language=preferred_language,
+        error=profile_error,
     )
 
 
@@ -617,6 +650,9 @@ async def build_player_self_service_summary(
     reminder_loader: ReminderLoader = get_user_config,
     calendar_reminder_loader: CalendarReminderLoader = load_user_calendar_reminder_state,
     preference_loader: PreferenceLoader = reporting_service.read_visibility_preference,
+    profile_preference_loader: ProfilePreferenceLoader = (
+        profile_preference_service.read_user_profile_preference
+    ),
     vip_profile_loader: VipProfileLoader = profile_service.fetch_inventory_profile,
     inventory_snapshot_loader: InventorySnapshotLoader = (
         reporting_service.build_latest_inventory_snapshot
@@ -626,6 +662,7 @@ async def build_player_self_service_summary(
     preference_task = summarize_preference_status(
         int(discord_user_id),
         preference_loader=preference_loader,
+        profile_preference_loader=profile_preference_loader,
     )
     account_summary, preferences = await asyncio.gather(account_summary_task, preference_task)
     vip_summary = await summarize_vip_status(

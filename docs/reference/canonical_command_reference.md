@@ -144,7 +144,7 @@ Legend:
 | Player Self-Service | `/me dashboard` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 9 dashboard Inventory/Exports handoffs delivered | Private player command centre status dashboard with generated visual card and embed fallback. Phase 9 removes KVK Quick Launch targets and keeps only safe private Inventory and Exports handoffs. `/me` owns the cross-domain player portal because account, reminder, preference, export, and inventory guidance do not fit cleanly under one existing domain group. |
 | Player Self-Service | `/me accounts` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 6 generated card and guided Manage flow smoke tested | Private account centre for account review, Governor ID lookup, registration, replacement, and removal with confirmation through one guided Manage journey. |
 | Player Self-Service | `/me reminders` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 7 unified KVK and calendar reminder centre delivered | Private reminder centre for KVK event reminder review/autosave/remove-all plus calendar reminder status and service-backed calendar reminder configuration. `/calendar_reminder_config` remains live in parallel. |
-| Player Self-Service | `/me preferences` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 12 Slice 1 keeps the page focused on service-backed Inventory Preferences | Private inventory preference status with service-backed inventory visibility controls and access to the existing Governor VIP update flow. |
+| Player Self-Service | `/me preferences` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 12B adds SQL-backed Discord-user profile preferences | Private preference status with service-backed inventory visibility controls, access to the existing Governor VIP update flow, and Manage Profile controls for Discord-user-level timezone, location country, and preferred language. Location country is stored as a two-letter code and displayed with a derived readable country name. |
 | Player Self-Service | `/me inventory` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 10 inventory summary card delivered and smoke tested | Private Inventory summary card using latest approved resources, speedups, and materials data for the player's registered governors, with no-data upload guidance and an Open Report handoff to the preserved `/myinventory` journey. |
 | Player Self-Service | `/me exports` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 9 preferred export route with option windows | Private personal export centre with `Export Stats` and `Export Inventory` child option windows. Stats supports Excel, CSV, and Google Sheets formats plus day-window selection. Inventory supports format, view, registered-governor scope, and day-window selection. Legacy `/my_stats_export` and `/export_inventory` remain live for compatibility. |
 | Ops | `/ops summary` | `commands/admin_cmds.py` | Grouped | Public command-level access | Public | Standard | Preserve | Daily file-processing summary. |
@@ -250,8 +250,11 @@ Legend:
   `/me exports` the preferred export route with Stats and Inventory option windows while keeping
   `/my_stats_export` and `/export_inventory` live. Phase 10 added a matching `/me inventory`
   generated card using latest approved inventory data, kept `/myinventory` as the detailed report
-  journey, and was smoke tested successfully in production PR #480. Existing legacy self-service
-  and calendar reminder commands remain registered in parallel.
+  journey, and was smoke tested successfully in production PR #480. Phase 12B adds SQL-backed
+  Discord-user-level timezone, location country, and preferred language profile preferences to
+  `/me preferences` while preserving Inventory visibility, Inventory VIP, and the current
+  session-based local-time toggle. Existing legacy self-service and calendar reminder commands
+  remain registered in parallel.
 - Legacy player self-service paths remain registered in parallel while the `/me` workflow rolls out.
 - Public calendar and KVK calendar paths remain flat pending a dedicated UX redesign.
 - `/ping` remains flat for simple health/debug discoverability.

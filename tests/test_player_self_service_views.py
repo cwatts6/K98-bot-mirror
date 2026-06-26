@@ -13,6 +13,11 @@ from player_self_service.account_service import (
     AccountMutationResult,
 )
 from player_self_service.preference_service import PreferenceMutationResult
+from player_self_service.profile_preference_service import (
+    UserProfilePreference,
+    UserProfilePreferenceMutationResult,
+    UserProfilePreferenceRead,
+)
 from player_self_service.reminder_service import (
     ReminderCentreState,
     ReminderMessage,
@@ -30,6 +35,7 @@ from player_self_service.service import (
 )
 from ui.views import (
     player_self_service_account_views as account_views,
+    player_self_service_preference_views as preference_views,
     player_self_service_reminder_views as reminder_views,
     player_self_service_views as views,
 )
@@ -57,6 +63,9 @@ def _summary() -> PlayerSelfServiceSummary:
             inventory_visibility="private",
             exports_summary="available through private export tools",
             next_action="Review preferences",
+            timezone="Europe/London",
+            location_country="United Kingdom (GB)",
+            preferred_language="English (en-GB)",
         ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
@@ -385,9 +394,11 @@ def test_reminders_embed_invites_service_backed_controls() -> None:
 def test_preferences_embed_invites_service_backed_visibility_controls() -> None:
     embed = views.build_preferences_embed(_summary(), display_name="Tester")
 
-    assert embed.title == "Inventory Preferences"
+    assert embed.title == "Preferences"
     assert "VIP level" in embed.fields[0].value
+    assert "Location: United Kingdom (GB)" in embed.fields[0].value
     assert "inventory reports are posted" in embed.fields[1].value
+    assert "Manage Profile" in embed.fields[1].value
     assert "/inventory_preferences" not in embed.fields[1].value
 
 
@@ -519,6 +530,7 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             *nav_row,
             ("Set Public", 2, success, False),
             ("Update VIP", 2, success, False),
+            ("Manage Profile", 2, success, False),
         ],
     )
     _assert_button_layout(
@@ -947,9 +959,8 @@ async def test_preferences_view_keeps_inventory_and_exports_navigation() -> None
     )
 
     labels = [getattr(child, "label", None) for child in view.children]
-    assert {"Set Public", "Update VIP"}.issubset(set(labels))
+    assert {"Set Public", "Update VIP", "Manage Profile"}.issubset(set(labels))
     assert "Set Private" not in labels
-    assert "Manage" not in labels
     assert "Inventory" in labels
     assert "Exports" in labels
 
@@ -1268,6 +1279,145 @@ async def test_preference_vip_button_reuses_inventory_vip_prompt(monkeypatch) ->
 
     assert calls == [(interaction, 42)]
     assert interaction.followup.sent[-1][0][0] == "Choose a governor and VIP level:"
+
+
+@pytest.mark.asyncio
+async def test_preference_profile_button_opens_private_profile_manager(monkeypatch) -> None:
+    async def fake_read(user_id: int):
+        assert user_id == 42
+        return UserProfilePreferenceRead(
+            ok=True,
+            profile=UserProfilePreference(
+                timezone_name="Europe/London",
+                location_country_code="GB",
+                preferred_language_tag="en-GB",
+            ),
+        )
+
+    monkeypatch.setattr(
+        views.profile_preference_service,
+        "read_user_profile_preference",
+        fake_read,
+    )
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_PREFERENCES,
+        summary=_summary(),
+    )
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:preference:profile"
+    )
+
+    await button.callback(interaction)
+
+    args, kwargs, _message = interaction.followup.sent[-1]
+    assert "United Kingdom (GB)" in args[0]
+    assert kwargs["ephemeral"] is True
+    assert isinstance(kwargs["view"], preference_views.ProfilePreferenceManageView)
+
+
+@pytest.mark.asyncio
+async def test_profile_preference_modal_rejects_invalid_country(monkeypatch) -> None:
+    async def fake_set(*_args, **_kwargs):
+        return UserProfilePreferenceMutationResult(
+            ok=False,
+            message="Location country was not recognised.",
+        )
+
+    monkeypatch.setattr(
+        preference_views.profile_preference_service,
+        "set_profile_preference",
+        fake_set,
+    )
+    modal = preference_views.ProfilePreferenceInputModal(
+        author_id=42,
+        display_name="Tester",
+        field="country",
+        current_profile=UserProfilePreference(),
+    )
+    modal.value_input.value = "Atlantis"
+    interaction = _Interaction()
+
+    await modal.callback(interaction)
+
+    args, kwargs, _message = interaction.followup.sent[-1]
+    assert args[0] == "Location country was not recognised."
+    assert kwargs["ephemeral"] is True
+    assert interaction.original_edits == []
+
+
+@pytest.mark.asyncio
+async def test_profile_preference_modal_rejects_missing_user(monkeypatch) -> None:
+    async def fake_set(*_args, **_kwargs):
+        raise AssertionError("profile mutation should not run without an interaction user")
+
+    monkeypatch.setattr(
+        preference_views.profile_preference_service,
+        "set_profile_preference",
+        fake_set,
+    )
+    modal = preference_views.ProfilePreferenceInputModal(
+        author_id=42,
+        display_name="Tester",
+        field="country",
+        current_profile=UserProfilePreference(),
+    )
+    modal.value_input.value = "GB"
+    interaction = _Interaction()
+    interaction.user = None
+
+    await modal.callback(interaction)
+
+    args, kwargs = interaction.response.sent[-1]
+    assert args[0] == "This profile preference action is not for you."
+    assert kwargs["ephemeral"] is True
+    assert interaction.followup.sent == []
+
+
+@pytest.mark.asyncio
+async def test_profile_preference_clear_refreshes_host_card(monkeypatch) -> None:
+    async def fake_clear(_user_id: int, field: str):
+        assert field == "country"
+        return UserProfilePreferenceMutationResult(
+            ok=True,
+            message="Location country removed.",
+            profile=UserProfilePreference(timezone_name="Europe/London"),
+        )
+
+    async def loader(_user_id: int):
+        return _summary()
+
+    monkeypatch.setattr(
+        preference_views.profile_preference_service,
+        "clear_profile_preference",
+        fake_clear,
+    )
+    host_message = _EditableMessage()
+    view = preference_views.ProfilePreferenceManageView(
+        author_id=42,
+        display_name="Tester",
+        profile=UserProfilePreference(location_country_code="GB"),
+        host_message=host_message,
+        summary_loader=loader,
+    )
+    interaction = _Interaction()
+    button = next(
+        child
+        for child in view.children
+        if getattr(child, "custom_id", None) == "me:preference:profile:clear_country"
+    )
+
+    await button.callback(interaction)
+
+    args, kwargs, _message = interaction.followup.sent[-1]
+    assert args[0] == "Location country removed."
+    assert kwargs["ephemeral"] is True
+    assert isinstance(kwargs["view"], preference_views.ProfilePreferenceManageView)
+    assert interaction.followup.edited[-1][0] == host_message.id
 
 
 @pytest.mark.asyncio

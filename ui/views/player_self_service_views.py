@@ -18,6 +18,7 @@ from player_self_service import (
     dashboard_card,
     page_cards,
     preference_service,
+    profile_preference_service,
     reminder_service,
 )
 from player_self_service.account_service import AccountCentreState
@@ -33,6 +34,7 @@ from ui.views.inventory_report_views import (
     start_myinventory_command,
 )
 from ui.views.player_self_service_account_views import AccountManageView
+from ui.views.player_self_service_preference_views import ProfilePreferenceManageView
 from ui.views.player_self_service_reminder_views import (
     ReminderSetupView,
 )
@@ -212,8 +214,8 @@ def build_preferences_embed(
 ) -> discord.Embed:
     preferences = summary.preferences
     embed = discord.Embed(
-        title="Inventory Preferences",
-        description=f"Private inventory preference status for {display_name}",
+        title="Preferences",
+        description=f"Private preference status for {display_name}",
         color=discord.Color.teal(),
     )
     embed.add_field(
@@ -222,6 +224,9 @@ def build_preferences_embed(
             [
                 f"Inventory visibility: {preferences.inventory_visibility}",
                 f"VIP levels: {preferences.vip_summary}",
+                f"Timezone: {preferences.timezone}",
+                f"Location: {preferences.location_country}",
+                f"Language: {preferences.preferred_language}",
             ]
         ),
         inline=False,
@@ -232,6 +237,7 @@ def build_preferences_embed(
             [
                 "Use the visibility toggle to choose how inventory reports are posted.",
                 "Use Update VIP to keep inventory capacity assumptions accurate.",
+                "Use Manage Profile to save timezone, country, and language.",
             ]
         ),
         inline=False,
@@ -1071,6 +1077,52 @@ class PlayerSelfServiceView(discord.ui.View):
         await send_inventory_vip_preference_prompt(
             interaction=interaction,
             requester_id=self.author_id,
+        )
+
+    @discord.ui.button(
+        label="Manage Profile",
+        style=discord.ButtonStyle.success,
+        custom_id="me:preference:profile",
+        row=4,
+    )
+    async def preference_profile_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+        except TypeError:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.debug("player_self_service_preference_profile_defer_failed", exc_info=True)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug("player_self_service_preference_profile_defer_failed", exc_info=True)
+
+        result = await profile_preference_service.read_user_profile_preference(self.author_id)
+        if not result.ok:
+            await interaction.followup.send(
+                "Profile preferences are temporarily unavailable. Please try again in a moment.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send(
+            "\n".join(result.profile.summary_lines),
+            view=ProfilePreferenceManageView(
+                author_id=self.author_id,
+                display_name=self.display_name,
+                profile=result.profile,
+                host_message=getattr(interaction, "message", None),
+                summary_loader=self.summary_loader,
+            ),
+            ephemeral=True,
         )
 
     async def on_timeout(self) -> None:

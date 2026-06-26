@@ -55,10 +55,15 @@ Player Self-Service Command Centre status:
   `inventory/report_image_renderer.py` text primitives to `core.visual_text` while preserving
   Inventory report output contracts. Phase 11 is complete.
 - Phase 11 records are archived under `archive/`.
-- Phase 12 Preferences Hub Expansion is prepared for audit/scope. Implementation has not started.
+- Phase 12 Preferences Hub Expansion Slice 1 is delivered in mirror PR #176 and smoke tested
+  successfully by the operator on 2026-06-26. It keeps `/me preferences` focused on the existing
+  service-backed Inventory Preferences controls for report visibility and Inventory VIP.
+- Phase 12B Discord User Preference Profile Store is prepared for audit/scope and SQL design.
 - Active Phase 12 files:
   - `Codex Task Pack - Player Self-Service Command Centre Phase 12 Preferences Hub Expansion.md`
   - `Codex Chat Starter - Player Self-Service Command Centre Phase 12 Preferences Hub Expansion.md`
+  - `Codex Task Pack - Player Self-Service Command Centre Phase 12B Discord User Preference Profile Store.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre Phase 12B Discord User Preference Profile Store.md`
 - Active programme file:
   - `Player Self-Service Command Centre - Programme Pack.md`
 - Completed Phase 1 through Phase 11 execution records are archived under `archive/`.
@@ -143,7 +148,7 @@ Latest completed starter:
 
 Next active work:
 
-Player Self-Service Command Centre Phase 12 Preferences Hub Expansion is the next planned
-programme slice, with the task pack and starter prepared for audit/scope. KVK final removal of
-temporary deprecated command paths remains captured as a deferred cleanup item for execution after
-the no-feedback window and operator approval.
+Player Self-Service Command Centre Phase 12B Discord User Preference Profile Store is the next
+planned programme slice, with the task pack and starter prepared for audit/scope. KVK final
+removal of temporary deprecated command paths remains captured as a deferred cleanup item for
+execution after the no-feedback window and operator approval.

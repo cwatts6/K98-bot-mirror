@@ -7,7 +7,7 @@
 - Owner/context: Player Self-Service Command Centre programme after Phase 11 Shared Visual-Card Renderer Consolidation was delivered in production PR #483 and smoke tested successfully
 - Task type: `Discord interaction feature | preferences product model | service-backed persistence | player self-service UX`
 - One-pass approved: `no`
-- Status: `audit complete; Slice 1 implementation approved for Inventory Preferences copy and docs`
+- Status: `Slice 1 delivered in mirror PR #176 and smoke tested successfully by the operator on 2026-06-26`
 
 ## 2. Required Reading
 
@@ -59,9 +59,9 @@ Delivered context:
 - Phase 11 completed shared visual-card renderer consolidation across `/me`, KVK, PreKvK
   compatibility, and Inventory report rendering.
 
-The active deferred preference item is now promoted into this Phase 12 task pack. Phase 12 must
-start by auditing preference-like state and persistence ownership before deciding which settings
-belong in `/me preferences`.
+The active deferred preference item was promoted into this Phase 12 task pack. Phase 12 started
+with an audit of preference-like state and persistence ownership before deciding which settings
+belonged in `/me preferences`.
 
 ## 5. Scope
 
@@ -162,16 +162,15 @@ categories touched by the approved implementation.
 
 ## 9. Manual Smoke
 
-After implementation, smoke test:
+Slice 1 smoke test completed successfully on 2026-06-26:
 
-- `/me preferences` remains private and renders the generated card.
-- Inventory visibility still saves and refreshes correctly.
-- Inventory VIP update handoff still works.
-- Any newly added preference persists across a fresh interaction and survives bot restart
-  expectations.
-- Failure states remain private and actionable.
-- `/inventory_preferences`, `/myinventory`, `/me inventory`, `/me exports`, and legacy export
-  commands remain behavior-compatible.
+- `/me preferences` remained private and rendered the generated Inventory Preferences card.
+- Inventory visibility still saved and refreshed correctly.
+- Inventory VIP update handoff still worked.
+- `/inventory_preferences`, `/myinventory`, `/me inventory`, `/me dashboard`, `/me accounts`,
+  `/me reminders`, and `/me exports` remained behavior-compatible.
+- No timezone, location country, preferred language, export-default, stats-privacy, reminder, or
+  main-account controls were exposed.
 
 ## 10. Acceptance Criteria
 
@@ -186,3 +185,15 @@ After implementation, smoke test:
 - Docs and the player briefing describe only delivered behavior.
 - Any useful but unsafe candidate preferences are captured as deferred optimisation items using
   the required structure.
+
+## 11. Phase 12B Follow-Up
+
+Phase 12B is split into its own task pack and starter:
+
+- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre Phase 12B Discord User Preference Profile Store.md`
+- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre Phase 12B Discord User Preference Profile Store.md`
+
+Phase 12B should add timezone, location country, and preferred language only as
+Discord-user-level data backed by a dedicated SQL preference/profile store. Do not duplicate these
+values on `dbo.DiscordGovernorRegistry`, and do not replace the current session-based local-time
+toggle.

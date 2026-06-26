@@ -458,6 +458,9 @@ def _preference_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     return (
         f"Inventory visibility: {preferences.inventory_visibility}",
         f"VIP levels: {preferences.vip_summary}",
+        f"Timezone: {preferences.timezone}",
+        f"Location: {preferences.location_country}",
+        f"Language: {preferences.preferred_language}",
     )
 
 
@@ -653,7 +656,7 @@ def _inventory_rows(summary: PlayerSelfServiceSummary) -> tuple[tuple[MetricCell
 def _preference_actions(summary: PlayerSelfServiceSummary) -> str:
     visibility = summary.preferences.inventory_visibility.strip().lower()
     visibility_action = "Set Public" if visibility == "private" else "Set Private"
-    return f"Actions available: {visibility_action}, Update VIP"
+    return f"Actions available: {visibility_action}, Update VIP, Manage Profile"
 
 
 def _page_copy(
@@ -685,10 +688,10 @@ def _page_copy(
         )
     if page == "preferences":
         return (
-            "Inventory Preferences",
+            "Preferences",
             summary.preferences.inventory_visibility,
             _preference_actions(summary),
-            "Switch inventory report visibility or update inventory VIP levels.",
+            "Switch inventory visibility, update VIP, or manage profile details.",
             _preference_lines(summary),
         )
     if page == "inventory":

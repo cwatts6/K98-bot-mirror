@@ -51,17 +51,26 @@ Status as of 2026-06-26:
   `phase11c_inventory_resources_smoke.png` artifact was rendered for inspection, and operator
   smoke confirmed special characters render correctly.
 - Phase 11 Shared Visual-Card Renderer Consolidation is complete.
+- Phase 12 Preferences Hub Expansion Slice 1 is delivered in mirror PR #176 and smoke tested
+  successfully by the operator on 2026-06-26. It keeps `/me preferences` focused on the existing
+  service-backed Inventory Preferences controls for report visibility and Inventory VIP, preserves
+  `/inventory_preferences`, and documents Discord-user-level timezone, location country, and
+  preferred language as Phase 12B.
+- Phase 12B Discord User Preference Profile Store is implemented in the current branch. It adds
+  SQL-backed Discord-user-level timezone, location country, and preferred language persistence
+  through `dbo.DiscordUserProfilePreference`, stores country as a two-letter code while deriving
+  readable names in the bot service, and preserves the current session-based local-time toggle.
 - The delivered `/me` surface now includes a private command-centre shell, a generated dashboard
-  card with safe embed fallback, generated cards for Accounts, Reminders, Preferences, and
+  card with safe embed fallback, generated cards for Accounts, Reminders, Preferences,
   Inventory, and Exports, account-centre lookup/register/replace/remove management, unified KVK/calendar
   reminder status and management, KVK reminder autosave and remove-all management, calendar
-  reminder autosave/remove-all management, inventory visibility and Governor VIP controls,
+  reminder autosave/remove-all management, inventory visibility, Governor VIP controls, and
+  Discord-user-level profile preference controls,
   dashboard Inventory/Exports handoffs, private Inventory summary data, option-window based
   private stats and inventory exports, graceful timeout handling, and return navigation. Legacy
   account, reminder, inventory, calendar reminder, and export commands remain live.
-- Next active programme scope: Phase 12 Preferences Hub Expansion. The Phase 12 task pack and
-  starter are prepared for audit/scope; implementation has not started. Legacy redirects/removal
-  and export schema redesign remain separate later decisions.
+- Next active programme scope after Phase 12B validation is Phase 13 legacy redirect planning.
+  Legacy redirects/removal and export schema redesign remain separate later decisions.
 
 Phase 2 manual smoke evidence:
 
@@ -212,7 +221,7 @@ Run /me dashboard. Everything personal starts there.
 | `/me dashboard` | The premium personal home screen: setup status, key identity information, reminder status, and safe personal handoff controls. |
 | `/me accounts` | Modern account centre replacing separate lookup/register/review/modify habits. |
 | `/me reminders` | Modern reminder centre replacing separate subscribe/modify/unsubscribe habits. |
-| `/me preferences` | First-pass personal settings hub, including inventory visibility and output privacy defaults. |
+| `/me preferences` | Preferences hub for inventory visibility, Inventory VIP, and SQL-backed Discord-user-level timezone, location country, and preferred language. Country is stored as a two-letter code and displayed with a derived readable name. |
 | `/me inventory` | Private Inventory summary card for latest approved resources, speedups, and materials, with report handoff. |
 | `/me exports` | Guided personal export launchpad for existing stats and inventory export flows. |
 
@@ -822,8 +831,8 @@ Approved implementation slicing:
 
 ### Phase 12 — Preferences Hub Expansion
 
-Status: audit complete; Slice 1 implementation narrows `/me preferences` to the existing
-service-backed Inventory Preferences controls.
+Status: Slice 1 delivered in mirror PR #176 and smoke tested successfully by the operator on
+2026-06-26.
 
 Expand `/me preferences` only after the persistence and product model are clear.
 
@@ -837,12 +846,49 @@ Slice 1 deliverables:
   location country, and preferred language
 - update focused card/view tests for the delivered copy
 
-This phase should not add preferences that cannot be saved safely.
+This phase did not add preferences that cannot be saved safely.
+
+Phase 12 manual smoke evidence:
+
+- `/me preferences` remained private and rendered the generated Inventory Preferences card.
+- Inventory report visibility still saved and refreshed correctly.
+- Inventory VIP update handoff still worked.
+- `/inventory_preferences`, `/myinventory`, `/me inventory`, `/me dashboard`, `/me accounts`,
+  `/me reminders`, and `/me exports` remained behavior-compatible.
+- No timezone, location country, preferred language, export-default, stats-privacy, reminder, or
+  main-account controls were exposed.
 
 Active Phase 12 files:
 
 - `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre Phase 12 Preferences Hub Expansion.md`
 - `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre Phase 12 Preferences Hub Expansion.md`
+
+### Phase 12B — Discord User Preference Profile Store
+
+Status: implemented in current branch; validation and PR handoff pending.
+
+Add a persisted Discord-user-level preference/profile store for timezone, location country, and
+preferred language after SQL design is validated against `C:\K98-bot-SQL-Server`.
+
+Delivered branch scope:
+
+- dedicated SQL-backed `dbo.DiscordUserProfilePreference` table keyed by Discord user ID rather
+  than extending `dbo.DiscordGovernorRegistry`
+- service and DAL accessors for reading, setting, and clearing timezone, location country, and
+  preferred language
+- IANA timezone validation, country-code storage with derived readable country names, and
+  language-tag normalization with readable display labels
+- `/me preferences` card display and Manage Profile add/update/remove controls for delivered
+  fields
+- preservation of the current session-based local-time toggle; saved timezone is planning/profile
+  metadata unless a later approved feature uses it
+- focused SQL/DAL, service, view, card, command-registration, failure-path, and restart-safety
+  tests
+
+Active Phase 12B files:
+
+- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre Phase 12B Discord User Preference Profile Store.md`
+- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre Phase 12B Discord User Preference Profile Store.md`
 
 ### Phase 13 — Legacy Redirects, Briefing, and Cleanup
 
@@ -1066,14 +1112,15 @@ Do not include these in the first build unless separately approved:
 
 ## 18. Suggested Next Action
 
-Start Phase 12 when approved:
+Complete Phase 12B validation and PR handoff:
 
 ```text
-Preferences Hub Expansion
+Discord User Preference Profile Store
 ```
 
-Phase 12 should expand `/me preferences` only after the persistence and product model are clear.
-Use the prepared Phase 12 task pack and starter in `docs/task_packs/`.
+Phase 12B now adds timezone, location country, and preferred language through the SQL-backed
+Discord-user preference/profile store. Complete validators, SQL repo validation, Codex Security
+review, and manual smoke before marking the phase smoke tested.
 Legacy export redirect/removal remains a later programme phase, and export schema/format redesign
 remains a separate export-output programme unless explicitly narrowed later. Do not redirect or
 remove `/my_stats_export` or `/export_inventory` without explicit operator approval, player

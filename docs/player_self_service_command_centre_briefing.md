@@ -9,12 +9,18 @@ renderer family to the shared `core.visual_text` primitive path while preserving
 contracts. Phase 11C Inventory Renderer Migration is delivered in production PR #483 and smoke
 tested successfully by the operator on 2026-06-26, moving Inventory report text primitives to
 `core.visual_text` while preserving report output contracts, filenames, visibility behavior,
-range controls, and export buttons. Phase 11 is complete. The dashboard uses the
-same full-bleed generated private card style as the Phase 6 subpages, with large row-based text
-directly on the card background. Accounts, Reminders, Preferences, Inventory, and Exports use
+range controls, and export buttons. Phase 11 is complete. Phase 12 Preferences Hub Expansion
+Slice 1 is delivered in mirror PR #176 and smoke tested successfully by the operator on
+2026-06-26, keeping `/me preferences` focused on service-backed Inventory Preferences for report
+visibility and Inventory VIP. The dashboard uses the same full-bleed generated private card style
+as the Phase 6 subpages, with large row-based text directly on the card background. Accounts,
+Reminders, Preferences, Inventory, and Exports use
 generated private visual cards with safe embed fallback. `/me inventory` summarizes latest
 approved inventory resources, speedups, and materials, and `/me exports` remains the preferred
 private export route while legacy export commands remain live.
+Phase 12B adds SQL-backed Discord-user-level timezone, location country, and preferred language
+profile preferences to `/me preferences`; country is stored as a two-letter code and displayed with
+a derived readable name.
 
 ## Player Briefing
 
@@ -40,8 +46,9 @@ register or replace without asking the player to remember or re-enter the select
 The reminder centre supports private KVK event reminder review, setup, automatic updates, and
 remove-all/unsubscribe with confirmation through one primary Manage journey. The same Manage
 journey can now open Calendar Settings for calendar reminder event types and lead times.
-`/me preferences` is currently an Inventory Preferences page: it can update inventory report
-visibility between private and public output and can open the existing Governor VIP update flow.
+`/me preferences` can update inventory report visibility between private and public output, open
+the existing Governor VIP update flow, and manage profile preferences for timezone, location
+country, and preferred language.
 `/me inventory` shows a private summary of latest approved resources, speedups, and materials for
 your registered governors. If no approved inventory data exists yet, it points you toward the
 inventory upload process. Open Report keeps the existing inventory report picker, range controls,
@@ -94,6 +101,10 @@ Rollout checks:
   path.
 - Confirm `/me preferences` can open the existing Governor VIP update flow and that VIP writes
   remain owned by the inventory profile service path.
+- Confirm `/me preferences` can add, update, remove, and reload timezone, location country, and
+  preferred language through the SQL-backed Discord-user profile preference store.
+- Confirm location country displays a readable country name derived from the stored two-letter
+  code.
 - Confirm `/me reminders` shows KVK-only, calendar-only, both, and neither states clearly.
 - Confirm `/me reminders` KVK event type and reminder time selections save automatically.
 - Confirm `/me reminders` Calendar Settings saves calendar reminder event types, lead times, and enabled/disabled state.
@@ -320,12 +331,46 @@ Phase 11C implementation notes:
 - Operator smoke testing completed successfully on 2026-06-26, including special-character
   rendering. Phase 11 is complete.
 
+Phase 12 implementation notes:
+
+- `/me preferences` is now explicitly framed as Inventory Preferences.
+- The page continues to use the existing service-backed Inventory report visibility and Inventory
+  VIP update paths only.
+- Export defaults, stats output/privacy defaults, reminder preferences, calendar reminder
+  preferences, and main-account behavior remain in their existing domain centres.
+- Timezone, location country, and preferred language are confirmed as valuable future
+  Discord-user-level profile settings rather than governor-level settings.
+- These future values should use a dedicated SQL-backed Discord user preference/profile store, not
+  duplicated columns on `dbo.DiscordGovernorRegistry`.
+- The current session-based local-time toggle must remain unchanged; it supports players away
+  from their usual location and should not be replaced by stored timezone metadata.
+
+Phase 12 smoke-test result:
+
+- `/me preferences` remained private and rendered the generated Inventory Preferences card.
+- Inventory visibility saved and refreshed correctly.
+- Inventory VIP update handoff worked.
+- `/inventory_preferences`, `/myinventory`, `/me inventory`, `/me dashboard`, `/me accounts`,
+  `/me reminders`, and `/me exports` remained behavior-compatible.
+- No timezone, location country, preferred language, export-default, stats-privacy, reminder, or
+  main-account controls were exposed.
+
+Phase 12B implementation notes:
+
+- Phase 12B adds `dbo.DiscordUserProfilePreference` in the SQL repo as the Discord-user-level
+  profile preference store, keyed by Discord user ID.
+- Timezone is stored as an IANA timezone name. Location country is stored as a two-letter code
+  and rendered with a derived readable name. Preferred language is stored as a normalized language
+  tag and rendered with a readable primary language name.
+- `/me preferences` adds Manage Profile controls to set and clear the delivered profile fields,
+  while preserving Inventory report visibility and Inventory VIP behavior.
+- The current session-based local-time toggle remains unchanged; saved timezone remains
+  planning/profile metadata until a later approved feature uses it.
+
 Next phase:
 
-- Phase 12 Preferences Hub Expansion has started with an audit-led Slice 1 that keeps
-  `/me preferences` focused on the existing service-backed Inventory visibility and VIP controls.
-- A later Phase 12B should scope Discord-user-level timezone, location country, and preferred
-  language persistence before adding card display or Manage controls.
+- Phase 13 legacy redirect planning remains the next Player Self-Service phase after Phase 12B
+  validation and smoke testing.
 - Legacy export redirect/removal remains a later Player Self-Service phase.
 - Export schema/format redesign remains a separate export-output programme unless explicitly
   narrowed later.

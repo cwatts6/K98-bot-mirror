@@ -11,6 +11,11 @@ from .preference_service import (
     PreferenceMutationResult,
     save_inventory_visibility,
 )
+from .profile_preference_service import (
+    UserProfilePreference,
+    UserProfilePreferenceMutationResult,
+    UserProfilePreferenceRead,
+)
 from .reminder_service import (
     ReminderCentreState,
     ReminderMessage,
@@ -44,6 +49,9 @@ __all__ = [
     "ReminderMutationResult",
     "ReminderStatus",
     "ReminderUnsubscribeConfirmation",
+    "UserProfilePreference",
+    "UserProfilePreferenceMutationResult",
+    "UserProfilePreferenceRead",
     "build_player_self_service_summary",
     "save_inventory_visibility",
 ]

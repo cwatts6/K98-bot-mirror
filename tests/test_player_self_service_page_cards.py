@@ -52,6 +52,9 @@ def _summary() -> PlayerSelfServiceSummary:
             exports_summary="available through private export tools",
             next_action="Review preferences",
             vip_summary="Main Gov - 19",
+            timezone="Europe/London",
+            location_country="United Kingdom (GB)",
+            preferred_language="English (en-GB)",
         ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
@@ -139,10 +142,12 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
     )
     assert _page_copy("reminders", summary)[2] == "Actions available: Manage"
     assert "manage calendar reminders" in _page_copy("reminders", summary)[3]
-    assert _page_copy("preferences", summary)[0] == "Inventory Preferences"
-    assert _page_copy("preferences", summary)[2] == ("Actions available: Set Private, Update VIP")
+    assert _page_copy("preferences", summary)[0] == "Preferences"
+    assert _page_copy("preferences", summary)[2] == (
+        "Actions available: Set Private, Update VIP, Manage Profile"
+    )
     assert _page_copy("preferences", summary)[3] == (
-        "Switch inventory report visibility or update inventory VIP levels."
+        "Switch inventory visibility, update VIP, or manage profile details."
     )
     assert _page_copy("inventory", summary)[0] == "Inventory"
     assert _page_copy("exports", summary)[1] == "private"
@@ -310,6 +315,7 @@ def test_page_card_account_and_vip_lines_show_full_summary() -> None:
 
     assert "Farm 2" in _page_copy("accounts", summary)[4][2]
     assert _page_copy("preferences", summary)[4][1] == "VIP levels: Main - 19, Alt 1 - 15"
+    assert _page_copy("preferences", summary)[4][3] == "Location: not set"
 
 
 def test_page_card_reminder_lines_include_calendar_status() -> None:

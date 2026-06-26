@@ -15,6 +15,10 @@ from inventory.models import (
     InventorySpeedupPoint,
 )
 from player_self_service import service
+from player_self_service.profile_preference_service import (
+    UserProfilePreference,
+    UserProfilePreferenceRead,
+)
 from services.governor_account_service import summarize_accounts
 
 
@@ -329,6 +333,16 @@ def test_reminder_status_combined_next_action_handles_incomplete_calendar() -> N
 
 @pytest.mark.asyncio
 async def test_preference_status_reads_private_public_unset_and_failure() -> None:
+    async def profile_loader(_uid):
+        return UserProfilePreferenceRead(
+            ok=True,
+            profile=UserProfilePreference(
+                timezone_name="Europe/London",
+                location_country_code="GB",
+                preferred_language_tag="en-GB",
+            ),
+        )
+
     async def private_loader(_uid):
         return SimpleNamespace(ok=True, visibility=InventoryReportVisibility.ONLY_ME)
 
@@ -342,16 +356,34 @@ async def test_preference_status_reads_private_public_unset_and_failure() -> Non
         return SimpleNamespace(ok=False, error="db unavailable")
 
     assert (
-        await service.summarize_preference_status(1, preference_loader=private_loader)
+        await service.summarize_preference_status(
+            1,
+            preference_loader=private_loader,
+            profile_preference_loader=profile_loader,
+        )
     ).inventory_visibility == "private"
+    public = await service.summarize_preference_status(
+        1,
+        preference_loader=public_loader,
+        profile_preference_loader=profile_loader,
+    )
+    assert public.inventory_visibility == "public"
+    assert public.timezone == "Europe/London"
+    assert public.location_country == "United Kingdom (GB)"
+    assert public.preferred_language == "English (en-GB)"
     assert (
-        await service.summarize_preference_status(1, preference_loader=public_loader)
-    ).inventory_visibility == "public"
-    assert (
-        await service.summarize_preference_status(1, preference_loader=unset_loader)
+        await service.summarize_preference_status(
+            1,
+            preference_loader=unset_loader,
+            profile_preference_loader=profile_loader,
+        )
     ).inventory_visibility == "not set"
 
-    failed = await service.summarize_preference_status(1, preference_loader=failed_loader)
+    failed = await service.summarize_preference_status(
+        1,
+        preference_loader=failed_loader,
+        profile_preference_loader=profile_loader,
+    )
     assert failed.inventory_visibility == "unknown"
     assert failed.next_action == "Try again"
 
@@ -371,6 +403,17 @@ async def test_build_summary_uses_read_only_loaders() -> None:
     async def preference_loader(user_id):
         calls.append(("preference", user_id))
         return SimpleNamespace(ok=True, visibility=InventoryReportVisibility.PUBLIC)
+
+    async def profile_preference_loader(user_id):
+        calls.append(("profile_preference", user_id))
+        return UserProfilePreferenceRead(
+            ok=True,
+            profile=UserProfilePreference(
+                timezone_name="Europe/London",
+                location_country_code="GB",
+                preferred_language_tag="en-GB",
+            ),
+        )
 
     async def vip_profile_loader(governor_id):
         calls.append(("vip", governor_id))
@@ -394,6 +437,7 @@ async def test_build_summary_uses_read_only_loaders() -> None:
         reminder_loader=reminder_loader,
         calendar_reminder_loader=calendar_reminder_loader,
         preference_loader=preference_loader,
+        profile_preference_loader=profile_preference_loader,
         vip_profile_loader=vip_profile_loader,
         inventory_snapshot_loader=inventory_snapshot_loader,
     )
@@ -406,9 +450,11 @@ async def test_build_summary_uses_read_only_loaders() -> None:
     assert ("reminder", 42) in calls
     assert ("calendar_reminder", 42) in calls
     assert ("preference", 42) in calls
+    assert ("profile_preference", 42) in calls
     assert ("vip", 111) in calls
     assert ("inventory", (111,)) in calls
     assert summary.preferences.vip_summary == "Main Gov - 19"
+    assert summary.preferences.location_country == "United Kingdom (GB)"
     assert summary.reminders.calendar.state == "on"
     assert summary.exports.action_state == "actionable"
     assert summary.inventory.state == "empty"

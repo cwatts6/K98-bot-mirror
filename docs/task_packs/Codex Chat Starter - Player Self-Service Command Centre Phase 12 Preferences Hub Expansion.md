@@ -1,6 +1,7 @@
 # Codex Chat Starter - Player Self-Service Command Centre Phase 12 Preferences Hub Expansion
 
-Status: ready starter for Phase 12. Implementation has not started.
+Status: completed starter for Phase 12 Slice 1. Mirror PR #176 was merged and smoke tested
+successfully by the operator on 2026-06-26.
 
 Phase 11 Shared Visual-Card Renderer Consolidation is complete. Phase 11A delivered
 `core.visual_text` and migrated `/me` page cards plus PreKvK compatibility wrappers. Phase 11B
@@ -9,8 +10,13 @@ migrated the KVK renderer family and was smoke tested successfully in production
 smoke tested successfully by the operator on 2026-06-26, and special-character rendering was
 confirmed correct.
 
-Phase 12 should expand `/me preferences` only after the persistence and product model are clear.
-Keep the first step audit/scope only unless implementation is explicitly approved.
+Phase 12 started with audit/scope and delivered the approved Inventory Preferences slice only:
+`/me preferences` remains private, shows the generated Inventory Preferences card, preserves the
+existing service-backed Inventory report visibility and Inventory VIP flows, and does not expose
+unsaved export, stats privacy, reminder, account, timezone, location, or language controls.
+
+The copy/paste starter below is retained as the historical execution prompt that launched the
+completed Phase 12 Slice 1. Use the Phase 12B starter for the next preference-profile slice.
 
 ## Copy/Paste Starter
 

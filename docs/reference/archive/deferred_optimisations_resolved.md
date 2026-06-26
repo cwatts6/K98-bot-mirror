@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Phase 12B Completed Item
+- Area: `player_self_service/profile_preference_service.py`, `player_self_service/service.py`, `ui/views/player_self_service_views.py`, `ui/views/player_self_service_preference_views.py`, SQL repo `C:\K98-bot-SQL-Server`
+- Type: architecture
+- Description: Timezone, location country, and preferred language are Discord-user-level settings rather than governor-level settings. Storing them on `dbo.DiscordGovernorRegistry` would duplicate user-level data across Main/Alt/Farm rows and risk drift between rows for the same Discord user.
+- Resolution: Phase 12B added a dedicated SQL-backed `dbo.DiscordUserProfilePreference` store keyed by Discord user ID, with nullable timezone, location country, and preferred language fields. Bot code now uses a DAL and service boundary for read, set, and clear operations; validates IANA timezone names; stores country as a two-letter code while deriving readable country names in the service/UI; normalizes language tags; and adds `/me preferences` Manage Profile controls for the delivered fields. The current session-based local-time toggle remains unchanged.
+- Validation: Focused service, DAL, view, page-card, and player self-service tests cover set, clear, invalid input, SQL failure, missing rows, fallback copy, and profile reload behavior. SQL migration and schema validation are tracked through the K98 SQL repo guardrails and release checklist.
+
 ### Phase 11C Completed Item
 - Area: `inventory/report_image_renderer.py`
 - Type: refactor
