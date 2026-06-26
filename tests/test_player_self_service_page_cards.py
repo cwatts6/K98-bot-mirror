@@ -60,7 +60,7 @@ def _summary() -> PlayerSelfServiceSummary:
         ),
         inventory=InventoryStatus(
             state="available",
-            account_summary="1 registered governor(s) with approved inventory data.",
+            account_summary="1 registered governor(s) with complete approved inventory data.",
             resources=InventoryCategoryStatus(
                 state="available",
                 value="1.2B RSS",

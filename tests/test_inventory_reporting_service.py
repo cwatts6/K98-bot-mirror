@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, timedelta
 import logging
+import threading
+import time
 import types
 
 import pytest
@@ -241,6 +243,74 @@ async def test_build_latest_inventory_snapshot_groups_latest_rows(monkeypatch):
     assert snapshot.resources[0].food == 111
     assert snapshot.speedups[0].universal_days == 5
     assert snapshot.materials == ()
+
+
+@pytest.mark.asyncio
+async def test_build_latest_inventory_snapshot_fetches_governors_with_bounded_concurrency(
+    monkeypatch,
+):
+    now = datetime.now(UTC)
+    lock = threading.Lock()
+    active_fetches_by_governor: dict[int, int] = {}
+    max_active_governors = 0
+
+    def _track_fetch(governor_id: int) -> None:
+        nonlocal max_active_governors
+        with lock:
+            active_fetches_by_governor[governor_id] = (
+                active_fetches_by_governor.get(governor_id, 0) + 1
+            )
+            max_active_governors = max(
+                max_active_governors,
+                len(active_fetches_by_governor),
+            )
+        time.sleep(0.05)
+        with lock:
+            remaining = active_fetches_by_governor[governor_id] - 1
+            if remaining:
+                active_fetches_by_governor[governor_id] = remaining
+            else:
+                del active_fetches_by_governor[governor_id]
+
+    def _fetch_resource_rows(governor_id):
+        _track_fetch(governor_id)
+        return [
+            {"ScanUtc": now, "ResourceType": "food", "TotalResourcesValue": governor_id},
+            {"ScanUtc": now, "ResourceType": "wood", "TotalResourcesValue": 1},
+            {"ScanUtc": now, "ResourceType": "stone", "TotalResourcesValue": 1},
+            {"ScanUtc": now, "ResourceType": "gold", "TotalResourcesValue": 1},
+        ]
+
+    def _fetch_empty_rows(governor_id):
+        _track_fetch(governor_id)
+        return []
+
+    monkeypatch.setattr(
+        reporting_service.inventory_reporting_dal,
+        "fetch_latest_resource_rows",
+        _fetch_resource_rows,
+    )
+    monkeypatch.setattr(
+        reporting_service.inventory_reporting_dal,
+        "fetch_latest_speedup_rows",
+        _fetch_empty_rows,
+    )
+    monkeypatch.setattr(
+        reporting_service.inventory_material_dal,
+        "fetch_latest_material_rows",
+        _fetch_empty_rows,
+    )
+
+    snapshot = await reporting_service.build_latest_inventory_snapshot(
+        [
+            RegisteredGovernor(governor_id, f"Gov {governor_id}", "Alt")
+            for governor_id in range(101, 107)
+        ]
+    )
+
+    assert len(snapshot.resources) == 6
+    assert max_active_governors > 1
+    assert max_active_governors <= reporting_service._LATEST_INVENTORY_SNAPSHOT_CONCURRENCY
 
 
 @pytest.mark.asyncio

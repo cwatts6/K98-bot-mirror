@@ -536,15 +536,27 @@ def summarize_inventory_snapshot(
             latest_scan=latest_scan,
         )
 
-    available_count = sum(
-        category.state == "available" for category in (resources, speedups, materials)
+    categories = (resources, speedups, materials)
+    available_count = sum(category.state == "available" for category in categories)
+    approved_governor_count = max(
+        (category.governor_count for category in categories if category.state == "available"),
+        default=0,
     )
-    if available_count == 3:
+    has_complete_category_coverage = all(
+        category.state == "available" and category.governor_count >= total_governors
+        for category in categories
+    )
+    if has_complete_category_coverage:
         state = "available"
-        account_summary = f"{total_governors} registered governor(s) with approved inventory data."
+        account_summary = (
+            f"{total_governors} registered governor(s) with complete approved inventory data."
+        )
     elif available_count > 0:
         state = "partial"
-        account_summary = f"Partial approved inventory data for {total_governors} governor(s)."
+        account_summary = (
+            f"Approved inventory data for {approved_governor_count}/{total_governors} "
+            "registered governor(s)."
+        )
     else:
         state = "empty"
         account_summary = f"No approved inventory data for {total_governors} registered governor(s)."

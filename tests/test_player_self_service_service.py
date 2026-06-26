@@ -108,12 +108,72 @@ def test_inventory_snapshot_summary_handles_approved_data() -> None:
 
     status = service.summarize_inventory_snapshot(snapshot, upload_channel_id=123)
 
-    assert status.state == "available"
+    assert status.state == "partial"
+    assert status.account_summary == "Approved inventory data for 1/2 registered governor(s)."
     assert status.resources.value == "1K RSS"
     assert status.resources.detail == "1/2 governors | latest 2026-06-25"
     assert status.speedups.value == "15d total"
     assert status.materials.value == "15 legendary"
     assert "<#123>" in status.upload_guidance
+
+
+def test_inventory_snapshot_summary_requires_complete_category_coverage() -> None:
+    scan = datetime(2026, 6, 25, 12, 0, tzinfo=UTC)
+    snapshot = reporting_service.LatestInventorySnapshot(
+        governors=(
+            service.RegisteredGovernor(111, "Main Gov", "Main"),
+            service.RegisteredGovernor(222, "Alt Gov", "Alt 1"),
+        ),
+        resources=(
+            InventoryResourcePoint(scan_utc=scan, food=100, wood=200, stone=300, gold=400),
+            InventoryResourcePoint(scan_utc=scan, food=200, wood=300, stone=400, gold=500),
+        ),
+        speedups=(
+            InventorySpeedupPoint(
+                scan_utc=scan,
+                building_days=1,
+                research_days=2,
+                training_days=3,
+                healing_days=4,
+                universal_days=5,
+            ),
+            InventorySpeedupPoint(
+                scan_utc=scan,
+                building_days=2,
+                research_days=3,
+                training_days=4,
+                healing_days=5,
+                universal_days=6,
+            ),
+        ),
+        materials=(
+            InventoryMaterialPoint(
+                scan_utc=scan,
+                animal_bone_legendary=1,
+                leather_legendary=2,
+                ebony_legendary=3,
+                iron_ore_legendary=4,
+                choice_chest_legendary=5,
+            ),
+            InventoryMaterialPoint(
+                scan_utc=scan,
+                animal_bone_legendary=2,
+                leather_legendary=3,
+                ebony_legendary=4,
+                iron_ore_legendary=5,
+                choice_chest_legendary=6,
+            ),
+        ),
+    )
+
+    status = service.summarize_inventory_snapshot(snapshot, upload_channel_id=123)
+
+    assert status.state == "available"
+    assert (
+        status.account_summary
+        == "2 registered governor(s) with complete approved inventory data."
+    )
+    assert status.resources.detail == "2/2 governors | latest 2026-06-25"
 
 
 def test_inventory_snapshot_summary_handles_no_approved_data() -> None:

@@ -38,6 +38,8 @@ REPORT_RANGE_DAYS = {
     InventoryReportRange.TWELVE_MONTHS: 366,
 }
 
+_LATEST_INVENTORY_SNAPSHOT_CONCURRENCY = 4
+
 
 @dataclass(frozen=True, slots=True)
 class InventoryVisibilityPreferenceRead:
@@ -200,11 +202,44 @@ async def resolve_governor_for_report(
 async def build_latest_inventory_snapshot(
     governors: list[RegisteredGovernor] | tuple[RegisteredGovernor, ...],
 ) -> LatestInventorySnapshot:
+    governor_tuple = tuple(governors)
     resource_points: list[InventoryResourcePoint] = []
     speedup_points: list[InventorySpeedupPoint] = []
     material_points: list[InventoryMaterialPoint] = []
+    if not governor_tuple:
+        return LatestInventorySnapshot(governors=())
 
-    for governor in governors:
+    semaphore = asyncio.Semaphore(
+        min(_LATEST_INVENTORY_SNAPSHOT_CONCURRENCY, len(governor_tuple))
+    )
+    results = await asyncio.gather(
+        *(
+            _build_latest_inventory_points_for_governor(governor, semaphore)
+            for governor in governor_tuple
+        )
+    )
+
+    for resource_point, speedup_point, material_point in results:
+        if resource_point is not None:
+            resource_points.append(resource_point)
+        if speedup_point is not None:
+            speedup_points.append(speedup_point)
+        if material_point is not None:
+            material_points.append(material_point)
+
+    return LatestInventorySnapshot(
+        governors=governor_tuple,
+        resources=tuple(resource_points),
+        speedups=tuple(speedup_points),
+        materials=tuple(material_points),
+    )
+
+
+async def _build_latest_inventory_points_for_governor(
+    governor: RegisteredGovernor,
+    semaphore: asyncio.Semaphore,
+) -> tuple[InventoryResourcePoint | None, InventorySpeedupPoint | None, InventoryMaterialPoint | None]:
+    async with semaphore:
         resource_rows, speedup_rows, material_rows = await asyncio.gather(
             asyncio.to_thread(
                 inventory_reporting_dal.fetch_latest_resource_rows,
@@ -220,21 +255,13 @@ async def build_latest_inventory_snapshot(
             ),
         )
 
-        grouped_resources = _group_resource_points(resource_rows)
-        grouped_speedups = _group_speedup_points(speedup_rows)
-        grouped_materials = _group_material_points(material_rows)
-        if grouped_resources:
-            resource_points.append(grouped_resources[-1])
-        if grouped_speedups:
-            speedup_points.append(grouped_speedups[-1])
-        if grouped_materials:
-            material_points.append(grouped_materials[-1])
-
-    return LatestInventorySnapshot(
-        governors=tuple(governors),
-        resources=tuple(resource_points),
-        speedups=tuple(speedup_points),
-        materials=tuple(material_points),
+    grouped_resources = _group_resource_points(resource_rows)
+    grouped_speedups = _group_speedup_points(speedup_rows)
+    grouped_materials = _group_material_points(material_rows)
+    return (
+        grouped_resources[-1] if grouped_resources else None,
+        grouped_speedups[-1] if grouped_speedups else None,
+        grouped_materials[-1] if grouped_materials else None,
     )
 
 
