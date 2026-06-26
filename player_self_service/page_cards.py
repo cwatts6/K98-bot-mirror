@@ -697,7 +697,11 @@ def _page_copy(
             "Inventory",
             inventory.state,
             f"Actions available: {inventory.next_action}",
-            inventory.upload_guidance if inventory.state in {"empty", "none"} else inventory.account_summary,
+            (
+                inventory.upload_guidance
+                if inventory.state in {"empty", "none"}
+                else inventory.account_summary
+            ),
             _inventory_lines(summary),
         )
     if page == "exports":

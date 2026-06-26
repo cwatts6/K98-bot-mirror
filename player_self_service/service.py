@@ -426,9 +426,7 @@ def summarize_export_status(accounts: AccountStatus) -> ExportStatus:
 
 def _upload_guidance(upload_channel_id: int | None = INVENTORY_UPLOAD_CHANNEL_ID) -> str:
     if upload_channel_id:
-        return (
-            f"Use `/inventory import` or upload inventory screenshots in <#{int(upload_channel_id)}>."
-        )
+        return f"Use `/inventory import` or upload inventory screenshots in <#{int(upload_channel_id)}>."
     return "Use `/inventory import` in the inventory upload channel."
 
 
@@ -559,7 +557,9 @@ def summarize_inventory_snapshot(
         )
     else:
         state = "empty"
-        account_summary = f"No approved inventory data for {total_governors} registered governor(s)."
+        account_summary = (
+            f"No approved inventory data for {total_governors} registered governor(s)."
+        )
 
     return InventoryStatus(
         state=state,

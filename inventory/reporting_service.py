@@ -209,9 +209,7 @@ async def build_latest_inventory_snapshot(
     if not governor_tuple:
         return LatestInventorySnapshot(governors=())
 
-    semaphore = asyncio.Semaphore(
-        min(_LATEST_INVENTORY_SNAPSHOT_CONCURRENCY, len(governor_tuple))
-    )
+    semaphore = asyncio.Semaphore(min(_LATEST_INVENTORY_SNAPSHOT_CONCURRENCY, len(governor_tuple)))
     results = await asyncio.gather(
         *(
             _build_latest_inventory_points_for_governor(governor, semaphore)
@@ -238,7 +236,9 @@ async def build_latest_inventory_snapshot(
 async def _build_latest_inventory_points_for_governor(
     governor: RegisteredGovernor,
     semaphore: asyncio.Semaphore,
-) -> tuple[InventoryResourcePoint | None, InventorySpeedupPoint | None, InventoryMaterialPoint | None]:
+) -> tuple[
+    InventoryResourcePoint | None, InventorySpeedupPoint | None, InventoryMaterialPoint | None
+]:
     async with semaphore:
         resource_rows, speedup_rows, material_rows = await asyncio.gather(
             asyncio.to_thread(

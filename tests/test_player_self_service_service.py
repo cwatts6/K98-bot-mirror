@@ -81,9 +81,7 @@ def test_inventory_snapshot_summary_handles_approved_data() -> None:
             service.RegisteredGovernor(111, "Main Gov", "Main"),
             service.RegisteredGovernor(222, "Alt Gov", "Alt 1"),
         ),
-        resources=(
-            InventoryResourcePoint(scan_utc=scan, food=100, wood=200, stone=300, gold=400),
-        ),
+        resources=(InventoryResourcePoint(scan_utc=scan, food=100, wood=200, stone=300, gold=400),),
         speedups=(
             InventorySpeedupPoint(
                 scan_utc=scan,
@@ -170,8 +168,7 @@ def test_inventory_snapshot_summary_requires_complete_category_coverage() -> Non
 
     assert status.state == "available"
     assert (
-        status.account_summary
-        == "2 registered governor(s) with complete approved inventory data."
+        status.account_summary == "2 registered governor(s) with complete approved inventory data."
     )
     assert status.resources.detail == "2/2 governors | latest 2026-06-25"
 
