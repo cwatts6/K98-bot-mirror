@@ -1,8 +1,8 @@
 # Codex Chat Starter - Player Self-Service Command Centre Phase 11 Shared Visual-Card Renderer Consolidation
 
-Status: completed starter for Phase 11A. Use
-`docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre Phase 11B KVK Renderer Migration.md`
-for the next Phase 11 slice.
+Status: completed starter for Phase 11A. Phase 11B KVK Renderer Migration is also delivered.
+Use the Phase 11 task pack and deferred backlog to prepare the next Phase 11C Inventory Renderer
+Migration slice.
 
 Phase 1 audit/design is complete and archived.
 

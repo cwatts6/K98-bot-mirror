@@ -42,26 +42,15 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 5A admin/leadership/operator grouping is complete; requires operator approval, SQL-backed usage review, user-facing briefing, and a fresh task pack.
 
 ### Deferred Optimisation
-- Area: `kvk/rendering/kvk_stats_card_renderer.py`, `kvk/rendering/kvk_targets_card_renderer.py`, `kvk/rendering/kvk_rankings_card_renderer.py`, `kvk/rendering/kvk_history_renderer.py`
-- Type: refactor
-- Description: Phase 11A extracted shared glyph-safe text primitives into `core.visual_text` and migrated `/me` page cards plus PreKvK compatibility wrappers. KVK stats and targets still import those primitives indirectly through `prekvk.report_image_renderer`, while history and rankings import KVK stats helper functions. This leaves the KVK renderer family on the old cross-domain helper path and keeps shared font/fit/draw ownership unclear.
-- Suggested Fix: Complete a Phase 11B KVK renderer migration slice that points KVK stats and targets directly at `core.visual_text`, then rationalises KVK-internal helper ownership for history and rankings without changing card layouts, filenames, dimensions, fallback behavior, public/private posting rules, or Unicode player-name handling. Validate with focused KVK renderer/card posting tests and at least one rendered KVK PNG smoke artifact.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 11A core text helper and `/me`/PreKvK migration delivered in mirror PR #173
-  and production PR #481 and smoke tested successfully on 2026-06-26; existing KVK renderer tests
-  green before migration.
-
-### Deferred Optimisation
 - Area: `inventory/report_image_renderer.py`
 - Type: refactor
-- Description: Phase 11A extracted shared glyph-safe text primitives into `core.visual_text`, but the inventory report renderer still owns local font loading, text measurement, fit-to-width, wrapping, panel drawing, and PNG export helpers. Inventory report cards are visually distinct and should not be forced into the `/me` or KVK layout model, but stable primitives should still use the shared helper before Phase 11 closes.
+- Description: Phase 11A extracted shared glyph-safe text primitives into `core.visual_text`, and Phase 11B migrated the KVK renderer family away from the old PreKvK helper path. The inventory report renderer still owns local font loading, text measurement, fit-to-width, wrapping, panel drawing, and PNG export helpers. Inventory report cards are visually distinct and should not be forced into the `/me` or KVK layout model, but stable primitives should still use the shared helper before Phase 11 closes.
 - Suggested Fix: Complete a Phase 11C inventory renderer migration slice that adopts `core.visual_text` for font loading, text width, fit-to-width, and wrapping where behavior can be preserved. Keep inventory chart layout, panel styling, filenames, dimensions, report visibility behavior, export buttons, and generated report contracts unchanged. Validate with focused inventory renderer tests and at least one rendered inventory PNG smoke artifact.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 11A core text helper and `/me`/PreKvK migration delivered in mirror PR #173
-  and production PR #481 and smoke tested successfully on 2026-06-26; KVK Phase 11B should run
-  first as the next documented slice; both KVK and inventory migrations must be completed before
+  and production PR #481 and smoke tested successfully on 2026-06-26; Phase 11B KVK renderer
+  migration completed as the second documented slice; Inventory migration remains required before
   Phase 11 is considered done.
 
 ### Deferred Optimisation

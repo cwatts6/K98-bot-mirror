@@ -1,6 +1,7 @@
 # Codex Chat Starter - Player Self-Service Command Centre Phase 11B KVK Renderer Migration
 
-Status: active starter for the next Player Self-Service Command Centre Phase 11 slice.
+Status: completed starter for Phase 11B. Phase 11C Inventory Renderer Migration is the remaining
+Phase 11 slice.
 
 Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and production
 PR #481 and smoke tested successfully on 2026-06-26. It extracted `core.visual_text`, migrated
@@ -9,8 +10,8 @@ added focused helper and renderer tests, included the rendered `phase11_me_dashb
 visual artifact, and kept command, SQL/data, export, preference, and Discord visibility behavior
 unchanged.
 
-Phase 11 is not complete yet. Phase 11B must migrate KVK renderers, and Phase 11C must migrate the
-Inventory report renderer, unless the operator explicitly re-scopes the phase.
+Phase 11 is not complete yet. Phase 11B migrated KVK renderers, and Phase 11C must migrate the
+Inventory report renderer unless the operator explicitly re-scopes the phase.
 
 ## Copy/Paste Starter
 

@@ -7,7 +7,7 @@
 - Owner/context: Player Self-Service Command Centre programme after Phase 10 Inventory Summary Card was delivered in production PR #480 and smoke tested successfully
 - Task type: `renderer refactor | visual card consolidation | player self-service polish | deferred optimisation execution`
 - One-pass approved: `no`
-- Status: `Phase 11A delivered; Phase 11B next`
+- Status: `Phase 11A and Phase 11B delivered; Phase 11C next`
 
 ## 2. Required Reading
 
@@ -62,10 +62,9 @@ cards to the shared text primitives, preserved PreKvK compatibility wrappers, ad
 tests, included the local `phase11_me_dashboard_smoke.png` visual artifact, and kept command,
 SQL/data, export, preference, and Discord visibility behavior unchanged.
 
-The active deferred backlog now keeps Phase 11B and Phase 11C visible so the remaining renderer
-families are not lost after the first helper extraction:
+The active deferred backlog now keeps Phase 11C visible so the remaining renderer family is not
+lost after the first two helper-consolidation slices:
 
-- Phase 11B: KVK stats, targets, rankings, and history renderer migration to `core.visual_text`.
 - Phase 11C: Inventory report renderer text primitive migration to `core.visual_text`.
 
 ## 5. Scope
@@ -112,16 +111,16 @@ renderer families have moved onto the shared primitive layer where practical:
 1. Phase 11A: delivered in mirror PR #173 and production PR #481. Extracted `core.visual_text`
    and migrated `/me` page cards plus PreKvK compatibility wrappers away from the accidental
    `prekvk.report_image_renderer` shared-helper role.
-2. Phase 11B: next slice. Migrate KVK stats, targets, rankings, and history renderers to use the
-   shared text primitives directly while preserving KVK-internal helper contracts and card output.
+2. Phase 11B: delivered. Migrated KVK stats and targets directly to the shared text primitives,
+   kept history and rankings on KVK-local helpers backed by `core.visual_text`, and preserved KVK
+   card output contracts.
 3. Phase 11C: final renderer slice. Migrate Inventory report rendering text primitives to the
    shared helper while preserving report chart layout, filenames, dimensions, and existing
    report/export behavior.
 
-KVK and Inventory are captured in `docs/reference/deferred_optimisations.md` as Phase 11 follow-up
-slices so they are not lost after the first helper extraction. Do not close Phase 11 as complete
-until those renderer families are migrated or an explicit operator decision changes the phase
-scope.
+Inventory is captured in `docs/reference/deferred_optimisations.md` as the remaining Phase 11
+follow-up slice so it is not lost after the KVK migration. Do not close Phase 11 as complete until
+the inventory renderer family is migrated or an explicit operator decision changes the phase scope.
 
 ### Out of Scope
 
@@ -231,11 +230,11 @@ Run full `pytest -q tests` if shared helper changes touch more than one renderer
 - [x] Standard validators pass for Phase 11A.
 - [x] At least one rendered PNG smoke artifact is inspected before handoff.
 - [x] Deferred backlog is updated to reflect the completed slice or remaining renderer work.
-- [ ] Phase 11B migrates KVK renderers to the shared helper while preserving KVK output.
+- [x] Phase 11B migrates KVK renderers to the shared helper while preserving KVK output.
 - [ ] Phase 11C migrates Inventory report rendering text primitives to the shared helper while
   preserving inventory output.
-- [ ] KVK and Inventory renderer migration slices are completed before Phase 11 is closed, unless
-  the operator explicitly re-scopes the phase.
+- [ ] Inventory renderer migration is completed before Phase 11 is closed, unless the operator
+  explicitly re-scopes the phase.
 
 ## 13. PR Summary Template
 

@@ -5,9 +5,9 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from core import visual_text
 from kvk.models.kvk_targets_card import KvkTargetsCardPayload, RenderedKvkTargetsCard
 from kvk.theme import normalize_kvk_mode
-from prekvk import report_image_renderer as text_renderer
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSET_DIR = ROOT / "assets" / "kvk" / "cards"
@@ -34,7 +34,7 @@ PURPLE = (168, 85, 247)
 
 
 def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
-    return text_renderer._font(size, bold=bold)
+    return visual_text.font(size, bold=bold)
 
 
 def _background_for_mode(kvk_name: str | None) -> Path | None:
@@ -63,10 +63,10 @@ def _fit_font(
     min_size: int,
     bold: bool = False,
 ) -> ImageFont.ImageFont:
-    font = text_renderer._font_for_text(text, size, bold=bold)
+    font = visual_text.font_for_text(text, size, bold=bold)
     while size > min_size and _text_width(draw, text, font) > max_width:
         size -= 1
-        font = text_renderer._font_for_text(text, size, bold=bold)
+        font = visual_text.font_for_text(text, size, bold=bold)
     return font
 
 
@@ -96,7 +96,7 @@ def _draw_text(
     bold: bool = False,
 ) -> None:
     font = font or _font(20, bold=bold)
-    text_renderer._draw_text(draw, xy, text, fill=fill, font=font, bold=bold)
+    visual_text.draw_text(draw, xy, text, fill=fill, font=font, bold=bold)
 
 
 def _compact(value: int | float | None) -> str:

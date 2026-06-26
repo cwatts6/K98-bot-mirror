@@ -5,9 +5,9 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from core import visual_text
 from kvk.models.kvk_stats_card import KvkStatsCardPayload, RenderedKvkStatsCard
 from kvk.theme import normalize_kvk_mode
-from prekvk import report_image_renderer as text_renderer
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSET_DIR = ROOT / "assets" / "kvk" / "cards"
@@ -32,7 +32,7 @@ GOLD = (255, 211, 87)
 
 
 def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
-    return text_renderer._font(size, bold=bold)
+    return visual_text.font(size, bold=bold)
 
 
 def _hex_color(value: str) -> tuple[int, int, int]:
@@ -100,10 +100,10 @@ def _fit_font(
     min_size: int,
     bold: bool = False,
 ) -> ImageFont.ImageFont:
-    font = text_renderer._font_for_text(text, size, bold=bold)
+    font = visual_text.font_for_text(text, size, bold=bold)
     while size > min_size and _text_width(draw, text, font) > max_width:
         size -= 1
-        font = text_renderer._font_for_text(text, size, bold=bold)
+        font = visual_text.font_for_text(text, size, bold=bold)
     return font
 
 
@@ -117,10 +117,10 @@ def _fit_shared_font(
     bold: bool = False,
 ) -> ImageFont.ImageFont:
     text = max(values or [""], key=len)
-    font = text_renderer._font_for_text(text, size, bold=bold)
+    font = visual_text.font_for_text(text, size, bold=bold)
     while size > min_size and any(_text_width(draw, value, font) > max_width for value in values):
         size -= 1
-        font = text_renderer._font_for_text(text, size, bold=bold)
+        font = visual_text.font_for_text(text, size, bold=bold)
     return font
 
 
@@ -134,7 +134,7 @@ def _draw_text(
     bold: bool = False,
 ) -> None:
     font = font or _font(20, bold=bold)
-    text_renderer._draw_text(draw, xy, text, fill=fill, font=font, bold=bold)
+    visual_text.draw_text(draw, xy, text, fill=fill, font=font, bold=bold)
 
 
 def _draw_centered_text(

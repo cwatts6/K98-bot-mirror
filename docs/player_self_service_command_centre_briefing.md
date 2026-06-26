@@ -3,8 +3,10 @@
 Last updated: 2026-06-26
 
 Status: Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and
-production PR #481, and smoke tested successfully on 2026-06-26. The dashboard uses the same
-full-bleed generated private card style as the Phase 6 subpages, with large row-based text
+production PR #481, and smoke tested successfully on 2026-06-26. Phase 11B KVK Renderer Migration
+is delivered in this implementation slice, moving the KVK renderer family to the shared
+`core.visual_text` primitive path while preserving KVK output contracts. The dashboard uses the
+same full-bleed generated private card style as the Phase 6 subpages, with large row-based text
 directly on the card background. Accounts, Reminders, Preferences, Inventory, and Exports use
 generated private visual cards with safe embed fallback. `/me inventory` summarizes latest
 approved inventory resources, speedups, and materials, and `/me exports` remains the preferred
@@ -282,14 +284,23 @@ Phase 11A implementation notes:
   `/me preferences`, `/me exports`, a representative PreKvK report image path, and a representative
   KVK visual card path still worked.
 
+Phase 11B implementation notes:
+
+- KVK stats and targets now import `core.visual_text` directly instead of routing shared text
+  primitives through `prekvk.report_image_renderer`.
+- KVK history and rankings keep their KVK-local helper import path, but those helpers now resolve
+  drawing through the shared primitive layer rather than the old PreKvK compatibility wrappers.
+- Focused ownership regression tests prevent the KVK renderer family from reintroducing the
+  PreKvK text-helper dependency.
+- The local `phase11b_kvk_stats_smoke.png` artifact was rendered and inspected before handoff.
+- Smoke validation preserves KVK image dimensions, filenames, fallback behavior, Unicode/player
+  name degradation, and public/private command behavior.
+
 Next phase:
 
-- Phase 11B is the active next slice and must migrate KVK stats, targets, rankings, and history
-  renderers to `core.visual_text` while preserving KVK card dimensions, filenames, image output,
-  fallback behavior, Unicode/player-name handling, and existing public/private command behavior.
-- Phase 11C must migrate Inventory report rendering text primitives. Phase 11 should not be
-  considered complete until KVK and Inventory renderer families are migrated or the operator
-  explicitly re-scopes the phase.
+- Phase 11C is the active next slice and must migrate Inventory report rendering text primitives.
+  Phase 11 should not be considered complete until the Inventory renderer family is migrated or
+  the operator explicitly re-scopes the phase.
 - Broader preferences expansion and legacy export redirect/removal remain later Player
   Self-Service phases.
 - Export schema/format redesign remains a separate export-output programme unless explicitly

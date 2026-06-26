@@ -37,6 +37,10 @@ Status as of 2026-06-26:
   production PR #481, smoke tested successfully by the operator on 2026-06-26, and established
   `core.visual_text` as the shared glyph-safe text primitive layer for `/me` page cards and
   PreKvK compatibility wrappers.
+- Phase 11B KVK Renderer Migration is delivered in this implementation slice. It migrates KVK
+  stats and targets directly to `core.visual_text`, keeps history and rankings on KVK-local text
+  wrappers backed by the shared helper, preserves KVK visual-card output contracts, and includes
+  the inspected local `phase11b_kvk_stats_smoke.png` artifact.
 - The delivered `/me` surface now includes a private command-centre shell, a generated dashboard
   card with safe embed fallback, generated cards for Accounts, Reminders, Preferences, and
   Inventory, and Exports, account-centre lookup/register/replace/remove management, unified KVK/calendar
@@ -45,8 +49,8 @@ Status as of 2026-06-26:
   dashboard Inventory/Exports handoffs, private Inventory summary data, option-window based
   private stats and inventory exports, graceful timeout handling, and return navigation. Legacy
   account, reminder, inventory, calendar reminder, and export commands remain live.
-- Next active scope: Phase 11B KVK Renderer Migration. Phase 11 remains open until KVK and
-  Inventory report renderer families are migrated to the shared primitive layer where practical,
+- Next active scope: Phase 11C Inventory Renderer Migration. Phase 11 remains open until the
+  Inventory report renderer family is migrated to the shared primitive layer where practical,
   unless the operator explicitly re-scopes the phase.
 
 Phase 2 manual smoke evidence:
@@ -741,7 +745,7 @@ Phase 10 manual smoke evidence:
 
 ### Phase 11 — Shared Visual-Card Renderer Consolidation
 
-Status: Phase 11A delivered; Phase 11B active next.
+Status: Phase 11A and Phase 11B delivered; Phase 11C active next.
 
 Consolidate stable visual-card primitives after the `/me` Inventory card fills the last obvious
 page-level visual gap and launch/legacy decisions are not competing for product attention.
@@ -760,10 +764,22 @@ Phase 11A delivered:
 - preserved card dimensions, filenames, attachment names, fallback behavior, Unicode fallback, and
   Discord visibility behavior
 
+Phase 11B delivered:
+
+- migrated KVK stats and targets away from `prekvk.report_image_renderer` and onto
+  `core.visual_text`
+- kept history and rankings on KVK-local renderer helpers that now resolve text drawing through
+  the shared primitive layer
+- added focused ownership regression tests so KVK renderers do not reintroduce the PreKvK text
+  helper path
+- rendered and inspected `phase11b_kvk_stats_smoke.png`
+- preserved KVK card dimensions, filenames, fallback behavior, Unicode/player-name degradation,
+  and public/private command behavior
+
 Remaining Phase 11 deliverables:
 
-- migrate one renderer family at a time, with Phase 11 not considered complete until KVK and
-  inventory renderer families are migrated where practical
+- migrate one renderer family at a time, with Phase 11 not considered complete until the inventory
+  renderer family is migrated where practical
 - preserve existing card filenames, dimensions, output bytes contracts, fallback behavior, and
   player-name Unicode handling
 - add focused renderer tests and at least one visual/PNG smoke artifact for each changed renderer
@@ -774,8 +790,8 @@ Approved implementation slicing:
 - Phase 11A delivered shared glyph-safe text primitives in `core.visual_text` and migrated `/me`
   page cards plus PreKvK compatibility wrappers away from the accidental PreKvK-as-shared-helper
   dependency.
-- Phase 11B is the next slice and must migrate the KVK renderer family (`kvk/rendering/`) to the
-  shared helper while preserving KVK stats, targets, rankings, and history output contracts.
+- Phase 11B delivered the KVK renderer family (`kvk/rendering/`) migration to the shared helper
+  while preserving KVK stats, targets, rankings, and history output contracts.
 - Phase 11C must migrate `inventory/report_image_renderer.py` text primitives to the shared helper
   while preserving report layout, filenames, dimensions, and existing report/export behavior.
 
@@ -1018,15 +1034,15 @@ Do not include these in the first build unless separately approved:
 
 ## 18. Suggested Next Action
 
-Start Phase 11B:
+Start Phase 11C:
 
 ```text
-KVK Renderer Migration
+Inventory Renderer Migration
 ```
 
-Use the prepared Phase 11B chat starter to migrate KVK stats, targets, rankings, and history
-renderers from the old PreKvK helper path to `core.visual_text`. Keep layouts, dimensions,
-filenames, fallback behavior, Unicode handling, and public/private command behavior unchanged.
+Prepare a Phase 11C task pack or chat starter to migrate `inventory/report_image_renderer.py`
+text primitives to `core.visual_text`. Keep inventory report layout, dimensions, filenames,
+fallback behavior, report visibility, export buttons, and generated report contracts unchanged.
 Preferences expansion and legacy export redirect/removal remain later programme phases, and export
 schema/format redesign remains a separate export-output programme unless explicitly narrowed
 later. Do not redirect or remove `/my_stats_export` or `/export_inventory` without explicit
