@@ -33,6 +33,14 @@ def test_timezone_validation_accepts_iana_name() -> None:
     assert "IANA timezone" in str(error)
 
 
+@pytest.mark.parametrize("timezone_name", ["/UTC", "../UTC", "Europe//London"])
+def test_timezone_validation_rejects_malformed_keys(timezone_name: str) -> None:
+    value, error = svc.normalize_timezone(timezone_name)
+
+    assert value is None
+    assert "IANA timezone" in str(error)
+
+
 @pytest.mark.asyncio
 async def test_set_profile_preference_preserves_other_fields_and_writes_country() -> None:
     writes = []

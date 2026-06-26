@@ -385,7 +385,7 @@ def normalize_timezone(value: str | None) -> tuple[str | None, str | None]:
         return None, "Timezone is too long. Use an IANA timezone like Europe/London."
     try:
         ZoneInfo(candidate)
-    except ZoneInfoNotFoundError:
+    except (ValueError, ZoneInfoNotFoundError):
         return (
             None,
             "Timezone must be an IANA timezone, for example Europe/London or America/New_York.",
