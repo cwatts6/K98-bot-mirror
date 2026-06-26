@@ -10,7 +10,6 @@ from kvk.rendering import (
     kvk_targets_card_renderer,
 )
 
-
 RENDERER_PATHS = (
     Path("kvk/rendering/kvk_stats_card_renderer.py"),
     Path("kvk/rendering/kvk_targets_card_renderer.py"),
