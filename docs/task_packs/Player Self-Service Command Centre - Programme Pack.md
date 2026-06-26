@@ -33,6 +33,10 @@ Status as of 2026-06-26:
 - Phase 10 Inventory Summary Card is delivered in production PR #480 and smoke tested
   successfully by the operator on 2026-06-26. It adds `/me inventory` as the sixth private `/me`
   subcommand and keeps the existing `/myinventory` report journey intact.
+- Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and
+  production PR #481, smoke tested successfully by the operator on 2026-06-26, and established
+  `core.visual_text` as the shared glyph-safe text primitive layer for `/me` page cards and
+  PreKvK compatibility wrappers.
 - The delivered `/me` surface now includes a private command-centre shell, a generated dashboard
   card with safe embed fallback, generated cards for Accounts, Reminders, Preferences, and
   Inventory, and Exports, account-centre lookup/register/replace/remove management, unified KVK/calendar
@@ -41,8 +45,9 @@ Status as of 2026-06-26:
   dashboard Inventory/Exports handoffs, private Inventory summary data, option-window based
   private stats and inventory exports, graceful timeout handling, and return navigation. Legacy
   account, reminder, inventory, calendar reminder, and export commands remain live.
-- Next active scope: Phase 11 Shared Visual-Card Renderer Consolidation, promoted from the active
-  deferred renderer item now that all `/me` page-level card surfaces are stable.
+- Next active scope: Phase 11B KVK Renderer Migration. Phase 11 remains open until KVK and
+  Inventory report renderer families are migrated to the shared primitive layer where practical,
+  unless the operator explicitly re-scopes the phase.
 
 Phase 2 manual smoke evidence:
 
@@ -736,30 +741,41 @@ Phase 10 manual smoke evidence:
 
 ### Phase 11 — Shared Visual-Card Renderer Consolidation
 
-Status: implementation started.
+Status: Phase 11A delivered; Phase 11B active next.
 
 Consolidate stable visual-card primitives after the `/me` Inventory card fills the last obvious
 page-level visual gap and launch/legacy decisions are not competing for product attention.
 
-Likely deliverables:
+Phase 11A delivered:
 
-- audit shared rendering patterns across `player_self_service`, KVK, PreKvK, and inventory
-  renderers
-- extract only stable primitives such as text fitting, badges, PNG wrappers, glyph-safe font
-  selection, and common fallback handling
-- migrate one renderer family at a time, with Phase 11 not considered complete until `/me`/PreKvK,
-  KVK, and inventory renderer families are migrated where practical
+- audited duplicated Pillow renderer primitives across `/me`, KVK, PreKvK, and inventory
+  renderers before extraction
+- added `core.visual_text` for font loading, glyph-safe text measurement/drawing, fit-to-width,
+  and shared fit helpers
+- migrated `/me` page cards to the shared helper directly
+- preserved PreKvK compatibility wrappers so existing PreKvK and KVK helper imports continue to
+  work during the remaining slices
+- added focused helper and renderer tests
+- rendered and inspected `phase11_me_dashboard_smoke.png`
+- preserved card dimensions, filenames, attachment names, fallback behavior, Unicode fallback, and
+  Discord visibility behavior
+
+Remaining Phase 11 deliverables:
+
+- migrate one renderer family at a time, with Phase 11 not considered complete until KVK and
+  inventory renderer families are migrated where practical
 - preserve existing card filenames, dimensions, output bytes contracts, fallback behavior, and
   player-name Unicode handling
-- add focused renderer tests and at least one visual/PNG smoke artifact for changed renderers
+- add focused renderer tests and at least one visual/PNG smoke artifact for each changed renderer
+  family
 
 Approved implementation slicing:
 
-- Phase 11A extracts shared glyph-safe text primitives into `core.visual_text` and migrates `/me`
+- Phase 11A delivered shared glyph-safe text primitives in `core.visual_text` and migrated `/me`
   page cards plus PreKvK compatibility wrappers away from the accidental PreKvK-as-shared-helper
   dependency.
-- Phase 11B must migrate the KVK renderer family (`kvk/rendering/`) to the shared helper while
-  preserving KVK stats, targets, rankings, and history output contracts.
+- Phase 11B is the next slice and must migrate the KVK renderer family (`kvk/rendering/`) to the
+  shared helper while preserving KVK stats, targets, rankings, and history output contracts.
 - Phase 11C must migrate `inventory/report_image_renderer.py` text primitives to the shared helper
   while preserving report layout, filenames, dimensions, and existing report/export behavior.
 
@@ -1002,16 +1018,16 @@ Do not include these in the first build unless separately approved:
 
 ## 18. Suggested Next Action
 
-Start Phase 11:
+Start Phase 11B:
 
 ```text
-Shared Visual-Card Renderer Consolidation
+KVK Renderer Migration
 ```
 
-Use the prepared Phase 11 task pack to audit and consolidate stable card-rendering primitives
-across the `/me` visual-card model and adjacent KVK, PreKvK, and inventory renderers. Keep the
-first pass audit/scope-led and migrate one renderer at a time. Preferences expansion and legacy
-export redirect/removal remain later programme phases, and export schema/format redesign remains a
-separate export-output programme unless explicitly narrowed later. Do not redirect or remove
-`/my_stats_export` or `/export_inventory` without explicit operator approval, player
-communication, and a no-feedback monitoring window.
+Use the prepared Phase 11B chat starter to migrate KVK stats, targets, rankings, and history
+renderers from the old PreKvK helper path to `core.visual_text`. Keep layouts, dimensions,
+filenames, fallback behavior, Unicode handling, and public/private command behavior unchanged.
+Preferences expansion and legacy export redirect/removal remain later programme phases, and export
+schema/format redesign remains a separate export-output programme unless explicitly narrowed
+later. Do not redirect or remove `/my_stats_export` or `/export_inventory` without explicit
+operator approval, player communication, and a no-feedback monitoring window.

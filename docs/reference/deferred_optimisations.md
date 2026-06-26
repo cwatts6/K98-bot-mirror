@@ -48,7 +48,9 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Suggested Fix: Complete a Phase 11B KVK renderer migration slice that points KVK stats and targets directly at `core.visual_text`, then rationalises KVK-internal helper ownership for history and rankings without changing card layouts, filenames, dimensions, fallback behavior, public/private posting rules, or Unicode player-name handling. Validate with focused KVK renderer/card posting tests and at least one rendered KVK PNG smoke artifact.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 11A core text helper and `/me`/PreKvK migration complete; existing KVK renderer tests green before migration.
+- Dependencies: Phase 11A core text helper and `/me`/PreKvK migration delivered in mirror PR #173
+  and production PR #481 and smoke tested successfully on 2026-06-26; existing KVK renderer tests
+  green before migration.
 
 ### Deferred Optimisation
 - Area: `inventory/report_image_renderer.py`
@@ -57,7 +59,10 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Suggested Fix: Complete a Phase 11C inventory renderer migration slice that adopts `core.visual_text` for font loading, text width, fit-to-width, and wrapping where behavior can be preserved. Keep inventory chart layout, panel styling, filenames, dimensions, report visibility behavior, export buttons, and generated report contracts unchanged. Validate with focused inventory renderer tests and at least one rendered inventory PNG smoke artifact.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 11A core text helper and `/me`/PreKvK migration complete; KVK Phase 11B can run before or after this slice, but both KVK and inventory migrations must be completed before Phase 11 is considered done.
+- Dependencies: Phase 11A core text helper and `/me`/PreKvK migration delivered in mirror PR #173
+  and production PR #481 and smoke tested successfully on 2026-06-26; KVK Phase 11B should run
+  first as the next documented slice; both KVK and inventory migrations must be completed before
+  Phase 11 is considered done.
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `/my_stats_export`, `/export_inventory`, player self-service docs/tests

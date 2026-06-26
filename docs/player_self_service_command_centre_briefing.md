@@ -2,12 +2,13 @@
 
 Last updated: 2026-06-26
 
-Status: Phase 10 Inventory Summary Card is delivered in production PR #480 and smoke tested
-successfully. The dashboard uses the same full-bleed generated private card style as the Phase 6
-subpages, with large row-based text directly on the card background. Accounts, Reminders,
-Preferences, Inventory, and Exports use generated private visual cards with safe embed fallback.
-`/me inventory` summarizes latest approved inventory resources, speedups, and materials, and
-`/me exports` remains the preferred private export route while legacy export commands remain live.
+Status: Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and
+production PR #481, and smoke tested successfully on 2026-06-26. The dashboard uses the same
+full-bleed generated private card style as the Phase 6 subpages, with large row-based text
+directly on the card background. Accounts, Reminders, Preferences, Inventory, and Exports use
+generated private visual cards with safe embed fallback. `/me inventory` summarizes latest
+approved inventory resources, speedups, and materials, and `/me exports` remains the preferred
+private export route while legacy export commands remain live.
 
 ## Player Briefing
 
@@ -270,15 +271,25 @@ Phase 7 validation notes:
   reminder management can switch to calendar reminders, calendar reminder management can switch
   back to KVK reminders, and the switch/remove buttons share one row in both child windows.
 
+Phase 11A implementation notes:
+
+- Shared glyph-safe Pillow text primitives now live in `core.visual_text`.
+- `/me` page cards use the shared text primitives directly.
+- PreKvK compatibility wrappers remain in place so existing PreKvK and KVK imports keep working
+  while later slices migrate away from the old helper ownership.
+- The local `phase11_me_dashboard_smoke.png` artifact was rendered and inspected before handoff.
+- Smoke testing confirmed `/me dashboard`, `/me inventory`, `/me accounts`, `/me reminders`,
+  `/me preferences`, `/me exports`, a representative PreKvK report image path, and a representative
+  KVK visual card path still worked.
+
 Next phase:
 
-- Phase 11 Shared Visual-Card Renderer Consolidation is now implementation work. Phase 11A
-  extracts shared glyph-safe text primitives into `core.visual_text` and migrates `/me` page cards
-  plus PreKvK compatibility wrappers away from the accidental PreKvK-as-shared-helper dependency.
-- Phase 11B must migrate KVK stats, targets, rankings, and history renderers to the shared helper.
-  Phase 11C must migrate Inventory report rendering text primitives. Phase 11 should not be
-  considered complete until those renderer families are migrated or the operator explicitly
-  re-scopes the phase.
+- Phase 11B is the active next slice and must migrate KVK stats, targets, rankings, and history
+  renderers to `core.visual_text` while preserving KVK card dimensions, filenames, image output,
+  fallback behavior, Unicode/player-name handling, and existing public/private command behavior.
+- Phase 11C must migrate Inventory report rendering text primitives. Phase 11 should not be
+  considered complete until KVK and Inventory renderer families are migrated or the operator
+  explicitly re-scopes the phase.
 - Broader preferences expansion and legacy export redirect/removal remain later Player
   Self-Service phases.
 - Export schema/format redesign remains a separate export-output programme unless explicitly

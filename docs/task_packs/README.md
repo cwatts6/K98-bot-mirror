@@ -44,9 +44,13 @@ Player Self-Service Command Centre status:
   smoke tested successfully by the operator on 2026-06-25.
 - Phase 10 Inventory Summary Card is delivered in production PR #480 and smoke tested
   successfully by the operator on 2026-06-26.
-- The active next phase is Phase 11 Shared Visual-Card Renderer Consolidation.
+- Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and
+  production PR #481 and smoke tested successfully by the operator on 2026-06-26.
+- The active next slice is Phase 11B KVK Renderer Migration. Phase 11 remains open until KVK and
+  Inventory report renderer migrations are complete or explicitly re-scoped.
 - Active Phase 11 files:
   - `Codex Task Pack - Player Self-Service Command Centre Phase 11 Shared Visual-Card Renderer Consolidation.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre Phase 11B KVK Renderer Migration.md`
   - `Codex Chat Starter - Player Self-Service Command Centre Phase 11 Shared Visual-Card Renderer Consolidation.md`
 - Active programme file:
   - `Player Self-Service Command Centre - Programme Pack.md`
@@ -132,6 +136,6 @@ Latest completed starter:
 
 Next active work:
 
-Player Self-Service Command Centre Phase 8 Exports Launchpad and Quick Launch Expansion is active.
-KVK final removal of temporary deprecated command paths remains captured as a deferred cleanup item
-for execution after the no-feedback window and operator approval.
+Player Self-Service Command Centre Phase 11B KVK Renderer Migration is active. KVK final removal
+of temporary deprecated command paths remains captured as a deferred cleanup item for execution
+after the no-feedback window and operator approval.

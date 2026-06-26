@@ -1,6 +1,8 @@
 # Codex Chat Starter - Player Self-Service Command Centre Phase 11 Shared Visual-Card Renderer Consolidation
 
-Status: active starter for the next Player Self-Service Command Centre phase.
+Status: completed starter for Phase 11A. Use
+`docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre Phase 11B KVK Renderer Migration.md`
+for the next Phase 11 slice.
 
 Phase 1 audit/design is complete and archived.
 
@@ -68,6 +70,13 @@ handles no-account/no-approved-data/partial-data states privately, and preserves
 `/myinventory` report journey, timescale controls, report visibility behavior, and export buttons.
 Final smoke feedback confirmed all cards and commands worked; a layout polish moved the Inventory
 action block clear of the Materials row.
+
+Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and production
+PR #481 and smoke tested successfully on 2026-06-26. It extracted `core.visual_text`, migrated
+`/me` page cards to the shared text primitives, preserved PreKvK compatibility wrappers, added
+focused helper and renderer tests, included the rendered `phase11_me_dashboard_smoke.png` visual
+artifact, and kept command, SQL/data, export, preference, and Discord visibility behavior
+unchanged.
 
 Source documents:
 
