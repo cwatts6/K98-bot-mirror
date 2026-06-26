@@ -27,6 +27,7 @@ def _import_modules(path: Path) -> set[str]:
             modules.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module:
             modules.add(node.module)
+            modules.update(f"{node.module}.{alias.name}" for alias in node.names)
     return modules
 
 
