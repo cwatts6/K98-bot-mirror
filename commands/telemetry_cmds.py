@@ -203,6 +203,8 @@ def register_commands(bot_instance):
             "Enter your Governor Name",
             name="governorname",
             autocomplete=autocomplete_governor_names,
+            required=False,
+            default="",
         ),
     ):
         await safe_defer(ctx, ephemeral=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -45,8 +46,22 @@ def test_legacy_player_account_commands_redirect_to_me_accounts() -> None:
     source = _source()
 
     for old_path in ("/register_governor", "/modify_registration", "/my_registrations"):
-        assert f'old_path="{old_path}"' in source
-    assert source.count('new_path="/me accounts"') >= 3
+        assert re.search(rf"old_path\s*=\s*['\"]{re.escape(old_path)}['\"]", source)
+    assert len(re.findall(r"new_path\s*=\s*['\"]/me accounts['\"]", source)) >= 3
+
+
+def test_deprecated_account_redirect_options_are_optional() -> None:
+    source = _source()
+
+    assert (
+        len(
+            re.findall(
+                r"required\s*=\s*False\s*,\s*default\s*=\s*['\"]['\"]",
+                source,
+            )
+        )
+        >= 4
+    )
 
 
 def test_my_registrations_legacy_helpers_removed_from_command_module() -> None:

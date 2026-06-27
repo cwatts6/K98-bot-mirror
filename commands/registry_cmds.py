@@ -91,8 +91,15 @@ def register_registry(bot: ext_commands.Bot) -> None:
             str,
             "Choose account type",
             autocomplete=_account_type_all_ac,
+            required=False,
+            default="",
         ),
-        governor_id: str = discord.Option(str, "Your in-game Governor ID"),
+        governor_id: str = discord.Option(
+            str,
+            "Your in-game Governor ID",
+            required=False,
+            default="",
+        ),
     ):
         await safe_defer(ctx, ephemeral=True)
         await send_deprecated_command_redirect(
@@ -120,8 +127,15 @@ def register_registry(bot: ext_commands.Bot) -> None:
             str,
             "Which account do you want to modify or remove?",
             autocomplete=_account_type_ac,
+            required=False,
+            default="",
         ),
-        new_governor_id: str = discord.Option(str, "New Governor ID to assign or REMOVE"),
+        new_governor_id: str = discord.Option(
+            str,
+            "New Governor ID to assign or REMOVE",
+            required=False,
+            default="",
+        ),
     ):
         await safe_defer(ctx, ephemeral=True)
         await send_deprecated_command_redirect(

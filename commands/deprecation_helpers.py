@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 import discord
 
+from core.interaction_safety import send_or_followup
+
 
 @dataclass(frozen=True)
 class CommandRedirect:
@@ -28,7 +30,19 @@ async def send_deprecated_command_redirect(
     *,
     ephemeral: bool,
 ) -> None:
-    await ctx.followup.send(
-        build_deprecated_command_message(redirect),
-        ephemeral=ephemeral,
-    )
+    message = build_deprecated_command_message(redirect)
+    interaction = getattr(ctx, "interaction", None)
+    if (
+        interaction is not None
+        and hasattr(interaction, "response")
+        and hasattr(interaction, "followup")
+    ):
+        await send_or_followup(interaction, message, ephemeral=ephemeral)
+        return
+
+    responder = getattr(ctx, "respond", None)
+    if responder is not None:
+        await responder(message, ephemeral=ephemeral)
+        return
+
+    await ctx.followup.send(message, ephemeral=ephemeral)
