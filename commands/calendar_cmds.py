@@ -6,11 +6,10 @@ import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID
+from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import track_usage
-from event_calendar.reminder_prefs_store import get_user_prefs
 from event_calendar.runtime_cache import (
-    list_event_types,
     load_runtime_cache,
     stale_banner,
 )
@@ -26,19 +25,11 @@ from ui.views.calendar import (
     paginate,
     query_calendar,
 )
-from ui.views.reminder_config import ReminderConfigView, build_reminder_config_embed
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
 
 _ALLOWED_DAYS = allowed_days()
-
-
-def _known_calendar_types() -> list[str]:
-    cache_state = load_runtime_cache()
-    if not cache_state.get("ok"):
-        return []
-    return [t for t in list_event_types(cache_state) if t]
 
 
 def register_calendar(bot: ext_commands.Bot) -> None:
@@ -171,6 +162,7 @@ def register_calendar(bot: ext_commands.Bot) -> None:
 
     @bot.slash_command(
         name="calendar_reminder_config",
+        # architecture-check: allow
         description="Interactive reminder configuration panel (multi-select).",
         guild_ids=[GUILD_ID],
     )
@@ -179,31 +171,13 @@ def register_calendar(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def calendar_reminder_config(ctx: discord.ApplicationContext):
         await safe_defer(ctx, ephemeral=True)
-
-        user_id = int(getattr(ctx.author, "id", 0) or 0)
-        if user_id <= 0:
-            await ctx.interaction.edit_original_response(content="Unable to resolve user.")
-            return
-
-        known_types = _known_calendar_types()
-        if not known_types:
-            # still allow all as fallback
-            known_types = ["all"]
-
-        prefs = get_user_prefs(user_id)
-
-        view = ReminderConfigView(
-            owner_user_id=user_id,
-            user_id=user_id,
-            initial_prefs=prefs,
-            known_event_types=[t for t in known_types if t != "all"],
-            timeout=300.0,
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/calendar_reminder_config",
+                new_path="/me reminders",
+                detail="Calendar reminder preferences now live beside KVK reminders in the private reminder centre.",
+            ),
+            ephemeral=True,
         )
-        embed = build_reminder_config_embed(view.state)
-
-        msg = await ctx.interaction.edit_original_response(
-            content=None,
-            embed=embed,
-            view=view,
-        )
-        view.message = msg
+        return

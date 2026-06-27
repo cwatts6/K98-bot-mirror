@@ -27,10 +27,7 @@ from embed_my_stats import SliceButtons, build_embeds
 from gsheet_module import run_kvk_export_test, run_kvk_proc_exports_with_alerts
 from kvk.services import kvk_admin_service
 from profile_cache import autocomplete_choices
-from services import (
-    governor_account_service,
-    stats_export_service,
-)
+from services import governor_account_service
 from stats_alerts.embeds.kvk import send_kvk_embed
 from stats_alerts.honors import purge_latest_honor_scan
 from stats_alerts.interface import send_stats_update_embed
@@ -478,80 +475,17 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
             required=False,
         ),
     ):
-        """
-        Export your stats to a downloadable file.
-
-        Supports Excel (.xlsx), CSV, and Google Sheets-compatible formats.
-        """
         await safe_defer(ctx, ephemeral=True)
-
-        export_file = None
-
-        try:
-            user_id = ctx.author.id
-            username = ctx.author.display_name or ctx.author.name
-
-            outcome = await stats_export_service.build_personal_stats_export(
-                discord_user_id=user_id,
-                display_name=username,
-                requested_format=format,
-                days=days,
-            )
-            if outcome.status != "ok" or outcome.export_file is None:
-                await ctx.followup.send(
-                    f"Error: {outcome.message or 'Export could not be prepared.'}",
-                    ephemeral=True,
-                )
-                return
-
-            export_file = outcome.export_file
-            file_obj = discord.File(export_file.file_path, filename=export_file.filename)
-
-            embed = discord.Embed(
-                title=f"{export_file.format_emoji} Stats Export ({export_file.format_name})",
-                description=export_file.description,
-                color=0x2ECC71,
-            )
-            embed.add_field(
-                name="File Info",
-                value=(
-                    f"**Accounts:** {len(export_file.governor_ids)}\n"
-                    f"**Daily Records:** {export_file.row_count:,}\n"
-                    f"**Date Range:** {export_file.days} days"
-                ),
-                inline=False,
-            )
-            embed.add_field(
-                name="How to Open",
-                value=export_file.instructions,
-                inline=False,
-            )
-            embed.set_footer(
-                text=(
-                    f"Exported {export_file.row_count:,} records for "
-                    f"{len(export_file.governor_ids)} account(s) - "
-                    "Data refreshed daily at ~06:00 UTC"
-                )
-            )
-
-            await ctx.followup.send(embed=embed, file=file_obj, ephemeral=True)
-
-            try:
-                from file_utils import emit_telemetry_event
-
-                emit_telemetry_event(export_file.telemetry)
-            except Exception:
-                pass
-
-        except Exception as exc:
-            logger.exception("Failed to export stats for user %s", ctx.author.id)
-            await ctx.followup.send(
-                f"Export failed: {type(exc).__name__}\n\nPlease try again or contact support.",
-                ephemeral=True,
-            )
-
-        finally:
-            stats_export_service.cleanup_export_file(export_file)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/my_stats_export",
+                new_path="/me exports",
+                detail="The export centre now provides personal stats exports from the same private self-service menu.",
+            ),
+            ephemeral=True,
+        )
+        return
 
     @stats_group.command(
         name="player",

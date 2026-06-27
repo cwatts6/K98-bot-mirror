@@ -48,10 +48,7 @@ from registry.account_slots import ACCOUNT_ORDER
 from registry.registry_service import load_registry_as_dict
 from services.governor_account_service import get_account_summary_for_user
 from services.profile_lookup_service import resolve_profile_lookup
-from target_utils import (
-    autocomplete_governor_names,
-    lookup_governor_id,
-)
+from target_utils import autocomplete_governor_names, lookup_governor_id
 from ui.views.kvk_personal_views import (
     FuzzySelectView,
     MyKVKStatsSelectView,  # noqa: F401 — re-exported for Commands.py star-import consumers
@@ -208,75 +205,17 @@ def register_commands(bot_instance):
             autocomplete=autocomplete_governor_names,
         ),
     ):
-        # Single, ephemeral ack
         await safe_defer(ctx, ephemeral=True)
-
-        # Input hygiene
-        name = (governorname or "").strip()
-        if not name:
-            await ctx.interaction.edit_original_response(
-                content="❌ Please enter a governor name.", embed=None, view=None
-            )
-            return
-        if len(name) < 2:
-            await ctx.interaction.edit_original_response(
-                content="⚠️ Please enter at least **2 characters** for better matches.",
-                embed=None,
-                view=None,
-            )
-            return
-
-        try:
-            result = await lookup_governor_id(name)
-
-            if result["status"] == "found":
-                embed = discord.Embed(
-                    title="🆔 Governor ID Lookup",
-                    description=(
-                        f"**Governor Name:** {result['data']['GovernorName']}\n"
-                        f"**Governor ID:** `{result['data']['GovernorID']}`"
-                    ),
-                    color=discord.Color.green(),
-                )
-                actions = PostLookupActions(
-                    author_id=ctx.user.id, governor_id=str(result["data"]["GovernorID"])
-                )
-                await ctx.interaction.edit_original_response(
-                    content=None, embed=embed, view=actions
-                )
-
-            elif result["status"] == "fuzzy_matches":
-                matches = result.get("matches", [])
-                # Summarize in description (avoid 25-field limit)
-                MAX_LINES = 15
-                lines = [
-                    f"• **{m['GovernorName']}** — `{m['GovernorID']}`" for m in matches[:MAX_LINES]
-                ]
-                more = len(matches) - MAX_LINES
-                desc = "Pick a governor from the dropdown below.\n\n" + "\n".join(lines)
-                if more > 0:
-                    desc += f"\n…and **{more}** more."
-
-                embed = discord.Embed(
-                    title="🔍 Governor Name Search Results",
-                    description=desc,
-                    color=discord.Color.blue(),
-                )
-                # Restrict interactions to the invoker
-                view = FuzzySelectView(matches, ctx.user.id, show_targets=True)
-                await ctx.interaction.edit_original_response(content=None, embed=embed, view=view)
-
-            else:
-                # e.g., not found
-                await ctx.interaction.edit_original_response(
-                    content=result.get("message", "No results found."), embed=None, view=None
-                )
-
-        except Exception as e:
-            logger.exception("[/mygovernorid] failed for query=%r", governorname)
-            await ctx.interaction.edit_original_response(
-                content=f"❌ Error: `{type(e).__name__}: {e}`", embed=None, view=None
-            )
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/mygovernorid",
+                new_path="/me accounts",
+                detail="Account lookup and linking now live in the private account centre.",
+            ),
+            ephemeral=True,
+        )
+        return
 
     @bot.slash_command(
         name="player_profile",

@@ -70,10 +70,15 @@ Status as of 2026-06-27:
   reminder autosave/remove-all management, inventory visibility, Governor VIP controls, and
   Discord-user-level profile preference controls,
   dashboard Inventory/Exports handoffs, private Inventory summary data, option-window based
-  private stats and inventory exports, graceful timeout handling, and return navigation. Legacy
-  account, reminder, inventory, calendar reminder, and export commands remain live.
-- Next active programme scope is Phase 13 legacy redirect planning.
-  Legacy redirects/removal and export schema redesign remain separate later decisions.
+  private stats and inventory exports, graceful timeout handling, and return navigation.
+- Phase 13 legacy redirect planning started with audit/scope only, then the operator approved a
+  lightweight redirect slice. Approved account, reminder, calendar reminder, inventory preference,
+  and export legacy commands remain registered but now point privately to the matching `/me`
+  centre. The operator-provided SQL extract and dated JSONL files showed nonzero broad usage for
+  every audited legacy and related personal path, recent direct usage for several legacy paths,
+  and `/me` usage concentrated in the smoke-test/operator window. Player briefing,
+  post-redirect usage monitoring, operator approval, and a no-feedback monitoring window are
+  required before any final command-registration removal. Export schema redesign remains separate.
 
 Phase 2 manual smoke evidence:
 
@@ -663,8 +668,9 @@ Phase 8 follow-ups:
 
 - Phase 9 resolved the Quick Launch question by removing KVK command targets from the dashboard
   launch surface and keeping only safe private Inventory and Exports handoffs.
-- Legacy export redirect/removal remains inside this programme and should be evaluated after
-  Phase 9 smoke and player communication planning.
+- Phase 13 resolved the legacy export entry-point redirect by sending `/my_stats_export` and
+  `/export_inventory` to `/me exports`; final command-registration removal still requires player
+  communication, monitoring, and operator approval.
 - Shared visual-card renderer consolidation was later delivered in Phase 11 as a dedicated
   helper-consolidation task, separate from launch/redirect behavior.
 - Export schema and format redesign is not a Player Self-Service phase by default; it should be a
@@ -681,8 +687,9 @@ output behavior that is safer and clearer in their existing command paths. Playe
 where to use those KVK outputs, so the extra dashboard step does not improve the journey.
 
 Phase 9 also decided that `/me exports` should become the preferred export route before any legacy
-export redirect/removal is attempted. `/my_stats_export` and `/export_inventory` remain live for
-compatibility until a later operator-approved communication and no-feedback window.
+export redirect/removal is attempted. Phase 13 later approved lightweight redirects for
+`/my_stats_export` and `/export_inventory` to `/me exports`; export schemas and service-backed file
+delivery remain unchanged behind the `/me exports` option windows.
 
 Delivered scope:
 
@@ -913,13 +920,18 @@ Archived Phase 12B files:
 
 ### Phase 13 — Legacy Redirects, Briefing, and Cleanup
 
-Status: next active task pack prepared; start with audit/scope only.
+Status: approved redirect slice implemented; awaiting validation and handoff.
 
-After the new `/me` journeys are validated and player communication is complete, plan redirects,
-deprecation messaging, or later removal for remaining legacy paths only with operator approval.
-Phase 13 should not remove commands by default. It should first classify each legacy command as
-preserve, redirect/help, monitor, or later removal candidate, then define the player briefing and
-no-feedback window needed before any removal.
+After audit/classification, the operator approved lightweight redirects for the legacy paths that now have clear `/me` replacements. Phase 13 keeps the old command registrations in place so players receive private guidance, removes only command-local legacy code that is no longer reachable from those flat commands, and leaves final registration removal for a later no-feedback monitoring decision.
+
+Phase 13 approved redirect result:
+
+- Account paths `/register_governor`, `/modify_registration`, `/my_registrations`, and `/mygovernorid` redirect to `/me accounts`.
+- Reminder paths `/subscribe`, `/modify_subscription`, `/unsubscribe`, and `/calendar_reminder_config` redirect to `/me reminders`.
+- `/inventory_preferences` redirects to `/me preferences`.
+- `/my_stats_export` and `/export_inventory` redirect to `/me exports`; export schemas, services, and `/me exports` option windows remain unchanged.
+- `/myinventory`, `/my_stats`, `/stats player`, `/player_profile`, and `/mykvkcrystaltech` remain live. `/my_stats`, `/stats player`, `/player_profile`, and `/myinventory` must be scoped into the Player Self-Service v2 programme pack; `/mykvkcrystaltech` is unique and not part of this slice.
+- Supplied SQL extract and dated JSONL evidence show direct legacy usage still exists and `/me` usage is concentrated in the smoke-test/operator window, so final command-registration removal still requires player communication, monitoring, usage review, and operator approval.
 
 Likely legacy paths:
 
@@ -1142,7 +1154,8 @@ Do not include these in the first build unless separately approved:
 
 ## 18. Suggested Next Action
 
-Start Phase 13 review/scope:
+Review the Phase 13 audit/scope package and decide whether to approve a communication-only or
+private help/redirect rollout slice:
 
 ```text
 Legacy Redirect Planning

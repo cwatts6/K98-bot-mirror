@@ -9,24 +9,15 @@ import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID
-from constants import DEFAULT_REMINDER_TIMES, VALID_TYPES
+from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import is_admin_and_notify_channel, track_usage
-from dm_tracker_utils import (
-    purge_user_from_dm_scheduled_tracker,
-    purge_user_from_dm_sent_tracker,
-)
 from event_scheduler import dm_scheduled_tracker, dm_sent_tracker
-from player_self_service.reminder_service import normalize_event_types
-from reminder_task_registry import active_task_count, cancel_user_reminder_tasks
+from reminder_task_registry import active_task_count
 from subscription_tracker import (
     get_all_subscribers,
-    get_user_config,
     migrate_subscriptions,
-    remove_user,
-    set_user_config,
 )
-from ui.views.subscription_views import SubscriptionView
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
@@ -48,124 +39,17 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
     @safe_command
     @track_usage()
     async def subscribe_command(ctx):
-        user = ctx.user
-        uid = user.id
-        username = str(user)
-
-        existing = get_user_config(uid)
-        if existing:
-            await ctx.respond(
-                "❌ You're already subscribed. Use `/modify_subscription` to change your preferences.",
-                ephemeral=True,
-            )
-            return
-
-        async def _on_timeout_edit(view: SubscriptionView):
-            try:
-                msg = await ctx.interaction.original_response()
-                await msg.edit(view=view)
-            except Exception:
-                pass
-
-        async def _on_confirm(interaction: discord.Interaction, view: SubscriptionView):
-            types = list(view.selected_types)
-            times = list(view.selected_reminders)
-            if not times:
-                times = DEFAULT_REMINDER_TIMES
-            if not types:
-                await interaction.response.send_message(
-                    # architecture-check: allow
-                    "❌ Please select at least one event type.",
-                    ephemeral=True,
-                )
-                return
-            if not times:
-                await interaction.response.send_message(
-                    # architecture-check: allow
-                    "❌ Please select at least one reminder time.",
-                    ephemeral=True,
-                )
-                return
-
-            valid_types = set(VALID_TYPES)
-            invalid_types = [t for t in types if t not in valid_types]
-            if invalid_types:
-                await interaction.response.send_message(
-                    f"❌ Invalid event types: {', '.join(invalid_types)}", ephemeral=True
-                )
-                return
-            valid_times = set(DEFAULT_REMINDER_TIMES)
-            invalid_times = [t for t in times if t not in valid_times]
-            if invalid_times:
-                await interaction.response.send_message(
-                    f"❌ Invalid reminder times: {', '.join(invalid_times)}", ephemeral=True
-                )
-                return
-
-            original_types = types.copy()
-            types, _adjusted_types = normalize_event_types(tuple(types))
-            types = list(types)
-            try:
-                set_user_config(view.uid, view.username, types, times)
-            except Exception as e:
-                logger.exception("[subscribe] set_user_config failed")
-                await interaction.response.send_message(
-                    f"❌ Failed to save your subscription: `{type(e).__name__}: {e}`",
-                    ephemeral=True,
-                )
-                return
-
-            embed = discord.Embed(
-                title="👋 Subscribed to Event Reminders",
-                description=f"Hi {view.user.mention}, you're now subscribed to event reminders!",
-                color=0x2ECC71,
-            )
-            embed.add_field(name="Event Types", value=", ".join(types), inline=False)
-            embed.add_field(name="Reminder Times", value=", ".join(times), inline=False)
-
-            if set(types) != set(original_types):
-                embed.add_field(
-                    name="⚠️ Note",
-                    value="Some selections were adjusted to avoid duplicate reminders (e.g., 'all' disables others).",
-                    inline=False,
-                )
-            # architecture-check: allow
-            embed.set_footer(text="You can update these anytime with /modify_subscription")
-
-            try:
-                await view.user.send(embed=embed)
-            except discord.Forbidden:
-                await interaction.response.send_message(
-                    "⚠️ Could not send DM. Please enable DMs from this server and try again.",
-                    ephemeral=True,
-                )
-                return
-
-            for c in view.children:
-                c.disabled = True
-            await interaction.response.edit_message(
-                content="✅ Subscribed successfully! A confirmation has been sent via DM.",
-                view=view,
-            )
-            view.stop()
-
-        await ctx.respond(
-            "📝 Please complete your subscription below:",
-            view=SubscriptionView(
-                user=user,
-                uid=uid,
-                username=username,
-                selected_types=[],
-                selected_reminders=[],
-                confirm_label="✅ Confirm",
-                include_unsubscribe=False,
-                reminder_min_values=1,
-                cid_prefix="sub",
-                on_confirm=_on_confirm,
-                on_timeout_edit=_on_timeout_edit,
+        await safe_defer(ctx, ephemeral=True)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/subscribe",
+                new_path="/me reminders",
+                detail="The reminder centre now manages KVK and calendar reminders in one private guided flow.",
             ),
             ephemeral=True,
         )
+        return
 
     @bot.slash_command(
         name="modify_subscription",
@@ -177,168 +61,17 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
     @safe_command
     @track_usage()
     async def modify_subscribe_command(ctx):
-
-        user = ctx.user
-        uid = user.id
-        username = str(user)
-
-        existing = get_user_config(uid)
-        if not existing:
-            await ctx.respond(
-                "❌ You're not currently subscribed. Use `/subscribe` to set your preferences.",
-                ephemeral=True,
-            )
-            return
-
-        existing_types = list(existing.get("subscriptions", []))
-        existing_times = list(existing.get("reminder_times", []))
-
-        async def _on_timeout_edit(view: SubscriptionView):
-            try:
-                msg = await ctx.interaction.original_response()
-                await msg.edit(view=view)
-            except Exception:
-                pass
-
-        async def _on_unsubscribe(interaction: discord.Interaction, view: SubscriptionView):
-            try:
-                cancelled = cancel_user_reminder_tasks(uid)
-                sched_removed = purge_user_from_dm_scheduled_tracker(uid)
-                sent_removed = purge_user_from_dm_sent_tracker(uid)
-                remove_user(uid)
-                logger.info(
-                    "[unsubscribe] uid=%s | tasks_cancelled=%s scheduled_removed=%s sent_removed=%s",
-                    uid,
-                    cancelled,
-                    sched_removed,
-                    sent_removed,
-                )
-
-            except Exception as e:
-                logger.exception("[modify_subscription] unsubscribe failed")
-                await interaction.response.send_message(
-                    f"❌ Failed to unsubscribe: `{type(e).__name__}: {e}`", ephemeral=True
-                )
-                return
-
-            for c in view.children:
-                c.disabled = True
-            await interaction.response.edit_message(
-                content="✅ You’ve been unsubscribed.", view=view
-            )
-            try:
-                await user.send(
-                    embed=discord.Embed(
-                        title="🔕 Unsubscribed",
-                        description=f"Hi {user.mention}, you’ve been unsubscribed from all event reminders.",
-                        color=0xE74C3C,
-                    )
-                )
-            except discord.Forbidden:
-                pass
-            view.stop()
-
-        async def _on_confirm(interaction: discord.Interaction, view: SubscriptionView):
-            types = list(view.selected_types)
-            times = list(view.selected_reminders)
-            if not times:
-                times = DEFAULT_REMINDER_TIMES
-
-            if not types:
-                await interaction.response.send_message(
-                    # architecture-check: allow
-                    "❌ Please select at least one event type.",
-                    ephemeral=True,
-                )
-                return
-            if not times:
-                await interaction.response.send_message(
-                    # architecture-check: allow
-                    "❌ Please select at least one reminder time.",
-                    ephemeral=True,
-                )
-                return
-
-            invalid_types = [t for t in types if t not in VALID_TYPES]
-            if invalid_types:
-                await interaction.response.send_message(
-                    f"❌ Invalid event types: {', '.join(invalid_types)}", ephemeral=True
-                )
-                return
-            invalid_times = [t for t in times if t not in DEFAULT_REMINDER_TIMES]
-            if invalid_times:
-                await interaction.response.send_message(
-                    f"❌ Invalid reminder times: {', '.join(invalid_times)}", ephemeral=True
-                )
-                return
-
-            original_types = types.copy()
-            types, _adjusted_types = normalize_event_types(tuple(types))
-            types = list(types)
-
-            try:
-                set_user_config(view.uid, view.username, types, times)
-            except Exception as e:
-                logger.exception("[modify_subscription] set_user_config failed")
-                await interaction.response.send_message(
-                    f"❌ Failed to save your preferences: `{type(e).__name__}: {e}`",
-                    ephemeral=True,
-                )
-                return
-
-            embed = discord.Embed(
-                title="🔄 Preferences Updated",
-                description=f"Hi {view.user.mention}, your event reminder preferences are now updated!",
-                color=0xF1C40F,
-            )
-            embed.add_field(name="Event Types", value=", ".join(types), inline=False)
-            embed.add_field(name="Reminder Times", value=", ".join(times), inline=False)
-
-            if set(types) != set(original_types):
-                embed.add_field(
-                    name="⚠️ Note",
-                    value="Some selections were adjusted to avoid duplicate reminders (e.g., 'all' disables others).",
-                    inline=False,
-                )
-            # architecture-check: allow
-            embed.set_footer(text="You can update these anytime with /modify_subscription")
-
-            try:
-                await view.user.send(embed=embed)
-            except discord.Forbidden:
-                await interaction.response.send_message(
-                    "⚠️ Could not send DM. Please enable DMs from this server.", ephemeral=True
-                )
-                return
-
-            for c in view.children:
-                c.disabled = True
-            await interaction.response.edit_message(
-                content="✅ Preferences updated! A confirmation has been sent via DM.",
-                view=view,
-            )
-            view.stop()
-
-        await ctx.respond(
-            # architecture-check: allow
-            "🛠️ Update your preferences below:",
-            view=SubscriptionView(
-                user=user,
-                uid=uid,
-                username=username,
-                selected_types=existing_types,
-                selected_reminders=existing_times,
-                # architecture-check: allow
-                confirm_label="✅ Update Preferences",
-                include_unsubscribe=True,
-                reminder_min_values=0,
-                cid_prefix="modsub",
-                on_confirm=_on_confirm,
-                on_unsubscribe=_on_unsubscribe,
-                on_timeout_edit=_on_timeout_edit,
+        await safe_defer(ctx, ephemeral=True)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/modify_subscription",
+                new_path="/me reminders",
+                detail="The reminder centre now updates reminder types, timings, and remove-all settings in one private guided flow.",
             ),
             ephemeral=True,
         )
+        return
 
     @bot.slash_command(
         name="unsubscribe", description="Stop receiving KVK event reminders", guild_ids=[GUILD_ID]
@@ -347,81 +80,17 @@ def register_subscriptions(bot: ext_commands.Bot) -> None:
     @safe_command
     @track_usage()
     async def unsubscribe_command(ctx):
-
         await safe_defer(ctx, ephemeral=True)
-
-        user = ctx.user
-        uid = user.id
-
-        # Look up existing config once
-        existing = get_user_config(uid)
-        if not existing:
-            await ctx.interaction.edit_original_response(
-                content="❌ You’re not currently subscribed to any reminders. Use `/subscribe` to get started."
-            )
-            return
-
-        # Keep a copy for the DM summary
-        prev_types = list(existing.get("subscriptions", []))
-        prev_times = list(existing.get("reminder_times", []))
-
-        # Remove from the store (cancel tasks, purge trackers, then remove config)
-        try:
-            cancelled = cancel_user_reminder_tasks(uid)  # no-op if none
-            sched_removed = purge_user_from_dm_scheduled_tracker(uid)  # per-user, per-event buckets
-            sent_removed = purge_user_from_dm_sent_tracker(uid)  # per-user, per-event buckets
-            success = remove_user(uid)
-            if success:
-                logger.info(
-                    "[UNSUBSCRIBE] uid=%s | success=1 tasks_cancelled=%s scheduled_removed=%s sent_removed=%s",
-                    uid,
-                    cancelled,
-                    sched_removed,
-                    sent_removed,
-                )
-            else:
-                logger.info("[UNSUBSCRIBE] No subscription found for user %s (stale state)", uid)
-        except Exception as e:
-            logger.exception("[UNSUBSCRIBE] remove_user failed for %s", uid)
-            await ctx.interaction.edit_original_response(
-                content=f"❌ Failed to unsubscribe: `{type(e).__name__}: {e}`"
-            )
-            return
-
-        # Build DM confirmation (include prior settings for the user's record)
-        embed = discord.Embed(
-            title="🔕 Unsubscribed",
-            description=f"Hi {user.mention}, you’ve been unsubscribed from all event reminders.",
-            color=0xE74C3C,
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/unsubscribe",
+                new_path="/me reminders",
+                detail="The reminder centre now handles remove-all/unsubscribe with confirmation in the private reminder flow.",
+            ),
+            ephemeral=True,
         )
-        embed.add_field(
-            name="Previous Event Types", value=", ".join(prev_types) or "None", inline=False
-        )
-        embed.add_field(
-            name="Previous Reminder Times", value=", ".join(prev_times) or "None", inline=False
-        )
-        embed.set_footer(text="You can re-subscribe anytime with /subscribe")
-
-        # Try sending DM first (doesn't affect the unsubscribe result)
-        dm_sent = True
-        try:
-            await user.send(embed=embed)
-        except (discord.Forbidden, discord.HTTPException):
-            dm_sent = False
-
-        # Confirm in the interaction (single-ack path)
-        try:
-            if dm_sent:
-                await ctx.interaction.edit_original_response(
-                    content="✅ You’ve been unsubscribed. A confirmation has been sent via DM."
-                )
-            else:
-                await ctx.interaction.edit_original_response(
-                    content="✅ You’ve been unsubscribed, but I couldn’t send you a DM. You’re all set!"
-                )
-        except discord.HTTPException:
-            # If the original response was deleted or already acknowledged elsewhere, ignore.
-            pass
+        return
 
     @subscriptions_group.command(
         name="list",

@@ -35,20 +35,29 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `commands/registry_cmds.py`, `commands/telemetry_cmds.py`, `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `commands/subscriptions_cmds.py`, `commands/calendar_cmds.py`, player self-service command docs/tests
 - Type: cleanup
-- Description: The Player Self-Service Command Centre now delivers `/me dashboard`, `/me accounts`, `/me reminders`, `/me preferences`, `/me inventory`, and `/me exports`, but the original legacy player self-service command paths remain live for compatibility. The remaining rollout decision covers `/register_governor`, `/modify_registration`, `/my_registrations`, `/mygovernorid`, `/subscribe`, `/modify_subscription`, `/unsubscribe`, `/calendar_reminder_config`, `/inventory_preferences`, `/my_stats_export`, and `/export_inventory`. Related personal commands such as `/myinventory`, `/my_stats`, `/mykvkcrystaltech`, and `/player_profile` may need preservation rather than redirect.
-- Suggested Fix: Execute Player Self-Service Command Centre Phase 13 Legacy Redirect Planning. Audit behavior, permission model, visibility, command usage, and player communication needs for each path; classify each command as preserve, prefer `/me` but keep live, redirect/help candidate, no-feedback-window removal candidate, or out of scope; then implement only the operator-approved rollout slice with command-registration, docs, and focused tests.
+- Description: Player Self-Service Command Centre Phase 13 converted the explicitly approved legacy self-service entry points to lightweight private redirects: `/register_governor`, `/modify_registration`, `/my_registrations`, and `/mygovernorid` to `/me accounts`; `/subscribe`, `/modify_subscription`, `/unsubscribe`, and `/calendar_reminder_config` to `/me reminders`; `/inventory_preferences` to `/me preferences`; and `/my_stats_export` plus `/export_inventory` to `/me exports`. The old command registrations remain temporarily so players receive guidance. `/myinventory`, `/my_stats`, `/mykvkcrystaltech`, `/player_profile`, and `/stats player` remain live.
+- Suggested Fix: After player communication and the agreed no-feedback monitoring window, review production `/ops usage_detail` or `dbo.BotCommandUsage` evidence for the redirected paths. Remove only the operator-approved command registrations and redirect-only tests, update `scripts/validate_command_registration.py::APPROVED_TOP_LEVEL_COMMANDS`, canonical docs, briefing docs, and focused command tests, and preserve the v2-scoped stats/profile/inventory paths unless separately approved.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 12B delivered and smoke tested successfully on 2026-06-27; requires operator approval, player communication, and a no-feedback monitoring window before any removal.
+- Dependencies: Phase 12B delivered and smoke tested successfully on 2026-06-27; Phase 13 audit/scope drafted using supplied SQL extract and dated JSONL evidence; Phase 13 redirect slice approved by the operator; requires player communication, no-feedback monitoring, production usage review, and operator approval before final command-registration removal.
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `/my_stats_export`, `/export_inventory`, player self-service docs/tests
 - Type: cleanup
-- Description: Phase 9 keeps `/my_stats_export` and `/export_inventory` live while making `/me exports` the preferred route with Stats and Inventory option windows. The legacy paths remain useful compatibility surfaces, but they still need a deliberate communication, monitoring, redirect, deprecation, or removal decision now that Phase 12B has completed the main `/me` programme surface.
-- Suggested Fix: Include `/my_stats_export` and `/export_inventory` in Phase 13 Legacy Redirect Planning. Review command usage and player feedback, choose whether each legacy export command should remain live indefinitely, redirect to `/me exports`, or be removed after a no-feedback window, then update command registration baselines, canonical command reference, player briefing, and focused command tests.
+- Description: Phase 13 explicitly approved lightweight redirects for `/my_stats_export` and `/export_inventory` to `/me exports`. The redirect slice intentionally preserves the existing stats and inventory export services, schemas, formats, option-window behavior, and file delivery through `/me exports`; only the old flat command entry points stop producing files directly.
+- Suggested Fix: After the export redirect no-feedback window, review production command usage and player feedback. Remove the flat export command registrations only with explicit operator approval, keep export schema/format redesign out of this cleanup, and update command registration baselines, canonical command reference, player briefing, and focused export redirect tests for the approved removal slice.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 9 `/me exports` option windows smoke tested; operator approval for any redirect/removal; player communication before final removal.
+- Dependencies: Phase 9 `/me exports` option windows smoke tested; Phase 13 audit/scope drafted; operator approved export entry-point redirects; player communication and no-feedback monitoring before final removal.
+
+### Deferred Optimisation
+- Area: `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `commands/telemetry_cmds.py`, `/my_stats`, `/stats player`, `/player_profile`, `/myinventory`, player self-service v2 programme docs/tests
+- Type: architecture
+- Description: The full player self-service modernisation still has larger personal stats, leadership/profile, and detailed inventory report surfaces outside Phase 13. `/my_stats`, `/stats player`, and `/player_profile` are too large for the first programme pack and need a Player Self-Service v2 scope; `/myinventory` remains valuable but needs product/design alignment with the new command group model; `/mykvkcrystaltech` is a unique channel-gated personal workflow and is not included in the immediate v2 redirect cleanup.
+- Suggested Fix: Prepare a Player Self-Service v2 programme pack that audits stats report, leadership/profile lookup, and detailed inventory report journeys, defines whether they stay flat/channel-gated or gain `/me`/grouped entry points, preserves public/private channel rules, and avoids folding CrystalTech into the same slice until its product fit is decided.
+- Impact: high
+- Risk: medium
+- Dependencies: Phase 13 redirect slice deployed and monitored; operator approval for a v2 programme pack; production usage evidence for `/my_stats`, `/stats player`, `/player_profile`, `/myinventory`, and `/mykvkcrystaltech` before any command-surface changes.
 
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `inventory/export_service.py`, `inventory/dal/`, SQL repo export views/tables, export docs/tests
@@ -58,15 +67,6 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: high
 - Risk: high
 - Dependencies: Phase 8 confirms launchpad requirements without changing file contracts; operator approval for a dedicated export-output programme; SQL validation and downstream consumer review before any schema/format changes.
-
-### Deferred Optimisation
-- Area: `commands/subscriptions_cmds.py`, `player_self_service/reminder_service.py`, `ui/views/subscription_views.py`
-- Type: refactor
-- Description: Phase 4 adds a service-backed `/me reminders` centre while intentionally leaving legacy `/subscribe`, `/modify_subscription`, and `/unsubscribe` command handlers live and behavior-compatible. Those legacy handlers still own duplicated validation, normalization, DM confirmation wording, and unsubscribe cleanup orchestration that now has a cleaner service-owned equivalent.
-- Suggested Fix: After Phase 4 is smoke tested and operator-approved, scope a follow-up consolidation that routes the legacy reminder commands through `player_self_service/reminder_service.py` without changing their registered paths or user-visible behavior. Keep duplicate subscription protection, DM confirmation behavior, unsubscribe tracker cleanup, scheduler/restart behavior, and focused legacy command/view tests green before considering later redirects or removal.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 4 Modern Reminder Centre delivered and smoke tested successfully; operator decision on whether legacy paths should be service-rerouted before any redirect/removal phase.
 
 ### Deferred Optimisation
 - Area: `commands/calendar_cmds.py`, `commands/events_cmds.py`, `ui/views/calendar.py`, `ui/views/events_views.py`, public calendar/KVK calendar docs/tests

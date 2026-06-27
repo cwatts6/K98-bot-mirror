@@ -24,6 +24,7 @@ location country, and preferred language profile preferences to `/me preferences
 stored as a two-letter code and displayed with a derived readable name. Manage Profile uses guided
 dropdowns and replaces the private child window after updates so repeated changes do not create
 duplicate windows.
+Phase 13 legacy redirect planning started with audit/scope only. After reviewing the classifications and updated usage evidence, the operator approved lightweight redirects for selected legacy player self-service commands. Those commands remain registered but now send private guidance to the matching `/me` centre; no command has been removed from Discord. Final command-registration removal still requires player communication, a no-feedback monitoring window, production usage review, and operator approval.
 
 ## Player Briefing
 
@@ -59,20 +60,23 @@ visibility behavior, and export buttons.
 `/me exports` can open private option windows for Stats and Inventory exports. Stats exports
 support Excel, CSV, and Google Sheets formats plus 30, 60, 90, 180, and 360 day windows,
 defaulting to Excel and 90 days. Inventory exports support format, view, registered-governor
-scope, and day-window choices using the existing inventory export defaults. Existing
-commands such as `/register_governor`, `/modify_registration`, `/my_registrations`,
-`/mygovernorid`, `/subscribe`,
-`/modify_subscription`, `/unsubscribe`, `/calendar_reminder_config`, `/inventory_preferences`,
-`/my_stats_export`, and `/export_inventory` still work.
+scope, and day-window choices using the existing inventory export defaults. Older direct commands for accounts, reminders, preferences, and exports now point privately to the matching `/me` centre. `/myinventory`, `/my_stats`, `/stats player`, `/player_profile`, and `/mykvkcrystaltech` remain live.
+
+Phase 13 player message draft:
+
+```text
+Personal setup is moving to /me dashboard.
+
+Use /me dashboard as your private starting point for accounts, reminders, preferences, inventory,
+and exports. The older account, reminder, preference, and export commands now point you to /me, which is the preferred place to manage personal setup.
+
+No command has been removed from Discord yet. Please report anything you still need from an older command before final cleanup.
+```
 
 ## Operator Briefing
 
 Phase 10 adds `/me inventory` as the sixth private `/me` subcommand and makes dashboard Inventory
-open that generated summary card instead of jumping directly into the report selector. It does not
-remove, redirect, or change `/myinventory`, `/my_stats_export`, `/export_inventory`,
-`/inventory_preferences`,
-`/subscribe`, `/modify_subscription`, `/unsubscribe`, `/calendar_reminder_config`, or account
-legacy commands.
+open that generated summary card instead of jumping directly into the report selector. Phase 13 redirects approved legacy account, reminder, preference, and export commands to `/me` while preserving command registrations. It does not remove `/myinventory`, `/my_stats`, `/stats player`, `/player_profile`, or `/mykvkcrystaltech`.
 
 The approved command group is:
 
@@ -136,9 +140,16 @@ Rollout checks:
   journey and preserves the player's inventory report visibility setting.
 - Confirm `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` remain invoked through
   their existing command paths and channel rules.
-- Confirm `/my_stats_export` and `/export_inventory` still work for their existing custom options.
+- Confirm `/my_stats_export` and `/export_inventory` return private guidance to `/me exports`, and confirm `/me exports` still produces files with the existing option windows.
 - Confirm legacy player commands remain registered and usable.
-- Monitor `/me` usage before approving any later legacy redirects.
+- Monitor redirect usage and `/me` usage before approving any final command-registration removal.
+- For Phase 13, the operator-provided SQL extract and dated JSONL files were reviewed. They show
+  legacy direct-command dependency still exists and `/me` adoption is not yet broad enough to
+  justify redirect/removal. Collect a fresh post-briefing production usage snapshot before
+  approving any redirect/help copy, deprecation, or removal.
+- Preserve `/myinventory`, `/my_stats`, `/mykvkcrystaltech`,
+  `/player_profile`, `/my_stats_export`, and `/export_inventory` unless a separate explicit
+  approval covers those paths.
 
 Phase 2 smoke-test result:
 
@@ -390,9 +401,11 @@ Phase 12B smoke-test result:
   windows were created.
 - Existing Inventory visibility and Inventory VIP flows remained behavior-compatible.
 
-Next phase:
+Current phase:
 
-- Phase 13 legacy redirect planning is the next Player Self-Service phase.
-- Legacy export redirect/removal remains a later Player Self-Service phase.
+- Phase 13 legacy redirect planning started with audit/scope only and now has an approved
+  lightweight redirect slice for selected account, reminder, preference, and export commands.
+- Legacy export entry points `/my_stats_export` and `/export_inventory` now redirect to
+  `/me exports`.
 - Export schema/format redesign remains a separate export-output programme unless explicitly
   narrowed later.

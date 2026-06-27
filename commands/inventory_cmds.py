@@ -6,9 +6,10 @@ import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID, INVENTORY_UPLOAD_CHANNEL_ID
+from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from core.interaction_safety import safe_command, safe_defer
-from decoraters import _is_admin, admin_only, channel_only, track_usage
-from inventory import audit_service, export_service, reporting_service
+from decoraters import admin_only, channel_only, track_usage
+from inventory import audit_service, reporting_service
 from inventory.models import InventoryAuditRecord
 from ui.views.inventory_report_views import (
     send_inventory_preference_prompt,
@@ -114,7 +115,16 @@ def register_inventory(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def inventory_preferences(ctx: discord.ApplicationContext) -> None:
         await safe_defer(ctx, ephemeral=True)
-        await send_inventory_preference_prompt(ctx)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/inventory_preferences",
+                new_path="/me preferences",
+                detail="Profile preferences now manage private/public inventory report visibility alongside timezone, location, and language.",
+            ),
+            ephemeral=True,
+        )
+        return
 
     @bot.slash_command(
         name="export_inventory",
@@ -156,44 +166,16 @@ def register_inventory(bot: ext_commands.Bot) -> None:
         ),
     ) -> None:
         await safe_defer(ctx, ephemeral=True)
-        export_file = None
-        try:
-            export_format = export_service.parse_export_format(format)
-            export_view = export_service.parse_export_view(view)
-            export_file = await export_service.build_inventory_export_file(
-                discord_user_id=int(ctx.user.id),
-                username=getattr(ctx.user, "display_name", None)
-                or getattr(ctx.user, "name", "user"),
-                export_format=export_format,
-                view=export_view,
-                governor_id=governor,
-                lookback_days=int(days),
-                is_admin=_is_admin(ctx.user),
-                discord_user=ctx.user,
-            )
-            file_obj = discord.File(str(export_file.path), filename=export_file.filename)
-            await ctx.followup.send(
-                content=(
-                    "Inventory export ready. "
-                    f"`{export_file.row_count}` raw approved row(s), "
-                    f"`{len(export_file.governor_ids)}` governor(s)."
-                ),
-                file=file_obj,
-                ephemeral=True,
-            )
-        except PermissionError as exc:
-            await ctx.followup.send(str(exc), ephemeral=True)
-        except ValueError as exc:
-            await ctx.followup.send(str(exc), ephemeral=True)
-        except Exception:
-            logger.exception("export_inventory_command_failed actor=%s", ctx.user.id)
-            await ctx.followup.send(
-                "Inventory export failed. Please try again or contact an admin.",
-                ephemeral=True,
-            )
-        finally:
-            if export_file is not None:
-                export_service.cleanup_export_file(export_file)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/export_inventory",
+                new_path="/me exports",
+                detail="The export centre now provides inventory exports from the same private self-service menu.",
+            ),
+            ephemeral=True,
+        )
+        return
 
     @inventory_group.command(
         name="audit",

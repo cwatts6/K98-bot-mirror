@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Protocol
 
 import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID
+from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import is_admin_and_notify_channel, track_usage
 from registry.registry_command_service import (
@@ -28,76 +28,15 @@ from registry.registry_service import (
     remove_governor,
 )
 from services.governor_account_service import (
-    AccountResolutionSummary,
     filter_account_slots,
     get_account_summary_for_user,
     parse_discord_user_id,
-    summarize_accounts,
 )
 import target_utils
 from ui.views.admin_views import ConfirmImportView
-from ui.views.registry_views import (
-    ConfirmRemoveView,
-    ModifyGovernorView,
-    MyRegsActionView,
-    RegisterGovernorView,
-)
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
-
-
-class _DisplayRequester(Protocol):
-    name: str
-
-
-async def _load_my_registrations_summary(discord_user_id: int) -> AccountResolutionSummary:
-    summary = await get_account_summary_for_user(discord_user_id)
-    if summary.ok:
-        return summary
-
-    if summary.error:
-        logger.warning("[my_registrations] account summary unavailable: %s", summary.error)
-
-    try:
-        registry: dict[str, Any] = (
-            await asyncio.to_thread(registry_service.load_registry_as_dict) or {}
-        )
-    except Exception:
-        logger.exception("[my_registrations] stale registry fallback failed")
-        return summary
-
-    user_data = registry.get(str(discord_user_id)) or registry.get(discord_user_id) or {}
-    return summarize_accounts(user_data.get("accounts", {}) or {})
-
-
-def _build_my_registrations_embed(
-    account_summary: AccountResolutionSummary,
-    *,
-    requested_by: _DisplayRequester,
-) -> tuple[discord.Embed, bool]:
-    lines: list[str] = []
-    for slot, info in account_summary.ordered_accounts.items():
-        gid = str(info.get("GovernorID", "")).strip()
-        gname = str(info.get("GovernorName", "")).strip()
-        label = f"**{gname}** (`{gid}`)" if (gname or gid) else "—"
-        lines.append(f"• **{slot}** — {label}")
-
-    has_regs = len(lines) > 0
-    desc = "\n".join(lines) if has_regs else "You don’t have any accounts registered yet."
-
-    if len(desc) > 4000:
-        logger.warning("[my_registrations] description too long (%d); truncating", len(desc))
-        desc = desc[:3970] + "\n… (truncated)"
-
-    embed = discord.Embed(
-        title="Your Registered Accounts",
-        description=desc,
-        colour=discord.Colour.green() if has_regs else discord.Colour.orange(),
-    )
-    requested_by_name = getattr(requested_by, "display_name", getattr(requested_by, "name", "?"))
-    embed.set_footer(text=f"Requested by {requested_by_name}")
-    return embed, has_regs
 
 
 def register_registry(bot: ext_commands.Bot) -> None:
@@ -156,57 +95,16 @@ def register_registry(bot: ext_commands.Bot) -> None:
         governor_id: str = discord.Option(str, "Your in-game Governor ID"),
     ):
         await safe_defer(ctx, ephemeral=True)
-
-        # Validate account type (autocomplete does not enforce server-side)
-        if account_type not in VALID_ACCOUNT_TYPES:
-            await ctx.interaction.edit_original_response(
-                content=(
-                    f"❌ `{account_type}` is not a valid account type. "
-                    "Please choose from the list (Main, Alt 1–5, Farm 1–20)."
-                ),
-                embed=None,
-                view=None,
-            )
-
-            return
-
-        # Validate numeric GovernorID
-        gid_raw = (governor_id or "").strip()
-        if not gid_raw.isdigit():
-            await ctx.interaction.edit_original_response(
-                content=(
-                    "❌ Please enter a **numeric** Governor ID (e.g., `2441482`).\n"
-                    "Tip: try `/mygovernorid` to look it up from your name."
-                ),
-                embed=None,
-                view=None,
-            )
-            return
-        gid = gid_raw
-
-        matched_row = await target_utils.lookup_governor_row_by_id(gid)
-        if not matched_row:
-            await ctx.interaction.edit_original_response(
-                content=(
-                    f"❌ Governor ID `{gid}` was not found in the database.\n"
-                    "Try `/mygovernorid` to look it up from your name."
-                ),
-                embed=None,
-                view=None,
-            )
-            return
-
-        governor_name = matched_row.get("GovernorName", "Unknown")
-
-        # Hand off to the confirmation view.
-        # Duplicate ownership checks are enforced atomically by sp_Registry_Insert
-        # when the user confirms — no pre-scan of the full registry needed here.
-        view = RegisterGovernorView(ctx.user, account_type, gid, governor_name)
-        await ctx.interaction.edit_original_response(
-            content=f"⚙️ Register `{account_type}` as **{governor_name}** (ID: `{gid}`)?",
-            embed=None,
-            view=view,
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/register_governor",
+                new_path="/me accounts",
+                detail="The account centre now links, replaces, and reviews your registered governors in one private guided flow.",
+            ),
+            ephemeral=True,
         )
+        return
 
     @bot.slash_command(
         name="modify_registration",
@@ -221,99 +119,21 @@ def register_registry(bot: ext_commands.Bot) -> None:
         account_type: str = discord.Option(
             str,
             "Which account do you want to modify or remove?",
-            autocomplete=_account_type_ac,  # keep existing — filters to user's registered slots
+            autocomplete=_account_type_ac,
         ),
         new_governor_id: str = discord.Option(str, "New Governor ID to assign or REMOVE"),
     ):
-
         await safe_defer(ctx, ephemeral=True)
-
-        # --- Load registry account state safely
-        try:
-            account_summary = await get_account_summary_for_user(ctx.user.id)
-            if not account_summary.ok:
-                raise RuntimeError(account_summary.error or "registry unavailable")
-        except Exception as e:
-            logger.exception("[modify_registration] get_user_accounts failed")
-            await ctx.interaction.edit_original_response(
-                content=f"❌ Could not load your registrations: `{type(e).__name__}: {e}`",
-                embed=None,
-                view=None,
-            )
-            return
-
-        # Ensure this slot exists
-        if account_type not in account_summary.ordered_accounts:
-            await ctx.interaction.edit_original_response(
-                content=f"❌ You haven't registered `{account_type}` yet. Use `/register_governor` instead.",
-                embed=None,
-                view=None,
-            )
-            return
-
-        raw = (new_governor_id or "").strip()
-
-        # --- Remove flow
-        if raw.upper() == "REMOVE":
-            view = ConfirmRemoveView(ctx.user, account_type)
-            await ctx.interaction.edit_original_response(
-                content=f"⚠️ Are you sure you want to **remove** `{account_type}` from your registration?",
-                embed=None,
-                view=view,
-            )
-            return
-
-        # --- Modify flow: validate numeric GovernorID
-        if not raw.isdigit():
-            await ctx.interaction.edit_original_response(
-                content="❌ Please enter a **numeric** Governor ID (or type `REMOVE` to remove). "
-                "Tip: try `/mygovernorid` to look it up from your name.",
-                embed=None,
-                view=None,
-            )
-            return
-        gid = raw
-
-        matched_row = await target_utils.lookup_governor_row_by_id(gid)
-        if not matched_row:
-            await ctx.interaction.edit_original_response(
-                content=(
-                    f"❌ Governor ID `{gid}` not found in the database.\n"
-                    "Try `/mygovernorid` to look it up from your name."
-                ),
-                embed=None,
-                view=None,
-            )
-            return
-
-        # Prevent duplicate registration across other users
-        try:
-            claimed_by_other = await asyncio.to_thread(
-                registry_service.check_governor_claimed_by_other, gid, ctx.user.id
-            )
-        except Exception as e:
-            logger.exception("[modify_registration] claimed check failed")
-            await ctx.interaction.edit_original_response(
-                content=f"❌ Could not validate Governor ID ownership: `{type(e).__name__}: {e}`",
-                embed=None,
-                view=None,
-            )
-            return
-        if claimed_by_other:
-            await ctx.interaction.edit_original_response(
-                content=f"❌ This Governor ID `{gid}` is already registered to another user.",
-                embed=None,
-                view=None,
-            )
-            return
-
-        gov_name = matched_row.get("GovernorName", "Unknown")
-        view = ModifyGovernorView(ctx.user, account_type, gid, gov_name)
-        await ctx.interaction.edit_original_response(
-            content=f"⚙️ Modify `{account_type}` to **{gov_name}** (ID: `{gid}`)?",
-            embed=None,
-            view=view,
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/modify_registration",
+                new_path="/me accounts",
+                detail="The account centre now handles replace and remove actions from one private guided flow.",
+            ),
+            ephemeral=True,
         )
+        return
 
     # === Normal command (member picker OR raw ID) ===
     @registry_group.command(
@@ -483,78 +303,17 @@ def register_registry(bot: ext_commands.Bot) -> None:
     @safe_command
     @track_usage()
     async def my_registrations(ctx: discord.ApplicationContext):
-        logger.info(
-            "[my_registrations] user=%s (%s)", ctx.user.id, getattr(ctx.user, "display_name", "?")
+        await safe_defer(ctx, ephemeral=True)
+        await send_deprecated_command_redirect(
+            ctx,
+            CommandRedirect(
+                old_path="/my_registrations",
+                new_path="/me accounts",
+                detail="The account centre now shows your linked accounts and account actions in one private guided flow.",
+            ),
+            ephemeral=True,
         )
-
-        # --- Defer ASAP (ephemeral) so the token stays alive
-        async def ensure_deferred(ephemeral: bool = True) -> None:
-            try:
-                ir = getattr(ctx, "interaction", None)
-                if ir and hasattr(ir, "response") and not ir.response.is_done():
-                    await ir.response.defer(ephemeral=ephemeral)
-                else:
-                    if hasattr(ctx, "defer"):
-                        try:
-                            await ctx.defer(ephemeral=ephemeral)
-                        except Exception:
-                            pass
-            except Exception:
-                logger.debug("[my_registrations] defer skipped/failed; continuing.")
-
-        await ensure_deferred(ephemeral=True)
-
-        try:
-            account_summary = await _load_my_registrations_summary(ctx.user.id)
-        except Exception:
-            logger.exception("[my_registrations] account summary load failed")
-            account_summary = None
-
-        if not account_summary or not account_summary.ok:
-            msg = "⚠️ Sorry, I couldn’t load your registrations. Please try again shortly."
-            try:
-                await ctx.interaction.edit_original_response(content=msg, embed=None, view=None)
-            except Exception:
-                try:
-                    await ctx.followup.send(msg, ephemeral=True)
-                except Exception:
-                    pass
-            return
-
-        embed, has_regs = _build_my_registrations_embed(account_summary, requested_by=ctx.user)
-
-        # --- Build the action view defensively
-        view = None
-        try:
-            view = MyRegsActionView(author_id=ctx.user.id, has_regs=has_regs)
-        except Exception:
-            logger.exception(
-                "[my_registrations] MyRegsActionView init failed; continuing without view"
-            )
-
-        # --- Deliver response: edit the deferred original; if not found, followup
-        sent_msg = None
-        try:
-            sent_msg = await ctx.interaction.edit_original_response(embed=embed, view=view)
-        except discord.NotFound:
-            sent_msg = await ctx.followup.send(embed=embed, view=view, ephemeral=True)
-        except discord.InteractionResponded:
-            sent_msg = await ctx.followup.send(embed=embed, view=view, ephemeral=True)
-        except Exception:
-            logger.exception("[my_registrations] edit/respond failed")
-            try:
-                sent_msg = await ctx.followup.send(
-                    "Here are your registrations:", embed=embed, view=view, ephemeral=True
-                )
-            except Exception:
-                pass
-
-        # Hand the message to the view so it can disable itself on timeout
-        try:
-            if view and hasattr(view, "set_message_ref") and sent_msg:
-                view.set_message_ref(sent_msg)
-        except Exception:
-            pass
+        return
 
     # --- Admin-only: register a governor for another user ---
     @registry_group.command(
