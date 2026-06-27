@@ -52,7 +52,6 @@ from target_utils import autocomplete_governor_names, lookup_governor_id
 from ui.views.kvk_personal_views import (
     FuzzySelectView,
     MyKVKStatsSelectView,  # noqa: F401 — re-exported for Commands.py star-import consumers
-    PostLookupActions,
     TargetLookupView,  # noqa: F401 — kept for external importers and smoke tests
 )
 from ui.views.registry_views import (
