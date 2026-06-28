@@ -8,7 +8,6 @@ from decimal import Decimal, InvalidOperation
 import json
 import re
 from typing import Any
-import unicodedata
 
 import pandas as pd
 
@@ -301,12 +300,6 @@ def _format_text_cell_for_bulk(value: object, column: str) -> str:
     text = str(value)
     text = _CONTROL_CHARS_RE.sub(" ", text)
     text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
-    text = "".join(
-        char
-        for char in unicodedata.normalize("NFKD", text)
-        if not unicodedata.category(char).startswith("M")
-    )
-    text = text.encode("ascii", "replace").decode("ascii")
     text = _WHITESPACE_RE.sub(" ", text).strip()
     max_length = TEXT_COLUMN_MAX_LENGTHS[column]
     return text[:max_length]

@@ -231,3 +231,41 @@ def test_process_excel_file_maps_conduct_score_to_credit(tmp_path, monkeypatch):
 
     assert "Conduct Score" not in rows[0]
     assert float(rows[0]["Credit"]) == pytest.approx(91.25)
+
+
+def test_process_excel_file_preserves_unicode_names_in_csv(tmp_path, monkeypatch):
+    source_path = tmp_path / "unicode.xlsx"
+    download_dir = tmp_path / "downloads"
+    archive_dir = download_dir / "archive"
+    download_dir.mkdir()
+
+    pd.DataFrame(
+        [
+            _full_upload_row(
+                **{
+                    "Governor ID": 123,
+                    "Name": "義Vìper義",
+                    "Alliance": "K98한",
+                    "Civilization": "한국",
+                    "Credit": 100,
+                }
+            )
+        ]
+    ).to_excel(source_path, index=False)
+
+    monkeypatch.setattr(stats_module, "DOWNLOAD_FOLDER", str(download_dir))
+    monkeypatch.setattr(stats_module, "ARCHIVE_DIR_1", str(archive_dir))
+    monkeypatch.setattr(stats_module, "CSV_FILE_PATH", str(download_dir / "stats.csv"))
+    monkeypatch.setattr(
+        stats_module, "IMPORT_METADATA_FILE_PATH", str(download_dir / "stats_import_metadata.json")
+    )
+
+    success, message, _ = stats_module.process_excel_file(str(source_path))
+
+    assert success, message
+    with open(stats_module.CSV_FILE_PATH, newline="", encoding="utf-8-sig") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert rows[0]["Name"] == "義Vìper義"
+    assert rows[0]["Alliance"] == "K98한"
+    assert rows[0]["Civilization"] == "한국"

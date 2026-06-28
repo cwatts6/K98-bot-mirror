@@ -196,7 +196,7 @@ def test_prepare_fallback_csv_dataframe_rejects_fractional_integer_values():
         prepare_fallback_csv_dataframe(df)
 
 
-def test_prepare_fallback_csv_dataframe_sanitizes_text_for_sql_bulk_insert():
+def test_prepare_fallback_csv_dataframe_preserves_unicode_text_for_sql_bulk_insert():
     result = normalize_fallback_dataframe(
         pd.DataFrame(
             [
@@ -213,8 +213,53 @@ def test_prepare_fallback_csv_dataframe_sanitizes_text_for_sql_bulk_insert():
 
     csv_df = prepare_fallback_csv_dataframe(result.dataframe)
 
-    assert csv_df.loc[0, "Name"].startswith("?Viper? ")
+    assert "\n" not in csv_df.loc[0, "Name"]
+    assert "?" not in csv_df.loc[0, "Name"]
     assert len(csv_df.loc[0, "Name"]) == 200
-    assert csv_df.loc[0, "Name"].isascii()
+    assert not csv_df.loc[0, "Name"].isascii()
     assert csv_df.loc[0, "Alliance"] == "K98 A"
     assert csv_df.loc[0, "Civilization"] == "Rome"
+
+
+def test_partial_snapshot_preserves_unicode_name_in_sql_payload():
+    latest = pd.DataFrame([_full_row(**{"Governor ID": 123, "Name": "Old Alice"})])
+    partial = pd.DataFrame(
+        [
+            {
+                "Governor ID": 123,
+                "Name": "義Vìper義",
+                "Power": 1500,
+                "Alliance": "K98",
+                "T1-Kills": 10,
+                "T2-Kills": 20,
+                "T3-Kills": 30,
+                "T4-Kills": 40,
+                "T5-Kills": 50,
+                "Total Kill Points": 1001,
+                "Dead Troops": 11,
+                "Healed Troops": 21,
+                "City Hall": 25,
+                "Civilization": "한국",
+                "Autarch Times": 3,
+                "Ranged Points": 78,
+                "KvK Played": 4,
+                "Most KvK Kill": 101,
+                "Most KvK Dead": 201,
+                "Most KvK Heal": 301,
+                "Acclaim": 401,
+                "Highest Acclaim": 501,
+                "AOO Joined": 7,
+                "AOO Won": 8,
+                "AOO Avg Kill": 9,
+                "AOO Avg Dead": 10,
+                "AOO Avg Heal": 11,
+            }
+        ]
+    )
+
+    result = normalize_fallback_dataframe(partial, latest_rows=latest)
+    csv_df = prepare_fallback_csv_dataframe(result.dataframe)
+    rows = csv_df.set_index("Governor ID")
+
+    assert rows.loc["123", "Name"] == "義Vìper義"
+    assert rows.loc["123", "Civilization"] == "한국"

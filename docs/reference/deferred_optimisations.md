@@ -15,6 +15,15 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Task A completed in mirror PR #179, production PR #487, and SQL PR #21. Keep the Task A ASCII-safe hotfix deployed until Task B is implemented and smoke tested with full fallback, interim auto partial fallback, and location shield imports.
 
 ### Deferred Optimisation
+- Area: `stats_module.py`, `services/fallback_import_schema.py`, upload route/import worker flow, SQL repo `dbo.UPDATE_ALL2`, fallback import audit tables
+- Type: architecture
+- Description: Task B first slice intentionally keeps the Unicode import contract small. The broader import architecture cleanup remains out of scope: extracting fallback import orchestration out of legacy `stats_module.py`, adding durable batch audit outcome/status tracking, changing Discord command or upload route behavior, and replacing or substantially redesigning `dbo.UPDATE_ALL2`.
+- Suggested Fix: Scope this as a later Task C import pipeline optimisation after Task B is smoke tested. Audit the fallback queue route, worker orchestration, `stats_module.py`, fallback schema service, SQL import procedures, batch metadata/audit needs, and `UPDATE_ALL2` downstream build responsibilities. Split implementation into PR-sized slices, preserving Task A/B import behavior and avoiding command/route changes unless explicitly approved.
+- Impact: high
+- Risk: medium
+- Dependencies: Complete and production-smoke Task B Unicode import contract first; use live import evidence from full fallback, interim auto partial fallback, and location shield import before approving any broader extraction or durable audit design.
+
+### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/telemetry_cmds.py`, `commands/prekvk_cmds.py`, `scripts/validate_command_registration.py`, `docs/reference/canonical_command_reference.md`
 - Type: cleanup
 - Description: Phase 7 converted `/mykvkstats`, `/mykvktargets`, `/mykvkhistory`, `/kvk_rankings`, `/honor_rankings`, and `/prekvk report` into tested deprecated redirect/help responses. The old command paths remain registered temporarily so players receive migration guidance, which means the command baseline, redirect helpers/tests, and compatibility docs still carry legacy surface area after the first deprecation rollout.
