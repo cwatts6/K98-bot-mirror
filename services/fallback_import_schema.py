@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 import json
 import re
 from typing import Any
@@ -100,6 +101,12 @@ FULL_REQUIRED_COLUMNS: list[str] = [
 ]
 
 SCORE_ALIASES = (SCORE_SOURCE_CREDIT, SCORE_SOURCE_CONDUCT_SCORE)
+
+TEXT_COLUMNS = {"Name", "Alliance", "Civilization", "updated_on"}
+DECIMAL_COLUMNS = {CANONICAL_SCORE_COLUMN}
+INTEGER_COLUMNS = tuple(
+    col for col in CANONICAL_COLUMNS if col not in TEXT_COLUMNS | DECIMAL_COLUMNS
+)
 
 _HEADER_ALIASES: dict[str, str] = {
     _normalize_header(col): col for col in CANONICAL_COLUMNS if col not in {CANONICAL_SCORE_COLUMN}
@@ -235,6 +242,61 @@ def _canonical_full_frame(df: pd.DataFrame, columns_present: set[str]) -> pd.Dat
     for col in CANONICAL_COLUMNS:
         if col in df.columns and col != "updated_on":
             out[col] = df[col]
+    return out
+
+
+def _is_blank_value(value: object) -> bool:
+    if value is None:
+        return True
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+    text = str(value).strip()
+    return text == "" or text.casefold() in {"nan", "none", "<na>"}
+
+
+def _decimal_from_cell(value: object, column: str) -> Decimal | None:
+    if _is_blank_value(value):
+        return None
+    text = str(value).strip().replace(",", "")
+    try:
+        return Decimal(text)
+    except InvalidOperation as exc:
+        raise ValueError(f"Invalid numeric value for {column}: {value!r}") from exc
+
+
+def _format_integer_cell_for_bulk(value: object, column: str) -> str:
+    number = _decimal_from_cell(value, column)
+    if number is None:
+        return ""
+    integral = number.to_integral_value()
+    if number != integral:
+        raise ValueError(f"Non-integer value for {column}: {value!r}")
+    return str(int(integral))
+
+
+def _format_decimal_cell_for_bulk(value: object, column: str) -> str:
+    number = _decimal_from_cell(value, column)
+    if number is None:
+        return ""
+    return format(number, "f")
+
+
+def prepare_fallback_csv_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Format canonical fallback rows for SQL Server BULK INSERT typed staging columns."""
+    out = df.copy()
+    for col in INTEGER_COLUMNS:
+        if col in out.columns:
+            out[col] = out[col].map(
+                lambda value, column=col: _format_integer_cell_for_bulk(value, column)
+            )
+    for col in DECIMAL_COLUMNS:
+        if col in out.columns:
+            out[col] = out[col].map(
+                lambda value, column=col: _format_decimal_cell_for_bulk(value, column)
+            )
     return out
 
 

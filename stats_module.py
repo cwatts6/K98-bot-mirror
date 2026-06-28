@@ -40,6 +40,7 @@ from services.fallback_import_schema import (
     INTERIM_AUTO_PARTIAL_SNAPSHOT,
     detect_fallback_source_type,
     normalize_fallback_dataframe,
+    prepare_fallback_csv_dataframe,
 )
 from update_all2_log_manager import execute_update_all2_with_log_management
 from utils import utcnow
@@ -237,7 +238,8 @@ def process_excel_file(source_filepath):
         _robust_move(source_filepath, archive_path)
         logger.info(f"[EXCEL] Archived original -> {archive_path}")
 
-        df.to_csv(CSV_FILE_PATH, index=False, encoding="utf-8-sig")
+        csv_df = prepare_fallback_csv_dataframe(df)
+        csv_df.to_csv(CSV_FILE_PATH, index=False, encoding="utf-8-sig")
         if not os.path.isfile(CSV_FILE_PATH):
             logger.error(f"[EXCEL] Failed to write CSV to {CSV_FILE_PATH}")
             return False, f"[ERROR] Failed to write CSV to {CSV_FILE_PATH}", None

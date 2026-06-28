@@ -8,6 +8,7 @@ from services.fallback_import_schema import (
     FULL_FALLBACK_SNAPSHOT,
     INTERIM_AUTO_PARTIAL_SNAPSHOT,
     normalize_fallback_dataframe,
+    prepare_fallback_csv_dataframe,
 )
 
 
@@ -169,3 +170,27 @@ def test_partial_snapshot_overlays_present_columns_and_preserves_absent_fields()
     assert rows.loc[123, "Troops Power"] == 60
     assert rows.loc[123, "Credit"] == pytest.approx(88.5)
     assert rows.loc[456, "Power"] == 2000
+
+
+def test_prepare_fallback_csv_dataframe_formats_integral_float_values_for_bulk_insert():
+    result = normalize_fallback_dataframe(pd.DataFrame([_full_row()]))
+    df = result.dataframe.copy()
+    df.loc[0, "Governor ID"] = 123.0
+    df.loc[0, "Power"] = 1500.0
+    df.loc[0, "Credit"] = 88.50
+
+    csv_df = prepare_fallback_csv_dataframe(df)
+
+    assert csv_df.loc[0, "Governor ID"] == "123"
+    assert csv_df.loc[0, "Power"] == "1500"
+    assert csv_df.loc[0, "Credit"] == "88.5"
+
+
+def test_prepare_fallback_csv_dataframe_rejects_fractional_integer_values():
+    result = normalize_fallback_dataframe(pd.DataFrame([_full_row()]))
+    df = result.dataframe.copy()
+    df["Power"] = df["Power"].astype("object")
+    df.loc[0, "Power"] = "1500.5"
+
+    with pytest.raises(ValueError, match="Non-integer value for Power"):
+        prepare_fallback_csv_dataframe(df)
