@@ -1,4 +1,5 @@
 import csv
+from datetime import UTC, datetime
 import inspect
 import io
 import logging
@@ -10,6 +11,20 @@ from constants import DATABASE, PASSWORD, SERVER, USERNAME
 from file_utils import fetch_one_dict
 
 log = logging.getLogger(__name__)
+
+_MAX_SQL_DATETIME2_UNIX = 253402300799  # 9999-12-31 23:59:59 UTC
+
+
+def _parse_shield_time_left(raw: object) -> tuple[int | None, datetime | None]:
+    if raw is None or str(raw).strip() == "":
+        return None, None
+
+    shield_unix = int(str(raw).strip())
+    if shield_unix == 0:
+        return 0, None
+    if shield_unix < 0 or shield_unix > _MAX_SQL_DATETIME2_UNIX:
+        raise ValueError(f"shield_time_left out of range: {shield_unix}")
+    return shield_unix, datetime.fromtimestamp(shield_unix, UTC).replace(tzinfo=None)
 
 
 def _get_conn():
@@ -25,7 +40,8 @@ def _get_conn():
 def parse_output_csv(csv_bytes: bytes) -> list[tuple]:
     """
     Returns tuples matching dbo.PlayerLocation_Staging insert order:
-    (player_id, player_name, player_power, player_kills, player_ch, player_alliance, x, y)
+    (player_id, player_name, player_power, player_kills, player_ch, player_alliance, x, y,
+     ShieldEndsAtUnix, ShieldEndsAtUtc)
     """
     text = csv_bytes.decode("utf-8-sig", errors="replace")
     reader = csv.DictReader(io.StringIO(text))
@@ -40,7 +56,8 @@ def parse_output_csv(csv_bytes: bytes) -> list[tuple]:
             ally = (r.get("player_alliance") or "").strip()
             x = int(str(r.get("x", "")).strip())
             y = int(str(r.get("y", "")).strip())
-            rows.append((pid, name, pwr, kills, ch, ally, x, y))
+            shield_unix, shield_utc = _parse_shield_time_left(r.get("shield_time_left"))
+            rows.append((pid, name, pwr, kills, ch, ally, x, y, shield_unix, shield_utc))
         except Exception as e:
             log.warning(f"[location_import] Skipping bad row {r}: {e}")
     return rows
@@ -148,8 +165,9 @@ def load_staging_and_merge(*rows_args) -> tuple[int, int]:
             cur.executemany(
                 """
                 INSERT INTO dbo.PlayerLocation_Staging
-                (player_id, player_name, player_power, player_kills, player_ch, player_alliance, x, y)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (player_id, player_name, player_power, player_kills, player_ch, player_alliance, x, y,
+                 ShieldEndsAtUnix, ShieldEndsAtUtc)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 rows,
             )
@@ -230,8 +248,9 @@ def load_staging_and_replace(*rows_args) -> tuple[int, int]:
             cur.executemany(
                 """
                 INSERT INTO dbo.PlayerLocation_Staging
-                (player_id, player_name, player_power, player_kills, player_ch, player_alliance, x, y)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (player_id, player_name, player_power, player_kills, player_ch, player_alliance, x, y,
+                 ShieldEndsAtUnix, ShieldEndsAtUtc)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 rows,
             )

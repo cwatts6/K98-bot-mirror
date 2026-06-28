@@ -128,4 +128,50 @@ def test_parse_output_csv_skips_bad_rows_and_keeps_valid_rows():
 
     rows = svc.parse_output_csv(csv_bytes)
 
-    assert rows == [(123, "Alice", 1000, 20, 25, "K98", 10, 20)]
+    assert rows == [(123, "Alice", 1000, 20, 25, "K98", 10, 20, None, None)]
+
+
+def test_parse_output_csv_maps_shield_time_left_to_raw_and_utc():
+    csv_bytes = (
+        b"player_id,player_name,player_power,player_kills,player_ch,player_alliance,x,y,shield_time_left\n"
+        b"123,Alice,1000,20,25,K98,10,20,1782483442\n"
+    )
+
+    rows = svc.parse_output_csv(csv_bytes)
+
+    assert rows == [
+        (
+            123,
+            "Alice",
+            1000,
+            20,
+            25,
+            "K98",
+            10,
+            20,
+            1782483442,
+            datetime(2026, 6, 26, 14, 17, 22),
+        )
+    ]
+
+
+def test_parse_output_csv_zero_shield_keeps_raw_zero_and_null_utc():
+    csv_bytes = (
+        b"player_id,player_name,player_power,player_kills,player_ch,player_alliance,x,y,shield_time_left\n"
+        b"123,Alice,1000,20,25,K98,10,20,0\n"
+    )
+
+    rows = svc.parse_output_csv(csv_bytes)
+
+    assert rows == [(123, "Alice", 1000, 20, 25, "K98", 10, 20, 0, None)]
+
+
+def test_parse_output_csv_skips_invalid_shield_row():
+    csv_bytes = (
+        b"player_id,player_name,player_power,player_kills,player_ch,player_alliance,x,y,shield_time_left\n"
+        b"123,Alice,1000,20,25,K98,10,20,not-a-number\n"
+    )
+
+    rows = svc.parse_output_csv(csv_bytes)
+
+    assert rows == []

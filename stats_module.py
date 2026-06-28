@@ -20,6 +20,7 @@ Apply this file in place of the existing stats_module.py.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import shutil
@@ -35,6 +36,11 @@ from file_utils import (  # run_step/run_blocking_in_thread imported dynamically
     emit_telemetry_event,
     fetch_one_dict,
 )
+from services.fallback_import_schema import (
+    INTERIM_AUTO_PARTIAL_SNAPSHOT,
+    detect_fallback_source_type,
+    normalize_fallback_dataframe,
+)
 from update_all2_log_manager import execute_update_all2_with_log_management
 from utils import utcnow
 
@@ -42,6 +48,7 @@ SOURCE_FILE_2 = os.path.join(DOWNLOAD_FOLDER, "stats.xlsx")
 ARCHIVE_DIR_1 = os.path.join(DOWNLOAD_FOLDER, "Databook_Archive")
 ARCHIVE_DIR_2 = os.path.join(DOWNLOAD_FOLDER, "Import_Archive")
 CSV_FILE_PATH = os.path.join(DOWNLOAD_FOLDER, "stats.csv")
+IMPORT_METADATA_FILE_PATH = os.path.join(DOWNLOAD_FOLDER, "stats_import_metadata.json")
 
 TASK_NAME = "UPDATE_ALL2"
 WAIT_SECONDS = 15
@@ -59,24 +66,117 @@ def _robust_move(src, dst):
             pass
 
 
-def _ensure_credit_column(df: pd.DataFrame) -> tuple[pd.DataFrame, bool, int]:
-    credit_present = "Credit" in df.columns
+def _read_source_dataframe(source_filepath: str) -> pd.DataFrame:
+    ext = os.path.splitext(source_filepath)[1].lower()
+    if ext == ".csv":
+        return pd.read_csv(source_filepath, encoding="utf-8-sig")
 
-    if not credit_present:
-        if "updated_on" in df.columns:
-            df.insert(df.columns.get_loc("updated_on"), "Credit", pd.NA)
-        else:
-            df["Credit"] = pd.NA
+    with pd.ExcelFile(source_filepath, engine="openpyxl") as xf:
+        sheet_name = "Data" if "Data" in xf.sheet_names else xf.sheet_names[-1]
+        return pd.read_excel(xf, sheet_name=sheet_name, engine="openpyxl")
 
-    if "updated_on" in df.columns and "Credit" in df.columns:
-        columns = list(df.columns)
-        if columns.index("Credit") > columns.index("updated_on"):
-            columns.remove("Credit")
-            columns.insert(columns.index("updated_on"), "Credit")
-            df = df.loc[:, columns]
 
-    non_null = int(pd.to_numeric(df["Credit"], errors="coerce").notna().sum())
-    return df, credit_present, non_null
+def _fetch_latest_fallback_snapshot() -> pd.DataFrame:
+    """Read the latest full stats snapshot so interim partial imports can overlay safely."""
+    query = """
+        SELECT
+            GovernorID AS [Governor ID],
+            GovernorName AS [Name],
+            [Power],
+            Alliance,
+            T1_Kills AS [T1-Kills],
+            T2_Kills AS [T2-Kills],
+            T3_Kills AS [T3-Kills],
+            T4_Kills AS [T4-Kills],
+            T5_Kills AS [T5-Kills],
+            KillPoints AS [Total Kill Points],
+            Deads AS [Dead Troops],
+            HealedTroops AS [Healed Troops],
+            RSSASSISTANCE AS [Rss Assistance],
+            Helps AS [Alliance Helps],
+            Rss_Gathered AS [Rss Gathered],
+            [City Hall],
+            [Troops Power],
+            [Tech Power],
+            [Building Power],
+            [Commander Power],
+            Civilization,
+            AutarchTimes AS [Autarch Times],
+            RangedPoints AS [Ranged Points],
+            KvKPlayed AS [KvK Played],
+            MostKvKKill AS [Most KvK Kill],
+            MostKvKDead AS [Most KvK Dead],
+            MostKvKHeal AS [Most KvK Heal],
+            Acclaim,
+            HighestAcclaim AS [Highest Acclaim],
+            AOOJoined AS [AOO Joined],
+            AOOWon AS [AOO Won],
+            AOOAvgKill AS [AOO Avg Kill],
+            AOOAvgDead AS [AOO Avg Dead],
+            AOOAvgHeal AS [AOO Avg Heal],
+            Conduct AS [Credit]
+        FROM dbo.KingdomScanData4 WITH (NOLOCK)
+        WHERE SCANORDER = (
+            SELECT TOP (1) SCANORDER
+            FROM dbo.KingdomScanData4 WITH (NOLOCK)
+            ORDER BY SCANORDER DESC
+        );
+    """
+    with _conn_trusted() as conn:
+        cur = conn.cursor()
+        cur.execute(query)
+        cols = [d[0] for d in cur.description]
+        return pd.DataFrame.from_records(cur.fetchall(), columns=cols)
+
+
+def _write_import_metadata(metadata: dict) -> None:
+    os.makedirs(os.path.dirname(IMPORT_METADATA_FILE_PATH), exist_ok=True)
+    with open(IMPORT_METADATA_FILE_PATH, "w", encoding="utf-8") as handle:
+        json.dump(metadata, handle, ensure_ascii=False, indent=2)
+
+
+def _load_import_metadata() -> dict:
+    try:
+        with open(IMPORT_METADATA_FILE_PATH, encoding="utf-8") as handle:
+            data = json.load(handle)
+            return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        logger.debug("[EXCEL] Failed to read import metadata sidecar", exc_info=True)
+        return {}
+
+
+def _record_fallback_import_control(cur, metadata: dict) -> None:
+    if not metadata:
+        return
+
+    source_type = str(metadata.get("source_type") or "")
+    cur.execute("SELECT OBJECT_ID(N'dbo.FallbackImportBatchControl', N'U') AS ObjectId;")
+    row = fetch_one_dict(cur)
+    if not row or row.get("ObjectId") is None:
+        if source_type == INTERIM_AUTO_PARTIAL_SNAPSHOT:
+            raise RuntimeError(
+                "dbo.FallbackImportBatchControl is required before interim partial imports."
+            )
+        logger.warning(
+            "[EXCEL] FallbackImportBatchControl missing; continuing without SQL metadata."
+        )
+        return
+
+    cur.execute(
+        """
+        INSERT INTO dbo.FallbackImportBatchControl
+            (SourceType, SourceFilename, ScoreHeader, ColumnsPresentJson, RowsInSource, RowsWritten)
+        VALUES (?, ?, ?, ?, ?, ?);
+        """,
+        source_type or None,
+        metadata.get("source_filename"),
+        metadata.get("score_header"),
+        json.dumps(metadata.get("columns_present") or [], ensure_ascii=False),
+        int(metadata.get("rows_in_source") or 0),
+        int(metadata.get("rows_written") or 0),
+    )
 
 
 # === Excel Processing ===
@@ -87,21 +187,31 @@ def process_excel_file(source_filepath):
 
     try:
         logger.info(f"[EXCEL] Processing {source_filepath}")
-        with pd.ExcelFile(source_filepath, engine="openpyxl") as xf:
-            latest_sheet = xf.sheet_names[-1]
-            df = pd.read_excel(xf, sheet_name=latest_sheet, engine="openpyxl")
-
-        df, credit_present, credit_non_null = _ensure_credit_column(df)
-        logger.info(
-            "[EXCEL] Credit column present=%s non_null=%d rows=%d",
-            credit_present,
-            credit_non_null,
-            len(df),
+        source_df = _read_source_dataframe(source_filepath)
+        source_type = detect_fallback_source_type(source_df)
+        latest_rows = (
+            _fetch_latest_fallback_snapshot()
+            if source_type == INTERIM_AUTO_PARTIAL_SNAPSHOT
+            else None
         )
+        normalized = normalize_fallback_dataframe(
+            source_df,
+            source_filename=os.path.basename(source_filepath),
+            latest_rows=latest_rows,
+        )
+        df = normalized.dataframe
+        metadata = normalized.metadata.as_json_dict()
+        _write_import_metadata(metadata)
 
-        if "updated_on" not in df.columns:
-            timestamp = utcnow().strftime("%d%b%y-%Hh%Mm")
-            df["updated_on"] = timestamp
+        credit_non_null = int(pd.to_numeric(df["Credit"], errors="coerce").notna().sum())
+        logger.info(
+            "[EXCEL] Fallback import source_type=%s score_header=%s rows_in_source=%d rows_written=%d credit_non_null=%d",
+            normalized.metadata.source_type,
+            normalized.metadata.score_header,
+            normalized.metadata.rows_in_source,
+            normalized.metadata.rows_written,
+            credit_non_null,
+        )
 
         output_path = os.path.join(DOWNLOAD_FOLDER, "stats.xlsx")
         df.to_excel(output_path, index=False, engine="openpyxl")
@@ -247,6 +357,7 @@ async def run_sql_procedure(rank=None, seed=None, timeout_seconds: int = 600):
             try:
                 # ⭐ DEFENSE LAYER 1: Wrap UPDATE_ALL2 with log management ⭐
                 logger.info("[SQL_PROC] Executing UPDATE_ALL2 with log management wrapper...")
+                _record_fallback_import_control(cur, _load_import_metadata())
 
                 result = execute_update_all2_with_log_management(cur, param1=rank, param2=seed)
 

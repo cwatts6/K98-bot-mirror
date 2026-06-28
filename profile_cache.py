@@ -204,6 +204,7 @@ def build_full_cache() -> dict[str, Any]:
                     # Defensive timestamp conversions
                     forts_updated = _safe_utc(row.get("FortsUpdated"))
                     location_updated = _safe_utc(row.get("LocationUpdated"))
+                    shield_ends_at_utc = _safe_utc(row.get("ShieldEndsAtUtc"))
                     status_updated = _safe_utc(row.get("StatusUpdated"))
 
                     out[str(gid)] = {
@@ -218,6 +219,8 @@ def build_full_cache() -> dict[str, Any]:
                         "Helps": _to_int(row.get("Helps")),
                         "X": _to_int(row.get("X")),
                         "Y": _to_int(row.get("Y")),
+                        "ShieldEndsAtUnix": _to_int(row.get("ShieldEndsAtUnix")),
+                        "ShieldEndsAtUtc": shield_ends_at_utc,
                         "Status": row.get("Status"),
                         "FortsRank": _to_int(row.get("FortsRank")),
                         "FortsStarted": _to_int(row.get("FortsStarted")),
@@ -285,6 +288,7 @@ def build_full_cache() -> dict[str, Any]:
                 ch_val = row.get("CityHallLevel", row.get("City Hall"))
                 forts_updated = _safe_utc(row.get("FortsUpdated"))
                 location_updated = _safe_utc(row.get("LocationUpdated"))
+                shield_ends_at_utc = _safe_utc(row.get("ShieldEndsAtUtc"))
                 status_updated = _safe_utc(row.get("StatusUpdated"))
 
                 out[str(gid)] = {
@@ -299,6 +303,8 @@ def build_full_cache() -> dict[str, Any]:
                     "Helps": _to_int(row.get("Helps")),
                     "X": _to_int(row.get("X")),
                     "Y": _to_int(row.get("Y")),
+                    "ShieldEndsAtUnix": _to_int(row.get("ShieldEndsAtUnix")),
+                    "ShieldEndsAtUtc": shield_ends_at_utc,
                     "Status": row.get("Status"),
                     "FortsRank": _to_int(row.get("FortsRank")),
                     "FortsStarted": _to_int(row.get("FortsStarted")),

@@ -9,6 +9,47 @@ import file_utils
 import stats_module
 
 
+def _full_upload_row(**overrides):
+    row = {
+        "Governor ID": 123,
+        "Name": "A",
+        "Power": 1000,
+        "Alliance": "K98",
+        "T1-Kills": 1,
+        "T2-Kills": 2,
+        "T3-Kills": 3,
+        "T4-Kills": 4,
+        "T5-Kills": 5,
+        "Total Kill Points": 999,
+        "Dead Troops": 10,
+        "Healed Troops": 20,
+        "Rss Assistance": 30,
+        "Alliance Helps": 40,
+        "Rss Gathered": 50,
+        "City Hall": 25,
+        "Troops Power": 60,
+        "Tech Power": 70,
+        "Building Power": 80,
+        "Commander Power": 90,
+        "Civilization": "Britain",
+        "Autarch Times": 2,
+        "Ranged Points": 77,
+        "KvK Played": 3,
+        "Most KvK Kill": 100,
+        "Most KvK Dead": 200,
+        "Most KvK Heal": 300,
+        "Acclaim": 400,
+        "Highest Acclaim": 500,
+        "AOO Joined": 6,
+        "AOO Won": 7,
+        "AOO Avg Kill": 8,
+        "AOO Avg Dead": 9,
+        "AOO Avg Heal": 10,
+    }
+    row.update(overrides)
+    return row
+
+
 @pytest.mark.asyncio
 async def test_run_stats_copy_archive_contract_monkeypatched(monkeypatch):
     """
@@ -57,16 +98,18 @@ def test_process_excel_file_preserves_credit_before_updated_on(tmp_path, monkeyp
     download_dir.mkdir()
 
     pd.DataFrame(
-        {
-            "Governor ID": [123, 456],
-            "Name": ["A", "B"],
-            "Credit": [100, None],
-        }
+        [
+            _full_upload_row(**{"Governor ID": 123, "Name": "A", "Credit": 100}),
+            _full_upload_row(**{"Governor ID": 456, "Name": "B", "Credit": None}),
+        ]
     ).to_excel(source_path, index=False)
 
     monkeypatch.setattr(stats_module, "DOWNLOAD_FOLDER", str(download_dir))
     monkeypatch.setattr(stats_module, "ARCHIVE_DIR_1", str(archive_dir))
     monkeypatch.setattr(stats_module, "CSV_FILE_PATH", str(download_dir / "stats.csv"))
+    monkeypatch.setattr(
+        stats_module, "IMPORT_METADATA_FILE_PATH", str(download_dir / "stats_import_metadata.json")
+    )
 
     success, message, _ = stats_module.process_excel_file(str(source_path))
 
@@ -85,16 +128,14 @@ def test_process_excel_file_adds_blank_credit_for_legacy_upload(tmp_path, monkey
     archive_dir = download_dir / "archive"
     download_dir.mkdir()
 
-    pd.DataFrame(
-        {
-            "Governor ID": [123],
-            "Name": ["A"],
-        }
-    ).to_excel(source_path, index=False)
+    pd.DataFrame([_full_upload_row()]).to_excel(source_path, index=False)
 
     monkeypatch.setattr(stats_module, "DOWNLOAD_FOLDER", str(download_dir))
     monkeypatch.setattr(stats_module, "ARCHIVE_DIR_1", str(archive_dir))
     monkeypatch.setattr(stats_module, "CSV_FILE_PATH", str(download_dir / "stats.csv"))
+    monkeypatch.setattr(
+        stats_module, "IMPORT_METADATA_FILE_PATH", str(download_dir / "stats_import_metadata.json")
+    )
 
     success, message, _ = stats_module.process_excel_file(str(source_path))
 
@@ -105,3 +146,28 @@ def test_process_excel_file_adds_blank_credit_for_legacy_upload(tmp_path, monkey
     assert "Credit" in rows[0]
     assert rows[0]["Credit"] == ""
     assert list(rows[0]).index("Credit") < list(rows[0]).index("updated_on")
+
+
+def test_process_excel_file_maps_conduct_score_to_credit(tmp_path, monkeypatch):
+    source_path = tmp_path / "conduct.xlsx"
+    download_dir = tmp_path / "downloads"
+    archive_dir = download_dir / "archive"
+    download_dir.mkdir()
+
+    pd.DataFrame([_full_upload_row(**{"Conduct Score": 91.25})]).to_excel(source_path, index=False)
+
+    monkeypatch.setattr(stats_module, "DOWNLOAD_FOLDER", str(download_dir))
+    monkeypatch.setattr(stats_module, "ARCHIVE_DIR_1", str(archive_dir))
+    monkeypatch.setattr(stats_module, "CSV_FILE_PATH", str(download_dir / "stats.csv"))
+    monkeypatch.setattr(
+        stats_module, "IMPORT_METADATA_FILE_PATH", str(download_dir / "stats_import_metadata.json")
+    )
+
+    success, message, _ = stats_module.process_excel_file(str(source_path))
+
+    assert success, message
+    with open(stats_module.CSV_FILE_PATH, newline="", encoding="utf-8-sig") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert "Conduct Score" not in rows[0]
+    assert float(rows[0]["Credit"]) == pytest.approx(91.25)
