@@ -194,3 +194,27 @@ def test_prepare_fallback_csv_dataframe_rejects_fractional_integer_values():
 
     with pytest.raises(ValueError, match="Non-integer value for Power"):
         prepare_fallback_csv_dataframe(df)
+
+
+def test_prepare_fallback_csv_dataframe_sanitizes_text_for_sql_bulk_insert():
+    result = normalize_fallback_dataframe(
+        pd.DataFrame(
+            [
+                _full_row(
+                    **{
+                        "Name": "义Vìper义\n" + ("x" * 250),
+                        "Alliance": "K98\tA",
+                        "Civilization": "Rome\x00",
+                    }
+                )
+            ]
+        )
+    )
+
+    csv_df = prepare_fallback_csv_dataframe(result.dataframe)
+
+    assert csv_df.loc[0, "Name"].startswith("?Viper? ")
+    assert len(csv_df.loc[0, "Name"]) == 200
+    assert csv_df.loc[0, "Name"].isascii()
+    assert csv_df.loc[0, "Alliance"] == "K98 A"
+    assert csv_df.loc[0, "Civilization"] == "Rome"

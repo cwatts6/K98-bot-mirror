@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 import json
 import re
 from typing import Any
+import unicodedata
 
 import pandas as pd
 
@@ -103,10 +104,19 @@ FULL_REQUIRED_COLUMNS: list[str] = [
 SCORE_ALIASES = (SCORE_SOURCE_CREDIT, SCORE_SOURCE_CONDUCT_SCORE)
 
 TEXT_COLUMNS = {"Name", "Alliance", "Civilization", "updated_on"}
+TEXT_COLUMN_MAX_LENGTHS = {
+    "Name": 200,
+    "Alliance": 100,
+    "Civilization": 100,
+    "updated_on": 200,
+}
 DECIMAL_COLUMNS = {CANONICAL_SCORE_COLUMN}
 INTEGER_COLUMNS = tuple(
     col for col in CANONICAL_COLUMNS if col not in TEXT_COLUMNS | DECIMAL_COLUMNS
 )
+
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_WHITESPACE_RE = re.compile(r"\s+")
 
 _HEADER_ALIASES: dict[str, str] = {
     _normalize_header(col): col for col in CANONICAL_COLUMNS if col not in {CANONICAL_SCORE_COLUMN}
@@ -284,9 +294,32 @@ def _format_decimal_cell_for_bulk(value: object, column: str) -> str:
     return format(number, "f")
 
 
+def _format_text_cell_for_bulk(value: object, column: str) -> str:
+    if _is_blank_value(value):
+        return ""
+
+    text = str(value)
+    text = _CONTROL_CHARS_RE.sub(" ", text)
+    text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+    text = "".join(
+        char
+        for char in unicodedata.normalize("NFKD", text)
+        if not unicodedata.category(char).startswith("M")
+    )
+    text = text.encode("ascii", "replace").decode("ascii")
+    text = _WHITESPACE_RE.sub(" ", text).strip()
+    max_length = TEXT_COLUMN_MAX_LENGTHS[column]
+    return text[:max_length]
+
+
 def prepare_fallback_csv_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Format canonical fallback rows for SQL Server BULK INSERT typed staging columns."""
     out = df.copy()
+    for col in TEXT_COLUMNS:
+        if col in out.columns:
+            out[col] = out[col].map(
+                lambda value, column=col: _format_text_cell_for_bulk(value, column)
+            )
     for col in INTEGER_COLUMNS:
         if col in out.columns:
             out[col] = out[col].map(
