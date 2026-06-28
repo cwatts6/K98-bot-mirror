@@ -83,6 +83,14 @@ def test_conflicting_credit_and_conduct_score_fails():
         normalize_fallback_dataframe(pd.DataFrame([row]))
 
 
+def test_duplicate_credit_headers_after_normalization_fail():
+    columns = list(_full_row().keys()) + [" credit "]
+    values = list(_full_row().values()) + [88.5]
+
+    with pytest.raises(ValueError, match="Duplicate fallback import column"):
+        normalize_fallback_dataframe(pd.DataFrame([values], columns=columns))
+
+
 def test_full_snapshot_without_score_gets_blank_credit():
     row = _full_row()
     row.pop("Credit")
@@ -161,4 +169,3 @@ def test_partial_snapshot_overlays_present_columns_and_preserves_absent_fields()
     assert rows.loc[123, "Troops Power"] == 60
     assert rows.loc[123, "Credit"] == pytest.approx(88.5)
     assert rows.loc[456, "Power"] == 2000
-

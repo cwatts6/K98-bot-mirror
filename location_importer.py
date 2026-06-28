@@ -27,6 +27,11 @@ def _parse_shield_time_left(raw: object) -> tuple[int | None, datetime | None]:
     return shield_unix, datetime.fromtimestamp(shield_unix, UTC).replace(tzinfo=None)
 
 
+def _int_or_zero(raw: object) -> int:
+    text = str(raw if raw is not None else "").strip()
+    return int(text or 0)
+
+
 def _get_conn():
     user = os.getenv("IMPORT_SQL_USERNAME", USERNAME)
     pwd = os.getenv("IMPORT_SQL_PASSWORD", PASSWORD)
@@ -50,9 +55,9 @@ def parse_output_csv(csv_bytes: bytes) -> list[tuple]:
         try:
             pid = int(str(r.get("player_id", "")).strip())
             name = (r.get("player_name") or "").strip()
-            pwr = int(str(r.get("player_power", "0") or 0))
-            kills = int(str(r.get("player_kills", "0") or 0))
-            ch = int(str(r.get("player_ch", "0") or 0))
+            pwr = _int_or_zero(r.get("player_power"))
+            kills = _int_or_zero(r.get("player_kills"))
+            ch = _int_or_zero(r.get("player_ch"))
             ally = (r.get("player_alliance") or "").strip()
             x = int(str(r.get("x", "")).strip())
             y = int(str(r.get("y", "")).strip())

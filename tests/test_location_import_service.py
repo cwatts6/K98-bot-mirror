@@ -166,6 +166,17 @@ def test_parse_output_csv_zero_shield_keeps_raw_zero_and_null_utc():
     assert rows == [(123, "Alice", 1000, 20, 25, "K98", 10, 20, 0, None)]
 
 
+def test_parse_output_csv_treats_whitespace_optional_numbers_as_zero():
+    csv_bytes = (
+        b"player_id,player_name,player_power,player_kills,player_ch,player_alliance,x,y\n"
+        b"123,Alice, , , ,K98,10,20\n"
+    )
+
+    rows = svc.parse_output_csv(csv_bytes)
+
+    assert rows == [(123, "Alice", 0, 0, 0, "K98", 10, 20, None, None)]
+
+
 def test_parse_output_csv_skips_invalid_shield_row():
     csv_bytes = (
         b"player_id,player_name,player_power,player_kills,player_ch,player_alliance,x,y,shield_time_left\n"

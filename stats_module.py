@@ -147,6 +147,15 @@ def _load_import_metadata() -> dict:
         return {}
 
 
+def _delete_import_metadata() -> None:
+    try:
+        os.remove(IMPORT_METADATA_FILE_PATH)
+    except FileNotFoundError:
+        return
+    except Exception:
+        logger.debug("[EXCEL] Failed to remove consumed import metadata sidecar", exc_info=True)
+
+
 def _record_fallback_import_control(cur, metadata: dict) -> None:
     if not metadata:
         return
@@ -332,7 +341,9 @@ async def _offload_callable_py(fn, *args, name: str | None = None, meta: dict | 
 
 
 # === Execute SQL Stored Procedure and Wait (NON-BLOCKING) ===
-async def run_sql_procedure(rank=None, seed=None, timeout_seconds: int = 600):
+async def run_sql_procedure(
+    rank=None, seed=None, timeout_seconds: int = 600, import_metadata: dict | None = None
+):
     logger.info(f"[SQL_PROC] Received Rank: {rank}, Seed: {seed}")
 
     def _proc_and_get_expected_counter() -> int:
@@ -357,7 +368,7 @@ async def run_sql_procedure(rank=None, seed=None, timeout_seconds: int = 600):
             try:
                 # ⭐ DEFENSE LAYER 1: Wrap UPDATE_ALL2 with log management ⭐
                 logger.info("[SQL_PROC] Executing UPDATE_ALL2 with log management wrapper...")
-                _record_fallback_import_control(cur, _load_import_metadata())
+                _record_fallback_import_control(cur, import_metadata or {})
 
                 result = execute_update_all2_with_log_management(cur, param1=rank, param2=seed)
 
@@ -420,6 +431,8 @@ async def run_sql_procedure(rank=None, seed=None, timeout_seconds: int = 600):
                     break
 
             conn.commit()
+            if import_metadata:
+                _delete_import_metadata()
             return expected_counter
 
     # Offload the blocking DB work via python-callable offload helper
@@ -505,6 +518,7 @@ async def run_stats_copy_archive(
     excel_title = "Processing Excel File"
     archive2_title = "Archiving Secondary File"
     sql_title = "Running SQL Procedure"
+    current_import_metadata: dict = {}
 
     excel_included = bool(source_filename)
     if excel_included:
@@ -547,7 +561,12 @@ async def run_stats_copy_archive(
 
     steps += [
         (archive2_title, _archive2_guard_async),
-        (sql_title, lambda: run_sql_procedure(rank, seed, timeout_seconds=600)),
+        (
+            sql_title,
+            lambda: run_sql_procedure(
+                rank, seed, timeout_seconds=600, import_metadata=current_import_metadata
+            ),
+        ),
     ]
 
     all_success = True
@@ -581,6 +600,8 @@ async def run_stats_copy_archive(
 
         if key:
             step_results[key] = bool(success)
+            if key == "excel" and success:
+                current_import_metadata = _load_import_metadata()
 
         status_icon = "✅" if success else "❌"
         message = stdout if success else stderr

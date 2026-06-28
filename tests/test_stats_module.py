@@ -58,7 +58,9 @@ async def test_run_stats_copy_archive_contract_monkeypatched(monkeypatch):
     """
 
     # Monkeypatch internal functions to avoid heavy IO / DB calls
-    async def fake_run_sql_procedure(rank=None, seed=None, timeout_seconds=600):
+    async def fake_run_sql_procedure(
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+    ):
         await asyncio.sleep(0)
         return True, "[SUCCESS] fake sql", None
 
@@ -89,6 +91,64 @@ async def test_run_stats_copy_archive_contract_monkeypatched(monkeypatch):
 
     # Expect canonical keys to exist
     assert "excel" in steps and "archive" in steps and "sql" in steps
+
+
+@pytest.mark.asyncio
+async def test_run_stats_copy_archive_passes_only_current_import_metadata(monkeypatch):
+    metadata_seen = []
+    metadata_path = "stats_import_metadata.json"
+
+    def fake_process_excel_file(path):
+        return True, "[INFO] fake excel", None
+
+    async def fake_run_sql_procedure(
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+    ):
+        metadata_seen.append(import_metadata)
+        await asyncio.sleep(0)
+        return True, "[SUCCESS] fake sql", None
+
+    monkeypatch.setattr(stats_module, "process_excel_file", fake_process_excel_file)
+    monkeypatch.setattr(stats_module, "archive_second_file", lambda: (True, "[INFO] archive", None))
+    monkeypatch.setattr(stats_module, "run_sql_procedure", fake_run_sql_procedure)
+    monkeypatch.setattr(
+        stats_module,
+        "_load_import_metadata",
+        lambda: {"source_type": "full_fallback_snapshot", "source_filename": metadata_path},
+    )
+
+    success, _combined_log, _steps = await stats_module.run_stats_copy_archive(
+        source_filename="upload.xlsx"
+    )
+
+    assert success is True
+    assert metadata_seen == [
+        {"source_type": "full_fallback_snapshot", "source_filename": metadata_path}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_run_stats_copy_archive_sql_only_does_not_reuse_stale_metadata(monkeypatch):
+    metadata_seen = []
+
+    async def fake_run_sql_procedure(
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+    ):
+        metadata_seen.append(import_metadata)
+        await asyncio.sleep(0)
+        return True, "[SUCCESS] fake sql", None
+
+    monkeypatch.setattr(stats_module, "run_sql_procedure", fake_run_sql_procedure)
+    monkeypatch.setattr(
+        stats_module,
+        "_load_import_metadata",
+        lambda: {"source_type": "interim_auto_partial_snapshot"},
+    )
+
+    success, _combined_log, _steps = await stats_module.run_stats_copy_archive()
+
+    assert success is True
+    assert metadata_seen == [{}]
 
 
 def test_process_excel_file_preserves_credit_before_updated_on(tmp_path, monkeypatch):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 import json
 import re
 from typing import Any
@@ -24,6 +24,7 @@ CANONICAL_SCORE_COLUMN = "Credit"
 def _normalize_header(header: object) -> str:
     text = str(header or "").strip().casefold()
     return re.sub(r"[^a-z0-9]+", "", text)
+
 
 CANONICAL_COLUMNS: list[str] = [
     "Governor ID",
@@ -95,17 +96,13 @@ PARTIAL_COLUMNS: list[str] = [
 ]
 
 FULL_REQUIRED_COLUMNS: list[str] = [
-    col
-    for col in CANONICAL_COLUMNS
-    if col not in {CANONICAL_SCORE_COLUMN, "updated_on"}
+    col for col in CANONICAL_COLUMNS if col not in {CANONICAL_SCORE_COLUMN, "updated_on"}
 ]
 
 SCORE_ALIASES = (SCORE_SOURCE_CREDIT, SCORE_SOURCE_CONDUCT_SCORE)
 
 _HEADER_ALIASES: dict[str, str] = {
-    _normalize_header(col): col
-    for col in CANONICAL_COLUMNS
-    if col not in {CANONICAL_SCORE_COLUMN}
+    _normalize_header(col): col for col in CANONICAL_COLUMNS if col not in {CANONICAL_SCORE_COLUMN}
 }
 _HEADER_ALIASES[_normalize_header(SCORE_SOURCE_CREDIT)] = CANONICAL_SCORE_COLUMN
 _HEADER_ALIASES[_normalize_header(SCORE_SOURCE_CONDUCT_SCORE)] = SCORE_SOURCE_CONDUCT_SCORE
@@ -162,7 +159,7 @@ def _canonicalize_headers(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, str
     for raw_col in df.columns:
         raw_text = str(raw_col or "").strip()
         canonical = _HEADER_ALIASES.get(_normalize_header(raw_text), raw_text)
-        if canonical in seen_canonical and canonical != CANONICAL_SCORE_COLUMN:
+        if canonical in seen_canonical:
             raise ValueError(
                 f"Duplicate fallback import column after normalization: {raw_text!r} "
                 f"conflicts with {seen_canonical[canonical]!r}"
@@ -187,9 +184,7 @@ def _prepare_score_column(df: pd.DataFrame) -> tuple[pd.DataFrame, str | None]:
     score_header: str | None = None
 
     if has_credit and has_conduct_score:
-        if not _score_values_identical(
-            df[CANONICAL_SCORE_COLUMN], df[SCORE_SOURCE_CONDUCT_SCORE]
-        ):
+        if not _score_values_identical(df[CANONICAL_SCORE_COLUMN], df[SCORE_SOURCE_CONDUCT_SCORE]):
             raise ValueError("Both Credit and Conduct Score are present with conflicting values.")
         score_header = f"{SCORE_SOURCE_CREDIT}+{SCORE_SOURCE_CONDUCT_SCORE}"
     elif has_conduct_score:
@@ -230,7 +225,9 @@ def detect_fallback_source_type(df: pd.DataFrame) -> str:
 
 
 def _blank_canonical_frame(row_count: int) -> pd.DataFrame:
-    return pd.DataFrame({col: pd.Series([pd.NA] * row_count, dtype="object") for col in CANONICAL_COLUMNS})
+    return pd.DataFrame(
+        {col: pd.Series([pd.NA] * row_count, dtype="object") for col in CANONICAL_COLUMNS}
+    )
 
 
 def _canonical_full_frame(df: pd.DataFrame, columns_present: set[str]) -> pd.DataFrame:
