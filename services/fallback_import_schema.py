@@ -282,7 +282,7 @@ def normalize_fallback_dataframe(
     if df.empty:
         raise ValueError("Fallback import file contains no rows.")
 
-    normalized, original_columns = _canonicalize_headers(df)
+    normalized, _original_columns = _canonicalize_headers(df)
     normalized, score_header = _prepare_score_column(normalized)
     columns_present = set(normalized.columns)
     if score_header is None:

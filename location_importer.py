@@ -1,5 +1,5 @@
 import csv
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import inspect
 import io
 import logging
@@ -13,6 +13,7 @@ from file_utils import fetch_one_dict
 log = logging.getLogger(__name__)
 
 _MAX_SQL_DATETIME2_UNIX = 253402300799  # 9999-12-31 23:59:59 UTC
+_UNIX_EPOCH_UTC = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 def _parse_shield_time_left(raw: object) -> tuple[int | None, datetime | None]:
@@ -24,7 +25,7 @@ def _parse_shield_time_left(raw: object) -> tuple[int | None, datetime | None]:
         return 0, None
     if shield_unix < 0 or shield_unix > _MAX_SQL_DATETIME2_UNIX:
         raise ValueError(f"shield_time_left out of range: {shield_unix}")
-    return shield_unix, datetime.fromtimestamp(shield_unix, UTC).replace(tzinfo=None)
+    return shield_unix, (_UNIX_EPOCH_UTC + timedelta(seconds=shield_unix)).replace(tzinfo=None)
 
 
 def _int_or_zero(raw: object) -> int:

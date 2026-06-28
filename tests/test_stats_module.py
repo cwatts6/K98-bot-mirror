@@ -182,7 +182,7 @@ def test_process_excel_file_preserves_credit_before_updated_on(tmp_path, monkeyp
     assert list(rows[0]).index("Credit") < list(rows[0]).index("updated_on")
 
 
-def test_process_excel_file_adds_blank_credit_for_legacy_upload(tmp_path, monkeypatch):
+def test_process_excel_file_adds_blank_credit_when_score_column_missing(tmp_path, monkeypatch):
     source_path = tmp_path / "legacy.xlsx"
     download_dir = tmp_path / "downloads"
     archive_dir = download_dir / "archive"
