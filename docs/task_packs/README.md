@@ -30,12 +30,19 @@ Import pipeline status:
   2026-06-28.
 - Task A records are archived under `archive/`:
   - `archive/Codex Task Pack - Import Process Schema Resilience and Shield Time Support.md`
-- Active Task B files:
-  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task B.md`
-  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task B Unicode Import Contract.md`
-- Task B's confirmed first slice is to replace the temporary ASCII-safe fallback CSV workaround
-  with a Unicode-preserving SQL import path while preserving Task A behaviour for full fallback,
-  interim auto partial fallback, and player-location shield imports.
+- Task B Import Pipeline Deferred Optimisation Unicode Import Contract is delivered in mirror PR
+  #180, production PR #488, and SQL PR #22. SQL deployment completed before bot rollout. Smoke
+  testing confirmed full fallback with `Credit`, full fallback with `Conduct Score`, interim auto
+  partial fallback with non-ASCII names, and existing location shield import unchanged.
+- Task B records are archived under `archive/`:
+  - `archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task B.md`
+  - `archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task B Unicode Import Contract.md`
+- Active Task C files:
+  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C.md`
+  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Import Architecture and Durable Audit.md`
+- Task C is the broader import architecture cleanup intentionally left out of Task B. It starts
+  with audit/scope only for `stats_module.py` service extraction, durable batch audit outcome
+  tracking, route/command impact review, and `dbo.UPDATE_ALL2` strategy.
 
 Player Self-Service Command Centre status:
 
@@ -169,9 +176,10 @@ Latest completed starter:
 
 Next active work:
 
-Import Pipeline Deferred Optimisation Task B Unicode Import Contract is the next prepared import
-pipeline slice. It starts with audit/scope only and should choose the smallest safe
-Unicode-preserving replacement for the current ASCII-safe fallback SQL bulk CSV path.
+Import Pipeline Deferred Optimisation Task C Import Architecture and Durable Audit is the next
+prepared import pipeline slice. It starts with audit/scope only and must keep broad
+`stats_module.py` extraction, durable audit implementation, route/command changes, and wholesale
+`dbo.UPDATE_ALL2` replacement behind explicit approval.
 
 Player Self-Service Command Centre v2 Phase 1 Stats, Profile, and Inventory Audit and Design is
 the next prepared player self-service slice. It starts with audit/scope only for `/my_stats`,

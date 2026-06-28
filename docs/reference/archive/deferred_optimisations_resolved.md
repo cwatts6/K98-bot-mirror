@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Import Pipeline Task B Completed Item
+- Area: `services/fallback_import_schema.py`, `stats_module.py`, SQL repo `dbo.IMPORT_STAGING_PROC`, SQL repo raw fallback staging
+- Type: architecture
+- Description: Task A restored fallback import reliability by sanitizing text columns to ASCII before writing `stats.csv` for SQL Server `BULK INSERT`, because the typed UTF-8 bulk path failed on padded and non-ASCII player names in interim auto partial snapshots. That preserved import reliability but temporarily degraded non-ASCII governor names in the SQL-loaded staging path.
+- Resolution: Task B replaced the temporary ASCII-safe workaround with a Unicode-preserving raw text SQL staging path plus explicit typed conversion. Bot fallback CSV text formatting now preserves non-ASCII names for the SQL import path while retaining Task A source detection, score-header aliasing, interim partial overlay behavior, and location shield import behavior.
+- Validation: Completed in mirror PR #180 (`codex/unicode-fallback-import-contract`), production PR #488 (`prod/unicode-fallback-import-contract`), and SQL PR #22 (`codex/unicode-fallback-import-raw-staging`). SQL deployment completed before bot rollout. Production smoke testing confirmed full fallback with `Credit`, full fallback with `Conduct Score`, interim auto partial fallback with non-ASCII names, and existing location shield import unchanged.
+
 ### Phase 12B Completed Item
 - Area: `player_self_service/profile_preference_service.py`, `player_self_service/service.py`, `ui/views/player_self_service_views.py`, `ui/views/player_self_service_preference_views.py`, SQL repo `C:\K98-bot-SQL-Server`
 - Type: architecture

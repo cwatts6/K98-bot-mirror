@@ -6,22 +6,13 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `services/fallback_import_schema.py`, `stats_module.py`, SQL repo `dbo.IMPORT_STAGING_PROC`
-- Type: architecture
-- Description: Task A restored fallback import reliability by sanitizing text columns to ASCII before writing `stats.csv` for SQL Server `BULK INSERT`, because the current typed UTF-8 bulk path failed on padded and non-ASCII player names in interim auto partial snapshots. This preserves import reliability but temporarily degrades non-ASCII governor names in the SQL-loaded staging path.
-- Suggested Fix: Execute active Task B in `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task B.md`. Design a Unicode-preserving fallback import path, such as UTF-16/widechar bulk import, a raw text staging table with explicit `TRY_CONVERT` mapping, or a parameterized/batched loader that avoids SQL Server CSV codepage limitations. Validate the chosen option against `dbo.IMPORT_STAGING_CSV`, `dbo.IMPORT_STAGING_PROC`, downstream name consumers, representative non-ASCII names, and deployment rollback requirements.
-- Impact: medium
-- Risk: medium
-- Dependencies: Task A completed in mirror PR #179, production PR #487, and SQL PR #21. Keep the Task A ASCII-safe hotfix deployed until Task B is implemented and smoke tested with full fallback, interim auto partial fallback, and location shield imports.
-
-### Deferred Optimisation
 - Area: `stats_module.py`, `services/fallback_import_schema.py`, upload route/import worker flow, SQL repo `dbo.UPDATE_ALL2`, fallback import audit tables
 - Type: architecture
-- Description: Task B first slice intentionally keeps the Unicode import contract small. The broader import architecture cleanup remains out of scope: extracting fallback import orchestration out of legacy `stats_module.py`, adding durable batch audit outcome/status tracking, changing Discord command or upload route behavior, and replacing or substantially redesigning `dbo.UPDATE_ALL2`.
-- Suggested Fix: Scope this as a later Task C import pipeline optimisation after Task B is smoke tested. Audit the fallback queue route, worker orchestration, `stats_module.py`, fallback schema service, SQL import procedures, batch metadata/audit needs, and `UPDATE_ALL2` downstream build responsibilities. Split implementation into PR-sized slices, preserving Task A/B import behavior and avoiding command/route changes unless explicitly approved.
+- Description: Task B delivered the Unicode-preserving fallback import contract as a focused first slice. The broader import architecture cleanup remains active for Task C: extracting fallback import orchestration out of legacy `stats_module.py`, adding durable batch audit outcome/status tracking, auditing Discord command or upload route behavior before any change, and assessing whether `dbo.UPDATE_ALL2` should be decomposed or replaced in later approved slices.
+- Suggested Fix: Use `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C.md` for an audit/scope-only Task C start. Audit the fallback queue route, worker orchestration, `stats_module.py`, fallback schema service, SQL import procedures, batch metadata/audit needs, and `UPDATE_ALL2` downstream build responsibilities. Split implementation into PR-sized slices, preserving Task A/B import behavior and avoiding command/route changes or wholesale `UPDATE_ALL2` replacement unless explicitly approved.
 - Impact: high
 - Risk: medium
-- Dependencies: Complete and production-smoke Task B Unicode import contract first; use live import evidence from full fallback, interim auto partial fallback, and location shield import before approving any broader extraction or durable audit design.
+- Dependencies: Task A completed in mirror PR #179, production PR #487, and SQL PR #21. Task B completed in mirror PR #180, production PR #488, and SQL PR #22, with smoke testing confirming full fallback with `Credit`, full fallback with `Conduct Score`, interim auto partial fallback with non-ASCII names, and existing location shield import unchanged.
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/telemetry_cmds.py`, `commands/prekvk_cmds.py`, `scripts/validate_command_registration.py`, `docs/reference/canonical_command_reference.md`

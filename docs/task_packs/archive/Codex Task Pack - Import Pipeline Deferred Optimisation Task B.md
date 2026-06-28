@@ -1,5 +1,22 @@
 # Codex Task Pack - Import Pipeline Deferred Optimisation Task B
 
+Status: completed and archived.
+
+Completion record:
+
+- Completed in mirror PR #180 (`codex/unicode-fallback-import-contract`), production PR #488
+  (`prod/unicode-fallback-import-contract`), and SQL PR #22
+  (`codex/unicode-fallback-import-raw-staging`).
+- SQL deployment completed before bot rollout.
+- Smoke testing confirmed full fallback import with `Credit`, full fallback import with
+  `Conduct Score`, interim auto partial fallback with non-ASCII names, and existing
+  player-location shield import unchanged.
+- Selected design: raw text SQL staging table plus explicit typed conversion.
+- The Task A ASCII-safe text workaround was replaced with Unicode-preserving fallback CSV text
+  formatting backed by SQL raw staging.
+- The broader import architecture cleanup is promoted to Task C:
+  `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C.md`.
+
 ## 1. Task Header
 
 - Task name: `Import Pipeline Deferred Optimisation Task B`
@@ -8,7 +25,7 @@
 - Task type: `deferred optimisation | SQL import hardening | architecture cleanup`
 - Depends on: completed Task A, archived at `docs/task_packs/archive/Codex Task Pack - Import Process Schema Resilience and Shield Time Support.md`
 - One-pass approved: `no`
-- Status: `active task pack for next import optimisation slice`
+- Status: `completed and archived`
 
 ## 2. Task B Confirmed Scope
 
@@ -244,18 +261,18 @@ cd C:\K98-bot-SQL-Server
 
 ## 14. Acceptance Criteria
 
-- [ ] Task A behaviour remains green.
-- [ ] Non-ASCII fallback governor names are preserved in the SQL-loaded path.
-- [ ] Full fallback import works with `Credit`.
-- [ ] Full fallback import works with `Conduct Score`.
-- [ ] Interim auto partial fallback import works and preserves absent fields.
-- [ ] `dbo.IMPORT_STAGING_CSV` or its replacement no longer fails on padded/non-ASCII `Name`.
-- [ ] SQL migration and schema snapshots are aligned.
-- [ ] `UPDATE_ALL2` remains compatible or has a documented backward-compatible change.
-- [ ] Manual SQL diagnostic rerun is no longer required for ordinary import failures.
-- [ ] Focused tests and selected validation gates pass.
-- [ ] Deployment and rollback steps are documented.
-- [ ] Deferred backlog is updated to show this item is delivered or superseded.
+- [x] Task A behaviour remains green.
+- [x] Non-ASCII fallback governor names are preserved in the SQL-loaded path.
+- [x] Full fallback import works with `Credit`.
+- [x] Full fallback import works with `Conduct Score`.
+- [x] Interim auto partial fallback import works and preserves absent fields.
+- [x] `dbo.IMPORT_STAGING_CSV` or its replacement no longer fails on padded/non-ASCII `Name`.
+- [x] SQL migration and schema snapshots are aligned.
+- [x] `UPDATE_ALL2` remains compatible or has a documented backward-compatible change.
+- [x] Manual SQL diagnostic rerun is no longer required for ordinary import failures.
+- [x] Focused tests and selected validation gates pass.
+- [x] Deployment and rollback steps are documented.
+- [x] Deferred backlog is updated to show this item is delivered or superseded.
 
 ## 15. Deployment Notes
 

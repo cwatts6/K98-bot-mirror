@@ -1,9 +1,17 @@
 # Codex Chat Starter - Import Pipeline Deferred Optimisation Task B Unicode Import Contract
 
-Status: active starter for the next import pipeline deferred optimisation slice.
+Status: completed and archived starter.
 
-Use this starter to begin Task B with audit/scope only. Do not implement until the audit confirms
-the selected Unicode-preserving import design and Chris approves the implementation plan.
+Task B completed in mirror PR #180, production PR #488, and SQL PR #22. Production smoke testing
+confirmed:
+
+- Full fallback with `Credit` succeeded.
+- Full fallback with `Conduct Score` succeeded.
+- Interim auto partial fallback with non-ASCII names succeeded.
+- Existing location shield import remained unchanged.
+
+This historical starter was used to begin Task B with audit/scope only. Task B is now complete;
+use the Task C starter in the active task-pack folder for the next import pipeline slice.
 
 ## Copy/Paste Starter
 
@@ -11,7 +19,7 @@ the selected Unicode-preserving import design and Chris approves the implementat
 Begin Task B - Import Pipeline Deferred Optimisation: Unicode Import Contract.
 
 Use the task pack:
-C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Import Pipeline Deferred Optimisation Task B.md
+C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - Import Pipeline Deferred Optimisation Task B.md
 
 Task A is complete and archived here:
 C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - Import Process Schema Resilience and Shield Time Support.md
