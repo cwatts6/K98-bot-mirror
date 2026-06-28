@@ -14,6 +14,12 @@ PreKvK schema standardisation, completed KVK Player Experience Redesign executio
 completed KVK_ALL phase initiation statements, and the DL_bot upload-routing and startup/lifecycle
 programmes.
 
+Import pipeline archives include Task A Import Process Schema Resilience and Shield Time Support,
+which delivered fallback `Credit` / `Conduct Score` compatibility, interim auto partial fallback
+overlay support, player-location shield timestamp persistence, and the temporary ASCII-safe SQL
+bulk CSV hotfix. The active follow-up is Task B in `../Codex Task Pack - Import Pipeline Deferred
+Optimisation Task B.md`.
+
 The DL_bot upload-routing and startup/lifecycle optimisation programme is complete through
 Phase 6L:
 

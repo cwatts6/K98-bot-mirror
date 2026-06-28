@@ -23,6 +23,20 @@ material.
 Player self-service workflow redesign and public calendar/KVK calendar UX redesign remain separate
 deferred optimisation programmes, not additional command-platform phases.
 
+Import pipeline status:
+
+- Task A Import Process Schema Resilience and Shield Time Support is delivered in mirror PR #179,
+  production PR #487, and SQL PR #21, with SQL deployment and operator smoke testing completed on
+  2026-06-28.
+- Task A records are archived under `archive/`:
+  - `archive/Codex Task Pack - Import Process Schema Resilience and Shield Time Support.md`
+- Active Task B files:
+  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task B.md`
+  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task B Unicode Import Contract.md`
+- Task B's confirmed first slice is to replace the temporary ASCII-safe fallback CSV workaround
+  with a Unicode-preserving SQL import path while preserving Task A behaviour for full fallback,
+  interim auto partial fallback, and player-location shield imports.
+
 Player Self-Service Command Centre status:
 
 - Phase 1 audit/design is complete and archived.
@@ -154,6 +168,10 @@ Latest completed starter:
 `archive/Codex Chat Starter - KVK Player Experience Redesign Phase 5H Ranking Card Performance Optimisation.md`
 
 Next active work:
+
+Import Pipeline Deferred Optimisation Task B Unicode Import Contract is the next prepared import
+pipeline slice. It starts with audit/scope only and should choose the smallest safe
+Unicode-preserving replacement for the current ASCII-safe fallback SQL bulk CSV path.
 
 Player Self-Service Command Centre v2 Phase 1 Stats, Profile, and Inventory Audit and Design is
 the next prepared player self-service slice. It starts with audit/scope only for `/my_stats`,

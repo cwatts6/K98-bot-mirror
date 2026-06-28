@@ -1,5 +1,21 @@
 # Codex Task Pack - Import Process Schema Resilience and Shield Time Support
 
+Status: completed and archived.
+
+Completion record:
+
+- Completed in mirror PR #179 (`codex/import-schema-shield-time`), production PR #487
+  (`prod/import-schema-shield-time`), and SQL PR #21.
+- SQL deployment completed successfully on 2026-06-28.
+- Smoke testing confirmed full fallback import with `Credit`, full fallback import with
+  `Conduct Score`, player-location import, shield timestamp visibility on `v_PlayerProfile`, and
+  interim auto partial fallback import.
+- Interim auto partial fallback rows were confirmed in `dbo.KingdomScanData4`: latest governor
+  data matched the partial file updates while absent full-snapshot fields remained present.
+- The delivered Task A hotfix includes temporary ASCII-safe formatting for the SQL bulk CSV path.
+  The Unicode-preserving replacement is promoted to active Task B:
+  `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task B.md`.
+
 ## 1. Task Header
 
 - Task name: `Import Process Schema Resilience and Shield Time Support`
@@ -7,6 +23,7 @@
 - Owner/context: `Chris Watts / KD98 bot import reliability`
 - Task type: `bug fix | feature | SQL migration`
 - One-pass approved: `no`
+- Final status: `delivered`
 
 ## 2. Required Reading
 
