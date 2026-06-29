@@ -6,13 +6,22 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: Weekly activity, MGE, and inventory upload routes/workers
+- Area: MGE and inventory upload routes/workers
 - Type: consistency
-- Description: Task C Slice 3 mapped the non-fallback import state surfaces, Task C Slice 3A normalized batch-level `RowsInSource`, Task C Slice 4 delivered Honor generic audit adoption, and Task C Slice 5 delivered PreKvK generic audit adoption. Weekly activity, MGE, and inventory still need deliberate adoption slices because each path has different route, worker, file, SQL procedure/table, cache refresh, domain batch/history, and operator-observable state surfaces. Wiring them together would risk inconsistent terminal status semantics or accidental user-facing behavior changes.
-- Suggested Fix: Continue generic audit adoption one import family at a time. Task C Slice 6 is prepared as weekly activity-only adoption, with `dbo.AllianceActivitySnapshotHeader.SnapshotId` as the expected accepted-import external correlation candidate pending fresh SQL validation. Subsequent slices remain MGE results, then inventory generic correlation. Preserve route/command UX, output files, SQL procedure/table behavior, cache refresh signaling, inventory's domain audit model, and existing worker recovery semantics unless separately approved.
+- Description: Task C Slice 3 mapped the non-fallback import state surfaces, Task C Slice 3A normalized batch-level `RowsInSource`, Task C Slice 4 delivered Honor generic audit adoption, Task C Slice 5 delivered PreKvK generic audit adoption, and Task C Slice 6 delivered weekly activity generic audit adoption. MGE and inventory still need deliberate adoption slices because each path has different route, worker, file, SQL procedure/table, cache refresh, domain batch/history, and operator-observable state surfaces. Wiring them together would risk inconsistent terminal status semantics or accidental user-facing behavior changes.
+- Suggested Fix: Continue generic audit adoption one import family at a time. Subsequent slices remain MGE results, then inventory generic correlation. Preserve route/command UX, output files, SQL procedure/table behavior, cache refresh signaling, inventory's domain audit model, and existing worker recovery semantics unless separately approved.
 - Impact: medium
 - Risk: medium
-- Dependencies: Generic durable import batch audit foundation delivered and smoke tested in Task C Slice 2; player-location adoption delivered and smoke tested in Task C Slice 3; batch-level `RowsInSource` normalization delivered and smoke tested in Task C Slice 3A; Honor adoption delivered and smoke tested in Task C Slice 4; PreKvK adoption delivered and smoke tested in Task C Slice 5 with accepted, duplicate, and rejected outcomes; weekly activity Slice 6 task pack and chat starter prepared; import-kind-specific tests identified for each adopted route/worker path.
+- Dependencies: Generic durable import batch audit foundation delivered and smoke tested in Task C Slice 2; player-location adoption delivered and smoke tested in Task C Slice 3; batch-level `RowsInSource` normalization delivered and smoke tested in Task C Slice 3A; Honor adoption delivered and smoke tested in Task C Slice 4; PreKvK adoption delivered and smoke tested in Task C Slice 5 with accepted, duplicate, and rejected outcomes; weekly activity adoption delivered in Task C Slice 6; import-kind-specific tests identified for each adopted route/worker path.
+
+### Deferred Optimisation
+- Area: SQL repo `dbo.vAllianceActivity_WeeklyCumulative`
+- Type: cleanup
+- Description: Weekly activity SQL validation during Task C Slice 6 found that `dbo.vAllianceActivity_WeeklyCumulative` appears to reference columns not exposed by `dbo.vAllianceActivity_WeeklyDelta`. Current bot searches did not find active usage, so fixing or dropping the view is outside the weekly activity audit-adoption slice.
+- Suggested Fix: Run a later SQL cleanup audit to confirm whether any reports, manual queries, or downstream exports still use `dbo.vAllianceActivity_WeeklyCumulative`. If unused, retire or correct the view through the SQL repo migration process with validation and rollback notes.
+- Impact: low
+- Risk: medium
+- Dependencies: SQL repo validation in `C:\K98-bot-SQL-Server`; operator approval before changing reporting view semantics or retiring the view.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.UPDATE_ALL2`, `update_all2_log_manager.py`, `stats/dal/fallback_import_dal.py`, `stats_module.py`

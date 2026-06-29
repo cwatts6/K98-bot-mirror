@@ -6,9 +6,9 @@ Purpose: document the weekly alliance activity Excel import path.
 
 - `DL_bot.py` delegates uploads in `ACTIVITY_UPLOAD_CHANNEL_ID` through
   `upload_routes/weekly_activity_route.py`.
-- `upload_routes/weekly_activity_route.py` owns Discord route matching, SQL preflight, offload
-  dispatch, duplicate/success/error embeds, notify-channel fallback, and best-effort log-backup
-  scheduling.
+- `upload_routes/weekly_activity_route.py` owns Discord route matching, SQL preflight,
+  generic durable import audit wiring, duplicate/success/error embeds, notify-channel fallback,
+  ingest offload dispatch, and best-effort log-backup scheduling.
 - `weekly_activity_importer.py` parses and writes activity snapshots.
 - SQL schema lives in `C:\K98-bot-SQL-Server`.
 
@@ -41,6 +41,9 @@ Files are deduplicated by:
 
 `SourceFileSha1` is stored as `VARBINARY(20)` in SQL.
 
+Duplicate uploads do not create a new `dbo.AllianceActivitySnapshotHeader` row. Generic audit
+records therefore keep duplicate outcomes uncorrelated to an external weekly activity snapshot.
+
 ## SQL Writes
 
 The importer writes:
@@ -51,6 +54,23 @@ The importer writes:
 4. `dbo.AllianceActivityDaily`
 
 Validate these objects against the SQL repo before changing importer behaviour.
+
+## Generic Import Audit
+
+The upload route creates best-effort generic audit rows through the shared import audit service
+and SQL-owned writer procedures.
+
+- `ImportKind`: `weekly_activity`
+- `SourceType`: `discord_upload_xlsx`
+- Phases: `weekly_activity_xlsx_parse`, `weekly_activity_sql_ingest`,
+  `weekly_activity_post_import_backup`
+- Accepted imports correlate to `dbo.AllianceActivitySnapshotHeader` with
+  `ExternalBatchId = <SnapshotId>`.
+- Duplicate and failed outcomes remain uncorrelated when no snapshot row exists.
+
+The route performs a direct thread pre-parse to capture source row counts for audit without going
+through the maintenance offload wrapper. The importer remains the owner of the SQL transaction and
+reparses the workbook for the actual database ingest.
 
 ## Daily Rebuild Behaviour
 

@@ -38,12 +38,14 @@ def schedule_best_effort(
     awaitable: Awaitable[Any],
     logger: logging.Logger,
     failure_message: str,
-) -> None:
+) -> BaseException | None:
     """Schedule a best-effort background task without affecting the route result."""
     try:
         create_task(awaitable)
-    except Exception:
+    except Exception as exc:
         close = getattr(awaitable, "close", None)
         if callable(close):
             close()
         logger.exception(failure_message)
+        return exc
+    return None
