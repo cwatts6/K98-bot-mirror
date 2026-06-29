@@ -89,17 +89,24 @@ Import pipeline status:
 - Task C Slice 5 records are archived under `archive/`:
   - `archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 5 PreKvK Import Audit Adoption.md`
   - `archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 5 PreKvK Import Audit Adoption.md`
-- Active Task C Slice 6 files:
-  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 6 Weekly Activity Import Audit Adoption.md`
-  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 6 Weekly Activity Import Audit Adoption.md`
-- Task C Slice 6 is the next import architecture cleanup slice. It starts with audit/scope and SQL
-  implementation-boundary confirmation for weekly-activity-only generic import audit adoption. It
-  preserves weekly activity route UX, embed text, file handling, importer transaction behavior,
-  duplicate behavior, output tables, telemetry/logging, SQL outputs, and user-facing behavior. MGE,
-  inventory generic audit adoption, `dbo.UPDATE_ALL2` wrapper instrumentation,
+- Task C Slice 6 Weekly Activity Import Audit Adoption is delivered in mirror PR #187 and
+  production PR #495. Production smoke testing on 2026-06-29 confirmed two completed weekly
+  activity batches correlated to `dbo.AllianceActivitySnapshotHeader` and one duplicate batch with
+  `RowsSkipped=816` and no external correlation.
+- Task C Slice 6 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 6 Weekly Activity Import Audit Adoption.md`
+  - `archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 6 Weekly Activity Import Audit Adoption.md`
+- Active Task C Slice 7 files:
+  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 7 MGE Results Import Audit Adoption.md`
+  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 7 MGE Results Import Audit Adoption.md`
+- Task C Slice 7 is the next import architecture cleanup slice. It starts with audit/scope and SQL
+  implementation-boundary confirmation for MGE-results-only generic import audit adoption. It
+  preserves MGE route UX, embed text, file handling, importer behavior, duplicate/overwrite
+  behavior, report generation, SQL outputs, telemetry/logging, and user-facing behavior. Inventory
+  generic audit adoption, `dbo.UPDATE_ALL2` wrapper instrumentation,
   `dbo.IMPORT_STAGING_PROC` decomposition, `dbo.UPDATE_ALL2` decomposition, residual
-  `stats_module.py` cleanup, and legacy PreKvK SQL cleanup remain separate later slices unless
-  explicitly approved.
+  `stats_module.py` cleanup, legacy PreKvK SQL cleanup, and weekly cumulative view cleanup remain
+  separate later slices unless explicitly approved.
 
 Player Self-Service Command Centre status:
 
@@ -233,14 +240,14 @@ Latest completed starter:
 
 Next active work:
 
-Import Pipeline Deferred Optimisation Task C Slice 6 Weekly Activity Import Audit Adoption is the
-next prepared import pipeline slice. It starts with audit/scope and SQL implementation-boundary
-confirmation for adopting generic durable audit on the weekly activity upload/import path only. MGE
-results, inventory adoption, fallback/player-location/Honor/PreKvK behavior changes,
+Import Pipeline Deferred Optimisation Task C Slice 7 MGE Results Import Audit Adoption is the next
+prepared import pipeline slice. It starts with audit/scope and SQL implementation-boundary
+confirmation for adopting generic durable audit on the MGE results upload/import path only.
+Inventory adoption, fallback/player-location/Honor/PreKvK/weekly activity behavior changes,
 route/command UX changes, queue embed changes, `dbo.UPDATE_ALL2` wrapper instrumentation,
 `dbo.IMPORT_STAGING_PROC` decomposition, `dbo.UPDATE_ALL2` decomposition, residual
-`stats_module.py` cleanup, and legacy PreKvK SQL cleanup remain separate later slices unless
-explicitly approved.
+`stats_module.py` cleanup, legacy PreKvK SQL cleanup, and weekly cumulative view cleanup remain
+separate later slices unless explicitly approved.
 
 Player Self-Service Command Centre v2 Phase 1 Stats, Profile, and Inventory Audit and Design is
 the next prepared player self-service slice. It starts with audit/scope only for `/my_stats`,

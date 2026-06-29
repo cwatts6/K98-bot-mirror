@@ -91,11 +91,20 @@ reparses the workbook for the actual database ingest.
 ## Tests
 
 - Focused route coverage lives in `tests/test_weekly_activity_upload_route.py`.
-- No dedicated unit test file exists for the weekly activity importer. Importer integration coverage
-  is exercised via manual upload testing in the development environment.
+- Weekly activity audit helper coverage lives in
+  `tests/test_weekly_activity_import_audit_service.py`.
+- Shared durable audit wrapper coverage lives in `tests/test_import_audit_service.py` and
+  `tests/test_import_audit_dal.py`.
 
 ## Delivery Notes
 
 - Phase 5B extracted weekly activity routing into `upload_routes/weekly_activity_route.py`.
 - Alliance weekly upload was smoke tested successfully on 2026-05-26 after PR 114 was merged and
   pushed to production.
+- Task C Slice 6 adopted generic durable audit for weekly activity uploads in mirror PR #187 and
+  production PR #495. Production smoke testing on 2026-06-29 confirmed two accepted imports with
+  `RowsInSource=816`, `RowsStaged=816`, `RowsWritten=816`, `RowsSkipped=0`, correlation to
+  `dbo.AllianceActivitySnapshotHeader` snapshot ids `440` and `441`, and completed parse, SQL
+  ingest, and backup phases. The duplicate smoke confirmed `Status=duplicate`,
+  `RowsInSource=816`, `RowsSkipped=816`, no external correlation, and completed parse plus
+  duplicate ingest phases.

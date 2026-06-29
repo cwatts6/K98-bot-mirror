@@ -16,18 +16,17 @@
   - Task C Slice 4, archived at `docs/task_packs/archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption.md`
   - Task C Slice 5, archived at `docs/task_packs/archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 5 PreKvK Import Audit Adoption.md`
 - One-pass approved: `no`
-- Status: `active task pack, starts with audit/scope and SQL implementation-boundary confirmation`
+- Status: `completed and archived after mirror PR #187 / production PR #495`
 
 ## 2. Objective
 
 Adopt the generic durable import audit model for the weekly alliance activity upload/import path
 after PreKvK adoption was delivered and smoke tested in Task C Slice 5.
 
-This slice must start with audit/scope only. Confirm the current weekly activity route, parser,
-importer transaction, SQL snapshot/delta/daily objects, duplicate semantics, output embeds,
-telemetry/logging, and tests before proposing implementation. The expected implementation is a
-small, behavior-preserving weekly activity audit wiring slice that reuses the existing generic
-audit DAL/service wrappers and SQL-owned audit writer procedures.
+Delivered: Task C Slice 6 started with audit/scope and SQL implementation-boundary confirmation,
+then implemented a behavior-preserving weekly activity audit wiring slice that reused the existing
+generic audit DAL/service wrappers and SQL-owned audit writer procedures. No SQL schema objects or
+weekly activity reporting-view semantic changes were introduced.
 
 ## 3. Delivered Baseline
 
@@ -150,7 +149,7 @@ Current weekly activity baseline:
 Do not lose these later slices:
 
 1. **Task C Slice 7 - MGE Results Import Audit Adoption**
-   - Validate `dbo.MGE_ResultImports.ImportId` or the current SQL equivalent.
+   - Active next slice. Validate `dbo.MGE_ResultImports.ImportId` or the current SQL equivalent.
    - Preserve event/result overwrite semantics, MGE DAL ownership, MGE upload route UX, and result
      publish/refresh behavior.
 2. **Task C Slice 8 - Inventory Generic Audit Correlation Adoption**
@@ -169,6 +168,10 @@ Do not lose these later slices:
 7. **Later SQL Cleanup - Legacy PreKvK Phase Object Retirement**
    - `dbo.PreKvk_Phases` retirement remains a separate SQL cleanup after live dependencies and
      production cycles are reviewed.
+8. **Later SQL Cleanup - `dbo.vAllianceActivity_WeeklyCumulative` Review**
+   - Weekly activity SQL validation found that this view appears to reference columns not exposed
+     by `dbo.vAllianceActivity_WeeklyDelta`; no bot usage was found. Confirm downstream/manual
+     usage before correcting or retiring it through the SQL repo process.
 
 ## 7. Required Reading
 
@@ -306,13 +309,36 @@ Manual smoke after deployment:
 
 ## 12. Acceptance Criteria
 
-- [ ] Weekly activity route/importer/SQL state surfaces are audited before implementation.
-- [ ] SQL object names, columns, and domain batch ids are validated against the SQL repo.
-- [ ] First response stops for approval before code or SQL changes.
-- [ ] Weekly activity generic audit wiring is implemented only after approval.
-- [ ] Existing weekly activity route, file, parse, SQL ingest, duplicate behavior, embeds,
+- [x] Weekly activity route/importer/SQL state surfaces are audited before implementation.
+- [x] SQL object names, columns, and domain batch ids are validated against the SQL repo.
+- [x] First response stops for approval before code or SQL changes.
+- [x] Weekly activity generic audit wiring is implemented only after approval.
+- [x] Existing weekly activity route, file, parse, SQL ingest, duplicate behavior, embeds,
   telemetry/logging, output tables, and user-facing behavior are preserved.
-- [ ] Audit writes remain best-effort.
-- [ ] Batch-level counters use the normalized Slice 3A terminal writer contract where applicable.
-- [ ] Focused weekly activity/import-audit tests pass.
-- [ ] Remaining import-audit slices and deferred SQL/Python cleanup items remain documented.
+- [x] Audit writes remain best-effort.
+- [x] Batch-level counters use the normalized Slice 3A terminal writer contract where applicable.
+- [x] Focused weekly activity/import-audit tests pass.
+- [x] Remaining import-audit slices and deferred SQL/Python cleanup items remain documented.
+
+## 13. Delivery Record
+
+- Mirror PR: `https://github.com/cwatts6/K98-bot-mirror/pull/187`
+- Production PR: `https://github.com/cwatts6/k98-bot/pull/495`
+- Main implementation files:
+  - `upload_routes/weekly_activity_route.py`
+  - `services/weekly_activity_import_audit_service.py`
+  - `upload_routes/common.py`
+  - `tests/test_weekly_activity_upload_route.py`
+  - `tests/test_weekly_activity_import_audit_service.py`
+  - `docs/reference/weekly_activity_importer.md`
+- Accepted correlation: `ExternalBatchTable=dbo.AllianceActivitySnapshotHeader`,
+  `ExternalBatchId=<SnapshotId>`.
+- Duplicate and failed-without-snapshot outcomes remain uncorrelated.
+- Production smoke testing on 2026-06-29 confirmed:
+  - batch 11 completed with `RowsInSource=816`, `RowsStaged=816`, `RowsWritten=816`,
+    `RowsSkipped=0`, `ExternalBatchId=440`;
+  - batch 12 completed with `RowsInSource=816`, `RowsStaged=816`, `RowsWritten=816`,
+    `RowsSkipped=0`, `ExternalBatchId=441`;
+  - duplicate batch 13 completed with `RowsInSource=816`, `RowsSkipped=816`, no external
+    correlation, and duplicate ingest phase.
+- Focused post-review validation: `29 passed` for weekly activity/import-audit tests.

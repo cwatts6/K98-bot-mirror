@@ -39,9 +39,15 @@ audit with `prekvk_xlsx_parse`, `prekvk_sql_ingest`, and `prekvk_post_import_ref
 correlated accepted batches to `dbo.PreKvk_Scan`, correlated duplicate/rejected batches to
 `dbo.PreKvk_ImportHistory` when available, preserved user-facing route/import behavior, and smoke
 tested accepted, duplicate, and rejected PreKvK outcomes.
+Task C Slice 6 Weekly Activity Import Audit Adoption wired the weekly activity upload/import path
+to generic durable audit with `weekly_activity_xlsx_parse`, `weekly_activity_sql_ingest`, and
+`weekly_activity_post_import_backup` phases, correlated accepted batches to
+`dbo.AllianceActivitySnapshotHeader`, left duplicate and failed-without-snapshot outcomes
+uncorrelated, preserved user-facing route/import behavior, and smoke tested completed and duplicate
+weekly activity outcomes.
 
-The active import follow-up is Task C Slice 6 in
-`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 6 Weekly Activity Import Audit Adoption.md`.
+The active import follow-up is Task C Slice 7 in
+`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 7 MGE Results Import Audit Adoption.md`.
 
 The DL_bot upload-routing and startup/lifecycle optimisation programme is complete through
 Phase 6L:
