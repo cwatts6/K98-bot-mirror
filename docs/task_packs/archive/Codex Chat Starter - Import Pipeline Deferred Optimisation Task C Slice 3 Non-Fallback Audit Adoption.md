@@ -2,10 +2,11 @@
 
 Status: archived after Task C Slice 3 delivery.
 
-Task C Slice 3 was delivered in mirror PR #183 and production PR #491. Do not reuse this starter
-for new work. Use the active Slice 3A starter for the next import audit slice:
+Task C Slice 3 was delivered in mirror PR #183 and production PR #491. Slice 3A is also complete
+and archived. Do not reuse this starter for new work. Use the active Slice 4 starter for the next
+import audit slice:
 
-`docs/task_packs/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md`
+`docs/task_packs/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption.md`
 
 The copy/paste starter below is preserved as historical execution context and still references the
 completed Slice 3 pack.

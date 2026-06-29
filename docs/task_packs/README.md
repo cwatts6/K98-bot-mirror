@@ -64,15 +64,24 @@ Import pipeline status:
 - Task C Slice 3 records are archived under `archive/`:
   - `archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3 Non-Fallback Audit Adoption.md`
   - `archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 3 Non-Fallback Audit Adoption.md`
-- Active Task C Slice 3A files:
-  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md`
-  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md`
-- Task C Slice 3A is the next import architecture cleanup slice. It resolves the explicitly
-  deferred `RowsInSource` writer-procedure/DAL normalization before broader Honor, PreKvK, weekly
-  activity, MGE, and inventory audit adoption continue. It keeps route/command UX changes, queue
-  embed changes, fallback behavior changes, `dbo.UPDATE_ALL2` wrapper instrumentation,
-  `dbo.IMPORT_STAGING_PROC` decomposition, and `dbo.UPDATE_ALL2` decomposition behind explicit
-  approval.
+- Task C Slice 3A Import Audit Batch Counter Normalization is delivered in mirror PR #184,
+  production PR #492, and SQL PR #24. SQL deployment completed before bot rollout. Production smoke
+  testing on 2026-06-29 confirmed fallback batch 5 completed with `RowsInSource=374` and
+  player-location batch 6 completed with `RowsInSource=302`; earlier pre-update rows retained
+  `RowsInSource=NULL`, confirming no historical backfill.
+- Task C Slice 3A records are archived under `archive/`:
+  - `archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md`
+  - `archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md`
+- Active Task C Slice 4 files:
+  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption.md`
+  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption.md`
+- Task C Slice 4 is the next import architecture cleanup slice. It starts with audit/scope and SQL
+  implementation-boundary confirmation for Honor-only generic import audit adoption. It preserves
+  Honor route UX, embed text, file handling, importer transaction behavior, ranking refresh,
+  telemetry, SQL outputs, and user-facing behavior. PreKvK, weekly activity, MGE, inventory generic
+  audit adoption, `dbo.UPDATE_ALL2` wrapper instrumentation, `dbo.IMPORT_STAGING_PROC`
+  decomposition, `dbo.UPDATE_ALL2` decomposition, and residual `stats_module.py` cleanup remain
+  separate later slices unless explicitly approved.
 
 Player Self-Service Command Centre status:
 
@@ -206,13 +215,13 @@ Latest completed starter:
 
 Next active work:
 
-Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization is
-the next prepared import pipeline slice. It starts with audit/scope and SQL implementation-boundary
-confirmation for normalizing batch-level `RowsInSource` through SQL-owned terminal writer
-procedures and bot DAL/service wrappers. Honor, PreKvK, weekly activity, MGE, inventory adoption,
-fallback behavior changes, route/command UX changes, queue embed changes, `dbo.UPDATE_ALL2`
-wrapper instrumentation, `dbo.IMPORT_STAGING_PROC` decomposition, and `dbo.UPDATE_ALL2`
-decomposition remain separate later slices unless explicitly approved.
+Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption is the next
+prepared import pipeline slice. It starts with audit/scope and SQL implementation-boundary
+confirmation for adopting generic durable audit on the KVK Honor upload/import path only. PreKvK,
+weekly activity, MGE, inventory adoption, fallback/player-location behavior changes, route/command
+UX changes, queue embed changes, `dbo.UPDATE_ALL2` wrapper instrumentation,
+`dbo.IMPORT_STAGING_PROC` decomposition, and `dbo.UPDATE_ALL2` decomposition remain separate later
+slices unless explicitly approved.
 
 Player Self-Service Command Centre v2 Phase 1 Stats, Profile, and Inventory Audit and Design is
 the next prepared player self-service slice. It starts with audit/scope only for `/my_stats`,

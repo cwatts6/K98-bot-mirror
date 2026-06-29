@@ -3,9 +3,9 @@
 Archived on 2026-06-29 after Task C audit and approved Slice 1 service/DAL wrapper extraction
 completed in mirror PR #181 and production PR #489. Do not use this starter for new work.
 
-Slice 2 and Slice 3 are complete and archived. Use the active Slice 3A starter instead:
+Slice 2, Slice 3, and Slice 3A are complete and archived. Use the active Slice 4 starter instead:
 
-`docs/task_packs/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md`
+`docs/task_packs/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption.md`
 
 Use this starter to begin Task C with audit/scope only. Do not implement until the audit confirms
 the architecture slices and Chris approves the implementation plan.

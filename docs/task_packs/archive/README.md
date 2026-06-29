@@ -26,10 +26,13 @@ DAL/service wrappers, and fallback-first audit wiring correlated to `dbo.Fallbac
 without changing route, command, queue, staging, SQL procedure, or import output behavior. Task C
 Slice 3 Non-Fallback Audit Adoption mapped location, Honor, PreKvK, weekly activity, MGE, and
 inventory import state surfaces, then wired player-location generic audit for the auto
-`scan_1198.csv` route and `/location import` command merge path.
+`scan_1198.csv` route and `/location import` command merge path. Task C Slice 3A Import Audit
+Batch Counter Normalization added optional `RowsInSource` support to SQL-owned terminal audit
+writer procedures, threaded it through bot DAL/service wrappers, and smoke tested normalized
+fallback and player-location batch counters without historical backfill.
 
-The active import follow-up is Task C Slice 3A in
-`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md`.
+The active import follow-up is Task C Slice 4 in
+`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption.md`.
 
 The DL_bot upload-routing and startup/lifecycle optimisation programme is complete through
 Phase 6L:

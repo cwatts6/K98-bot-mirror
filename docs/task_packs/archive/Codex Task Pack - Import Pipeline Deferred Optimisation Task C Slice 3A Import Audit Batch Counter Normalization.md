@@ -13,7 +13,55 @@
   - Task C Slice 2, archived at `docs/task_packs/archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation.md`
   - Task C Slice 3, archived at `docs/task_packs/archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3 Non-Fallback Audit Adoption.md`
 - One-pass approved: `no`
-- Status: `active task pack, starts with audit/scope and SQL implementation-boundary confirmation`
+- Status: `archived after Task C Slice 3A delivery`
+
+## Delivery Summary
+
+Task C Slice 3A was delivered in mirror PR #184, production PR #492, and SQL PR #24. It completed
+the deferred batch-level `RowsInSource` normalization item before the remaining generic import
+audit adoption slices continue.
+
+Delivered SQL:
+
+- Added optional `@RowsInSource int = NULL` support to the SQL-owned terminal writer procedures:
+  - `dbo.usp_ImportAudit_CompleteBatch`
+  - `dbo.usp_ImportAudit_FailBatch`
+- Appended the optional parameter to preserve existing positional caller compatibility.
+- Kept updates SQL-owned and non-invasive: terminal writers only update
+  `dbo.ImportAuditBatch.RowsInSource` when a non-NULL value is supplied.
+- Excluded historical production backfill.
+
+Delivered bot changes:
+
+- Threaded optional `rows_in_source` through `stats/dal/import_audit_dal.py` and
+  `services/import_audit_service.py`.
+- Populated batch-level `RowsInSource` for the already wired fallback and player-location generic
+  audit paths when the source row count is known.
+- Preserved route, command, queue, embed, file, staging, SQL import procedure output, cache
+  refresh, and user-facing behavior.
+- Kept audit writes best-effort.
+
+Validation and smoke evidence:
+
+- SQL repo validation passed after the terminal writer procedure update.
+- Focused audit/location tests passed.
+- Full bot pytest passed: `2085 passed, 2 skipped`.
+- Architecture validator, deferred validator, selected-test review, smoke imports, command
+  registration validation, pytest log-noise validation, and Codex Security diff review completed
+  during PR preparation.
+- Production smoke testing on 2026-06-29 confirmed:
+  - fallback full import batch 5 completed with `RowsInSource=374`, `RowsStaged=374`, and
+    `RowsWritten=374`;
+  - player-location auto import batch 6 completed with `RowsInSource=302`, `RowsStaged=302`,
+    `RowsWritten=302`, and `RowsSkipped=0`;
+  - earlier pre-update production batches retained `RowsInSource=NULL`, confirming no historical
+    backfill was performed;
+  - phase counters and details JSON remained intact for fallback and player-location imports.
+
+Next slice:
+
+- `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption.md`
+- `docs/task_packs/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption.md`
 
 ## 2. Objective
 

@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Import Pipeline Task C Slice 3A Completed Item
+- Area: `services/import_audit_service.py`, `stats/dal/import_audit_dal.py`, `services/fallback_import_service.py`, `stats_module.py`, `services/location_import_service.py`, `upload_routes/player_location_route.py`, SQL repo `dbo.usp_ImportAudit_CompleteBatch`, SQL repo `dbo.usp_ImportAudit_FailBatch`
+- Type: consistency
+- Description: Task C Slice 2 and Task C Slice 3 created durable generic audit batches and phases for fallback and player-location imports, but batch-level `RowsInSource` remained `NULL` when the source row count was known only after `dbo.usp_ImportAudit_StartBatch`. The count existed in phase counters and details JSON, but future audit consumers would have needed import-kind-specific JSON parsing for a basic batch counter.
+- Resolution: Task C Slice 3A added optional `@RowsInSource int = NULL` support to SQL-owned terminal writer procedures `dbo.usp_ImportAudit_CompleteBatch` and `dbo.usp_ImportAudit_FailBatch`, appended the optional parameter for caller compatibility, and kept the update SQL-owned and non-invasive by only setting `RowsInSource` when a non-NULL value is supplied. Bot DAL/service wrappers now accept optional `rows_in_source`, and already wired fallback and player-location callers pass the known source count at terminal completion/failure time. Route, command, queue, embed, file, staging, SQL import procedure output, cache refresh, and user-facing behavior were preserved. No historical production backfill was performed.
+- Validation: Completed in mirror PR #184, production PR #492, and SQL PR #24. SQL deployment completed before bot rollout. Automated validation included SQL repo validation, focused audit/location tests, full pytest (`2085 passed, 2 skipped`), architecture and deferred validators, selected-test review, smoke imports, command registration validation, pytest log-noise validation, and Codex Security review. Production smoke testing on 2026-06-29 confirmed fallback batch 5 completed with `RowsInSource=374`, `RowsStaged=374`, and `RowsWritten=374`; player-location batch 6 completed with `RowsInSource=302`, `RowsStaged=302`, `RowsWritten=302`, and `RowsSkipped=0`; earlier pre-update audit batches retained `RowsInSource=NULL`, confirming no historical backfill.
+
 ### Import Pipeline Task C Slice 3 Completed Item
 - Area: `upload_routes/player_location_route.py`, `services/location_import_service.py`, `commands/location_cmds.py`, `services/import_audit_service.py`, `stats/dal/import_audit_dal.py`
 - Type: consistency

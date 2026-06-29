@@ -15,10 +15,10 @@ Completion record:
 - The Task A ASCII-safe text workaround was replaced with Unicode-preserving fallback CSV text
   formatting backed by SQL raw staging.
 - The broader import architecture cleanup was promoted to Task C Slice 1 and completed in mirror
-  PR #181 / production PR #489. Task C Slice 2 durable audit foundation and Task C Slice 3
-  player-location audit adoption are also complete and archived. The active follow-up is Task C
-  Slice 3A:
-  `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md`.
+  PR #181 / production PR #489. Task C Slice 2 durable audit foundation, Task C Slice 3
+  player-location audit adoption, and Task C Slice 3A batch-counter normalization are also
+  complete and archived. The active follow-up is Task C Slice 4:
+  `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption.md`.
 
 ## 1. Task Header
 

@@ -63,10 +63,10 @@ Validation completed during PR preparation:
 - Review feedback fixed the `now_fn` typing annotation and an adjacent Pyright narrowing issue;
   follow-up validation reported `0 errors` with only environment missing-import warnings.
 
-The remaining Task C work was promoted into Slice 2 and later deferred optimisation items. Slice 2
-and Slice 3 are complete and archived. The active follow-up is:
+The remaining Task C work was promoted into Slice 2 and later deferred optimisation items. Slice 2,
+Slice 3, and Slice 3A are complete and archived. The active follow-up is:
 
-`docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md`
+`docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption.md`
 
 ## 4. Task C Purpose
 

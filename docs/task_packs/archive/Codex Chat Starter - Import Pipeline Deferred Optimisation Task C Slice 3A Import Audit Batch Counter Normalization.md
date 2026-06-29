@@ -1,18 +1,22 @@
 # Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization
 
-Use this starter to begin Task C Slice 3A after Task C Slice 3 player-location audit adoption is
-merged, deployed, and smoke tested.
+Task C Slice 3A is complete and archived. Use the active Slice 4 starter for new import-audit
+work:
+
+`docs/task_packs/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 4 Honor Import Audit Adoption.md`
+
+Historical starter content follows.
 
 ```markdown
 # Files mentioned by the user:
 
-## Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md: C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md
+## Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md: C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md
 
 ## My request for Codex:
 Begin Task C Slice 3A - Import Pipeline Deferred Optimisation: Import Audit Batch Counter Normalization.
 
 Use the task pack:
-C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md
+C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md
 
 Completed dependencies:
 - Task A:
