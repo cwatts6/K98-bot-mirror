@@ -211,12 +211,6 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                 ),
                 set_batch_status="duplicate",
             )
-            await deps.send_embed(
-                target_ch,
-                "Alliance Activity Import",
-                {"Status": "Duplicate detected for this week. Skipped."},
-                0xF1C40F,
-            )
             await deps.complete_audit_batch(
                 audit_ref,
                 status="duplicate",
@@ -232,6 +226,15 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                 ),
             )
             audit_terminal_recorded = True
+            try:
+                await deps.send_embed(
+                    target_ch,
+                    "Alliance Activity Import",
+                    {"Status": "Duplicate detected for this week. Skipped."},
+                    0xF1C40F,
+                )
+            except Exception:
+                logger.exception("weekly_activity_duplicate_notification_failed")
         else:
             external_batch_id = weekly_activity_external_batch_id(snap_id)
             await deps.record_audit_phase(
@@ -250,13 +253,13 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                 ),
                 set_batch_status="staged",
             )
+            backup_started = deps.now_utc()
             backup_schedule_error = schedule_best_effort(
                 deps.create_task,
                 deps.trigger_log_backup_background(),
                 logger,
                 "Failed to schedule background log-backup trigger",
             )
-            backup_started = deps.now_utc()
             backup_phase_status = "failed" if backup_schedule_error is not None else "completed"
             await deps.record_audit_phase(
                 audit_ref,
@@ -279,9 +282,7 @@ async def handle_weekly_activity_upload(message: Any, deps: WeeklyActivityRouteD
                     rows_parsed=rows_parsed,
                     snapshot_id=snap_id,
                     delta_rows=row_count,
-                    error=str(backup_schedule_error)
-                    if backup_schedule_error is not None
-                    else None,
+                    error=str(backup_schedule_error) if backup_schedule_error is not None else None,
                 ),
             )
             await deps.complete_audit_batch(

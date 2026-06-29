@@ -273,6 +273,24 @@ async def test_weekly_activity_route_duplicate_preserves_minimal_embed():
 
 
 @pytest.mark.asyncio
+async def test_weekly_activity_route_duplicate_embed_failure_keeps_duplicate_completed():
+    deps, sent, _offloads, created, _preflight, audit = _deps(
+        offload_result=(0, 0),
+        send_exception=RuntimeError("discord down"),
+    )
+
+    handled = await route.handle_weekly_activity_upload(_message(), deps)
+
+    assert handled is True
+    assert created == []
+    assert len(sent) == 1
+    assert sent[-1][1] == "Alliance Activity Import"
+    assert audit["completed"][-1][1]["status"] == "duplicate"
+    assert audit["completed"][-1][1]["rows_skipped"] == 7
+    assert audit["failed"] == []
+
+
+@pytest.mark.asyncio
 async def test_weekly_activity_route_backup_schedule_failure_keeps_import_completed():
     deps, sent, _offloads, created, _preflight, audit = _deps(
         create_task_exception=RuntimeError("scheduler down")
