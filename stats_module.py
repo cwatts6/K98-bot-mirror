@@ -20,12 +20,9 @@ Apply this file in place of the existing stats_module.py.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
-import shutil
 
-import pandas as pd
 import pyodbc
 
 logger = logging.getLogger(__name__)
@@ -34,16 +31,23 @@ telemetry_logger = logging.getLogger("telemetry")
 from constants import DOWNLOAD_FOLDER, _conn_trusted
 from file_utils import (  # run_step/run_blocking_in_thread imported dynamically later
     emit_telemetry_event,
-    fetch_one_dict,
 )
-from services.fallback_import_schema import (
-    INTERIM_AUTO_PARTIAL_SNAPSHOT,
-    detect_fallback_source_type,
-    normalize_fallback_dataframe,
-    prepare_fallback_csv_dataframe,
+from services.fallback_import_service import (
+    FallbackImportPaths,
+    archive_secondary_file,
+    delete_import_metadata,
+    load_import_metadata,
+    process_fallback_source_file,
+    read_source_dataframe,
+    robust_move,
+)
+from stats.dal.fallback_import_dal import (
+    fetch_latest_fallback_snapshot,
+    fetch_update_all2_last_counter,
+    fetch_update_all2_status,
+    record_fallback_import_control,
 )
 from update_all2_log_manager import execute_update_all2_with_log_management
-from utils import utcnow
 
 SOURCE_FILE_2 = os.path.join(DOWNLOAD_FOLDER, "stats.xlsx")
 ARCHIVE_DIR_1 = os.path.join(DOWNLOAD_FOLDER, "Databook_Archive")
@@ -56,218 +60,61 @@ WAIT_SECONDS = 15
 MAX_RETRIES = 10
 
 
+def _fallback_import_paths() -> FallbackImportPaths:
+    return FallbackImportPaths(
+        download_folder=DOWNLOAD_FOLDER,
+        source_file_2=SOURCE_FILE_2,
+        archive_dir_1=ARCHIVE_DIR_1,
+        archive_dir_2=ARCHIVE_DIR_2,
+        csv_file_path=CSV_FILE_PATH,
+        import_metadata_file_path=IMPORT_METADATA_FILE_PATH,
+    )
+
+
 def _robust_move(src, dst):
-    try:
-        shutil.move(src, dst)
-    except Exception:
-        shutil.copy2(src, dst)
-        try:
-            os.remove(src)
-        except Exception:
-            pass
+    return robust_move(src, dst)
 
 
-def _read_source_dataframe(source_filepath: str) -> pd.DataFrame:
-    ext = os.path.splitext(source_filepath)[1].lower()
-    if ext == ".csv":
-        return pd.read_csv(source_filepath, encoding="utf-8-sig")
-
-    with pd.ExcelFile(source_filepath, engine="openpyxl") as xf:
-        sheet_name = "Data" if "Data" in xf.sheet_names else xf.sheet_names[-1]
-        return pd.read_excel(xf, sheet_name=sheet_name, engine="openpyxl")
+def _read_source_dataframe(source_filepath: str):
+    return read_source_dataframe(source_filepath)
 
 
-def _fetch_latest_fallback_snapshot() -> pd.DataFrame:
-    """Read the latest full stats snapshot so interim partial imports can overlay safely."""
-    query = """
-        SELECT
-            GovernorID AS [Governor ID],
-            GovernorName AS [Name],
-            [Power],
-            Alliance,
-            T1_Kills AS [T1-Kills],
-            T2_Kills AS [T2-Kills],
-            T3_Kills AS [T3-Kills],
-            T4_Kills AS [T4-Kills],
-            T5_Kills AS [T5-Kills],
-            KillPoints AS [Total Kill Points],
-            Deads AS [Dead Troops],
-            HealedTroops AS [Healed Troops],
-            RSSASSISTANCE AS [Rss Assistance],
-            Helps AS [Alliance Helps],
-            Rss_Gathered AS [Rss Gathered],
-            [City Hall],
-            [Troops Power],
-            [Tech Power],
-            [Building Power],
-            [Commander Power],
-            Civilization,
-            AutarchTimes AS [Autarch Times],
-            RangedPoints AS [Ranged Points],
-            KvKPlayed AS [KvK Played],
-            MostKvKKill AS [Most KvK Kill],
-            MostKvKDead AS [Most KvK Dead],
-            MostKvKHeal AS [Most KvK Heal],
-            Acclaim,
-            HighestAcclaim AS [Highest Acclaim],
-            AOOJoined AS [AOO Joined],
-            AOOWon AS [AOO Won],
-            AOOAvgKill AS [AOO Avg Kill],
-            AOOAvgDead AS [AOO Avg Dead],
-            AOOAvgHeal AS [AOO Avg Heal],
-            Conduct AS [Credit]
-        FROM dbo.KingdomScanData4 WITH (NOLOCK)
-        WHERE SCANORDER = (
-            SELECT TOP (1) SCANORDER
-            FROM dbo.KingdomScanData4 WITH (NOLOCK)
-            ORDER BY SCANORDER DESC
-        );
-    """
-    with _conn_trusted() as conn:
-        cur = conn.cursor()
-        cur.execute(query)
-        cols = [d[0] for d in cur.description]
-        return pd.DataFrame.from_records(cur.fetchall(), columns=cols)
+def _fetch_latest_fallback_snapshot():
+    return fetch_latest_fallback_snapshot(_conn_trusted)
 
 
 def _write_import_metadata(metadata: dict) -> None:
-    os.makedirs(os.path.dirname(IMPORT_METADATA_FILE_PATH), exist_ok=True)
-    with open(IMPORT_METADATA_FILE_PATH, "w", encoding="utf-8") as handle:
-        json.dump(metadata, handle, ensure_ascii=False, indent=2)
+    from services.fallback_import_service import write_import_metadata
+
+    write_import_metadata(metadata, IMPORT_METADATA_FILE_PATH)
 
 
 def _load_import_metadata() -> dict:
-    try:
-        with open(IMPORT_METADATA_FILE_PATH, encoding="utf-8") as handle:
-            data = json.load(handle)
-            return data if isinstance(data, dict) else {}
-    except FileNotFoundError:
-        return {}
-    except Exception:
-        logger.debug("[EXCEL] Failed to read import metadata sidecar", exc_info=True)
-        return {}
+    return load_import_metadata(IMPORT_METADATA_FILE_PATH)
 
 
 def _delete_import_metadata() -> None:
-    try:
-        os.remove(IMPORT_METADATA_FILE_PATH)
-    except FileNotFoundError:
-        return
-    except Exception:
-        logger.debug("[EXCEL] Failed to remove consumed import metadata sidecar", exc_info=True)
+    delete_import_metadata(IMPORT_METADATA_FILE_PATH)
 
 
 def _record_fallback_import_control(cur, metadata: dict) -> None:
-    if not metadata:
-        return
-
-    source_type = str(metadata.get("source_type") or "")
-    cur.execute("SELECT OBJECT_ID(N'dbo.FallbackImportBatchControl', N'U') AS ObjectId;")
-    row = fetch_one_dict(cur)
-    if not row or row.get("ObjectId") is None:
-        if source_type == INTERIM_AUTO_PARTIAL_SNAPSHOT:
-            raise RuntimeError(
-                "dbo.FallbackImportBatchControl is required before interim partial imports."
-            )
-        logger.warning(
-            "[EXCEL] FallbackImportBatchControl missing; continuing without SQL metadata."
-        )
-        return
-
-    cur.execute(
-        """
-        INSERT INTO dbo.FallbackImportBatchControl
-            (SourceType, SourceFilename, ScoreHeader, ColumnsPresentJson, RowsInSource, RowsWritten)
-        VALUES (?, ?, ?, ?, ?, ?);
-        """,
-        source_type or None,
-        metadata.get("source_filename"),
-        metadata.get("score_header"),
-        json.dumps(metadata.get("columns_present") or [], ensure_ascii=False),
-        int(metadata.get("rows_in_source") or 0),
-        int(metadata.get("rows_written") or 0),
-    )
+    record_fallback_import_control(cur, metadata)
 
 
 # === Excel Processing ===
 def process_excel_file(source_filepath):
-    if not os.path.isfile(source_filepath):
-        logger.error(f"[EXCEL] Source file does not exist: {source_filepath}")
-        return False, f"[ERROR] Source file not found: {source_filepath}", None
-
-    try:
-        logger.info(f"[EXCEL] Processing {source_filepath}")
-        source_df = _read_source_dataframe(source_filepath)
-        source_type = detect_fallback_source_type(source_df)
-        latest_rows = (
-            _fetch_latest_fallback_snapshot()
-            if source_type == INTERIM_AUTO_PARTIAL_SNAPSHOT
-            else None
-        )
-        normalized = normalize_fallback_dataframe(
-            source_df,
-            source_filename=os.path.basename(source_filepath),
-            latest_rows=latest_rows,
-        )
-        df = normalized.dataframe
-        metadata = normalized.metadata.as_json_dict()
-        _write_import_metadata(metadata)
-
-        credit_non_null = int(pd.to_numeric(df["Credit"], errors="coerce").notna().sum())
-        logger.info(
-            "[EXCEL] Fallback import source_type=%s score_header=%s rows_in_source=%d rows_written=%d credit_non_null=%d",
-            normalized.metadata.source_type,
-            normalized.metadata.score_header,
-            normalized.metadata.rows_in_source,
-            normalized.metadata.rows_written,
-            credit_non_null,
-        )
-
-        output_path = os.path.join(DOWNLOAD_FOLDER, "stats.xlsx")
-        df.to_excel(output_path, index=False, engine="openpyxl")
-        if not os.path.isfile(output_path):
-            logger.error(f"[EXCEL] to_excel reported no error but file missing: {output_path}")
-            return False, f"[ERROR] Failed to write Excel to {output_path}", None
-        else:
-            logger.info(f"[EXCEL] Wrote Excel -> {output_path}")
-
-        os.makedirs(ARCHIVE_DIR_1, exist_ok=True)
-        base_name, ext = os.path.splitext(os.path.basename(source_filepath))
-        timestamp_str = utcnow().strftime("%Y-%m-%d_%H%M")
-        archive_path = os.path.join(ARCHIVE_DIR_1, f"{base_name}_{timestamp_str}{ext}")
-        _robust_move(source_filepath, archive_path)
-        logger.info(f"[EXCEL] Archived original -> {archive_path}")
-
-        csv_df = prepare_fallback_csv_dataframe(df)
-        csv_df.to_csv(CSV_FILE_PATH, index=False, encoding="utf-8-sig")
-        if not os.path.isfile(CSV_FILE_PATH):
-            logger.error(f"[EXCEL] Failed to write CSV to {CSV_FILE_PATH}")
-            return False, f"[ERROR] Failed to write CSV to {CSV_FILE_PATH}", None
-        else:
-            logger.info(f"[EXCEL] Wrote CSV -> {CSV_FILE_PATH}")
-
-        return True, "[INFO] Excel processed successfully.", None
-
-    except Exception as e:
-        logger.exception(f"[EXCEL] Excel processing failed for {source_filepath}: {e}")
-        return False, f"[ERROR] Excel processing failed: {e}", None
+    return process_fallback_source_file(
+        source_filepath,
+        paths=_fallback_import_paths(),
+        fetch_latest_snapshot=_fetch_latest_fallback_snapshot,
+        read_dataframe=_read_source_dataframe,
+        move_file=_robust_move,
+    )
 
 
 # === Archive second file ===
 def archive_second_file():
-    if not os.path.isfile(SOURCE_FILE_2):
-        return False, f"[ERROR] Second source file not found: {SOURCE_FILE_2}", None
-
-    try:
-        os.makedirs(ARCHIVE_DIR_2, exist_ok=True)
-        base_name, ext = os.path.splitext(os.path.basename(SOURCE_FILE_2))
-        timestamp_str = utcnow().strftime("%Y-%m-%d_%H%M")
-        archive_path = os.path.join(ARCHIVE_DIR_2, f"{base_name}_{timestamp_str}{ext}")
-        _robust_move(SOURCE_FILE_2, archive_path)
-        return True, "[INFO] Second file archived.", None
-    except Exception as e:
-        logger.exception("Archiving second file failed: %s", e)
-        return False, f"[ERROR] Archiving second file failed: {e}", None
+    return archive_secondary_file(paths=_fallback_import_paths(), move_file=_robust_move)
 
 
 # ---- Helpers to handle offload return shapes ---------------------------------
@@ -357,13 +204,7 @@ async def run_sql_procedure(
             except Exception:
                 pass
 
-            cur.execute(
-                "SELECT ISNULL(MAX(LastRunCounter), 0) AS LastRunCounter "
-                "FROM SP_TaskStatus WHERE TaskName = ?",
-                TASK_NAME,
-            )
-            row = fetch_one_dict(cur)
-            original_counter = int(row.get("LastRunCounter", 0) if row else 0) or 0
+            original_counter = fetch_update_all2_last_counter(cur, TASK_NAME)
             expected_counter = original_counter + 1
             logger.info(f"[SQL_PROC] Executing procedure with expected counter: {expected_counter}")
 
@@ -471,17 +312,7 @@ async def run_sql_procedure(
         await asyncio.sleep(WAIT_SECONDS)
 
         def _read_status():
-            with _conn_trusted() as conn:
-                cur = conn.cursor()
-                cur.execute(
-                    "SELECT "
-                    "MAX(LastRunCounter) AS LastRunCounter, "
-                    "MAX(LastRunTime)    AS LastRunTime, "
-                    "MAX(DurationSeconds) AS DurationSeconds "
-                    "FROM SP_TaskStatus WHERE TaskName = ?",
-                    TASK_NAME,
-                )
-                return fetch_one_dict(cur)
+            return fetch_update_all2_status(_conn_trusted, TASK_NAME)
 
         try:
             row = await _offload_callable_py(
