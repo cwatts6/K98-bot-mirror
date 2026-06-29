@@ -70,6 +70,8 @@ def _deps(**overrides):
         return overrides.get("notify_channel")
 
     async def send_embed(ch, title, fields, color, mention=None):
+        if "send_embed" in overrides:
+            return await overrides["send_embed"](ch, title, fields, color, mention=mention)
         sent.append((ch, title, fields, color, mention))
 
     async def ensure_sql_headroom_or_notify(ch):
@@ -236,6 +238,34 @@ async def test_player_location_route_records_replace_audit(monkeypatch):
     assert audit_calls[-1][0] == "complete"
     assert audit_calls[-1][2]["rows_staged"] == 3
     assert audit_calls[-1][2]["rows_written"] == 3
+
+
+@pytest.mark.asyncio
+async def test_player_location_route_completes_audit_before_success_notification(monkeypatch):
+    rows = [(1, "A", 0, 0, 1, "TAG", 10, 20)]
+    audit_calls = []
+    sent_titles = []
+
+    async def _complete(batch_ref, **kwargs):
+        audit_calls.append(("complete", batch_ref, kwargs))
+
+    async def _send_embed(_ch, title, _fields, _color, mention=None):
+        sent_titles.append(title)
+        if "✅" in title:
+            raise RuntimeError("notify failed")
+
+    monkeypatch.setattr(route, "parse_output_csv", lambda _bytes: rows)
+    monkeypatch.setattr(route, "signal_location_refresh_complete", lambda: None)
+    monkeypatch.setattr(route, "complete_location_audit_batch", _complete)
+    deps, _sent, _offloads, _created = _deps(send_embed=_send_embed)
+
+    handled = await route.handle_player_location_upload(_message(), deps)
+
+    assert handled is True
+    assert audit_calls[0][0] == "complete"
+    assert audit_calls[0][2]["rows_staged"] == 3
+    assert audit_calls[0][2]["details"]["terminal_before_discord_notification"] is True
+    assert any("Player Location Import ❌" == title for title in sent_titles)
 
 
 @pytest.mark.asyncio

@@ -121,6 +121,7 @@ async def test_import_location_csv_bytes_formats_success_and_signals_refresh():
 @pytest.mark.asyncio
 async def test_import_location_csv_bytes_records_merge_audit(monkeypatch):
     calls = []
+    runner_functions = []
 
     def _start(**kwargs):
         calls.append(("start", kwargs))
@@ -135,6 +136,7 @@ async def test_import_location_csv_bytes_records_merge_audit(monkeypatch):
         return True
 
     async def _runner(func, *args, **kwargs):
+        runner_functions.append(func.__name__)
         return func(*args, **kwargs)
 
     async def _thread_runner(func, rows):
@@ -161,6 +163,7 @@ async def test_import_location_csv_bytes_records_merge_audit(monkeypatch):
     )
 
     assert result.ok is True
+    assert runner_functions[0] == "_start_location_audit_batch_sync"
     assert calls[0][0] == "start"
     assert calls[0][1]["import_kind"] == "player_location"
     assert calls[0][1]["source_type"] == "discord_upload_csv"
@@ -199,12 +202,23 @@ async def test_import_location_csv_bytes_preserves_success_when_audit_fails(monk
 
 
 @pytest.mark.asyncio
-async def test_import_location_csv_bytes_preserves_success_when_refresh_signal_fails():
+async def test_import_location_csv_bytes_preserves_success_when_refresh_signal_fails(monkeypatch):
+    complete_calls = []
+
+    def _complete(batch_ref, **kwargs):
+        complete_calls.append((batch_ref, kwargs))
+        return True
+
+    async def _audit_runner(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
     async def _thread_runner(func, rows):
         return func(rows)
 
     def _signal():
         raise RuntimeError("signal failed")
+
+    monkeypatch.setattr(svc.import_audit_service, "complete_batch_best_effort", _complete)
 
     result = await svc.import_location_csv_bytes(
         b"csv",
@@ -213,10 +227,12 @@ async def test_import_location_csv_bytes_preserves_success_when_refresh_signal_f
         merge_rows=lambda _rows: (2, 50),
         thread_runner=_thread_runner,
         on_success=_signal,
+        audit_runner=_audit_runner,
     )
 
     assert result.ok is True
     assert "Imported **2** rows." in result.message
+    assert complete_calls[-1][1]["status"] == "failed"
 
 
 def test_parse_output_csv_skips_bad_rows_and_keeps_valid_rows():

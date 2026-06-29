@@ -93,6 +93,22 @@ def _sha256_hex(content: bytes | None) -> str | None:
         return None
 
 
+def _start_location_audit_batch_sync(
+    context: LocationImportAuditContext,
+    csv_bytes: bytes | None,
+):
+    return import_audit_service.start_batch_best_effort(
+        import_kind=LOCATION_AUDIT_IMPORT_KIND,
+        source_type=LOCATION_AUDIT_SOURCE_TYPE,
+        source_filename=context.source_filename,
+        source_file_hash_sha256=_sha256_hex(csv_bytes),
+        source_message_id=context.source_message_id,
+        source_channel_id=context.source_channel_id,
+        actor_discord_id=context.actor_discord_id,
+        details=_audit_details(context),
+    )
+
+
 def _audit_details(
     context: LocationImportAuditContext,
     *,
@@ -124,15 +140,9 @@ async def start_location_audit_batch(
 ):
     try:
         return await audit_runner(
-            import_audit_service.start_batch_best_effort,
-            import_kind=LOCATION_AUDIT_IMPORT_KIND,
-            source_type=LOCATION_AUDIT_SOURCE_TYPE,
-            source_filename=context.source_filename,
-            source_file_hash_sha256=_sha256_hex(csv_bytes),
-            source_message_id=context.source_message_id,
-            source_channel_id=context.source_channel_id,
-            actor_discord_id=context.actor_discord_id,
-            details=_audit_details(context),
+            _start_location_audit_batch_sync,
+            context,
+            csv_bytes,
         )
     except Exception:
         logger.warning("location_audit_start_failed; continuing import", exc_info=True)
@@ -181,6 +191,7 @@ async def record_location_audit_phase(
 async def complete_location_audit_batch(
     batch_ref,
     *,
+    status: str = "completed",
     rows_staged: int | None = None,
     rows_written: int | None = None,
     rows_skipped: int | None = None,
@@ -193,6 +204,7 @@ async def complete_location_audit_batch(
         await audit_runner(
             import_audit_service.complete_batch_best_effort,
             batch_ref,
+            status=status,
             rows_staged=rows_staged,
             rows_written=rows_written,
             rows_skipped=rows_skipped,
@@ -426,6 +438,7 @@ async def import_location_csv_bytes(
 
     await complete_location_audit_batch(
         audit_ref,
+        status="failed" if refresh_failed else "completed",
         rows_staged=staging_rows,
         rows_written=staging_rows,
         rows_skipped=max(0, len(rows) - int(staging_rows or 0)),

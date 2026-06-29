@@ -221,6 +221,21 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
             set_batch_status="staged",
         )
 
+        await complete_location_audit_batch(
+            audit_ref,
+            rows_staged=staging_rows,
+            rows_written=staging_rows,
+            rows_skipped=max(0, len(rows) - int(staging_rows or 0)),
+            details={
+                "entry_point": audit_context.entry_point,
+                "sql_operation": audit_context.sql_operation,
+                "rows_parsed": len(rows),
+                "staging_rows": staging_rows,
+                "total_tracked": total_tracked,
+                "terminal_before_discord_notification": True,
+            },
+        )
+
         await deps.send_embed(
             target_ch,
             "Player Location Import ✅",
