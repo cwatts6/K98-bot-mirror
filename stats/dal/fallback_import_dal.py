@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import json
 import logging
-from typing import Any, Callable
+from typing import Any
 
 import pandas as pd
 

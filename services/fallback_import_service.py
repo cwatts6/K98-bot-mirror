@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 import json
 import logging
 import os
 import shutil
-from typing import Callable
 
 import pandas as pd
 
@@ -99,9 +99,7 @@ def process_fallback_source_file(
         source_df = read_dataframe(source_filepath)
         source_type = detect_fallback_source_type(source_df)
         latest_rows = (
-            fetch_latest_snapshot()
-            if source_type == INTERIM_AUTO_PARTIAL_SNAPSHOT
-            else None
+            fetch_latest_snapshot() if source_type == INTERIM_AUTO_PARTIAL_SNAPSHOT else None
         )
         normalized = normalize_fallback_dataframe(
             source_df,
