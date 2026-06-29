@@ -236,6 +236,7 @@ async def test_player_location_route_records_replace_audit(monkeypatch):
         "location_post_import_refresh",
     ]
     assert audit_calls[-1][0] == "complete"
+    assert audit_calls[-1][2]["rows_in_source"] == 1
     assert audit_calls[-1][2]["rows_staged"] == 3
     assert audit_calls[-1][2]["rows_written"] == 3
 
@@ -263,6 +264,7 @@ async def test_player_location_route_completes_audit_before_success_notification
 
     assert handled is True
     assert audit_calls[0][0] == "complete"
+    assert audit_calls[0][2]["rows_in_source"] == 1
     assert audit_calls[0][2]["rows_staged"] == 3
     assert audit_calls[0][2]["details"]["terminal_before_discord_notification"] is True
     assert any("Player Location Import ❌" == title for title in sent_titles)
@@ -310,6 +312,7 @@ async def test_player_location_route_refresh_failure_preserves_user_success(monk
     complete_calls = [call for call in audit_calls if call[0] == "complete"]
     assert len(complete_calls) == 1
     assert complete_calls[0][2]["status"] == "failed"
+    assert complete_calls[0][2]["rows_in_source"] == 1
     assert complete_calls[0][2]["details"]["error"] == "signal failed"
 
 

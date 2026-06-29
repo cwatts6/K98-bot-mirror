@@ -538,6 +538,7 @@ async def run_stats_copy_archive(
                 status=status,
                 error_type=error_type,
                 error_text=error_text,
+                rows_in_source=_metadata_int(current_import_metadata, "rows_in_source"),
                 external_batch_table=(
                     "dbo.FallbackImportBatchControl" if fallback_control_id else None
                 ),
@@ -621,6 +622,7 @@ async def run_stats_copy_archive(
             await _offload_callable_py(
                 lambda: import_audit_service.complete_batch_best_effort(
                     audit_ref,
+                    rows_in_source=rows_in_source,
                     rows_staged=rows_written,
                     rows_written=rows_written,
                     external_batch_table=(
@@ -638,6 +640,7 @@ async def run_stats_copy_archive(
                     audit_ref,
                     error_type="FallbackImportFailed",
                     error_text=combined_log,
+                    rows_in_source=rows_in_source,
                     rows_staged=rows_written,
                     rows_written=rows_written,
                     rows_skipped=(

@@ -235,6 +235,7 @@ async def test_run_stats_copy_archive_records_best_effort_audit(monkeypatch):
         "fallback_update_all2",
     ]
     assert audit_calls[-1][0] == "complete"
+    assert audit_calls[-1][2]["rows_in_source"] == 3
     assert audit_calls[-1][2]["external_batch_table"] == "dbo.FallbackImportBatchControl"
     assert audit_calls[-1][2]["external_batch_id"] == "456"
     assert not any(call[0] == "fail" for call in audit_calls)

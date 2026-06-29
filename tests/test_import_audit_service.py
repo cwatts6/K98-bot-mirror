@@ -66,6 +66,35 @@ def test_complete_and_fail_best_effort_ignore_missing_batch_ref():
     assert import_audit_service.fail_batch_best_effort(None) is False
 
 
+def test_complete_and_fail_best_effort_pass_rows_in_source():
+    seen = []
+
+    def writer(**kwargs):
+        seen.append(kwargs)
+
+    assert (
+        import_audit_service.complete_batch_best_effort(
+            12,
+            rows_in_source=3,
+            rows_staged=2,
+            writer=writer,
+        )
+        is True
+    )
+    assert (
+        import_audit_service.fail_batch_best_effort(
+            12,
+            rows_in_source=4,
+            rows_skipped=4,
+            writer=writer,
+        )
+        is True
+    )
+
+    assert seen[0]["rows_in_source"] == 3
+    assert seen[1]["rows_in_source"] == 4
+
+
 def test_complete_and_fail_best_effort_swallow_writer_failure():
     def writer(**kwargs):
         raise RuntimeError("audit unavailable")

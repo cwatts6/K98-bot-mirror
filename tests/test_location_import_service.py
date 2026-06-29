@@ -175,6 +175,7 @@ async def test_import_location_csv_bytes_records_merge_audit(monkeypatch):
         "location_post_import_refresh",
     ]
     assert calls[-1][0] == "complete"
+    assert calls[-1][2]["rows_in_source"] == 1
     assert calls[-1][2]["rows_staged"] == 1
     assert calls[-1][2]["rows_written"] == 1
 
@@ -233,6 +234,7 @@ async def test_import_location_csv_bytes_preserves_success_when_refresh_signal_f
     assert result.ok is True
     assert "Imported **2** rows." in result.message
     assert complete_calls[-1][1]["status"] == "failed"
+    assert complete_calls[-1][1]["rows_in_source"] == 1
 
 
 def test_parse_output_csv_skips_bad_rows_and_keeps_valid_rows():

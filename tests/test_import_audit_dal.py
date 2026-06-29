@@ -91,6 +91,7 @@ def test_complete_import_audit_batch_executes_writer_proc():
 
     import_audit_dal.complete_import_audit_batch(
         import_audit_batch_id=42,
+        rows_in_source=11,
         rows_staged=10,
         rows_written=9,
         external_batch_table="dbo.FallbackImportBatchControl",
@@ -101,8 +102,8 @@ def test_complete_import_audit_batch_executes_writer_proc():
     assert conn.autocommit is True
     sql, params = cursor.calls[0]
     assert "dbo.usp_ImportAudit_CompleteBatch" in sql
-    assert params[0:4] == (42, "completed", 10, 9)
-    assert params[5:7] == ("dbo.FallbackImportBatchControl", "123")
+    assert params[0:5] == (42, "completed", 11, 10, 9)
+    assert params[6:8] == ("dbo.FallbackImportBatchControl", "123")
 
 
 def test_fail_import_audit_batch_executes_writer_proc():
@@ -111,6 +112,7 @@ def test_fail_import_audit_batch_executes_writer_proc():
 
     import_audit_dal.fail_import_audit_batch(
         import_audit_batch_id=42,
+        rows_in_source=5,
         error_type="ImportStepFailed",
         error_text="boom",
         rows_staged=4,
@@ -122,5 +124,5 @@ def test_fail_import_audit_batch_executes_writer_proc():
     assert conn.autocommit is True
     sql, params = cursor.calls[0]
     assert "dbo.usp_ImportAudit_FailBatch" in sql
-    assert params[0:5] == (42, "failed", "ImportStepFailed", "boom", 4)
-    assert params[7:9] == ("dbo.FallbackImportBatchControl", "456")
+    assert params[0:6] == (42, "failed", 5, "ImportStepFailed", "boom", 4)
+    assert params[8:10] == ("dbo.FallbackImportBatchControl", "456")

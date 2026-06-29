@@ -9,10 +9,10 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Area: Honor, PreKvK, weekly activity, MGE, and inventory upload routes/workers
 - Type: consistency
 - Description: Task C Slice 3 mapped the non-fallback import state surfaces and delivered player-location generic audit adoption first. Honor, PreKvK, weekly activity, MGE, and inventory still need deliberate adoption slices because each path has different route, worker, file, SQL procedure, cache refresh, domain batch/history, and operator-observable state surfaces. Wiring them together would risk inconsistent terminal status semantics or accidental user-facing behavior changes.
-- Suggested Fix: After Task C Slice 3A completes batch-level `RowsInSource` normalization, continue generic audit adoption one import family at a time: Honor, PreKvK, weekly activity, MGE, then inventory generic correlation. Preserve route/command UX, output files, SQL procedure behavior, cache refresh signaling, inventory's domain audit model, and existing worker recovery semantics unless separately approved.
+- Suggested Fix: Continue generic audit adoption one import family at a time now that Task C Slice 3A normalizes batch-level `RowsInSource` for already wired fallback and player-location audit paths: Honor, PreKvK, weekly activity, MGE, then inventory generic correlation. Preserve route/command UX, output files, SQL procedure behavior, cache refresh signaling, inventory's domain audit model, and existing worker recovery semantics unless separately approved.
 - Impact: medium
 - Risk: medium
-- Dependencies: Generic durable import batch audit foundation delivered and smoke tested in Task C Slice 2; player-location adoption delivered and smoke tested in Task C Slice 3; `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3A Import Audit Batch Counter Normalization.md`; import-kind-specific tests identified for each adopted route/worker path.
+- Dependencies: Generic durable import batch audit foundation delivered and smoke tested in Task C Slice 2; player-location adoption delivered and smoke tested in Task C Slice 3; batch-level `RowsInSource` normalization delivered in Task C Slice 3A; import-kind-specific tests identified for each adopted route/worker path.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.UPDATE_ALL2`, `update_all2_log_manager.py`, `stats/dal/fallback_import_dal.py`, `stats_module.py`

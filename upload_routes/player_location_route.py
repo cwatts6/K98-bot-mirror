@@ -120,6 +120,7 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
                 status="skipped",
                 error_type="NoValidLocationRows",
                 error_text="No valid rows found in CSV.",
+                rows_in_source=0,
                 rows_skipped=0,
                 details={
                     "entry_point": audit_context.entry_point,
@@ -158,6 +159,7 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
                 status="skipped",
                 error_type="SqlHeadroomUnavailable",
                 error_text="SQL headroom preflight rejected location import.",
+                rows_in_source=len(rows),
                 rows_skipped=len(rows),
                 details={
                     "entry_point": audit_context.entry_point,
@@ -193,6 +195,7 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
                 audit_ref,
                 error_type=type(exc).__name__,
                 error_text=str(exc),
+                rows_in_source=len(rows),
                 rows_staged=0,
                 rows_written=0,
                 rows_skipped=len(rows),
@@ -262,6 +265,7 @@ async def handle_player_location_upload(message: Any, deps: PlayerLocationRouteD
         await complete_location_audit_batch(
             audit_ref,
             status="failed" if refresh_failed else "completed",
+            rows_in_source=len(rows),
             rows_staged=staging_rows,
             rows_written=staging_rows,
             rows_skipped=max(0, len(rows) - int(staging_rows or 0)),
