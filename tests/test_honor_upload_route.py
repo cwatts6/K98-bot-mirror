@@ -66,6 +66,8 @@ def _deps(**overrides):
 
     async def send_embed(ch, title, fields, color, mention=None):
         sent.append((ch, title, fields, color, mention))
+        if title.startswith("KVK Honor Import \u2705") and "send_success_exception" in overrides:
+            raise overrides["send_success_exception"]
 
     async def ensure_sql_headroom_or_notify(ch):
         return overrides.get("sql_ok", True)
@@ -295,6 +297,30 @@ async def test_honor_route_ingest_exception_sends_existing_error():
     assert audit_events[-1][2]["error_type"] == "RuntimeError"
     assert audit_events[-1][2]["rows_in_source"] == 4
     assert audit_events[-1][2]["rows_skipped"] == 4
+
+
+@pytest.mark.asyncio
+async def test_honor_route_success_embed_exception_fails_audit_terminal_status():
+    audit_events = []
+    deps, sent, _offloads, created, stats = _deps(
+        send_success_exception=RuntimeError("notify down"),
+        audit_events=audit_events,
+    )
+
+    handled = await route.handle_honor_upload(_message(), deps)
+
+    assert handled is True
+    assert created == []
+    assert stats == []
+    assert sent[-1][1] == "KVK Honor Import \u274c"
+    assert sent[-1][2]["Error"] == "RuntimeError: notify down"
+    assert audit_events[-1][0] == "fail"
+    assert audit_events[-1][2]["error_type"] == "RuntimeError"
+    assert audit_events[-1][2]["rows_in_source"] == 4
+    assert audit_events[-1][2]["rows_staged"] == 4
+    assert audit_events[-1][2]["rows_written"] == 4
+    assert audit_events[-1][2]["rows_skipped"] == 0
+    assert audit_events[-1][2]["external_batch_id"] == "15:9"
 
 
 @pytest.mark.asyncio

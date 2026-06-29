@@ -95,6 +95,15 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
         await deps.send_embed(notify_ch, "KVK Honor Import ⚠️", fields, 0xE67E22)
         return True
 
+    audit_context: HonorImportAuditContext | None = None
+    audit_ref: Any = None
+    audit_terminal_recorded = False
+    parse_succeeded = False
+    row_count = 0
+    kvk_no: int | None = None
+    scan_id: int | None = None
+    external_batch_id: str | None = None
+
     try:
         is_test = _is_test_upload(message, target.filename)
 
@@ -121,7 +130,6 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
             xlsx_bytes=file_bytes,
         )
 
-        parse_succeeded = False
         parse_started = deps.now_utc()
         try:
             pre_df = await deps.offload_callable(
@@ -215,6 +223,7 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
                     error=str(exc),
                 ),
             )
+            audit_terminal_recorded = True
             raise
 
         fields = {
@@ -281,7 +290,31 @@ async def handle_honor_upload(message: Any, deps: HonorRouteDeps) -> bool:
                 refresh_failed=refresh_failed is not None,
             ),
         )
+        audit_terminal_recorded = True
     except Exception as e:
+        if audit_ref is not None and not audit_terminal_recorded:
+            await deps.fail_audit_batch(
+                audit_ref,
+                error_type=type(e).__name__,
+                error_text=str(e),
+                rows_in_source=row_count if parse_succeeded else None,
+                rows_staged=row_count if parse_succeeded and scan_id is not None else None,
+                rows_written=row_count if parse_succeeded and scan_id is not None else None,
+                rows_skipped=0 if parse_succeeded and scan_id is not None else None,
+                external_batch_id=external_batch_id,
+                details=(
+                    honor_audit_details(
+                        audit_context,
+                        rows_parsed=row_count if parse_succeeded else None,
+                        kvk_no=kvk_no,
+                        scan_id=scan_id,
+                        error=str(e),
+                    )
+                    if audit_context is not None
+                    else None
+                ),
+            )
+            audit_terminal_recorded = True
         fields = {
             "Error": f"{type(e).__name__}: {e}",
             "Filename": target.filename,
