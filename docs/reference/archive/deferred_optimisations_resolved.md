@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Import Pipeline Task C Slice 2 Completed Item
+- Area: `services/import_audit_service.py`, `stats/dal/import_audit_dal.py`, `stats/dal/fallback_import_dal.py`, `stats_module.py`, SQL repo import audit objects
+- Type: architecture
+- Description: Import attempts across fallback, location, honor, PreKvK, weekly activity, MGE, and inventory did not share a durable SQL-backed batch lifecycle model. Task C Slice 1 extracted fallback orchestration into service/DAL wrappers, but failures were still spread across logs, sidecar metadata, worker state, `FallbackImportBatchControl`, and procedure polling.
+- Resolution: Task C Slice 2 added SQL-owned durable audit foundation objects `dbo.ImportAuditBatch`, `dbo.ImportAuditPhase`, and stored procedure writers `dbo.usp_ImportAudit_StartBatch`, `dbo.usp_ImportAudit_RecordPhase`, `dbo.usp_ImportAudit_CompleteBatch`, and `dbo.usp_ImportAudit_FailBatch`. Bot code added a narrow audit DAL plus best-effort service wrappers, then wired fallback imports first with batch start, per-step phases, completion/failure, and `FallbackImportBatchControl.ControlId` correlation through `ExternalBatchTable`/`ExternalBatchId`. Route, command, queue, CSV/XLSX, staging, SQL procedure, and output behavior were preserved; `FallbackImportBatchControl` remains the compatibility and partial-import protection mechanism.
+- Validation: Focused pytest passed (`32 passed`), full pytest passed (`2076 passed, 2 skipped`), architecture and deferred validators passed, command registration validation passed, import smoke passed, and SQL repo validation passed. SQL validation warnings were limited to older pre-existing migrations with `DROP TABLE`/`TRUNCATE TABLE`; the new audit migration did not introduce those warnings. Codex Security diff-scan setup was opened, but the app workflow timed out waiting for Start scan, so the security review remains outstanding before PR/promotion.
+
 ### Import Pipeline Task C Slice 1 Completed Item
 - Area: `stats_module.py`, `services/fallback_import_service.py`, `stats/dal/fallback_import_dal.py`, fallback import orchestration
 - Type: architecture

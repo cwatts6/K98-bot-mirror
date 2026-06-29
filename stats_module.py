@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 
 import pyodbc
 
@@ -41,6 +42,7 @@ from services.fallback_import_service import (
     read_source_dataframe,
     robust_move,
 )
+import services.import_audit_service as import_audit_service
 from stats.dal.fallback_import_dal import (
     fetch_latest_fallback_snapshot,
     fetch_update_all2_last_counter,
@@ -48,6 +50,7 @@ from stats.dal.fallback_import_dal import (
     record_fallback_import_control,
 )
 from update_all2_log_manager import execute_update_all2_with_log_management
+from utils import utcnow
 
 SOURCE_FILE_2 = os.path.join(DOWNLOAD_FOLDER, "stats.xlsx")
 ARCHIVE_DIR_1 = os.path.join(DOWNLOAD_FOLDER, "Databook_Archive")
@@ -58,6 +61,13 @@ IMPORT_METADATA_FILE_PATH = os.path.join(DOWNLOAD_FOLDER, "stats_import_metadata
 TASK_NAME = "UPDATE_ALL2"
 WAIT_SECONDS = 15
 MAX_RETRIES = 10
+
+FALLBACK_AUDIT_IMPORT_KIND = "fallback"
+FALLBACK_AUDIT_PHASES = {
+    "excel": "fallback_file_prepare",
+    "archive": "fallback_secondary_archive",
+    "sql": "fallback_update_all2",
+}
 
 
 def _fallback_import_paths() -> FallbackImportPaths:
@@ -97,8 +107,47 @@ def _delete_import_metadata() -> None:
     delete_import_metadata(IMPORT_METADATA_FILE_PATH)
 
 
-def _record_fallback_import_control(cur, metadata: dict) -> None:
-    record_fallback_import_control(cur, metadata)
+def _record_fallback_import_control(cur, metadata: dict) -> int | None:
+    return record_fallback_import_control(cur, metadata)
+
+
+def _audit_timestamp_utc():
+    return utcnow().replace(tzinfo=None)
+
+
+def _metadata_int(metadata: dict, key: str) -> int | None:
+    try:
+        value = metadata.get(key)
+        if value is None or value == "":
+            return None
+        return int(value)
+    except Exception:
+        return None
+
+
+def _fallback_audit_source_type(source_filename: str | None) -> str:
+    return "fallback_source_file" if source_filename else "fallback_sql_only"
+
+
+def _fallback_audit_source_filename(source_filename: str | None) -> str | None:
+    if not source_filename:
+        return None
+    try:
+        return os.path.basename(source_filename)
+    except Exception:
+        return source_filename
+
+
+def _fallback_control_external_id(metadata: dict) -> str | None:
+    try:
+        value = metadata.get("_fallback_import_control_id")
+        return str(value) if value is not None and value != "" else None
+    except Exception:
+        return None
+
+
+def _step_display_message(success: bool, stdout: str, stderr: str) -> str:
+    return stdout if success else (stderr or stdout)
 
 
 # === Excel Processing ===
@@ -211,7 +260,7 @@ async def run_sql_procedure(
             try:
                 # ⭐ DEFENSE LAYER 1: Wrap UPDATE_ALL2 with log management ⭐
                 logger.info("[SQL_PROC] Executing UPDATE_ALL2 with log management wrapper...")
-                _record_fallback_import_control(cur, import_metadata or {})
+                fallback_control_id = _record_fallback_import_control(cur, import_metadata or {})
 
                 result = execute_update_all2_with_log_management(cur, param1=rank, param2=seed)
 
@@ -274,6 +323,8 @@ async def run_sql_procedure(
                     break
 
             conn.commit()
+            if fallback_control_id is not None and isinstance(import_metadata, dict):
+                import_metadata["_fallback_import_control_id"] = fallback_control_id
             if import_metadata:
                 _delete_import_metadata()
             return expected_counter
@@ -354,6 +405,73 @@ async def run_stats_copy_archive(
     current_import_metadata: dict = {}
 
     excel_included = bool(source_filename)
+    audit_ref = _unwrap_offload_result(
+        await _offload_callable_py(
+            lambda: import_audit_service.start_batch_best_effort(
+                import_kind=FALLBACK_AUDIT_IMPORT_KIND,
+                source_type=_fallback_audit_source_type(source_filename),
+                source_filename=_fallback_audit_source_filename(source_filename),
+                details={
+                    "entry_point": "run_stats_copy_archive",
+                    "rank": rank,
+                    "seed": seed,
+                    "source_filename": source_filename,
+                    "excel_included": excel_included,
+                },
+            ),
+            name="import_audit_start",
+            meta={"import_kind": FALLBACK_AUDIT_IMPORT_KIND},
+        ),
+    )
+
+    async def _record_audit_phase(
+        *,
+        key: str | None,
+        title: str,
+        success: bool,
+        stdout: str,
+        stderr: str,
+        started_at_utc,
+        completed_at_utc,
+        duration_ms: int,
+    ) -> None:
+        if not key or not audit_ref:
+            return
+        phase_name = FALLBACK_AUDIT_PHASES.get(key)
+        if not phase_name:
+            return
+        rows_in = (
+            _metadata_int(current_import_metadata, "rows_in_source") if key == "excel" else None
+        )
+        rows_out = (
+            _metadata_int(current_import_metadata, "rows_written")
+            if key in {"excel", "sql"}
+            else None
+        )
+        await _offload_callable_py(
+            lambda: import_audit_service.record_phase_best_effort(
+                audit_ref,
+                phase_name=phase_name,
+                phase_status="completed" if success else "failed",
+                started_at_utc=started_at_utc,
+                completed_at_utc=completed_at_utc,
+                rows_in=rows_in,
+                rows_out=rows_out,
+                duration_ms=duration_ms,
+                error_type=None if success else "ImportStepFailed",
+                error_text=None if success else (stderr or stdout),
+                details={
+                    "step": key,
+                    "title": title,
+                    "message": _step_display_message(success, stdout, stderr),
+                    "metadata": current_import_metadata if current_import_metadata else None,
+                },
+                set_batch_status="staged" if key == "excel" and success else None,
+            ),
+            name="import_audit_phase",
+            meta={"import_kind": FALLBACK_AUDIT_IMPORT_KIND, "phase": phase_name},
+        )
+
     if source_filename:
         source_filename_for_import = source_filename
 
@@ -407,49 +525,149 @@ async def run_stats_copy_archive(
     combined_log_parts = []
     step_results = {}
 
-    for title, func in steps:
-        if send_step_embed:
-            await send_step_embed(title, "⏳ Running...")
+    async def _fail_audit_batch_for_exit(
+        *,
+        status: str,
+        error_type: str,
+        error_text: str,
+    ) -> None:
+        fallback_control_id = _fallback_control_external_id(current_import_metadata)
+        await _offload_callable_py(
+            lambda: import_audit_service.fail_batch_best_effort(
+                audit_ref,
+                status=status,
+                error_type=error_type,
+                error_text=error_text,
+                external_batch_table=(
+                    "dbo.FallbackImportBatchControl" if fallback_control_id else None
+                ),
+                external_batch_id=fallback_control_id,
+                details={
+                    "steps": dict(step_results),
+                    "metadata": current_import_metadata if current_import_metadata else None,
+                },
+            ),
+            name="import_audit_exit",
+            meta={"import_kind": FALLBACK_AUDIT_IMPORT_KIND, "status": status},
+        )
 
-        try:
-            result = func()
-            if asyncio.iscoroutine(result):
-                raw = await result
-            else:
-                raw = result
-            success, stdout, stderr = _normalize_step_result(raw)
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            success, stdout, stderr = False, "", str(e)
+    try:
+        for title, func in steps:
+            if send_step_embed:
+                await send_step_embed(title, "⏳ Running...")
 
-        logger.info("[STEP] %s -> %s", title, "SUCCESS" if success else "FAIL")
-        key = None
-        if title == excel_title:
-            key = "excel"
-        elif title == archive2_title:
-            key = "archive"
-        elif title == sql_title:
-            key = "sql"
+            step_started_at_utc = _audit_timestamp_utc()
+            step_started_monotonic = time.monotonic()
+            try:
+                result = func()
+                if asyncio.iscoroutine(result):
+                    raw = await result
+                else:
+                    raw = result
+                success, stdout, stderr = _normalize_step_result(raw)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                success, stdout, stderr = False, "", str(e)
 
-        if key:
-            step_results[key] = bool(success)
-            if key == "excel" and success:
-                current_import_metadata = _load_import_metadata()
+            step_completed_at_utc = _audit_timestamp_utc()
+            duration_ms = int((time.monotonic() - step_started_monotonic) * 1000)
+            logger.info("[STEP] %s -> %s", title, "SUCCESS" if success else "FAIL")
+            key = None
+            if title == excel_title:
+                key = "excel"
+            elif title == archive2_title:
+                key = "archive"
+            elif title == sql_title:
+                key = "sql"
 
-        status_icon = "✅" if success else "❌"
-        message = stdout if success else stderr
-        combined_log_parts.append(f"{status_icon} **{title}**\n{message}")
+            if key:
+                step_results[key] = bool(success)
+                if key == "excel" and success:
+                    current_import_metadata = _load_import_metadata()
 
-        if send_step_embed:
-            await send_step_embed(title, f"{status_icon} {message}")
+            await _record_audit_phase(
+                key=key,
+                title=title,
+                success=success,
+                stdout=stdout,
+                stderr=stderr,
+                started_at_utc=step_started_at_utc,
+                completed_at_utc=step_completed_at_utc,
+                duration_ms=duration_ms,
+            )
 
-        if not success:
-            all_success = False
+            status_icon = "✅" if success else "❌"
+            message = _step_display_message(success, stdout, stderr)
+            combined_log_parts.append(f"{status_icon} **{title}**\n{message}")
 
-        await asyncio.sleep(0.01)
+            if send_step_embed:
+                await send_step_embed(title, f"{status_icon} {message}")
 
-    combined_log = "\n\n".join(combined_log_parts)
+            if not success:
+                all_success = False
+
+            await asyncio.sleep(0.01)
+
+        combined_log = "\n\n".join(combined_log_parts)
+        rows_written = _metadata_int(current_import_metadata, "rows_written")
+        rows_in_source = _metadata_int(current_import_metadata, "rows_in_source")
+        fallback_control_id = _fallback_control_external_id(current_import_metadata)
+        completion_details = {
+            "steps": dict(step_results),
+            "metadata": current_import_metadata if current_import_metadata else None,
+        }
+        if all_success:
+            await _offload_callable_py(
+                lambda: import_audit_service.complete_batch_best_effort(
+                    audit_ref,
+                    rows_staged=rows_written,
+                    rows_written=rows_written,
+                    external_batch_table=(
+                        "dbo.FallbackImportBatchControl" if fallback_control_id else None
+                    ),
+                    external_batch_id=fallback_control_id,
+                    details=completion_details,
+                ),
+                name="import_audit_complete",
+                meta={"import_kind": FALLBACK_AUDIT_IMPORT_KIND},
+            )
+        else:
+            await _offload_callable_py(
+                lambda: import_audit_service.fail_batch_best_effort(
+                    audit_ref,
+                    error_type="FallbackImportFailed",
+                    error_text=combined_log,
+                    rows_staged=rows_written,
+                    rows_written=rows_written,
+                    rows_skipped=(
+                        rows_in_source - rows_written
+                        if rows_in_source is not None and rows_written is not None
+                        else None
+                    ),
+                    external_batch_table=(
+                        "dbo.FallbackImportBatchControl" if fallback_control_id else None
+                    ),
+                    external_batch_id=fallback_control_id,
+                    details=completion_details,
+                ),
+                name="import_audit_fail",
+                meta={"import_kind": FALLBACK_AUDIT_IMPORT_KIND},
+            )
+    except asyncio.CancelledError:
+        await _fail_audit_batch_for_exit(
+            status="cancelled",
+            error_type="FallbackImportCancelled",
+            error_text="Fallback import was cancelled before completion.",
+        )
+        raise
+    except Exception as e:
+        await _fail_audit_batch_for_exit(
+            status="failed",
+            error_type=type(e).__name__,
+            error_text=str(e),
+        )
+        raise
     return (
         bool(all_success),
         str(combined_log or ""),

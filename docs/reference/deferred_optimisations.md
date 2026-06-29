@@ -6,15 +6,6 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `services/fallback_import_service.py`, `stats/dal/fallback_import_dal.py`, `stats_module.py`, upload route/import worker flow, SQL repo import audit objects
-- Type: architecture
-- Description: Import attempts across fallback, location, honor, PreKvK, weekly activity, MGE, and inventory do not yet share a durable SQL-backed batch lifecycle model. Task C Slice 1 extracted fallback orchestration into service/DAL wrappers, but failures are still spread across logs, sidecar metadata, worker state, `FallbackImportBatchControl`, and procedure polling.
-- Suggested Fix: Use `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation.md` to design and implement the generic durable import batch audit foundation. The model should capture import kind, source file, source type, queue/upload context, row counts, staging outcome, SQL procedure outcome, downstream rebuild outcome, timestamps, errors, and retry/correlation identifiers. Preserve route and command behavior, and treat audit writes as best-effort except where interim partial metadata protects data.
-- Impact: high
-- Risk: medium
-- Dependencies: Task A completed in mirror PR #179, production PR #487, and SQL PR #21. Task B completed in mirror PR #180, production PR #488, and SQL PR #22. Task C Slice 1 completed in mirror PR #181 and production PR #489, with smoke testing confirming fallback behavior remains intact.
-
-### Deferred Optimisation
 - Area: fallback, location, honor, PreKvK, weekly activity, MGE, and inventory upload routes/workers
 - Type: consistency
 - Description: Even after the generic durable audit foundation exists, each import kind will still need deliberate adoption planning. The non-fallback import paths may have different route, worker, file, SQL procedure, and operator-observable state surfaces, so wiring them without audit could change behavior or create inconsistent status semantics.

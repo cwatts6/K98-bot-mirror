@@ -13,6 +13,27 @@ class _FakeCursor:
         self.calls.append((sql, params))
 
 
+class _ReturningCursor(_FakeCursor):
+    def __init__(self, rows):
+        super().__init__()
+        self.rows = list(rows)
+        self.description = None
+        self._row = None
+
+    def execute(self, sql, *params):
+        super().execute(sql, *params)
+        row = self.rows.pop(0)
+        if row is None:
+            self.description = None
+            self._row = None
+            return
+        self.description = [(name,) for name in row]
+        self._row = tuple(row.values())
+
+    def fetchone(self):
+        return self._row
+
+
 def test_record_fallback_import_control_ignores_empty_metadata():
     cur = _FakeCursor()
 
@@ -77,3 +98,19 @@ def test_record_fallback_import_control_inserts_metadata(monkeypatch):
     )
     assert json.loads(params[3]) == ["Governor ID", "Name", "Civilization"]
     assert params[4:] == (2, 10)
+
+
+def test_record_fallback_import_control_returns_inserted_control_id():
+    cur = _ReturningCursor([{"ObjectId": 123}, {"ControlId": 456}])
+
+    control_id = fallback_import_dal.record_fallback_import_control(
+        cur,
+        {
+            "source_type": "full_fallback_snapshot",
+            "source_filename": "stats.xlsx",
+            "rows_in_source": 1,
+            "rows_written": 1,
+        },
+    )
+
+    assert control_id == 456

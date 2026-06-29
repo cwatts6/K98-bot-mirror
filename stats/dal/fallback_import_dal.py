@@ -73,10 +73,10 @@ def fetch_latest_fallback_snapshot(
         return pd.DataFrame.from_records(cur.fetchall(), columns=cols)
 
 
-def record_fallback_import_control(cur: Any, metadata: dict) -> None:
+def record_fallback_import_control(cur: Any, metadata: dict) -> int | None:
     """Persist the existing fallback import metadata row when the SQL object exists."""
     if not metadata:
-        return
+        return None
 
     source_type = str(metadata.get("source_type") or "")
     cur.execute("SELECT OBJECT_ID(N'dbo.FallbackImportBatchControl', N'U') AS ObjectId;")
@@ -89,12 +89,13 @@ def record_fallback_import_control(cur: Any, metadata: dict) -> None:
         logger.warning(
             "[EXCEL] FallbackImportBatchControl missing; continuing without SQL metadata."
         )
-        return
+        return None
 
     cur.execute(
         """
         INSERT INTO dbo.FallbackImportBatchControl
             (SourceType, SourceFilename, ScoreHeader, ColumnsPresentJson, RowsInSource, RowsWritten)
+        OUTPUT INSERTED.ControlId AS ControlId
         VALUES (?, ?, ?, ?, ?, ?);
         """,
         source_type or None,
@@ -103,6 +104,10 @@ def record_fallback_import_control(cur: Any, metadata: dict) -> None:
         json.dumps(metadata.get("columns_present") or [], ensure_ascii=False),
         int(metadata.get("rows_in_source") or 0),
         int(metadata.get("rows_written") or 0),
+    )
+    inserted = fetch_one_dict(cur)
+    return (
+        int(inserted["ControlId"]) if inserted and inserted.get("ControlId") is not None else None
     )
 
 

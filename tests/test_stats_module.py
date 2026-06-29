@@ -9,6 +9,30 @@ import file_utils
 import stats_module
 
 
+@pytest.fixture(autouse=True)
+def _disable_import_audit(monkeypatch):
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "start_batch_best_effort",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "record_phase_best_effort",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "complete_batch_best_effort",
+        lambda *args, **kwargs: False,
+    )
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "fail_batch_best_effort",
+        lambda *args, **kwargs: False,
+    )
+
+
 def _full_upload_row(**overrides):
     row = {
         "Governor ID": 123,
@@ -61,6 +85,7 @@ async def test_run_stats_copy_archive_contract_monkeypatched(monkeypatch):
     async def fake_run_sql_procedure(
         rank=None, seed=None, timeout_seconds=600, import_metadata=None
     ):
+        import_metadata["_fallback_import_control_id"] = 456
         await asyncio.sleep(0)
         return True, "[SUCCESS] fake sql", None
 
@@ -149,6 +174,190 @@ async def test_run_stats_copy_archive_sql_only_does_not_reuse_stale_metadata(mon
 
     assert success is True
     assert metadata_seen == [{}]
+
+
+@pytest.mark.asyncio
+async def test_run_stats_copy_archive_records_best_effort_audit(monkeypatch):
+    audit_calls = []
+
+    def fake_start(**kwargs):
+        audit_calls.append(("start", kwargs))
+        return 123
+
+    def fake_phase(batch_ref, **kwargs):
+        audit_calls.append(("phase", batch_ref, kwargs))
+        return 1
+
+    def fake_complete(batch_ref, **kwargs):
+        audit_calls.append(("complete", batch_ref, kwargs))
+        return True
+
+    def fake_fail(batch_ref, **kwargs):
+        audit_calls.append(("fail", batch_ref, kwargs))
+        return True
+
+    def fake_process_excel_file(path):
+        return True, "[INFO] fake excel", None
+
+    async def fake_run_sql_procedure(
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+    ):
+        import_metadata["_fallback_import_control_id"] = 456
+        await asyncio.sleep(0)
+        return True, "[SUCCESS] fake sql", None
+
+    monkeypatch.setattr(stats_module.import_audit_service, "start_batch_best_effort", fake_start)
+    monkeypatch.setattr(stats_module.import_audit_service, "record_phase_best_effort", fake_phase)
+    monkeypatch.setattr(
+        stats_module.import_audit_service, "complete_batch_best_effort", fake_complete
+    )
+    monkeypatch.setattr(stats_module.import_audit_service, "fail_batch_best_effort", fake_fail)
+    monkeypatch.setattr(stats_module, "process_excel_file", fake_process_excel_file)
+    monkeypatch.setattr(stats_module, "archive_second_file", lambda: (True, "[INFO] archive", None))
+    monkeypatch.setattr(stats_module, "run_sql_procedure", fake_run_sql_procedure)
+    monkeypatch.setattr(
+        stats_module,
+        "_load_import_metadata",
+        lambda: {"source_type": "full_fallback_snapshot", "rows_in_source": 3, "rows_written": 3},
+    )
+
+    success, _combined_log, steps = await stats_module.run_stats_copy_archive(
+        rank=1, seed=2, source_filename="upload.xlsx"
+    )
+
+    assert success is True
+    assert steps == {"excel": True, "archive": True, "sql": True}
+    assert audit_calls[0][0] == "start"
+    phase_names = [call[2]["phase_name"] for call in audit_calls if call[0] == "phase"]
+    assert phase_names == [
+        "fallback_file_prepare",
+        "fallback_secondary_archive",
+        "fallback_update_all2",
+    ]
+    assert audit_calls[-1][0] == "complete"
+    assert audit_calls[-1][2]["external_batch_table"] == "dbo.FallbackImportBatchControl"
+    assert audit_calls[-1][2]["external_batch_id"] == "456"
+    assert not any(call[0] == "fail" for call in audit_calls)
+
+
+@pytest.mark.asyncio
+async def test_run_stats_copy_archive_uses_stdout_failure_message(monkeypatch):
+    audit_calls = []
+
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "start_batch_best_effort",
+        lambda **kwargs: 123,
+    )
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "record_phase_best_effort",
+        lambda batch_ref, **kwargs: audit_calls.append(("phase", kwargs)),
+    )
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "fail_batch_best_effort",
+        lambda batch_ref, **kwargs: audit_calls.append(("fail", kwargs)),
+    )
+
+    async def fake_run_sql_procedure(
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+    ):
+        await asyncio.sleep(0)
+        return False, "[TIMEOUT] fake timeout", None
+
+    monkeypatch.setattr(stats_module, "run_sql_procedure", fake_run_sql_procedure)
+
+    success, combined_log, _steps = await stats_module.run_stats_copy_archive()
+
+    assert success is False
+    assert "[TIMEOUT] fake timeout" in combined_log
+    sql_phase = next(
+        call[1]
+        for call in audit_calls
+        if call[0] == "phase" and call[1]["phase_name"] == "fallback_update_all2"
+    )
+    assert sql_phase["details"]["message"] == "[TIMEOUT] fake timeout"
+    assert audit_calls[-1][0] == "fail"
+    assert "[TIMEOUT] fake timeout" in audit_calls[-1][1]["error_text"]
+
+
+@pytest.mark.asyncio
+async def test_run_stats_copy_archive_marks_audit_cancelled(monkeypatch):
+    audit_calls = []
+
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "start_batch_best_effort",
+        lambda **kwargs: 123,
+    )
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "record_phase_best_effort",
+        lambda batch_ref, **kwargs: audit_calls.append(("phase", kwargs)),
+    )
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "fail_batch_best_effort",
+        lambda batch_ref, **kwargs: audit_calls.append(("fail", kwargs)),
+    )
+
+    async def fake_run_sql_procedure(
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+    ):
+        await asyncio.sleep(0)
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(stats_module, "run_sql_procedure", fake_run_sql_procedure)
+
+    with pytest.raises(asyncio.CancelledError):
+        await stats_module.run_stats_copy_archive()
+
+    assert audit_calls[-1][0] == "fail"
+    assert audit_calls[-1][1]["status"] == "cancelled"
+    assert audit_calls[-1][1]["error_type"] == "FallbackImportCancelled"
+
+
+@pytest.mark.asyncio
+async def test_run_sql_procedure_does_not_publish_uncommitted_control_id(monkeypatch):
+    class FakeCursor:
+        timeout = 0
+
+    class FakeConnection:
+        autocommit = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+    async def direct_offload(fn, *args, **kwargs):
+        return fn(*args)
+
+    def failing_update_all2(cur, param1=None, param2=None):
+        raise RuntimeError("update failed")
+
+    metadata = {"source_type": "full_fallback_snapshot"}
+
+    monkeypatch.setattr(stats_module, "_offload_callable_py", direct_offload)
+    monkeypatch.setattr(stats_module, "_conn_trusted", lambda: FakeConnection())
+    monkeypatch.setattr(stats_module, "fetch_update_all2_last_counter", lambda cur, task: 0)
+    monkeypatch.setattr(stats_module, "_record_fallback_import_control", lambda cur, meta: 456)
+    monkeypatch.setattr(
+        stats_module,
+        "execute_update_all2_with_log_management",
+        failing_update_all2,
+    )
+
+    success, message, _extra = await stats_module.run_sql_procedure(import_metadata=metadata)
+
+    assert success is False
+    assert "update failed" in message
+    assert "_fallback_import_control_id" not in metadata
 
 
 def test_process_excel_file_preserves_credit_before_updated_on(tmp_path, monkeypatch):
