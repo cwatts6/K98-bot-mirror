@@ -150,8 +150,7 @@ async def _record_importer_audit_phases(
         note if status in {"rejected", "failed"} else None
     )
     parsed = rows_in_source is not None and (
-        status in {"accepted", "duplicate"}
-        or str(importer_phase or "").startswith("db")
+        status in {"accepted", "duplicate"} or str(importer_phase or "").startswith("db")
     )
 
     await deps.record_audit_phase(
