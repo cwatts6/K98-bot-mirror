@@ -5,6 +5,26 @@ import pytest
 from services import location_import_service as svc
 
 
+@pytest.fixture(autouse=True)
+def _disable_location_audit(monkeypatch):
+    monkeypatch.setattr(svc.import_audit_service, "start_batch_best_effort", lambda **_kwargs: 123)
+    monkeypatch.setattr(
+        svc.import_audit_service,
+        "record_phase_best_effort",
+        lambda _batch_ref, **_kwargs: 1,
+    )
+    monkeypatch.setattr(
+        svc.import_audit_service,
+        "complete_batch_best_effort",
+        lambda _batch_ref, **_kwargs: True,
+    )
+    monkeypatch.setattr(
+        svc.import_audit_service,
+        "fail_batch_best_effort",
+        lambda _batch_ref, **_kwargs: True,
+    )
+
+
 def test_validate_location_csv_attachment_rejects_non_csv():
     result = svc.validate_location_csv_attachment(filename="output.txt", size=10)
 
@@ -96,6 +116,86 @@ async def test_import_location_csv_bytes_formats_success_and_signals_refresh():
     assert result.total_tracked == 42
     assert result.message.startswith("✅ Imported **1** row. Total tracked now **42**. ⏱ ")
     assert signal_calls == ["called"]
+
+
+@pytest.mark.asyncio
+async def test_import_location_csv_bytes_records_merge_audit(monkeypatch):
+    calls = []
+
+    def _start(**kwargs):
+        calls.append(("start", kwargs))
+        return 321
+
+    def _phase(batch_ref, **kwargs):
+        calls.append(("phase", batch_ref, kwargs))
+        return 1
+
+    def _complete(batch_ref, **kwargs):
+        calls.append(("complete", batch_ref, kwargs))
+        return True
+
+    async def _runner(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    async def _thread_runner(func, rows):
+        return func(rows)
+
+    monkeypatch.setattr(svc.import_audit_service, "start_batch_best_effort", _start)
+    monkeypatch.setattr(svc.import_audit_service, "record_phase_best_effort", _phase)
+    monkeypatch.setattr(svc.import_audit_service, "complete_batch_best_effort", _complete)
+
+    result = await svc.import_location_csv_bytes(
+        b"csv",
+        filename="output.csv",
+        parser=lambda _csv_bytes: [(1, "A", 2, 3, 4, "K98", 10, 20)],
+        merge_rows=lambda _rows: (1, 42),
+        thread_runner=_thread_runner,
+        audit_runner=_runner,
+        audit_context=svc.LocationImportAuditContext(
+            source_filename="output.csv",
+            source_channel_id=10,
+            actor_discord_id=123,
+            entry_point="location_command_import",
+            sql_operation="merge",
+        ),
+    )
+
+    assert result.ok is True
+    assert calls[0][0] == "start"
+    assert calls[0][1]["import_kind"] == "player_location"
+    assert calls[0][1]["source_type"] == "discord_upload_csv"
+    assert calls[0][1]["source_filename"] == "output.csv"
+    phase_names = [call[2]["phase_name"] for call in calls if call[0] == "phase"]
+    assert phase_names == [
+        "location_csv_parse",
+        "location_sql_merge",
+        "location_post_import_refresh",
+    ]
+    assert calls[-1][0] == "complete"
+    assert calls[-1][2]["rows_staged"] == 1
+    assert calls[-1][2]["rows_written"] == 1
+
+
+@pytest.mark.asyncio
+async def test_import_location_csv_bytes_preserves_success_when_audit_fails(monkeypatch):
+    async def _thread_runner(func, rows):
+        return func(rows)
+
+    def _raise(**_kwargs):
+        raise RuntimeError("audit unavailable")
+
+    monkeypatch.setattr(svc.import_audit_service, "start_batch_best_effort", _raise)
+
+    result = await svc.import_location_csv_bytes(
+        b"csv",
+        filename="output.csv",
+        parser=lambda _csv_bytes: [(1, "A", 2, 3, 4, "K98", 10, 20)],
+        merge_rows=lambda _rows: (1, 42),
+        thread_runner=_thread_runner,
+    )
+
+    assert result.ok is True
+    assert result.staging_rows == 1
 
 
 @pytest.mark.asyncio

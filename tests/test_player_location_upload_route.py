@@ -5,6 +5,26 @@ import pytest
 from upload_routes import player_location_route as route
 
 
+@pytest.fixture(autouse=True)
+def _disable_location_audit(monkeypatch):
+    async def _start(**_kwargs):
+        return 123
+
+    async def _record(_batch_ref, **_kwargs):
+        return None
+
+    async def _complete(_batch_ref, **_kwargs):
+        return None
+
+    async def _fail(_batch_ref, **_kwargs):
+        return None
+
+    monkeypatch.setattr(route, "start_location_audit_batch", _start)
+    monkeypatch.setattr(route, "record_location_audit_phase", _record)
+    monkeypatch.setattr(route, "complete_location_audit_batch", _complete)
+    monkeypatch.setattr(route, "fail_location_audit_batch", _fail)
+
+
 class _FakeAttachment:
     def __init__(self, filename: str, payload: bytes = b"csv"):
         self.filename = filename
@@ -29,6 +49,7 @@ class _FakeAuthor:
 
 class _FakeMessage:
     def __init__(self, channel_id: int, attachments):
+        self.id = 555
         self.channel = _FakeChannel(channel_id)
         self.author = _FakeAuthor()
         self.attachments = attachments
@@ -173,6 +194,48 @@ async def test_player_location_route_success_preserves_outputs_and_side_effects(
     assert fields["Uploaded By"] == "uploader (123)"
     assert color == 0x2ECC71
     assert mention is None
+
+
+@pytest.mark.asyncio
+async def test_player_location_route_records_replace_audit(monkeypatch):
+    rows = [(1, "A", 0, 0, 1, "TAG", 10, 20)]
+    audit_calls = []
+
+    async def _start(**kwargs):
+        audit_calls.append(("start", kwargs))
+        return 987
+
+    async def _record(batch_ref, **kwargs):
+        audit_calls.append(("phase", batch_ref, kwargs))
+
+    async def _complete(batch_ref, **kwargs):
+        audit_calls.append(("complete", batch_ref, kwargs))
+
+    monkeypatch.setattr(route, "parse_output_csv", lambda _bytes: rows)
+    monkeypatch.setattr(route, "signal_location_refresh_complete", lambda: None)
+    monkeypatch.setattr(route, "start_location_audit_batch", _start)
+    monkeypatch.setattr(route, "record_location_audit_phase", _record)
+    monkeypatch.setattr(route, "complete_location_audit_batch", _complete)
+    deps, _sent, _offloads, _created = _deps()
+
+    handled = await route.handle_player_location_upload(_message(), deps)
+
+    assert handled is True
+    assert audit_calls[0][0] == "start"
+    context = audit_calls[0][1]["context"]
+    assert context.entry_point == "location_auto_upload"
+    assert context.sql_operation == "replace"
+    assert context.source_filename == "scan_1198.csv"
+    assert context.source_message_id == 555
+    phase_names = [call[2]["phase_name"] for call in audit_calls if call[0] == "phase"]
+    assert phase_names == [
+        "location_csv_parse",
+        "location_sql_replace",
+        "location_post_import_refresh",
+    ]
+    assert audit_calls[-1][0] == "complete"
+    assert audit_calls[-1][2]["rows_staged"] == 3
+    assert audit_calls[-1][2]["rows_written"] == 3
 
 
 @pytest.mark.asyncio

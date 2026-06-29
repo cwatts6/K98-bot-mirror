@@ -21,6 +21,7 @@ from profile_cache import (
     warm_cache,
 )
 from services.location_import_service import (
+    LocationImportAuditContext,
     import_location_csv_bytes,
     validate_location_csv_attachment,
 )
@@ -245,6 +246,20 @@ def register_location(bot: ext_commands.Bot) -> None:
             size=getattr(attach, "size", None),
             on_success=signal_location_refresh_complete,
             started_at_utc=started,
+            audit_context=LocationImportAuditContext(
+                source_filename=getattr(attach, "filename", None),
+                source_channel_id=(
+                    int(ctx.channel.id)
+                    if getattr(getattr(ctx, "channel", None), "id", None) is not None
+                    else None
+                ),
+                actor_discord_id=(
+                    int(ctx.user.id)
+                    if getattr(getattr(ctx, "user", None), "id", None) is not None
+                    else None
+                ),
+                entry_point="location_command_import",
+            ),
         )
         await ctx.interaction.edit_original_response(content=result.message)
 
