@@ -54,7 +54,7 @@ Task C should answer:
 ## 4. In Scope For Audit
 
 - Map fallback upload route and worker orchestration.
-- Map the other upload routes and worker orchestration for locations, honor, prekvk, rally_forts, weekly_activity, mge-results, inventory to ensure we have acomplete picture before progressing
+- Map the other upload routes and worker orchestration for locations, honor, prekvk, rally_forts, weekly_activity, mge-results, inventory to ensure we have a complete picture before progressing.
 - Map `stats_module.py` import responsibilities and current direct SQL/import side effects.
 - Map `services/fallback_import_schema.py` boundaries after Task A/B.
 - Map current fallback metadata and `dbo.FallbackImportBatchControl` usage.
