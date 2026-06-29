@@ -53,6 +53,7 @@ def _deps(**overrides):
     offloads = []
     created_tasks = []
     stats_refreshes = []
+    audit_events = overrides.get("audit_events", [])
 
     async def get_notify_channel():
         return overrides.get("notify_channel")
@@ -75,7 +76,23 @@ def _deps(**overrides):
         offloads.append((func, args, kwargs))
         if "offload_exception" in overrides:
             raise overrides["offload_exception"]
-        return overrides.get("offload_result", (True, "Imported 3 rows as scan 9.", 3))
+        return overrides.get(
+            "offload_result",
+            (
+                True,
+                "Imported 3 rows as scan 9.",
+                3,
+                {
+                    "status": "accepted",
+                    "phase": "db_insert_rows",
+                    "kvk_no": 15,
+                    "rows_in_source": 3,
+                    "rows_written": 3,
+                    "scan_id": 9,
+                    "history_id": 42,
+                },
+            ),
+        )
 
     async def trigger_log_backup_background():
         return None
@@ -90,6 +107,19 @@ def _deps(**overrides):
         if "stats_exception" in overrides:
             raise overrides["stats_exception"]
 
+    async def start_audit_batch(**kwargs):
+        audit_events.append(("start", kwargs))
+        return overrides.get("audit_ref", "audit-ref")
+
+    async def record_audit_phase(batch_ref, **kwargs):
+        audit_events.append(("phase", batch_ref, kwargs))
+
+    async def complete_audit_batch(batch_ref, **kwargs):
+        audit_events.append(("complete", batch_ref, kwargs))
+
+    async def fail_audit_batch(batch_ref, **kwargs):
+        audit_events.append(("fail", batch_ref, kwargs))
+
     deps = route.PreKvkRouteDeps(
         prekvk_channel_id=10,
         bot=overrides.get("bot", _FakeBot()),
@@ -99,6 +129,10 @@ def _deps(**overrides):
         offload_callable=offload_callable,
         trigger_log_backup_background=trigger_log_backup_background,
         create_task=create_task,
+        start_audit_batch=overrides.get("start_audit_batch", start_audit_batch),
+        record_audit_phase=overrides.get("record_audit_phase", record_audit_phase),
+        complete_audit_batch=overrides.get("complete_audit_batch", complete_audit_batch),
+        fail_audit_batch=overrides.get("fail_audit_batch", fail_audit_batch),
         current_kvk_metadata=overrides.get("current_kvk_metadata", current_kvk_metadata),
         run_blocking_in_thread=overrides.get("run_blocking_in_thread", run_blocking_in_thread),
         send_stats_update_embed=overrides.get("send_stats_update_embed", send_stats_update_embed),
@@ -175,7 +209,8 @@ async def test_prekvk_route_kvk_lookup_failure_sends_existing_error():
 
 @pytest.mark.asyncio
 async def test_prekvk_route_success_preserves_import_contract_and_side_effects():
-    deps, sent, offloads, created, stats = _deps()
+    audit_events = []
+    deps, sent, offloads, created, stats = _deps(audit_events=audit_events)
     msg = _message(
         attachments=[_FakeAttachment("PreKvK_Rankings_C13164_2026-05-08.xlsx", b"xlsx-bytes")]
     )
@@ -191,6 +226,7 @@ async def test_prekvk_route_success_preserves_import_contract_and_side_effects()
     assert kwargs["uploader_discord_id"] == 123456789
     assert kwargs["channel_id"] == 10
     assert kwargs["message_id"] == 987654321
+    assert kwargs["return_metadata"] is True
     assert kwargs["name"] == "import_prekvk_bytes"
     assert kwargs["prefer_process"] is True
     assert kwargs["meta"] == {
@@ -209,12 +245,44 @@ async def test_prekvk_route_success_preserves_import_contract_and_side_effects()
     assert fields["Rows"] == "3"
     assert fields["Note"] == "Imported 3 rows as scan 9."
     assert color == 0x2ECC71
+    assert audit_events[0][0] == "start"
+    assert audit_events[0][1]["context"].source_filename == (
+        "PreKvK_Rankings_C13164_2026-05-08.xlsx"
+    )
+    phase_names = [event[2]["phase_name"] for event in audit_events if event[0] == "phase"]
+    assert phase_names == [
+        route.PREKVK_AUDIT_PARSE_PHASE,
+        route.PREKVK_AUDIT_INGEST_PHASE,
+        route.PREKVK_AUDIT_REFRESH_PHASE,
+    ]
+    assert audit_events[-1][0] == "complete"
+    assert audit_events[-1][2]["status"] == "completed"
+    assert audit_events[-1][2]["rows_in_source"] == 3
+    assert audit_events[-1][2]["rows_staged"] == 3
+    assert audit_events[-1][2]["rows_written"] == 3
+    assert audit_events[-1][2]["rows_skipped"] == 0
+    assert audit_events[-1][2]["external_batch_table"] == route.PREKVK_AUDIT_SCAN_TABLE
+    assert audit_events[-1][2]["external_batch_id"] == "15:9"
 
 
 @pytest.mark.asyncio
 async def test_prekvk_route_duplicate_skip_preserves_embed_without_refresh_side_effects():
+    audit_events = []
     deps, sent, offloads, created, stats = _deps(
-        offload_result=(True, "Duplicate file skipped (hash match).", 0)
+        audit_events=audit_events,
+        offload_result=(
+            True,
+            "Duplicate file skipped (hash match).",
+            0,
+            {
+                "status": "duplicate",
+                "phase": "db_dedupe_check",
+                "kvk_no": 15,
+                "rows_in_source": 3,
+                "rows_written": 0,
+                "history_id": 44,
+            },
+        ),
     )
 
     handled = await route.handle_prekvk_upload(_message(), deps)
@@ -228,11 +296,37 @@ async def test_prekvk_route_duplicate_skip_preserves_embed_without_refresh_side_
     assert fields["Rows"] == "0"
     assert fields["Note"] == "Duplicate file skipped (hash match)."
     assert color == 0xF1C40F
+    assert audit_events[-1][0] == "complete"
+    assert audit_events[-1][2]["status"] == "duplicate"
+    assert audit_events[-1][2]["rows_in_source"] == 3
+    assert audit_events[-1][2]["rows_staged"] == 0
+    assert audit_events[-1][2]["rows_written"] == 0
+    assert audit_events[-1][2]["rows_skipped"] == 3
+    assert audit_events[-1][2]["external_batch_table"] == route.PREKVK_AUDIT_HISTORY_TABLE
+    assert audit_events[-1][2]["external_batch_id"] == "44"
 
 
 @pytest.mark.asyncio
 async def test_prekvk_route_importer_failure_sends_existing_error():
-    deps, sent, _offloads, created, stats = _deps(offload_result=(False, "bad workbook", 0))
+    audit_events = []
+    deps, sent, _offloads, created, stats = _deps(
+        audit_events=audit_events,
+        offload_result=(
+            False,
+            "bad workbook",
+            0,
+            {
+                "status": "rejected",
+                "phase": "read_excel",
+                "kvk_no": 15,
+                "rows_in_source": 0,
+                "rows_written": 0,
+                "history_id": 45,
+                "error_type": "InvalidWorkbook",
+                "error_text": "bad workbook",
+            },
+        ),
+    )
 
     handled = await route.handle_prekvk_upload(_message(), deps)
 
@@ -243,6 +337,11 @@ async def test_prekvk_route_importer_failure_sends_existing_error():
     assert title == "Pre-KVK Import ❌"
     assert fields["Error"] == "bad workbook"
     assert color == 0xE74C3C
+    assert audit_events[-1][0] == "fail"
+    assert audit_events[-1][2]["error_type"] == "InvalidWorkbook"
+    assert audit_events[-1][2]["rows_in_source"] == 0
+    assert audit_events[-1][2]["external_batch_table"] == route.PREKVK_AUDIT_HISTORY_TABLE
+    assert audit_events[-1][2]["external_batch_id"] == "45"
 
 
 @pytest.mark.asyncio

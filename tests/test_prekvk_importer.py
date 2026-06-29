@@ -3,6 +3,7 @@ import zipfile
 import pandas as pd
 
 import file_utils
+from prekvk import diagnostics_service
 import prekvk_importer as pki
 
 
@@ -299,6 +300,63 @@ def test_governor_name_nan_becomes_empty_string(monkeypatch):
     # GovernorName is 4th column in inserted row tuple: (kvk_no, scan_id, gid, name, points)
     assert inserted_rows[0][3] == ""
     assert inserted_rows[1][3] == ""
+
+
+def test_import_default_return_shape_remains_three_tuple(monkeypatch):
+    df = _fake_df_with_columns(
+        ["GovernorID", "Name", "Prekvk Points"],
+        [{"GovernorID": 123, "Name": "Alice", "Prekvk Points": 10}],
+    )
+    _patch_read_excel(monkeypatch, df)
+
+    cur = MockCursor()
+    conn = MockConn(cur)
+    _patch_conn(monkeypatch, cur, conn)
+    cur.queue_fetchone(None, columns=("x",))
+    cur.queue_fetchone((99,), columns=("ScanID",))
+
+    result = pki.import_prekvk_bytes(
+        b"content-bytes",
+        "1198_prekvk.xlsx",
+        kvk_no=13,
+    )
+
+    assert len(result) == 3
+    assert result == (True, "Imported 1 rows as scan 99.", 1)
+
+
+def test_import_metadata_includes_scan_and_history_correlation(monkeypatch):
+    monkeypatch.delenv("PREKVK_IMPORT_HISTORY_DISABLED", raising=False)
+    df = _fake_df_with_columns(
+        ["GovernorID", "Name", "Prekvk Points"],
+        [{"GovernorID": 123, "Name": "Alice", "Prekvk Points": 10}],
+    )
+    _patch_read_excel(monkeypatch, df)
+
+    cur = MockCursor()
+    conn = MockConn(cur)
+    _patch_conn(monkeypatch, cur, conn)
+    cur.queue_fetchone(None, columns=("x",))
+    cur.queue_fetchone((99,), columns=("ScanID",))
+    monkeypatch.setattr(diagnostics_service, "record_import_outcome", lambda **_kw: 42)
+
+    ok, msg, rows, metadata = pki.import_prekvk_bytes(
+        b"content-bytes",
+        "1198_prekvk.xlsx",
+        kvk_no=13,
+        return_metadata=True,
+    )
+
+    assert ok is True
+    assert rows == 1
+    assert msg == "Imported 1 rows as scan 99."
+    assert metadata["status"] == "accepted"
+    assert metadata["phase"] == "db_insert_rows"
+    assert metadata["kvk_no"] == 13
+    assert metadata["rows_in_source"] == 1
+    assert metadata["rows_written"] == 1
+    assert metadata["scan_id"] == 99
+    assert metadata["history_id"] == 42
 
 
 def test_new_schema_import_maps_stage_columns(monkeypatch):

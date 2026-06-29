@@ -4,6 +4,7 @@ import io
 import logging
 import os
 import re
+from typing import Any
 
 import pandas as pd
 import pyodbc
@@ -224,10 +225,12 @@ def import_prekvk_bytes(
     uploader_discord_id: int | None = None,
     channel_id: int | None = None,
     message_id: int | None = None,
-) -> tuple[bool, str, int]:
+    return_metadata: bool = False,
+) -> tuple[bool, str, int] | tuple[bool, str, int, dict[str, Any]]:
     phase = "start"
     scan_id: int | None = None
     rows_imported = 0
+    rows_in_source: int | None = None
 
     try:
         filehash = hashlib.sha256(xlsx_bytes).digest()
@@ -240,6 +243,36 @@ def import_prekvk_bytes(
 
     bytes_len = len(xlsx_bytes) if xlsx_bytes is not None else 0
 
+    def _result(
+        ok: bool,
+        note: str,
+        rows: int,
+        *,
+        status: str,
+        phase_name: str | None = None,
+        rows_in_source_value: int | None = None,
+        history_id: int | None = None,
+        error_type: str | None = None,
+        error_text: str | None = None,
+    ) -> tuple[bool, str, int] | tuple[bool, str, int, dict[str, Any]]:
+        if not return_metadata:
+            return (ok, note, rows)
+        metadata: dict[str, Any] = {
+            "status": status,
+            "phase": phase_name or phase,
+            "kvk_no": int(kvk_no),
+            "rows_in_source": rows_in_source_value,
+            "rows_written": int(rows),
+            "scan_id": scan_id,
+            "history_id": history_id,
+            "hash_prefix": hash_prefix,
+        }
+        if error_type:
+            metadata["error_type"] = error_type
+        if error_text:
+            metadata["error_text"] = error_text
+        return (ok, note, rows, metadata)
+
     def _record_history(
         status: str,
         *,
@@ -247,13 +280,13 @@ def import_prekvk_bytes(
         row_count: int | None = None,
         error_type: str | None = None,
         error_text: str | None = None,
-    ) -> None:
+    ) -> int | None:
         if os.getenv("PREKVK_IMPORT_HISTORY_DISABLED", "").strip() == "1":
-            return
+            return None
         try:
             from prekvk.diagnostics_service import record_import_outcome
 
-            record_import_outcome(
+            return record_import_outcome(
                 kvk_no=kvk_no,
                 filename=filename,
                 status=status,
@@ -270,6 +303,7 @@ def import_prekvk_bytes(
             )
         except Exception:
             logger.exception("[PREKVK] import history hook failed")
+            return None
 
     logger.info("[PREKVK] import start kvk_no=%s file=%s bytes=%s", kvk_no, filename, bytes_len)
     _emit_telemetry(
@@ -306,14 +340,24 @@ def import_prekvk_bytes(
                     "error_text": str(e),
                 }
             )
-            _record_history(
+            history_id = _record_history(
                 "rejected",
                 phase_name=phase,
                 row_count=0,
                 error_type="NoSheets",
                 error_text=str(e),
             )
-            return (False, f"{e}.", 0)
+            return _result(
+                False,
+                f"{e}.",
+                0,
+                status="rejected",
+                phase_name=phase,
+                rows_in_source_value=0,
+                history_id=history_id,
+                error_type="NoSheets",
+                error_text=str(e),
+            )
         except InvalidWorkbookError as e:
             logger.warning(
                 "[PREKVK] import failed phase=%s kvk_no=%s file=%s: %s",
@@ -334,14 +378,24 @@ def import_prekvk_bytes(
                     "error_text": str(e),
                 }
             )
-            _record_history(
+            history_id = _record_history(
                 "rejected",
                 phase_name=phase,
                 row_count=0,
                 error_type="InvalidWorkbook",
                 error_text=str(e),
             )
-            return (False, str(e), 0)
+            return _result(
+                False,
+                str(e),
+                0,
+                status="rejected",
+                phase_name=phase,
+                rows_in_source_value=0,
+                history_id=history_id,
+                error_type="InvalidWorkbook",
+                error_text=str(e),
+            )
 
         phase = "normalize"
         try:
@@ -368,14 +422,24 @@ def import_prekvk_bytes(
                     "error_text": msg,
                 }
             )
-            _record_history(
+            history_id = _record_history(
                 "rejected",
                 phase_name=phase,
                 row_count=0,
                 error_type="MissingColumns",
                 error_text=msg,
             )
-            return (False, msg, 0)
+            return _result(
+                False,
+                msg,
+                0,
+                status="rejected",
+                phase_name=phase,
+                rows_in_source_value=0,
+                history_id=history_id,
+                error_type="MissingColumns",
+                error_text=msg,
+            )
         except ValueError as e:
             msg = str(e)
             logger.warning(
@@ -397,14 +461,24 @@ def import_prekvk_bytes(
                     "error_text": msg,
                 }
             )
-            _record_history(
+            history_id = _record_history(
                 "rejected",
                 phase_name=phase,
                 row_count=0,
                 error_type="InvalidNumericValue",
                 error_text=msg,
             )
-            return (False, msg, 0)
+            return _result(
+                False,
+                msg,
+                0,
+                status="rejected",
+                phase_name=phase,
+                rows_in_source_value=0,
+                history_id=history_id,
+                error_type="InvalidNumericValue",
+                error_text=msg,
+            )
 
         out = out.dropna(subset=["GovernorID"])
         if out.empty:
@@ -426,16 +500,27 @@ def import_prekvk_bytes(
                     "error_text": "No valid governor rows after cleaning",
                 }
             )
-            _record_history(
+            history_id = _record_history(
                 "rejected",
                 phase_name=phase,
                 row_count=0,
                 error_type="NoValidRows",
                 error_text="No valid governor rows after cleaning",
             )
-            return (False, "No valid governor rows after cleaning.", 0)
+            return _result(
+                False,
+                "No valid governor rows after cleaning.",
+                0,
+                status="rejected",
+                phase_name=phase,
+                rows_in_source_value=0,
+                history_id=history_id,
+                error_type="NoValidRows",
+                error_text="No valid governor rows after cleaning",
+            )
 
         out["GovernorID"] = out["GovernorID"].astype("int64")
+        rows_in_source = int(len(out))
 
         dup_mask = out["GovernorID"].duplicated(keep=False)
         if bool(dup_mask.any()):
@@ -469,14 +554,24 @@ def import_prekvk_bytes(
                     "duplicate_count": len(uniq),
                 }
             )
-            _record_history(
+            history_id = _record_history(
                 "rejected",
                 phase_name="validate_duplicates",
                 row_count=0,
                 error_type="DuplicateGovernorIDs",
                 error_text=msg,
             )
-            return (False, msg, 0)
+            return _result(
+                False,
+                msg,
+                0,
+                status="rejected",
+                phase_name="validate_duplicates",
+                rows_in_source_value=rows_in_source,
+                history_id=history_id,
+                error_type="DuplicateGovernorIDs",
+                error_text=msg,
+            )
 
         phase = "db"
         with _conn() as conn:
@@ -505,8 +600,16 @@ def import_prekvk_bytes(
                             "rows": 0,
                         }
                     )
-                    _record_history("duplicate", phase_name=phase, row_count=0)
-                    return (True, "Duplicate file skipped (hash match).", 0)
+                    history_id = _record_history("duplicate", phase_name=phase, row_count=0)
+                    return _result(
+                        True,
+                        "Duplicate file skipped (hash match).",
+                        0,
+                        status="duplicate",
+                        phase_name=phase,
+                        rows_in_source_value=rows_in_source,
+                        history_id=history_id,
+                    )
 
                 phase = "db_insert_header"
                 cur.execute(
@@ -599,7 +702,7 @@ def import_prekvk_bytes(
                         "rows": rows_imported,
                     }
                 )
-                _record_history("accepted", phase_name=phase, row_count=rows_imported)
+                history_id = _record_history("accepted", phase_name=phase, row_count=rows_imported)
 
             except Exception:
                 try:
@@ -608,7 +711,15 @@ def import_prekvk_bytes(
                     pass
                 raise
 
-        return (True, f"Imported {rows_imported} rows as scan {scan_id}.", rows_imported)
+        return _result(
+            True,
+            f"Imported {rows_imported} rows as scan {scan_id}.",
+            rows_imported,
+            status="accepted",
+            phase_name=phase,
+            rows_in_source_value=rows_in_source,
+            history_id=history_id,
+        )
 
     except pyodbc.IntegrityError as e:
         if "UQ_PreKvk_Scan" in str(e) or "unique" in str(e).lower():
@@ -630,8 +741,16 @@ def import_prekvk_bytes(
                     "dedupe": "unique_constraint",
                 }
             )
-            _record_history("duplicate", phase_name=phase, row_count=0)
-            return (True, "Duplicate file skipped (unique constraint).", 0)
+            history_id = _record_history("duplicate", phase_name=phase, row_count=0)
+            return _result(
+                True,
+                "Duplicate file skipped (unique constraint).",
+                0,
+                status="duplicate",
+                phase_name=phase,
+                rows_in_source_value=rows_in_source,
+                history_id=history_id,
+            )
 
         logger.warning(
             "[PREKVK] import failed phase=%s kvk_no=%s file=%s integrity_error=%s",
@@ -652,14 +771,24 @@ def import_prekvk_bytes(
                 "error_text": str(e),
             }
         )
-        _record_history(
+        history_id = _record_history(
             "failed",
             phase_name=phase,
             row_count=0,
             error_type="IntegrityError",
             error_text=str(e),
         )
-        return (False, f"IntegrityError: {e}", 0)
+        return _result(
+            False,
+            f"IntegrityError: {e}",
+            0,
+            status="failed",
+            phase_name=phase,
+            rows_in_source_value=rows_in_source,
+            history_id=history_id,
+            error_type="IntegrityError",
+            error_text=str(e),
+        )
 
     except Exception as e:
         logger.exception(
@@ -677,11 +806,21 @@ def import_prekvk_bytes(
                 "error_text": str(e),
             }
         )
-        _record_history(
+        history_id = _record_history(
             "failed",
             phase_name=phase,
             row_count=0,
             error_type=type(e).__name__,
             error_text=str(e),
         )
-        return (False, f"{type(e).__name__}: {e}", 0)
+        return _result(
+            False,
+            f"{type(e).__name__}: {e}",
+            0,
+            status="failed",
+            phase_name=phase,
+            rows_in_source_value=rows_in_source,
+            history_id=history_id,
+            error_type=type(e).__name__,
+            error_text=str(e),
+        )
