@@ -149,7 +149,9 @@ async def record_honor_audit_phase(
             set_batch_status=set_batch_status,
         )
     except Exception:
-        logger.warning("honor_audit_phase_failed phase=%s; continuing import", phase_name, exc_info=True)
+        logger.warning(
+            "honor_audit_phase_failed phase=%s; continuing import", phase_name, exc_info=True
+        )
 
 
 async def complete_honor_audit_batch(
