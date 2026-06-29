@@ -20,10 +20,13 @@ overlay support, player-location shield timestamp persistence, and the temporary
 bulk CSV hotfix. Task B Unicode Import Contract replaced the temporary ASCII fallback with raw text
 SQL staging plus explicit typed conversion. Task C Slice 1 Import Architecture and Service/DAL
 Wrappers extracted fallback import file orchestration and DAL helpers while preserving current
-route, command, SQL, and import output behavior.
+route, command, SQL, and import output behavior. Task C Slice 2 Durable Batch Audit Foundation
+added SQL-owned durable import batch/phase audit tables and stored procedure writers, bot audit
+DAL/service wrappers, and fallback-first audit wiring correlated to `dbo.FallbackImportBatchControl`
+without changing route, command, queue, staging, SQL procedure, or import output behavior.
 
-The active import follow-up is Task C Slice 2 in
-`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation.md`.
+The active import follow-up is Task C Slice 3 in
+`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3 Non-Fallback Audit Adoption.md`.
 
 The DL_bot upload-routing and startup/lifecycle optimisation programme is complete through
 Phase 6L:

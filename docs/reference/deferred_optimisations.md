@@ -6,31 +6,40 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: fallback, location, honor, PreKvK, weekly activity, MGE, and inventory upload routes/workers
+- Area: location, honor, PreKvK, weekly activity, MGE, and inventory upload routes/workers
 - Type: consistency
-- Description: Even after the generic durable audit foundation exists, each import kind will still need deliberate adoption planning. The non-fallback import paths may have different route, worker, file, SQL procedure, and operator-observable state surfaces, so wiring them without audit could change behavior or create inconsistent status semantics.
-- Suggested Fix: After Slice 2 creates the generic audit foundation, run a focused adoption slice that maps each non-fallback import path and wires audit events through service/DAL boundaries one import family at a time. Preserve route/command UX, output files, SQL procedure behavior, and existing worker recovery semantics unless separately approved.
+- Description: Task C Slice 2 delivered the generic durable audit foundation and fallback-first wiring. The remaining non-fallback import paths still need deliberate adoption planning because they have different route, worker, file, SQL procedure, cache refresh, and operator-observable state surfaces. Wiring them without a focused map could change behavior or create inconsistent status semantics.
+- Suggested Fix: Use Task C Slice 3 to map each non-fallback import path and wire audit events through service/DAL boundaries one import family at a time, with player location import proposed as the first low-risk target. Preserve route/command UX, output files, SQL procedure behavior, cache refresh signaling, and existing worker recovery semantics unless separately approved.
 - Impact: medium
 - Risk: medium
-- Dependencies: Generic durable import batch audit foundation delivered and smoke tested; import-kind-specific tests identified for each adopted route/worker path.
+- Dependencies: Generic durable import batch audit foundation delivered and smoke tested in Task C Slice 2; `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3 Non-Fallback Audit Adoption.md`; import-kind-specific tests identified for each adopted route/worker path.
+
+### Deferred Optimisation
+- Area: `services/import_audit_service.py`, `stats/dal/import_audit_dal.py`, `stats_module.py`, SQL repo `dbo.usp_ImportAudit_CompleteBatch`
+- Type: consistency
+- Description: Task C Slice 2 smoke testing confirmed fallback audit batches and phase rows are durable and correctly completed, but batch-level `RowsInSource` remains `NULL` when the source row count is only known after `dbo.usp_ImportAudit_StartBatch` runs. The count is still preserved in fallback metadata/details and phase rows, so this is not a data-protection issue, but later audit consumers may expect top-level batch row counters to be consistently populated.
+- Suggested Fix: In the next audit-adoption slice or a small SQL/DAL follow-up, decide whether `dbo.usp_ImportAudit_CompleteBatch` should accept `RowsInSource` or whether Python should update batch counters through a separate SQL-owned writer. Preserve existing audit rows, avoid historical backfill unless separately approved, and keep phase-level counters as the source of truth until the batch-level policy is approved.
+- Impact: low
+- Risk: low
+- Dependencies: Task C Slice 2 audit foundation delivered; SQL owner approval for any writer-procedure signature change; no requirement to block non-fallback adoption.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.UPDATE_ALL2`, `update_all2_log_manager.py`, `stats/dal/fallback_import_dal.py`, `stats_module.py`
 - Type: architecture
 - Description: `dbo.UPDATE_ALL2` remains a broad downstream rebuild procedure, and Python currently observes completion through `SP_TaskStatus` counter/status polling. There is not yet a durable per-phase audit output that explains which downstream phase failed or dominated runtime.
-- Suggested Fix: After the generic batch audit foundation exists, add a wrapper or non-invasive audit output around `dbo.UPDATE_ALL2` that records start/end, status, duration, and phase-level markers without changing output tables or player-visible behavior. Use the resulting baseline before deciding whether to split the procedure.
+- Suggested Fix: After Task C Slice 2's generic batch audit foundation is deployed, add a wrapper or non-invasive audit output around `dbo.UPDATE_ALL2` that records start/end, status, duration, and phase-level markers without changing output tables or player-visible behavior. Use the resulting baseline before deciding whether to split the procedure.
 - Impact: high
 - Risk: medium
-- Dependencies: Generic import batch audit foundation; SQL validation in `C:\K98-bot-SQL-Server`; no wholesale `UPDATE_ALL2` replacement in this slice.
+- Dependencies: Task C Slice 2 generic import batch audit foundation; SQL validation in `C:\K98-bot-SQL-Server`; no wholesale `UPDATE_ALL2` replacement in this slice.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.IMPORT_STAGING_PROC`, raw fallback staging, `dbo.IMPORT_STAGING_CSV`, `dbo.IMPORT_STAGING`
 - Type: refactor
 - Description: `dbo.IMPORT_STAGING_PROC` owns multiple responsibilities around fallback staging, raw text conversion, typed conversion, metadata-sensitive partial fallback behavior, and final staging/output handoff. Task B intentionally preserved procedure shape to reduce risk while fixing Unicode preservation.
-- Suggested Fix: After durable audit hooks exist, split `dbo.IMPORT_STAGING_PROC` responsibilities into smaller phase procedures or clearly bounded internal sections with audit markers, preserving existing input/output contracts and rollback scripts. Keep data-contract changes out of the split unless separately approved.
+- Suggested Fix: After durable audit hooks are deployed and fallback audit evidence is stable, split `dbo.IMPORT_STAGING_PROC` responsibilities into smaller phase procedures or clearly bounded internal sections with audit markers, preserving existing input/output contracts and rollback scripts. Keep data-contract changes out of the split unless separately approved.
 - Impact: high
 - Risk: high
-- Dependencies: Task B raw staging path deployed; generic batch audit and SQL validation available; production smoke baseline for full and partial fallback imports.
+- Dependencies: Task B raw staging path deployed; Task C Slice 2 generic batch audit and SQL validation available; production smoke baseline for full and partial fallback imports.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.UPDATE_ALL2` and downstream stats/dashboard rebuild procedures

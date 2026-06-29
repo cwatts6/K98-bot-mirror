@@ -15,8 +15,9 @@ Completion record:
 - The Task A ASCII-safe text workaround was replaced with Unicode-preserving fallback CSV text
   formatting backed by SQL raw staging.
 - The broader import architecture cleanup was promoted to Task C Slice 1 and completed in mirror
-  PR #181 / production PR #489. The active follow-up is Task C Slice 2:
-  `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation.md`.
+  PR #181 / production PR #489. Task C Slice 2 durable audit foundation is also complete and
+  archived. The active follow-up is Task C Slice 3:
+  `docs/task_packs/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3 Non-Fallback Audit Adoption.md`.
 
 ## 1. Task Header
 

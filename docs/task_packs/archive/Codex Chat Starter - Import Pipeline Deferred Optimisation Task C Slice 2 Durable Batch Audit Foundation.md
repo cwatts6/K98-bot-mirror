@@ -1,5 +1,8 @@
 # Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation
 
+Status: archived after Task C Slice 2 delivery. Use the Slice 3 starter for the next import-audit
+slice.
+
 Use this starter to begin the next import pipeline slice. Start with audit/scope and SQL design
 only; do not implement code or SQL until the model and first implementation boundary are approved.
 
@@ -9,7 +12,7 @@ only; do not implement code or SQL until the model and first implementation boun
 Begin Task C Slice 2 - Import Pipeline Deferred Optimisation: Durable Batch Audit Foundation.
 
 Use the task pack:
-C:\discord_file_downloader\docs\task_packs\Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation.md
+C:\discord_file_downloader\docs\task_packs\archive\Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation.md
 
 Completed dependencies:
 - Task A:

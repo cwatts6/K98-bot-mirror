@@ -46,14 +46,23 @@ Import pipeline status:
 - Task C Slice 1 records are archived under `archive/`:
   - `archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Import Architecture and Service DAL Wrappers.md`
   - `archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Import Architecture and Durable Audit.md`
-- Active Task C Slice 2 files:
-  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation.md`
-  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation.md`
-- Task C Slice 2 is the next import architecture cleanup slice. It starts with audit/scope and SQL
-  design for a generic durable import batch audit model covering fallback, location, honor, PreKvK,
-  weekly activity, MGE, and inventory. It must keep route/command behavior changes,
-  `dbo.IMPORT_STAGING_PROC` decomposition, and `dbo.UPDATE_ALL2` decomposition behind explicit
-  approval.
+- Task C Slice 2 Durable Batch Audit Foundation is delivered in mirror PR #182 and SQL PR #23. It
+  added `dbo.ImportAuditBatch`, `dbo.ImportAuditPhase`, SQL-owned audit writer procedures, bot
+  DAL/service wrappers, and fallback-first audit wiring correlated to
+  `dbo.FallbackImportBatchControl`. Smoke testing on 2026-06-29 confirmed full fallback and interim
+  auto partial fallback produce completed audit batches and phase rows while preserving existing
+  import output behavior.
+- Task C Slice 2 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation.md`
+  - `archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation.md`
+- Active Task C Slice 3 files:
+  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 3 Non-Fallback Audit Adoption.md`
+  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 3 Non-Fallback Audit Adoption.md`
+- Task C Slice 3 is the next import architecture cleanup slice. It starts with audit/scope across
+  location, honor, PreKvK, weekly activity, MGE, and inventory, then proposes location import as the
+  first non-fallback audit wiring target. It keeps route/command UX changes, queue embed changes,
+  fallback behavior changes, `dbo.UPDATE_ALL2` wrapper instrumentation, `dbo.IMPORT_STAGING_PROC`
+  decomposition, and `dbo.UPDATE_ALL2` decomposition behind explicit approval.
 
 Player Self-Service Command Centre status:
 
@@ -187,12 +196,12 @@ Latest completed starter:
 
 Next active work:
 
-Import Pipeline Deferred Optimisation Task C Slice 2 Durable Batch Audit Foundation is the next
-prepared import pipeline slice. It starts with audit/scope and SQL design only for a generic
-durable import batch audit model across fallback, location, honor, PreKvK, weekly activity, MGE,
-and inventory. The first implementation boundary must be approved before code or SQL changes, and
-route/command changes, `dbo.IMPORT_STAGING_PROC` decomposition, and `dbo.UPDATE_ALL2`
-decomposition remain separate later slices.
+Import Pipeline Deferred Optimisation Task C Slice 3 Non-Fallback Audit Adoption is the next
+prepared import pipeline slice. It starts with audit/scope for location, honor, PreKvK, weekly
+activity, MGE, and inventory import state surfaces, then asks for approval to wire durable audit
+records to location import first. Fallback behavior changes, route/command UX changes, queue embed
+changes, `dbo.UPDATE_ALL2` wrapper instrumentation, `dbo.IMPORT_STAGING_PROC` decomposition, and
+`dbo.UPDATE_ALL2` decomposition remain separate later slices unless explicitly approved.
 
 Player Self-Service Command Centre v2 Phase 1 Stats, Profile, and Inventory Audit and Design is
 the next prepared player self-service slice. It starts with audit/scope only for `/my_stats`,

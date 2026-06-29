@@ -11,7 +11,15 @@
   - Task B, archived at `docs/task_packs/archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task B.md`
   - Task C Slice 1, archived at `docs/task_packs/archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Import Architecture and Service DAL Wrappers.md`
 - One-pass approved: `no`
-- Status: `active task pack, starts with audit/scope and SQL design only`
+- Status: `complete; archived after mirror PR #182 and SQL PR #23 review/smoke validation`
+
+Completion note: Task C Slice 2 delivered the generic SQL-owned durable import audit foundation
+and fallback-first wiring. It added `dbo.ImportAuditBatch`, `dbo.ImportAuditPhase`, and SQL writer
+procedures in the SQL repo; added bot DAL/service audit wrappers; correlated fallback imports to
+`dbo.FallbackImportBatchControl`; preserved route, command, queue, staging, stored procedure, CSV/XLSX,
+and output behavior; and smoke tested full fallback plus interim auto partial fallback audit rows on
+2026-06-29. Remaining non-fallback adoption, `dbo.UPDATE_ALL2` wrapper instrumentation,
+`dbo.IMPORT_STAGING_PROC` split, and `dbo.UPDATE_ALL2` decomposition are tracked as later slices.
 
 ## 2. Objective
 
