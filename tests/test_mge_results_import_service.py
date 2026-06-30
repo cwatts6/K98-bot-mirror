@@ -236,9 +236,7 @@ def test_auto_success_completes_generic_audit_with_import_correlation(monkeypatc
         lambda event_id: [{"Rank": 1, "PlayerId": 1, "PlayerName": "A", "Score": 10}],
     )
 
-    out = mge_results_import.import_results_auto(
-        b"x", "mge_rankings_kd1198_20260311.xlsx", 123
-    )
+    out = mge_results_import.import_results_auto(b"x", "mge_rankings_kd1198_20260311.xlsx", 123)
 
     assert out["import_audit_batch_id"] == 12
     complete = [call for call in calls if call[0] == "complete"][-1]
@@ -284,9 +282,7 @@ def test_auto_duplicate_file_hash_records_uncorrelated_duplicate_audit(monkeypat
     )
 
     try:
-        mge_results_import.import_results_auto(
-            b"x", "mge_rankings_kd1198_20260311.xlsx", 123
-        )
+        mge_results_import.import_results_auto(b"x", "mge_rankings_kd1198_20260311.xlsx", 123)
         raise AssertionError("Expected duplicate rejection")
     except ValueError:
         pass
@@ -352,9 +348,7 @@ def test_auto_failure_after_import_batch_correlates_failed_audit(monkeypatch):
     )
 
     try:
-        mge_results_import.import_results_auto(
-            b"x", "mge_rankings_kd1198_20260311.xlsx", 123
-        )
+        mge_results_import.import_results_auto(b"x", "mge_rankings_kd1198_20260311.xlsx", 123)
         raise AssertionError("Expected import failure")
     except RuntimeError:
         pass
