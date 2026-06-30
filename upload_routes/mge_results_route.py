@@ -8,7 +8,15 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
+from services.mge_results_import_audit_service import (
+    MGE_RESULTS_AUDIT_BACKUP_PHASE,
+    MgeResultsImportAuditContext,
+    audit_duration_ms,
+    mge_results_audit_details,
+    record_mge_results_audit_phase,
+)
 from upload_routes.common import message_source_fields, resolve_notify_channel, schedule_best_effort
+from utils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -61,12 +69,27 @@ async def handle_mge_results_upload(message: Any, deps: MgeResultsRouteDeps) -> 
             return True
 
         file_bytes = await target.read()
+        audit_context = MgeResultsImportAuditContext(
+            source_filename=target.filename,
+            source_message_id=int(message.id) if getattr(message, "id", None) is not None else None,
+            source_channel_id=(
+                int(message.channel.id)
+                if getattr(message.channel, "id", None) is not None
+                else None
+            ),
+            actor_discord_id=(
+                int(message.author.id) if getattr(message.author, "id", None) is not None else None
+            ),
+            source="auto",
+            entry_point="mge_results_upload",
+        )
 
         result = await deps.offload_callable(
             _load_import_results_auto(),
             file_bytes,
             target.filename,
             message.author.id,
+            audit_context,
             name="import_results_auto",
             prefer_process=True,
             meta={"filename": target.filename, "channel_id": message.channel.id},
@@ -88,11 +111,35 @@ async def handle_mge_results_upload(message: Any, deps: MgeResultsRouteDeps) -> 
             fields["Matched"] = str(report.get("matched_actual_total", 0))
 
         await deps.send_embed(notify_ch, "MGE Results Import ✅", fields, 0x2ECC71)
-        schedule_best_effort(
+        backup_started = utcnow()
+        backup_schedule_error = schedule_best_effort(
             deps.create_task,
             deps.trigger_log_backup_background(),
             logger,
             "Failed to schedule background log-backup trigger",
+        )
+        await asyncio.to_thread(
+            record_mge_results_audit_phase,
+            result.get("import_audit_batch_id"),
+            phase_name=MGE_RESULTS_AUDIT_BACKUP_PHASE,
+            phase_status="failed" if backup_schedule_error is not None else "completed",
+            started_at_utc=backup_started.replace(tzinfo=None),
+            rows_in=int(result["rows"]),
+            rows_out=int(result["rows"]) if backup_schedule_error is None else None,
+            duration_ms=audit_duration_ms(backup_started),
+            error_type=(
+                type(backup_schedule_error).__name__ if backup_schedule_error is not None else None
+            ),
+            error_text=str(backup_schedule_error) if backup_schedule_error is not None else None,
+            details=mge_results_audit_details(
+                audit_context,
+                event_id=int(result["event_id"]),
+                event_mode=str(result["event_mode"]),
+                import_id=int(result["import_id"]),
+                rows_written=int(result["rows"]),
+                backup_failed=backup_schedule_error is not None,
+                error=str(backup_schedule_error) if backup_schedule_error is not None else None,
+            ),
         )
     except Exception as e:
         fields = {

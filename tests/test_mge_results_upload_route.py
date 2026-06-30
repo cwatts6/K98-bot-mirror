@@ -167,7 +167,12 @@ async def test_mge_results_route_success_preserves_import_contract_and_side_effe
     assert len(offloads) == 1
     func, args, kwargs = offloads[0]
     assert func is route_import
-    assert args == (b"xlsx", "mge_rankings_kd1198_20260311.xlsx", 123456789)
+    assert args[:3] == (b"xlsx", "mge_rankings_kd1198_20260311.xlsx", 123456789)
+    audit_context = args[3]
+    assert audit_context.source_filename == "mge_rankings_kd1198_20260311.xlsx"
+    assert audit_context.source_channel_id == 10
+    assert audit_context.actor_discord_id == 123456789
+    assert audit_context.entry_point == "mge_results_upload"
     assert kwargs["name"] == "import_results_auto"
     assert kwargs["prefer_process"] is True
     assert kwargs["meta"] == {
