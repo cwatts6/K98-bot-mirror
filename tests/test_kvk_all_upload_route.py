@@ -392,8 +392,8 @@ async def test_kvk_all_route_kvk_details_rejection_correlates_diagnostic_id():
 async def test_kvk_all_route_exception_diagnostic_id_records_kvk_details_rejection():
     audit_events = []
     exc = RuntimeError("Scan timestamp outside KVK_Details ranges.")
-    setattr(exc, "kvk_diagnostic_id", 42)
-    setattr(exc, "kvk_staged_rows", 7)
+    exc.kvk_diagnostic_id = 42
+    exc.kvk_staged_rows = 7
     deps, sent, _offloads, _created, _exports = _deps(
         offload_results=[exc],
         audit_events=audit_events,

@@ -605,9 +605,7 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                         rows_written=rows if rows is not None else 0,
                         rows_skipped=0 if rows is not None else staged_from_exc,
                         external_batch_table=(
-                            KVK_ALL_AUDIT_DIAGNOSTIC_TABLE
-                            if diagnostic_external_id
-                            else None
+                            KVK_ALL_AUDIT_DIAGNOSTIC_TABLE if diagnostic_external_id else None
                         ),
                         external_batch_id=diagnostic_external_id,
                         details=terminal_details,

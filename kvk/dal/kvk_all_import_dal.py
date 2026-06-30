@@ -477,8 +477,8 @@ def ingest_prepared_import(
                     diagnostic_id,
                 )
         try:
-            setattr(exc, "kvk_diagnostic_id", diagnostic_id)
-            setattr(exc, "kvk_staged_rows", staged_rows)
+            exc.kvk_diagnostic_id = diagnostic_id
+            exc.kvk_staged_rows = staged_rows
         except Exception:
             pass
         raise
