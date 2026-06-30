@@ -5,6 +5,7 @@ import pytest
 
 from inventory.models import (
     InventoryAnalysisSummary,
+    InventoryFlowType,
     InventoryImagePayload,
     InventoryImportType,
     RegisteredGovernor,
@@ -267,6 +268,92 @@ async def test_interaction_review_prefers_channel_message_when_upload_message_ex
     )
 
 
+async def test_additional_material_review_preserves_specific_audit_entry_point(monkeypatch):
+    captured = {}
+    message = _Message()
+
+    class _Response:
+        def __init__(self):
+            self.done = False
+
+        def is_done(self):
+            return self.done
+
+        async def defer(self, **_kwargs):
+            self.done = True
+
+    interaction = types.SimpleNamespace(
+        user=types.SimpleNamespace(id=42),
+        response=_Response(),
+        followup=types.SimpleNamespace(send=None),
+    )
+    summary = InventoryAnalysisSummary(
+        ok=True,
+        import_type=InventoryImportType.MATERIALS,
+        values={"materials": {"animal_bone": {"legendary": 1}}},
+        confidence_score=0.95,
+        raw_json={"screenshot_count": 2},
+    )
+
+    async def _analyse_additional_material_image(**_kwargs):
+        return summary
+
+    async def _fetch_inventory_audit_batch(**_kwargs):
+        return None
+
+    async def _start_inventory_audit_batch(**_kwargs):
+        return None
+
+    async def _record_inventory_audit_phase(*_args, **_kwargs):
+        return None
+
+    async def _send_review_message(**kwargs):
+        captured["view"] = kwargs["view"]
+        return types.SimpleNamespace(id=987)
+
+    monkeypatch.setattr(
+        inventory_views.inventory_service,
+        "analyse_additional_material_image",
+        _analyse_additional_material_image,
+    )
+    monkeypatch.setattr(
+        inventory_views.inventory_audit,
+        "fetch_inventory_audit_batch",
+        _fetch_inventory_audit_batch,
+    )
+    monkeypatch.setattr(
+        inventory_views.inventory_audit,
+        "start_inventory_audit_batch",
+        _start_inventory_audit_batch,
+    )
+    monkeypatch.setattr(
+        inventory_views.inventory_audit,
+        "record_inventory_audit_phase",
+        _record_inventory_audit_phase,
+    )
+    monkeypatch.setattr(inventory_views, "_send_review_message", _send_review_message)
+    monkeypatch.setattr(
+        inventory_views.InventoryConfirmationView,
+        "start_timeout_watch",
+        lambda self: None,
+    )
+
+    await inventory_views._process_payload_for_governor(
+        bot=object(),
+        interaction=interaction,
+        governor_id=111,
+        actor_discord_id=42,
+        payload=InventoryImagePayload(image_bytes=b"img", filename="materials.png"),
+        original_message=message,
+        batch_id=99,
+        flow_from_pending_command=False,
+        flow_type=InventoryFlowType.UPLOAD_FIRST.value,
+        existing_detected_json={"materials": {"animal_bone": {"epic": 1}}},
+    )
+
+    assert captured["view"]._audit_context().entry_point == "inventory_additional_material_upload"
+
+
 async def test_approve_deletes_original_upload_after_success(monkeypatch):
     async def _state(_batch_id):
         return inventory_views.inventory_service.InventoryReviewActionState(active=True)
@@ -317,6 +404,27 @@ async def test_approve_deletes_original_upload_after_success(monkeypatch):
 
     await view.approve.callback(interaction)
 
+    assert original.deleted is True
+
+
+async def test_delete_original_upload_reports_deleted_when_marking_batch_fails(monkeypatch):
+    async def _mark_deleted(_batch_id):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(
+        inventory_views.inventory_service,
+        "mark_original_upload_deleted",
+        _mark_deleted,
+    )
+
+    original = _Message()
+
+    deleted = await inventory_views._delete_original_upload(
+        original_message=original,
+        batch_id=99,
+    )
+
+    assert deleted is True
     assert original.deleted is True
 
 

@@ -1,7 +1,12 @@
 import pytest
 
 from inventory import inventory_service
-from inventory.models import InventoryAnalysisSummary, InventoryImportType
+from inventory.models import (
+    InventoryAnalysisSummary,
+    InventoryFlowType,
+    InventoryImagePayload,
+    InventoryImportType,
+)
 from ui.views import inventory_views
 from ui.views.inventory_views import (
     InventoryConfirmationView,
@@ -97,6 +102,22 @@ def test_inventory_review_embed_hides_model_and_fallback_details():
     assert "Model" not in field_names
     assert "Fallback Used" not in field_names
     assert "Detected Values" in field_names
+
+
+@pytest.mark.asyncio
+async def test_confirmation_view_uses_explicit_audit_entry_point():
+    view = InventoryConfirmationView(
+        bot=object(),
+        actor_discord_id=42,
+        governor_id=111,
+        batch_id=7,
+        payload=InventoryImagePayload(image_bytes=b"img", filename="materials.png"),
+        summary=_summary(InventoryImportType.MATERIALS),
+        flow_type=InventoryFlowType.UPLOAD_FIRST.value,
+        audit_entry_point="inventory_additional_material_upload",
+    )
+
+    assert view._audit_context().entry_point == "inventory_additional_material_upload"
 
 
 @pytest.mark.asyncio

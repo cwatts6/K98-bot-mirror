@@ -258,6 +258,7 @@ class InventoryConfirmationView(discord.ui.View):
         original_message: discord.Message | None = None,
         audit_batch_ref: Any | None = None,
         flow_type: str = InventoryFlowType.UPLOAD_FIRST.value,
+        audit_entry_point: str | None = None,
     ) -> None:
         super().__init__(timeout=INVENTORY_REVIEW_UI_TIMEOUT_SECONDS)
         self.bot = bot
@@ -269,6 +270,11 @@ class InventoryConfirmationView(discord.ui.View):
         self.original_message = original_message
         self.audit_batch_ref = audit_batch_ref
         self.flow_type = flow_type
+        self.audit_entry_point = audit_entry_point or (
+            "inventory_command_upload"
+            if self.flow_type == InventoryFlowType.COMMAND.value
+            else "inventory_upload_first"
+        )
         self.corrected_values: dict[str, Any] | None = None
         self._terminal = False
         self._expired = False
@@ -869,11 +875,7 @@ class InventoryConfirmationView(discord.ui.View):
             source_message_id=self.payload.source_message_id,
             source_channel_id=self.payload.source_channel_id,
             actor_discord_id=self.actor_discord_id,
-            entry_point=(
-                "inventory_command_upload"
-                if self.flow_type == InventoryFlowType.COMMAND.value
-                else "inventory_upload_first"
-            ),
+            entry_point=self.audit_entry_point,
         )
 
     async def _get_audit_batch_ref(self) -> Any | None:
@@ -1106,12 +1108,15 @@ async def _delete_original_upload(
         return False
     try:
         await original_message.delete()
-        if batch_id is not None:
-            await inventory_service.mark_original_upload_deleted(batch_id)
-        return True
     except Exception:
         logger.debug("inventory_original_upload_delete_failed", exc_info=True)
         return False
+    if batch_id is not None:
+        try:
+            await inventory_service.mark_original_upload_deleted(batch_id)
+        except Exception:
+            logger.debug("inventory_original_upload_mark_deleted_failed", exc_info=True)
+    return True
 
 
 async def _process_payload_for_governor(
@@ -1388,6 +1393,7 @@ async def _process_payload_for_governor(
             summary=summary,
             audit_batch_ref=audit_batch_ref,
             flow_type=resolved_flow_type,
+            audit_entry_point=audit_context.entry_point,
         )
         content = "Review the detected inventory values before approving."
         if flow_from_pending_command:
