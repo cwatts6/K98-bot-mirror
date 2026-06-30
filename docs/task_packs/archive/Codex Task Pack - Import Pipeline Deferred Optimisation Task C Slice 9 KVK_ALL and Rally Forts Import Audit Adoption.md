@@ -1,5 +1,11 @@
 # Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 9 KVK_ALL and Rally Forts Import Audit Adoption
 
+> Archived 2026-06-30 after the combined KVK_ALL/Rally Forts scope was split into two
+> implementation PRs. Slice 9 delivered KVK_ALL generic durable import audit adoption in mirror
+> PR #190 and production PR #498, including smoke-tested `KVK.KVK_Scan` and
+> `KVK.KVK_Ingest_Diagnostics` correlation. Rally Forts remains active and has been promoted into
+> Task C Slice 10.
+
 ## 1. Task Header
 
 - Task name: `Import Pipeline Deferred Optimisation Task C Slice 9 - KVK_ALL and Rally Forts Import Audit Adoption`
@@ -19,7 +25,7 @@
   - Task C Slice 7, archived at `docs/task_packs/archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 7 MGE Results Import Audit Adoption.md`
   - Task C Slice 8, archived at `docs/task_packs/archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 8 Inventory Import Audit Adoption.md`
 - One-pass approved: `no`
-- Status: `active task pack, starts with audit/scope and SQL implementation-boundary confirmation`
+- Status: `archived split-scope record; KVK_ALL delivered, Rally Forts moved to Task C Slice 10`
 
 ## 2. Objective
 

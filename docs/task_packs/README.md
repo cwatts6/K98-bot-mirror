@@ -111,18 +111,27 @@ Import pipeline status:
 - Task C Slice 8 records are archived under `archive/`:
   - `archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 8 Inventory Import Audit Adoption.md`
   - `archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 8 Inventory Import Audit Adoption.md`
-- Active Task C Slice 9 files:
-  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 9 KVK_ALL and Rally Forts Import Audit Adoption.md`
-  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 9 KVK_ALL and Rally Forts Import Audit Adoption.md`
-- Task C Slice 9 is the next import architecture cleanup slice. It starts with audit/scope and SQL
-  implementation-boundary confirmation for KVK_ALL and Rally Forts generic durable import audit
-  adoption. KVK_ALL route extraction is already complete from upload-routing Phase 4 / PR 110, and
+- Task C Slice 9 KVK_ALL Import Audit Adoption is delivered in mirror PR #190 and production
+  PR #498. Production smoke testing on 2026-06-30 confirmed completed KVK_ALL batch 23 correlated
+  to `KVK.KVK_Scan` with `ExternalBatchId=15:83`, `RowsInSource=9194`, `RowsStaged=9194`,
+  `RowsWritten=9194`, and `RowsSkipped=0`; KVK-details rejection batch 22 failed as
+  `KvkDetailsTimestampRejected` and correlated to `KVK.KVK_Ingest_Diagnostics` with
+  `ExternalBatchId=2`, `RowsStaged=9194`, and `RowsSkipped=9194`.
+- Task C Slice 9 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 9 KVK_ALL and Rally Forts Import Audit Adoption.md`
+  - `archive/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 9 KVK_ALL and Rally Forts Import Audit Adoption.md`
+- Active Task C Slice 10 files:
+  - `Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 10 Rally Forts Import Audit Adoption.md`
+  - `Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 10 Rally Forts Import Audit Adoption.md`
+- Task C Slice 10 is the next import architecture cleanup slice. It starts with audit/scope and
+  SQL implementation-boundary confirmation for Rally Forts generic durable import audit adoption.
   Rally Forts route extraction is already complete from upload-routing Phase 5C / PR 115; the
-  remaining gap is shared durable import audit adoption. `dbo.UPDATE_ALL2` wrapper
+  remaining gap is durable audit adoption and safe `dbo.IngestionLog` correlation when an
+  `IngestionID` can be exposed without behavior changes. `dbo.UPDATE_ALL2` wrapper
   instrumentation, `dbo.IMPORT_STAGING_PROC` decomposition, `dbo.UPDATE_ALL2` decomposition,
   residual `stats_module.py` cleanup, legacy PreKvK SQL cleanup, weekly cumulative view cleanup,
-  and inventory view-orchestration extraction remain separate later slices unless explicitly
-  approved.
+  inventory view-orchestration extraction, and generic audit phase timestamp normalization remain
+  separate later slices unless explicitly approved.
 
 Player Self-Service Command Centre status:
 
@@ -256,16 +265,16 @@ Latest completed starter:
 
 Next active work:
 
-Import Pipeline Deferred Optimisation Task C Slice 9 KVK_ALL and Rally Forts Import Audit Adoption
-is the next prepared import pipeline slice. It starts with audit/scope and SQL
-implementation-boundary confirmation for adopting generic durable audit on the KVK_ALL
-all-kingdom upload route and Rally Forts upload route. KVK_ALL/Rally route extraction is complete;
-generic durable audit adoption is not. Fallback/player-location/Honor/PreKvK/weekly
-activity/MGE/inventory behavior changes, route UX changes, queue embed changes, `dbo.UPDATE_ALL2`
-wrapper instrumentation, `dbo.IMPORT_STAGING_PROC` decomposition, `dbo.UPDATE_ALL2`
-decomposition, residual `stats_module.py` cleanup, legacy PreKvK SQL cleanup, weekly cumulative
-view cleanup, and inventory view-orchestration extraction remain separate later slices unless
-explicitly approved.
+Import Pipeline Deferred Optimisation Task C Slice 10 Rally Forts Import Audit Adoption is the
+next prepared import pipeline slice. It starts with audit/scope and SQL implementation-boundary
+confirmation for adopting generic durable audit on the Rally Forts upload route. Rally Forts route
+extraction is complete; generic durable audit adoption is not. KVK_ALL is delivered and smoke
+tested in Slice 9. Fallback/player-location/Honor/PreKvK/weekly activity/MGE/inventory/KVK_ALL
+behavior changes, route UX changes, queue embed changes, `dbo.UPDATE_ALL2` wrapper
+instrumentation, `dbo.IMPORT_STAGING_PROC` decomposition, `dbo.UPDATE_ALL2` decomposition,
+residual `stats_module.py` cleanup, legacy PreKvK SQL cleanup, weekly cumulative view cleanup,
+inventory view-orchestration extraction, and generic audit phase timestamp normalization remain
+separate later slices unless explicitly approved.
 
 Player Self-Service Command Centre v2 Phase 1 Stats, Profile, and Inventory Audit and Design is
 the next prepared player self-service slice. It starts with audit/scope only for `/my_stats`,

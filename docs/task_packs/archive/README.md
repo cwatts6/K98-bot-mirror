@@ -58,9 +58,18 @@ audit/history model and route UX. Accepted lifecycle outcomes correlate to
 `dbo.InventoryImportBatch`. Operator smoke testing on 2026-06-30 confirmed resources, speedups,
 materials, failure, and cancel audit outcomes, including a three-file material continuation with
 `RowsInSource=3`, `RowsStaged=3`, and `RowsWritten=25`.
+Task C Slice 9 KVK_ALL Import Audit Adoption delivered the KVK_ALL half of the split
+KVK_ALL/Rally Forts audit-adoption scope in mirror PR #190 and production PR #498. It wired the
+KVK_ALL upload route to generic durable audit while preserving route UX, embed text, importer
+contracts, SQL ingest/recompute behavior, Google Sheet link behavior, and auto-export scheduling.
+Accepted imports correlate to `KVK.KVK_Scan` using `ExternalBatchId=<KVK_NO>:<ScanID>`, and
+KVK-details timestamp rejections correlate to `KVK.KVK_Ingest_Diagnostics` when a diagnostic id
+exists. Operator smoke testing on 2026-06-30 confirmed completed batch 23 with `ExternalBatchId=15:83`
+and 9194 source/staged/written rows, plus failed diagnostic batch 22 with `ExternalBatchId=2` and
+9194 staged/skipped rows. Rally Forts was split into the active Task C Slice 10 pack.
 
-The active import follow-up is Task C Slice 9 in
-`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 9 KVK_ALL and Rally Forts Import Audit Adoption.md`.
+The active import follow-up is Task C Slice 10 in
+`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 10 Rally Forts Import Audit Adoption.md`.
 
 The DL_bot upload-routing and startup/lifecycle optimisation programme is complete through
 Phase 6L:
