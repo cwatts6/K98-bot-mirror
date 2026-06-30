@@ -165,5 +165,42 @@ async def test_complete_inventory_audit_batch_uses_cancelled_status(monkeypatch)
 
     assert seen["batch_ref"] == ImportAuditBatchRef(12, "cid")
     assert seen["status"] == "cancelled"
-    assert seen["external_batch_table"] == audit.INVENTORY_AUDIT_EXTERNAL_TABLE
+    assert "external_batch_table" not in seen
+    assert "external_batch_id" not in seen
+    assert seen["rows_skipped"] == 1
+
+
+@pytest.mark.asyncio
+async def test_fail_inventory_audit_batch_preserves_existing_external_correlation(monkeypatch):
+    seen = {}
+
+    def fake_fail_batch_best_effort(batch_ref, **kwargs):
+        seen["batch_ref"] = batch_ref
+        seen.update(kwargs)
+
+    async def inline_runner(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(
+        audit.import_audit_service,
+        "fail_batch_best_effort",
+        fake_fail_batch_best_effort,
+    )
+
+    await audit.fail_inventory_audit_batch(
+        ImportAuditBatchRef(12, "cid"),
+        status="failed",
+        error_type="InventoryAnalysisFailed",
+        error_text="analysis failed",
+        rows_in_source=1,
+        rows_written=0,
+        rows_skipped=1,
+        audit_runner=inline_runner,
+    )
+
+    assert seen["batch_ref"] == ImportAuditBatchRef(12, "cid")
+    assert seen["status"] == "failed"
+    assert seen["error_type"] == "InventoryAnalysisFailed"
+    assert "external_batch_table" not in seen
+    assert "external_batch_id" not in seen
     assert seen["rows_skipped"] == 1

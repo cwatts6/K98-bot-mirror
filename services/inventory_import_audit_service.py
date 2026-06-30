@@ -257,8 +257,6 @@ async def complete_inventory_audit_batch(
             rows_staged=rows_staged,
             rows_written=rows_written,
             rows_skipped=rows_skipped,
-            external_batch_table=INVENTORY_AUDIT_EXTERNAL_TABLE,
-            external_batch_id=None,
             details=details,
         )
     except Exception:
@@ -291,8 +289,6 @@ async def fail_inventory_audit_batch(
             rows_staged=rows_staged,
             rows_written=rows_written,
             rows_skipped=rows_skipped,
-            external_batch_table=INVENTORY_AUDIT_EXTERNAL_TABLE,
-            external_batch_id=None,
             details=details,
         )
     except Exception:
