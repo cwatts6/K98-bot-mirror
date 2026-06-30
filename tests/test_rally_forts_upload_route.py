@@ -67,6 +67,7 @@ def _deps(tmp_path, **overrides):
     offloads = []
     created_tasks = []
     preflight_channels = []
+    audit_calls = overrides.get("audit_calls", [])
 
     async def get_notify_channel():
         if "notify_exception" in overrides:
@@ -104,6 +105,19 @@ def _deps(tmp_path, **overrides):
             overrides.get("daily_importer", _fake_daily_importer),
         )
 
+    async def start_audit_batch(**kwargs):
+        audit_calls.append(("start", kwargs))
+        return overrides.get("audit_ref", "audit-ref")
+
+    async def record_audit_phase(batch_ref, **kwargs):
+        audit_calls.append(("phase", batch_ref, kwargs))
+
+    async def complete_audit_batch(batch_ref, **kwargs):
+        audit_calls.append(("complete", batch_ref, kwargs))
+
+    async def fail_audit_batch(batch_ref, **kwargs):
+        audit_calls.append(("fail", batch_ref, kwargs))
+
     deps = route.RallyFortsRouteDeps(
         fort_rally_channel_id=overrides.get("fort_rally_channel_id", 10),
         log_dir=str(tmp_path),
@@ -114,6 +128,10 @@ def _deps(tmp_path, **overrides):
         trigger_log_backup_background=trigger_log_backup_background,
         create_task=create_task,
         importer_loader=overrides.get("importer_loader", importer_loader),
+        start_audit_batch=overrides.get("start_audit_batch", start_audit_batch),
+        record_audit_phase=overrides.get("record_audit_phase", record_audit_phase),
+        complete_audit_batch=overrides.get("complete_audit_batch", complete_audit_batch),
+        fail_audit_batch=overrides.get("fail_audit_batch", fail_audit_batch),
     )
     return deps, sent, offloads, created_tasks, preflight_channels
 
@@ -226,6 +244,46 @@ async def test_rally_daily_success_preserves_save_offload_and_embed_contract(tmp
 
 
 @pytest.mark.asyncio
+async def test_rally_daily_success_records_completed_audit_with_ingestion_correlation(tmp_path):
+    audit_calls = []
+    deps, _sent, _offloads, _created, _preflight = _deps(
+        tmp_path,
+        audit_calls=audit_calls,
+        offload_result={
+            "status": "success",
+            "rows": 7,
+            "as_of": "2026-05-26",
+            "ingestion_id": 42,
+        },
+    )
+
+    handled = await route.handle_rally_forts_upload(
+        _message(attachments=[_FakeAttachment("Rally_data_26-05-2026.xlsx")]),
+        deps,
+    )
+
+    assert handled is True
+    assert audit_calls[0][0] == "start"
+    phase_names = [call[2]["phase_name"] for call in audit_calls if call[0] == "phase"]
+    assert phase_names == [
+        route.RALLY_FORTS_AUDIT_ATTACHMENT_SAVE_PHASE,
+        route.RALLY_FORTS_AUDIT_FILE_CLASSIFY_PHASE,
+        route.RALLY_FORTS_AUDIT_SQL_PREFLIGHT_PHASE,
+        route.RALLY_FORTS_AUDIT_DAILY_INGEST_PHASE,
+        route.RALLY_FORTS_AUDIT_BACKUP_PHASE,
+    ]
+    complete_call = [call for call in audit_calls if call[0] == "complete"][-1]
+    assert complete_call[2]["status"] == "completed"
+    assert complete_call[2]["rows_in_source"] == 7
+    assert complete_call[2]["rows_staged"] == 7
+    assert complete_call[2]["rows_written"] == 7
+    assert complete_call[2]["rows_skipped"] == 0
+    assert complete_call[2]["external_batch_id"] == "42"
+    assert complete_call[2]["details"]["ingestion_id"] == 42
+    assert complete_call[2]["details"]["as_of"] == "2026-05-26"
+
+
+@pytest.mark.asyncio
 async def test_rally_alltime_success_preserves_import_contract(tmp_path):
     deps, sent, offloads, created, _preflight = _deps(
         tmp_path, offload_result={"status": "success", "rows": 4}
@@ -250,6 +308,38 @@ async def test_rally_alltime_success_preserves_import_contract(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_rally_duplicate_skip_records_skipped_audit_without_external_correlation(tmp_path):
+    audit_calls = []
+    deps, sent, _offloads, created, _preflight = _deps(
+        tmp_path,
+        audit_calls=audit_calls,
+        offload_result={"status": "skipped", "reason": "duplicate filename"},
+    )
+
+    handled = await route.handle_rally_forts_upload(
+        _message(attachments=[_FakeAttachment("Rally_data_All_Time.xlsx")]),
+        deps,
+    )
+
+    assert handled is True
+    assert len(created) == 1
+    assert sent[-1][1] == "Rally Forts Import \u2705"
+    ingest_phase = [
+        call
+        for call in audit_calls
+        if call[0] == "phase"
+        and call[2]["phase_name"] == route.RALLY_FORTS_AUDIT_ALLTIME_INGEST_PHASE
+    ][0]
+    assert ingest_phase[2]["phase_status"] == "skipped"
+    complete_call = [call for call in audit_calls if call[0] == "complete"][-1]
+    assert complete_call[2]["status"] == "skipped"
+    assert complete_call[2]["external_batch_id"] is None
+    assert complete_call[2]["rows_staged"] == 0
+    assert complete_call[2]["rows_written"] == 0
+    assert complete_call[2]["details"]["reason"] == "duplicate filename"
+
+
+@pytest.mark.asyncio
 async def test_rally_sql_preflight_abort_happens_after_save_before_offload(tmp_path):
     attachment = _FakeAttachment("Rally_data_26-05-2026.xlsx")
     deps, sent, offloads, created, preflight = _deps(tmp_path, sql_ok=False)
@@ -271,6 +361,33 @@ async def test_rally_sql_preflight_abort_happens_after_save_before_offload(tmp_p
 
 
 @pytest.mark.asyncio
+async def test_rally_sql_preflight_abort_records_failed_uncorrelated_audit(tmp_path):
+    audit_calls = []
+    deps, _sent, offloads, created, _preflight = _deps(
+        tmp_path,
+        audit_calls=audit_calls,
+        sql_ok=False,
+    )
+
+    handled = await route.handle_rally_forts_upload(_message(), deps)
+
+    assert handled is True
+    assert offloads == []
+    assert created == []
+    preflight_phase = [
+        call
+        for call in audit_calls
+        if call[0] == "phase"
+        and call[2]["phase_name"] == route.RALLY_FORTS_AUDIT_SQL_PREFLIGHT_PHASE
+    ][0]
+    assert preflight_phase[2]["phase_status"] == "failed"
+    fail_call = [call for call in audit_calls if call[0] == "fail"][-1]
+    assert fail_call[2]["error_type"] == "SqlHeadroomInsufficient"
+    assert fail_call[2].get("external_batch_id") is None
+    assert fail_call[2]["rows_written"] == 0
+
+
+@pytest.mark.asyncio
 async def test_rally_unrecognized_xlsx_is_saved_and_reported_as_skip(tmp_path):
     attachment = _FakeAttachment("rally_notes.xlsx")
     deps, sent, offloads, created, _preflight = _deps(tmp_path)
@@ -285,6 +402,25 @@ async def test_rally_unrecognized_xlsx_is_saved_and_reported_as_skip(tmp_path):
     assert title == "Rally Forts Import \u274c"
     assert fields["\u23ed\ufe0f rally_notes.xlsx"] == "Unrecognized rally filename"
     assert color == 0xE74C3C
+
+
+@pytest.mark.asyncio
+async def test_rally_unrecognized_xlsx_records_skipped_uncorrelated_audit(tmp_path):
+    audit_calls = []
+    deps, _sent, offloads, created, _preflight = _deps(tmp_path, audit_calls=audit_calls)
+
+    handled = await route.handle_rally_forts_upload(
+        _message(attachments=[_FakeAttachment("rally_notes.xlsx")]),
+        deps,
+    )
+
+    assert handled is True
+    assert offloads == []
+    assert created == []
+    complete_call = [call for call in audit_calls if call[0] == "complete"][-1]
+    assert complete_call[2]["status"] == "skipped"
+    assert complete_call[2].get("external_batch_id") is None
+    assert complete_call[2]["details"]["reason"] == "Unrecognized rally filename"
 
 
 @pytest.mark.asyncio
@@ -310,6 +446,32 @@ async def test_rally_per_attachment_exception_is_aggregated(tmp_path):
     assert title == "Rally Forts Import \u274c"
     assert fields["\u274c Rally_data_26-05-2026.xlsx"] == "RuntimeError: disk full"
     assert color == 0xE74C3C
+
+
+@pytest.mark.asyncio
+async def test_rally_offload_exception_records_failed_ingest_audit(tmp_path):
+    audit_calls = []
+    deps, _sent, offloads, created, _preflight = _deps(
+        tmp_path,
+        audit_calls=audit_calls,
+        offload_exception=RuntimeError("import exploded"),
+    )
+
+    handled = await route.handle_rally_forts_upload(_message(), deps)
+
+    assert handled is True
+    assert len(offloads) == 1
+    assert created == []
+    ingest_phase = [
+        call
+        for call in audit_calls
+        if call[0] == "phase"
+        and call[2]["phase_name"] == route.RALLY_FORTS_AUDIT_DAILY_INGEST_PHASE
+    ][0]
+    assert ingest_phase[2]["phase_status"] == "failed"
+    fail_call = [call for call in audit_calls if call[0] == "fail"][-1]
+    assert fail_call[2]["error_type"] == "RuntimeError"
+    assert fail_call[2].get("external_batch_id") is None
 
 
 @pytest.mark.asyncio
@@ -395,6 +557,23 @@ async def test_rally_rejects_path_traversal_filenames(tmp_path):
     assert "\u274c ../../etc/Rally_data_26-05-2026.xlsx" in fields
     assert "path separators not allowed" in fields["\u274c ../../etc/Rally_data_26-05-2026.xlsx"]
     assert color == 0xE74C3C
+
+
+@pytest.mark.asyncio
+async def test_rally_rejects_path_traversal_records_failed_uncorrelated_audit(tmp_path):
+    audit_calls = []
+    deps, _sent, offloads, _created, _preflight = _deps(tmp_path, audit_calls=audit_calls)
+
+    handled = await route.handle_rally_forts_upload(
+        _message(attachments=[_FakeAttachment("../../etc/Rally_data_26-05-2026.xlsx")]),
+        deps,
+    )
+
+    assert handled is True
+    assert offloads == []
+    fail_call = [call for call in audit_calls if call[0] == "fail"][-1]
+    assert fail_call[2]["error_type"] == "UnsafeFilename"
+    assert fail_call[2].get("external_batch_id") is None
 
 
 @pytest.mark.asyncio

@@ -6,15 +6,6 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: Rally Forts upload/import route
-- Type: consistency
-- Description: Task C Slice 9 was split into two implementation PRs after audit/scope approval. KVK_ALL generic durable audit adoption is delivered and smoke tested in mirror PR #190 and production PR #498, including accepted `KVK.KVK_Scan` correlation and KVK-details rejection `KVK.KVK_Ingest_Diagnostics` correlation. The remaining active gap is Rally Forts generic durable `ImportAuditBatch` / `ImportAuditPhase` adoption. Rally Forts route extraction is already complete from the DL_bot upload-routing programme, but the route still relies on route embeds, logs, local file staging, `dbo.IngestionLog`, Rally staging/current tables, and importer return dictionaries.
-- Suggested Fix: Continue with Task C Slice 10, the approved second Rally Forts PR. Validate Rally Forts correlation to `dbo.IngestionLog/<IngestionID>` only if a safe return/lookup helper can expose it without changing behavior, and leave duplicate/no-row/unrecognized/preflight failures externally uncorrelated. Preserve Rally route UX, embed text, attachment/file handling, importer contracts, SQL table/procedure behavior, log-backup scheduling, telemetry/logging, and user-facing behavior.
-- Impact: medium
-- Risk: medium
-- Dependencies: Generic durable import batch audit foundation delivered and smoke tested in Task C Slice 2; batch-level `RowsInSource` normalization delivered and smoke tested in Task C Slice 3A; inventory adoption delivered and smoke tested in Task C Slice 8; KVK_ALL audit adoption delivered and smoke tested in Task C Slice 9; Rally Forts route extraction completed in upload-routing Phase 5C / PR 115; SQL validation against `C:\K98-bot-SQL-Server`.
-
-### Deferred Optimisation
 - Area: `services/import_audit_service.py`, `stats/dal/import_audit_dal.py`, import upload route audit phase callers, SQL repo `dbo.usp_ImportAudit_RecordPhase`
 - Type: consistency
 - Description: KVK_ALL production smoke testing for Task C Slice 9 showed some `ImportAuditPhase` rows with `CompletedAtUtc` one to three milliseconds earlier than `StartedAtUtc`, while `DurationMs`, terminal batch state, counters, and external correlation were correct. This appears to be timestamp-boundary polish in the generic phase writer/caller contract rather than a route behavior defect.

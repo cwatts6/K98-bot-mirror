@@ -35,10 +35,13 @@ def _insert_log(cur, source, filename, filehash, as_of, rows, status, error=None
         """
         INSERT INTO dbo.IngestionLog
             (Source, FileName, FileHash, AsOfDate, RowsIn, EndedAt, Status, ErrorMessage)
+        OUTPUT INSERTED.IngestionID
         VALUES (?, ?, ?, ?, ?, SYSUTCDATETIME(), ?, ?)
         """,
         (source, filename, filehash, as_of, rows, status, error),
     )
+    row = fetch_one_dict(cur)
+    return int(row["IngestionID"]) if row and row.get("IngestionID") is not None else None
 
 
 def _normalise_cols(df: pd.DataFrame) -> pd.DataFrame:
@@ -113,10 +116,17 @@ def import_rally_daily_xlsx(path: str):
             )
 
             cur.execute("EXEC dbo.sp_Import_Rally_Daily @AsOfDate=?", (as_of,))
-            _insert_log(cur, src, os.path.basename(path), filehash, as_of, len(df), "success", None)
+            ingestion_id = _insert_log(
+                cur, src, os.path.basename(path), filehash, as_of, len(df), "success", None
+            )
 
             conn.commit()
-            return {"status": "success", "rows": len(df), "as_of": str(as_of)}
+            return {
+                "status": "success",
+                "rows": len(df),
+                "as_of": str(as_of),
+                "ingestion_id": ingestion_id,
+            }
         except Exception as e:
             # roll back data changes
             try:
@@ -168,10 +178,12 @@ def import_rally_alltime_xlsx(path: str):
             )
 
             cur.execute("EXEC dbo.sp_Import_Rally_AllTime;")
-            _insert_log(cur, src, os.path.basename(path), filehash, None, len(df), "success", None)
+            ingestion_id = _insert_log(
+                cur, src, os.path.basename(path), filehash, None, len(df), "success", None
+            )
 
             conn.commit()
-            return {"status": "success", "rows": len(df)}
+            return {"status": "success", "rows": len(df), "ingestion_id": ingestion_id}
         except Exception as e:
             try:
                 conn.rollback()
