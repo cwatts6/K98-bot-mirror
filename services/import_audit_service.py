@@ -131,6 +131,32 @@ def record_phase_best_effort(
         return None
 
 
+def fetch_batch_by_external_id_best_effort(
+    *,
+    import_kind: str,
+    external_batch_table: str,
+    external_batch_id: str,
+    reader: Callable[..., ImportAuditBatchRef | None] = (
+        import_audit_dal.fetch_import_audit_batch_by_external_id
+    ),
+) -> ImportAuditBatchRef | None:
+    try:
+        return reader(
+            import_kind=import_kind,
+            external_batch_table=external_batch_table,
+            external_batch_id=external_batch_id,
+        )
+    except Exception:
+        logger.warning(
+            "[IMPORT_AUDIT] Failed to fetch %s audit batch for %s=%s; continuing.",
+            import_kind,
+            external_batch_table,
+            external_batch_id,
+            exc_info=True,
+        )
+        return None
+
+
 def complete_batch_best_effort(
     batch_ref: ImportAuditBatchRef | int | None,
     *,

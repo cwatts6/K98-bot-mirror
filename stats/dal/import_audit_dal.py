@@ -143,6 +143,40 @@ def record_import_audit_phase(
         return int(row["ImportAuditPhaseId"]) if row else None
 
 
+def fetch_import_audit_batch_by_external_id(
+    *,
+    import_kind: str,
+    external_batch_table: str,
+    external_batch_id: str,
+    connection_factory: Callable[[], Any] = _conn_trusted,
+) -> ImportAuditBatchRef | None:
+    """Fetch the latest durable audit batch for a domain batch correlation."""
+    with connection_factory() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT TOP (1)
+                   ImportAuditBatchId,
+                   CorrelationId
+            FROM dbo.ImportAuditBatch
+            WHERE ImportKind = ?
+              AND ExternalBatchTable = ?
+              AND ExternalBatchId = ?
+            ORDER BY StartedAtUtc DESC, ImportAuditBatchId DESC;
+            """,
+            import_kind,
+            external_batch_table,
+            external_batch_id,
+        )
+        row = fetch_one_dict(cur)
+        if not row:
+            return None
+        return ImportAuditBatchRef(
+            import_audit_batch_id=int(row["ImportAuditBatchId"]),
+            correlation_id=str(row["CorrelationId"]),
+        )
+
+
 def complete_import_audit_batch(
     *,
     import_audit_batch_id: int,

@@ -15,6 +15,7 @@ from inventory import inventory_service, material_service
 from inventory.material_calculations import MATERIAL_RARITIES, normalize_material_values
 from inventory.models import (
     InventoryAnalysisSummary,
+    InventoryFlowType,
     InventoryImagePayload,
     InventoryImportType,
 )
@@ -25,6 +26,7 @@ from inventory.parsing import (
     format_speedup_duration,
     parse_resource_value,
 )
+from services import inventory_import_audit_service as inventory_audit
 
 logger = logging.getLogger(__name__)
 
@@ -254,6 +256,8 @@ class InventoryConfirmationView(discord.ui.View):
         payload: InventoryImagePayload,
         summary: InventoryAnalysisSummary,
         original_message: discord.Message | None = None,
+        audit_batch_ref: Any | None = None,
+        flow_type: str = InventoryFlowType.UPLOAD_FIRST.value,
     ) -> None:
         super().__init__(timeout=INVENTORY_REVIEW_UI_TIMEOUT_SECONDS)
         self.bot = bot
@@ -263,6 +267,8 @@ class InventoryConfirmationView(discord.ui.View):
         self.payload = payload
         self.summary = summary
         self.original_message = original_message
+        self.audit_batch_ref = audit_batch_ref
+        self.flow_type = flow_type
         self.corrected_values: dict[str, Any] | None = None
         self._terminal = False
         self._expired = False
@@ -494,6 +500,7 @@ class InventoryConfirmationView(discord.ui.View):
             final_values = self.corrected_values or self.summary.values
             if await self._requires_second_approve(interaction):
                 return
+            approval_started = inventory_audit.audit_timestamp_utc()
             normalized = await inventory_service.approve_import(
                 import_batch_id=self.batch_id,
                 governor_id=self.governor_id,
@@ -503,15 +510,58 @@ class InventoryConfirmationView(discord.ui.View):
                 is_admin=_is_admin(interaction.user),
             )
         except ValueError as exc:
+            phase_status = "duplicate" if "already has an approved import" in str(exc) else "failed"
+            await inventory_audit.record_inventory_audit_phase(
+                await self._get_audit_batch_ref(),
+                phase_name=inventory_audit.INVENTORY_AUDIT_APPROVAL_PHASE,
+                phase_status=phase_status,
+                error_type=type(exc).__name__,
+                error_text=str(exc),
+                details=inventory_audit.inventory_audit_details(
+                    self._audit_context(),
+                    import_type=self.summary.import_type,
+                    error=str(exc),
+                ),
+            )
             await interaction.followup.send(str(exc), ephemeral=True)
             return
-        except Exception:
+        except Exception as exc:
             logger.exception("inventory_import_approve_failed batch_id=%s", self.batch_id)
+            await inventory_audit.record_inventory_audit_phase(
+                await self._get_audit_batch_ref(),
+                phase_name=inventory_audit.INVENTORY_AUDIT_APPROVAL_PHASE,
+                phase_status="failed",
+                error_type=type(exc).__name__,
+                error_text=str(exc),
+                details=inventory_audit.inventory_audit_details(
+                    self._audit_context(),
+                    import_type=self.summary.import_type,
+                    error=str(exc),
+                ),
+            )
             await interaction.followup.send(
                 f"Approval failed due to an internal error. Please try again or contact an admin with batch ID {self.batch_id}.",
                 ephemeral=True,
             )
             return
+        rows_written = inventory_audit.inventory_row_count(self.summary.import_type, normalized)
+        rows_in_source = inventory_audit.image_count_from_summary(self.summary)
+        await inventory_audit.record_inventory_audit_phase(
+            await self._get_audit_batch_ref(),
+            phase_name=inventory_audit.INVENTORY_AUDIT_APPROVAL_PHASE,
+            phase_status="completed",
+            started_at_utc=approval_started,
+            rows_in=rows_in_source,
+            rows_out=rows_written,
+            duration_ms=inventory_audit.audit_duration_ms(approval_started),
+            details=inventory_audit.inventory_audit_details(
+                self._audit_context(),
+                import_type=self.summary.import_type,
+                rows_in_source=rows_in_source,
+                rows_written=rows_written,
+                domain_status="approved",
+            ),
+        )
         self._terminal = True
         self.disable_all_items()
         self.stop()
@@ -528,11 +578,70 @@ class InventoryConfirmationView(discord.ui.View):
                     corrected_json=self.corrected_values,
                     final_json=normalized,
                 )
+                await inventory_audit.record_inventory_audit_phase(
+                    await self._get_audit_batch_ref(),
+                    phase_name=inventory_audit.INVENTORY_AUDIT_ADMIN_DEBUG_PHASE,
+                    phase_status="completed",
+                    details=inventory_audit.inventory_audit_details(
+                        self._audit_context(),
+                        import_type=self.summary.import_type,
+                        admin_debug_status="corrected_approved",
+                    ),
+                )
             except Exception:
                 logger.exception("inventory_approve_debug_post_failed batch_id=%s", self.batch_id)
-        await _delete_original_upload(
+                await inventory_audit.record_inventory_audit_phase(
+                    await self._get_audit_batch_ref(),
+                    phase_name=inventory_audit.INVENTORY_AUDIT_ADMIN_DEBUG_PHASE,
+                    phase_status="failed",
+                    details=inventory_audit.inventory_audit_details(
+                        self._audit_context(),
+                        import_type=self.summary.import_type,
+                        admin_debug_status="corrected_approved",
+                    ),
+                )
+        deleted = await _delete_original_upload(
             original_message=self.original_message,
             batch_id=self.batch_id,
+        )
+        await inventory_audit.record_inventory_audit_phase(
+            await self._get_audit_batch_ref(),
+            phase_name=inventory_audit.INVENTORY_AUDIT_UPLOAD_CLEANUP_PHASE,
+            phase_status="completed" if deleted else "skipped",
+            details=inventory_audit.inventory_audit_details(
+                self._audit_context(),
+                import_type=self.summary.import_type,
+                cleanup_deleted=deleted,
+            ),
+        )
+        await inventory_audit.record_inventory_audit_phase(
+            await self._get_audit_batch_ref(),
+            phase_name=inventory_audit.INVENTORY_AUDIT_TERMINAL_PHASE,
+            phase_status="completed",
+            rows_in=rows_in_source,
+            rows_out=rows_written,
+            details=inventory_audit.inventory_audit_details(
+                self._audit_context(),
+                import_type=self.summary.import_type,
+                rows_in_source=rows_in_source,
+                rows_written=rows_written,
+                domain_status="approved",
+            ),
+        )
+        await inventory_audit.complete_inventory_audit_batch(
+            await self._get_audit_batch_ref(),
+            status="completed",
+            rows_in_source=rows_in_source,
+            rows_staged=rows_in_source,
+            rows_written=rows_written,
+            rows_skipped=0,
+            details=inventory_audit.inventory_audit_details(
+                self._audit_context(),
+                import_type=self.summary.import_type,
+                rows_in_source=rows_in_source,
+                rows_written=rows_written,
+                domain_status="approved",
+            ),
         )
         await interaction.followup.send("Inventory import approved.", ephemeral=True)
         await self._update_review_message(interaction, content="Inventory import approved.")
@@ -592,6 +701,16 @@ class InventoryConfirmationView(discord.ui.View):
                 ephemeral=True,
             )
             return
+        await inventory_audit.record_inventory_audit_phase(
+            await self._get_audit_batch_ref(),
+            phase_name=inventory_audit.INVENTORY_AUDIT_MATERIAL_MORE_PHASE,
+            phase_status="completed",
+            details=inventory_audit.inventory_audit_details(
+                self._audit_context(),
+                import_type=self.summary.import_type,
+                domain_status="awaiting_more_material",
+            ),
+        )
         self._terminal = True
         self.disable_all_items()
         self.stop()
@@ -629,9 +748,45 @@ class InventoryConfirmationView(discord.ui.View):
         self._terminal = True
         self.disable_all_items()
         self.stop()
-        await _delete_original_upload(
+        await inventory_audit.record_inventory_audit_phase(
+            await self._get_audit_batch_ref(),
+            phase_name=inventory_audit.INVENTORY_AUDIT_TERMINAL_PHASE,
+            phase_status="cancelled",
+            rows_in=inventory_audit.image_count_from_summary(self.summary),
+            rows_out=0,
+            details=inventory_audit.inventory_audit_details(
+                self._audit_context(),
+                import_type=self.summary.import_type,
+                domain_status="cancelled",
+                terminal_reason="cancelled_by_user",
+            ),
+        )
+        await inventory_audit.complete_inventory_audit_batch(
+            await self._get_audit_batch_ref(),
+            status="cancelled",
+            rows_in_source=inventory_audit.image_count_from_summary(self.summary),
+            rows_written=0,
+            rows_skipped=inventory_audit.image_count_from_summary(self.summary),
+            details=inventory_audit.inventory_audit_details(
+                self._audit_context(),
+                import_type=self.summary.import_type,
+                domain_status="cancelled",
+                terminal_reason="cancelled_by_user",
+            ),
+        )
+        deleted = await _delete_original_upload(
             original_message=self.original_message,
             batch_id=self.batch_id,
+        )
+        await inventory_audit.record_inventory_audit_phase(
+            await self._get_audit_batch_ref(),
+            phase_name=inventory_audit.INVENTORY_AUDIT_UPLOAD_CLEANUP_PHASE,
+            phase_status="completed" if deleted else "skipped",
+            details=inventory_audit.inventory_audit_details(
+                self._audit_context(),
+                import_type=self.summary.import_type,
+                cleanup_deleted=deleted,
+            ),
         )
         try:
             await _post_admin_debug(
@@ -643,6 +798,16 @@ class InventoryConfirmationView(discord.ui.View):
                 payload=self.payload,
                 summary=self.summary,
                 error_json={"error": "Cancelled by user."},
+            )
+            await inventory_audit.record_inventory_audit_phase(
+                await self._get_audit_batch_ref(),
+                phase_name=inventory_audit.INVENTORY_AUDIT_ADMIN_DEBUG_PHASE,
+                phase_status="completed",
+                details=inventory_audit.inventory_audit_details(
+                    self._audit_context(),
+                    import_type=self.summary.import_type,
+                    admin_debug_status="cancelled",
+                ),
             )
         except Exception:
             logger.exception("inventory_cancel_debug_post_failed batch_id=%s", self.batch_id)
@@ -657,6 +822,32 @@ class InventoryConfirmationView(discord.ui.View):
         if not self._terminal:
             try:
                 await inventory_service.cancel_import(self.batch_id)
+                await inventory_audit.record_inventory_audit_phase(
+                    await self._get_audit_batch_ref(),
+                    phase_name=inventory_audit.INVENTORY_AUDIT_TERMINAL_PHASE,
+                    phase_status="cancelled",
+                    rows_in=inventory_audit.image_count_from_summary(self.summary),
+                    rows_out=0,
+                    details=inventory_audit.inventory_audit_details(
+                        self._audit_context(),
+                        import_type=self.summary.import_type,
+                        domain_status="cancelled",
+                        terminal_reason="timeout",
+                    ),
+                )
+                await inventory_audit.complete_inventory_audit_batch(
+                    await self._get_audit_batch_ref(),
+                    status="cancelled",
+                    rows_in_source=inventory_audit.image_count_from_summary(self.summary),
+                    rows_written=0,
+                    rows_skipped=inventory_audit.image_count_from_summary(self.summary),
+                    details=inventory_audit.inventory_audit_details(
+                        self._audit_context(),
+                        import_type=self.summary.import_type,
+                        domain_status="cancelled",
+                        terminal_reason="timeout",
+                    ),
+                )
             except Exception:
                 logger.debug(
                     "inventory_confirmation_timeout_cancel_failed batch_id=%s",
@@ -668,6 +859,25 @@ class InventoryConfirmationView(discord.ui.View):
             expired=True,
             content="Inventory import review expired. Please upload the screenshot again.",
         )
+
+    def _audit_context(self) -> inventory_audit.InventoryImportAuditContext:
+        return inventory_audit.InventoryImportAuditContext(
+            import_batch_id=self.batch_id,
+            governor_id=self.governor_id,
+            flow_type=self.flow_type,
+            source_filename=self.payload.filename,
+            source_message_id=self.payload.source_message_id,
+            source_channel_id=self.payload.source_channel_id,
+            actor_discord_id=self.actor_discord_id,
+            entry_point=(
+                "inventory_command_upload"
+                if self.flow_type == InventoryFlowType.COMMAND.value
+                else "inventory_upload_first"
+            ),
+        )
+
+    async def _get_audit_batch_ref(self) -> Any | None:
+        return self.audit_batch_ref
 
 
 class ResourceCorrectionModal(discord.ui.Modal):
@@ -891,15 +1101,17 @@ class InventoryUploadGovernorSelectView(AccountPickerView):
 
 async def _delete_original_upload(
     *, original_message: discord.Message | None, batch_id: int | None
-) -> None:
+) -> bool:
     if original_message is None:
-        return
+        return False
     try:
         await original_message.delete()
         if batch_id is not None:
             await inventory_service.mark_original_upload_deleted(batch_id)
+        return True
     except Exception:
         logger.debug("inventory_original_upload_delete_failed", exc_info=True)
+        return False
 
 
 async def _process_payload_for_governor(
@@ -912,6 +1124,7 @@ async def _process_payload_for_governor(
     original_message: discord.Message | None,
     batch_id: int | None,
     flow_from_pending_command: bool,
+    flow_type: str | None = None,
     existing_detected_json: dict[str, Any] | None = None,
 ) -> None:
     if interaction is not None:
@@ -921,7 +1134,14 @@ async def _process_payload_for_governor(
         except Exception:
             pass
 
+    audit_batch_ref: Any | None = None
+    audit_context: inventory_audit.InventoryImportAuditContext | None = None
     try:
+        resolved_flow_type = flow_type or (
+            InventoryFlowType.COMMAND.value
+            if flow_from_pending_command
+            else InventoryFlowType.UPLOAD_FIRST.value
+        )
         if batch_id is None:
             batch_id = await inventory_service.create_upload_first_batch(
                 governor_id=governor_id,
@@ -929,6 +1149,57 @@ async def _process_payload_for_governor(
                 payload=payload,
                 is_admin=_is_admin(getattr(interaction, "user", None)) if interaction else False,
             )
+            resolved_flow_type = InventoryFlowType.UPLOAD_FIRST.value
+        audit_context = inventory_audit.InventoryImportAuditContext(
+            import_batch_id=batch_id,
+            governor_id=governor_id,
+            flow_type=resolved_flow_type,
+            source_filename=payload.filename,
+            source_message_id=payload.source_message_id,
+            source_channel_id=payload.source_channel_id,
+            actor_discord_id=actor_discord_id,
+            entry_point=(
+                "inventory_additional_material_upload"
+                if existing_detected_json is not None
+                else (
+                    "inventory_command_upload"
+                    if resolved_flow_type == InventoryFlowType.COMMAND.value
+                    else "inventory_upload_first"
+                )
+            ),
+        )
+        if existing_detected_json is not None:
+            audit_batch_ref = await inventory_audit.fetch_inventory_audit_batch(
+                import_batch_id=batch_id
+            )
+            if audit_batch_ref is None:
+                audit_batch_ref = await inventory_audit.start_inventory_audit_batch(
+                    context=audit_context,
+                    image_bytes=payload.image_bytes,
+                )
+        else:
+            audit_batch_ref = await inventory_audit.start_inventory_audit_batch(
+                context=audit_context,
+                image_bytes=payload.image_bytes,
+            )
+        await inventory_audit.record_inventory_audit_phase(
+            audit_batch_ref,
+            phase_name=inventory_audit.INVENTORY_AUDIT_IMAGE_READ_PHASE,
+            phase_status="completed",
+            rows_in=1,
+            rows_out=1,
+            details=inventory_audit.inventory_audit_details(
+                audit_context,
+                rows_in_source=1,
+            ),
+        )
+        await inventory_audit.record_inventory_audit_phase(
+            audit_batch_ref,
+            phase_name=inventory_audit.INVENTORY_AUDIT_BATCH_HANDOFF_PHASE,
+            phase_status="completed",
+            details=inventory_audit.inventory_audit_details(audit_context),
+        )
+        analysis_started = inventory_audit.audit_timestamp_utc()
         if existing_detected_json is not None:
             summary = await inventory_service.analyse_additional_material_image(
                 import_batch_id=batch_id,
@@ -941,9 +1212,64 @@ async def _process_payload_for_governor(
                 payload=payload,
             )
         decision = inventory_service.decide_analysis_outcome(summary)
+        analysis_phase = (
+            inventory_audit.INVENTORY_AUDIT_MATERIAL_MERGE_PHASE
+            if existing_detected_json is not None
+            else inventory_audit.INVENTORY_AUDIT_VISION_PHASE
+        )
+        await inventory_audit.record_inventory_audit_phase(
+            audit_batch_ref,
+            phase_name=analysis_phase,
+            phase_status="completed" if decision.action != "fail" else "failed",
+            started_at_utc=analysis_started,
+            rows_in=1,
+            rows_out=1 if decision.action != "fail" else 0,
+            duration_ms=inventory_audit.audit_duration_ms(analysis_started),
+            error_type="InventoryAnalysisFailed" if decision.action == "fail" else None,
+            error_text=decision.error if decision.action == "fail" else None,
+            details=inventory_audit.inventory_audit_details(
+                audit_context,
+                import_type=summary.import_type,
+                rows_in_source=inventory_audit.image_count_from_summary(summary),
+                error=decision.error,
+            ),
+            set_batch_status="staged" if decision.action != "fail" else None,
+        )
         if decision.action == "fail":
             if existing_detected_json is None:
                 await inventory_service.fail_import(batch_id, error=decision.error)
+                await inventory_audit.record_inventory_audit_phase(
+                    audit_batch_ref,
+                    phase_name=inventory_audit.INVENTORY_AUDIT_TERMINAL_PHASE,
+                    phase_status="failed",
+                    rows_in=1,
+                    rows_out=0,
+                    error_type="InventoryAnalysisFailed",
+                    error_text=decision.error,
+                    details=inventory_audit.inventory_audit_details(
+                        audit_context,
+                        import_type=summary.import_type,
+                        domain_status="failed",
+                        terminal_reason="analysis_failed",
+                        error=decision.error,
+                    ),
+                )
+                await inventory_audit.fail_inventory_audit_batch(
+                    audit_batch_ref,
+                    status="failed",
+                    error_type="InventoryAnalysisFailed",
+                    error_text=decision.error,
+                    rows_in_source=1,
+                    rows_written=0,
+                    rows_skipped=1,
+                    details=inventory_audit.inventory_audit_details(
+                        audit_context,
+                        import_type=summary.import_type,
+                        domain_status="failed",
+                        terminal_reason="analysis_failed",
+                        error=decision.error,
+                    ),
+                )
             else:
                 try:
                     await inventory_service.revert_additional_material_upload(batch_id)
@@ -960,6 +1286,16 @@ async def _process_payload_for_governor(
                 payload=payload,
                 summary=summary,
                 error_json={"error": decision.error},
+            )
+            await inventory_audit.record_inventory_audit_phase(
+                audit_batch_ref,
+                phase_name=inventory_audit.INVENTORY_AUDIT_ADMIN_DEBUG_PHASE,
+                phase_status="completed",
+                details=inventory_audit.inventory_audit_details(
+                    audit_context,
+                    import_type=summary.import_type,
+                    admin_debug_status=decision.debug_status or "failed",
+                ),
             )
             message = (
                 "I could not read this inventory screenshot clearly enough. No values were saved.\n\n"
@@ -985,6 +1321,36 @@ async def _process_payload_for_governor(
         embed = _analysis_embed(governor_id=governor_id, summary=summary)
         if decision.action == "reject":
             await inventory_service.reject_import(batch_id, error=decision.error)
+            await inventory_audit.record_inventory_audit_phase(
+                audit_batch_ref,
+                phase_name=inventory_audit.INVENTORY_AUDIT_TERMINAL_PHASE,
+                phase_status="skipped",
+                rows_in=1,
+                rows_out=0,
+                error_type="InventoryRejected",
+                error_text=decision.error,
+                details=inventory_audit.inventory_audit_details(
+                    audit_context,
+                    import_type=summary.import_type,
+                    domain_status="rejected",
+                    terminal_reason="rejected",
+                    error=decision.error,
+                ),
+            )
+            await inventory_audit.complete_inventory_audit_batch(
+                audit_batch_ref,
+                status="skipped",
+                rows_in_source=1,
+                rows_written=0,
+                rows_skipped=1,
+                details=inventory_audit.inventory_audit_details(
+                    audit_context,
+                    import_type=summary.import_type,
+                    domain_status="rejected",
+                    terminal_reason="rejected",
+                    error=decision.error,
+                ),
+            )
             await _post_admin_debug(
                 bot=bot,
                 batch_id=batch_id,
@@ -1020,6 +1386,8 @@ async def _process_payload_for_governor(
             batch_id=batch_id,
             payload=payload,
             summary=summary,
+            audit_batch_ref=audit_batch_ref,
+            flow_type=resolved_flow_type,
         )
         content = "Review the detected inventory values before approving."
         if flow_from_pending_command:
@@ -1034,9 +1402,52 @@ async def _process_payload_for_governor(
             view=view,
         )
         view.message = sent
+        await inventory_audit.record_inventory_audit_phase(
+            audit_batch_ref,
+            phase_name=inventory_audit.INVENTORY_AUDIT_REVIEW_PHASE,
+            phase_status="completed",
+            rows_in=inventory_audit.image_count_from_summary(summary),
+            rows_out=inventory_audit.image_count_from_summary(summary),
+            details=inventory_audit.inventory_audit_details(
+                audit_context,
+                import_type=summary.import_type,
+                rows_in_source=inventory_audit.image_count_from_summary(summary),
+                domain_status="analysed",
+            ),
+            set_batch_status="staged",
+        )
         view.start_timeout_watch()
-    except Exception:
+    except Exception as exc:
         logger.exception("inventory_process_payload_failed governor_id=%s", governor_id)
+        if audit_batch_ref is not None and audit_context is not None:
+            await inventory_audit.record_inventory_audit_phase(
+                audit_batch_ref,
+                phase_name=inventory_audit.INVENTORY_AUDIT_TERMINAL_PHASE,
+                phase_status="failed",
+                rows_in=1,
+                rows_out=0,
+                error_type=type(exc).__name__,
+                error_text=str(exc),
+                details=inventory_audit.inventory_audit_details(
+                    audit_context,
+                    terminal_reason="internal_error",
+                    error=str(exc),
+                ),
+            )
+            await inventory_audit.fail_inventory_audit_batch(
+                audit_batch_ref,
+                status="failed",
+                error_type=type(exc).__name__,
+                error_text=str(exc),
+                rows_in_source=1,
+                rows_written=0,
+                rows_skipped=1,
+                details=inventory_audit.inventory_audit_details(
+                    audit_context,
+                    terminal_reason="internal_error",
+                    error=str(exc),
+                ),
+            )
         if interaction is not None:
             sent = await _safe_followup_send(
                 interaction,
@@ -1171,6 +1582,7 @@ async def handle_inventory_upload_message(message: discord.Message, bot: Any) ->
             original_message=message,
             batch_id=int(pending["ImportBatchID"]),
             flow_from_pending_command=True,
+            flow_type=str(pending.get("FlowType") or InventoryFlowType.COMMAND.value),
         )
         return True
 
@@ -1200,6 +1612,7 @@ async def handle_inventory_upload_message(message: discord.Message, bot: Any) ->
             original_message=message,
             batch_id=int(active_material["ImportBatchID"]),
             flow_from_pending_command=False,
+            flow_type=str(active_material.get("FlowType") or InventoryFlowType.UPLOAD_FIRST.value),
             existing_detected_json=detected_json if isinstance(detected_json, dict) else None,
         )
         return True

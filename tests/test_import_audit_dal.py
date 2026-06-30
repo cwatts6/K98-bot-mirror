@@ -85,6 +85,28 @@ def test_record_import_audit_phase_executes_writer_proc():
     assert phase_id == 7
 
 
+def test_fetch_import_audit_batch_by_external_id_returns_latest_ref():
+    cursor = _FakeCursor(
+        row=(88, "22222222-2222-2222-2222-222222222222"),
+        columns=["ImportAuditBatchId", "CorrelationId"],
+    )
+    factory, _conn = _factory(cursor)
+
+    ref = import_audit_dal.fetch_import_audit_batch_by_external_id(
+        import_kind="inventory",
+        external_batch_table="dbo.InventoryImportBatch",
+        external_batch_id="123",
+        connection_factory=factory,
+    )
+
+    sql, params = cursor.calls[0]
+    assert "FROM dbo.ImportAuditBatch" in sql
+    assert params == ("inventory", "dbo.InventoryImportBatch", "123")
+    assert ref is not None
+    assert ref.import_audit_batch_id == 88
+    assert ref.correlation_id == "22222222-2222-2222-2222-222222222222"
+
+
 def test_complete_import_audit_batch_executes_writer_proc():
     cursor = _FakeCursor(row=(42,), columns=["ImportAuditBatchId"])
     factory, conn = _factory(cursor)

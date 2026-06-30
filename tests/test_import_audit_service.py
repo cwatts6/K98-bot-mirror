@@ -61,6 +61,43 @@ def test_record_phase_best_effort_truncates_error_fields():
     assert json.loads(seen["details_json"]) == {"ok": False}
 
 
+def test_fetch_batch_by_external_id_best_effort_passes_lookup_fields():
+    seen = {}
+
+    def reader(**kwargs):
+        seen.update(kwargs)
+        return ImportAuditBatchRef(44, "cid")
+
+    ref = import_audit_service.fetch_batch_by_external_id_best_effort(
+        import_kind="inventory",
+        external_batch_table="dbo.InventoryImportBatch",
+        external_batch_id="123",
+        reader=reader,
+    )
+
+    assert ref == ImportAuditBatchRef(44, "cid")
+    assert seen == {
+        "import_kind": "inventory",
+        "external_batch_table": "dbo.InventoryImportBatch",
+        "external_batch_id": "123",
+    }
+
+
+def test_fetch_batch_by_external_id_best_effort_swallows_reader_failure():
+    def reader(**kwargs):
+        raise RuntimeError("audit unavailable")
+
+    assert (
+        import_audit_service.fetch_batch_by_external_id_best_effort(
+            import_kind="inventory",
+            external_batch_table="dbo.InventoryImportBatch",
+            external_batch_id="123",
+            reader=reader,
+        )
+        is None
+    )
+
+
 def test_complete_and_fail_best_effort_ignore_missing_batch_ref():
     assert import_audit_service.complete_batch_best_effort(None) is False
     assert import_audit_service.fail_batch_best_effort(None) is False
