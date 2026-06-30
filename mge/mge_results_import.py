@@ -55,10 +55,27 @@ def _audit_context(
     actor_discord_id: int | None,
     event_id: int | None = None,
     event_mode: str | None = None,
-    audit_context: MgeResultsImportAuditContext | None = None,
+    audit_context: object | None = None,
 ) -> MgeResultsImportAuditContext:
-    if audit_context is not None:
+    if isinstance(audit_context, MgeResultsImportAuditContext):
         return audit_context
+    if isinstance(audit_context, dict):
+        return MgeResultsImportAuditContext(
+            source_filename=str(audit_context.get("source_filename") or filename),
+            source_message_id=_optional_int(audit_context.get("source_message_id")),
+            source_channel_id=_optional_int(audit_context.get("source_channel_id")),
+            actor_discord_id=_optional_int(
+                audit_context.get("actor_discord_id", actor_discord_id)
+            ),
+            event_id=_optional_int(audit_context.get("event_id", event_id)),
+            event_mode=(
+                str(audit_context["event_mode"])
+                if audit_context.get("event_mode")
+                else event_mode
+            ),
+            source=str(audit_context.get("source") or source),
+            entry_point=str(audit_context.get("entry_point") or f"mge_results_{source}"),
+        )
     return MgeResultsImportAuditContext(
         source_filename=filename,
         actor_discord_id=actor_discord_id,
@@ -67,6 +84,15 @@ def _audit_context(
         source=source,
         entry_point=f"mge_results_{source}",
     )
+
+
+def _optional_int(value: object | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _with_event(
@@ -134,12 +160,14 @@ def import_results_auto(
         actor_discord_id=actor_discord_id,
         audit_context=audit_context,
     )
-    audit_ref = start_mge_results_audit_batch(context, content)
+    file_hash = sha256_hex(content)
+    audit_ref = start_mge_results_audit_batch(
+        context, content, source_file_hash_sha256=file_hash
+    )
     audit_terminal_recorded = False
     rows_parsed: int | None = None
     inserted: int | None = None
     import_id: int | None = None
-    file_hash = sha256_hex(content)
 
     precheck_started = utcnow()
     try:
@@ -380,12 +408,14 @@ def import_results_manual(
         event_id=event_id,
         audit_context=audit_context,
     )
-    audit_ref = start_mge_results_audit_batch(context, content)
+    file_hash = sha256_hex(content)
+    audit_ref = start_mge_results_audit_batch(
+        context, content, source_file_hash_sha256=file_hash
+    )
     audit_terminal_recorded = False
     rows_parsed: int | None = None
     inserted: int | None = None
     import_id: int | None = None
-    file_hash = sha256_hex(content)
 
     precheck_started = utcnow()
     try:

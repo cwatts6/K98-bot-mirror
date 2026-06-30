@@ -252,6 +252,90 @@ def test_auto_success_completes_generic_audit_with_import_correlation(monkeypatc
     ]
 
 
+def test_auto_accepts_serialized_audit_context_and_reuses_file_hash(monkeypatch):
+    calls = {}
+
+    def fake_start(context, content, **kwargs):
+        calls["context"] = context
+        calls["content"] = content
+        calls["hash"] = kwargs["source_file_hash_sha256"]
+        return ImportAuditBatchRef(12, "cid")
+
+    monkeypatch.setattr(mge_results_import, "start_mge_results_audit_batch", fake_start)
+    monkeypatch.setattr(mge_results_import, "record_mge_results_audit_phase", _noop)
+    monkeypatch.setattr(mge_results_import, "complete_mge_results_audit_batch", _noop)
+    monkeypatch.setattr(mge_results_import, "fail_mge_results_audit_batch", _noop)
+    monkeypatch.setattr(
+        mge_results_import.mge_results_dal, "get_last_completed_event_id", lambda: 1001
+    )
+    monkeypatch.setattr(mge_results_import.mge_results_dal, "get_event_mode", lambda eid: "open")
+    monkeypatch.setattr(
+        mge_results_import.mge_results_dal,
+        "has_successful_import_for_event_filehash",
+        lambda eid, h: False,
+    )
+    monkeypatch.setattr(
+        mge_results_import.mge_results_dal, "has_successful_import_for_event", lambda eid: False
+    )
+    monkeypatch.setattr(
+        mge_results_import,
+        "parse_mge_results_xlsx",
+        lambda content, filename: [
+            ParsedMgeResultRow(rank=1, player_id=1, player_name="A", score=10)
+        ],
+    )
+    monkeypatch.setattr(
+        mge_results_import.mge_results_dal, "create_import_batch", lambda **kwargs: 77
+    )
+    monkeypatch.setattr(
+        mge_results_import.mge_results_dal, "replace_event_results", lambda *a, **k: 1
+    )
+    monkeypatch.setattr(
+        mge_results_import.mge_results_dal, "mark_import_completed", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        mge_results_import.mge_results_dal,
+        "fetch_open_top_15",
+        lambda event_id: [{"Rank": 1, "PlayerId": 1, "PlayerName": "A", "Score": 10}],
+    )
+
+    content = b"x"
+    out = mge_results_import.import_results_auto(
+        content,
+        "mge_rankings_kd1198_20260311.xlsx",
+        123,
+        {
+            "source_filename": "serialized.xlsx",
+            "source_message_id": "44",
+            "source_channel_id": "55",
+            "actor_discord_id": "66",
+            "entry_point": "serialized_entry",
+        },
+    )
+
+    assert out["import_id"] == 77
+    assert calls["content"] == content
+    assert calls["hash"] == mge_results_import.sha256_hex(content)
+    assert calls["context"].source_filename == "serialized.xlsx"
+    assert calls["context"].source_message_id == 44
+    assert calls["context"].source_channel_id == 55
+    assert calls["context"].actor_discord_id == 66
+    assert calls["context"].entry_point == "serialized_entry"
+
+
+def test_audit_context_ignores_unexpected_type():
+    context = mge_results_import._audit_context(
+        source="auto",
+        filename="mge_rankings_kd1198_20260311.xlsx",
+        actor_discord_id=123,
+        audit_context="not a context",
+    )
+
+    assert context.source_filename == "mge_rankings_kd1198_20260311.xlsx"
+    assert context.actor_discord_id == 123
+    assert context.entry_point == "mge_results_auto"
+
+
 def test_auto_duplicate_file_hash_records_uncorrelated_duplicate_audit(monkeypatch):
     calls = []
 

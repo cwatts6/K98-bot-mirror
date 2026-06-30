@@ -58,6 +58,36 @@ def test_start_mge_results_audit_batch_populates_generic_taxonomy(monkeypatch):
     }
 
 
+def test_start_mge_results_audit_batch_uses_precomputed_hash(monkeypatch):
+    seen = {}
+
+    def fake_start_batch_best_effort(**kwargs):
+        seen.update(kwargs)
+        return ImportAuditBatchRef(12, "cid")
+
+    monkeypatch.setattr(
+        audit.import_audit_service,
+        "start_batch_best_effort",
+        fake_start_batch_best_effort,
+    )
+    monkeypatch.setattr(
+        audit.hashlib,
+        "sha256",
+        lambda _content: (_ for _ in ()).throw(AssertionError("hash recomputed")),
+    )
+
+    context = audit.MgeResultsImportAuditContext(source_filename="mge.xlsx")
+
+    ref = audit.start_mge_results_audit_batch(
+        context,
+        b"mge workbook",
+        source_file_hash_sha256="a" * 64,
+    )
+
+    assert ref == ImportAuditBatchRef(12, "cid")
+    assert seen["source_file_hash_sha256"] == "a" * 64
+
+
 def test_complete_mge_results_audit_batch_sets_mge_external_table(monkeypatch):
     seen = {}
 

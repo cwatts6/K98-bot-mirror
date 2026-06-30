@@ -102,13 +102,15 @@ def _sha256_hex(content: bytes | None) -> str | None:
 def start_mge_results_audit_batch(
     context: MgeResultsImportAuditContext,
     xlsx_bytes: bytes | None,
+    *,
+    source_file_hash_sha256: str | None = None,
 ):
     try:
         return import_audit_service.start_batch_best_effort(
             import_kind=MGE_RESULTS_AUDIT_IMPORT_KIND,
             source_type=MGE_RESULTS_AUDIT_SOURCE_TYPE,
             source_filename=context.source_filename,
-            source_file_hash_sha256=_sha256_hex(xlsx_bytes),
+            source_file_hash_sha256=source_file_hash_sha256 or _sha256_hex(xlsx_bytes),
             source_message_id=context.source_message_id,
             source_channel_id=context.source_channel_id,
             actor_discord_id=context.actor_discord_id,
