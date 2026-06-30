@@ -51,9 +51,16 @@ to generic durable audit with `mge_results_xlsx_parse`, `mge_results_sql_ingest`
 to `dbo.MGE_ResultImports`, left duplicate/pre-domain outcomes uncorrelated, preserved route,
 manual overwrite, report, and importer behavior, resolved review hardening feedback, and was
 reported smoke tested successfully on 2026-06-30.
+Task C Slice 8 Inventory Import Audit Adoption wired inventory image uploads, command-session
+imports, additional-material continuation, approval/reject/cancel/timeout/failure outcomes, admin
+debug, and original-upload cleanup into generic durable audit while preserving inventory's domain
+audit/history model and route UX. Accepted lifecycle outcomes correlate to
+`dbo.InventoryImportBatch`. Operator smoke testing on 2026-06-30 confirmed resources, speedups,
+materials, failure, and cancel audit outcomes, including a three-file material continuation with
+`RowsInSource=3`, `RowsStaged=3`, and `RowsWritten=25`.
 
-The active import follow-up is Task C Slice 8 in
-`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 8 Inventory Import Audit Adoption.md`.
+The active import follow-up is Task C Slice 9 in
+`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 9 KVK_ALL and Rally Forts Import Audit Adoption.md`.
 
 The DL_bot upload-routing and startup/lifecycle optimisation programme is complete through
 Phase 6L:

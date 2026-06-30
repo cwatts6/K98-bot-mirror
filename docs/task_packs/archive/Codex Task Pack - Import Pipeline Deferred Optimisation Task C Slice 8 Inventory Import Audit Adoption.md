@@ -18,19 +18,18 @@
   - Task C Slice 6, archived at `docs/task_packs/archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 6 Weekly Activity Import Audit Adoption.md`
   - Task C Slice 7, archived at `docs/task_packs/archive/Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 7 MGE Results Import Audit Adoption.md`
 - One-pass approved: `no`
-- Status: `active task pack, starts with audit/scope and SQL implementation-boundary confirmation`
+- Status: `completed and archived after mirror PR #189 / production PR #497`
 
 ## 2. Objective
 
 Adopt the generic durable import audit model for the inventory image upload/import lifecycle only,
 after MGE results adoption was delivered and smoke tested in Task C Slice 7.
 
-This slice must start with audit/scope only. Confirm the current inventory upload route, command
-session handoff, image analysis service, approval/correction/materials flows, DAL writes, SQL
-domain batch tables, duplicate/cancel/reject/fail semantics, admin debug behavior, original upload
-cleanup, telemetry/logging, and tests before proposing implementation. The expected
-implementation is a behavior-preserving inventory audit wiring slice that reuses the existing
-generic audit DAL/service wrappers and SQL-owned audit writer procedures.
+Delivered: Task C Slice 8 started with audit/scope and SQL implementation-boundary confirmation,
+then implemented behavior-preserving inventory generic audit wiring that reused the existing
+generic audit DAL/service wrappers and SQL-owned audit writer procedures. No SQL schema objects,
+inventory domain audit/history replacements, upload route UX changes, command behavior changes,
+OCR/vision redesign, report/export changes, or table-schema changes were made.
 
 ## 3. Delivered Baseline
 
@@ -339,16 +338,72 @@ Manual smoke after deployment:
 
 ## 12. Acceptance Criteria
 
-- [ ] Inventory route/view/service/DAL/SQL state surfaces are audited before implementation.
-- [ ] SQL object names, columns, statuses, constraints, indexes, and domain batch ids are validated
+- [x] Inventory route/view/service/DAL/SQL state surfaces are audited before implementation.
+- [x] SQL object names, columns, statuses, constraints, indexes, and domain batch ids are validated
   against the SQL repo.
-- [ ] First response stops for approval before code or SQL changes.
-- [ ] Inventory generic audit wiring is implemented only after approval.
-- [ ] Existing inventory route, command-session, upload-first, image analysis, correction,
+- [x] First response stops for approval before code or SQL changes.
+- [x] Inventory generic audit wiring is implemented only after approval.
+- [x] Existing inventory route, command-session, upload-first, image analysis, correction,
   additional-material, approval, duplicate, reject/cancel/fail, admin-debug, original-upload
   cleanup, SQL ingest, report/export, telemetry/logging, and user-facing behavior are preserved.
-- [ ] Inventory's existing domain audit/history model is preserved.
-- [ ] Audit writes remain best-effort.
-- [ ] Batch-level counters use the normalized Slice 3A terminal writer contract where applicable.
-- [ ] Focused inventory/import-audit tests pass.
-- [ ] Remaining SQL/Python cleanup items remain documented.
+- [x] Inventory's existing domain audit/history model is preserved.
+- [x] Audit writes remain best-effort.
+- [x] Batch-level counters use the normalized Slice 3A terminal writer contract where applicable.
+- [x] Focused inventory/import-audit tests pass.
+- [x] Remaining SQL/Python cleanup items remain documented.
+
+## 13. Delivery Record
+
+- Mirror PR: `https://github.com/cwatts6/K98-bot-mirror/pull/189`
+- Production PR: `https://github.com/cwatts6/k98-bot/pull/497`
+- Main implementation files:
+  - `services/inventory_import_audit_service.py`
+  - `ui/views/inventory_views.py`
+  - `inventory/material_service.py`
+  - `inventory/inventory_service.py`
+  - `stats/dal/import_audit_dal.py`
+  - `services/import_audit_service.py`
+  - `tests/test_inventory_import_audit_service.py`
+  - `tests/test_inventory_upload_flow.py`
+  - `tests/test_inventory_views.py`
+  - `tests/test_inventory_service.py`
+- External correlation contract: `ExternalBatchTable=dbo.InventoryImportBatch`,
+  `ExternalBatchId=<ImportBatchID>`.
+- Pre-domain-batch failures remain outside the generic audit correlation scope for this slice.
+- Terminal mapping delivered:
+  - approved resource/speedup/material imports: `completed`;
+  - user rejection: `skipped`;
+  - user cancel and timeout: `cancelled`;
+  - image/vision/import failures after a domain batch exists: `failed`;
+  - additional-material continuation is phase-audited and remains part of the same
+    `dbo.InventoryImportBatch` correlation.
+- Review hardening delivered:
+  - original upload Discord-message deletion is treated as authoritative; marking the original
+    upload deleted in the inventory domain model is best-effort so generic cleanup audit does not
+    falsely report skipped/failed after a successful delete.
+  - `InventoryConfirmationView` carries forward the explicit audit entry point chosen during
+    payload processing, including `inventory_additional_material_upload`, so later phases for the
+    same batch keep consistent metadata.
+  - material screenshot counting now preserves aggregate `screenshot_count` values when adding
+    more material images, so a two-image aggregate plus a third image records `RowsInSource=3`
+    rather than `2`.
+- Operator smoke testing on 2026-06-30 confirmed:
+  - upload-first resources completed with `RowsInSource=1`, `RowsStaged=1`, `RowsWritten=4`;
+  - command speedups completed with `RowsInSource=1`, `RowsStaged=1`, `RowsWritten=5`;
+  - command vision failure recorded `failed` with `RowsInSource=1`, `RowsWritten=0`,
+    `RowsSkipped=1`, and `ErrorType=InventoryAnalysisFailed`;
+  - command cancel recorded `cancelled` with `RowsInSource=1`, `RowsWritten=0`,
+    `RowsSkipped=1`;
+  - upload-first materials with two additional material screenshots completed with
+    `RowsInSource=3`, `RowsStaged=3`, `RowsWritten=25`, correlated to
+    `dbo.InventoryImportBatch` and preserved the additional-material entry point.
+- Focused validation after the final image-count fix:
+  - `tests/test_inventory_service.py`: `23 passed`;
+  - `tests/test_inventory_import_audit_service.py`, `tests/test_inventory_upload_flow.py`,
+    `tests/test_inventory_views.py`, and `tests/test_inventory_service.py`: `56 passed`;
+  - explicit `tests/test_inventory_*.py` module set: `177 passed`;
+  - `scripts/smoke_imports.py`, `scripts/validate_command_registration.py`,
+    `scripts/validate_architecture_boundaries.py`, `scripts/validate_deferred_items.py`,
+    `scripts/select_tests.py`, `py_compile`, and `git diff --check` passed.
+- Broad validation earlier in the slice included full pytest `2132 passed, 2 skipped` and Codex
+  Security diff scan with zero findings.

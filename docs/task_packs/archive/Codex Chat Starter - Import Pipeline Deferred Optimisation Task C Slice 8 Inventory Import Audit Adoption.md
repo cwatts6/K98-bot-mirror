@@ -1,7 +1,11 @@
 # Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 8 Inventory Import Audit Adoption
 
-Use this starter to begin Task C Slice 8 after Task C Slice 7 is merged, deployed, and smoke
-tested.
+Task C Slice 8 is complete and archived. Use the active Slice 9 starter for the next import
+pipeline slice:
+
+`docs/task_packs/Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 9 KVK_ALL and Rally Forts Import Audit Adoption.md`
+
+Original Slice 8 starter retained for delivery history:
 
 ```markdown
 # Files mentioned by the user:
