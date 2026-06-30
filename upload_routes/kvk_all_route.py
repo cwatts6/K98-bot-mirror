@@ -184,7 +184,11 @@ async def _record_structured_failure_audit(
 ) -> None:
     error_text = str(result.get("error") or "KVK_ALL import failed")
     error_type = _structured_error_type(result)
-    rows_staged = _maybe_int(result.get("staged_rows") or result.get("row_count"))
+    rows_staged = _maybe_int(
+        result.get("staged_rows")
+        if result.get("staged_rows") is not None
+        else result.get("row_count")
+    )
     diagnostic_id = _maybe_int(result.get("diagnostic_id"))
     details = kvk_all_audit_details(
         audit_context,

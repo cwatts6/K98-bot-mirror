@@ -308,6 +308,34 @@ async def test_kvk_all_route_structured_failure_sends_existing_error_and_continu
 
 
 @pytest.mark.asyncio
+async def test_kvk_all_route_structured_failure_preserves_zero_staged_rows():
+    audit_events = []
+    deps, sent, _offloads, _created, _exports = _deps(
+        offload_result={
+            "success": False,
+            "error": "No rows found in uploaded file.",
+            "sheet": "Full Data",
+            "schema_version": "kvk_all_full_data_v2",
+            "staged_rows": 0,
+            "row_count": 7,
+            "validation_error": {"code": "no_rows_found"},
+        },
+        audit_events=audit_events,
+    )
+
+    handled = await route.handle_kvk_all_upload(_message(), deps)
+
+    assert handled is True
+    _ch, title, fields, _color, _mention = sent[-1]
+    assert title == "KVK All-Kingdom Import \u274c"
+    assert fields["Error"] == "No rows found in uploaded file."
+    fail_events = [event for event in audit_events if event[0] == "fail"]
+    assert fail_events[-1][2]["rows_in_source"] == 0
+    assert fail_events[-1][2]["rows_staged"] == 0
+    assert fail_events[-1][2]["rows_skipped"] == 0
+
+
+@pytest.mark.asyncio
 async def test_kvk_all_route_success_without_negatives_preserves_embed_and_link_button():
     audit_events = []
     deps, _sent, offloads, created, exports = _deps(
