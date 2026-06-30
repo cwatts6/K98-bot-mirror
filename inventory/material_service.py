@@ -56,8 +56,16 @@ def build_material_review_from_summaries(
         values=merged.values,
         warnings=list(dict.fromkeys(item for item in warnings if item)),
         conflicts=merged.conflicts,
-        screenshot_count=len(summaries),
+        screenshot_count=sum(_summary_screenshot_count(summary) for summary in summaries),
     )
+
+
+def _summary_screenshot_count(summary: InventoryAnalysisSummary) -> int:
+    raw_json = summary.raw_json if isinstance(summary.raw_json, dict) else {}
+    try:
+        return max(1, int(raw_json.get("screenshot_count") or 1))
+    except (TypeError, ValueError):
+        return 1
 
 
 def apply_material_corrections(

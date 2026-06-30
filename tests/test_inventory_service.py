@@ -302,6 +302,31 @@ async def test_additional_material_image_merges_and_persists_materials(monkeypat
     assert captured["status"] == InventoryImportStatus.ANALYSED
 
 
+async def test_additional_material_image_preserves_existing_screenshot_count(monkeypatch):
+    captured = {}
+
+    def _update(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(inventory_service.inventory_dal, "update_batch_analysis", _update)
+
+    summary = await inventory_service.analyse_additional_material_image(
+        import_batch_id=42,
+        existing_detected_json={
+            "detected_image_type": "materials",
+            "values": {"materials": {"animal_bone": {"epic": 4}}},
+            "warnings": [],
+            "screenshot_count": 2,
+        },
+        payload=InventoryImagePayload(image_bytes=b"materials", filename="materials.png"),
+        vision_client=_MaterialVisionClient(),
+    )
+
+    assert summary.import_type == InventoryImportType.MATERIALS
+    assert summary.raw_json["screenshot_count"] == 3
+    assert captured["detected_json"]["screenshot_count"] == 3
+
+
 async def test_decide_analysis_outcome_allows_materials_review():
     result = _VisionResult()
     result.detected_image_type = "materials"
