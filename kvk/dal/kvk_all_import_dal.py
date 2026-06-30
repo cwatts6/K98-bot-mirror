@@ -412,6 +412,7 @@ def ingest_prepared_import(
             "cleanup_failed": cleanup_failed,
             "cleanup_error": cleanup_error,
             "diagnostic_id": diagnostic_id,
+            "staged_rows": staged_rows,
             "stage_rows_ms": stage_rows_ms,
             "stage_insert_ms": stage_insert_ms,
             "precheck_ms": precheck_ms,

@@ -161,6 +161,7 @@ def test_ingest_prepared_import_cleans_stage_rows_when_precheck_fails(monkeypatc
     assert result["success"] is False
     assert result["cleanup_failed"] is False
     assert result["cleanup_error"] is None
+    assert result["staged_rows"] == 1
     assert result["stage_rows_ms"] >= 0
     assert result["stage_insert_ms"] >= 0
     assert result["precheck_ms"] >= 0

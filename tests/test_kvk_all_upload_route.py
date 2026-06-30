@@ -57,6 +57,11 @@ class _FakeChannel:
         self.sent.append(kwargs)
 
 
+class _FailingSendChannel(_FakeChannel):
+    async def send(self, **kwargs) -> None:
+        raise RuntimeError("discord send failed")
+
+
 class _FakeAuthor:
     id = 123456789
 
@@ -463,3 +468,25 @@ async def test_kvk_all_route_unexpected_exception_renders_error_and_continues():
     assert fail_events[0][2]["error_type"] == "RuntimeError"
     complete_events = [event for event in audit_events if event[0] == "complete"]
     assert complete_events[-1][2]["external_batch_id"] == "13:5"
+
+
+@pytest.mark.asyncio
+async def test_kvk_all_route_post_ingest_send_failure_completes_import_audit():
+    audit_events = []
+    deps, sent, _offloads, _created, _exports = _deps(
+        offload_result=_success_result(scan_id=6),
+        audit_events=audit_events,
+    )
+    msg = _message()
+    msg.channel = _FailingSendChannel(10)
+
+    handled = await route.handle_kvk_all_upload(msg, deps)
+
+    assert handled is True
+    _ch, title, fields, _color, _mention = sent[-1]
+    assert title == "KVK All-Kingdom Import \u274c"
+    assert fields["Error"] == "RuntimeError: discord send failed"
+    assert [event for event in audit_events if event[0] == "fail"] == []
+    complete_events = [event for event in audit_events if event[0] == "complete"]
+    assert complete_events[-1][2]["external_batch_id"] == "13:6"
+    assert complete_events[-1][2]["rows_written"] == 10

@@ -574,32 +574,44 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                 )
                 staged_from_exc = _maybe_int(getattr(exc, "kvk_staged_rows", None))
                 error_type = _exception_error_type(exc, diagnostic_id)
-                await deps.fail_audit_batch(
-                    audit_ref,
-                    error_type=error_type,
-                    error_text=str(exc),
-                    rows_in_source=staged if staged is not None else staged_from_exc,
+                terminal_details = kvk_all_audit_details(
+                    audit_context,
+                    rows_parsed=staged if staged is not None else staged_from_exc,
                     rows_staged=staged if staged is not None else staged_from_exc,
-                    rows_written=rows if rows is not None else 0,
-                    rows_skipped=0 if rows is not None else staged_from_exc,
-                    external_batch_table=(
-                        KVK_ALL_AUDIT_DIAGNOSTIC_TABLE
-                        if diagnostic_external_id
-                        else None
-                    ),
-                    external_batch_id=diagnostic_external_id or external_batch_id,
-                    details=kvk_all_audit_details(
-                        audit_context,
-                        rows_parsed=staged if staged is not None else staged_from_exc,
-                        rows_staged=staged if staged is not None else staged_from_exc,
-                        rows_written=rows,
-                        negatives=neg,
-                        kvk_no=kvk_no,
-                        scan_id=scan_id,
-                        diagnostic_id=diagnostic_id,
-                        error=str(exc),
-                    ),
+                    rows_written=rows,
+                    negatives=neg,
+                    kvk_no=kvk_no,
+                    scan_id=scan_id,
+                    diagnostic_id=diagnostic_id,
+                    error=str(exc),
                 )
+                if external_batch_id is not None and rows is not None:
+                    await deps.complete_audit_batch(
+                        audit_ref,
+                        rows_in_source=staged,
+                        rows_staged=staged,
+                        rows_written=rows,
+                        rows_skipped=0,
+                        external_batch_id=external_batch_id,
+                        details=terminal_details,
+                    )
+                else:
+                    await deps.fail_audit_batch(
+                        audit_ref,
+                        error_type=error_type,
+                        error_text=str(exc),
+                        rows_in_source=staged if staged is not None else staged_from_exc,
+                        rows_staged=staged if staged is not None else staged_from_exc,
+                        rows_written=rows if rows is not None else 0,
+                        rows_skipped=0 if rows is not None else staged_from_exc,
+                        external_batch_table=(
+                            KVK_ALL_AUDIT_DIAGNOSTIC_TABLE
+                            if diagnostic_external_id
+                            else None
+                        ),
+                        external_batch_id=diagnostic_external_id,
+                        details=terminal_details,
+                    )
                 audit_terminal_recorded = True
             logger.exception("[KVK] Import failed for %s: %s", attachment.filename, exc)
             await deps.send_embed(
