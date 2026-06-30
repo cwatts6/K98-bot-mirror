@@ -104,7 +104,9 @@ def inventory_audit_details(
     return details
 
 
-def inventory_row_count(import_type: InventoryImportType | str | None, values: dict[str, Any]) -> int:
+def inventory_row_count(
+    import_type: InventoryImportType | str | None, values: dict[str, Any]
+) -> int:
     raw_import_type = str(getattr(import_type, "value", import_type or ""))
     if raw_import_type == InventoryImportType.RESOURCES.value:
         rows = values.get("resources") if isinstance(values, dict) else None
