@@ -10,6 +10,28 @@ import os
 from typing import Any
 
 from kvk_all_importer import ingest_kvk_all_excel
+from services.kvk_all_import_audit_service import (
+    KVK_ALL_AUDIT_ATTACHMENT_READ_PHASE,
+    KVK_ALL_AUDIT_AUTO_EXPORT_PHASE,
+    KVK_ALL_AUDIT_DIAGNOSTIC_TABLE,
+    KVK_ALL_AUDIT_INGEST_PHASE,
+    KVK_ALL_AUDIT_NEGATIVE_PHASE,
+    KVK_ALL_AUDIT_PARSE_PHASE,
+    KVK_ALL_AUDIT_RECOMPUTE_PHASE,
+    KVK_ALL_AUDIT_SQL_PREFLIGHT_PHASE,
+    KVK_ALL_AUDIT_STAGE_PHASE,
+    KvkAllImportAuditContext,
+    audit_duration_ms,
+    audit_timestamp_utc,
+    complete_kvk_all_audit_batch,
+    fail_kvk_all_audit_batch,
+    kvk_all_audit_details,
+    kvk_all_diagnostic_external_batch_id,
+    kvk_all_external_batch_id,
+    kvk_all_source_type,
+    record_kvk_all_audit_phase,
+    start_kvk_all_audit_batch,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +55,11 @@ class KvkAllRouteDeps:
     button_factory: Callable[..., Any] | None = None
     button_style_link: Any | None = None
     custom_avatar_url: str | None = None
+    start_audit_batch: Callable[..., Awaitable[Any]] = start_kvk_all_audit_batch
+    record_audit_phase: Callable[..., Awaitable[None]] = record_kvk_all_audit_phase
+    complete_audit_batch: Callable[..., Awaitable[None]] = complete_kvk_all_audit_batch
+    fail_audit_batch: Callable[..., Awaitable[None]] = fail_kvk_all_audit_batch
+    now_utc: Callable[[], Any] = audit_timestamp_utc
 
 
 def _default_embed_factory(**kwargs: Any) -> Any:
@@ -116,6 +143,127 @@ def _build_sheet_view(deps: KvkAllRouteDeps) -> Any | None:
         return None
 
 
+def _maybe_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _structured_error_type(result: dict[str, Any]) -> str:
+    validation_error = result.get("validation_error")
+    if isinstance(validation_error, dict) and validation_error.get("code"):
+        return str(validation_error["code"])
+    if result.get("missing_stage_columns"):
+        return "MissingStageColumns"
+    if result.get("diagnostic_id") is not None:
+        return "KvkDetailsTimestampRejected"
+    return "KvkAllImportFailed"
+
+
+def _diagnostic_external_id(result: dict[str, Any]) -> str | None:
+    diagnostic_id = _maybe_int(result.get("diagnostic_id"))
+    if diagnostic_id is None:
+        return None
+    return kvk_all_diagnostic_external_batch_id(diagnostic_id)
+
+
+def _exception_error_type(exc: Exception, diagnostic_id: int | None) -> str:
+    if diagnostic_id is not None:
+        return "KvkDetailsTimestampRejected"
+    return type(exc).__name__
+
+
+async def _record_structured_failure_audit(
+    deps: KvkAllRouteDeps,
+    audit_ref: Any,
+    audit_context: KvkAllImportAuditContext,
+    result: dict[str, Any],
+) -> None:
+    error_text = str(result.get("error") or "KVK_ALL import failed")
+    error_type = _structured_error_type(result)
+    rows_staged = _maybe_int(result.get("staged_rows") or result.get("row_count"))
+    diagnostic_id = _maybe_int(result.get("diagnostic_id"))
+    details = kvk_all_audit_details(
+        audit_context,
+        rows_parsed=rows_staged,
+        rows_staged=rows_staged,
+        diagnostic_id=diagnostic_id,
+        sheet=result.get("sheet"),
+        schema_version=result.get("schema_version"),
+        error=error_text,
+    )
+
+    if result.get("prepare_ms") is not None:
+        await deps.record_audit_phase(
+            audit_ref,
+            phase_name=KVK_ALL_AUDIT_PARSE_PHASE,
+            phase_status="completed",
+            rows_out=rows_staged,
+            duration_ms=_maybe_int(float(result.get("prepare_ms", 0))),
+            details=details,
+        )
+
+    if result.get("missing_stage_columns"):
+        await deps.record_audit_phase(
+            audit_ref,
+            phase_name=KVK_ALL_AUDIT_STAGE_PHASE,
+            phase_status="failed",
+            rows_in=rows_staged,
+            duration_ms=0,
+            error_type=error_type,
+            error_text=error_text,
+            details=details,
+        )
+    elif result.get("stage_insert_ms") is not None:
+        await deps.record_audit_phase(
+            audit_ref,
+            phase_name=KVK_ALL_AUDIT_STAGE_PHASE,
+            phase_status="completed",
+            rows_in=rows_staged,
+            rows_out=rows_staged,
+            duration_ms=_maybe_int(float(result.get("stage_insert_ms", 0))),
+            details=details,
+            set_batch_status="staged",
+        )
+        await deps.record_audit_phase(
+            audit_ref,
+            phase_name=KVK_ALL_AUDIT_INGEST_PHASE,
+            phase_status="failed",
+            rows_in=rows_staged,
+            duration_ms=_maybe_int(float(result.get("precheck_ms", 0))),
+            error_type=error_type,
+            error_text=error_text,
+            details=details,
+        )
+    else:
+        await deps.record_audit_phase(
+            audit_ref,
+            phase_name=KVK_ALL_AUDIT_PARSE_PHASE,
+            phase_status="failed",
+            rows_out=0,
+            error_type=error_type,
+            error_text=error_text,
+            details=details,
+        )
+
+    external_id = _diagnostic_external_id(result)
+    await deps.fail_audit_batch(
+        audit_ref,
+        error_type=error_type,
+        error_text=error_text,
+        rows_in_source=rows_staged,
+        rows_staged=rows_staged,
+        rows_written=0,
+        rows_skipped=rows_staged,
+        external_batch_table=KVK_ALL_AUDIT_DIAGNOSTIC_TABLE if external_id else None,
+        external_batch_id=external_id,
+        details=details,
+    )
+
+
 async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
     """Handle KVK all-kingdom uploads from the configured Pro Kingdom channel."""
     if message.channel.id != deps.prokingdom_channel_id or not message.attachments:
@@ -152,17 +300,90 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
         return True
 
     for attachment in excel_attachments:
+        audit_context: KvkAllImportAuditContext | None = None
+        audit_ref: Any = None
+        audit_terminal_recorded = False
+        kvk_no: int | None = None
+        scan_id: int | None = None
+        rows: int | None = None
+        staged: int | None = None
+        neg: int | None = None
+        external_batch_id: str | None = None
         try:
             logger.info(
                 "[KVK] Reading attachment: %s (%s bytes)",
                 attachment.filename,
                 getattr(attachment, "size", None),
             )
+            read_started = deps.now_utc()
             file_bytes = await attachment.read()
+            audit_context = KvkAllImportAuditContext(
+                source_filename=attachment.filename,
+                source_type=kvk_all_source_type(attachment.filename),
+                source_message_id=(
+                    int(message.id) if getattr(message, "id", None) is not None else None
+                ),
+                source_channel_id=(
+                    int(message.channel.id)
+                    if getattr(message.channel, "id", None) is not None
+                    else None
+                ),
+                actor_discord_id=(
+                    int(message.author.id)
+                    if getattr(message.author, "id", None) is not None
+                    else None
+                ),
+            )
+            audit_ref = await deps.start_audit_batch(
+                context=audit_context,
+                content=file_bytes,
+            )
+            await deps.record_audit_phase(
+                audit_ref,
+                phase_name=KVK_ALL_AUDIT_ATTACHMENT_READ_PHASE,
+                phase_status="completed",
+                started_at_utc=read_started.replace(tzinfo=None),
+                rows_out=1,
+                duration_ms=audit_duration_ms(read_started),
+                details=kvk_all_audit_details(audit_context),
+            )
 
+            preflight_started = deps.now_utc()
             ok = await deps.ensure_sql_headroom_or_notify(notify_ch)
             if not ok:
+                await deps.record_audit_phase(
+                    audit_ref,
+                    phase_name=KVK_ALL_AUDIT_SQL_PREFLIGHT_PHASE,
+                    phase_status="failed",
+                    started_at_utc=preflight_started.replace(tzinfo=None),
+                    duration_ms=audit_duration_ms(preflight_started),
+                    error_type="SqlHeadroomInsufficient",
+                    error_text="SQL log headroom insufficient",
+                    details=kvk_all_audit_details(
+                        audit_context,
+                        error="SQL log headroom insufficient",
+                    ),
+                )
+                await deps.fail_audit_batch(
+                    audit_ref,
+                    error_type="SqlHeadroomInsufficient",
+                    error_text="SQL log headroom insufficient",
+                    rows_written=0,
+                    details=kvk_all_audit_details(
+                        audit_context,
+                        error="SQL log headroom insufficient",
+                    ),
+                )
+                audit_terminal_recorded = True
                 continue
+            await deps.record_audit_phase(
+                audit_ref,
+                phase_name=KVK_ALL_AUDIT_SQL_PREFLIGHT_PHASE,
+                phase_status="completed",
+                started_at_utc=preflight_started.replace(tzinfo=None),
+                duration_ms=audit_duration_ms(preflight_started),
+                details=kvk_all_audit_details(audit_context),
+            )
 
             result = await deps.offload_callable(
                 ingest_kvk_all_excel,
@@ -183,6 +404,14 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                 logger.info(
                     "[KVK] Import failed for %s: %s", attachment.filename, result.get("error")
                 )
+                if audit_context is not None:
+                    await _record_structured_failure_audit(
+                        deps,
+                        audit_ref,
+                        audit_context,
+                        result,
+                    )
+                    audit_terminal_recorded = True
                 await deps.send_embed(
                     notify_ch,
                     "KVK All-Kingdom Import \u274c",
@@ -207,6 +436,68 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
             io_ms = max(0.0, dur_s * 1000.0 - proc_ms)
             recompute_ms = float(result.get("recompute_ms", 0.0))
             sheet_used = result.get("sheet", "unknown")
+            external_batch_id = kvk_all_external_batch_id(kvk_no, scan_id)
+
+            if audit_context is not None:
+                success_details = kvk_all_audit_details(
+                    audit_context,
+                    rows_parsed=staged,
+                    rows_staged=staged,
+                    rows_written=rows,
+                    negatives=neg,
+                    kvk_no=kvk_no,
+                    scan_id=scan_id,
+                    sheet=sheet_used,
+                    schema_version=result.get("schema_version"),
+                    auto_export_enabled=deps.auto_export_enabled,
+                )
+                await deps.record_audit_phase(
+                    audit_ref,
+                    phase_name=KVK_ALL_AUDIT_PARSE_PHASE,
+                    phase_status="completed",
+                    rows_out=staged,
+                    duration_ms=_maybe_int(float(result.get("prepare_ms", 0))),
+                    details=success_details,
+                )
+                await deps.record_audit_phase(
+                    audit_ref,
+                    phase_name=KVK_ALL_AUDIT_STAGE_PHASE,
+                    phase_status="completed",
+                    rows_in=staged,
+                    rows_out=staged,
+                    duration_ms=_maybe_int(float(result.get("stage_insert_ms", 0))),
+                    details=success_details,
+                    set_batch_status="staged",
+                )
+                await deps.record_audit_phase(
+                    audit_ref,
+                    phase_name=KVK_ALL_AUDIT_INGEST_PHASE,
+                    phase_status="completed",
+                    rows_in=staged,
+                    rows_out=rows,
+                    duration_ms=_maybe_int(float(result.get("ingest_ms", proc_ms))),
+                    details=success_details,
+                    set_batch_status="procedure_started",
+                )
+                await deps.record_audit_phase(
+                    audit_ref,
+                    phase_name=KVK_ALL_AUDIT_RECOMPUTE_PHASE,
+                    phase_status="completed",
+                    rows_in=rows,
+                    rows_out=rows,
+                    duration_ms=_maybe_int(recompute_ms),
+                    details=success_details,
+                    set_batch_status="downstream_rebuild_started",
+                )
+                await deps.record_audit_phase(
+                    audit_ref,
+                    phase_name=KVK_ALL_AUDIT_NEGATIVE_PHASE,
+                    phase_status="completed",
+                    rows_in=rows,
+                    rows_out=neg,
+                    duration_ms=_maybe_int(float(result.get("negative_count_ms", 0))),
+                    details=success_details,
+                )
 
             neg_badge = "0" if neg == 0 else f"{neg} \u26a0\ufe0f"
             color = 0x2ECC71 if neg == 0 else 0xE67E22
@@ -238,6 +529,7 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
             await notify_ch.send(embed=embed, view=view)
 
             if deps.auto_export_enabled:
+                export_started = deps.now_utc()
                 logger.info(
                     "[KVK_EXPORT] Scheduling auto-export for KVK %s (Scan %s)",
                     kvk_no,
@@ -250,7 +542,65 @@ async def handle_kvk_all_upload(message: Any, deps: KvkAllRouteDeps) -> bool:
                         deps.bot.loop,
                     )
                 )
+                if audit_context is not None:
+                    await deps.record_audit_phase(
+                        audit_ref,
+                        phase_name=KVK_ALL_AUDIT_AUTO_EXPORT_PHASE,
+                        phase_status="completed",
+                        started_at_utc=export_started.replace(tzinfo=None),
+                        rows_in=rows,
+                        rows_out=rows,
+                        duration_ms=audit_duration_ms(export_started),
+                        details=success_details,
+                    )
+            if audit_context is not None:
+                await deps.complete_audit_batch(
+                    audit_ref,
+                    rows_in_source=staged,
+                    rows_staged=staged,
+                    rows_written=rows,
+                    rows_skipped=0,
+                    external_batch_id=external_batch_id,
+                    details=success_details,
+                )
+                audit_terminal_recorded = True
         except Exception as exc:
+            if audit_ref is not None and audit_context is not None and not audit_terminal_recorded:
+                diagnostic_id = _maybe_int(getattr(exc, "kvk_diagnostic_id", None))
+                diagnostic_external_id = (
+                    kvk_all_diagnostic_external_batch_id(diagnostic_id)
+                    if diagnostic_id is not None
+                    else None
+                )
+                staged_from_exc = _maybe_int(getattr(exc, "kvk_staged_rows", None))
+                error_type = _exception_error_type(exc, diagnostic_id)
+                await deps.fail_audit_batch(
+                    audit_ref,
+                    error_type=error_type,
+                    error_text=str(exc),
+                    rows_in_source=staged if staged is not None else staged_from_exc,
+                    rows_staged=staged if staged is not None else staged_from_exc,
+                    rows_written=rows if rows is not None else 0,
+                    rows_skipped=0 if rows is not None else staged_from_exc,
+                    external_batch_table=(
+                        KVK_ALL_AUDIT_DIAGNOSTIC_TABLE
+                        if diagnostic_external_id
+                        else None
+                    ),
+                    external_batch_id=diagnostic_external_id or external_batch_id,
+                    details=kvk_all_audit_details(
+                        audit_context,
+                        rows_parsed=staged if staged is not None else staged_from_exc,
+                        rows_staged=staged if staged is not None else staged_from_exc,
+                        rows_written=rows,
+                        negatives=neg,
+                        kvk_no=kvk_no,
+                        scan_id=scan_id,
+                        diagnostic_id=diagnostic_id,
+                        error=str(exc),
+                    ),
+                )
+                audit_terminal_recorded = True
             logger.exception("[KVK] Import failed for %s: %s", attachment.filename, exc)
             await deps.send_embed(
                 notify_ch,

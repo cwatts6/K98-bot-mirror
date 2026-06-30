@@ -105,6 +105,7 @@ def _deps(**overrides):
     offloads = []
     created_tasks = []
     scheduled_exports = []
+    audit_events = overrides.get("audit_events", [])
     notify_channel = overrides.get("notify_channel")
 
     async def get_notify_channel():
@@ -146,6 +147,19 @@ def _deps(**overrides):
         coro.close()
         return None
 
+    async def start_audit_batch(**kwargs):
+        audit_events.append(("start", kwargs))
+        return overrides.get("audit_ref", "audit-ref")
+
+    async def record_audit_phase(batch_ref, **kwargs):
+        audit_events.append(("phase", batch_ref, kwargs))
+
+    async def complete_audit_batch(batch_ref, **kwargs):
+        audit_events.append(("complete", batch_ref, kwargs))
+
+    async def fail_audit_batch(batch_ref, **kwargs):
+        audit_events.append(("fail", batch_ref, kwargs))
+
     deps = route.KvkAllRouteDeps(
         prokingdom_channel_id=10,
         bot=overrides.get("bot", _FakeBot()),
@@ -162,6 +176,10 @@ def _deps(**overrides):
         button_factory=_FakeButton,
         button_style_link="link",
         custom_avatar_url=overrides.get("custom_avatar_url", ""),
+        start_audit_batch=overrides.get("start_audit_batch", start_audit_batch),
+        record_audit_phase=overrides.get("record_audit_phase", record_audit_phase),
+        complete_audit_batch=overrides.get("complete_audit_batch", complete_audit_batch),
+        fail_audit_batch=overrides.get("fail_audit_batch", fail_audit_batch),
     )
     return deps, sent_embeds, offloads, created_tasks, scheduled_exports
 
@@ -227,9 +245,11 @@ async def test_kvk_all_route_accepts_existing_extensions(filename: str):
 
 @pytest.mark.asyncio
 async def test_kvk_all_route_sql_preflight_abort_skips_only_current_attachment():
+    audit_events = []
     deps, sent, offloads, _created, _exports = _deps(
         sql_results=[False, True],
         offload_result=_success_result(scan_id=3),
+        audit_events=audit_events,
     )
 
     msg = _message(attachments=[_FakeAttachment("first.xlsx"), _FakeAttachment("second.xlsx")])
@@ -241,15 +261,26 @@ async def test_kvk_all_route_sql_preflight_abort_skips_only_current_attachment()
     assert offloads[0][2]["source_filename"] == "second.xlsx"
     assert sent == []
     assert msg.channel.sent[0]["embed"].field_dict()["ScanID"] == "3"
+    fail_events = [event for event in audit_events if event[0] == "fail"]
+    assert fail_events[0][2]["error_type"] == "SqlHeadroomInsufficient"
+    complete_events = [event for event in audit_events if event[0] == "complete"]
+    assert complete_events[-1][2]["external_batch_id"] == "13:3"
 
 
 @pytest.mark.asyncio
 async def test_kvk_all_route_structured_failure_sends_existing_error_and_continues():
+    audit_events = []
     deps, sent, offloads, _created, _exports = _deps(
         offload_results=[
-            {"success": False, "error": "missing Full Data", "sheet": "Basic Data"},
+            {
+                "success": False,
+                "error": "missing Full Data",
+                "sheet": "Basic Data",
+                "validation_error": {"code": "missing_full_data_sheet"},
+            },
             _success_result(scan_id=4),
         ],
+        audit_events=audit_events,
     )
     msg = _message(attachments=[_FakeAttachment("bad.xlsx"), _FakeAttachment("good.xlsx")])
 
@@ -265,15 +296,21 @@ async def test_kvk_all_route_structured_failure_sends_existing_error_and_continu
     assert color == 0xE74C3C
     assert len(msg.channel.sent) == 1
     assert msg.channel.sent[0]["embed"].field_dict()["ScanID"] == "4"
+    fail_events = [event for event in audit_events if event[0] == "fail"]
+    assert fail_events[0][2]["error_type"] == "missing_full_data_sheet"
+    assert fail_events[0][2]["external_batch_id"] is None
+    assert [event[0] for event in audit_events].count("complete") == 1
 
 
 @pytest.mark.asyncio
 async def test_kvk_all_route_success_without_negatives_preserves_embed_and_link_button():
+    audit_events = []
     deps, _sent, offloads, created, exports = _deps(
         auto_export_enabled=True,
         custom_avatar_url="https://example.invalid/avatar.png",
         get_sheet_id=lambda: "sheet123",
         offload_result=_success_result(),
+        audit_events=audit_events,
     )
     msg = _message()
 
@@ -302,6 +339,72 @@ async def test_kvk_all_route_success_without_negatives_preserves_embed_and_link_
     assert view.items[0].kwargs["url"] == "https://docs.google.com/spreadsheets/d/sheet123"
     assert len(created) == 1
     assert exports == [(13, msg.channel, deps.bot.loop)]
+    phase_names = [event[2]["phase_name"] for event in audit_events if event[0] == "phase"]
+    assert route.KVK_ALL_AUDIT_PARSE_PHASE in phase_names
+    assert route.KVK_ALL_AUDIT_STAGE_PHASE in phase_names
+    assert route.KVK_ALL_AUDIT_INGEST_PHASE in phase_names
+    assert route.KVK_ALL_AUDIT_RECOMPUTE_PHASE in phase_names
+    assert route.KVK_ALL_AUDIT_NEGATIVE_PHASE in phase_names
+    assert route.KVK_ALL_AUDIT_AUTO_EXPORT_PHASE in phase_names
+    complete_events = [event for event in audit_events if event[0] == "complete"]
+    assert complete_events[-1][2]["external_batch_id"] == "13:2"
+    assert complete_events[-1][2]["rows_in_source"] == 10
+    assert complete_events[-1][2]["rows_written"] == 10
+
+
+@pytest.mark.asyncio
+async def test_kvk_all_route_kvk_details_rejection_correlates_diagnostic_id():
+    audit_events = []
+    deps, sent, _offloads, _created, _exports = _deps(
+        offload_result={
+            "success": False,
+            "error": "Scan timestamp outside KVK_Details ranges.",
+            "sheet": "Full Data",
+            "schema_version": "kvk_all_full_data_v2",
+            "diagnostic_id": 42,
+            "staged_rows": 7,
+            "prepare_ms": 3.0,
+            "stage_insert_ms": 4.0,
+            "precheck_ms": 5.0,
+        },
+        audit_events=audit_events,
+    )
+
+    handled = await route.handle_kvk_all_upload(_message(), deps)
+
+    assert handled is True
+    _ch, title, fields, _color, _mention = sent[-1]
+    assert title == "KVK All-Kingdom Import \u274c"
+    assert fields["Error"] == "Scan timestamp outside KVK_Details ranges."
+    fail_events = [event for event in audit_events if event[0] == "fail"]
+    assert fail_events[-1][2]["error_type"] == "KvkDetailsTimestampRejected"
+    assert fail_events[-1][2]["external_batch_table"] == route.KVK_ALL_AUDIT_DIAGNOSTIC_TABLE
+    assert fail_events[-1][2]["external_batch_id"] == "42"
+    assert fail_events[-1][2]["rows_staged"] == 7
+
+
+@pytest.mark.asyncio
+async def test_kvk_all_route_exception_diagnostic_id_records_kvk_details_rejection():
+    audit_events = []
+    exc = RuntimeError("Scan timestamp outside KVK_Details ranges.")
+    setattr(exc, "kvk_diagnostic_id", 42)
+    setattr(exc, "kvk_staged_rows", 7)
+    deps, sent, _offloads, _created, _exports = _deps(
+        offload_results=[exc],
+        audit_events=audit_events,
+    )
+
+    handled = await route.handle_kvk_all_upload(_message(), deps)
+
+    assert handled is True
+    _ch, title, fields, _color, _mention = sent[-1]
+    assert title == "KVK All-Kingdom Import \u274c"
+    assert fields["Error"] == "RuntimeError: Scan timestamp outside KVK_Details ranges."
+    fail_events = [event for event in audit_events if event[0] == "fail"]
+    assert fail_events[-1][2]["error_type"] == "KvkDetailsTimestampRejected"
+    assert fail_events[-1][2]["external_batch_table"] == route.KVK_ALL_AUDIT_DIAGNOSTIC_TABLE
+    assert fail_events[-1][2]["external_batch_id"] == "42"
+    assert fail_events[-1][2]["rows_staged"] == 7
 
 
 @pytest.mark.asyncio
@@ -339,8 +442,10 @@ async def test_kvk_all_route_link_button_is_best_effort():
 
 @pytest.mark.asyncio
 async def test_kvk_all_route_unexpected_exception_renders_error_and_continues():
+    audit_events = []
     deps, sent, offloads, _created, _exports = _deps(
-        offload_results=[RuntimeError("boom"), _success_result(scan_id=5)]
+        offload_results=[RuntimeError("boom"), _success_result(scan_id=5)],
+        audit_events=audit_events,
     )
     msg = _message(attachments=[_FakeAttachment("bad.xlsx"), _FakeAttachment("good.xlsx")])
 
@@ -354,3 +459,7 @@ async def test_kvk_all_route_unexpected_exception_renders_error_and_continues():
     assert fields["File"] == "bad.xlsx"
     assert color == 0xE74C3C
     assert msg.channel.sent[0]["embed"].field_dict()["ScanID"] == "5"
+    fail_events = [event for event in audit_events if event[0] == "fail"]
+    assert fail_events[0][2]["error_type"] == "RuntimeError"
+    complete_events = [event for event in audit_events if event[0] == "complete"]
+    assert complete_events[-1][2]["external_batch_id"] == "13:5"

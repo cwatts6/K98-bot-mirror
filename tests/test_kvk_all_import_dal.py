@@ -244,6 +244,8 @@ def test_ingest_prepared_import_records_proc_failure_and_keeps_stage_rows(
         )
     except RuntimeError as exc:
         assert str(exc) == "stored procedure failed"
+        assert getattr(exc, "kvk_diagnostic_id") == 42
+        assert getattr(exc, "kvk_staged_rows") == 1
     else:  # pragma: no cover - defensive guard
         raise AssertionError("expected ingest failure")
 

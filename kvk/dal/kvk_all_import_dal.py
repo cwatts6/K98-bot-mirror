@@ -475,6 +475,11 @@ def ingest_prepared_import(
                     "[KVK] Failed to commit ingest diagnostic id=%s after ingest failure.",
                     diagnostic_id,
                 )
+        try:
+            setattr(exc, "kvk_diagnostic_id", diagnostic_id)
+            setattr(exc, "kvk_staged_rows", staged_rows)
+        except Exception:
+            pass
         raise
     kvk_no, scan_id, row_count = rows[0]
     con.commit()
