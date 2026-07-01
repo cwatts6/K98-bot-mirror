@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / K98 bot import architecture`
 - Task type: `deferred optimisation batch | import audit consistency | timestamp normalization`
 - One-pass approved: `no`
-- Status: `active next-slice task pack, starts with audit/scope and SQL implementation-boundary confirmation`
+- Status: `completed, archived after production smoke testing`
 
 ## 2. Required Reading
 
@@ -27,7 +27,26 @@ For SQL-facing validation, use the SQL source of truth:
 
 `C:\K98-bot-SQL-Server`
 
-## 3. Objective
+## 3. Delivered Outcome
+
+Task C Slice 11 normalized the generic import-audit phase timestamp contract after Rally Forts
+Slice 10 closure. Bot-side `services/import_audit_service.py` clamps caller-supplied
+`CompletedAtUtc` to `StartedAtUtc` when both values are present and completion would otherwise
+precede start. The SQL Server repo migration
+`C:\K98-bot-SQL-Server\migrations\20260701_001_clamp_import_audit_phase_completed_at.sql` and the
+SQL Server repo `dbo.usp_ImportAudit_RecordPhase` schema source add the same persisted writer
+invariant for all callers, including paths that rely on SQL-owned timestamps.
+
+Duration, phase status, best-effort audit behavior, route/importer contracts, batch counters,
+external correlation, SQL import behavior, user-facing behavior, and historical audit rows remain
+unchanged.
+
+Production smoke testing on `2026-07-01` confirmed new fallback batch `27` and player-location
+batch `28` phase rows no longer show `CompletedAtUtc < StartedAtUtc`. Earlier rows with
+millisecond-level timestamp inversions remain unchanged by design because the slice intentionally
+avoided historical production audit backfill.
+
+## 4. Original Objective
 
 Normalize generic import-audit phase timestamp handling so persisted `dbo.ImportAuditPhase` rows
 cannot show `CompletedAtUtc` earlier than `StartedAtUtc`, while preserving current best-effort
@@ -38,7 +57,7 @@ This is a small audit-polish slice after fallback, player-location, Honor, PreKv
 activity, MGE results, inventory, KVK_ALL, and Rally Forts have all adopted generic durable import
 audit.
 
-## 4. Background
+## 5. Background
 
 Task C Slice 9 production smoke testing for KVK_ALL showed some `ImportAuditPhase` rows where
 `CompletedAtUtc` was one to three milliseconds earlier than `StartedAtUtc`, while terminal batch
@@ -50,7 +69,7 @@ Task C Slice 10 then completed Rally Forts generic durable audit adoption, so th
 phase-heavy audit surface is now broad enough to normalize centrally without blocking route
 adoption.
 
-## 5. Completed Dependencies And Baseline
+## 6. Completed Dependencies And Baseline
 
 Delivered import audit baseline:
 
@@ -72,7 +91,7 @@ Current known timestamp issue:
 - No user-visible import behavior, terminal counter, external correlation, or SQL import output
   defect has been reported from this timestamp polish item.
 
-## 6. Source Deferred Item Promoted Into This Pack
+## 7. Source Deferred Item Promoted Into This Pack
 
 ### Deferred Optimisation
 - Area: `services/import_audit_service.py`, `stats/dal/import_audit_dal.py`, import upload route audit phase callers, SQL repo `dbo.usp_ImportAudit_RecordPhase`
@@ -83,7 +102,7 @@ Current known timestamp issue:
 - Risk: medium
 - Dependencies: Generic import audit objects from Task C Slice 2; phase-heavy route adoption through KVK_ALL and Rally Forts; SQL validation against `C:\K98-bot-SQL-Server`.
 
-## 7. Scope
+## 8. Scope
 
 ### In Scope
 
@@ -125,7 +144,7 @@ Current known timestamp issue:
 - Weekly cumulative view cleanup.
 - Inventory view-orchestration extraction.
 
-## 8. SQL Position To Validate
+## 9. SQL Position Validated
 
 Validate these SQL objects against `C:\K98-bot-SQL-Server` before implementation:
 
@@ -135,30 +154,27 @@ Validate these SQL objects against `C:\K98-bot-SQL-Server` before implementation
 - `dbo.usp_ImportAudit_CompleteBatch`
 - `dbo.usp_ImportAudit_FailBatch`
 
-Specific questions:
+Validated conclusions:
 
-- What precision and defaults are used for `StartedAtUtc` and `CompletedAtUtc`?
-- Does `dbo.usp_ImportAudit_RecordPhase` already default or coerce completion timestamps?
-- Can the SQL writer safely set `CompletedAtUtc = StartedAtUtc` when a supplied/defaulted
-  completion would otherwise be earlier?
-- Would Python-side normalization be enough without SQL changes?
-- Would a SQL change require a SQL repo PR/deployment before bot rollout?
+- `dbo.ImportAuditPhase.StartedAtUtc` and `CompletedAtUtc` use `datetime2(3)`.
+- `dbo.usp_ImportAudit_RecordPhase` is the correct persisted writer boundary for the invariant.
+- SQL-owned defaults could reintroduce a boundary mismatch if Python-only normalization were used.
+- The SQL writer can safely clamp `CompletedAtUtc` to effective `StartedAtUtc` only when needed.
+- The SQL change required a SQL repo PR and deployment before relying on the persisted invariant.
 
-## 9. Implementation Proposal
+## 10. Implementation Delivered
 
-Start with audit/scope only and stop for approval. After approval, prefer the smallest safe fix:
+Audit/scope completed first and implementation proceeded after approval. The delivered fix used a
+minimal combined contract:
 
-1. Normalize in the generic service/DAL layer if the bot is the only source of inconsistent phase
-   timestamps and SQL validation confirms no writer-side default can reintroduce the issue.
-2. If SQL-owned defaults can still create `CompletedAtUtc < StartedAtUtc`, prepare a small SQL
-   writer-procedure change in `C:\K98-bot-SQL-Server` that clamps completion to start time only
-   when needed.
-3. Keep route helpers unchanged unless a caller is demonstrably passing an invalid timestamp
-   contract and the fix is a tiny local correction.
+1. Bot service normalization clamps caller-supplied completion timestamps before DAL submission.
+2. SQL writer normalization enforces the same invariant for all persisted phase rows.
+3. Route helpers and importers remained unchanged because the defect was generic timestamp-boundary
+   polish rather than a route-specific invalid timestamp contract.
 
-No route UX, import behavior, SQL import procedure, or historical audit data changes are expected.
+No route UX, import behavior, SQL import procedure, or historical audit data changes were made.
 
-## 10. Remaining Slice Map To Preserve
+## 11. Remaining Slice Map To Preserve
 
 Do not lose these later slices:
 
@@ -178,11 +194,11 @@ Do not lose these later slices:
    - Inventory lifecycle coordination cleanup remains separate now that Slice 8 audit adoption is
      delivered and smoke tested.
 
-No new deferred optimisation was identified from Rally Forts smoke testing. The backup scheduling
-`RowsOut=NULL` consistency issue found during production review was fixed in Slice 10 follow-up
-commits before this pack was prepared.
+No new deferred optimisation was identified from Slice 11 implementation or smoke testing. The
+backup scheduling `RowsOut=NULL` consistency issue found during Rally Forts production review was
+fixed in Slice 10 follow-up commits before this pack was prepared.
 
-## 11. Codex Skills To Use
+## 12. Codex Skills Used
 
 | Skill | Decision | Notes |
 |---|---|---|
@@ -194,7 +210,7 @@ commits before this pack was prepared.
 | `k98-promotion-check` | use before production promotion | Required if SQL or deployment sequencing is involved. |
 | `codex-security:security-diff-scan` | likely skip if docs/tests-only; use if code/SQL changes touch SQL/data audit behavior | Timestamp writer changes touch SQL/data audit persistence, so run or explicitly justify. |
 
-## 12. Files To Audit
+## 13. Files Audited
 
 Bot repo:
 
@@ -217,7 +233,7 @@ SQL repo:
 - `C:\K98-bot-SQL-Server\sql_schema\dbo.usp_ImportAudit_RecordPhase.StoredProcedure.sql`
 - terminal writer procedure definitions only if the audit finds shared timestamp assumptions.
 
-## 13. Required First Response
+## 14. Required First Response Used
 
 Use this shape and stop for approval before code or SQL changes:
 
@@ -244,7 +260,31 @@ Use this shape and stop for approval before code or SQL changes:
 <specific decisions for Chris>
 ```
 
-## 14. Validation Plan
+## 15. Validation Completed
+
+- Focused import-audit service/DAL tests passed: `16 passed`.
+- SQL repo validation passed with only pre-existing warnings in older migrations.
+- Architecture and deferred validators passed.
+- Selected-test review completed.
+- Smoke imports passed.
+- Command registration validation passed.
+- Full pytest passed: `2157 passed, 2 skipped`.
+- Pytest log-noise validation passed.
+- Pre-commit on touched files passed.
+- Whitespace checks passed.
+- Codex Security app scan was skipped with justification because the approved change only clamps
+  audit timestamps, adds no dynamic SQL, exposes no new data, and changes no authorization, file,
+  network, user-input parsing, or route behavior.
+
+Production smoke after deployment:
+
+- Fallback batch `27` phases `122` through `124` showed no `CompletedAtUtc < StartedAtUtc`.
+- Player-location batch `28` phases `125` through `127` showed no
+  `CompletedAtUtc < StartedAtUtc`.
+- Historical rows from batches produced before the fix still show old millisecond-level inversions,
+  which is expected because no historical backfill was in scope.
+
+## 16. Original Validation Plan
 
 Baseline validators:
 
@@ -290,15 +330,15 @@ Smoke after deployment:
 - Confirm import route UX/output remains unchanged.
 - Confirm batch terminal counters and external correlation remain unchanged.
 
-## 15. Acceptance Criteria
+## 17. Acceptance Criteria
 
-- [ ] Current generic audit timestamp behavior is audited before implementation.
-- [ ] SQL object precision/default/coercion behavior is validated against the SQL repo.
-- [ ] First response stops for approval before code or SQL changes.
-- [ ] The chosen fix prevents new `ImportAuditPhase` rows from persisting `CompletedAtUtc < StartedAtUtc`.
-- [ ] `DurationMs` semantics are preserved or explicitly normalized with tests.
-- [ ] Audit writes remain best-effort.
-- [ ] No route UX/import behavior changes are introduced.
-- [ ] No historical production audit rows are backfilled.
-- [ ] Focused import-audit tests pass.
-- [ ] Remaining SQL/Python cleanup items remain documented.
+- [x] Current generic audit timestamp behavior is audited before implementation.
+- [x] SQL object precision/default/coercion behavior is validated against the SQL repo.
+- [x] First response stops for approval before code or SQL changes.
+- [x] The chosen fix prevents new `ImportAuditPhase` rows from persisting `CompletedAtUtc < StartedAtUtc`.
+- [x] `DurationMs` semantics are preserved or explicitly normalized with tests.
+- [x] Audit writes remain best-effort.
+- [x] No route UX/import behavior changes are introduced.
+- [x] No historical production audit rows are backfilled.
+- [x] Focused import-audit tests pass.
+- [x] Remaining SQL/Python cleanup items remain documented.

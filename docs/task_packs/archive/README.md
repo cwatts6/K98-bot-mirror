@@ -74,8 +74,15 @@ uploads, correlated successful daily/all-time imports to `dbo.IngestionLog/<Inge
 duplicate/no-row/unrecognized/preflight/failure outcomes externally uncorrelated, and was reported
 smoke tested successfully on 2026-07-01.
 
-The active import follow-up is Task C Slice 11 in
-`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 11 Import Audit Phase Timestamp Normalization.md`.
+Task C Slice 11 Import Audit Phase Timestamp Normalization normalized generic
+`ImportAuditPhase` timestamp handling in bot service and SQL writer boundaries, preserving
+duration semantics, audit best-effort behavior, route/importer contracts, batch counters, external
+correlation, SQL import behavior, user-facing behavior, and historical rows. Production smoke
+testing on 2026-07-01 confirmed new fallback batch 27 and player-location batch 28 phase rows no
+longer show `CompletedAtUtc < StartedAtUtc`.
+
+The active import follow-up is Task C Slice 12 in
+`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 12 UPDATE_ALL2 Wrapper Audit Outputs.md`.
 
 The DL_bot upload-routing and startup/lifecycle optimisation programme is complete through
 Phase 6L:

@@ -1,7 +1,7 @@
 # Codex Chat Starter - Import Pipeline Deferred Optimisation Task C Slice 11 Import Audit Phase Timestamp Normalization
 
-Use this starter to begin the generic import-audit timestamp-normalization slice after Rally Forts
-Task C Slice 10 is merged, deployed, and smoke tested.
+Archived starter. Task C Slice 11 completed generic import-audit timestamp normalization and
+production smoke testing on `2026-07-01`.
 
 ```markdown
 # Files mentioned by the user:

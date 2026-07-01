@@ -30,7 +30,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Suggested Fix: After Task C Slice 2's generic batch audit foundation is deployed, add a wrapper or non-invasive audit output around `dbo.UPDATE_ALL2` that records start/end, status, duration, and phase-level markers without changing output tables or player-visible behavior. Use the resulting baseline before deciding whether to split the procedure.
 - Impact: high
 - Risk: medium
-- Dependencies: Task C Slice 2 generic import batch audit foundation; SQL validation in `C:\K98-bot-SQL-Server`; no wholesale `UPDATE_ALL2` replacement in this slice.
+- Dependencies: Task C Slice 2 generic import batch audit foundation; Task C Slice 11 timestamp normalization delivered and smoke tested; SQL validation in `C:\K98-bot-SQL-Server`; no wholesale `UPDATE_ALL2` replacement in this slice. Promoted into the prepared Task C Slice 12 task pack for audit/scope and SQL implementation-boundary confirmation.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.IMPORT_STAGING_PROC`, raw fallback staging, `dbo.IMPORT_STAGING_CSV`, `dbo.IMPORT_STAGING`
