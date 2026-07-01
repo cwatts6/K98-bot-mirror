@@ -8,9 +8,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 from core import visual_text
 from voting.models import RenderedVoteCard, VoteSnapshot
+from voting.outcomes import vote_outcome
 
 ROOT = Path(__file__).resolve().parents[1]
-VOTING_BACKGROUND = ROOT / "assets" / "voting" / "vote_background.png"
+VOTING_BACKGROUND = ROOT / "assets" / "vote" / "vote.png"
 FALLBACK_BACKGROUND = ROOT / "assets" / "kvk" / "cards" / "Default_card.jpg"
 WIDTH = 1180
 HEIGHT = 640
@@ -96,6 +97,14 @@ def _pct(count: int, total: int) -> str:
     return f"{value:.1f}".rstrip("0").rstrip(".") + "%"
 
 
+def _is_closed(snapshot: VoteSnapshot, now_utc: datetime) -> bool:
+    return (
+        snapshot.status == "Closed"
+        or snapshot.closed_at_utc is not None
+        or snapshot.closes_at_utc <= now_utc
+    )
+
+
 def render_vote_card(
     snapshot: VoteSnapshot, *, now_utc: datetime | None = None
 ) -> RenderedVoteCard:
@@ -125,28 +134,70 @@ def render_vote_card(
     deadline = f"Closes: {_fmt_dt(snapshot.closes_at_utc)}"
     _draw_text(draw, (48, 145), deadline, fill=GOLD, font=_font(22, bold=True), bold=True)
 
-    total = snapshot.total_votes
-    row_top = 230
-    row_gap = 52
-    bar_x = 390
-    bar_w = 520
-    for index, option in enumerate(snapshot.options[:5]):
-        y = row_top + (index * row_gap)
-        label_font = _fit_font(draw, option.label, max_width=290, size=24, min_size=16, bold=True)
-        _draw_text(draw, (62, y), option.label, fill=TEXT, font=label_font, bold=True)
+    total = int(snapshot.total_votes or 0)
+    closed = _is_closed(snapshot, now)
+    outcome = vote_outcome(snapshot) if closed else None
+    winner_ids = set(outcome.winning_option_ids if outcome else ())
+    options = snapshot.options[:6]
+    count = max(1, len(options))
+    chart_left = 66
+    chart_right = WIDTH - 66
+    chart_bottom = 456
+    slot_w = (chart_right - chart_left) / count
+    max_bar_h = 148
+    bar_w = min(72, max(40, int(slot_w * 0.45)))
+    for index, option in enumerate(options):
+        center_x = int(chart_left + (slot_w * index) + (slot_w / 2))
+        bar_left = center_x - (bar_w // 2)
+        bar_right = center_x + (bar_w // 2)
+        bar_top = chart_bottom - max_bar_h
+        is_winner = closed and int(option.option_id) in winner_ids
+        fill = GOLD if is_winner else BLUE
         draw.rounded_rectangle(
-            (bar_x, y + 8, bar_x + bar_w, y + 28), radius=10, fill=(51, 65, 85, 230)
+            (bar_left, bar_top, bar_right, chart_bottom), radius=14, fill=(51, 65, 85, 210)
         )
-        fill_w = int(bar_w * option.vote_count / total) if total else 0
-        if fill_w:
-            draw.rounded_rectangle((bar_x, y + 8, bar_x + fill_w, y + 28), radius=10, fill=BLUE)
-        stat = f"{_compact_count(option.vote_count)} votes  |  {_pct(option.vote_count, total)}"
-        stat_font = _fit_font(draw, stat, max_width=180, size=21, min_size=15, bold=True)
-        _draw_text(draw, (936, y), stat, fill=MUTED, font=stat_font, bold=True)
+        fill_h = int(max_bar_h * int(option.vote_count or 0) / total) if total else 0
+        if fill_h:
+            draw.rounded_rectangle(
+                (bar_left, chart_bottom - fill_h, bar_right, chart_bottom),
+                radius=14,
+                fill=fill,
+            )
+        if is_winner:
+            draw.rounded_rectangle(
+                (bar_left - 5, bar_top - 5, bar_right + 5, chart_bottom + 5),
+                radius=18,
+                outline=GOLD,
+                width=3,
+            )
+        stat = f"{_compact_count(option.vote_count)} | {_pct(option.vote_count, total)}"
+        stat_font = _fit_font(
+            draw, stat, max_width=int(slot_w) - 12, size=20, min_size=14, bold=True
+        )
+        stat_x = center_x - (_text_width(draw, stat, stat_font, bold=True) // 2)
+        _draw_text(
+            draw, (stat_x, 218), stat, fill=GOLD if is_winner else MUTED, font=stat_font, bold=True
+        )
+
+        label = option.label
+        label_font = _fit_font(
+            draw, label, max_width=int(slot_w) - 12, size=20, min_size=13, bold=True
+        )
+        label_w = _text_width(draw, label, label_font, bold=True)
+        label_x = center_x - (label_w // 2)
+        _draw_text(
+            draw, (max(chart_left, label_x), 466), label, fill=TEXT, font=label_font, bold=True
+        )
+
+    if outcome:
+        summary_font = _fit_font(
+            draw, outcome.summary, max_width=760, size=24, min_size=16, bold=True
+        )
+        _draw_text(draw, (48, 520), outcome.summary, fill=GOLD, font=summary_font, bold=True)
 
     footer = f"Total voters: {_compact_count(total)}    Last updated: {_fmt_dt(now)}    Vote #{snapshot.vote_post_id}"
     footer_font = _fit_font(draw, footer, max_width=1000, size=22, min_size=16, bold=True)
-    _draw_text(draw, (48, 560), footer, fill=MUTED, font=footer_font, bold=True)
+    _draw_text(draw, (48, 578), footer, fill=MUTED, font=footer_font, bold=True)
 
     buf = BytesIO()
     canvas.convert("RGB").save(buf, format="PNG", optimize=True)

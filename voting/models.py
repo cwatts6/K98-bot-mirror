@@ -96,6 +96,23 @@ class VoteCloseResult:
 
 
 @dataclass(frozen=True)
+class VoteLookupChoice:
+    vote_post_id: int
+    title: str
+    status: str
+    channel_id: int
+    closes_at_utc: datetime
+
+
+@dataclass(frozen=True)
+class VoteOutcome:
+    kind: str
+    summary: str
+    winning_option_ids: tuple[int, ...] = ()
+    top_vote_count: int = 0
+
+
+@dataclass(frozen=True)
 class RenderedVoteCard:
     filename: str
     image_bytes: BytesIO

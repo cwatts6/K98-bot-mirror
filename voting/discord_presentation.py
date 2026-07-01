@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 import discord
 
 from voting.models import VoteSnapshot
+from voting.outcomes import vote_outcome
 from voting.render_service import render_vote_card
 
 
@@ -38,6 +39,12 @@ def build_vote_embed(snapshot: VoteSnapshot) -> discord.Embed:
         inline=True,
     )
     embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
+    if (
+        snapshot.status == "Closed"
+        or snapshot.closed_at_utc is not None
+        or snapshot.closes_at_utc <= datetime.now(UTC)
+    ):
+        embed.add_field(name="Outcome", value=vote_outcome(snapshot).summary, inline=False)
     embed.set_footer(text=f"Vote #{snapshot.vote_post_id}")
     embed.timestamp = datetime.now(UTC)
     embed.set_image(url=f"attachment://vote_{snapshot.vote_post_id}.png")
@@ -61,9 +68,13 @@ def build_reminder_embed(snapshot: VoteSnapshot) -> discord.Embed:
 
 
 def build_close_embed(snapshot: VoteSnapshot) -> discord.Embed:
+    outcome = vote_outcome(snapshot)
     embed = discord.Embed(
         title=f"Vote closed: {snapshot.title}",
-        description=f"Final results are available on the original vote post: {message_link(snapshot)}",
+        description=(
+            f"{outcome.summary}\n\n"
+            f"Final results are available on the original vote post: {message_link(snapshot)}"
+        ),
         color=discord.Color.red(),
     )
     embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)

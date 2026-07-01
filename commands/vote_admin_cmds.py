@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import discord
 from discord.ext import commands as ext_commands
@@ -8,6 +9,7 @@ from discord.ext import commands as ext_commands
 from bot_config import GUILD_ID
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import is_admin_or_leadership_only, track_usage
+from ui.views.vote_admin_update_view import VoteAdminUpdateView
 from ui.views.vote_post_view import VotePostView, disabled_vote_view
 from versioning import versioned
 from voting.discord_presentation import (
@@ -19,6 +21,11 @@ from voting.discord_presentation import (
     no_broad_mentions,
 )
 from voting.service import (
+    CLOSE_DURATION_CHOICES,
+    MAX_CLOSE_REASON_LEN,
+    MAX_DESCRIPTION_LEN,
+    MAX_OPTION_LABEL_LEN,
+    MAX_TITLE_LEN,
     VoteValidationError,
     attach_vote_message,
     build_create_request,
@@ -26,10 +33,27 @@ from voting.service import (
     close_vote,
     create_vote_record,
     get_vote_snapshot,
-    update_vote,
+    search_vote_choices,
 )
 
 logger = logging.getLogger(__name__)
+
+_CLOSE_DURATION_LABELS = {
+    "30m": "30 minutes",
+    "1h": "1 hour",
+    "2h": "2 hours",
+    "4h": "4 hours",
+    "8h": "8 hours",
+    "12h": "12 hours",
+    "1d": "1 day",
+    "2d": "2 days",
+    "3d": "3 days",
+    "7d": "7 days",
+}
+_CLOSE_DURATION_CHOICES = [
+    discord.OptionChoice(name=_CLOSE_DURATION_LABELS.get(value, value), value=value)
+    for value in CLOSE_DURATION_CHOICES
+]
 
 
 def _channel_permission_error(
@@ -55,13 +79,52 @@ def _channel_permission_error(
     return None
 
 
-def _optional_bool_choice(value: str | None) -> bool | None:
-    normalized = (value or "unchanged").strip().casefold()
-    if normalized == "yes":
-        return True
-    if normalized == "no":
-        return False
-    return None
+def _parse_vote_post_id(value: str | int) -> int:
+    if isinstance(value, int):
+        return int(value)
+    text = str(value or "").strip()
+    if text.isdigit():
+        return int(text)
+    match = re.fullmatch(r"#(\d+)", text)
+    if match:
+        return int(match.group(1))
+    raise VoteValidationError("Choose a vote from autocomplete.")
+
+
+async def _vote_post_autocomplete(ctx: discord.AutocompleteContext):
+    query = str(getattr(ctx, "value", "") or "")
+    try:
+        choices = await search_vote_choices(query=query, limit=25)
+    except Exception:
+        logger.exception("vote_post_autocomplete_failed query=%r", query)
+        return []
+    output = []
+    for choice in choices:
+        closes = choice.closes_at_utc.strftime("%Y-%m-%d %H:%M UTC")
+        label = f"#{choice.vote_post_id} {choice.title} | {choice.status} | {closes}"
+        output.append(discord.OptionChoice(name=label[:100], value=str(choice.vote_post_id)))
+    return output
+
+
+async def _send_vote_update_panel(ctx: discord.ApplicationContext, snapshot) -> None:
+    # architecture-check: allow - Discord response copy, not embedded SQL.
+    content = f"Choose what to update for Vote #{snapshot.vote_post_id}."
+    view = VoteAdminUpdateView(snapshot, owner_user_id=int(ctx.user.id))
+    followup = getattr(ctx, "followup", None)
+    if followup is not None and hasattr(followup, "send"):
+        try:
+            await followup.send(content=content, view=view, ephemeral=True)
+            await ctx.interaction.edit_original_response(
+                # architecture-check: allow - Discord response copy, not embedded SQL.
+                content=f"Update panel opened for Vote #{snapshot.vote_post_id}."
+            )
+            return
+        except Exception:
+            logger.exception(
+                "vote_admin_update_followup_failed vote_post_id=%s", snapshot.vote_post_id
+            )
+
+    await ctx.interaction.edit_original_response(content=content, view=view)
 
 
 def register_vote_admin(bot: ext_commands.Bot) -> None:
@@ -79,13 +142,36 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def vote_create(
         ctx: discord.ApplicationContext,
-        title: str = discord.Option(str, "Vote title"),
-        options: str = discord.Option(str, "Options separated by |, from 2 to 5 options"),
+        title: str = discord.Option(str, "Vote title", max_length=MAX_TITLE_LEN),
         target_channel: discord.TextChannel = discord.Option(
             discord.TextChannel, "Channel to post in"
         ),
-        closes_at_utc: str = discord.Option(str, "UTC close time, e.g. 2026-07-01 20:30"),
-        description: str = discord.Option(str, "Vote description", required=False, default=""),
+        close_in: str = discord.Option(
+            str,
+            "When voting should close",
+            choices=_CLOSE_DURATION_CHOICES,
+        ),
+        option_1: str = discord.Option(str, "Option 1", max_length=MAX_OPTION_LABEL_LEN),
+        option_2: str = discord.Option(str, "Option 2", max_length=MAX_OPTION_LABEL_LEN),
+        description: str = discord.Option(
+            str,
+            "Vote description",
+            required=False,
+            default="",
+            max_length=MAX_DESCRIPTION_LEN,
+        ),
+        option_3: str = discord.Option(
+            str, "Option 3", required=False, default="", max_length=MAX_OPTION_LABEL_LEN
+        ),
+        option_4: str = discord.Option(
+            str, "Option 4", required=False, default="", max_length=MAX_OPTION_LABEL_LEN
+        ),
+        option_5: str = discord.Option(
+            str, "Option 5", required=False, default="", max_length=MAX_OPTION_LABEL_LEN
+        ),
+        option_6: str = discord.Option(
+            str, "Option 6", required=False, default="", max_length=MAX_OPTION_LABEL_LEN
+        ),
         reminder_offsets_minutes: str = discord.Option(
             str,
             "Reminder offsets before close in minutes, comma-separated",
@@ -125,8 +211,8 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                 created_by_discord_user_id=int(ctx.user.id),
                 title=title,
                 description=description,
-                raw_options=options,
-                close_time_utc=closes_at_utc,
+                option_labels=(option_1, option_2, option_3, option_4, option_5, option_6),
+                close_time_utc=close_in,
                 reminder_offsets=reminder_offsets_minutes,
                 allow_vote_change=allow_vote_changes,
                 launch_mention_everyone=launch_mention_everyone,
@@ -209,10 +295,25 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def vote_close(
         ctx: discord.ApplicationContext,
-        vote_post_id: int = discord.Option(int, "Vote ID to close"),
-        reason: str = discord.Option(str, "Close reason", required=False, default="closed early"),
+        vote: str = discord.Option(
+            str,
+            "Vote to close",
+            autocomplete=_vote_post_autocomplete,
+        ),
+        reason: str = discord.Option(
+            str,
+            "Close reason",
+            required=False,
+            default="closed early",
+            max_length=MAX_CLOSE_REASON_LEN,
+        ),
     ) -> None:
         await safe_defer(ctx, ephemeral=True)
+        try:
+            vote_post_id = _parse_vote_post_id(vote)
+        except VoteValidationError as exc:
+            await ctx.interaction.edit_original_response(content=f"Vote not closed: {exc}")
+            return
         try:
             result, snapshot = await close_vote(
                 vote_post_id=vote_post_id,
@@ -255,64 +356,30 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def vote_update(
         ctx: discord.ApplicationContext,
-        vote_post_id: int = discord.Option(int, "Vote number to change"),
-        title: str = discord.Option(str, "New title", required=False, default=None),
-        description: str = discord.Option(str, "New description", required=False, default=None),
-        closes_at_utc: str = discord.Option(
+        vote: str = discord.Option(
             str,
-            "New UTC close time, e.g. 2026-07-01 20:30",
-            required=False,
-            default=None,
-        ),
-        reminder_offsets_minutes: str = discord.Option(
-            str,
-            "Replace unsent reminder offsets, comma-separated minutes",
-            required=False,
-            default=None,
-        ),
-        reminder_mention_everyone: str = discord.Option(
-            str,
-            "Mention @everyone on future reminders",
-            required=False,
-            default="unchanged",
-            choices=["unchanged", "yes", "no"],
-        ),
-        close_mention_everyone: str = discord.Option(
-            str,
-            "Mention @everyone on close",
-            required=False,
-            default="unchanged",
-            choices=["unchanged", "yes", "no"],
+            # architecture-check: allow - Discord option copy, not embedded SQL.
+            "Vote to update",
+            autocomplete=_vote_post_autocomplete,
         ),
     ) -> None:
         await safe_defer(ctx, ephemeral=True)
         try:
-            snapshot = await update_vote(
-                vote_post_id=vote_post_id,
-                actor_discord_user_id=int(ctx.user.id),
-                title=title,
-                description=description,
-                close_time_utc=closes_at_utc,
-                reminder_offsets=reminder_offsets_minutes,
-                reminder_mention_everyone=_optional_bool_choice(reminder_mention_everyone),
-                close_mention_everyone=_optional_bool_choice(close_mention_everyone),
-            )
+            vote_post_id = _parse_vote_post_id(vote)
         except VoteValidationError as exc:
             await ctx.interaction.edit_original_response(content=f"Vote not updated: {exc}")
             return
-        if snapshot.message_id:
-            channel = bot.get_channel(snapshot.channel_id) or await bot.fetch_channel(
-                snapshot.channel_id
+        snapshot = await get_vote_snapshot(vote_post_id)
+        if snapshot is None:
+            await ctx.interaction.edit_original_response(content="Vote not found.")
+            return
+        if snapshot.status != "Open":
+            await ctx.interaction.edit_original_response(
+                content="Vote not updated: vote is already closed."
             )
-            message = await channel.fetch_message(snapshot.message_id)
-            await message.edit(
-                embed=build_vote_embed(snapshot),
-                attachments=[],
-                files=[build_vote_file(snapshot)],
-                view=VotePostView(snapshot),
-                allowed_mentions=no_broad_mentions(),
-            )
-        await ctx.interaction.edit_original_response(content=f"Vote #{vote_post_id} updated.")
+            return
+        # architecture-check: allow - Discord response copy, not embedded SQL.
+        await _send_vote_update_panel(ctx, snapshot)
 
     @group.command(name="status", description="Show vote status and reminder state.")
     @versioned("v1.00")
@@ -321,9 +388,18 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def vote_status(
         ctx: discord.ApplicationContext,
-        vote_post_id: int = discord.Option(int, "Vote ID to inspect"),
+        vote: str = discord.Option(
+            str,
+            "Vote to inspect",
+            autocomplete=_vote_post_autocomplete,
+        ),
     ) -> None:
         await safe_defer(ctx, ephemeral=True)
+        try:
+            vote_post_id = _parse_vote_post_id(vote)
+        except VoteValidationError as exc:
+            await ctx.interaction.edit_original_response(content=f"Vote not found: {exc}")
+            return
         snapshot = await get_vote_snapshot(vote_post_id)
         if snapshot is None:
             await ctx.interaction.edit_original_response(content="Vote not found.")

@@ -29,18 +29,26 @@ class VotePostView(discord.ui.View):
         self.vote_post_id = int(snapshot.vote_post_id)
         closed = snapshot.status != "Open" or snapshot.closes_at_utc <= datetime.now(UTC)
         should_disable = closed if disabled is None else bool(disabled)
-        for option in snapshot.options:
-            self.add_item(_VoteOptionButton(self.vote_post_id, option, disabled=should_disable))
+        for index, option in enumerate(snapshot.options):
+            self.add_item(
+                _VoteOptionButton(
+                    self.vote_post_id,
+                    option,
+                    disabled=should_disable,
+                    row=index // 3,
+                )
+            )
 
 
 class _VoteOptionButton(discord.ui.Button):
-    def __init__(self, vote_post_id: int, option: VoteOption, *, disabled: bool) -> None:
+    def __init__(self, vote_post_id: int, option: VoteOption, *, disabled: bool, row: int) -> None:
         label = option.label[:80]
         super().__init__(
             label=label,
             style=_button_style(option.button_style),
             custom_id=f"vote:{int(vote_post_id)}:{int(option.option_id)}",
             disabled=disabled,
+            row=row,
         )
         self.vote_post_id = int(vote_post_id)
         self.option_id = int(option.option_id)

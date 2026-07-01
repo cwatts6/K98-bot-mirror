@@ -1,21 +1,59 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import logging
+import os
 import re
 
 from voting import dal
-from voting.models import VoteCastResult, VoteCloseResult, VoteCreateRequest, VoteSnapshot
+from voting.models import (
+    VoteCastResult,
+    VoteCloseResult,
+    VoteCreateRequest,
+    VoteLookupChoice,
+    VoteSnapshot,
+)
 
 logger = logging.getLogger(__name__)
 
-MAX_OPTIONS = 5
+
+def _option_label_length_from_env() -> int:
+    raw = (os.getenv(OPTION_LABEL_LENGTH_ENV) or "").strip()
+    if not raw:
+        return DEFAULT_OPTION_LABEL_LEN
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{OPTION_LABEL_LENGTH_ENV} must be an integer.") from exc
+    if value < 1 or value > DISCORD_OPTION_LABEL_MAX_LEN:
+        raise RuntimeError(
+            f"{OPTION_LABEL_LENGTH_ENV} must be between 1 and {DISCORD_OPTION_LABEL_MAX_LEN}."
+        )
+    return value
+
+
+MAX_OPTIONS = 6
 MIN_OPTIONS = 2
-MAX_OPTION_LABEL_LEN = 80
+DISCORD_OPTION_LABEL_MAX_LEN = 80
+DEFAULT_OPTION_LABEL_LEN = 20
+OPTION_LABEL_LENGTH_ENV = "VOTE_OPTION_LABEL_MAX_LENGTH"
+MAX_OPTION_LABEL_LEN = _option_label_length_from_env()
 MAX_TITLE_LEN = 180
 MAX_DESCRIPTION_LEN = 2000
 MAX_CLOSE_REASON_LEN = 200
 DEFAULT_REMINDER_OFFSETS = (60,)
+CLOSE_DURATION_CHOICES: dict[str, timedelta] = {
+    "30m": timedelta(minutes=30),
+    "1h": timedelta(hours=1),
+    "2h": timedelta(hours=2),
+    "4h": timedelta(hours=4),
+    "8h": timedelta(hours=8),
+    "12h": timedelta(hours=12),
+    "1d": timedelta(days=1),
+    "2d": timedelta(days=2),
+    "3d": timedelta(days=3),
+    "7d": timedelta(days=7),
+}
 
 
 class VoteValidationError(ValueError):
@@ -61,12 +99,40 @@ def parse_utc_datetime(value: str) -> datetime:
     return parsed.astimezone(UTC)
 
 
-def parse_options(raw_options: str) -> tuple[str, ...]:
-    parts = [part.strip() for part in re.split(r"[|\n]", raw_options or "") if part.strip()]
+def parse_close_time(value: str, *, now_utc: datetime | None = None) -> datetime:
+    now = now_utc or datetime.now(UTC)
+    text = (value or "").strip()
+    duration = CLOSE_DURATION_CHOICES.get(text.casefold())
+    if duration is not None:
+        return now + duration
+    return parse_utc_datetime(text)
+
+
+def parse_option_labels(option_labels: tuple[str | None, ...]) -> tuple[str, ...]:
+    labels = [str(label or "").strip() for label in option_labels]
+    if len(labels) < MIN_OPTIONS or not labels[0] or not labels[1]:
+        raise VoteValidationError("Option 1 and Option 2 are required.")
+
+    output: list[str] = []
+    found_blank = False
+    for index, label in enumerate(labels):
+        if not label:
+            found_blank = True
+            continue
+        if found_blank:
+            raise VoteValidationError(
+                f"Option fields cannot skip a number; fill Option {index} before Option {index + 1}."
+            )
+        output.append(label)
+
+    return _validate_options(output)
+
+
+def _validate_options(parts: list[str]) -> tuple[str, ...]:
     if len(parts) < MIN_OPTIONS:
-        raise VoteValidationError("Provide at least two options, separated with |.")
+        raise VoteValidationError("Provide at least two options.")
     if len(parts) > MAX_OPTIONS:
-        raise VoteValidationError(f"Phase 1 supports at most {MAX_OPTIONS} options.")
+        raise VoteValidationError(f"Votes support at most {MAX_OPTIONS} options.")
     seen: set[str] = set()
     output: list[str] = []
     for label in parts:
@@ -80,6 +146,11 @@ def parse_options(raw_options: str) -> tuple[str, ...]:
         seen.add(key)
         output.append(label)
     return tuple(output)
+
+
+def parse_options(raw_options: str) -> tuple[str, ...]:
+    parts = [part.strip() for part in re.split(r"[|\n]", raw_options or "") if part.strip()]
+    return _validate_options(parts)
 
 
 def parse_reminder_offsets(raw_offsets: str | None) -> tuple[int, ...]:
@@ -109,13 +180,14 @@ def build_create_request(
     created_by_discord_user_id: int,
     title: str,
     description: str | None,
-    raw_options: str,
     close_time_utc: str,
     reminder_offsets: str | None,
     allow_vote_change: bool,
     launch_mention_everyone: bool,
     reminder_mention_everyone: bool,
     close_mention_everyone: bool,
+    raw_options: str | None = None,
+    option_labels: tuple[str | None, ...] | None = None,
     background_asset_key: str | None = None,
     now_utc: datetime | None = None,
 ) -> VoteCreateRequest:
@@ -126,7 +198,7 @@ def build_create_request(
     if len(normalized_title) > MAX_TITLE_LEN:
         raise VoteValidationError(f"Title must be {MAX_TITLE_LEN} characters or fewer.")
     normalized_description = _validate_description(description)
-    closes_at = parse_utc_datetime(close_time_utc)
+    closes_at = parse_close_time(close_time_utc, now_utc=now)
     if closes_at <= now:
         raise VoteValidationError("Close time must be in the future.")
     offsets = tuple(
@@ -140,7 +212,11 @@ def build_create_request(
         created_by_discord_user_id=int(created_by_discord_user_id),
         title=normalized_title,
         description=normalized_description,
-        options=parse_options(raw_options),
+        options=(
+            parse_option_labels(option_labels)
+            if option_labels is not None
+            else parse_options(raw_options or "")
+        ),
         closes_at_utc=closes_at,
         reminder_offsets_minutes=offsets,
         allow_vote_change=bool(allow_vote_change),
@@ -272,6 +348,12 @@ async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
     return await dal.get_vote_snapshot(vote_post_id)
 
 
+async def search_vote_choices(
+    query: str | None = None, *, limit: int = 25
+) -> list[VoteLookupChoice]:
+    return await dal.search_vote_posts(query=query, limit=limit)
+
+
 async def record_message_edit_failed(
     *,
     vote_post_id: int,
@@ -299,7 +381,7 @@ async def update_vote(
     now_utc: datetime | None = None,
 ) -> VoteSnapshot:
     now = now_utc or datetime.now(UTC)
-    closes_at = parse_utc_datetime(close_time_utc) if close_time_utc else None
+    closes_at = parse_close_time(close_time_utc, now_utc=now) if close_time_utc else None
     if closes_at is not None and closes_at <= now:
         raise VoteValidationError("Updated close time must be in the future.")
     offsets = parse_reminder_offsets(reminder_offsets) if reminder_offsets is not None else None

@@ -6,15 +6,6 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `commands/vote_admin_cmds.py`, `voting/service.py`, `voting/render_service.py`, `voting/scheduler.py`, `ui/views/vote_post_view.py`
-- Type: consistency
-- Description: Phase 1 smoke testing confirmed the SQL-backed voting framework works, but the admin and result UX is still too raw for repeated leadership use. The create command relies on clunky pipe-separated option input, option character limits are discovered only after submit, close time is hard to enter as free-text UTC, update/status/close require raw VotePostID knowledge, update has confusing all-optional fields, result bars are horizontal, and close output requires players to infer the winner from counts.
-- Suggested Fix: Deliver the prepared `Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish` task pack. Replace pipe-separated options with guided fields for Option 1 and Option 2 required plus Options 3-6 optional, enforce label limits as early as Discord allows, add guided close-time input, add title/autocomplete-style vote selection for update/status/close, make update target selection explicit, redesign the result card toward vertical bars, and show winner/tie/no-vote summaries on both manual and automatic close.
-- Impact: high
-- Risk: medium
-- Dependencies: Phase 1 SQL-backed voting delivered in mirror PR #193, production PR #501, and SQL PR #26; SQL deployed and smoke tested successfully on 2026-07-01; prepared task pack `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md`.
-
-### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks
 - Type: architecture
 - Description: Inventory import lifecycle coordination remains intentionally view-heavy. `ui/views/inventory_views.py` routes upload-first messages, command-session continuations, multi-governor selection, review interactions, correction modals, additional-material continuation, approval, rejection, cancellation, timeout, admin-debug posting, and original-upload cleanup. Task C Slice 8 adopted generic audit without redesigning this workflow and smoke testing confirmed the behavior-preserving audit contract.

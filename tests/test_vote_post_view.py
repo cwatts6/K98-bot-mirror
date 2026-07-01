@@ -37,6 +37,36 @@ def _snapshot() -> VoteSnapshot:
     )
 
 
+def _six_option_snapshot() -> VoteSnapshot:
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+    return VoteSnapshot(
+        vote_post_id=7,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Vote",
+        description=None,
+        status="Open",
+        allow_vote_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        background_asset_key=None,
+        total_votes=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        options=tuple(
+            VoteOption(index, 7, f"opt{index}", f"Option {index}", index) for index in range(1, 7)
+        ),
+    )
+
+
 class _Response:
     def __init__(self) -> None:
         self.done = False
@@ -142,3 +172,11 @@ async def test_vote_button_does_not_edit_message_for_unchanged_vote(monkeypatch)
     await button.callback(interaction)
 
     assert captured["ephemeral_content"] == "Already recorded."
+
+
+@pytest.mark.asyncio
+async def test_vote_post_view_lays_out_six_buttons_across_two_rows():
+    view = VotePostView(_six_option_snapshot())
+
+    rows = [child.row for child in view.children]
+    assert rows == [0, 0, 0, 1, 1, 1]

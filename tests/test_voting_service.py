@@ -32,6 +32,61 @@ def test_build_create_request_validates_options_and_future_close():
     assert req.allow_vote_change is True
 
 
+def test_build_create_request_accepts_six_guided_option_fields():
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+
+    req = service.build_create_request(
+        guild_id=1,
+        channel_id=2,
+        created_by_discord_user_id=3,
+        title="Best time?",
+        description="Pick one",
+        option_labels=("A", "B", "C", "D", "E", "F"),
+        close_time_utc="2h",
+        reminder_offsets="60, 30",
+        allow_vote_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        now_utc=now,
+    )
+
+    assert req.options == ("A", "B", "C", "D", "E", "F")
+    assert req.closes_at_utc == now + timedelta(hours=2)
+
+
+def test_guided_option_fields_reject_gaps_and_duplicates():
+    with pytest.raises(service.VoteValidationError, match="cannot skip"):
+        service.parse_option_labels(("A", "B", "", "D"))
+
+    with pytest.raises(service.VoteValidationError, match="unique"):
+        service.parse_option_labels(("A", "b", "B"))
+
+
+def test_pipe_options_now_allow_six_for_compatibility():
+    assert service.parse_options("A | B | C | D | E | F") == ("A", "B", "C", "D", "E", "F")
+
+
+def test_option_label_length_defaults_to_compact_labels(monkeypatch):
+    monkeypatch.delenv(service.OPTION_LABEL_LENGTH_ENV, raising=False)
+
+    assert service._option_label_length_from_env() == 20
+
+
+def test_option_label_length_env_override_is_bounded(monkeypatch):
+    monkeypatch.setenv(service.OPTION_LABEL_LENGTH_ENV, "32")
+    assert service._option_label_length_from_env() == 32
+
+    monkeypatch.setenv(service.OPTION_LABEL_LENGTH_ENV, "81")
+    with pytest.raises(RuntimeError, match="between 1 and 80"):
+        service._option_label_length_from_env()
+
+
+def test_option_labels_reject_over_configured_limit():
+    with pytest.raises(service.VoteValidationError, match="20 characters"):
+        service.parse_option_labels(("A" * (service.MAX_OPTION_LABEL_LEN + 1), "B"))
+
+
 def test_build_create_request_rejects_duplicate_options():
     now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
 
@@ -72,6 +127,13 @@ def test_build_create_request_rejects_past_close():
             close_mention_everyone=False,
             now_utc=now,
         )
+
+
+def test_parse_close_time_accepts_guided_duration_choices():
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+
+    assert service.parse_close_time("30m", now_utc=now) == now + timedelta(minutes=30)
+    assert service.parse_close_time("1d", now_utc=now) == now + timedelta(days=1)
 
 
 def test_build_create_request_rejects_overlong_description():

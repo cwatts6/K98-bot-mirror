@@ -101,6 +101,17 @@ Defined through `bot_config.py` and validated by `scripts/config_self_test.py` w
 
 Use `bot_config.py` as the exact source for exported names and types.
 
+## Voting Configuration
+
+### VOTE_OPTION_LABEL_MAX_LENGTH
+
+- Type: integer from `1` to `80`
+- Default: `20`
+- Used by: `voting.service`, `/vote_admin create`
+- Notes: Caps vote option labels for Discord slash-command validation, SQL validation, button
+  labels, and result-card readability. Values above `80` are rejected because Discord button
+  labels cannot exceed 80 characters.
+
 ## Runtime Path Constants
 
 These are primarily configured in `constants.py`, not usually as environment variables:

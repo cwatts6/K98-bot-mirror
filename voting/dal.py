@@ -12,6 +12,7 @@ from voting.models import (
     VoteCastResult,
     VoteCloseResult,
     VoteCreateRequest,
+    VoteLookupChoice,
     VoteOption,
     VoteReminder,
     VoteSnapshot,
@@ -312,6 +313,45 @@ async def list_open_vote_posts() -> list[VoteSnapshot]:
         if snapshot:
             snapshots.append(snapshot)
     return snapshots
+
+
+async def search_vote_posts(query: str | None = None, *, limit: int = 25) -> list[VoteLookupChoice]:
+    text = (query or "").strip()
+    like = f"%{text}%"
+    vote_id = int(text) if text.isdigit() else None
+    rows = await run_query_async(
+        """
+        SELECT TOP (?) VotePostID, Title, Status, ChannelID, ClosesAtUtc
+        FROM dbo.VotePosts
+        WHERE MessageID IS NOT NULL
+          AND (
+              ? = ''
+              OR Title LIKE ?
+              OR VotePostID = ?
+          )
+        ORDER BY
+          CASE WHEN Status = 'Open' THEN 0 ELSE 1 END,
+          CASE WHEN Status = 'Open' THEN ClosesAtUtc END ASC,
+          UpdatedAtUtc DESC,
+          VotePostID DESC;
+        """,
+        (int(max(1, min(limit, 25))), text, like, vote_id),
+    )
+    choices: list[VoteLookupChoice] = []
+    for row in rows:
+        closes_at = _aware_utc(row.get("ClosesAtUtc"))
+        if closes_at is None:
+            continue
+        choices.append(
+            VoteLookupChoice(
+                vote_post_id=int(row["VotePostID"]),
+                title=str(row.get("Title") or ""),
+                status=str(row.get("Status") or ""),
+                channel_id=int(row.get("ChannelID") or 0),
+                closes_at_utc=closes_at,
+            )
+        )
+    return choices
 
 
 async def cast_vote(
