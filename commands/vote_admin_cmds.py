@@ -80,12 +80,12 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
     async def vote_create(
         ctx: discord.ApplicationContext,
         title: str = discord.Option(str, "Vote title"),
-        description: str = discord.Option(str, "Vote description", required=False, default=""),
         options: str = discord.Option(str, "Options separated by |, from 2 to 5 options"),
         target_channel: discord.TextChannel = discord.Option(
             discord.TextChannel, "Channel to post in"
         ),
         closes_at_utc: str = discord.Option(str, "UTC close time, e.g. 2026-07-01 20:30"),
+        description: str = discord.Option(str, "Vote description", required=False, default=""),
         reminder_offsets_minutes: str = discord.Option(
             str,
             "Reminder offsets before close in minutes, comma-separated",
