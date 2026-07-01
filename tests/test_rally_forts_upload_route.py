@@ -93,6 +93,8 @@ def _deps(tmp_path, **overrides):
         return None
 
     def create_task(coro):
+        if "create_task_exception" in overrides:
+            raise overrides["create_task_exception"]
         created_tasks.append(coro)
         coro.close()
         return None
@@ -344,6 +346,71 @@ async def test_rally_duplicate_skip_records_skipped_audit_without_external_corre
     assert complete_call[2]["rows_staged"] == 0
     assert complete_call[2]["rows_written"] == 0
     assert complete_call[2]["details"]["reason"] == "duplicate filename"
+
+
+@pytest.mark.asyncio
+async def test_rally_alltime_backup_schedule_failure_records_no_rows_out(tmp_path):
+    audit_calls = []
+    deps, sent, _offloads, created, _preflight = _deps(
+        tmp_path,
+        audit_calls=audit_calls,
+        create_task_exception=RuntimeError("scheduler down"),
+        offload_result={"status": "success", "rows": 4, "ingestion_id": 99},
+    )
+
+    handled = await route.handle_rally_forts_upload(
+        _message(attachments=[_FakeAttachment("Rally_data_All_Time.xlsx")]),
+        deps,
+    )
+
+    assert handled is True
+    assert created == []
+    assert sent[-1][1] == "Rally Forts Import \u2705"
+    backup_phase = next(
+        call
+        for call in audit_calls
+        if call[0] == "phase"
+        and call[2]["phase_name"] == route.RALLY_FORTS_AUDIT_BACKUP_PHASE
+    )
+    assert backup_phase[2]["phase_status"] == "failed"
+    assert backup_phase[2]["rows_in"] == 4
+    assert backup_phase[2]["rows_out"] is None
+    assert backup_phase[2]["error_type"] == "RuntimeError"
+
+
+@pytest.mark.asyncio
+async def test_rally_daily_backup_schedule_failure_records_no_rows_out(tmp_path):
+    audit_calls = []
+    deps, sent, _offloads, created, _preflight = _deps(
+        tmp_path,
+        audit_calls=audit_calls,
+        create_task_exception=RuntimeError("scheduler down"),
+        offload_result={
+            "status": "success",
+            "rows": 7,
+            "as_of": "2026-05-26",
+            "ingestion_id": 42,
+        },
+    )
+
+    handled = await route.handle_rally_forts_upload(
+        _message(attachments=[_FakeAttachment("Rally_data_26-05-2026.xlsx")]),
+        deps,
+    )
+
+    assert handled is True
+    assert created == []
+    assert sent[-1][1] == "Rally Forts Import \u2705"
+    backup_phase = next(
+        call
+        for call in audit_calls
+        if call[0] == "phase"
+        and call[2]["phase_name"] == route.RALLY_FORTS_AUDIT_BACKUP_PHASE
+    )
+    assert backup_phase[2]["phase_status"] == "failed"
+    assert backup_phase[2]["rows_in"] == 7
+    assert backup_phase[2]["rows_out"] is None
+    assert backup_phase[2]["error_type"] == "RuntimeError"
 
 
 @pytest.mark.asyncio
