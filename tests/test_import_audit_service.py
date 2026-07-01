@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 import json
 
 from services import import_audit_service
@@ -59,6 +60,52 @@ def test_record_phase_best_effort_truncates_error_fields():
     assert len(seen["error_type"]) == import_audit_service.MAX_ERROR_TYPE_LENGTH
     assert len(seen["error_text"]) == import_audit_service.MAX_ERROR_TEXT_LENGTH
     assert json.loads(seen["details_json"]) == {"ok": False}
+
+
+def test_record_phase_best_effort_clamps_completed_before_started():
+    seen = {}
+    started = datetime(2026, 7, 1, 12, 0, 0)
+    completed = started - timedelta(milliseconds=3)
+
+    def writer(**kwargs):
+        seen.update(kwargs)
+        return 5
+
+    phase_id = import_audit_service.record_phase_best_effort(
+        ImportAuditBatchRef(12, "cid"),
+        phase_name="kvk_all_schema_parse",
+        phase_status="completed",
+        started_at_utc=started,
+        completed_at_utc=completed,
+        duration_ms=0,
+        writer=writer,
+    )
+
+    assert phase_id == 5
+    assert seen["started_at_utc"] == started
+    assert seen["completed_at_utc"] == started
+    assert seen["duration_ms"] == 0
+
+
+def test_record_phase_best_effort_preserves_valid_completed_timestamp():
+    seen = {}
+    started = datetime(2026, 7, 1, 12, 0, 0, tzinfo=UTC)
+    completed = started + timedelta(milliseconds=7)
+
+    def writer(**kwargs):
+        seen.update(kwargs)
+        return 5
+
+    import_audit_service.record_phase_best_effort(
+        ImportAuditBatchRef(12, "cid"),
+        phase_name="rally_forts_daily_ingest",
+        phase_status="completed",
+        started_at_utc=started,
+        completed_at_utc=completed,
+        writer=writer,
+    )
+
+    assert seen["completed_at_utc"] == completed
 
 
 def test_fetch_batch_by_external_id_best_effort_passes_lookup_fields():

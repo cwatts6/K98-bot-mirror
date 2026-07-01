@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 import json
 import logging
 from typing import Any
@@ -39,6 +39,26 @@ def _truncate(value: Any, max_length: int) -> str | None:
         return None
     text = str(value)
     return text[:max_length]
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _normalized_completed_at_utc(
+    *,
+    started_at_utc: datetime | None,
+    completed_at_utc: datetime | None,
+) -> datetime | None:
+    started = _as_utc(started_at_utc)
+    completed = _as_utc(completed_at_utc)
+    if started is not None and completed is not None and completed < started:
+        return started_at_utc
+    return completed_at_utc
 
 
 def start_batch_best_effort(
@@ -112,7 +132,10 @@ def record_phase_best_effort(
             phase_name=phase_name,
             phase_status=phase_status,
             started_at_utc=started_at_utc,
-            completed_at_utc=completed_at_utc,
+            completed_at_utc=_normalized_completed_at_utc(
+                started_at_utc=started_at_utc,
+                completed_at_utc=completed_at_utc,
+            ),
             rows_in=rows_in,
             rows_out=rows_out,
             duration_ms=duration_ms,
