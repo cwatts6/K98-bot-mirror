@@ -59,6 +59,29 @@ def _vote_create_option_max_lengths() -> dict[str, str]:
     raise AssertionError("vote_create command was not found")
 
 
+def _vote_admin_command_names() -> set[str]:
+    tree = ast.parse(Path("commands/vote_admin_cmds.py").read_text(encoding="utf-8"))
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AsyncFunctionDef):
+            for decorator in node.decorator_list:
+                if not isinstance(decorator, ast.Call):
+                    continue
+                if not (
+                    isinstance(decorator.func, ast.Attribute)
+                    and decorator.func.attr == "command"
+                ):
+                    continue
+                for keyword in decorator.keywords:
+                    if (
+                        keyword.arg == "name"
+                        and isinstance(keyword.value, ast.Constant)
+                        and isinstance(keyword.value.value, str)
+                    ):
+                        names.add(keyword.value.value)
+    return names
+
+
 def test_vote_create_places_required_options_before_optional_options() -> None:
     seen_optional = False
     for name, required in _vote_create_option_required_flags():
@@ -91,6 +114,12 @@ def test_vote_create_applies_string_max_lengths() -> None:
     assert lengths["description"] == "MAX_DESCRIPTION_LEN"
     for name in ("option_1", "option_2", "option_3", "option_4", "option_5", "option_6"):
         assert lengths[name] == "MAX_OPTION_LABEL_LEN"
+
+
+def test_vote_admin_registers_export_subcommand() -> None:
+    assert {"create", "update", "close", "status", "export"}.issubset(
+        _vote_admin_command_names()
+    )
 
 
 @pytest.mark.parametrize(
@@ -132,6 +161,36 @@ async def test_vote_post_autocomplete_returns_vote_ids_as_values(monkeypatch):
 
     assert choices[0].value == "42"
     assert "Best rally time?" in choices[0].name
+
+
+@pytest.mark.asyncio
+async def test_closed_vote_post_autocomplete_returns_closed_vote_ids(monkeypatch):
+    async def fake_search_closed_vote_choices(*, query, limit):
+        assert query == "rally"
+        assert limit == 25
+        return [
+            VoteLookupChoice(
+                vote_post_id=42,
+                title="Best rally time?",
+                status="Closed",
+                channel_id=5,
+                closes_at_utc=datetime(2026, 7, 1, 20, 0, tzinfo=UTC),
+                closed_at_utc=datetime(2026, 7, 1, 21, 0, tzinfo=UTC),
+            )
+        ]
+
+    monkeypatch.setattr(
+        vote_admin_cmds, "search_closed_vote_choices", fake_search_closed_vote_choices
+    )
+
+    choices = await vote_admin_cmds._closed_vote_post_autocomplete(
+        SimpleNamespace(value="rally")
+    )
+
+    assert choices[0].value == "42"
+    assert "Best rally time?" in choices[0].name
+    assert "Closed" in choices[0].name
+    assert "2026-07-01 21:00 UTC" in choices[0].name
 
 
 @pytest.mark.asyncio

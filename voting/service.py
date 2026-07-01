@@ -354,6 +354,12 @@ async def search_vote_choices(
     return await dal.search_vote_posts(query=query, limit=limit)
 
 
+async def search_closed_vote_choices(
+    query: str | None = None, *, limit: int = 25
+) -> list[VoteLookupChoice]:
+    return await dal.search_closed_vote_posts(query=query, limit=limit)
+
+
 async def record_message_edit_failed(
     *,
     vote_post_id: int,

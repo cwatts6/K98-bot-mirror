@@ -20,6 +20,7 @@ from voting.discord_presentation import (
     mention_content,
     no_broad_mentions,
 )
+from voting.export_service import build_vote_totals_export
 from voting.service import (
     CLOSE_DURATION_CHOICES,
     MAX_CLOSE_REASON_LEN,
@@ -33,6 +34,7 @@ from voting.service import (
     close_vote,
     create_vote_record,
     get_vote_snapshot,
+    search_closed_vote_choices,
     search_vote_choices,
 )
 
@@ -104,6 +106,58 @@ async def _vote_post_autocomplete(ctx: discord.AutocompleteContext):
         label = f"#{choice.vote_post_id} {choice.title} | {choice.status} | {closes}"
         output.append(discord.OptionChoice(name=label[:100], value=str(choice.vote_post_id)))
     return output
+
+
+async def _closed_vote_post_autocomplete(ctx: discord.AutocompleteContext):
+    query = str(getattr(ctx, "value", "") or "")
+    try:
+        choices = await search_closed_vote_choices(query=query, limit=25)
+    except Exception:
+        logger.exception("closed_vote_post_autocomplete_failed query=%r", query)
+        return []
+    output = []
+    for choice in choices:
+        closed_at = choice.closed_at_utc or choice.closes_at_utc
+        closed = closed_at.strftime("%Y-%m-%d %H:%M UTC")
+        label = f"#{choice.vote_post_id} {choice.title} | Closed | {closed}"
+        output.append(discord.OptionChoice(name=label[:100], value=str(choice.vote_post_id)))
+    return output
+
+
+def _build_vote_export_summary_embed(export) -> discord.Embed:
+    snapshot = export.snapshot
+    embed = discord.Embed(
+        title=f"Vote #{snapshot.vote_post_id} totals export",
+        description=export.outcome_summary,
+        color=discord.Color.blurple(),
+    )
+    embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
+    embed.add_field(name="Rows", value=str(export.row_count), inline=True)
+    embed.add_field(
+        name="Closed",
+        value=(
+            snapshot.closed_at_utc.strftime("%Y-%m-%d %H:%M UTC")
+            if snapshot.closed_at_utc
+            else "Unknown"
+        ),
+        inline=True,
+    )
+    if snapshot.closed_by_discord_user_id is not None:
+        embed.add_field(
+            name="Closed by",
+            value=str(snapshot.closed_by_discord_user_id),
+            inline=True,
+        )
+    if snapshot.closed_reason:
+        embed.add_field(name="Close reason", value=snapshot.closed_reason[:1024], inline=False)
+    if snapshot.message_id:
+        embed.add_field(
+            name="Message",
+            value=f"https://discord.com/channels/{snapshot.guild_id}/{snapshot.channel_id}/{snapshot.message_id}",
+            inline=False,
+        )
+    embed.set_footer(text="Totals-only export. Voter-level audit export is deferred.")
+    return embed
 
 
 async def _send_vote_update_panel(ctx: discord.ApplicationContext, snapshot) -> None:
@@ -427,5 +481,51 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                 inline=False,
             )
         await ctx.interaction.edit_original_response(embed=embed)
+
+    @group.command(name="export", description="Export final totals for a closed vote.")
+    @versioned("v1.00")
+    @safe_command
+    @is_admin_or_leadership_only()
+    @track_usage()
+    async def vote_export(
+        ctx: discord.ApplicationContext,
+        vote: str = discord.Option(
+            str,
+            "Closed vote to export",
+            autocomplete=_closed_vote_post_autocomplete,
+        ),
+    ) -> None:
+        await safe_defer(ctx, ephemeral=True)
+        try:
+            vote_post_id = _parse_vote_post_id(vote)
+            export = await build_vote_totals_export(
+                vote_post_id=vote_post_id,
+                requested_by_discord_user_id=int(ctx.user.id),
+            )
+        except VoteValidationError as exc:
+            await ctx.interaction.edit_original_response(content=f"Vote not exported: {exc}")
+            return
+        except Exception:
+            logger.exception("vote_admin_export_failed vote=%r", vote)
+            await ctx.interaction.edit_original_response(
+                content="Vote export failed. Please try again."
+            )
+            return
+
+        if export.is_oversized():
+            await ctx.interaction.edit_original_response(
+                content=(
+                    "Vote export was built but is too large for Discord upload. "
+                    "Ask an operator for a direct SQL export."
+                )
+            )
+            return
+
+        file = discord.File(export.csv_bytes, filename=export.filename)
+        embed = _build_vote_export_summary_embed(export)
+        await ctx.followup.send(embed=embed, file=file, ephemeral=True)
+        await ctx.interaction.edit_original_response(
+            content=f"Vote #{export.snapshot.vote_post_id} totals export generated."
+        )
 
     bot.add_application_command(group)

@@ -102,6 +102,7 @@ class VoteLookupChoice:
     status: str
     channel_id: int
     closes_at_utc: datetime
+    closed_at_utc: datetime | None = None
 
 
 @dataclass(frozen=True)

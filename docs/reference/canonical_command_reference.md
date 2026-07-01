@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=42 grouped_subcommands_detected=90 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
+primary=42 grouped_subcommands_detected=91 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
 ```
 
 Grouped command summary:
@@ -40,7 +40,7 @@ Grouped command summary:
 | `/registry` | 7 |
 | `/stats` | 1 |
 | `/subscriptions` | 3 |
-| `/vote_admin` | 4 |
+| `/vote_admin` | 5 |
 
 ## Command Surface Rules
 
@@ -213,6 +213,7 @@ Legend:
 | Voting Admin | `/vote_admin update` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral guided update panel | Standard | Phase 2 guided voting framework | Selects a vote by autocomplete and opens an explicit edit-target menu for safe open-vote fields: title, description, close time, unsent reminders, and future mention settings. |
 | Voting Admin | `/vote_admin close` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response; public close announcement side effect | Standard | Phase 2 guided voting framework | Selects a vote by autocomplete, closes it early, disables buttons, refreshes the final card, and sends a controlled close announcement with winner, tie, or no-vote summary. |
 | Voting Admin | `/vote_admin status` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Phase 2 guided voting framework | Selects a vote by autocomplete and shows vote state, totals, reminder delivery state, and original message link. |
+| Voting Admin | `/vote_admin export` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response and private CSV file | Standard | Phase 3 admin export and audit hardening | Selects a closed vote by autocomplete and privately exports totals-only CSV results with winner/tie/no-vote, close source, reminder, and original message metadata. Voter-level audit export remains deferred. |
 
 ## Migration And Disposition Notes
 
