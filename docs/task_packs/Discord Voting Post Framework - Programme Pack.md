@@ -1,0 +1,341 @@
+# Discord Voting Post Framework - Programme Pack
+
+> Living programme pack for SQL-backed, button-driven Discord vote posts with live Pillow result
+> cards, restart-safe scheduling, and guided admin/player workflows.
+
+## 1. Programme Header
+
+- Programme name: `Discord Voting Post Framework`
+- Date: `2026-07-01`
+- Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
+- Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
+- One-pass approved: `no`
+- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 prepared`
+- Headline: `Make voting simple, guided, durable, and good-looking.`
+
+## 2. Programme Vision
+
+The voting framework should give KD98 admins a polished way to launch decisions, event-time
+choices, player preference checks, and community votes without manual counting, repeated pings, or
+fragile restart behavior.
+
+Players should see a clear public vote post, tap a button, receive private confirmation, and trust
+that the visible result card reflects the SQL-backed source of truth. Admins should be guided
+through vote creation and management rather than needing to remember vote IDs, UTC string formats,
+pipe-separated option syntax, or hidden character limits.
+
+The product standard is: make it simple, make it guided, and make it look great. SQL remains the
+authority; Discord buttons, embeds, selectors, modals, reminders, and Pillow cards are the UX.
+
+## 3. Phase 1 Delivery Summary
+
+Phase 1 delivered the first working SQL-backed live voting MVP.
+
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#193`
+- Production PR: `cwatts6/k98-bot#501`
+- SQL PR: `cwatts6/K98-bot-SQL-Server#26`
+- SQL deployment: `2026-07-01`
+- Bot smoke test: `2026-07-01`
+
+SQL deployment added:
+
+- `dbo.VotePosts`
+- `dbo.VotePostOptions`
+- `dbo.VotePostVotes`
+- `dbo.VotePostReminders`
+- `dbo.VotePostAudit`
+
+Smoke test confirmed:
+
+- `/vote_admin create` creates a public vote post.
+- Voting buttons work.
+- Vote changes record correctly.
+- SQL rows reflect vote creation, votes recorded, and votes changed.
+- `@everyone` launch behavior works as configured.
+- The original vote post updates in place without repeated broad pings.
+- Manual close works.
+- Timer close works.
+- Buttons are disabled after close.
+
+Phase 1 records are archived under:
+
+```text
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 1 SQL Backed Live Voting.md
+```
+
+## 4. Phase 2 Delivery Summary
+
+Phase 2 delivered the guided admin UX and results polish slice.
+
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#194`
+- Production PR: `cwatts6/k98-bot#502`
+- SQL PR: `not required`
+- Bot smoke test: `2026-07-01`
+
+Delivered:
+
+- `/vote_admin create` now uses individual option fields instead of pipe-separated input.
+- Option 1 and Option 2 are required; Options 3-6 are optional.
+- Vote posts support up to six options.
+- Option label validation is configurable with `VOTE_OPTION_LABEL_MAX_LENGTH`, defaulting to 20 and
+  allowing values from 1 through 80.
+- Close time uses guided duration choices rather than raw UTC free text.
+- `/vote_admin update`, `/vote_admin status`, and `/vote_admin close` use autocomplete vote
+  selection with title plus status/close-time metadata.
+- `/vote_admin update` opens an explicit private update panel so admins choose the field to edit.
+- `/vote_admin status` output was preserved.
+- Result cards use vertical bars.
+- Closed cards and close announcements show winner, tie, or no-vote outcomes clearly.
+- Manual close and automatic close both use the same outcome summary.
+- Restart-safe open vote buttons continue to work after bot restart.
+- Vote updates still avoid repeated `@everyone` pings.
+
+Smoke test confirmed:
+
+- Guided create works.
+- The 20-character option label limit works when configured in `.env`.
+- Status, close, and update vote selection offer the expected vote list.
+- Update opens the six-option guided follow-up menu.
+- Manual close disables buttons and shows a clear result.
+- Open-vote buttons still work after bot restart.
+
+Phase 2 records are archived under:
+
+```text
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md
+```
+
+## 5. Target Model
+
+### Current command model
+
+```text
+/vote_admin create
+/vote_admin update
+/vote_admin close
+/vote_admin status
+```
+
+Phase 1 intentionally used `/vote_admin` as the approved command group.
+
+### Phase 3 target command model
+
+Keep the existing command group and add reporting under it:
+
+```text
+/vote_admin create
+/vote_admin update
+/vote_admin close
+/vote_admin status
+/vote_admin export
+```
+
+Phase 3 should avoid adding a new top-level command. It may add autocomplete, selectors, modal
+confirmation, or private file delivery behind the existing group.
+
+### Target workflow model
+
+```text
+Admin creates guided vote -> bot validates early -> bot posts vote -> players vote -> SQL updates
+-> original message/card edits in place -> reminder/close scheduler runs -> final card and close
+announcement highlight the winner
+```
+
+### Target data/model contract
+
+```text
+Discord command/select/modal -> voting service -> voting DAL -> SQL tables
+SQL snapshot -> embed/card renderer -> original Discord message update
+Scheduler -> due reminders/closes -> voting service -> final card and close announcement
+```
+
+## 6. Design Principles
+
+1. **Guided before clever** - Avoid compact syntax when Discord can provide separate fields,
+   selectors, autocomplete, or staged forms.
+2. **Validate as early as possible** - Use Discord option limits where available, then service
+   validation as the authority.
+3. **SQL is the source of truth** - Buttons and cards reflect SQL state; they do not define it.
+4. **No accidental spam** - Launch, reminders, and close may use configured broad mentions; vote
+   updates never do.
+5. **Restart-safe by default** - Views, reminders, close jobs, and message IDs must survive restart.
+6. **Readable final outcome** - Closed votes should tell players who won without making them infer
+   it from bars.
+7. **Good visual hierarchy** - Cards should scan well on Discord desktop and mobile, with clear
+   status, options, totals, and winner treatment.
+8. **Commands stay thin** - Commands collect/validate Discord-facing inputs and call services;
+   services and DAL own behavior and persistence.
+
+## 7. Programme Phases
+
+### Phase 1 - SQL-Backed Live Voting MVP
+
+Status: complete.
+
+Delivered:
+
+- SQL schema and deployed tables for vote posts, options, votes, reminders, and audit.
+- `/vote_admin create`, `/vote_admin update`, `/vote_admin status`, and `/vote_admin close`.
+- Persistent button view and restart-safe rehydration.
+- SQL-backed one-vote-per-Discord-user enforcement.
+- Optional vote changes before close.
+- Live Pillow result card.
+- Original vote post updates without repeated `@everyone` pings.
+- Scheduler reminders and automatic close.
+- Manual close.
+- Disabled buttons after close.
+- Backend late-vote rejection.
+- Review hardening for launch failure cleanup, SQL length validation, close reason validation,
+  elapsed-deadline card status, background file-handle handling, reminder mark failure handling,
+  and Discord required/optional command option ordering.
+- Focused tests, full test suite validation, mirror and production PR promotion.
+
+### Phase 2 - Guided Admin UX and Results Polish
+
+Status: complete.
+
+Delivered:
+
+- Individual create option fields with two required options and four optional options.
+- Up to six option buttons and six vertical result bars.
+- Configurable option label length via `VOTE_OPTION_LABEL_MAX_LENGTH`, default 20.
+- Guided close-duration choices.
+- Autocomplete vote lookup for update, status, and close.
+- Explicit update target menu.
+- Preserved status output.
+- Vertical result card bars.
+- Winner, tie, and no-vote outcome treatment on closed cards and announcements.
+- Preserved SQL source of truth, one vote per Discord user, vote changes, scheduler reminders,
+  automatic close, manual close, disabled buttons, backend late-vote rejection, restart safety, and
+  mention safety.
+
+### Phase 3 - Admin Export and Audit Hardening
+
+Status: prepared.
+
+Deliver:
+
+- Add a guided `/vote_admin export` workflow for one vote's final result and voter audit, subject
+  to permission and privacy review.
+- Add an admin-friendly closed-vote lookup/history path so completed votes are retrievable without
+  message scrolling or raw SQL.
+- Produce CSV export output for final option totals and, when approved, voter-level audit rows.
+- Preserve current status output while adding richer close source, reminder, and operational
+  metadata where existing SQL supports it.
+- Confirm whether any SQL query/index changes are required for closed-vote lookup and export.
+- Keep export output private/ephemeral unless the operator explicitly approves public posting.
+
+### Phase 4 - Advanced Voting Modes
+
+Status: future candidate.
+
+Deliver:
+
+- Role-restricted voting.
+- Governor-linked voting mode.
+- Private or hidden-until-close results.
+- Multi-select or survey-style vote modes.
+- Per-option emoji/icon support.
+- Saved templates for recurring vote types.
+
+## 8. Phase 3 Scope Summary
+
+Phase 3 is a read/reporting phase for completed vote results and audit retrieval. It should not add
+new voting modes or change player voting behavior.
+
+Affected areas:
+
+- `commands/vote_admin_cmds.py`
+- `voting/service.py`
+- `voting/dal.py`
+- `voting/models.py`
+- `voting/discord_presentation.py`
+- `ui/views/` for guided export/history selectors if needed
+- `tests/test_vote_admin_cmds.py`
+- `tests/test_voting_service.py`
+- `tests/test_voting_dal.py` or equivalent SQL/DAL contract tests if query shape changes
+- `tests/test_voting_discord_presentation.py`
+- SQL repo only if closed-vote lookup, audit export, or query performance needs cannot be
+  satisfied by current tables and indexed queries.
+
+## 9. Cross-Programme Constraints
+
+- Do not add another top-level command for Phase 3.
+- Keep `/vote_admin` command registration valid: required options must precede optional options.
+- Do not rely on Discord UI limits alone; service validation must remain authoritative.
+- Validate any SQL-facing assumptions against `C:\K98-bot-SQL-Server`.
+- Preserve all Phase 1 and Phase 2 smoke-tested behavior.
+- Do not introduce repeated `@everyone` pings on vote updates.
+- Preserve persistent view restart behavior and scheduler idempotency.
+- Do not edit vote options after votes exist unless the task explicitly defines safe rules.
+- Do not expose voter-level exports publicly without explicit approval.
+
+## 10. Validation Strategy
+
+Every implementation phase should consider:
+
+- command registration validation
+- focused command tests
+- service validation tests
+- view/button interaction tests
+- scheduler reminder/close tests
+- render output shape tests
+- SQL/DAL contract tests where SQL-facing behavior changes
+- restart/rehydration tests
+- manual Discord smoke testing
+- Codex Security review when Discord interactions, SQL/data access, permissions, or persistence are
+  touched
+
+Baseline commands:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pytest -q tests
+```
+
+## 11. Programme Acceptance Criteria
+
+The core programme is successful when:
+
+- [x] Admins can create a SQL-backed vote.
+- [x] Players can vote once per Discord user.
+- [x] Vote changes can update the existing vote row.
+- [x] Launch `@everyone` works when configured.
+- [x] Per-vote updates do not repeat `@everyone`.
+- [x] Scheduler reminders and closes are SQL-backed.
+- [x] Buttons disable after close.
+- [x] Backend rejects late votes.
+- [x] Persistent views survive restart.
+- [x] SQL is the durable source of truth.
+- [x] Admin creation is guided and avoids pipe-separated option syntax.
+- [x] Admin close time input is guided.
+- [x] Admin update/status/close do not require raw VotePostID lookup.
+- [x] Closed votes visibly highlight the winner or tie state.
+- [x] Result cards meet the vertical-bar visual direction.
+- [ ] Export/audit workflow is delivered in Phase 3 or intentionally deferred again with rationale.
+
+## 12. Suggested Next Action
+
+```text
+Start Discord Voting Post Framework Phase 3: Admin Export and Audit Hardening using the prepared
+task pack and chat starter.
+```
+
+## 13. Programme Change Log
+
+| Date | Change | Notes |
+|---|---|---|
+| 2026-07-01 | Initial programme pack created | Captured SQL-backed live voting, buttons, Pillow card, reminders, and close handling. |
+| 2026-07-01 | Phase 1 marked complete | SQL deployed, bot smoke test successful, mirror/prod review fixes completed. |
+| 2026-07-01 | Phase 2 scope prepared | Preserved smoke-test feedback for guided create UX, vote selectors, vertical bars, and winner callout. |
+| 2026-07-01 | Phase 2 marked complete | Guided create, vote lookup, update panel, vertical bars, outcome summaries, restart smoke, and configurable option length delivered. |
+| 2026-07-01 | Phase 3 scope prepared | Next slice confirmed as admin export, closed-vote history, and audit retrieval under `/vote_admin`. |
