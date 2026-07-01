@@ -102,7 +102,6 @@ from logging_setup import (
     is_pytest_logging_mode,
 )
 from mge.mge_scheduler import schedule_mge_lifecycle
-from voting.scheduler import schedule_voting_lifecycle
 from player_stats_cache import (  # optional, see note
     build_lastkvk_player_stats_cache,
     build_player_stats_cache,
@@ -121,6 +120,7 @@ from utils import (
     update_live_queue_embed,
     utcnow,
 )
+from voting.scheduler import schedule_voting_lifecycle
 
 # offload monitor integration
 try:

@@ -6,9 +6,16 @@ import json
 import logging
 from typing import Any
 
-from file_utils import cursor_row_to_dict, fetch_all_dicts, fetch_one_dict, run_blocking_in_thread
-from stats_alerts.db import exec_with_cursor, run_query_async, run_one_async
-from voting.models import VoteCastResult, VoteCloseResult, VoteCreateRequest, VoteOption, VoteReminder, VoteSnapshot
+from file_utils import cursor_row_to_dict, fetch_one_dict, run_blocking_in_thread
+from stats_alerts.db import exec_with_cursor, run_one_async, run_query_async
+from voting.models import (
+    VoteCastResult,
+    VoteCloseResult,
+    VoteCreateRequest,
+    VoteOption,
+    VoteReminder,
+    VoteSnapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +81,7 @@ def _rows_to_reminders(rows: Sequence[dict[str, Any]]) -> tuple[VoteReminder, ..
                 due_at_utc=due_at,
                 sent_at_utc=_aware_utc(row.get("SentAtUtc")),
                 message_id=(
-                    int(row["MessageID"])
-                    if row.get("MessageID") not in (None, "")
-                    else None
+                    int(row["MessageID"]) if row.get("MessageID") not in (None, "") else None
                 ),
             )
         )
@@ -192,7 +197,9 @@ async def create_vote_post(req: VoteCreateRequest) -> int:
         )
         return vote_post_id
 
-    vote_post_id = await run_blocking_in_thread(_create_vote_post_sync, _callback, name="vote_create")
+    vote_post_id = await run_blocking_in_thread(
+        _create_vote_post_sync, _callback, name="vote_create"
+    )
     return int(vote_post_id or 0)
 
 
@@ -252,16 +259,14 @@ async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
 
 
 async def list_open_vote_posts() -> list[VoteSnapshot]:
-    rows = await run_query_async(
-        """
+    rows = await run_query_async("""
         SELECT p.*,
                (SELECT COUNT_BIG(1) FROM dbo.VotePostVotes v WHERE v.VotePostID = p.VotePostID) AS TotalVotes
         FROM dbo.VotePosts p
         WHERE p.Status = 'Open'
           AND p.MessageID IS NOT NULL
         ORDER BY p.ClosesAtUtc ASC, p.VotePostID ASC;
-        """
-    )
+        """)
     snapshots: list[VoteSnapshot] = []
     for row in rows:
         snapshot = await get_vote_snapshot(int(row["VotePostID"]))
@@ -303,7 +308,9 @@ async def cast_vote(
             (int(vote_post_id), int(option_id)),
         )
         if cur.fetchone() is None:
-            return VoteCastResult("invalid_option", vote_post_id, message="That option is not valid.")
+            return VoteCastResult(
+                "invalid_option", vote_post_id, message="That option is not valid."
+            )
 
         cur.execute(
             """
@@ -457,7 +464,10 @@ async def update_vote_post(
             )
             close_for_due = closes_at_utc
             if close_for_due is None:
-                cur.execute("SELECT ClosesAtUtc FROM dbo.VotePosts WHERE VotePostID = ?;", (int(vote_post_id),))
+                cur.execute(
+                    "SELECT ClosesAtUtc FROM dbo.VotePosts WHERE VotePostID = ?;",
+                    (int(vote_post_id),),
+                )
                 row = cur.fetchone()
                 close_for_due = _aware_utc(row[0]) if row else None
             if close_for_due is not None:
@@ -531,7 +541,9 @@ async def claim_due_reminders(now_utc: datetime, *, limit: int = 10) -> list[dic
         )
         return [cursor_row_to_dict(cur, row) for row in cur.fetchall()]
 
-    rows = await run_blocking_in_thread(_claim_due_reminders_sync, _callback, name="vote_claim_reminders")
+    rows = await run_blocking_in_thread(
+        _claim_due_reminders_sync, _callback, name="vote_claim_reminders"
+    )
     return list(rows or [])
 
 

@@ -109,7 +109,9 @@ def build_create_request(
     if closes_at <= now:
         raise VoteValidationError("Close time must be in the future.")
     offsets = tuple(
-        offset for offset in parse_reminder_offsets(reminder_offsets) if closes_at.timestamp() - (offset * 60) > now.timestamp()
+        offset
+        for offset in parse_reminder_offsets(reminder_offsets)
+        if closes_at.timestamp() - (offset * 60) > now.timestamp()
     )
     return VoteCreateRequest(
         guild_id=int(guild_id),
@@ -146,7 +148,9 @@ async def create_vote_record(req: VoteCreateRequest) -> VoteSnapshot:
     return snapshot
 
 
-async def attach_vote_message(snapshot: VoteSnapshot, *, channel_id: int, message_id: int) -> VoteSnapshot:
+async def attach_vote_message(
+    snapshot: VoteSnapshot, *, channel_id: int, message_id: int
+) -> VoteSnapshot:
     updated = await dal.update_vote_message(
         snapshot.vote_post_id, channel_id=channel_id, message_id=message_id
     )
@@ -283,5 +287,7 @@ async def update_vote(
     snapshot = await dal.get_vote_snapshot(vote_post_id)
     if snapshot is None:
         raise RuntimeError("Vote could not be loaded after update.")
-    logger.info("vote_updated vote_post_id=%s actor_discord_id=%s", vote_post_id, actor_discord_user_id)
+    logger.info(
+        "vote_updated vote_post_id=%s actor_discord_id=%s", vote_post_id, actor_discord_user_id
+    )
     return snapshot

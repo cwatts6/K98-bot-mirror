@@ -116,7 +116,9 @@ async def _send_reminder(bot: discord.Client, reminder_row: dict[str, Any], now:
             int(message.id),
         )
     except Exception:
-        logger.exception("vote_reminder_send_failed vote_post_id=%s reminder_id=%s", vote_post_id, reminder_id)
+        logger.exception(
+            "vote_reminder_send_failed vote_post_id=%s reminder_id=%s", vote_post_id, reminder_id
+        )
 
 
 async def _close_due_vote(bot: discord.Client, vote_post_id: int, now: datetime) -> None:
@@ -143,7 +145,9 @@ async def _close_due_vote(bot: discord.Client, vote_post_id: int, now: datetime)
         logger.exception("vote_close_announcement_failed vote_post_id=%s", vote_post_id)
 
 
-async def run_voting_scheduler_tick(bot: discord.Client, *, now_utc: datetime | None = None) -> dict[str, int]:
+async def run_voting_scheduler_tick(
+    bot: discord.Client, *, now_utc: datetime | None = None
+) -> dict[str, int]:
     now = now_utc or datetime.now(UTC)
     summary = {"reminders": 0, "closes": 0}
     for vote_post_id in await dal.list_due_closes(now):

@@ -27,7 +27,9 @@ def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
     return visual_text.font(size, bold=bold)
 
 
-def _text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, *, bold: bool = False) -> int:
+def _text_width(
+    draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, *, bold: bool = False
+) -> int:
     return visual_text.text_width(draw, text, font=font, bold=bold)
 
 
@@ -63,7 +65,9 @@ def _draw_text(
 def _load_background() -> Image.Image:
     for path in (VOTING_BACKGROUND, FALLBACK_BACKGROUND):
         if path.exists():
-            return Image.open(path).convert("RGBA").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+            return (
+                Image.open(path).convert("RGBA").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+            )
     return Image.new("RGBA", (WIDTH, HEIGHT), (13, 20, 33, 255))
 
 
@@ -91,7 +95,9 @@ def _pct(count: int, total: int) -> str:
     return f"{value:.1f}".rstrip("0").rstrip(".") + "%"
 
 
-def render_vote_card(snapshot: VoteSnapshot, *, now_utc: datetime | None = None) -> RenderedVoteCard:
+def render_vote_card(
+    snapshot: VoteSnapshot, *, now_utc: datetime | None = None
+) -> RenderedVoteCard:
     now = now_utc or datetime.now(UTC)
     background = _load_background()
     overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
@@ -127,7 +133,9 @@ def render_vote_card(snapshot: VoteSnapshot, *, now_utc: datetime | None = None)
         y = row_top + (index * row_gap)
         label_font = _fit_font(draw, option.label, max_width=290, size=24, min_size=16, bold=True)
         _draw_text(draw, (62, y), option.label, fill=TEXT, font=label_font, bold=True)
-        draw.rounded_rectangle((bar_x, y + 8, bar_x + bar_w, y + 28), radius=10, fill=(51, 65, 85, 230))
+        draw.rounded_rectangle(
+            (bar_x, y + 8, bar_x + bar_w, y + 28), radius=10, fill=(51, 65, 85, 230)
+        )
         fill_w = int(bar_w * option.vote_count / total) if total else 0
         if fill_w:
             draw.rounded_rectangle((bar_x, y + 8, bar_x + fill_w, y + 28), radius=10, fill=BLUE)

@@ -41,7 +41,9 @@ def _snapshot(total_votes: int = 0) -> VoteSnapshot:
 
 
 def test_render_vote_card_outputs_png_with_expected_size():
-    rendered = render_vote_card(_snapshot(total_votes=3), now_utc=datetime(2026, 7, 1, 12, 0, tzinfo=UTC))
+    rendered = render_vote_card(
+        _snapshot(total_votes=3), now_utc=datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+    )
 
     image = Image.open(BytesIO(rendered.image_bytes.getvalue()))
     assert image.format == "PNG"
@@ -50,6 +52,8 @@ def test_render_vote_card_outputs_png_with_expected_size():
 
 
 def test_render_vote_card_handles_zero_vote_state():
-    rendered = render_vote_card(_snapshot(total_votes=0), now_utc=datetime(2026, 7, 1, 12, 0, tzinfo=UTC))
+    rendered = render_vote_card(
+        _snapshot(total_votes=0), now_utc=datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+    )
 
     assert rendered.image_bytes.getbuffer().nbytes > 10_000

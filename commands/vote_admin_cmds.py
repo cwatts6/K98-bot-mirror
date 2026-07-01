@@ -81,7 +81,9 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
         title: str = discord.Option(str, "Vote title"),
         description: str = discord.Option(str, "Vote description"),
         options: str = discord.Option(str, "Options separated by |, from 2 to 5 options"),
-        target_channel: discord.TextChannel = discord.Option(discord.TextChannel, "Channel to post in"),
+        target_channel: discord.TextChannel = discord.Option(
+            discord.TextChannel, "Channel to post in"
+        ),
         closes_at_utc: str = discord.Option(str, "UTC close time, e.g. 2026-07-01 20:30"),
         reminder_offsets_minutes: str = discord.Option(
             str,
@@ -189,7 +191,9 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
         if not result.closed:
             await ctx.interaction.edit_original_response(content=result.message)
             return
-        channel = bot.get_channel(snapshot.channel_id) or await bot.fetch_channel(snapshot.channel_id)
+        channel = bot.get_channel(snapshot.channel_id) or await bot.fetch_channel(
+            snapshot.channel_id
+        )
         message = await channel.fetch_message(snapshot.message_id) if snapshot.message_id else None
         if message is not None:
             await message.edit(
@@ -260,7 +264,9 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             await ctx.interaction.edit_original_response(content=f"Vote not updated: {exc}")
             return
         if snapshot.message_id:
-            channel = bot.get_channel(snapshot.channel_id) or await bot.fetch_channel(snapshot.channel_id)
+            channel = bot.get_channel(snapshot.channel_id) or await bot.fetch_channel(
+                snapshot.channel_id
+            )
             message = await channel.fetch_message(snapshot.message_id)
             await message.edit(
                 embed=build_vote_embed(snapshot),

@@ -28,7 +28,9 @@ def message_link(snapshot: VoteSnapshot) -> str:
 
 def build_vote_embed(snapshot: VoteSnapshot) -> discord.Embed:
     color = discord.Color.green() if snapshot.status == "Open" else discord.Color.red()
-    embed = discord.Embed(title=snapshot.title, description=snapshot.description or None, color=color)
+    embed = discord.Embed(
+        title=snapshot.title, description=snapshot.description or None, color=color
+    )
     embed.add_field(name="Status", value=snapshot.status, inline=True)
     embed.add_field(
         name="Closes",
