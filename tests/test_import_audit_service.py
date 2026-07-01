@@ -108,6 +108,28 @@ def test_record_phase_best_effort_preserves_valid_completed_timestamp():
     assert seen["completed_at_utc"] == completed
 
 
+def test_record_phase_best_effort_clamps_mixed_timezone_awareness():
+    seen = {}
+    started = datetime(2026, 7, 1, 12, 0, 0, tzinfo=UTC)
+    completed = datetime(2026, 7, 1, 11, 59, 59, 997000)
+
+    def writer(**kwargs):
+        seen.update(kwargs)
+        return 5
+
+    phase_id = import_audit_service.record_phase_best_effort(
+        ImportAuditBatchRef(12, "cid"),
+        phase_name="weekly_activity_sql_ingest",
+        phase_status="completed",
+        started_at_utc=started,
+        completed_at_utc=completed,
+        writer=writer,
+    )
+
+    assert phase_id == 5
+    assert seen["completed_at_utc"] == started
+
+
 def test_fetch_batch_by_external_id_best_effort_passes_lookup_fields():
     seen = {}
 
