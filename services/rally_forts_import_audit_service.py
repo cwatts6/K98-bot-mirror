@@ -41,9 +41,7 @@ def audit_timestamp_utc() -> datetime:
 
 
 def audit_duration_ms(started: datetime) -> int:
-    started_utc = (
-        started.replace(tzinfo=UTC) if started.tzinfo is None else started.astimezone(UTC)
-    )
+    started_utc = started.replace(tzinfo=UTC) if started.tzinfo is None else started.astimezone(UTC)
     return max(0, int((datetime.now(UTC) - started_utc).total_seconds() * 1000))
 
 
