@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 1 SQL-backed voting smoke test`
 - Task type: `feature | UX polish | Discord command workflow | visual output`
 - One-pass approved: `no`
-- Status: `prepared - not started`
+- Status: `complete - archived`
 
 ## 2. Objective
 
@@ -17,6 +17,12 @@ card visual layout, and make final winners obvious on both manual and automatic 
 
 Phase 2 should preserve the working SQL-backed Phase 1 behavior while improving the admin and
 player-facing experience.
+
+Completion note: Phase 2 was delivered through mirror PR `cwatts6/K98-bot-mirror#194` and
+production PR `cwatts6/k98-bot#502`. Operator smoke testing on 2026-07-01 confirmed guided create,
+configurable 20-character option labels, autocomplete vote lookup for status/update/close, the
+guided update follow-up menu, clear manual close results, disabled buttons after close, and
+restart-safe open vote buttons.
 
 ## 3. Required Reading
 
@@ -303,21 +309,21 @@ After implementation:
 
 ## 14. Acceptance Criteria
 
-- [ ] Admins no longer need pipe-separated option input.
-- [ ] Option 1 and Option 2 are required; Options 3-6 are optional.
-- [ ] Maximum option count is 6, or audit documents why 6 is unsafe and preserves a smaller limit.
-- [ ] Option label limits are enforced as early as Discord supports and again in service validation.
-- [ ] Close-time input is guided and less error-prone than raw UTC free text.
-- [ ] Update/status/close can select votes by title/autocomplete/dropdown-style lookup.
-- [ ] Raw VotePostID remains available as metadata but is not the main admin burden.
-- [ ] Update UX clearly requires or guides a specific change.
-- [ ] Result card uses vertical bars or audit-approved visual equivalent.
-- [ ] Closed votes show winner, tie, or no-vote outcome clearly.
-- [ ] Manual and automatic close announcements include winner/tie/no-vote summary.
-- [ ] Phase 1 SQL-backed voting, reminder, close, restart, and mention safety behavior is preserved.
-- [ ] Command registration validation passes.
-- [ ] Focused and broad tests pass or skips are justified.
-- [ ] Codex Security review is run or explicitly justified if skipped.
+- [x] Admins no longer need pipe-separated option input.
+- [x] Option 1 and Option 2 are required; Options 3-6 are optional.
+- [x] Maximum option count is 6, or audit documents why 6 is unsafe and preserves a smaller limit.
+- [x] Option label limits are enforced as early as Discord supports and again in service validation.
+- [x] Close-time input is guided and less error-prone than raw UTC free text.
+- [x] Update/status/close can select votes by title/autocomplete/dropdown-style lookup.
+- [x] Raw VotePostID remains available as metadata but is not the main admin burden.
+- [x] Update UX clearly requires or guides a specific change.
+- [x] Result card uses vertical bars or audit-approved visual equivalent.
+- [x] Closed votes show winner, tie, or no-vote outcome clearly.
+- [x] Manual and automatic close announcements include winner/tie/no-vote summary.
+- [x] Phase 1 SQL-backed voting, reminder, close, restart, and mention safety behavior is preserved.
+- [x] Command registration validation passes.
+- [x] Focused and broad tests pass or skips are justified.
+- [x] Codex Security review is run or explicitly justified if skipped.
 
 ## 15. PR Summary Template
 

@@ -156,15 +156,23 @@ Discord Voting Post Framework status:
   close, timer close, and disabled buttons after close.
 - Phase 1 records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 1 SQL Backed Live Voting.md`
+- Phase 2 Guided Admin UX and Results Polish is delivered in mirror PR #194 and production PR
+  #502. Operator smoke testing on 2026-07-01 confirmed guided create, configurable 20-character
+  option labels, vote lookup choices for status/update/close, the guided update follow-up menu,
+  clear manual close results, disabled buttons after close, and restart-safe open vote buttons.
+- Phase 2 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md`
+  - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md`
 - Active Discord Voting Post Framework files:
   - `Discord Voting Post Framework - Programme Pack.md`
-  - `Codex Task Pack - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md`
-  - `Codex Chat Starter - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md`
-- Phase 2 is the next prepared voting slice. It starts with audit/scope for guided admin creation,
-  individual option fields, option character-limit feedback, guided close-time input, vote-title
-  lookup for update/status/close, clearer update flow, vertical result bars, and explicit
-  winner/tie/no-vote close output. Export, role-restricted voting, hidden results, templates, and
-  advanced modes remain later phases unless separately approved.
+  - `Codex Task Pack - Discord Voting Post Framework Phase 3 Admin Export and Audit Hardening.md`
+  - `Codex Chat Starter - Discord Voting Post Framework Phase 3 Admin Export and Audit Hardening.md`
+- Phase 3 is the next prepared voting slice. It starts with audit/scope for guided closed-vote
+  lookup, final result export, voter-audit privacy decisions, SQL query/index validation, private
+  export delivery, and preservation of all Phase 1 and Phase 2 voting behavior. Role-restricted
+  voting, hidden results, governor-linked voting, multi-select/survey voting, templates, website
+  dashboards, and public voter-level export posting remain later phases unless separately
+  approved.
 
 Player Self-Service Command Centre status:
 
@@ -315,3 +323,7 @@ the next prepared player self-service slice. It starts with audit/scope only for
 Final removal of temporary deprecated command paths remains captured as deferred cleanup for
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.
+
+Discord Voting Post Framework Phase 3 Admin Export and Audit Hardening is the next prepared voting
+slice. It starts with audit/scope only for completed vote lookup, result CSV export, voter-audit
+privacy, SQL lookup/export validation, private delivery, and no changes to player voting behavior.

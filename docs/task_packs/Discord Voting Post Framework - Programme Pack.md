@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 complete; Phase 2 prepared`
+- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 prepared`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -65,36 +65,50 @@ Phase 1 records are archived under:
 docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 1 SQL Backed Live Voting.md
 ```
 
-## 4. Current Product Feedback
+## 4. Phase 2 Delivery Summary
 
-Phase 1 works, but smoke testing showed the admin UX needs a guided second phase.
+Phase 2 delivered the guided admin UX and results polish slice.
 
-Feedback to preserve:
+Delivered through:
 
-- Pipe-separated `options` input is clunky and error-prone.
-- Option character limits are discovered too late, after the admin has already filled the command.
-- Creation should use individual option fields:
-  - `Option 1` required
-  - `Option 2` required
-  - `Option 3` optional
-  - `Option 4` optional
-  - `Option 5` optional
-  - `Option 6` optional
-- Option count should increase to a maximum of 6.
-- Character limits should be enforced while filling fields where Discord supports this, not only
-  after submit.
-- `closes_at_utc` as free-text UTC is hard to fill in and should become selector-guided.
-- Result bars should become vertical rather than horizontal.
-- `/vote_admin update`, `/vote_admin status`, and `/vote_admin close` should not require admins to
-  know a raw VotePostID.
-- Admin vote selection should use a vote title dropdown or autocomplete selector, with IDs shown
-  only as disambiguating metadata.
-- `/vote_admin update` with every field optional is confusing; it should guide the admin toward one
-  explicit change or a clearer edit flow.
-- `/vote_admin status` is good and should be preserved while improving vote selection.
-- `/vote_admin close` works, but close output should show the winner clearly.
-- Automatic close should also show the winner clearly.
-- The final card and close announcement should make the winning option or tie state obvious.
+- Mirror PR: `cwatts6/K98-bot-mirror#194`
+- Production PR: `cwatts6/k98-bot#502`
+- SQL PR: `not required`
+- Bot smoke test: `2026-07-01`
+
+Delivered:
+
+- `/vote_admin create` now uses individual option fields instead of pipe-separated input.
+- Option 1 and Option 2 are required; Options 3-6 are optional.
+- Vote posts support up to six options.
+- Option label validation is configurable with `VOTE_OPTION_LABEL_MAX_LENGTH`, defaulting to 20 and
+  allowing values from 1 through 80.
+- Close time uses guided duration choices rather than raw UTC free text.
+- `/vote_admin update`, `/vote_admin status`, and `/vote_admin close` use autocomplete vote
+  selection with title plus status/close-time metadata.
+- `/vote_admin update` opens an explicit private update panel so admins choose the field to edit.
+- `/vote_admin status` output was preserved.
+- Result cards use vertical bars.
+- Closed cards and close announcements show winner, tie, or no-vote outcomes clearly.
+- Manual close and automatic close both use the same outcome summary.
+- Restart-safe open vote buttons continue to work after bot restart.
+- Vote updates still avoid repeated `@everyone` pings.
+
+Smoke test confirmed:
+
+- Guided create works.
+- The 20-character option label limit works when configured in `.env`.
+- Status, close, and update vote selection offer the expected vote list.
+- Update opens the six-option guided follow-up menu.
+- Manual close disables buttons and shows a clear result.
+- Open-vote buttons still work after bot restart.
+
+Phase 2 records are archived under:
+
+```text
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md
+```
 
 ## 5. Target Model
 
@@ -109,19 +123,20 @@ Feedback to preserve:
 
 Phase 1 intentionally used `/vote_admin` as the approved command group.
 
-### Phase 2 target command model
+### Phase 3 target command model
 
-Keep the existing command group and improve the command UX:
+Keep the existing command group and add reporting under it:
 
 ```text
 /vote_admin create
 /vote_admin update
 /vote_admin close
 /vote_admin status
+/vote_admin export
 ```
 
-Phase 2 should avoid adding a new top-level command. It may add autocomplete, option fields,
-modals, buttons, or selects behind the existing group.
+Phase 3 should avoid adding a new top-level command. It may add autocomplete, selectors, modal
+confirmation, or private file delivery behind the existing group.
 
 ### Target workflow model
 
@@ -182,45 +197,38 @@ Delivered:
 
 ### Phase 2 - Guided Admin UX and Results Polish
 
+Status: complete.
+
+Delivered:
+
+- Individual create option fields with two required options and four optional options.
+- Up to six option buttons and six vertical result bars.
+- Configurable option label length via `VOTE_OPTION_LABEL_MAX_LENGTH`, default 20.
+- Guided close-duration choices.
+- Autocomplete vote lookup for update, status, and close.
+- Explicit update target menu.
+- Preserved status output.
+- Vertical result card bars.
+- Winner, tie, and no-vote outcome treatment on closed cards and announcements.
+- Preserved SQL source of truth, one vote per Discord user, vote changes, scheduler reminders,
+  automatic close, manual close, disabled buttons, backend late-vote rejection, restart safety, and
+  mention safety.
+
+### Phase 3 - Admin Export and Audit Hardening
+
 Status: prepared.
 
 Deliver:
 
-- Replace pipe-separated create options with individual fields:
-  - `option_1` required
-  - `option_2` required
-  - `option_3` optional
-  - `option_4` optional
-  - `option_5` optional
-  - `option_6` optional
-- Raise maximum supported options from 5 to 6 if Discord button layout and card layout remain
-  clear.
-- Add Discord-supported option length limits where possible so admins get feedback while filling
-  the command.
-- Keep service-side SQL/card/button validation as the final authority.
-- Replace raw UTC close text with a guided close-time flow using the best viable Discord pattern:
-  autocomplete, preset choices, select menus, modal fields, or a staged confirm flow.
-- Add vote-title autocomplete/select support for update, status, and close so admins do not need
-  raw VotePostID values.
-- Rework update UX so admins explicitly choose what to change or use a clearer guided edit flow.
-- Preserve the useful status output while adding easier vote selection.
-- Redesign result card bars from horizontal to vertical.
-- Highlight the winner or tie state on final/closed cards.
-- Include winner/tie summary in both manual-close and automatic-close announcements.
-- Preserve restart safety, SQL source of truth, no broad ping on vote updates, and backend
-  validation.
-
-### Phase 3 - Admin Export and Audit Hardening
-
-Status: future candidate.
-
-Deliver:
-
-- Export command for results and voter audit.
-- Admin-friendly closed vote summaries.
-- Richer audit/status inspection for reminders, close source, and operational failures.
-- Permission review for voter identity export.
-- Optional CSV and/or embed summary output.
+- Add a guided `/vote_admin export` workflow for one vote's final result and voter audit, subject
+  to permission and privacy review.
+- Add an admin-friendly closed-vote lookup/history path so completed votes are retrievable without
+  message scrolling or raw SQL.
+- Produce CSV export output for final option totals and, when approved, voter-level audit rows.
+- Preserve current status output while adding richer close source, reminder, and operational
+  metadata where existing SQL supports it.
+- Confirm whether any SQL query/index changes are required for closed-vote lookup and export.
+- Keep export output private/ephemeral unless the operator explicitly approves public posting.
 
 ### Phase 4 - Advanced Voting Modes
 
@@ -235,10 +243,10 @@ Deliver:
 - Per-option emoji/icon support.
 - Saved templates for recurring vote types.
 
-## 8. Phase 2 Scope Summary
+## 8. Phase 3 Scope Summary
 
-Phase 2 is a UX polish and guided-admin workflow phase. It should not add export, role-restricted
-voting, anonymous voting, templates, or survey builder functionality.
+Phase 3 is a read/reporting phase for completed vote results and audit retrieval. It should not add
+new voting modes or change player voting behavior.
 
 Affected areas:
 
@@ -247,26 +255,25 @@ Affected areas:
 - `voting/dal.py`
 - `voting/models.py`
 - `voting/discord_presentation.py`
-- `voting/render_service.py`
-- `voting/scheduler.py`
-- `ui/views/vote_post_view.py`
+- `ui/views/` for guided export/history selectors if needed
 - `tests/test_vote_admin_cmds.py`
 - `tests/test_voting_service.py`
-- `tests/test_voting_render_service.py`
-- `tests/test_voting_scheduler.py`
-- SQL repo only if option count, title lookup, or result-summary needs cannot be satisfied by
-  current tables and queries.
+- `tests/test_voting_dal.py` or equivalent SQL/DAL contract tests if query shape changes
+- `tests/test_voting_discord_presentation.py`
+- SQL repo only if closed-vote lookup, audit export, or query performance needs cannot be
+  satisfied by current tables and indexed queries.
 
 ## 9. Cross-Programme Constraints
 
-- Do not add another top-level command for Phase 2.
+- Do not add another top-level command for Phase 3.
 - Keep `/vote_admin` command registration valid: required options must precede optional options.
 - Do not rely on Discord UI limits alone; service validation must remain authoritative.
 - Validate any SQL-facing assumptions against `C:\K98-bot-SQL-Server`.
-- Preserve all Phase 1 smoke-tested behavior.
+- Preserve all Phase 1 and Phase 2 smoke-tested behavior.
 - Do not introduce repeated `@everyone` pings on vote updates.
 - Preserve persistent view restart behavior and scheduler idempotency.
 - Do not edit vote options after votes exist unless the task explicitly defines safe rules.
+- Do not expose voter-level exports publicly without explicit approval.
 
 ## 10. Validation Strategy
 
@@ -309,18 +316,18 @@ The core programme is successful when:
 - [x] Backend rejects late votes.
 - [x] Persistent views survive restart.
 - [x] SQL is the durable source of truth.
-- [ ] Admin creation is guided and avoids pipe-separated option syntax.
-- [ ] Admin close time input is guided.
-- [ ] Admin update/status/close do not require raw VotePostID lookup.
-- [ ] Closed votes visibly highlight the winner or tie state.
-- [ ] Result cards meet the vertical-bar visual direction.
-- [ ] Export/audit workflow is delivered or intentionally deferred to Phase 3.
+- [x] Admin creation is guided and avoids pipe-separated option syntax.
+- [x] Admin close time input is guided.
+- [x] Admin update/status/close do not require raw VotePostID lookup.
+- [x] Closed votes visibly highlight the winner or tie state.
+- [x] Result cards meet the vertical-bar visual direction.
+- [ ] Export/audit workflow is delivered in Phase 3 or intentionally deferred again with rationale.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 2: Guided Admin UX and Results Polish using the
-prepared task pack and chat starter.
+Start Discord Voting Post Framework Phase 3: Admin Export and Audit Hardening using the prepared
+task pack and chat starter.
 ```
 
 ## 13. Programme Change Log
@@ -330,3 +337,5 @@ prepared task pack and chat starter.
 | 2026-07-01 | Initial programme pack created | Captured SQL-backed live voting, buttons, Pillow card, reminders, and close handling. |
 | 2026-07-01 | Phase 1 marked complete | SQL deployed, bot smoke test successful, mirror/prod review fixes completed. |
 | 2026-07-01 | Phase 2 scope prepared | Preserved smoke-test feedback for guided create UX, vote selectors, vertical bars, and winner callout. |
+| 2026-07-01 | Phase 2 marked complete | Guided create, vote lookup, update panel, vertical bars, outcome summaries, restart smoke, and configurable option length delivered. |
+| 2026-07-01 | Phase 3 scope prepared | Next slice confirmed as admin export, closed-vote history, and audit retrieval under `/vote_admin`. |

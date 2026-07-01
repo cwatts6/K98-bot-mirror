@@ -1,6 +1,10 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter for the completed Discord Voting Post Framework Phase 2 slice.
+
+Completion note: Phase 2 was delivered and smoke tested on 2026-07-01. Use the Phase 3 starter in
+`docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 3 Admin Export and Audit Hardening.md`
+for the next voting slice.
 
 Phase 1 is complete. SQL was deployed on 2026-07-01, the bot smoke test created a vote
 successfully, voting and vote changes worked, `@everyone` behaved as configured, SQL records

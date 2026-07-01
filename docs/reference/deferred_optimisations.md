@@ -6,6 +6,15 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
+- Area: `voting/`, `/vote_admin`, future voting programme phases
+- Type: architecture
+- Description: Discord Voting Post Framework Phase 2 intentionally delivered guided admin UX and closed-result polish without adding advanced voting modes. Role-restricted voting, anonymous or hidden-until-close results, governor-linked voting, multi-select/survey modes, saved templates, public dashboard reporting, and public voter-level export posting remain outside the active Phase 3 export/audit scope because each changes permissions, data visibility, SQL contracts, or player expectations.
+- Suggested Fix: After Phase 3 admin export and audit hardening is complete, prepare a Phase 4 advanced voting modes audit that separately evaluates product need, permission/privacy model, SQL schema changes, command/view UX, migration and rollback plan, and focused tests for each candidate mode before implementation.
+- Impact: medium
+- Risk: high
+- Dependencies: Discord Voting Post Framework Phase 2 complete; Phase 3 export/audit scope prepared; operator approval before any advanced-mode implementation.
+
+### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks
 - Type: architecture
 - Description: Inventory import lifecycle coordination remains intentionally view-heavy. `ui/views/inventory_views.py` routes upload-first messages, command-session continuations, multi-governor selection, review interactions, correction modals, additional-material continuation, approval, rejection, cancellation, timeout, admin-debug posting, and original-upload cleanup. Task C Slice 8 adopted generic audit without redesigning this workflow and smoke testing confirmed the behavior-preserving audit contract.
