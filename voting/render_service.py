@@ -65,9 +65,8 @@ def _draw_text(
 def _load_background() -> Image.Image:
     for path in (VOTING_BACKGROUND, FALLBACK_BACKGROUND):
         if path.exists():
-            return (
-                Image.open(path).convert("RGBA").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-            )
+            with Image.open(path) as image:
+                return image.convert("RGBA").resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
     return Image.new("RGBA", (WIDTH, HEIGHT), (13, 20, 33, 255))
 
 
@@ -75,6 +74,8 @@ def _status(snapshot: VoteSnapshot, now_utc: datetime) -> tuple[str, tuple[int, 
     if snapshot.status == "Closed" or snapshot.closed_at_utc is not None:
         return "Closed", RED
     minutes_left = (snapshot.closes_at_utc - now_utc).total_seconds() / 60
+    if minutes_left <= 0:
+        return "Closed", RED
     if minutes_left <= 60:
         return "Closing Soon", GOLD
     return "Open", GREEN

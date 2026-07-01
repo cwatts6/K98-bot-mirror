@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
 
 from PIL import Image
 
 from voting.models import VoteOption, VoteSnapshot
-from voting.render_service import HEIGHT, WIDTH, render_vote_card
+from voting.render_service import HEIGHT, RED, WIDTH, _status, render_vote_card
 
 
 def _snapshot(total_votes: int = 0) -> VoteSnapshot:
@@ -57,3 +58,10 @@ def test_render_vote_card_handles_zero_vote_state():
     )
 
     assert rendered.image_bytes.getbuffer().nbytes > 10_000
+
+
+def test_status_treats_elapsed_open_vote_as_closed():
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+    snapshot = replace(_snapshot(), closes_at_utc=now - timedelta(seconds=1))
+
+    assert _status(snapshot, now) == ("Closed", RED)

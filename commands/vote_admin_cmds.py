@@ -22,6 +22,7 @@ from voting.service import (
     VoteValidationError,
     attach_vote_message,
     build_create_request,
+    cancel_vote_launch_failure,
     close_vote,
     create_vote_record,
     get_vote_snapshot,
@@ -79,7 +80,7 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
     async def vote_create(
         ctx: discord.ApplicationContext,
         title: str = discord.Option(str, "Vote title"),
-        description: str = discord.Option(str, "Vote description"),
+        description: str = discord.Option(str, "Vote description", required=False, default=""),
         options: str = discord.Option(str, "Options separated by |, from 2 to 5 options"),
         target_channel: discord.TextChannel = discord.Option(
             discord.TextChannel, "Channel to post in"
@@ -151,20 +152,52 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                 await ctx.interaction.edit_original_response(content=permission_error)
                 return
 
+        message = None
         snapshot = await create_vote_record(req)
-        view = VotePostView(snapshot)
-        message = await target_channel.send(
-            content=mention_content(snapshot.launch_mention_everyone, "New vote is open"),
-            embed=build_vote_embed(snapshot),
-            file=build_vote_file(snapshot),
-            view=view,
-            allowed_mentions=configured_everyone_mentions(snapshot.launch_mention_everyone),
-        )
-        snapshot = await attach_vote_message(
-            snapshot,
-            channel_id=int(target_channel.id),
-            message_id=int(message.id),
-        )
+        try:
+            view = VotePostView(snapshot)
+            message = await target_channel.send(
+                content=mention_content(snapshot.launch_mention_everyone, "New vote is open"),
+                embed=build_vote_embed(snapshot),
+                file=build_vote_file(snapshot),
+                view=view,
+                allowed_mentions=configured_everyone_mentions(snapshot.launch_mention_everyone),
+            )
+            snapshot = await attach_vote_message(
+                snapshot,
+                channel_id=int(target_channel.id),
+                message_id=int(message.id),
+            )
+        except Exception:
+            logger.exception("vote_launch_failed vote_post_id=%s", snapshot.vote_post_id)
+            await cancel_vote_launch_failure(
+                vote_post_id=snapshot.vote_post_id,
+                actor_discord_user_id=int(ctx.user.id),
+                reason="launch failed",
+            )
+            if message is not None:
+                try:
+                    cancelled = await get_vote_snapshot(snapshot.vote_post_id)
+                    if cancelled is not None:
+                        await message.edit(
+                            embed=build_vote_embed(cancelled),
+                            attachments=[],
+                            files=[build_vote_file(cancelled)],
+                            view=disabled_vote_view(cancelled),
+                            allowed_mentions=no_broad_mentions(),
+                        )
+                except Exception:
+                    logger.exception(
+                        "vote_launch_failed_message_disable_failed vote_post_id=%s",
+                        snapshot.vote_post_id,
+                    )
+            await ctx.interaction.edit_original_response(
+                content=(
+                    "Vote not created: the Discord vote post could not be sent, "
+                    "and the SQL record was cancelled."
+                )
+            )
+            return
         await ctx.interaction.edit_original_response(
             content=f"Vote #{snapshot.vote_post_id} created in {target_channel.mention}."
         )
@@ -180,11 +213,15 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
         reason: str = discord.Option(str, "Close reason", required=False, default="closed early"),
     ) -> None:
         await safe_defer(ctx, ephemeral=True)
-        result, snapshot = await close_vote(
-            vote_post_id=vote_post_id,
-            actor_discord_user_id=int(ctx.user.id),
-            reason=reason,
-        )
+        try:
+            result, snapshot = await close_vote(
+                vote_post_id=vote_post_id,
+                actor_discord_user_id=int(ctx.user.id),
+                reason=reason,
+            )
+        except VoteValidationError as exc:
+            await ctx.interaction.edit_original_response(content=f"Vote not closed: {exc}")
+            return
         if snapshot is None:
             await ctx.interaction.edit_original_response(content=result.message)
             return

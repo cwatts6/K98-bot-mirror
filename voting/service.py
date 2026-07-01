@@ -13,11 +13,31 @@ MAX_OPTIONS = 5
 MIN_OPTIONS = 2
 MAX_OPTION_LABEL_LEN = 80
 MAX_TITLE_LEN = 180
+MAX_DESCRIPTION_LEN = 2000
+MAX_CLOSE_REASON_LEN = 200
 DEFAULT_REMINDER_OFFSETS = (60,)
 
 
 class VoteValidationError(ValueError):
     """Raised when a vote request cannot be accepted."""
+
+
+def _validate_description(value: str | None, *, blank_as_none: bool = True) -> str | None:
+    clean_value = (value or "").strip()
+    if len(clean_value) > MAX_DESCRIPTION_LEN:
+        raise VoteValidationError(f"Description must be {MAX_DESCRIPTION_LEN} characters or fewer.")
+    if blank_as_none and not clean_value:
+        return None
+    return clean_value
+
+
+def _validate_close_reason(reason: str) -> str:
+    clean_reason = (reason or "").strip() or "closed"
+    if len(clean_reason) > MAX_CLOSE_REASON_LEN:
+        raise VoteValidationError(
+            f"Close reason must be {MAX_CLOSE_REASON_LEN} characters or fewer."
+        )
+    return clean_reason
 
 
 def parse_utc_datetime(value: str) -> datetime:
@@ -105,6 +125,7 @@ def build_create_request(
         raise VoteValidationError("Title is required.")
     if len(normalized_title) > MAX_TITLE_LEN:
         raise VoteValidationError(f"Title must be {MAX_TITLE_LEN} characters or fewer.")
+    normalized_description = _validate_description(description)
     closes_at = parse_utc_datetime(close_time_utc)
     if closes_at <= now:
         raise VoteValidationError("Close time must be in the future.")
@@ -118,7 +139,7 @@ def build_create_request(
         channel_id=int(channel_id),
         created_by_discord_user_id=int(created_by_discord_user_id),
         title=normalized_title,
-        description=(description or "").strip() or None,
+        description=normalized_description,
         options=parse_options(raw_options),
         closes_at_utc=closes_at,
         reminder_offsets_minutes=offsets,
@@ -205,10 +226,11 @@ async def close_vote(
     now_utc: datetime | None = None,
 ) -> tuple[VoteCloseResult, VoteSnapshot | None]:
     now = now_utc or datetime.now(UTC)
+    clean_reason = _validate_close_reason(reason)
     result = await dal.close_vote(
         vote_post_id=vote_post_id,
         actor_discord_user_id=actor_discord_user_id,
-        reason=reason,
+        reason=clean_reason,
         now_utc=now,
     )
     snapshot = await dal.get_vote_snapshot(vote_post_id) if result.closed else None
@@ -217,9 +239,33 @@ async def close_vote(
         result.status,
         vote_post_id,
         actor_discord_user_id,
-        reason,
+        clean_reason,
     )
     return result, snapshot
+
+
+async def cancel_vote_launch_failure(
+    *,
+    vote_post_id: int,
+    actor_discord_user_id: int | None,
+    reason: str = "launch failed",
+    now_utc: datetime | None = None,
+) -> bool:
+    clean_reason = _validate_close_reason(reason)
+    ok = await dal.cancel_vote_launch_failure(
+        vote_post_id=vote_post_id,
+        actor_discord_user_id=actor_discord_user_id,
+        reason=clean_reason,
+        now_utc=now_utc or datetime.now(UTC),
+    )
+    logger.info(
+        "vote_launch_failure_cancelled=%s vote_post_id=%s actor_discord_id=%s reason=%s",
+        ok,
+        vote_post_id,
+        actor_discord_user_id,
+        clean_reason,
+    )
+    return ok
 
 
 async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
@@ -269,9 +315,13 @@ async def update_vote(
                 if close_for_offsets.timestamp() - (offset * 60) > now.timestamp()
             )
     clean_title = (title or "").strip() if title is not None else None
-    clean_description = (description or "").strip() if description is not None else None
+    clean_description = (
+        _validate_description(description, blank_as_none=False) if description is not None else None
+    )
     if clean_title is not None and not clean_title:
         raise VoteValidationError("Title cannot be blank.")
+    if clean_title is not None and len(clean_title) > MAX_TITLE_LEN:
+        raise VoteValidationError(f"Title must be {MAX_TITLE_LEN} characters or fewer.")
     ok = await dal.update_vote_post(
         vote_post_id=vote_post_id,
         actor_discord_user_id=actor_discord_user_id,

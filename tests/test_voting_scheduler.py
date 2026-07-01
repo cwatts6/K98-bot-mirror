@@ -106,6 +106,7 @@ async def test_scheduler_closes_due_votes_before_sending_reminders(monkeypatch):
 
     async def send_reminder(_bot, reminder, _now):
         calls.append(("reminder", reminder["ReminderID"]))
+        return True
 
     monkeypatch.setattr("voting.scheduler.dal.list_due_closes", list_due_closes)
     monkeypatch.setattr("voting.scheduler._close_due_vote", close_due_vote)
@@ -121,3 +122,40 @@ async def test_scheduler_closes_due_votes_before_sending_reminders(monkeypatch):
         "claim_reminders",
         ("reminder", 8),
     ]
+
+
+@pytest.mark.asyncio
+async def test_scheduler_does_not_count_or_success_audit_when_reminder_mark_fails(monkeypatch):
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+    channel = _Channel()
+    audits = []
+
+    async def claim_due_reminders(_now):
+        return [{"ReminderID": 8, "VotePostID": 5}]
+
+    async def get_vote_snapshot(_vote_post_id):
+        return _snapshot()
+
+    async def mark_reminder_sent(_reminder_id, *, message_id, now_utc):
+        return False
+
+    async def list_due_closes(_now):
+        return []
+
+    async def insert_audit(**kwargs):
+        audits.append(kwargs)
+
+    monkeypatch.setattr("voting.scheduler.dal.claim_due_reminders", claim_due_reminders)
+    monkeypatch.setattr("voting.scheduler.dal.get_vote_snapshot", get_vote_snapshot)
+    monkeypatch.setattr("voting.scheduler.dal.mark_reminder_sent", mark_reminder_sent)
+    monkeypatch.setattr("voting.scheduler.dal.list_due_closes", list_due_closes)
+    monkeypatch.setattr("voting.scheduler.dal.insert_audit", insert_audit)
+
+    bot = SimpleNamespace(get_channel=lambda _channel_id: channel)
+
+    summary = await run_voting_scheduler_tick(bot, now_utc=now)
+
+    assert summary == {"reminders": 0, "closes": 0}
+    assert len(channel.sent) == 1
+    assert [audit["action_type"] for audit in audits] == ["ReminderMarkFailed"]
+    assert audits[0]["details"] == {"reminder_id": 8, "message_id": 900}

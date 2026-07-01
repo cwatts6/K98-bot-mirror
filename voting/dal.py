@@ -222,6 +222,45 @@ async def update_vote_message(vote_post_id: int, *, channel_id: int, message_id:
     return bool(row)
 
 
+async def cancel_vote_launch_failure(
+    *,
+    vote_post_id: int,
+    actor_discord_user_id: int | None,
+    reason: str,
+    now_utc: datetime,
+) -> bool:
+    row = await run_one_async(
+        """
+        UPDATE dbo.VotePosts
+        SET Status = 'Cancelled',
+            ClosedAtUtc = ?,
+            ClosedByDiscordUserID = ?,
+            ClosedReason = ?,
+            UpdatedAtUtc = ?
+        OUTPUT INSERTED.VotePostID
+        WHERE VotePostID = ?
+          AND Status = 'Open'
+          AND MessageID IS NULL;
+        """,
+        (
+            _naive_utc(now_utc),
+            int(actor_discord_user_id) if actor_discord_user_id is not None else None,
+            reason,
+            _naive_utc(now_utc),
+            int(vote_post_id),
+        ),
+    )
+    if row:
+        await insert_audit(
+            vote_post_id=vote_post_id,
+            actor_discord_user_id=actor_discord_user_id,
+            action_type="LaunchFailed",
+            details={"reason": reason},
+            now_utc=now_utc,
+        )
+    return bool(row)
+
+
 async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
     post = await run_one_async(
         """

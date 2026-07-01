@@ -74,6 +74,27 @@ def test_build_create_request_rejects_past_close():
         )
 
 
+def test_build_create_request_rejects_overlong_description():
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+
+    with pytest.raises(service.VoteValidationError, match="Description"):
+        service.build_create_request(
+            guild_id=1,
+            channel_id=2,
+            created_by_discord_user_id=3,
+            title="Best time?",
+            description="x" * (service.MAX_DESCRIPTION_LEN + 1),
+            raw_options="A | B",
+            close_time_utc=(now + timedelta(hours=2)).isoformat(),
+            reminder_offsets="60",
+            allow_vote_change=True,
+            launch_mention_everyone=False,
+            reminder_mention_everyone=False,
+            close_mention_everyone=False,
+            now_utc=now,
+        )
+
+
 def test_result_helpers_only_treat_state_changes_as_transitioning():
     assert VoteCastResult("recorded", 1).accepted is True
     assert VoteCastResult("changed", 1).accepted is True
@@ -129,3 +150,75 @@ async def test_update_vote_filters_past_due_reminder_offsets(monkeypatch):
     )
 
     assert captured["reminder_offsets_minutes"] == (5,)
+
+
+@pytest.mark.asyncio
+async def test_update_vote_rejects_sql_length_overruns(monkeypatch):
+    async def fail_update_vote_post(**_kwargs):
+        raise AssertionError("DAL should not be called for invalid text lengths")
+
+    monkeypatch.setattr(service.dal, "update_vote_post", fail_update_vote_post)
+
+    with pytest.raises(service.VoteValidationError, match="Title"):
+        await service.update_vote(
+            vote_post_id=9,
+            actor_discord_user_id=123,
+            title="x" * (service.MAX_TITLE_LEN + 1),
+        )
+
+    with pytest.raises(service.VoteValidationError, match="Description"):
+        await service.update_vote(
+            vote_post_id=9,
+            actor_discord_user_id=123,
+            description="x" * (service.MAX_DESCRIPTION_LEN + 1),
+        )
+
+
+@pytest.mark.asyncio
+async def test_close_vote_rejects_overlong_reason_before_dal(monkeypatch):
+    async def fail_close_vote(**_kwargs):
+        raise AssertionError("DAL should not be called for invalid close reasons")
+
+    monkeypatch.setattr(service.dal, "close_vote", fail_close_vote)
+
+    with pytest.raises(service.VoteValidationError, match="Close reason"):
+        await service.close_vote(
+            vote_post_id=9,
+            actor_discord_user_id=123,
+            reason="x" * (service.MAX_CLOSE_REASON_LEN + 1),
+        )
+
+
+@pytest.mark.asyncio
+async def test_cancel_vote_launch_failure_uses_dal_and_validates_reason(monkeypatch):
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+    captured = {}
+
+    async def fake_cancel_vote_launch_failure(**kwargs):
+        captured.update(kwargs)
+        return True
+
+    monkeypatch.setattr(service.dal, "cancel_vote_launch_failure", fake_cancel_vote_launch_failure)
+
+    ok = await service.cancel_vote_launch_failure(
+        vote_post_id=9,
+        actor_discord_user_id=123,
+        reason=" launch failed ",
+        now_utc=now,
+    )
+
+    assert ok is True
+    assert captured == {
+        "vote_post_id": 9,
+        "actor_discord_user_id": 123,
+        "reason": "launch failed",
+        "now_utc": now,
+    }
+
+    with pytest.raises(service.VoteValidationError, match="Close reason"):
+        await service.cancel_vote_launch_failure(
+            vote_post_id=9,
+            actor_discord_user_id=123,
+            reason="x" * (service.MAX_CLOSE_REASON_LEN + 1),
+            now_utc=now,
+        )

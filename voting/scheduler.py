@@ -86,22 +86,37 @@ async def _refresh_vote_message(bot: discord.Client, snapshot, *, disabled: bool
         )
 
 
-async def _send_reminder(bot: discord.Client, reminder_row: dict[str, Any], now: datetime) -> None:
+async def _send_reminder(bot: discord.Client, reminder_row: dict[str, Any], now: datetime) -> bool:
     vote_post_id = int(reminder_row["VotePostID"])
     reminder_id = int(reminder_row["ReminderID"])
     snapshot = await dal.get_vote_snapshot(vote_post_id)
     if snapshot is None or snapshot.status != "Open" or snapshot.closes_at_utc <= now:
-        return
+        return False
     channel = await _fetch_channel(bot, snapshot.channel_id)
     if channel is None:
-        return
+        return False
     try:
         message = await channel.send(
             content=mention_content(snapshot.reminder_mention_everyone, "Vote reminder"),
             embed=build_reminder_embed(snapshot),
             allowed_mentions=configured_everyone_mentions(snapshot.reminder_mention_everyone),
         )
-        await dal.mark_reminder_sent(reminder_id, message_id=int(message.id), now_utc=now)
+        marked = await dal.mark_reminder_sent(reminder_id, message_id=int(message.id), now_utc=now)
+        if not marked:
+            await dal.insert_audit(
+                vote_post_id=vote_post_id,
+                actor_discord_user_id=None,
+                action_type="ReminderMarkFailed",
+                details={"reminder_id": reminder_id, "message_id": int(message.id)},
+                now_utc=now,
+            )
+            logger.warning(
+                "vote_reminder_mark_failed vote_post_id=%s reminder_id=%s message_id=%s",
+                vote_post_id,
+                reminder_id,
+                int(message.id),
+            )
+            return False
         await dal.insert_audit(
             vote_post_id=vote_post_id,
             actor_discord_user_id=None,
@@ -115,10 +130,12 @@ async def _send_reminder(bot: discord.Client, reminder_row: dict[str, Any], now:
             reminder_id,
             int(message.id),
         )
+        return True
     except Exception:
         logger.exception(
             "vote_reminder_send_failed vote_post_id=%s reminder_id=%s", vote_post_id, reminder_id
         )
+        return False
 
 
 async def _close_due_vote(bot: discord.Client, vote_post_id: int, now: datetime) -> None:
@@ -154,8 +171,8 @@ async def run_voting_scheduler_tick(
         await _close_due_vote(bot, vote_post_id, now)
         summary["closes"] += 1
     for reminder in await dal.claim_due_reminders(now):
-        await _send_reminder(bot, reminder, now)
-        summary["reminders"] += 1
+        if await _send_reminder(bot, reminder, now):
+            summary["reminders"] += 1
     return summary
 
 
