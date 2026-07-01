@@ -8,7 +8,7 @@ import forts_ingest
 
 
 class _FakeCursor:
-    description = [("IngestionID",)]
+    description = (("IngestionID",),)
 
     def __init__(self):
         self.calls = []

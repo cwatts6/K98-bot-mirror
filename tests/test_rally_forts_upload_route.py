@@ -331,12 +331,12 @@ async def test_rally_duplicate_skip_records_skipped_audit_without_external_corre
     assert handled is True
     assert len(created) == 1
     assert sent[-1][1] == "Rally Forts Import \u2705"
-    ingest_phase = [
+    ingest_phase = next(
         call
         for call in audit_calls
         if call[0] == "phase"
         and call[2]["phase_name"] == route.RALLY_FORTS_AUDIT_ALLTIME_INGEST_PHASE
-    ][0]
+    )
     assert ingest_phase[2]["phase_status"] == "skipped"
     complete_call = [call for call in audit_calls if call[0] == "complete"][-1]
     assert complete_call[2]["status"] == "skipped"
@@ -381,12 +381,12 @@ async def test_rally_sql_preflight_abort_records_failed_uncorrelated_audit(tmp_p
     assert handled is True
     assert offloads == []
     assert created == []
-    preflight_phase = [
+    preflight_phase = next(
         call
         for call in audit_calls
         if call[0] == "phase"
         and call[2]["phase_name"] == route.RALLY_FORTS_AUDIT_SQL_PREFLIGHT_PHASE
-    ][0]
+    )
     assert preflight_phase[2]["phase_status"] == "failed"
     fail_call = [call for call in audit_calls if call[0] == "fail"][-1]
     assert fail_call[2]["error_type"] == "SqlHeadroomInsufficient"
@@ -469,12 +469,12 @@ async def test_rally_offload_exception_records_failed_ingest_audit(tmp_path):
     assert handled is True
     assert len(offloads) == 1
     assert created == []
-    ingest_phase = [
+    ingest_phase = next(
         call
         for call in audit_calls
         if call[0] == "phase"
         and call[2]["phase_name"] == route.RALLY_FORTS_AUDIT_DAILY_INGEST_PHASE
-    ][0]
+    )
     assert ingest_phase[2]["phase_status"] == "failed"
     fail_call = [call for call in audit_calls if call[0] == "fail"][-1]
     assert fail_call[2]["error_type"] == "RuntimeError"
@@ -578,7 +578,7 @@ async def test_rally_rejects_path_traversal_records_failed_uncorrelated_audit(tm
 
     assert handled is True
     assert offloads == []
-    start_call = [call for call in audit_calls if call[0] == "start"][0]
+    start_call = next(call for call in audit_calls if call[0] == "start")
     assert start_call[1]["context"].source_filename == "Rally_data_26-05-2026.xlsx"
     assert "local_path" not in start_call[1]
     fail_call = [call for call in audit_calls if call[0] == "fail"][-1]
