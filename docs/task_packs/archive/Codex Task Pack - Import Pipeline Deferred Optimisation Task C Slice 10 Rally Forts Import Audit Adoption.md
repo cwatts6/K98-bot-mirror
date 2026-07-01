@@ -1,5 +1,13 @@
 # Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 10 Rally Forts Import Audit Adoption
 
+> Archived 2026-07-01 after Rally Forts generic durable import audit adoption was delivered in
+> mirror PR #191 and production PR #499. Operator smoke testing was reported successful on
+> 2026-07-01. Successful daily/all-time Rally imports now correlate to `dbo.IngestionLog` through
+> the returned `IngestionID`; duplicate/no-row/unrecognized/preflight/failure outcomes remain
+> externally uncorrelated. Route UX, embed text, accepted extension rules, file staging, importer
+> contracts, SQL procedure/table behavior, log-backup scheduling, telemetry/logging, and
+> user-facing behavior were preserved.
+
 ## 1. Task Header
 
 - Task name: `Import Pipeline Deferred Optimisation Task C Slice 10 - Rally Forts Import Audit Adoption`
@@ -7,7 +15,7 @@
 - Owner/context: `Chris Watts / K98 bot import architecture`
 - Task type: `deferred optimisation batch | import audit adoption | Rally Forts upload route`
 - One-pass approved: `no`
-- Status: `active next-slice task pack, starts with Rally Forts audit/scope and SQL implementation-boundary confirmation`
+- Status: `archived delivered slice; Rally Forts generic durable import audit adoption complete`
 
 ## 2. Objective
 
@@ -22,6 +30,30 @@ complete from the DL_bot upload-routing programme; the remaining gap is generic 
 audit adoption.
 
 ## 3. Completed Dependencies And Baseline
+
+Slice 10 delivery evidence:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#191`
+- Production PR: `cwatts6/k98-bot#499`
+- Production smoke testing was reported successful on `2026-07-01`.
+- Added `services/rally_forts_import_audit_service.py` with Rally-specific best-effort wrappers
+  around the existing generic audit service/DAL and SQL-owned writer procedures.
+- Wired `upload_routes/rally_forts_route.py` through attachment save, file classification, SQL
+  preflight, daily/all-time ingest, and log-backup scheduling audit phases.
+- Updated `forts_ingest.py` to return `dbo.IngestionLog.IngestionID` on successful daily/all-time
+  inserts via `OUTPUT INSERTED.IngestionID`.
+- Successful Rally imports complete `ImportKind=rally_forts` audit batches with
+  `ExternalBatchTable=dbo.IngestionLog` and `ExternalBatchId=<IngestionID>`.
+- Duplicate/no-row/unrecognized, unsafe filename, SQL preflight, and importer/offload failure
+  outcomes remain externally uncorrelated.
+- Review follow-ups sanitized audit `source_filename`, passed saved workbook `local_path` so
+  source-file hashes are populated for saved workbooks, and aligned backup-schedule failure
+  metrics with other upload routes by recording `RowsOut=NULL`.
+- Automated validation included focused Rally/import-audit tests (`38 passed` after review
+  follow-ups), ruff checks for touched route/tests, architecture/deferred validators, selected-test
+  review, smoke imports, command registration validation, full pytest earlier in the slice
+  (`2152 passed, 2 skipped`), pytest log-noise validation, and Codex Security diff scan with
+  `0` findings.
 
 Completed import architecture baseline:
 

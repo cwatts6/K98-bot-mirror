@@ -3,8 +3,8 @@
 > Archived 2026-06-30 after the combined KVK_ALL/Rally Forts scope was split into two
 > implementation PRs. Slice 9 delivered KVK_ALL generic durable import audit adoption in mirror
 > PR #190 and production PR #498, including smoke-tested `KVK.KVK_Scan` and
-> `KVK.KVK_Ingest_Diagnostics` correlation. Rally Forts remains active and has been promoted into
-> Task C Slice 10.
+> `KVK.KVK_Ingest_Diagnostics` correlation. Rally Forts was promoted into Task C Slice 10 and
+> later delivered in mirror PR #191 and production PR #499.
 
 ## 1. Task Header
 

@@ -6,15 +6,6 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `services/import_audit_service.py`, `stats/dal/import_audit_dal.py`, import upload route audit phase callers, SQL repo `dbo.usp_ImportAudit_RecordPhase`
-- Type: consistency
-- Description: KVK_ALL production smoke testing for Task C Slice 9 showed some `ImportAuditPhase` rows with `CompletedAtUtc` one to three milliseconds earlier than `StartedAtUtc`, while `DurationMs`, terminal batch state, counters, and external correlation were correct. This appears to be timestamp-boundary polish in the generic phase writer/caller contract rather than a route behavior defect.
-- Suggested Fix: Scope a small import-audit timestamp-normalization slice after Rally Forts adoption. Validate whether the mismatch comes from caller-supplied `StartedAtUtc`, SQL-owned completion time, or clock/rounding precision, then normalize the writer/service contract so persisted phase rows cannot have `CompletedAtUtc < StartedAtUtc` while preserving existing best-effort audit behavior and duration semantics.
-- Impact: low
-- Risk: medium
-- Dependencies: Generic import audit objects from Task C Slice 2; phase-heavy route adoption through at least KVK_ALL and Rally Forts; SQL validation against `C:\K98-bot-SQL-Server`.
-
-### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks
 - Type: architecture
 - Description: Inventory import lifecycle coordination remains intentionally view-heavy. `ui/views/inventory_views.py` routes upload-first messages, command-session continuations, multi-governor selection, review interactions, correction modals, additional-material continuation, approval, rejection, cancellation, timeout, admin-debug posting, and original-upload cleanup. Task C Slice 8 adopted generic audit without redesigning this workflow and smoke testing confirmed the behavior-preserving audit contract.

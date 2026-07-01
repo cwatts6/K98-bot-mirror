@@ -66,10 +66,16 @@ Accepted imports correlate to `KVK.KVK_Scan` using `ExternalBatchId=<KVK_NO>:<Sc
 KVK-details timestamp rejections correlate to `KVK.KVK_Ingest_Diagnostics` when a diagnostic id
 exists. Operator smoke testing on 2026-06-30 confirmed completed batch 23 with `ExternalBatchId=15:83`
 and 9194 source/staged/written rows, plus failed diagnostic batch 22 with `ExternalBatchId=2` and
-9194 staged/skipped rows. Rally Forts was split into the active Task C Slice 10 pack.
+9194 staged/skipped rows. Rally Forts was split into Task C Slice 10 and later delivered in
+mirror PR #191 and production PR #499.
 
-The active import follow-up is Task C Slice 10 in
-`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 10 Rally Forts Import Audit Adoption.md`.
+Task C Slice 10 Rally Forts Import Audit Adoption delivered generic durable audit for Rally Forts
+uploads, correlated successful daily/all-time imports to `dbo.IngestionLog/<IngestionID>`, kept
+duplicate/no-row/unrecognized/preflight/failure outcomes externally uncorrelated, and was reported
+smoke tested successfully on 2026-07-01.
+
+The active import follow-up is Task C Slice 11 in
+`../Codex Task Pack - Import Pipeline Deferred Optimisation Task C Slice 11 Import Audit Phase Timestamp Normalization.md`.
 
 The DL_bot upload-routing and startup/lifecycle optimisation programme is complete through
 Phase 6L:
