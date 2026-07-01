@@ -164,7 +164,9 @@ def vote_totals_csv_rows(snapshot: VoteSnapshot) -> list[dict[str, Any]]:
                 "SortOrder": option.sort_order,
                 "VoteCount": vote_count,
                 "VotePercent": _pct(vote_count, total_votes),
-                "IsWinningOption": int(option.option_id) in outcome.winning_option_ids,
+                "IsWinningOption": 1
+                if int(option.option_id) in outcome.winning_option_ids
+                else 0,
             }
         )
     return rows

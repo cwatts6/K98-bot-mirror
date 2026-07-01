@@ -71,7 +71,8 @@ def test_vote_totals_csv_rows_include_outcome_and_operational_metadata() -> None
     assert rows[0]["ReminderOffsetsMinutes"] == "60;10"
     assert rows[0]["ReminderSentCount"] == 1
     assert rows[0]["ReminderPendingCount"] == 1
-    assert rows[1]["IsWinningOption"] is True
+    assert rows[0]["IsWinningOption"] == 0
+    assert rows[1]["IsWinningOption"] == 1
     assert rows[1]["VotePercent"] == "75%"
 
 
