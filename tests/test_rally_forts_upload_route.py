@@ -264,6 +264,13 @@ async def test_rally_daily_success_records_completed_audit_with_ingestion_correl
 
     assert handled is True
     assert audit_calls[0][0] == "start"
+    start_kwargs = audit_calls[0][1]
+    assert start_kwargs["context"].source_filename == "Rally_data_26-05-2026.xlsx"
+    assert start_kwargs["local_path"] == os.path.join(
+        str(tmp_path),
+        "downloads",
+        "Rally_data_26-05-2026.xlsx",
+    )
     phase_names = [call[2]["phase_name"] for call in audit_calls if call[0] == "phase"]
     assert phase_names == [
         route.RALLY_FORTS_AUDIT_ATTACHMENT_SAVE_PHASE,
@@ -571,6 +578,9 @@ async def test_rally_rejects_path_traversal_records_failed_uncorrelated_audit(tm
 
     assert handled is True
     assert offloads == []
+    start_call = [call for call in audit_calls if call[0] == "start"][0]
+    assert start_call[1]["context"].source_filename == "Rally_data_26-05-2026.xlsx"
+    assert "local_path" not in start_call[1]
     fail_call = [call for call in audit_calls if call[0] == "fail"][-1]
     assert fail_call[2]["error_type"] == "UnsafeFilename"
     assert fail_call[2].get("external_batch_id") is None

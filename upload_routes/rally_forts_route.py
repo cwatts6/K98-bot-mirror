@@ -77,6 +77,11 @@ def _message_int_attr(obj: Any, name: str) -> int | None:
     return _maybe_int(getattr(obj, name, None))
 
 
+def _audit_source_filename(filename: str) -> str:
+    safe_name = filename.replace("\\", "/").rstrip("/").split("/")[-1]
+    return safe_name or "attachment.xlsx"
+
+
 def _result_rows(result: Any) -> int | None:
     if isinstance(result, dict):
         rows = _maybe_int(result.get("rows"))
@@ -151,15 +156,16 @@ async def handle_rally_forts_upload(message: Any, deps: RallyFortsRouteDeps) -> 
 
         filename = attachment.filename
         audit_context = RallyFortsImportAuditContext(
-            source_filename=filename,
+            source_filename=_audit_source_filename(filename),
             source_message_id=_message_int_attr(message, "id"),
             source_channel_id=_message_int_attr(message.channel, "id"),
             actor_discord_id=_message_int_attr(message.author, "id"),
         )
-        audit_ref: Any = await deps.start_audit_batch(context=audit_context)
+        audit_ref: Any = None
         audit_terminal_recorded = False
 
         if "/" in filename or "\\" in filename:
+            audit_ref = await deps.start_audit_batch(context=audit_context)
             logger.warning(
                 "[RALLY] Rejecting unsafe filename with path components: %s",
                 filename,
@@ -196,6 +202,10 @@ async def handle_rally_forts_upload(message: Any, deps: RallyFortsRouteDeps) -> 
             save_started = phase_started
             await attachment.save(local_path)
             logger.info("[RALLY] Saved %s to %s", filename, local_path)
+            audit_ref = await deps.start_audit_batch(
+                context=audit_context,
+                local_path=local_path,
+            )
             await deps.record_audit_phase(
                 audit_ref,
                 phase_name=RALLY_FORTS_AUDIT_ATTACHMENT_SAVE_PHASE,
@@ -498,6 +508,8 @@ async def handle_rally_forts_upload(message: Any, deps: RallyFortsRouteDeps) -> 
                 results.append(("skip", filename, "Unrecognized rally filename"))
         except Exception as e:
             if not audit_terminal_recorded:
+                if audit_ref is None:
+                    audit_ref = await deps.start_audit_batch(context=audit_context)
                 details = rally_forts_audit_details(
                     audit_context,
                     file_kind=current_file_kind,
