@@ -89,6 +89,7 @@ async def test_ready_view_rehydration_helpers_schedule_expected_tasks(monkeypatc
 
     assert calls == [
         ("rehydrate_tracked_views", 10.0),
+        ("rehydrate_vote_post_views", 10.0),
         ("rehydrate_pinned_calendar_view", 8.0),
     ]
 

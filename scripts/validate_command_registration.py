@@ -77,6 +77,7 @@ APPROVED_TOP_LEVEL_COMMANDS = frozenset(
         "subscribe",
         "subscriptions",
         "unsubscribe",
+        "vote_admin",
     }
 )
 

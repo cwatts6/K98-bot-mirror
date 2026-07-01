@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=41 grouped_subcommands_detected=86 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=41
+primary=42 grouped_subcommands_detected=90 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
 ```
 
 Grouped command summary:
@@ -40,6 +40,7 @@ Grouped command summary:
 | `/registry` | 7 |
 | `/stats` | 1 |
 | `/subscriptions` | 3 |
+| `/vote_admin` | 4 |
 
 ## Command Surface Rules
 
@@ -70,7 +71,7 @@ export_inventory, honor, honor_rankings, inventory, inventory_preferences, kvk, 
 location, me, mge, modify_registration, modify_subscription, my_registrations, my_stats,
 my_stats_export, mygovernorid, myinventory, mykvkcrystaltech, mykvkhistory, mykvkstats,
 mykvktargets, next_kvk_event, next_kvk_fight, ops, ping, player_profile, prekvk,
-register_governor, registry, stats, subscribe, subscriptions, unsubscribe
+register_governor, registry, stats, subscribe, subscriptions, unsubscribe, vote_admin
 ```
 
 If a task proposes a new top-level command, it must:
@@ -208,6 +209,10 @@ Legend:
 | Subscriptions | `/subscriptions migrate_dryrun` | `commands/subscriptions_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Subscription migration preview. |
 | Subscriptions | `/subscriptions migrate_apply` | `commands/subscriptions_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Subscription migration apply. |
 | Telemetry | `/ping` | `commands/telemetry_cmds.py` | Flat | Public command-level access | Public | Standard | Preserve flat health/debug path | Basic bot response test. |
+| Voting Admin | `/vote_admin create` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response; public vote post side effect | Standard | Phase 1 voting framework | Creates a SQL-backed live vote post with buttons, result card, close time, reminders, and controlled launch mention behaviour. Dedicated group approved because there is no `/admin` group and `/ops` is operational rather than voting workflow ownership. |
+| Voting Admin | `/vote_admin update` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Phase 1 voting framework | Updates safe open-vote fields: title, description, close time, unsent reminders, and future mention settings. |
+| Voting Admin | `/vote_admin close` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response; public close announcement side effect | Standard | Phase 1 voting framework | Closes a vote early, disables buttons, refreshes final card, and sends a controlled close announcement. |
+| Voting Admin | `/vote_admin status` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Phase 1 voting framework | Shows vote state, totals, reminder delivery state, and original message link. |
 
 ## Migration And Disposition Notes
 

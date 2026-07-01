@@ -18,6 +18,7 @@ from .registry_cmds import register_registry
 from .stats_cmds import register_stats
 from .subscriptions_cmds import register_subscriptions
 from .telemetry_cmds import register_telemetry
+from .vote_admin_cmds import register_vote_admin
 
 
 def register_all(bot: ext_commands.Bot) -> None:
@@ -36,3 +37,4 @@ def register_all(bot: ext_commands.Bot) -> None:
     register_stats(bot)
     register_subscriptions(bot)
     register_telemetry(bot)
+    register_vote_admin(bot)

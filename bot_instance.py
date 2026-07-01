@@ -102,6 +102,7 @@ from logging_setup import (
     is_pytest_logging_mode,
 )
 from mge.mge_scheduler import schedule_mge_lifecycle
+from voting.scheduler import schedule_voting_lifecycle
 from player_stats_cache import (  # optional, see note
     build_lastkvk_player_stats_cache,
     build_player_stats_cache,
@@ -1733,6 +1734,7 @@ async def _run_ready_domain_scheduler_tasks() -> None:
         schedule_ark_lifecycle=lambda: schedule_ark_lifecycle(bot),
         refresh_mge_caches_on_startup=_refresh_mge_caches_on_startup,
         schedule_mge_lifecycle=lambda: schedule_mge_lifecycle(bot),
+        schedule_voting_lifecycle=lambda: schedule_voting_lifecycle(bot),
     )
 
 

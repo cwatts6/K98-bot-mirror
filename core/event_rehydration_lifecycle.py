@@ -15,6 +15,7 @@ from event_cache import (
 from event_calendar.pinned_embed import rehydrate_pinned_calendar_view
 from event_scheduler import load_active_reminders
 from rehydrate_views import rehydrate_tracked_views
+from voting.rehydration import rehydrate_vote_post_views
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,11 @@ async def run_ready_tracked_view_rehydration(
         logger.info("[BOOT] View tracker rehydration scheduled")
     except Exception:
         logger.exception("[BOOT] Failed to start rehydrate_tracked_views")
+    try:
+        schedule_bg("rehydrate_vote_post_views", 10.0, lambda: rehydrate_vote_post_views(bot))
+        logger.info("[BOOT] Vote post view rehydration scheduled")
+    except Exception:
+        logger.exception("[BOOT] Failed to start rehydrate_vote_post_views")
 
 
 async def run_ready_pinned_calendar_rehydration(

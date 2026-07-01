@@ -67,6 +67,7 @@ async def run_ready_domain_scheduler_tasks(
     schedule_ark_lifecycle: StartupCoroutine,
     refresh_mge_caches_on_startup: StartupCoroutine,
     schedule_mge_lifecycle: StartupCoroutine,
+    schedule_voting_lifecycle: StartupCoroutine | None = None,
 ) -> None:
     """Register domain scheduler tasks that run after event/view readiness."""
     try:
@@ -100,6 +101,22 @@ async def run_ready_domain_scheduler_tasks(
             logger.info("[BOOT] MGE scheduler already running")
     except Exception:
         logger.exception("[BOOT] Failed to start MGE scheduler")
+
+    if schedule_voting_lifecycle is None:
+        return
+
+    try:
+        if not task_monitor_is_running("voting_lifecycle"):
+            task_monitor_create(
+                "voting_lifecycle",
+                schedule_voting_lifecycle,
+                replace=False,
+            )
+            logger.info("[BOOT] Voting scheduler started")
+        else:
+            logger.info("[BOOT] Voting scheduler already running")
+    except Exception:
+        logger.exception("[BOOT] Failed to start Voting scheduler")
 
 
 async def start_event_cache_refresh_loop(*, refresh_event_cache_task: Any) -> None:

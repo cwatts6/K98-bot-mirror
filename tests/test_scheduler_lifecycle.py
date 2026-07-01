@@ -137,6 +137,41 @@ async def test_domain_scheduler_tasks_skip_duplicate_mge_tasks():
 
 
 @pytest.mark.asyncio
+async def test_domain_scheduler_tasks_register_voting_lifecycle_when_provided():
+    calls: list[str] = []
+
+    def create(name, factory, **kwargs):
+        calls.append(f"create:{name}:{kwargs.get('replace')}")
+        assert callable(factory)
+
+    def is_running(name: str) -> bool:
+        calls.append(f"is_running:{name}")
+        return False
+
+    async def noop() -> None:
+        return None
+
+    await lifecycle.run_ready_domain_scheduler_tasks(
+        task_monitor_create=create,
+        task_monitor_is_running=is_running,
+        schedule_ark_lifecycle=noop,
+        refresh_mge_caches_on_startup=noop,
+        schedule_mge_lifecycle=noop,
+        schedule_voting_lifecycle=noop,
+    )
+
+    assert calls == [
+        "create:ark_scheduler:None",
+        "is_running:refresh_mge_caches_on_startup",
+        "create:refresh_mge_caches_on_startup:False",
+        "is_running:mge_lifecycle",
+        "create:mge_lifecycle:False",
+        "is_running:voting_lifecycle",
+        "create:voting_lifecycle:False",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_calendar_scheduler_tasks_register_and_skip_duplicate_loop():
     calls: list[str] = []
 
