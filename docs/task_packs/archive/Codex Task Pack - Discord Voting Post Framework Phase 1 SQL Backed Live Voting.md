@@ -1,6 +1,26 @@
 # Codex Task Pack — Discord Voting Post Framework Phase 1 SQL-Backed Live Voting
 
-> First implementation task pack for building the MVP of the K98 Discord voting post framework.
+> Archived completed execution record for the first SQL-backed K98 Discord voting MVP.
+
+## Completion Note
+
+Phase 1 is complete.
+
+- Mirror PR: `cwatts6/K98-bot-mirror#193`
+- Production PR: `cwatts6/k98-bot#501`
+- SQL PR: `cwatts6/K98-bot-SQL-Server#26`
+- SQL deployment: `2026-07-01`
+- Bot smoke test: `2026-07-01`
+
+Smoke testing confirmed vote creation, button voting, vote changes, configured `@everyone`
+behavior, SQL records for created/recorded/changed votes, manual close, timer close, and disabled
+buttons after close.
+
+Follow-up UX feedback from smoke testing was promoted into:
+
+```text
+docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md
+```
 
 ## 1. Task Header
 
@@ -9,6 +29,7 @@
 - Owner/context: `KD98 Discord bot / admin-created voting posts with live Pillow result card`
 - Task type: `feature`
 - One-pass approved: `no`
+- Status: `complete - archived`
 
 ## 2. Required Reading
 

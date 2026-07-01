@@ -148,6 +148,24 @@ Import pipeline status:
   view cleanup, and inventory view-orchestration extraction remain separate later slices unless
   explicitly approved.
 
+Discord Voting Post Framework status:
+
+- Phase 1 SQL-Backed Live Voting is delivered in mirror PR #193, production PR #501, and SQL PR
+  #26. SQL deployment completed on 2026-07-01. Operator smoke testing confirmed vote creation,
+  button voting, vote changes, configured `@everyone` launch behavior, SQL record updates, manual
+  close, timer close, and disabled buttons after close.
+- Phase 1 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 1 SQL Backed Live Voting.md`
+- Active Discord Voting Post Framework files:
+  - `Discord Voting Post Framework - Programme Pack.md`
+  - `Codex Task Pack - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md`
+  - `Codex Chat Starter - Discord Voting Post Framework Phase 2 Guided Admin UX and Results Polish.md`
+- Phase 2 is the next prepared voting slice. It starts with audit/scope for guided admin creation,
+  individual option fields, option character-limit feedback, guided close-time input, vote-title
+  lookup for update/status/close, clearer update flow, vertical result bars, and explicit
+  winner/tie/no-vote close output. Export, role-restricted voting, hidden results, templates, and
+  advanced modes remain later phases unless separately approved.
+
 Player Self-Service Command Centre status:
 
 - Phase 1 audit/design is complete and archived.
