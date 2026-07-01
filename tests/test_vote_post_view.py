@@ -79,4 +79,66 @@ async def test_vote_button_edits_original_message_without_broad_mentions(monkeyp
     allowed_mentions = captured["allowed_mentions"]
     assert allowed_mentions.everyone is False
     assert allowed_mentions.roles is False
+    assert captured["attachments"] == []
+    assert captured["files"]
     assert captured["ephemeral_content"] == "Vote recorded."
+
+
+@pytest.mark.asyncio
+async def test_vote_button_reports_cast_vote_failure(monkeypatch):
+    snapshot = _snapshot()
+    view = VotePostView(snapshot)
+    button = view.children[0]
+    captured: dict[str, object] = {}
+
+    async def fail_cast_vote(**_kwargs):
+        raise RuntimeError("database unavailable")
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        captured["ephemeral_content"] = content
+
+    monkeypatch.setattr("ui.views.vote_post_view.vote_service.cast_vote", fail_cast_vote)
+    monkeypatch.setattr("ui.views.vote_post_view.send_ephemeral", fake_send_ephemeral)
+
+    interaction = SimpleNamespace(
+        response=_Response(),
+        user=SimpleNamespace(id=123),
+        message=SimpleNamespace(id=456),
+    )
+
+    await button.callback(interaction)
+
+    assert captured["ephemeral_content"] == "Vote could not be recorded. Please try again."
+
+
+@pytest.mark.asyncio
+async def test_vote_button_does_not_edit_message_for_unchanged_vote(monkeypatch):
+    snapshot = _snapshot()
+    view = VotePostView(snapshot)
+    button = view.children[0]
+    captured: dict[str, object] = {}
+
+    async def fake_cast_vote(**_kwargs):
+        return (
+            VoteCastResult("unchanged", 7, option_id=9, message="Already recorded."),
+            None,
+        )
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        captured["ephemeral_content"] = content
+
+    async def fail_edit(**_kwargs):
+        raise AssertionError("unchanged votes should not edit the public message")
+
+    monkeypatch.setattr("ui.views.vote_post_view.vote_service.cast_vote", fake_cast_vote)
+    monkeypatch.setattr("ui.views.vote_post_view.send_ephemeral", fake_send_ephemeral)
+
+    interaction = SimpleNamespace(
+        response=_Response(),
+        user=SimpleNamespace(id=123),
+        message=SimpleNamespace(id=456, edit=fail_edit),
+    )
+
+    await button.callback(interaction)
+
+    assert captured["ephemeral_content"] == "Already recorded."

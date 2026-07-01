@@ -81,7 +81,7 @@ class VoteCastResult:
 
     @property
     def accepted(self) -> bool:
-        return self.status in {"recorded", "changed", "unchanged"}
+        return self.status in {"recorded", "changed"}
 
 
 @dataclass(frozen=True)
@@ -92,7 +92,7 @@ class VoteCloseResult:
 
     @property
     def closed(self) -> bool:
-        return self.status in {"closed", "already_closed"}
+        return self.status == "closed"
 
 
 @dataclass(frozen=True)

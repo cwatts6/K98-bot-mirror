@@ -515,6 +515,7 @@ async def claim_due_reminders(now_utc: datetime, *, limit: int = 10) -> list[dic
                 FROM dbo.VotePostReminders r WITH (UPDLOCK, READPAST)
                 JOIN dbo.VotePosts p ON p.VotePostID = r.VotePostID
                 WHERE p.Status = 'Open'
+                  AND p.ClosesAtUtc > ?
                   AND r.SentAtUtc IS NULL
                   AND r.DueAtUtc <= ?
                   AND (r.ClaimedAtUtc IS NULL OR r.ClaimedAtUtc < DATEADD(minute, -30, ?))
@@ -526,7 +527,7 @@ async def claim_due_reminders(now_utc: datetime, *, limit: int = 10) -> list[dic
             FROM dbo.VotePostReminders r
             JOIN due ON due.ReminderID = r.ReminderID;
             """,
-            (int(limit), now, now, now),
+            (int(limit), now, now, now, now),
         )
         return [cursor_row_to_dict(cur, row) for row in cur.fetchall()]
 

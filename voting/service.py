@@ -253,6 +253,17 @@ async def update_vote(
     if closes_at is not None and closes_at <= now:
         raise VoteValidationError("Updated close time must be in the future.")
     offsets = parse_reminder_offsets(reminder_offsets) if reminder_offsets is not None else None
+    if offsets is not None:
+        close_for_offsets = closes_at
+        if close_for_offsets is None:
+            current = await dal.get_vote_snapshot(vote_post_id)
+            close_for_offsets = current.closes_at_utc if current is not None else None
+        if close_for_offsets is not None:
+            offsets = tuple(
+                offset
+                for offset in offsets
+                if close_for_offsets.timestamp() - (offset * 60) > now.timestamp()
+            )
     clean_title = (title or "").strip() if title is not None else None
     clean_description = (description or "").strip() if description is not None else None
     if clean_title is not None and not clean_title:

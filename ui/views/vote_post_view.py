@@ -53,11 +53,21 @@ class _VoteOptionButton(discord.ui.Button):
         except Exception:
             logger.debug("vote_button_defer_failed", exc_info=True)
 
-        result, snapshot = await vote_service.cast_vote(
-            vote_post_id=self.vote_post_id,
-            option_id=self.option_id,
-            discord_user_id=int(interaction.user.id),
-        )
+        try:
+            result, snapshot = await vote_service.cast_vote(
+                vote_post_id=self.vote_post_id,
+                option_id=self.option_id,
+                discord_user_id=int(interaction.user.id),
+            )
+        except Exception:
+            logger.exception(
+                "vote_cast_failed vote_post_id=%s option_id=%s actor_discord_id=%s",
+                self.vote_post_id,
+                self.option_id,
+                getattr(getattr(interaction, "user", None), "id", None),
+            )
+            await send_ephemeral(interaction, "Vote could not be recorded. Please try again.")
+            return
         if not result.accepted or snapshot is None:
             await send_ephemeral(interaction, result.message or "This vote could not be recorded.")
             return
@@ -67,7 +77,8 @@ class _VoteOptionButton(discord.ui.Button):
             if interaction.message is not None:
                 await interaction.message.edit(
                     embed=build_vote_embed(snapshot),
-                    attachments=[build_vote_file(snapshot)],
+                    attachments=[],
+                    files=[build_vote_file(snapshot)],
                     view=refreshed_view,
                     allowed_mentions=no_broad_mentions(),
                 )

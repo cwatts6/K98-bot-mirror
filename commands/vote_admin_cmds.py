@@ -186,12 +186,16 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
         if snapshot is None:
             await ctx.interaction.edit_original_response(content=result.message)
             return
+        if not result.closed:
+            await ctx.interaction.edit_original_response(content=result.message)
+            return
         channel = bot.get_channel(snapshot.channel_id) or await bot.fetch_channel(snapshot.channel_id)
         message = await channel.fetch_message(snapshot.message_id) if snapshot.message_id else None
         if message is not None:
             await message.edit(
                 embed=build_vote_embed(snapshot),
-                attachments=[build_vote_file(snapshot)],
+                attachments=[],
+                files=[build_vote_file(snapshot)],
                 view=disabled_vote_view(snapshot),
                 allowed_mentions=no_broad_mentions(),
             )
@@ -260,7 +264,8 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             message = await channel.fetch_message(snapshot.message_id)
             await message.edit(
                 embed=build_vote_embed(snapshot),
-                attachments=[build_vote_file(snapshot)],
+                attachments=[],
+                files=[build_vote_file(snapshot)],
                 view=VotePostView(snapshot),
                 allowed_mentions=no_broad_mentions(),
             )

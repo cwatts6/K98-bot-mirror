@@ -86,3 +86,38 @@ async def test_scheduler_sends_claimed_reminder_once_with_configured_mentions(mo
     assert channel.sent[0]["allowed_mentions"].everyone is True
     assert (8, 900, now) in calls
     assert "ReminderSent" in calls
+
+
+@pytest.mark.asyncio
+async def test_scheduler_closes_due_votes_before_sending_reminders(monkeypatch):
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+    calls = []
+
+    async def list_due_closes(_now):
+        calls.append("list_closes")
+        return [5]
+
+    async def close_due_vote(_bot, vote_post_id, _now):
+        calls.append(("close", vote_post_id))
+
+    async def claim_due_reminders(_now):
+        calls.append("claim_reminders")
+        return [{"ReminderID": 8, "VotePostID": 5}]
+
+    async def send_reminder(_bot, reminder, _now):
+        calls.append(("reminder", reminder["ReminderID"]))
+
+    monkeypatch.setattr("voting.scheduler.dal.list_due_closes", list_due_closes)
+    monkeypatch.setattr("voting.scheduler._close_due_vote", close_due_vote)
+    monkeypatch.setattr("voting.scheduler.dal.claim_due_reminders", claim_due_reminders)
+    monkeypatch.setattr("voting.scheduler._send_reminder", send_reminder)
+
+    summary = await run_voting_scheduler_tick(SimpleNamespace(), now_utc=now)
+
+    assert summary == {"reminders": 1, "closes": 1}
+    assert calls == [
+        "list_closes",
+        ("close", 5),
+        "claim_reminders",
+        ("reminder", 8),
+    ]

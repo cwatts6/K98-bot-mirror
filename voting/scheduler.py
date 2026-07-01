@@ -67,7 +67,8 @@ async def _refresh_vote_message(bot: discord.Client, snapshot, *, disabled: bool
         view = disabled_vote_view(snapshot) if disabled else None
         await message.edit(
             embed=build_vote_embed(snapshot),
-            attachments=[build_vote_file(snapshot)],
+            attachments=[],
+            files=[build_vote_file(snapshot)],
             view=view,
             allowed_mentions=no_broad_mentions(),
         )
@@ -89,7 +90,7 @@ async def _send_reminder(bot: discord.Client, reminder_row: dict[str, Any], now:
     vote_post_id = int(reminder_row["VotePostID"])
     reminder_id = int(reminder_row["ReminderID"])
     snapshot = await dal.get_vote_snapshot(vote_post_id)
-    if snapshot is None or snapshot.status != "Open":
+    if snapshot is None or snapshot.status != "Open" or snapshot.closes_at_utc <= now:
         return
     channel = await _fetch_channel(bot, snapshot.channel_id)
     if channel is None:
@@ -145,12 +146,12 @@ async def _close_due_vote(bot: discord.Client, vote_post_id: int, now: datetime)
 async def run_voting_scheduler_tick(bot: discord.Client, *, now_utc: datetime | None = None) -> dict[str, int]:
     now = now_utc or datetime.now(UTC)
     summary = {"reminders": 0, "closes": 0}
-    for reminder in await dal.claim_due_reminders(now):
-        await _send_reminder(bot, reminder, now)
-        summary["reminders"] += 1
     for vote_post_id in await dal.list_due_closes(now):
         await _close_due_vote(bot, vote_post_id, now)
         summary["closes"] += 1
+    for reminder in await dal.claim_due_reminders(now):
+        await _send_reminder(bot, reminder, now)
+        summary["reminders"] += 1
     return summary
 
 
