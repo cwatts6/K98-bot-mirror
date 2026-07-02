@@ -103,17 +103,23 @@ def test_survey_response_detail_rows_include_spreadsheet_safe_discord_id():
         ),
     )
 
-    csv_rows = survey_response_detail_csv_rows(rows, discord_names_by_user_id={123456789012345678: "Tester"})
+    csv_rows = survey_response_detail_csv_rows(
+        rows, discord_names_by_user_id={123456789012345678: "Tester"}
+    )
 
     assert csv_rows[0]["DiscordUserID"] == "'123456789012345678"
     assert csv_rows[0]["DiscordName"] == "Tester"
     assert csv_rows[0]["SelectedOptionLabels"] == "A"
     assert csv_rows[0]["ResponseChanged"] == 1
 
-    text = build_survey_response_detail_csv_bytes(
-        rows,
-        discord_names_by_user_id={123456789012345678: "Tester"},
-    ).getvalue().decode("utf-8-sig")
+    text = (
+        build_survey_response_detail_csv_bytes(
+            rows,
+            discord_names_by_user_id={123456789012345678: "Tester"},
+        )
+        .getvalue()
+        .decode("utf-8-sig")
+    )
     assert "ResponseChanged" in text
 
 

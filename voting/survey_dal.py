@@ -10,7 +10,6 @@ from file_utils import cursor_row_to_dict, fetch_one_dict, run_blocking_in_threa
 from stats_alerts.db import exec_with_cursor, run_one_async, run_query_async
 from voting.result_visibility import normalize_result_visibility
 from voting.survey_models import (
-    SURVEY_QUESTION_MULTI_SELECT,
     SURVEY_QUESTION_SINGLE_CHOICE,
     SurveyAnswerAuditRow,
     SurveyCloseResult,
@@ -344,16 +343,14 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
 
 
 async def list_open_surveys() -> list[SurveySnapshot]:
-    rows = await run_query_async(
-        """
+    rows = await run_query_async("""
         SELECT p.*,
                (SELECT COUNT_BIG(1) FROM dbo.SurveyResponses r WHERE r.SurveyID = p.SurveyID) AS TotalResponses
         FROM dbo.SurveyPosts p
         WHERE p.Status = 'Open'
           AND p.MessageID IS NOT NULL
         ORDER BY p.ClosesAtUtc ASC, p.SurveyID ASC;
-        """
-    )
+        """)
     snapshots: list[SurveySnapshot] = []
     for row in rows:
         snapshot = await get_survey_snapshot(int(row["SurveyID"]))
@@ -446,10 +443,14 @@ async def submit_survey_response(
         )
         survey = fetch_one_dict(cur)
         if not survey:
-            return SurveySubmitResult("missing", int(survey_id), message="This survey no longer exists.")
+            return SurveySubmitResult(
+                "missing", int(survey_id), message="This survey no longer exists."
+            )
         closes_at = _aware_utc(survey.get("ClosesAtUtc"))
         if str(survey.get("Status")) != "Open" or (closes_at is not None and now_utc >= closes_at):
-            return SurveySubmitResult("closed", int(survey_id), message="This survey is already closed.")
+            return SurveySubmitResult(
+                "closed", int(survey_id), message="This survey is already closed."
+            )
 
         cur.execute(
             """
@@ -572,7 +573,9 @@ async def submit_survey_response(
     )
     if isinstance(result, SurveySubmitResult):
         return result
-    return SurveySubmitResult("error", int(survey_id), message="Survey response could not be recorded.")
+    return SurveySubmitResult(
+        "error", int(survey_id), message="Survey response could not be recorded."
+    )
 
 
 def _current_answer_ids(cur, survey_id: int, discord_user_id: int) -> dict[int, tuple[int, ...]]:

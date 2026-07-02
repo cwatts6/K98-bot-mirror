@@ -7,10 +7,9 @@ from typing import Any
 
 import discord
 
-from ui.views.vote_post_view import disabled_vote_view
-from voting import dal
 from ui.views.survey_post_view import disabled_survey_view
-from voting import survey_dal
+from ui.views.vote_post_view import disabled_vote_view
+from voting import dal, survey_dal
 from voting.discord_presentation import (
     build_close_embed,
     build_reminder_embed,
@@ -229,7 +228,9 @@ async def _send_survey_reminder(
         )
         return True
     except Exception:
-        logger.exception("survey_reminder_send_failed survey_id=%s reminder_id=%s", survey_id, reminder_id)
+        logger.exception(
+            "survey_reminder_send_failed survey_id=%s reminder_id=%s", survey_id, reminder_id
+        )
         return False
 
 

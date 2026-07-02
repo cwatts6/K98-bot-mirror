@@ -158,7 +158,9 @@ def _timestamp(snapshot: SurveySnapshot) -> str:
 
 
 def survey_totals_csv_filename(snapshot: SurveySnapshot) -> str:
-    return f"survey_{snapshot.survey_id}_{_filename_part(snapshot.title)}_{_timestamp(snapshot)}.csv"
+    return (
+        f"survey_{snapshot.survey_id}_{_filename_part(snapshot.title)}_{_timestamp(snapshot)}.csv"
+    )
 
 
 def survey_response_detail_csv_filename(snapshot: SurveySnapshot) -> str:

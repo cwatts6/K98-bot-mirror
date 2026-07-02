@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ui.views.vote_post_view import VotePostView
 from ui.views.survey_post_view import SurveyPostView
+from ui.views.vote_post_view import VotePostView
 from voting import dal, survey_dal
 
 logger = logging.getLogger(__name__)

@@ -7,9 +7,7 @@ import logging
 from voting import survey_dal
 from voting.result_visibility import normalize_result_visibility
 from voting.service import (
-    CLOSE_DURATION_CHOICES,
     MAX_CLOSE_REASON_LEN,
-    MAX_DESCRIPTION_LEN,
     MAX_OPTION_LABEL_LEN,
     MAX_TITLE_LEN,
     VoteValidationError,
@@ -65,7 +63,9 @@ def _validate_survey_option_labels(labels: tuple[str, ...]) -> tuple[str, ...]:
     if len(labels) < MIN_SURVEY_OPTIONS:
         raise VoteValidationError("Each survey question needs at least two options.")
     if len(labels) > MAX_SURVEY_OPTIONS:
-        raise VoteValidationError(f"Each survey question supports at most {MAX_SURVEY_OPTIONS} options.")
+        raise VoteValidationError(
+            f"Each survey question supports at most {MAX_SURVEY_OPTIONS} options."
+        )
     seen: set[str] = set()
     output: list[str] = []
     for label in labels:
@@ -107,7 +107,9 @@ def build_question_request(
     maximum = 1 if max_selections is None else int(max_selections)
     if normalized_type == SURVEY_QUESTION_SINGLE_CHOICE:
         if minimum != 1 or maximum != 1:
-            raise VoteValidationError("Single-choice survey questions must use exactly one selection.")
+            raise VoteValidationError(
+                "Single-choice survey questions must use exactly one selection."
+            )
         return SurveyQuestionCreateRequest(
             prompt=clean_prompt,
             question_type=normalized_type,
@@ -122,7 +124,9 @@ def build_question_request(
     if maximum > len(clean_options):
         raise VoteValidationError("Maximum selections cannot exceed the number of options.")
     if maximum < 2:
-        raise VoteValidationError("Multi-select survey questions must allow at least two selections.")
+        raise VoteValidationError(
+            "Multi-select survey questions must allow at least two selections."
+        )
     return SurveyQuestionCreateRequest(
         prompt=clean_prompt,
         question_type=normalized_type,
@@ -196,15 +200,26 @@ def validate_answers(
     output: dict[int, tuple[int, ...]] = {}
     for question in snapshot.questions:
         selected_ids = tuple(
-            sorted({int(option_id) for option_id in answers_by_question_id.get(question.question_id, ())})
+            sorted(
+                {
+                    int(option_id)
+                    for option_id in answers_by_question_id.get(question.question_id, ())
+                }
+            )
         )
         if len(selected_ids) < question.min_selections:
-            raise VoteValidationError(f"Answer question {question.sort_order}: choose at least {question.min_selections}.")
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: choose at least {question.min_selections}."
+            )
         if len(selected_ids) > question.max_selections:
-            raise VoteValidationError(f"Answer question {question.sort_order}: choose at most {question.max_selections}.")
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: choose at most {question.max_selections}."
+            )
         valid_ids = {option.option_id for option in question.options}
         if any(option_id not in valid_ids for option_id in selected_ids):
-            raise VoteValidationError(f"Answer question {question.sort_order}: one or more options are not valid.")
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: one or more options are not valid."
+            )
         output[question.question_id] = selected_ids
     return output
 
@@ -250,7 +265,10 @@ async def submit_survey_response(
 ) -> tuple[SurveySubmitResult, SurveySnapshot | None]:
     snapshot = await survey_dal.get_survey_snapshot(int(survey_id))
     if snapshot is None:
-        return SurveySubmitResult("missing", int(survey_id), message="This survey no longer exists."), None
+        return (
+            SurveySubmitResult("missing", int(survey_id), message="This survey no longer exists."),
+            None,
+        )
     validated = validate_answers(snapshot, answers_by_question_id)
     result = await survey_dal.submit_survey_response(
         survey_id=int(survey_id),

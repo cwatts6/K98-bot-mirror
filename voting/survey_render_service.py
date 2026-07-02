@@ -100,7 +100,11 @@ def _top_option_line(snapshot: SurveySnapshot) -> str:
         if not question.options:
             continue
         top_count = max(int(option.response_count or 0) for option in question.options)
-        leaders = [option.label for option in question.options if int(option.response_count or 0) == top_count]
+        leaders = [
+            option.label
+            for option in question.options
+            if int(option.response_count or 0) == top_count
+        ]
         if top_count == 0:
             lines.append(f"Q{question.sort_order}: no responses yet")
         else:

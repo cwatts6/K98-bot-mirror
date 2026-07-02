@@ -10,8 +10,8 @@ from discord.ext import commands as ext_commands
 from bot_config import GUILD_ID
 from core.interaction_safety import safe_command, safe_defer, send_ephemeral
 from decoraters import is_admin_or_leadership_only, track_usage
-from ui.views.vote_admin_update_view import VoteAdminUpdateView
 from ui.views.survey_post_view import SurveyBuilderView, SurveyPostView, disabled_survey_view
+from ui.views.vote_admin_update_view import VoteAdminUpdateView
 from ui.views.vote_post_view import VotePostView, disabled_vote_view
 from versioning import versioned
 from voting.discord_presentation import (
@@ -26,6 +26,24 @@ from voting.export_service import build_vote_totals_export, build_vote_voter_aud
 from voting.result_visibility import (
     RESULT_VISIBILITY_PUBLIC_LIVE,
     result_visibility_label,
+)
+from voting.service import (
+    CLOSE_DURATION_CHOICES,
+    MAX_CLOSE_REASON_LEN,
+    MAX_DESCRIPTION_LEN,
+    MAX_OPTION_LABEL_LEN,
+    MAX_TITLE_LEN,
+    RESULT_VISIBILITY_CHOICES,
+    VOTE_MODE_CHOICES,
+    VoteValidationError,
+    attach_vote_message,
+    build_create_request,
+    cancel_vote_launch_failure,
+    close_vote,
+    create_vote_record,
+    get_vote_snapshot,
+    search_closed_vote_choices,
+    search_vote_choices,
 )
 from voting.survey_export_service import (
     build_survey_response_detail_export,
@@ -47,24 +65,6 @@ from voting.survey_service import (
     get_survey_snapshot,
     search_closed_survey_choices,
     search_survey_choices,
-)
-from voting.service import (
-    CLOSE_DURATION_CHOICES,
-    MAX_CLOSE_REASON_LEN,
-    MAX_DESCRIPTION_LEN,
-    MAX_OPTION_LABEL_LEN,
-    MAX_TITLE_LEN,
-    RESULT_VISIBILITY_CHOICES,
-    VOTE_MODE_CHOICES,
-    VoteValidationError,
-    attach_vote_message,
-    build_create_request,
-    cancel_vote_launch_failure,
-    close_vote,
-    create_vote_record,
-    get_vote_snapshot,
-    search_closed_vote_choices,
-    search_vote_choices,
 )
 from voting.vote_modes import VOTE_MODE_ONE_CHOICE, normalize_vote_mode, vote_mode_label
 
@@ -824,7 +824,9 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
         await ctx.followup.send(embed=summary_embed, file=file, ephemeral=True)
         await ctx.interaction.edit_original_response(content=generated_message)
 
-    @group.command(name="survey_create", description="Build and start a durable multi-question survey.")
+    @group.command(
+        name="survey_create", description="Build and start a durable multi-question survey."
+    )
     @versioned("v1.00")
     @safe_command
     @is_admin_or_leadership_only()
@@ -889,9 +891,7 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
         me = target_channel.guild.me
         if me is not None:
             needs_mention_everyone = (
-                launch_mention_everyone
-                or reminder_mention_everyone
-                or close_mention_everyone
+                launch_mention_everyone or reminder_mention_everyone or close_mention_everyone
             )
             permission_error = _channel_permission_error(
                 target_channel,
@@ -931,9 +931,7 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                     embed=build_survey_embed(snapshot),
                     file=build_survey_file(snapshot),
                     view=SurveyPostView(snapshot),
-                    allowed_mentions=configured_everyone_mentions(
-                        snapshot.launch_mention_everyone
-                    ),
+                    allowed_mentions=configured_everyone_mentions(snapshot.launch_mention_everyone),
                 )
                 snapshot = await attach_survey_message(
                     snapshot,
@@ -1091,7 +1089,9 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             value=snapshot.closes_at_utc.strftime("%Y-%m-%d %H:%M UTC"),
             inline=True,
         )
-        embed.add_field(name="Private live totals", value="\n".join(question_lines)[:1024], inline=False)
+        embed.add_field(
+            name="Private live totals", value="\n".join(question_lines)[:1024], inline=False
+        )
         embed.add_field(name="Reminders", value="\n".join(reminder_lines), inline=False)
         if snapshot.message_id:
             embed.add_field(
@@ -1101,7 +1101,9 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             )
         await ctx.interaction.edit_original_response(embed=embed)
 
-    @group.command(name="survey_export", description="Export closed survey totals or response detail.")
+    @group.command(
+        name="survey_export", description="Export closed survey totals or response detail."
+    )
     @versioned("v1.00")
     @safe_command
     @is_admin_or_leadership_only()

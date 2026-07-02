@@ -84,7 +84,7 @@ class _SurveyOpenButton(discord.ui.Button):
 
 
 class _SurveyQuestionSelect(discord.ui.Select):
-    def __init__(self, parent_view: "SurveyResponsePanel") -> None:
+    def __init__(self, parent_view: SurveyResponsePanel) -> None:
         self.parent_view = parent_view
         question = parent_view.current_question
         selected_option_ids = set(parent_view.answers.get(question.question_id, ()))
@@ -117,13 +117,16 @@ class _SurveyQuestionSelect(discord.ui.Select):
 
 
 class _SurveyNavButton(discord.ui.Button):
-    def __init__(self, parent_view: "SurveyResponsePanel", *, direction: int) -> None:
+    def __init__(self, parent_view: SurveyResponsePanel, *, direction: int) -> None:
         label = "Back" if direction < 0 else "Next"
         super().__init__(
             label=label,
             style=discord.ButtonStyle.secondary,
-            disabled=direction < 0 and parent_view.current_index == 0
-            or direction > 0 and parent_view.current_index >= len(parent_view.snapshot.questions) - 1,
+            disabled=(direction < 0 and parent_view.current_index == 0)
+            or (
+                direction > 0
+                and parent_view.current_index >= len(parent_view.snapshot.questions) - 1
+            ),
         )
         self.parent_view = parent_view
         self.direction = int(direction)
@@ -143,7 +146,7 @@ class _SurveyNavButton(discord.ui.Button):
 
 
 class _SurveySubmitButton(discord.ui.Button):
-    def __init__(self, parent_view: "SurveyResponsePanel") -> None:
+    def __init__(self, parent_view: SurveyResponsePanel) -> None:
         super().__init__(label="Submit", style=discord.ButtonStyle.success)
         self.parent_view = parent_view
 
@@ -174,7 +177,9 @@ class _SurveySubmitButton(discord.ui.Button):
             await send_ephemeral(interaction, "Survey response could not be recorded.")
             return
         if not result.accepted or snapshot is None:
-            await send_ephemeral(interaction, result.message or "Survey response could not be recorded.")
+            await send_ephemeral(
+                interaction, result.message or "Survey response could not be recorded."
+            )
             return
         await _refresh_public_survey_message(interaction, snapshot)
         await send_ephemeral(interaction, result.message or "Survey response recorded.")
@@ -210,7 +215,11 @@ class SurveyResponsePanel(discord.ui.View):
 
     def content(self) -> str:
         question = self.current_question
-        question_type = "multi-select" if question.question_type == SURVEY_QUESTION_MULTI_SELECT else "single choice"
+        question_type = (
+            "multi-select"
+            if question.question_type == SURVEY_QUESTION_MULTI_SELECT
+            else "single choice"
+        )
         return (
             f"Survey #{self.survey_id}: question {question.sort_order} of {len(self.snapshot.questions)}\n"
             f"{question.prompt}\n"
@@ -395,11 +404,13 @@ class _SurveyQuestionModal(discord.ui.Modal):
         )
 
 
-async def _refresh_public_survey_message(interaction: discord.Interaction, snapshot: SurveySnapshot) -> None:
+async def _refresh_public_survey_message(
+    interaction: discord.Interaction, snapshot: SurveySnapshot
+) -> None:
     try:
-        channel = interaction.client.get_channel(snapshot.channel_id) or await interaction.client.fetch_channel(
+        channel = interaction.client.get_channel(
             snapshot.channel_id
-        )
+        ) or await interaction.client.fetch_channel(snapshot.channel_id)
         message = await channel.fetch_message(snapshot.message_id) if snapshot.message_id else None
         if message is not None:
             await message.edit(

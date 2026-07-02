@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
 
-
 SURVEY_QUESTION_SINGLE_CHOICE = "SingleChoice"
 SURVEY_QUESTION_MULTI_SELECT = "MultiSelect"
 

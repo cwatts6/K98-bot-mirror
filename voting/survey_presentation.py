@@ -4,7 +4,11 @@ from datetime import UTC, datetime
 
 import discord
 
-from voting.discord_presentation import configured_everyone_mentions, mention_content, no_broad_mentions
+from voting.discord_presentation import (
+    configured_everyone_mentions,
+    mention_content,
+    no_broad_mentions,
+)
 from voting.result_visibility import public_results_hidden, result_visibility_label
 from voting.survey_models import SurveySnapshot
 from voting.survey_render_service import render_survey_card
