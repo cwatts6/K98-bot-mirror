@@ -56,6 +56,101 @@ def test_build_create_request_accepts_hidden_until_close_visibility():
     assert req.result_visibility == service.RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE
 
 
+def test_build_create_request_accepts_multi_select_cardinality():
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+
+    req = service.build_create_request(
+        guild_id=1,
+        channel_id=2,
+        created_by_discord_user_id=3,
+        title="Availability?",
+        description="Pick all that work",
+        raw_options="18:00 | 19:00 | 20:00",
+        close_time_utc=(now + timedelta(hours=2)).isoformat(),
+        reminder_offsets="60",
+        allow_vote_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        vote_mode=service.VOTE_MODE_MULTI_SELECT,
+        min_selections=1,
+        max_selections=2,
+        now_utc=now,
+    )
+
+    assert req.vote_mode == service.VOTE_MODE_MULTI_SELECT
+    assert req.min_selections == 1
+    assert req.max_selections == 2
+
+
+def test_build_create_request_rejects_invalid_multi_select_cardinality():
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+
+    with pytest.raises(service.VoteValidationError, match="at least two"):
+        service.build_create_request(
+            guild_id=1,
+            channel_id=2,
+            created_by_discord_user_id=3,
+            title="Availability?",
+            description=None,
+            raw_options="A | B",
+            close_time_utc=(now + timedelta(hours=2)).isoformat(),
+            reminder_offsets="60",
+            allow_vote_change=True,
+            launch_mention_everyone=False,
+            reminder_mention_everyone=False,
+            close_mention_everyone=False,
+            vote_mode=service.VOTE_MODE_MULTI_SELECT,
+            min_selections=1,
+            max_selections=1,
+            now_utc=now,
+        )
+
+    with pytest.raises(service.VoteValidationError, match="cannot exceed"):
+        service.build_create_request(
+            guild_id=1,
+            channel_id=2,
+            created_by_discord_user_id=3,
+            title="Availability?",
+            description=None,
+            raw_options="A | B",
+            close_time_utc=(now + timedelta(hours=2)).isoformat(),
+            reminder_offsets="60",
+            allow_vote_change=True,
+            launch_mention_everyone=False,
+            reminder_mention_everyone=False,
+            close_mention_everyone=False,
+            vote_mode=service.VOTE_MODE_MULTI_SELECT,
+            min_selections=1,
+            max_selections=3,
+            now_utc=now,
+        )
+
+
+def test_build_create_request_rejects_one_choice_cardinality_drift():
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+
+    with pytest.raises(service.VoteValidationError, match="exactly one"):
+        service.build_create_request(
+            guild_id=1,
+            channel_id=2,
+            created_by_discord_user_id=3,
+            title="Best time?",
+            description=None,
+            raw_options="A | B",
+            close_time_utc=(now + timedelta(hours=2)).isoformat(),
+            reminder_offsets="60",
+            allow_vote_change=True,
+            launch_mention_everyone=False,
+            reminder_mention_everyone=False,
+            close_mention_everyone=False,
+            vote_mode=service.VOTE_MODE_ONE_CHOICE,
+            min_selections=1,
+            max_selections=2,
+            now_utc=now,
+        )
+
+
 def test_build_create_request_rejects_unknown_result_visibility():
     now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
 
@@ -74,6 +169,28 @@ def test_build_create_request_rejects_unknown_result_visibility():
             reminder_mention_everyone=False,
             close_mention_everyone=False,
             result_visibility="EveryoneGetsAPodium",
+            now_utc=now,
+        )
+
+
+def test_build_create_request_rejects_unknown_vote_mode():
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+
+    with pytest.raises(service.VoteValidationError, match="valid vote mode"):
+        service.build_create_request(
+            guild_id=1,
+            channel_id=2,
+            created_by_discord_user_id=3,
+            title="Best time?",
+            description=None,
+            raw_options="A | B",
+            close_time_utc=(now + timedelta(hours=2)).isoformat(),
+            reminder_offsets="60",
+            allow_vote_change=True,
+            launch_mention_everyone=False,
+            reminder_mention_everyone=False,
+            close_mention_everyone=False,
+            vote_mode="RankedChoice",
             now_utc=now,
         )
 
@@ -258,6 +375,29 @@ async def test_update_vote_filters_past_due_reminder_offsets(monkeypatch):
     )
 
     assert captured["reminder_offsets_minutes"] == (5,)
+
+
+@pytest.mark.asyncio
+async def test_get_multi_select_selection_ids_delegates_to_dal(monkeypatch):
+    captured: dict[str, object] = {}
+
+    async def fake_get_multi_select_selection_ids(**kwargs):
+        captured.update(kwargs)
+        return (11, 12)
+
+    monkeypatch.setattr(
+        service.dal,
+        "get_multi_select_selection_ids",
+        fake_get_multi_select_selection_ids,
+    )
+
+    option_ids = await service.get_multi_select_selection_ids(
+        vote_post_id=42,
+        discord_user_id=123,
+    )
+
+    assert option_ids == (11, 12)
+    assert captured == {"vote_post_id": 42, "discord_user_id": 123}
 
 
 @pytest.mark.asyncio

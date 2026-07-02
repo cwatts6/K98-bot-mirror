@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from voting.models import VoteOutcome, VoteSnapshot
+from voting.vote_modes import is_multi_select
 
 
 def _pct(count: int, total: int) -> str:
@@ -21,6 +22,16 @@ def vote_outcome(snapshot: VoteSnapshot) -> VoteOutcome:
 
     if len(winners) == 1:
         winner = winners[0]
+        if is_multi_select(snapshot.vote_mode):
+            return VoteOutcome(
+                kind="top_selection",
+                summary=(
+                    f"Top selection: {winner.label} selected by {top:,} voter"
+                    f"{'' if top == 1 else 's'} ({_pct(top, total)})."
+                ),
+                winning_option_ids=winner_ids,
+                top_vote_count=top,
+            )
         return VoteOutcome(
             kind="winner",
             summary=(
@@ -32,6 +43,16 @@ def vote_outcome(snapshot: VoteSnapshot) -> VoteOutcome:
         )
 
     names = ", ".join(option.label for option in winners)
+    if is_multi_select(snapshot.vote_mode):
+        return VoteOutcome(
+            kind="top_selection_tie",
+            summary=(
+                f"Top selections: {names} selected by {top:,} voter"
+                f"{'' if top == 1 else 's'} each ({_pct(top, total)})."
+            ),
+            winning_option_ids=winner_ids,
+            top_vote_count=top,
+        )
     return VoteOutcome(
         kind="tie",
         summary=(

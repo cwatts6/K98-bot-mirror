@@ -9,6 +9,7 @@ import pytest
 from voting import export_service
 from voting.models import VoteOption, VoteReminder, VoteSnapshot, VoteVoterAuditRow
 from voting.service import VoteValidationError
+from voting.vote_modes import VOTE_MODE_MULTI_SELECT
 
 
 def _snapshot(*, status: str = "Closed", total_votes: int = 4) -> VoteSnapshot:
@@ -94,6 +95,67 @@ def _voter_audit_rows() -> tuple[VoteVoterAuditRow, ...]:
     )
 
 
+def _multi_select_snapshot(*, status: str = "Closed") -> VoteSnapshot:
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+    return VoteSnapshot(
+        vote_post_id=43,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Availability?",
+        description="Pick all that work",
+        status=status,
+        allow_vote_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now - timedelta(minutes=1),
+        closed_at_utc=now if status == "Closed" else None,
+        closed_by_discord_user_id=99 if status == "Closed" else None,
+        closed_reason="deadline" if status == "Closed" else None,
+        background_asset_key=None,
+        total_votes=2,
+        total_selections=3,
+        vote_mode=VOTE_MODE_MULTI_SELECT,
+        min_selections=1,
+        max_selections=2,
+        created_at_utc=now - timedelta(hours=1),
+        updated_at_utc=now,
+        options=(
+            VoteOption(10, 43, "opt1", "18:00 UTC", 1, vote_count=1),
+            VoteOption(11, 43, "opt2", "19:00 UTC", 2, vote_count=2),
+        ),
+    )
+
+
+def _multi_select_voter_audit_rows() -> tuple[VoteVoterAuditRow, ...]:
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+    return (
+        VoteVoterAuditRow(
+            vote_post_id=43,
+            title="Availability?",
+            closed_at_utc=now,
+            discord_user_id=123,
+            option_id=10,
+            option_key="opt1",
+            option_label="18:00 UTC",
+            original_option_id=10,
+            original_option_key="opt1",
+            original_option_label="18:00 UTC",
+            vote_created_at_utc=now - timedelta(minutes=30),
+            vote_updated_at_utc=now - timedelta(minutes=10),
+            selected_option_ids=(10, 11),
+            selected_option_keys=("opt1", "opt2"),
+            selected_option_labels=("18:00 UTC", "19:00 UTC"),
+            original_option_ids=(10,),
+            original_option_keys=("opt1",),
+            original_option_labels=("18:00 UTC",),
+        ),
+    )
+
+
 def test_vote_totals_csv_rows_include_outcome_and_operational_metadata() -> None:
     rows = export_service.vote_totals_csv_rows(_snapshot())
 
@@ -127,6 +189,21 @@ def test_vote_totals_csv_handles_no_votes() -> None:
     assert rows[0]["OutcomeKind"] == "no_votes"
     assert rows[0]["OutcomeSummary"] == "No votes were cast."
     assert rows[0]["VotePercent"] == "0%"
+
+
+def test_multi_select_totals_csv_uses_selection_columns() -> None:
+    csv_bytes = export_service.build_vote_totals_csv_bytes(_multi_select_snapshot())
+    text = csv_bytes.getvalue().decode("utf-8-sig")
+    rows = list(csv.DictReader(io.StringIO(text)))
+
+    assert "TotalVoters" in rows[0]
+    assert "SelectionCount" in rows[0]
+    assert rows[0]["VoteMode"] == VOTE_MODE_MULTI_SELECT
+    assert rows[0]["TotalVoters"] == "2"
+    assert rows[0]["TotalSelections"] == "3"
+    assert rows[1]["SelectionCount"] == "2"
+    assert rows[1]["SelectionPercentOfVoters"] == "100%"
+    assert rows[1]["IsTopSelection"] == "1"
 
 
 @pytest.mark.asyncio
@@ -192,6 +269,23 @@ def test_vote_voter_audit_csv_escapes_formula_like_text_and_unknown_names() -> N
     assert rows[1]["DiscordName"] == "Unknown"
 
 
+def test_multi_select_voter_audit_csv_uses_selection_sets() -> None:
+    csv_bytes = export_service.build_vote_voter_audit_csv_bytes(
+        _multi_select_voter_audit_rows(),
+        discord_names_by_user_id={123: "Planner"},
+        vote_mode=VOTE_MODE_MULTI_SELECT,
+    )
+    text = csv_bytes.getvalue().decode("utf-8-sig")
+    rows = list(csv.DictReader(io.StringIO(text)))
+
+    assert "OptionID" not in rows[0]
+    assert rows[0]["DiscordUserID"] == "'123"
+    assert rows[0]["SelectedOptionIDs"] == "10;11"
+    assert rows[0]["SelectedOptionLabels"] == "18:00 UTC;19:00 UTC"
+    assert rows[0]["OriginalOptionIDs"] == "10"
+    assert rows[0]["VoteChanged"] == "1"
+
+
 @pytest.mark.asyncio
 async def test_build_vote_voter_audit_export_rejects_open_vote(monkeypatch) -> None:
     async def fake_get_vote_snapshot(_vote_post_id):
@@ -250,3 +344,39 @@ async def test_build_vote_voter_audit_export_logs_sql_audit_event(monkeypatch) -
     assert captured["details"]["is_oversized"] is False
     assert captured["details"]["delivery_status"] == "ready_for_ephemeral_delivery"
     assert "DiscordName" in captured["details"]["columns"]
+
+
+@pytest.mark.asyncio
+async def test_build_multi_select_voter_audit_export_logs_mode_columns(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_get_vote_snapshot(_vote_post_id):
+        return _multi_select_snapshot()
+
+    async def fake_list_vote_voter_audit_rows(_vote_post_id):
+        return _multi_select_voter_audit_rows()
+
+    async def fake_insert_audit(**kwargs):
+        captured.update(kwargs)
+
+    async def fake_name_resolver(user_ids):
+        assert user_ids == (123,)
+        return {123: "Planner"}
+
+    monkeypatch.setattr(export_service.dal, "get_vote_snapshot", fake_get_vote_snapshot)
+    monkeypatch.setattr(
+        export_service.dal,
+        "list_vote_voter_audit_rows",
+        fake_list_vote_voter_audit_rows,
+    )
+    monkeypatch.setattr(export_service.dal, "insert_audit", fake_insert_audit)
+
+    export = await export_service.build_vote_voter_audit_export(
+        vote_post_id=43,
+        requested_by_discord_user_id=99,
+        discord_name_resolver=fake_name_resolver,
+    )
+
+    assert export.row_count == 1
+    assert "SelectedOptionIDs" in captured["details"]["columns"]
+    assert "OptionID" not in captured["details"]["columns"]

@@ -187,17 +187,24 @@ Discord Voting Post Framework status:
 - Phase 5 records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 5 Advanced Voting Modes Audit and Slice Planning.md`
   - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 5 Advanced Voting Modes Audit and Slice Planning.md`
+- Phase 6 Multi-Select / Survey Voting Audit and Design is delivered in mirror PR #198,
+  production PR #506, and SQL PR #28. SQL deployment completed on 2026-07-02. Operator smoke
+  testing confirmed multi-select create/vote/update/close/status paths, allowed/blocked changes,
+  selection limits, restart-safe opener behavior, existing-selection prefill when reopening the
+  selector, successful amendments, and one-choice regression compatibility.
+- Phase 6 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md`
+  - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md`
 - Active Discord Voting Post Framework files:
   - `Discord Voting Post Framework - Programme Pack.md`
-  - `Codex Task Pack - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md`
-  - `Codex Chat Starter - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md`
-- Phase 6 is the next prepared voting slice. It starts with audit/scope only for multi-select and
-  survey-style voting. It should decide whether the first implementation is a single-question
-  `MultiSelect` mode, a broader multi-question survey mode, or a staged roadmap where
-  `MultiSelect` ships first and survey builder work remains deferred. Role-restricted voting,
-  governor-linked voting, saved templates, public voter-level export posting, emoji/icon support,
-  and dashboard/reporting implementation remain out of this Phase 6 slice unless separately
-  approved.
+  - `Codex Task Pack - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md`
+  - `Codex Chat Starter - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md`
+- Phase 7 is the next prepared voting slice. It starts with audit/scope only for multi-question
+  survey-style voting. It should decide the safest first survey-builder implementation slice,
+  including question types, builder/response UX, SQL storage, privacy, result visibility, exports,
+  tests, smoke plan, and remaining deferred work. Role-restricted voting, governor-linked voting,
+  saved templates, public voter-level export posting, emoji/icon support, and dashboard/reporting
+  implementation remain out of this Phase 7 slice unless separately approved.
 
 Player Self-Service Command Centre status:
 
@@ -349,8 +356,6 @@ Final removal of temporary deprecated command paths remains captured as deferred
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.
 
-Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design is the next
-prepared voting slice. It starts with audit/scope only and should decide whether the first
-cardinality-changing implementation should be a single-question `MultiSelect` mode, full
-survey-style voting, or a staged roadmap, while keeping all Phase 1 through Phase 5 behaviour
-unchanged.
+Discord Voting Post Framework Phase 7 Survey Builder Audit and Design is the next prepared voting
+slice. It starts with audit/scope only and should decide the safest first multi-question survey
+implementation slice while keeping all Phase 1 through Phase 6 behaviour unchanged.

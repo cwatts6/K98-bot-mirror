@@ -52,6 +52,10 @@ class VoteSnapshot:
     options: tuple[VoteOption, ...]
     reminders: tuple[VoteReminder, ...] = ()
     result_visibility: str = "PublicLive"
+    vote_mode: str = "OneChoice"
+    min_selections: int = 1
+    max_selections: int = 1
+    total_selections: int = 0
 
 
 @dataclass(frozen=True)
@@ -71,6 +75,9 @@ class VoteCreateRequest:
     background_asset_key: str | None = None
     opens_at_utc: datetime | None = None
     result_visibility: str = "PublicLive"
+    vote_mode: str = "OneChoice"
+    min_selections: int = 1
+    max_selections: int = 1
 
 
 @dataclass(frozen=True)
@@ -79,6 +86,8 @@ class VoteCastResult:
     vote_post_id: int
     option_id: int | None = None
     previous_option_id: int | None = None
+    selected_option_ids: tuple[int, ...] = ()
+    previous_option_ids: tuple[int, ...] = ()
     message: str = ""
 
     @property
@@ -121,6 +130,12 @@ class VoteVoterAuditRow:
     original_option_label: str | None
     vote_created_at_utc: datetime
     vote_updated_at_utc: datetime
+    selected_option_ids: tuple[int, ...] = ()
+    selected_option_keys: tuple[str, ...] = ()
+    selected_option_labels: tuple[str, ...] = ()
+    original_option_ids: tuple[int, ...] = ()
+    original_option_keys: tuple[str, ...] = ()
+    original_option_labels: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
