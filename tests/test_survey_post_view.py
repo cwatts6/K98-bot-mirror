@@ -9,7 +9,8 @@ from ui.views.survey_post_view import (
     SurveyBuilderView,
     SurveyPostView,
     SurveyResponsePanel,
-    _SurveyQuestionModal,
+    _SurveyOptionModal,
+    _SurveyQuestionPromptModal,
 )
 from voting.survey_models import (
     SurveyQuestion,
@@ -89,6 +90,10 @@ class _Response:
     async def edit_message(self, **kwargs) -> None:
         self.done = True
         self.edited = kwargs
+
+
+def _button(view: SurveyBuilderView, label: str):
+    return next(child for child in view.children if getattr(child, "label", None) == label)
 
 
 @pytest.mark.asyncio
@@ -193,10 +198,17 @@ async def test_survey_submit_defers_before_persisting(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_survey_builder_disables_publish_after_success(monkeypatch):
-    question = SurveyQuestionCreateRequest(
+    question_one = SurveyQuestionCreateRequest(
         prompt="First?",
         question_type="SingleChoice",
         options=("A", "B"),
+    )
+    question_two = SurveyQuestionCreateRequest(
+        prompt="Second?",
+        question_type="MultiSelect",
+        options=("A", "B", "C"),
+        min_selections=1,
+        max_selections=2,
     )
     captured: dict[str, object] = {"publish_calls": 0}
 
@@ -214,22 +226,22 @@ async def test_survey_builder_disables_publish_after_success(monkeypatch):
     view = SurveyBuilderView(
         owner_user_id=123,
         publish_callback=fake_publish,
-        questions=(question,),
+        questions=(question_one, question_two),
     )
     interaction = SimpleNamespace(
         response=_Response(),
         user=SimpleNamespace(id=123),
     )
 
-    await view.children[1].callback(interaction)
+    await _button(view, "Publish").callback(interaction)
 
     assert captured["publish_calls"] == 1
-    assert captured["questions"] == (question,)
-    assert captured["disabled_during_publish"] == (True, True)
+    assert captured["questions"] == (question_one, question_two)
+    assert all(captured["disabled_during_publish"])
     assert view.published is True
-    assert tuple(child.disabled for child in view.children) == (True, True)
+    assert all(child.disabled for child in view.children)
 
-    await view.children[1].callback(
+    await _button(view, "Publish").callback(
         SimpleNamespace(
             response=_Response(),
             user=SimpleNamespace(id=123),
@@ -241,7 +253,53 @@ async def test_survey_builder_disables_publish_after_success(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_survey_question_modal_rejects_after_publish_started(monkeypatch):
+async def test_survey_guided_builder_saves_multi_select_from_max_selection(monkeypatch):
+    captured: dict[str, object] = {}
+
+    async def fake_publish(_interaction, _questions):
+        return True
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        captured["ephemeral"] = content
+
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    view = SurveyBuilderView(owner_user_id=123, publish_callback=fake_publish)
+    prompt_modal = _SurveyQuestionPromptModal(view)
+    prompt_modal.prompt.value = "Which nights work?"
+    prompt_interaction = SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+
+    await prompt_modal.callback(prompt_interaction)
+
+    assert "Draft prompt: Which nights work? (18/180)" in prompt_interaction.response.edited["content"]
+
+    first_option = _SurveyOptionModal(view)
+    first_option.option.value = "Friday"
+    await first_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    second_option = _SurveyOptionModal(view)
+    second_option.option.value = "Saturday"
+    await second_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    third_option = _SurveyOptionModal(view)
+    third_option.option.value = "Sunday"
+    await third_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    view.draft_max_selections = 2
+    view._sync_selection_bounds()
+    view._rebuild()
+
+    await _button(view, "Save question").callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    assert len(view.questions) == 1
+    assert view.questions[0].question_type == "MultiSelect"
+    assert view.questions[0].max_selections == 2
+    assert view.questions[0].options == ("Friday", "Saturday", "Sunday")
+    assert "Survey question saved." not in captured.get("ephemeral", "")
+
+
+@pytest.mark.asyncio
+async def test_survey_question_prompt_modal_rejects_after_publish_started(monkeypatch):
     captured: dict[str, object] = {}
 
     async def fake_publish(_interaction, _questions):
@@ -254,7 +312,7 @@ async def test_survey_question_modal_rejects_after_publish_started(monkeypatch):
 
     view = SurveyBuilderView(owner_user_id=123, publish_callback=fake_publish)
     view.publish_in_progress = True
-    modal = _SurveyQuestionModal(view)
+    modal = _SurveyQuestionPromptModal(view)
 
     await modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
 
@@ -263,7 +321,7 @@ async def test_survey_question_modal_rejects_after_publish_started(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_survey_question_modal_enforces_max_questions_server_side(monkeypatch):
+async def test_survey_question_prompt_modal_enforces_max_questions_server_side(monkeypatch):
     question = SurveyQuestionCreateRequest(
         prompt="First?",
         question_type="SingleChoice",
@@ -284,7 +342,7 @@ async def test_survey_question_modal_enforces_max_questions_server_side(monkeypa
         publish_callback=fake_publish,
         questions=(question,) * 5,
     )
-    modal = _SurveyQuestionModal(view)
+    modal = _SurveyQuestionPromptModal(view)
 
     await modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
 

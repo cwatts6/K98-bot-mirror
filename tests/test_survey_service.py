@@ -105,6 +105,26 @@ def test_build_question_request_rejects_unknown_type_and_bad_cardinality():
         )
 
 
+def test_build_question_request_derives_type_from_max_selections():
+    single = survey_service.build_question_request(
+        prompt="Question?",
+        question_type=None,
+        options=("A", "B"),
+        min_selections=1,
+        max_selections=1,
+    )
+    multi = survey_service.build_question_request(
+        prompt="Question?",
+        question_type=None,
+        options=("A", "B", "C"),
+        min_selections=1,
+        max_selections=2,
+    )
+
+    assert single.question_type == "SingleChoice"
+    assert multi.question_type == "MultiSelect"
+
+
 def test_validate_answers_requires_every_question_and_valid_options():
     now = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
     snapshot = SurveySnapshot(

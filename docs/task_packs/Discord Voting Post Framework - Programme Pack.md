@@ -455,8 +455,9 @@ Audit recommendation drafted on `2026-07-02`:
 - Keep surveys under the existing `/vote_admin` top-level group, beginning with a new
   survey-specific create flow only after operator approval.
 - First implementation slice: choice-only surveys with two to five required questions, two to six
-  options per question, `SingleChoice` and per-question `MultiSelect`, no free text, no optional
-  answers, no role restrictions, no governor linking, and no templates.
+  options per question, min/max selection controls that derive single-choice versus multi-select
+  behavior, no free text, no optional answers, no role restrictions, no governor linking, and no
+  templates.
 - Player UX: persistent public `Answer survey` button, private paged response panel, direct
   submit from the private panel, submitted-answer prefill when reopening, no persisted partial
   drafts in the first slice, and SQL-backed submitted responses only.

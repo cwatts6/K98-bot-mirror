@@ -39,9 +39,11 @@ SURVEY_QUESTION_TYPE_CHOICES: dict[str, str] = {
 }
 
 
-def _normalize_question_type(value: str | None) -> str:
+def _normalize_question_type(value: str | None, *, max_selections: int | None = None) -> str:
     text = str(value or "").strip()
     if not text:
+        if max_selections is not None and int(max_selections) > 1:
+            return SURVEY_QUESTION_MULTI_SELECT
         return SURVEY_QUESTION_SINGLE_CHOICE
     by_casefold = {item.casefold(): item for item in SURVEY_QUESTION_TYPE_CHOICES}
     normalized = by_casefold.get(text.casefold())
@@ -101,10 +103,10 @@ def build_question_request(
         raise VoteValidationError(
             f"Survey question prompt must be {MAX_SURVEY_QUESTION_PROMPT_LEN} characters or fewer."
         )
-    normalized_type = _normalize_question_type(question_type)
     clean_options = _validate_survey_option_labels(options)
     minimum = 1 if min_selections is None else int(min_selections)
     maximum = 1 if max_selections is None else int(max_selections)
+    normalized_type = _normalize_question_type(question_type, max_selections=maximum)
     if normalized_type == SURVEY_QUESTION_SINGLE_CHOICE:
         if minimum != 1 or maximum != 1:
             raise VoteValidationError(

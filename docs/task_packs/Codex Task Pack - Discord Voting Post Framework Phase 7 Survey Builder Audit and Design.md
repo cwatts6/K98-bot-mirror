@@ -182,8 +182,8 @@ Verdict: implement surveys as a separate SQL-backed survey-post model under the 
 
 Operator sequencing confirmed:
 
-- First implementation step is multiple-choice only: `SingleChoice` and per-question
-  `MultiSelect`.
+- First implementation step is multiple-choice only: single-choice when max selections is `1`,
+  and per-question multi-select when max selections is greater than `1`.
 - Second implementation slice should add free-text questions and optional choice-question
   `Add details` text.
 - Free-text and `Add details` response data must be included in private admin/leadership exports
@@ -238,7 +238,7 @@ survey objects from Python naming and should not overload `dbo.VotePostVotes.Opt
 |---|---|---|---|---|---|---|
 | Extend `/vote_admin create` with more fields | Low to medium. It looks familiar, but Discord slash options are already dense and the current command is tuned for one question. | Admin/leadership would remain correct, but players would need a separate private flow anyway. Privacy rules become confusing if a `Survey` mode shares current vote exports/status. | Would require adding `Survey` to vote-mode checks or adding post kind branching to `VotePosts`; high risk of existing one-choice/multi-select code treating survey as multi-select. | Bad fit. Dynamic question counts cannot be expressed cleanly in slash-command options. | Heavy regression coverage across every existing vote path because the central command and mode normalization would change. | Reject for first slice. Too much regression risk and poor admin UX. |
 | Simple single-page private survey panel | Medium. Useful for 2-3 small surveys. | Public post can stay simple; responses stay private. Without paging, Discord component limits cap usefulness. | Needs survey/question/option/response tables, but could avoid drafts. | One `Answer survey` button opens one private view with all selects. This breaks down on mobile and with more than a few questions. | View tests for component limits, privacy, stale panels, close rejection, exports, and hidden-results leak prevention. | Defer as too constrained. It is simpler but would likely be replaced quickly. |
-| Linked survey object plus paged private response flow | High. Supports event planning, availability, preference ranking, and structured KD98 feedback without public noise. | Admin/leadership creates/manages/exports. Any Discord user can respond unless a later task adds restrictions. No public voter-level detail. HiddenUntilClose hides all public aggregates until close. | New additive survey tables for posts, questions, options, submitted response envelopes, and answer selections. Existing vote tables remain untouched except shared naming/docs if approved. | New `/vote_admin survey_create` launches a guided builder. Public survey post has persistent opener. Player flow is private, paged, confirm-before-submit, and prefilled from submitted answers when editing. | Focused service/DAL/view/export/scheduler tests plus one-choice and multi-select regression tests. Smoke covers create, answer, change allowed/blocked, restart, hidden close reveal, exports. | Recommended first implementation slice. Best balance of value and containment. |
+| Linked survey object plus paged private response flow | High. Supports event planning, availability, preference ranking, and structured KD98 feedback without public noise. | Admin/leadership creates/manages/exports. Any Discord user can respond unless a later task adds restrictions. No public voter-level detail. HiddenUntilClose hides all public aggregates until close. | New additive survey tables for posts, questions, options, submitted response envelopes, and answer selections. Existing vote tables remain untouched except shared naming/docs if approved. | New `/vote_admin survey_create` launches a guided builder. Public survey post has persistent opener. Player flow is private, paged, direct-submit in the first slice, and prefilled from submitted answers when editing. | Focused service/DAL/view/export/scheduler tests plus one-choice and multi-select regression tests. Smoke covers create, answer, change allowed/blocked, restart, hidden close reveal, exports. | Recommended first implementation slice. Best balance of value and containment. |
 | Staged builder with SQL draft persistence and response resume | High for long surveys and interrupted admin/player flows. | More durable, but draft responses may contain sensitive unsubmitted intent. Needs explicit retention and cleanup policy. | Adds draft status, partial answers, expiry/cleanup fields, and likely more indexes/procedures. | Admin and player flows survive restart mid-build/mid-response. More states, stale actions, and cleanup rules. | Adds draft lifecycle, expiry, resume, cleanup, and restart tests. | Defer. Useful later, but too many states for the first survey slice. |
 | Full builder with free text, rating, optional questions, edit/resume, reporting | Very high long-term value. | Highest privacy risk, especially free text and detail exports. Needs retention, moderation, and operator-facing access rules. | Adds answer-value columns or type-specific answer tables, reporting views/procs, optional-answer semantics, and possibly full-text/export safeguards. | Rich builder and richer private response UI. More export/report variants. | Broad test and security surface: injection/formula safety, free-text privacy, report permissions, mobile UX, restart, migration. | Defer into future task packs. Too large and security-sensitive for first implementation. |
 
@@ -250,7 +250,8 @@ Product scope:
 
 - Survey title and optional description.
 - Two to five ordered questions.
-- Each question is `SingleChoice` or `MultiSelect`.
+- Each question stores `SingleChoice` or `MultiSelect`, derived from max selections rather than
+  typed by the admin.
 - Each question has two to six ordered options.
 - All questions are required in the first slice.
 - Per-question multi-select supports `MinSelections` and `MaxSelections` within that question.
@@ -373,8 +374,10 @@ Admin builder:
 
 - Slash command should collect only stable launch fields: title, target channel, close duration,
   result visibility, allow response changes, and mention/reminder policy.
-- A private builder view should collect questions one at a time through modals/selects.
-- Builder limits should be visible through enabled/disabled controls, not long instructional copy.
+- A private builder view should collect questions one at a time through focused prompt/option
+  modals plus min/max selection dropdowns.
+- Builder limits should be visible through enabled/disabled controls and live counts, not long
+  instructional copy.
 - Draft builder state can be in memory for the first slice because no public post or submitted
   data exists until `Publish`. If the builder times out or the bot restarts, the admin restarts the
   builder.

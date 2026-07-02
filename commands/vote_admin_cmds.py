@@ -978,10 +978,7 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             publish_callback=_publish_survey,
         )
         await ctx.interaction.edit_original_response(
-            content=(
-                f"Survey builder opened. Add {MIN_SURVEY_QUESTIONS}-{MAX_SURVEY_QUESTIONS} "
-                "choice questions, then publish."
-            ),
+            content=f"Survey builder opened.\n\n{view.summary()}",
             view=view,
         )
 
