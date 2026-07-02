@@ -22,7 +22,7 @@ from voting.survey_presentation import (
 logger = logging.getLogger(__name__)
 
 SurveyPublishCallback = Callable[
-    [discord.Interaction, tuple[SurveyQuestionCreateRequest, ...]], Awaitable[None]
+    [discord.Interaction, tuple[SurveyQuestionCreateRequest, ...]], Awaitable[bool]
 ]
 
 
@@ -243,6 +243,8 @@ class SurveyBuilderView(discord.ui.View):
         self.owner_user_id = int(owner_user_id)
         self.publish_callback = publish_callback
         self.questions: list[SurveyQuestionCreateRequest] = list(questions)
+        self.publish_in_progress = False
+        self.published = False
         self._rebuild()
 
     def _rebuild(self) -> None:
@@ -265,7 +267,9 @@ class _BuilderAddQuestionButton(discord.ui.Button):
         super().__init__(
             label="Add question",
             style=discord.ButtonStyle.primary,
-            disabled=len(parent_view.questions) >= survey_service.MAX_SURVEY_QUESTIONS,
+            disabled=parent_view.publish_in_progress
+            or parent_view.published
+            or len(parent_view.questions) >= survey_service.MAX_SURVEY_QUESTIONS,
         )
         self.parent_view = parent_view
 
@@ -281,7 +285,9 @@ class _BuilderPublishButton(discord.ui.Button):
         super().__init__(
             label="Publish",
             style=discord.ButtonStyle.success,
-            disabled=len(parent_view.questions) < survey_service.MIN_SURVEY_QUESTIONS,
+            disabled=parent_view.publish_in_progress
+            or parent_view.published
+            or len(parent_view.questions) < survey_service.MIN_SURVEY_QUESTIONS,
         )
         self.parent_view = parent_view
 
@@ -289,7 +295,38 @@ class _BuilderPublishButton(discord.ui.Button):
         if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
             await send_ephemeral(interaction, "This survey builder belongs to another admin.")
             return
-        await self.parent_view.publish_callback(interaction, tuple(self.parent_view.questions))
+        if self.parent_view.publish_in_progress or self.parent_view.published:
+            await send_ephemeral(interaction, "This survey has already been published.")
+            return
+        self.parent_view.publish_in_progress = True
+        self.parent_view._rebuild()
+        try:
+            await interaction.response.edit_message(
+                content=f"Survey publishing...\n\n{self.parent_view.summary()}",
+                view=self.parent_view,
+            )
+        except Exception:
+            logger.debug("survey_builder_publish_disable_failed", exc_info=True)
+        try:
+            published = await self.parent_view.publish_callback(
+                interaction,
+                tuple(self.parent_view.questions),
+            )
+        except Exception:
+            logger.exception("survey_builder_publish_failed")
+            published = False
+            await send_ephemeral(interaction, "Survey not created. Please try again.")
+        self.parent_view.published = bool(published)
+        self.parent_view.publish_in_progress = False
+        self.parent_view._rebuild()
+        if not published:
+            try:
+                await interaction.edit_original_response(
+                    content=f"Survey builder reopened.\n\n{self.parent_view.summary()}",
+                    view=self.parent_view,
+                )
+            except Exception:
+                logger.debug("survey_builder_publish_reenable_failed", exc_info=True)
 
 
 class _SurveyQuestionModal(discord.ui.Modal):

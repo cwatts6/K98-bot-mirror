@@ -5,8 +5,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from ui.views.survey_post_view import SurveyPostView, SurveyResponsePanel
-from voting.survey_models import SurveyQuestion, SurveyQuestionOption, SurveySnapshot
+from ui.views.survey_post_view import SurveyBuilderView, SurveyPostView, SurveyResponsePanel
+from voting.survey_models import (
+    SurveyQuestion,
+    SurveyQuestionCreateRequest,
+    SurveyQuestionOption,
+    SurveySnapshot,
+)
 
 
 def _snapshot() -> SurveySnapshot:
@@ -75,6 +80,10 @@ class _Response:
     async def defer(self, *, ephemeral: bool) -> None:
         self.done = True
         self.ephemeral = ephemeral
+
+    async def edit_message(self, **kwargs) -> None:
+        self.done = True
+        self.edited = kwargs
 
 
 @pytest.mark.asyncio
@@ -175,3 +184,52 @@ async def test_survey_submit_defers_before_persisting(monkeypatch):
     assert captured["deferred_before_submit"] is True
     assert captured["refresh"] is True
     assert captured["content"] == "Survey response recorded."
+
+
+@pytest.mark.asyncio
+async def test_survey_builder_disables_publish_after_success(monkeypatch):
+    question = SurveyQuestionCreateRequest(
+        prompt="First?",
+        question_type="SingleChoice",
+        options=("A", "B"),
+    )
+    captured: dict[str, object] = {"publish_calls": 0}
+
+    async def fake_publish(_interaction, questions):
+        captured["publish_calls"] = int(captured["publish_calls"]) + 1
+        captured["questions"] = questions
+        captured["disabled_during_publish"] = tuple(child.disabled for child in view.children)
+        return True
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        captured["ephemeral"] = content
+
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    view = SurveyBuilderView(
+        owner_user_id=123,
+        publish_callback=fake_publish,
+        questions=(question,),
+    )
+    interaction = SimpleNamespace(
+        response=_Response(),
+        user=SimpleNamespace(id=123),
+    )
+
+    await view.children[1].callback(interaction)
+
+    assert captured["publish_calls"] == 1
+    assert captured["questions"] == (question,)
+    assert captured["disabled_during_publish"] == (True, True)
+    assert view.published is True
+    assert tuple(child.disabled for child in view.children) == (True, True)
+
+    await view.children[1].callback(
+        SimpleNamespace(
+            response=_Response(),
+            user=SimpleNamespace(id=123),
+        )
+    )
+
+    assert captured["publish_calls"] == 1
+    assert captured["ephemeral"] == "This survey has already been published."

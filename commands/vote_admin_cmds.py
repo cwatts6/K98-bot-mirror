@@ -902,7 +902,7 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                 await ctx.interaction.edit_original_response(content=permission_error)
                 return
 
-        async def _publish_survey(interaction, questions) -> None:
+        async def _publish_survey(interaction, questions) -> bool:
             try:
                 req = build_survey_create_request(
                     guild_id=int(ctx.guild_id or target_channel.guild.id),
@@ -921,7 +921,7 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                 )
             except VoteValidationError as exc:
                 await send_ephemeral(interaction, f"Survey not created: {exc}")
-                return
+                return False
 
             message = None
             snapshot = await create_survey_record(req)
@@ -968,11 +968,12 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                     "Survey not created: the Discord survey post could not be sent, "
                     "and the SQL record was cancelled.",
                 )
-                return
+                return False
             await send_ephemeral(
                 interaction,
                 f"Survey #{snapshot.survey_id} created in {target_channel.mention}.",
             )
+            return True
 
         view = SurveyBuilderView(
             owner_user_id=int(ctx.user.id),
