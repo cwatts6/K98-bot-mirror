@@ -1,0 +1,120 @@
+from __future__ import annotations
+
+import pytest
+
+from core import event_rehydration_lifecycle as lifecycle
+
+
+@pytest.mark.asyncio
+async def test_ready_event_cache_rehydration_refreshes_and_schedules_one_shot(monkeypatch):
+    calls: list[str] = []
+
+    async def fake_load_active_reminders(_bot):
+        calls.append("load_active_reminders")
+        return {"event-1"}
+
+    async def fake_refresh_event_cache():
+        calls.append("refresh_event_cache")
+        return 1
+
+    def fake_schedule_bg(name, timeout, coro_factory):
+        calls.append(f"schedule_bg:{name}:{timeout}")
+        assert callable(coro_factory)
+
+    monkeypatch.setattr(lifecycle, "load_active_reminders", fake_load_active_reminders)
+    monkeypatch.setattr(lifecycle, "load_event_cache", lambda: calls.append("load_event_cache"))
+    monkeypatch.setattr(lifecycle, "is_cache_stale", lambda: True)
+    monkeypatch.setattr(lifecycle, "get_all_upcoming_events", lambda: [{"name": "Ready"}])
+    monkeypatch.setattr(lifecycle, "refresh_event_cache", fake_refresh_event_cache)
+
+    loaded = await lifecycle.run_ready_event_cache_rehydration(
+        bot=object(),
+        schedule_bg=fake_schedule_bg,
+    )
+
+    assert loaded == {"event-1"}
+    assert calls == [
+        "load_active_reminders",
+        "load_event_cache",
+        "refresh_event_cache",
+        "schedule_bg:refresh_event_cache_once:10.0",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_ready_event_cache_rehydration_schedules_one_shot_when_empty(monkeypatch):
+    calls: list[str] = []
+
+    async def fake_load_active_reminders(_bot):
+        return set()
+
+    def fake_schedule_bg(name, timeout, coro_factory):
+        calls.append(f"schedule_bg:{name}:{timeout}")
+
+    monkeypatch.setattr(lifecycle, "load_active_reminders", fake_load_active_reminders)
+    monkeypatch.setattr(lifecycle, "load_event_cache", lambda: None)
+    monkeypatch.setattr(lifecycle, "is_cache_stale", lambda: False)
+    monkeypatch.setattr(lifecycle, "get_all_upcoming_events", lambda: [])
+
+    async def fake_refresh_event_cache():
+        calls.append("refresh_event_cache")
+        return 0
+
+    monkeypatch.setattr(lifecycle, "refresh_event_cache", fake_refresh_event_cache)
+
+    loaded = await lifecycle.run_ready_event_cache_rehydration(
+        bot=object(),
+        schedule_bg=fake_schedule_bg,
+    )
+
+    assert loaded == set()
+    assert calls == [
+        "refresh_event_cache",
+        "schedule_bg:refresh_event_cache_once:10.0",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_ready_view_rehydration_helpers_schedule_expected_tasks(monkeypatch):
+    calls: list[tuple[str, float]] = []
+
+    def fake_schedule_bg(name, timeout, coro_factory):
+        calls.append((name, timeout))
+        assert callable(coro_factory)
+
+    await lifecycle.run_ready_tracked_view_rehydration(bot=object(), schedule_bg=fake_schedule_bg)
+    await lifecycle.run_ready_pinned_calendar_rehydration(
+        bot=object(), schedule_bg=fake_schedule_bg
+    )
+
+    assert calls == [
+        ("rehydrate_tracked_views", 10.0),
+        ("rehydrate_vote_post_views", 10.0),
+        ("rehydrate_pinned_calendar_view", 8.0),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_tracked_view_rehydration_schedule_failure_is_best_effort(caplog):
+    def fail_schedule_bg(name, timeout, coro_factory):
+        raise RuntimeError("scheduler unavailable")
+
+    await lifecycle.run_ready_tracked_view_rehydration(
+        bot=object(),
+        schedule_bg=fail_schedule_bg,
+    )
+
+    assert "Failed to start rehydrate_tracked_views" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_pinned_calendar_rehydration_schedule_failure_is_best_effort(caplog):
+    def fail_schedule_bg(name, timeout, coro_factory):
+        raise RuntimeError("scheduler unavailable")
+
+    await lifecycle.run_ready_pinned_calendar_rehydration(
+        bot=object(),
+        schedule_bg=fail_schedule_bg,
+    )
+
+    assert "failed to schedule pinned calendar rehydration" in caplog.text
