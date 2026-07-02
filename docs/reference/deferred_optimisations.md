@@ -8,29 +8,29 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `voting/`, `/vote_admin`, future survey builder UI, SQL repo vote/survey framework
 - Type: architecture
-- Description: Full multi-question survey-style voting remains valuable for richer KD98 feedback, event planning, rankings, and structured questionnaires, but it is intentionally separate from the Phase 6 single-question MultiSelect implementation. It requires question modeling, per-question options, response envelopes, partial/private response UX, broader export design, and question-level privacy/reporting decisions that are not needed for single-question MultiSelect.
-- Suggested Fix: After the Phase 6 single-question MultiSelect slice is deployed and smoke tested, prepare a separate survey-builder audit/task pack. Define survey question types, create/edit builder UX, private response flow, partial submission/restart behavior, SQL tables for questions/options/responses/answers, PublicLive versus HiddenUntilClose summary rules, closed-only private export shapes, audit events, and migration/rollback order. Do not bundle survey builder with emoji/icon polish or dashboard/reporting implementation.
+- Description: Full multi-question survey-style voting remains valuable for richer KD98 feedback, event planning, rankings, and structured questionnaires, but it is intentionally separate from the delivered Phase 6 single-question MultiSelect implementation. It requires question modeling, per-question options, response envelopes, partial/private response UX, broader export design, and question-level privacy/reporting decisions that are not needed for single-question MultiSelect.
+- Suggested Fix: Use `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md` to run a separate survey-builder audit/design slice. Define survey question types, create/edit builder UX, private response flow, partial submission/restart behavior, SQL tables for questions/options/responses/answers, PublicLive versus HiddenUntilClose summary rules, closed-only private export shapes, audit events, and migration/rollback order. Do not bundle survey builder with emoji/icon polish or dashboard/reporting implementation.
 - Impact: high
 - Risk: high
-- Dependencies: Operator approval for survey product scope; Phase 6 MultiSelect production smoke evidence; SQL repo validation in `C:\K98-bot-SQL-Server`; privacy review for question-level responses; focused builder/response/export/restart tests.
+- Dependencies: Phase 6 MultiSelect delivered and smoke tested on 2026-07-02; operator approval for survey product scope; SQL repo validation in `C:\K98-bot-SQL-Server`; privacy review for question-level responses; focused builder/response/export/restart tests. Promoted into the prepared Phase 7 survey-builder audit/design task pack.
 
 ### Deferred Optimisation
 - Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, SQL repo `dbo.VotePostOptions`
 - Type: consistency
-- Description: Per-option emoji/icon support is approved for future scope because it makes public votes more readable and engaging. Current options have labels and nullable `ButtonStyle`, but no emoji/icon metadata. Adding emoji has Discord button UX, CSV/export, and generated-card font/glyph implications. This remains a later polish slice after hidden-until-close delivery and should not be bundled into the Phase 6 multi-select/survey audit unless the operator explicitly reorders the roadmap.
+- Description: Per-option emoji/icon support is approved for future scope because it makes public votes more readable and engaging. Current options have labels and nullable `ButtonStyle`, but no emoji/icon metadata. Adding emoji has Discord button UX, CSV/export, and generated-card font/glyph implications. This remains a later polish slice after hidden-until-close and MultiSelect delivery and should not be bundled into the Phase 7 survey-builder audit unless the operator explicitly reorders the roadmap.
 - Suggested Fix: Prepare a focused polish slice that adds approved option emoji/icon metadata, validates Unicode or custom emoji input, uses Discord button emoji support where practical, updates card rendering with glyph fallback checks, and preserves existing label-length/export behavior.
 - Impact: medium
 - Risk: medium
-- Dependencies: Renderer visual QA with representative emoji/custom emoji cases.
+- Dependencies: Phase 5 hidden-until-close and Phase 6 MultiSelect are delivered; renderer visual QA with representative emoji/custom emoji cases; operator approval for whether emoji applies to one-choice only, MultiSelect, survey options, or all option-bearing voting surfaces.
 
 ### Deferred Optimisation
 - Area: `voting/`, `/vote_admin status`, SQL repo vote reporting views/procedures
 - Type: architecture
-- Description: Dashboard/reporting readiness is approved for future scope. Current vote tables can support basic closed-vote summaries, but there are no dedicated reporting views/procedures and future mode columns may change reporting dimensions. This remains required but should follow enough mode design to avoid building reporting dimensions that immediately drift.
-- Suggested Fix: Scope a private reporting-readiness slice that defines SQL views or procedures for vote summaries, participation, outcomes, export/audit history, result visibility, and approved mode dimensions. Keep public website work out of scope unless separately approved.
+- Description: Dashboard/reporting readiness is approved for future scope. Current vote tables can support basic closed-vote summaries, and Phase 6 added stable `OneChoice`/`MultiSelect` mode dimensions, but there are no dedicated reporting views/procedures and the future survey-builder model may add question/answer dimensions that would affect reporting shape. This remains required but should follow enough survey design to avoid building reporting dimensions that immediately drift.
+- Suggested Fix: Scope a private reporting-readiness slice after the survey-builder audit clarifies whether survey data belongs in vote tables or separate survey tables. Define SQL views or procedures for vote/survey summaries, participation, outcomes/top selections, export/audit history, result visibility, mode dimensions, and any approved long-form export/reporting variants. Keep public website work out of scope unless separately approved.
 - Impact: medium
 - Risk: medium
-- Dependencies: Stable approved voting-mode SQL columns, including Phase 5 result visibility and the approved Phase 6 vote-mode/cardinality design; operator approval for private versus public reporting consumers.
+- Dependencies: Phase 5 result visibility and Phase 6 vote-mode/cardinality SQL are delivered; Phase 7 survey-builder data model decision; operator approval for private versus public reporting consumers.
 
 ### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks

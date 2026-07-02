@@ -1,13 +1,15 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: completed starter. Phase 6 has been delivered, smoke tested, and archived as the
+single-question MultiSelect implementation slice.
 
 Phase 1 through Phase 5 are complete and smoke tested. SQL-backed live voting works, guided vote
 creation works, totals-only and voter-audit exports are private/ephemeral for one closed vote at a
 time, hidden-until-close result visibility works, and existing open vote buttons work after restart
 and deployment.
 
-Use this starter to begin Phase 6 with audit/scope only.
+This starter is preserved as the historical initiation record for Phase 6. Use the Phase 7 Survey
+Builder starter for the next voting slice.
 
 ## Copy/Paste Starter
 
@@ -53,7 +55,7 @@ Read first:
 - docs/reference/ENV_REFERENCE.md
 - docs/reference/deferred_optimisations.md
 - docs/task_packs/Discord Voting Post Framework - Programme Pack.md
-- docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md
+- docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md
 
 Use these skills as applicable:
 - k98-architecture-scope

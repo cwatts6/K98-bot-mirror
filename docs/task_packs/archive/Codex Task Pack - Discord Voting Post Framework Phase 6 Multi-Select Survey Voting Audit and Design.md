@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 5 hidden-until-close results smoke test`
 - Task type: `audit | product scope | SQL-backed voting design | Discord interaction UX`
 - One-pass approved: `no`
-- Status: `implementation delivered locally - awaiting PR handoff / smoke approval`
+- Status: `complete and smoke tested`
 
 ## 2. Objective
 
@@ -550,8 +550,8 @@ Remaining out of scope:
 
 ## 16. Validation Results
 
-Implementation slice. Runtime Python and SQL migration files changed; no production SQL deployment
-or Discord smoke test has been performed yet.
+Implementation slice. Runtime Python and SQL migration files changed. SQL PR
+`cwatts6/K98-bot-SQL-Server#28` has been merged and successfully deployed to production.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
@@ -564,7 +564,8 @@ or Discord smoke test has been performed yet.
 .\.venv\Scripts\python.exe -m pytest -q tests
 ```
 
-Result: passed on 2026-07-02. Full pytest result: `2245 passed, 2 skipped`.
+Result: passed on 2026-07-02. Final full pytest result after review hardening and smoke-test UX
+polish: `2251 passed, 2 skipped`.
 
 SQL repo validation:
 
@@ -575,10 +576,46 @@ SQL repo validation:
 Result: succeeded on 2026-07-02, with pre-existing warnings on older migrations containing
 `DROP TABLE` or `TRUNCATE TABLE`.
 
-Codex Security review is required before PR handoff because this implementation touches Discord
-interactions, SQL persistence, privacy/export surfaces, user input, and restart-safe views.
+Codex Security review was considered before PR handoff because this implementation touches Discord
+interactions, SQL persistence, privacy/export surfaces, user input, and restart-safe views. The
+full Codex Security workbench was not opened for the final tiny UX follow-up because it required a
+manual scan-start step; the security-sensitive surface was reviewed locally. The follow-up only
+reads the current caller's existing multi-select option IDs for the current vote and uses them as
+private Discord select defaults; it does not change writes, exports, permissions, or public
+visibility.
 
-## 17. PR Summary Template
+## 17. Smoke Test Results
+
+Operator smoke testing completed successfully on `2026-07-02`.
+
+Confirmed:
+
+- Multi-select create, vote, update, close, and status paths work.
+- Vote changes allowed and blocked behavior works.
+- Selection limits work.
+- Restart-safe multi-select opener behavior works.
+- Previously selected options display when reopening the selector and can be amended.
+- Updated selections are reflected successfully.
+- Existing one-choice regression behavior remains compatible.
+
+Phase 6 delivered:
+
+- Single-question `MultiSelect` voting.
+- SQL-backed vote mode and min/max selection rules.
+- SQL-backed multi-select ballots and current selections.
+- Persistent public opener with private per-user selection panel.
+- Private panel preselection of existing choices when changes are allowed.
+- PublicLive and HiddenUntilClose result behavior for multi-select.
+- Mode-aware status, close outcome, cards, totals export, and voter-audit export.
+
+Remaining out of scope and still tracked:
+
+- Full multi-question survey builder.
+- Per-option emoji/icon support.
+- Dashboard/reporting readiness.
+- Role-restricted voting, governor-linked voting, saved templates, and public voter-level exports.
+
+## 18. PR Summary Template
 
 ```md
 ## Summary

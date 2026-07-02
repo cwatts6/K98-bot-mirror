@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 complete; Phase 5 hidden-until-close results complete and smoke tested; Phase 6 single-question MultiSelect implemented locally and awaiting PR handoff / smoke approval`
+- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 complete; Phase 5 complete; Phase 6 single-question MultiSelect complete and smoke tested; Phase 7 survey-builder audit/design prepared`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -361,11 +361,20 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 6 - Multi-Select / Survey Voting Audit and Design
 
-Status: single-question `MultiSelect` implemented locally; awaiting PR handoff / smoke approval.
+Status: complete and smoke tested.
 
-Phase 6 is the next prepared voting slice. It should start with audit/scope only because
-multi-select and survey-style voting change vote cardinality, interaction state, result
-aggregation, export shape, and SQL storage more deeply than hidden-until-close visibility did.
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#198`
+- Production PR: `cwatts6/k98-bot#506`
+- SQL PR: `cwatts6/K98-bot-SQL-Server#28`
+- SQL deployment: `2026-07-02`
+- Bot smoke test: `2026-07-02`
+
+Phase 6 first audited multi-select versus full survey-style voting and selected a staged roadmap:
+ship single-question `MultiSelect` first, then defer the full survey builder into a later task
+pack. This kept the first cardinality change bounded to the existing `/vote_admin` workflow while
+preserving all Phase 1 through Phase 5 behavior.
 
 Confirmed Phase 6 direction:
 
@@ -397,7 +406,7 @@ Audit recommendation drafted on `2026-07-02`:
   totals and voter-audit shapes for multi-select.
 - Full multi-question survey builder remains deferred as a separate high-risk task pack.
 
-Implementation delivered locally after operator approval:
+Delivered after operator approval:
 
 - Added `OneChoice` / `MultiSelect` vote mode handling with `OneChoice` as the default.
 - Added SQL-backed mode/cardinality columns and multi-select current-selection storage in the SQL
@@ -405,9 +414,53 @@ Implementation delivered locally after operator approval:
 - Preserved existing one-choice public option buttons and exports.
 - Added a persistent public "Choose options" opener button for multi-select votes with a private
   user-specific selection panel.
+- Added private panel preselection of existing choices when a user reopens the selector.
 - Made status, public embeds, rendered cards, outcomes, and closed-only private exports mode-aware.
 - Full pytest passed locally with `2245 passed, 2 skipped`; SQL repo validation succeeded with only
   pre-existing warnings on older migrations.
+
+Final validation and smoke evidence:
+
+- Final full pytest after review hardening and smoke-test UX polish: `2251 passed, 2 skipped`.
+- Multi-select create/vote/update/close/status paths work.
+- Vote changes allowed and blocked behavior works.
+- Selection limits work.
+- Restart-safe opener behavior works.
+- Previously selected options display when reopening the selector and can be amended.
+- Updated selections are reflected successfully.
+- Existing one-choice regression behavior remains compatible.
+
+Phase 6 records are archived under:
+
+```text
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md
+```
+
+### Phase 7 - Survey Builder Audit and Design
+
+Status: prepared, not started.
+
+Phase 7 is the next voting slice. It should start with audit/scope only because full
+multi-question survey-style voting changes product semantics, privacy, SQL shape, private response
+flow, export shape, and reporting implications more deeply than Phase 6 single-question
+`MultiSelect`.
+
+Prepared scope:
+
+- Define the first survey implementation candidate and decide whether it is a simple
+  choice-question survey, a paged private response flow, or a fuller guided builder.
+- Define question types and first-slice limits.
+- Define required/optional answer rules, partial response policy, resume policy, and response
+  change behavior.
+- Define how existing answers are shown privately when editing a response.
+- Define PublicLive and HiddenUntilClose behavior across multiple questions.
+- Define summary and detail/voter-audit export shapes.
+- Validate SQL options against `C:\K98-bot-SQL-Server`, including survey definitions, questions,
+  options, response envelopes, answers, indexes, constraints, and audit events.
+- Preserve one-choice and multi-select behavior.
+- Keep emoji/icon support and dashboard/reporting implementation out of the first survey audit
+  unless separately approved.
 
 ## 8. Remaining Slice Scope Summary
 
@@ -446,34 +499,54 @@ posting were removed from active scope.
 Phase 5 decided:
 
 - hidden-until-close result visibility was the safest first implementation slice and is now complete
-- multi-select/survey voting, emoji/icon support, and dashboard/reporting readiness remain active
-  future slices
+- full survey-builder voting, emoji/icon support, and dashboard/reporting readiness remain active
+  future slices after Phase 6 MultiSelect delivery
 - role-restricted voting, governor-linked voting, saved vote templates, and public voter-level
   export posting are removed from active scope
 - existing `/vote_admin` paths remain sufficient for the approved voting-mode roadmap
 - each future slice must define SQL/schema/index/audit, automated tests, and manual smoke evidence
   before implementation
 
-### Phase 6 multi-select/survey scope summary
+### Phase 6 multi-select scope summary
 
-Phase 6 should not implement multi-select immediately. It should audit and design the safest
-cardinality change first, then stop for approval.
+Phase 6 is complete. It resolved the first half of the combined multi-select/survey deferred item
+by delivering single-question `MultiSelect` voting with SQL-backed cardinality and selection
+storage.
+
+Delivered scope:
+
+- Staged roadmap selected: `MultiSelect` first, full survey builder deferred.
+- Additive SQL delivered: `VotePosts.VoteMode`, `MinSelections`, `MaxSelections`,
+  `dbo.VotePostMultiSelectVotes`, and `dbo.VotePostMultiSelectSelections`.
+- Existing one-choice vote buttons preserved.
+- Multi-select public opener plus private selection panel delivered.
+- Existing selections are preselected when a user reopens the panel.
+- PublicLive and HiddenUntilClose result behavior works for multi-select.
+- Mode-aware status, card, close outcome, totals export, and voter-audit export delivered.
+- Restart-safe opener behavior smoke tested.
+- One-choice regression behavior smoke tested.
+
+### Phase 7 survey-builder scope summary
+
+Phase 7 should not implement survey voting immediately. It should audit and design the safest first
+survey builder slice, then stop for approval.
 
 Prepared scope:
 
-- Define whether the first runtime slice is `MultiSelect` single-question voting, full
-  multi-question survey voting, or a two-step roadmap where `MultiSelect` ships first and survey
-  builder work remains deferred.
-- Validate SQL options against `C:\K98-bot-SQL-Server`, including whether to add a `VoteMode`
-  column to `dbo.VotePosts`, a child selection table such as `dbo.VotePostVoteSelections`, and
-  constraints for min/max selections.
-- Define how select menus or private panels should represent selected/unselected options without
-  breaking restart-safe vote post buttons.
-- Define how public live and hidden-until-close result visibility should work for multi-select
-  totals and final outcomes.
-- Define export shapes for totals-only and voter-audit CSVs before changing any export behavior.
-- Define automated tests and manual smoke steps for cardinality, selection changes, restart
-  behavior, exports, close reveal, and privacy.
+- Define whether survey-style voting should be modeled as a vote mode, a separate survey object,
+  or a survey object linked to a public vote post.
+- Define command placement under existing `/vote_admin` paths versus a separately approved survey
+  command group.
+- Define first-slice question types and limits.
+- Define partial response, resume, response-change, and existing-answer prefill behavior.
+- Validate SQL options against `C:\K98-bot-SQL-Server`, including survey definitions, questions,
+  options, response envelopes, answers, constraints, indexes, and audit events.
+- Define how public live and hidden-until-close result visibility should work across multiple
+  questions.
+- Define closed summary, totals export, and voter-audit/detail export shapes before changing any
+  export behavior.
+- Define automated tests and manual smoke steps for builder UX, response submission/change,
+  restart behavior, exports, close reveal, and privacy.
 
 ## 9. Cross-Programme Constraints
 
@@ -488,6 +561,9 @@ Prepared scope:
 - Do not expose voter-level exports publicly without explicit approval.
 - Do not add further advanced voting modes until their product, privacy, permissions, SQL, UX,
   test, and rollout model are explicitly approved.
+- Do not implement full survey builder, emoji/icon support, dashboard/reporting readiness,
+  role-restricted voting, governor-linked voting, saved templates, or public voter-level exports
+  as part of Phase 7 unless separately approved.
 
 ## 10. Validation Strategy
 
@@ -540,15 +616,19 @@ The core programme is successful when:
       Discord ID/name columns, SQL audit logging, and governor identity deferred.
 - [x] Hidden-until-close result visibility is delivered in Phase 5 with public open-result hiding,
       public close reveal, private admin live totals, and unchanged private closed-only exports.
+- [x] Single-question multi-select voting is delivered in Phase 6 with SQL-backed mode/cardinality
+      storage, restart-safe public opener, private selection panel, existing-selection prefill,
+      PublicLive/HiddenUntilClose support, mode-aware status/cards/outcomes/exports, and preserved
+      one-choice behavior.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 6: Multi-Select / Survey Voting Audit and Design.
+Start Discord Voting Post Framework Phase 7: Survey Builder Audit and Design.
 
-Begin with audit/scope only. Do not implement SQL migrations, vote-mode behavior, select-menu
-interactions, export shape changes, or survey builder UI until the Phase 6 architecture and product
-scope are approved.
+Begin with audit/scope only. Do not implement SQL migrations, survey tables, question-builder UI,
+private response flows, export shape changes, dashboard/reporting implementation, or command
+changes until the Phase 7 architecture and product scope are approved.
 ```
 
 ## 13. Programme Change Log
@@ -570,4 +650,6 @@ scope are approved.
 | 2026-07-02 | Hidden results slice locally validated | Added create-time `PublicLive`/`HiddenUntilClose` result visibility, SQL `VotePosts.ResultVisibility` migration, public open-result hiding, public close reveal, private admin live totals, focused regression tests, full pytest, SQL validation, and Codex Security review with 0 findings. |
 | 2026-07-02 | Hidden results smoke tested and archived | Operator smoke testing confirmed hidden-until-close behavior was successful. Phase 5 audit/starter records were archived, and Phase 6 multi-select/survey audit and design was prepared as the next voting slice. |
 | 2026-07-02 | Phase 6 audit drafted | Recommended staged roadmap with single-question `MultiSelect` first, full survey builder deferred, additive SQL mode/cardinality and selection storage, private selection-panel UX, mode-aware result/export behavior, and no runtime changes until operator approval. |
-| 2026-07-02 | Phase 6 MultiSelect implemented locally | Added SQL-backed `OneChoice`/`MultiSelect` mode, min/max selections, multi-select ballot/selection storage, persistent public opener with private selection panel, mode-aware status/cards/outcomes/exports, focused tests, full pytest, and SQL repo validation. Production SQL deployment and Discord smoke remain pending. |
+| 2026-07-02 | Phase 6 MultiSelect implemented locally | Added SQL-backed `OneChoice`/`MultiSelect` mode, min/max selections, multi-select ballot/selection storage, persistent public opener with private selection panel, mode-aware status/cards/outcomes/exports, focused tests, full pytest, and SQL repo validation. |
+| 2026-07-02 | Phase 6 smoke tested and archived | SQL PR #28 was merged and deployed to production. Smoke testing confirmed multi-select create/vote/update/close/status paths, allowed/blocked changes, selection limits, restart-safe opener behavior, existing-selection prefill, successful amendments, and one-choice regression compatibility. Phase 6 task pack and starter were archived. |
+| 2026-07-02 | Phase 7 survey-builder audit prepared | Created the next active survey-builder audit/design task pack and starter; preserved remaining full survey, emoji/icon, dashboard/reporting, and export/reporting follow-up work in deferred optimisation scope. |
