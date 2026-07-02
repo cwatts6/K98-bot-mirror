@@ -126,7 +126,12 @@ class _MultiSelectOpenButton(discord.ui.Button):
         except Exception:
             logger.debug("vote_multi_select_defer_failed", exc_info=True)
 
-        snapshot = await vote_service.get_vote_snapshot(self.vote_post_id)
+        try:
+            snapshot = await vote_service.get_vote_snapshot(self.vote_post_id)
+        except Exception:
+            logger.exception("vote_multi_select_snapshot_failed vote_post_id=%s", self.vote_post_id)
+            await send_ephemeral(interaction, "Vote could not be loaded. Please try again.")
+            return
         if snapshot is None:
             await send_ephemeral(interaction, "This vote no longer exists.")
             return
@@ -171,7 +176,17 @@ class _MultiSelectOptionSelect(discord.ui.Select):
         except Exception:
             logger.debug("vote_multi_select_panel_defer_failed", exc_info=True)
 
-        selected_option_ids = tuple(int(value) for value in self.values)
+        try:
+            selected_option_ids = tuple(int(value) for value in self.values)
+        except (TypeError, ValueError):
+            logger.warning(
+                "vote_multi_select_invalid_payload vote_post_id=%s actor_discord_id=%s values=%s",
+                self.parent_view.vote_post_id,
+                getattr(getattr(interaction, "user", None), "id", None),
+                list(self.values),
+            )
+            await send_ephemeral(interaction, "One or more selected options are not valid.")
+            return
         try:
             result, snapshot = await vote_service.cast_multi_select_vote(
                 vote_post_id=self.parent_view.vote_post_id,

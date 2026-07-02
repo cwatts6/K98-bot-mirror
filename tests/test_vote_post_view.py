@@ -241,3 +241,65 @@ async def test_multi_select_opener_sends_private_selection_panel(monkeypatch):
     select = panel.children[0]
     assert select.min_values == 1
     assert select.max_values == 2
+
+
+@pytest.mark.asyncio
+async def test_multi_select_opener_reports_snapshot_load_failure(monkeypatch):
+    view = VotePostView(_multi_select_snapshot())
+    button = view.children[0]
+    captured: dict[str, object] = {}
+
+    async def fail_get_vote_snapshot(_vote_post_id):
+        raise RuntimeError("database unavailable")
+
+    async def fake_send_ephemeral(_interaction, content, **kwargs):
+        captured["content"] = content
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "ui.views.vote_post_view.vote_service.get_vote_snapshot", fail_get_vote_snapshot
+    )
+    monkeypatch.setattr("ui.views.vote_post_view.send_ephemeral", fake_send_ephemeral)
+
+    interaction = SimpleNamespace(
+        response=_Response(),
+        user=SimpleNamespace(id=123),
+        message=SimpleNamespace(id=456),
+    )
+
+    await button.callback(interaction)
+
+    assert captured["content"] == "Vote could not be loaded. Please try again."
+
+
+@pytest.mark.asyncio
+async def test_multi_select_panel_rejects_invalid_payload_before_cast(monkeypatch):
+    snapshot = _multi_select_snapshot()
+    panel = MultiSelectVotePanel(snapshot, owner_user_id=123)
+    select = panel.children[0]
+    select._interaction = SimpleNamespace(data={})
+    select._selected_values = ["not-an-option-id"]
+    captured: dict[str, object] = {}
+
+    async def fail_cast_multi_select_vote(**_kwargs):
+        raise AssertionError("invalid payload should not reach service cast")
+
+    async def fake_send_ephemeral(_interaction, content, **kwargs):
+        captured["content"] = content
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "ui.views.vote_post_view.vote_service.cast_multi_select_vote",
+        fail_cast_multi_select_vote,
+    )
+    monkeypatch.setattr("ui.views.vote_post_view.send_ephemeral", fake_send_ephemeral)
+
+    interaction = SimpleNamespace(
+        response=_Response(),
+        user=SimpleNamespace(id=123),
+        message=SimpleNamespace(id=456),
+    )
+
+    await select.callback(interaction)
+
+    assert captured["content"] == "One or more selected options are not valid."
