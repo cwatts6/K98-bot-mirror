@@ -374,7 +374,10 @@ def _builder_option_count(parent_view: SurveyBuilderView) -> int:
 
 
 def _builder_disabled(parent_view: SurveyBuilderView) -> bool:
-    return parent_view.builder_locked or len(parent_view.questions) >= survey_service.MAX_SURVEY_QUESTIONS
+    return (
+        parent_view.builder_locked
+        or len(parent_view.questions) >= survey_service.MAX_SURVEY_QUESTIONS
+    )
 
 
 class _BuilderPromptButton(discord.ui.Button):
@@ -488,9 +491,7 @@ class _BuilderSelectionSelect(discord.ui.Select):
         self.kind = kind
         option_count = max(1, len(parent_view.draft_options))
         current = (
-            parent_view.draft_min_selections
-            if kind == "min"
-            else parent_view.draft_max_selections
+            parent_view.draft_min_selections if kind == "min" else parent_view.draft_max_selections
         )
         label = "Minimum selections" if kind == "min" else "Maximum selections"
         options = [

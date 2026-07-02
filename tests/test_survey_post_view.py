@@ -271,14 +271,18 @@ async def test_survey_guided_builder_saves_multi_select_from_max_selection(monke
 
     await prompt_modal.callback(prompt_interaction)
 
-    assert "Draft prompt: Which nights work? (18/180)" in prompt_interaction.response.edited["content"]
+    assert (
+        "Draft prompt: Which nights work? (18/180)" in prompt_interaction.response.edited["content"]
+    )
 
     first_option = _SurveyOptionModal(view)
     first_option.option.value = "Friday"
     await first_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
     second_option = _SurveyOptionModal(view)
     second_option.option.value = "Saturday"
-    await second_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    await second_option.callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
     third_option = _SurveyOptionModal(view)
     third_option.option.value = "Sunday"
     await third_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
