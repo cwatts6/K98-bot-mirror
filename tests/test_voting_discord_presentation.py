@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from voting.discord_presentation import build_close_embed, build_vote_embed
 from voting.models import VoteOption, VoteSnapshot
+from voting.result_visibility import RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE
 
 
 def _closed_snapshot(*, total_votes: int) -> VoteSnapshot:
@@ -67,3 +69,52 @@ def test_vote_embed_includes_outcome_for_elapsed_vote():
     outcome_fields = [field for field in embed.fields if field.name == "Outcome"]
     assert outcome_fields
     assert outcome_fields[0].value.startswith("Winner:")
+
+
+def test_open_hidden_vote_embed_hides_public_totals_and_outcome():
+    snapshot = replace(
+        _closed_snapshot(total_votes=4),
+        status="Open",
+        closed_at_utc=None,
+        closed_reason=None,
+        closes_at_utc=datetime(2026, 7, 1, 13, 0, tzinfo=UTC),
+        result_visibility=RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE,
+    )
+
+    embed = build_vote_embed(snapshot)
+    fields = {field.name: field.value for field in embed.fields}
+
+    assert "Total votes" not in fields
+    assert fields["Results"] == "Hidden until close"
+    assert fields["Result visibility"] == "Hidden until close"
+    assert "Outcome" not in fields
+
+
+def test_elapsed_hidden_vote_embed_waits_for_actual_close_before_reveal():
+    snapshot = replace(
+        _closed_snapshot(total_votes=4),
+        status="Open",
+        closed_at_utc=None,
+        closed_reason=None,
+        result_visibility=RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE,
+    )
+
+    embed = build_vote_embed(snapshot)
+    fields = {field.name: field.value for field in embed.fields}
+
+    assert fields["Results"] == "Hidden until close"
+    assert "Total votes" not in fields
+    assert "Outcome" not in fields
+
+
+def test_closed_hidden_vote_embed_reveals_public_totals_and_outcome():
+    snapshot = replace(
+        _closed_snapshot(total_votes=4),
+        result_visibility=RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE,
+    )
+
+    embed = build_vote_embed(snapshot)
+    fields = {field.name: field.value for field in embed.fields}
+
+    assert fields["Total votes"] == "4"
+    assert fields["Outcome"].startswith("Winner:")

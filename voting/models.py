@@ -51,6 +51,7 @@ class VoteSnapshot:
     updated_at_utc: datetime
     options: tuple[VoteOption, ...]
     reminders: tuple[VoteReminder, ...] = ()
+    result_visibility: str = "PublicLive"
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,7 @@ class VoteCreateRequest:
     close_mention_everyone: bool = False
     background_asset_key: str | None = None
     opens_at_utc: datetime | None = None
+    result_visibility: str = "PublicLive"
 
 
 @dataclass(frozen=True)

@@ -104,6 +104,7 @@ def test_vote_create_description_remains_optional() -> None:
     flags = dict(_vote_create_option_required_flags())
 
     assert flags["description"] is False
+    assert flags["result_visibility"] is False
 
 
 def test_vote_create_uses_individual_option_fields() -> None:
@@ -138,6 +139,28 @@ def test_vote_export_adds_optional_mode_defaulting_to_totals() -> None:
     keywords = {keyword.arg: keyword.value for keyword in mode_default.keywords}
     assert isinstance(keywords["default"], ast.Name)
     assert keywords["default"].id == "_EXPORT_MODE_TOTALS"
+    assert isinstance(keywords["required"], ast.Constant)
+    assert keywords["required"].value is False
+
+
+def test_vote_create_adds_optional_result_visibility_defaulting_to_public_live() -> None:
+    tree = ast.parse(Path("commands/vote_admin_cmds.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "vote_create":
+            defaults = dict(
+                zip(node.args.args[-len(node.args.defaults) :], node.args.defaults, strict=True)
+            )
+            break
+    else:
+        raise AssertionError("vote_create command was not found")
+
+    result_visibility_default = defaults[
+        next(arg for arg in defaults if arg.arg == "result_visibility")
+    ]
+    assert isinstance(result_visibility_default, ast.Call)
+    keywords = {keyword.arg: keyword.value for keyword in result_visibility_default.keywords}
+    assert isinstance(keywords["default"], ast.Name)
+    assert keywords["default"].id == "RESULT_VISIBILITY_PUBLIC_LIVE"
     assert isinstance(keywords["required"], ast.Constant)
     assert keywords["required"].value is False
 

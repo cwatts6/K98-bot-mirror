@@ -37,6 +37,11 @@ from voting.service import (
     get_vote_snapshot,
     search_closed_vote_choices,
     search_vote_choices,
+    RESULT_VISIBILITY_CHOICES,
+)
+from voting.result_visibility import (
+    RESULT_VISIBILITY_PUBLIC_LIVE,
+    result_visibility_label,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,6 +67,10 @@ _EXPORT_MODE_VOTER_AUDIT = "voter_audit"
 _EXPORT_MODE_CHOICES = [
     discord.OptionChoice(name="Totals only", value=_EXPORT_MODE_TOTALS),
     discord.OptionChoice(name="Voter audit", value=_EXPORT_MODE_VOTER_AUDIT),
+]
+_RESULT_VISIBILITY_CHOICES = [
+    discord.OptionChoice(name=label, value=value)
+    for value, label in RESULT_VISIBILITY_CHOICES.items()
 ]
 
 
@@ -321,6 +330,13 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             required=False,
             default=True,
         ),
+        result_visibility: str = discord.Option(
+            str,
+            "Show live results publicly or hide them until close",
+            choices=_RESULT_VISIBILITY_CHOICES,
+            required=False,
+            default=RESULT_VISIBILITY_PUBLIC_LIVE,
+        ),
     ) -> None:
         await safe_defer(ctx, ephemeral=True)
         try:
@@ -337,6 +353,7 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                 launch_mention_everyone=launch_mention_everyone,
                 reminder_mention_everyone=reminder_mention_everyone,
                 close_mention_everyone=close_mention_everyone,
+                result_visibility=result_visibility,
             )
         except VoteValidationError as exc:
             await ctx.interaction.edit_original_response(content=f"Vote not created: {exc}")
@@ -533,6 +550,11 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
         )
         embed.add_field(name="Status", value=snapshot.status, inline=True)
         embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
+        embed.add_field(
+            name="Result visibility",
+            value=result_visibility_label(snapshot.result_visibility),
+            inline=True,
+        )
         embed.add_field(
             name="Closes",
             value=snapshot.closes_at_utc.strftime("%Y-%m-%d %H:%M UTC"),

@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Hidden Results Completed Item
+- Area: `voting/render_service.py`, `voting/discord_presentation.py`, `commands/vote_admin_cmds.py`, `voting/service.py`, `voting/dal.py`, SQL repo vote framework
+- Type: architecture
+- Description: Hidden-until-close result visibility was approved as the safest first advanced voting slice after Phase 5 operator review. Before this slice, all open vote posts rendered live public totals and SQL had no result-visibility mode.
+- Resolution: The implementation adds create-time `PublicLive` versus `HiddenUntilClose` result visibility with `PublicLive` as the default to preserve Phase 1 through Phase 4 behavior. Hidden open votes keep public vote buttons unchanged while suppressing public embed/card totals, option counts, percentages, bar fills, total-voter footer, and outcome text until the vote is actually closed. Admin `/vote_admin status` remains private and still shows live totals. Manual close and scheduled close use the existing closed snapshot paths to reveal final results publicly. Totals-only and voter-audit exports remain private and closed-only.
+- Validation: SQL source-of-truth migration `C:\K98-bot-SQL-Server\migrations\20260702_001_add_vote_post_result_visibility.sql` adds additive `dbo.VotePosts.ResultVisibility` storage with `PublicLive` default and a `PublicLive`/`HiddenUntilClose` check constraint. Automated validation included focused voting tests (`68 passed`), architecture-boundary validation, deferred-item validation, selected-test review, command-registration tests, SQL repo validation, smoke imports, command-registration script validation, full pytest (`2231 passed, 2 skipped`), and Codex Security diff scan `4c30e6e8-19df-410f-8c76-7aecd49b5290` with 0 findings and 6/6 reviewed rows.
+
 ### Discord Voting Post Framework Phase 4 Completed Item
 - Area: `voting/export_service.py`, `voting/dal.py`, `commands/vote_admin_cmds.py`, `/vote_admin export`, SQL vote/audit tables
 - Type: architecture

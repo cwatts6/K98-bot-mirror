@@ -6,13 +6,31 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `voting/`, `/vote_admin`, future voting programme phases
+- Area: `voting/`, `ui/views/vote_post_view.py`, `/vote_admin`, SQL repo vote framework
 - Type: architecture
-- Description: Discord Voting Post Framework Phase 4 delivered private voter-level audit export without adding advanced voting modes. Role-restricted voting, anonymous or hidden-until-close results, governor-linked voting, multi-select/survey modes, saved templates, public dashboard reporting, and public voter-level export posting remain outside the delivered Phase 4 scope because each changes permissions, data visibility, SQL contracts, or player expectations.
-- Suggested Fix: Use `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 5 Advanced Voting Modes Audit and Slice Planning.md` to run the advanced voting modes audit. Separately evaluate product need, permission/privacy model, SQL schema changes, command/view UX, migration and rollback plan, and focused tests for each candidate mode before implementation. Phase 5 should either split this item into specific future implementation task packs or keep unapproved modes as structured deferred items.
-- Impact: medium
+- Description: Multi-select and survey-style voting are approved for future scope because they support public availability and preference checks better than one forced choice. Current SQL stores one `OptionID` per `(VotePostID, DiscordUserID)`, current buttons have no selected/unselected multi-state, and current result cards assume one vote per user.
+- Suggested Fix: Treat multi-select/survey as a separate high-value design and implementation slice after hidden-results scope. Define vote mode, min/max selection rules, result aggregation, export shape, and restart-safe interaction UX before adding SQL such as a vote-selection child table or survey question tables. Do not bundle with hidden results, emoji support, or dashboard readiness.
+- Impact: high
 - Risk: high
-- Dependencies: Discord Voting Post Framework Phase 1 through Phase 4 complete and smoke tested; Phase 5 audit/scope approval; operator approval before any advanced-mode implementation.
+- Dependencies: Approved product design for cardinality and survey semantics; SQL repo migration design; focused interaction and export regression tests.
+
+### Deferred Optimisation
+- Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, SQL repo `dbo.VotePostOptions`
+- Type: consistency
+- Description: Per-option emoji/icon support is approved for future scope because it makes public votes more readable and engaging. Current options have labels and nullable `ButtonStyle`, but no emoji/icon metadata. Adding emoji has Discord button UX, CSV/export, and generated-card font/glyph implications.
+- Suggested Fix: Prepare a focused polish slice that adds approved option emoji/icon metadata, validates Unicode or custom emoji input, uses Discord button emoji support where practical, updates card rendering with glyph fallback checks, and preserves existing label-length/export behavior.
+- Impact: medium
+- Risk: medium
+- Dependencies: Renderer visual QA with representative emoji/custom emoji cases.
+
+### Deferred Optimisation
+- Area: `voting/`, `/vote_admin status`, SQL repo vote reporting views/procedures
+- Type: architecture
+- Description: Dashboard/reporting readiness is approved for future scope. Current vote tables can support basic closed-vote summaries, but there are no dedicated reporting views/procedures and future mode columns may change reporting dimensions.
+- Suggested Fix: Scope a private reporting-readiness slice that defines SQL views or procedures for vote summaries, participation, outcomes, export/audit history, and approved mode dimensions. Keep public website work out of scope unless separately approved.
+- Impact: medium
+- Risk: medium
+- Dependencies: Stable approved voting-mode SQL columns; operator approval for private versus public reporting consumers.
 
 ### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks

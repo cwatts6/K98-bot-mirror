@@ -7,6 +7,7 @@ import discord
 from voting.models import VoteSnapshot
 from voting.outcomes import vote_outcome
 from voting.render_service import render_vote_card
+from voting.result_visibility import public_results_hidden, result_visibility_label
 
 
 def no_broad_mentions() -> discord.AllowedMentions:
@@ -28,6 +29,7 @@ def message_link(snapshot: VoteSnapshot) -> str:
 
 
 def build_vote_embed(snapshot: VoteSnapshot) -> discord.Embed:
+    now = datetime.now(UTC)
     color = discord.Color.green() if snapshot.status == "Open" else discord.Color.red()
     embed = discord.Embed(
         title=snapshot.title, description=snapshot.description or None, color=color
@@ -38,13 +40,22 @@ def build_vote_embed(snapshot: VoteSnapshot) -> discord.Embed:
         value=snapshot.closes_at_utc.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         inline=True,
     )
-    embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
-    if (
+    if public_results_hidden(snapshot, now_utc=now):
+        embed.add_field(name="Results", value="Hidden until close", inline=True)
+    else:
+        embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
+    if not public_results_hidden(snapshot, now_utc=now) and (
         snapshot.status == "Closed"
         or snapshot.closed_at_utc is not None
-        or snapshot.closes_at_utc <= datetime.now(UTC)
+        or snapshot.closes_at_utc <= now
     ):
         embed.add_field(name="Outcome", value=vote_outcome(snapshot).summary, inline=False)
+    if getattr(snapshot, "result_visibility", "PublicLive") != "PublicLive":
+        embed.add_field(
+            name="Result visibility",
+            value=result_visibility_label(snapshot.result_visibility),
+            inline=True,
+        )
     embed.set_footer(text=f"Vote #{snapshot.vote_post_id}")
     embed.timestamp = datetime.now(UTC)
     embed.set_image(url=f"attachment://vote_{snapshot.vote_post_id}.png")

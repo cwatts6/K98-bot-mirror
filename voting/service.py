@@ -13,6 +13,11 @@ from voting.models import (
     VoteLookupChoice,
     VoteSnapshot,
 )
+from voting.result_visibility import (
+    RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE,
+    RESULT_VISIBILITY_PUBLIC_LIVE,
+    normalize_result_visibility,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +47,10 @@ MAX_TITLE_LEN = 180
 MAX_DESCRIPTION_LEN = 2000
 MAX_CLOSE_REASON_LEN = 200
 DEFAULT_REMINDER_OFFSETS = (60,)
+RESULT_VISIBILITY_CHOICES: dict[str, str] = {
+    RESULT_VISIBILITY_PUBLIC_LIVE: "Public live",
+    RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE: "Hidden until close",
+}
 CLOSE_DURATION_CHOICES: dict[str, timedelta] = {
     "30m": timedelta(minutes=30),
     "1h": timedelta(hours=1),
@@ -189,6 +198,7 @@ def build_create_request(
     raw_options: str | None = None,
     option_labels: tuple[str | None, ...] | None = None,
     background_asset_key: str | None = None,
+    result_visibility: str | None = None,
     now_utc: datetime | None = None,
 ) -> VoteCreateRequest:
     now = now_utc or datetime.now(UTC)
@@ -201,6 +211,10 @@ def build_create_request(
     closes_at = parse_close_time(close_time_utc, now_utc=now)
     if closes_at <= now:
         raise VoteValidationError("Close time must be in the future.")
+    try:
+        normalized_result_visibility = normalize_result_visibility(result_visibility)
+    except ValueError as exc:
+        raise VoteValidationError(str(exc)) from exc
     offsets = tuple(
         offset
         for offset in parse_reminder_offsets(reminder_offsets)
@@ -224,6 +238,7 @@ def build_create_request(
         reminder_mention_everyone=bool(reminder_mention_everyone),
         close_mention_everyone=bool(close_mention_everyone),
         background_asset_key=background_asset_key,
+        result_visibility=normalized_result_visibility,
     )
 
 

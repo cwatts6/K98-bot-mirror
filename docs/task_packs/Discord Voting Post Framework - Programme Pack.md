@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 complete and smoke tested; Phase 5 prepared`
+- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 complete and smoke tested; Phase 5 audit complete; hidden-until-close implementation slice locally validated`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -269,7 +269,8 @@ Delivered:
 - Preserved default totals-only `/vote_admin export` behavior.
 - Included spreadsheet-safe Discord user ID text, resolved Discord name, selected option, original
   option, vote timestamps, and vote-change flag.
-- Excluded governor names and `GovernorID`; governor-linked voting remains deferred.
+- Excluded governor names and `GovernorID`; Phase 5 later removed governor-linked voting from active
+  voting scope.
 - Added SQL audit logging through `VotePostAudit` with `ActionType=VoterAuditExported`.
 - Logged requester ID plus mode, row count, byte count, upload limit, oversized flag, delivery
   status, and column profile without storing the voter list in audit JSON.
@@ -295,22 +296,32 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 5 - Advanced Voting Modes Audit and Slice Planning
 
-Status: prepared.
+Status: audit complete; hidden-until-close implementation slice locally validated.
 
-Deliver audit/scope before implementation. Phase 5 should produce a mode-by-mode decision matrix
-and split the remaining candidate modes into safe implementation slices for:
+Deliver audit/scope before implementation. Phase 5 produced a mode-by-mode decision matrix and
+split the remaining candidate modes into approved future slices for:
 
-- Role-restricted voting.
-- Hidden-until-close or private result visibility.
-- Governor-linked voting or governor-aware audit/reporting.
+- Hidden-until-close result visibility.
 - Multi-select or survey-style vote modes.
 - Per-option emoji/icon support.
-- Saved templates for recurring vote types.
 - Dashboard/reporting readiness.
-- Public voter-level export posting policy.
 
-Do not implement advanced voting modes until the Phase 5 audit approves their product, privacy,
-permission, SQL, and UX model and the operator approves a follow-up implementation slice.
+Do not implement additional advanced voting modes until the operator separately approves the next
+implementation slice.
+
+Operator-reviewed Phase 5 recommendation:
+
+- First implementation candidate: hidden-until-close results, because it improves public vote
+  quality without changing vote cardinality, scheduler behavior, exports, or existing button
+  semantics.
+- Second implementation candidate: multi-select/survey voting, because it has high KD98 value for
+  availability and preference checks.
+- Later approved candidates: per-option emoji/icon support and dashboard/reporting readiness.
+- Removed from active scope: role-restricted voting, governor-linked voting/governor-aware audit,
+  saved vote templates, and public voter-level export posting.
+- First approved implementation slice delivered locally: create-time hidden-until-close result
+  visibility with public close reveal, private admin live totals, unchanged player vote buttons, and
+  unchanged private closed-only exports.
 
 ## 8. Remaining Slice Scope Summary
 
@@ -338,19 +349,23 @@ Affected areas:
 
 ### Phase 5 advanced-mode scope summary
 
-Phase 5 should audit role restrictions, hidden/anonymous result rules, governor-linked identity,
-multi-select/survey semantics, templates, and optional emoji/icon support separately before any
-mode is implemented. Each mode may require SQL contract changes, permission/privacy design,
-command/view UX, migration/rollback planning, focused tests, manual Discord smoke tests, and
-Codex Security review if implementation follows.
+Phase 5 audited role restrictions, hidden/anonymous result rules, governor-linked identity,
+multi-select/survey semantics, templates, optional emoji/icon support, dashboard/reporting
+readiness, and public voter-level export posting. Operator review retained hidden-until-close
+results, multi-select/survey voting, per-option emoji/icon support, and dashboard/reporting
+readiness as active future scope. Role-restricted voting, governor-linked voting, saved templates,
+and public voter-level export posting were removed from active scope.
 
-Phase 5 must decide:
+Phase 5 decided:
 
-- which mode, if any, is the safest first implementation slice
-- which modes remain explicitly deferred
-- which SQL/schema/index/audit changes each future slice needs
-- whether existing `/vote_admin` paths remain sufficient
-- what manual smoke evidence and automated tests are required per future slice
+- hidden-until-close result visibility is the safest first implementation slice
+- multi-select/survey voting, emoji/icon support, and dashboard/reporting readiness remain active
+  future slices
+- role-restricted voting, governor-linked voting, saved vote templates, and public voter-level
+  export posting are removed from active scope
+- existing `/vote_admin` paths remain sufficient for the approved voting-mode roadmap
+- each future slice must define SQL/schema/index/audit, automated tests, and manual smoke evidence
+  before implementation
 
 ## 9. Cross-Programme Constraints
 
@@ -363,8 +378,8 @@ Phase 5 must decide:
 - Preserve persistent view restart behavior and scheduler idempotency.
 - Do not edit vote options after votes exist unless the task explicitly defines safe rules.
 - Do not expose voter-level exports publicly without explicit approval.
-- Do not add advanced voting modes until Phase 5 explicitly approves their product, privacy,
-  permissions, SQL, UX, test, and rollout model.
+- Do not add further advanced voting modes until their product, privacy, permissions, SQL, UX,
+  test, and rollout model are explicitly approved.
 
 ## 10. Validation Strategy
 
@@ -419,7 +434,8 @@ The core programme is successful when:
 ## 12. Suggested Next Action
 
 ```text
-Start Phase 5 Advanced Voting Modes Audit and Slice Planning with audit/scope only.
+Review and approve or revise the Phase 5 audit recommendation before any advanced-mode
+implementation slice starts.
 ```
 
 ## 13. Programme Change Log
@@ -436,3 +452,6 @@ Start Phase 5 Advanced Voting Modes Audit and Slice Planning with audit/scope on
 | 2026-07-02 | Phase 4 implemented | Added private voter-level audit export mode with Discord ID/name, option/timestamp/change columns, SQL audit logging, and totals-only export preserved. |
 | 2026-07-02 | Phase 4 smoke tested and archived | Smoke confirmed private voter-audit export, Excel-safe Discord ID text, DiscordName, governor identity exclusion, VoteChanged, SQL audit metadata, and regression tests. Phase 4 task pack and starter moved to archive. |
 | 2026-07-02 | Phase 5 prepared | Created advanced voting modes audit/slice-planning task pack and starter; active deferred voting item promoted into Phase 5 audit scope. |
+| 2026-07-02 | Phase 5 audit drafted | Initial draft recommended role-restricted voting as the safest first implementation slice; split hidden results, governor-aware audit/reporting, multi-select/survey, templates, emoji/icon support, dashboard readiness, and public voter-level export posting into future slices or deferred policy items. |
+| 2026-07-02 | Phase 5 operator scope revised | Approved hidden-until-close results, multi-select/survey voting, per-option emoji/icon support, and dashboard/reporting readiness for future slices; removed role-restricted voting, governor-linked voting, saved templates, and public voter-level export posting from active scope. |
+| 2026-07-02 | Hidden results slice locally validated | Added create-time `PublicLive`/`HiddenUntilClose` result visibility, SQL `VotePosts.ResultVisibility` migration, public open-result hiding, public close reveal, private admin live totals, focused regression tests, full pytest, SQL validation, and Codex Security review with 0 findings. |

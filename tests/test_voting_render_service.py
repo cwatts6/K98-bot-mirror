@@ -7,6 +7,7 @@ from io import BytesIO
 from PIL import Image
 
 from voting.models import VoteOption, VoteSnapshot
+from voting.result_visibility import RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE
 from voting.render_service import HEIGHT, RED, WIDTH, _status, render_vote_card
 
 
@@ -93,6 +94,27 @@ def test_render_vote_card_handles_zero_vote_state():
     )
 
     assert rendered.image_bytes.getbuffer().nbytes > 10_000
+
+
+def test_render_vote_card_handles_hidden_open_results_without_outcome(monkeypatch):
+    def fail_vote_outcome(_snapshot):
+        raise AssertionError("open hidden vote should not compute a public outcome")
+
+    monkeypatch.setattr("voting.render_service.vote_outcome", fail_vote_outcome)
+    snapshot = _snapshot(total_votes=3)
+    snapshot = VoteSnapshot(
+        **{
+            **snapshot.__dict__,
+            "closes_at_utc": datetime(2026, 7, 1, 11, 59, tzinfo=UTC),
+            "result_visibility": RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE,
+        }
+    )
+
+    rendered = render_vote_card(snapshot, now_utc=datetime(2026, 7, 1, 12, 0, tzinfo=UTC))
+
+    image = Image.open(BytesIO(rendered.image_bytes.getvalue()))
+    assert image.format == "PNG"
+    assert image.size == (WIDTH, HEIGHT)
 
 
 def test_render_vote_card_handles_six_closed_options_with_winner_state():

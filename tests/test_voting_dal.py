@@ -5,6 +5,86 @@ from datetime import UTC, datetime
 import pytest
 
 from voting import dal
+from voting.models import VoteCreateRequest
+from voting.result_visibility import (
+    RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE,
+    RESULT_VISIBILITY_PUBLIC_LIVE,
+)
+
+
+def test_snapshot_from_rows_defaults_missing_result_visibility_to_public_live() -> None:
+    now = datetime(2026, 7, 1, 12, 0)
+
+    snapshot = dal._snapshot_from_rows(
+        {
+            "VotePostID": 42,
+            "GuildID": 1,
+            "ChannelID": 2,
+            "MessageID": 3,
+            "CreatedByDiscordUserID": 4,
+            "Title": "Vote",
+            "Description": None,
+            "Status": "Open",
+            "AllowVoteChange": 1,
+            "LaunchMentionEveryone": 0,
+            "ReminderMentionEveryone": 0,
+            "CloseMentionEveryone": 0,
+            "OpensAtUtc": None,
+            "ClosesAtUtc": now,
+            "ClosedAtUtc": None,
+            "ClosedByDiscordUserID": None,
+            "ClosedReason": None,
+            "BackgroundAssetKey": None,
+            "TotalVotes": 0,
+            "CreatedAtUtc": now,
+            "UpdatedAtUtc": now,
+        },
+        [],
+        [],
+    )
+
+    assert snapshot.result_visibility == RESULT_VISIBILITY_PUBLIC_LIVE
+
+
+@pytest.mark.asyncio
+async def test_create_vote_post_persists_result_visibility_and_audit(monkeypatch) -> None:
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+    captured: list[tuple[str, tuple[object, ...]]] = []
+
+    class _Cursor:
+        def execute(self, sql, params=()):
+            captured.append((str(sql), tuple(params)))
+
+        def fetchone(self):
+            return (42,)
+
+    async def fake_run_blocking_in_thread(_sync_func, callback, *, name):
+        assert name == "vote_create"
+        return callback(_Cursor())
+
+    monkeypatch.setattr(dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    vote_post_id = await dal.create_vote_post(
+        VoteCreateRequest(
+            guild_id=1,
+            channel_id=2,
+            created_by_discord_user_id=3,
+            title="Vote",
+            description=None,
+            options=("A", "B"),
+            closes_at_utc=now,
+            reminder_offsets_minutes=(),
+            result_visibility=RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE,
+        )
+    )
+
+    assert vote_post_id == 42
+    vote_post_insert = captured[0]
+    assert "ResultVisibility" in vote_post_insert[0]
+    assert RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE in vote_post_insert[1]
+    audit_insert = captured[-1]
+    assert "VotePostAudit" in audit_insert[0]
+    assert '"result_visibility": "HiddenUntilClose"' in str(audit_insert[1])
 
 
 @pytest.mark.asyncio

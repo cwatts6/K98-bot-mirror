@@ -18,6 +18,7 @@ from voting.models import (
     VoteSnapshot,
     VoteVoterAuditRow,
 )
+from voting.result_visibility import normalize_result_visibility
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,7 @@ def _snapshot_from_rows(
         updated_at_utc=updated_at,
         options=_rows_to_options(option_rows),
         reminders=_rows_to_reminders(reminder_rows),
+        result_visibility=normalize_result_visibility(post.get("ResultVisibility")),
     )
 
 
@@ -171,10 +173,11 @@ async def create_vote_post(req: VoteCreateRequest) -> int:
                     GuildID, ChannelID, CreatedByDiscordUserID, Title, Description, Status,
                     AllowVoteChange, LaunchMentionEveryone, ReminderMentionEveryone,
                     CloseMentionEveryone, OpensAtUtc, ClosesAtUtc, BackgroundAssetKey,
+                    ResultVisibility,
                     CreatedAtUtc, UpdatedAtUtc
                 )
             OUTPUT INSERTED.VotePostID
-            VALUES (?, ?, ?, ?, ?, 'Open', ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, 'Open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 int(req.guild_id),
@@ -189,6 +192,7 @@ async def create_vote_post(req: VoteCreateRequest) -> int:
                 _naive_utc(req.opens_at_utc) if req.opens_at_utc else None,
                 _naive_utc(req.closes_at_utc),
                 req.background_asset_key,
+                normalize_result_visibility(req.result_visibility),
                 now,
                 now,
             ),
@@ -223,7 +227,15 @@ async def create_vote_post(req: VoteCreateRequest) -> int:
             (
                 vote_post_id,
                 int(req.created_by_discord_user_id),
-                json.dumps({"option_count": len(req.options)}, ensure_ascii=False),
+                json.dumps(
+                    {
+                        "option_count": len(req.options),
+                        "result_visibility": normalize_result_visibility(
+                            req.result_visibility
+                        ),
+                    },
+                    ensure_ascii=False,
+                ),
                 now,
             ),
         )
