@@ -5,7 +5,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from ui.views.survey_post_view import SurveyBuilderView, SurveyPostView, SurveyResponsePanel
+from ui.views.survey_post_view import (
+    SurveyBuilderView,
+    SurveyPostView,
+    SurveyResponsePanel,
+    _SurveyQuestionModal,
+)
 from voting.survey_models import (
     SurveyQuestion,
     SurveyQuestionCreateRequest,
@@ -233,3 +238,55 @@ async def test_survey_builder_disables_publish_after_success(monkeypatch):
 
     assert captured["publish_calls"] == 1
     assert captured["ephemeral"] == "This survey has already been published."
+
+
+@pytest.mark.asyncio
+async def test_survey_question_modal_rejects_after_publish_started(monkeypatch):
+    captured: dict[str, object] = {}
+
+    async def fake_publish(_interaction, _questions):
+        return True
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        captured["content"] = content
+
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    view = SurveyBuilderView(owner_user_id=123, publish_callback=fake_publish)
+    view.publish_in_progress = True
+    modal = _SurveyQuestionModal(view)
+
+    await modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    assert view.questions == []
+    assert captured["content"] == "This survey has already been published."
+
+
+@pytest.mark.asyncio
+async def test_survey_question_modal_enforces_max_questions_server_side(monkeypatch):
+    question = SurveyQuestionCreateRequest(
+        prompt="First?",
+        question_type="SingleChoice",
+        options=("A", "B"),
+    )
+    captured: dict[str, object] = {}
+
+    async def fake_publish(_interaction, _questions):
+        return True
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        captured["content"] = content
+
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    view = SurveyBuilderView(
+        owner_user_id=123,
+        publish_callback=fake_publish,
+        questions=(question,) * 5,
+    )
+    modal = _SurveyQuestionModal(view)
+
+    await modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    assert len(view.questions) == 5
+    assert captured["content"] == "Question not added: surveys support at most 5 questions."

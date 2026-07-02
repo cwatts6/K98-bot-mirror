@@ -316,7 +316,7 @@ Proposed first-slice tables:
 - `dbo.SurveyQuestionOptions`: ordered choice options per question.
 - `dbo.SurveyResponses`: one submitted response envelope per survey and Discord user, with
   created/submitted/updated timestamps and optional original-answer metadata if approved for audit.
-- `dbo.SurveyResponseSelections`: normalized selected options keyed by survey, Discord user,
+- `dbo.SurveyAnswers`: normalized selected options keyed by survey, Discord user,
   question, and option.
 - `dbo.SurveyReminders`: reminder offsets, due/claim/sent timestamps, and reminder message IDs.
 - `dbo.SurveyAudit`: create/publish/update/response/close/export audit events with JSON metadata
@@ -385,7 +385,7 @@ Player response flow:
 - Public post contains a persistent `Answer survey` button.
 - Button opens a private paged response panel owned by that Discord user.
 - Each page shows one question with a select control.
-- Back/Next controls navigate pages; final page opens a review/submit step.
+- Back/Next controls navigate pages; the private panel submits directly in the first slice.
 - Existing submitted answers are prefilled when the player reopens the panel.
 - Unauthorized users cannot use another user's private panel.
 - Closed, stale, deleted-message, and permission failure paths return private safe errors.
@@ -416,17 +416,20 @@ Export rules:
 - CSV formula-safety and spreadsheet-safe Discord ID handling must match existing vote exports.
 - Existing one-choice and multi-select export headers and behavior remain unchanged.
 
-Audit events:
+Implemented audit action types:
 
-- `SurveyCreated`
-- `SurveyPublished`
-- `SurveyResponseSubmitted`
-- `SurveyResponseChanged`
-- `SurveyClosedEarly`
-- `SurveyClosedAutomatically`
-- `SurveySummaryExported`
-- `SurveyDetailExported`
-- `SurveyMessageEditFailed`
+- `Created`
+- `ResponseRecorded`
+- `ResponseChanged`
+- `ClosedEarly`
+- `ClosedAutomatically`
+- `LaunchFailed`
+- `MessageEditFailed`
+- `ReminderMarkFailed`
+- `ReminderSent`
+- `ResponseDetailExported`
+
+Earlier proposed names prefixed with `Survey*` were not used in the first implementation slice.
 
 Audit JSON should contain operational metadata, not full voter lists or full answer payloads.
 

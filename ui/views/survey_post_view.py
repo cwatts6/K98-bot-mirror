@@ -382,6 +382,15 @@ class _SurveyQuestionModal(discord.ui.Modal):
         if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
             await send_ephemeral(interaction, "This survey builder belongs to another admin.")
             return
+        if self.parent_view.publish_in_progress or self.parent_view.published:
+            await send_ephemeral(interaction, "This survey has already been published.")
+            return
+        if len(self.parent_view.questions) >= survey_service.MAX_SURVEY_QUESTIONS:
+            await send_ephemeral(
+                interaction,
+                f"Question not added: surveys support at most {survey_service.MAX_SURVEY_QUESTIONS} questions.",
+            )
+            return
         try:
             options = tuple(
                 line.strip() for line in str(self.options.value or "").splitlines() if line.strip()

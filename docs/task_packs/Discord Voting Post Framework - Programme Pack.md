@@ -457,14 +457,14 @@ Audit recommendation drafted on `2026-07-02`:
 - First implementation slice: choice-only surveys with two to five required questions, two to six
   options per question, `SingleChoice` and per-question `MultiSelect`, no free text, no optional
   answers, no role restrictions, no governor linking, and no templates.
-- Player UX: persistent public `Answer survey` button, private paged response panel, staged
-  confirmation, submitted-answer prefill when reopening, no persisted partial drafts in the first
-  slice, and SQL-backed submitted responses only.
+- Player UX: persistent public `Answer survey` button, private paged response panel, direct
+  submit from the private panel, submitted-answer prefill when reopening, no persisted partial
+  drafts in the first slice, and SQL-backed submitted responses only.
 - Privacy: public aggregate summaries only, no public voter-level detail, `HiddenUntilClose` hides
   public response counts and per-question totals until close, and private closed-only summary/detail
   CSV exports remain admin/leadership-gated.
 - SQL direction: additive `dbo.SurveyPosts`, `dbo.SurveyQuestions`,
-  `dbo.SurveyQuestionOptions`, `dbo.SurveyResponses`, `dbo.SurveyResponseSelections`,
+  `dbo.SurveyQuestionOptions`, `dbo.SurveyResponses`, `dbo.SurveyAnswers`,
   `dbo.SurveyReminders`, and `dbo.SurveyAudit` tables with FKs, uniqueness constraints, JSON audit
   checks, open/due indexes, and aggregation indexes.
 - Future slices remain separate for draft/resume support, optional questions, free-text/rating

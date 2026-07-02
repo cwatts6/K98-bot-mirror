@@ -205,6 +205,12 @@ async def _send_survey_reminder(
             reminder_id, message_id=int(message.id), now_utc=now
         )
         if not marked:
+            logger.warning(
+                "survey_reminder_mark_failed survey_id=%s reminder_id=%s message_id=%s",
+                survey_id,
+                reminder_id,
+                int(message.id),
+            )
             await survey_dal.insert_audit(
                 survey_id=survey_id,
                 actor_discord_user_id=None,
