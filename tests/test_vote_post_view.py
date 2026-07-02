@@ -218,12 +218,20 @@ async def test_multi_select_opener_sends_private_selection_panel(monkeypatch):
     async def fake_get_vote_snapshot(_vote_post_id):
         return snapshot
 
+    async def fake_get_multi_select_selection_ids(**kwargs):
+        assert kwargs == {"vote_post_id": 7, "discord_user_id": 123}
+        return (1, 3)
+
     async def fake_send_ephemeral(_interaction, content, **kwargs):
         captured["content"] = content
         captured.update(kwargs)
 
     monkeypatch.setattr(
         "ui.views.vote_post_view.vote_service.get_vote_snapshot", fake_get_vote_snapshot
+    )
+    monkeypatch.setattr(
+        "ui.views.vote_post_view.vote_service.get_multi_select_selection_ids",
+        fake_get_multi_select_selection_ids,
     )
     monkeypatch.setattr("ui.views.vote_post_view.send_ephemeral", fake_send_ephemeral)
 
@@ -241,6 +249,47 @@ async def test_multi_select_opener_sends_private_selection_panel(monkeypatch):
     select = panel.children[0]
     assert select.min_values == 1
     assert select.max_values == 2
+    defaults = {option.value for option in select.options if option.default}
+    assert defaults == {"1", "3"}
+
+
+@pytest.mark.asyncio
+async def test_multi_select_opener_still_opens_when_existing_selection_load_fails(monkeypatch):
+    snapshot = _multi_select_snapshot()
+    view = VotePostView(snapshot)
+    button = view.children[0]
+    captured: dict[str, object] = {}
+
+    async def fake_get_vote_snapshot(_vote_post_id):
+        return snapshot
+
+    async def fail_get_multi_select_selection_ids(**_kwargs):
+        raise RuntimeError("database unavailable")
+
+    async def fake_send_ephemeral(_interaction, content, **kwargs):
+        captured["content"] = content
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "ui.views.vote_post_view.vote_service.get_vote_snapshot", fake_get_vote_snapshot
+    )
+    monkeypatch.setattr(
+        "ui.views.vote_post_view.vote_service.get_multi_select_selection_ids",
+        fail_get_multi_select_selection_ids,
+    )
+    monkeypatch.setattr("ui.views.vote_post_view.send_ephemeral", fake_send_ephemeral)
+
+    interaction = SimpleNamespace(
+        response=_Response(),
+        user=SimpleNamespace(id=123),
+        message=SimpleNamespace(id=456),
+    )
+
+    await button.callback(interaction)
+
+    assert isinstance(captured["view"], MultiSelectVotePanel)
+    select = captured["view"].children[0]
+    assert [option.value for option in select.options if option.default] == []
 
 
 @pytest.mark.asyncio

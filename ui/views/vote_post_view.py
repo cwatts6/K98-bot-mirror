@@ -141,6 +141,18 @@ class _MultiSelectOpenButton(discord.ui.Button):
         if snapshot.status != "Open" or snapshot.closes_at_utc <= datetime.now(UTC):
             await send_ephemeral(interaction, "This vote is already closed.")
             return
+        selected_option_ids: tuple[int, ...] = ()
+        try:
+            selected_option_ids = await vote_service.get_multi_select_selection_ids(
+                vote_post_id=self.vote_post_id,
+                discord_user_id=int(interaction.user.id),
+            )
+        except Exception:
+            logger.exception(
+                "vote_multi_select_selection_load_failed vote_post_id=%s actor_discord_id=%s",
+                self.vote_post_id,
+                getattr(getattr(interaction, "user", None), "id", None),
+            )
 
         await send_ephemeral(
             interaction,
@@ -148,15 +160,24 @@ class _MultiSelectOpenButton(discord.ui.Button):
                 f"Choose {snapshot.min_selections}-{snapshot.max_selections} options "
                 f"for Vote #{snapshot.vote_post_id}."
             ),
-            view=MultiSelectVotePanel(snapshot, owner_user_id=int(interaction.user.id)),
+            view=MultiSelectVotePanel(
+                snapshot,
+                owner_user_id=int(interaction.user.id),
+                selected_option_ids=selected_option_ids,
+            ),
         )
 
 
 class _MultiSelectOptionSelect(discord.ui.Select):
     def __init__(self, parent_view: MultiSelectVotePanel) -> None:
         self.parent_view = parent_view
+        selected_option_ids = set(parent_view.selected_option_ids)
         options = [
-            discord.SelectOption(label=option.label[:100], value=str(option.option_id))
+            discord.SelectOption(
+                label=option.label[:100],
+                value=str(option.option_id),
+                default=int(option.option_id) in selected_option_ids,
+            )
             for option in parent_view.snapshot.options[:25]
         ]
         super().__init__(
@@ -236,11 +257,18 @@ class _MultiSelectOptionSelect(discord.ui.Select):
 
 
 class MultiSelectVotePanel(discord.ui.View):
-    def __init__(self, snapshot: VoteSnapshot, *, owner_user_id: int) -> None:
+    def __init__(
+        self,
+        snapshot: VoteSnapshot,
+        *,
+        owner_user_id: int,
+        selected_option_ids: tuple[int, ...] = (),
+    ) -> None:
         super().__init__(timeout=300)
         self.snapshot = snapshot
         self.vote_post_id = int(snapshot.vote_post_id)
         self.owner_user_id = int(owner_user_id)
+        self.selected_option_ids = tuple(int(option_id) for option_id in selected_option_ids)
         self.add_item(_MultiSelectOptionSelect(self))
 
 

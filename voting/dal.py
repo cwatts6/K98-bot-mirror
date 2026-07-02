@@ -502,6 +502,22 @@ async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
     return _snapshot_from_rows(post, options, reminders)
 
 
+async def get_multi_select_selection_ids(
+    *, vote_post_id: int, discord_user_id: int
+) -> tuple[int, ...]:
+    rows = await run_query_async(
+        """
+        SELECT OptionID
+        FROM dbo.VotePostMultiSelectSelections
+        WHERE VotePostID = ?
+          AND DiscordUserID = ?
+        ORDER BY OptionID ASC;
+        """,
+        (int(vote_post_id), int(discord_user_id)),
+    )
+    return tuple(int(row["OptionID"]) for row in rows)
+
+
 async def list_open_vote_posts() -> list[VoteSnapshot]:
     rows = await run_query_async("""
         SELECT p.*,

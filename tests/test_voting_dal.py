@@ -224,6 +224,28 @@ async def test_list_vote_voter_audit_rows_maps_multi_select_rows(monkeypatch) ->
 
 
 @pytest.mark.asyncio
+async def test_get_multi_select_selection_ids_returns_current_user_selection(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_run_query_async(sql, params=()):
+        captured["sql"] = sql
+        captured["params"] = params
+        return [{"OptionID": 11}, {"OptionID": 12}]
+
+    monkeypatch.setattr(dal, "run_query_async", fake_run_query_async)
+
+    option_ids = await dal.get_multi_select_selection_ids(
+        vote_post_id=42,
+        discord_user_id=123,
+    )
+
+    assert option_ids == (11, 12)
+    assert "FROM dbo.VotePostMultiSelectSelections" in str(captured["sql"])
+    assert "ORDER BY OptionID ASC" in str(captured["sql"])
+    assert captured["params"] == (42, 123)
+
+
+@pytest.mark.asyncio
 async def test_cast_multi_select_vote_replaces_selection_set_and_audits(monkeypatch) -> None:
     now = datetime(2026, 7, 1, 21, 0, tzinfo=UTC)
     executed: list[tuple[str, tuple[object, ...]]] = []

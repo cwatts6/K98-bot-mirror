@@ -378,6 +378,29 @@ async def test_update_vote_filters_past_due_reminder_offsets(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_get_multi_select_selection_ids_delegates_to_dal(monkeypatch):
+    captured: dict[str, object] = {}
+
+    async def fake_get_multi_select_selection_ids(**kwargs):
+        captured.update(kwargs)
+        return (11, 12)
+
+    monkeypatch.setattr(
+        service.dal,
+        "get_multi_select_selection_ids",
+        fake_get_multi_select_selection_ids,
+    )
+
+    option_ids = await service.get_multi_select_selection_ids(
+        vote_post_id=42,
+        discord_user_id=123,
+    )
+
+    assert option_ids == (11, 12)
+    assert captured == {"vote_post_id": 42, "discord_user_id": 123}
+
+
+@pytest.mark.asyncio
 async def test_update_vote_rejects_sql_length_overruns(monkeypatch):
     async def fail_update_vote_post(**_kwargs):
         raise AssertionError("DAL should not be called for invalid text lengths")

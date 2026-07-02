@@ -449,6 +449,15 @@ async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
     return await dal.get_vote_snapshot(vote_post_id)
 
 
+async def get_multi_select_selection_ids(
+    *, vote_post_id: int, discord_user_id: int
+) -> tuple[int, ...]:
+    return await dal.get_multi_select_selection_ids(
+        vote_post_id=vote_post_id,
+        discord_user_id=discord_user_id,
+    )
+
+
 async def search_vote_choices(
     query: str | None = None, *, limit: int = 25
 ) -> list[VoteLookupChoice]:
