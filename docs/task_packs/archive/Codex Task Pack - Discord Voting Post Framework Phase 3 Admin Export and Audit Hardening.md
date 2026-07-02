@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 2 guided admin UX smoke test`
 - Task type: `feature | reporting | Discord command workflow | SQL-backed audit`
 - One-pass approved: `no`
-- Status: `prepared - not started`
+- Status: `complete - delivered and smoke tested`
 
 ## 2. Objective
 
@@ -15,6 +15,30 @@ Add a guided admin workflow for retrieving completed vote results and exporting 
 Phase 3 should make closed votes easy to find after the Discord message has moved out of view,
 provide reviewable result output, and prepare a safe voter-audit export path without changing
 player voting behaviour.
+
+## 2A. Delivery Summary
+
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#195`
+- SQL PR: `not required`
+- Bot smoke test: `2026-07-02`
+
+Delivered:
+
+- `/vote_admin export` under the existing `/vote_admin` command group.
+- Closed-vote autocomplete for export lookup.
+- Private/ephemeral totals-only CSV export for one closed vote at a time.
+- Final option totals, percentages, outcome kind/summary, close metadata, message link, reminder
+  metadata, and numeric `IsWinningOption` flags.
+- Existing Phase 1 and Phase 2 behavior preserved.
+- Voter-level audit export intentionally deferred to Phase 4.
+
+Smoke test confirmed:
+
+- `/vote_admin export` looks good.
+- Export response posts ephemerally/private as expected.
+- Existing vote buttons work after restart and deployment.
 
 ## 3. Required Reading
 
@@ -195,17 +219,17 @@ After implementation:
 
 ## 12. Acceptance Criteria
 
-- [ ] Phase 3 begins with audit/scope and approval before implementation.
-- [ ] Admins can find closed votes without raw SQL or scrolling Discord history.
-- [ ] Export selection is guided and disambiguates duplicate titles.
-- [ ] Final option totals export correctly.
-- [ ] Winner, tie, and no-vote outcomes are represented in export output.
-- [ ] Voter-level export is either safely permissioned or intentionally deferred.
-- [ ] Existing Phase 1 and Phase 2 voting behaviour is preserved.
-- [ ] SQL assumptions are validated against `C:\K98-bot-SQL-Server`.
-- [ ] Command registration validation passes.
-- [ ] Focused and broad tests pass or skips are justified.
-- [ ] Codex Security review is run or explicitly justified if skipped.
+- [x] Phase 3 begins with audit/scope and approval before implementation.
+- [x] Admins can find closed votes without raw SQL or scrolling Discord history.
+- [x] Export selection is guided and disambiguates duplicate titles.
+- [x] Final option totals export correctly.
+- [x] Winner, tie, and no-vote outcomes are represented in export output.
+- [x] Voter-level export is intentionally deferred to Phase 4.
+- [x] Existing Phase 1 and Phase 2 voting behaviour is preserved.
+- [x] SQL assumptions are validated against `C:\K98-bot-SQL-Server`.
+- [x] Command registration validation passes.
+- [x] Focused and broad tests pass.
+- [x] Codex Security review completed with 0 reportable findings.
 
 ## 13. PR Summary Template
 

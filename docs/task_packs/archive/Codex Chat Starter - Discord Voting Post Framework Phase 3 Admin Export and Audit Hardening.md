@@ -1,6 +1,7 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 3 Admin Export and Audit Hardening
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived completed starter. Phase 3 was delivered in mirror PR #195 and smoke tested on
+2026-07-02. Use the Phase 4 starter in `docs/task_packs/` for the next voting slice.
 
 Phase 1 and Phase 2 are complete. SQL-backed live voting works, guided vote creation works,
 admins can select votes by lookup for status/update/close, the guided update panel works, closed
