@@ -173,7 +173,10 @@ def _validate_cardinality(
     min_selections: int | None,
     max_selections: int | None,
 ) -> tuple[str, int, int]:
-    normalized_mode = normalize_vote_mode(vote_mode)
+    try:
+        normalized_mode = normalize_vote_mode(vote_mode)
+    except ValueError as exc:
+        raise VoteValidationError(str(exc)) from exc
     minimum = 1 if min_selections is None else int(min_selections)
     maximum = 1 if max_selections is None else int(max_selections)
     if normalized_mode == VOTE_MODE_ONE_CHOICE:

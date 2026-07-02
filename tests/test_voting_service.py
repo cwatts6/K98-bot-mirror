@@ -173,6 +173,28 @@ def test_build_create_request_rejects_unknown_result_visibility():
         )
 
 
+def test_build_create_request_rejects_unknown_vote_mode():
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+
+    with pytest.raises(service.VoteValidationError, match="valid vote mode"):
+        service.build_create_request(
+            guild_id=1,
+            channel_id=2,
+            created_by_discord_user_id=3,
+            title="Best time?",
+            description=None,
+            raw_options="A | B",
+            close_time_utc=(now + timedelta(hours=2)).isoformat(),
+            reminder_offsets="60",
+            allow_vote_change=True,
+            launch_mention_everyone=False,
+            reminder_mention_everyone=False,
+            close_mention_everyone=False,
+            vote_mode="RankedChoice",
+            now_utc=now,
+        )
+
+
 def test_build_create_request_accepts_six_guided_option_fields():
     now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
 
