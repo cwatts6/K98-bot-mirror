@@ -21,7 +21,6 @@ from voting.models import (
 from voting.result_visibility import normalize_result_visibility
 from voting.vote_modes import (
     VOTE_MODE_MULTI_SELECT,
-    VOTE_MODE_ONE_CHOICE,
     normalize_vote_mode,
 )
 

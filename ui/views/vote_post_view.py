@@ -153,7 +153,7 @@ class _MultiSelectOpenButton(discord.ui.Button):
 
 
 class _MultiSelectOptionSelect(discord.ui.Select):
-    def __init__(self, parent_view: "MultiSelectVotePanel") -> None:
+    def __init__(self, parent_view: MultiSelectVotePanel) -> None:
         self.parent_view = parent_view
         options = [
             discord.SelectOption(label=option.label[:100], value=str(option.option_id))
