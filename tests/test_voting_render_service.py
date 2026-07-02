@@ -7,8 +7,8 @@ from io import BytesIO
 from PIL import Image
 
 from voting.models import VoteOption, VoteSnapshot
-from voting.result_visibility import RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE
 from voting.render_service import HEIGHT, RED, WIDTH, _status, render_vote_card
+from voting.result_visibility import RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE
 
 
 def _snapshot(total_votes: int = 0) -> VoteSnapshot:

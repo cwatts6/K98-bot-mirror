@@ -231,9 +231,7 @@ async def create_vote_post(req: VoteCreateRequest) -> int:
                 json.dumps(
                     {
                         "option_count": len(req.options),
-                        "result_visibility": normalize_result_visibility(
-                            req.result_visibility
-                        ),
+                        "result_visibility": normalize_result_visibility(req.result_visibility),
                     },
                     ensure_ascii=False,
                 ),

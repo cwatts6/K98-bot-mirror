@@ -22,12 +22,17 @@ from voting.discord_presentation import (
     no_broad_mentions,
 )
 from voting.export_service import build_vote_totals_export, build_vote_voter_audit_export
+from voting.result_visibility import (
+    RESULT_VISIBILITY_PUBLIC_LIVE,
+    result_visibility_label,
+)
 from voting.service import (
     CLOSE_DURATION_CHOICES,
     MAX_CLOSE_REASON_LEN,
     MAX_DESCRIPTION_LEN,
     MAX_OPTION_LABEL_LEN,
     MAX_TITLE_LEN,
+    RESULT_VISIBILITY_CHOICES,
     VoteValidationError,
     attach_vote_message,
     build_create_request,
@@ -37,11 +42,6 @@ from voting.service import (
     get_vote_snapshot,
     search_closed_vote_choices,
     search_vote_choices,
-    RESULT_VISIBILITY_CHOICES,
-)
-from voting.result_visibility import (
-    RESULT_VISIBILITY_PUBLIC_LIVE,
-    result_visibility_label,
 )
 
 logger = logging.getLogger(__name__)
