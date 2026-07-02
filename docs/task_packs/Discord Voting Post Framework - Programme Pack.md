@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 complete; Phase 5 complete; Phase 6 single-question MultiSelect complete and smoke tested; Phase 7 survey-builder audit/design prepared`
+- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 complete; Phase 5 complete; Phase 6 single-question MultiSelect complete and smoke tested; Phase 7 choice-only survey first slice in implementation; free-text and Add details confirmed as the next phase`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -439,14 +439,44 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 7 - Survey Builder Audit and Design
 
-Status: prepared, not started.
+Status: first choice-only implementation slice approved and in implementation.
 
-Phase 7 is the next voting slice. It should start with audit/scope only because full
-multi-question survey-style voting changes product semantics, privacy, SQL shape, private response
-flow, export shape, and reporting implications more deeply than Phase 6 single-question
-`MultiSelect`.
+Phase 7 started with audit/scope because full multi-question survey-style voting changes product
+semantics, privacy, SQL shape, private response flow, export shape, and reporting implications
+more deeply than Phase 6 single-question `MultiSelect`. The operator approved the safest first
+implementation slice: choice-only surveys first, with free-text questions and choice-question
+`Add details` confirmed as the next phase.
 
-Prepared scope:
+Audit recommendation drafted on `2026-07-02`:
+
+- Use a separate SQL-backed survey-post model rather than adding `Survey` to
+  `VotePosts.VoteMode`, because the current vote-post model and Python snapshot/view/export code
+  are intentionally single-question.
+- Keep surveys under the existing `/vote_admin` top-level group, beginning with a new
+  survey-specific create flow only after operator approval.
+- First implementation slice: choice-only surveys with two to five required questions, two to six
+  options per question, `SingleChoice` and per-question `MultiSelect`, no free text, no optional
+  answers, no role restrictions, no governor linking, and no templates.
+- Player UX: persistent public `Answer survey` button, private paged response panel, direct
+  submit from the private panel, submitted-answer prefill when reopening, no persisted partial
+  drafts in the first slice, and SQL-backed submitted responses only.
+- Privacy: public aggregate summaries only, no public voter-level detail, `HiddenUntilClose` hides
+  public response counts and per-question totals until close, and private closed-only summary/detail
+  CSV exports remain admin/leadership-gated.
+- SQL direction: additive `dbo.SurveyPosts`, `dbo.SurveyQuestions`,
+  `dbo.SurveyQuestionOptions`, `dbo.SurveyResponses`, `dbo.SurveyAnswers`,
+  `dbo.SurveyReminders`, and `dbo.SurveyAudit` tables with FKs, uniqueness constraints, JSON audit
+  checks, open/due indexes, and aggregation indexes.
+- Future slices remain separate for draft/resume support, optional questions, free-text/rating
+  types, richer survey exports, emoji/icon support, and private reporting/dashboard readiness.
+- Operator follow-up confirmed that the first implementation step should stay multiple-choice
+  only. A second survey slice should add free-text questions and optional choice-question
+  `Add details` text, and that submitted text/detail data must be included in private
+  admin/leadership exports. Admin/leadership visibility should match the current vote results
+  model: authorized private live/status/export visibility, public aggregate output only according
+  to result visibility, and no public voter-level/detail export.
+
+Prepared scope retained:
 
 - Define the first survey implementation candidate and decide whether it is a simple
   choice-question survey, a paged private response flow, or a fuller guided builder.
@@ -653,3 +683,5 @@ changes until the Phase 7 architecture and product scope are approved.
 | 2026-07-02 | Phase 6 MultiSelect implemented locally | Added SQL-backed `OneChoice`/`MultiSelect` mode, min/max selections, multi-select ballot/selection storage, persistent public opener with private selection panel, mode-aware status/cards/outcomes/exports, focused tests, full pytest, and SQL repo validation. |
 | 2026-07-02 | Phase 6 smoke tested and archived | SQL PR #28 was merged and deployed to production. Smoke testing confirmed multi-select create/vote/update/close/status paths, allowed/blocked changes, selection limits, restart-safe opener behavior, existing-selection prefill, successful amendments, and one-choice regression compatibility. Phase 6 task pack and starter were archived. |
 | 2026-07-02 | Phase 7 survey-builder audit prepared | Created the next active survey-builder audit/design task pack and starter; preserved remaining full survey, emoji/icon, dashboard/reporting, and export/reporting follow-up work in deferred optimisation scope. |
+| 2026-07-02 | Phase 7 survey-builder audit drafted | Recommended separate SQL-backed choice-only survey posts under `/vote_admin`, with private paged response UX, no partial persisted drafts, hidden-until-close aggregate privacy, closed-only private exports, additive survey SQL tables, and future task-pack outlines for draft/resume, advanced question types, reporting, and export v2. Operator confirmed multiple-choice first, then free-text questions plus choice-question `Add details` in a second slice with submitted text/detail data included in private admin/leadership exports. |
+| 2026-07-02 | Phase 7 choice-only survey first slice started | Began implementation of separate SQL-backed choice-only survey posts under `/vote_admin survey_*`, preserving existing one-choice and single-question MultiSelect behavior. Free-text questions and choice-question `Add details` remain the next phase. |

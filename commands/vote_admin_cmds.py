@@ -8,8 +8,9 @@ import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID
-from core.interaction_safety import safe_command, safe_defer
+from core.interaction_safety import safe_command, safe_defer, send_ephemeral
 from decoraters import is_admin_or_leadership_only, track_usage
+from ui.views.survey_post_view import SurveyBuilderView, SurveyPostView, disabled_survey_view
 from ui.views.vote_admin_update_view import VoteAdminUpdateView
 from ui.views.vote_post_view import VotePostView, disabled_vote_view
 from versioning import versioned
@@ -44,6 +45,27 @@ from voting.service import (
     search_closed_vote_choices,
     search_vote_choices,
 )
+from voting.survey_export_service import (
+    build_survey_response_detail_export,
+    build_survey_totals_export,
+)
+from voting.survey_presentation import (
+    build_survey_close_embed,
+    build_survey_embed,
+    build_survey_file,
+)
+from voting.survey_service import (
+    MAX_SURVEY_QUESTIONS,
+    MIN_SURVEY_QUESTIONS,
+    attach_survey_message,
+    build_create_request as build_survey_create_request,
+    cancel_survey_launch_failure,
+    close_survey,
+    create_survey_record,
+    get_survey_snapshot,
+    search_closed_survey_choices,
+    search_survey_choices,
+)
 from voting.vote_modes import VOTE_MODE_ONE_CHOICE, normalize_vote_mode, vote_mode_label
 
 logger = logging.getLogger(__name__)
@@ -76,6 +98,12 @@ _RESULT_VISIBILITY_CHOICES = [
 ]
 _VOTE_MODE_CHOICES = [
     discord.OptionChoice(name=label, value=value) for value, label in VOTE_MODE_CHOICES.items()
+]
+_SURVEY_EXPORT_MODE_TOTALS = "totals"
+_SURVEY_EXPORT_MODE_RESPONSE_DETAIL = "response_detail"
+_SURVEY_EXPORT_MODE_CHOICES = [
+    discord.OptionChoice(name="Totals only", value=_SURVEY_EXPORT_MODE_TOTALS),
+    discord.OptionChoice(name="Response detail", value=_SURVEY_EXPORT_MODE_RESPONSE_DETAIL),
 ]
 
 
@@ -114,6 +142,18 @@ def _parse_vote_post_id(value: str | int) -> int:
     raise VoteValidationError("Choose a vote from autocomplete.")
 
 
+def _parse_survey_id(value: str | int) -> int:
+    if isinstance(value, int):
+        return int(value)
+    text = str(value or "").strip()
+    if text.isdigit():
+        return int(text)
+    match = re.fullmatch(r"#(\d+)", text)
+    if match:
+        return int(match.group(1))
+    raise VoteValidationError("Choose a survey from autocomplete.")
+
+
 async def _vote_post_autocomplete(ctx: discord.AutocompleteContext):
     query = str(getattr(ctx, "value", "") or "")
     try:
@@ -142,6 +182,37 @@ async def _closed_vote_post_autocomplete(ctx: discord.AutocompleteContext):
         closed = closed_at.strftime("%Y-%m-%d %H:%M UTC")
         label = f"#{choice.vote_post_id} {choice.title} | Closed | {closed}"
         output.append(discord.OptionChoice(name=label[:100], value=str(choice.vote_post_id)))
+    return output
+
+
+async def _survey_autocomplete(ctx: discord.AutocompleteContext):
+    query = str(getattr(ctx, "value", "") or "")
+    try:
+        choices = await search_survey_choices(query=query, limit=25)
+    except Exception:
+        logger.exception("survey_autocomplete_failed query=%r", query)
+        return []
+    output = []
+    for choice in choices:
+        closes = choice.closes_at_utc.strftime("%Y-%m-%d %H:%M UTC")
+        label = f"#{choice.survey_id} {choice.title} | {choice.status} | {closes}"
+        output.append(discord.OptionChoice(name=label[:100], value=str(choice.survey_id)))
+    return output
+
+
+async def _closed_survey_autocomplete(ctx: discord.AutocompleteContext):
+    query = str(getattr(ctx, "value", "") or "")
+    try:
+        choices = await search_closed_survey_choices(query=query, limit=25)
+    except Exception:
+        logger.exception("closed_survey_autocomplete_failed query=%r", query)
+        return []
+    output = []
+    for choice in choices:
+        closed_at = choice.closed_at_utc or choice.closes_at_utc
+        closed = closed_at.strftime("%Y-%m-%d %H:%M UTC")
+        label = f"#{choice.survey_id} {choice.title} | Closed | {closed}"
+        output.append(discord.OptionChoice(name=label[:100], value=str(choice.survey_id)))
     return output
 
 
@@ -250,6 +321,58 @@ def _build_vote_voter_audit_export_summary_embed(export) -> discord.Embed:
         inline=True,
     )
     embed.set_footer(text="Private voter-level export. Includes Discord user ID and name.")
+    return embed
+
+
+def _build_survey_totals_export_summary_embed(export) -> discord.Embed:
+    snapshot = export.snapshot
+    embed = discord.Embed(
+        title=f"Survey #{snapshot.survey_id} totals export",
+        description="Per-question option totals for one closed survey.",
+        color=discord.Color.blurple(),
+    )
+    embed.add_field(name="Responses", value=str(snapshot.total_responses), inline=True)
+    embed.add_field(name="Questions", value=str(len(snapshot.questions)), inline=True)
+    embed.add_field(name="Rows", value=str(export.row_count), inline=True)
+    embed.add_field(
+        name="Closed",
+        value=(
+            snapshot.closed_at_utc.strftime("%Y-%m-%d %H:%M UTC")
+            if snapshot.closed_at_utc
+            else "Unknown"
+        ),
+        inline=True,
+    )
+    if snapshot.message_id:
+        embed.add_field(
+            name="Message",
+            value=f"https://discord.com/channels/{snapshot.guild_id}/{snapshot.channel_id}/{snapshot.message_id}",
+            inline=False,
+        )
+    embed.set_footer(text="Totals-only survey export.")
+    return embed
+
+
+def _build_survey_response_detail_export_summary_embed(export) -> discord.Embed:
+    snapshot = export.snapshot
+    embed = discord.Embed(
+        title=f"Survey #{snapshot.survey_id} response detail export",
+        description="Response-level detail rows for one closed survey.",
+        color=discord.Color.blurple(),
+    )
+    embed.add_field(name="Responses", value=str(snapshot.total_responses), inline=True)
+    embed.add_field(name="Questions", value=str(len(snapshot.questions)), inline=True)
+    embed.add_field(name="Rows", value=str(export.row_count), inline=True)
+    embed.add_field(
+        name="Closed",
+        value=(
+            snapshot.closed_at_utc.strftime("%Y-%m-%d %H:%M UTC")
+            if snapshot.closed_at_utc
+            else "Unknown"
+        ),
+        inline=True,
+    )
+    embed.set_footer(text="Private response-detail export. Includes Discord user ID and name.")
     return embed
 
 
@@ -692,6 +815,351 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             await ctx.interaction.edit_original_response(
                 content=(
                     "Vote export was built but is too large for Discord upload. "
+                    "Ask an operator for a direct SQL export."
+                )
+            )
+            return
+
+        file = discord.File(export.csv_bytes, filename=export.filename)
+        await ctx.followup.send(embed=summary_embed, file=file, ephemeral=True)
+        await ctx.interaction.edit_original_response(content=generated_message)
+
+    @group.command(
+        name="survey_create", description="Build and start a durable multi-question survey."
+    )
+    @versioned("v1.00")
+    @safe_command
+    @is_admin_or_leadership_only()
+    @track_usage()
+    async def survey_create(
+        ctx: discord.ApplicationContext,
+        title: str = discord.Option(str, "Survey title", max_length=MAX_TITLE_LEN),
+        target_channel: discord.TextChannel = discord.Option(
+            discord.TextChannel, "Channel to post in"
+        ),
+        close_in: str = discord.Option(
+            str,
+            "When the survey should close",
+            choices=_CLOSE_DURATION_CHOICES,
+        ),
+        description: str = discord.Option(
+            str,
+            "Survey description",
+            required=False,
+            default="",
+            max_length=MAX_DESCRIPTION_LEN,
+        ),
+        reminder_offsets_minutes: str = discord.Option(
+            str,
+            "Reminder offsets before close in minutes, comma-separated",
+            required=False,
+            default="60",
+        ),
+        launch_mention_everyone: bool = discord.Option(
+            bool,
+            "Mention @everyone on the launch post",
+            required=False,
+            default=False,
+        ),
+        reminder_mention_everyone: bool = discord.Option(
+            bool,
+            "Mention @everyone on reminder posts",
+            required=False,
+            default=False,
+        ),
+        close_mention_everyone: bool = discord.Option(
+            bool,
+            "Mention @everyone on closing post",
+            required=False,
+            default=False,
+        ),
+        allow_response_changes: bool = discord.Option(
+            bool,
+            "Allow players to change responses before close",
+            required=False,
+            default=True,
+        ),
+        result_visibility: str = discord.Option(
+            str,
+            "Show live results publicly or hide them until close",
+            choices=_RESULT_VISIBILITY_CHOICES,
+            required=False,
+            default=RESULT_VISIBILITY_PUBLIC_LIVE,
+        ),
+    ) -> None:
+        await safe_defer(ctx, ephemeral=True)
+        me = target_channel.guild.me
+        if me is not None:
+            needs_mention_everyone = (
+                launch_mention_everyone or reminder_mention_everyone or close_mention_everyone
+            )
+            permission_error = _channel_permission_error(
+                target_channel,
+                me,
+                needs_mention_everyone=needs_mention_everyone,
+            )
+            if permission_error:
+                await ctx.interaction.edit_original_response(content=permission_error)
+                return
+
+        async def _publish_survey(interaction, questions) -> bool:
+            try:
+                req = build_survey_create_request(
+                    guild_id=int(ctx.guild_id or target_channel.guild.id),
+                    channel_id=int(target_channel.id),
+                    created_by_discord_user_id=int(ctx.user.id),
+                    title=title,
+                    description=description,
+                    questions=questions,
+                    close_time_utc=close_in,
+                    reminder_offsets=reminder_offsets_minutes,
+                    allow_response_change=allow_response_changes,
+                    launch_mention_everyone=launch_mention_everyone,
+                    reminder_mention_everyone=reminder_mention_everyone,
+                    close_mention_everyone=close_mention_everyone,
+                    result_visibility=result_visibility,
+                )
+            except VoteValidationError as exc:
+                await send_ephemeral(interaction, f"Survey not created: {exc}")
+                return False
+
+            message = None
+            snapshot = await create_survey_record(req)
+            try:
+                message = await target_channel.send(
+                    content=mention_content(snapshot.launch_mention_everyone, "New survey is open"),
+                    embed=build_survey_embed(snapshot),
+                    file=build_survey_file(snapshot),
+                    view=SurveyPostView(snapshot),
+                    allowed_mentions=configured_everyone_mentions(snapshot.launch_mention_everyone),
+                )
+                snapshot = await attach_survey_message(
+                    snapshot,
+                    channel_id=int(target_channel.id),
+                    message_id=int(message.id),
+                )
+            except Exception:
+                logger.exception("survey_launch_failed survey_id=%s", snapshot.survey_id)
+                await cancel_survey_launch_failure(
+                    survey_id=snapshot.survey_id,
+                    actor_discord_user_id=int(ctx.user.id),
+                    reason="launch failed",
+                )
+                if message is not None:
+                    try:
+                        cancelled = await get_survey_snapshot(snapshot.survey_id)
+                        if cancelled is not None:
+                            await message.edit(
+                                embed=build_survey_embed(cancelled),
+                                attachments=[],
+                                files=[build_survey_file(cancelled)],
+                                view=disabled_survey_view(cancelled),
+                                allowed_mentions=no_broad_mentions(),
+                            )
+                    except Exception:
+                        logger.exception(
+                            "survey_launch_failed_message_disable_failed survey_id=%s",
+                            snapshot.survey_id,
+                        )
+                await send_ephemeral(
+                    interaction,
+                    "Survey not created: the Discord survey post could not be sent, "
+                    "and the SQL record was cancelled.",
+                )
+                return False
+            await send_ephemeral(
+                interaction,
+                f"Survey #{snapshot.survey_id} created in {target_channel.mention}.",
+            )
+            return True
+
+        view = SurveyBuilderView(
+            owner_user_id=int(ctx.user.id),
+            publish_callback=_publish_survey,
+        )
+        await ctx.interaction.edit_original_response(
+            content=(
+                f"Survey builder opened. Add {MIN_SURVEY_QUESTIONS}-{MAX_SURVEY_QUESTIONS} "
+                "choice questions, then publish."
+            ),
+            view=view,
+        )
+
+    @group.command(name="survey_close", description="Close a survey early and disable its button.")
+    @versioned("v1.00")
+    @safe_command
+    @is_admin_or_leadership_only()
+    @track_usage()
+    async def survey_close(
+        ctx: discord.ApplicationContext,
+        survey: str = discord.Option(
+            str,
+            "Survey to close",
+            autocomplete=_survey_autocomplete,
+        ),
+        reason: str = discord.Option(
+            str,
+            "Close reason",
+            required=False,
+            default="closed early",
+            max_length=MAX_CLOSE_REASON_LEN,
+        ),
+    ) -> None:
+        await safe_defer(ctx, ephemeral=True)
+        try:
+            survey_id = _parse_survey_id(survey)
+            result, snapshot = await close_survey(
+                survey_id=survey_id,
+                actor_discord_user_id=int(ctx.user.id),
+                reason=reason,
+            )
+        except VoteValidationError as exc:
+            await ctx.interaction.edit_original_response(content=f"Survey not closed: {exc}")
+            return
+        if snapshot is None or not result.closed:
+            await ctx.interaction.edit_original_response(content=result.message)
+            return
+        channel = bot.get_channel(snapshot.channel_id) or await bot.fetch_channel(
+            snapshot.channel_id
+        )
+        message = await channel.fetch_message(snapshot.message_id) if snapshot.message_id else None
+        if message is not None:
+            await message.edit(
+                embed=build_survey_embed(snapshot),
+                attachments=[],
+                files=[build_survey_file(snapshot)],
+                view=disabled_survey_view(snapshot),
+                allowed_mentions=no_broad_mentions(),
+            )
+        await channel.send(
+            content=mention_content(snapshot.close_mention_everyone, "Survey closed"),
+            embed=build_survey_close_embed(snapshot),
+            allowed_mentions=configured_everyone_mentions(snapshot.close_mention_everyone),
+        )
+        await ctx.interaction.edit_original_response(content=f"Survey #{survey_id} closed.")
+
+    @group.command(name="survey_status", description="Show survey status and private live totals.")
+    @versioned("v1.00")
+    @safe_command
+    @is_admin_or_leadership_only()
+    @track_usage()
+    async def survey_status(
+        ctx: discord.ApplicationContext,
+        survey: str = discord.Option(
+            str,
+            "Survey to inspect",
+            autocomplete=_survey_autocomplete,
+        ),
+    ) -> None:
+        await safe_defer(ctx, ephemeral=True)
+        try:
+            survey_id = _parse_survey_id(survey)
+        except VoteValidationError as exc:
+            await ctx.interaction.edit_original_response(content=f"Survey not found: {exc}")
+            return
+        snapshot = await get_survey_snapshot(survey_id)
+        if snapshot is None:
+            await ctx.interaction.edit_original_response(content="Survey not found.")
+            return
+        reminder_lines = [
+            f"{r.offset_minutes_before_close}m: {'sent' if r.sent_at_utc else 'pending'}"
+            for r in snapshot.reminders
+        ] or ["No reminders configured"]
+        question_lines = []
+        for question in snapshot.questions:
+            top = max((option.response_count for option in question.options), default=0)
+            leaders = [option.label for option in question.options if option.response_count == top]
+            question_lines.append(
+                f"Q{question.sort_order}: {', '.join(leaders[:2]) if top else 'no responses'} ({top})"
+            )
+        embed = discord.Embed(
+            title=f"Survey #{snapshot.survey_id}: {snapshot.title}",
+            color=discord.Color.green() if snapshot.status == "Open" else discord.Color.red(),
+        )
+        embed.add_field(name="Status", value=snapshot.status, inline=True)
+        embed.add_field(name="Responses", value=str(snapshot.total_responses), inline=True)
+        embed.add_field(name="Questions", value=str(len(snapshot.questions)), inline=True)
+        embed.add_field(
+            name="Result visibility",
+            value=result_visibility_label(snapshot.result_visibility),
+            inline=True,
+        )
+        embed.add_field(
+            name="Closes",
+            value=snapshot.closes_at_utc.strftime("%Y-%m-%d %H:%M UTC"),
+            inline=True,
+        )
+        embed.add_field(
+            name="Private live totals", value="\n".join(question_lines)[:1024], inline=False
+        )
+        embed.add_field(name="Reminders", value="\n".join(reminder_lines), inline=False)
+        if snapshot.message_id:
+            embed.add_field(
+                name="Message",
+                value=f"https://discord.com/channels/{snapshot.guild_id}/{snapshot.channel_id}/{snapshot.message_id}",
+                inline=False,
+            )
+        await ctx.interaction.edit_original_response(embed=embed)
+
+    @group.command(
+        name="survey_export", description="Export closed survey totals or response detail."
+    )
+    @versioned("v1.00")
+    @safe_command
+    @is_admin_or_leadership_only()
+    @track_usage()
+    async def survey_export(
+        ctx: discord.ApplicationContext,
+        survey: str = discord.Option(
+            str,
+            "Closed survey to export",
+            autocomplete=_closed_survey_autocomplete,
+        ),
+        mode: str = discord.Option(
+            str,
+            "Export type",
+            choices=_SURVEY_EXPORT_MODE_CHOICES,
+            required=False,
+            default=_SURVEY_EXPORT_MODE_TOTALS,
+        ),
+    ) -> None:
+        await safe_defer(ctx, ephemeral=True)
+        try:
+            survey_id = _parse_survey_id(survey)
+            export_mode = str(mode or _SURVEY_EXPORT_MODE_TOTALS).strip().casefold()
+            if export_mode == _SURVEY_EXPORT_MODE_TOTALS:
+                export = await build_survey_totals_export(
+                    survey_id=survey_id,
+                    requested_by_discord_user_id=int(ctx.user.id),
+                )
+                summary_embed = _build_survey_totals_export_summary_embed(export)
+                generated_message = f"Survey #{export.snapshot.survey_id} totals export generated."
+            elif export_mode == _SURVEY_EXPORT_MODE_RESPONSE_DETAIL:
+                export = await build_survey_response_detail_export(
+                    survey_id=survey_id,
+                    requested_by_discord_user_id=int(ctx.user.id),
+                    discord_name_resolver=lambda ids: _resolve_voter_discord_names(ctx, ids),
+                )
+                summary_embed = _build_survey_response_detail_export_summary_embed(export)
+                generated_message = (
+                    f"Survey #{export.snapshot.survey_id} response detail export generated."
+                )
+            else:
+                raise VoteValidationError("Choose a valid export type.")
+        except VoteValidationError as exc:
+            await ctx.interaction.edit_original_response(content=f"Survey not exported: {exc}")
+            return
+        except Exception:
+            logger.exception("survey_admin_export_failed survey=%r", survey)
+            await ctx.interaction.edit_original_response(
+                content="Survey export failed. Please try again."
+            )
+            return
+
+        if export.is_oversized():
+            await ctx.interaction.edit_original_response(
+                content=(
+                    "Survey export was built but is too large for Discord upload. "
                     "Ask an operator for a direct SQL export."
                 )
             )

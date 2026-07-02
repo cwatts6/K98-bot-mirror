@@ -3,8 +3,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from ui.views.survey_post_view import SurveyPostView
 from ui.views.vote_post_view import VotePostView
-from voting import dal
+from voting import dal, survey_dal
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,41 @@ async def rehydrate_vote_post_views(bot: Any) -> dict[str, int]:
             )
     logger.info(
         "vote_view_rehydration_complete rehydrated=%s failed=%s",
+        summary["rehydrated"],
+        summary["failed"],
+    )
+    return summary
+
+
+async def rehydrate_survey_post_views(bot: Any) -> dict[str, int]:
+    summary = {"rehydrated": 0, "failed": 0}
+    snapshots = await survey_dal.list_open_surveys()
+    if not snapshots:
+        logger.info("survey_view_rehydration_no_open_surveys")
+        return summary
+
+    for snapshot in snapshots:
+        if snapshot.message_id is None:
+            continue
+        try:
+            bot.add_view(SurveyPostView(snapshot), message_id=int(snapshot.message_id))
+            summary["rehydrated"] += 1
+            logger.info(
+                "survey_view_rehydrated survey_id=%s channel_id=%s message_id=%s",
+                snapshot.survey_id,
+                snapshot.channel_id,
+                snapshot.message_id,
+            )
+        except Exception:
+            summary["failed"] += 1
+            logger.exception(
+                "survey_view_rehydration_failed survey_id=%s channel_id=%s message_id=%s",
+                snapshot.survey_id,
+                snapshot.channel_id,
+                snapshot.message_id,
+            )
+    logger.info(
+        "survey_view_rehydration_complete rehydrated=%s failed=%s",
         summary["rehydrated"],
         summary["failed"],
     )
