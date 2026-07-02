@@ -177,7 +177,7 @@ async def create_vote_post(req: VoteCreateRequest) -> int:
                     CreatedAtUtc, UpdatedAtUtc
                 )
             OUTPUT INSERTED.VotePostID
-            VALUES (?, ?, ?, ?, ?, 'Open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 int(req.guild_id),
@@ -185,6 +185,7 @@ async def create_vote_post(req: VoteCreateRequest) -> int:
                 int(req.created_by_discord_user_id),
                 req.title,
                 req.description,
+                "Open",
                 1 if req.allow_vote_change else 0,
                 1 if req.launch_mention_everyone else 0,
                 1 if req.reminder_mention_everyone else 0,

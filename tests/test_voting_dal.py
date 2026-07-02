@@ -81,6 +81,7 @@ async def test_create_vote_post_persists_result_visibility_and_audit(monkeypatch
     assert vote_post_id == 42
     vote_post_insert = captured[0]
     assert "ResultVisibility" in vote_post_insert[0]
+    assert vote_post_insert[0].count("?") == len(vote_post_insert[1])
     assert RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE in vote_post_insert[1]
     audit_insert = captured[-1]
     assert "VotePostAudit" in audit_insert[0]
