@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Mapping
 import csv
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import io
 import logging
 import re
-from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 from voting import dal
@@ -159,7 +159,9 @@ def vote_voter_audit_csv_filename(snapshot: VoteSnapshot) -> str:
     timestamp = (
         closed_at.replace(tzinfo=UTC) if closed_at.tzinfo is None else closed_at.astimezone(UTC)
     ).strftime("%Y%m%d_%H%M%S")
-    return f"vote_{snapshot.vote_post_id}_{_filename_part(snapshot.title)}_voter_audit_{timestamp}.csv"
+    return (
+        f"vote_{snapshot.vote_post_id}_{_filename_part(snapshot.title)}_voter_audit_{timestamp}.csv"
+    )
 
 
 def _message_link(snapshot: VoteSnapshot) -> str:
@@ -235,8 +237,8 @@ def vote_voter_audit_csv_rows(
     output: list[dict[str, Any]] = []
     for row in rows:
         original_option_id = row.original_option_id
-        vote_changed = (
-            original_option_id is not None and int(original_option_id) != int(row.option_id)
+        vote_changed = original_option_id is not None and int(original_option_id) != int(
+            row.option_id
         )
         output.append(
             {
@@ -352,9 +354,7 @@ async def build_vote_voter_audit_export(
             "max_upload_bytes": CSV_UPLOAD_MAX_BYTES,
             "is_oversized": export.is_oversized(),
             "delivery_status": (
-                "blocked_oversized"
-                if export.is_oversized()
-                else "ready_for_ephemeral_delivery"
+                "blocked_oversized" if export.is_oversized() else "ready_for_ephemeral_delivery"
             ),
             "columns": list(VOTER_AUDIT_EXPORT_COLUMNS),
         },

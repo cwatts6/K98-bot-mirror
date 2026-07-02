@@ -577,9 +577,7 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                     requested_by_discord_user_id=int(ctx.user.id),
                 )
                 summary_embed = _build_vote_export_summary_embed(export)
-                generated_message = (
-                    f"Vote #{export.snapshot.vote_post_id} totals export generated."
-                )
+                generated_message = f"Vote #{export.snapshot.vote_post_id} totals export generated."
             elif export_mode == _EXPORT_MODE_VOTER_AUDIT:
                 export = await build_vote_voter_audit_export(
                     vote_post_id=vote_post_id,
