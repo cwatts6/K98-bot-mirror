@@ -312,7 +312,7 @@ async def build_survey_response_detail_export(
     if snapshot.status != "Closed":
         raise VoteValidationError("Only closed surveys can be exported.")
     rows = await survey_dal.list_answer_audit_rows(int(survey_id))
-    voter_ids = tuple(row.discord_user_id for row in rows)
+    voter_ids = tuple(dict.fromkeys(row.discord_user_id for row in rows))
     discord_names: Mapping[int, str] = {}
     if discord_name_resolver is not None and voter_ids:
         discord_names = await discord_name_resolver(voter_ids)

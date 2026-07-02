@@ -75,15 +75,12 @@ class _SurveyOpenButton(discord.ui.Button):
                 self.survey_id,
                 getattr(getattr(interaction, "user", None), "id", None),
             )
-        await send_ephemeral(
-            interaction,
-            f"Answer Survey #{snapshot.survey_id}: question 1 of {len(snapshot.questions)}.",
-            view=SurveyResponsePanel(
-                snapshot,
-                owner_user_id=int(interaction.user.id),
-                selected_option_ids=selected_option_ids,
-            ),
+        panel = SurveyResponsePanel(
+            snapshot,
+            owner_user_id=int(interaction.user.id),
+            selected_option_ids=selected_option_ids,
         )
+        await send_ephemeral(interaction, panel.content(), view=panel)
 
 
 class _SurveyQuestionSelect(discord.ui.Select):
@@ -154,6 +151,11 @@ class _SurveySubmitButton(discord.ui.Button):
         if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
             await send_ephemeral(interaction, "This survey panel belongs to another player.")
             return
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
+        except Exception:
+            logger.debug("survey_submit_defer_failed", exc_info=True)
         try:
             result, snapshot = await survey_service.submit_survey_response(
                 survey_id=self.parent_view.survey_id,

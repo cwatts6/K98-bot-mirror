@@ -124,7 +124,54 @@ async def test_survey_opener_sends_private_panel_with_existing_answers(monkeypat
     await button.callback(interaction)
 
     assert "question 1 of 2" in str(captured["content"])
+    assert "First?" in str(captured["content"])
+    assert "Required single choice" in str(captured["content"])
     assert isinstance(captured["view"], SurveyResponsePanel)
     select = captured["view"].children[0]
     defaults = {option.value for option in select.options if option.default}
     assert defaults == {"102"}
+
+
+@pytest.mark.asyncio
+async def test_survey_submit_defers_before_persisting(monkeypatch):
+    snapshot = _snapshot()
+    panel = SurveyResponsePanel(
+        snapshot,
+        owner_user_id=123,
+        selected_option_ids={10: (101,), 11: (201,)},
+    )
+    submit = panel.children[-1]
+    captured: dict[str, object] = {}
+
+    async def fake_submit_survey_response(**_kwargs):
+        captured["deferred_before_submit"] = interaction.response.done
+        return SimpleNamespace(accepted=True, message="Survey response recorded."), snapshot
+
+    async def fake_refresh_public_survey_message(_interaction, _snapshot):
+        captured["refresh"] = True
+
+    async def fake_send_ephemeral(_interaction, content, **kwargs):
+        captured["content"] = content
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.submit_survey_response",
+        fake_submit_survey_response,
+    )
+    monkeypatch.setattr(
+        "ui.views.survey_post_view._refresh_public_survey_message",
+        fake_refresh_public_survey_message,
+    )
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    interaction = SimpleNamespace(
+        response=_Response(),
+        user=SimpleNamespace(id=123),
+        message=SimpleNamespace(id=456),
+    )
+
+    await submit.callback(interaction)
+
+    assert captured["deferred_before_submit"] is True
+    assert captured["refresh"] is True
+    assert captured["content"] == "Survey response recorded."

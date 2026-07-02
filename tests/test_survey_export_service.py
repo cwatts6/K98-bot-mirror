@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
+
+from voting import survey_export_service
 from voting.survey_export_service import (
     build_survey_response_detail_csv_bytes,
     build_survey_totals_csv_bytes,
@@ -112,3 +115,83 @@ def test_survey_response_detail_rows_include_spreadsheet_safe_discord_id():
         discord_names_by_user_id={123456789012345678: "Tester"},
     ).getvalue().decode("utf-8-sig")
     assert "ResponseChanged" in text
+
+
+@pytest.mark.asyncio
+async def test_survey_response_detail_export_deduplicates_name_resolution(monkeypatch):
+    now = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
+    rows = (
+        SurveyAnswerAuditRow(
+            survey_id=42,
+            title="Planning",
+            closed_at_utc=now,
+            response_id=9,
+            discord_user_id=123,
+            response_created_at_utc=now,
+            response_updated_at_utc=now,
+            question_id=10,
+            question_key="q1",
+            question_prompt="First?",
+            question_type="SingleChoice",
+            selected_option_ids=(101,),
+            selected_option_keys=("opt1",),
+            selected_option_labels=("A",),
+            original_option_ids=(101,),
+            original_option_keys=(),
+            original_option_labels=(),
+        ),
+        SurveyAnswerAuditRow(
+            survey_id=42,
+            title="Planning",
+            closed_at_utc=now,
+            response_id=9,
+            discord_user_id=123,
+            response_created_at_utc=now,
+            response_updated_at_utc=now,
+            question_id=11,
+            question_key="q2",
+            question_prompt="Second?",
+            question_type="SingleChoice",
+            selected_option_ids=(201,),
+            selected_option_keys=("opt1",),
+            selected_option_labels=("B",),
+            original_option_ids=(201,),
+            original_option_keys=(),
+            original_option_labels=(),
+        ),
+    )
+    captured: dict[str, object] = {}
+
+    async def fake_get_survey_snapshot(_survey_id):
+        return _snapshot()
+
+    async def fake_list_answer_audit_rows(_survey_id):
+        return rows
+
+    async def fake_insert_audit(**_kwargs):
+        return None
+
+    async def fake_resolver(user_ids):
+        captured["user_ids"] = user_ids
+        return {123: "Tester"}
+
+    monkeypatch.setattr(
+        survey_export_service.survey_dal,
+        "get_survey_snapshot",
+        fake_get_survey_snapshot,
+    )
+    monkeypatch.setattr(
+        survey_export_service.survey_dal,
+        "list_answer_audit_rows",
+        fake_list_answer_audit_rows,
+    )
+    monkeypatch.setattr(survey_export_service.survey_dal, "insert_audit", fake_insert_audit)
+
+    export = await survey_export_service.build_survey_response_detail_export(
+        survey_id=42,
+        requested_by_discord_user_id=456,
+        discord_name_resolver=fake_resolver,
+    )
+
+    assert captured["user_ids"] == (123,)
+    assert export.row_count == 2
