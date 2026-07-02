@@ -13,6 +13,7 @@ from voting import dal
 from voting.models import VoteSnapshot, VoteVoterAuditRow
 from voting.outcomes import vote_outcome
 from voting.service import VoteValidationError
+from voting.vote_modes import VOTE_MODE_MULTI_SELECT, VOTE_MODE_ONE_CHOICE, normalize_vote_mode
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,39 @@ EXPORT_COLUMNS = (
     "IsWinningOption",
 )
 
+MULTI_SELECT_EXPORT_COLUMNS = (
+    "VotePostID",
+    "Title",
+    "Description",
+    "Status",
+    "VoteMode",
+    "MinSelections",
+    "MaxSelections",
+    "TotalVoters",
+    "TotalSelections",
+    "OutcomeKind",
+    "OutcomeSummary",
+    "ClosedAtUtc",
+    "ClosedByDiscordUserID",
+    "ClosedReason",
+    "CreatedAtUtc",
+    "ClosesAtUtc",
+    "ChannelID",
+    "MessageID",
+    "MessageLink",
+    "ReminderOffsetsMinutes",
+    "ReminderSentCount",
+    "ReminderPendingCount",
+    "ReminderMessageIDs",
+    "OptionID",
+    "OptionKey",
+    "OptionLabel",
+    "SortOrder",
+    "SelectionCount",
+    "SelectionPercentOfVoters",
+    "IsTopSelection",
+)
+
 VOTER_AUDIT_EXPORT_COLUMNS = (
     "VotePostID",
     "Title",
@@ -62,6 +96,23 @@ VOTER_AUDIT_EXPORT_COLUMNS = (
     "OriginalOptionID",
     "OriginalOptionKey",
     "OriginalOptionLabel",
+    "VoteCreatedAtUtc",
+    "VoteUpdatedAtUtc",
+    "VoteChanged",
+)
+
+MULTI_SELECT_VOTER_AUDIT_EXPORT_COLUMNS = (
+    "VotePostID",
+    "Title",
+    "ClosedAtUtc",
+    "DiscordUserID",
+    "DiscordName",
+    "SelectedOptionIDs",
+    "SelectedOptionKeys",
+    "SelectedOptionLabels",
+    "OriginalOptionIDs",
+    "OriginalOptionKeys",
+    "OriginalOptionLabels",
     "VoteCreatedAtUtc",
     "VoteUpdatedAtUtc",
     "VoteChanged",
@@ -114,6 +165,10 @@ def _pct(count: int, total: int) -> str:
         return "0%"
     value = (int(count) / int(total)) * 100
     return f"{value:.1f}".rstrip("0").rstrip(".") + "%"
+
+
+def _join_values(values: tuple[Any, ...]) -> str:
+    return ";".join(str(value) for value in values)
 
 
 def _csv_text_cell(value: Any) -> str:
@@ -182,8 +237,47 @@ def vote_totals_csv_rows(snapshot: VoteSnapshot) -> list[dict[str, Any]]:
     total_votes = int(snapshot.total_votes or 0)
 
     rows: list[dict[str, Any]] = []
+    is_multi_select = normalize_vote_mode(snapshot.vote_mode) == VOTE_MODE_MULTI_SELECT
     for option in snapshot.options:
         vote_count = int(option.vote_count or 0)
+        if is_multi_select:
+            rows.append(
+                {
+                    "VotePostID": snapshot.vote_post_id,
+                    "Title": snapshot.title,
+                    "Description": snapshot.description,
+                    "Status": snapshot.status,
+                    "VoteMode": VOTE_MODE_MULTI_SELECT,
+                    "MinSelections": snapshot.min_selections,
+                    "MaxSelections": snapshot.max_selections,
+                    "TotalVoters": total_votes,
+                    "TotalSelections": int(snapshot.total_selections or 0),
+                    "OutcomeKind": outcome.kind,
+                    "OutcomeSummary": outcome.summary,
+                    "ClosedAtUtc": _dt(snapshot.closed_at_utc),
+                    "ClosedByDiscordUserID": snapshot.closed_by_discord_user_id,
+                    "ClosedReason": snapshot.closed_reason,
+                    "CreatedAtUtc": _dt(snapshot.created_at_utc),
+                    "ClosesAtUtc": _dt(snapshot.closes_at_utc),
+                    "ChannelID": snapshot.channel_id,
+                    "MessageID": snapshot.message_id,
+                    "MessageLink": _message_link(snapshot),
+                    "ReminderOffsetsMinutes": reminder_offsets,
+                    "ReminderSentCount": len(sent_reminders),
+                    "ReminderPendingCount": len(pending_reminders),
+                    "ReminderMessageIDs": reminder_message_ids,
+                    "OptionID": option.option_id,
+                    "OptionKey": option.option_key,
+                    "OptionLabel": option.label,
+                    "SortOrder": option.sort_order,
+                    "SelectionCount": vote_count,
+                    "SelectionPercentOfVoters": _pct(vote_count, total_votes),
+                    "IsTopSelection": (
+                        1 if int(option.option_id) in outcome.winning_option_ids else 0
+                    ),
+                }
+            )
+            continue
         rows.append(
             {
                 "VotePostID": snapshot.vote_post_id,
@@ -219,11 +313,16 @@ def vote_totals_csv_rows(snapshot: VoteSnapshot) -> list[dict[str, Any]]:
 
 def build_vote_totals_csv_bytes(snapshot: VoteSnapshot) -> io.BytesIO:
     rows = vote_totals_csv_rows(snapshot)
+    fieldnames = (
+        MULTI_SELECT_EXPORT_COLUMNS
+        if normalize_vote_mode(snapshot.vote_mode) == VOTE_MODE_MULTI_SELECT
+        else EXPORT_COLUMNS
+    )
     text_buffer = io.StringIO(newline="")
-    writer = csv.DictWriter(text_buffer, fieldnames=EXPORT_COLUMNS, lineterminator="\n")
+    writer = csv.DictWriter(text_buffer, fieldnames=fieldnames, lineterminator="\n")
     writer.writeheader()
     for row in rows:
-        writer.writerow({header: _csv_cell(row.get(header)) for header in EXPORT_COLUMNS})
+        writer.writerow({header: _csv_cell(row.get(header)) for header in fieldnames})
     out = io.BytesIO(text_buffer.getvalue().encode("utf-8-sig"))
     out.seek(0)
     return out
@@ -233,9 +332,32 @@ def vote_voter_audit_csv_rows(
     rows: tuple[VoteVoterAuditRow, ...],
     *,
     discord_names_by_user_id: Mapping[int, str],
+    vote_mode: str = VOTE_MODE_ONE_CHOICE,
 ) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
+    is_multi_select = normalize_vote_mode(vote_mode) == VOTE_MODE_MULTI_SELECT
     for row in rows:
+        if is_multi_select:
+            vote_changed = set(row.original_option_ids) != set(row.selected_option_ids)
+            output.append(
+                {
+                    "VotePostID": row.vote_post_id,
+                    "Title": row.title,
+                    "ClosedAtUtc": _dt(row.closed_at_utc),
+                    "DiscordUserID": _spreadsheet_text_id(row.discord_user_id),
+                    "DiscordName": discord_names_by_user_id.get(row.discord_user_id) or "Unknown",
+                    "SelectedOptionIDs": _join_values(row.selected_option_ids),
+                    "SelectedOptionKeys": _join_values(row.selected_option_keys),
+                    "SelectedOptionLabels": _join_values(row.selected_option_labels),
+                    "OriginalOptionIDs": _join_values(row.original_option_ids),
+                    "OriginalOptionKeys": _join_values(row.original_option_keys),
+                    "OriginalOptionLabels": _join_values(row.original_option_labels),
+                    "VoteCreatedAtUtc": _dt(row.vote_created_at_utc),
+                    "VoteUpdatedAtUtc": _dt(row.vote_updated_at_utc),
+                    "VoteChanged": 1 if vote_changed else 0,
+                }
+            )
+            continue
         original_option_id = row.original_option_id
         vote_changed = original_option_id is not None and int(original_option_id) != int(
             row.option_id
@@ -265,22 +387,27 @@ def build_vote_voter_audit_csv_bytes(
     rows: tuple[VoteVoterAuditRow, ...],
     *,
     discord_names_by_user_id: Mapping[int, str],
+    vote_mode: str = VOTE_MODE_ONE_CHOICE,
 ) -> io.BytesIO:
     csv_rows = vote_voter_audit_csv_rows(
         rows,
         discord_names_by_user_id=discord_names_by_user_id,
+        vote_mode=vote_mode,
+    )
+    fieldnames = (
+        MULTI_SELECT_VOTER_AUDIT_EXPORT_COLUMNS
+        if normalize_vote_mode(vote_mode) == VOTE_MODE_MULTI_SELECT
+        else VOTER_AUDIT_EXPORT_COLUMNS
     )
     text_buffer = io.StringIO(newline="")
     writer = csv.DictWriter(
         text_buffer,
-        fieldnames=VOTER_AUDIT_EXPORT_COLUMNS,
+        fieldnames=fieldnames,
         lineterminator="\n",
     )
     writer.writeheader()
     for row in csv_rows:
-        writer.writerow(
-            {header: _csv_cell(row.get(header)) for header in VOTER_AUDIT_EXPORT_COLUMNS}
-        )
+        writer.writerow({header: _csv_cell(row.get(header)) for header in fieldnames})
     out = io.BytesIO(text_buffer.getvalue().encode("utf-8-sig"))
     out.seek(0)
     return out
@@ -336,6 +463,7 @@ async def build_vote_voter_audit_export(
     csv_bytes = build_vote_voter_audit_csv_bytes(
         rows,
         discord_names_by_user_id=discord_names,
+        vote_mode=snapshot.vote_mode,
     )
     export = VoteVoterAuditExport(
         filename=vote_voter_audit_csv_filename(snapshot),
@@ -356,7 +484,11 @@ async def build_vote_voter_audit_export(
             "delivery_status": (
                 "blocked_oversized" if export.is_oversized() else "ready_for_ephemeral_delivery"
             ),
-            "columns": list(VOTER_AUDIT_EXPORT_COLUMNS),
+            "columns": list(
+                MULTI_SELECT_VOTER_AUDIT_EXPORT_COLUMNS
+                if normalize_vote_mode(snapshot.vote_mode) == VOTE_MODE_MULTI_SELECT
+                else VOTER_AUDIT_EXPORT_COLUMNS
+            ),
         },
     )
     logger.info(

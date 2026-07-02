@@ -9,6 +9,7 @@ from PIL import Image
 from voting.models import VoteOption, VoteSnapshot
 from voting.render_service import HEIGHT, RED, WIDTH, _status, render_vote_card
 from voting.result_visibility import RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE
+from voting.vote_modes import VOTE_MODE_MULTI_SELECT
 
 
 def _snapshot(total_votes: int = 0) -> VoteSnapshot:
@@ -133,3 +134,26 @@ def test_status_treats_elapsed_open_vote_as_closed():
     snapshot = replace(_snapshot(), closes_at_utc=now - timedelta(seconds=1))
 
     assert _status(snapshot, now) == ("Closed", RED)
+
+
+def test_render_vote_card_handles_closed_multi_select_vote():
+    snapshot = replace(
+        _snapshot(total_votes=2),
+        status="Closed",
+        closed_at_utc=datetime(2026, 7, 1, 12, 0, tzinfo=UTC),
+        closes_at_utc=datetime(2026, 7, 1, 11, 59, tzinfo=UTC),
+        vote_mode=VOTE_MODE_MULTI_SELECT,
+        min_selections=1,
+        max_selections=2,
+        total_selections=3,
+        options=(
+            VoteOption(10, 42, "opt1", "18:00 UTC", 1, vote_count=1),
+            VoteOption(11, 42, "opt2", "19:00 UTC", 2, vote_count=2),
+        ),
+    )
+
+    rendered = render_vote_card(snapshot, now_utc=datetime(2026, 7, 1, 12, 0, tzinfo=UTC))
+
+    image = Image.open(BytesIO(rendered.image_bytes.getvalue()))
+    assert image.format == "PNG"
+    assert image.size == (WIDTH, HEIGHT)

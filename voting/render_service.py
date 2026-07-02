@@ -10,6 +10,7 @@ from core import visual_text
 from voting.models import RenderedVoteCard, VoteSnapshot
 from voting.outcomes import vote_outcome
 from voting.result_visibility import public_results_hidden
+from voting.vote_modes import VOTE_MODE_MULTI_SELECT, normalize_vote_mode
 
 ROOT = Path(__file__).resolve().parents[1]
 VOTING_BACKGROUND = ROOT / "assets" / "vote" / "vote.png"
@@ -136,6 +137,8 @@ def render_vote_card(
     _draw_text(draw, (48, 145), deadline, fill=GOLD, font=_font(22, bold=True), bold=True)
 
     total = int(snapshot.total_votes or 0)
+    total_selections = int(snapshot.total_selections or total)
+    is_multi_select = normalize_vote_mode(snapshot.vote_mode) == VOTE_MODE_MULTI_SELECT
     hide_results = public_results_hidden(snapshot, now_utc=now)
     closed = _is_closed(snapshot, now)
     outcome = vote_outcome(snapshot) if closed and not hide_results else None
@@ -205,11 +208,22 @@ def render_vote_card(
         )
         _draw_text(draw, (48, 520), outcome.summary, fill=GOLD, font=summary_font, bold=True)
 
-    footer = (
-        f"Results hidden until close    Last updated: {_fmt_dt(now)}    Vote #{snapshot.vote_post_id}"
-        if hide_results
-        else f"Total voters: {_compact_count(total)}    Last updated: {_fmt_dt(now)}    Vote #{snapshot.vote_post_id}"
-    )
+    if hide_results:
+        footer = (
+            f"Results hidden until close    Last updated: {_fmt_dt(now)}    "
+            f"Vote #{snapshot.vote_post_id}"
+        )
+    elif is_multi_select:
+        footer = (
+            f"Total voters: {_compact_count(total)}    "
+            f"Selections: {_compact_count(total_selections)}    "
+            f"Last updated: {_fmt_dt(now)}    Vote #{snapshot.vote_post_id}"
+        )
+    else:
+        footer = (
+            f"Total voters: {_compact_count(total)}    Last updated: {_fmt_dt(now)}    "
+            f"Vote #{snapshot.vote_post_id}"
+        )
     footer_font = _fit_font(draw, footer, max_width=1000, size=22, min_size=16, bold=True)
     _draw_text(draw, (48, 578), footer, fill=MUTED, font=footer_font, bold=True)
 

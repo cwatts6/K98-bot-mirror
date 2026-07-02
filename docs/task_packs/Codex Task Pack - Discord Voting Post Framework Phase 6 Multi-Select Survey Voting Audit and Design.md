@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 5 hidden-until-close results smoke test`
 - Task type: `audit | product scope | SQL-backed voting design | Discord interaction UX`
 - One-pass approved: `no`
-- Status: `prepared - not started`
+- Status: `implementation delivered locally - awaiting PR handoff / smoke approval`
 
 ## 2. Objective
 
@@ -251,19 +251,334 @@ Baseline validation for this audit/docs slice:
 
 ## 13. Acceptance Criteria
 
-- [ ] Current vote SQL contract is validated against `C:\K98-bot-SQL-Server`.
-- [ ] Multi-select-only and survey-style candidates are compared in a decision matrix.
-- [ ] The first implementation slice is recommended with rationale.
-- [ ] SQL contract options and migration order are documented.
-- [ ] Permission/privacy and result-visibility behavior is documented.
-- [ ] Command/view UX is documented.
-- [ ] Export and audit implications are documented.
-- [ ] Automated tests and manual smoke plan are documented.
-- [ ] Deferred optimisation backlog is updated so no survey, emoji, or reporting work is lost.
-- [ ] No runtime voting behavior changes in this audit slice.
-- [ ] Required docs validators pass.
+- [x] Current vote SQL contract is validated against `C:\K98-bot-SQL-Server`.
+- [x] Multi-select-only and survey-style candidates are compared in a decision matrix.
+- [x] The first implementation slice is recommended with rationale.
+- [x] SQL contract options and migration order are documented.
+- [x] Permission/privacy and result-visibility behavior is documented.
+- [x] Command/view UX is documented.
+- [x] Export and audit implications are documented.
+- [x] Automated tests and manual smoke plan are documented.
+- [x] Deferred optimisation backlog is updated so no survey, emoji, or reporting work is lost.
+- [x] No runtime voting behavior changes in this audit slice.
+- [x] Required docs validators pass.
 
-## 14. PR Summary Template
+## 14. Phase 6 Audit / Scope Packet
+
+### Scope Summary
+
+Phase 6 audited the next cardinality-changing voting slice after Phase 5 hidden-until-close
+results. The safe recommendation is a staged roadmap:
+
+1. Ship single-question `MultiSelect` first.
+2. Defer full multi-question survey builder work into a later task pack.
+3. Keep emoji/icon polish and dashboard/reporting readiness as separate future slices.
+
+This keeps the first implementation PR focused on one new vote mode, one public post, one
+restart-safe interaction entry point, one result aggregation model, and one additive SQL contract.
+It also preserves all Phase 1 through Phase 5 one-choice behavior.
+
+### Current SQL / Persistence Contract
+
+Validated against `C:\K98-bot-SQL-Server`:
+
+- `dbo.VotePosts` stores the post, message IDs, status, reminders/mention flags, close metadata,
+  and `ResultVisibility`.
+- `dbo.VotePostOptions` stores one flat option list per vote post with unique option key and sort
+  order indexes.
+- `dbo.VotePostVotes` is keyed by `(VotePostID, DiscordUserID)` and has one non-null `OptionID`.
+- `dbo.VotePostReminders` and scheduler close state are vote-post-level, not option-level.
+- `dbo.VotePostAudit` has single `OptionID` / `PreviousOptionID` columns plus JSON details.
+- No SQL object currently stores `VoteMode`, min/max selection rules, multiple selections per
+  Discord user, survey questions, or survey responses.
+
+The existing one-choice model is therefore not sufficient for multi-select without an additive SQL
+contract. It should not be stretched by stuffing multiple option IDs into the current
+`VotePostVotes.OptionID` column or JSON-only storage.
+
+### Decision Matrix
+
+| Candidate | Product value | Privacy / permissions | SQL contract | Discord UX | Exports / audit | Test and smoke burden | Rollout risk | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| Single-question `MultiSelect` | High. Directly supports availability checks, "pick all that work", preference shortlists, and lightweight leadership decisions. | Same admin/leadership create/manage model; same public voter access; same private export delivery. Result visibility can reuse `PublicLive` and `HiddenUntilClose`. | Add `VotePosts.VoteMode`, `MinSelections`, `MaxSelections`; add current-selection storage for multiple option IDs per Discord user. Existing one-choice tables remain compatible. | Public post should expose one persistent "Choose options" button for multi-select votes. It opens a private panel/select menu for the acting user, avoiding shared public selected-state confusion. | Totals export becomes option-count based for multi-select. Voter audit needs selection-set output without governor identity. Audit details should store before/after selected option IDs. | Moderate: service cardinality, DAL transactions, public/hidden aggregation, private panel, restart opener, exports, close reveal. | Medium. Cardinality changes are real but bounded to one question and current `/vote_admin` workflow. | Recommended first implementation slice. |
+| Full multi-question survey | Very high long-term value for richer feedback, event planning, rankings, and structured forms. | More complex. Some survey answers may be sensitive; question-level visibility and admin-only summaries may be needed. | Needs question tables, per-question options, response headers, response answers, order, question type, probably page/progress state. | Requires a guided survey builder and a multi-step private response flow. Public post becomes a survey entry point, not the full voting UI. | Needs long-form and possibly wide-form CSV choices; voter audit must represent multiple questions and answer types. | High: builder, response flow, restart recovery, partial submissions, exports, renderer/reporting, permission review. | High. Too broad for the first cardinality PR. | Defer to a later survey-builder task pack after MultiSelect proves the selection model. |
+| Combined MultiSelect + survey in one implementation | Broad coverage, but mostly theoretical first-release value. | Complex and easier to get privacy defaults wrong. | Requires both selection-set and survey-response schema now. | Mixes public vote UX with private survey form UX. | Export shape likely churns immediately. | Very high. | High. | Do not ship as one slice. |
+
+### Recommended First Slice: Single-Question `MultiSelect`
+
+The first implementation should add one new vote mode:
+
+```text
+VoteMode = OneChoice | MultiSelect
+```
+
+Default remains `OneChoice`, preserving current button behavior, SQL writes, result cards, status,
+close, reminders, exports, and rehydration.
+
+For `MultiSelect`:
+
+- Use the same flat option list, initially keeping the existing two-to-six option create limit.
+- Default `MinSelections = 1`.
+- Require `MaxSelections` between `MinSelections` and option count.
+- Allow vote changes before close only when the existing `AllowVoteChange` flag is true.
+- Treat one Discord user as one voter even if they select multiple options.
+- Treat option counts as "selection count", not total voters.
+- Define the closed outcome as "Top selection" or "Top selections", not "Winner", because voters
+  can support more than one option.
+
+### SQL Contract Direction
+
+Recommended additive SQL shape for the first implementation:
+
+1. Add to `dbo.VotePosts`:
+   - `VoteMode varchar(30) NOT NULL DEFAULT ('OneChoice')`
+   - `MinSelections tinyint NOT NULL DEFAULT (1)`
+   - `MaxSelections tinyint NOT NULL DEFAULT (1)`
+   - checks for `VoteMode IN ('OneChoice', 'MultiSelect')`
+   - checks that `MinSelections >= 1`, `MaxSelections >= MinSelections`, and `MaxSelections <= 6`
+2. Preserve `dbo.VotePostVotes` for one-choice votes.
+3. Add SQL-backed multi-select current-selection storage, preferably:
+   - a per-user multi-select ballot/envelope table keyed by `(VotePostID, DiscordUserID)` with
+     created/updated timestamps and optional original-selection JSON, plus
+   - a child current-selection table keyed by `(VotePostID, DiscordUserID, OptionID)` with a
+     composite FK to the option list.
+4. Keep `dbo.VotePostAudit` as the durable action trail and use `DetailsJson` for multi-select
+   before/after option ID lists. Do not add voter lists to export audit JSON.
+
+Migration order should be:
+
+1. SQL repo migration with nullable/additive or defaulted columns and new tables.
+2. Backfill existing rows to `OneChoice`, `MinSelections=1`, `MaxSelections=1`.
+3. Add constraints and indexes after data normalization.
+4. Deploy bot code that understands both `OneChoice` and `MultiSelect`.
+5. Keep rollback as disabling `MultiSelect` creation first, then leaving additive SQL objects in
+   place unless a separate destructive rollback is explicitly approved.
+
+Do not infer these objects from Python. The implementation slice must create matching SQL repo
+migrations and re-run SQL validation before bot rollout.
+
+### Command / View UX Direction
+
+Keep `/vote_admin` and the current command group.
+
+For `/vote_admin create`, add optional fields only after existing required option fields:
+
+- `vote_mode`, default `OneChoice`
+- `min_selections`, default `1`
+- `max_selections`, default `1` for `OneChoice`, required/validated for `MultiSelect`
+
+The service remains authoritative: it must reject `OneChoice` values other than min/max `1`, reject
+`MultiSelect` cardinality outside the option count, and reject unsupported modes.
+
+Player UX:
+
+- `OneChoice` continues to use the existing public option buttons.
+- `MultiSelect` should use a persistent public opener button such as "Choose options".
+- The opener creates a private ephemeral selection panel for the acting user.
+- The private panel should show a Discord select menu with `min_values` and `max_values` matching
+  SQL-backed rules and should write only through the service/DAL.
+- Critical selection state must be SQL-backed after submission. Ephemeral view state can be
+  transient because users can reopen the public post after restart.
+
+Do not overload public option buttons for multi-select. Shared public buttons cannot clearly show
+per-user selected/unselected state, and they would make hidden-result leak review harder.
+
+### Result Visibility And Outcome Rules
+
+`PublicLive`:
+
+- Open multi-select votes may show total voters, total selections, and per-option selection count.
+- Percentages should be "percent of voters who selected this option", so percentages can sum above
+  100 percent across options.
+- Public wording should avoid implying one exclusive winner.
+
+`HiddenUntilClose`:
+
+- Open public posts must hide total voters, total selections, option counts, percentages, bars, and
+  outcome text.
+- Private `/vote_admin status` may show live totals to admin/leadership users.
+- Closing reveals the final multi-select totals and top-selection outcome publicly, just like Phase
+  5 close reveal for one-choice votes.
+
+Closed outcome wording:
+
+- no selections: `No votes were cast.`
+- one top option: `Top selection: <label> selected by N voter(s) (P%).`
+- tie: `Top selections: <labels> selected by N voter(s) each (P%).`
+
+### Export And Audit Direction
+
+Existing closed-only, private export behavior must remain unchanged for `OneChoice`.
+
+For closed `MultiSelect` votes:
+
+- Totals export should include vote mode, min/max selections, total voters, total selections,
+  option selection count, percent of voters, and top-selection flag.
+- Voter-audit export should stay private and include Discord ID/name only, not governor identity.
+- Prefer one row per voter with semicolon-delimited selected option IDs/keys/labels for the first
+  implementation. A later reporting slice may add a long-form row-per-selection export if needed.
+- Record export audit metadata with mode, row count, byte count, upload limit, oversized flag,
+  delivery status, and column profile, but not the voter list.
+- Vote-cast audit events should store previous and new selection IDs in `DetailsJson`.
+
+### Architecture Direction
+
+Layer ownership for a later implementation:
+
+- `commands/vote_admin_cmds.py`: collect optional create fields, permission checks, safe defer,
+  service handoff, public/private response rendering.
+- `voting/service.py`: mode/cardinality validation, min/max rules, selection-set comparison,
+  result/outcome semantics, update orchestration.
+- `voting/dal.py`: SQL transactions, row mapping, current-selection persistence, aggregation
+  queries, audit inserts.
+- `ui/views/vote_post_view.py`: persistent public opener and private select-panel interaction
+  routing only.
+- `voting/discord_presentation.py`, `voting/render_service.py`, `voting/outcomes.py`: mode-aware
+  copy, result visibility, card totals, and top-selection wording.
+- `voting/export_service.py`: mode-aware closed export rows while preserving one-choice schemas.
+- `voting/rehydration.py`: rehydrate one-choice button views and multi-select opener views from
+  SQL snapshots.
+
+No direct SQL belongs in commands or views.
+
+### Test Strategy For The Approved Runtime Slice
+
+Focused tests to add/update:
+
+- `tests/test_voting_service.py`: mode parsing, min/max validation, option-count bounds,
+  change-blocked behavior, hidden-result compatibility.
+- `tests/test_voting_dal.py`: SQL insert/update transaction shape, current-selection aggregation,
+  one-choice compatibility, audit details JSON.
+- `tests/test_vote_post_view.py`: multi-select opener, private panel handoff, stale/closed vote
+  rejection, public message refresh without broad mentions.
+- `tests/test_voting_discord_presentation.py`: PublicLive multi-select totals, HiddenUntilClose
+  leak prevention, closed reveal.
+- `tests/test_voting_render_service.py`: card labels for total voters/selections and hidden mode.
+- `tests/test_voting_export_service.py`: totals and voter-audit CSV shape for multi-select plus
+  one-choice regression.
+- `tests/test_voting_scheduler.py`: automatic close reveal and disabled/open views remain safe.
+- `tests/test_vote_admin_cmds.py`: command option validation, default mode, create handoff, export
+  mode compatibility.
+
+Validation gates for implementation:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_voting_service.py tests\test_voting_dal.py tests\test_vote_post_view.py tests\test_voting_discord_presentation.py tests\test_voting_render_service.py tests\test_voting_export_service.py tests\test_voting_scheduler.py tests\test_vote_admin_cmds.py
+```
+
+Run Codex Security review before PR handoff for any approved runtime implementation because the
+slice touches Discord interactions, permissions/privacy, SQL persistence, exports, user input, and
+restart-sensitive views.
+
+### Manual Smoke Plan For The Approved Runtime Slice
+
+1. Create a default `OneChoice` vote and confirm existing buttons, live totals, close, and export
+   behavior still match Phase 1 through Phase 5.
+2. Create a `MultiSelect` `PublicLive` vote with min `1`, max `2`, and at least three options.
+3. Select two options from the private panel, confirm public counts update, and confirm total voters
+   remains one.
+4. Change selections before close and verify old selections are replaced, audit records change, and
+   public post refreshes without broad mentions.
+5. Try too few and too many selections and confirm private rejection.
+6. Create a `MultiSelect` `HiddenUntilClose` vote, vote on it, and confirm the public post leaks no
+   open totals, counts, bars, or outcome.
+7. Restart the bot while a multi-select vote is open and confirm the public opener still works.
+8. Close manually and by scheduler, confirming disabled public controls and top-selection wording.
+9. Export totals and voter audit privately for a closed multi-select vote.
+10. Confirm one-choice exports remain unchanged.
+
+### Deferred Optimisation Status
+
+The original combined multi-select/survey deferred item has been split:
+
+- `MultiSelect` single-question implementation remains active and is now prepared as the safest
+  first implementation slice after operator approval.
+- Full multi-question survey builder remains deferred as a separate high-risk architecture item.
+- Per-option emoji/icon support remains deferred as its own polish slice.
+- Dashboard/reporting readiness remains deferred and should wait for stable mode/cardinality
+  dimensions.
+
+### Approval Needed
+
+Before implementation, operator approval is needed for:
+
+- staged roadmap with `MultiSelect` first and survey builder deferred
+- `VoteMode` names: `OneChoice` and `MultiSelect`
+- min/max defaults and first-slice option cap of six
+- public opener plus private selection panel UX
+- SQL direction using additive mode/cardinality columns and multi-select selection tables
+- export shape for multi-select totals and voter audit
+- closed outcome wording using "Top selection(s)" instead of "Winner"
+
+## 15. Implementation Addendum
+
+Operator approval to proceed was given after the audit recommendation. The approved first slice was
+implemented locally as single-question `MultiSelect` voting while preserving existing `OneChoice`
+behavior as the default.
+
+Delivered locally:
+
+- Added `OneChoice` / `MultiSelect` vote-mode normalization.
+- Extended vote snapshots and create requests with `VoteMode`, `MinSelections`, `MaxSelections`,
+  and `TotalSelections`.
+- Added additive SQL migration `20260702_002_add_vote_post_multi_select.sql` in
+  `C:\K98-bot-SQL-Server`.
+- Preserved `dbo.VotePostVotes` for one-choice votes.
+- Added SQL-backed multi-select ballot/current-selection storage through
+  `dbo.VotePostMultiSelectVotes` and `dbo.VotePostMultiSelectSelections`.
+- Added `/vote_admin create` optional mode/cardinality fields after the existing required options.
+- Kept existing one-choice public option buttons.
+- Added a persistent public multi-select opener button and private user-specific selection panel.
+- Made public embed/card/result outcome copy mode-aware.
+- Reused `PublicLive` and `HiddenUntilClose` result visibility for MultiSelect.
+- Kept existing one-choice totals/voter-audit CSV headers unchanged.
+- Added mode-aware closed-only private totals and voter-audit CSV shape for MultiSelect.
+- Added focused regression coverage across service, DAL, command, view, presentation, renderer,
+  export, and scheduler-adjacent behavior.
+
+Remaining out of scope:
+
+- Full multi-question survey builder.
+- Per-option emoji/icon support.
+- Dashboard/reporting implementation.
+- Role-restricted voting, governor-linked voting, saved templates, and public voter-level exports.
+
+## 16. Validation Results
+
+Implementation slice. Runtime Python and SQL migration files changed; no production SQL deployment
+or Discord smoke test has been performed yet.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_voting_service.py tests\test_voting_dal.py tests\test_vote_post_view.py tests\test_voting_discord_presentation.py tests\test_voting_render_service.py tests\test_voting_export_service.py tests\test_voting_scheduler.py tests\test_vote_admin_cmds.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_ui_imports.py
+.\.venv\Scripts\python.exe -m pytest -q tests
+```
+
+Result: passed on 2026-07-02. Full pytest result: `2245 passed, 2 skipped`.
+
+SQL repo validation:
+
+```powershell
+.\deploy\Validate-SqlRepo.ps1
+```
+
+Result: succeeded on 2026-07-02, with pre-existing warnings on older migrations containing
+`DROP TABLE` or `TRUNCATE TABLE`.
+
+Codex Security review is required before PR handoff because this implementation touches Discord
+interactions, SQL persistence, privacy/export surfaces, user input, and restart-safe views.
+
+## 17. PR Summary Template
 
 ```md
 ## Summary

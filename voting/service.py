@@ -18,6 +18,11 @@ from voting.result_visibility import (
     RESULT_VISIBILITY_PUBLIC_LIVE,
     normalize_result_visibility,
 )
+from voting.vote_modes import (
+    VOTE_MODE_MULTI_SELECT,
+    VOTE_MODE_ONE_CHOICE,
+    normalize_vote_mode,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +55,10 @@ DEFAULT_REMINDER_OFFSETS = (60,)
 RESULT_VISIBILITY_CHOICES: dict[str, str] = {
     RESULT_VISIBILITY_PUBLIC_LIVE: "Public live",
     RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE: "Hidden until close",
+}
+VOTE_MODE_CHOICES: dict[str, str] = {
+    VOTE_MODE_ONE_CHOICE: "One choice",
+    VOTE_MODE_MULTI_SELECT: "Multi-select",
 }
 CLOSE_DURATION_CHOICES: dict[str, timedelta] = {
     "30m": timedelta(minutes=30),
@@ -157,6 +166,32 @@ def _validate_options(parts: list[str]) -> tuple[str, ...]:
     return tuple(output)
 
 
+def _validate_cardinality(
+    *,
+    vote_mode: str | None,
+    option_count: int,
+    min_selections: int | None,
+    max_selections: int | None,
+) -> tuple[str, int, int]:
+    normalized_mode = normalize_vote_mode(vote_mode)
+    minimum = 1 if min_selections is None else int(min_selections)
+    maximum = 1 if max_selections is None else int(max_selections)
+    if normalized_mode == VOTE_MODE_ONE_CHOICE:
+        if minimum != 1 or maximum != 1:
+            raise VoteValidationError("One-choice votes must use exactly one selection.")
+        return normalized_mode, 1, 1
+
+    if minimum < 1:
+        raise VoteValidationError("Minimum selections must be at least 1.")
+    if maximum < minimum:
+        raise VoteValidationError("Maximum selections must be at least the minimum selections.")
+    if maximum > option_count:
+        raise VoteValidationError("Maximum selections cannot exceed the number of options.")
+    if maximum < 2:
+        raise VoteValidationError("Multi-select votes must allow at least two selections.")
+    return normalized_mode, minimum, maximum
+
+
 def parse_options(raw_options: str) -> tuple[str, ...]:
     parts = [part.strip() for part in re.split(r"[|\n]", raw_options or "") if part.strip()]
     return _validate_options(parts)
@@ -199,6 +234,9 @@ def build_create_request(
     option_labels: tuple[str | None, ...] | None = None,
     background_asset_key: str | None = None,
     result_visibility: str | None = None,
+    vote_mode: str | None = None,
+    min_selections: int | None = None,
+    max_selections: int | None = None,
     now_utc: datetime | None = None,
 ) -> VoteCreateRequest:
     now = now_utc or datetime.now(UTC)
@@ -220,17 +258,24 @@ def build_create_request(
         for offset in parse_reminder_offsets(reminder_offsets)
         if closes_at.timestamp() - (offset * 60) > now.timestamp()
     )
+    options = (
+        parse_option_labels(option_labels)
+        if option_labels is not None
+        else parse_options(raw_options or "")
+    )
+    normalized_vote_mode, normalized_min, normalized_max = _validate_cardinality(
+        vote_mode=vote_mode,
+        option_count=len(options),
+        min_selections=min_selections,
+        max_selections=max_selections,
+    )
     return VoteCreateRequest(
         guild_id=int(guild_id),
         channel_id=int(channel_id),
         created_by_discord_user_id=int(created_by_discord_user_id),
         title=normalized_title,
         description=normalized_description,
-        options=(
-            parse_option_labels(option_labels)
-            if option_labels is not None
-            else parse_options(raw_options or "")
-        ),
+        options=options,
         closes_at_utc=closes_at,
         reminder_offsets_minutes=offsets,
         allow_vote_change=bool(allow_vote_change),
@@ -239,6 +284,9 @@ def build_create_request(
         close_mention_everyone=bool(close_mention_everyone),
         background_asset_key=background_asset_key,
         result_visibility=normalized_result_visibility,
+        vote_mode=normalized_vote_mode,
+        min_selections=normalized_min,
+        max_selections=normalized_max,
     )
 
 
@@ -304,6 +352,41 @@ async def cast_vote(
             result.status,
             vote_post_id,
             option_id,
+            discord_user_id,
+        )
+    return result, snapshot
+
+
+async def cast_multi_select_vote(
+    *,
+    vote_post_id: int,
+    option_ids: tuple[int, ...],
+    discord_user_id: int,
+    now_utc: datetime | None = None,
+) -> tuple[VoteCastResult, VoteSnapshot | None]:
+    now = now_utc or datetime.now(UTC)
+    result = await dal.cast_multi_select_vote(
+        vote_post_id=vote_post_id,
+        option_ids=tuple(int(option_id) for option_id in option_ids),
+        discord_user_id=discord_user_id,
+        now_utc=now,
+    )
+    snapshot = await dal.get_vote_snapshot(vote_post_id) if result.accepted else None
+    if result.accepted:
+        logger.info(
+            "vote_multi_select_cast status=%s vote_post_id=%s option_ids=%s previous_option_ids=%s actor_discord_id=%s",
+            result.status,
+            vote_post_id,
+            list(result.selected_option_ids),
+            list(result.previous_option_ids),
+            discord_user_id,
+        )
+    else:
+        logger.info(
+            "vote_multi_select_rejected status=%s vote_post_id=%s option_ids=%s actor_discord_id=%s",
+            result.status,
+            vote_post_id,
+            list(option_ids),
             discord_user_id,
         )
     return result, snapshot

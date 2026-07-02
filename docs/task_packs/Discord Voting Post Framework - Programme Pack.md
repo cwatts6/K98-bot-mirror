@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 complete; Phase 5 hidden-until-close results complete and smoke tested; Phase 6 multi-select/survey audit prepared`
+- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 complete; Phase 5 hidden-until-close results complete and smoke tested; Phase 6 single-question MultiSelect implemented locally and awaiting PR handoff / smoke approval`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -361,7 +361,7 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 6 - Multi-Select / Survey Voting Audit and Design
 
-Status: prepared; not started.
+Status: single-question `MultiSelect` implemented locally; awaiting PR handoff / smoke approval.
 
 Phase 6 is the next prepared voting slice. It should start with audit/scope only because
 multi-select and survey-style voting change vote cardinality, interaction state, result
@@ -378,6 +378,36 @@ Confirmed Phase 6 direction:
 - Keep private exports private and closed-only unless a later task explicitly approves a change.
 - Keep role-restricted voting, governor-linked voting, saved templates, public voter-level export
   posting, emoji/icon support, and dashboard/reporting implementation out of this slice.
+
+Audit recommendation drafted on `2026-07-02`:
+
+- Use a staged roadmap rather than one combined multi-select/survey implementation.
+- First implementation slice: single-question `MultiSelect` under the existing `/vote_admin`
+  workflow.
+- Preserve current `OneChoice` behavior as the default and keep the current public option buttons
+  for that mode.
+- Additive SQL direction: `VotePosts.VoteMode`, `MinSelections`, `MaxSelections`, and SQL-backed
+  multi-select selection storage; do not overload `VotePostVotes.OptionID` with multiple values.
+- Player UX direction: persistent public opener button for multi-select votes, with a private
+  user-specific select panel for selection submission.
+- Result direction: reuse `PublicLive` and `HiddenUntilClose`; public multi-select percentages are
+  percent of voters selecting each option, and closed copy should say `Top selection(s)` rather
+  than `Winner`.
+- Export direction: keep existing one-choice exports unchanged; add mode-aware closed-only private
+  totals and voter-audit shapes for multi-select.
+- Full multi-question survey builder remains deferred as a separate high-risk task pack.
+
+Implementation delivered locally after operator approval:
+
+- Added `OneChoice` / `MultiSelect` vote mode handling with `OneChoice` as the default.
+- Added SQL-backed mode/cardinality columns and multi-select current-selection storage in the SQL
+  repo migration `20260702_002_add_vote_post_multi_select.sql`.
+- Preserved existing one-choice public option buttons and exports.
+- Added a persistent public "Choose options" opener button for multi-select votes with a private
+  user-specific selection panel.
+- Made status, public embeds, rendered cards, outcomes, and closed-only private exports mode-aware.
+- Full pytest passed locally with `2245 passed, 2 skipped`; SQL repo validation succeeded with only
+  pre-existing warnings on older migrations.
 
 ## 8. Remaining Slice Scope Summary
 
@@ -539,3 +569,5 @@ scope are approved.
 | 2026-07-02 | Phase 5 operator scope revised | Approved hidden-until-close results, multi-select/survey voting, per-option emoji/icon support, and dashboard/reporting readiness for future slices; removed role-restricted voting, governor-linked voting, saved templates, and public voter-level export posting from active scope. |
 | 2026-07-02 | Hidden results slice locally validated | Added create-time `PublicLive`/`HiddenUntilClose` result visibility, SQL `VotePosts.ResultVisibility` migration, public open-result hiding, public close reveal, private admin live totals, focused regression tests, full pytest, SQL validation, and Codex Security review with 0 findings. |
 | 2026-07-02 | Hidden results smoke tested and archived | Operator smoke testing confirmed hidden-until-close behavior was successful. Phase 5 audit/starter records were archived, and Phase 6 multi-select/survey audit and design was prepared as the next voting slice. |
+| 2026-07-02 | Phase 6 audit drafted | Recommended staged roadmap with single-question `MultiSelect` first, full survey builder deferred, additive SQL mode/cardinality and selection storage, private selection-panel UX, mode-aware result/export behavior, and no runtime changes until operator approval. |
+| 2026-07-02 | Phase 6 MultiSelect implemented locally | Added SQL-backed `OneChoice`/`MultiSelect` mode, min/max selections, multi-select ballot/selection storage, persistent public opener with private selection panel, mode-aware status/cards/outcomes/exports, focused tests, full pytest, and SQL repo validation. Production SQL deployment and Discord smoke remain pending. |

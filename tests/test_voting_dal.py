@@ -83,9 +83,13 @@ async def test_create_vote_post_persists_result_visibility_and_audit(monkeypatch
     assert "ResultVisibility" in vote_post_insert[0]
     assert vote_post_insert[0].count("?") == len(vote_post_insert[1])
     assert RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE in vote_post_insert[1]
+    assert "VoteMode" in vote_post_insert[0]
+    assert "MinSelections" in vote_post_insert[0]
+    assert "MaxSelections" in vote_post_insert[0]
     audit_insert = captured[-1]
     assert "VotePostAudit" in audit_insert[0]
     assert '"result_visibility": "HiddenUntilClose"' in str(audit_insert[1])
+    assert '"vote_mode": "OneChoice"' in str(audit_insert[1])
 
 
 @pytest.mark.asyncio
@@ -141,6 +145,12 @@ async def test_list_vote_voter_audit_rows_maps_current_and_original_options(monk
             }
         ]
 
+    async def fake_run_one_async(sql, params=()):
+        assert "VoteMode" in str(sql)
+        assert params == (42,)
+        return {"VoteMode": "OneChoice"}
+
+    monkeypatch.setattr(dal, "run_one_async", fake_run_one_async)
     monkeypatch.setattr(dal, "run_query_async", fake_run_query_async)
 
     rows = await dal.list_vote_voter_audit_rows(42)
@@ -153,3 +163,140 @@ async def test_list_vote_voter_audit_rows_maps_current_and_original_options(monk
     assert rows[0].option_label == "19:00 UTC"
     assert rows[0].original_option_label == "18:00 UTC"
     assert rows[0].vote_updated_at_utc == datetime(2026, 7, 1, 20, 30, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_list_vote_voter_audit_rows_maps_multi_select_rows(monkeypatch) -> None:
+    now = datetime(2026, 7, 1, 21, 0)
+    captured: list[str] = []
+
+    async def fake_run_one_async(sql, params=()):
+        assert "VoteMode" in str(sql)
+        assert params == (42,)
+        return {"VoteMode": "MultiSelect"}
+
+    async def fake_run_query_async(sql, params=()):
+        captured.append(str(sql))
+        assert params == (42,)
+        if "VotePostMultiSelectVotes" in str(sql):
+            return [
+                {
+                    "VotePostID": 42,
+                    "Title": "Availability?",
+                    "ClosedAtUtc": now,
+                    "DiscordUserID": 123,
+                    "OriginalOptionIDsJson": "[10, 11]",
+                    "VoteCreatedAtUtc": now,
+                    "VoteUpdatedAtUtc": now,
+                    "OptionID": 11,
+                    "OptionKey": "opt2",
+                    "OptionLabel": "19:00 UTC",
+                },
+                {
+                    "VotePostID": 42,
+                    "Title": "Availability?",
+                    "ClosedAtUtc": now,
+                    "DiscordUserID": 123,
+                    "OriginalOptionIDsJson": "[10, 11]",
+                    "VoteCreatedAtUtc": now,
+                    "VoteUpdatedAtUtc": now,
+                    "OptionID": 12,
+                    "OptionKey": "opt3",
+                    "OptionLabel": "20:00 UTC",
+                },
+            ]
+        return [
+            {"OptionID": 10, "OptionKey": "opt1", "Label": "18:00 UTC"},
+            {"OptionID": 11, "OptionKey": "opt2", "Label": "19:00 UTC"},
+            {"OptionID": 12, "OptionKey": "opt3", "Label": "20:00 UTC"},
+        ]
+
+    monkeypatch.setattr(dal, "run_one_async", fake_run_one_async)
+    monkeypatch.setattr(dal, "run_query_async", fake_run_query_async)
+
+    rows = await dal.list_vote_voter_audit_rows(42)
+
+    assert any("FROM dbo.VotePostMultiSelectVotes" in sql for sql in captured)
+    assert rows[0].selected_option_ids == (11, 12)
+    assert rows[0].selected_option_labels == ("19:00 UTC", "20:00 UTC")
+    assert rows[0].original_option_ids == (10, 11)
+    assert rows[0].original_option_labels == ("18:00 UTC", "19:00 UTC")
+
+
+@pytest.mark.asyncio
+async def test_cast_multi_select_vote_replaces_selection_set_and_audits(monkeypatch) -> None:
+    now = datetime(2026, 7, 1, 21, 0, tzinfo=UTC)
+    executed: list[tuple[str, tuple[object, ...]]] = []
+
+    class _Cursor:
+        description = None
+
+        def __init__(self) -> None:
+            self._rows: list[tuple[object, ...]] = []
+
+        def execute(self, sql, params=()):
+            text = str(sql)
+            executed.append((text, tuple(params)))
+            if "FROM dbo.VotePosts WITH" in text:
+                self.description = [
+                    ("VotePostID",),
+                    ("Status",),
+                    ("AllowVoteChange",),
+                    ("ClosesAtUtc",),
+                    ("VoteMode",),
+                    ("MinSelections",),
+                    ("MaxSelections",),
+                ]
+                self._rows = [
+                    (
+                        42,
+                        "Open",
+                        1,
+                        (now.replace(tzinfo=None) + datetime.resolution),
+                        "MultiSelect",
+                        1,
+                        2,
+                    )
+                ]
+            elif "FROM dbo.VotePostOptions" in text and "IN" in text:
+                self.description = [("OptionID",)]
+                self._rows = [(11,), (12,)]
+            elif "FROM dbo.VotePostMultiSelectVotes WITH" in text:
+                self.description = [("DiscordUserID",), ("OriginalOptionIDsJson",)]
+                self._rows = [(123, "[10]")]
+            elif "FROM dbo.VotePostMultiSelectSelections WITH" in text:
+                self.description = [("OptionID",)]
+                self._rows = [(10,)]
+            else:
+                self.description = None
+                self._rows = []
+
+        def fetchone(self):
+            return self._rows.pop(0) if self._rows else None
+
+        def fetchall(self):
+            rows = self._rows
+            self._rows = []
+            return rows
+
+    async def fake_run_blocking_in_thread(_sync_func, callback, *, name):
+        assert name == "vote_multi_select_cast"
+        return callback(_Cursor())
+
+    monkeypatch.setattr(dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    result = await dal.cast_multi_select_vote(
+        vote_post_id=42,
+        option_ids=(11, 12),
+        discord_user_id=123,
+        now_utc=now,
+    )
+
+    assert result.status == "changed"
+    assert result.selected_option_ids == (11, 12)
+    assert result.previous_option_ids == (10,)
+    assert any("DELETE FROM dbo.VotePostMultiSelectSelections" in sql for sql, _ in executed)
+    assert sum("INSERT INTO dbo.VotePostMultiSelectSelections" in sql for sql, _ in executed) == 2
+    audit = next(params for sql, params in executed if "INSERT INTO dbo.VotePostAudit" in sql)
+    assert "MultiSelectVoteChanged" in audit
+    assert '"option_ids": [11, 12]' in str(audit)

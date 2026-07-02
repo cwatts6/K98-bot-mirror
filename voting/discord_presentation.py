@@ -8,6 +8,7 @@ from voting.models import VoteSnapshot
 from voting.outcomes import vote_outcome
 from voting.render_service import render_vote_card
 from voting.result_visibility import public_results_hidden, result_visibility_label
+from voting.vote_modes import VOTE_MODE_MULTI_SELECT, normalize_vote_mode, vote_mode_label
 
 
 def no_broad_mentions() -> discord.AllowedMentions:
@@ -41,10 +42,30 @@ def build_vote_embed(snapshot: VoteSnapshot) -> discord.Embed:
         value=snapshot.closes_at_utc.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         inline=True,
     )
+    is_multi_select = normalize_vote_mode(snapshot.vote_mode) == VOTE_MODE_MULTI_SELECT
     if hidden_results:
         embed.add_field(name="Results", value="Hidden until close", inline=True)
     else:
-        embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
+        embed.add_field(
+            name="Total voters" if is_multi_select else "Total votes",
+            value=str(snapshot.total_votes),
+            inline=True,
+        )
+        if is_multi_select:
+            embed.add_field(
+                name="Total selections",
+                value=str(snapshot.total_selections),
+                inline=True,
+            )
+    if is_multi_select:
+        embed.add_field(
+            name="Vote mode",
+            value=(
+                f"{vote_mode_label(snapshot.vote_mode)} "
+                f"({snapshot.min_selections}-{snapshot.max_selections} selections)"
+            ),
+            inline=True,
+        )
     if not hidden_results and (
         snapshot.status == "Closed"
         or snapshot.closed_at_utc is not None
@@ -89,6 +110,17 @@ def build_close_embed(snapshot: VoteSnapshot) -> discord.Embed:
         ),
         color=discord.Color.red(),
     )
-    embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
+    is_multi_select = normalize_vote_mode(snapshot.vote_mode) == VOTE_MODE_MULTI_SELECT
+    embed.add_field(
+        name="Total voters" if is_multi_select else "Total votes",
+        value=str(snapshot.total_votes),
+        inline=True,
+    )
+    if is_multi_select:
+        embed.add_field(
+            name="Total selections",
+            value=str(snapshot.total_selections),
+            inline=True,
+        )
     embed.set_footer(text=f"Vote #{snapshot.vote_post_id}")
     return embed

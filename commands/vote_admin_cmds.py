@@ -33,6 +33,7 @@ from voting.service import (
     MAX_OPTION_LABEL_LEN,
     MAX_TITLE_LEN,
     RESULT_VISIBILITY_CHOICES,
+    VOTE_MODE_CHOICES,
     VoteValidationError,
     attach_vote_message,
     build_create_request,
@@ -43,6 +44,7 @@ from voting.service import (
     search_closed_vote_choices,
     search_vote_choices,
 )
+from voting.vote_modes import VOTE_MODE_ONE_CHOICE, normalize_vote_mode, vote_mode_label
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,9 @@ _EXPORT_MODE_CHOICES = [
 _RESULT_VISIBILITY_CHOICES = [
     discord.OptionChoice(name=label, value=value)
     for value, label in RESULT_VISIBILITY_CHOICES.items()
+]
+_VOTE_MODE_CHOICES = [
+    discord.OptionChoice(name=label, value=value) for value, label in VOTE_MODE_CHOICES.items()
 ]
 
 
@@ -147,7 +152,14 @@ def _build_vote_export_summary_embed(export) -> discord.Embed:
         description=export.outcome_summary,
         color=discord.Color.blurple(),
     )
-    embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
+    is_multi_select = normalize_vote_mode(snapshot.vote_mode) != VOTE_MODE_ONE_CHOICE
+    embed.add_field(
+        name="Total voters" if is_multi_select else "Total votes",
+        value=str(snapshot.total_votes),
+        inline=True,
+    )
+    if is_multi_select:
+        embed.add_field(name="Total selections", value=str(snapshot.total_selections), inline=True)
     embed.add_field(name="Rows", value=str(export.row_count), inline=True)
     embed.add_field(
         name="Closed",
@@ -219,7 +231,14 @@ def _build_vote_voter_audit_export_summary_embed(export) -> discord.Embed:
         description="Voter-level audit rows for one closed vote.",
         color=discord.Color.blurple(),
     )
-    embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
+    is_multi_select = normalize_vote_mode(snapshot.vote_mode) != VOTE_MODE_ONE_CHOICE
+    embed.add_field(
+        name="Total voters" if is_multi_select else "Total votes",
+        value=str(snapshot.total_votes),
+        inline=True,
+    )
+    if is_multi_select:
+        embed.add_field(name="Total selections", value=str(snapshot.total_selections), inline=True)
     embed.add_field(name="Rows", value=str(export.row_count), inline=True)
     embed.add_field(
         name="Closed",
@@ -337,6 +356,31 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             required=False,
             default=RESULT_VISIBILITY_PUBLIC_LIVE,
         ),
+        vote_mode: str = discord.Option(
+            str,
+            "Whether players choose one option or multiple options",
+            choices=_VOTE_MODE_CHOICES,
+            required=False,
+            default=VOTE_MODE_ONE_CHOICE,
+        ),
+        min_selections: int = discord.Option(
+            int,
+            # architecture-check: allow - Discord option copy, not embedded SQL.
+            "Minimum options for multi-select votes",
+            required=False,
+            default=1,
+            min_value=1,
+            max_value=6,
+        ),
+        max_selections: int = discord.Option(
+            int,
+            # architecture-check: allow - Discord option copy, not embedded SQL.
+            "Maximum options for multi-select votes",
+            required=False,
+            default=1,
+            min_value=1,
+            max_value=6,
+        ),
     ) -> None:
         await safe_defer(ctx, ephemeral=True)
         try:
@@ -354,6 +398,9 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                 reminder_mention_everyone=reminder_mention_everyone,
                 close_mention_everyone=close_mention_everyone,
                 result_visibility=result_visibility,
+                vote_mode=vote_mode,
+                min_selections=min_selections,
+                max_selections=max_selections,
             )
         except VoteValidationError as exc:
             await ctx.interaction.edit_original_response(content=f"Vote not created: {exc}")
@@ -549,10 +596,29 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             color=discord.Color.green() if snapshot.status == "Open" else discord.Color.red(),
         )
         embed.add_field(name="Status", value=snapshot.status, inline=True)
-        embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
+        is_multi_select = normalize_vote_mode(snapshot.vote_mode) != VOTE_MODE_ONE_CHOICE
+        embed.add_field(
+            name="Total voters" if is_multi_select else "Total votes",
+            value=str(snapshot.total_votes),
+            inline=True,
+        )
+        if is_multi_select:
+            embed.add_field(
+                name="Total selections",
+                value=str(snapshot.total_selections),
+                inline=True,
+            )
         embed.add_field(
             name="Result visibility",
             value=result_visibility_label(snapshot.result_visibility),
+            inline=True,
+        )
+        embed.add_field(
+            name="Vote mode",
+            value=(
+                f"{vote_mode_label(snapshot.vote_mode)} "
+                f"({snapshot.min_selections}-{snapshot.max_selections} selections)"
+            ),
             inline=True,
         )
         embed.add_field(

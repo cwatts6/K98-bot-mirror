@@ -6,13 +6,13 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `voting/`, `ui/views/vote_post_view.py`, `/vote_admin`, SQL repo vote framework
+- Area: `voting/`, `/vote_admin`, future survey builder UI, SQL repo vote/survey framework
 - Type: architecture
-- Description: Multi-select and survey-style voting are approved for future scope because they support public availability and preference checks better than one forced choice. Hidden-until-close result visibility is now delivered and smoke tested, so this is the next prepared voting slice. Current SQL stores one `OptionID` per `(VotePostID, DiscordUserID)`, current buttons have no selected/unselected multi-state, and current result cards assume one vote per user.
-- Suggested Fix: Use `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md` to run an audit/design slice before implementation. Define whether to ship single-question `MultiSelect` first or split full multi-question survey builder work into a later slice. Confirm vote mode, min/max selection rules, result aggregation, export shape, SQL selection storage, audit events, and restart-safe interaction UX before adding SQL such as a vote-selection child table or survey question tables. Do not bundle with emoji support or dashboard readiness.
+- Description: Full multi-question survey-style voting remains valuable for richer KD98 feedback, event planning, rankings, and structured questionnaires, but it is intentionally separate from the Phase 6 single-question MultiSelect implementation. It requires question modeling, per-question options, response envelopes, partial/private response UX, broader export design, and question-level privacy/reporting decisions that are not needed for single-question MultiSelect.
+- Suggested Fix: After the Phase 6 single-question MultiSelect slice is deployed and smoke tested, prepare a separate survey-builder audit/task pack. Define survey question types, create/edit builder UX, private response flow, partial submission/restart behavior, SQL tables for questions/options/responses/answers, PublicLive versus HiddenUntilClose summary rules, closed-only private export shapes, audit events, and migration/rollback order. Do not bundle survey builder with emoji/icon polish or dashboard/reporting implementation.
 - Impact: high
 - Risk: high
-- Dependencies: Hidden-until-close results delivered and smoke tested on 2026-07-02; approved product design for cardinality and survey semantics; SQL repo migration design; focused interaction and export regression tests.
+- Dependencies: Operator approval for survey product scope; Phase 6 MultiSelect production smoke evidence; SQL repo validation in `C:\K98-bot-SQL-Server`; privacy review for question-level responses; focused builder/response/export/restart tests.
 
 ### Deferred Optimisation
 - Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, SQL repo `dbo.VotePostOptions`
