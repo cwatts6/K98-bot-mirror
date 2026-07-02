@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 implemented`
+- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 complete and smoke tested; Phase 5 prepared`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -123,7 +123,7 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 Phase 1 intentionally used `/vote_admin` as the approved command group.
 
-### Current command model after Phase 3
+### Current command model after Phase 4
 
 The existing command group now includes private completed-vote export:
 
@@ -135,8 +135,9 @@ The existing command group now includes private completed-vote export:
 /vote_admin export
 ```
 
-No new top-level command was added. Phase 4 should keep using `/vote_admin` unless a later task
-pack explicitly approves a different command shape.
+No new top-level command was added. Phase 4 added `mode` selection to `/vote_admin export` rather
+than creating a separate command. Phase 5 should keep using `/vote_admin` unless a later task pack
+explicitly approves a different command shape.
 
 ### Target workflow model
 
@@ -252,41 +253,70 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 4 - Voter-Level Audit Export Privacy and Access Controls
 
-Status: implemented.
+Status: complete and smoke tested.
+
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#196`
+- Production PR: `cwatts6/K98-bot#504`
+- SQL PR: `not required`
+- Bot smoke test: `2026-07-02`
 
 Delivered:
 
 - Approved voter-level audit export for admin/leadership users.
 - Added private `/vote_admin export mode:voter_audit` for one closed vote at a time.
 - Preserved default totals-only `/vote_admin export` behavior.
-- Included Discord user ID, resolved Discord name, selected option, original option, vote
-  timestamps, and vote-change flag.
+- Included spreadsheet-safe Discord user ID text, resolved Discord name, selected option, original
+  option, vote timestamps, and vote-change flag.
 - Excluded governor names and `GovernorID`; governor-linked voting remains deferred.
 - Added SQL audit logging through `VotePostAudit` with `ActionType=VoterAuditExported`.
+- Logged requester ID plus mode, row count, byte count, upload limit, oversized flag, delivery
+  status, and column profile without storing the voter list in audit JSON.
 - Preserved private/ephemeral delivery by default.
 - Validated all SQL-facing voter/audit columns against `C:\K98-bot-SQL-Server`.
 
-### Phase 5 - Advanced Voting Modes Audit
+Smoke test confirmed:
 
-Status: future candidate.
+- `/vote_admin export mode:voter_audit` produces a private/ephemeral voter-level export.
+- Voter-audit CSV includes `DiscordUserID` and `DiscordName`.
+- `DiscordUserID` opens in Excel/Sheets as text and preserves the full Discord snowflake.
+- Governor names and `GovernorID` are absent.
+- `VoteChanged` is correct for a changed vote.
+- `VotePostAudit` writes `ActionType=VoterAuditExported` with requester ID and expected metadata.
+- Regression tests passed.
 
-Deliver audit/scope before implementation for:
+Phase 4 records are archived under:
+
+```text
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 4 Voter-Level Audit Export Privacy and Access Controls.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 4 Voter-Level Audit Export Privacy and Access Controls.md
+```
+
+### Phase 5 - Advanced Voting Modes Audit and Slice Planning
+
+Status: prepared.
+
+Deliver audit/scope before implementation. Phase 5 should produce a mode-by-mode decision matrix
+and split the remaining candidate modes into safe implementation slices for:
 
 - Role-restricted voting.
-- Governor-linked voting mode.
-- Private or hidden-until-close results.
+- Hidden-until-close or private result visibility.
+- Governor-linked voting or governor-aware audit/reporting.
 - Multi-select or survey-style vote modes.
 - Per-option emoji/icon support.
 - Saved templates for recurring vote types.
+- Dashboard/reporting readiness.
+- Public voter-level export posting policy.
 
-Do not implement advanced voting modes until a separate audit approves their product, privacy,
-permission, SQL, and UX model.
+Do not implement advanced voting modes until the Phase 5 audit approves their product, privacy,
+permission, SQL, and UX model and the operator approves a follow-up implementation slice.
 
 ## 8. Remaining Slice Scope Summary
 
-### Phase 4 scope summary
+### Completed Phase 4 scope summary
 
-Phase 4 is a privacy and access-control slice for voter-level audit export. It should not add new
+Phase 4 was a privacy and access-control slice for voter-level audit export. It did not add new
 voting modes or change player voting behavior.
 
 Affected areas:
@@ -306,12 +336,21 @@ Affected areas:
 - SQL repo only if voter-level export, audit logging, or query performance needs cannot be
   satisfied by current tables and indexed queries.
 
-### Later advanced-mode scope summary
+### Phase 5 advanced-mode scope summary
 
 Phase 5 should audit role restrictions, hidden/anonymous result rules, governor-linked identity,
 multi-select/survey semantics, templates, and optional emoji/icon support separately before any
 mode is implemented. Each mode may require SQL contract changes, permission/privacy design,
-command/view UX, migration/rollback planning, and focused tests.
+command/view UX, migration/rollback planning, focused tests, manual Discord smoke tests, and
+Codex Security review if implementation follows.
+
+Phase 5 must decide:
+
+- which mode, if any, is the safest first implementation slice
+- which modes remain explicitly deferred
+- which SQL/schema/index/audit changes each future slice needs
+- whether existing `/vote_admin` paths remain sufficient
+- what manual smoke evidence and automated tests are required per future slice
 
 ## 9. Cross-Programme Constraints
 
@@ -324,8 +363,8 @@ command/view UX, migration/rollback planning, and focused tests.
 - Preserve persistent view restart behavior and scheduler idempotency.
 - Do not edit vote options after votes exist unless the task explicitly defines safe rules.
 - Do not expose voter-level exports publicly without explicit approval.
-- Do not add voter-level export until Phase 4 explicitly approves its privacy, permissions, CSV
-  schema, and audit/logging behavior.
+- Do not add advanced voting modes until Phase 5 explicitly approves their product, privacy,
+  permissions, SQL, UX, test, and rollout model.
 
 ## 10. Validation Strategy
 
@@ -380,7 +419,7 @@ The core programme is successful when:
 ## 12. Suggested Next Action
 
 ```text
-Prepare the next approved voting slice only after reviewing Phase 4 smoke-test results.
+Start Phase 5 Advanced Voting Modes Audit and Slice Planning with audit/scope only.
 ```
 
 ## 13. Programme Change Log
@@ -395,3 +434,5 @@ Prepare the next approved voting slice only after reviewing Phase 4 smoke-test r
 | 2026-07-02 | Phase 3 marked complete | Totals-only `/vote_admin export` delivered, smoke tested private/ephemeral export, and restart/deployment vote buttons confirmed. |
 | 2026-07-02 | Phase 4 scope prepared | Next slice confirmed as voter-level audit export privacy and access-control audit before advanced voting modes. |
 | 2026-07-02 | Phase 4 implemented | Added private voter-level audit export mode with Discord ID/name, option/timestamp/change columns, SQL audit logging, and totals-only export preserved. |
+| 2026-07-02 | Phase 4 smoke tested and archived | Smoke confirmed private voter-audit export, Excel-safe Discord ID text, DiscordName, governor identity exclusion, VoteChanged, SQL audit metadata, and regression tests. Phase 4 task pack and starter moved to archive. |
+| 2026-07-02 | Phase 5 prepared | Created advanced voting modes audit/slice-planning task pack and starter; active deferred voting item promoted into Phase 5 audit scope. |

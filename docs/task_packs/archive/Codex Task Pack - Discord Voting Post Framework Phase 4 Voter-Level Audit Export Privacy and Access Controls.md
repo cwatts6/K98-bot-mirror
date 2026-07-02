@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 3 totals-only export smoke test`
 - Task type: `audit | privacy | Discord command workflow | SQL-backed export`
 - One-pass approved: `no`
-- Status: `implemented`
+- Status: `complete | smoke tested`
 
 ## 2. Objective
 
@@ -17,6 +17,12 @@ Discord vote posts.
 Phase 3 delivered private totals-only CSV export for one closed vote at a time. It intentionally
 deferred voter-level audit export because that changes the privacy and permission boundary. Phase 4
 resolved that decision without changing player voting behavior or adding advanced voting modes.
+
+Phase 4 was delivered in mirror PR `cwatts6/K98-bot-mirror#196` and production PR
+`cwatts6/K98-bot#504`. Operator smoke testing on `2026-07-02` confirmed private voter-audit
+export, Excel-safe Discord ID text preservation, correct `DiscordName` inclusion, governor identity
+exclusion, `VoteChanged` output, SQL `VoterAuditExported` audit metadata, and regression test
+success.
 
 ## 3. Required Reading
 
@@ -81,9 +87,12 @@ Approved implementation included:
 - Voter-level CSV export for one closed vote at a time.
 - Private/ephemeral delivery only.
 - Admin/leadership permission gate matching the existing `/vote_admin` workflow.
-- Discord user ID and resolved Discord name, with governor identity excluded.
+- Spreadsheet-safe Discord user ID text and resolved Discord name, with governor identity excluded.
 - CSV formula escaping for all text fields.
-- Tests for permission, privacy, closed-only behavior, field shape, and no totals-export regression.
+- SQL audit details with requester ID, mode, row count, byte count, max upload size, oversized flag,
+  delivery status, and column profile.
+- Tests for privacy, closed-only behavior, field shape, Excel-safe Discord IDs, and no totals-export
+  regression.
 
 ## 6. Out Of Scope
 
@@ -209,30 +218,36 @@ Expected validation:
 Run Codex Security review before PR handoff because this slice touches Discord interactions,
 permissions/privacy, SQL/data access, generated files, and user-controlled selection.
 
-## 12. Manual Discord Smoke Test If Implemented
+## 12. Manual Discord Smoke Test
 
-1. Use an authorized user to export voter audit rows for a closed vote.
-2. Confirm the response is private/ephemeral.
-3. Confirm the CSV includes only approved voter/audit columns.
-4. Confirm totals-only export still works and remains unchanged.
-5. Confirm an unauthorized user cannot receive voter-level export.
-6. Confirm an open vote cannot be exported as voter-level audit.
-7. Confirm no public channel message or broad mention is sent.
-8. Confirm existing open vote buttons still work after restart.
+Completed on `2026-07-02`.
+
+Confirmed:
+
+1. Authorized voter audit export generated a private/ephemeral response.
+2. CSV included only approved voter/audit columns.
+3. CSV included `DiscordUserID` and `DiscordName`.
+4. `DiscordUserID` opened in Excel/Sheets as text and preserved the full Discord snowflake.
+5. Governor names and `GovernorID` were absent.
+6. `VoteChanged` reflected a changed vote correctly.
+7. SQL `VotePostAudit` wrote `ActionType=VoterAuditExported` with requester ID and expected
+   metadata: mode, row count, byte count, upload limit, oversized flag, delivery status, and
+   columns.
+8. Regression tests passed.
 
 ## 13. Acceptance Criteria
 
-- [ ] Phase 4 begins with audit/scope and approval before implementation.
-- [ ] Voter-level audit export is either approved with a concrete privacy model or explicitly
+- [x] Phase 4 begins with audit/scope and approval before implementation.
+- [x] Voter-level audit export is either approved with a concrete privacy model or explicitly
       deferred again with rationale.
-- [ ] The approved command shape does not add a new top-level command.
-- [ ] Export output remains private/ephemeral by default.
-- [ ] Current totals-only export remains available.
-- [ ] SQL assumptions are validated against `C:\K98-bot-SQL-Server`.
-- [ ] Deferred optimisation backlog is updated to show what was resolved, promoted, or still
+- [x] The approved command shape does not add a new top-level command.
+- [x] Export output remains private/ephemeral by default.
+- [x] Current totals-only export remains available.
+- [x] SQL assumptions are validated against `C:\K98-bot-SQL-Server`.
+- [x] Deferred optimisation backlog is updated to show what was resolved, promoted, or still
       deferred.
-- [ ] Focused and broad tests pass if implementation is approved.
-- [ ] Codex Security review is run or explicitly justified if skipped.
+- [x] Focused and broad tests pass if implementation is approved.
+- [x] Codex Security review is run or explicitly justified if skipped.
 
 ## 14. PR Summary Template
 

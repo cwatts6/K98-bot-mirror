@@ -1,12 +1,14 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 4 Voter-Level Audit Export Privacy and Access Controls
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived completed starter. Phase 4 was delivered in mirror PR #196 and production PR
+#504, then smoke tested successfully on 2026-07-02. Use the Phase 5 starter in `docs/task_packs/`
+for the next voting slice.
 
 Phase 1, Phase 2, and Phase 3 are complete and smoke tested. SQL-backed live voting works, guided
 vote creation works, closed vote lookup/export works, totals-only CSV export is private/ephemeral,
 and existing open vote buttons work after restart and deployment.
 
-Use this starter to begin Phase 4 with audit/scope only.
+This starter was used to begin Phase 4 with audit/scope only.
 
 ## Copy/Paste Starter
 

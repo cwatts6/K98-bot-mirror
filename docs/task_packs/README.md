@@ -171,16 +171,22 @@ Discord Voting Post Framework status:
 - Phase 3 records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 3 Admin Export and Audit Hardening.md`
   - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 3 Admin Export and Audit Hardening.md`
+- Phase 4 Voter-Level Audit Export Privacy and Access Controls is delivered in mirror PR #196 and
+  production PR #504. Operator smoke testing on 2026-07-02 confirmed private/ephemeral
+  voter-audit export, spreadsheet-safe `DiscordUserID`, resolved `DiscordName`, governor identity
+  exclusion, correct `VoteChanged`, SQL `VoterAuditExported` metadata, and regression-test success.
+- Phase 4 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 4 Voter-Level Audit Export Privacy and Access Controls.md`
+  - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 4 Voter-Level Audit Export Privacy and Access Controls.md`
 - Active Discord Voting Post Framework files:
   - `Discord Voting Post Framework - Programme Pack.md`
-  - `Codex Task Pack - Discord Voting Post Framework Phase 4 Voter-Level Audit Export Privacy and Access Controls.md`
-  - `Codex Chat Starter - Discord Voting Post Framework Phase 4 Voter-Level Audit Export Privacy and Access Controls.md`
-- Phase 4 is the next prepared voting slice. It starts with audit/scope for whether voter-level
-  audit export is allowed, who can receive it, which columns may be exported, whether SQL audit
-  logging/indexing is needed, and how to preserve private/ephemeral delivery. Role-restricted
-  voting, hidden results, governor-linked voting, multi-select/survey voting, templates, website
-  dashboards, and public voter-level export posting remain later phases unless separately
-  approved.
+  - `Codex Task Pack - Discord Voting Post Framework Phase 5 Advanced Voting Modes Audit and Slice Planning.md`
+  - `Codex Chat Starter - Discord Voting Post Framework Phase 5 Advanced Voting Modes Audit and Slice Planning.md`
+- Phase 5 is the next prepared voting slice. It starts with audit/scope only for role-restricted
+  voting, hidden/private result visibility, governor-linked voting/reporting, multi-select or
+  survey-style modes, saved templates, per-option emoji/icons, dashboard/reporting readiness, and
+  public voter-level export policy. It should split future implementation work into safe task packs
+  before any mode is built.
 
 Player Self-Service Command Centre status:
 
@@ -332,7 +338,7 @@ Final removal of temporary deprecated command paths remains captured as deferred
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.
 
-Discord Voting Post Framework Phase 4 Voter-Level Audit Export Privacy and Access Controls is the
-next prepared voting slice. It starts with audit/scope only for the voter-level audit export
-privacy decision, permission model, allowed/redacted/excluded columns, SQL lookup/audit validation,
-private delivery, and no changes to player voting behavior.
+Discord Voting Post Framework Phase 5 Advanced Voting Modes Audit and Slice Planning is the next
+prepared voting slice. It starts with audit/scope only and should decide which advanced voting mode,
+if any, becomes the first implementation slice while keeping all Phase 1 through Phase 4 behaviour
+unchanged.

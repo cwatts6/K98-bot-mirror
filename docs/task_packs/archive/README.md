@@ -2,12 +2,13 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
-Discord Voting Post Framework Phase 1 SQL-Backed Live Voting is archived here as the completed
-MVP execution record. It delivered SQL-backed vote posts, button voting, one-vote-per-Discord-user
-enforcement, vote changes, live Pillow result cards, scheduler reminders, automatic close,
-manual close, persistent views, mention safety, SQL deployment, production promotion, and
-operator smoke testing on 2026-07-01. The active programme and Phase 2 guided-admin UX polish
-pack remain in `../`.
+Discord Voting Post Framework Phase 1 through Phase 4 execution records are archived here. The
+programme delivered SQL-backed vote posts, button voting, one-vote-per-Discord-user enforcement,
+vote changes, live Pillow result cards, scheduler reminders, automatic close, manual close,
+persistent views, mention safety, guided admin UX, private totals-only export, private
+admin/leadership voter-audit export, SQL audit logging, production promotion, and operator smoke
+testing through 2026-07-02. The active programme and Phase 5 advanced voting modes audit pack
+remain in `../`.
 
 Player Self-Service Command Centre completed Phase 1 audit/design, Phase 2 `/me` shell
 foundation, Phase 3 Modern Account Centre, Phase 4 Modern Reminder Centre, Phase 5 Visual
