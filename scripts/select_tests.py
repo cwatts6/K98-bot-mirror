@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Recommend focused tests for changed K98 files."""
+
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+import subprocess
+
+ROOT = Path(__file__).resolve().parents[1]
+ALWAYS_RUN = [
+    "python scripts/smoke_imports.py",
+    "python scripts/validate_command_registration.py",
+]
+RULES = [
+    (
+        "commands/stats",
+        ["python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py"],
+    ),
+    ("stats_service", ["python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py"]),
+    ("ark/", ["python -m pytest -q tests/test_ark_*.py"]),
+    ("mge/", ["python -m pytest -q tests/test_mge_*.py"]),
+    ("event_calendar/", ["python -m pytest -q tests/test_calendar_*.py"]),
+    ("ui/views/", ["python -m pytest -q tests/test_ui_imports.py"]),
+    ("registry/", ["python -m pytest -q tests/test_registry_*.py"]),
+    ("inventory/", ["python -m pytest -q tests/test_inventory_*.py"]),
+]
+
+
+def _run_git(args: list[str], root: Path) -> list[str]:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return []
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def _resolve_diff_base(root: Path) -> str:
+    in_ci = os.environ.get("GITHUB_ACTIONS") == "true"
+    candidates: list[str] = []
+    github_base = os.environ.get("GITHUB_BASE_REF")
+    if github_base:
+        candidates.append(f"origin/{github_base}")
+    candidates.extend(["origin/main", "main"])
+    for ref in candidates:
+        result = _run_git(["merge-base", "HEAD", ref], root)
+        if result:
+            return result[0]
+    if in_ci:
+        raise SystemExit(
+            "ERROR: Could not resolve a diff base ref in CI. Tried: " + ", ".join(candidates)
+        )
+    return "HEAD"
+
+
+def changed_files(root: Path) -> list[str]:
+    diff_base = _resolve_diff_base(root)
+    changed = _run_git(["diff", "--name-only", f"{diff_base}...HEAD"], root)
+    changed.extend(_run_git(["diff", "--name-only"], root))
+    changed.extend(_run_git(["diff", "--name-only", "--cached"], root))
+    changed.extend(_run_git(["ls-files", "--others", "--exclude-standard"], root))
+    return list(dict.fromkeys(changed))
+
+
+def select_tests(paths: list[str]) -> list[str]:
+    commands: list[str] = []
+    normalized = [path.replace("\\", "/") for path in paths]
+    for prefix, tests in RULES:
+        if any(path.startswith(prefix) for path in normalized):
+            commands.extend(tests)
+    if any(path.startswith("tests/") for path in normalized):
+        commands.append("python -m pytest -q tests")
+    commands.extend(ALWAYS_RUN)
+    return list(dict.fromkeys(commands))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("paths", nargs="*", help="Optional changed file paths.")
+    args = parser.parse_args(argv)
+
+    paths = args.paths or changed_files(ROOT)
+    print("Changed files:")
+    if paths:
+        for path in paths:
+            print(f"- {path}")
+    else:
+        print("- none detected")
+
+    print("\nRecommended validation:")
+    for command in select_tests(paths):
+        print(f"- {command}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
