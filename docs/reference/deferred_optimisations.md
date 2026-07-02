@@ -8,16 +8,16 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `voting/`, `ui/views/vote_post_view.py`, `/vote_admin`, SQL repo vote framework
 - Type: architecture
-- Description: Multi-select and survey-style voting are approved for future scope because they support public availability and preference checks better than one forced choice. Current SQL stores one `OptionID` per `(VotePostID, DiscordUserID)`, current buttons have no selected/unselected multi-state, and current result cards assume one vote per user.
-- Suggested Fix: Treat multi-select/survey as a separate high-value design and implementation slice after hidden-results scope. Define vote mode, min/max selection rules, result aggregation, export shape, and restart-safe interaction UX before adding SQL such as a vote-selection child table or survey question tables. Do not bundle with hidden results, emoji support, or dashboard readiness.
+- Description: Multi-select and survey-style voting are approved for future scope because they support public availability and preference checks better than one forced choice. Hidden-until-close result visibility is now delivered and smoke tested, so this is the next prepared voting slice. Current SQL stores one `OptionID` per `(VotePostID, DiscordUserID)`, current buttons have no selected/unselected multi-state, and current result cards assume one vote per user.
+- Suggested Fix: Use `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md` to run an audit/design slice before implementation. Define whether to ship single-question `MultiSelect` first or split full multi-question survey builder work into a later slice. Confirm vote mode, min/max selection rules, result aggregation, export shape, SQL selection storage, audit events, and restart-safe interaction UX before adding SQL such as a vote-selection child table or survey question tables. Do not bundle with emoji support or dashboard readiness.
 - Impact: high
 - Risk: high
-- Dependencies: Approved product design for cardinality and survey semantics; SQL repo migration design; focused interaction and export regression tests.
+- Dependencies: Hidden-until-close results delivered and smoke tested on 2026-07-02; approved product design for cardinality and survey semantics; SQL repo migration design; focused interaction and export regression tests.
 
 ### Deferred Optimisation
 - Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, SQL repo `dbo.VotePostOptions`
 - Type: consistency
-- Description: Per-option emoji/icon support is approved for future scope because it makes public votes more readable and engaging. Current options have labels and nullable `ButtonStyle`, but no emoji/icon metadata. Adding emoji has Discord button UX, CSV/export, and generated-card font/glyph implications.
+- Description: Per-option emoji/icon support is approved for future scope because it makes public votes more readable and engaging. Current options have labels and nullable `ButtonStyle`, but no emoji/icon metadata. Adding emoji has Discord button UX, CSV/export, and generated-card font/glyph implications. This remains a later polish slice after hidden-until-close delivery and should not be bundled into the Phase 6 multi-select/survey audit unless the operator explicitly reorders the roadmap.
 - Suggested Fix: Prepare a focused polish slice that adds approved option emoji/icon metadata, validates Unicode or custom emoji input, uses Discord button emoji support where practical, updates card rendering with glyph fallback checks, and preserves existing label-length/export behavior.
 - Impact: medium
 - Risk: medium
@@ -26,11 +26,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `voting/`, `/vote_admin status`, SQL repo vote reporting views/procedures
 - Type: architecture
-- Description: Dashboard/reporting readiness is approved for future scope. Current vote tables can support basic closed-vote summaries, but there are no dedicated reporting views/procedures and future mode columns may change reporting dimensions.
-- Suggested Fix: Scope a private reporting-readiness slice that defines SQL views or procedures for vote summaries, participation, outcomes, export/audit history, and approved mode dimensions. Keep public website work out of scope unless separately approved.
+- Description: Dashboard/reporting readiness is approved for future scope. Current vote tables can support basic closed-vote summaries, but there are no dedicated reporting views/procedures and future mode columns may change reporting dimensions. This remains required but should follow enough mode design to avoid building reporting dimensions that immediately drift.
+- Suggested Fix: Scope a private reporting-readiness slice that defines SQL views or procedures for vote summaries, participation, outcomes, export/audit history, result visibility, and approved mode dimensions. Keep public website work out of scope unless separately approved.
 - Impact: medium
 - Risk: medium
-- Dependencies: Stable approved voting-mode SQL columns; operator approval for private versus public reporting consumers.
+- Dependencies: Stable approved voting-mode SQL columns, including Phase 5 result visibility and the approved Phase 6 vote-mode/cardinality design; operator approval for private versus public reporting consumers.
 
 ### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks

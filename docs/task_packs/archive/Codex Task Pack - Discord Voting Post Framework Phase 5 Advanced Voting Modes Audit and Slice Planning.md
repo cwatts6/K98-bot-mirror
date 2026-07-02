@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 4 voter-level audit export smoke test`
 - Task type: `audit | product scope | Discord command workflow | SQL-backed voting design`
 - One-pass approved: `no`
-- Status: `audit drafted - awaiting operator approval`
+- Status: `complete and archived - audit delivered; hidden-until-close implementation delivered and smoke tested`
 
 ## 2. Objective
 
@@ -361,28 +361,30 @@ Minimum approved first-slice scope should be:
 
 ### Future Slice Outlines
 
-1. Phase 6 candidate: hidden-until-close results.
+1. Completed first implementation slice: hidden-until-close results.
    - SQL: add `ResultVisibility` to `dbo.VotePosts`.
    - Bot: renderer/status/update behavior for hidden open results and revealed closed results.
    - Tests: renderer leak prevention, status private totals, close reveal, export regression.
-   - Smoke: open public card hides totals; close reveals winner/tie/no-vote correctly.
+   - Smoke: completed successfully on 2026-07-02; open public card hides totals and close reveals
+     winner/tie/no-vote correctly.
 
-2. Phase 7 candidate: multi-select/survey voting.
+2. Next prepared slice: multi-select/survey voting.
    - SQL: design vote mode and selection storage, likely `dbo.VotePostVoteSelections` or survey
      question tables.
    - Bot: select-menu or private survey-panel interaction model, min/max selection rules, result
      aggregation, and export shape.
    - Tests: cardinality, DAL transactions, selection updates, export rows, restart/view behavior.
    - Smoke: choose multiple options, change selections, close, and export.
+   - Prepared task pack: `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md`.
 
-3. Phase 8 candidate: per-option emoji/icon support.
+3. Later candidate: per-option emoji/icon support.
    - SQL: add approved emoji/icon metadata to `dbo.VotePostOptions`.
    - Bot: button emoji support, card rendering, validation, and export regression.
    - Tests: Unicode/custom emoji validation, button construction, renderer visual sample, export
      compatibility.
    - Smoke: emoji and no-emoji votes with labels near the configured limit.
 
-4. Phase 9 candidate: dashboard/reporting readiness.
+4. Later required candidate: dashboard/reporting readiness.
    - SQL: define private reporting views or procedures for vote summaries, participation, outcomes,
      export/audit history, and approved mode dimensions.
    - Bot: private admin/leadership/operator reporting entry point or export enhancement under
@@ -467,13 +469,14 @@ Result: passed. Runtime pytest was skipped because this slice changed only docum
 planning files and did not change bot code, SQL, tests, command registration, exports, or Discord
 interaction behavior.
 
-### Approval Needed
+### Completion Notes
 
-Operator approval is needed before any follow-up implementation. Specific decisions to approve:
+Operator review completed after the Phase 5 audit:
 
-- approval to prepare the hidden-until-close implementation task pack as the next slice
-- confirmation that hidden results should reveal publicly at close
-- confirmation that multi-select/survey, emoji/icon support, and dashboard/reporting readiness stay
-  in future scope
-- confirmation that role-restricted voting, governor-linked voting, saved templates, and public
-  voter-level export posting are removed from active voting scope
+- hidden-until-close result visibility was approved, implemented, smoke tested, and archived as the
+  first advanced voting mode
+- hidden results reveal publicly at close
+- multi-select/survey, emoji/icon support, and dashboard/reporting readiness stay in future scope
+- role-restricted voting, governor-linked voting, saved templates, and public voter-level export
+  posting are removed from active voting scope
+- Phase 6 multi-select/survey audit and design is prepared as the next voting slice

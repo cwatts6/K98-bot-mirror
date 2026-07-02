@@ -1,13 +1,17 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 5 Advanced Voting Modes Audit and Slice Planning
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter. Phase 5 audit is complete, and hidden-until-close result visibility was
+implemented and smoke tested successfully on 2026-07-02.
 
 Phase 1, Phase 2, Phase 3, and Phase 4 are complete and smoke tested. SQL-backed live voting works,
 guided vote creation works, closed vote lookup/export works, totals-only CSV export is
 private/ephemeral, voter-level audit CSV export is private/ephemeral for admin/leadership users,
 and existing open vote buttons work after restart and deployment.
 
-Use this starter to begin Phase 5 with audit/scope only.
+This starter is retained as an execution record only. Use the active Phase 6 starter for the next
+Discord Voting Post Framework slice:
+
+`docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md`
 
 ## Copy/Paste Starter
 
@@ -52,7 +56,7 @@ Read first:
 - docs/reference/ENV_REFERENCE.md
 - docs/reference/deferred_optimisations.md
 - docs/task_packs/Discord Voting Post Framework - Programme Pack.md
-- docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 5 Advanced Voting Modes Audit and Slice Planning.md
+- docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 5 Advanced Voting Modes Audit and Slice Planning.md
 
 Use these skills as applicable:
 - k98-architecture-scope
