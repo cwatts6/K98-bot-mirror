@@ -547,7 +547,7 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             )
         await ctx.interaction.edit_original_response(embed=embed)
 
-    @group.command(name="export", description="Export final totals for a closed vote.")
+    @group.command(name="export", description="Export closed vote totals or voter audit.")
     @versioned("v1.00")
     @safe_command
     @is_admin_or_leadership_only()

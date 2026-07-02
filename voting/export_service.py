@@ -135,6 +135,10 @@ def _csv_cell(value: Any) -> Any:
     return _csv_text_cell(value)
 
 
+def _spreadsheet_text_id(value: int) -> str:
+    return f"'{int(value)}"
+
+
 def _filename_part(value: Any) -> str:
     text = str(value or "").strip().lower().replace("-", "_")
     text = _FILENAME_SAFE_RE.sub("_", text)
@@ -239,7 +243,7 @@ def vote_voter_audit_csv_rows(
                 "VotePostID": row.vote_post_id,
                 "Title": row.title,
                 "ClosedAtUtc": _dt(row.closed_at_utc),
-                "DiscordUserID": row.discord_user_id,
+                "DiscordUserID": _spreadsheet_text_id(row.discord_user_id),
                 "DiscordName": discord_names_by_user_id.get(row.discord_user_id) or "Unknown",
                 "OptionID": row.option_id,
                 "OptionKey": row.option_key,

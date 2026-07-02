@@ -169,7 +169,7 @@ def test_vote_voter_audit_csv_rows_include_discord_identity_and_change_flag() ->
         discord_names_by_user_id={123: "Planner", 456: "Scout"},
     )
 
-    assert rows[0]["DiscordUserID"] == 123
+    assert rows[0]["DiscordUserID"] == "'123"
     assert rows[0]["DiscordName"] == "Planner"
     assert rows[0]["OriginalOptionLabel"] == "+18:00 UTC"
     assert rows[0]["VoteChanged"] == 1
@@ -186,6 +186,7 @@ def test_vote_voter_audit_csv_escapes_formula_like_text_and_unknown_names() -> N
     rows = list(csv.DictReader(io.StringIO(text)))
 
     assert rows[0]["Title"] == "'=Best rally time?"
+    assert rows[0]["DiscordUserID"] == "'123"
     assert rows[0]["DiscordName"] == "'=Planner"
     assert rows[0]["OriginalOptionLabel"] == "'+18:00 UTC"
     assert rows[1]["DiscordName"] == "Unknown"
