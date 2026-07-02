@@ -110,9 +110,7 @@ def _filename_part(value: Any) -> str:
 def vote_totals_csv_filename(snapshot: VoteSnapshot) -> str:
     closed_at = snapshot.closed_at_utc or datetime.now(UTC)
     timestamp = (
-        closed_at.replace(tzinfo=UTC)
-        if closed_at.tzinfo is None
-        else closed_at.astimezone(UTC)
+        closed_at.replace(tzinfo=UTC) if closed_at.tzinfo is None else closed_at.astimezone(UTC)
     ).strftime("%Y%m%d_%H%M%S")
     return f"vote_{snapshot.vote_post_id}_{_filename_part(snapshot.title)}_{timestamp}.csv"
 
@@ -164,9 +162,7 @@ def vote_totals_csv_rows(snapshot: VoteSnapshot) -> list[dict[str, Any]]:
                 "SortOrder": option.sort_order,
                 "VoteCount": vote_count,
                 "VotePercent": _pct(vote_count, total_votes),
-                "IsWinningOption": 1
-                if int(option.option_id) in outcome.winning_option_ids
-                else 0,
+                "IsWinningOption": 1 if int(option.option_id) in outcome.winning_option_ids else 0,
             }
         )
     return rows

@@ -68,8 +68,7 @@ def _vote_admin_command_names() -> set[str]:
                 if not isinstance(decorator, ast.Call):
                     continue
                 if not (
-                    isinstance(decorator.func, ast.Attribute)
-                    and decorator.func.attr == "command"
+                    isinstance(decorator.func, ast.Attribute) and decorator.func.attr == "command"
                 ):
                     continue
                 for keyword in decorator.keywords:
@@ -117,9 +116,7 @@ def test_vote_create_applies_string_max_lengths() -> None:
 
 
 def test_vote_admin_registers_export_subcommand() -> None:
-    assert {"create", "update", "close", "status", "export"}.issubset(
-        _vote_admin_command_names()
-    )
+    assert {"create", "update", "close", "status", "export"}.issubset(_vote_admin_command_names())
 
 
 @pytest.mark.parametrize(
@@ -183,9 +180,7 @@ async def test_closed_vote_post_autocomplete_returns_closed_vote_ids(monkeypatch
         vote_admin_cmds, "search_closed_vote_choices", fake_search_closed_vote_choices
     )
 
-    choices = await vote_admin_cmds._closed_vote_post_autocomplete(
-        SimpleNamespace(value="rally")
-    )
+    choices = await vote_admin_cmds._closed_vote_post_autocomplete(SimpleNamespace(value="rally"))
 
     assert choices[0].value == "42"
     assert "Best rally time?" in choices[0].name

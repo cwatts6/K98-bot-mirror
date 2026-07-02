@@ -184,9 +184,7 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
     assert "player_profile" in names
     assert "ping" in names
     assert "vote_admin" in names
-    assert {"create", "update", "close", "status", "export"}.issubset(
-        grouped["vote_admin"]
-    )
+    assert {"create", "update", "close", "status", "export"}.issubset(grouped["vote_admin"])
 
 
 def test_validator_delegates_static_inventory_to_shared_helper():
