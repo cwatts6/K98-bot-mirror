@@ -48,6 +48,18 @@ class _Channel:
         return SimpleNamespace(id=900)
 
 
+@pytest.fixture(autouse=True)
+def _stub_empty_survey_scheduler(monkeypatch):
+    async def list_due_closes(_now):
+        return []
+
+    async def claim_due_reminders(_now):
+        return []
+
+    monkeypatch.setattr("voting.scheduler.survey_dal.list_due_closes", list_due_closes)
+    monkeypatch.setattr("voting.scheduler.survey_dal.claim_due_reminders", claim_due_reminders)
+
+
 @pytest.mark.asyncio
 async def test_scheduler_sends_claimed_reminder_once_with_configured_mentions(monkeypatch):
     now = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
@@ -81,7 +93,7 @@ async def test_scheduler_sends_claimed_reminder_once_with_configured_mentions(mo
 
     summary = await run_voting_scheduler_tick(bot, now_utc=now)
 
-    assert summary == {"reminders": 1, "closes": 0}
+    assert summary == {"reminders": 1, "closes": 0, "survey_reminders": 0, "survey_closes": 0}
     assert channel.sent[0]["content"].startswith("@everyone")
     assert channel.sent[0]["allowed_mentions"].everyone is True
     assert (8, 900, now) in calls
@@ -115,7 +127,7 @@ async def test_scheduler_closes_due_votes_before_sending_reminders(monkeypatch):
 
     summary = await run_voting_scheduler_tick(SimpleNamespace(), now_utc=now)
 
-    assert summary == {"reminders": 1, "closes": 1}
+    assert summary == {"reminders": 1, "closes": 1, "survey_reminders": 0, "survey_closes": 0}
     assert calls == [
         "list_closes",
         ("close", 5),
@@ -155,7 +167,7 @@ async def test_scheduler_does_not_count_or_success_audit_when_reminder_mark_fail
 
     summary = await run_voting_scheduler_tick(bot, now_utc=now)
 
-    assert summary == {"reminders": 0, "closes": 0}
+    assert summary == {"reminders": 0, "closes": 0, "survey_reminders": 0, "survey_closes": 0}
     assert len(channel.sent) == 1
     assert [audit["action_type"] for audit in audits] == ["ReminderMarkFailed"]
     assert audits[0]["details"] == {"reminder_id": 8, "message_id": 900}

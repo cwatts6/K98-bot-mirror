@@ -8,11 +8,38 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `voting/`, `/vote_admin`, future survey builder UI, SQL repo vote/survey framework
 - Type: architecture
-- Description: Full multi-question survey-style voting remains valuable for richer KD98 feedback, event planning, rankings, and structured questionnaires, but it is intentionally separate from the delivered Phase 6 single-question MultiSelect implementation. It requires question modeling, per-question options, response envelopes, partial/private response UX, broader export design, and question-level privacy/reporting decisions that are not needed for single-question MultiSelect.
-- Suggested Fix: Use `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md` to run a separate survey-builder audit/design slice. Define survey question types, create/edit builder UX, private response flow, partial submission/restart behavior, SQL tables for questions/options/responses/answers, PublicLive versus HiddenUntilClose summary rules, closed-only private export shapes, audit events, and migration/rollback order. Do not bundle survey builder with emoji/icon polish or dashboard/reporting implementation.
+- Description: Full multi-question survey-style voting remains valuable for richer KD98 feedback, event planning, rankings, and structured questionnaires, but it is intentionally separate from the delivered Phase 6 single-question MultiSelect implementation. The Phase 7 audit was approved and the choice-only first slice is now active implementation work as separate SQL-backed survey posts under `/vote_admin`, with required `SingleChoice`/per-question `MultiSelect` questions, private paged response flow, no persisted partial drafts, submitted-answer prefill, hidden-until-close aggregate privacy, and closed-only private summary/detail exports.
+- Suggested Fix: Complete the approved choice-only implementation slice from `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md`, including additive survey SQL tables for survey posts, questions, options, submitted responses, answer selections, reminders, and audit rows; survey-specific service/DAL/view/export/scheduler modules; preservation of all one-choice and single-question MultiSelect behavior; focused validation; and SQL/Codex Security review before PR handoff. Keep emoji/icon polish, dashboard/reporting, free-text/rating questions, optional questions, draft/resume, and richer export/reporting work separate.
 - Impact: high
 - Risk: high
-- Dependencies: Phase 6 MultiSelect delivered and smoke tested on 2026-07-02; operator approval for survey product scope; SQL repo validation in `C:\K98-bot-SQL-Server`; privacy review for question-level responses; focused builder/response/export/restart tests. Promoted into the prepared Phase 7 survey-builder audit/design task pack.
+- Dependencies: Phase 6 MultiSelect delivered and smoke tested on 2026-07-02; Phase 7 audit drafted and first slice approved on 2026-07-02; SQL repo migration in `C:\K98-bot-SQL-Server`; Codex Security review before runtime PR handoff; focused builder/response/export/restart tests.
+
+### Deferred Optimisation
+- Area: `voting/`, future survey response UX, SQL repo survey response tables
+- Type: architecture
+- Description: Phase 7 recommends no persisted partial player response drafts in the first survey implementation slice. This keeps privacy and restart behavior simple, but longer surveys may eventually need SQL-backed draft responses, resume after timeout/restart, optional answers, expiry/cleanup rules, and clearer abandoned-draft retention.
+- Suggested Fix: After the first choice-only survey slice is deployed and smoke tested, scope a dedicated survey draft/resume task pack. Add explicit draft status, partial answer storage, cleanup/expiry policy, resume UX, optional-question rules, and tests for restart, timeout, close, stale draft, and export exclusion behavior.
+- Impact: medium
+- Risk: high
+- Dependencies: First choice-only survey implementation approved and deployed; privacy approval for storing unsubmitted answers; SQL repo validation; restart and cleanup tests.
+
+### Deferred Optimisation
+- Area: `voting/`, future survey question model, survey exports
+- Type: architecture
+- Description: Free-text, rating, and other non-choice survey question types are intentionally excluded from the recommended first survey slice. Operator follow-up confirmed the second survey slice should add free-text questions and optional choice-question `Add details` text, and that submitted text/detail data must be included in private admin/leadership exports. Free text still increases privacy, moderation, CSV formula-safety, retention, and export risks beyond choice-only aggregate voting.
+- Suggested Fix: Prepare a later advanced survey question-types task pack that defines free-text questions, per-choice `Add details` text, storage shape, retention/redaction rules, export columns containing submitted text/detail data, formula-safety handling, private admin/leadership detail access matching current vote results visibility, and public aggregate behavior before any SQL or runtime implementation.
+- Impact: high
+- Risk: high
+- Dependencies: Choice-only survey model stable; operator sequencing confirmation from Phase 7 follow-up; Codex Security review; SQL schema design for type-specific answers and per-choice detail notes; export regression tests.
+
+### Deferred Optimisation
+- Area: `voting/export_service.py`, future survey export services, SQL repo survey reporting views/procedures
+- Type: architecture
+- Description: Phase 7 defines first-slice survey summary/detail CSV shapes only for one closed survey at a time. Richer survey export/reporting work remains out of scope, including cross-survey exports, workbook-style exports, longitudinal reporting, and private reporting views/procedures.
+- Suggested Fix: After first-slice survey CSV exports have production evidence, scope a Survey Export v2 and reporting-readiness task. Validate consumer needs, define SQL views/procedures or service-owned queries, preserve private delivery by default, and add output-shape regression tests before changing export/report formats.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 7 survey data model approval; first survey implementation deployed; reporting consumer requirements; SQL repo validation; no public reporting without separate approval.
 
 ### Deferred Optimisation
 - Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, SQL repo `dbo.VotePostOptions`

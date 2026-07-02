@@ -178,13 +178,23 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
         assert set(mapping.values()).issubset(grouped[group_name])
     assert len(grouped["ops"]) == 25
     assert len(grouped["ark"]) == 14
-    assert sum(len(commands) for commands in grouped.values()) == 91
+    assert sum(len(commands) for commands in grouped.values()) == 95
     assert "calendar" in names
     assert "honor_rankings" in names
     assert "player_profile" in names
     assert "ping" in names
     assert "vote_admin" in names
-    assert {"create", "update", "close", "status", "export"}.issubset(grouped["vote_admin"])
+    assert {
+        "create",
+        "update",
+        "close",
+        "status",
+        "export",
+        "survey_create",
+        "survey_close",
+        "survey_status",
+        "survey_export",
+    }.issubset(grouped["vote_admin"])
 
 
 def test_validator_delegates_static_inventory_to_shared_helper():

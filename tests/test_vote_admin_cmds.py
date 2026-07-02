@@ -91,6 +91,16 @@ def _vote_export_defaults() -> dict[ast.arg, ast.expr]:
     raise AssertionError("vote_export command was not found")
 
 
+def _survey_export_defaults() -> dict[ast.arg, ast.expr]:
+    tree = ast.parse(Path("commands/vote_admin_cmds.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "survey_export":
+            return dict(
+                zip(node.args.args[-len(node.args.defaults) :], node.args.defaults, strict=True)
+            )
+    raise AssertionError("survey_export command was not found")
+
+
 def test_vote_create_places_required_options_before_optional_options() -> None:
     seen_optional = False
     for name, required in _vote_create_option_required_flags():
@@ -133,6 +143,15 @@ def test_vote_admin_registers_export_subcommand() -> None:
     assert {"create", "update", "close", "status", "export"}.issubset(_vote_admin_command_names())
 
 
+def test_vote_admin_registers_survey_subcommands() -> None:
+    assert {
+        "survey_create",
+        "survey_close",
+        "survey_status",
+        "survey_export",
+    }.issubset(_vote_admin_command_names())
+
+
 def test_vote_export_adds_optional_mode_defaulting_to_totals() -> None:
     defaults = _vote_export_defaults()
 
@@ -142,6 +161,19 @@ def test_vote_export_adds_optional_mode_defaulting_to_totals() -> None:
     keywords = {keyword.arg: keyword.value for keyword in mode_default.keywords}
     assert isinstance(keywords["default"], ast.Name)
     assert keywords["default"].id == "_EXPORT_MODE_TOTALS"
+    assert isinstance(keywords["required"], ast.Constant)
+    assert keywords["required"].value is False
+
+
+def test_survey_export_adds_optional_mode_defaulting_to_totals() -> None:
+    defaults = _survey_export_defaults()
+
+    assert "mode" in {arg.arg for arg in defaults}
+    mode_default = defaults[next(arg for arg in defaults if arg.arg == "mode")]
+    assert isinstance(mode_default, ast.Call)
+    keywords = {keyword.arg: keyword.value for keyword in mode_default.keywords}
+    assert isinstance(keywords["default"], ast.Name)
+    assert keywords["default"].id == "_SURVEY_EXPORT_MODE_TOTALS"
     assert isinstance(keywords["required"], ast.Constant)
     assert keywords["required"].value is False
 
