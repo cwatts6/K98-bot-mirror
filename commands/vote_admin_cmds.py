@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 import logging
 import re
 
@@ -20,7 +21,7 @@ from voting.discord_presentation import (
     mention_content,
     no_broad_mentions,
 )
-from voting.export_service import build_vote_totals_export
+from voting.export_service import build_vote_totals_export, build_vote_voter_audit_export
 from voting.service import (
     CLOSE_DURATION_CHOICES,
     MAX_CLOSE_REASON_LEN,
@@ -55,6 +56,12 @@ _CLOSE_DURATION_LABELS = {
 _CLOSE_DURATION_CHOICES = [
     discord.OptionChoice(name=_CLOSE_DURATION_LABELS.get(value, value), value=value)
     for value in CLOSE_DURATION_CHOICES
+]
+_EXPORT_MODE_TOTALS = "totals"
+_EXPORT_MODE_VOTER_AUDIT = "voter_audit"
+_EXPORT_MODE_CHOICES = [
+    discord.OptionChoice(name="Totals only", value=_EXPORT_MODE_TOTALS),
+    discord.OptionChoice(name="Voter audit", value=_EXPORT_MODE_VOTER_AUDIT),
 ]
 
 
@@ -156,7 +163,65 @@ def _build_vote_export_summary_embed(export) -> discord.Embed:
             value=f"https://discord.com/channels/{snapshot.guild_id}/{snapshot.channel_id}/{snapshot.message_id}",
             inline=False,
         )
-    embed.set_footer(text="Totals-only export. Voter-level audit export is deferred.")
+    embed.set_footer(text="Totals-only export.")
+    return embed
+
+
+def _discord_display_name(member) -> str:
+    for attr in ("display_name", "global_name", "name"):
+        value = str(getattr(member, attr, "") or "").strip()
+        if value:
+            return value
+    return "Unknown"
+
+
+async def _resolve_voter_discord_names(
+    ctx: discord.ApplicationContext,
+    discord_user_ids: Iterable[int],
+) -> Mapping[int, str]:
+    unique_ids = tuple(dict.fromkeys(int(user_id) for user_id in discord_user_ids))
+    guild = getattr(ctx, "guild", None)
+    if guild is None:
+        bot = getattr(ctx, "bot", None)
+        guild_id = getattr(ctx, "guild_id", None)
+        if bot is not None and guild_id is not None and hasattr(bot, "get_guild"):
+            guild = bot.get_guild(int(guild_id))
+
+    names: dict[int, str] = {}
+    for user_id in unique_ids:
+        member = None
+        if guild is not None and hasattr(guild, "get_member"):
+            member = guild.get_member(int(user_id))
+        if member is None and guild is not None and hasattr(guild, "fetch_member"):
+            try:
+                member = await guild.fetch_member(int(user_id))
+            except (discord.Forbidden, discord.HTTPException, discord.NotFound):
+                logger.info("vote_voter_name_lookup_unavailable discord_user_id=%s", user_id)
+            except Exception:
+                logger.exception("vote_voter_name_lookup_failed discord_user_id=%s", user_id)
+        names[user_id] = _discord_display_name(member) if member is not None else "Unknown"
+    return names
+
+
+def _build_vote_voter_audit_export_summary_embed(export) -> discord.Embed:
+    snapshot = export.snapshot
+    embed = discord.Embed(
+        title=f"Vote #{snapshot.vote_post_id} voter audit export",
+        description="Voter-level audit rows for one closed vote.",
+        color=discord.Color.blurple(),
+    )
+    embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
+    embed.add_field(name="Rows", value=str(export.row_count), inline=True)
+    embed.add_field(
+        name="Closed",
+        value=(
+            snapshot.closed_at_utc.strftime("%Y-%m-%d %H:%M UTC")
+            if snapshot.closed_at_utc
+            else "Unknown"
+        ),
+        inline=True,
+    )
+    embed.set_footer(text="Private voter-level export. Includes Discord user ID and name.")
     return embed
 
 
@@ -494,14 +559,39 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             "Closed vote to export",
             autocomplete=_closed_vote_post_autocomplete,
         ),
+        mode: str = discord.Option(
+            str,
+            "Export type",
+            choices=_EXPORT_MODE_CHOICES,
+            required=False,
+            default=_EXPORT_MODE_TOTALS,
+        ),
     ) -> None:
         await safe_defer(ctx, ephemeral=True)
         try:
             vote_post_id = _parse_vote_post_id(vote)
-            export = await build_vote_totals_export(
-                vote_post_id=vote_post_id,
-                requested_by_discord_user_id=int(ctx.user.id),
-            )
+            export_mode = str(mode or _EXPORT_MODE_TOTALS).strip().casefold()
+            if export_mode == _EXPORT_MODE_TOTALS:
+                export = await build_vote_totals_export(
+                    vote_post_id=vote_post_id,
+                    requested_by_discord_user_id=int(ctx.user.id),
+                )
+                summary_embed = _build_vote_export_summary_embed(export)
+                generated_message = (
+                    f"Vote #{export.snapshot.vote_post_id} totals export generated."
+                )
+            elif export_mode == _EXPORT_MODE_VOTER_AUDIT:
+                export = await build_vote_voter_audit_export(
+                    vote_post_id=vote_post_id,
+                    requested_by_discord_user_id=int(ctx.user.id),
+                    discord_name_resolver=lambda ids: _resolve_voter_discord_names(ctx, ids),
+                )
+                summary_embed = _build_vote_voter_audit_export_summary_embed(export)
+                generated_message = (
+                    f"Vote #{export.snapshot.vote_post_id} voter audit export generated."
+                )
+            else:
+                raise VoteValidationError("Choose a valid export type.")
         except VoteValidationError as exc:
             await ctx.interaction.edit_original_response(content=f"Vote not exported: {exc}")
             return
@@ -522,10 +612,7 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             return
 
         file = discord.File(export.csv_bytes, filename=export.filename)
-        embed = _build_vote_export_summary_embed(export)
-        await ctx.followup.send(embed=embed, file=file, ephemeral=True)
-        await ctx.interaction.edit_original_response(
-            content=f"Vote #{export.snapshot.vote_post_id} totals export generated."
-        )
+        await ctx.followup.send(embed=summary_embed, file=file, ephemeral=True)
+        await ctx.interaction.edit_original_response(content=generated_message)
 
     bot.add_application_command(group)

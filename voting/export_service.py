@@ -6,10 +6,11 @@ from datetime import UTC, datetime
 import io
 import logging
 import re
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 from voting import dal
-from voting.models import VoteSnapshot
+from voting.models import VoteSnapshot, VoteVoterAuditRow
 from voting.outcomes import vote_outcome
 from voting.service import VoteValidationError
 
@@ -49,6 +50,25 @@ EXPORT_COLUMNS = (
     "IsWinningOption",
 )
 
+VOTER_AUDIT_EXPORT_COLUMNS = (
+    "VotePostID",
+    "Title",
+    "ClosedAtUtc",
+    "DiscordUserID",
+    "DiscordName",
+    "OptionID",
+    "OptionKey",
+    "OptionLabel",
+    "OriginalOptionID",
+    "OriginalOptionKey",
+    "OriginalOptionLabel",
+    "VoteCreatedAtUtc",
+    "VoteUpdatedAtUtc",
+    "VoteChanged",
+)
+
+DiscordNameResolver = Callable[[tuple[int, ...]], Awaitable[Mapping[int, str]]]
+
 
 @dataclass(frozen=True)
 class VoteTotalsExport:
@@ -58,6 +78,21 @@ class VoteTotalsExport:
     snapshot: VoteSnapshot
     outcome_kind: str
     outcome_summary: str
+
+    @property
+    def byte_count(self) -> int:
+        return self.csv_bytes.getbuffer().nbytes
+
+    def is_oversized(self, *, max_bytes: int = CSV_UPLOAD_MAX_BYTES) -> bool:
+        return self.byte_count > max_bytes
+
+
+@dataclass(frozen=True)
+class VoteVoterAuditExport:
+    filename: str
+    csv_bytes: io.BytesIO
+    row_count: int
+    snapshot: VoteSnapshot
 
     @property
     def byte_count(self) -> int:
@@ -113,6 +148,14 @@ def vote_totals_csv_filename(snapshot: VoteSnapshot) -> str:
         closed_at.replace(tzinfo=UTC) if closed_at.tzinfo is None else closed_at.astimezone(UTC)
     ).strftime("%Y%m%d_%H%M%S")
     return f"vote_{snapshot.vote_post_id}_{_filename_part(snapshot.title)}_{timestamp}.csv"
+
+
+def vote_voter_audit_csv_filename(snapshot: VoteSnapshot) -> str:
+    closed_at = snapshot.closed_at_utc or datetime.now(UTC)
+    timestamp = (
+        closed_at.replace(tzinfo=UTC) if closed_at.tzinfo is None else closed_at.astimezone(UTC)
+    ).strftime("%Y%m%d_%H%M%S")
+    return f"vote_{snapshot.vote_post_id}_{_filename_part(snapshot.title)}_voter_audit_{timestamp}.csv"
 
 
 def _message_link(snapshot: VoteSnapshot) -> str:
@@ -180,6 +223,63 @@ def build_vote_totals_csv_bytes(snapshot: VoteSnapshot) -> io.BytesIO:
     return out
 
 
+def vote_voter_audit_csv_rows(
+    rows: tuple[VoteVoterAuditRow, ...],
+    *,
+    discord_names_by_user_id: Mapping[int, str],
+) -> list[dict[str, Any]]:
+    output: list[dict[str, Any]] = []
+    for row in rows:
+        original_option_id = row.original_option_id
+        vote_changed = (
+            original_option_id is not None and int(original_option_id) != int(row.option_id)
+        )
+        output.append(
+            {
+                "VotePostID": row.vote_post_id,
+                "Title": row.title,
+                "ClosedAtUtc": _dt(row.closed_at_utc),
+                "DiscordUserID": row.discord_user_id,
+                "DiscordName": discord_names_by_user_id.get(row.discord_user_id) or "Unknown",
+                "OptionID": row.option_id,
+                "OptionKey": row.option_key,
+                "OptionLabel": row.option_label,
+                "OriginalOptionID": original_option_id,
+                "OriginalOptionKey": row.original_option_key,
+                "OriginalOptionLabel": row.original_option_label,
+                "VoteCreatedAtUtc": _dt(row.vote_created_at_utc),
+                "VoteUpdatedAtUtc": _dt(row.vote_updated_at_utc),
+                "VoteChanged": 1 if vote_changed else 0,
+            }
+        )
+    return output
+
+
+def build_vote_voter_audit_csv_bytes(
+    rows: tuple[VoteVoterAuditRow, ...],
+    *,
+    discord_names_by_user_id: Mapping[int, str],
+) -> io.BytesIO:
+    csv_rows = vote_voter_audit_csv_rows(
+        rows,
+        discord_names_by_user_id=discord_names_by_user_id,
+    )
+    text_buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(
+        text_buffer,
+        fieldnames=VOTER_AUDIT_EXPORT_COLUMNS,
+        lineterminator="\n",
+    )
+    writer.writeheader()
+    for row in csv_rows:
+        writer.writerow(
+            {header: _csv_cell(row.get(header)) for header in VOTER_AUDIT_EXPORT_COLUMNS}
+        )
+    out = io.BytesIO(text_buffer.getvalue().encode("utf-8-sig"))
+    out.seek(0)
+    return out
+
+
 async def build_vote_totals_export(
     *, vote_post_id: int, requested_by_discord_user_id: int
 ) -> VoteTotalsExport:
@@ -201,6 +301,62 @@ async def build_vote_totals_export(
     )
     logger.info(
         "vote_totals_export_ready vote_post_id=%s actor_discord_id=%s rows=%s bytes=%s",
+        snapshot.vote_post_id,
+        requested_by_discord_user_id,
+        export.row_count,
+        export.byte_count,
+    )
+    return export
+
+
+async def build_vote_voter_audit_export(
+    *,
+    vote_post_id: int,
+    requested_by_discord_user_id: int,
+    discord_name_resolver: DiscordNameResolver | None = None,
+) -> VoteVoterAuditExport:
+    snapshot = await dal.get_vote_snapshot(int(vote_post_id))
+    if snapshot is None:
+        raise VoteValidationError("Vote not found.")
+    if snapshot.status != "Closed":
+        raise VoteValidationError("Only closed votes can be exported.")
+
+    rows = await dal.list_vote_voter_audit_rows(int(vote_post_id))
+    voter_ids = tuple(row.discord_user_id for row in rows)
+    discord_names: Mapping[int, str] = {}
+    if discord_name_resolver is not None and voter_ids:
+        discord_names = await discord_name_resolver(voter_ids)
+
+    csv_bytes = build_vote_voter_audit_csv_bytes(
+        rows,
+        discord_names_by_user_id=discord_names,
+    )
+    export = VoteVoterAuditExport(
+        filename=vote_voter_audit_csv_filename(snapshot),
+        csv_bytes=csv_bytes,
+        row_count=len(rows),
+        snapshot=snapshot,
+    )
+    await dal.insert_audit(
+        vote_post_id=snapshot.vote_post_id,
+        actor_discord_user_id=int(requested_by_discord_user_id),
+        action_type="VoterAuditExported",
+        details={
+            "mode": "voter_audit",
+            "row_count": export.row_count,
+            "byte_count": export.byte_count,
+            "max_upload_bytes": CSV_UPLOAD_MAX_BYTES,
+            "is_oversized": export.is_oversized(),
+            "delivery_status": (
+                "blocked_oversized"
+                if export.is_oversized()
+                else "ready_for_ephemeral_delivery"
+            ),
+            "columns": list(VOTER_AUDIT_EXPORT_COLUMNS),
+        },
+    )
+    logger.info(
+        "vote_voter_audit_export_ready vote_post_id=%s actor_discord_id=%s rows=%s bytes=%s",
         snapshot.vote_post_id,
         requested_by_discord_user_id,
         export.row_count,

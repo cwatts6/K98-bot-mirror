@@ -106,6 +106,22 @@ class VoteLookupChoice:
 
 
 @dataclass(frozen=True)
+class VoteVoterAuditRow:
+    vote_post_id: int
+    title: str
+    closed_at_utc: datetime | None
+    discord_user_id: int
+    option_id: int
+    option_key: str
+    option_label: str
+    original_option_id: int | None
+    original_option_key: str | None
+    original_option_label: str | None
+    vote_created_at_utc: datetime
+    vote_updated_at_utc: datetime
+
+
+@dataclass(frozen=True)
 class VoteOutcome:
     kind: str
     summary: str

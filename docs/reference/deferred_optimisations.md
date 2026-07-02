@@ -6,22 +6,13 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `voting/export_service.py`, `/vote_admin export`, SQL vote/audit tables
-- Type: architecture
-- Description: Discord Voting Post Framework Phase 3 delivered private totals-only CSV export for one closed vote at a time and intentionally deferred voter-level audit export because it exposes individual Discord voter identifiers and changes the privacy/permission model.
-- Suggested Fix: Use the prepared Phase 4 voter-level audit export task pack to decide whether voter-level export is allowed, who can receive it, which columns may be exported or redacted, whether SQL audit logging/indexing is needed, and whether implementation should proceed. If approved, implement private closed-vote voter audit export with focused permission/privacy tests; otherwise document the continued deferral and keep totals-only export unchanged.
-- Impact: high
-- Risk: high
-- Dependencies: Discord Voting Post Framework Phase 3 totals-only export delivered and smoke tested on 2026-07-02; SQL validation in `C:\K98-bot-SQL-Server`; operator approval before implementation. Promoted into `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 4 Voter-Level Audit Export Privacy and Access Controls.md`.
-
-### Deferred Optimisation
 - Area: `voting/`, `/vote_admin`, future voting programme phases
 - Type: architecture
-- Description: Discord Voting Post Framework Phase 3 delivered completed-vote totals export without adding advanced voting modes. Role-restricted voting, anonymous or hidden-until-close results, governor-linked voting, multi-select/survey modes, saved templates, public dashboard reporting, and public voter-level export posting remain outside the delivered Phase 3 scope because each changes permissions, data visibility, SQL contracts, or player expectations.
-- Suggested Fix: After the Phase 4 voter-level audit export privacy decision is settled or explicitly deferred again, prepare an advanced voting modes audit that separately evaluates product need, permission/privacy model, SQL schema changes, command/view UX, migration and rollback plan, and focused tests for each candidate mode before implementation.
+- Description: Discord Voting Post Framework Phase 4 delivered private voter-level audit export without adding advanced voting modes. Role-restricted voting, anonymous or hidden-until-close results, governor-linked voting, multi-select/survey modes, saved templates, public dashboard reporting, and public voter-level export posting remain outside the delivered Phase 4 scope because each changes permissions, data visibility, SQL contracts, or player expectations.
+- Suggested Fix: Prepare an advanced voting modes audit that separately evaluates product need, permission/privacy model, SQL schema changes, command/view UX, migration and rollback plan, and focused tests for each candidate mode before implementation.
 - Impact: medium
 - Risk: high
-- Dependencies: Discord Voting Post Framework Phase 1 through Phase 3 complete; Phase 4 voter-level audit privacy decision complete or explicitly deferred; operator approval before any advanced-mode implementation.
+- Dependencies: Discord Voting Post Framework Phase 1 through Phase 4 complete; operator approval before any advanced-mode implementation.
 
 ### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks

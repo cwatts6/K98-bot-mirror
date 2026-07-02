@@ -16,6 +16,7 @@ from voting.models import (
     VoteOption,
     VoteReminder,
     VoteSnapshot,
+    VoteVoterAuditRow,
 )
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,36 @@ def _snapshot_from_rows(
         options=_rows_to_options(option_rows),
         reminders=_rows_to_reminders(reminder_rows),
     )
+
+
+def _rows_to_voter_audit(rows: Sequence[dict[str, Any]]) -> tuple[VoteVoterAuditRow, ...]:
+    output: list[VoteVoterAuditRow] = []
+    for row in rows:
+        created_at = _aware_utc(row.get("VoteCreatedAtUtc"))
+        updated_at = _aware_utc(row.get("VoteUpdatedAtUtc"))
+        if created_at is None or updated_at is None:
+            raise ValueError("VotePostVotes row is missing required UTC timestamps.")
+        output.append(
+            VoteVoterAuditRow(
+                vote_post_id=int(row["VotePostID"]),
+                title=str(row.get("Title") or ""),
+                closed_at_utc=_aware_utc(row.get("ClosedAtUtc")),
+                discord_user_id=int(row["DiscordUserID"]),
+                option_id=int(row["OptionID"]),
+                option_key=str(row.get("OptionKey") or ""),
+                option_label=str(row.get("OptionLabel") or ""),
+                original_option_id=(
+                    int(row["OriginalOptionID"])
+                    if row.get("OriginalOptionID") not in (None, "")
+                    else None
+                ),
+                original_option_key=row.get("OriginalOptionKey"),
+                original_option_label=row.get("OriginalOptionLabel"),
+                vote_created_at_utc=created_at,
+                vote_updated_at_utc=updated_at,
+            )
+        )
+    return tuple(output)
 
 
 async def create_vote_post(req: VoteCreateRequest) -> int:
@@ -392,6 +423,37 @@ async def search_closed_vote_posts(
             )
         )
     return choices
+
+
+async def list_vote_voter_audit_rows(vote_post_id: int) -> tuple[VoteVoterAuditRow, ...]:
+    rows = await run_query_async(
+        """
+        SELECT p.VotePostID,
+               p.Title,
+               p.ClosedAtUtc,
+               v.DiscordUserID,
+               v.OptionID,
+               o.OptionKey,
+               o.Label AS OptionLabel,
+               v.OriginalOptionID,
+               original.OptionKey AS OriginalOptionKey,
+               original.Label AS OriginalOptionLabel,
+               v.CreatedAtUtc AS VoteCreatedAtUtc,
+               v.UpdatedAtUtc AS VoteUpdatedAtUtc
+        FROM dbo.VotePostVotes v
+        JOIN dbo.VotePosts p ON p.VotePostID = v.VotePostID
+        JOIN dbo.VotePostOptions o
+          ON o.VotePostID = v.VotePostID
+         AND o.OptionID = v.OptionID
+        LEFT JOIN dbo.VotePostOptions original
+          ON original.VotePostID = v.VotePostID
+         AND original.OptionID = v.OriginalOptionID
+        WHERE v.VotePostID = ?
+        ORDER BY v.UpdatedAtUtc ASC, v.DiscordUserID ASC;
+        """,
+        (int(vote_post_id),),
+    )
+    return _rows_to_voter_audit(rows)
 
 
 async def cast_vote(

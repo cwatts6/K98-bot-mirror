@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Phase 4 Completed Item
+- Area: `voting/export_service.py`, `voting/dal.py`, `commands/vote_admin_cmds.py`, `/vote_admin export`, SQL vote/audit tables
+- Type: architecture
+- Description: Discord Voting Post Framework Phase 3 delivered private totals-only CSV export for one closed vote at a time and intentionally deferred voter-level audit export because it exposes individual Discord voter identifiers and changes the privacy/permission model.
+- Resolution: Phase 4 approved voter-level audit export for admin/leadership users and delivered private `/vote_admin export mode:voter_audit` for one closed vote at a time. The export includes Discord user ID, export-time resolved Discord name, selected option, original option, vote timestamps, and a vote-change flag. Governor names and `GovernorID` remain excluded because one Discord user can map to many governors, reducing report clarity. Totals-only export remains the default. SQL audit logging records `ActionType=VoterAuditExported` with requester ID, row count, mode, and column profile without storing the voter list in `DetailsJson`.
+- Validation: SQL assumptions were checked against `C:\K98-bot-SQL-Server`; no SQL migration was required because `VotePostVotes`, `VotePostOptions`, `VotePosts`, and `VotePostAudit` already support the approved export and audit event shape. Automated validation for the implementation is recorded in the delivery summary for the Phase 4 bot change.
+
 ### Import Pipeline Task C Slice 11 Completed Item
 - Area: `services/import_audit_service.py`, `stats/dal/import_audit_dal.py`, import upload route audit phase callers, SQL repo `dbo.usp_ImportAudit_RecordPhase`
 - Type: consistency

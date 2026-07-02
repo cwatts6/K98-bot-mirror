@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 prepared`
+- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 implemented`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -252,20 +252,19 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 4 - Voter-Level Audit Export Privacy and Access Controls
 
-Status: prepared.
+Status: implemented.
 
-Deliver:
+Delivered:
 
-- Start with audit/scope only.
-- Decide whether voter-level export is allowed for admin/leadership users, a narrower role, or
-  remains deferred.
-- If approved, add a private `/vote_admin export` mode or approved guided path for voter-level
-  audit rows for one closed vote at a time.
-- Define exact CSV columns, redaction rules, retention expectations, logging/audit behavior, and
-  permissions.
-- Keep totals-only export behavior unchanged.
-- Preserve private/ephemeral delivery by default.
-- Validate all SQL-facing voter/audit columns against `C:\K98-bot-SQL-Server`.
+- Approved voter-level audit export for admin/leadership users.
+- Added private `/vote_admin export mode:voter_audit` for one closed vote at a time.
+- Preserved default totals-only `/vote_admin export` behavior.
+- Included Discord user ID, resolved Discord name, selected option, original option, vote
+  timestamps, and vote-change flag.
+- Excluded governor names and `GovernorID`; governor-linked voting remains deferred.
+- Added SQL audit logging through `VotePostAudit` with `ActionType=VoterAuditExported`.
+- Preserved private/ephemeral delivery by default.
+- Validated all SQL-facing voter/audit columns against `C:\K98-bot-SQL-Server`.
 
 ### Phase 5 - Advanced Voting Modes Audit
 
@@ -280,8 +279,8 @@ Deliver audit/scope before implementation for:
 - Per-option emoji/icon support.
 - Saved templates for recurring vote types.
 
-Do not implement advanced voting modes until Phase 4's voter-level audit privacy decision is
-settled or explicitly deferred again.
+Do not implement advanced voting modes until a separate audit approves their product, privacy,
+permission, SQL, and UX model.
 
 ## 8. Remaining Slice Scope Summary
 
@@ -375,14 +374,13 @@ The core programme is successful when:
 - [x] Closed votes visibly highlight the winner or tie state.
 - [x] Result cards meet the vertical-bar visual direction.
 - [x] Totals-only completed-vote export workflow is delivered in Phase 3.
-- [ ] Voter-level audit export is delivered in Phase 4 or intentionally deferred again with
-      rationale.
+- [x] Voter-level audit export is delivered in Phase 4 with admin/leadership private delivery,
+      Discord ID/name columns, SQL audit logging, and governor identity deferred.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 4: Voter-Level Audit Export Privacy and Access Controls
-using the prepared task pack and chat starter.
+Prepare the next approved voting slice only after reviewing Phase 4 smoke-test results.
 ```
 
 ## 13. Programme Change Log
@@ -396,3 +394,4 @@ using the prepared task pack and chat starter.
 | 2026-07-01 | Phase 3 scope prepared | Next slice confirmed as admin export, closed-vote history, and audit retrieval under `/vote_admin`. |
 | 2026-07-02 | Phase 3 marked complete | Totals-only `/vote_admin export` delivered, smoke tested private/ephemeral export, and restart/deployment vote buttons confirmed. |
 | 2026-07-02 | Phase 4 scope prepared | Next slice confirmed as voter-level audit export privacy and access-control audit before advanced voting modes. |
+| 2026-07-02 | Phase 4 implemented | Added private voter-level audit export mode with Discord ID/name, option/timestamp/change columns, SQL audit logging, and totals-only export preserved. |

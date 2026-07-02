@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 3 totals-only export smoke test`
 - Task type: `audit | privacy | Discord command workflow | SQL-backed export`
 - One-pass approved: `no`
-- Status: `prepared - not started`
+- Status: `implemented`
 
 ## 2. Objective
 
@@ -16,7 +16,7 @@ Discord vote posts.
 
 Phase 3 delivered private totals-only CSV export for one closed vote at a time. It intentionally
 deferred voter-level audit export because that changes the privacy and permission boundary. Phase 4
-must resolve that decision without changing player voting behavior or adding advanced voting modes.
+resolved that decision without changing player voting behavior or adding advanced voting modes.
 
 ## 3. Required Reading
 
@@ -76,11 +76,12 @@ Phase 4 should decide:
 7. Whether export generation should log an audit event in SQL or only structured bot logs.
 8. Whether current SQL tables and indexes support the lookup/export efficiently.
 
-If approved after audit, implementation may include:
+Approved implementation included:
 
 - Voter-level CSV export for one closed vote at a time.
 - Private/ephemeral delivery only.
-- Explicit permission gate and clear user-facing denial text.
+- Admin/leadership permission gate matching the existing `/vote_admin` workflow.
+- Discord user ID and resolved Discord name, with governor identity excluded.
 - CSV formula escaping for all text fields.
 - Tests for permission, privacy, closed-only behavior, field shape, and no totals-export regression.
 

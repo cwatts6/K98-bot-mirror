@@ -81,6 +81,16 @@ def _vote_admin_command_names() -> set[str]:
     return names
 
 
+def _vote_export_defaults() -> dict[ast.arg, ast.expr]:
+    tree = ast.parse(Path("commands/vote_admin_cmds.py").read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "vote_export":
+            return dict(
+                zip(node.args.args[-len(node.args.defaults) :], node.args.defaults, strict=True)
+            )
+    raise AssertionError("vote_export command was not found")
+
+
 def test_vote_create_places_required_options_before_optional_options() -> None:
     seen_optional = False
     for name, required in _vote_create_option_required_flags():
@@ -117,6 +127,19 @@ def test_vote_create_applies_string_max_lengths() -> None:
 
 def test_vote_admin_registers_export_subcommand() -> None:
     assert {"create", "update", "close", "status", "export"}.issubset(_vote_admin_command_names())
+
+
+def test_vote_export_adds_optional_mode_defaulting_to_totals() -> None:
+    defaults = _vote_export_defaults()
+
+    assert "mode" in {arg.arg for arg in defaults}
+    mode_default = defaults[next(arg for arg in defaults if arg.arg == "mode")]
+    assert isinstance(mode_default, ast.Call)
+    keywords = {keyword.arg: keyword.value for keyword in mode_default.keywords}
+    assert isinstance(keywords["default"], ast.Name)
+    assert keywords["default"].id == "_EXPORT_MODE_TOTALS"
+    assert isinstance(keywords["required"], ast.Constant)
+    assert keywords["required"].value is False
 
 
 @pytest.mark.parametrize(
@@ -236,3 +259,27 @@ async def test_send_vote_update_panel_falls_back_to_original_response():
     edit = captured["edit"]
     assert edit["content"] == "Choose what to update for Vote #7."
     assert isinstance(edit["view"], VoteAdminUpdateView)
+
+
+@pytest.mark.asyncio
+async def test_resolve_voter_discord_names_uses_cached_and_fetched_members() -> None:
+    class _Guild:
+        def get_member(self, user_id):
+            if user_id == 123:
+                return SimpleNamespace(display_name="Cached Name")
+            return None
+
+        async def fetch_member(self, user_id):
+            if user_id == 456:
+                return SimpleNamespace(display_name="Fetched Name")
+            return None
+
+    ctx = SimpleNamespace(guild=_Guild())
+
+    names = await vote_admin_cmds._resolve_voter_discord_names(ctx, (123, 456, 789))
+
+    assert names == {
+        123: "Cached Name",
+        456: "Fetched Name",
+        789: "Unknown",
+    }
