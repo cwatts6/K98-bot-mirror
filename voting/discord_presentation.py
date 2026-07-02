@@ -30,6 +30,7 @@ def message_link(snapshot: VoteSnapshot) -> str:
 
 def build_vote_embed(snapshot: VoteSnapshot) -> discord.Embed:
     now = datetime.now(UTC)
+    hidden_results = public_results_hidden(snapshot, now_utc=now)
     color = discord.Color.green() if snapshot.status == "Open" else discord.Color.red()
     embed = discord.Embed(
         title=snapshot.title, description=snapshot.description or None, color=color
@@ -40,11 +41,11 @@ def build_vote_embed(snapshot: VoteSnapshot) -> discord.Embed:
         value=snapshot.closes_at_utc.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         inline=True,
     )
-    if public_results_hidden(snapshot, now_utc=now):
+    if hidden_results:
         embed.add_field(name="Results", value="Hidden until close", inline=True)
     else:
         embed.add_field(name="Total votes", value=str(snapshot.total_votes), inline=True)
-    if not public_results_hidden(snapshot, now_utc=now) and (
+    if not hidden_results and (
         snapshot.status == "Closed"
         or snapshot.closed_at_utc is not None
         or snapshot.closes_at_utc <= now
@@ -57,7 +58,7 @@ def build_vote_embed(snapshot: VoteSnapshot) -> discord.Embed:
             inline=True,
         )
     embed.set_footer(text=f"Vote #{snapshot.vote_post_id}")
-    embed.timestamp = datetime.now(UTC)
+    embed.timestamp = now
     embed.set_image(url=f"attachment://vote_{snapshot.vote_post_id}.png")
     return embed
 
