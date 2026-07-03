@@ -188,30 +188,47 @@ def survey_totals_csv_rows(snapshot: SurveySnapshot) -> list[dict[str, Any]]:
     total = int(snapshot.total_responses or 0)
     for question in snapshot.questions:
         top_count = max((int(option.response_count or 0) for option in question.options), default=0)
+        base_row = {
+            "SurveyID": snapshot.survey_id,
+            "Title": snapshot.title,
+            "Description": snapshot.description,
+            "Status": snapshot.status,
+            "TotalResponses": total,
+            "ClosedAtUtc": _dt(snapshot.closed_at_utc),
+            "ClosedByDiscordUserID": snapshot.closed_by_discord_user_id,
+            "ClosedReason": snapshot.closed_reason,
+            "CreatedAtUtc": _dt(snapshot.created_at_utc),
+            "ClosesAtUtc": _dt(snapshot.closes_at_utc),
+            "ChannelID": snapshot.channel_id,
+            "MessageID": snapshot.message_id,
+            "MessageLink": _message_link(snapshot),
+            "QuestionID": question.question_id,
+            "QuestionKey": question.question_key,
+            "QuestionPrompt": question.prompt,
+            "QuestionType": question.question_type,
+            "QuestionSortOrder": question.sort_order,
+            "MinSelections": question.min_selections,
+            "MaxSelections": question.max_selections,
+        }
+        if not question.options:
+            rows.append(
+                {
+                    **base_row,
+                    "OptionID": "",
+                    "OptionKey": "",
+                    "OptionLabel": "",
+                    "OptionSortOrder": "",
+                    "SelectionCount": total,
+                    "SelectionPercentOfResponses": _pct(total, total),
+                    "IsTopSelection": 0,
+                }
+            )
+            continue
         for option in question.options:
             count = int(option.response_count or 0)
             rows.append(
                 {
-                    "SurveyID": snapshot.survey_id,
-                    "Title": snapshot.title,
-                    "Description": snapshot.description,
-                    "Status": snapshot.status,
-                    "TotalResponses": total,
-                    "ClosedAtUtc": _dt(snapshot.closed_at_utc),
-                    "ClosedByDiscordUserID": snapshot.closed_by_discord_user_id,
-                    "ClosedReason": snapshot.closed_reason,
-                    "CreatedAtUtc": _dt(snapshot.created_at_utc),
-                    "ClosesAtUtc": _dt(snapshot.closes_at_utc),
-                    "ChannelID": snapshot.channel_id,
-                    "MessageID": snapshot.message_id,
-                    "MessageLink": _message_link(snapshot),
-                    "QuestionID": question.question_id,
-                    "QuestionKey": question.question_key,
-                    "QuestionPrompt": question.prompt,
-                    "QuestionType": question.question_type,
-                    "QuestionSortOrder": question.sort_order,
-                    "MinSelections": question.min_selections,
-                    "MaxSelections": question.max_selections,
+                    **base_row,
                     "OptionID": option.option_id,
                     "OptionKey": option.option_key,
                     "OptionLabel": option.label,
@@ -307,7 +324,7 @@ async def build_survey_totals_export(
     if snapshot.status != "Closed":
         raise VoteValidationError("Only closed surveys can be exported.")
     csv_bytes = build_survey_totals_csv_bytes(snapshot)
-    row_count = sum(len(question.options) for question in snapshot.questions)
+    row_count = sum(len(question.options) or 1 for question in snapshot.questions)
     export = SurveyTotalsExport(
         filename=survey_totals_csv_filename(snapshot),
         csv_bytes=csv_bytes,

@@ -61,6 +61,45 @@ def _snapshot() -> SurveySnapshot:
     )
 
 
+def _text_snapshot() -> SurveySnapshot:
+    now = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
+    return SurveySnapshot(
+        survey_id=43,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Planning",
+        description=None,
+        status="Closed",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now,
+        closed_at_utc=now,
+        closed_by_discord_user_id=4,
+        closed_reason="done",
+        total_responses=2,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=20,
+                survey_id=43,
+                question_key="q1",
+                prompt="What should leadership know?",
+                question_type="Text",
+                sort_order=1,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+            ),
+        ),
+    )
+
+
 def test_survey_totals_rows_include_question_and_option_totals():
     rows = survey_totals_csv_rows(_snapshot())
 
@@ -70,6 +109,65 @@ def test_survey_totals_rows_include_question_and_option_totals():
     assert rows[0]["SelectionCount"] == 2
     assert rows[0]["SelectionPercentOfResponses"] == "100%"
     assert rows[0]["IsTopSelection"] == 1
+
+
+def test_survey_totals_rows_include_text_question_metadata_without_raw_answers():
+    rows = survey_totals_csv_rows(_text_snapshot())
+
+    assert rows == [
+        {
+            "SurveyID": 43,
+            "Title": "Planning",
+            "Description": None,
+            "Status": "Closed",
+            "TotalResponses": 2,
+            "ClosedAtUtc": "2026-07-02T12:00:00Z",
+            "ClosedByDiscordUserID": 4,
+            "ClosedReason": "done",
+            "CreatedAtUtc": "2026-07-02T12:00:00Z",
+            "ClosesAtUtc": "2026-07-02T12:00:00Z",
+            "ChannelID": 2,
+            "MessageID": 3,
+            "MessageLink": "https://discord" + ".com/channels/1/2/3",
+            "QuestionID": 20,
+            "QuestionKey": "q1",
+            "QuestionPrompt": "What should leadership know?",
+            "QuestionType": "Text",
+            "QuestionSortOrder": 1,
+            "MinSelections": 0,
+            "MaxSelections": 0,
+            "OptionID": "",
+            "OptionKey": "",
+            "OptionLabel": "",
+            "OptionSortOrder": "",
+            "SelectionCount": 2,
+            "SelectionPercentOfResponses": "100%",
+            "IsTopSelection": 0,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_survey_totals_export_counts_text_question_rows(monkeypatch):
+    async def fake_get_survey_snapshot(_survey_id):
+        return _text_snapshot()
+
+    async def fake_insert_audit(**_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        survey_export_service.survey_dal,
+        "get_survey_snapshot",
+        fake_get_survey_snapshot,
+    )
+    monkeypatch.setattr(survey_export_service.survey_dal, "insert_audit", fake_insert_audit)
+
+    export = await survey_export_service.build_survey_totals_export(
+        survey_id=43,
+        requested_by_discord_user_id=456,
+    )
+
+    assert export.row_count == 1
 
 
 def test_survey_csv_bytes_are_formula_safe():
