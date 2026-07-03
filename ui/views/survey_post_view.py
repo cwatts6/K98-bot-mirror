@@ -171,9 +171,7 @@ class _SurveyDetailOptionSelect(discord.ui.Select):
                 )
             else:
                 action_label = (
-                    "Click here to edit details"
-                    if has_detail
-                    else "Click here to add more details"
+                    "Click here to edit details" if has_detail else "Click here to add more details"
                 )
             options.append(
                 discord.SelectOption(
@@ -398,8 +396,7 @@ class _SurveyTextAnswerModal(discord.ui.Modal):
             style=discord.InputTextStyle.long,
             max_length=survey_service.MAX_SURVEY_TEXT_ANSWER_LEN,
             placeholder=(
-                "Required response. "
-                f"Max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters."
+                "Required response. " f"Max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters."
             ),
             value=parent_view.text_answers.get(question.question_id, ""),
         )

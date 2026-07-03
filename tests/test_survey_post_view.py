@@ -247,9 +247,7 @@ async def test_survey_submit_requires_all_questions_before_enabled(monkeypatch):
     assert submit.disabled is True
     assert SURVEY_INCOMPLETE_HELP in panel.content()
 
-    await submit.callback(
-        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
-    )
+    await submit.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
 
     assert captured["content"] == SURVEY_INCOMPLETE_HELP
     assert "submit_called" not in captured
@@ -349,8 +347,7 @@ async def test_survey_text_and_detail_modals_update_private_panel_state():
         f"Response (max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters)"
     )
     assert text_modal.answer.placeholder == (
-        "Required response. "
-        f"Max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters."
+        "Required response. " f"Max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters."
     )
     text_modal.answer.value = " I can lead "
     await text_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
