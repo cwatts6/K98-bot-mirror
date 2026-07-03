@@ -18,10 +18,12 @@ from voting.service import (
 from voting.survey_models import (
     SURVEY_QUESTION_MULTI_SELECT,
     SURVEY_QUESTION_SINGLE_CHOICE,
+    SURVEY_QUESTION_TEXT,
     SurveyCloseResult,
     SurveyCreateRequest,
     SurveyLookupChoice,
     SurveyQuestionCreateRequest,
+    SurveyResponsePayload,
     SurveySnapshot,
     SurveySubmitResult,
 )
@@ -33,9 +35,12 @@ MAX_SURVEY_QUESTIONS = 5
 MIN_SURVEY_OPTIONS = 2
 MAX_SURVEY_OPTIONS = 6
 MAX_SURVEY_QUESTION_PROMPT_LEN = 180
+MAX_SURVEY_TEXT_ANSWER_LEN = 500
+MAX_SURVEY_DETAIL_LEN = 300
 SURVEY_QUESTION_TYPE_CHOICES: dict[str, str] = {
     SURVEY_QUESTION_SINGLE_CHOICE: "Single choice",
     SURVEY_QUESTION_MULTI_SELECT: "Multi-select",
+    SURVEY_QUESTION_TEXT: "Text",
 }
 
 
@@ -88,6 +93,19 @@ def _validate_survey_option_labels(labels: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(output)
 
 
+def _clean_limited_text(
+    value: str | None, *, limit: int, field_name: str, required: bool
+) -> str | None:
+    clean = str(value or "").strip()
+    if not clean:
+        if required:
+            raise VoteValidationError(f"{field_name} is required.")
+        return None
+    if len(clean) > limit:
+        raise VoteValidationError(f"{field_name} must be {limit} characters or fewer.")
+    return clean
+
+
 def build_question_request(
     *,
     prompt: str,
@@ -95,6 +113,7 @@ def build_question_request(
     options: tuple[str, ...],
     min_selections: int | None = None,
     max_selections: int | None = None,
+    allow_details: bool = False,
 ) -> SurveyQuestionCreateRequest:
     clean_prompt = str(prompt or "").strip()
     if not clean_prompt:
@@ -103,10 +122,23 @@ def build_question_request(
         raise VoteValidationError(
             f"Survey question prompt must be {MAX_SURVEY_QUESTION_PROMPT_LEN} characters or fewer."
         )
-    clean_options = _validate_survey_option_labels(options)
     minimum = 1 if min_selections is None else int(min_selections)
     maximum = 1 if max_selections is None else int(max_selections)
     normalized_type = _normalize_question_type(question_type, max_selections=maximum)
+    if normalized_type == SURVEY_QUESTION_TEXT:
+        if tuple(str(item or "").strip() for item in options if str(item or "").strip()):
+            raise VoteValidationError("Text survey questions do not use options.")
+        if allow_details:
+            raise VoteValidationError("Text survey questions cannot allow choice details.")
+        return SurveyQuestionCreateRequest(
+            prompt=clean_prompt,
+            question_type=normalized_type,
+            options=(),
+            min_selections=0,
+            max_selections=0,
+            allow_details=False,
+        )
+    clean_options = _validate_survey_option_labels(options)
     if normalized_type == SURVEY_QUESTION_SINGLE_CHOICE:
         if minimum != 1 or maximum != 1:
             raise VoteValidationError(
@@ -118,6 +150,7 @@ def build_question_request(
             options=clean_options,
             min_selections=1,
             max_selections=1,
+            allow_details=bool(allow_details),
         )
     if minimum < 1:
         raise VoteValidationError("Minimum selections must be at least 1.")
@@ -135,6 +168,7 @@ def build_question_request(
         options=clean_options,
         min_selections=minimum,
         max_selections=maximum,
+        allow_details=bool(allow_details),
     )
 
 
@@ -199,13 +233,46 @@ def validate_answers(
     snapshot: SurveySnapshot,
     answers_by_question_id: Mapping[int, tuple[int, ...]],
 ) -> dict[int, tuple[int, ...]]:
-    output: dict[int, tuple[int, ...]] = {}
+    return validate_response_payload(
+        snapshot,
+        answers_by_question_id=answers_by_question_id,
+    ).selected_option_ids
+
+
+def validate_response_payload(
+    snapshot: SurveySnapshot,
+    *,
+    answers_by_question_id: Mapping[int, tuple[int, ...]] | None = None,
+    text_answers_by_question_id: Mapping[int, str] | None = None,
+    detail_text_by_question_option: Mapping[tuple[int, int], str] | None = None,
+) -> SurveyResponsePayload:
+    choice_answers = answers_by_question_id or {}
+    text_answers = text_answers_by_question_id or {}
+    detail_answers = detail_text_by_question_option or {}
+    selected_output: dict[int, tuple[int, ...]] = {}
+    text_output: dict[int, str] = {}
+    detail_output: dict[tuple[int, int], str] = {}
+    questions_by_id = {question.question_id: question for question in snapshot.questions}
     for question in snapshot.questions:
+        if question.question_type == SURVEY_QUESTION_TEXT:
+            if choice_answers.get(question.question_id):
+                raise VoteValidationError(
+                    f"Answer question {question.sort_order}: text questions do not use options."
+                )
+            clean_text = _clean_limited_text(
+                text_answers.get(question.question_id),
+                limit=MAX_SURVEY_TEXT_ANSWER_LEN,
+                field_name=f"Answer question {question.sort_order}",
+                required=True,
+            )
+            if clean_text is not None:
+                text_output[question.question_id] = clean_text
+            continue
         selected_ids = tuple(
             sorted(
                 {
                     int(option_id)
-                    for option_id in answers_by_question_id.get(question.question_id, ())
+                    for option_id in choice_answers.get(question.question_id, ())
                 }
             )
         )
@@ -222,8 +289,56 @@ def validate_answers(
             raise VoteValidationError(
                 f"Answer question {question.sort_order}: one or more options are not valid."
             )
-        output[question.question_id] = selected_ids
-    return output
+        selected_output[question.question_id] = selected_ids
+
+    for question_id, text in text_answers.items():
+        question = questions_by_id.get(int(question_id))
+        if question is None:
+            raise VoteValidationError("One or more text answers are not valid.")
+        if question.question_type != SURVEY_QUESTION_TEXT:
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: this question does not accept text."
+            )
+        if int(question_id) not in text_output:
+            clean_text = _clean_limited_text(
+                text,
+                limit=MAX_SURVEY_TEXT_ANSWER_LEN,
+                field_name=f"Answer question {question.sort_order}",
+                required=True,
+            )
+            if clean_text is not None:
+                text_output[int(question_id)] = clean_text
+
+    for raw_key, text in detail_answers.items():
+        try:
+            question_id, option_id = int(raw_key[0]), int(raw_key[1])
+        except (IndexError, TypeError, ValueError):
+            raise VoteValidationError("One or more detail notes are not valid.") from None
+        question = questions_by_id.get(question_id)
+        if question is None:
+            raise VoteValidationError("One or more detail notes are not valid.")
+        if question.question_type == SURVEY_QUESTION_TEXT or not question.allow_details:
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: details are not enabled."
+            )
+        if option_id not in selected_output.get(question_id, ()):
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: details can only be added to selected options."
+            )
+        clean_detail = _clean_limited_text(
+            text,
+            limit=MAX_SURVEY_DETAIL_LEN,
+            field_name=f"Detail for question {question.sort_order}",
+            required=False,
+        )
+        if clean_detail is not None:
+            detail_output[(question_id, option_id)] = clean_detail
+
+    return SurveyResponsePayload(
+        selected_option_ids=selected_output,
+        text_answers=text_output,
+        detail_text_by_option=detail_output,
+    )
 
 
 async def create_survey_record(req: SurveyCreateRequest) -> SurveySnapshot:
@@ -263,6 +378,8 @@ async def submit_survey_response(
     survey_id: int,
     discord_user_id: int,
     answers_by_question_id: Mapping[int, tuple[int, ...]],
+    text_answers_by_question_id: Mapping[int, str] | None = None,
+    detail_text_by_question_option: Mapping[tuple[int, int], str] | None = None,
     now_utc: datetime | None = None,
 ) -> tuple[SurveySubmitResult, SurveySnapshot | None]:
     snapshot = await survey_dal.get_survey_snapshot(int(survey_id))
@@ -271,11 +388,18 @@ async def submit_survey_response(
             SurveySubmitResult("missing", int(survey_id), message="This survey no longer exists."),
             None,
         )
-    validated = validate_answers(snapshot, answers_by_question_id)
+    validated = validate_response_payload(
+        snapshot,
+        answers_by_question_id=answers_by_question_id,
+        text_answers_by_question_id=text_answers_by_question_id,
+        detail_text_by_question_option=detail_text_by_question_option,
+    )
     result = await survey_dal.submit_survey_response(
         survey_id=int(survey_id),
         discord_user_id=int(discord_user_id),
-        answers_by_question_id=validated,
+        answers_by_question_id=validated.selected_option_ids,
+        text_answers_by_question_id=validated.text_answers,
+        detail_text_by_question_option=validated.detail_text_by_option,
         now_utc=now_utc or datetime.now(UTC),
     )
     refreshed = await survey_dal.get_survey_snapshot(int(survey_id)) if result.accepted else None
@@ -286,6 +410,15 @@ async def get_existing_answer_option_ids(
     *, survey_id: int, discord_user_id: int
 ) -> dict[int, tuple[int, ...]]:
     return await survey_dal.get_existing_answer_option_ids(
+        survey_id=int(survey_id),
+        discord_user_id=int(discord_user_id),
+    )
+
+
+async def get_existing_response_payload(
+    *, survey_id: int, discord_user_id: int
+) -> SurveyResponsePayload:
+    return await survey_dal.get_existing_response_payload(
         survey_id=int(survey_id),
         discord_user_id=int(discord_user_id),
     )

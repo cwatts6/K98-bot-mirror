@@ -9,14 +9,17 @@ from ui.views.survey_post_view import (
     SurveyBuilderView,
     SurveyPostView,
     SurveyResponsePanel,
+    _SurveyDetailModal,
     _SurveyOptionModal,
     _SurveyQuestionPromptModal,
+    _SurveyTextAnswerModal,
 )
 from voting import survey_service
 from voting.survey_models import (
     SurveyQuestion,
     SurveyQuestionCreateRequest,
     SurveyQuestionOption,
+    SurveyResponsePayload,
     SurveySnapshot,
 )
 
@@ -123,9 +126,13 @@ async def test_survey_opener_sends_private_panel_with_existing_answers(monkeypat
     async def fake_get_survey_snapshot(_survey_id):
         return snapshot
 
-    async def fake_get_existing_answer_option_ids(**kwargs):
+    async def fake_get_existing_response_payload(**kwargs):
         assert kwargs == {"survey_id": 7, "discord_user_id": 123}
-        return {10: (102,), 11: (201, 202)}
+        return SurveyResponsePayload(
+            selected_option_ids={10: (102,), 11: (201, 202)},
+            text_answers={},
+            detail_text_by_option={},
+        )
 
     async def fake_send_ephemeral(_interaction, content, **kwargs):
         captured["content"] = content
@@ -136,8 +143,8 @@ async def test_survey_opener_sends_private_panel_with_existing_answers(monkeypat
         fake_get_survey_snapshot,
     )
     monkeypatch.setattr(
-        "ui.views.survey_post_view.survey_service.get_existing_answer_option_ids",
-        fake_get_existing_answer_option_ids,
+        "ui.views.survey_post_view.survey_service.get_existing_response_payload",
+        fake_get_existing_response_payload,
     )
     monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
 
@@ -201,6 +208,75 @@ async def test_survey_submit_defers_before_persisting(monkeypatch):
     assert captured["deferred_before_submit"] is True
     assert captured["refresh"] is True
     assert captured["content"] == "Survey response recorded."
+
+
+@pytest.mark.asyncio
+async def test_survey_text_and_detail_modals_update_private_panel_state():
+    now = datetime.now(UTC)
+    snapshot = SurveySnapshot(
+        survey_id=7,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Survey",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=7,
+                question_key="q1",
+                prompt="Choice?",
+                question_type="SingleChoice",
+                sort_order=1,
+                min_selections=1,
+                max_selections=1,
+                options=(
+                    SurveyQuestionOption(101, 10, "opt1", "A", 1),
+                    SurveyQuestionOption(102, 10, "opt2", "B", 2),
+                ),
+                allow_details=True,
+            ),
+            SurveyQuestion(
+                question_id=11,
+                survey_id=7,
+                question_key="q2",
+                prompt="Explain?",
+                question_type="Text",
+                sort_order=2,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+            ),
+        ),
+    )
+    panel = SurveyResponsePanel(snapshot, owner_user_id=123, selected_option_ids={10: (101,)})
+    detail_modal = _SurveyDetailModal(panel, 101)
+    detail_modal.detail.value = " Preferred because reset is easier "
+    await detail_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    panel.current_index = 1
+    panel._rebuild()
+    text_modal = _SurveyTextAnswerModal(panel)
+    text_modal.answer.value = " I can lead "
+    await text_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    assert panel.detail_text_by_option == {(10, 101): "Preferred because reset is easier"}
+    assert panel.text_answers == {11: "I can lead"}
+    assert "answer saved" in panel.content()
 
 
 @pytest.mark.asyncio
@@ -363,6 +439,54 @@ async def test_survey_guided_builder_saves_multi_select_from_max_selection(monke
     assert view.questions[0].max_selections == 2
     assert view.questions[0].options == ("Friday", "Saturday", "Sunday")
     assert "Survey question saved." not in captured.get("ephemeral", "")
+
+
+@pytest.mark.asyncio
+async def test_survey_guided_builder_saves_text_question_and_details_toggle(monkeypatch):
+    captured: dict[str, object] = {}
+
+    async def fake_publish(_interaction, _questions):
+        return True
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        captured["ephemeral"] = content
+
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    view = SurveyBuilderView(owner_user_id=123, publish_callback=fake_publish)
+    view.draft_is_text = True
+    view._rebuild()
+    prompt_modal = _SurveyQuestionPromptModal(view)
+    prompt_modal.prompt.value = "What should we know?"
+    await prompt_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    await _button(view, "Save question").callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    assert view.questions[0].question_type == "Text"
+    assert view.questions[0].options == ()
+
+    prompt_modal = _SurveyQuestionPromptModal(view)
+    prompt_modal.prompt.value = "Which night?"
+    await prompt_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    first_option = _SurveyOptionModal(view)
+    first_option.option.value = "Friday"
+    await first_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    second_option = _SurveyOptionModal(view)
+    second_option.option.value = "Saturday"
+    await second_option.callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+    await _button(view, "Details off").callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+    await _button(view, "Save question").callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    assert view.questions[1].question_type == "SingleChoice"
+    assert view.questions[1].allow_details is True
 
 
 @pytest.mark.asyncio

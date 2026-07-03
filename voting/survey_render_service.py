@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from core import visual_text
 from voting.result_visibility import public_results_hidden
-from voting.survey_models import RenderedSurveyCard, SurveySnapshot
+from voting.survey_models import SURVEY_QUESTION_TEXT, RenderedSurveyCard, SurveySnapshot
 
 ROOT = Path(__file__).resolve().parents[1]
 SURVEY_BACKGROUND = ROOT / "assets" / "vote" / "vote.png"
@@ -97,6 +97,9 @@ def _top_option_line(snapshot: SurveySnapshot) -> str:
     lines: list[str] = []
     total = int(snapshot.total_responses or 0)
     for question in snapshot.questions[:5]:
+        if question.question_type == SURVEY_QUESTION_TEXT:
+            lines.append(f"Q{question.sort_order}: text responses recorded privately")
+            continue
         if not question.options:
             continue
         top_count = max(int(option.response_count or 0) for option in question.options)
@@ -158,7 +161,7 @@ def render_survey_card(
     _draw_text(draw, (66, 228), headline, fill=GOLD, font=headline_font, bold=True)
 
     if hidden:
-        detail = f"{len(snapshot.questions)} required choice questions"
+        detail = f"{len(snapshot.questions)} required questions"
     else:
         detail = _top_option_line(snapshot)
     detail_font = _fit_font(draw, detail.splitlines()[0], max_width=960, size=24, min_size=16)

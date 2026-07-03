@@ -6,6 +6,7 @@ from io import BytesIO
 
 SURVEY_QUESTION_SINGLE_CHOICE = "SingleChoice"
 SURVEY_QUESTION_MULTI_SELECT = "MultiSelect"
+SURVEY_QUESTION_TEXT = "Text"
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class SurveyQuestion:
     min_selections: int
     max_selections: int
     options: tuple[SurveyQuestionOption, ...]
+    allow_details: bool = False
 
 
 @dataclass(frozen=True)
@@ -75,6 +77,14 @@ class SurveyQuestionCreateRequest:
     options: tuple[str, ...]
     min_selections: int = 1
     max_selections: int = 1
+    allow_details: bool = False
+
+
+@dataclass(frozen=True)
+class SurveyResponsePayload:
+    selected_option_ids: dict[int, tuple[int, ...]]
+    text_answers: dict[int, str]
+    detail_text_by_option: dict[tuple[int, int], str]
 
 
 @dataclass(frozen=True)
@@ -147,6 +157,10 @@ class SurveyAnswerAuditRow:
     original_option_ids: tuple[int, ...]
     original_option_keys: tuple[str, ...]
     original_option_labels: tuple[str, ...]
+    text_answer: str | None = None
+    original_text_answer: str | None = None
+    selected_option_detail_notes: tuple[str, ...] = ()
+    original_selected_option_detail_notes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -3,6 +3,29 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Phase 8 Survey Free Text and Add Details Completed Item
+- Area: `voting/`, `/vote_admin survey_*`, `ui/views/survey_post_view.py`, SQL repo survey response tables
+- Type: architecture
+- Description: Free-text and other text-bearing survey answer types were intentionally excluded
+  from the delivered Phase 7 choice-only survey slice. Operator follow-up confirmed the second
+  survey slice should add free-text questions and optional choice-question `Add details` text, and
+  that submitted text/detail data must be included in private admin/leadership response-detail
+  exports.
+- Resolution: Phase 8 first audited product scope, privacy, SQL storage, permissions, builder/view
+  UX, result visibility, export shape, tests, smoke plan, migration order, rollback posture, and
+  deferred follow-up work. After operator approval, the implementation delivered required
+  free-text survey questions, optional per-choice-question details, dedicated additive
+  `SurveyTextAnswers` and `SurveyAnswerDetails` storage, private modal entry/edit UX, submitted
+  response prefill, response-change comparison for text/details, private export columns for raw
+  submitted text/detail data, formula-safety coverage for the new export cells, aggregate-only
+  public result behavior, and audit metadata that records counts rather than full text payloads.
+- Validation: Automated validation included SQL repo validation for
+  `20260703_001_add_survey_text_details.sql`, focused survey DAL/service/view/export tests,
+  neighboring vote/admin/scheduler/export/render tests, architecture and deferred validators,
+  selected-test review, smoke imports, command registration validation, full pytest, whitespace
+  checks, and Codex Security diff scan `378f3c4a-373e-4bc8-a4b7-2cd5db89b6b6` with zero
+  findings. Production promotion and operator smoke testing remain separate follow-up steps.
+
 ### Discord Voting Post Framework Phase 7 Choice-Only Surveys Completed Item
 - Area: `voting/`, `/vote_admin survey_*`, `ui/views/survey_post_view.py`, SQL repo survey framework
 - Type: architecture

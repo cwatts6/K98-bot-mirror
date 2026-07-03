@@ -49,6 +49,7 @@ from voting.survey_export_service import (
     build_survey_response_detail_export,
     build_survey_totals_export,
 )
+from voting.survey_models import SURVEY_QUESTION_TEXT
 from voting.survey_presentation import (
     build_survey_close_embed,
     build_survey_embed,
@@ -1069,6 +1070,11 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
         ] or ["No reminders configured"]
         question_lines = []
         for question in snapshot.questions:
+            if question.question_type == SURVEY_QUESTION_TEXT:
+                question_lines.append(
+                    f"Q{question.sort_order}: private text responses ({snapshot.total_responses})"
+                )
+                continue
             top = max((option.response_count for option in question.options), default=0)
             leaders = [option.label for option in question.options if option.response_count == top]
             question_lines.append(

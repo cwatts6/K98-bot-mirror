@@ -5,19 +5,20 @@
 - Task name: `Discord Voting Post Framework Phase 8 Survey Free Text and Add Details`
 - Date: `2026-07-03`
 - Owner/context: `Follow-up after successful Phase 7 choice-only survey delivery and smoke test`
-- Task type: `audit | product scope | SQL-backed survey extension design | Discord interaction UX | privacy/export review`
+- Task type: `audit | product scope | SQL-backed survey extension design | Discord interaction UX | privacy/export review | implementation`
 - One-pass approved: `no`
-- Status: `prepared; start with audit/scope only`
+- Status: `audit approved; first implementation slice delivered; pending PR/promotion/smoke`
 
 ## 2. Objective
 
-Audit and design the second survey slice: free-text survey questions and optional
-choice-question `Add details` text.
+Audit, design, and deliver the approved second survey slice: free-text survey questions and
+optional choice-question `Add details` text.
 
 Phase 7 delivered choice-only multi-question surveys. Phase 8 should extend that model carefully
 for text-bearing responses, including privacy, SQL shape, UI, exports, and moderation/retention
-considerations. Do not implement runtime changes until the architecture, product scope, privacy,
-SQL, permissions, and UX direction are approved.
+considerations. Runtime implementation was intentionally blocked until the architecture, product
+scope, privacy, SQL, permissions, and UX direction were approved. Operator approval was recorded
+on 2026-07-03, after the audit/scope packet was prepared.
 
 ## 3. Required Reading
 
@@ -302,3 +303,274 @@ At minimum, the eventual implementation smoke plan should cover:
 - Risk: documentation/scope only unless implementation is separately approved.
 - Rollback: revert docs/backlog/task-pack changes.
 ```
+
+## 17. Audit / Scope Packet - Drafted 2026-07-03
+
+### Scope Summary
+
+Phase 8 should extend the delivered Phase 7 survey model with text-bearing submitted answers while
+preserving the existing choice-only survey behavior. The audit recommends a split implementation:
+
+1. Recommended first implementation slice: add required free-text survey questions plus optional
+   per-choice selected-option details for choice questions.
+2. Later slices: persisted draft/resume, optional questions, rating/ranking questions, richer
+   export/reporting surfaces, emoji/icon support, and dashboard/reporting readiness.
+
+The first slice should not change existing one-choice votes, single-question multi-select votes,
+choice-only survey creation, existing choice-only response submission, survey reminders/closes,
+PublicLive/HiddenUntilClose aggregate behavior, or existing export modes except for adding approved
+text/detail columns to private response-detail export rows.
+
+### Current Phase 7 Contract Confirmed
+
+- Bot code stores survey definitions and answers in `voting/survey_*`, `ui/views/survey_post_view.py`,
+  and `/vote_admin survey_*` in `commands/vote_admin_cmds.py`.
+- `SurveyQuestions.QuestionType` currently supports only `SingleChoice` and `MultiSelect`.
+- `SurveyQuestionOptions` is required for all current questions.
+- `SurveyResponses` enforces one response envelope per survey/Discord user.
+- `SurveyAnswers` stores normalized selected option IDs keyed by survey, response, Discord user,
+  question, and option.
+- `SurveyResponses.OriginalAnswersJson` currently stores original option ID lists for response
+  change comparison.
+- Public survey cards and embeds show aggregate option counts only; response-detail export is
+  private and closed-only.
+- SQL source-of-truth validation found the Phase 7 survey objects in
+  `C:\K98-bot-SQL-Server\migrations\20260702_003_add_survey_post_framework.sql`. No separate
+  `sql_schema` survey object files were found in the SQL repo during this audit.
+
+### Decision Matrix
+
+| Candidate | Product value | Privacy / permissions | SQL contract | Player UX | Builder UX | Export impact | Tests / smoke | Rollback posture | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| Free-text questions only | High for open feedback, explanations, nominations, and availability notes. | Raw text is sensitive; never public. Admin/leadership private status may show counts only; closed response-detail export includes text. | Add `Text` question type plus a dedicated `dbo.SurveyTextAnswers` table keyed to `ResponseID`, `SurveyID`, `DiscordUserID`, and `SurveyQuestionID`. Keep `dbo.SurveyAnswers` choice-only. | Modal per text question from the private response panel, with prefilled value on reopen. Required non-whitespace answer. | Add an explicit question-type control, not free-typed type input. Text questions do not need options or min/max. | Add `TextAnswer` and original/current text change metadata to response-detail export only. Summary export remains aggregate and excludes raw text. | Service validation, DAL transaction, view modal, export formula safety, PublicLive/HiddenUntilClose leak prevention, manual smoke. | Additive SQL table and `QuestionType` constraint expansion; rollback can drop the new table/constraint if no runtime code depends on it. | Good, but less useful alone than pairing with details after the same privacy/storage work. |
+| Choice-question `Add details` only | Medium-high for explaining selected choices without changing survey question types. | Raw details are sensitive; details should attach only to selected options and stay private/export-only. | Add details enablement metadata to choice questions or options plus `dbo.SurveyAnswerDetails` keyed to selected answer identity. Keep `dbo.SurveyAnswers` as the selected-option authority. | Optional modal attached to selected choice or selected choices; prefilled on reopen; empty means no detail. | Per-question toggle is safest first; per-option enablement is more granular but harder to build and explain. | Add detail columns to response-detail export; summary export still excludes raw detail text. | Tests for detail allowed/blocked, details only on selected options, updates, CSV safety, and stale close rejection. | Additive metadata plus detail table; details can be ignored by old code if bot rollback happens before SQL rollback. | Valuable, but implementing it without free-text creates nearly the same storage/privacy work. |
+| Free-text + per-question details in one slice | Highest near-term KD98 value: freeform answers and explanations for selected choices share modal, validation, export, privacy, and audit patterns. | Same admin/leadership model as current private status/export. No public raw text. No public detail export. No governor identity. Audit JSON stores metadata only. | Expand `SurveyQuestions.QuestionType` to include `Text`; add `AllowDetails` or `DetailsMode` on choice questions; add `dbo.SurveyTextAnswers`; add `dbo.SurveyAnswerDetails`; optionally add original text/detail JSON metadata without full payloads. | Private response panel pages show answer status. Text/details are edited through modals. Submit persists all answers transactionally. No persisted partial drafts. | Add a question type segmented/dropdown-like control and an `Allow details` toggle for choice questions. Save question validates mode-specific fields. | Response-detail export includes text/detail columns and formula-safes every text cell; totals export remains aggregate. | Broad but coherent: service, DAL, view, export, presentation leak prevention, command registration, smoke for choice-only regression and text/detail flows. | Additive SQL first, bot second. Bot rollback can ignore new columns/tables; SQL rollback is manual only if data removal is accepted. | Recommended safest first implementation slice, with per-question details not per-option details. |
+| Per-option details | Fine-grained control, but less important than the first text slice. | Slightly easier to avoid irrelevant details, but users/admins must understand which options allow notes. | Requires per-option metadata and constraints around selected option detail rows. | More UI branching and more edge cases when a user changes selected options. | Admin must configure details per option, increasing builder complexity. | Same response-detail export impact, with extra option-level metadata columns. | More matrix coverage across selected/unselected/removed options. | Additive but higher migration/UI risk. | Defer until the per-question details model has production evidence. |
+| Whole-response details | Low clarity; becomes a generic comment box detached from a specific question/choice. | Higher accidental disclosure/confusion risk because exported notes are not anchored to a selected option. | Simpler table, but weaker relational integrity. | Easy to enter, harder to review against choices. | Survey-level toggle is simple. | Export consumers must infer what the comment explains. | Lower implementation cost but weaker product fit. | Additive. | Do not use for Phase 8. |
+| Single generic typed answer table | Flexible for future ratings/rankings, but broadens the model before those types are approved. | One table can mix sensitive answer types and becomes a reporting magnet. | Replaces/duplicates choice answer semantics and risks disturbing Phase 7 aggregation. | No direct UX benefit. | No direct builder benefit. | Requires wider export remapping. | High regression risk around existing choice-only surveys. | Harder to rollback because it touches the core answer model. | Defer; not the safest first slice. |
+| Nullable text columns on `SurveyAnswers` | Quick for selected-choice details, poor fit for text questions with no option. | Couples raw text to aggregate choice rows. | Pollutes choice-selection table and cannot represent a text question cleanly without fake options. | No UX benefit. | No UX benefit. | Export mapping becomes ambiguous. | Risks choice-only regressions. | Column rollback is additive but semantically messy. | Reject. |
+
+### Recommended First Implementation Slice
+
+Implement required free-text survey questions and optional per-question `Add details` for choice
+questions together, after approval.
+
+Recommended product rules:
+
+- Free-text questions are required in Phase 8 because all Phase 7 survey questions are required.
+- Optional questions remain out of scope.
+- Text answers and detail notes are trimmed; empty or whitespace-only text is invalid for
+  required free-text answers and treated as absent for optional details.
+- Recommended first limits: 500 characters for free-text answers and 300 characters for per-choice
+  detail notes. These fit comfortably inside Discord modal inputs and private review copy while
+  keeping exports manageable.
+- Add details is enabled per choice question, not per survey and not per option, for the first
+  implementation slice.
+- Details are tied to selected option rows. If a user changes a selection and removes an option,
+  detail text for the removed option is deleted on submit.
+- No partial player drafts are persisted. Text entered into a modal but not submitted with the
+  final response is intentionally lost on panel timeout/restart.
+- Response changes follow the existing survey-level `AllowResponseChange` flag. If changes are
+  disabled, existing submitted text/details cannot be edited through the player flow.
+
+### Architecture Direction
+
+- Models: add a `Text` question type and explicit text/detail fields to survey request/answer DTOs.
+- DAL: keep `dbo.SurveyAnswers` as the normalized choice-selection table. Add dedicated text/detail
+  persistence and query helpers; submit/update remains one service-owned transaction.
+- Service: validate question type, mode-specific required fields, text/detail limits, empty rules,
+  response-change rules, close/stale rules, and export/audit metadata. Services should not depend
+  on Discord objects.
+- Commands: keep `/vote_admin survey_create`, `/vote_admin survey_status`, `/vote_admin survey_close`,
+  and `/vote_admin survey_export`. No new top-level command.
+- Views: keep the public persistent `Answer survey` opener. Private response panels own modals and
+  routing only; service owns validation and persistence.
+- Presentation: public cards/embeds never render raw text/detail data. Text questions may show
+  response counts only if needed; choice aggregates keep existing PublicLive/HiddenUntilClose rules.
+- Exports: only private closed response-detail export gains raw text/detail columns. Totals export
+  remains aggregate.
+- Audit: record action type, question counts, text-answer count, detail-note count, changed flag,
+  row/byte counts, column profile, oversized status, and delivery status. Do not store full
+  submitted text/detail payloads in audit JSON.
+
+### SQL / Persistence Direction
+
+Subject to approval, the additive SQL shape should be:
+
+- Expand `CK_SurveyQuestions_Type` to allow `Text`.
+- Add nullable/defaulted choice-detail enablement metadata on `dbo.SurveyQuestions`, such as
+  `AllowDetails bit NOT NULL DEFAULT 0`, constrained so `Text` questions cannot allow details.
+- Add `dbo.SurveyTextAnswers` with:
+  - `SurveyID bigint NOT NULL`
+  - `ResponseID bigint NOT NULL`
+  - `DiscordUserID bigint NOT NULL`
+  - `SurveyQuestionID bigint NOT NULL`
+  - `AnswerText nvarchar(500) NOT NULL`
+  - `CreatedAtUtc datetime2(0) NOT NULL`
+  - `UpdatedAtUtc datetime2(0) NOT NULL`
+  - primary key on `(SurveyID, DiscordUserID, SurveyQuestionID)`
+  - FK to `SurveyResponses(ResponseID, SurveyID, DiscordUserID)`
+  - FK to `SurveyQuestions(SurveyID, SurveyQuestionID)`
+- Add `dbo.SurveyAnswerDetails` with:
+  - `SurveyID bigint NOT NULL`
+  - `ResponseID bigint NOT NULL`
+  - `DiscordUserID bigint NOT NULL`
+  - `SurveyQuestionID bigint NOT NULL`
+  - `SurveyOptionID bigint NOT NULL`
+  - `DetailText nvarchar(300) NOT NULL`
+  - `CreatedAtUtc datetime2(0) NOT NULL`
+  - `UpdatedAtUtc datetime2(0) NOT NULL`
+  - primary key on `(SurveyID, DiscordUserID, SurveyQuestionID, SurveyOptionID)`
+  - FK to `SurveyAnswers(SurveyID, DiscordUserID, SurveyQuestionID, SurveyOptionID)` so details
+    cannot exist for unselected options
+  - FK to `SurveyResponses(ResponseID, SurveyID, DiscordUserID)`
+- Add export-oriented indexes only where the response-detail query needs them; avoid reporting
+  views/procedures in Phase 8.
+- Add a new SQL migration before bot rollout. Rollback is manual because text/detail tables can
+  contain user-submitted data; bot rollback should remain compatible by ignoring new objects.
+
+### Permission And Privacy Model
+
+- Admin/leadership permissions remain command-level through existing `/vote_admin` decorators.
+- Player entry remains public post button plus private response panel.
+- PublicLive shows only choice aggregates and response counts. It never shows raw free-text answers
+  or detail notes while open.
+- HiddenUntilClose hides choice aggregates while open as today and still never reveals raw text
+  publicly at close.
+- `/vote_admin survey_status` remains private. It should show counts/totals for text-bearing
+  questions, not raw text payloads.
+- `/vote_admin survey_export mode:response_detail` remains private, closed-only, and
+  admin/leadership-gated; it is the approved surface for raw submitted text/detail data.
+- Public voter-level/detail posting remains out of scope.
+
+### UX Direction
+
+Builder:
+
+- Add a question type selector/control with `Choice` and `Text`; do not reintroduce free-typed
+  question-type values.
+- For choice questions, preserve the current prompt/options/min/max builder flow and add an
+  `Allow details` toggle.
+- For text questions, hide option and min/max controls, show the text-answer limit, and save once
+  the prompt is valid.
+- Keep unpublished survey builder drafts in memory only. Timeout behavior remains graceful and
+  unpublished drafts do not survive restart.
+
+Player:
+
+- Keep one private paged response panel.
+- Choice questions keep dropdown selection; if details are enabled, selected options get an
+  `Add details` / `Edit details` modal path.
+- Text questions use a modal launched from the question page, with current text prefilled when
+  reopening a submitted response.
+- The review panel should indicate whether the current question has a saved text/detail value
+  without printing long raw text into the panel.
+- Submit persists the complete response. Unsaved modal/panel state is not durable until submit.
+
+### Export Shape Direction
+
+Totals export:
+
+- Preserve current aggregate columns and exclude raw text/detail values.
+- For text questions, either omit rows or include a count-only row only if explicitly approved in
+  implementation scope. The safest first implementation is to keep totals export choice-option
+  oriented and document that text details live in response-detail export.
+
+Response-detail export:
+
+- Preserve `DiscordUserID` as spreadsheet-safe text and continue resolving `DiscordName`.
+- Add columns such as `TextAnswer`, `OriginalTextAnswer`, `TextAnswerChanged`,
+  `SelectedOptionDetailNotes`, and/or detail-per-option rows. Exact column layout should be
+  finalized during implementation, but every raw text/detail cell must use the existing
+  formula-safety helper.
+- Keep closed-only enforcement and oversized-private-failure behavior.
+- Include export audit metadata with the updated column profile, row count, byte count, oversized
+  flag, delivery status, and no raw text payload.
+
+### Test Strategy
+
+Implementation should add or update:
+
+- `tests/test_survey_service.py`: text/detail validation, required free-text enforcement,
+  whitespace rules, response-change allowed/blocked behavior, closed rejection, invalid question
+  type rules.
+- `tests/test_survey_dal.py` or equivalent DAL contract tests: transactional create/submit/update,
+  delete/replacement semantics, details only for selected options, export row mapping, original
+  answer metadata.
+- `tests/test_survey_post_view.py`: builder type controls, details toggle, text modal/detail modal,
+  owner-only private panel, prefill, timeout/stale behavior.
+- `tests/test_survey_export_service.py`: response-detail text/detail columns, formula safety,
+  spreadsheet-safe Discord IDs, oversized audit metadata, closed-only enforcement.
+- Survey presentation/render tests: text/detail leak prevention for PublicLive and
+  HiddenUntilClose.
+- `tests/test_vote_admin_cmds.py` and command registration validation if command option ordering or
+  subcommand wiring changes.
+- Existing vote and survey regression tests, including one-choice, single-question multi-select,
+  choice-only surveys, scheduler close/reminders, and rehydration.
+
+Required validation before runtime PR handoff:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_survey_service.py tests\test_survey_post_view.py tests\test_survey_export_service.py tests\test_voting_scheduler.py tests\test_vote_admin_cmds.py
+```
+
+Run full pytest before production promotion if runtime implementation touches shared survey DAL,
+service, views, scheduler, exports, or command wiring.
+
+### Manual Smoke Plan
+
+1. Create an existing choice-only survey and submit/update a response to confirm Phase 7 regression
+   safety.
+2. Create a survey with at least one free-text question.
+3. Create a survey with a choice question that enables details.
+4. Submit a response with choice selections, free text, and details.
+5. Reopen and confirm selected options, text, and details prefill.
+6. Change text/details when response changes are enabled.
+7. Confirm changes are blocked when response changes are disabled.
+8. Confirm PublicLive never exposes raw text/details publicly.
+9. Confirm HiddenUntilClose hides aggregates while open and still never exposes raw text/details at
+   close.
+10. Close manually and by scheduler.
+11. Export response detail privately and confirm text/details are present, formula-safe, and
+    Discord IDs remain spreadsheet-safe.
+12. Confirm totals export remains aggregate and existing vote exports remain unchanged.
+
+### Future Task-Pack / Deferred Outlines
+
+- Survey Draft/Resume: SQL-backed partial drafts, resume after timeout/restart, cleanup/expiry,
+  privacy approval, and export exclusion for unsubmitted drafts.
+- Survey Optional Questions: allow optional questions after required text/detail behavior is stable;
+  revisit `SurveyQuestions.IsRequired` constraints, validation copy, missing-answer export shape,
+  and public count semantics.
+- Survey Rating/Ranking Questions: separate question types with dedicated validation/storage and
+  no overloading of choice/text tables.
+- Survey Export v2 / Reporting Readiness: cross-survey exports, workbook outputs, private reporting
+  views/procedures, retention/redaction policy, and dashboard/reporting decisions.
+- Emoji/Icon Support: option metadata, Discord button/select rendering, export representation, and
+  generated-card glyph QA.
+
+### Approval And Delivery Status
+
+Approved and delivered first implementation slice:
+
+- Combined first slice: required free-text questions plus per-choice-question optional details.
+- Per-question details rather than per-survey or per-option enablement.
+- Text/detail limits of 500 and 300 characters.
+- Dedicated `SurveyTextAnswers` and `SurveyAnswerDetails` SQL tables.
+- Private/export-only raw text visibility.
+- No persisted partial player drafts.
+- Totals export remains aggregate; response-detail export receives raw text/detail columns.
+
+Remaining outside this slice:
+
+- Production promotion and operator smoke testing.
+- Persisted partial player drafts/resume.
+- Optional survey questions.
+- Rating/ranking questions.
+- Per-option emoji/icon support.
+- Survey Export v2, dashboard, and reporting implementation.

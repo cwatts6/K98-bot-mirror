@@ -15,13 +15,13 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 7 choice-only surveys delivered and smoke tested on 2026-07-03; privacy approval for storing unsubmitted answers; SQL repo validation; restart and cleanup tests.
 
 ### Deferred Optimisation
-- Area: `voting/`, future survey question model, survey exports
+- Area: `voting/`, future survey question model, survey builder, survey exports
 - Type: architecture
-- Description: Free-text, rating, and other non-choice survey question types were intentionally excluded from the delivered Phase 7 choice-only survey slice. Operator follow-up confirmed the second survey slice should add free-text questions and optional choice-question `Add details` text, and that submitted text/detail data must be included in private admin/leadership exports. Free text still increases privacy, moderation, CSV formula-safety, retention, and export risks beyond choice-only aggregate voting.
-- Suggested Fix: Use `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details.md` to audit and design free-text questions, per-choice `Add details` text, storage shape, retention/redaction rules, export columns containing submitted text/detail data, formula-safety handling, private admin/leadership detail access matching current vote results visibility, and public aggregate behavior before any SQL or runtime implementation.
+- Description: Optional survey questions and rating/ranking question types remain intentionally outside Phase 8. They require changes to `SurveyQuestions.IsRequired`, missing-answer validation, response completion semantics, public count/card behavior, private export shape, and SQL constraints. Bundling them with free-text/details would make the first text-bearing survey slice too broad and would risk Phase 7 choice-only regression behavior.
+- Suggested Fix: After the Phase 8 text/detail slice has production evidence, prepare a separate advanced survey question-types audit. Decide optional-answer semantics, rating/ranking storage, validation limits, export columns for missing/rated/ranked answers, PublicLive/HiddenUntilClose aggregate behavior, builder controls, and smoke tests before any implementation.
 - Impact: high
 - Risk: high
-- Dependencies: Phase 7 choice-only survey model delivered and smoke tested on 2026-07-03; operator sequencing confirmation from Phase 7 follow-up; Codex Security review before runtime handoff; SQL schema design for type-specific answers and per-choice detail notes; export regression tests.
+- Dependencies: Phase 8 text/detail direction approved and, preferably, smoke tested; SQL repo validation; privacy/export approval for non-choice answers; regression tests for required choice-only surveys.
 
 ### Deferred Optimisation
 - Area: `voting/export_service.py`, future survey export services, SQL repo survey reporting views/procedures

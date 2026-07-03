@@ -123,6 +123,56 @@ def test_survey_response_detail_rows_include_spreadsheet_safe_discord_id():
     assert "ResponseChanged" in text
 
 
+def test_survey_response_detail_text_and_details_are_formula_safe():
+    now = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
+    rows = (
+        SurveyAnswerAuditRow(
+            survey_id=42,
+            title="Planning",
+            closed_at_utc=now,
+            response_id=9,
+            discord_user_id=123456789012345678,
+            response_created_at_utc=now,
+            response_updated_at_utc=now,
+            question_id=10,
+            question_key="q1",
+            question_prompt="First?",
+            question_type="Text",
+            selected_option_ids=(),
+            selected_option_keys=(),
+            selected_option_labels=(),
+            original_option_ids=(),
+            original_option_keys=(),
+            original_option_labels=(),
+            text_answer="=call me",
+            original_text_answer="+old",
+            selected_option_detail_notes=("@detail",),
+            original_selected_option_detail_notes=("-old detail",),
+        ),
+    )
+
+    csv_rows = survey_response_detail_csv_rows(
+        rows, discord_names_by_user_id={123456789012345678: "Tester"}
+    )
+    assert csv_rows[0]["TextAnswer"] == "=call me"
+    assert csv_rows[0]["TextAnswerChanged"] == 1
+    assert csv_rows[0]["DetailNotesChanged"] == 1
+
+    text = (
+        build_survey_response_detail_csv_bytes(
+            rows,
+            discord_names_by_user_id={123456789012345678: "Tester"},
+        )
+        .getvalue()
+        .decode("utf-8-sig")
+    )
+
+    assert "'=call me" in text
+    assert "'+old" in text
+    assert "'@detail" in text
+    assert "'-old detail" in text
+
+
 @pytest.mark.asyncio
 async def test_survey_response_detail_export_deduplicates_name_resolution(monkeypatch):
     now = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)

@@ -64,6 +64,12 @@ SURVEY_RESPONSE_DETAIL_COLUMNS = (
     "SelectedOptionKeys",
     "SelectedOptionLabels",
     "OriginalOptionIDs",
+    "TextAnswer",
+    "OriginalTextAnswer",
+    "TextAnswerChanged",
+    "SelectedOptionDetailNotes",
+    "OriginalSelectedOptionDetailNotes",
+    "DetailNotesChanged",
     "ResponseCreatedAtUtc",
     "ResponseUpdatedAtUtc",
     "ResponseChanged",
@@ -240,7 +246,15 @@ def survey_response_detail_csv_rows(
 ) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
     for row in rows:
-        response_changed = set(row.original_option_ids) != set(row.selected_option_ids)
+        text_changed = (row.original_text_answer or "") != (row.text_answer or "")
+        details_changed = set(row.original_selected_option_detail_notes) != set(
+            row.selected_option_detail_notes
+        )
+        response_changed = (
+            set(row.original_option_ids) != set(row.selected_option_ids)
+            or text_changed
+            or details_changed
+        )
         output.append(
             {
                 "SurveyID": row.survey_id,
@@ -257,6 +271,14 @@ def survey_response_detail_csv_rows(
                 "SelectedOptionKeys": _join_values(row.selected_option_keys),
                 "SelectedOptionLabels": _join_values(row.selected_option_labels),
                 "OriginalOptionIDs": _join_values(row.original_option_ids),
+                "TextAnswer": row.text_answer or "",
+                "OriginalTextAnswer": row.original_text_answer or "",
+                "TextAnswerChanged": 1 if text_changed else 0,
+                "SelectedOptionDetailNotes": _join_values(row.selected_option_detail_notes),
+                "OriginalSelectedOptionDetailNotes": _join_values(
+                    row.original_selected_option_detail_notes
+                ),
+                "DetailNotesChanged": 1 if details_changed else 0,
                 "ResponseCreatedAtUtc": _dt(row.response_created_at_utc),
                 "ResponseUpdatedAtUtc": _dt(row.response_updated_at_utc),
                 "ResponseChanged": 1 if response_changed else 0,

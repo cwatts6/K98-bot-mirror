@@ -11,6 +11,7 @@ from stats_alerts.db import exec_with_cursor, run_one_async, run_query_async
 from voting.result_visibility import normalize_result_visibility
 from voting.survey_models import (
     SURVEY_QUESTION_SINGLE_CHOICE,
+    SURVEY_QUESTION_TEXT,
     SurveyAnswerAuditRow,
     SurveyCloseResult,
     SurveyCreateRequest,
@@ -18,6 +19,7 @@ from voting.survey_models import (
     SurveyQuestion,
     SurveyQuestionOption,
     SurveyReminder,
+    SurveyResponsePayload,
     SurveySnapshot,
     SurveySubmitResult,
 )
@@ -91,9 +93,14 @@ def _rows_to_questions(
             prompt=str(row.get("Prompt") or ""),
             question_type=str(row.get("QuestionType") or SURVEY_QUESTION_SINGLE_CHOICE),
             sort_order=int(row.get("SortOrder") or 0),
-            min_selections=int(row.get("MinSelections") or 1),
-            max_selections=int(row.get("MaxSelections") or 1),
+            min_selections=(
+                int(row["MinSelections"]) if row.get("MinSelections") not in (None, "") else 1
+            ),
+            max_selections=(
+                int(row["MaxSelections"]) if row.get("MaxSelections") not in (None, "") else 1
+            ),
             options=options_by_question_id.get(int(row["SurveyQuestionID"]), ()),
+            allow_details=_bool(row.get("AllowDetails")),
         )
         for row in question_rows
     )
@@ -203,10 +210,10 @@ async def create_survey(req: SurveyCreateRequest) -> int:
                 INSERT INTO dbo.SurveyQuestions
                     (
                         SurveyID, QuestionKey, Prompt, QuestionType, SortOrder,
-                        IsRequired, MinSelections, MaxSelections, CreatedAtUtc
+                        IsRequired, MinSelections, MaxSelections, AllowDetails, CreatedAtUtc
                     )
                 OUTPUT INSERTED.SurveyQuestionID
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     survey_id,
@@ -217,6 +224,7 @@ async def create_survey(req: SurveyCreateRequest) -> int:
                     1,
                     int(question.min_selections),
                     int(question.max_selections),
+                    1 if question.allow_details else 0,
                     now,
                 ),
             )
@@ -308,7 +316,7 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
     questions = await run_query_async(
         """
         SELECT SurveyQuestionID, SurveyID, QuestionKey, Prompt, QuestionType, SortOrder,
-               IsRequired, MinSelections, MaxSelections
+               IsRequired, MinSelections, MaxSelections, AllowDetails
         FROM dbo.SurveyQuestions
         WHERE SurveyID = ?
         ORDER BY SortOrder ASC, SurveyQuestionID ASC;
@@ -424,11 +432,53 @@ async def get_existing_answer_option_ids(
     return {key: tuple(value) for key, value in grouped.items()}
 
 
+async def get_existing_response_payload(
+    *, survey_id: int, discord_user_id: int
+) -> SurveyResponsePayload:
+    option_ids = await get_existing_answer_option_ids(
+        survey_id=survey_id, discord_user_id=discord_user_id
+    )
+    text_rows = await run_query_async(
+        """
+        SELECT SurveyQuestionID, AnswerText
+        FROM dbo.SurveyTextAnswers
+        WHERE SurveyID = ?
+          AND DiscordUserID = ?
+        ORDER BY SurveyQuestionID ASC;
+        """,
+        (int(survey_id), int(discord_user_id)),
+    )
+    detail_rows = await run_query_async(
+        """
+        SELECT SurveyQuestionID, SurveyOptionID, DetailText
+        FROM dbo.SurveyAnswerDetails
+        WHERE SurveyID = ?
+          AND DiscordUserID = ?
+        ORDER BY SurveyQuestionID ASC, SurveyOptionID ASC;
+        """,
+        (int(survey_id), int(discord_user_id)),
+    )
+    return SurveyResponsePayload(
+        selected_option_ids=option_ids,
+        text_answers={
+            int(row["SurveyQuestionID"]): str(row.get("AnswerText") or "") for row in text_rows
+        },
+        detail_text_by_option={
+            (int(row["SurveyQuestionID"]), int(row["SurveyOptionID"])): str(
+                row.get("DetailText") or ""
+            )
+            for row in detail_rows
+        },
+    )
+
+
 async def submit_survey_response(
     *,
     survey_id: int,
     discord_user_id: int,
     answers_by_question_id: Mapping[int, tuple[int, ...]],
+    text_answers_by_question_id: Mapping[int, str] | None = None,
+    detail_text_by_question_option: Mapping[tuple[int, int], str] | None = None,
     now_utc: datetime,
 ) -> SurveySubmitResult:
     def _callback(cur) -> SurveySubmitResult:
@@ -470,10 +520,22 @@ async def submit_survey_response(
                 message="You have already responded and changes are not enabled for this survey.",
             )
 
-        previous_by_question = _current_answer_ids(cur, int(survey_id), int(discord_user_id))
-        if existing_response_id is not None and previous_by_question == {
-            int(key): tuple(value) for key, value in answers_by_question_id.items()
-        }:
+        previous_payload = _current_response_payload(cur, int(survey_id), int(discord_user_id))
+        incoming_payload = SurveyResponsePayload(
+            selected_option_ids={
+                int(key): tuple(int(item) for item in value)
+                for key, value in answers_by_question_id.items()
+            },
+            text_answers={
+                int(key): str(value)
+                for key, value in (text_answers_by_question_id or {}).items()
+            },
+            detail_text_by_option={
+                (int(key[0]), int(key[1])): str(value)
+                for key, value in (detail_text_by_question_option or {}).items()
+            },
+        )
+        if existing_response_id is not None and previous_payload == incoming_payload:
             return SurveySubmitResult(
                 "unchanged",
                 int(survey_id),
@@ -492,7 +554,7 @@ async def submit_survey_response(
                 (
                     int(survey_id),
                     int(discord_user_id),
-                    json.dumps({str(k): list(v) for k, v in answers_by_question_id.items()}),
+                    json.dumps(_payload_to_json_dict(incoming_payload), ensure_ascii=False),
                     now,
                     now,
                 ),
@@ -518,12 +580,26 @@ async def submit_survey_response(
 
         cur.execute(
             """
+            DELETE FROM dbo.SurveyAnswerDetails
+            WHERE SurveyID = ? AND DiscordUserID = ?;
+            """,
+            (int(survey_id), int(discord_user_id)),
+        )
+        cur.execute(
+            """
+            DELETE FROM dbo.SurveyTextAnswers
+            WHERE SurveyID = ? AND DiscordUserID = ?;
+            """,
+            (int(survey_id), int(discord_user_id)),
+        )
+        cur.execute(
+            """
             DELETE FROM dbo.SurveyAnswers
             WHERE SurveyID = ? AND DiscordUserID = ?;
             """,
             (int(survey_id), int(discord_user_id)),
         )
-        for question_id, option_ids in answers_by_question_id.items():
+        for question_id, option_ids in incoming_payload.selected_option_ids.items():
             for option_id in option_ids:
                 cur.execute(
                     """
@@ -543,6 +619,47 @@ async def submit_survey_response(
                         now,
                     ),
                 )
+        for question_id, text in incoming_payload.text_answers.items():
+            cur.execute(
+                """
+                INSERT INTO dbo.SurveyTextAnswers
+                    (
+                        SurveyID, ResponseID, DiscordUserID, SurveyQuestionID,
+                        AnswerText, CreatedAtUtc, UpdatedAtUtc
+                    )
+                VALUES (?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    int(survey_id),
+                    response_id,
+                    int(discord_user_id),
+                    int(question_id),
+                    text,
+                    now,
+                    now,
+                ),
+            )
+        for (question_id, option_id), text in incoming_payload.detail_text_by_option.items():
+            cur.execute(
+                """
+                INSERT INTO dbo.SurveyAnswerDetails
+                    (
+                        SurveyID, ResponseID, DiscordUserID, SurveyQuestionID,
+                        SurveyOptionID, DetailText, CreatedAtUtc, UpdatedAtUtc
+                    )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    int(survey_id),
+                    response_id,
+                    int(discord_user_id),
+                    int(question_id),
+                    int(option_id),
+                    text,
+                    now,
+                    now,
+                ),
+            )
 
         cur.execute(
             """
@@ -556,10 +673,14 @@ async def submit_survey_response(
                 action,
                 json.dumps(
                     {
-                        "answers": {str(k): list(v) for k, v in answers_by_question_id.items()},
-                        "previous_answers": {
-                            str(k): list(v) for k, v in previous_by_question.items()
-                        },
+                        "choice_question_count": len(incoming_payload.selected_option_ids),
+                        "text_answer_count": len(incoming_payload.text_answers),
+                        "detail_note_count": len(incoming_payload.detail_text_by_option),
+                        "previous_choice_question_count": len(
+                            previous_payload.selected_option_ids
+                        ),
+                        "previous_text_answer_count": len(previous_payload.text_answers),
+                        "previous_detail_note_count": len(previous_payload.detail_text_by_option),
                     },
                     ensure_ascii=False,
                 ),
@@ -575,6 +696,38 @@ async def submit_survey_response(
         return result
     return SurveySubmitResult(
         "error", int(survey_id), message="Survey response could not be recorded."
+    )
+
+
+def _payload_to_json_dict(payload: SurveyResponsePayload) -> dict[str, Any]:
+    return {
+        "choices": {
+            str(question_id): list(option_ids)
+            for question_id, option_ids in payload.selected_option_ids.items()
+        },
+        "text": {
+            str(question_id): text for question_id, text in payload.text_answers.items()
+        },
+        "details": {
+            str(question_id): {
+                str(option_id): text
+                for (detail_question_id, option_id), text in payload.detail_text_by_option.items()
+                if detail_question_id == question_id
+            }
+            for question_id in sorted(
+                {question_id for question_id, _option_id in payload.detail_text_by_option}
+            )
+        },
+    }
+
+
+def _current_response_payload(
+    cur, survey_id: int, discord_user_id: int
+) -> SurveyResponsePayload:
+    return SurveyResponsePayload(
+        selected_option_ids=_current_answer_ids(cur, survey_id, discord_user_id),
+        text_answers=_current_text_answers(cur, survey_id, discord_user_id),
+        detail_text_by_option=_current_detail_text(cur, survey_id, discord_user_id),
     )
 
 
@@ -594,6 +747,32 @@ def _current_answer_ids(cur, survey_id: int, discord_user_id: int) -> dict[int, 
     return {key: tuple(value) for key, value in grouped.items()}
 
 
+def _current_text_answers(cur, survey_id: int, discord_user_id: int) -> dict[int, str]:
+    cur.execute(
+        """
+        SELECT SurveyQuestionID, AnswerText
+        FROM dbo.SurveyTextAnswers WITH (UPDLOCK, HOLDLOCK)
+        WHERE SurveyID = ? AND DiscordUserID = ?
+        ORDER BY SurveyQuestionID ASC;
+        """,
+        (survey_id, discord_user_id),
+    )
+    return {int(row[0]): str(row[1] or "") for row in cur.fetchall()}
+
+
+def _current_detail_text(cur, survey_id: int, discord_user_id: int) -> dict[tuple[int, int], str]:
+    cur.execute(
+        """
+        SELECT SurveyQuestionID, SurveyOptionID, DetailText
+        FROM dbo.SurveyAnswerDetails WITH (UPDLOCK, HOLDLOCK)
+        WHERE SurveyID = ? AND DiscordUserID = ?
+        ORDER BY SurveyQuestionID ASC, SurveyOptionID ASC;
+        """,
+        (survey_id, discord_user_id),
+    )
+    return {(int(row[0]), int(row[1])): str(row[2] or "") for row in cur.fetchall()}
+
+
 def _submit_survey_response_sync(callback) -> Any:
     return exec_with_cursor(callback)
 
@@ -605,7 +784,8 @@ async def list_answer_audit_rows(survey_id: int) -> tuple[SurveyAnswerAuditRow, 
                r.OriginalAnswersJson, r.CreatedAtUtc AS ResponseCreatedAtUtc,
                r.UpdatedAtUtc AS ResponseUpdatedAtUtc,
                q.SurveyQuestionID, q.QuestionKey, q.Prompt, q.QuestionType,
-               o.SurveyOptionID, o.OptionKey, o.Label
+               o.SurveyOptionID, o.OptionKey, o.Label,
+               t.AnswerText, d.DetailText
         FROM dbo.SurveyResponses r
         JOIN dbo.SurveyPosts p ON p.SurveyID = r.SurveyID
         JOIN dbo.SurveyQuestions q ON q.SurveyID = r.SurveyID
@@ -614,6 +794,15 @@ async def list_answer_audit_rows(survey_id: int) -> tuple[SurveyAnswerAuditRow, 
          AND a.DiscordUserID = r.DiscordUserID
          AND a.SurveyQuestionID = q.SurveyQuestionID
         LEFT JOIN dbo.SurveyQuestionOptions o ON o.SurveyOptionID = a.SurveyOptionID
+        LEFT JOIN dbo.SurveyTextAnswers t
+          ON t.SurveyID = r.SurveyID
+         AND t.DiscordUserID = r.DiscordUserID
+         AND t.SurveyQuestionID = q.SurveyQuestionID
+        LEFT JOIN dbo.SurveyAnswerDetails d
+          ON d.SurveyID = a.SurveyID
+         AND d.DiscordUserID = a.DiscordUserID
+         AND d.SurveyQuestionID = a.SurveyQuestionID
+         AND d.SurveyOptionID = a.SurveyOptionID
         WHERE r.SurveyID = ?
         ORDER BY r.DiscordUserID ASC, q.SortOrder ASC, o.SortOrder ASC;
         """,
@@ -633,6 +822,7 @@ def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswe
                 "selected_ids": [],
                 "selected_keys": [],
                 "selected_labels": [],
+                "detail_notes": [],
             },
         )
         if row.get("SurveyOptionID") in (None, ""):
@@ -640,6 +830,8 @@ def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswe
         current["selected_ids"].append(int(row["SurveyOptionID"]))
         current["selected_keys"].append(str(row.get("OptionKey") or ""))
         current["selected_labels"].append(str(row.get("Label") or ""))
+        if row.get("DetailText") not in (None, ""):
+            current["detail_notes"].append(str(row.get("DetailText") or ""))
 
     output: list[SurveyAnswerAuditRow] = []
     for (_response_id, question_id), item in grouped.items():
@@ -670,19 +862,29 @@ def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswe
                 original_option_ids=original_ids,
                 original_option_keys=(),
                 original_option_labels=(),
+                text_answer=(
+                    str(row.get("AnswerText")) if row.get("AnswerText") not in (None, "") else None
+                ),
+                original_text_answer=_original_text_for_question(
+                    row.get("OriginalAnswersJson"), question_id
+                ),
+                selected_option_detail_notes=tuple(item["detail_notes"]),
+                original_selected_option_detail_notes=_original_detail_notes_for_question(
+                    row.get("OriginalAnswersJson"), question_id
+                ),
             )
         )
     return tuple(output)
 
 
 def _original_option_ids_for_question(value: Any, question_id: int) -> tuple[int, ...]:
-    if value in (None, ""):
-        return ()
-    try:
-        parsed = json.loads(str(value))
-    except (TypeError, ValueError):
-        return ()
-    raw_ids = parsed.get(str(question_id)) if isinstance(parsed, dict) else None
+    parsed = _parse_original_answers_json(value)
+    if isinstance(parsed, dict) and "choices" in parsed:
+        raw_ids = parsed.get("choices", {}).get(str(question_id))
+    elif isinstance(parsed, dict):
+        raw_ids = parsed.get(str(question_id))
+    else:
+        raw_ids = None
     if not isinstance(raw_ids, list):
         return ()
     output: list[int] = []
@@ -692,6 +894,34 @@ def _original_option_ids_for_question(value: Any, question_id: int) -> tuple[int
         except (TypeError, ValueError):
             continue
     return tuple(output)
+
+
+def _original_text_for_question(value: Any, question_id: int) -> str | None:
+    parsed = _parse_original_answers_json(value)
+    if not isinstance(parsed, dict):
+        return None
+    raw = parsed.get("text", {}).get(str(question_id))
+    text = str(raw or "").strip()
+    return text or None
+
+
+def _original_detail_notes_for_question(value: Any, question_id: int) -> tuple[str, ...]:
+    parsed = _parse_original_answers_json(value)
+    if not isinstance(parsed, dict):
+        return ()
+    raw = parsed.get("details", {}).get(str(question_id))
+    if not isinstance(raw, dict):
+        return ()
+    return tuple(str(text).strip() for text in raw.values() if str(text or "").strip())
+
+
+def _parse_original_answers_json(value: Any) -> Any:
+    if value in (None, ""):
+        return None
+    try:
+        return json.loads(str(value))
+    except (TypeError, ValueError):
+        return None
 
 
 async def claim_due_reminders(now_utc: datetime, *, limit: int = 10) -> list[dict[str, Any]]:
