@@ -253,6 +253,13 @@ def validate_response_payload(
     text_output: dict[int, str] = {}
     detail_output: dict[tuple[int, int], str] = {}
     questions_by_id = {question.question_id: question for question in snapshot.questions}
+    for raw_question_id in choice_answers:
+        try:
+            question_id = int(raw_question_id)
+        except (TypeError, ValueError):
+            raise VoteValidationError("One or more selected answers are not valid.") from None
+        if question_id not in questions_by_id:
+            raise VoteValidationError("One or more selected answers are not valid.")
     for question in snapshot.questions:
         if question.question_type == SURVEY_QUESTION_TEXT:
             if choice_answers.get(question.question_id):

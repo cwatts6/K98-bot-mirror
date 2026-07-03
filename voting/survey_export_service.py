@@ -247,7 +247,7 @@ def survey_response_detail_csv_rows(
     output: list[dict[str, Any]] = []
     for row in rows:
         text_changed = (row.original_text_answer or "") != (row.text_answer or "")
-        details_changed = set(row.original_selected_option_detail_notes) != set(
+        details_changed = sorted(row.original_selected_option_detail_notes) != sorted(
             row.selected_option_detail_notes
         )
         response_changed = (

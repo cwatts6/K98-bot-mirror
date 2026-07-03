@@ -800,6 +800,7 @@ async def list_answer_audit_rows(survey_id: int) -> tuple[SurveyAnswerAuditRow, 
          AND t.SurveyQuestionID = q.SurveyQuestionID
         LEFT JOIN dbo.SurveyAnswerDetails d
           ON d.SurveyID = a.SurveyID
+         AND d.ResponseID = a.ResponseID
          AND d.DiscordUserID = a.DiscordUserID
          AND d.SurveyQuestionID = a.SurveyQuestionID
          AND d.SurveyOptionID = a.SurveyOptionID
@@ -822,16 +823,17 @@ def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswe
                 "selected_ids": [],
                 "selected_keys": [],
                 "selected_labels": [],
-                "detail_notes": [],
+                "detail_by_option": {},
             },
         )
         if row.get("SurveyOptionID") in (None, ""):
             continue
-        current["selected_ids"].append(int(row["SurveyOptionID"]))
+        option_id = int(row["SurveyOptionID"])
+        current["selected_ids"].append(option_id)
         current["selected_keys"].append(str(row.get("OptionKey") or ""))
         current["selected_labels"].append(str(row.get("Label") or ""))
         if row.get("DetailText") not in (None, ""):
-            current["detail_notes"].append(str(row.get("DetailText") or ""))
+            current["detail_by_option"][option_id] = str(row.get("DetailText") or "")
 
     output: list[SurveyAnswerAuditRow] = []
     for (_response_id, question_id), item in grouped.items():
@@ -839,6 +841,11 @@ def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswe
         original_ids = _original_option_ids_for_question(
             row.get("OriginalAnswersJson"), question_id
         )
+        original_details = _original_detail_by_option_for_question(
+            row.get("OriginalAnswersJson"), question_id
+        )
+        current_details = item["detail_by_option"]
+        include_empty_details = bool(current_details or original_details)
         created_at = _aware_utc(row.get("ResponseCreatedAtUtc"))
         updated_at = _aware_utc(row.get("ResponseUpdatedAtUtc"))
         if created_at is None or updated_at is None:
@@ -868,9 +875,15 @@ def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswe
                 original_text_answer=_original_text_for_question(
                     row.get("OriginalAnswersJson"), question_id
                 ),
-                selected_option_detail_notes=tuple(item["detail_notes"]),
-                original_selected_option_detail_notes=_original_detail_notes_for_question(
-                    row.get("OriginalAnswersJson"), question_id
+                selected_option_detail_notes=_format_detail_notes(
+                    item["selected_ids"],
+                    current_details,
+                    include_empty=include_empty_details,
+                ),
+                original_selected_option_detail_notes=_format_detail_notes(
+                    original_ids,
+                    original_details,
+                    include_empty=include_empty_details,
                 ),
             )
         )
@@ -905,14 +918,38 @@ def _original_text_for_question(value: Any, question_id: int) -> str | None:
     return text or None
 
 
-def _original_detail_notes_for_question(value: Any, question_id: int) -> tuple[str, ...]:
+def _original_detail_by_option_for_question(value: Any, question_id: int) -> dict[int, str]:
     parsed = _parse_original_answers_json(value)
     if not isinstance(parsed, dict):
-        return ()
+        return {}
     raw = parsed.get("details", {}).get(str(question_id))
     if not isinstance(raw, dict):
+        return {}
+    output: dict[int, str] = {}
+    for option_id, text in raw.items():
+        clean_text = str(text or "").strip()
+        if not clean_text:
+            continue
+        try:
+            output[int(option_id)] = clean_text
+        except (TypeError, ValueError):
+            continue
+    return output
+
+
+def _format_detail_notes(
+    option_ids: Sequence[int],
+    detail_by_option: Mapping[int, str],
+    *,
+    include_empty: bool,
+) -> tuple[str, ...]:
+    if not include_empty:
         return ()
-    return tuple(str(text).strip() for text in raw.values() if str(text or "").strip())
+    output: list[str] = []
+    for option_id in option_ids:
+        note = str(detail_by_option.get(int(option_id), "") or "").strip()
+        output.append(f"{int(option_id)}:{note}")
+    return tuple(output)
 
 
 def _parse_original_answers_json(value: Any) -> Any:

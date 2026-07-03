@@ -224,6 +224,8 @@ def test_validate_answers_requires_every_question_and_valid_options():
         survey_service.validate_answers(snapshot, {10: (101,)})
     with pytest.raises(VoteValidationError, match="not valid"):
         survey_service.validate_answers(snapshot, {10: (999,), 11: (201,)})
+    with pytest.raises(VoteValidationError, match="not valid"):
+        survey_service.validate_answers(snapshot, {10: (101,), 11: (201,), 999: (1,)})
 
 
 def test_validate_response_payload_accepts_required_text_and_selected_details():
