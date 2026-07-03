@@ -276,12 +276,7 @@ def validate_response_payload(
                 text_output[question.question_id] = clean_text
             continue
         selected_ids = tuple(
-            sorted(
-                {
-                    int(option_id)
-                    for option_id in choice_answers.get(question.question_id, ())
-                }
-            )
+            sorted({int(option_id) for option_id in choice_answers.get(question.question_id, ())})
         )
         if len(selected_ids) < question.min_selections:
             raise VoteValidationError(

@@ -122,7 +122,10 @@ class _SurveyQuestionSelect(discord.ui.Select):
         self.parent_view.answers[self.parent_view.current_question.question_id] = values
         for key in tuple(self.parent_view.detail_text_by_option):
             question_id, option_id = key
-            if question_id == self.parent_view.current_question.question_id and option_id not in values:
+            if (
+                question_id == self.parent_view.current_question.question_id
+                and option_id not in values
+            ):
                 self.parent_view.detail_text_by_option.pop(key, None)
         await self.parent_view.refresh(interaction)
 
@@ -307,11 +310,7 @@ class SurveyResponsePanel(discord.ui.View):
             for (question_id, _option_id), text in self.detail_text_by_option.items()
             if question_id == question.question_id and text.strip()
         )
-        detail_line = (
-            f"\nDetails: {detail_count} saved."
-            if question.allow_details
-            else ""
-        )
+        detail_line = f"\nDetails: {detail_count} saved." if question.allow_details else ""
         return (
             f"Survey #{self.survey_id}: question {question.sort_order} of {len(self.snapshot.questions)}\n"
             f"{question.prompt}\n"
@@ -533,11 +532,7 @@ class SurveyBuilderView(discord.ui.View):
     def build_draft_question(self) -> SurveyQuestionCreateRequest:
         question = survey_service.build_question_request(
             prompt=self.draft_prompt,
-            question_type=(
-                SURVEY_QUESTION_TEXT
-                if self.draft_is_text
-                else None
-            ),
+            question_type=(SURVEY_QUESTION_TEXT if self.draft_is_text else None),
             options=() if self.draft_is_text else tuple(self.draft_options),
             min_selections=0 if self.draft_is_text else self.draft_min_selections,
             max_selections=0 if self.draft_is_text else self.draft_max_selections,

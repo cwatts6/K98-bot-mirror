@@ -11,7 +11,6 @@ from stats_alerts.db import exec_with_cursor, run_one_async, run_query_async
 from voting.result_visibility import normalize_result_visibility
 from voting.survey_models import (
     SURVEY_QUESTION_SINGLE_CHOICE,
-    SURVEY_QUESTION_TEXT,
     SurveyAnswerAuditRow,
     SurveyCloseResult,
     SurveyCreateRequest,
@@ -527,8 +526,7 @@ async def submit_survey_response(
                 for key, value in answers_by_question_id.items()
             },
             text_answers={
-                int(key): str(value)
-                for key, value in (text_answers_by_question_id or {}).items()
+                int(key): str(value) for key, value in (text_answers_by_question_id or {}).items()
             },
             detail_text_by_option={
                 (int(key[0]), int(key[1])): str(value)
@@ -676,9 +674,7 @@ async def submit_survey_response(
                         "choice_question_count": len(incoming_payload.selected_option_ids),
                         "text_answer_count": len(incoming_payload.text_answers),
                         "detail_note_count": len(incoming_payload.detail_text_by_option),
-                        "previous_choice_question_count": len(
-                            previous_payload.selected_option_ids
-                        ),
+                        "previous_choice_question_count": len(previous_payload.selected_option_ids),
                         "previous_text_answer_count": len(previous_payload.text_answers),
                         "previous_detail_note_count": len(previous_payload.detail_text_by_option),
                     },
@@ -705,9 +701,7 @@ def _payload_to_json_dict(payload: SurveyResponsePayload) -> dict[str, Any]:
             str(question_id): list(option_ids)
             for question_id, option_ids in payload.selected_option_ids.items()
         },
-        "text": {
-            str(question_id): text for question_id, text in payload.text_answers.items()
-        },
+        "text": {str(question_id): text for question_id, text in payload.text_answers.items()},
         "details": {
             str(question_id): {
                 str(option_id): text
@@ -721,9 +715,7 @@ def _payload_to_json_dict(payload: SurveyResponsePayload) -> dict[str, Any]:
     }
 
 
-def _current_response_payload(
-    cur, survey_id: int, discord_user_id: int
-) -> SurveyResponsePayload:
+def _current_response_payload(cur, survey_id: int, discord_user_id: int) -> SurveyResponsePayload:
     return SurveyResponsePayload(
         selected_option_ids=_current_answer_ids(cur, survey_id, discord_user_id),
         text_answers=_current_text_answers(cur, survey_id, discord_user_id),
