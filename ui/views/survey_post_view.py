@@ -23,6 +23,8 @@ from voting.survey_presentation import (
 
 logger = logging.getLogger(__name__)
 
+SURVEY_INCOMPLETE_HELP = "You must answer all questions to submit response to the survey."
+
 SurveyPublishCallback = Callable[
     [discord.Interaction, tuple[SurveyQuestionCreateRequest, ...]], Awaitable[bool]
 ]
@@ -132,10 +134,8 @@ class _SurveyQuestionSelect(discord.ui.Select):
 
 class _SurveyTextAnswerButton(discord.ui.Button):
     def __init__(self, parent_view: SurveyResponsePanel) -> None:
-        question = parent_view.current_question
-        saved = bool(parent_view.text_answers.get(question.question_id, "").strip())
         super().__init__(
-            label="Edit text" if saved else "Answer text",
+            label="Response (required)",
             style=discord.ButtonStyle.primary,
         )
         self.parent_view = parent_view
@@ -236,12 +236,19 @@ class _SurveyNavButton(discord.ui.Button):
 
 class _SurveySubmitButton(discord.ui.Button):
     def __init__(self, parent_view: SurveyResponsePanel) -> None:
-        super().__init__(label="Submit", style=discord.ButtonStyle.success)
+        super().__init__(
+            label="Submit",
+            style=discord.ButtonStyle.success,
+            disabled=not parent_view.is_complete(),
+        )
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction) -> None:
         if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
             await send_ephemeral(interaction, "This survey panel belongs to another player.")
+            return
+        if not self.parent_view.is_complete():
+            await send_ephemeral(interaction, SURVEY_INCOMPLETE_HELP)
             return
         try:
             if not interaction.response.is_done():
@@ -313,6 +320,18 @@ class SurveyResponsePanel(discord.ui.View):
     def current_question(self):
         return self.snapshot.questions[self.current_index]
 
+    def is_complete(self) -> bool:
+        try:
+            survey_service.validate_response_payload(
+                self.snapshot,
+                answers_by_question_id=self.answers,
+                text_answers_by_question_id=self.text_answers,
+                detail_text_by_question_option=self.detail_text_by_option,
+            )
+        except survey_service.VoteValidationError:
+            return False
+        return True
+
     def _rebuild(self) -> None:
         self.clear_items()
         if self.current_question.question_type == SURVEY_QUESTION_TEXT:
@@ -327,12 +346,14 @@ class SurveyResponsePanel(discord.ui.View):
 
     def content(self) -> str:
         question = self.current_question
+        incomplete_line = f"\n{SURVEY_INCOMPLETE_HELP}" if not self.is_complete() else ""
         if question.question_type == SURVEY_QUESTION_TEXT:
             saved = bool(self.text_answers.get(question.question_id, "").strip())
             return (
                 f"Survey #{self.survey_id}: question {question.sort_order} of {len(self.snapshot.questions)}\n"
                 f"{question.prompt}\n"
-                f"Required text: {'answer saved' if saved else 'answer not saved'}."
+                f"Please provide a response: {'complete' if saved else 'not yet complete'}"
+                f"{incomplete_line}"
             )
         question_type = (
             "multi-select"
@@ -350,6 +371,7 @@ class SurveyResponsePanel(discord.ui.View):
             f"{question.prompt}\n"
             f"Required {question_type}: choose {question.min_selections}-{question.max_selections}."
             f"{detail_line}"
+            f"{incomplete_line}"
         )
 
     async def refresh(self, interaction: discord.Interaction) -> None:
@@ -372,9 +394,13 @@ class _SurveyTextAnswerModal(discord.ui.Modal):
         self.parent_view = parent_view
         question = parent_view.current_question
         self.answer = discord.ui.InputText(
-            label=f"Question {question.sort_order}",
+            label=f"Response (max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters)",
             style=discord.InputTextStyle.long,
             max_length=survey_service.MAX_SURVEY_TEXT_ANSWER_LEN,
+            placeholder=(
+                "Required response. "
+                f"Max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters."
+            ),
             value=parent_view.text_answers.get(question.question_id, ""),
         )
         self.add_item(self.answer)

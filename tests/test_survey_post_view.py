@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from ui.views.survey_post_view import (
+    SURVEY_INCOMPLETE_HELP,
     SurveyBuilderView,
     SurveyPostView,
     SurveyResponsePanel,
@@ -219,6 +220,48 @@ async def test_survey_submit_defers_before_persisting(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_survey_submit_requires_all_questions_before_enabled(monkeypatch):
+    snapshot = _snapshot()
+    panel = SurveyResponsePanel(
+        snapshot,
+        owner_user_id=123,
+        selected_option_ids={10: (101,)},
+    )
+    submit = panel.children[-1]
+    captured: dict[str, object] = {}
+
+    async def fake_submit_survey_response(**_kwargs):
+        captured["submit_called"] = True
+        return SimpleNamespace(accepted=True, message="Survey response recorded."), snapshot
+
+    async def fake_send_ephemeral(_interaction, content, **kwargs):
+        captured["content"] = content
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.submit_survey_response",
+        fake_submit_survey_response,
+    )
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    assert submit.disabled is True
+    assert SURVEY_INCOMPLETE_HELP in panel.content()
+
+    await submit.callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    assert captured["content"] == SURVEY_INCOMPLETE_HELP
+    assert "submit_called" not in captured
+
+    panel.answers[11] = (201,)
+    panel._rebuild()
+
+    assert not panel.children[-1].disabled
+    assert SURVEY_INCOMPLETE_HELP not in panel.content()
+
+
+@pytest.mark.asyncio
 async def test_survey_text_and_detail_modals_update_private_panel_state():
     now = datetime.now(UTC)
     snapshot = SurveySnapshot(
@@ -272,6 +315,9 @@ async def test_survey_text_and_detail_modals_update_private_panel_state():
         ),
     )
     panel = SurveyResponsePanel(snapshot, owner_user_id=123, selected_option_ids={10: (101,)})
+    assert panel.children[-1].disabled is True
+    assert SURVEY_INCOMPLETE_HELP in panel.content()
+
     detail_select = next(
         child for child in panel.children if isinstance(child, _SurveyDetailOptionSelect)
     )
@@ -292,13 +338,28 @@ async def test_survey_text_and_detail_modals_update_private_panel_state():
 
     panel.current_index = 1
     panel._rebuild()
+
+    assert panel.children[0].label == "Response (required)"
+    assert panel.children[-1].disabled is True
+    assert "Please provide a response: not yet complete" in panel.content()
+    assert SURVEY_INCOMPLETE_HELP in panel.content()
+
     text_modal = _SurveyTextAnswerModal(panel)
+    assert text_modal.answer.label == (
+        f"Response (max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters)"
+    )
+    assert text_modal.answer.placeholder == (
+        "Required response. "
+        f"Max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters."
+    )
     text_modal.answer.value = " I can lead "
     await text_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
 
     assert panel.detail_text_by_option == {(10, 101): "Preferred because reset is easier"}
     assert panel.text_answers == {11: "I can lead"}
-    assert "answer saved" in panel.content()
+    assert "Please provide a response: complete" in panel.content()
+    assert SURVEY_INCOMPLETE_HELP not in panel.content()
+    assert not panel.children[-1].disabled
 
 
 @pytest.mark.asyncio
