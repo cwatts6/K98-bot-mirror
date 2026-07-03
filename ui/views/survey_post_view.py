@@ -152,15 +152,37 @@ class _SurveyDetailOptionSelect(discord.ui.Select):
         self.parent_view = parent_view
         question = parent_view.current_question
         selected_option_ids = set(parent_view.answers.get(question.question_id, ()))
-        options = [
-            discord.SelectOption(
-                label=option.label[:100],
-                value=str(option.option_id),
-                default=False,
-            )
-            for option in question.options
-            if option.option_id in selected_option_ids
+        selected_options = [
+            option for option in question.options if option.option_id in selected_option_ids
         ][:25]
+        has_multiple_selected_options = len(selected_options) > 1
+        options = []
+        for index, option in enumerate(selected_options, start=1):
+            has_detail = bool(
+                parent_view.detail_text_by_option.get(
+                    (question.question_id, option.option_id), ""
+                ).strip()
+            )
+            if has_multiple_selected_options:
+                action_label = (
+                    f"Edit details for selected choice {index}"
+                    if has_detail
+                    else f"Add details for selected choice {index}"
+                )
+            else:
+                action_label = (
+                    "Click here to edit details"
+                    if has_detail
+                    else "Click here to add more details"
+                )
+            options.append(
+                discord.SelectOption(
+                    label=action_label[:100],
+                    value=str(option.option_id),
+                    description="Optional note for this choice",
+                    default=False,
+                )
+            )
         if not options:
             options = [discord.SelectOption(label="Select an option first", value="none")]
         super().__init__(
@@ -251,7 +273,19 @@ class _SurveySubmitButton(discord.ui.Button):
             )
             return
         await _refresh_public_survey_message(interaction, snapshot)
-        await send_ephemeral(interaction, result.message or "Survey response recorded.")
+        message = result.message or "Survey response recorded."
+        self.parent_view.stop()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.edit_message(content=message, view=None)
+                return
+        except Exception:
+            logger.debug("survey_submit_ack_response_edit_failed", exc_info=True)
+        try:
+            await interaction.edit_original_response(content=message, view=None)
+        except Exception:
+            logger.debug("survey_submit_ack_edit_failed", exc_info=True)
+            await send_ephemeral(interaction, message)
 
 
 class SurveyResponsePanel(discord.ui.View):
@@ -364,19 +398,15 @@ class _SurveyDetailModal(discord.ui.Modal):
         self.parent_view = parent_view
         self.option_id = int(option_id)
         question = parent_view.current_question
-        option_label = next(
-            (
-                option.label
-                for option in question.options
-                if int(option.option_id) == int(option_id)
-            ),
-            "Selected option",
-        )
         self.detail = discord.ui.InputText(
-            label=option_label[:45],
+            label=f"Add more details (max {survey_service.MAX_SURVEY_DETAIL_LEN})",
             style=discord.InputTextStyle.long,
             required=False,
             max_length=survey_service.MAX_SURVEY_DETAIL_LEN,
+            placeholder=(
+                "Optional context for this choice. "
+                f"Max {survey_service.MAX_SURVEY_DETAIL_LEN} characters."
+            ),
             value=parent_view.detail_text_by_option.get((question.question_id, self.option_id), ""),
         )
         self.add_item(self.detail)

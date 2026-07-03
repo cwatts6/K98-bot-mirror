@@ -10,6 +10,7 @@ from ui.views.survey_post_view import (
     SurveyPostView,
     SurveyResponsePanel,
     _SurveyDetailModal,
+    _SurveyDetailOptionSelect,
     _SurveyOptionModal,
     _SurveyQuestionPromptModal,
     _SurveyTextAnswerModal,
@@ -187,6 +188,9 @@ async def test_survey_submit_defers_before_persisting(monkeypatch):
         captured["content"] = content
         captured.update(kwargs)
 
+    async def fake_edit_original_response(**kwargs):
+        captured["edited_original"] = kwargs
+
     monkeypatch.setattr(
         "ui.views.survey_post_view.survey_service.submit_survey_response",
         fake_submit_survey_response,
@@ -201,13 +205,17 @@ async def test_survey_submit_defers_before_persisting(monkeypatch):
         response=_Response(),
         user=SimpleNamespace(id=123),
         message=SimpleNamespace(id=456),
+        edit_original_response=fake_edit_original_response,
     )
 
     await submit.callback(interaction)
 
     assert captured["deferred_before_submit"] is True
     assert captured["refresh"] is True
-    assert captured["content"] == "Survey response recorded."
+    assert captured["edited_original"] == {
+        "content": "Survey response recorded.",
+        "view": None,
+    }
 
 
 @pytest.mark.asyncio
@@ -264,7 +272,21 @@ async def test_survey_text_and_detail_modals_update_private_panel_state():
         ),
     )
     panel = SurveyResponsePanel(snapshot, owner_user_id=123, selected_option_ids={10: (101,)})
+    detail_select = next(
+        child for child in panel.children if isinstance(child, _SurveyDetailOptionSelect)
+    )
+
+    assert detail_select.options[0].label == "Click here to add more details"
+    assert detail_select.options[0].description == "Optional note for this choice"
+
     detail_modal = _SurveyDetailModal(panel, 101)
+    assert detail_modal.detail.label == (
+        f"Add more details (max {survey_service.MAX_SURVEY_DETAIL_LEN})"
+    )
+    assert detail_modal.detail.placeholder == (
+        "Optional context for this choice. "
+        f"Max {survey_service.MAX_SURVEY_DETAIL_LEN} characters."
+    )
     detail_modal.detail.value = " Preferred because reset is easier "
     await detail_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
 
