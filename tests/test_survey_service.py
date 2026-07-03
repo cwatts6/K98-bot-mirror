@@ -299,6 +299,13 @@ def test_validate_response_payload_accepts_required_text_and_selected_details():
             text_answers_by_question_id={11: " "},
         )
 
+    with pytest.raises(VoteValidationError, match="text answers"):
+        survey_service.validate_response_payload(
+            snapshot,
+            answers_by_question_id={10: (101,)},
+            text_answers_by_question_id={"not-a-question": "ok"},
+        )
+
     with pytest.raises(VoteValidationError, match="selected options"):
         survey_service.validate_response_payload(
             snapshot,

@@ -260,6 +260,13 @@ def validate_response_payload(
             raise VoteValidationError("One or more selected answers are not valid.") from None
         if question_id not in questions_by_id:
             raise VoteValidationError("One or more selected answers are not valid.")
+    for raw_question_id in text_answers:
+        try:
+            question_id = int(raw_question_id)
+        except (TypeError, ValueError):
+            raise VoteValidationError("One or more text answers are not valid.") from None
+        if question_id not in questions_by_id:
+            raise VoteValidationError("One or more text answers are not valid.")
     for question in snapshot.questions:
         if question.question_type == SURVEY_QUESTION_TEXT:
             if choice_answers.get(question.question_id):
@@ -294,14 +301,15 @@ def validate_response_payload(
         selected_output[question.question_id] = selected_ids
 
     for question_id, text in text_answers.items():
-        question = questions_by_id.get(int(question_id))
+        normalized_question_id = int(question_id)
+        question = questions_by_id.get(normalized_question_id)
         if question is None:
             raise VoteValidationError("One or more text answers are not valid.")
         if question.question_type != SURVEY_QUESTION_TEXT:
             raise VoteValidationError(
                 f"Answer question {question.sort_order}: this question does not accept text."
             )
-        if int(question_id) not in text_output:
+        if normalized_question_id not in text_output:
             clean_text = _clean_limited_text(
                 text,
                 limit=MAX_SURVEY_TEXT_ANSWER_LEN,
@@ -309,7 +317,7 @@ def validate_response_payload(
                 required=True,
             )
             if clean_text is not None:
-                text_output[int(question_id)] = clean_text
+                text_output[normalized_question_id] = clean_text
 
     for raw_key, text in detail_answers.items():
         try:
