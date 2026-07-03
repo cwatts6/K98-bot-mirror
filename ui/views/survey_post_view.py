@@ -355,7 +355,7 @@ class SurveyBuilderView(discord.ui.View):
         lines.extend(
             (
                 "",
-                f"Draft prompt: {prompt} "
+                f"Draft question: {prompt} "
                 f"({len(self.draft_prompt.strip())}/{survey_service.MAX_SURVEY_QUESTION_PROMPT_LEN})",
                 f"Draft options: {len(self.draft_options)}/{survey_service.MAX_SURVEY_OPTIONS}",
             )
@@ -383,7 +383,7 @@ def _builder_disabled(parent_view: SurveyBuilderView) -> bool:
 class _BuilderPromptButton(discord.ui.Button):
     def __init__(self, parent_view: SurveyBuilderView) -> None:
         super().__init__(
-            label="Prompt",
+            label="Draft question",
             style=discord.ButtonStyle.primary,
             disabled=_builder_disabled(parent_view),
             row=0,
@@ -494,9 +494,10 @@ class _BuilderSelectionSelect(discord.ui.Select):
             parent_view.draft_min_selections if kind == "min" else parent_view.draft_max_selections
         )
         label = "Minimum selections" if kind == "min" else "Maximum selections"
+        option_label = "Minimum" if kind == "min" else "Maximum"
         options = [
             discord.SelectOption(
-                label=str(value),
+                label=f"{option_label}: {value}",
                 value=str(value),
                 default=value == current,
             )
@@ -590,7 +591,11 @@ class _SurveyQuestionPromptModal(discord.ui.Modal):
         super().__init__(title="Survey question prompt")
         self.parent_view = parent_view
         self.prompt = discord.ui.InputText(
-            label="Question",
+            label="Draft question",
+            placeholder=(
+                f"Max {survey_service.MAX_SURVEY_QUESTION_PROMPT_LEN} characters; "
+                "Discord stops typing at the limit."
+            ),
             max_length=survey_service.MAX_SURVEY_QUESTION_PROMPT_LEN,
             value=parent_view.draft_prompt,
         )
@@ -619,6 +624,10 @@ class _SurveyOptionModal(discord.ui.Modal):
         self.parent_view = parent_view
         self.option = discord.ui.InputText(
             label=f"Option {len(parent_view.draft_options) + 1}",
+            placeholder=(
+                f"Max {survey_service.MAX_OPTION_LABEL_LEN} characters; "
+                "Discord stops typing at the limit."
+            ),
             max_length=survey_service.MAX_OPTION_LABEL_LEN,
         )
         self.add_item(self.option)

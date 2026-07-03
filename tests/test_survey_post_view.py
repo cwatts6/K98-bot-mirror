@@ -12,6 +12,7 @@ from ui.views.survey_post_view import (
     _SurveyOptionModal,
     _SurveyQuestionPromptModal,
 )
+from voting import survey_service
 from voting.survey_models import (
     SurveyQuestion,
     SurveyQuestionCreateRequest,
@@ -94,6 +95,12 @@ class _Response:
 
 def _button(view: SurveyBuilderView, label: str):
     return next(child for child in view.children if getattr(child, "label", None) == label)
+
+
+def _select(view: SurveyBuilderView, placeholder: str):
+    return next(
+        child for child in view.children if getattr(child, "placeholder", None) == placeholder
+    )
 
 
 @pytest.mark.asyncio
@@ -266,16 +273,26 @@ async def test_survey_guided_builder_saves_multi_select_from_max_selection(monke
 
     view = SurveyBuilderView(owner_user_id=123, publish_callback=fake_publish)
     prompt_modal = _SurveyQuestionPromptModal(view)
+    assert prompt_modal.prompt.label == "Draft question"
+    assert (
+        f"Max {survey_service.MAX_SURVEY_QUESTION_PROMPT_LEN} characters"
+        in prompt_modal.prompt.placeholder
+    )
     prompt_modal.prompt.value = "Which nights work?"
     prompt_interaction = SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
 
     await prompt_modal.callback(prompt_interaction)
 
     assert (
-        "Draft prompt: Which nights work? (18/180)" in prompt_interaction.response.edited["content"]
+        "Draft question: Which nights work? (18/180)"
+        in prompt_interaction.response.edited["content"]
     )
+    assert _button(view, "Draft question").label == "Draft question"
 
     first_option = _SurveyOptionModal(view)
+    assert (
+        f"Max {survey_service.MAX_OPTION_LABEL_LEN} characters" in first_option.option.placeholder
+    )
     first_option.option.value = "Friday"
     await first_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
     second_option = _SurveyOptionModal(view)
@@ -290,6 +307,19 @@ async def test_survey_guided_builder_saves_multi_select_from_max_selection(monke
     view.draft_max_selections = 2
     view._sync_selection_bounds()
     view._rebuild()
+
+    minimum_select = _select(view, "Minimum selections")
+    maximum_select = _select(view, "Maximum selections")
+    assert [option.label for option in minimum_select.options] == [
+        "Minimum: 1",
+        "Minimum: 2",
+        "Minimum: 3",
+    ]
+    assert [option.label for option in maximum_select.options] == [
+        "Maximum: 1",
+        "Maximum: 2",
+        "Maximum: 3",
+    ]
 
     await _button(view, "Save question").callback(
         SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
