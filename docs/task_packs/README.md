@@ -195,16 +195,25 @@ Discord Voting Post Framework status:
 - Phase 6 records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md`
   - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md`
+- Phase 7 Choice-Only Survey Builder is delivered in mirror PR #199 and production PR #507. SQL
+  migration `20260702_003_add_survey_post_framework.sql` was deployed. Operator smoke testing on
+  2026-07-03 confirmed survey creation with single-choice and multi-select questions, response
+  submission, response updates after submit, PublicLive and HiddenUntilClose behavior, manual
+  close, automatic close, and the polished guided builder flow.
+- Phase 7 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md`
+  - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md`
 - Active Discord Voting Post Framework files:
   - `Discord Voting Post Framework - Programme Pack.md`
-  - `Codex Task Pack - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md`
-  - `Codex Chat Starter - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md`
-- Phase 7 is the next prepared voting slice. It starts with audit/scope only for multi-question
-  survey-style voting. It should decide the safest first survey-builder implementation slice,
-  including question types, builder/response UX, SQL storage, privacy, result visibility, exports,
-  tests, smoke plan, and remaining deferred work. Role-restricted voting, governor-linked voting,
-  saved templates, public voter-level export posting, emoji/icon support, and dashboard/reporting
-  implementation remain out of this Phase 7 slice unless separately approved.
+  - `Codex Task Pack - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details.md`
+  - `Codex Chat Starter - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details.md`
+- Phase 8 is the next prepared voting slice. It starts with audit/scope only for free-text survey
+  questions and optional choice-question `Add details` text. It should decide the safest text/detail
+  implementation slice, SQL storage, privacy/retention, builder/player UX, private export shape,
+  tests, smoke plan, and remaining deferred work. Draft/resume, optional questions, rating
+  questions, emoji/icon support, dashboard/reporting, role-restricted voting, governor-linked
+  voting, saved templates, and public voter-level/detail export posting remain out of this Phase 8
+  slice unless separately approved.
 
 Player Self-Service Command Centre status:
 
@@ -356,6 +365,7 @@ Final removal of temporary deprecated command paths remains captured as deferred
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.
 
-Discord Voting Post Framework Phase 7 Survey Builder Audit and Design is the next prepared voting
-slice. It starts with audit/scope only and should decide the safest first multi-question survey
-implementation slice while keeping all Phase 1 through Phase 6 behaviour unchanged.
+Discord Voting Post Framework Phase 8 Survey Free Text and Add Details is the next prepared voting
+slice. It starts with audit/scope only and should decide the safest way to add free-text survey
+questions and optional choice-question detail notes while keeping all Phase 1 through Phase 7
+behaviour unchanged.

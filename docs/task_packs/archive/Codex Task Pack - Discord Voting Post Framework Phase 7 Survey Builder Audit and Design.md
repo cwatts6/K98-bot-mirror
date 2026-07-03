@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 6 single-question MultiSelect delivery and smoke test`
 - Task type: `audit | product scope | SQL-backed survey design | Discord interaction UX | privacy review | approved first-slice implementation`
 - One-pass approved: `no`
-- Status: `audit approved; choice-only first implementation slice in progress`
+- Status: `complete and smoke tested; archived as Phase 7 execution record`
 
 ## 2. Objective
 
@@ -21,6 +21,16 @@ The audit/scope pass was completed first. The operator then approved the safest 
 implementation slice: choice-only multi-question surveys. Free-text questions and choice-question
 `Add details` are confirmed as the next phase, and submitted text/detail data must be included in
 private admin/leadership exports when that phase is implemented.
+
+Phase 7 implementation and smoke testing are complete. The active next slice is
+`docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details.md`.
+
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#199`
+- Production PR: `cwatts6/k98-bot#507`
+- SQL migration: `20260702_003_add_survey_post_framework.sql`
+- Bot smoke test: `2026-07-03`
 
 ## 3. Required Reading
 
@@ -658,7 +668,7 @@ should include:
 
 ## 14. Acceptance Criteria
 
-- [ ] Current vote and multi-select SQL contracts are validated against `C:\K98-bot-SQL-Server`.
+- [x] Current vote and multi-select SQL contracts are validated against `C:\K98-bot-SQL-Server`.
 - [x] Survey shape candidates are compared in a decision matrix.
 - [x] The first survey implementation slice is recommended with rationale.
 - [x] SQL contract options and migration order are documented.
@@ -668,7 +678,7 @@ should include:
 - [x] Automated tests and manual smoke plan are documented.
 - [x] Deferred optimisation backlog is updated so no survey, emoji, reporting, or export work is lost.
 - [x] Audit-only constraint satisfied before implementation approval.
-- [ ] Required docs validators pass after implementation updates.
+- [x] Required docs validators passed during Phase 7 delivery.
 
 ## 15. PR Summary Template
 

@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 complete; Phase 5 complete; Phase 6 single-question MultiSelect complete and smoke tested; Phase 7 choice-only survey first slice in implementation; free-text and Add details confirmed as the next phase`
+- Current status: `Phase 1 complete; Phase 2 complete; Phase 3 complete; Phase 4 complete; Phase 5 complete; Phase 6 single-question MultiSelect complete and smoke tested; Phase 7 choice-only surveys complete and smoke tested; Phase 8 free-text questions and Add details prepared as the next phase`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -437,9 +437,16 @@ docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 6 
 docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 6 Multi-Select Survey Voting Audit and Design.md
 ```
 
-### Phase 7 - Survey Builder Audit and Design
+### Phase 7 - Choice-Only Survey Builder
 
-Status: first choice-only implementation slice approved and in implementation.
+Status: complete and smoke tested.
+
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#199`
+- Production PR: `cwatts6/k98-bot#507`
+- SQL migration: `20260702_003_add_survey_post_framework.sql`
+- Bot smoke test: `2026-07-03`
 
 Phase 7 started with audit/scope because full multi-question survey-style voting changes product
 semantics, privacy, SQL shape, private response flow, export shape, and reporting implications
@@ -477,21 +484,64 @@ Audit recommendation drafted on `2026-07-02`:
   model: authorized private live/status/export visibility, public aggregate output only according
   to result visibility, and no public voter-level/detail export.
 
-Prepared scope retained:
+Delivered:
 
-- Define the first survey implementation candidate and decide whether it is a simple
-  choice-question survey, a paged private response flow, or a fuller guided builder.
-- Define question types and first-slice limits.
-- Define required/optional answer rules, partial response policy, resume policy, and response
-  change behavior.
-- Define how existing answers are shown privately when editing a response.
-- Define PublicLive and HiddenUntilClose behavior across multiple questions.
-- Define summary and detail/voter-audit export shapes.
-- Validate SQL options against `C:\K98-bot-SQL-Server`, including survey definitions, questions,
-  options, response envelopes, answers, indexes, constraints, and audit events.
-- Preserve one-choice and multi-select behavior.
-- Keep emoji/icon support and dashboard/reporting implementation out of the first survey audit
-  unless separately approved.
+- Added separate SQL-backed survey tables for survey posts, questions, question options,
+  submitted response envelopes, selected answers, reminders, and survey audit.
+- Added `/vote_admin survey_create`, `/vote_admin survey_status`, `/vote_admin survey_close`, and
+  `/vote_admin survey_export` under the existing `/vote_admin` command group.
+- Kept survey creation admin/leadership-gated and player answering public-entry/private-panel.
+- Added a guided private admin builder with focused prompt/option modals, visible draft counts,
+  min/max selection dropdowns, max-selection-derived `SingleChoice`/`MultiSelect` semantics, and
+  graceful timeout handling for unpublished drafts.
+- Kept unpublished survey drafts in memory only by design; if the builder times out it disables
+  controls and tells the admin to rerun `/vote_admin survey_create`.
+- Added persistent public `Answer survey` buttons for published open surveys.
+- Added private paged response panels, submitted-answer prefill, response-change allowed/blocked
+  behavior, required choice-only questions, and restart-safe public survey opener behavior.
+- Added public-live and hidden-until-close aggregate result visibility for surveys.
+- Added manual close, automatic close, close announcements, disabled controls after close, and
+  restart-safe close/reminder handling.
+- Added private admin/leadership survey status with live totals.
+- Added private closed-only totals and response-detail CSV exports for one survey at a time.
+- Preserved existing one-choice vote and single-question multi-select behavior.
+
+Smoke test confirmed:
+
+- Survey creation works for single-choice and multi-select questions.
+- Response submission works.
+- Response updates after submit work.
+- Public-live and hidden-until-close survey result visibility work as required.
+- Manual close and automatic close both work.
+- The guided builder flow is easier than the modal-first version.
+- The builder now uses `Draft question` wording, labelled min/max dropdown options, character-limit
+  notes, and graceful expiry for ordinary builder timeouts.
+
+Phase 7 records are archived under:
+
+```text
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md
+```
+
+### Phase 8 - Survey Free Text And Add Details
+
+Status: prepared as the next voting slice.
+
+Confirmed next-slice scope:
+
+- Add free-text survey questions.
+- Add optional choice-question `Add details` text where a respondent can attach explanatory text to
+  a selected choice.
+- Include free-text answers and `Add details` text in private admin/leadership response-detail
+  exports.
+- Preserve current admin/leadership visibility: private live/status/export visibility for
+  authorized users, public aggregate output only according to result visibility, and no public
+  voter-level/detail export.
+- Preserve all Phase 7 choice-only survey behavior and all Phase 1 through Phase 6 vote behavior.
+- Keep draft/resume, optional questions, rating questions, emoji/icon support,
+  dashboard/reporting, role-restricted voting, governor-linked voting, saved templates, and public
+  detail exports out of Phase 8 unless separately approved.
 
 ## 8. Remaining Slice Scope Summary
 
@@ -559,25 +609,47 @@ Delivered scope:
 
 ### Phase 7 survey-builder scope summary
 
-Phase 7 should not implement survey voting immediately. It should audit and design the safest first
-survey builder slice, then stop for approval.
+Phase 7 is complete. It resolved the first survey-builder slice by delivering separate SQL-backed
+choice-only surveys under `/vote_admin`.
+
+Delivered scope:
+
+- Separate survey model selected rather than adding `Survey` to `VotePosts.VoteMode`.
+- Additive SQL delivered: `dbo.SurveyPosts`, `dbo.SurveyQuestions`,
+  `dbo.SurveyQuestionOptions`, `dbo.SurveyResponses`, `dbo.SurveyAnswers`,
+  `dbo.SurveyReminders`, and `dbo.SurveyAudit`.
+- Survey subcommands delivered under the existing `/vote_admin` group.
+- Choice-only question types delivered, with `SingleChoice` versus `MultiSelect` derived from
+  max selections.
+- All first-slice questions are required; no free text, optional questions, or ratings yet.
+- Private admin builder delivered with focused prompt/option modals, min/max dropdowns, visible
+  limits, and graceful timeout behavior for unpublished drafts.
+- Public `Answer survey` opener and private paged response flow delivered.
+- Submitted-answer prefill and response-change allowed/blocked behavior delivered.
+- PublicLive and HiddenUntilClose aggregate behavior delivered for surveys.
+- Manual close, automatic close, reminders, disabled controls, and restart-safe survey opener
+  behavior delivered.
+- Private closed-only totals and response-detail exports delivered.
+
+### Phase 8 survey text/details scope summary
+
+Phase 8 should extend the delivered survey model with text-bearing answers, not redesign the
+choice-only survey foundation.
 
 Prepared scope:
 
-- Define whether survey-style voting should be modeled as a vote mode, a separate survey object,
-  or a survey object linked to a public vote post.
-- Define command placement under existing `/vote_admin` paths versus a separately approved survey
-  command group.
-- Define first-slice question types and limits.
-- Define partial response, resume, response-change, and existing-answer prefill behavior.
-- Validate SQL options against `C:\K98-bot-SQL-Server`, including survey definitions, questions,
-  options, response envelopes, answers, constraints, indexes, and audit events.
-- Define how public live and hidden-until-close result visibility should work across multiple
-  questions.
-- Define closed summary, totals export, and voter-audit/detail export shapes before changing any
-  export behavior.
-- Define automated tests and manual smoke steps for builder UX, response submission/change,
-  restart behavior, exports, close reveal, and privacy.
+- Decide the SQL shape for free-text answers and per-choice `Add details` text. Validate against
+  `C:\K98-bot-SQL-Server` before recommending tables, columns, constraints, indexes, or migration
+  order.
+- Define the player UX for a free-text question and an optional details prompt attached to a
+  selected choice.
+- Define length limits, Discord component choice, validation copy, empty/whitespace handling, and
+  CSV formula-safety for submitted text.
+- Include text/detail data in private admin/leadership response-detail exports.
+- Define public aggregate behavior: text values are not shown publicly; choice aggregates continue
+  to follow PublicLive/HiddenUntilClose.
+- Preserve no persisted partial player drafts unless a separate draft/resume slice is approved.
+- Preserve all existing survey create/status/close/export behavior for choice-only surveys.
 
 ## 9. Cross-Programme Constraints
 
@@ -592,9 +664,10 @@ Prepared scope:
 - Do not expose voter-level exports publicly without explicit approval.
 - Do not add further advanced voting modes until their product, privacy, permissions, SQL, UX,
   test, and rollout model are explicitly approved.
-- Do not implement full survey builder, emoji/icon support, dashboard/reporting readiness,
+- Do not implement survey free-text/details, optional questions, draft/resume, rating questions,
+  emoji/icon support, dashboard/reporting readiness,
   role-restricted voting, governor-linked voting, saved templates, or public voter-level exports
-  as part of Phase 7 unless separately approved.
+  as part of any voting slice unless separately approved.
 
 ## 10. Validation Strategy
 
@@ -651,15 +724,21 @@ The core programme is successful when:
       storage, restart-safe public opener, private selection panel, existing-selection prefill,
       PublicLive/HiddenUntilClose support, mode-aware status/cards/outcomes/exports, and preserved
       one-choice behavior.
+- [x] Choice-only multi-question surveys are delivered in Phase 7 with separate SQL-backed survey
+      tables, guided private admin builder, public `Answer survey` opener, private paged response
+      panel, submitted-answer prefill, manual/automatic close, PublicLive/HiddenUntilClose
+      aggregate behavior, private live admin status, private closed-only totals/detail exports,
+      and preserved one-choice/multi-select vote behavior.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 7: Survey Builder Audit and Design.
+Start Discord Voting Post Framework Phase 8: Survey Free Text and Add Details.
 
-Begin with audit/scope only. Do not implement SQL migrations, survey tables, question-builder UI,
-private response flows, export shape changes, dashboard/reporting implementation, or command
-changes until the Phase 7 architecture and product scope are approved.
+Begin with audit/scope only. Do not implement SQL migrations, runtime survey text/detail storage,
+free-text response UI, export shape changes, dashboard/reporting implementation, or command
+changes until the Phase 8 architecture, product scope, privacy, SQL, permissions, and UX direction
+are approved.
 ```
 
 ## 13. Programme Change Log
@@ -686,3 +765,5 @@ changes until the Phase 7 architecture and product scope are approved.
 | 2026-07-02 | Phase 7 survey-builder audit prepared | Created the next active survey-builder audit/design task pack and starter; preserved remaining full survey, emoji/icon, dashboard/reporting, and export/reporting follow-up work in deferred optimisation scope. |
 | 2026-07-02 | Phase 7 survey-builder audit drafted | Recommended separate SQL-backed choice-only survey posts under `/vote_admin`, with private paged response UX, no partial persisted drafts, hidden-until-close aggregate privacy, closed-only private exports, additive survey SQL tables, and future task-pack outlines for draft/resume, advanced question types, reporting, and export v2. Operator confirmed multiple-choice first, then free-text questions plus choice-question `Add details` in a second slice with submitted text/detail data included in private admin/leadership exports. |
 | 2026-07-02 | Phase 7 choice-only survey first slice started | Began implementation of separate SQL-backed choice-only survey posts under `/vote_admin survey_*`, preserving existing one-choice and single-question MultiSelect behavior. Free-text questions and choice-question `Add details` remain the next phase. |
+| 2026-07-03 | Phase 7 choice-only surveys smoke tested | Smoke testing confirmed survey creation with single-choice and multi-select questions, response submission, response updates, PublicLive and HiddenUntilClose behavior, manual close, automatic close, and the guided builder polish. Ordinary builder timeout now expires gracefully; unpublished drafts intentionally do not survive bot restart. |
+| 2026-07-03 | Phase 8 prepared | Created the next task pack and starter for free-text survey questions plus optional choice-question `Add details`, with submitted text/detail data required in private admin/leadership exports and public detail exposure out of scope. |

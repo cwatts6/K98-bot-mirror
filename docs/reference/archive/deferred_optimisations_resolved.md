@@ -3,6 +3,33 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Phase 7 Choice-Only Surveys Completed Item
+- Area: `voting/`, `/vote_admin survey_*`, `ui/views/survey_post_view.py`, SQL repo survey framework
+- Type: architecture
+- Description: Full multi-question survey-style voting remained valuable for richer KD98 feedback,
+  event planning, rankings, and structured questionnaires, but it was intentionally separated from
+  Phase 6 single-question MultiSelect because it needed question modeling, response envelopes,
+  private response UX, export design, and question-level privacy/reporting decisions.
+- Resolution: Phase 7 first audited survey shapes and selected a separate SQL-backed survey model
+  under the existing `/vote_admin` group. The delivered implementation added choice-only
+  multi-question surveys with `dbo.SurveyPosts`, `dbo.SurveyQuestions`,
+  `dbo.SurveyQuestionOptions`, `dbo.SurveyResponses`, `dbo.SurveyAnswers`,
+  `dbo.SurveyReminders`, and `dbo.SurveyAudit`; guided private admin builder controls; persistent
+  public `Answer survey` buttons; private paged response panels; submitted-answer prefill;
+  response-change allowed/blocked behavior; PublicLive and HiddenUntilClose aggregate visibility;
+  manual and automatic close; private admin live status; and private closed-only totals/detail CSV
+  exports. Unpublished builder drafts intentionally remain in memory only, and ordinary builder
+  timeout now expires gracefully.
+- Validation: Delivered in mirror PR #199 and production PR #507 with SQL migration
+  `20260702_003_add_survey_post_framework.sql`. Automated validation included architecture and
+  deferred validators, selected-test review, smoke imports, command registration validation,
+  focused survey/admin tests, full pytest (`2272 passed, 2 skipped` after timeout polish), and CI
+  checks on both mirror and production PR branches. Operator smoke testing on 2026-07-03 confirmed
+  survey creation with single-choice and multi-select questions, response submission, response
+  updates after submit, PublicLive and HiddenUntilClose behavior, manual close, automatic close,
+  and guided builder polish. Free-text questions and optional choice-question `Add details` are
+  promoted into the active Phase 8 task pack.
+
 ### Discord Voting Post Framework Hidden Results Completed Item
 - Area: `voting/render_service.py`, `voting/discord_presentation.py`, `commands/vote_admin_cmds.py`, `voting/service.py`, `voting/dal.py`, SQL repo vote framework
 - Type: architecture
