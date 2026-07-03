@@ -260,6 +260,39 @@ async def test_survey_builder_disables_publish_after_success(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_survey_builder_timeout_disables_controls_and_edits_builder_message():
+    captured: dict[str, object] = {}
+
+    async def fake_publish(_interaction, _questions):
+        captured["published"] = True
+        return True
+
+    async def fake_timeout_edit(expired_view):
+        captured["content"] = expired_view.expired_content()
+        captured["view"] = expired_view
+
+    view = SurveyBuilderView(
+        owner_user_id=123,
+        publish_callback=fake_publish,
+        timeout_edit_callback=fake_timeout_edit,
+    )
+    view.draft_prompt = "Which night works?"
+    view.draft_options = ["Friday", "Saturday"]
+    view._sync_selection_bounds()
+    view._rebuild()
+
+    await view.on_timeout()
+
+    assert captured.get("published") is not True
+    assert captured["view"] is view
+    assert view.expired is True
+    assert all(child.disabled for child in view.children)
+    assert str(captured["content"]).startswith("Survey builder expired. No survey was published.")
+    assert "Run `/vote_admin survey_create` again" in str(captured["content"])
+    assert "Draft question: Which night works?" in str(captured["content"])
+
+
+@pytest.mark.asyncio
 async def test_survey_guided_builder_saves_multi_select_from_max_selection(monkeypatch):
     captured: dict[str, object] = {}
 

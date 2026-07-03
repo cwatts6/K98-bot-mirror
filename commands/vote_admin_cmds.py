@@ -973,9 +973,16 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             )
             return True
 
+        async def _expire_survey_builder(expired_view: SurveyBuilderView) -> None:
+            await ctx.interaction.edit_original_response(
+                content=expired_view.expired_content(),
+                view=expired_view,
+            )
+
         view = SurveyBuilderView(
             owner_user_id=int(ctx.user.id),
             publish_callback=_publish_survey,
+            timeout_edit_callback=_expire_survey_builder,
         )
         await ctx.interaction.edit_original_response(
             content=f"Survey builder opened.\n\n{view.summary()}",

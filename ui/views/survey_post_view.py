@@ -24,6 +24,9 @@ logger = logging.getLogger(__name__)
 SurveyPublishCallback = Callable[
     [discord.Interaction, tuple[SurveyQuestionCreateRequest, ...]], Awaitable[bool]
 ]
+SurveyBuilderTimeoutCallback = Callable[["SurveyBuilderView"], Awaitable[None]]
+
+_SURVEY_BUILDER_TIMEOUT_SECONDS = 14 * 60
 
 
 class SurveyPostView(discord.ui.View):
@@ -247,10 +250,12 @@ class SurveyBuilderView(discord.ui.View):
         owner_user_id: int,
         publish_callback: SurveyPublishCallback,
         questions: tuple[SurveyQuestionCreateRequest, ...] = (),
+        timeout_edit_callback: SurveyBuilderTimeoutCallback | None = None,
     ) -> None:
-        super().__init__(timeout=900)
+        super().__init__(timeout=_SURVEY_BUILDER_TIMEOUT_SECONDS)
         self.owner_user_id = int(owner_user_id)
         self.publish_callback = publish_callback
+        self.timeout_edit_callback = timeout_edit_callback
         self.questions: list[SurveyQuestionCreateRequest] = list(questions)
         self.draft_prompt = ""
         self.draft_options: list[str] = []
@@ -258,6 +263,7 @@ class SurveyBuilderView(discord.ui.View):
         self.draft_max_selections = 1
         self.publish_in_progress = False
         self.published = False
+        self.expired = False
         self._rebuild()
 
     def _rebuild(self) -> None:
@@ -273,7 +279,7 @@ class SurveyBuilderView(discord.ui.View):
 
     @property
     def builder_locked(self) -> bool:
-        return self.publish_in_progress or self.published
+        return self.publish_in_progress or self.published or self.expired
 
     @property
     def has_draft(self) -> bool:
@@ -329,6 +335,27 @@ class SurveyBuilderView(discord.ui.View):
             await interaction.edit_original_response(content=content, view=self)
         except Exception:
             logger.exception("survey_builder_refresh_failed")
+
+    async def on_timeout(self) -> None:
+        if self.published:
+            return
+        self.expired = True
+        for child in self.children:
+            if hasattr(child, "disabled"):
+                child.disabled = True
+        if self.timeout_edit_callback is None:
+            return
+        try:
+            await self.timeout_edit_callback(self)
+        except Exception:
+            logger.debug("survey_builder_timeout_edit_failed", exc_info=True)
+
+    def expired_content(self) -> str:
+        return (
+            "Survey builder expired. No survey was published.\n\n"
+            "Run `/vote_admin survey_create` again if you still need it.\n\n"
+            f"{self.summary()}"
+        )
 
     def build_draft_question(self) -> SurveyQuestionCreateRequest:
         question = survey_service.build_question_request(
