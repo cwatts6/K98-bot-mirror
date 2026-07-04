@@ -121,14 +121,10 @@ class _SurveyQuestionSelect(discord.ui.Select):
         except (TypeError, ValueError):
             await send_ephemeral(interaction, "One or more selected options are not valid.")
             return
-        self.parent_view.answers[self.parent_view.current_question.question_id] = values
-        for key in tuple(self.parent_view.detail_text_by_option):
-            question_id, option_id = key
-            if (
-                question_id == self.parent_view.current_question.question_id
-                and option_id not in values
-            ):
-                self.parent_view.detail_text_by_option.pop(key, None)
+        question = self.parent_view.current_question
+        existing_detail = self.parent_view.detail_text_for_question(question)
+        self.parent_view.answers[question.question_id] = values
+        self.parent_view.set_detail_text_for_question(question, existing_detail)
         await self.parent_view.refresh(interaction)
 
 
@@ -151,54 +147,39 @@ class _SurveyDetailOptionSelect(discord.ui.Select):
     def __init__(self, parent_view: SurveyResponsePanel) -> None:
         self.parent_view = parent_view
         question = parent_view.current_question
-        selected_option_ids = set(parent_view.answers.get(question.question_id, ()))
-        selected_options = [
-            option for option in question.options if option.option_id in selected_option_ids
-        ][:25]
-        has_multiple_selected_options = len(selected_options) > 1
-        options = []
-        for index, option in enumerate(selected_options, start=1):
-            has_detail = bool(
-                parent_view.detail_text_by_option.get(
-                    (question.question_id, option.option_id), ""
-                ).strip()
-            )
-            if has_multiple_selected_options:
-                action_label = (
-                    f"Edit details for selected choice {index}"
-                    if has_detail
-                    else f"Add details for selected choice {index}"
-                )
-            else:
-                action_label = (
-                    "Click here to edit details" if has_detail else "Click here to add more details"
-                )
-            options.append(
+        anchor_option_id = parent_view.detail_anchor_option_id(question)
+        has_detail = bool(parent_view.detail_text_for_question(question))
+        if anchor_option_id is None:
+            options = [discord.SelectOption(label="Select an option first", value="none")]
+        else:
+            options = [
                 discord.SelectOption(
-                    label=action_label[:100],
-                    value=str(option.option_id),
-                    description="Optional note for this choice",
+                    label=(
+                        "Edit details about your response"
+                        if has_detail
+                        else "Add more details about your response"
+                    ),
+                    value=str(anchor_option_id),
+                    description="Optional note for this question",
                     default=False,
                 )
-            )
-        if not options:
-            options = [discord.SelectOption(label="Select an option first", value="none")]
+            ]
         super().__init__(
             placeholder="Add details",
             min_values=1,
             max_values=1,
             options=options,
-            disabled=not selected_option_ids,
+            disabled=anchor_option_id is None,
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
             await send_ephemeral(interaction, "This survey panel belongs to another player.")
             return
-        try:
-            option_id = int(self.values[0])
-        except (IndexError, TypeError, ValueError):
-            await send_ephemeral(interaction, "Select an answered option before adding details.")
+        question = self.parent_view.current_question
+        option_id = self.parent_view.detail_anchor_option_id(question)
+        if option_id is None:
+            await send_ephemeral(interaction, "Select an answer before adding details.")
             return
         await interaction.response.send_modal(_SurveyDetailModal(self.parent_view, option_id))
 
@@ -259,7 +240,7 @@ class _SurveySubmitButton(discord.ui.Button):
                 discord_user_id=int(interaction.user.id),
                 answers_by_question_id=self.parent_view.answers,
                 text_answers_by_question_id=self.parent_view.text_answers,
-                detail_text_by_question_option=self.parent_view.detail_text_by_option,
+                detail_text_by_question_option=self.parent_view.normalized_detail_text_by_option(),
             )
         except survey_service.VoteValidationError as exc:
             await send_ephemeral(interaction, str(exc))
@@ -324,11 +305,51 @@ class SurveyResponsePanel(discord.ui.View):
                 self.snapshot,
                 answers_by_question_id=self.answers,
                 text_answers_by_question_id=self.text_answers,
-                detail_text_by_question_option=self.detail_text_by_option,
+                detail_text_by_question_option=self.normalized_detail_text_by_option(),
             )
         except survey_service.VoteValidationError:
             return False
         return True
+
+    def detail_anchor_option_id(self, question) -> int | None:
+        selected_option_ids = set(self.answers.get(question.question_id, ()))
+        for option in question.options:
+            if option.option_id in selected_option_ids:
+                return int(option.option_id)
+        return None
+
+    def detail_text_for_question(self, question) -> str:
+        selected_option_ids = set(self.answers.get(question.question_id, ()))
+        for option in question.options:
+            if option.option_id not in selected_option_ids:
+                continue
+            text = self.detail_text_by_option.get((question.question_id, option.option_id), "")
+            if text.strip():
+                return text.strip()
+        for (question_id, _option_id), text in sorted(self.detail_text_by_option.items()):
+            if question_id == question.question_id and text.strip():
+                return text.strip()
+        return ""
+
+    def set_detail_text_for_question(self, question, text: str) -> None:
+        for key in tuple(self.detail_text_by_option):
+            if key[0] == question.question_id:
+                self.detail_text_by_option.pop(key, None)
+        clean_text = str(text or "").strip()
+        anchor_option_id = self.detail_anchor_option_id(question)
+        if clean_text and anchor_option_id is not None:
+            self.detail_text_by_option[(question.question_id, anchor_option_id)] = clean_text
+
+    def normalized_detail_text_by_option(self) -> dict[tuple[int, int], str]:
+        normalized: dict[tuple[int, int], str] = {}
+        for question in self.snapshot.questions:
+            if not question.allow_details:
+                continue
+            anchor_option_id = self.detail_anchor_option_id(question)
+            detail_text = self.detail_text_for_question(question)
+            if anchor_option_id is not None and detail_text:
+                normalized[(question.question_id, anchor_option_id)] = detail_text
+        return normalized
 
     def _rebuild(self) -> None:
         self.clear_items()
@@ -358,11 +379,7 @@ class SurveyResponsePanel(discord.ui.View):
             if question.question_type == SURVEY_QUESTION_MULTI_SELECT
             else "single choice"
         )
-        detail_count = sum(
-            1
-            for (question_id, _option_id), text in self.detail_text_by_option.items()
-            if question_id == question.question_id and text.strip()
-        )
+        detail_count = 1 if self.detail_text_for_question(question) else 0
         detail_line = f"\nDetails: {detail_count} saved." if question.allow_details else ""
         return (
             f"Survey #{self.survey_id}: question {question.sort_order} of {len(self.snapshot.questions)}\n"
@@ -417,7 +434,7 @@ class _SurveyTextAnswerModal(discord.ui.Modal):
 
 class _SurveyDetailModal(discord.ui.Modal):
     def __init__(self, parent_view: SurveyResponsePanel, option_id: int) -> None:
-        super().__init__(title="Choice details")
+        super().__init__(title="Question details")
         self.parent_view = parent_view
         self.option_id = int(option_id)
         question = parent_view.current_question
@@ -427,10 +444,10 @@ class _SurveyDetailModal(discord.ui.Modal):
             required=False,
             max_length=survey_service.MAX_SURVEY_DETAIL_LEN,
             placeholder=(
-                "Optional context for this choice. "
+                "Optional context for your response. "
                 f"Max {survey_service.MAX_SURVEY_DETAIL_LEN} characters."
             ),
-            value=parent_view.detail_text_by_option.get((question.question_id, self.option_id), ""),
+            value=parent_view.detail_text_for_question(question),
         )
         self.add_item(self.detail)
 
@@ -439,12 +456,8 @@ class _SurveyDetailModal(discord.ui.Modal):
             await send_ephemeral(interaction, "This survey panel belongs to another player.")
             return
         question = self.parent_view.current_question
-        key = (question.question_id, self.option_id)
         text = str(self.detail.value or "").strip()
-        if text:
-            self.parent_view.detail_text_by_option[key] = text
-        else:
-            self.parent_view.detail_text_by_option.pop(key, None)
+        self.parent_view.set_detail_text_for_question(question, text)
         await self.parent_view.refresh(interaction)
 
 

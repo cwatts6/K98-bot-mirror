@@ -320,15 +320,15 @@ async def test_survey_text_and_detail_modals_update_private_panel_state():
         child for child in panel.children if isinstance(child, _SurveyDetailOptionSelect)
     )
 
-    assert detail_select.options[0].label == "Click here to add more details"
-    assert detail_select.options[0].description == "Optional note for this choice"
+    assert detail_select.options[0].label == "Add more details about your response"
+    assert detail_select.options[0].description == "Optional note for this question"
 
     detail_modal = _SurveyDetailModal(panel, 101)
     assert detail_modal.detail.label == (
         f"Add more details (max {survey_service.MAX_SURVEY_DETAIL_LEN})"
     )
     assert detail_modal.detail.placeholder == (
-        "Optional context for this choice. "
+        "Optional context for your response. "
         f"Max {survey_service.MAX_SURVEY_DETAIL_LEN} characters."
     )
     detail_modal.detail.value = " Preferred because reset is easier "
@@ -357,6 +357,83 @@ async def test_survey_text_and_detail_modals_update_private_panel_state():
     assert "Please provide a response: complete" in panel.content()
     assert SURVEY_INCOMPLETE_HELP not in panel.content()
     assert not panel.children[-1].disabled
+
+
+@pytest.mark.asyncio
+async def test_survey_multi_select_details_are_question_level():
+    now = datetime.now(UTC)
+    snapshot = SurveySnapshot(
+        survey_id=7,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Survey",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=7,
+                question_key="q1",
+                prompt="Choices?",
+                question_type="MultiSelect",
+                sort_order=1,
+                min_selections=1,
+                max_selections=2,
+                options=(
+                    SurveyQuestionOption(101, 10, "opt1", "A", 1),
+                    SurveyQuestionOption(102, 10, "opt2", "B", 2),
+                    SurveyQuestionOption(103, 10, "opt3", "C", 3),
+                ),
+                allow_details=True,
+            ),
+        ),
+    )
+    panel = SurveyResponsePanel(
+        snapshot,
+        owner_user_id=123,
+        selected_option_ids={10: (101, 103)},
+        detail_text_by_option={(10, 101): "first detail", (10, 103): "second detail"},
+    )
+    detail_select = next(
+        child for child in panel.children if isinstance(child, _SurveyDetailOptionSelect)
+    )
+
+    assert len(detail_select.options) == 1
+    assert detail_select.options[0].label == "Edit details about your response"
+    assert detail_select.options[0].description == "Optional note for this question"
+    assert detail_select.options[0].value == "101"
+    assert panel.detail_text_for_question(snapshot.questions[0]) == "first detail"
+    assert panel.normalized_detail_text_by_option() == {(10, 101): "first detail"}
+    assert "Details: 1 saved." in panel.content()
+
+    detail_modal = _SurveyDetailModal(panel, 101)
+    assert detail_modal.title == "Question details"
+    assert detail_modal.detail.value == "first detail"
+    detail_modal.detail.value = " Combined context "
+    await detail_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    assert panel.detail_text_by_option == {(10, 101): "Combined context"}
+    assert panel.normalized_detail_text_by_option() == {(10, 101): "Combined context"}
+
+    panel.answers[10] = (103,)
+    panel.set_detail_text_for_question(snapshot.questions[0], "Combined context")
+
+    assert panel.detail_text_by_option == {(10, 103): "Combined context"}
+    assert panel.normalized_detail_text_by_option() == {(10, 103): "Combined context"}
 
 
 @pytest.mark.asyncio
