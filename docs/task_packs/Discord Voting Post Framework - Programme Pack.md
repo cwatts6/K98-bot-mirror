@@ -634,7 +634,8 @@ Delivered scope:
 - Survey subcommands delivered under the existing `/vote_admin` group.
 - Choice-only question types delivered, with `SingleChoice` versus `MultiSelect` derived from
   max selections.
-- All first-slice questions are required; no free text, optional questions, or ratings yet.
+- All first-slice questions were required; free text/details and optional questions were delivered
+  in later phases.
 - Private admin builder delivered with focused prompt/option modals, min/max dropdowns, visible
   limits, and graceful timeout behavior for unpublished drafts.
 - Public `Answer survey` opener and private paged response flow delivered.
@@ -669,36 +670,76 @@ Delivered scope:
 - Existing choice-only survey create/status/close/export behavior and existing one-choice and
   multi-select vote behavior were preserved.
 
-### Phase 9 advanced survey question-types scope summary
+### Phase 9A optional survey questions scope summary
 
-Phase 9 is prepared as the next audit/design slice. It should decide whether and how to add
-optional survey questions plus rating/ranking question types after the required text/detail model
-has production smoke evidence.
+Phase 9A is complete. It delivered optional questions for the existing `SingleChoice`,
+`MultiSelect`, and `Text` survey question types after the Phase 9 audit selected optional
+questions as the safest first advanced-question slice.
 
-Confirmed audit scope:
+Delivered scope:
 
-- Optional survey questions: completion semantics, `SurveyQuestions.IsRequired` behavior,
-  unanswered-question copy, missing-answer export shape, public count semantics, and response
-  change behavior.
-- Rating questions: allowed scale shapes, storage contract, validation limits, aggregate
-  presentation, and private detail export shape.
-- Ranking questions: ranking cardinality, duplicate/preference validation, storage shape, public
-  aggregate behavior, and export representation.
-- Builder UX for advanced question types without free-typed question-type values.
-- Player UX for entering, reviewing, editing, and submitting optional/rating/ranking answers.
-- PublicLive and HiddenUntilClose behavior for non-choice aggregates.
-- Private admin/leadership live status and closed-only response-detail export behavior.
-- SQL migration order, constraints, indexes, rollback posture, and source-of-truth validation.
+- SQL deployment relaxed `CK_SurveyQuestions_Required` while preserving required-by-default survey
+  creation.
+- Guided survey builder controls can mark questions required or optional without free-typed
+  question-type values.
+- Submit gating now requires only required questions; optional unanswered questions can be skipped.
+- Optional choice/question details are cleared when an optional answer is skipped.
+- Player response panels preserve prefilled editing and successful-submit closeout behavior.
+- PublicLive and HiddenUntilClose remain aggregate-only and never expose raw text/detail values.
+- Public cards/embeds show mixed required/optional question counts.
+- Private admin status and closed-only exports represent answered versus skipped optional answers.
+- Response-detail export distinguishes skipped optional answers from blank submitted text while
+  preserving formula safety and spreadsheet-safe Discord IDs.
+- Audit metadata records counts and changed status without storing full answer payloads.
+- Existing one-choice, multi-select, required choice survey, required text survey, Add details,
+  reminder, close, restart-safe opener, status, and export behavior was preserved.
+
+Smoke evidence:
+
+- Operator smoke testing on 2026-07-04 confirmed a mixed five-question survey with three required
+  and two optional questions submitted successfully when the optional questions were not answered.
+  The public card showed the response recorded, mixed required/optional question counts, and no
+  raw text/detail exposure.
+
+### Phase 9B rating survey questions scope summary
+
+Phase 9B is the next prepared voting slice. It should start with audit/scope confirmation and then,
+if approved, add fixed 1-5 rating questions as a focused implementation.
+
+Confirmed Phase 9B scope:
+
+- Fixed 1-5 rating survey questions.
+- Required versus optional rating completion semantics using the delivered Phase 9A model.
+- Builder UX through the existing guided question-type controls, without free-typed type values.
+- Player UX for entering, reviewing, prefilled editing, skipping optional ratings, and submitting
+  rating answers.
+- PublicLive and HiddenUntilClose aggregate-only behavior for rating counts, averages, and
+  distributions.
+- Private admin/leadership live status behavior.
+- Private closed-only totals and response-detail export shape for rating values and skipped
+  optional ratings.
+- CSV formula-safety and spreadsheet-safe Discord ID behavior.
+- SQL storage, constraints, indexes, migration order, rollback posture, and source-of-truth
+  validation against `C:\K98-bot-SQL-Server`.
+- Audit metadata without storing full answer payloads in audit JSON.
 - Focused service/DAL/view/export/scheduler/command tests and Discord smoke plan.
 
-Explicitly out of Phase 9 unless separately approved:
+Explicitly out of Phase 9B unless separately approved:
 
+- Ranking survey questions.
+- Custom rating scales, 1-10 scales, scale labels, emoji/icons, or rating comments.
 - Persisted partial player drafts/resume.
-- Emoji/icon support.
 - Dashboard/reporting implementation or cross-survey export redesign.
 - Role-restricted voting, governor-linked voting, saved templates, public voter-level/detail
-  export posting, `/vote_admin` rename/removal, or existing one-choice/multi-select behavior
-  changes.
+  export posting, `/vote_admin` rename/removal, or existing one-choice/multi-select/choice/text
+  behavior changes except as explicitly approved for rating compatibility.
+
+### Phase 9C ranking survey questions outline
+
+Ranking remains the next advanced-question candidate after rating is delivered and smoke tested.
+It should be prepared as a separate task pack because it needs a dedicated ranked-option answer
+contract, duplicate rank prevention, clearer Discord entry/edit UX, conservative aggregate
+semantics, response-detail export representation, and a more careful rollback posture than rating.
 
 ## 9. Cross-Programme Constraints
 
@@ -713,7 +754,7 @@ Explicitly out of Phase 9 unless separately approved:
 - Do not expose voter-level exports publicly without explicit approval.
 - Do not add further advanced voting modes until their product, privacy, permissions, SQL, UX,
   test, and rollout model are explicitly approved.
-- Do not implement optional questions, draft/resume, rating/ranking questions, emoji/icon support,
+- Do not implement draft/resume, rating/ranking questions, emoji/icon support,
   dashboard/reporting readiness, role-restricted voting, governor-linked voting, saved templates,
   or public voter-level exports as part of any voting slice unless separately approved.
 
@@ -781,16 +822,19 @@ The core programme is successful when:
       additive SQL tables, private modal entry/editing, submit gating, successful submit closeout,
       aggregate-only public behavior, text-question rows in totals export, private response-detail
       text/detail export, and preserved Phase 1 through Phase 7 behavior.
+- [x] Optional survey questions are delivered in Phase 9A with required-by-default builder
+      behavior, required-only submit gating, skipped optional answer semantics, aggregate-only
+      public behavior, private status/export representation, and preserved Phase 1 through Phase 8
+      behavior.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 9: Advanced Survey Question Types Audit and Design.
+Start Discord Voting Post Framework Phase 9B: Rating Survey Questions.
 
-Begin with audit/scope only. Do not implement SQL migrations, optional survey-question behavior,
-rating/ranking runtime storage, response UI, export shape changes, dashboard/reporting
-implementation, or command changes until the Phase 9 architecture, product scope, privacy, SQL,
-permissions, and UX direction are approved.
+Begin with audit/scope confirmation. Do not implement SQL migrations, rating runtime storage,
+response UI, export shape changes, dashboard/reporting implementation, or command changes until the
+Phase 9B architecture, product scope, privacy, SQL, permissions, and UX direction are approved.
 ```
 
 ## 13. Programme Change Log
@@ -821,3 +865,5 @@ permissions, and UX direction are approved.
 | 2026-07-03 | Phase 8 prepared | Created the next task pack and starter for free-text survey questions plus optional choice-question `Add details`, with submitted text/detail data required in private admin/leadership exports and public detail exposure out of scope. |
 | 2026-07-04 | Phase 8 smoke tested and archived | Delivered SQL-backed free-text survey questions, one details capture per choice question, modal limit guidance, submit gating, successful submit closeout, private response-detail text/detail export, aggregate text-question totals rows, and preserved existing vote/survey behavior. Phase 8 task pack and starter moved to archive. |
 | 2026-07-04 | Phase 9 prepared | Created the next audit/design task pack and starter for optional survey questions plus rating/ranking question types; kept persisted drafts/resume, emoji/icon support, richer exports, dashboard/reporting, role/governor/template/public-detail work as separate deferred slices. |
+| 2026-07-04 | Phase 9A optional questions delivered | SQL PR was merged/deployed before bot rollout. Optional questions for existing choice/text survey types were delivered with required-by-default builder behavior, required-only submit gating, skipped optional export/status semantics, aggregate-only public behavior, and preserved existing vote/survey behavior. Operator smoke testing confirmed skipped optional questions submit successfully. |
+| 2026-07-04 | Phase 9B rating questions prepared | Archived the Phase 9 audit/Phase 9A closeout record and created the active Phase 9B rating survey question task pack and chat starter. Ranking, draft/resume, emoji/icon, reporting/export v2, policy/identity, templates, public-detail export, and `/vote_admin` reshaping remain separate deferred work. |

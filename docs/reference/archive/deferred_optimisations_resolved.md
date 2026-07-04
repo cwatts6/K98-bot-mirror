@@ -3,6 +3,30 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Phase 9A Optional Survey Questions Completed Item
+- Area: `voting/`, `/vote_admin survey_*`, `ui/views/survey_post_view.py`, SQL repo survey question model and exports
+- Type: architecture
+- Description: Optional survey questions and rating/ranking question types were intentionally
+  outside Phase 8. The Phase 9 audit recommended splitting implementation so optional questions
+  for existing `SingleChoice`, `MultiSelect`, and `Text` surveys shipped first, with rating and
+  ranking kept as later slices. Optional questions needed SQL `SurveyQuestions.IsRequired`
+  support, missing-answer validation, response completion semantics, public count/card behavior,
+  private export shape, and regression protection for required surveys.
+- Resolution: Phase 9A delivered optional questions for existing survey question types with
+  required-by-default builder behavior, required-only submit gating, skipped optional answer
+  semantics, optional answer clear/skip handling, public aggregate-only presentation, private
+  status/export representation, response-detail `IsRequired`/answer-status semantics, formula-safe
+  export behavior, and audit metadata that records counts rather than full answer payloads.
+  Rating and ranking were split into future Phase 9B and Phase 9C task packs.
+- Validation: SQL PR #31 was merged and deployed before bot rollout. Automated validation included
+  SQL-source validation, architecture and deferred validators, selected-test review, smoke imports,
+  command registration validation, focused survey service/DAL/view/export/presentation tests,
+  full pytest (`2289 passed, 2 skipped` during implementation), Ruff/pre-commit Ruff after review
+  feedback, and a Codex Security diff scan with zero findings. Operator smoke testing on
+  2026-07-04 confirmed a mixed five-question survey with three required and two optional questions
+  submitted successfully when optional questions were not answered; the public card showed the
+  response recorded, mixed required/optional question counts, and no raw text/detail exposure.
+
 ### Discord Voting Post Framework Phase 8 Survey Free Text and Add Details Completed Item
 - Area: `voting/`, `/vote_admin survey_*`, `ui/views/survey_post_view.py`, SQL repo survey response tables
 - Type: architecture

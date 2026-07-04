@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 8 survey text/details delivery and smoke test`
 - Task type: `audit | product scope | SQL-backed survey extension design | Discord interaction UX | privacy/export review`
 - One-pass approved: `no`
-- Status: `prepared; audit/scope only until approved`
+- Status: `completed; Phase 9A optional survey questions delivered and smoke tested`
 
 ## 2. Objective
 
@@ -19,9 +19,12 @@ decide the safest next implementation shape for advanced survey question types, 
 completion semantics, SQL storage, validation, privacy, PublicLive/HiddenUntilClose behavior,
 private exports, tests, smoke plan, migration order, rollback posture, and deferred follow-up work.
 
-Do not implement SQL migrations, runtime optional/rating/ranking storage, response UI, export shape
-changes, dashboard/reporting implementation, or command changes until the Phase 9 architecture,
-product scope, privacy, SQL, permissions, and UX direction are approved.
+Phase 9A was approved after this audit and delivered optional questions for the existing survey
+question types only. Rating and ranking remain separate future slices.
+
+Do not implement rating/ranking runtime storage, response UI, export shape changes,
+dashboard/reporting implementation, or command changes until the next slice architecture, product
+scope, privacy, SQL, permissions, and UX direction are approved.
 
 ## 3. Required Reading
 
@@ -39,7 +42,7 @@ Read first:
 - `docs/reference/ENV_REFERENCE.md`
 - `docs/reference/deferred_optimisations.md`
 - `docs/task_packs/Discord Voting Post Framework - Programme Pack.md`
-- `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md`
+- `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md`
 
 ## 4. Delivered Baseline
 
@@ -557,3 +560,53 @@ Before implementation, confirm:
 - Whether response-detail export should add `IsRequired` and `AnswerStatus` columns as proposed.
 - Whether totals export should add answered/skipped counts in Phase 9A.
 - Whether rating should be the next slice after optional questions, with fixed 1-5 scale first.
+
+## 17. Phase 9A Completion Record - 2026-07-04
+
+Phase 9A was approved, implemented, reviewed, and smoke tested as the optional-question slice.
+
+Delivered scope:
+
+- Optional questions for existing `SingleChoice`, `MultiSelect`, and `Text` survey question types.
+- Required remains the default in the guided survey builder.
+- SQL deployment relaxed `CK_SurveyQuestions_Required` while preserving the `IsRequired = 1`
+  default and existing survey rows.
+- Submit gating now requires only required questions. Optional unanswered questions can be skipped.
+- Player private response panels distinguish required/optional state, support prefilled editing,
+  and close/clear controls after successful submit.
+- Optional choice-question details are cleared when the optional choice answer is skipped.
+- PublicLive and HiddenUntilClose continue to expose aggregate-only results and never expose raw
+  text/detail values.
+- Public cards and embeds now describe mixed required/optional question counts.
+- Private admin status and closed-only exports include optional answered/skipped semantics.
+- Response-detail export represents skipped optional answers distinctly from blank submitted text,
+  keeps Discord IDs spreadsheet-safe, and preserves formula safety for user-controlled cells.
+- Submission/change audit metadata records counts and changed status without storing full answer
+  payloads.
+- Review hardening added `VoteValidationError` handling for malformed submitted option IDs instead
+  of allowing uncaught `TypeError`/`ValueError` exceptions.
+
+Preserved behavior:
+
+- Existing one-choice votes, single-question multi-select votes, required choice surveys, required
+  text surveys, Add details, reminders, manual/automatic close, restart-safe public openers,
+  private exports, and Phase 1 through Phase 8 compatibility remain intact.
+- No persisted partial response drafts were added.
+- Rating questions, ranking questions, emoji/icon support, dashboard/reporting, cross-survey export
+  redesign, role/governor voting, saved templates, public detail exports, and `/vote_admin`
+  reshaping remain separate deferred optimisation items.
+
+Validation and smoke evidence:
+
+- SQL PR was merged and deployed before the bot rollout.
+- Focused survey validation passed, including optional completion, export/status behavior, and
+  malformed option ID regression coverage.
+- Full pytest passed during implementation with `2289 passed, 2 skipped`.
+- Ruff and pre-commit Ruff passed after review feedback.
+- Architecture, deferred-item, selected-test, smoke-import, and command-registration validators
+  passed during implementation.
+- Codex Security diff scan completed with zero findings.
+- Operator smoke testing on 2026-07-04 confirmed a mixed five-question survey with three required
+  and two optional questions submitted successfully when the optional questions were not answered;
+  the public card showed the response recorded, mixed required/optional question counts, and no raw
+  text/detail exposure.
