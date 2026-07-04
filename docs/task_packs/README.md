@@ -203,17 +203,26 @@ Discord Voting Post Framework status:
 - Phase 7 records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md`
   - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 7 Survey Builder Audit and Design.md`
+- Phase 8 Survey Free Text and Add Details is delivered in mirror PR #200, production PR #508,
+  and SQL PR #30. SQL deployment completed before bot rollout. Operator smoke testing on
+  2026-07-04 confirmed free-text survey questions, one details capture per choice question,
+  text/detail guidance copy, submit gating, successful submit closeout, PublicLive and
+  HiddenUntilClose privacy behavior, private exports, and existing survey/vote behavior.
+- Phase 8 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details.md`
+  - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details.md`
 - Active Discord Voting Post Framework files:
   - `Discord Voting Post Framework - Programme Pack.md`
-  - `Codex Task Pack - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details.md`
-  - `Codex Chat Starter - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details.md`
-- Phase 8 is the next prepared voting slice. It starts with audit/scope only for free-text survey
-  questions and optional choice-question `Add details` text. It should decide the safest text/detail
-  implementation slice, SQL storage, privacy/retention, builder/player UX, private export shape,
-  tests, smoke plan, and remaining deferred work. Draft/resume, optional questions, rating
-  questions, emoji/icon support, dashboard/reporting, role-restricted voting, governor-linked
-  voting, saved templates, and public voter-level/detail export posting remain out of this Phase 8
-  slice unless separately approved.
+  - `Codex Task Pack - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md`
+  - `Codex Chat Starter - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md`
+- Phase 9 is the next prepared voting slice. It starts with audit/scope only for optional survey
+  questions and rating/ranking question types. It should decide completion semantics, SQL storage,
+  validation, builder/player UX, PublicLive/HiddenUntilClose aggregate behavior, private export
+  shape, tests, smoke plan, migration order, rollback posture, and remaining deferred work before
+  any runtime implementation. Persisted partial drafts/resume, emoji/icon support,
+  dashboard/reporting, richer exports, role-restricted voting, governor-linked voting, saved
+  templates, and public voter-level/detail export posting remain separate later slices unless
+  explicitly approved.
 
 Player Self-Service Command Centre status:
 

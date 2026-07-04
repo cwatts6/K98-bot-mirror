@@ -1,13 +1,15 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived. Phase 8 was delivered, SQL deployed, production-promoted, and operator smoke
+tested on 2026-07-04.
 
 Phase 1 through Phase 7 are complete and smoke tested. SQL-backed live voting works, guided vote
 creation works, totals-only and voter-audit exports are private/ephemeral for one closed vote at a
 time, hidden-until-close result visibility works, single-question multi-select voting works, and
 choice-only multi-question surveys now work under `/vote_admin survey_*`.
 
-Use this starter to begin Phase 8 with audit/scope only.
+This starter is retained as the Phase 8 execution record. Use the active Phase 9 starter for the
+next voting slice.
 
 ## Copy/Paste Starter
 

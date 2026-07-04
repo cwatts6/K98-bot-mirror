@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 7 choice-only survey delivery and smoke test`
 - Task type: `audit | product scope | SQL-backed survey extension design | Discord interaction UX | privacy/export review | implementation`
 - One-pass approved: `no`
-- Status: `audit approved; first implementation slice delivered; pending PR/promotion/smoke`
+- Status: `delivered; SQL deployed; operator smoke tested; archived`
 
 ## 2. Objective
 
@@ -388,7 +388,7 @@ Recommended product rules:
 - Presentation: public cards/embeds never render raw text/detail data. Text questions may show
   response counts only if needed; choice aggregates keep existing PublicLive/HiddenUntilClose rules.
 - Exports: only private closed response-detail export gains raw text/detail columns. Totals export
-  remains aggregate.
+  remains aggregate and includes count-only rows for text questions.
 - Audit: record action type, question counts, text-answer count, detail-note count, changed flag,
   row/byte counts, column profile, oversized status, and delivery status. Do not store full
   submitted text/detail payloads in audit JSON.
@@ -459,8 +459,8 @@ Builder:
 Player:
 
 - Keep one private paged response panel.
-- Choice questions keep dropdown selection; if details are enabled, selected options get an
-  `Add details` / `Edit details` modal path.
+- Choice questions keep dropdown selection; if details are enabled, the question gets one
+  `Add details` / `Edit details` modal path for the overall question response.
 - Text questions use a modal launched from the question page, with current text prefilled when
   reopening a submitted response.
 - The review panel should indicate whether the current question has a saved text/detail value
@@ -472,9 +472,8 @@ Player:
 Totals export:
 
 - Preserve current aggregate columns and exclude raw text/detail values.
-- For text questions, either omit rows or include a count-only row only if explicitly approved in
-  implementation scope. The safest first implementation is to keep totals export choice-option
-  oriented and document that text details live in response-detail export.
+- Text questions emit aggregate count-only rows so all-text surveys still show question metadata
+  and response counts without exposing raw submitted text.
 
 Response-detail export:
 
@@ -538,7 +537,8 @@ service, views, scheduler, exports, or command wiring.
 10. Close manually and by scheduler.
 11. Export response detail privately and confirm text/details are present, formula-safe, and
     Discord IDs remain spreadsheet-safe.
-12. Confirm totals export remains aggregate and existing vote exports remain unchanged.
+12. Confirm totals export remains aggregate, includes text-question count rows, and existing vote
+    exports remain unchanged.
 
 ### Future Task-Pack / Deferred Outlines
 
@@ -564,11 +564,11 @@ Approved and delivered first implementation slice:
 - Dedicated `SurveyTextAnswers` and `SurveyAnswerDetails` SQL tables.
 - Private/export-only raw text visibility.
 - No persisted partial player drafts.
-- Totals export remains aggregate; response-detail export receives raw text/detail columns.
+- Totals export remains aggregate and includes text-question count rows; response-detail export
+  receives raw text/detail columns.
 
 Remaining outside this slice:
 
-- Production promotion and operator smoke testing.
 - Persisted partial player drafts/resume.
 - Optional survey questions.
 - Rating/ranking questions.

@@ -526,22 +526,35 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 8 - Survey Free Text And Add Details
 
-Status: prepared as the next voting slice.
+Status: delivered, smoke tested, and archived.
 
-Confirmed next-slice scope:
+Delivered scope:
 
-- Add free-text survey questions.
-- Add optional choice-question `Add details` text where a respondent can attach explanatory text to
-  a selected choice.
-- Include free-text answers and `Add details` text in private admin/leadership response-detail
-  exports.
-- Preserve current admin/leadership visibility: private live/status/export visibility for
-  authorized users, public aggregate output only according to result visibility, and no public
-  voter-level/detail export.
-- Preserve all Phase 7 choice-only survey behavior and all Phase 1 through Phase 6 vote behavior.
-- Keep draft/resume, optional questions, rating questions, emoji/icon support,
+- Required free-text survey questions with 500-character answer limits, modal guidance, response
+  prefill/editing, and required-answer validation.
+- Optional choice-question `Add details` text with one details capture per question, 300-character
+  guidance, response prefill/editing, and no public raw text exposure.
+- Additive SQL-backed `Text` survey question type, `AllowDetails` metadata,
+  `SurveyTextAnswers`, and `SurveyAnswerDetails`.
+- Private response-detail exports include text/detail data with formula safety and
+  spreadsheet-safe Discord IDs.
+- Totals export remains aggregate and includes count-only rows for text questions so all-text
+  surveys are not header-only.
+- PublicLive and HiddenUntilClose preserve aggregate-only public behavior; raw text/details stay
+  private to authorized admin/leadership response-detail exports.
+- Successful survey submit closes/clears the private response controls; submit remains gated until
+  all required questions are answered.
+- Phase 7 choice-only survey behavior and Phase 1 through Phase 6 vote behavior were preserved.
+- Draft/resume, optional questions, rating/ranking questions, emoji/icon support,
   dashboard/reporting, role-restricted voting, governor-linked voting, saved templates, and public
-  detail exports out of Phase 8 unless separately approved.
+  detail exports stayed out of Phase 8.
+
+Archived records:
+
+```text
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details.md
+```
 
 ## 8. Remaining Slice Scope Summary
 
@@ -633,23 +646,59 @@ Delivered scope:
 
 ### Phase 8 survey text/details scope summary
 
-Phase 8 should extend the delivered survey model with text-bearing answers, not redesign the
-choice-only survey foundation.
+Phase 8 is complete. It extended the delivered survey model with text-bearing answers without
+redesigning the choice-only survey foundation.
 
-Prepared scope:
+Delivered scope:
 
-- Decide the SQL shape for free-text answers and per-choice `Add details` text. Validate against
-  `C:\K98-bot-SQL-Server` before recommending tables, columns, constraints, indexes, or migration
-  order.
-- Define the player UX for a free-text question and an optional details prompt attached to a
-  selected choice.
-- Define length limits, Discord component choice, validation copy, empty/whitespace handling, and
-  CSV formula-safety for submitted text.
-- Include text/detail data in private admin/leadership response-detail exports.
-- Define public aggregate behavior: text values are not shown publicly; choice aggregates continue
-  to follow PublicLive/HiddenUntilClose.
-- Preserve no persisted partial player drafts unless a separate draft/resume slice is approved.
-- Preserve all existing survey create/status/close/export behavior for choice-only surveys.
+- Additive SQL shape validated and deployed through `C:\K98-bot-SQL-Server`:
+  `SurveyQuestions.QuestionType = Text`, `SurveyQuestions.AllowDetails`,
+  `dbo.SurveyTextAnswers`, and `dbo.SurveyAnswerDetails`.
+- Required free-text questions and optional per-choice-question details delivered with trimmed
+  text, empty/whitespace rules, 500/300 character limits, and Discord modal guidance.
+- Player UX delivered with private modal entry/editing, saved-state review copy, response prefill,
+  submit gating until all required questions are complete, and response controls closed after
+  successful submit.
+- Public output remains aggregate-only. PublicLive and HiddenUntilClose never render raw
+  free-text answers or detail notes.
+- Private closed-only response-detail exports include raw text/detail values with formula safety.
+- Totals export stays aggregate and emits count-only rows for text questions.
+- Audit metadata records counts, row/byte/export status, and changed flags without storing full
+  text/detail payloads.
+- No persisted partial player drafts were added.
+- Existing choice-only survey create/status/close/export behavior and existing one-choice and
+  multi-select vote behavior were preserved.
+
+### Phase 9 advanced survey question-types scope summary
+
+Phase 9 is prepared as the next audit/design slice. It should decide whether and how to add
+optional survey questions plus rating/ranking question types after the required text/detail model
+has production smoke evidence.
+
+Confirmed audit scope:
+
+- Optional survey questions: completion semantics, `SurveyQuestions.IsRequired` behavior,
+  unanswered-question copy, missing-answer export shape, public count semantics, and response
+  change behavior.
+- Rating questions: allowed scale shapes, storage contract, validation limits, aggregate
+  presentation, and private detail export shape.
+- Ranking questions: ranking cardinality, duplicate/preference validation, storage shape, public
+  aggregate behavior, and export representation.
+- Builder UX for advanced question types without free-typed question-type values.
+- Player UX for entering, reviewing, editing, and submitting optional/rating/ranking answers.
+- PublicLive and HiddenUntilClose behavior for non-choice aggregates.
+- Private admin/leadership live status and closed-only response-detail export behavior.
+- SQL migration order, constraints, indexes, rollback posture, and source-of-truth validation.
+- Focused service/DAL/view/export/scheduler/command tests and Discord smoke plan.
+
+Explicitly out of Phase 9 unless separately approved:
+
+- Persisted partial player drafts/resume.
+- Emoji/icon support.
+- Dashboard/reporting implementation or cross-survey export redesign.
+- Role-restricted voting, governor-linked voting, saved templates, public voter-level/detail
+  export posting, `/vote_admin` rename/removal, or existing one-choice/multi-select behavior
+  changes.
 
 ## 9. Cross-Programme Constraints
 
@@ -664,10 +713,9 @@ Prepared scope:
 - Do not expose voter-level exports publicly without explicit approval.
 - Do not add further advanced voting modes until their product, privacy, permissions, SQL, UX,
   test, and rollout model are explicitly approved.
-- Do not implement survey free-text/details, optional questions, draft/resume, rating questions,
-  emoji/icon support, dashboard/reporting readiness,
-  role-restricted voting, governor-linked voting, saved templates, or public voter-level exports
-  as part of any voting slice unless separately approved.
+- Do not implement optional questions, draft/resume, rating/ranking questions, emoji/icon support,
+  dashboard/reporting readiness, role-restricted voting, governor-linked voting, saved templates,
+  or public voter-level exports as part of any voting slice unless separately approved.
 
 ## 10. Validation Strategy
 
@@ -729,16 +777,20 @@ The core programme is successful when:
       panel, submitted-answer prefill, manual/automatic close, PublicLive/HiddenUntilClose
       aggregate behavior, private live admin status, private closed-only totals/detail exports,
       and preserved one-choice/multi-select vote behavior.
+- [x] Free-text survey questions and optional choice-question details are delivered in Phase 8 with
+      additive SQL tables, private modal entry/editing, submit gating, successful submit closeout,
+      aggregate-only public behavior, text-question rows in totals export, private response-detail
+      text/detail export, and preserved Phase 1 through Phase 7 behavior.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 8: Survey Free Text and Add Details.
+Start Discord Voting Post Framework Phase 9: Advanced Survey Question Types Audit and Design.
 
-Begin with audit/scope only. Do not implement SQL migrations, runtime survey text/detail storage,
-free-text response UI, export shape changes, dashboard/reporting implementation, or command
-changes until the Phase 8 architecture, product scope, privacy, SQL, permissions, and UX direction
-are approved.
+Begin with audit/scope only. Do not implement SQL migrations, optional survey-question behavior,
+rating/ranking runtime storage, response UI, export shape changes, dashboard/reporting
+implementation, or command changes until the Phase 9 architecture, product scope, privacy, SQL,
+permissions, and UX direction are approved.
 ```
 
 ## 13. Programme Change Log
@@ -767,3 +819,5 @@ are approved.
 | 2026-07-02 | Phase 7 choice-only survey first slice started | Began implementation of separate SQL-backed choice-only survey posts under `/vote_admin survey_*`, preserving existing one-choice and single-question MultiSelect behavior. Free-text questions and choice-question `Add details` remain the next phase. |
 | 2026-07-03 | Phase 7 choice-only surveys smoke tested | Smoke testing confirmed survey creation with single-choice and multi-select questions, response submission, response updates, PublicLive and HiddenUntilClose behavior, manual close, automatic close, and the guided builder polish. Ordinary builder timeout now expires gracefully; unpublished drafts intentionally do not survive bot restart. |
 | 2026-07-03 | Phase 8 prepared | Created the next task pack and starter for free-text survey questions plus optional choice-question `Add details`, with submitted text/detail data required in private admin/leadership exports and public detail exposure out of scope. |
+| 2026-07-04 | Phase 8 smoke tested and archived | Delivered SQL-backed free-text survey questions, one details capture per choice question, modal limit guidance, submit gating, successful submit closeout, private response-detail text/detail export, aggregate text-question totals rows, and preserved existing vote/survey behavior. Phase 8 task pack and starter moved to archive. |
+| 2026-07-04 | Phase 9 prepared | Created the next audit/design task pack and starter for optional survey questions plus rating/ranking question types; kept persisted drafts/resume, emoji/icon support, richer exports, dashboard/reporting, role/governor/template/public-detail work as separate deferred slices. |

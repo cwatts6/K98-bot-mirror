@@ -24,7 +24,11 @@ This file preserves resolved deferred-optimisation notes that used to live in
   neighboring vote/admin/scheduler/export/render tests, architecture and deferred validators,
   selected-test review, smoke imports, command registration validation, full pytest, whitespace
   checks, and Codex Security diff scan `378f3c4a-373e-4bc8-a4b7-2cd5db89b6b6` with zero
-  findings. Production promotion and operator smoke testing remain separate follow-up steps.
+  findings. SQL PR #30 was merged and deployed before bot rollout. Operator smoke testing on
+  2026-07-04 confirmed text questions, one details capture per choice question, text/detail limit
+  guidance, submit gating, successful submit closeout, PublicLive/HiddenUntilClose privacy,
+  private response-detail export, aggregate text-question totals rows, and existing vote/survey
+  regression behavior.
 
 ### Discord Voting Post Framework Phase 7 Choice-Only Surveys Completed Item
 - Area: `voting/`, `/vote_admin survey_*`, `ui/views/survey_post_view.py`, SQL repo survey framework
