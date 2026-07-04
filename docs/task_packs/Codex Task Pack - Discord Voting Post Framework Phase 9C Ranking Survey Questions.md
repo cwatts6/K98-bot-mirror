@@ -303,7 +303,7 @@ service, views, scheduler, exports, or command wiring.
 
 ## 14. Deferred Follow-Up Work
 
-Keep these separate unless explicitly approved:
+Keep these required follow-up slices separate from Phase 9C unless explicitly approved:
 
 - Survey Draft/Resume: SQL-backed partial drafts, resume after timeout/restart, cleanup/expiry,
   privacy approval, and export exclusion for unsubmitted drafts.
@@ -313,8 +313,16 @@ Keep these separate unless explicitly approved:
   reporting views/procedures, retention/redaction policy, and dashboard/reporting decisions.
 - Emoji/Icon Support: option metadata, Discord button/select rendering, export representation, and
   generated-card glyph QA.
-- Voting Identity/Policy Work: role-restricted voting, governor-linked voting/reporting, saved
-  templates, public detail exports, and `/vote_admin` command reshaping.
+- `/vote_admin` Reshaping: command-surface governance, canonical docs, permissions review, and
+  smoke tests.
+
+These items are definitely not required and should remain out of scope unless a future operator
+decision reverses that status:
+
+- Role-restricted voting.
+- Governor-linked voting or governor-aware reporting.
+- Saved vote/survey templates.
+- Public voter-level/detail export posting.
 
 ## 15. Approval Needed
 

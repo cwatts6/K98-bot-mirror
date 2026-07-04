@@ -19,6 +19,7 @@ from ui.views.survey_post_view import (
 )
 from voting import survey_service
 from voting.survey_models import (
+    SURVEY_QUESTION_RANKING,
     SURVEY_QUESTION_RATING,
     SurveyQuestion,
     SurveyQuestionCreateRequest,
@@ -436,6 +437,129 @@ async def test_survey_response_panel_allows_skipped_optional_rating():
     assert panel.rating_answers == {}
     assert not panel.children[-1].disabled
     assert "Optional rating: choose 1-5 (skipped)." in panel.content()
+
+
+@pytest.mark.asyncio
+async def test_survey_response_panel_supports_ranking_entry_and_duplicate_prevention():
+    now = datetime.now(UTC)
+    snapshot = SurveySnapshot(
+        survey_id=7,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Survey",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=7,
+                question_key="q1",
+                prompt="Rank priorities",
+                question_type="Ranking",
+                sort_order=1,
+                min_selections=3,
+                max_selections=3,
+                options=(
+                    SurveyQuestionOption(101, 10, "opt1", "A", 1),
+                    SurveyQuestionOption(102, 10, "opt2", "B", 2),
+                    SurveyQuestionOption(103, 10, "opt3", "C", 3),
+                ),
+            ),
+        ),
+    )
+    panel = SurveyResponsePanel(snapshot, owner_user_id=123)
+
+    assert panel.children[-1].disabled is True
+    assert "Required ranking: rank all 3 options (not yet complete)." in panel.content()
+
+    panel.set_ranking_option(snapshot.questions[0], rank_value=1, option_id=101)
+    panel.set_ranking_option(snapshot.questions[0], rank_value=2, option_id=102)
+    panel.set_ranking_option(snapshot.questions[0], rank_value=3, option_id=101)
+    assert panel.ranking_answers == {10: (0, 102, 101)}
+    assert panel.is_complete() is False
+
+    panel.set_ranking_option(snapshot.questions[0], rank_value=1, option_id=103)
+    panel._rebuild()
+
+    assert panel.normalized_ranking_answers() == {10: (103, 102, 101)}
+    assert panel.is_complete() is True
+    assert not panel.children[-1].disabled
+    assert "Required ranking: rank all 3 options (complete)." in panel.content()
+
+
+@pytest.mark.asyncio
+async def test_survey_response_panel_allows_skipped_optional_ranking():
+    now = datetime.now(UTC)
+    snapshot = SurveySnapshot(
+        survey_id=7,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Survey",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=7,
+                question_key="q1",
+                prompt="Optional ranking",
+                question_type="Ranking",
+                sort_order=1,
+                min_selections=2,
+                max_selections=2,
+                options=(
+                    SurveyQuestionOption(101, 10, "opt1", "A", 1),
+                    SurveyQuestionOption(102, 10, "opt2", "B", 2),
+                ),
+                is_required=False,
+            ),
+        ),
+    )
+    panel = SurveyResponsePanel(
+        snapshot,
+        owner_user_id=123,
+        ranking_answers={10: (102, 101)},
+    )
+
+    assert not panel.children[-1].disabled
+    assert "Optional ranking: rank all 2 options (complete)." in panel.content()
+
+    skip = next(
+        child for child in panel.children if getattr(child, "label", None) == "Skip ranking"
+    )
+    await skip.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    assert panel.ranking_answers == {}
+    assert not panel.children[-1].disabled
+    assert "Optional ranking: rank all 2 options (skipped)." in panel.content()
 
 
 @pytest.mark.asyncio
@@ -888,6 +1012,53 @@ async def test_survey_guided_builder_saves_rating_question(monkeypatch):
     assert view.questions[0].min_selections == 0
     assert view.questions[0].max_selections == 0
     assert "Rating 1-5" in view.summary()
+
+
+@pytest.mark.asyncio
+async def test_survey_guided_builder_saves_ranking_question(monkeypatch):
+    async def fake_publish(_interaction, _questions):
+        return True
+
+    async def fake_send_ephemeral(_interaction, _content, **_kwargs):
+        return None
+
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    view = SurveyBuilderView(owner_user_id=123, publish_callback=fake_publish)
+    type_select = _select(view, "Question type")
+    type_select._selected_values = ["ranking"]
+    type_select._interaction = SimpleNamespace(data={})
+    await type_select.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    assert view.draft_is_ranking is True
+    assert _select(view, "Minimum selections").disabled is True
+    assert _select(view, "Maximum selections").disabled is True
+    assert _button(view, "Details off").disabled is True
+
+    prompt_modal = _SurveyQuestionPromptModal(view)
+    prompt_modal.prompt.value = "Rank priorities"
+    await prompt_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    first_option = _SurveyOptionModal(view)
+    first_option.option.value = "A"
+    await first_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    second_option = _SurveyOptionModal(view)
+    second_option.option.value = "B"
+    await second_option.callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+    third_option = _SurveyOptionModal(view)
+    third_option.option.value = "C"
+    await third_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    await _button(view, "Save question").callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    assert view.questions[0].question_type == SURVEY_QUESTION_RANKING
+    assert view.questions[0].options == ("A", "B", "C")
+    assert view.questions[0].min_selections == 3
+    assert view.questions[0].max_selections == 3
+    assert view.questions[0].allow_details is False
 
 
 @pytest.mark.asyncio

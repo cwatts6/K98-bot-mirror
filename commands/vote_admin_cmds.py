@@ -50,8 +50,10 @@ from voting.survey_export_service import (
     build_survey_totals_export,
 )
 from voting.survey_models import (
+    SURVEY_QUESTION_RANKING,
     SURVEY_QUESTION_RATING,
     SURVEY_QUESTION_TEXT,
+    ranking_count_for_value,
     rating_count_for_value,
 )
 from voting.survey_presentation import (
@@ -927,7 +929,11 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                 return False
 
             message = None
-            snapshot = await create_survey_record(req)
+            try:
+                snapshot = await create_survey_record(req)
+            except VoteValidationError as exc:
+                await send_ephemeral(interaction, f"Survey not created: {exc}")
+                return False
             try:
                 message = await target_channel.send(
                     content=mention_content(snapshot.launch_mention_everyone, "New survey is open"),
@@ -1103,6 +1109,47 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                     rating_summary = "no ratings"
                 question_lines.append(
                     f"Q{question.sort_order}: {rating_summary} ({answered} answered, {skipped} skipped, {requirement})"
+                )
+                continue
+            if question.question_type == SURVEY_QUESTION_RANKING:
+                ranked_options = [
+                    option for option in question.options if option.ranking_average is not None
+                ]
+                if answered and ranked_options:
+                    best_average = min(
+                        float(option.ranking_average or 99) for option in ranked_options
+                    )
+                    average_leaders = [
+                        option.label
+                        for option in ranked_options
+                        if option.ranking_average is not None
+                        and abs(float(option.ranking_average) - best_average) < 0.0001
+                    ]
+                    first_place_top = max(
+                        int(option.ranking_first_place_count or 0) for option in ranked_options
+                    )
+                    first_place_leaders = [
+                        option.label
+                        for option in ranked_options
+                        if int(option.ranking_first_place_count or 0) == first_place_top
+                    ]
+                    distribution = "; ".join(
+                        f"{option.label}: avg {option.ranking_average:.1f}, first {option.ranking_first_place_count}, "
+                        + " ".join(
+                            f"{rank}:{ranking_count_for_value(option, rank)}"
+                            for rank in range(1, len(question.options) + 1)
+                        )
+                        for option in ranked_options[:3]
+                    )
+                    ranking_summary = (
+                        f"best avg {', '.join(average_leaders[:2])} ({best_average:.1f}); "
+                        f"most first-place {', '.join(first_place_leaders[:2])} ({first_place_top}); "
+                        f"{distribution}"
+                    )
+                else:
+                    ranking_summary = "no rankings"
+                question_lines.append(
+                    f"Q{question.sort_order}: {ranking_summary} ({answered} answered, {skipped} skipped, {requirement})"
                 )
                 continue
             top = max((option.response_count for option in question.options), default=0)

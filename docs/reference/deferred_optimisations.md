@@ -9,7 +9,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Area: `voting/`, future survey response UX, SQL repo survey response tables
 - Type: architecture
 - Description: Phase 7 delivered choice-only surveys without persisted partial player response drafts. This keeps privacy and restart behavior simple, but longer surveys may eventually need SQL-backed draft responses, resume after timeout/restart, expiry/cleanup rules, and clearer abandoned-draft retention. Phase 9A delivered optional-question completion semantics and Phase 9B delivered rating questions without adding persisted drafts.
-- Suggested Fix: Keep draft/resume as a separate later slice after advanced question-type work is stable. Add explicit draft status, partial answer storage, cleanup/expiry policy, resume UX, optional-question interaction rules using the delivered Phase 9A semantics, and tests for restart, timeout, close, stale draft, and export exclusion behavior.
+- Suggested Fix: Required follow-up, but not part of Phase 9C. Keep draft/resume as a separate later slice after advanced question-type work is stable. Add explicit draft status, partial answer storage, cleanup/expiry policy, resume UX, optional-question interaction rules using the delivered Phase 9A semantics, and tests for restart, timeout, close, stale draft, and export exclusion behavior.
 - Impact: medium
 - Risk: high
 - Dependencies: Phase 7 choice-only surveys delivered and smoke tested on 2026-07-03; Phase 8 text/details delivered and smoke tested on 2026-07-04; Phase 9A optional-question semantics delivered and smoke tested on 2026-07-04; Phase 9B fixed 1-5 rating questions delivered and smoke tested on 2026-07-04; privacy approval for storing unsubmitted answers; SQL repo validation; restart and cleanup tests.
@@ -17,8 +17,8 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `voting/`, future survey ranking question types, SQL repo survey answer tables
 - Type: architecture
-- Description: Phase 9 audit designed rating and ranking question directions, Phase 9A delivered the optional-question foundation, and Phase 9B delivered fixed 1-5 rating questions. Ranking still needs a dedicated ranked-option answer contract, duplicate-rank prevention, clearer Discord entry/edit UX, conservative aggregate semantics, and private response-detail export representation.
-- Suggested Fix: Prepare Phase 9C ranking questions using existing `SurveyQuestionOptions` plus a dedicated SQL ranking answer contract, likely `dbo.SurveyRankingAnswers`, with uniqueness constraints for rank and option per response/question after source-of-truth SQL validation. Keep public output aggregate-only and private response-detail exports closed-only/admin-leadership-only.
+- Description: Phase 9 audit designed rating and ranking question directions, Phase 9A delivered the optional-question foundation, and Phase 9B delivered fixed 1-5 rating questions. Phase 9C implements complete ranking questions only; partial/top-N ranking, ties, ranking comments, and richer ranking methods remain outside the first ranking slice.
+- Suggested Fix: Phase 9C should close this item only after complete ranking questions are delivered and smoke tested using existing `SurveyQuestionOptions` plus a dedicated SQL ranking answer contract, `dbo.SurveyRankingAnswers`, with uniqueness constraints for rank and option per response/question after source-of-truth SQL validation. Keep public output aggregate-only and private response-detail exports closed-only/admin-leadership-only. Keep partial/top-N ranking and richer ranking methods out of scope unless separately approved.
 - Impact: high
 - Risk: high
 - Dependencies: Phase 9A optional-question semantics delivered and smoke tested on 2026-07-04; Phase 9B fixed 1-5 rating questions delivered and smoke tested on 2026-07-04; SQL repo migration approval for ranking; export shape approval; focused service/DAL/view/export tests; Discord smoke testing for prefill/update/close/restart behavior.
@@ -27,7 +27,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Area: `voting/`, future survey rating scale extensions, survey response UX, export/report surfaces
 - Type: architecture
 - Description: Phase 9B intentionally delivered only a fixed 1-5 rating question type. Custom rating scales, 1-10 scales, scale labels, per-rating comments, and richer rating presentation remain out of scope so the first rating slice stays predictable and aggregate-only.
-- Suggested Fix: After Phase 9C ranking and export/reporting needs are clear, scope a dedicated rating-scale polish slice. Confirm product value, privacy, SQL storage shape, backward compatibility for existing 1-5 ratings, export columns, public aggregate rendering, builder UX, player editing UX, validation, and migration/rollback posture before implementation.
+- Suggested Fix: Required follow-up, but not part of Phase 9C. After Phase 9C ranking and export/reporting needs are clear, scope a dedicated rating-scale polish slice. Confirm product value, privacy, SQL storage shape, backward compatibility for existing 1-5 ratings, export columns, public aggregate rendering, builder UX, player editing UX, validation, and migration/rollback posture before implementation.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 9B fixed 1-5 rating questions delivered and smoke tested on 2026-07-04; operator approval for custom scales/comments; SQL repo validation; export/reporting shape approval; visual smoke testing for generated cards.
@@ -35,8 +35,8 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `voting/`, `/vote_admin`, voting policy and identity future scope
 - Type: architecture
-- Description: Role-restricted voting, governor-linked voting/reporting, saved vote/survey templates, public voter-level/detail export posting, and `/vote_admin` command reshaping remain outside Phase 9. They are product-policy and command-surface changes, not prerequisites for optional/rating/ranking survey answers, and each can change privacy, permissions, exports, or command governance.
-- Suggested Fix: Keep these as separate approval-gated policy/design task packs. Each future pack should validate command-surface fit, permission/privacy model, SQL identity/template storage, export/reporting implications, public posting rules, tests, smoke plan, and promotion posture before implementation.
+- Description: Role-restricted voting, governor-linked voting/reporting, saved vote/survey templates, and public voter-level/detail export posting are definitely not required for the voting framework roadmap. `/vote_admin` command reshaping remains required follow-up work, but it is a command-surface governance task and not a prerequisite for optional/rating/ranking survey answers.
+- Suggested Fix: Do not implement role-restricted voting, governor-linked voting/reporting, saved vote/survey templates, or public voter-level/detail export posting unless a future operator decision reverses this not-required status. Keep required `/vote_admin` reshaping as a separate approval-gated command-surface task pack that validates command fit, permission/privacy model, docs, tests, smoke plan, and promotion posture before implementation.
 - Impact: medium
 - Risk: high
 - Dependencies: Explicit operator approval; canonical command reference updates if command paths change; SQL repo validation for identity/template storage; Codex Security review before runtime PR handoff.
@@ -45,7 +45,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Area: `voting/export_service.py`, future survey export services, SQL repo survey reporting views/procedures
 - Type: architecture
 - Description: Phase 7 delivered first-slice survey summary/detail CSV exports only for one closed survey at a time. Phase 8 added approved text/detail response-detail columns and aggregate text-question rows without broadening into richer reporting. Richer survey export/reporting work remains out of scope, including cross-survey exports, workbook-style exports, longitudinal reporting, and private reporting views/procedures.
-- Suggested Fix: After Phase 9B/9C advanced question-type shape is settled, scope a Survey Export v2 and reporting-readiness task. Validate consumer needs, define SQL views/procedures or service-owned queries, preserve private delivery by default, and add output-shape regression tests before changing export/report formats.
+- Suggested Fix: Required follow-up, but not part of Phase 9C. After Phase 9B/9C advanced question-type shape is settled, scope a Survey Export v2 and reporting-readiness task. Validate consumer needs, define SQL views/procedures or service-owned queries, preserve private delivery by default, and add output-shape regression tests before changing export/report formats.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 7 survey data model delivered; Phase 8 text/detail export behavior delivered and smoke tested; Phase 9A optional export behavior delivered and smoke tested; Phase 9B fixed 1-5 rating export behavior delivered and smoke tested; Phase 9C ranking export decisions; reporting consumer requirements; SQL repo validation; no public reporting without separate approval.
@@ -54,7 +54,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, SQL repo `dbo.VotePostOptions`
 - Type: consistency
 - Description: Per-option emoji/icon support is approved for future scope because it makes public votes and surveys more readable and engaging. Current options have labels and nullable `ButtonStyle`, but no emoji/icon metadata. Adding emoji has Discord button UX, CSV/export, and generated-card font/glyph implications. This remains a later polish slice and should not be bundled into Phase 9 advanced question types unless the operator explicitly reorders the roadmap.
-- Suggested Fix: Prepare a focused polish slice that adds approved option emoji/icon metadata, validates Unicode or custom emoji input, uses Discord button emoji support where practical, updates card rendering with glyph fallback checks, and preserves existing label-length/export behavior.
+- Suggested Fix: Required follow-up, but not part of Phase 9C. Prepare a focused polish slice that adds approved option emoji/icon metadata, validates Unicode or custom emoji input, uses Discord button emoji support where practical, updates card rendering with glyph fallback checks, and preserves existing label-length/export behavior.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 5 hidden-until-close, Phase 6 MultiSelect, and Phase 7 choice-only surveys are delivered; renderer visual QA with representative emoji/custom emoji cases; operator approval for whether emoji applies to one-choice only, MultiSelect, survey options, or all option-bearing voting surfaces.
@@ -63,7 +63,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Area: `voting/`, `/vote_admin status`, SQL repo vote reporting views/procedures
 - Type: architecture
 - Description: Dashboard/reporting readiness is approved for future scope. Current vote tables can support basic closed-vote summaries, Phase 6 added stable `OneChoice`/`MultiSelect` mode dimensions, Phase 7 added separate survey question/answer dimensions, and Phase 8 added text/detail answer dimensions, but there are no dedicated reporting views/procedures for combined vote/survey reporting.
-- Suggested Fix: Scope a private reporting-readiness slice after Phase 9B/9C advanced question-type shape is settled. Define SQL views or procedures for vote/survey summaries, participation, outcomes/top selections, export/audit history, result visibility, mode dimensions, text/detail exclusion or redaction policy, optional/rating/ranking dimensions, and any approved long-form export/reporting variants. Keep public website work out of scope unless separately approved.
+- Suggested Fix: Required follow-up, but not part of Phase 9C. Scope a private reporting-readiness slice after Phase 9B/9C advanced question-type shape is settled. Define SQL views or procedures for vote/survey summaries, participation, outcomes/top selections, export/audit history, result visibility, mode dimensions, text/detail exclusion or redaction policy, optional/rating/ranking dimensions, and any approved long-form export/reporting variants. Keep public website work out of scope unless separately approved.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 5 result visibility, Phase 6 vote-mode/cardinality SQL, Phase 7 survey SQL, Phase 8 text/details, Phase 9A optional questions, and Phase 9B fixed 1-5 rating questions are delivered and smoke tested; Phase 9C ranking decisions; operator approval for private versus public reporting consumers.

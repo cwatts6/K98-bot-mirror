@@ -17,6 +17,7 @@ from voting.service import (
 )
 from voting.survey_models import (
     SURVEY_QUESTION_MULTI_SELECT,
+    SURVEY_QUESTION_RANKING,
     SURVEY_QUESTION_RATING,
     SURVEY_QUESTION_SINGLE_CHOICE,
     SURVEY_QUESTION_TEXT,
@@ -43,6 +44,7 @@ SURVEY_QUESTION_TYPE_CHOICES: dict[str, str] = {
     SURVEY_QUESTION_MULTI_SELECT: "Multi-select",
     SURVEY_QUESTION_TEXT: "Text",
     SURVEY_QUESTION_RATING: "Rating",
+    SURVEY_QUESTION_RANKING: "Ranking",
 }
 
 
@@ -139,6 +141,19 @@ def build_question_request(
             options=(),
             min_selections=0,
             max_selections=0,
+            allow_details=False,
+            is_required=bool(is_required),
+        )
+    if normalized_type == SURVEY_QUESTION_RANKING:
+        clean_options = _validate_survey_option_labels(options)
+        if allow_details:
+            raise VoteValidationError("Ranking survey questions cannot allow choice details.")
+        return SurveyQuestionCreateRequest(
+            prompt=clean_prompt,
+            question_type=normalized_type,
+            options=clean_options,
+            min_selections=len(clean_options),
+            max_selections=len(clean_options),
             allow_details=False,
             is_required=bool(is_required),
         )
@@ -266,15 +281,18 @@ def validate_response_payload(
     text_answers_by_question_id: Mapping[int, str] | None = None,
     detail_text_by_question_option: Mapping[tuple[int, int], str] | None = None,
     rating_answers_by_question_id: Mapping[int, int | str | None] | None = None,
+    ranking_answers_by_question_id: Mapping[int, tuple[int, ...] | list[int] | None] | None = None,
 ) -> SurveyResponsePayload:
     choice_answers = answers_by_question_id or {}
     text_answers = text_answers_by_question_id or {}
     detail_answers = detail_text_by_question_option or {}
     rating_answers: dict[int, int | str | None] = {}
+    ranking_answers: dict[int, tuple[int, ...] | list[int] | None] = {}
     selected_output: dict[int, tuple[int, ...]] = {}
     text_output: dict[int, str] = {}
     detail_output: dict[tuple[int, int], str] = {}
     rating_output: dict[int, int] = {}
+    ranking_output: dict[int, tuple[int, ...]] = {}
     questions_by_id = {question.question_id: question for question in snapshot.questions}
     for raw_question_id in choice_answers:
         try:
@@ -300,7 +318,63 @@ def validate_response_payload(
         if question_id in rating_answers:
             raise VoteValidationError("One or more rating answers are not valid.")
         rating_answers[question_id] = raw_rating
+    for raw_question_id, raw_ranking in (ranking_answers_by_question_id or {}).items():
+        try:
+            question_id = int(raw_question_id)
+        except (TypeError, ValueError):
+            raise VoteValidationError("One or more ranking answers are not valid.") from None
+        if question_id not in questions_by_id:
+            raise VoteValidationError("One or more ranking answers are not valid.")
+        if question_id in ranking_answers:
+            raise VoteValidationError("One or more ranking answers are not valid.")
+        ranking_answers[question_id] = raw_ranking
     for question in snapshot.questions:
+        if question.question_type == SURVEY_QUESTION_RANKING:
+            if choice_answers.get(question.question_id):
+                raise VoteValidationError(
+                    f"Answer question {question.sort_order}: ranking questions do not use selections."
+                )
+            if (
+                question.question_id in text_answers
+                and str(text_answers.get(question.question_id) or "").strip()
+            ):
+                raise VoteValidationError(
+                    f"Answer question {question.sort_order}: this question does not accept text."
+                )
+            if question.question_id in rating_answers:
+                raise VoteValidationError(
+                    f"Answer question {question.sort_order}: this question does not accept ratings."
+                )
+            raw_ranking = ranking_answers.get(question.question_id)
+            if raw_ranking in (None, (), []):
+                if question.is_required:
+                    raise VoteValidationError(
+                        f"Answer question {question.sort_order}: rank every option."
+                    )
+                continue
+            try:
+                if isinstance(raw_ranking, (str, bytes)):
+                    raise TypeError
+                ranked_option_ids = tuple(int(option_id) for option_id in raw_ranking or ())
+            except (TypeError, ValueError):
+                raise VoteValidationError(
+                    f"Answer question {question.sort_order}: one or more ranked options are not valid."
+                ) from None
+            expected_option_ids = {option.option_id for option in question.options}
+            if len(ranked_option_ids) != len(question.options):
+                raise VoteValidationError(
+                    f"Answer question {question.sort_order}: rank every option."
+                )
+            if len(set(ranked_option_ids)) != len(ranked_option_ids):
+                raise VoteValidationError(
+                    f"Answer question {question.sort_order}: each option can only be ranked once."
+                )
+            if set(ranked_option_ids) != expected_option_ids:
+                raise VoteValidationError(
+                    f"Answer question {question.sort_order}: one or more ranked options are not valid."
+                )
+            ranking_output[question.question_id] = ranked_option_ids
+            continue
         if question.question_type == SURVEY_QUESTION_RATING:
             if choice_answers.get(question.question_id):
                 raise VoteValidationError(
@@ -341,6 +415,10 @@ def validate_response_payload(
                 raise VoteValidationError(
                     f"Answer question {question.sort_order}: this question does not accept ratings."
                 )
+            if question.question_id in ranking_answers:
+                raise VoteValidationError(
+                    f"Answer question {question.sort_order}: this question does not accept rankings."
+                )
             clean_text = _clean_limited_text(
                 text_answers.get(question.question_id),
                 limit=MAX_SURVEY_TEXT_ANSWER_LEN,
@@ -353,6 +431,10 @@ def validate_response_payload(
         if question.question_id in rating_answers:
             raise VoteValidationError(
                 f"Answer question {question.sort_order}: this question does not accept ratings."
+            )
+        if question.question_id in ranking_answers:
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: this question does not accept rankings."
             )
         raw_selected_ids = choice_answers.get(question.question_id, ())
         try:
@@ -393,6 +475,10 @@ def validate_response_payload(
             raise VoteValidationError(
                 f"Answer question {question.sort_order}: this question does not accept ratings."
             )
+        if normalized_question_id in ranking_answers:
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: this question does not accept rankings."
+            )
         if normalized_question_id not in text_output:
             clean_text = _clean_limited_text(
                 text,
@@ -413,6 +499,7 @@ def validate_response_payload(
             raise VoteValidationError("One or more detail notes are not valid.")
         if (
             question.question_type in {SURVEY_QUESTION_TEXT, SURVEY_QUESTION_RATING}
+            or question.question_type == SURVEY_QUESTION_RANKING
             or not question.allow_details
         ):
             raise VoteValidationError(
@@ -436,6 +523,7 @@ def validate_response_payload(
         text_answers=text_output,
         detail_text_by_option=detail_output,
         rating_answers=rating_output,
+        ranking_answers=ranking_output,
     )
 
 
@@ -479,6 +567,7 @@ async def submit_survey_response(
     text_answers_by_question_id: Mapping[int, str] | None = None,
     detail_text_by_question_option: Mapping[tuple[int, int], str] | None = None,
     rating_answers_by_question_id: Mapping[int, int | str | None] | None = None,
+    ranking_answers_by_question_id: Mapping[int, tuple[int, ...] | list[int] | None] | None = None,
     now_utc: datetime | None = None,
 ) -> tuple[SurveySubmitResult, SurveySnapshot | None]:
     snapshot = await survey_dal.get_survey_snapshot(int(survey_id))
@@ -493,6 +582,7 @@ async def submit_survey_response(
         text_answers_by_question_id=text_answers_by_question_id,
         detail_text_by_question_option=detail_text_by_question_option,
         rating_answers_by_question_id=rating_answers_by_question_id,
+        ranking_answers_by_question_id=ranking_answers_by_question_id,
     )
     result = await survey_dal.submit_survey_response(
         survey_id=int(survey_id),
@@ -501,6 +591,7 @@ async def submit_survey_response(
         text_answers_by_question_id=validated.text_answers,
         detail_text_by_question_option=validated.detail_text_by_option,
         rating_answers_by_question_id=validated.rating_answers,
+        ranking_answers_by_question_id=validated.ranking_answers,
         now_utc=now_utc or datetime.now(UTC),
     )
     refreshed = await survey_dal.get_survey_snapshot(int(survey_id)) if result.accepted else None

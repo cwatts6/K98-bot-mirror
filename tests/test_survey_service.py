@@ -7,6 +7,7 @@ import pytest
 from voting import survey_service
 from voting.service import VoteValidationError
 from voting.survey_models import (
+    SURVEY_QUESTION_RANKING,
     SURVEY_QUESTION_RATING,
     SURVEY_QUESTION_TEXT,
     SurveyQuestion,
@@ -129,6 +130,30 @@ def test_build_question_request_derives_type_from_max_selections():
 
     assert single.question_type == "SingleChoice"
     assert multi.question_type == "MultiSelect"
+
+
+def test_build_question_request_accepts_ranking_options_and_rejects_details():
+    question = survey_service.build_question_request(
+        prompt="Rank priorities",
+        question_type="Ranking",
+        options=("A", "B", "C"),
+        min_selections=1,
+        max_selections=1,
+    )
+
+    assert question.question_type == SURVEY_QUESTION_RANKING
+    assert question.options == ("A", "B", "C")
+    assert question.min_selections == 3
+    assert question.max_selections == 3
+    assert question.allow_details is False
+
+    with pytest.raises(VoteValidationError, match="cannot allow choice details"):
+        survey_service.build_question_request(
+            prompt="Rank priorities",
+            question_type="Ranking",
+            options=("A", "B"),
+            allow_details=True,
+        )
 
 
 def test_build_question_request_accepts_text_and_choice_details():
@@ -576,4 +601,104 @@ def test_validate_response_payload_accepts_required_and_optional_ratings():
             snapshot,
             answers_by_question_id={10: (101,)},
             rating_answers_by_question_id={10: 5},
+        )
+
+
+def test_validate_response_payload_accepts_required_and_optional_rankings():
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+    snapshot = SurveySnapshot(
+        survey_id=8,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Survey",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=8,
+                question_key="q1",
+                prompt="Required ranking",
+                question_type="Ranking",
+                sort_order=1,
+                min_selections=3,
+                max_selections=3,
+                options=(
+                    SurveyQuestionOption(101, 10, "opt1", "A", 1),
+                    SurveyQuestionOption(102, 10, "opt2", "B", 2),
+                    SurveyQuestionOption(103, 10, "opt3", "C", 3),
+                ),
+            ),
+            SurveyQuestion(
+                question_id=11,
+                survey_id=8,
+                question_key="q2",
+                prompt="Optional ranking",
+                question_type="Ranking",
+                sort_order=2,
+                min_selections=2,
+                max_selections=2,
+                options=(
+                    SurveyQuestionOption(201, 11, "opt1", "D", 1),
+                    SurveyQuestionOption(202, 11, "opt2", "E", 2),
+                ),
+                is_required=False,
+            ),
+        ),
+    )
+
+    payload = survey_service.validate_response_payload(
+        snapshot,
+        ranking_answers_by_question_id={10: (102, 101, 103)},
+    )
+
+    assert payload.ranking_answers == {10: (102, 101, 103)}
+
+    payload = survey_service.validate_response_payload(
+        snapshot,
+        ranking_answers_by_question_id={10: (101, 102, 103), 11: (202, 201)},
+    )
+
+    assert payload.ranking_answers == {10: (101, 102, 103), 11: (202, 201)}
+
+    with pytest.raises(VoteValidationError, match=r"question 1.*rank every option"):
+        survey_service.validate_response_payload(snapshot)
+
+    with pytest.raises(VoteValidationError, match=r"question 1.*rank every option"):
+        survey_service.validate_response_payload(
+            snapshot,
+            ranking_answers_by_question_id={10: (101, 102)},
+        )
+
+    with pytest.raises(VoteValidationError, match="only be ranked once"):
+        survey_service.validate_response_payload(
+            snapshot,
+            ranking_answers_by_question_id={10: (101, 101, 102)},
+        )
+
+    with pytest.raises(VoteValidationError, match="ranked options are not valid"):
+        survey_service.validate_response_payload(
+            snapshot,
+            ranking_answers_by_question_id={10: (101, 102, 999)},
+        )
+
+    with pytest.raises(VoteValidationError, match="do not use selections"):
+        survey_service.validate_response_payload(
+            snapshot,
+            ranking_answers_by_question_id={11: (201, 202)},
+            answers_by_question_id={10: (101,)},
         )

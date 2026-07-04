@@ -11,7 +11,12 @@ from typing import Any
 
 from voting import survey_dal
 from voting.service import VoteValidationError
-from voting.survey_models import SurveyAnswerAuditRow, SurveySnapshot, rating_count_for_value
+from voting.survey_models import (
+    SurveyAnswerAuditRow,
+    SurveySnapshot,
+    ranking_count_for_value,
+    rating_count_for_value,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +63,14 @@ SURVEY_TOTALS_COLUMNS = (
     "Rating3Count",
     "Rating4Count",
     "Rating5Count",
+    "AverageRank",
+    "FirstPlaceCount",
+    "Rank1Count",
+    "Rank2Count",
+    "Rank3Count",
+    "Rank4Count",
+    "Rank5Count",
+    "Rank6Count",
 )
 
 SURVEY_RESPONSE_DETAIL_COLUMNS = (
@@ -83,6 +96,12 @@ SURVEY_RESPONSE_DETAIL_COLUMNS = (
     "RatingValue",
     "OriginalRatingValue",
     "RatingChanged",
+    "RankingOptionID",
+    "RankingOptionKey",
+    "RankingOptionLabel",
+    "RankingRankValue",
+    "OriginalRankingRankValue",
+    "RankingChanged",
     "SelectedOptionDetailNotes",
     "OriginalSelectedOptionDetailNotes",
     "DetailNotesChanged",
@@ -177,7 +196,10 @@ def _answered_count(snapshot: SurveySnapshot, question) -> int:
 
 def _answer_status(row: SurveyAnswerAuditRow) -> str:
     has_answer = bool(
-        row.selected_option_ids or (row.text_answer or "").strip() or row.rating_value is not None
+        row.selected_option_ids
+        or (row.text_answer or "").strip()
+        or row.rating_value is not None
+        or row.ranking_rank_value is not None
     )
     if has_answer:
         return "Answered"
@@ -257,6 +279,14 @@ def survey_totals_csv_rows(snapshot: SurveySnapshot) -> list[dict[str, Any]]:
             "Rating3Count": rating_count_for_value(question, 3),
             "Rating4Count": rating_count_for_value(question, 4),
             "Rating5Count": rating_count_for_value(question, 5),
+            "AverageRank": "",
+            "FirstPlaceCount": 0,
+            "Rank1Count": 0,
+            "Rank2Count": 0,
+            "Rank3Count": 0,
+            "Rank4Count": 0,
+            "Rank5Count": 0,
+            "Rank6Count": 0,
         }
         if not question.options:
             answered = _answered_count(snapshot, question)
@@ -285,6 +315,18 @@ def survey_totals_csv_rows(snapshot: SurveySnapshot) -> list[dict[str, Any]]:
                     "SelectionCount": count,
                     "SelectionPercentOfResponses": _pct(count, total),
                     "IsTopSelection": 1 if top_count > 0 and count == top_count else 0,
+                    "AverageRank": (
+                        f"{option.ranking_average:.2f}"
+                        if option.ranking_average is not None
+                        else ""
+                    ),
+                    "FirstPlaceCount": option.ranking_first_place_count,
+                    "Rank1Count": ranking_count_for_value(option, 1),
+                    "Rank2Count": ranking_count_for_value(option, 2),
+                    "Rank3Count": ranking_count_for_value(option, 3),
+                    "Rank4Count": ranking_count_for_value(option, 4),
+                    "Rank5Count": ranking_count_for_value(option, 5),
+                    "Rank6Count": ranking_count_for_value(option, 6),
                 }
             )
     return rows
@@ -314,6 +356,7 @@ def survey_response_detail_csv_rows(
     for row in rows:
         text_changed = (row.original_text_answer or "") != (row.text_answer or "")
         rating_changed = row.original_rating_value != row.rating_value
+        ranking_changed = row.original_ranking_rank_value != row.ranking_rank_value
         details_changed = sorted(row.original_selected_option_detail_notes) != sorted(
             row.selected_option_detail_notes
         )
@@ -321,6 +364,7 @@ def survey_response_detail_csv_rows(
             set(row.original_option_ids) != set(row.selected_option_ids)
             or text_changed
             or rating_changed
+            or ranking_changed
             or details_changed
         )
         output.append(
@@ -349,6 +393,20 @@ def survey_response_detail_csv_rows(
                     row.original_rating_value if row.original_rating_value is not None else ""
                 ),
                 "RatingChanged": 1 if rating_changed else 0,
+                "RankingOptionID": (
+                    row.ranking_option_id if row.ranking_option_id is not None else ""
+                ),
+                "RankingOptionKey": row.ranking_option_key or "",
+                "RankingOptionLabel": row.ranking_option_label or "",
+                "RankingRankValue": (
+                    row.ranking_rank_value if row.ranking_rank_value is not None else ""
+                ),
+                "OriginalRankingRankValue": (
+                    row.original_ranking_rank_value
+                    if row.original_ranking_rank_value is not None
+                    else ""
+                ),
+                "RankingChanged": 1 if ranking_changed else 0,
                 "SelectedOptionDetailNotes": _join_values(row.selected_option_detail_notes),
                 "OriginalSelectedOptionDetailNotes": _join_values(
                     row.original_selected_option_detail_notes

@@ -8,6 +8,13 @@ SURVEY_QUESTION_SINGLE_CHOICE = "SingleChoice"
 SURVEY_QUESTION_MULTI_SELECT = "MultiSelect"
 SURVEY_QUESTION_TEXT = "Text"
 SURVEY_QUESTION_RATING = "Rating"
+SURVEY_QUESTION_RANKING = "Ranking"
+
+
+@dataclass(frozen=True)
+class SurveyRankingCount:
+    rank_value: int
+    response_count: int
 
 
 @dataclass(frozen=True)
@@ -18,6 +25,9 @@ class SurveyQuestionOption:
     label: str
     sort_order: int
     response_count: int = 0
+    ranking_average: float | None = None
+    ranking_first_place_count: int = 0
+    ranking_counts: tuple[SurveyRankingCount, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -49,6 +59,13 @@ class SurveyQuestion:
 def rating_count_for_value(question: SurveyQuestion, rating_value: int) -> int:
     for item in question.rating_counts:
         if int(item.rating_value) == int(rating_value):
+            return int(item.response_count)
+    return 0
+
+
+def ranking_count_for_value(option: SurveyQuestionOption, rank_value: int) -> int:
+    for item in option.ranking_counts:
+        if int(item.rank_value) == int(rank_value):
             return int(item.response_count)
     return 0
 
@@ -107,6 +124,7 @@ class SurveyResponsePayload:
     text_answers: dict[int, str]
     detail_text_by_option: dict[tuple[int, int], str]
     rating_answers: dict[int, int] = field(default_factory=dict)
+    ranking_answers: dict[int, tuple[int, ...]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -186,6 +204,11 @@ class SurveyAnswerAuditRow:
     original_selected_option_detail_notes: tuple[str, ...] = ()
     rating_value: int | None = None
     original_rating_value: int | None = None
+    ranking_option_id: int | None = None
+    ranking_option_key: str | None = None
+    ranking_option_label: str | None = None
+    ranking_rank_value: int | None = None
+    original_ranking_rank_value: int | None = None
 
 
 @dataclass(frozen=True)

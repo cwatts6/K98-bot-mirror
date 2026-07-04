@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 from core import visual_text
 from voting.result_visibility import public_results_hidden
 from voting.survey_models import (
+    SURVEY_QUESTION_RANKING,
     SURVEY_QUESTION_RATING,
     SURVEY_QUESTION_TEXT,
     RenderedSurveyCard,
@@ -117,6 +118,35 @@ def _top_option_line(snapshot: SurveySnapshot) -> str:
             lines.append(
                 f"Q{question.sort_order}: avg {question.rating_average:.1f}/5 "
                 f"({answered} ratings; {distribution})"
+            )
+            continue
+        if question.question_type == SURVEY_QUESTION_RANKING:
+            answered = int(question.answered_response_count or 0)
+            ranked_options = [
+                option for option in question.options if option.ranking_average is not None
+            ]
+            if answered <= 0 or not ranked_options:
+                lines.append(f"Q{question.sort_order}: no rankings yet")
+                continue
+            first_place_top = max(
+                int(option.ranking_first_place_count or 0) for option in ranked_options
+            )
+            first_place_leaders = [
+                option.label
+                for option in ranked_options
+                if int(option.ranking_first_place_count or 0) == first_place_top
+            ]
+            best_average = min(float(option.ranking_average or 99) for option in ranked_options)
+            average_leaders = [
+                option.label
+                for option in ranked_options
+                if option.ranking_average is not None
+                and abs(float(option.ranking_average) - best_average) < 0.0001
+            ]
+            lines.append(
+                f"Q{question.sort_order}: first {', '.join(first_place_leaders[:2])} "
+                f"({first_place_top}); best avg {', '.join(average_leaders[:2])} "
+                f"({best_average:.1f})"
             )
             continue
         if not question.options:
