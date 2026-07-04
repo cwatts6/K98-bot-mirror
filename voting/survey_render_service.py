@@ -117,6 +117,14 @@ def _top_option_line(snapshot: SurveySnapshot) -> str:
     return "\n".join(lines) or "No questions configured."
 
 
+def _question_mix(snapshot: SurveySnapshot) -> str:
+    required = sum(1 for question in snapshot.questions if question.is_required)
+    optional = len(snapshot.questions) - required
+    if optional:
+        return f"{required} required, {optional} optional questions"
+    return f"{required} required questions"
+
+
 def render_survey_card(
     snapshot: SurveySnapshot, *, now_utc: datetime | None = None
 ) -> RenderedSurveyCard:
@@ -161,7 +169,7 @@ def render_survey_card(
     _draw_text(draw, (66, 228), headline, fill=GOLD, font=headline_font, bold=True)
 
     if hidden:
-        detail = f"{len(snapshot.questions)} required questions"
+        detail = _question_mix(snapshot)
     else:
         detail = _top_option_line(snapshot)
     detail_font = _fit_font(draw, detail.splitlines()[0], max_width=960, size=24, min_size=16)
@@ -171,7 +179,7 @@ def render_survey_card(
         y += 38
 
     footer = (
-        f"Required questions: {len(snapshot.questions)}    "
+        f"Questions: {_question_mix(snapshot)}    "
         f"Last updated: {_fmt_dt(now)}    Survey #{snapshot.survey_id}"
     )
     footer_font = _fit_font(draw, footer, max_width=1000, size=22, min_size=16, bold=True)

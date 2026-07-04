@@ -1070,15 +1070,24 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
         ] or ["No reminders configured"]
         question_lines = []
         for question in snapshot.questions:
+            total_responses = int(snapshot.total_responses)
+            raw_answered = (
+                int(question.answered_response_count)
+                if question.answered_response_count is not None
+                else total_responses
+            )
+            answered = max(0, min(raw_answered, total_responses))
+            skipped = max(0, total_responses - answered)
+            requirement = "required" if question.is_required else "optional"
             if question.question_type == SURVEY_QUESTION_TEXT:
                 question_lines.append(
-                    f"Q{question.sort_order}: private text responses ({snapshot.total_responses})"
+                    f"Q{question.sort_order}: private text responses ({answered} answered, {skipped} skipped, {requirement})"
                 )
                 continue
             top = max((option.response_count for option in question.options), default=0)
             leaders = [option.label for option in question.options if option.response_count == top]
             question_lines.append(
-                f"Q{question.sort_order}: {', '.join(leaders[:2]) if top else 'no responses'} ({top})"
+                f"Q{question.sort_order}: {', '.join(leaders[:2]) if top else 'no responses'} ({top}; {answered} answered, {skipped} skipped, {requirement})"
             )
         embed = discord.Embed(
             title=f"Survey #{snapshot.survey_id}: {snapshot.title}",

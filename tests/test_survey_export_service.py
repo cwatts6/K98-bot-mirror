@@ -133,9 +133,12 @@ def test_survey_totals_rows_include_text_question_metadata_without_raw_answers()
             "QuestionKey": "q1",
             "QuestionPrompt": "What should leadership know?",
             "QuestionType": "Text",
+            "IsRequired": 1,
             "QuestionSortOrder": 1,
             "MinSelections": 0,
             "MaxSelections": 0,
+            "AnsweredResponses": 2,
+            "SkippedResponses": 0,
             "OptionID": "",
             "OptionKey": "",
             "OptionLabel": "",
@@ -145,6 +148,55 @@ def test_survey_totals_rows_include_text_question_metadata_without_raw_answers()
             "IsTopSelection": 0,
         }
     ]
+
+
+def test_survey_totals_rows_include_optional_answered_and_skipped_counts():
+    now = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
+    snapshot = SurveySnapshot(
+        survey_id=44,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Planning",
+        description=None,
+        status="Closed",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now,
+        closed_at_utc=now,
+        closed_by_discord_user_id=4,
+        closed_reason="done",
+        total_responses=3,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=20,
+                survey_id=44,
+                question_key="q1",
+                prompt="Optional note?",
+                question_type="Text",
+                sort_order=1,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+                is_required=False,
+                answered_response_count=1,
+            ),
+        ),
+    )
+
+    rows = survey_totals_csv_rows(snapshot)
+
+    assert rows[0]["IsRequired"] == 0
+    assert rows[0]["AnsweredResponses"] == 1
+    assert rows[0]["SkippedResponses"] == 2
+    assert rows[0]["SelectionCount"] == 1
+    assert rows[0]["SelectionPercentOfResponses"] == "33.3%"
 
 
 @pytest.mark.asyncio
@@ -219,6 +271,40 @@ def test_survey_response_detail_rows_include_spreadsheet_safe_discord_id():
         .decode("utf-8-sig")
     )
     assert "ResponseChanged" in text
+
+
+def test_survey_response_detail_rows_mark_skipped_optional_answers():
+    now = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
+    rows = (
+        SurveyAnswerAuditRow(
+            survey_id=42,
+            title="Planning",
+            closed_at_utc=now,
+            response_id=9,
+            discord_user_id=123456789012345678,
+            response_created_at_utc=now,
+            response_updated_at_utc=now,
+            question_id=10,
+            question_key="q1",
+            question_prompt="Optional note?",
+            question_type="Text",
+            selected_option_ids=(),
+            selected_option_keys=(),
+            selected_option_labels=(),
+            original_option_ids=(),
+            original_option_keys=(),
+            original_option_labels=(),
+            is_required=False,
+        ),
+    )
+
+    csv_rows = survey_response_detail_csv_rows(
+        rows, discord_names_by_user_id={123456789012345678: "Tester"}
+    )
+
+    assert csv_rows[0]["IsRequired"] == 0
+    assert csv_rows[0]["AnswerStatus"] == "SkippedOptional"
+    assert csv_rows[0]["TextAnswer"] == ""
 
 
 def test_survey_response_detail_text_and_details_are_formula_safe():

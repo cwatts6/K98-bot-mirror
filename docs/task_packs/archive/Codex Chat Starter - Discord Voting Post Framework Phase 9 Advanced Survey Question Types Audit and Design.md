@@ -1,6 +1,7 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter. Phase 9 audit completed and Phase 9A optional survey questions were
+delivered and smoke tested on 2026-07-04.
 
 Phase 1 through Phase 8 are complete and smoke tested. SQL-backed voting, one-choice voting,
 single-question multi-select voting, choice/text multi-question surveys, PublicLive and
@@ -62,7 +63,7 @@ Read first:
 - docs/reference/deferred_optimisations.md
 - docs/task_packs/Discord Voting Post Framework - Programme Pack.md
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 8 Survey Free Text and Add Details.md
-- docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md
+- docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md
 
 Use these skills as applicable:
 - k98-architecture-scope

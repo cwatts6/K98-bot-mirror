@@ -28,6 +28,7 @@ def test_answer_audit_rows_include_text_and_option_aligned_detail_payloads():
             "QuestionKey": "q1",
             "Prompt": "Choice?",
             "QuestionType": "SingleChoice",
+            "IsRequired": 0,
             "SurveyOptionID": 101,
             "OptionKey": "opt1",
             "Label": "A",
@@ -53,6 +54,7 @@ def test_answer_audit_rows_include_text_and_option_aligned_detail_payloads():
             "QuestionKey": "q1",
             "Prompt": "Choice?",
             "QuestionType": "MultiSelect",
+            "IsRequired": 0,
             "SurveyOptionID": 102,
             "OptionKey": "opt2",
             "Label": "B",
@@ -78,6 +80,7 @@ def test_answer_audit_rows_include_text_and_option_aligned_detail_payloads():
             "QuestionKey": "q2",
             "Prompt": "Explain?",
             "QuestionType": "Text",
+            "IsRequired": 1,
             "SurveyOptionID": None,
             "OptionKey": None,
             "Label": None,
@@ -89,7 +92,9 @@ def test_answer_audit_rows_include_text_and_option_aligned_detail_payloads():
     audit_rows = survey_dal._answer_audit_from_rows(rows)
 
     assert audit_rows[0].selected_option_ids == (101, 102)
+    assert audit_rows[0].is_required is False
     assert audit_rows[0].selected_option_detail_notes == ("101:new detail", "102:")
     assert audit_rows[0].original_selected_option_detail_notes == ("101:old detail", "102:")
     assert audit_rows[1].text_answer == "new text"
+    assert audit_rows[1].is_required is True
     assert audit_rows[1].original_text_answer == "old text"

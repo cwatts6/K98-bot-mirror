@@ -260,6 +260,72 @@ async def test_survey_submit_requires_all_questions_before_enabled(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_survey_submit_allows_skipped_optional_question():
+    now = datetime.now(UTC)
+    snapshot = SurveySnapshot(
+        survey_id=7,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Survey",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=7,
+                question_key="q1",
+                prompt="Required?",
+                question_type="SingleChoice",
+                sort_order=1,
+                min_selections=1,
+                max_selections=1,
+                options=(
+                    SurveyQuestionOption(101, 10, "opt1", "A", 1),
+                    SurveyQuestionOption(102, 10, "opt2", "B", 2),
+                ),
+            ),
+            SurveyQuestion(
+                question_id=11,
+                survey_id=7,
+                question_key="q2",
+                prompt="Optional note?",
+                question_type="Text",
+                sort_order=2,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+                is_required=False,
+            ),
+        ),
+    )
+    panel = SurveyResponsePanel(
+        snapshot,
+        owner_user_id=123,
+        selected_option_ids={10: (101,)},
+        current_index=1,
+    )
+
+    assert panel.is_complete() is True
+    assert not panel.children[-1].disabled
+    assert "Optional text response: skipped" in panel.content()
+    assert SURVEY_INCOMPLETE_HELP not in panel.content()
+
+
+@pytest.mark.asyncio
 async def test_survey_text_and_detail_modals_update_private_panel_state():
     now = datetime.now(UTC)
     snapshot = SurveySnapshot(
@@ -339,7 +405,7 @@ async def test_survey_text_and_detail_modals_update_private_panel_state():
 
     assert panel.children[0].label == "Response (required)"
     assert panel.children[-1].disabled is True
-    assert "Please provide a response: not yet complete" in panel.content()
+    assert "Required text response: not yet complete" in panel.content()
     assert SURVEY_INCOMPLETE_HELP in panel.content()
 
     text_modal = _SurveyTextAnswerModal(panel)
@@ -354,7 +420,7 @@ async def test_survey_text_and_detail_modals_update_private_panel_state():
 
     assert panel.detail_text_by_option == {(10, 101): "Preferred because reset is easier"}
     assert panel.text_answers == {11: "I can lead"}
-    assert "Please provide a response: complete" in panel.content()
+    assert "Required text response: complete" in panel.content()
     assert SURVEY_INCOMPLETE_HELP not in panel.content()
     assert not panel.children[-1].disabled
 
@@ -644,6 +710,43 @@ async def test_survey_guided_builder_saves_text_question_and_details_toggle(monk
 
     assert view.questions[1].question_type == "SingleChoice"
     assert view.questions[1].allow_details is True
+
+
+@pytest.mark.asyncio
+async def test_survey_guided_builder_saves_optional_question(monkeypatch):
+    async def fake_publish(_interaction, _questions):
+        return True
+
+    async def fake_send_ephemeral(_interaction, _content, **_kwargs):
+        return None
+
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    view = SurveyBuilderView(owner_user_id=123, publish_callback=fake_publish)
+    await _button(view, "Required").callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    assert view.draft_is_required is False
+    assert _button(view, "Optional").label == "Optional"
+
+    prompt_modal = _SurveyQuestionPromptModal(view)
+    prompt_modal.prompt.value = "Optional notes?"
+    await prompt_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    first_option = _SurveyOptionModal(view)
+    first_option.option.value = "A"
+    await first_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    second_option = _SurveyOptionModal(view)
+    second_option.option.value = "B"
+    await second_option.callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+    await _button(view, "Save question").callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    assert view.questions[0].is_required is False
+    assert "optional" in view.summary()
 
 
 @pytest.mark.asyncio
