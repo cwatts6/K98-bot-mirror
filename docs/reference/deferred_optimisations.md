@@ -8,20 +8,29 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `voting/`, future survey response UX, SQL repo survey response tables
 - Type: architecture
-- Description: Phase 7 delivered choice-only surveys without persisted partial player response drafts. This keeps privacy and restart behavior simple, but longer surveys may eventually need SQL-backed draft responses, resume after timeout/restart, expiry/cleanup rules, and clearer abandoned-draft retention. Phase 9A delivered optional-question completion semantics without adding persisted drafts.
+- Description: Phase 7 delivered choice-only surveys without persisted partial player response drafts. This keeps privacy and restart behavior simple, but longer surveys may eventually need SQL-backed draft responses, resume after timeout/restart, expiry/cleanup rules, and clearer abandoned-draft retention. Phase 9A delivered optional-question completion semantics and Phase 9B delivered rating questions without adding persisted drafts.
 - Suggested Fix: Keep draft/resume as a separate later slice after advanced question-type work is stable. Add explicit draft status, partial answer storage, cleanup/expiry policy, resume UX, optional-question interaction rules using the delivered Phase 9A semantics, and tests for restart, timeout, close, stale draft, and export exclusion behavior.
 - Impact: medium
 - Risk: high
-- Dependencies: Phase 7 choice-only surveys delivered and smoke tested on 2026-07-03; Phase 8 text/details delivered and smoke tested on 2026-07-04; Phase 9A optional-question semantics delivered and smoke tested on 2026-07-04; Phase 9B fixed 1-5 rating questions implemented locally on 2026-07-04 pending operator smoke; privacy approval for storing unsubmitted answers; SQL repo validation; restart and cleanup tests.
+- Dependencies: Phase 7 choice-only surveys delivered and smoke tested on 2026-07-03; Phase 8 text/details delivered and smoke tested on 2026-07-04; Phase 9A optional-question semantics delivered and smoke tested on 2026-07-04; Phase 9B fixed 1-5 rating questions delivered and smoke tested on 2026-07-04; privacy approval for storing unsubmitted answers; SQL repo validation; restart and cleanup tests.
 
 ### Deferred Optimisation
 - Area: `voting/`, future survey ranking question types, SQL repo survey answer tables
 - Type: architecture
-- Description: Phase 9 audit designed rating and ranking question directions, Phase 9A delivered the optional-question foundation, and Phase 9B implemented fixed 1-5 rating questions locally. Ranking still needs a dedicated ranked-option answer contract, duplicate-rank prevention, clearer Discord entry/edit UX, conservative aggregate semantics, and private response-detail export representation.
-- Suggested Fix: Prepare Phase 9C ranking questions using existing `SurveyQuestionOptions` plus `dbo.SurveyRankingAnswers` with uniqueness constraints for rank and option per response/question. Keep public output aggregate-only and private response-detail exports closed-only/admin-leadership-only.
+- Description: Phase 9 audit designed rating and ranking question directions, Phase 9A delivered the optional-question foundation, and Phase 9B delivered fixed 1-5 rating questions. Ranking still needs a dedicated ranked-option answer contract, duplicate-rank prevention, clearer Discord entry/edit UX, conservative aggregate semantics, and private response-detail export representation.
+- Suggested Fix: Prepare Phase 9C ranking questions using existing `SurveyQuestionOptions` plus a dedicated SQL ranking answer contract, likely `dbo.SurveyRankingAnswers`, with uniqueness constraints for rank and option per response/question after source-of-truth SQL validation. Keep public output aggregate-only and private response-detail exports closed-only/admin-leadership-only.
 - Impact: high
 - Risk: high
-- Dependencies: Phase 9A optional-question semantics delivered and smoke tested on 2026-07-04; Phase 9B fixed 1-5 rating questions implemented locally on 2026-07-04 pending operator smoke; SQL repo migration approval for ranking; export shape approval; focused service/DAL/view/export tests; Discord smoke testing for prefill/update/close/restart behavior.
+- Dependencies: Phase 9A optional-question semantics delivered and smoke tested on 2026-07-04; Phase 9B fixed 1-5 rating questions delivered and smoke tested on 2026-07-04; SQL repo migration approval for ranking; export shape approval; focused service/DAL/view/export tests; Discord smoke testing for prefill/update/close/restart behavior.
+
+### Deferred Optimisation
+- Area: `voting/`, future survey rating scale extensions, survey response UX, export/report surfaces
+- Type: architecture
+- Description: Phase 9B intentionally delivered only a fixed 1-5 rating question type. Custom rating scales, 1-10 scales, scale labels, per-rating comments, and richer rating presentation remain out of scope so the first rating slice stays predictable and aggregate-only.
+- Suggested Fix: After Phase 9C ranking and export/reporting needs are clear, scope a dedicated rating-scale polish slice. Confirm product value, privacy, SQL storage shape, backward compatibility for existing 1-5 ratings, export columns, public aggregate rendering, builder UX, player editing UX, validation, and migration/rollback posture before implementation.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 9B fixed 1-5 rating questions delivered and smoke tested on 2026-07-04; operator approval for custom scales/comments; SQL repo validation; export/reporting shape approval; visual smoke testing for generated cards.
 
 ### Deferred Optimisation
 - Area: `voting/`, `/vote_admin`, voting policy and identity future scope
@@ -39,7 +48,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Suggested Fix: After Phase 9B/9C advanced question-type shape is settled, scope a Survey Export v2 and reporting-readiness task. Validate consumer needs, define SQL views/procedures or service-owned queries, preserve private delivery by default, and add output-shape regression tests before changing export/report formats.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 7 survey data model delivered; Phase 8 text/detail export behavior delivered and smoke tested; Phase 9A optional export behavior delivered and smoke tested; Phase 9B fixed 1-5 rating export behavior implemented locally pending operator smoke; Phase 9C ranking export decisions; reporting consumer requirements; SQL repo validation; no public reporting without separate approval.
+- Dependencies: Phase 7 survey data model delivered; Phase 8 text/detail export behavior delivered and smoke tested; Phase 9A optional export behavior delivered and smoke tested; Phase 9B fixed 1-5 rating export behavior delivered and smoke tested; Phase 9C ranking export decisions; reporting consumer requirements; SQL repo validation; no public reporting without separate approval.
 
 ### Deferred Optimisation
 - Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, SQL repo `dbo.VotePostOptions`
@@ -57,7 +66,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Suggested Fix: Scope a private reporting-readiness slice after Phase 9B/9C advanced question-type shape is settled. Define SQL views or procedures for vote/survey summaries, participation, outcomes/top selections, export/audit history, result visibility, mode dimensions, text/detail exclusion or redaction policy, optional/rating/ranking dimensions, and any approved long-form export/reporting variants. Keep public website work out of scope unless separately approved.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5 result visibility, Phase 6 vote-mode/cardinality SQL, Phase 7 survey SQL, Phase 8 text/details, Phase 9A optional questions, and Phase 9B fixed 1-5 rating questions are delivered or locally implemented; Phase 9C ranking decisions; operator approval for private versus public reporting consumers.
+- Dependencies: Phase 5 result visibility, Phase 6 vote-mode/cardinality SQL, Phase 7 survey SQL, Phase 8 text/details, Phase 9A optional questions, and Phase 9B fixed 1-5 rating questions are delivered and smoke tested; Phase 9C ranking decisions; operator approval for private versus public reporting consumers.
 
 ### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks

@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 9A optional survey-question delivery and smoke test`
 - Task type: `audit | product scope | SQL-backed survey extension design | Discord interaction UX | privacy/export review`
 - One-pass approved: `no`
-- Status: `implemented locally after operator approval; pending SQL deployment and Discord smoke`
+- Status: `delivered and operator smoke tested; archived after Phase 9B closeout`
 
 ## 2. Objective
 
@@ -43,7 +43,7 @@ Read first:
 - `docs/reference/deferred_optimisations.md`
 - `docs/task_packs/Discord Voting Post Framework - Programme Pack.md`
 - `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md`
-- `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 9B Rating Survey Questions.md`
+- `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 9B Rating Survey Questions.md`
 
 ## 4. Delivered Baseline
 
@@ -299,12 +299,12 @@ Before implementation, confirm:
   `RatingChanged`.
 - Whether ranking should remain Phase 9C after rating is delivered and smoke tested.
 
-## 16. Phase 9B Local Implementation Record - 2026-07-04
+## 16. Phase 9B Delivery And Smoke Completion Record - 2026-07-04
 
-Phase 9B was approved after the audit/scope packet and implemented locally as the fixed 1-5 rating
-slice only.
+Phase 9B was approved after the audit/scope packet and delivered as the fixed 1-5 rating slice
+only.
 
-Delivered local scope:
+Delivered scope:
 
 - Added `QuestionType = Rating` as a first-class survey question type.
 - Prepared additive SQL migration `20260704_002_add_survey_rating_questions.sql` in the SQL repo.
@@ -323,6 +323,9 @@ Delivered local scope:
   payloads in audit JSON.
 - Preserved existing one-choice votes, multi-select votes, choice/text surveys, optional questions,
   details, reminders, automatic/manual close, restart-safe public openers, and private exports.
+- Added rollout-safety guards so non-rating survey snapshot/export paths continue to work with
+  empty rating aggregates if the rating migration is missing, while rating submissions surface an
+  explicit operator-facing migration error for `20260704_002_add_survey_rating_questions`.
 
 Still out of scope:
 
@@ -332,14 +335,27 @@ Still out of scope:
 - Dashboard/reporting, export v2/workbook redesign, role/governor voting, saved templates,
   public detail exports, and `/vote_admin` reshaping.
 
-Local validation:
+Validation:
 
 - Focused survey/voting pytest passed: `69 passed`.
+- Review-feedback focused pytest passed after migration-guard changes: `67 passed`.
+- Full pytest passed: `2299 passed, 2 skipped`.
+- `pre_commit run -a` passed.
+- Architecture/deferred/test-selection validators passed.
+- Smoke imports, command registration validation, and pytest log-noise validation passed.
+- Codex Security review was completed before runtime PR handoff with no unresolved security
+  blockers.
 
-Pending before production rollout:
+Operator smoke testing:
 
-- SQL deployment from `C:\K98-bot-SQL-Server`.
-- Full bot validation gates and Codex Security review before PR handoff.
-- Operator Discord smoke covering rating create, submit, update, optional skip, PublicLive,
-  HiddenUntilClose close reveal, status, exports, manual/automatic close, restart-safe opener, and
-  existing choice/text optional regressions.
+- SQL migration was deployed before bot runtime smoke.
+- Rating-question builder UX was confirmed with option/details controls disabled for rating
+  questions.
+- Required and optional rating questions both submitted correctly.
+- Optional rating skip/clear behavior worked correctly.
+- Public aggregate cards displayed average rating and distribution based only on submitted rating
+  answers.
+- Existing choice-only, text/detail, optional, multi-select vote, and one-choice vote behavior
+  remained compatible.
+- Phase 9B task pack and starter are archived; Phase 9C ranking questions are the next prepared
+  audit/design slice.

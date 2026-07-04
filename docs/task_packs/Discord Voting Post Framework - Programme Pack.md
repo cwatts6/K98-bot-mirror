@@ -701,30 +701,41 @@ Smoke evidence:
   The public card showed the response recorded, mixed required/optional question counts, and no
   raw text/detail exposure.
 
-### Phase 9B rating survey questions scope summary
+### Phase 9B rating survey questions delivery summary
 
-Phase 9B is the next prepared voting slice. It should start with audit/scope confirmation and then,
-if approved, add fixed 1-5 rating questions as a focused implementation.
+Phase 9B is complete and operator smoke tested. It delivered fixed 1-5 `Rating` survey questions
+as a focused advanced-question slice without broadening into ranking, custom scales, drafts,
+reporting, policy/identity, templates, or command reshaping.
 
-Confirmed Phase 9B scope:
+Delivered Phase 9B scope:
 
-- Fixed 1-5 rating survey questions.
+- Fixed 1-5 rating survey questions with dedicated SQL-backed rating answer storage.
 - Required versus optional rating completion semantics using the delivered Phase 9A model.
-- Builder UX through the existing guided question-type controls, without free-typed type values.
+- Builder UX through guided question-type controls, with options/details controls disabled or
+  rejected for rating questions.
 - Player UX for entering, reviewing, prefilled editing, skipping optional ratings, and submitting
   rating answers.
-- PublicLive and HiddenUntilClose aggregate-only behavior for rating counts, averages, and
-  distributions.
+- PublicLive and HiddenUntilClose aggregate-only behavior for answered count, average, min/max,
+  and 1-5 distribution.
 - Private admin/leadership live status behavior.
-- Private closed-only totals and response-detail export shape for rating values and skipped
-  optional ratings.
+- Private closed-only totals and response-detail export shape for rating values, skipped optional
+  ratings, original rating value, and changed flag where applicable.
 - CSV formula-safety and spreadsheet-safe Discord ID behavior.
-- SQL storage, constraints, indexes, migration order, rollback posture, and source-of-truth
-  validation against `C:\K98-bot-SQL-Server`.
-- Audit metadata without storing full answer payloads in audit JSON.
-- Focused service/DAL/view/export/scheduler/command tests and Discord smoke plan.
+- Additive SQL migration with rollout-safety guards for missing `dbo.SurveyRatingAnswers` during
+  bot/schema deployment ordering.
+- Audit metadata that records counts and changed status without storing full answer payloads in
+  audit JSON.
+- Focused service/DAL/view/export/scheduler/command tests, full pytest, pre-commit, validators,
+  smoke imports, command registration validation, log-noise validation, and Codex Security review.
 
-Explicitly out of Phase 9B unless separately approved:
+Smoke evidence:
+
+- Operator smoke testing on 2026-07-04 confirmed rating-question creation, disabled option/detail
+  controls for ratings, required and optional rating submission, optional rating skip behavior,
+  average-rating public display, and compatibility for existing choice/text/detail/optional
+  surveys, multi-select votes, and one-choice votes.
+
+Explicitly still out of scope after Phase 9B unless separately approved:
 
 - Ranking survey questions.
 - Custom rating scales, 1-10 scales, scale labels, emoji/icons, or rating comments.
@@ -732,14 +743,14 @@ Explicitly out of Phase 9B unless separately approved:
 - Dashboard/reporting implementation or cross-survey export redesign.
 - Role-restricted voting, governor-linked voting, saved templates, public voter-level/detail
   export posting, `/vote_admin` rename/removal, or existing one-choice/multi-select/choice/text
-  behavior changes except as explicitly approved for rating compatibility.
+  behavior changes.
 
 ### Phase 9C ranking survey questions outline
 
-Ranking remains the next advanced-question candidate after rating is delivered and smoke tested.
-It should be prepared as a separate task pack because it needs a dedicated ranked-option answer
-contract, duplicate rank prevention, clearer Discord entry/edit UX, conservative aggregate
-semantics, response-detail export representation, and a more careful rollback posture than rating.
+Ranking is the next prepared advanced-question candidate after Phase 9B. It is intentionally
+separate because it needs a dedicated ranked-option answer contract, duplicate-rank prevention,
+clearer Discord entry/edit UX, conservative aggregate semantics, response-detail export
+representation, and a more careful rollback posture than rating.
 
 ## 9. Cross-Programme Constraints
 
@@ -754,7 +765,7 @@ semantics, response-detail export representation, and a more careful rollback po
 - Do not expose voter-level exports publicly without explicit approval.
 - Do not add further advanced voting modes until their product, privacy, permissions, SQL, UX,
   test, and rollout model are explicitly approved.
-- Do not implement draft/resume, rating/ranking questions, emoji/icon support,
+- Do not implement draft/resume, ranking questions, rating-scale extensions, emoji/icon support,
   dashboard/reporting readiness, role-restricted voting, governor-linked voting, saved templates,
   or public voter-level exports as part of any voting slice unless separately approved.
 
@@ -826,15 +837,19 @@ The core programme is successful when:
       behavior, required-only submit gating, skipped optional answer semantics, aggregate-only
       public behavior, private status/export representation, and preserved Phase 1 through Phase 8
       behavior.
+- [x] Fixed 1-5 rating survey questions are delivered in Phase 9B with SQL-backed scalar answers,
+      required/optional completion semantics, optional skip behavior, prefilled editing,
+      aggregate-only public average/distribution output, private status/export representation,
+      rollout-safe migration guards, and preserved Phase 1 through Phase 9A behavior.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 9B: Rating Survey Questions.
+Start Discord Voting Post Framework Phase 9C: Ranking Survey Questions.
 
-Begin with audit/scope confirmation. Do not implement SQL migrations, rating runtime storage,
+Begin with audit/scope confirmation. Do not implement SQL migrations, ranking runtime storage,
 response UI, export shape changes, dashboard/reporting implementation, or command changes until the
-Phase 9B architecture, product scope, privacy, SQL, permissions, and UX direction are approved.
+Phase 9C architecture, product scope, privacy, SQL, permissions, and UX direction are approved.
 ```
 
 ## 13. Programme Change Log
@@ -867,3 +882,5 @@ Phase 9B architecture, product scope, privacy, SQL, permissions, and UX directio
 | 2026-07-04 | Phase 9 prepared | Created the next audit/design task pack and starter for optional survey questions plus rating/ranking question types; kept persisted drafts/resume, emoji/icon support, richer exports, dashboard/reporting, role/governor/template/public-detail work as separate deferred slices. |
 | 2026-07-04 | Phase 9A optional questions delivered | SQL PR was merged/deployed before bot rollout. Optional questions for existing choice/text survey types were delivered with required-by-default builder behavior, required-only submit gating, skipped optional export/status semantics, aggregate-only public behavior, and preserved existing vote/survey behavior. Operator smoke testing confirmed skipped optional questions submit successfully. |
 | 2026-07-04 | Phase 9B rating questions prepared | Archived the Phase 9 audit/Phase 9A closeout record and created the active Phase 9B rating survey question task pack and chat starter. Ranking, draft/resume, emoji/icon, reporting/export v2, policy/identity, templates, public-detail export, and `/vote_admin` reshaping remain separate deferred work. |
+| 2026-07-04 | Phase 9B rating questions delivered | Fixed 1-5 rating questions were delivered with required/optional semantics, optional skip, guided builder controls, private player rating controls, aggregate-only public average/distribution output, private status/export representation, rollout-safe migration guards, focused and full validation, and successful operator smoke. |
+| 2026-07-04 | Phase 9C ranking questions prepared | Phase 9B task pack and starter were archived. Created the active Phase 9C ranking survey question task pack and chat starter; ranking remains audit/design-first with SQL, UX, privacy, export, tests, migration, rollback, and deferred-scope approval required before runtime implementation. |

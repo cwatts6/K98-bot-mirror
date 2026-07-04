@@ -219,16 +219,26 @@ Discord Voting Post Framework status:
 - Phase 9 audit and Phase 9A records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md`
   - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md`
+- Phase 9B Rating Survey Questions is delivered in mirror PR #203, production PR #510, and SQL PR
+  #32. SQL deployment completed before bot runtime smoke. Operator smoke testing on 2026-07-04
+  confirmed rating-question creation, disabled option/detail controls for ratings, required and
+  optional rating submission, optional rating skip behavior, average-rating public display, and
+  compatibility for existing choice/text/detail/optional surveys, multi-select votes, and
+  one-choice votes.
+- Phase 9B records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 9B Rating Survey Questions.md`
+  - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 9B Rating Survey Questions.md`
 - Active Discord Voting Post Framework files:
   - `Discord Voting Post Framework - Programme Pack.md`
-  - `Codex Task Pack - Discord Voting Post Framework Phase 9B Rating Survey Questions.md`
-  - `Codex Chat Starter - Discord Voting Post Framework Phase 9B Rating Survey Questions.md`
-- Phase 9B is the next prepared voting slice. It starts with audit/scope confirmation for fixed
-  1-5 rating survey questions, using the delivered Phase 9A required/optional semantics. It should
-  confirm SQL storage, validation, builder/player UX, PublicLive/HiddenUntilClose aggregate
-  behavior, private export shape, tests, smoke plan, migration order, rollback posture, and
-  remaining deferred work before any runtime implementation. Ranking, persisted partial
-  drafts/resume, emoji/icon support, dashboard/reporting, richer exports, role-restricted voting,
+  - `Codex Task Pack - Discord Voting Post Framework Phase 9C Ranking Survey Questions.md`
+  - `Codex Chat Starter - Discord Voting Post Framework Phase 9C Ranking Survey Questions.md`
+- Phase 9C is the next prepared voting slice. It starts with audit/scope confirmation for ranking
+  survey questions over existing survey options, using the delivered Phase 9A required/optional
+  semantics and preserving Phase 9B rating behavior. It should confirm SQL storage, validation,
+  builder/player UX, PublicLive/HiddenUntilClose aggregate behavior, private export shape, tests,
+  smoke plan, migration order, rollback posture, and remaining deferred work before any runtime
+  implementation. Partial top-N ranking, persisted partial drafts/resume, rating scale extensions,
+  emoji/icon support, dashboard/reporting, richer exports, role-restricted voting,
   governor-linked voting, saved templates, and public voter-level/detail export posting remain
   separate later slices unless explicitly approved.
 
@@ -382,6 +392,6 @@ Final removal of temporary deprecated command paths remains captured as deferred
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.
 
-Discord Voting Post Framework Phase 9B Rating Survey Questions is the next prepared voting slice.
-It starts with audit/scope confirmation and should decide the safest way to add fixed 1-5 rating
-questions while keeping all Phase 1 through Phase 9A behaviour unchanged.
+Discord Voting Post Framework Phase 9C Ranking Survey Questions is the next prepared voting slice.
+It starts with audit/scope confirmation and should decide the safest way to add complete ranking
+questions while keeping all Phase 1 through Phase 9B behaviour unchanged.

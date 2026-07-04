@@ -1,6 +1,7 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 9B Rating Survey Questions
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter. Phase 9B fixed 1-5 rating survey questions were delivered and operator
+smoke tested on 2026-07-04.
 
 Phase 1 through Phase 9A are complete and smoke tested. SQL-backed voting, one-choice voting,
 single-question multi-select voting, choice/text multi-question surveys, PublicLive and
@@ -8,7 +9,8 @@ HiddenUntilClose result visibility, private admin status, private closed-only ex
 answers, choice-question details, aggregate text-question totals rows, optional survey questions,
 and private response-detail text/detail/optional export semantics are working.
 
-Use this starter to begin Phase 9B with audit/scope confirmation before implementation.
+Historical starter preserved for traceability. Use the active Phase 9C ranking starter in
+`docs/task_packs/` for the next survey slice.
 
 ## Copy/Paste Starter
 
@@ -62,7 +64,7 @@ Read first:
 - docs/reference/deferred_optimisations.md
 - docs/task_packs/Discord Voting Post Framework - Programme Pack.md
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md
-- docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 9B Rating Survey Questions.md
+- docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 9B Rating Survey Questions.md
 
 Use these skills as applicable:
 - k98-architecture-scope
