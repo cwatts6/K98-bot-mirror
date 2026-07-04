@@ -103,7 +103,14 @@ async def test_submit_survey_response_missing_rating_table_has_clear_error(monke
         return func(callback)
 
     monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
-    monkeypatch.setattr(survey_dal, "exec_with_cursor", lambda callback: callback(FakeCursor()))
+
+    def fake_exec_with_cursor(callback):
+        try:
+            return callback(FakeCursor())
+        except Exception:
+            return None
+
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
     monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
 
     with pytest.raises(VoteValidationError, match=survey_dal.SURVEY_RATING_MIGRATION_ID):
@@ -143,7 +150,14 @@ async def test_submit_survey_response_missing_ranking_table_has_clear_error(monk
         return func(callback)
 
     monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
-    monkeypatch.setattr(survey_dal, "exec_with_cursor", lambda callback: callback(FakeCursor()))
+
+    def fake_exec_with_cursor(callback):
+        try:
+            return callback(FakeCursor())
+        except Exception:
+            return None
+
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
     monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
 
     with pytest.raises(VoteValidationError, match=survey_dal.SURVEY_RANKING_MIGRATION_ID):
@@ -174,7 +188,14 @@ async def test_create_survey_missing_ranking_table_has_clear_error(monkeypatch):
         return func(callback)
 
     monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
-    monkeypatch.setattr(survey_dal, "exec_with_cursor", lambda callback: callback(FakeCursor()))
+
+    def fake_exec_with_cursor(callback):
+        try:
+            return callback(FakeCursor())
+        except Exception:
+            return None
+
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
     monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
 
     req = SurveyCreateRequest(
@@ -383,3 +404,45 @@ def test_answer_audit_rows_expand_ranking_values_and_original_metadata():
     assert audit_rows[1].ranking_option_id == 102
     assert audit_rows[1].ranking_rank_value == 2
     assert audit_rows[1].original_ranking_rank_value == 1
+
+
+def test_answer_audit_rows_preserve_original_ranking_when_current_is_cleared():
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+    rows = [
+        {
+            "SurveyID": 42,
+            "Title": "Planning",
+            "ClosedAtUtc": now,
+            "ResponseID": 9,
+            "DiscordUserID": 123,
+            "OriginalAnswersJson": json.dumps({"rankings": {"10": [102, 101]}}),
+            "ResponseCreatedAtUtc": now,
+            "ResponseUpdatedAtUtc": now,
+            "SurveyQuestionID": 10,
+            "QuestionKey": "q1",
+            "Prompt": "Rank priorities",
+            "QuestionType": "Ranking",
+            "IsRequired": 0,
+            "SurveyOptionID": None,
+            "OptionKey": None,
+            "Label": None,
+            "AnswerText": None,
+            "DetailText": None,
+            "RatingValue": None,
+            "RankingOptionID": None,
+            "RankingOptionKey": None,
+            "RankingOptionLabel": None,
+            "RankingRankValue": None,
+        }
+    ]
+
+    audit_rows = survey_dal._answer_audit_from_rows(rows)
+
+    assert len(audit_rows) == 2
+    assert audit_rows[0].question_type == "Ranking"
+    assert audit_rows[0].ranking_option_id == 102
+    assert audit_rows[0].ranking_rank_value is None
+    assert audit_rows[0].original_ranking_rank_value == 1
+    assert audit_rows[1].ranking_option_id == 101
+    assert audit_rows[1].ranking_rank_value is None
+    assert audit_rows[1].original_ranking_rank_value == 2

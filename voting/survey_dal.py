@@ -271,14 +271,14 @@ def _snapshot_from_rows(
 
 
 async def create_survey(req: SurveyCreateRequest) -> int:
-    def _callback(cur) -> int:
+    def _callback(cur) -> int | VoteValidationError:
         if any(question.question_type == SURVEY_QUESTION_RANKING for question in req.questions):
             if not _survey_ranking_answers_table_exists_sync(cur):
                 logger.warning(
                     "survey_ranking_answers_missing_create migration=%s",
                     SURVEY_RANKING_MIGRATION_ID,
                 )
-                raise VoteValidationError(SURVEY_RANKING_MIGRATION_MESSAGE)
+                return VoteValidationError(SURVEY_RANKING_MIGRATION_MESSAGE)
         now = _naive_utc(datetime.now(UTC))
         cur.execute(
             """
@@ -383,6 +383,8 @@ async def create_survey(req: SurveyCreateRequest) -> int:
         return survey_id
 
     survey_id = await run_blocking_in_thread(_create_survey_sync, _callback, name="survey_create")
+    if isinstance(survey_id, VoteValidationError):
+        raise survey_id
     return int(survey_id or 0)
 
 
@@ -821,7 +823,7 @@ async def submit_survey_response(
     ranking_answers_by_question_id: Mapping[int, tuple[int, ...]] | None = None,
     now_utc: datetime,
 ) -> SurveySubmitResult:
-    def _callback(cur) -> SurveySubmitResult:
+    def _callback(cur) -> SurveySubmitResult | VoteValidationError:
         now = _naive_utc(now_utc)
         cur.execute(
             """
@@ -870,7 +872,7 @@ async def submit_survey_response(
                 SURVEY_RATING_MIGRATION_ID,
             )
             if rating_answers_by_question_id:
-                raise VoteValidationError(SURVEY_RATING_MIGRATION_MESSAGE)
+                return VoteValidationError(SURVEY_RATING_MIGRATION_MESSAGE)
         if not ranking_answers_available:
             logger.warning(
                 "survey_ranking_answers_missing_submit survey_id=%s discord_user_id=%s migration=%s",
@@ -879,7 +881,7 @@ async def submit_survey_response(
                 SURVEY_RANKING_MIGRATION_ID,
             )
             if ranking_answers_by_question_id:
-                raise VoteValidationError(SURVEY_RANKING_MIGRATION_MESSAGE)
+                return VoteValidationError(SURVEY_RANKING_MIGRATION_MESSAGE)
 
         previous_payload = _current_response_payload(
             cur,
@@ -1137,6 +1139,8 @@ async def submit_survey_response(
     )
     if isinstance(result, SurveySubmitResult):
         return result
+    if isinstance(result, VoteValidationError):
+        raise result
     return SurveySubmitResult(
         "error", int(survey_id), message="Survey response could not be recorded."
     )
@@ -1457,25 +1461,42 @@ def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswe
                 include_empty=include_empty_details,
             ),
         )
-        if str(row.get("QuestionType") or "") == SURVEY_QUESTION_RANKING and item["ranking_items"]:
+        if str(row.get("QuestionType") or "") == SURVEY_QUESTION_RANKING:
             original_rank_by_option = {
                 option_id: rank_index
                 for rank_index, option_id in enumerate(original_ranking, start=1)
             }
+            current_option_ids: set[int] = set()
             for ranking_item in sorted(item["ranking_items"], key=lambda item: item["rank_value"]):
+                option_id = int(ranking_item["option_id"])
+                current_option_ids.add(option_id)
                 output.append(
                     SurveyAnswerAuditRow(
                         **base_kwargs,
-                        ranking_option_id=int(ranking_item["option_id"]),
+                        ranking_option_id=option_id,
                         ranking_option_key=str(ranking_item["option_key"]),
                         ranking_option_label=str(ranking_item["option_label"]),
                         ranking_rank_value=int(ranking_item["rank_value"]),
-                        original_ranking_rank_value=original_rank_by_option.get(
-                            int(ranking_item["option_id"])
-                        ),
+                        original_ranking_rank_value=original_rank_by_option.get(option_id),
                     )
                 )
-            continue
+            for option_id, original_rank_value in sorted(
+                original_rank_by_option.items(), key=lambda item: item[1]
+            ):
+                if option_id in current_option_ids:
+                    continue
+                output.append(
+                    SurveyAnswerAuditRow(
+                        **base_kwargs,
+                        ranking_option_id=option_id,
+                        ranking_option_key="",
+                        ranking_option_label="",
+                        ranking_rank_value=None,
+                        original_ranking_rank_value=original_rank_value,
+                    )
+                )
+            if current_option_ids or original_rank_by_option:
+                continue
         output.append(SurveyAnswerAuditRow(**base_kwargs))
     return tuple(output)
 

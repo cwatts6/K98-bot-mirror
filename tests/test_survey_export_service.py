@@ -551,6 +551,48 @@ def test_survey_response_detail_rows_include_ranking_values_and_changes():
     assert "'@A" in text
 
 
+def test_survey_response_detail_rows_mark_cleared_optional_ranking_as_changed():
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+    rows = (
+        SurveyAnswerAuditRow(
+            survey_id=42,
+            title="Planning",
+            closed_at_utc=now,
+            response_id=9,
+            discord_user_id=123456789012345678,
+            response_created_at_utc=now,
+            response_updated_at_utc=now,
+            question_id=10,
+            question_key="q1",
+            question_prompt="Rank priorities",
+            question_type="Ranking",
+            selected_option_ids=(),
+            selected_option_keys=(),
+            selected_option_labels=(),
+            original_option_ids=(),
+            original_option_keys=(),
+            original_option_labels=(),
+            is_required=False,
+            ranking_option_id=101,
+            ranking_option_key="",
+            ranking_option_label="",
+            ranking_rank_value=None,
+            original_ranking_rank_value=1,
+        ),
+    )
+
+    csv_rows = survey_response_detail_csv_rows(
+        rows, discord_names_by_user_id={123456789012345678: "Tester"}
+    )
+
+    assert csv_rows[0]["AnswerStatus"] == "SkippedOptional"
+    assert csv_rows[0]["RankingOptionID"] == 101
+    assert csv_rows[0]["RankingRankValue"] == ""
+    assert csv_rows[0]["OriginalRankingRankValue"] == 1
+    assert csv_rows[0]["RankingChanged"] == 1
+    assert csv_rows[0]["ResponseChanged"] == 1
+
+
 def test_survey_response_detail_text_and_details_are_formula_safe():
     now = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
     rows = (
