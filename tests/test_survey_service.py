@@ -228,6 +228,68 @@ def test_validate_answers_requires_every_question_and_valid_options():
         survey_service.validate_answers(snapshot, {10: (101,), 11: (201,), 999: (1,)})
 
 
+def test_validate_response_payload_rejects_malformed_option_ids():
+    now = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
+    snapshot = SurveySnapshot(
+        survey_id=8,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Survey",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=8,
+                question_key="q1",
+                prompt="Q1",
+                question_type="SingleChoice",
+                sort_order=1,
+                min_selections=1,
+                max_selections=1,
+                options=(SurveyQuestionOption(101, 10, "opt1", "A", 1),),
+            ),
+            SurveyQuestion(
+                question_id=11,
+                survey_id=8,
+                question_key="q2",
+                prompt="Q2",
+                question_type="SingleChoice",
+                sort_order=2,
+                min_selections=1,
+                max_selections=1,
+                options=(SurveyQuestionOption(201, 11, "opt1", "A", 1),),
+            ),
+        ),
+    )
+
+    with pytest.raises(VoteValidationError, match="question 1.*not valid"):
+        survey_service.validate_response_payload(
+            snapshot,
+            answers_by_question_id={10: ("not-an-option",), 11: (201,)},
+        )
+
+    with pytest.raises(VoteValidationError, match="question 1.*not valid"):
+        survey_service.validate_response_payload(
+            snapshot,
+            answers_by_question_id={10: (None,), 11: (201,)},
+        )
+
+
 def test_validate_response_payload_accepts_required_text_and_selected_details():
     now = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
     snapshot = SurveySnapshot(

@@ -286,9 +286,15 @@ def validate_response_payload(
             if clean_text is not None:
                 text_output[question.question_id] = clean_text
             continue
-        selected_ids = tuple(
-            sorted({int(option_id) for option_id in choice_answers.get(question.question_id, ())})
-        )
+        raw_selected_ids = choice_answers.get(question.question_id, ())
+        try:
+            if raw_selected_ids is None or isinstance(raw_selected_ids, (str, bytes)):
+                raise TypeError
+            selected_ids = tuple(sorted({int(option_id) for option_id in raw_selected_ids}))
+        except (TypeError, ValueError):
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: one or more options are not valid."
+            ) from None
         if not selected_ids and not question.is_required:
             continue
         if len(selected_ids) < question.min_selections:
