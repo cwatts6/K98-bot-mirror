@@ -114,6 +114,7 @@ def build_question_request(
     min_selections: int | None = None,
     max_selections: int | None = None,
     allow_details: bool = False,
+    is_required: bool = True,
 ) -> SurveyQuestionCreateRequest:
     clean_prompt = str(prompt or "").strip()
     if not clean_prompt:
@@ -137,6 +138,7 @@ def build_question_request(
             min_selections=0,
             max_selections=0,
             allow_details=False,
+            is_required=bool(is_required),
         )
     clean_options = _validate_survey_option_labels(options)
     if normalized_type == SURVEY_QUESTION_SINGLE_CHOICE:
@@ -151,6 +153,7 @@ def build_question_request(
             min_selections=1,
             max_selections=1,
             allow_details=bool(allow_details),
+            is_required=bool(is_required),
         )
     if minimum < 1:
         raise VoteValidationError("Minimum selections must be at least 1.")
@@ -169,6 +172,7 @@ def build_question_request(
         min_selections=minimum,
         max_selections=maximum,
         allow_details=bool(allow_details),
+        is_required=bool(is_required),
     )
 
 
@@ -277,7 +281,7 @@ def validate_response_payload(
                 text_answers.get(question.question_id),
                 limit=MAX_SURVEY_TEXT_ANSWER_LEN,
                 field_name=f"Answer question {question.sort_order}",
-                required=True,
+                required=question.is_required,
             )
             if clean_text is not None:
                 text_output[question.question_id] = clean_text
@@ -285,6 +289,8 @@ def validate_response_payload(
         selected_ids = tuple(
             sorted({int(option_id) for option_id in choice_answers.get(question.question_id, ())})
         )
+        if not selected_ids and not question.is_required:
+            continue
         if len(selected_ids) < question.min_selections:
             raise VoteValidationError(
                 f"Answer question {question.sort_order}: choose at least {question.min_selections}."
@@ -314,7 +320,7 @@ def validate_response_payload(
                 text,
                 limit=MAX_SURVEY_TEXT_ANSWER_LEN,
                 field_name=f"Answer question {question.sort_order}",
-                required=True,
+                required=question.is_required,
             )
             if clean_text is not None:
                 text_output[normalized_question_id] = clean_text

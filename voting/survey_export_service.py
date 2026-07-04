@@ -37,9 +37,12 @@ SURVEY_TOTALS_COLUMNS = (
     "QuestionKey",
     "QuestionPrompt",
     "QuestionType",
+    "IsRequired",
     "QuestionSortOrder",
     "MinSelections",
     "MaxSelections",
+    "AnsweredResponses",
+    "SkippedResponses",
     "OptionID",
     "OptionKey",
     "OptionLabel",
@@ -60,6 +63,8 @@ SURVEY_RESPONSE_DETAIL_COLUMNS = (
     "QuestionKey",
     "QuestionPrompt",
     "QuestionType",
+    "IsRequired",
+    "AnswerStatus",
     "SelectedOptionIDs",
     "SelectedOptionKeys",
     "SelectedOptionLabels",
@@ -149,6 +154,21 @@ def _join_values(values: tuple[Any, ...]) -> str:
     return ";".join(str(value) for value in values)
 
 
+def _answered_count(snapshot: SurveySnapshot, question) -> int:
+    if question.answered_response_count is not None:
+        return max(0, min(int(question.answered_response_count), int(snapshot.total_responses or 0)))
+    if question.is_required:
+        return int(snapshot.total_responses or 0)
+    return 0
+
+
+def _answer_status(row: SurveyAnswerAuditRow) -> str:
+    has_answer = bool(row.selected_option_ids or (row.text_answer or "").strip())
+    if has_answer:
+        return "Answered"
+    return "MissingRequired" if row.is_required else "SkippedOptional"
+
+
 def _filename_part(value: Any) -> str:
     text = str(value or "").strip().lower().replace("-", "_")
     text = _FILENAME_SAFE_RE.sub("_", text)
@@ -206,11 +226,15 @@ def survey_totals_csv_rows(snapshot: SurveySnapshot) -> list[dict[str, Any]]:
             "QuestionKey": question.question_key,
             "QuestionPrompt": question.prompt,
             "QuestionType": question.question_type,
+            "IsRequired": 1 if question.is_required else 0,
             "QuestionSortOrder": question.sort_order,
             "MinSelections": question.min_selections,
             "MaxSelections": question.max_selections,
+            "AnsweredResponses": _answered_count(snapshot, question),
+            "SkippedResponses": max(0, total - _answered_count(snapshot, question)),
         }
         if not question.options:
+            answered = _answered_count(snapshot, question)
             rows.append(
                 {
                     **base_row,
@@ -218,8 +242,8 @@ def survey_totals_csv_rows(snapshot: SurveySnapshot) -> list[dict[str, Any]]:
                     "OptionKey": "",
                     "OptionLabel": "",
                     "OptionSortOrder": "",
-                    "SelectionCount": total,
-                    "SelectionPercentOfResponses": _pct(total, total),
+                    "SelectionCount": answered,
+                    "SelectionPercentOfResponses": _pct(answered, total),
                     "IsTopSelection": 0,
                 }
             )
@@ -284,6 +308,8 @@ def survey_response_detail_csv_rows(
                 "QuestionKey": row.question_key,
                 "QuestionPrompt": row.question_prompt,
                 "QuestionType": row.question_type,
+                "IsRequired": 1 if row.is_required else 0,
+                "AnswerStatus": _answer_status(row),
                 "SelectedOptionIDs": _join_values(row.selected_option_ids),
                 "SelectedOptionKeys": _join_values(row.selected_option_keys),
                 "SelectedOptionLabels": _join_values(row.selected_option_labels),

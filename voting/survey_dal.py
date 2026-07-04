@@ -100,6 +100,12 @@ def _rows_to_questions(
             ),
             options=options_by_question_id.get(int(row["SurveyQuestionID"]), ()),
             allow_details=_bool(row.get("AllowDetails")),
+            is_required=_bool(row.get("IsRequired", 1)),
+            answered_response_count=(
+                int(row["AnsweredResponseCount"])
+                if row.get("AnsweredResponseCount") not in (None, "")
+                else None
+            ),
         )
         for row in question_rows
     )
@@ -220,7 +226,7 @@ async def create_survey(req: SurveyCreateRequest) -> int:
                     question.prompt,
                     question.question_type,
                     question_index + 1,
-                    1,
+                    1 if question.is_required else 0,
                     int(question.min_selections),
                     int(question.max_selections),
                     1 if question.allow_details else 0,
@@ -314,13 +320,41 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
         return None
     questions = await run_query_async(
         """
-        SELECT SurveyQuestionID, SurveyID, QuestionKey, Prompt, QuestionType, SortOrder,
-               IsRequired, MinSelections, MaxSelections, AllowDetails
-        FROM dbo.SurveyQuestions
-        WHERE SurveyID = ?
-        ORDER BY SortOrder ASC, SurveyQuestionID ASC;
+        WITH ChoiceAnswered AS (
+            SELECT SurveyID, SurveyQuestionID, COUNT_BIG(1) AS AnsweredResponseCount
+            FROM (
+                SELECT DISTINCT SurveyID, SurveyQuestionID, DiscordUserID
+                FROM dbo.SurveyAnswers
+                WHERE SurveyID = ?
+            ) answered
+            GROUP BY SurveyID, SurveyQuestionID
+        ),
+        TextAnswered AS (
+            SELECT SurveyID, SurveyQuestionID, COUNT_BIG(1) AS AnsweredResponseCount
+            FROM dbo.SurveyTextAnswers
+            WHERE SurveyID = ?
+            GROUP BY SurveyID, SurveyQuestionID
+        )
+        SELECT q.SurveyQuestionID, q.SurveyID, q.QuestionKey, q.Prompt, q.QuestionType, q.SortOrder,
+               q.IsRequired, q.MinSelections, q.MaxSelections, q.AllowDetails,
+               COALESCE(
+                   CASE
+                       WHEN q.QuestionType = 'Text' THEN text_counts.AnsweredResponseCount
+                       ELSE choice_counts.AnsweredResponseCount
+                   END,
+                   0
+               ) AS AnsweredResponseCount
+        FROM dbo.SurveyQuestions q
+        LEFT JOIN ChoiceAnswered choice_counts
+          ON choice_counts.SurveyID = q.SurveyID
+         AND choice_counts.SurveyQuestionID = q.SurveyQuestionID
+        LEFT JOIN TextAnswered text_counts
+          ON text_counts.SurveyID = q.SurveyID
+         AND text_counts.SurveyQuestionID = q.SurveyQuestionID
+        WHERE q.SurveyID = ?
+        ORDER BY q.SortOrder ASC, q.SurveyQuestionID ASC;
         """,
-        (int(survey_id),),
+        (int(survey_id), int(survey_id), int(survey_id)),
     )
     options = await run_query_async(
         """
@@ -775,7 +809,7 @@ async def list_answer_audit_rows(survey_id: int) -> tuple[SurveyAnswerAuditRow, 
         SELECT r.SurveyID, p.Title, p.ClosedAtUtc, r.ResponseID, r.DiscordUserID,
                r.OriginalAnswersJson, r.CreatedAtUtc AS ResponseCreatedAtUtc,
                r.UpdatedAtUtc AS ResponseUpdatedAtUtc,
-               q.SurveyQuestionID, q.QuestionKey, q.Prompt, q.QuestionType,
+               q.SurveyQuestionID, q.QuestionKey, q.Prompt, q.QuestionType, q.IsRequired,
                o.SurveyOptionID, o.OptionKey, o.Label,
                t.AnswerText, d.DetailText
         FROM dbo.SurveyResponses r
@@ -855,6 +889,7 @@ def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswe
                 question_key=str(row.get("QuestionKey") or ""),
                 question_prompt=str(row.get("Prompt") or ""),
                 question_type=str(row.get("QuestionType") or ""),
+                is_required=_bool(row.get("IsRequired", 1)),
                 selected_option_ids=tuple(item["selected_ids"]),
                 selected_option_keys=tuple(item["selected_keys"]),
                 selected_option_labels=tuple(item["selected_labels"]),

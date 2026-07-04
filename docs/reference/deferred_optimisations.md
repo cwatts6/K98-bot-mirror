@@ -17,11 +17,29 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `voting/`, future survey question model, survey builder, survey exports
 - Type: architecture
-- Description: Optional survey questions and rating/ranking question types remain intentionally outside Phase 8. They require changes to `SurveyQuestions.IsRequired`, missing-answer validation, response completion semantics, public count/card behavior, private export shape, and SQL constraints. Bundling them with free-text/details would have made the first text-bearing survey slice too broad and risked Phase 7 choice-only regression behavior.
-- Suggested Fix: Use the prepared Phase 9 advanced survey question-types audit to decide optional-answer semantics, rating/ranking storage, validation limits, export columns for missing/rated/ranked answers, PublicLive/HiddenUntilClose aggregate behavior, builder controls, and smoke tests before any implementation.
+- Description: Optional survey questions and rating/ranking question types remain intentionally outside Phase 8. Phase 9 audit now recommends splitting implementation: first optional questions for existing `SingleChoice`, `MultiSelect`, and `Text` surveys, then rating questions, then ranking questions. These require changes to `SurveyQuestions.IsRequired`, missing-answer validation, response completion semantics, public count/card behavior, private export shape, and SQL constraints. Bundling all advanced question types together would make one PR too broad and risk Phase 7/8 survey regressions.
+- Suggested Fix: Use `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md` as the approval packet. If approved, implement Phase 9A optional questions first by relaxing `CK_SurveyQuestions_Required`, preserving required-by-default builder behavior, adding missing-answer export/status semantics, and keeping rating/ranking as separate later task packs with dedicated answer tables and aggregate-only public behavior.
 - Impact: high
 - Risk: high
-- Dependencies: Phase 8 text/details delivered and smoke tested on 2026-07-04; SQL repo validation; privacy/export approval for non-choice answers; regression tests for required choice-only surveys. Promoted into `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 9 Advanced Survey Question Types Audit and Design.md`.
+- Dependencies: Phase 8 text/details delivered and smoke tested on 2026-07-04; Phase 9 audit/scope drafted on 2026-07-04; SQL repo validation confirmed `SurveyQuestions.IsRequired` exists but `CK_SurveyQuestions_Required` currently enforces required-only; operator approval for optional-question implementation; regression tests for required choice/text surveys; later SQL validation for rating/ranking tables.
+
+### Deferred Optimisation
+- Area: `voting/`, future survey rating and ranking question types, SQL repo survey answer tables
+- Type: architecture
+- Description: Phase 9 audit designed rating and ranking question directions but recommends not shipping them with the first optional-question implementation. Rating needs a dedicated scalar answer contract, aggregate average/distribution behavior, and response-detail columns. Ranking needs a dedicated ranked-option answer contract, duplicate-rank prevention, clearer Discord entry/edit UX, and conservative aggregate semantics.
+- Suggested Fix: After optional questions are approved, delivered, and smoke tested, prepare separate task packs: first rating questions with a fixed 1-5 scale and `dbo.SurveyRatingAnswers`, then ranking questions using existing `SurveyQuestionOptions` plus `dbo.SurveyRankingAnswers` with uniqueness constraints for rank and option per response/question. Keep public output aggregate-only and private response-detail exports closed-only/admin-leadership-only.
+- Impact: high
+- Risk: high
+- Dependencies: Optional-question semantics delivered or explicitly skipped; SQL repo migration approval; export shape approval; focused service/DAL/view/export tests; Discord smoke testing for prefill/update/close/restart behavior.
+
+### Deferred Optimisation
+- Area: `voting/`, `/vote_admin`, voting policy and identity future scope
+- Type: architecture
+- Description: Role-restricted voting, governor-linked voting/reporting, saved vote/survey templates, public voter-level/detail export posting, and `/vote_admin` command reshaping remain outside Phase 9. They are product-policy and command-surface changes, not prerequisites for optional/rating/ranking survey answers, and each can change privacy, permissions, exports, or command governance.
+- Suggested Fix: Keep these as separate approval-gated policy/design task packs. Each future pack should validate command-surface fit, permission/privacy model, SQL identity/template storage, export/reporting implications, public posting rules, tests, smoke plan, and promotion posture before implementation.
+- Impact: medium
+- Risk: high
+- Dependencies: Explicit operator approval; canonical command reference updates if command paths change; SQL repo validation for identity/template storage; Codex Security review before runtime PR handoff.
 
 ### Deferred Optimisation
 - Area: `voting/export_service.py`, future survey export services, SQL repo survey reporting views/procedures

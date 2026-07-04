@@ -31,6 +31,8 @@ class SurveyQuestion:
     max_selections: int
     options: tuple[SurveyQuestionOption, ...]
     allow_details: bool = False
+    is_required: bool = True
+    answered_response_count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,7 @@ class SurveyQuestionCreateRequest:
     min_selections: int = 1
     max_selections: int = 1
     allow_details: bool = False
+    is_required: bool = True
 
 
 @dataclass(frozen=True)
@@ -157,6 +160,7 @@ class SurveyAnswerAuditRow:
     original_option_ids: tuple[int, ...]
     original_option_keys: tuple[str, ...]
     original_option_labels: tuple[str, ...]
+    is_required: bool = True
     text_answer: str | None = None
     original_text_answer: str | None = None
     selected_option_detail_notes: tuple[str, ...] = ()

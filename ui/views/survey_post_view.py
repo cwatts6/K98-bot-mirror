@@ -23,7 +23,7 @@ from voting.survey_presentation import (
 
 logger = logging.getLogger(__name__)
 
-SURVEY_INCOMPLETE_HELP = "You must answer all questions to submit response to the survey."
+SURVEY_INCOMPLETE_HELP = "You must answer all required questions to submit the survey."
 
 SurveyPublishCallback = Callable[
     [discord.Interaction, tuple[SurveyQuestionCreateRequest, ...]], Awaitable[bool]
@@ -107,7 +107,7 @@ class _SurveyQuestionSelect(discord.ui.Select):
         ]
         super().__init__(
             placeholder=f"Question {question.sort_order}",
-            min_values=max(1, int(question.min_selections)),
+            min_values=0 if not question.is_required else max(1, int(question.min_selections)),
             max_values=max(1, min(int(question.max_selections), len(options))),
             options=options,
         )
@@ -131,7 +131,7 @@ class _SurveyQuestionSelect(discord.ui.Select):
 class _SurveyTextAnswerButton(discord.ui.Button):
     def __init__(self, parent_view: SurveyResponsePanel) -> None:
         super().__init__(
-            label="Response (required)",
+            label="Response (required)" if parent_view.current_question.is_required else "Response",
             style=discord.ButtonStyle.primary,
         )
         self.parent_view = parent_view
@@ -368,10 +368,12 @@ class SurveyResponsePanel(discord.ui.View):
         incomplete_line = f"\n{SURVEY_INCOMPLETE_HELP}" if not self.is_complete() else ""
         if question.question_type == SURVEY_QUESTION_TEXT:
             saved = bool(self.text_answers.get(question.question_id, "").strip())
+            requirement = "required" if question.is_required else "optional"
+            state = "complete" if saved else ("not yet complete" if question.is_required else "skipped")
             return (
                 f"Survey #{self.survey_id}: question {question.sort_order} of {len(self.snapshot.questions)}\n"
                 f"{question.prompt}\n"
-                f"Please provide a response: {'complete' if saved else 'not yet complete'}"
+                f"{requirement.title()} text response: {state}"
                 f"{incomplete_line}"
             )
         question_type = (
@@ -381,10 +383,15 @@ class SurveyResponsePanel(discord.ui.View):
         )
         detail_count = 1 if self.detail_text_for_question(question) else 0
         detail_line = f"\nDetails: {detail_count} saved." if question.allow_details else ""
+        requirement = "Required" if question.is_required else "Optional"
+        answer_state = "answered" if self.answers.get(question.question_id) else "not yet complete"
+        if not question.is_required and not self.answers.get(question.question_id):
+            answer_state = "skipped"
         return (
             f"Survey #{self.survey_id}: question {question.sort_order} of {len(self.snapshot.questions)}\n"
             f"{question.prompt}\n"
-            f"Required {question_type}: choose {question.min_selections}-{question.max_selections}."
+            f"{requirement} {question_type}: choose {question.min_selections}-{question.max_selections} "
+            f"({answer_state})."
             f"{detail_line}"
             f"{incomplete_line}"
         )
@@ -411,9 +418,11 @@ class _SurveyTextAnswerModal(discord.ui.Modal):
         self.answer = discord.ui.InputText(
             label=f"Response (max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters)",
             style=discord.InputTextStyle.long,
+            required=question.is_required,
             max_length=survey_service.MAX_SURVEY_TEXT_ANSWER_LEN,
             placeholder=(
-                "Required response. " f"Max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters."
+                ("Required response. " if question.is_required else "Optional response. ")
+                + f"Max {survey_service.MAX_SURVEY_TEXT_ANSWER_LEN} characters."
             ),
             value=parent_view.text_answers.get(question.question_id, ""),
         )
@@ -426,9 +435,12 @@ class _SurveyTextAnswerModal(discord.ui.Modal):
         question = self.parent_view.current_question
         text = str(self.answer.value or "").strip()
         if not text:
-            await send_ephemeral(interaction, "Text answer is required.")
-            return
-        self.parent_view.text_answers[question.question_id] = text
+            if question.is_required:
+                await send_ephemeral(interaction, "Text answer is required.")
+                return
+            self.parent_view.text_answers.pop(question.question_id, None)
+        else:
+            self.parent_view.text_answers[question.question_id] = text
         await self.parent_view.refresh(interaction)
 
 
@@ -481,6 +493,7 @@ class SurveyBuilderView(discord.ui.View):
         self.draft_max_selections = 1
         self.draft_is_text = False
         self.draft_allow_details = False
+        self.draft_is_required = True
         self.publish_in_progress = False
         self.published = False
         self.expired = False
@@ -496,6 +509,7 @@ class SurveyBuilderView(discord.ui.View):
         self.add_item(_BuilderQuestionTypeSelect(self))
         self.add_item(_BuilderSelectionSelect(self, kind="min"))
         self.add_item(_BuilderSelectionSelect(self, kind="max"))
+        self.add_item(_BuilderRequiredToggleButton(self))
         self.add_item(_BuilderDetailsToggleButton(self))
         self.add_item(_BuilderPublishButton(self))
 
@@ -510,6 +524,7 @@ class SurveyBuilderView(discord.ui.View):
             or self.draft_options
             or self.draft_is_text
             or self.draft_allow_details
+            or not self.draft_is_required
         )
 
     @property
@@ -559,6 +574,7 @@ class SurveyBuilderView(discord.ui.View):
         self.draft_max_selections = 1
         self.draft_is_text = False
         self.draft_allow_details = False
+        self.draft_is_required = True
 
     async def refresh(self, interaction: discord.Interaction, *, prefix: str) -> None:
         self._rebuild()
@@ -603,6 +619,7 @@ class SurveyBuilderView(discord.ui.View):
             min_selections=0 if self.draft_is_text else self.draft_min_selections,
             max_selections=0 if self.draft_is_text else self.draft_max_selections,
             allow_details=False if self.draft_is_text else self.draft_allow_details,
+            is_required=self.draft_is_required,
         )
         self._clear_draft()
         return question
@@ -613,7 +630,8 @@ class SurveyBuilderView(discord.ui.View):
             lines.extend(
                 f"{index}. {question.prompt[:70]} "
                 f"({question.question_type}, {question.max_selections} max, {len(question.options)} options"
-                f"{', details' if question.allow_details else ''})"
+                f"{', details' if question.allow_details else ''}, "
+                f"{'required' if question.is_required else 'optional'})"
                 for index, question in enumerate(self.questions, start=1)
             )
         else:
@@ -625,6 +643,7 @@ class SurveyBuilderView(discord.ui.View):
                 f"Draft question: {prompt} "
                 f"({len(self.draft_prompt.strip())}/{survey_service.MAX_SURVEY_QUESTION_PROMPT_LEN})",
                 f"Draft type: {self.draft_mode_label}",
+                f"Requirement: {'required' if self.draft_is_required else 'optional'}",
                 f"Draft options: {len(self.draft_options)}/{survey_service.MAX_SURVEY_OPTIONS}",
             )
         )
@@ -870,6 +889,28 @@ class _BuilderDetailsToggleButton(discord.ui.Button):
             await send_ephemeral(interaction, "Text questions do not use choice details.")
             return
         self.parent_view.draft_allow_details = not self.parent_view.draft_allow_details
+        await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
+
+
+class _BuilderRequiredToggleButton(discord.ui.Button):
+    def __init__(self, parent_view: SurveyBuilderView) -> None:
+        super().__init__(
+            label="Required" if parent_view.draft_is_required else "Optional",
+            style=(
+                discord.ButtonStyle.success
+                if parent_view.draft_is_required
+                else discord.ButtonStyle.secondary
+            ),
+            disabled=parent_view.builder_locked,
+            row=4,
+        )
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey builder belongs to another admin.")
+            return
+        self.parent_view.draft_is_required = not self.parent_view.draft_is_required
         await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
 
 
