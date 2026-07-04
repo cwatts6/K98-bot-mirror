@@ -156,7 +156,9 @@ def _join_values(values: tuple[Any, ...]) -> str:
 
 def _answered_count(snapshot: SurveySnapshot, question) -> int:
     if question.answered_response_count is not None:
-        return max(0, min(int(question.answered_response_count), int(snapshot.total_responses or 0)))
+        return max(
+            0, min(int(question.answered_response_count), int(snapshot.total_responses or 0))
+        )
     if question.is_required:
         return int(snapshot.total_responses or 0)
     return 0

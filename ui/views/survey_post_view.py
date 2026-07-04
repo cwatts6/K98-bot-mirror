@@ -369,7 +369,9 @@ class SurveyResponsePanel(discord.ui.View):
         if question.question_type == SURVEY_QUESTION_TEXT:
             saved = bool(self.text_answers.get(question.question_id, "").strip())
             requirement = "required" if question.is_required else "optional"
-            state = "complete" if saved else ("not yet complete" if question.is_required else "skipped")
+            state = (
+                "complete" if saved else ("not yet complete" if question.is_required else "skipped")
+            )
             return (
                 f"Survey #{self.survey_id}: question {question.sort_order} of {len(self.snapshot.questions)}\n"
                 f"{question.prompt}\n"
