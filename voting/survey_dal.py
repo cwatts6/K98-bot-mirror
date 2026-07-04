@@ -9,6 +9,7 @@ from typing import Any
 from file_utils import cursor_row_to_dict, fetch_one_dict, run_blocking_in_thread
 from stats_alerts.db import exec_with_cursor, run_one_async, run_query_async
 from voting.result_visibility import normalize_result_visibility
+from voting.service import VoteValidationError
 from voting.survey_models import (
     SURVEY_QUESTION_RATING,
     SURVEY_QUESTION_SINGLE_CHOICE,
@@ -26,6 +27,12 @@ from voting.survey_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+SURVEY_RATING_MIGRATION_ID = "20260704_002_add_survey_rating_questions"
+SURVEY_RATING_MIGRATION_MESSAGE = (
+    "Survey rating storage is unavailable. Deploy SQL migration "
+    f"{SURVEY_RATING_MIGRATION_ID} before using rating survey questions."
+)
 
 
 def _naive_utc(value: datetime) -> datetime:
@@ -94,6 +101,21 @@ def _rows_to_rating_counts(
             )
         )
     return {key: tuple(value) for key, value in grouped.items()}
+
+
+async def _survey_rating_answers_table_exists() -> bool:
+    row = await run_one_async("""
+        SELECT OBJECT_ID(N'dbo.SurveyRatingAnswers', N'U') AS ObjectId;
+        """)
+    return bool(row and row.get("ObjectId") not in (None, ""))
+
+
+def _survey_rating_answers_table_exists_sync(cur) -> bool:
+    cur.execute("""
+        SELECT OBJECT_ID(N'dbo.SurveyRatingAnswers', N'U') AS ObjectId;
+        """)
+    row = fetch_one_dict(cur)
+    return bool(row and row.get("ObjectId") not in (None, ""))
 
 
 def _rows_to_questions(
@@ -348,61 +370,111 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
     )
     if not survey:
         return None
-    questions = await run_query_async(
-        """
-        WITH ChoiceAnswered AS (
-            SELECT SurveyID, SurveyQuestionID, COUNT_BIG(1) AS AnsweredResponseCount
-            FROM (
-                SELECT DISTINCT SurveyID, SurveyQuestionID, DiscordUserID
-                FROM dbo.SurveyAnswers
+    rating_answers_available = await _survey_rating_answers_table_exists()
+    if rating_answers_available:
+        questions = await run_query_async(
+            """
+            WITH ChoiceAnswered AS (
+                SELECT SurveyID, SurveyQuestionID, COUNT_BIG(1) AS AnsweredResponseCount
+                FROM (
+                    SELECT DISTINCT SurveyID, SurveyQuestionID, DiscordUserID
+                    FROM dbo.SurveyAnswers
+                    WHERE SurveyID = ?
+                ) answered
+                GROUP BY SurveyID, SurveyQuestionID
+            ),
+            TextAnswered AS (
+                SELECT SurveyID, SurveyQuestionID, COUNT_BIG(1) AS AnsweredResponseCount
+                FROM dbo.SurveyTextAnswers
                 WHERE SurveyID = ?
-            ) answered
-            GROUP BY SurveyID, SurveyQuestionID
-        ),
-        TextAnswered AS (
-            SELECT SurveyID, SurveyQuestionID, COUNT_BIG(1) AS AnsweredResponseCount
-            FROM dbo.SurveyTextAnswers
-            WHERE SurveyID = ?
-            GROUP BY SurveyID, SurveyQuestionID
-        ),
-        RatingAnswered AS (
-            SELECT SurveyID, SurveyQuestionID,
-                   COUNT_BIG(1) AS AnsweredResponseCount,
-                   AVG(CAST(RatingValue AS float)) AS AverageRating,
-                   MIN(RatingValue) AS MinimumRating,
-                   MAX(RatingValue) AS MaximumRating
-            FROM dbo.SurveyRatingAnswers
-            WHERE SurveyID = ?
-            GROUP BY SurveyID, SurveyQuestionID
+                GROUP BY SurveyID, SurveyQuestionID
+            ),
+            RatingAnswered AS (
+                SELECT SurveyID, SurveyQuestionID,
+                       COUNT_BIG(1) AS AnsweredResponseCount,
+                       AVG(CAST(RatingValue AS float)) AS AverageRating,
+                       MIN(RatingValue) AS MinimumRating,
+                       MAX(RatingValue) AS MaximumRating
+                FROM dbo.SurveyRatingAnswers
+                WHERE SurveyID = ?
+                GROUP BY SurveyID, SurveyQuestionID
+            )
+            SELECT q.SurveyQuestionID, q.SurveyID, q.QuestionKey, q.Prompt, q.QuestionType, q.SortOrder,
+                   q.IsRequired, q.MinSelections, q.MaxSelections, q.AllowDetails,
+                   COALESCE(
+                       CASE
+                           WHEN q.QuestionType = 'Text' THEN text_counts.AnsweredResponseCount
+                           WHEN q.QuestionType = 'Rating' THEN rating_counts.AnsweredResponseCount
+                           ELSE choice_counts.AnsweredResponseCount
+                       END,
+                       0
+                   ) AS AnsweredResponseCount,
+                   rating_counts.AverageRating,
+                   rating_counts.MinimumRating,
+                   rating_counts.MaximumRating
+            FROM dbo.SurveyQuestions q
+            LEFT JOIN ChoiceAnswered choice_counts
+              ON choice_counts.SurveyID = q.SurveyID
+             AND choice_counts.SurveyQuestionID = q.SurveyQuestionID
+            LEFT JOIN TextAnswered text_counts
+              ON text_counts.SurveyID = q.SurveyID
+             AND text_counts.SurveyQuestionID = q.SurveyQuestionID
+            LEFT JOIN RatingAnswered rating_counts
+              ON rating_counts.SurveyID = q.SurveyID
+             AND rating_counts.SurveyQuestionID = q.SurveyQuestionID
+            WHERE q.SurveyID = ?
+            ORDER BY q.SortOrder ASC, q.SurveyQuestionID ASC;
+            """,
+            (int(survey_id), int(survey_id), int(survey_id), int(survey_id)),
         )
-        SELECT q.SurveyQuestionID, q.SurveyID, q.QuestionKey, q.Prompt, q.QuestionType, q.SortOrder,
-               q.IsRequired, q.MinSelections, q.MaxSelections, q.AllowDetails,
-               COALESCE(
-                   CASE
-                       WHEN q.QuestionType = 'Text' THEN text_counts.AnsweredResponseCount
-                       WHEN q.QuestionType = 'Rating' THEN rating_counts.AnsweredResponseCount
-                       ELSE choice_counts.AnsweredResponseCount
-                   END,
-                   0
-               ) AS AnsweredResponseCount,
-               rating_counts.AverageRating,
-               rating_counts.MinimumRating,
-               rating_counts.MaximumRating
-        FROM dbo.SurveyQuestions q
-        LEFT JOIN ChoiceAnswered choice_counts
-          ON choice_counts.SurveyID = q.SurveyID
-         AND choice_counts.SurveyQuestionID = q.SurveyQuestionID
-        LEFT JOIN TextAnswered text_counts
-          ON text_counts.SurveyID = q.SurveyID
-         AND text_counts.SurveyQuestionID = q.SurveyQuestionID
-        LEFT JOIN RatingAnswered rating_counts
-          ON rating_counts.SurveyID = q.SurveyID
-         AND rating_counts.SurveyQuestionID = q.SurveyQuestionID
-        WHERE q.SurveyID = ?
-        ORDER BY q.SortOrder ASC, q.SurveyQuestionID ASC;
-        """,
-        (int(survey_id), int(survey_id), int(survey_id), int(survey_id)),
-    )
+    else:
+        logger.warning(
+            "survey_rating_answers_missing_snapshot survey_id=%s migration=%s",
+            survey_id,
+            SURVEY_RATING_MIGRATION_ID,
+        )
+        questions = await run_query_async(
+            """
+            WITH ChoiceAnswered AS (
+                SELECT SurveyID, SurveyQuestionID, COUNT_BIG(1) AS AnsweredResponseCount
+                FROM (
+                    SELECT DISTINCT SurveyID, SurveyQuestionID, DiscordUserID
+                    FROM dbo.SurveyAnswers
+                    WHERE SurveyID = ?
+                ) answered
+                GROUP BY SurveyID, SurveyQuestionID
+            ),
+            TextAnswered AS (
+                SELECT SurveyID, SurveyQuestionID, COUNT_BIG(1) AS AnsweredResponseCount
+                FROM dbo.SurveyTextAnswers
+                WHERE SurveyID = ?
+                GROUP BY SurveyID, SurveyQuestionID
+            )
+            SELECT q.SurveyQuestionID, q.SurveyID, q.QuestionKey, q.Prompt, q.QuestionType, q.SortOrder,
+                   q.IsRequired, q.MinSelections, q.MaxSelections, q.AllowDetails,
+                   COALESCE(
+                       CASE
+                           WHEN q.QuestionType = 'Text' THEN text_counts.AnsweredResponseCount
+                           WHEN q.QuestionType = 'Rating' THEN 0
+                           ELSE choice_counts.AnsweredResponseCount
+                       END,
+                       0
+                   ) AS AnsweredResponseCount,
+                   CAST(NULL AS float) AS AverageRating,
+                   CAST(NULL AS tinyint) AS MinimumRating,
+                   CAST(NULL AS tinyint) AS MaximumRating
+            FROM dbo.SurveyQuestions q
+            LEFT JOIN ChoiceAnswered choice_counts
+              ON choice_counts.SurveyID = q.SurveyID
+             AND choice_counts.SurveyQuestionID = q.SurveyQuestionID
+            LEFT JOIN TextAnswered text_counts
+              ON text_counts.SurveyID = q.SurveyID
+             AND text_counts.SurveyQuestionID = q.SurveyQuestionID
+            WHERE q.SurveyID = ?
+            ORDER BY q.SortOrder ASC, q.SurveyQuestionID ASC;
+            """,
+            (int(survey_id), int(survey_id), int(survey_id)),
+        )
     options = await run_query_async(
         """
         SELECT o.SurveyOptionID, o.SurveyQuestionID, o.OptionKey, o.Label, o.SortOrder,
@@ -418,15 +490,19 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
         """,
         (int(survey_id),),
     )
-    ratings = await run_query_async(
-        """
-        SELECT SurveyQuestionID, RatingValue, COUNT_BIG(1) AS ResponseCount
-        FROM dbo.SurveyRatingAnswers
-        WHERE SurveyID = ?
-        GROUP BY SurveyQuestionID, RatingValue
-        ORDER BY SurveyQuestionID ASC, RatingValue ASC;
-        """,
-        (int(survey_id),),
+    ratings = (
+        await run_query_async(
+            """
+            SELECT SurveyQuestionID, RatingValue, COUNT_BIG(1) AS ResponseCount
+            FROM dbo.SurveyRatingAnswers
+            WHERE SurveyID = ?
+            GROUP BY SurveyQuestionID, RatingValue
+            ORDER BY SurveyQuestionID ASC, RatingValue ASC;
+            """,
+            (int(survey_id),),
+        )
+        if rating_answers_available
+        else []
     )
     reminders = await run_query_async(
         """
@@ -548,16 +624,25 @@ async def get_existing_response_payload(
         """,
         (int(survey_id), int(discord_user_id)),
     )
-    rating_rows = await run_query_async(
-        """
-        SELECT SurveyQuestionID, RatingValue
-        FROM dbo.SurveyRatingAnswers
-        WHERE SurveyID = ?
-          AND DiscordUserID = ?
-        ORDER BY SurveyQuestionID ASC;
-        """,
-        (int(survey_id), int(discord_user_id)),
-    )
+    if await _survey_rating_answers_table_exists():
+        rating_rows = await run_query_async(
+            """
+            SELECT SurveyQuestionID, RatingValue
+            FROM dbo.SurveyRatingAnswers
+            WHERE SurveyID = ?
+              AND DiscordUserID = ?
+            ORDER BY SurveyQuestionID ASC;
+            """,
+            (int(survey_id), int(discord_user_id)),
+        )
+    else:
+        logger.warning(
+            "survey_rating_answers_missing_prefill survey_id=%s discord_user_id=%s migration=%s",
+            survey_id,
+            discord_user_id,
+            SURVEY_RATING_MIGRATION_ID,
+        )
+        rating_rows = []
     return SurveyResponsePayload(
         selected_option_ids=option_ids,
         text_answers={
@@ -624,7 +709,23 @@ async def submit_survey_response(
                 message="You have already responded and changes are not enabled for this survey.",
             )
 
-        previous_payload = _current_response_payload(cur, int(survey_id), int(discord_user_id))
+        rating_answers_available = _survey_rating_answers_table_exists_sync(cur)
+        if not rating_answers_available:
+            logger.warning(
+                "survey_rating_answers_missing_submit survey_id=%s discord_user_id=%s migration=%s",
+                survey_id,
+                discord_user_id,
+                SURVEY_RATING_MIGRATION_ID,
+            )
+            if rating_answers_by_question_id:
+                raise VoteValidationError(SURVEY_RATING_MIGRATION_MESSAGE)
+
+        previous_payload = _current_response_payload(
+            cur,
+            int(survey_id),
+            int(discord_user_id),
+            rating_answers_available=rating_answers_available,
+        )
         incoming_payload = SurveyResponsePayload(
             selected_option_ids={
                 int(key): tuple(int(item) for item in value)
@@ -698,13 +799,14 @@ async def submit_survey_response(
             """,
             (int(survey_id), int(discord_user_id)),
         )
-        cur.execute(
-            """
-            DELETE FROM dbo.SurveyRatingAnswers
-            WHERE SurveyID = ? AND DiscordUserID = ?;
-            """,
-            (int(survey_id), int(discord_user_id)),
-        )
+        if rating_answers_available:
+            cur.execute(
+                """
+                DELETE FROM dbo.SurveyRatingAnswers
+                WHERE SurveyID = ? AND DiscordUserID = ?;
+                """,
+                (int(survey_id), int(discord_user_id)),
+            )
         cur.execute(
             """
             DELETE FROM dbo.SurveyAnswers
@@ -773,27 +875,28 @@ async def submit_survey_response(
                     now,
                 ),
             )
-        for question_id, rating_value in incoming_payload.rating_answers.items():
-            cur.execute(
-                """
-                INSERT INTO dbo.SurveyRatingAnswers
+        if rating_answers_available:
+            for question_id, rating_value in incoming_payload.rating_answers.items():
+                cur.execute(
+                    """
+                    INSERT INTO dbo.SurveyRatingAnswers
+                        (
+                            SurveyID, ResponseID, DiscordUserID, SurveyQuestionID,
+                            QuestionType, RatingValue, CreatedAtUtc, UpdatedAtUtc
+                        )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
                     (
-                        SurveyID, ResponseID, DiscordUserID, SurveyQuestionID,
-                        QuestionType, RatingValue, CreatedAtUtc, UpdatedAtUtc
-                    )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-                """,
-                (
-                    int(survey_id),
-                    response_id,
-                    int(discord_user_id),
-                    int(question_id),
-                    SURVEY_QUESTION_RATING,
-                    int(rating_value),
-                    now,
-                    now,
-                ),
-            )
+                        int(survey_id),
+                        response_id,
+                        int(discord_user_id),
+                        int(question_id),
+                        SURVEY_QUESTION_RATING,
+                        int(rating_value),
+                        now,
+                        now,
+                    ),
+                )
 
         cur.execute(
             """
@@ -857,12 +960,18 @@ def _payload_to_json_dict(payload: SurveyResponsePayload) -> dict[str, Any]:
     }
 
 
-def _current_response_payload(cur, survey_id: int, discord_user_id: int) -> SurveyResponsePayload:
+def _current_response_payload(
+    cur, survey_id: int, discord_user_id: int, *, rating_answers_available: bool = True
+) -> SurveyResponsePayload:
     return SurveyResponsePayload(
         selected_option_ids=_current_answer_ids(cur, survey_id, discord_user_id),
         text_answers=_current_text_answers(cur, survey_id, discord_user_id),
         detail_text_by_option=_current_detail_text(cur, survey_id, discord_user_id),
-        rating_answers=_current_rating_answers(cur, survey_id, discord_user_id),
+        rating_answers=(
+            _current_rating_answers(cur, survey_id, discord_user_id)
+            if rating_answers_available
+            else {}
+        ),
     )
 
 
@@ -926,41 +1035,79 @@ def _submit_survey_response_sync(callback) -> Any:
 
 
 async def list_answer_audit_rows(survey_id: int) -> tuple[SurveyAnswerAuditRow, ...]:
-    rows = await run_query_async(
-        """
-        SELECT r.SurveyID, p.Title, p.ClosedAtUtc, r.ResponseID, r.DiscordUserID,
-               r.OriginalAnswersJson, r.CreatedAtUtc AS ResponseCreatedAtUtc,
-               r.UpdatedAtUtc AS ResponseUpdatedAtUtc,
-               q.SurveyQuestionID, q.QuestionKey, q.Prompt, q.QuestionType, q.IsRequired,
-               o.SurveyOptionID, o.OptionKey, o.Label,
-               t.AnswerText, d.DetailText, rating.RatingValue
-        FROM dbo.SurveyResponses r
-        JOIN dbo.SurveyPosts p ON p.SurveyID = r.SurveyID
-        JOIN dbo.SurveyQuestions q ON q.SurveyID = r.SurveyID
-        LEFT JOIN dbo.SurveyAnswers a
-          ON a.SurveyID = r.SurveyID
-         AND a.DiscordUserID = r.DiscordUserID
-         AND a.SurveyQuestionID = q.SurveyQuestionID
-        LEFT JOIN dbo.SurveyQuestionOptions o ON o.SurveyOptionID = a.SurveyOptionID
-        LEFT JOIN dbo.SurveyTextAnswers t
-          ON t.SurveyID = r.SurveyID
-         AND t.DiscordUserID = r.DiscordUserID
-         AND t.SurveyQuestionID = q.SurveyQuestionID
-        LEFT JOIN dbo.SurveyRatingAnswers rating
-          ON rating.SurveyID = r.SurveyID
-         AND rating.DiscordUserID = r.DiscordUserID
-         AND rating.SurveyQuestionID = q.SurveyQuestionID
-        LEFT JOIN dbo.SurveyAnswerDetails d
-          ON d.SurveyID = a.SurveyID
-         AND d.ResponseID = a.ResponseID
-         AND d.DiscordUserID = a.DiscordUserID
-         AND d.SurveyQuestionID = a.SurveyQuestionID
-         AND d.SurveyOptionID = a.SurveyOptionID
-        WHERE r.SurveyID = ?
-        ORDER BY r.DiscordUserID ASC, q.SortOrder ASC, o.SortOrder ASC;
-        """,
-        (int(survey_id),),
-    )
+    if await _survey_rating_answers_table_exists():
+        rows = await run_query_async(
+            """
+            SELECT r.SurveyID, p.Title, p.ClosedAtUtc, r.ResponseID, r.DiscordUserID,
+                   r.OriginalAnswersJson, r.CreatedAtUtc AS ResponseCreatedAtUtc,
+                   r.UpdatedAtUtc AS ResponseUpdatedAtUtc,
+                   q.SurveyQuestionID, q.QuestionKey, q.Prompt, q.QuestionType, q.IsRequired,
+                   o.SurveyOptionID, o.OptionKey, o.Label,
+                   t.AnswerText, d.DetailText, rating.RatingValue
+            FROM dbo.SurveyResponses r
+            JOIN dbo.SurveyPosts p ON p.SurveyID = r.SurveyID
+            JOIN dbo.SurveyQuestions q ON q.SurveyID = r.SurveyID
+            LEFT JOIN dbo.SurveyAnswers a
+              ON a.SurveyID = r.SurveyID
+             AND a.DiscordUserID = r.DiscordUserID
+             AND a.SurveyQuestionID = q.SurveyQuestionID
+            LEFT JOIN dbo.SurveyQuestionOptions o ON o.SurveyOptionID = a.SurveyOptionID
+            LEFT JOIN dbo.SurveyTextAnswers t
+              ON t.SurveyID = r.SurveyID
+             AND t.DiscordUserID = r.DiscordUserID
+             AND t.SurveyQuestionID = q.SurveyQuestionID
+            LEFT JOIN dbo.SurveyRatingAnswers rating
+              ON rating.SurveyID = r.SurveyID
+             AND rating.DiscordUserID = r.DiscordUserID
+             AND rating.SurveyQuestionID = q.SurveyQuestionID
+            LEFT JOIN dbo.SurveyAnswerDetails d
+              ON d.SurveyID = a.SurveyID
+             AND d.ResponseID = a.ResponseID
+             AND d.DiscordUserID = a.DiscordUserID
+             AND d.SurveyQuestionID = a.SurveyQuestionID
+             AND d.SurveyOptionID = a.SurveyOptionID
+            WHERE r.SurveyID = ?
+            ORDER BY r.DiscordUserID ASC, q.SortOrder ASC, o.SortOrder ASC;
+            """,
+            (int(survey_id),),
+        )
+    else:
+        logger.warning(
+            "survey_rating_answers_missing_audit survey_id=%s migration=%s",
+            survey_id,
+            SURVEY_RATING_MIGRATION_ID,
+        )
+        rows = await run_query_async(
+            """
+            SELECT r.SurveyID, p.Title, p.ClosedAtUtc, r.ResponseID, r.DiscordUserID,
+                   r.OriginalAnswersJson, r.CreatedAtUtc AS ResponseCreatedAtUtc,
+                   r.UpdatedAtUtc AS ResponseUpdatedAtUtc,
+                   q.SurveyQuestionID, q.QuestionKey, q.Prompt, q.QuestionType, q.IsRequired,
+                   o.SurveyOptionID, o.OptionKey, o.Label,
+                   t.AnswerText, d.DetailText, CAST(NULL AS tinyint) AS RatingValue
+            FROM dbo.SurveyResponses r
+            JOIN dbo.SurveyPosts p ON p.SurveyID = r.SurveyID
+            JOIN dbo.SurveyQuestions q ON q.SurveyID = r.SurveyID
+            LEFT JOIN dbo.SurveyAnswers a
+              ON a.SurveyID = r.SurveyID
+             AND a.DiscordUserID = r.DiscordUserID
+             AND a.SurveyQuestionID = q.SurveyQuestionID
+            LEFT JOIN dbo.SurveyQuestionOptions o ON o.SurveyOptionID = a.SurveyOptionID
+            LEFT JOIN dbo.SurveyTextAnswers t
+              ON t.SurveyID = r.SurveyID
+             AND t.DiscordUserID = r.DiscordUserID
+             AND t.SurveyQuestionID = q.SurveyQuestionID
+            LEFT JOIN dbo.SurveyAnswerDetails d
+              ON d.SurveyID = a.SurveyID
+             AND d.ResponseID = a.ResponseID
+             AND d.DiscordUserID = a.DiscordUserID
+             AND d.SurveyQuestionID = a.SurveyQuestionID
+             AND d.SurveyOptionID = a.SurveyOptionID
+            WHERE r.SurveyID = ?
+            ORDER BY r.DiscordUserID ASC, q.SortOrder ASC, o.SortOrder ASC;
+            """,
+            (int(survey_id),),
+        )
     return _answer_audit_from_rows(rows)
 
 

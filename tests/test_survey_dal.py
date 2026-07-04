@@ -3,7 +3,116 @@ from __future__ import annotations
 from datetime import UTC, datetime
 import json
 
+import pytest
+
 from voting import survey_dal
+from voting.service import VoteValidationError
+
+
+@pytest.mark.asyncio
+async def test_get_survey_snapshot_skips_rating_queries_when_rating_table_missing(monkeypatch):
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+    executed_queries: list[str] = []
+
+    async def fake_run_one_async(sql, params=None):
+        if "OBJECT_ID" in sql:
+            return {"ObjectId": None}
+        return {
+            "SurveyID": 42,
+            "GuildID": 1,
+            "ChannelID": 2,
+            "MessageID": 3,
+            "CreatedByDiscordUserID": 4,
+            "Title": "Planning",
+            "Description": None,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "LaunchMentionEveryone": 0,
+            "ReminderMentionEveryone": 0,
+            "CloseMentionEveryone": 0,
+            "OpensAtUtc": None,
+            "ClosesAtUtc": now,
+            "ClosedAtUtc": None,
+            "ClosedByDiscordUserID": None,
+            "ClosedReason": None,
+            "TotalResponses": 0,
+            "CreatedAtUtc": now,
+            "UpdatedAtUtc": now,
+            "ResultVisibility": "PublicLive",
+        }
+
+    async def fake_run_query_async(sql, params=None):
+        executed_queries.append(sql)
+        assert "SurveyRatingAnswers" not in sql
+        if "FROM dbo.SurveyQuestions q" in sql:
+            return [
+                {
+                    "SurveyQuestionID": 10,
+                    "SurveyID": 42,
+                    "QuestionKey": "q1",
+                    "Prompt": "Pick one",
+                    "QuestionType": "SingleChoice",
+                    "SortOrder": 1,
+                    "IsRequired": 1,
+                    "MinSelections": 1,
+                    "MaxSelections": 1,
+                    "AllowDetails": 0,
+                    "AnsweredResponseCount": 0,
+                    "AverageRating": None,
+                    "MinimumRating": None,
+                    "MaximumRating": None,
+                }
+            ]
+        return []
+
+    monkeypatch.setattr(survey_dal, "run_one_async", fake_run_one_async)
+    monkeypatch.setattr(survey_dal, "run_query_async", fake_run_query_async)
+
+    snapshot = await survey_dal.get_survey_snapshot(42)
+
+    assert snapshot is not None
+    assert snapshot.questions[0].rating_counts == ()
+    assert executed_queries
+
+
+@pytest.mark.asyncio
+async def test_submit_survey_response_missing_rating_table_has_clear_error(monkeypatch):
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+        def fetchone(self):
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "OBJECT_ID" in cur.last_sql:
+            return {"ObjectId": None}
+        return {
+            "SurveyID": 42,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "ClosesAtUtc": datetime(2026, 7, 4, 13, 0, tzinfo=UTC),
+        }
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", lambda callback: callback(FakeCursor()))
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    with pytest.raises(VoteValidationError, match=survey_dal.SURVEY_RATING_MIGRATION_ID):
+        await survey_dal.submit_survey_response(
+            survey_id=42,
+            discord_user_id=123,
+            answers_by_question_id={},
+            rating_answers_by_question_id={10: 5},
+            now_utc=now,
+        )
 
 
 def test_answer_audit_rows_include_text_and_option_aligned_detail_payloads():
