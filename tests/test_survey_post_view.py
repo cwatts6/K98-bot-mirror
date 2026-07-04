@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
+import discord
 import pytest
 
 from ui.views.survey_post_view import (
@@ -18,6 +19,7 @@ from ui.views.survey_post_view import (
 )
 from voting import survey_service
 from voting.survey_models import (
+    SURVEY_QUESTION_RATING,
     SurveyQuestion,
     SurveyQuestionCreateRequest,
     SurveyQuestionOption,
@@ -323,6 +325,117 @@ async def test_survey_submit_allows_skipped_optional_question():
     assert not panel.children[-1].disabled
     assert "Optional text response: skipped" in panel.content()
     assert SURVEY_INCOMPLETE_HELP not in panel.content()
+
+
+@pytest.mark.asyncio
+async def test_survey_response_panel_supports_rating_entry_and_prefill():
+    now = datetime.now(UTC)
+    snapshot = SurveySnapshot(
+        survey_id=7,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Survey",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=7,
+                question_key="q1",
+                prompt="Rate readiness",
+                question_type="Rating",
+                sort_order=1,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+            ),
+        ),
+    )
+    panel = SurveyResponsePanel(snapshot, owner_user_id=123)
+
+    assert panel.children[-1].disabled is True
+    assert "Required rating: choose 1-5 (not yet complete)." in panel.content()
+
+    rating_five = next(child for child in panel.children if getattr(child, "label", None) == "5")
+    await rating_five.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    assert panel.rating_answers == {10: 5}
+    assert not panel.children[-1].disabled
+    assert "Required rating: choose 1-5 (rated 5/5)." in panel.content()
+    selected_button = next(
+        child for child in panel.children if getattr(child, "label", None) == "5"
+    )
+    assert selected_button.style == discord.ButtonStyle.success
+
+
+@pytest.mark.asyncio
+async def test_survey_response_panel_allows_skipped_optional_rating():
+    now = datetime.now(UTC)
+    snapshot = SurveySnapshot(
+        survey_id=7,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Survey",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=7,
+                question_key="q1",
+                prompt="Optional rating",
+                question_type="Rating",
+                sort_order=1,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+                is_required=False,
+            ),
+        ),
+    )
+    panel = SurveyResponsePanel(
+        snapshot,
+        owner_user_id=123,
+        rating_answers={10: 4},
+    )
+
+    assert not panel.children[-1].disabled
+    assert "Optional rating: choose 1-5 (rated 4/5)." in panel.content()
+
+    skip = next(child for child in panel.children if getattr(child, "label", None) == "Skip rating")
+    await skip.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    assert panel.rating_answers == {}
+    assert not panel.children[-1].disabled
+    assert "Optional rating: choose 1-5 (skipped)." in panel.content()
 
 
 @pytest.mark.asyncio
@@ -747,6 +860,34 @@ async def test_survey_guided_builder_saves_optional_question(monkeypatch):
 
     assert view.questions[0].is_required is False
     assert "optional" in view.summary()
+
+
+@pytest.mark.asyncio
+async def test_survey_guided_builder_saves_rating_question(monkeypatch):
+    async def fake_publish(_interaction, _questions):
+        return True
+
+    async def fake_send_ephemeral(_interaction, _content, **_kwargs):
+        return None
+
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    view = SurveyBuilderView(owner_user_id=123, publish_callback=fake_publish)
+    view.draft_is_rating = True
+    view._rebuild()
+
+    prompt_modal = _SurveyQuestionPromptModal(view)
+    prompt_modal.prompt.value = "Rate readiness"
+    await prompt_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    await _button(view, "Save question").callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    assert view.questions[0].question_type == SURVEY_QUESTION_RATING
+    assert view.questions[0].options == ()
+    assert view.questions[0].min_selections == 0
+    assert view.questions[0].max_selections == 0
+    assert "Rating 1-5" in view.summary()
 
 
 @pytest.mark.asyncio

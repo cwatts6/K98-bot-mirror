@@ -7,6 +7,7 @@ import pytest
 from voting import survey_service
 from voting.service import VoteValidationError
 from voting.survey_models import (
+    SURVEY_QUESTION_RATING,
     SURVEY_QUESTION_TEXT,
     SurveyQuestion,
     SurveyQuestionOption,
@@ -158,6 +159,42 @@ def test_build_question_request_accepts_text_and_choice_details():
             options=("A",),
             min_selections=0,
             max_selections=0,
+        )
+
+
+def test_build_question_request_accepts_fixed_rating_question():
+    rating = survey_service.build_question_request(
+        prompt="How ready are you?",
+        question_type="Rating",
+        options=(),
+        min_selections=0,
+        max_selections=0,
+        is_required=False,
+    )
+
+    assert rating.question_type == SURVEY_QUESTION_RATING
+    assert rating.options == ()
+    assert rating.min_selections == 0
+    assert rating.max_selections == 0
+    assert rating.is_required is False
+
+    with pytest.raises(VoteValidationError, match="do not use options"):
+        survey_service.build_question_request(
+            prompt="How ready are you?",
+            question_type="Rating",
+            options=("Low", "High"),
+            min_selections=0,
+            max_selections=0,
+        )
+
+    with pytest.raises(VoteValidationError, match="cannot allow choice details"):
+        survey_service.build_question_request(
+            prompt="How ready are you?",
+            question_type="Rating",
+            options=(),
+            min_selections=0,
+            max_selections=0,
+            allow_details=True,
         )
 
 
@@ -458,4 +495,85 @@ def test_validate_response_payload_allows_skipped_optional_choice_and_text():
             snapshot,
             answers_by_question_id={},
             detail_text_by_question_option={(10, 101): "detail without selection"},
+        )
+
+
+def test_validate_response_payload_accepts_required_and_optional_ratings():
+    now = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
+    snapshot = SurveySnapshot(
+        survey_id=8,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Survey",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=8,
+                question_key="q1",
+                prompt="Required rating",
+                question_type="Rating",
+                sort_order=1,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+            ),
+            SurveyQuestion(
+                question_id=11,
+                survey_id=8,
+                question_key="q2",
+                prompt="Optional rating",
+                question_type="Rating",
+                sort_order=2,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+                is_required=False,
+            ),
+        ),
+    )
+
+    payload = survey_service.validate_response_payload(
+        snapshot,
+        rating_answers_by_question_id={10: "5"},
+    )
+
+    assert payload.rating_answers == {10: 5}
+
+    payload = survey_service.validate_response_payload(
+        snapshot,
+        rating_answers_by_question_id={"10": "4"},
+    )
+
+    assert payload.rating_answers == {10: 4}
+
+    with pytest.raises(VoteValidationError, match=r"question 1.*1 to 5"):
+        survey_service.validate_response_payload(snapshot)
+
+    with pytest.raises(VoteValidationError, match=r"question 1.*1 to 5"):
+        survey_service.validate_response_payload(
+            snapshot,
+            rating_answers_by_question_id={10: 6},
+        )
+
+    with pytest.raises(VoteValidationError, match="do not use options"):
+        survey_service.validate_response_payload(
+            snapshot,
+            answers_by_question_id={10: (101,)},
+            rating_answers_by_question_id={10: 5},
         )

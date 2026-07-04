@@ -10,6 +10,7 @@ from core.interaction_safety import send_ephemeral
 from voting import survey_service
 from voting.survey_models import (
     SURVEY_QUESTION_MULTI_SELECT,
+    SURVEY_QUESTION_RATING,
     SURVEY_QUESTION_TEXT,
     SurveyQuestionCreateRequest,
     SurveyResponsePayload,
@@ -88,6 +89,7 @@ class _SurveyOpenButton(discord.ui.Button):
             selected_option_ids=response_payload.selected_option_ids,
             text_answers=response_payload.text_answers,
             detail_text_by_option=response_payload.detail_text_by_option,
+            rating_answers=response_payload.rating_answers,
         )
         await send_ephemeral(interaction, panel.content(), view=panel)
 
@@ -213,6 +215,47 @@ class _SurveyNavButton(discord.ui.Button):
         await self.parent_view.refresh(interaction)
 
 
+class _SurveyRatingButton(discord.ui.Button):
+    def __init__(self, parent_view: SurveyResponsePanel, rating_value: int) -> None:
+        self.parent_view = parent_view
+        self.rating_value = int(rating_value)
+        question = parent_view.current_question
+        selected = parent_view.rating_answers.get(question.question_id) == self.rating_value
+        super().__init__(
+            label=str(self.rating_value),
+            style=discord.ButtonStyle.success if selected else discord.ButtonStyle.secondary,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey panel belongs to another player.")
+            return
+        question = self.parent_view.current_question
+        self.parent_view.rating_answers[question.question_id] = self.rating_value
+        await self.parent_view.refresh(interaction)
+
+
+class _SurveyClearRatingButton(discord.ui.Button):
+    def __init__(self, parent_view: SurveyResponsePanel) -> None:
+        question = parent_view.current_question
+        super().__init__(
+            label="Skip rating",
+            style=discord.ButtonStyle.secondary,
+            disabled=question.is_required or question.question_id not in parent_view.rating_answers,
+            row=1,
+        )
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey panel belongs to another player.")
+            return
+        question = self.parent_view.current_question
+        self.parent_view.rating_answers.pop(question.question_id, None)
+        await self.parent_view.refresh(interaction)
+
+
 class _SurveySubmitButton(discord.ui.Button):
     def __init__(self, parent_view: SurveyResponsePanel) -> None:
         super().__init__(
@@ -241,6 +284,7 @@ class _SurveySubmitButton(discord.ui.Button):
                 answers_by_question_id=self.parent_view.answers,
                 text_answers_by_question_id=self.parent_view.text_answers,
                 detail_text_by_question_option=self.parent_view.normalized_detail_text_by_option(),
+                rating_answers_by_question_id=self.parent_view.rating_answers,
             )
         except survey_service.VoteValidationError as exc:
             await send_ephemeral(interaction, str(exc))
@@ -283,6 +327,7 @@ class SurveyResponsePanel(discord.ui.View):
         selected_option_ids: dict[int, tuple[int, ...]] | None = None,
         text_answers: dict[int, str] | None = None,
         detail_text_by_option: dict[tuple[int, int], str] | None = None,
+        rating_answers: dict[int, int] | None = None,
         current_index: int = 0,
     ) -> None:
         super().__init__(timeout=600)
@@ -293,6 +338,7 @@ class SurveyResponsePanel(discord.ui.View):
         self.answers: dict[int, tuple[int, ...]] = dict(selected_option_ids or {})
         self.text_answers: dict[int, str] = dict(text_answers or {})
         self.detail_text_by_option: dict[tuple[int, int], str] = dict(detail_text_by_option or {})
+        self.rating_answers: dict[int, int] = dict(rating_answers or {})
         self._rebuild()
 
     @property
@@ -306,6 +352,7 @@ class SurveyResponsePanel(discord.ui.View):
                 answers_by_question_id=self.answers,
                 text_answers_by_question_id=self.text_answers,
                 detail_text_by_question_option=self.normalized_detail_text_by_option(),
+                rating_answers_by_question_id=self.rating_answers,
             )
         except survey_service.VoteValidationError:
             return False
@@ -353,7 +400,11 @@ class SurveyResponsePanel(discord.ui.View):
 
     def _rebuild(self) -> None:
         self.clear_items()
-        if self.current_question.question_type == SURVEY_QUESTION_TEXT:
+        if self.current_question.question_type == SURVEY_QUESTION_RATING:
+            for rating_value in range(1, 6):
+                self.add_item(_SurveyRatingButton(self, rating_value))
+            self.add_item(_SurveyClearRatingButton(self))
+        elif self.current_question.question_type == SURVEY_QUESTION_TEXT:
             self.add_item(_SurveyTextAnswerButton(self))
         else:
             self.add_item(_SurveyQuestionSelect(self))
@@ -366,6 +417,18 @@ class SurveyResponsePanel(discord.ui.View):
     def content(self) -> str:
         question = self.current_question
         incomplete_line = f"\n{SURVEY_INCOMPLETE_HELP}" if not self.is_complete() else ""
+        if question.question_type == SURVEY_QUESTION_RATING:
+            saved = self.rating_answers.get(question.question_id)
+            requirement = "Required" if question.is_required else "Optional"
+            state = f"rated {saved}/5" if saved is not None else "not yet complete"
+            if not question.is_required and saved is None:
+                state = "skipped"
+            return (
+                f"Survey #{self.survey_id}: question {question.sort_order} of {len(self.snapshot.questions)}\n"
+                f"{question.prompt}\n"
+                f"{requirement} rating: choose 1-5 ({state})."
+                f"{incomplete_line}"
+            )
         if question.question_type == SURVEY_QUESTION_TEXT:
             saved = bool(self.text_answers.get(question.question_id, "").strip())
             requirement = "required" if question.is_required else "optional"
@@ -494,6 +557,7 @@ class SurveyBuilderView(discord.ui.View):
         self.draft_min_selections = 1
         self.draft_max_selections = 1
         self.draft_is_text = False
+        self.draft_is_rating = False
         self.draft_allow_details = False
         self.draft_is_required = True
         self.publish_in_progress = False
@@ -525,18 +589,23 @@ class SurveyBuilderView(discord.ui.View):
             self.draft_prompt.strip()
             or self.draft_options
             or self.draft_is_text
+            or self.draft_is_rating
             or self.draft_allow_details
             or not self.draft_is_required
         )
 
     @property
     def draft_question_type(self) -> str:
+        if self.draft_is_rating:
+            return "Rating"
         if self.draft_is_text:
             return "Text"
         return "MultiSelect" if self.draft_max_selections > 1 else "SingleChoice"
 
     @property
     def draft_mode_label(self) -> str:
+        if self.draft_is_rating:
+            return "rating 1-5"
         if self.draft_is_text:
             return "text"
         return "multi-select" if self.draft_max_selections > 1 else "single choice"
@@ -547,6 +616,7 @@ class SurveyBuilderView(discord.ui.View):
             bool(self.draft_prompt.strip())
             and (
                 self.draft_is_text
+                or self.draft_is_rating
                 or (
                     len(self.draft_options) >= survey_service.MIN_SURVEY_OPTIONS
                     and self.draft_min_selections >= 1
@@ -575,6 +645,7 @@ class SurveyBuilderView(discord.ui.View):
         self.draft_min_selections = 1
         self.draft_max_selections = 1
         self.draft_is_text = False
+        self.draft_is_rating = False
         self.draft_allow_details = False
         self.draft_is_required = True
 
@@ -616,11 +687,21 @@ class SurveyBuilderView(discord.ui.View):
     def build_draft_question(self) -> SurveyQuestionCreateRequest:
         question = survey_service.build_question_request(
             prompt=self.draft_prompt,
-            question_type=(SURVEY_QUESTION_TEXT if self.draft_is_text else None),
-            options=() if self.draft_is_text else tuple(self.draft_options),
-            min_selections=0 if self.draft_is_text else self.draft_min_selections,
-            max_selections=0 if self.draft_is_text else self.draft_max_selections,
-            allow_details=False if self.draft_is_text else self.draft_allow_details,
+            question_type=(
+                SURVEY_QUESTION_RATING
+                if self.draft_is_rating
+                else (SURVEY_QUESTION_TEXT if self.draft_is_text else None)
+            ),
+            options=() if self.draft_is_text or self.draft_is_rating else tuple(self.draft_options),
+            min_selections=(
+                0 if self.draft_is_text or self.draft_is_rating else self.draft_min_selections
+            ),
+            max_selections=(
+                0 if self.draft_is_text or self.draft_is_rating else self.draft_max_selections
+            ),
+            allow_details=(
+                False if self.draft_is_text or self.draft_is_rating else self.draft_allow_details
+            ),
             is_required=self.draft_is_required,
         )
         self._clear_draft()
@@ -630,10 +711,7 @@ class SurveyBuilderView(discord.ui.View):
         lines = [f"Questions: {len(self.questions)}/{survey_service.MAX_SURVEY_QUESTIONS}"]
         if self.questions:
             lines.extend(
-                f"{index}. {question.prompt[:70]} "
-                f"({question.question_type}, {question.max_selections} max, {len(question.options)} options"
-                f"{', details' if question.allow_details else ''}, "
-                f"{'required' if question.is_required else 'optional'})"
+                self._question_summary(index, question)
                 for index, question in enumerate(self.questions, start=1)
             )
         else:
@@ -646,18 +724,35 @@ class SurveyBuilderView(discord.ui.View):
                 f"({len(self.draft_prompt.strip())}/{survey_service.MAX_SURVEY_QUESTION_PROMPT_LEN})",
                 f"Draft type: {self.draft_mode_label}",
                 f"Requirement: {'required' if self.draft_is_required else 'optional'}",
-                f"Draft options: {len(self.draft_options)}/{survey_service.MAX_SURVEY_OPTIONS}",
             )
         )
+        if self.draft_is_rating:
+            lines.append("Scale: 1-5")
+        else:
+            lines.append(
+                f"Draft options: {len(self.draft_options)}/{survey_service.MAX_SURVEY_OPTIONS}"
+            )
         if self.draft_options:
             lines.extend(f"- {option}" for option in self.draft_options)
-        if not self.draft_is_text:
+        if not self.draft_is_text and not self.draft_is_rating:
             lines.append(
                 f"Selections: {self.draft_min_selections}-{self.draft_max_selections} "
                 f"({self.draft_mode_label})"
             )
             lines.append(f"Add details: {'enabled' if self.draft_allow_details else 'disabled'}")
         return "\n".join(lines)
+
+    def _question_summary(self, index: int, question: SurveyQuestionCreateRequest) -> str:
+        requirement = "required" if question.is_required else "optional"
+        if question.question_type == SURVEY_QUESTION_RATING:
+            return f"{index}. {question.prompt[:70]} (Rating 1-5, {requirement})"
+        if question.question_type == SURVEY_QUESTION_TEXT:
+            return f"{index}. {question.prompt[:70]} (Text, {requirement})"
+        return (
+            f"{index}. {question.prompt[:70]} "
+            f"({question.question_type}, {question.max_selections} max, {len(question.options)} options"
+            f"{', details' if question.allow_details else ''}, {requirement})"
+        )
 
 
 def _builder_option_count(parent_view: SurveyBuilderView) -> int:
@@ -695,6 +790,7 @@ class _BuilderAddOptionButton(discord.ui.Button):
             style=discord.ButtonStyle.primary,
             disabled=_builder_disabled(parent_view)
             or parent_view.draft_is_text
+            or parent_view.draft_is_rating
             or _builder_option_count(parent_view) >= survey_service.MAX_SURVEY_OPTIONS,
             row=0,
         )
@@ -714,6 +810,7 @@ class _BuilderRemoveOptionButton(discord.ui.Button):
             style=discord.ButtonStyle.secondary,
             disabled=_builder_disabled(parent_view)
             or parent_view.draft_is_text
+            or parent_view.draft_is_rating
             or not parent_view.draft_options,
             row=0,
         )
@@ -786,12 +883,18 @@ class _BuilderQuestionTypeSelect(discord.ui.Select):
             discord.SelectOption(
                 label="Choice",
                 value="choice",
-                default=not parent_view.draft_is_text,
+                default=not parent_view.draft_is_text and not parent_view.draft_is_rating,
             ),
             discord.SelectOption(
                 label="Text",
                 value="text",
                 default=parent_view.draft_is_text,
+            ),
+            discord.SelectOption(
+                label="Rating",
+                value="rating",
+                description="Fixed 1-5 scale",
+                default=parent_view.draft_is_rating,
             ),
         ]
         super().__init__(
@@ -809,7 +912,8 @@ class _BuilderQuestionTypeSelect(discord.ui.Select):
             return
         selected = self.values[0] if self.values else "choice"
         self.parent_view.draft_is_text = selected == "text"
-        if self.parent_view.draft_is_text:
+        self.parent_view.draft_is_rating = selected == "rating"
+        if self.parent_view.draft_is_text or self.parent_view.draft_is_rating:
             self.parent_view.draft_options = []
             self.parent_view.draft_min_selections = 1
             self.parent_view.draft_max_selections = 1
@@ -844,6 +948,7 @@ class _BuilderSelectionSelect(discord.ui.Select):
             options=options,
             disabled=parent_view.builder_locked
             or parent_view.draft_is_text
+            or parent_view.draft_is_rating
             or len(parent_view.draft_options) < 2,
             row=2 if kind == "min" else 3,
         )
@@ -878,7 +983,9 @@ class _BuilderDetailsToggleButton(discord.ui.Button):
                 if parent_view.draft_allow_details
                 else discord.ButtonStyle.secondary
             ),
-            disabled=parent_view.builder_locked or parent_view.draft_is_text,
+            disabled=parent_view.builder_locked
+            or parent_view.draft_is_text
+            or parent_view.draft_is_rating,
             row=4,
         )
         self.parent_view = parent_view
@@ -887,8 +994,8 @@ class _BuilderDetailsToggleButton(discord.ui.Button):
         if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
             await send_ephemeral(interaction, "This survey builder belongs to another admin.")
             return
-        if self.parent_view.draft_is_text:
-            await send_ephemeral(interaction, "Text questions do not use choice details.")
+        if self.parent_view.draft_is_text or self.parent_view.draft_is_rating:
+            await send_ephemeral(interaction, "This question type does not use choice details.")
             return
         self.parent_view.draft_allow_details = not self.parent_view.draft_allow_details
         await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
@@ -1026,6 +1133,12 @@ class _SurveyOptionModal(discord.ui.Modal):
             await send_ephemeral(
                 interaction,
                 f"Question not added: surveys support at most {survey_service.MAX_SURVEY_QUESTIONS} questions.",
+            )
+            return
+        if self.parent_view.draft_is_text or self.parent_view.draft_is_rating:
+            await send_ephemeral(
+                interaction,
+                "Option not added: this question type does not use options.",
             )
             return
         if len(self.parent_view.draft_options) >= survey_service.MAX_SURVEY_OPTIONS:

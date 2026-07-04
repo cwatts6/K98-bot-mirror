@@ -98,3 +98,37 @@ def test_answer_audit_rows_include_text_and_option_aligned_detail_payloads():
     assert audit_rows[1].text_answer == "new text"
     assert audit_rows[1].is_required is True
     assert audit_rows[1].original_text_answer == "old text"
+
+
+def test_answer_audit_rows_include_rating_values_and_original_metadata():
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+    rows = [
+        {
+            "SurveyID": 42,
+            "Title": "Planning",
+            "ClosedAtUtc": now,
+            "ResponseID": 9,
+            "DiscordUserID": 123,
+            "OriginalAnswersJson": json.dumps({"ratings": {"10": 2}}),
+            "ResponseCreatedAtUtc": now,
+            "ResponseUpdatedAtUtc": now,
+            "SurveyQuestionID": 10,
+            "QuestionKey": "q1",
+            "Prompt": "Rate readiness",
+            "QuestionType": "Rating",
+            "IsRequired": 1,
+            "SurveyOptionID": None,
+            "OptionKey": None,
+            "Label": None,
+            "AnswerText": None,
+            "DetailText": None,
+            "RatingValue": 5,
+        }
+    ]
+
+    audit_rows = survey_dal._answer_audit_from_rows(rows)
+
+    assert audit_rows[0].question_type == "Rating"
+    assert audit_rows[0].rating_value == 5
+    assert audit_rows[0].original_rating_value == 2
+    assert audit_rows[0].selected_option_ids == ()

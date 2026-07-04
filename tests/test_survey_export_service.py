@@ -15,6 +15,7 @@ from voting.survey_models import (
     SurveyAnswerAuditRow,
     SurveyQuestion,
     SurveyQuestionOption,
+    SurveyRatingCount,
     SurveySnapshot,
 )
 
@@ -146,6 +147,14 @@ def test_survey_totals_rows_include_text_question_metadata_without_raw_answers()
             "SelectionCount": 2,
             "SelectionPercentOfResponses": "100%",
             "IsTopSelection": 0,
+            "AverageRating": "",
+            "MinimumRating": None,
+            "MaximumRating": None,
+            "Rating1Count": 0,
+            "Rating2Count": 0,
+            "Rating3Count": 0,
+            "Rating4Count": 0,
+            "Rating5Count": 0,
         }
     ]
 
@@ -197,6 +206,65 @@ def test_survey_totals_rows_include_optional_answered_and_skipped_counts():
     assert rows[0]["SkippedResponses"] == 2
     assert rows[0]["SelectionCount"] == 1
     assert rows[0]["SelectionPercentOfResponses"] == "33.3%"
+
+
+def test_survey_totals_rows_include_rating_aggregates():
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+    snapshot = SurveySnapshot(
+        survey_id=45,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Planning",
+        description=None,
+        status="Closed",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now,
+        closed_at_utc=now,
+        closed_by_discord_user_id=4,
+        closed_reason="done",
+        total_responses=3,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=20,
+                survey_id=45,
+                question_key="q1",
+                prompt="Rate readiness",
+                question_type="Rating",
+                sort_order=1,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+                is_required=False,
+                answered_response_count=2,
+                rating_counts=(
+                    SurveyRatingCount(3, 1),
+                    SurveyRatingCount(5, 1),
+                ),
+                rating_average=4.0,
+                rating_min=3,
+                rating_max=5,
+            ),
+        ),
+    )
+
+    rows = survey_totals_csv_rows(snapshot)
+
+    assert rows[0]["QuestionType"] == "Rating"
+    assert rows[0]["AnsweredResponses"] == 2
+    assert rows[0]["SkippedResponses"] == 1
+    assert rows[0]["AverageRating"] == "4.00"
+    assert rows[0]["MinimumRating"] == 3
+    assert rows[0]["MaximumRating"] == 5
+    assert rows[0]["Rating3Count"] == 1
+    assert rows[0]["Rating5Count"] == 1
 
 
 @pytest.mark.asyncio
@@ -305,6 +373,43 @@ def test_survey_response_detail_rows_mark_skipped_optional_answers():
     assert csv_rows[0]["IsRequired"] == 0
     assert csv_rows[0]["AnswerStatus"] == "SkippedOptional"
     assert csv_rows[0]["TextAnswer"] == ""
+
+
+def test_survey_response_detail_rows_include_rating_values_and_changes():
+    now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
+    rows = (
+        SurveyAnswerAuditRow(
+            survey_id=42,
+            title="Planning",
+            closed_at_utc=now,
+            response_id=9,
+            discord_user_id=123456789012345678,
+            response_created_at_utc=now,
+            response_updated_at_utc=now,
+            question_id=10,
+            question_key="q1",
+            question_prompt="Rate readiness",
+            question_type="Rating",
+            selected_option_ids=(),
+            selected_option_keys=(),
+            selected_option_labels=(),
+            original_option_ids=(),
+            original_option_keys=(),
+            original_option_labels=(),
+            rating_value=5,
+            original_rating_value=3,
+        ),
+    )
+
+    csv_rows = survey_response_detail_csv_rows(
+        rows, discord_names_by_user_id={123456789012345678: "Tester"}
+    )
+
+    assert csv_rows[0]["AnswerStatus"] == "Answered"
+    assert csv_rows[0]["RatingValue"] == 5
+    assert csv_rows[0]["OriginalRatingValue"] == 3
+    assert csv_rows[0]["RatingChanged"] == 1
+    assert csv_rows[0]["ResponseChanged"] == 1
 
 
 def test_survey_response_detail_text_and_details_are_formula_safe():
