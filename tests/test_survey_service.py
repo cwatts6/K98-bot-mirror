@@ -277,13 +277,13 @@ def test_validate_response_payload_rejects_malformed_option_ids():
         ),
     )
 
-    with pytest.raises(VoteValidationError, match="question 1.*not valid"):
+    with pytest.raises(VoteValidationError, match=r"question 1.*not valid"):
         survey_service.validate_response_payload(
             snapshot,
             answers_by_question_id={10: ("not-an-option",), 11: (201,)},
         )
 
-    with pytest.raises(VoteValidationError, match="question 1.*not valid"):
+    with pytest.raises(VoteValidationError, match=r"question 1.*not valid"):
         survey_service.validate_response_payload(
             snapshot,
             answers_by_question_id={10: (None,), 11: (201,)},
