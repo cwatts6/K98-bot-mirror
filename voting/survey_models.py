@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
 
 SURVEY_QUESTION_SINGLE_CHOICE = "SingleChoice"
 SURVEY_QUESTION_MULTI_SELECT = "MultiSelect"
 SURVEY_QUESTION_TEXT = "Text"
+SURVEY_QUESTION_RATING = "Rating"
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,12 @@ class SurveyQuestionOption:
     label: str
     sort_order: int
     response_count: int = 0
+
+
+@dataclass(frozen=True)
+class SurveyRatingCount:
+    rating_value: int
+    response_count: int
 
 
 @dataclass(frozen=True)
@@ -33,6 +40,17 @@ class SurveyQuestion:
     allow_details: bool = False
     is_required: bool = True
     answered_response_count: int | None = None
+    rating_counts: tuple[SurveyRatingCount, ...] = ()
+    rating_average: float | None = None
+    rating_min: int | None = None
+    rating_max: int | None = None
+
+
+def rating_count_for_value(question: SurveyQuestion, rating_value: int) -> int:
+    for item in question.rating_counts:
+        if int(item.rating_value) == int(rating_value):
+            return int(item.response_count)
+    return 0
 
 
 @dataclass(frozen=True)
@@ -88,6 +106,7 @@ class SurveyResponsePayload:
     selected_option_ids: dict[int, tuple[int, ...]]
     text_answers: dict[int, str]
     detail_text_by_option: dict[tuple[int, int], str]
+    rating_answers: dict[int, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -165,6 +184,8 @@ class SurveyAnswerAuditRow:
     original_text_answer: str | None = None
     selected_option_detail_notes: tuple[str, ...] = ()
     original_selected_option_detail_notes: tuple[str, ...] = ()
+    rating_value: int | None = None
+    original_rating_value: int | None = None
 
 
 @dataclass(frozen=True)

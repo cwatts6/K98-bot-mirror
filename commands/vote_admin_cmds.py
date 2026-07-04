@@ -49,7 +49,11 @@ from voting.survey_export_service import (
     build_survey_response_detail_export,
     build_survey_totals_export,
 )
-from voting.survey_models import SURVEY_QUESTION_TEXT
+from voting.survey_models import (
+    SURVEY_QUESTION_RATING,
+    SURVEY_QUESTION_TEXT,
+    rating_count_for_value,
+)
 from voting.survey_presentation import (
     build_survey_close_embed,
     build_survey_embed,
@@ -1082,6 +1086,23 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             if question.question_type == SURVEY_QUESTION_TEXT:
                 question_lines.append(
                     f"Q{question.sort_order}: private text responses ({answered} answered, {skipped} skipped, {requirement})"
+                )
+                continue
+            if question.question_type == SURVEY_QUESTION_RATING:
+                if answered and question.rating_average is not None:
+                    distribution = " ".join(
+                        f"{value}:{rating_count_for_value(question, value)}"
+                        for value in range(1, 6)
+                    )
+                    rating_summary = (
+                        f"avg {question.rating_average:.1f}/5, "
+                        f"min {question.rating_min or '-'}, max {question.rating_max or '-'}, "
+                        f"{distribution}"
+                    )
+                else:
+                    rating_summary = "no ratings"
+                question_lines.append(
+                    f"Q{question.sort_order}: {rating_summary} ({answered} answered, {skipped} skipped, {requirement})"
                 )
                 continue
             top = max((option.response_count for option in question.options), default=0)

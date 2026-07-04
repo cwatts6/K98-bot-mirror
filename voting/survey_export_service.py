@@ -11,7 +11,7 @@ from typing import Any
 
 from voting import survey_dal
 from voting.service import VoteValidationError
-from voting.survey_models import SurveyAnswerAuditRow, SurveySnapshot
+from voting.survey_models import SurveyAnswerAuditRow, SurveySnapshot, rating_count_for_value
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,14 @@ SURVEY_TOTALS_COLUMNS = (
     "SelectionCount",
     "SelectionPercentOfResponses",
     "IsTopSelection",
+    "AverageRating",
+    "MinimumRating",
+    "MaximumRating",
+    "Rating1Count",
+    "Rating2Count",
+    "Rating3Count",
+    "Rating4Count",
+    "Rating5Count",
 )
 
 SURVEY_RESPONSE_DETAIL_COLUMNS = (
@@ -72,6 +80,9 @@ SURVEY_RESPONSE_DETAIL_COLUMNS = (
     "TextAnswer",
     "OriginalTextAnswer",
     "TextAnswerChanged",
+    "RatingValue",
+    "OriginalRatingValue",
+    "RatingChanged",
     "SelectedOptionDetailNotes",
     "OriginalSelectedOptionDetailNotes",
     "DetailNotesChanged",
@@ -165,7 +176,9 @@ def _answered_count(snapshot: SurveySnapshot, question) -> int:
 
 
 def _answer_status(row: SurveyAnswerAuditRow) -> str:
-    has_answer = bool(row.selected_option_ids or (row.text_answer or "").strip())
+    has_answer = bool(
+        row.selected_option_ids or (row.text_answer or "").strip() or row.rating_value is not None
+    )
     if has_answer:
         return "Answered"
     return "MissingRequired" if row.is_required else "SkippedOptional"
@@ -234,6 +247,16 @@ def survey_totals_csv_rows(snapshot: SurveySnapshot) -> list[dict[str, Any]]:
             "MaxSelections": question.max_selections,
             "AnsweredResponses": _answered_count(snapshot, question),
             "SkippedResponses": max(0, total - _answered_count(snapshot, question)),
+            "AverageRating": (
+                f"{question.rating_average:.2f}" if question.rating_average is not None else ""
+            ),
+            "MinimumRating": question.rating_min,
+            "MaximumRating": question.rating_max,
+            "Rating1Count": rating_count_for_value(question, 1),
+            "Rating2Count": rating_count_for_value(question, 2),
+            "Rating3Count": rating_count_for_value(question, 3),
+            "Rating4Count": rating_count_for_value(question, 4),
+            "Rating5Count": rating_count_for_value(question, 5),
         }
         if not question.options:
             answered = _answered_count(snapshot, question)
@@ -290,12 +313,14 @@ def survey_response_detail_csv_rows(
     output: list[dict[str, Any]] = []
     for row in rows:
         text_changed = (row.original_text_answer or "") != (row.text_answer or "")
+        rating_changed = row.original_rating_value != row.rating_value
         details_changed = sorted(row.original_selected_option_detail_notes) != sorted(
             row.selected_option_detail_notes
         )
         response_changed = (
             set(row.original_option_ids) != set(row.selected_option_ids)
             or text_changed
+            or rating_changed
             or details_changed
         )
         output.append(
@@ -319,6 +344,11 @@ def survey_response_detail_csv_rows(
                 "TextAnswer": row.text_answer or "",
                 "OriginalTextAnswer": row.original_text_answer or "",
                 "TextAnswerChanged": 1 if text_changed else 0,
+                "RatingValue": row.rating_value if row.rating_value is not None else "",
+                "OriginalRatingValue": (
+                    row.original_rating_value if row.original_rating_value is not None else ""
+                ),
+                "RatingChanged": 1 if rating_changed else 0,
                 "SelectedOptionDetailNotes": _join_values(row.selected_option_detail_notes),
                 "OriginalSelectedOptionDetailNotes": _join_values(
                     row.original_selected_option_detail_notes

@@ -8,7 +8,13 @@ from PIL import Image, ImageDraw, ImageFont
 
 from core import visual_text
 from voting.result_visibility import public_results_hidden
-from voting.survey_models import SURVEY_QUESTION_TEXT, RenderedSurveyCard, SurveySnapshot
+from voting.survey_models import (
+    SURVEY_QUESTION_RATING,
+    SURVEY_QUESTION_TEXT,
+    RenderedSurveyCard,
+    SurveySnapshot,
+    rating_count_for_value,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SURVEY_BACKGROUND = ROOT / "assets" / "vote" / "vote.png"
@@ -99,6 +105,19 @@ def _top_option_line(snapshot: SurveySnapshot) -> str:
     for question in snapshot.questions[:5]:
         if question.question_type == SURVEY_QUESTION_TEXT:
             lines.append(f"Q{question.sort_order}: text responses recorded privately")
+            continue
+        if question.question_type == SURVEY_QUESTION_RATING:
+            answered = int(question.answered_response_count or 0)
+            if answered <= 0 or question.rating_average is None:
+                lines.append(f"Q{question.sort_order}: no ratings yet")
+                continue
+            distribution = " ".join(
+                f"{value}:{rating_count_for_value(question, value)}" for value in range(1, 6)
+            )
+            lines.append(
+                f"Q{question.sort_order}: avg {question.rating_average:.1f}/5 "
+                f"({answered} ratings; {distribution})"
+            )
             continue
         if not question.options:
             continue

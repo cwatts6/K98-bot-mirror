@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after successful Phase 9A optional survey-question delivery and smoke test`
 - Task type: `audit | product scope | SQL-backed survey extension design | Discord interaction UX | privacy/export review`
 - One-pass approved: `no`
-- Status: `prepared; audit/scope first, implementation only after operator approval`
+- Status: `implemented locally after operator approval; pending SQL deployment and Discord smoke`
 
 ## 2. Objective
 
@@ -298,3 +298,48 @@ Before implementation, confirm:
 - Whether response-detail export should include `RatingValue`, `OriginalRatingValue`, and
   `RatingChanged`.
 - Whether ranking should remain Phase 9C after rating is delivered and smoke tested.
+
+## 16. Phase 9B Local Implementation Record - 2026-07-04
+
+Phase 9B was approved after the audit/scope packet and implemented locally as the fixed 1-5 rating
+slice only.
+
+Delivered local scope:
+
+- Added `QuestionType = Rating` as a first-class survey question type.
+- Prepared additive SQL migration `20260704_002_add_survey_rating_questions.sql` in the SQL repo.
+- Added dedicated `dbo.SurveyRatingAnswers` storage with fixed 1-5 rating constraint, response
+  linkage, one rating per response/question, and rating-question FK enforcement.
+- Preserved Phase 9A required/optional semantics for rating questions.
+- Added private player rating controls with prefilled editing and optional skip/clear behavior.
+- Added guided builder `Rating` selection without free-typed question type values.
+- Added PublicLive and HiddenUntilClose aggregate-only rating behavior using answered count,
+  average, min/max, and 1-5 distribution.
+- Added private admin status rating summaries.
+- Added private closed-only totals and response-detail export fields for rating values,
+  original rating values, changed flags, skipped optional ratings, formula safety, and
+  spreadsheet-safe Discord IDs.
+- Extended submission/change audit metadata with rating counts without storing full answer
+  payloads in audit JSON.
+- Preserved existing one-choice votes, multi-select votes, choice/text surveys, optional questions,
+  details, reminders, automatic/manual close, restart-safe public openers, and private exports.
+
+Still out of scope:
+
+- Ranking questions.
+- Custom scales, 1-10 scales, scale labels, emoji/icons, rating comments.
+- Persisted partial drafts/resume.
+- Dashboard/reporting, export v2/workbook redesign, role/governor voting, saved templates,
+  public detail exports, and `/vote_admin` reshaping.
+
+Local validation:
+
+- Focused survey/voting pytest passed: `69 passed`.
+
+Pending before production rollout:
+
+- SQL deployment from `C:\K98-bot-SQL-Server`.
+- Full bot validation gates and Codex Security review before PR handoff.
+- Operator Discord smoke covering rating create, submit, update, optional skip, PublicLive,
+  HiddenUntilClose close reveal, status, exports, manual/automatic close, restart-safe opener, and
+  existing choice/text optional regressions.
