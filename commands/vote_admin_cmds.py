@@ -46,6 +46,7 @@ from voting.service import (
     search_vote_choices,
 )
 from voting.survey_export_service import (
+    build_survey_report_bundle_export,
     build_survey_response_detail_export,
     build_survey_totals_export,
 )
@@ -106,9 +107,11 @@ _VOTE_MODE_CHOICES = [
 ]
 _SURVEY_EXPORT_MODE_TOTALS = "totals"
 _SURVEY_EXPORT_MODE_RESPONSE_DETAIL = "response_detail"
+_SURVEY_EXPORT_MODE_REPORT_BUNDLE = "report_bundle"
 _SURVEY_EXPORT_MODE_CHOICES = [
     discord.OptionChoice(name="Totals only", value=_SURVEY_EXPORT_MODE_TOTALS),
     discord.OptionChoice(name="Response detail", value=_SURVEY_EXPORT_MODE_RESPONSE_DETAIL),
+    discord.OptionChoice(name="Report bundle", value=_SURVEY_EXPORT_MODE_REPORT_BUNDLE),
 ]
 
 
@@ -378,6 +381,40 @@ def _build_survey_response_detail_export_summary_embed(export) -> discord.Embed:
         inline=True,
     )
     embed.set_footer(text="Private response-detail export. Includes Discord user ID and name.")
+    return embed
+
+
+def _build_survey_report_bundle_export_summary_embed(export) -> discord.Embed:
+    snapshot = export.snapshot
+    embed = discord.Embed(
+        title=f"Survey #{snapshot.survey_id} report bundle",
+        description=(
+            "Private reporting CSV bundle for one closed survey. Aggregate files exclude raw "
+            "answers; response detail includes Discord user ID and name."
+        ),
+        color=discord.Color.blurple(),
+    )
+    embed.add_field(name="Responses", value=str(snapshot.total_responses), inline=True)
+    embed.add_field(name="Questions", value=str(len(snapshot.questions)), inline=True)
+    embed.add_field(name="Files", value=str(len(export.files)), inline=True)
+    embed.add_field(name="Rows", value=str(export.row_count), inline=True)
+    embed.add_field(
+        name="Closed",
+        value=(
+            snapshot.closed_at_utc.strftime("%Y-%m-%d %H:%M UTC")
+            if snapshot.closed_at_utc
+            else "Unknown"
+        ),
+        inline=True,
+    )
+    embed.add_field(
+        name="Profiles",
+        value="\n".join(f"{file.filename}: {file.row_count} row(s)" for file in export.files)[
+            :1024
+        ],
+        inline=False,
+    )
+    embed.set_footer(text="Private admin/leadership report bundle.")
     return embed
 
 
@@ -1229,6 +1266,14 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                 generated_message = (
                     f"Survey #{export.snapshot.survey_id} response detail export generated."
                 )
+            elif export_mode == _SURVEY_EXPORT_MODE_REPORT_BUNDLE:
+                export = await build_survey_report_bundle_export(
+                    survey_id=survey_id,
+                    requested_by_discord_user_id=int(ctx.user.id),
+                    discord_name_resolver=lambda ids: _resolve_voter_discord_names(ctx, ids),
+                )
+                summary_embed = _build_survey_report_bundle_export_summary_embed(export)
+                generated_message = f"Survey #{export.snapshot.survey_id} report bundle generated."
             else:
                 raise VoteValidationError("Choose a valid export type.")
         except VoteValidationError as exc:
@@ -1242,16 +1287,25 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             return
 
         if export.is_oversized():
+            oversized_files = getattr(export, "oversized_filenames", lambda: ())()
+            file_detail = (
+                " Oversized file(s): " + ", ".join(oversized_files) + "." if oversized_files else ""
+            )
             await ctx.interaction.edit_original_response(
                 content=(
                     "Survey export was built but is too large for Discord upload. "
                     "Ask an operator for a direct SQL export."
+                    f"{file_detail}"
                 )
             )
             return
 
-        file = discord.File(export.csv_bytes, filename=export.filename)
-        await ctx.followup.send(embed=summary_embed, file=file, ephemeral=True)
+        if export_mode == _SURVEY_EXPORT_MODE_REPORT_BUNDLE:
+            files = [discord.File(file.csv_bytes, filename=file.filename) for file in export.files]
+            await ctx.followup.send(embed=summary_embed, files=files, ephemeral=True)
+        else:
+            file = discord.File(export.csv_bytes, filename=export.filename)
+            await ctx.followup.send(embed=summary_embed, file=file, ephemeral=True)
         await ctx.interaction.edit_original_response(content=generated_message)
 
     bot.add_application_command(group)

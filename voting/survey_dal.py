@@ -23,6 +23,8 @@ from voting.survey_models import (
     SurveyRankingCount,
     SurveyRatingCount,
     SurveyReminder,
+    SurveyReportingOptionRow,
+    SurveyReportingQuestionRow,
     SurveyResponsePayload,
     SurveySnapshot,
     SurveySubmitResult,
@@ -39,6 +41,11 @@ SURVEY_RANKING_MIGRATION_ID = "20260704_003_add_survey_ranking_questions"
 SURVEY_RANKING_MIGRATION_MESSAGE = (
     "Survey ranking storage is unavailable. Deploy SQL migration "
     f"{SURVEY_RANKING_MIGRATION_ID} before using ranking survey questions."
+)
+SURVEY_REPORTING_MIGRATION_ID = "20260705_001_add_survey_reporting_views"
+SURVEY_REPORTING_MIGRATION_MESSAGE = (
+    "Survey reporting views are unavailable. Deploy SQL migration "
+    f"{SURVEY_REPORTING_MIGRATION_ID} before using Survey Export v2."
 )
 
 
@@ -162,6 +169,26 @@ def _survey_ranking_answers_table_exists_sync(cur) -> bool:
     return bool(row and row.get("ObjectId") not in (None, ""))
 
 
+async def _survey_reporting_views_exist() -> bool:
+    row = await run_one_async("""
+        SELECT
+            OBJECT_ID(N'dbo.v_SurveyReportingQuestionSummary', N'V') AS QuestionViewObjectId,
+            OBJECT_ID(N'dbo.v_SurveyReportingOptionSummary', N'V') AS OptionViewObjectId;
+        """)
+    return bool(
+        row
+        and row.get("QuestionViewObjectId") not in (None, "")
+        and row.get("OptionViewObjectId") not in (None, "")
+    )
+
+
+async def _require_survey_reporting_views() -> None:
+    if await _survey_reporting_views_exist():
+        return
+    logger.warning("survey_reporting_views_missing migration=%s", SURVEY_REPORTING_MIGRATION_ID)
+    raise VoteValidationError(SURVEY_REPORTING_MIGRATION_MESSAGE)
+
+
 def _rows_to_questions(
     question_rows: Sequence[dict[str, Any]],
     option_rows: Sequence[dict[str, Any]],
@@ -225,6 +252,77 @@ def _rows_to_reminders(rows: Sequence[dict[str, Any]]) -> tuple[SurveyReminder, 
             )
         )
     return tuple(reminders)
+
+
+def _reporting_question_from_row(row: Mapping[str, Any]) -> SurveyReportingQuestionRow:
+    return SurveyReportingQuestionRow(
+        survey_id=int(row["SurveyID"]),
+        title=str(row.get("Title") or ""),
+        status=str(row.get("Status") or ""),
+        result_visibility=normalize_result_visibility(row.get("ResultVisibility")),
+        question_id=int(row["SurveyQuestionID"]),
+        question_key=str(row.get("QuestionKey") or ""),
+        question_prompt=str(row.get("Prompt") or ""),
+        question_type=str(row.get("QuestionType") or ""),
+        question_sort_order=int(row.get("QuestionSortOrder") or 0),
+        is_required=_bool(row.get("IsRequired", 1)),
+        min_selections=int(row.get("MinSelections") or 0),
+        max_selections=int(row.get("MaxSelections") or 0),
+        allow_details=_bool(row.get("AllowDetails")),
+        total_responses=int(row.get("TotalResponses") or 0),
+        option_count=int(row.get("OptionCount") or 0),
+        answered_responses=int(row.get("AnsweredResponses") or 0),
+        skipped_responses=int(row.get("SkippedResponses") or 0),
+        choice_selection_count=int(row.get("ChoiceSelectionCount") or 0),
+        ranked_option_count=int(row.get("RankedOptionCount") or 0),
+        ranking_first_place_count=int(row.get("RankingFirstPlaceCount") or 0),
+        average_rating=(
+            float(row["AverageRating"]) if row.get("AverageRating") not in (None, "") else None
+        ),
+        minimum_rating=(
+            int(row["MinimumRating"]) if row.get("MinimumRating") not in (None, "") else None
+        ),
+        maximum_rating=(
+            int(row["MaximumRating"]) if row.get("MaximumRating") not in (None, "") else None
+        ),
+        rating1_count=int(row.get("Rating1Count") or 0),
+        rating2_count=int(row.get("Rating2Count") or 0),
+        rating3_count=int(row.get("Rating3Count") or 0),
+        rating4_count=int(row.get("Rating4Count") or 0),
+        rating5_count=int(row.get("Rating5Count") or 0),
+    )
+
+
+def _reporting_option_from_row(row: Mapping[str, Any]) -> SurveyReportingOptionRow:
+    return SurveyReportingOptionRow(
+        survey_id=int(row["SurveyID"]),
+        title=str(row.get("Title") or ""),
+        status=str(row.get("Status") or ""),
+        result_visibility=normalize_result_visibility(row.get("ResultVisibility")),
+        question_id=int(row["SurveyQuestionID"]),
+        question_key=str(row.get("QuestionKey") or ""),
+        question_prompt=str(row.get("Prompt") or ""),
+        question_type=str(row.get("QuestionType") or ""),
+        question_sort_order=int(row.get("QuestionSortOrder") or 0),
+        is_required=_bool(row.get("IsRequired", 1)),
+        option_id=int(row["SurveyOptionID"]),
+        option_key=str(row.get("OptionKey") or ""),
+        option_label=str(row.get("OptionLabel") or ""),
+        option_sort_order=int(row.get("OptionSortOrder") or 0),
+        total_responses=int(row.get("TotalResponses") or 0),
+        selection_count=int(row.get("SelectionCount") or 0),
+        is_top_selection=_bool(row.get("IsTopSelection")),
+        ranked_count=int(row.get("RankedCount") or 0),
+        average_rank=(
+            float(row["AverageRank"]) if row.get("AverageRank") not in (None, "") else None
+        ),
+        rank1_count=int(row.get("Rank1Count") or 0),
+        rank2_count=int(row.get("Rank2Count") or 0),
+        rank3_count=int(row.get("Rank3Count") or 0),
+        rank4_count=int(row.get("Rank4Count") or 0),
+        rank5_count=int(row.get("Rank5Count") or 0),
+        rank6_count=int(row.get("Rank6Count") or 0),
+    )
 
 
 def _snapshot_from_rows(
@@ -1365,6 +1463,49 @@ async def list_answer_audit_rows(survey_id: int) -> tuple[SurveyAnswerAuditRow, 
         (int(survey_id),),
     )
     return _answer_audit_from_rows(rows)
+
+
+async def list_reporting_question_rows(
+    survey_id: int,
+) -> tuple[SurveyReportingQuestionRow, ...]:
+    await _require_survey_reporting_views()
+    rows = await run_query_async(
+        """
+        SELECT SurveyID, Title, Status, ResultVisibility,
+               SurveyQuestionID, QuestionKey, Prompt, QuestionType, QuestionSortOrder,
+               IsRequired, MinSelections, MaxSelections, AllowDetails, TotalResponses,
+               OptionCount, AnsweredResponses, SkippedResponses, ChoiceSelectionCount,
+               RankedOptionCount, RankingFirstPlaceCount, AverageRating, MinimumRating,
+               MaximumRating, Rating1Count, Rating2Count, Rating3Count, Rating4Count,
+               Rating5Count
+        FROM dbo.v_SurveyReportingQuestionSummary
+        WHERE SurveyID = ?
+        ORDER BY QuestionSortOrder ASC, SurveyQuestionID ASC;
+        """,
+        (int(survey_id),),
+    )
+    return tuple(_reporting_question_from_row(row) for row in rows)
+
+
+async def list_reporting_option_rows(
+    survey_id: int,
+) -> tuple[SurveyReportingOptionRow, ...]:
+    await _require_survey_reporting_views()
+    rows = await run_query_async(
+        """
+        SELECT SurveyID, Title, Status, ResultVisibility, SurveyQuestionID, QuestionKey,
+               Prompt, QuestionType, QuestionSortOrder, IsRequired,
+               SurveyOptionID, OptionKey, OptionLabel, OptionSortOrder,
+               TotalResponses, SelectionCount, IsTopSelection,
+               RankedCount, AverageRank, Rank1Count, Rank2Count,
+               Rank3Count, Rank4Count, Rank5Count, Rank6Count
+        FROM dbo.v_SurveyReportingOptionSummary
+        WHERE SurveyID = ?
+        ORDER BY QuestionSortOrder ASC, OptionSortOrder ASC, SurveyOptionID ASC;
+        """,
+        (int(survey_id),),
+    )
+    return tuple(_reporting_option_from_row(row) for row in rows)
 
 
 def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswerAuditRow, ...]:

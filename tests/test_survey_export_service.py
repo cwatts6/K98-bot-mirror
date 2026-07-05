@@ -17,6 +17,8 @@ from voting.survey_models import (
     SurveyQuestionOption,
     SurveyRankingCount,
     SurveyRatingCount,
+    SurveyReportingOptionRow,
+    SurveyReportingQuestionRow,
     SurveySnapshot,
 )
 
@@ -753,3 +755,155 @@ async def test_survey_response_detail_export_deduplicates_name_resolution(monkey
 
     assert captured["user_ids"] == (123,)
     assert export.row_count == 2
+
+
+@pytest.mark.asyncio
+async def test_survey_report_bundle_export_builds_private_multi_csv_bundle(monkeypatch):
+    now = datetime(2026, 7, 5, 12, 0, tzinfo=UTC)
+    response_rows = (
+        SurveyAnswerAuditRow(
+            survey_id=42,
+            title="Planning",
+            closed_at_utc=now,
+            response_id=9,
+            discord_user_id=123456789012345678,
+            response_created_at_utc=now,
+            response_updated_at_utc=now,
+            question_id=10,
+            question_key="q1",
+            question_prompt="First?",
+            question_type="Text",
+            selected_option_ids=(),
+            selected_option_keys=(),
+            selected_option_labels=(),
+            original_option_ids=(),
+            original_option_keys=(),
+            original_option_labels=(),
+            text_answer="=private answer",
+        ),
+    )
+    question_rows = (
+        SurveyReportingQuestionRow(
+            survey_id=42,
+            title="Planning",
+            status="Closed",
+            result_visibility="HiddenUntilClose",
+            question_id=10,
+            question_key="q1",
+            question_prompt="First?",
+            question_type="Text",
+            question_sort_order=1,
+            is_required=True,
+            min_selections=0,
+            max_selections=0,
+            allow_details=False,
+            total_responses=1,
+            option_count=0,
+            answered_responses=1,
+            skipped_responses=0,
+            choice_selection_count=0,
+            ranked_option_count=0,
+            ranking_first_place_count=0,
+            average_rating=None,
+            minimum_rating=None,
+            maximum_rating=None,
+            rating1_count=0,
+            rating2_count=0,
+            rating3_count=0,
+            rating4_count=0,
+            rating5_count=0,
+        ),
+    )
+    option_rows = (
+        SurveyReportingOptionRow(
+            survey_id=42,
+            title="Planning",
+            status="Closed",
+            result_visibility="HiddenUntilClose",
+            question_id=11,
+            question_key="q2",
+            question_prompt="Rank?",
+            question_type="Ranking",
+            question_sort_order=2,
+            is_required=False,
+            option_id=101,
+            option_key="opt1",
+            option_label="@A",
+            option_sort_order=1,
+            total_responses=1,
+            selection_count=0,
+            is_top_selection=False,
+            ranked_count=1,
+            average_rank=1.0,
+            rank1_count=1,
+            rank2_count=0,
+            rank3_count=0,
+            rank4_count=0,
+            rank5_count=0,
+            rank6_count=0,
+        ),
+    )
+    captured: dict[str, object] = {}
+
+    async def fake_get_survey_snapshot(_survey_id):
+        return _snapshot()
+
+    async def fake_question_rows(_survey_id):
+        return question_rows
+
+    async def fake_option_rows(_survey_id):
+        return option_rows
+
+    async def fake_response_rows(_survey_id):
+        return response_rows
+
+    async def fake_insert_audit(**kwargs):
+        captured.update(kwargs)
+
+    async def fake_resolver(user_ids):
+        captured["user_ids"] = user_ids
+        return {123456789012345678: "=Planner"}
+
+    monkeypatch.setattr(
+        survey_export_service.survey_dal,
+        "get_survey_snapshot",
+        fake_get_survey_snapshot,
+    )
+    monkeypatch.setattr(
+        survey_export_service.survey_dal,
+        "list_reporting_question_rows",
+        fake_question_rows,
+    )
+    monkeypatch.setattr(
+        survey_export_service.survey_dal,
+        "list_reporting_option_rows",
+        fake_option_rows,
+    )
+    monkeypatch.setattr(
+        survey_export_service.survey_dal,
+        "list_answer_audit_rows",
+        fake_response_rows,
+    )
+    monkeypatch.setattr(survey_export_service.survey_dal, "insert_audit", fake_insert_audit)
+
+    export = await survey_export_service.build_survey_report_bundle_export(
+        survey_id=42,
+        requested_by_discord_user_id=456,
+        discord_name_resolver=fake_resolver,
+    )
+
+    assert len(export.files) == 4
+    assert export.row_count == 4
+    assert export.is_oversized() is False
+    assert captured["user_ids"] == (123456789012345678,)
+    assert captured["action_type"] == "ReportBundleExported"
+    assert captured["details"]["mode"] == "report_bundle"
+    assert captured["details"]["file_count"] == 4
+    assert "raw/detail answers" in captured["details"]["privacy_profile"]
+
+    summary_csv = export.files[0].csv_bytes.getvalue().decode("utf-8-sig")
+    response_detail_csv = export.files[3].csv_bytes.getvalue().decode("utf-8-sig")
+    assert "QuestionReportRows" in summary_csv
+    assert "'123456789012345678" in response_detail_csv
+    assert "'=Planner" in response_detail_csv
+    assert "'=private answer" in response_detail_csv

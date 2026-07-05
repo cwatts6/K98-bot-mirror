@@ -13,6 +13,8 @@ from voting import survey_dal
 from voting.service import VoteValidationError
 from voting.survey_models import (
     SurveyAnswerAuditRow,
+    SurveyReportingOptionRow,
+    SurveyReportingQuestionRow,
     SurveySnapshot,
     ranking_count_for_value,
     rating_count_for_value,
@@ -110,6 +112,89 @@ SURVEY_RESPONSE_DETAIL_COLUMNS = (
     "ResponseChanged",
 )
 
+SURVEY_REPORT_SUMMARY_COLUMNS = (
+    "SurveyID",
+    "Title",
+    "Description",
+    "Status",
+    "ResultVisibility",
+    "TotalResponses",
+    "QuestionCount",
+    "RequiredQuestionCount",
+    "OptionalQuestionCount",
+    "QuestionReportRows",
+    "OptionReportRows",
+    "ResponseDetailRows",
+    "ClosedAtUtc",
+    "ClosedByDiscordUserID",
+    "ClosedReason",
+    "CreatedAtUtc",
+    "ClosesAtUtc",
+    "ChannelID",
+    "MessageID",
+    "MessageLink",
+)
+
+SURVEY_REPORT_QUESTION_COLUMNS = (
+    "SurveyID",
+    "Title",
+    "Status",
+    "ResultVisibility",
+    "QuestionID",
+    "QuestionKey",
+    "QuestionPrompt",
+    "QuestionType",
+    "QuestionSortOrder",
+    "IsRequired",
+    "MinSelections",
+    "MaxSelections",
+    "AllowDetails",
+    "TotalResponses",
+    "OptionCount",
+    "AnsweredResponses",
+    "SkippedResponses",
+    "ChoiceSelectionCount",
+    "RankedOptionCount",
+    "RankingFirstPlaceCount",
+    "AverageRating",
+    "MinimumRating",
+    "MaximumRating",
+    "Rating1Count",
+    "Rating2Count",
+    "Rating3Count",
+    "Rating4Count",
+    "Rating5Count",
+)
+
+SURVEY_REPORT_OPTION_COLUMNS = (
+    "SurveyID",
+    "Title",
+    "Status",
+    "ResultVisibility",
+    "QuestionID",
+    "QuestionKey",
+    "QuestionPrompt",
+    "QuestionType",
+    "QuestionSortOrder",
+    "IsRequired",
+    "OptionID",
+    "OptionKey",
+    "OptionLabel",
+    "OptionSortOrder",
+    "TotalResponses",
+    "SelectionCount",
+    "SelectionPercentOfResponses",
+    "IsTopSelection",
+    "RankedCount",
+    "AverageRank",
+    "Rank1Count",
+    "Rank2Count",
+    "Rank3Count",
+    "Rank4Count",
+    "Rank5Count",
+    "Rank6Count",
+)
+
 DiscordNameResolver = Callable[[tuple[int, ...]], Awaitable[Mapping[int, str]]]
 
 
@@ -141,6 +226,41 @@ class SurveyResponseDetailExport:
 
     def is_oversized(self, *, max_bytes: int = CSV_UPLOAD_MAX_BYTES) -> bool:
         return self.byte_count > max_bytes
+
+
+@dataclass(frozen=True)
+class SurveyReportCsvFile:
+    filename: str
+    csv_bytes: io.BytesIO
+    row_count: int
+    columns: tuple[str, ...]
+
+    @property
+    def byte_count(self) -> int:
+        return self.csv_bytes.getbuffer().nbytes
+
+    def is_oversized(self, *, max_bytes: int = CSV_UPLOAD_MAX_BYTES) -> bool:
+        return self.byte_count > max_bytes
+
+
+@dataclass(frozen=True)
+class SurveyReportBundleExport:
+    files: tuple[SurveyReportCsvFile, ...]
+    snapshot: SurveySnapshot
+
+    @property
+    def row_count(self) -> int:
+        return sum(file.row_count for file in self.files)
+
+    @property
+    def byte_count(self) -> int:
+        return sum(file.byte_count for file in self.files)
+
+    def is_oversized(self, *, max_bytes: int = CSV_UPLOAD_MAX_BYTES) -> bool:
+        return any(file.is_oversized(max_bytes=max_bytes) for file in self.files)
+
+    def oversized_filenames(self, *, max_bytes: int = CSV_UPLOAD_MAX_BYTES) -> tuple[str, ...]:
+        return tuple(file.filename for file in self.files if file.is_oversized(max_bytes=max_bytes))
 
 
 def _dt(value: datetime | None) -> str:
@@ -229,6 +349,13 @@ def survey_totals_csv_filename(snapshot: SurveySnapshot) -> str:
 def survey_response_detail_csv_filename(snapshot: SurveySnapshot) -> str:
     return (
         f"survey_{snapshot.survey_id}_{_filename_part(snapshot.title)}_response_detail_"
+        f"{_timestamp(snapshot)}.csv"
+    )
+
+
+def _survey_report_csv_filename(snapshot: SurveySnapshot, profile: str) -> str:
+    return (
+        f"survey_{snapshot.survey_id}_{_filename_part(snapshot.title)}_{profile}_"
         f"{_timestamp(snapshot)}.csv"
     )
 
@@ -431,6 +558,119 @@ def build_survey_response_detail_csv_bytes(
     )
 
 
+def survey_report_summary_csv_rows(
+    snapshot: SurveySnapshot,
+    *,
+    question_rows: tuple[SurveyReportingQuestionRow, ...],
+    option_rows: tuple[SurveyReportingOptionRow, ...],
+    response_detail_rows: tuple[SurveyAnswerAuditRow, ...],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "SurveyID": snapshot.survey_id,
+            "Title": snapshot.title,
+            "Description": snapshot.description,
+            "Status": snapshot.status,
+            "ResultVisibility": snapshot.result_visibility,
+            "TotalResponses": snapshot.total_responses,
+            "QuestionCount": len(snapshot.questions),
+            "RequiredQuestionCount": sum(
+                1 for question in snapshot.questions if question.is_required
+            ),
+            "OptionalQuestionCount": sum(
+                1 for question in snapshot.questions if not question.is_required
+            ),
+            "QuestionReportRows": len(question_rows),
+            "OptionReportRows": len(option_rows),
+            "ResponseDetailRows": len(response_detail_rows),
+            "ClosedAtUtc": _dt(snapshot.closed_at_utc),
+            "ClosedByDiscordUserID": snapshot.closed_by_discord_user_id,
+            "ClosedReason": snapshot.closed_reason,
+            "CreatedAtUtc": _dt(snapshot.created_at_utc),
+            "ClosesAtUtc": _dt(snapshot.closes_at_utc),
+            "ChannelID": snapshot.channel_id,
+            "MessageID": snapshot.message_id,
+            "MessageLink": _message_link(snapshot),
+        }
+    ]
+
+
+def survey_report_question_csv_rows(
+    rows: tuple[SurveyReportingQuestionRow, ...],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "SurveyID": row.survey_id,
+            "Title": row.title,
+            "Status": row.status,
+            "ResultVisibility": row.result_visibility,
+            "QuestionID": row.question_id,
+            "QuestionKey": row.question_key,
+            "QuestionPrompt": row.question_prompt,
+            "QuestionType": row.question_type,
+            "QuestionSortOrder": row.question_sort_order,
+            "IsRequired": 1 if row.is_required else 0,
+            "MinSelections": row.min_selections,
+            "MaxSelections": row.max_selections,
+            "AllowDetails": 1 if row.allow_details else 0,
+            "TotalResponses": row.total_responses,
+            "OptionCount": row.option_count,
+            "AnsweredResponses": row.answered_responses,
+            "SkippedResponses": row.skipped_responses,
+            "ChoiceSelectionCount": row.choice_selection_count,
+            "RankedOptionCount": row.ranked_option_count,
+            "RankingFirstPlaceCount": row.ranking_first_place_count,
+            "AverageRating": (
+                f"{row.average_rating:.2f}" if row.average_rating is not None else ""
+            ),
+            "MinimumRating": row.minimum_rating,
+            "MaximumRating": row.maximum_rating,
+            "Rating1Count": row.rating1_count,
+            "Rating2Count": row.rating2_count,
+            "Rating3Count": row.rating3_count,
+            "Rating4Count": row.rating4_count,
+            "Rating5Count": row.rating5_count,
+        }
+        for row in rows
+    ]
+
+
+def survey_report_option_csv_rows(
+    rows: tuple[SurveyReportingOptionRow, ...],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "SurveyID": row.survey_id,
+            "Title": row.title,
+            "Status": row.status,
+            "ResultVisibility": row.result_visibility,
+            "QuestionID": row.question_id,
+            "QuestionKey": row.question_key,
+            "QuestionPrompt": row.question_prompt,
+            "QuestionType": row.question_type,
+            "QuestionSortOrder": row.question_sort_order,
+            "IsRequired": 1 if row.is_required else 0,
+            "OptionID": row.option_id,
+            "OptionKey": row.option_key,
+            "OptionLabel": row.option_label,
+            "OptionSortOrder": row.option_sort_order,
+            "TotalResponses": row.total_responses,
+            "SelectionCount": row.selection_count,
+            "SelectionPercentOfResponses": _pct(row.selection_count, row.total_responses),
+            "IsTopSelection": 1 if row.is_top_selection else 0,
+            "RankedCount": row.ranked_count,
+            "AverageRank": f"{row.average_rank:.2f}" if row.average_rank is not None else "",
+            "Rank1Count": row.rank1_count,
+            "Rank2Count": row.rank2_count,
+            "Rank3Count": row.rank3_count,
+            "Rank4Count": row.rank4_count,
+            "Rank5Count": row.rank5_count,
+            "Rank6Count": row.rank6_count,
+        }
+        for row in rows
+    ]
+
+
 async def build_survey_totals_export(
     *, survey_id: int, requested_by_discord_user_id: int
 ) -> SurveyTotalsExport:
@@ -503,6 +743,108 @@ async def build_survey_response_detail_export(
         "survey_response_detail_export_ready survey_id=%s actor_discord_id=%s rows=%s bytes=%s",
         snapshot.survey_id,
         requested_by_discord_user_id,
+        export.row_count,
+        export.byte_count,
+    )
+    return export
+
+
+async def build_survey_report_bundle_export(
+    *,
+    survey_id: int,
+    requested_by_discord_user_id: int,
+    discord_name_resolver: DiscordNameResolver | None = None,
+) -> SurveyReportBundleExport:
+    snapshot = await survey_dal.get_survey_snapshot(int(survey_id))
+    if snapshot is None:
+        raise VoteValidationError("Survey not found.")
+    if snapshot.status != "Closed":
+        raise VoteValidationError("Only closed surveys can be exported.")
+
+    question_rows = await survey_dal.list_reporting_question_rows(int(survey_id))
+    option_rows = await survey_dal.list_reporting_option_rows(int(survey_id))
+    response_rows = await survey_dal.list_answer_audit_rows(int(survey_id))
+    voter_ids = tuple(dict.fromkeys(row.discord_user_id for row in response_rows))
+    discord_names: Mapping[int, str] = {}
+    if discord_name_resolver is not None and voter_ids:
+        discord_names = await discord_name_resolver(voter_ids)
+
+    summary_rows = survey_report_summary_csv_rows(
+        snapshot,
+        question_rows=question_rows,
+        option_rows=option_rows,
+        response_detail_rows=response_rows,
+    )
+    files = (
+        SurveyReportCsvFile(
+            filename=_survey_report_csv_filename(snapshot, "report_summary"),
+            csv_bytes=_write_csv(summary_rows, SURVEY_REPORT_SUMMARY_COLUMNS),
+            row_count=len(summary_rows),
+            columns=SURVEY_REPORT_SUMMARY_COLUMNS,
+        ),
+        SurveyReportCsvFile(
+            filename=_survey_report_csv_filename(snapshot, "report_questions"),
+            csv_bytes=_write_csv(
+                survey_report_question_csv_rows(question_rows),
+                SURVEY_REPORT_QUESTION_COLUMNS,
+            ),
+            row_count=len(question_rows),
+            columns=SURVEY_REPORT_QUESTION_COLUMNS,
+        ),
+        SurveyReportCsvFile(
+            filename=_survey_report_csv_filename(snapshot, "report_options"),
+            csv_bytes=_write_csv(
+                survey_report_option_csv_rows(option_rows),
+                SURVEY_REPORT_OPTION_COLUMNS,
+            ),
+            row_count=len(option_rows),
+            columns=SURVEY_REPORT_OPTION_COLUMNS,
+        ),
+        SurveyReportCsvFile(
+            filename=_survey_report_csv_filename(snapshot, "report_response_detail"),
+            csv_bytes=build_survey_response_detail_csv_bytes(
+                response_rows,
+                discord_names_by_user_id=discord_names,
+            ),
+            row_count=len(response_rows),
+            columns=SURVEY_RESPONSE_DETAIL_COLUMNS,
+        ),
+    )
+    export = SurveyReportBundleExport(files=files, snapshot=snapshot)
+    await survey_dal.insert_audit(
+        survey_id=snapshot.survey_id,
+        actor_discord_user_id=int(requested_by_discord_user_id),
+        action_type="ReportBundleExported",
+        details={
+            "mode": "report_bundle",
+            "file_count": len(export.files),
+            "row_count": export.row_count,
+            "byte_count": export.byte_count,
+            "max_upload_bytes": CSV_UPLOAD_MAX_BYTES,
+            "is_oversized": export.is_oversized(),
+            "delivery_status": (
+                "blocked_oversized" if export.is_oversized() else "ready_for_ephemeral_delivery"
+            ),
+            "files": [
+                {
+                    "filename": file.filename,
+                    "row_count": file.row_count,
+                    "byte_count": file.byte_count,
+                    "columns": list(file.columns),
+                }
+                for file in export.files
+            ],
+            "privacy_profile": (
+                "admin_leadership_private; aggregate files exclude raw answers; "
+                "response detail includes Discord identity and raw/detail answers"
+            ),
+        },
+    )
+    logger.info(
+        "survey_report_bundle_export_ready survey_id=%s actor_discord_id=%s files=%s rows=%s bytes=%s",
+        snapshot.survey_id,
+        requested_by_discord_user_id,
+        len(export.files),
         export.row_count,
         export.byte_count,
     )

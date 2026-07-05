@@ -178,6 +178,47 @@ def test_survey_export_adds_optional_mode_defaulting_to_totals() -> None:
     assert keywords["required"].value is False
 
 
+def test_survey_export_mode_choices_include_report_bundle() -> None:
+    tree = ast.parse(Path("commands/vote_admin_cmds.py").read_text(encoding="utf-8"))
+    constants = {
+        target.id: node.value.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
+    choices = next(
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Name) and target.id == "_SURVEY_EXPORT_MODE_CHOICES"
+    )
+    assert isinstance(choices, ast.List)
+
+    assert constants["_SURVEY_EXPORT_MODE_REPORT_BUNDLE"] == "report_bundle"
+    assert any(
+        isinstance(choice, ast.Call)
+        and isinstance(choice.func, ast.Attribute)
+        and choice.func.attr == "OptionChoice"
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "Report bundle"
+            for keyword in choice.keywords
+        )
+        and any(
+            keyword.arg == "value"
+            and isinstance(keyword.value, ast.Name)
+            and keyword.value.id == "_SURVEY_EXPORT_MODE_REPORT_BUNDLE"
+            for keyword in choice.keywords
+        )
+        for choice in choices.elts
+    )
+
+
 def test_vote_create_adds_optional_result_visibility_defaulting_to_public_live() -> None:
     tree = ast.parse(Path("commands/vote_admin_cmds.py").read_text(encoding="utf-8"))
     for node in ast.walk(tree):

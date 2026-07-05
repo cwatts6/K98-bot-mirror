@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 through Phase 9C complete and smoke tested; Phase 10 Survey Export v2 and Reporting Readiness prepared as the next audit/design slice`
+- Current status: `Phase 1 through Phase 10 complete and smoke tested; Phase 11 Private Dashboard Reporting Runtime prepared as the next audit/design slice`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -784,10 +784,9 @@ Smoke evidence:
   aggregate-only public ranking cards, and compatibility for existing choice/text/detail/optional
   surveys, fixed 1-5 rating surveys, multi-select votes, and one-choice votes.
 
-Explicitly still required after Phase 9C as separate slices:
+Explicitly still required after Phase 10 as separate slices:
 
-- Survey Export v2 and Reporting Readiness.
-- Dashboard/reporting readiness and later approved private reporting implementation.
+- Private Dashboard/Reporting Runtime Readiness.
 - Survey Draft/Resume.
 - Rating Scale Extensions.
 - Emoji/Icon Support.
@@ -800,13 +799,61 @@ Definitely not required unless a later operator decision reverses the status:
 - Saved vote/survey templates.
 - Public voter-level/detail export posting.
 
-### Phase 10 survey export v2 and reporting readiness outline
+### Phase 10 survey export v2 and reporting readiness delivery summary
 
-Phase 10 is the next prepared voting-framework slice. It starts with audit/scope confirmation for
-private export v2 and reporting readiness now that the full first-pass survey answer model is
-delivered. The audit should decide consumers, privacy profiles, SQL/reporting ownership, output
-formats, command/admin UX, retention/redaction, tests, smoke plan, migration order, rollback
-posture, and implementation slices before any runtime export/reporting changes.
+Phase 10 is complete and operator smoke tested. It delivered the first private Survey Export v2
+runtime slice and left dashboard runtime implementation for Phase 11.
+
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#205`
+- Production PR: `cwatts6/k98-bot#512`
+- SQL PR: `cwatts6/K98-bot-SQL-Server#35`
+- SQL deployment: `2026-07-05`
+- Bot smoke test: `2026-07-05`
+
+Delivered:
+
+- SQL survey reporting views `dbo.v_SurveyReportingQuestionSummary` and
+  `dbo.v_SurveyReportingOptionSummary`.
+- SQL helper procedure `dbo.usp_SurveyReporting_ExportV2`.
+- `/vote_admin survey_export mode:report_bundle` under the existing `/vote_admin` command group.
+- Private multi-CSV report bundle for one closed survey: summary, question aggregates, option
+  aggregates, and response detail.
+- Dashboard-safe aggregate files that exclude raw text/detail answers, per-user rows, Discord IDs,
+  and Discord names.
+- Response-detail file that remains the private raw/detail profile and includes spreadsheet-safe
+  Discord IDs plus resolved Discord names for admin/leadership-only reporting.
+- Preserved `totals` and `response_detail` survey export modes.
+- Review hardening for AST-based command-surface tests and removal of unused reporting row fields.
+
+Validation and smoke evidence:
+
+- Focused export/command/DAL tests passed.
+- Full bot suite passed with `2315 passed, 2 skipped`.
+- Architecture, deferred, selected-test, smoke-import, command-registration, pre-commit, SQL
+  validation, and Codex Security review gates passed.
+- Operator smoke testing confirmed the report bundle creates a private multi-CSV bundle, opens
+  cleanly, contains expected rows, and preserves regression behavior.
+
+Explicitly still out of scope after Phase 10 unless separately approved:
+
+- Dashboard/reporting runtime implementation beyond contract readiness.
+- Cross-survey exports or workbook-style exports.
+- Retention/redaction behavior changes.
+- Public raw text/detail or voter-level/detail export posting.
+- Role-restricted voting, governor-linked reporting, saved templates, draft/resume, rating-scale
+  extensions, emoji/icon support, and `/vote_admin` reshaping.
+
+### Phase 11 private dashboard reporting runtime outline
+
+Phase 11 is the next prepared voting-framework slice. It starts with audit/scope confirmation for
+private dashboard/reporting runtime readiness now that Phase 10 delivered a single-survey report
+bundle and SQL survey reporting views/procedure. The audit should decide private consumers,
+privacy profiles, combined vote/survey reporting contracts, SQL versus service ownership,
+dashboard-safe output shapes, command/admin UX, text/detail redaction or exclusion policy, tests,
+smoke plan, migration order, rollback posture, and implementation slices before any runtime
+dashboard/reporting changes.
 
 ## 9. Cross-Programme Constraints
 
@@ -823,7 +870,8 @@ posture, and implementation slices before any runtime export/reporting changes.
   test, and rollout model are explicitly approved.
 - Do not implement draft/resume, rating-scale extensions, emoji/icon support,
   dashboard/reporting runtime surfaces, role-restricted voting, governor-linked voting, saved
-  templates, or public voter-level exports as part of any voting slice unless separately approved.
+  templates, cross-survey/workbook exports, retention/redaction behavior changes, or public
+  voter-level exports as part of any voting slice unless separately approved.
 
 ## 10. Validation Strategy
 
@@ -902,16 +950,20 @@ The core programme is successful when:
       editing, duplicate-rank prevention, aggregate-only public average-rank/distribution output,
       private status/export representation, rollout-safe migration guards, and preserved Phase 1
       through Phase 9B behavior.
+- [x] Survey Export v2 report bundle is delivered in Phase 10 with SQL-backed aggregate survey
+      reporting views/procedure, private multi-CSV report bundle output, admin/leadership-only
+      delivery, private response-detail raw/detail profile preservation, dashboard-safe aggregate
+      files, and preserved existing totals/detail exports and vote/survey behavior.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 10: Survey Export v2 and Reporting Readiness Audit and Design.
+Start Discord Voting Post Framework Phase 11: Private Dashboard Reporting Runtime Audit and Design.
 
-Begin with audit/scope confirmation. Do not implement SQL reporting views/procedures, workbook
-exports, cross-survey exports, dashboard/reporting UI, command changes, export shape changes, or
-retention/redaction behavior until the Phase 10 architecture, product scope, privacy, SQL,
-permissions, and UX direction are approved.
+Begin with audit/scope confirmation. Do not implement dashboard UI, new commands, combined SQL
+views/procedures, cross-survey exports, workbook exports, retention/redaction behavior, or command
+reshaping until the Phase 11 architecture, product scope, privacy, SQL, permissions, and UX
+direction are approved.
 ```
 
 ## 13. Programme Change Log
@@ -948,3 +1000,5 @@ permissions, and UX direction are approved.
 | 2026-07-04 | Phase 9C ranking questions prepared | Phase 9B task pack and starter were archived. Created the active Phase 9C ranking survey question task pack and chat starter; ranking remains audit/design-first with SQL, UX, privacy, export, tests, migration, rollback, and deferred-scope approval required before runtime implementation. |
 | 2026-07-04 | Phase 9C ranking questions delivered | Complete ranking questions were delivered with SQL-backed ranked-option answers, required/optional semantics, optional skip/clear, guided builder controls, private player ranking controls, aggregate-only public average-rank/distribution output, private status/export representation, rollout-safe migration guards, review hardening, and successful operator smoke. |
 | 2026-07-04 | Phase 10 export/reporting readiness prepared | Phase 9C task pack and starter were archived. Created the active Phase 10 Survey Export v2 and Reporting Readiness audit/design task pack and chat starter. Draft/resume, rating-scale extensions, emoji/icon support, and `/vote_admin` reshaping remain required separate slices; role/governor voting, saved templates, and public detail exports remain definitely not required. |
+| 2026-07-05 | Phase 10 survey export v2 delivered | SQL PR #35 was merged/deployed. Mirror PR #205 and production PR #512 delivered `/vote_admin survey_export mode:report_bundle`, SQL survey reporting views/procedure, private multi-CSV report bundle output, review hardening, full validation, and successful operator smoke. |
+| 2026-07-05 | Phase 11 private dashboard reporting prepared | Phase 10 task pack and starter were archived. Created the active Phase 11 Private Dashboard Reporting Runtime audit/design task pack and chat starter. Cross-survey/workbook exports, retention/redaction behavior changes, draft/resume, rating-scale extensions, emoji/icon support, and `/vote_admin` reshaping remain separate approval-gated slices. |

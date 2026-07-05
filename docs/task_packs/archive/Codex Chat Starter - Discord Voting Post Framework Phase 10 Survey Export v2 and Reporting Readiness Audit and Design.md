@@ -1,6 +1,8 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 10 Survey Export v2 and Reporting Readiness Audit and Design
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter. Phase 10 is delivered, SQL deployed, bot runtime smoke tested, and
+closed as the Survey Export v2/report-bundle delivery record. Use the Phase 11 starter for the
+next active Discord Voting Post Framework slice.
 
 Phase 1 through Phase 9C are complete and smoke tested. The voting framework now supports
 SQL-backed vote posts, one-choice voting, single-question multi-select voting, SQL-backed
@@ -12,7 +14,7 @@ admin/leadership live status, private closed-only exports, spreadsheet-safe Disc
 formula safety, aggregate-only public rating/ranking summaries, and audit metadata that avoids
 full answer payloads.
 
-Use this starter to begin Phase 10 with audit/scope confirmation before implementation.
+This starter is retained for historical context only. Do not use it to start new work.
 
 ## Copy/Paste Starter
 
@@ -66,7 +68,7 @@ Read first:
 - docs/reference/deferred_optimisations.md
 - docs/task_packs/Discord Voting Post Framework - Programme Pack.md
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 9C Ranking Survey Questions.md
-- docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 10 Survey Export v2 and Reporting Readiness Audit and Design.md
+- docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 10 Survey Export v2 and Reporting Readiness Audit and Design.md
 
 Use these skills as applicable:
 - k98-architecture-scope

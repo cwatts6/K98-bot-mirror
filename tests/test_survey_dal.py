@@ -320,6 +320,106 @@ def test_answer_audit_rows_include_text_and_option_aligned_detail_payloads():
     assert audit_rows[1].original_text_answer == "old text"
 
 
+@pytest.mark.asyncio
+async def test_reporting_question_rows_require_reporting_views(monkeypatch):
+    async def fake_run_one_async(_sql, _params=None):
+        return {"QuestionViewObjectId": None, "OptionViewObjectId": None}
+
+    monkeypatch.setattr(survey_dal, "run_one_async", fake_run_one_async)
+
+    with pytest.raises(VoteValidationError, match=survey_dal.SURVEY_REPORTING_MIGRATION_ID):
+        await survey_dal.list_reporting_question_rows(42)
+
+
+@pytest.mark.asyncio
+async def test_reporting_rows_read_sql_reporting_views(monkeypatch):
+    captured: list[str] = []
+
+    async def fake_run_one_async(_sql, _params=None):
+        return {"QuestionViewObjectId": 1, "OptionViewObjectId": 2}
+
+    async def fake_run_query_async(sql, params=None):
+        captured.append(sql)
+        assert params == (42,)
+        if "v_SurveyReportingQuestionSummary" in sql:
+            return [
+                {
+                    "SurveyID": 42,
+                    "Title": "Planning",
+                    "Status": "Closed",
+                    "ResultVisibility": "HiddenUntilClose",
+                    "SurveyQuestionID": 10,
+                    "QuestionKey": "q1",
+                    "Prompt": "Rate?",
+                    "QuestionType": "Rating",
+                    "QuestionSortOrder": 1,
+                    "IsRequired": 0,
+                    "MinSelections": 0,
+                    "MaxSelections": 0,
+                    "AllowDetails": 0,
+                    "TotalResponses": 3,
+                    "OptionCount": 0,
+                    "AnsweredResponses": 2,
+                    "SkippedResponses": 1,
+                    "ChoiceSelectionCount": 0,
+                    "RankedOptionCount": 0,
+                    "RankingFirstPlaceCount": 0,
+                    "AverageRating": 4.5,
+                    "MinimumRating": 4,
+                    "MaximumRating": 5,
+                    "Rating1Count": 0,
+                    "Rating2Count": 0,
+                    "Rating3Count": 0,
+                    "Rating4Count": 1,
+                    "Rating5Count": 1,
+                }
+            ]
+        return [
+            {
+                "SurveyID": 42,
+                "Title": "Planning",
+                "Status": "Closed",
+                "ResultVisibility": "HiddenUntilClose",
+                "SurveyQuestionID": 11,
+                "QuestionKey": "q2",
+                "Prompt": "Rank?",
+                "QuestionType": "Ranking",
+                "QuestionSortOrder": 2,
+                "IsRequired": 1,
+                "SurveyOptionID": 101,
+                "OptionKey": "opt1",
+                "OptionLabel": "A",
+                "OptionSortOrder": 1,
+                "TotalResponses": 3,
+                "SelectionCount": 0,
+                "IsTopSelection": 0,
+                "RankedCount": 2,
+                "AverageRank": 1.5,
+                "Rank1Count": 1,
+                "Rank2Count": 1,
+                "Rank3Count": 0,
+                "Rank4Count": 0,
+                "Rank5Count": 0,
+                "Rank6Count": 0,
+            }
+        ]
+
+    monkeypatch.setattr(survey_dal, "run_one_async", fake_run_one_async)
+    monkeypatch.setattr(survey_dal, "run_query_async", fake_run_query_async)
+
+    question_rows = await survey_dal.list_reporting_question_rows(42)
+    option_rows = await survey_dal.list_reporting_option_rows(42)
+
+    assert question_rows[0].question_type == "Rating"
+    assert question_rows[0].is_required is False
+    assert question_rows[0].average_rating == 4.5
+    assert option_rows[0].question_type == "Ranking"
+    assert option_rows[0].average_rank == 1.5
+    assert option_rows[0].rank1_count == 1
+    assert any("dbo.v_SurveyReportingQuestionSummary" in sql for sql in captured)
+    assert any("dbo.v_SurveyReportingOptionSummary" in sql for sql in captured)
+
+
 def test_answer_audit_rows_include_rating_values_and_original_metadata():
     now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
     rows = [

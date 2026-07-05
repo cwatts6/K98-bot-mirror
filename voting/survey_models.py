@@ -212,6 +212,67 @@ class SurveyAnswerAuditRow:
 
 
 @dataclass(frozen=True)
+class SurveyReportingQuestionRow:
+    survey_id: int
+    title: str
+    status: str
+    result_visibility: str
+    question_id: int
+    question_key: str
+    question_prompt: str
+    question_type: str
+    question_sort_order: int
+    is_required: bool
+    min_selections: int
+    max_selections: int
+    allow_details: bool
+    total_responses: int
+    option_count: int
+    answered_responses: int
+    skipped_responses: int
+    choice_selection_count: int
+    ranked_option_count: int
+    ranking_first_place_count: int
+    average_rating: float | None
+    minimum_rating: int | None
+    maximum_rating: int | None
+    rating1_count: int
+    rating2_count: int
+    rating3_count: int
+    rating4_count: int
+    rating5_count: int
+
+
+@dataclass(frozen=True)
+class SurveyReportingOptionRow:
+    survey_id: int
+    title: str
+    status: str
+    result_visibility: str
+    question_id: int
+    question_key: str
+    question_prompt: str
+    question_type: str
+    question_sort_order: int
+    is_required: bool
+    option_id: int
+    option_key: str
+    option_label: str
+    option_sort_order: int
+    total_responses: int
+    selection_count: int
+    is_top_selection: bool
+    ranked_count: int
+    average_rank: float | None
+    rank1_count: int
+    rank2_count: int
+    rank3_count: int
+    rank4_count: int
+    rank5_count: int
+    rank6_count: int
+
+
+@dataclass(frozen=True)
 class RenderedSurveyCard:
     filename: str
     image_bytes: BytesIO
