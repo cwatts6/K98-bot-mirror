@@ -1468,9 +1468,19 @@ async def list_answer_audit_rows(survey_id: int) -> tuple[SurveyAnswerAuditRow, 
 async def list_reporting_question_rows(
     survey_id: int,
 ) -> tuple[SurveyReportingQuestionRow, ...]:
+    return await list_reporting_question_rows_for_surveys((survey_id,))
+
+
+async def list_reporting_question_rows_for_surveys(
+    survey_ids: Sequence[int],
+) -> tuple[SurveyReportingQuestionRow, ...]:
+    normalized_ids = tuple(dict.fromkeys(int(survey_id) for survey_id in survey_ids))
+    if not normalized_ids:
+        return ()
     await _require_survey_reporting_views()
+    placeholders = ", ".join("?" for _ in normalized_ids)
     rows = await run_query_async(
-        """
+        f"""
         SELECT SurveyID, Title, Status, ResultVisibility,
                SurveyQuestionID, QuestionKey, Prompt, QuestionType, QuestionSortOrder,
                IsRequired, MinSelections, MaxSelections, AllowDetails, TotalResponses,
@@ -1479,10 +1489,10 @@ async def list_reporting_question_rows(
                MaximumRating, Rating1Count, Rating2Count, Rating3Count, Rating4Count,
                Rating5Count
         FROM dbo.v_SurveyReportingQuestionSummary
-        WHERE SurveyID = ?
-        ORDER BY QuestionSortOrder ASC, SurveyQuestionID ASC;
+        WHERE SurveyID IN ({placeholders})
+        ORDER BY SurveyID DESC, QuestionSortOrder ASC, SurveyQuestionID ASC;
         """,
-        (int(survey_id),),
+        normalized_ids,
     )
     return tuple(_reporting_question_from_row(row) for row in rows)
 
@@ -1490,9 +1500,19 @@ async def list_reporting_question_rows(
 async def list_reporting_option_rows(
     survey_id: int,
 ) -> tuple[SurveyReportingOptionRow, ...]:
+    return await list_reporting_option_rows_for_surveys((survey_id,))
+
+
+async def list_reporting_option_rows_for_surveys(
+    survey_ids: Sequence[int],
+) -> tuple[SurveyReportingOptionRow, ...]:
+    normalized_ids = tuple(dict.fromkeys(int(survey_id) for survey_id in survey_ids))
+    if not normalized_ids:
+        return ()
     await _require_survey_reporting_views()
+    placeholders = ", ".join("?" for _ in normalized_ids)
     rows = await run_query_async(
-        """
+        f"""
         SELECT SurveyID, Title, Status, ResultVisibility, SurveyQuestionID, QuestionKey,
                Prompt, QuestionType, QuestionSortOrder, IsRequired,
                SurveyOptionID, OptionKey, OptionLabel, OptionSortOrder,
@@ -1500,10 +1520,10 @@ async def list_reporting_option_rows(
                RankedCount, AverageRank, Rank1Count, Rank2Count,
                Rank3Count, Rank4Count, Rank5Count, Rank6Count
         FROM dbo.v_SurveyReportingOptionSummary
-        WHERE SurveyID = ?
-        ORDER BY QuestionSortOrder ASC, OptionSortOrder ASC, SurveyOptionID ASC;
+        WHERE SurveyID IN ({placeholders})
+        ORDER BY SurveyID DESC, QuestionSortOrder ASC, OptionSortOrder ASC, SurveyOptionID ASC;
         """,
-        (int(survey_id),),
+        normalized_ids,
     )
     return tuple(_reporting_option_from_row(row) for row in rows)
 

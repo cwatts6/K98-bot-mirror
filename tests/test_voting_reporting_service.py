@@ -50,7 +50,10 @@ async def test_admin_leadership_dashboard_report_is_aggregate_only(monkeypatch):
 
     async def fake_survey_summaries(*, limit):
         assert limit == 10
-        return (_summary(REPORT_CONTENT_SURVEY, 77, now),)
+        return (
+            _summary(REPORT_CONTENT_SURVEY, 77, now),
+            _summary(REPORT_CONTENT_SURVEY, 78, now),
+        )
 
     async def fake_vote_options(vote_post_ids):
         assert vote_post_ids == (42,)
@@ -79,8 +82,8 @@ async def test_admin_leadership_dashboard_report_is_aggregate_only(monkeypatch):
             ),
         )
 
-    async def fake_question_rows(survey_id):
-        assert survey_id == 77
+    async def fake_question_rows(survey_ids):
+        assert survey_ids == (78, 77)
         return (
             SurveyReportingQuestionRow(
                 survey_id=77,
@@ -114,8 +117,8 @@ async def test_admin_leadership_dashboard_report_is_aggregate_only(monkeypatch):
             ),
         )
 
-    async def fake_option_rows(survey_id):
-        assert survey_id == 77
+    async def fake_option_rows(survey_ids):
+        assert survey_ids == (78, 77)
         return (
             SurveyReportingOptionRow(
                 survey_id=77,
@@ -149,7 +152,12 @@ async def test_admin_leadership_dashboard_report_is_aggregate_only(monkeypatch):
     async def forbidden_answer_audit(_survey_id):
         raise AssertionError("dashboard contract must not read raw response-detail rows")
 
-    monkeypatch.setattr(reporting_service.reporting_dal, "list_vote_dashboard_summaries", fake_vote_summaries)
+    async def forbidden_per_survey_reporting(_survey_id):
+        raise AssertionError("dashboard contract must use batch survey reporting rows")
+
+    monkeypatch.setattr(
+        reporting_service.reporting_dal, "list_vote_dashboard_summaries", fake_vote_summaries
+    )
     monkeypatch.setattr(
         reporting_service.reporting_dal,
         "list_survey_dashboard_summaries",
@@ -160,9 +168,29 @@ async def test_admin_leadership_dashboard_report_is_aggregate_only(monkeypatch):
         "list_vote_dashboard_option_aggregates",
         fake_vote_options,
     )
-    monkeypatch.setattr(reporting_service.survey_dal, "list_reporting_question_rows", fake_question_rows)
-    monkeypatch.setattr(reporting_service.survey_dal, "list_reporting_option_rows", fake_option_rows)
-    monkeypatch.setattr(reporting_service.survey_dal, "list_answer_audit_rows", forbidden_answer_audit)
+    monkeypatch.setattr(
+        reporting_service.survey_dal,
+        "list_reporting_question_rows_for_surveys",
+        fake_question_rows,
+    )
+    monkeypatch.setattr(
+        reporting_service.survey_dal,
+        "list_reporting_option_rows_for_surveys",
+        fake_option_rows,
+    )
+    monkeypatch.setattr(
+        reporting_service.survey_dal,
+        "list_reporting_question_rows",
+        forbidden_per_survey_reporting,
+    )
+    monkeypatch.setattr(
+        reporting_service.survey_dal,
+        "list_reporting_option_rows",
+        forbidden_per_survey_reporting,
+    )
+    monkeypatch.setattr(
+        reporting_service.survey_dal, "list_answer_audit_rows", forbidden_answer_audit
+    )
 
     report = await reporting_service.build_admin_leadership_dashboard_report(limit=10)
 
@@ -171,7 +199,7 @@ async def test_admin_leadership_dashboard_report_is_aggregate_only(monkeypatch):
     assert report.contains_raw_text_or_detail is False
     assert report.contains_discord_identity is False
     assert report.raw_detail_access_profile == "private_exports_only"
-    assert len(report.summaries) == 2
+    assert len(report.summaries) == 3
     assert report.summaries[0].top_summary == "Top selection: A (2)"
     assert report.question_aggregates[0].question_type == "SingleChoice"
     assert report.option_aggregates[-1].content_kind == REPORT_CONTENT_SURVEY

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import replace
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from voting import reporting_dal, survey_dal
 from voting.reporting_models import (
@@ -15,6 +16,9 @@ from voting.reporting_models import (
     DashboardReportingSummary,
 )
 from voting.service import VoteValidationError
+
+if TYPE_CHECKING:
+    from voting.survey_models import SurveyReportingOptionRow, SurveyReportingQuestionRow
 
 
 MAX_DASHBOARD_REPORT_ITEMS = 50
@@ -42,6 +46,7 @@ def _sort_summaries(
         )
     )
 
+
 def _top_summary(options: tuple[DashboardReportingOptionAggregate, ...]) -> str:
     if not options:
         return "No options"
@@ -58,7 +63,9 @@ def _top_summary(options: tuple[DashboardReportingOptionAggregate, ...]) -> str:
     return f"{noun}: {labels} ({suffix})"
 
 
-def _survey_question_aggregate(row) -> DashboardReportingQuestionAggregate:
+def _survey_question_aggregate(
+    row: SurveyReportingQuestionRow,
+) -> DashboardReportingQuestionAggregate:
     return DashboardReportingQuestionAggregate(
         content_kind=REPORT_CONTENT_SURVEY,
         content_id=row.survey_id,
@@ -86,7 +93,7 @@ def _survey_question_aggregate(row) -> DashboardReportingQuestionAggregate:
     )
 
 
-def _survey_option_aggregate(row) -> DashboardReportingOptionAggregate:
+def _survey_option_aggregate(row: SurveyReportingOptionRow) -> DashboardReportingOptionAggregate:
     return DashboardReportingOptionAggregate(
         content_kind=REPORT_CONTENT_SURVEY,
         content_id=row.survey_id,
@@ -135,22 +142,21 @@ async def build_admin_leadership_dashboard_report(*, limit: int = 25) -> Dashboa
     for summary in summaries:
         if summary.content_kind == REPORT_CONTENT_VOTE:
             enriched_summaries.append(
-                replace(summary, top_summary=_top_summary(tuple(vote_options_by_id[summary.content_id])))
+                replace(
+                    summary, top_summary=_top_summary(tuple(vote_options_by_id[summary.content_id]))
+                )
             )
         else:
             enriched_summaries.append(summary)
 
-    question_aggregates: list[DashboardReportingQuestionAggregate] = []
+    survey_question_rows = await survey_dal.list_reporting_question_rows_for_surveys(survey_ids)
+    survey_option_rows = await survey_dal.list_reporting_option_rows_for_surveys(survey_ids)
+
+    question_aggregates: list[DashboardReportingQuestionAggregate] = [
+        _survey_question_aggregate(row) for row in survey_question_rows
+    ]
     option_aggregates: list[DashboardReportingOptionAggregate] = list(vote_options)
-    for survey_id in survey_ids:
-        question_aggregates.extend(
-            _survey_question_aggregate(row)
-            for row in await survey_dal.list_reporting_question_rows(survey_id)
-        )
-        option_aggregates.extend(
-            _survey_option_aggregate(row)
-            for row in await survey_dal.list_reporting_option_rows(survey_id)
-        )
+    option_aggregates.extend(_survey_option_aggregate(row) for row in survey_option_rows)
 
     return DashboardReportingContract(
         generated_at_utc=datetime.now(UTC),

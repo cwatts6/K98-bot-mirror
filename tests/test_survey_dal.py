@@ -420,6 +420,121 @@ async def test_reporting_rows_read_sql_reporting_views(monkeypatch):
     assert any("dbo.v_SurveyReportingOptionSummary" in sql for sql in captured)
 
 
+@pytest.mark.asyncio
+async def test_reporting_rows_batch_multiple_surveys(monkeypatch):
+    captured: list[tuple[str, tuple[int, ...]]] = []
+
+    async def fake_run_one_async(_sql, _params=None):
+        return {"QuestionViewObjectId": 1, "OptionViewObjectId": 2}
+
+    async def fake_run_query_async(sql, params=None):
+        captured.append((sql, params))
+        assert params == (42, 43)
+        assert "IN (?, ?)" in sql
+        if "v_SurveyReportingQuestionSummary" in sql:
+            return [
+                {
+                    "SurveyID": 42,
+                    "Title": "Planning",
+                    "Status": "Closed",
+                    "ResultVisibility": "HiddenUntilClose",
+                    "SurveyQuestionID": 10,
+                    "QuestionKey": "q1",
+                    "Prompt": "Rate?",
+                    "QuestionType": "Rating",
+                    "QuestionSortOrder": 1,
+                    "IsRequired": 0,
+                    "MinSelections": 0,
+                    "MaxSelections": 0,
+                    "AllowDetails": 0,
+                    "TotalResponses": 3,
+                    "OptionCount": 0,
+                    "AnsweredResponses": 2,
+                    "SkippedResponses": 1,
+                    "ChoiceSelectionCount": 0,
+                    "RankedOptionCount": 0,
+                    "RankingFirstPlaceCount": 0,
+                    "AverageRating": 4.5,
+                    "MinimumRating": 4,
+                    "MaximumRating": 5,
+                    "Rating1Count": 0,
+                    "Rating2Count": 0,
+                    "Rating3Count": 0,
+                    "Rating4Count": 1,
+                    "Rating5Count": 1,
+                },
+                {
+                    "SurveyID": 43,
+                    "Title": "Planning 2",
+                    "Status": "Closed",
+                    "ResultVisibility": "PublicLive",
+                    "SurveyQuestionID": 12,
+                    "QuestionKey": "q1",
+                    "Prompt": "Pick?",
+                    "QuestionType": "SingleChoice",
+                    "QuestionSortOrder": 1,
+                    "IsRequired": 1,
+                    "MinSelections": 1,
+                    "MaxSelections": 1,
+                    "AllowDetails": 1,
+                    "TotalResponses": 4,
+                    "OptionCount": 2,
+                    "AnsweredResponses": 4,
+                    "SkippedResponses": 0,
+                    "ChoiceSelectionCount": 4,
+                    "RankedOptionCount": 0,
+                    "RankingFirstPlaceCount": 0,
+                    "AverageRating": None,
+                    "MinimumRating": None,
+                    "MaximumRating": None,
+                    "Rating1Count": 0,
+                    "Rating2Count": 0,
+                    "Rating3Count": 0,
+                    "Rating4Count": 0,
+                    "Rating5Count": 0,
+                },
+            ]
+        return [
+            {
+                "SurveyID": 43,
+                "Title": "Planning 2",
+                "Status": "Closed",
+                "ResultVisibility": "PublicLive",
+                "SurveyQuestionID": 12,
+                "QuestionKey": "q1",
+                "Prompt": "Pick?",
+                "QuestionType": "SingleChoice",
+                "QuestionSortOrder": 1,
+                "IsRequired": 1,
+                "SurveyOptionID": 201,
+                "OptionKey": "opt1",
+                "OptionLabel": "A",
+                "OptionSortOrder": 1,
+                "TotalResponses": 4,
+                "SelectionCount": 3,
+                "IsTopSelection": 1,
+                "RankedCount": 0,
+                "AverageRank": None,
+                "Rank1Count": 0,
+                "Rank2Count": 0,
+                "Rank3Count": 0,
+                "Rank4Count": 0,
+                "Rank5Count": 0,
+                "Rank6Count": 0,
+            }
+        ]
+
+    monkeypatch.setattr(survey_dal, "run_one_async", fake_run_one_async)
+    monkeypatch.setattr(survey_dal, "run_query_async", fake_run_query_async)
+
+    question_rows = await survey_dal.list_reporting_question_rows_for_surveys((42, 42, 43))
+    option_rows = await survey_dal.list_reporting_option_rows_for_surveys((42, 42, 43))
+
+    assert [row.survey_id for row in question_rows] == [42, 43]
+    assert option_rows[0].survey_id == 43
+    assert len(captured) == 2
+
+
 def test_answer_audit_rows_include_rating_values_and_original_metadata():
     now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
     rows = [

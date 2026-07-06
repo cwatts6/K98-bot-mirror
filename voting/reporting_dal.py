@@ -122,7 +122,9 @@ def _option_from_vote_row(row: Mapping[str, Any]) -> DashboardReportingOptionAgg
     )
 
 
-async def list_vote_dashboard_summaries(*, limit: int = 25) -> tuple[DashboardReportingSummary, ...]:
+async def list_vote_dashboard_summaries(
+    *, limit: int = 25
+) -> tuple[DashboardReportingSummary, ...]:
     rows = await run_query_async(
         """
         SELECT TOP (?) p.VotePostID, p.GuildID, p.ChannelID, p.MessageID, p.Title, p.Status,
