@@ -1479,6 +1479,9 @@ async def list_reporting_question_rows_for_surveys(
         return ()
     await _require_survey_reporting_views()
     placeholders = ", ".join("?" for _ in normalized_ids)
+    order_cases = " ".join(
+        f"WHEN ? THEN {index}" for index, _survey_id in enumerate(normalized_ids)
+    )
     rows = await run_query_async(
         f"""
         SELECT SurveyID, Title, Status, ResultVisibility,
@@ -1490,9 +1493,10 @@ async def list_reporting_question_rows_for_surveys(
                Rating5Count
         FROM dbo.v_SurveyReportingQuestionSummary
         WHERE SurveyID IN ({placeholders})
-        ORDER BY SurveyID DESC, QuestionSortOrder ASC, SurveyQuestionID ASC;
+        ORDER BY CASE SurveyID {order_cases} ELSE {len(normalized_ids)} END ASC,
+                 QuestionSortOrder ASC, SurveyQuestionID ASC;
         """,
-        normalized_ids,
+        normalized_ids + normalized_ids,
     )
     return tuple(_reporting_question_from_row(row) for row in rows)
 
@@ -1511,6 +1515,9 @@ async def list_reporting_option_rows_for_surveys(
         return ()
     await _require_survey_reporting_views()
     placeholders = ", ".join("?" for _ in normalized_ids)
+    order_cases = " ".join(
+        f"WHEN ? THEN {index}" for index, _survey_id in enumerate(normalized_ids)
+    )
     rows = await run_query_async(
         f"""
         SELECT SurveyID, Title, Status, ResultVisibility, SurveyQuestionID, QuestionKey,
@@ -1521,9 +1528,10 @@ async def list_reporting_option_rows_for_surveys(
                Rank3Count, Rank4Count, Rank5Count, Rank6Count
         FROM dbo.v_SurveyReportingOptionSummary
         WHERE SurveyID IN ({placeholders})
-        ORDER BY SurveyID DESC, QuestionSortOrder ASC, OptionSortOrder ASC, SurveyOptionID ASC;
+        ORDER BY CASE SurveyID {order_cases} ELSE {len(normalized_ids)} END ASC,
+                 QuestionSortOrder ASC, OptionSortOrder ASC, SurveyOptionID ASC;
         """,
-        normalized_ids,
+        normalized_ids + normalized_ids,
     )
     return tuple(_reporting_option_from_row(row) for row in rows)
 

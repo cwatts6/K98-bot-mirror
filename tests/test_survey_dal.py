@@ -340,7 +340,7 @@ async def test_reporting_rows_read_sql_reporting_views(monkeypatch):
 
     async def fake_run_query_async(sql, params=None):
         captured.append(sql)
-        assert params == (42,)
+        assert params == (42, 42)
         if "v_SurveyReportingQuestionSummary" in sql:
             return [
                 {
@@ -429,40 +429,11 @@ async def test_reporting_rows_batch_multiple_surveys(monkeypatch):
 
     async def fake_run_query_async(sql, params=None):
         captured.append((sql, params))
-        assert params == (42, 43)
+        assert params == (43, 42, 43, 42)
         assert "IN (?, ?)" in sql
+        assert "CASE SurveyID WHEN ? THEN 0 WHEN ? THEN 1 ELSE 2 END ASC" in sql
         if "v_SurveyReportingQuestionSummary" in sql:
             return [
-                {
-                    "SurveyID": 42,
-                    "Title": "Planning",
-                    "Status": "Closed",
-                    "ResultVisibility": "HiddenUntilClose",
-                    "SurveyQuestionID": 10,
-                    "QuestionKey": "q1",
-                    "Prompt": "Rate?",
-                    "QuestionType": "Rating",
-                    "QuestionSortOrder": 1,
-                    "IsRequired": 0,
-                    "MinSelections": 0,
-                    "MaxSelections": 0,
-                    "AllowDetails": 0,
-                    "TotalResponses": 3,
-                    "OptionCount": 0,
-                    "AnsweredResponses": 2,
-                    "SkippedResponses": 1,
-                    "ChoiceSelectionCount": 0,
-                    "RankedOptionCount": 0,
-                    "RankingFirstPlaceCount": 0,
-                    "AverageRating": 4.5,
-                    "MinimumRating": 4,
-                    "MaximumRating": 5,
-                    "Rating1Count": 0,
-                    "Rating2Count": 0,
-                    "Rating3Count": 0,
-                    "Rating4Count": 1,
-                    "Rating5Count": 1,
-                },
                 {
                     "SurveyID": 43,
                     "Title": "Planning 2",
@@ -492,6 +463,36 @@ async def test_reporting_rows_batch_multiple_surveys(monkeypatch):
                     "Rating3Count": 0,
                     "Rating4Count": 0,
                     "Rating5Count": 0,
+                },
+                {
+                    "SurveyID": 42,
+                    "Title": "Planning",
+                    "Status": "Closed",
+                    "ResultVisibility": "HiddenUntilClose",
+                    "SurveyQuestionID": 10,
+                    "QuestionKey": "q1",
+                    "Prompt": "Rate?",
+                    "QuestionType": "Rating",
+                    "QuestionSortOrder": 1,
+                    "IsRequired": 0,
+                    "MinSelections": 0,
+                    "MaxSelections": 0,
+                    "AllowDetails": 0,
+                    "TotalResponses": 3,
+                    "OptionCount": 0,
+                    "AnsweredResponses": 2,
+                    "SkippedResponses": 1,
+                    "ChoiceSelectionCount": 0,
+                    "RankedOptionCount": 0,
+                    "RankingFirstPlaceCount": 0,
+                    "AverageRating": 4.5,
+                    "MinimumRating": 4,
+                    "MaximumRating": 5,
+                    "Rating1Count": 0,
+                    "Rating2Count": 0,
+                    "Rating3Count": 0,
+                    "Rating4Count": 1,
+                    "Rating5Count": 1,
                 },
             ]
         return [
@@ -527,10 +528,10 @@ async def test_reporting_rows_batch_multiple_surveys(monkeypatch):
     monkeypatch.setattr(survey_dal, "run_one_async", fake_run_one_async)
     monkeypatch.setattr(survey_dal, "run_query_async", fake_run_query_async)
 
-    question_rows = await survey_dal.list_reporting_question_rows_for_surveys((42, 42, 43))
-    option_rows = await survey_dal.list_reporting_option_rows_for_surveys((42, 42, 43))
+    question_rows = await survey_dal.list_reporting_question_rows_for_surveys((43, 43, 42))
+    option_rows = await survey_dal.list_reporting_option_rows_for_surveys((43, 43, 42))
 
-    assert [row.survey_id for row in question_rows] == [42, 43]
+    assert [row.survey_id for row in question_rows] == [43, 42]
     assert option_rows[0].survey_id == 43
     assert len(captured) == 2
 
