@@ -1080,14 +1080,19 @@ async def save_survey_response_draft(
                     "stale",
                     int(survey_id),
                     revision=current_revision,
-                    message="A newer draft exists. Reopen the survey to continue.",
+                    message=(
+                        "A newer draft exists. Please continue editing in your newer "
+                        "survey panel."
+                    ),
                 )
         elif expected_revision is not None and current_revision != int(expected_revision):
             return SurveyDraftSaveResult(
                 "stale",
                 int(survey_id),
                 revision=current_revision,
-                message="A newer draft exists. Reopen the survey to continue.",
+                message=(
+                    "A newer draft exists. Please continue editing in your newer survey panel."
+                ),
             )
         payload_json = json.dumps(_payload_to_json_dict(payload), ensure_ascii=False)
         if current_revision is None:
@@ -1186,7 +1191,9 @@ async def discard_survey_response_draft(
                 "stale",
                 int(survey_id),
                 revision=current_revision,
-                message="A newer draft exists. Reopen the survey to continue.",
+                message=(
+                    "A newer draft exists. Please continue editing in your newer survey panel."
+                ),
             )
         cur.execute(
             """

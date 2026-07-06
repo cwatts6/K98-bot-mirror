@@ -26,6 +26,14 @@ from voting.survey_presentation import (
 logger = logging.getLogger(__name__)
 
 SURVEY_INCOMPLETE_HELP = "You must answer all required questions to submit the survey."
+SURVEY_DRAFT_STALE_MESSAGE = (
+    "A newer draft exists. Please continue editing in your newer survey panel."
+)
+SURVEY_DRAFT_SAVED_TITLE = "Survey draft saved"
+SURVEY_DRAFT_SAVED_DESCRIPTION = (
+    "Reopen the survey to resume your draft.\n\n"
+    "Draft answers are not counted in results or reports until you submit the survey."
+)
 
 SurveyPublishCallback = Callable[
     [discord.Interaction, tuple[SurveyQuestionCreateRequest, ...]], Awaitable[bool]
@@ -406,19 +414,19 @@ class _SurveySaveDraftButton(discord.ui.Button):
             return
         if not await self.parent_view.save_draft(interaction, require_persisted=True):
             return
-        message = "Survey draft saved. Reopen the survey to resume."
         self.parent_view.stop()
+        embed = _build_survey_draft_saved_embed()
         try:
             if not interaction.response.is_done():
-                await interaction.response.edit_message(content=message, view=None)
+                await interaction.response.edit_message(content=None, embed=embed, view=None)
                 return
         except Exception:
             logger.debug("survey_draft_save_ack_response_edit_failed", exc_info=True)
         try:
-            await interaction.edit_original_response(content=message, view=None)
+            await interaction.edit_original_response(content=None, embed=embed, view=None)
         except Exception:
             logger.debug("survey_draft_save_ack_edit_failed", exc_info=True)
-            await send_ephemeral(interaction, message)
+            await send_ephemeral(interaction, SURVEY_DRAFT_SAVED_TITLE, embed=embed)
 
 
 class _SurveyDiscardDraftButton(discord.ui.Button):
@@ -449,7 +457,7 @@ class _SurveyDiscardDraftButton(discord.ui.Button):
             await send_ephemeral(interaction, "Survey draft could not be discarded.")
             return
         if result.status == "stale":
-            await send_ephemeral(interaction, result.message)
+            await self.parent_view.close_as_stale(interaction, result.message)
             self.parent_view.stop()
             return
         message = result.message or "Survey draft discarded."
@@ -706,10 +714,30 @@ class SurveyResponsePanel(discord.ui.View):
                 getattr(getattr(interaction, "user", None), "id", None),
             )
             return True
+        if result.status == "stale":
+            await self.close_as_stale(interaction, result.message)
+            return False
         await send_ephemeral(interaction, result.message or "Survey draft could not be saved.")
         if result.status in {"stale", "closed", "change_blocked"}:
             self.stop()
         return False
+
+    async def close_as_stale(
+        self, interaction: discord.Interaction, message: str | None = None
+    ) -> None:
+        content = message or SURVEY_DRAFT_STALE_MESSAGE
+        self.stop()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.edit_message(content=content, view=None)
+                return
+        except Exception:
+            logger.debug("survey_stale_draft_response_edit_failed", exc_info=True)
+        try:
+            await interaction.edit_original_response(content=content, view=None)
+        except Exception:
+            logger.debug("survey_stale_draft_edit_failed", exc_info=True)
+            await send_ephemeral(interaction, content)
 
     def _rebuild(self) -> None:
         self.clear_items()
@@ -820,6 +848,14 @@ class SurveyResponsePanel(discord.ui.View):
         message = self._pending_draft_warning
         self._pending_draft_warning = None
         await send_ephemeral(interaction, message)
+
+
+def _build_survey_draft_saved_embed() -> discord.Embed:
+    return discord.Embed(
+        title=SURVEY_DRAFT_SAVED_TITLE,
+        description=SURVEY_DRAFT_SAVED_DESCRIPTION,
+        color=discord.Color.orange(),
+    )
 
 
 class _SurveyTextAnswerModal(discord.ui.Modal):

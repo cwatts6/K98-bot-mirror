@@ -7,6 +7,9 @@ import discord
 import pytest
 
 from ui.views.survey_post_view import (
+    SURVEY_DRAFT_SAVED_DESCRIPTION,
+    SURVEY_DRAFT_SAVED_TITLE,
+    SURVEY_DRAFT_STALE_MESSAGE,
     SURVEY_INCOMPLETE_HELP,
     SurveyBuilderView,
     SurveyPostView,
@@ -383,6 +386,89 @@ async def test_survey_choice_change_rejects_accepted_draft_without_revision(monk
     assert panel.draft_revision == 0
     assert "could not be saved" in str(captured["content"]).casefold()
     assert not hasattr(interaction.response, "edited")
+
+
+@pytest.mark.asyncio
+async def test_survey_choice_change_closes_stale_panel(monkeypatch):
+    snapshot = _snapshot()
+    panel = SurveyResponsePanel(
+        snapshot,
+        owner_user_id=123,
+        selected_option_ids={11: (201,)},
+        draft_revision=1,
+        drafts_enabled=True,
+    )
+    select = panel.children[0]
+
+    async def fake_save_survey_response_draft(**_kwargs):
+        return SimpleNamespace(
+            accepted=False,
+            status="stale",
+            revision=2,
+            message=SURVEY_DRAFT_STALE_MESSAGE,
+        )
+
+    async def fake_send_ephemeral(*_args, **_kwargs):
+        raise AssertionError("stale duplicate panels should be edited, not followed up")
+
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.save_survey_response_draft",
+        fake_save_survey_response_draft,
+    )
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+    monkeypatch.setattr(type(select), "values", property(lambda _self: ["102"]))
+
+    interaction = SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+
+    await select.callback(interaction)
+
+    assert interaction.response.edited == {
+        "content": SURVEY_DRAFT_STALE_MESSAGE,
+        "view": None,
+    }
+    assert panel.is_finished()
+
+
+@pytest.mark.asyncio
+async def test_survey_save_and_exit_uses_orange_draft_warning_embed(monkeypatch):
+    snapshot = _snapshot()
+    panel = SurveyResponsePanel(
+        snapshot,
+        owner_user_id=123,
+        selected_option_ids={10: (101,), 11: (201,)},
+        draft_revision=1,
+        drafts_enabled=True,
+    )
+    button = next(
+        child for child in panel.children if getattr(child, "label", None) == "Save and exit"
+    )
+    captured: dict[str, object] = {}
+
+    async def fake_save_survey_response_draft(**kwargs):
+        captured["save_kwargs"] = kwargs
+        return SimpleNamespace(accepted=True, status="saved", revision=2, message="saved")
+
+    async def fake_send_ephemeral(*_args, **_kwargs):
+        raise AssertionError("save acknowledgement should edit the existing panel")
+
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.save_survey_response_draft",
+        fake_save_survey_response_draft,
+    )
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    interaction = SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+
+    await button.callback(interaction)
+
+    embed = interaction.response.edited["embed"]
+    assert captured["save_kwargs"]["expected_revision"] == 1
+    assert interaction.response.edited["content"] is None
+    assert interaction.response.edited["view"] is None
+    assert embed.title == SURVEY_DRAFT_SAVED_TITLE
+    assert embed.description == SURVEY_DRAFT_SAVED_DESCRIPTION
+    assert embed.color == discord.Color.orange()
+    assert panel.is_finished()
 
 
 @pytest.mark.asyncio
