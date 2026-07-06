@@ -73,7 +73,12 @@ class _SurveyOpenButton(discord.ui.Button):
             await send_ephemeral(interaction, "This survey is already closed.")
             return
         response_payload = SurveyResponsePayload({}, {}, {})
+        submitted_response_exists = False
         try:
+            submitted_response_exists = await survey_service.has_submitted_response(
+                survey_id=self.survey_id,
+                discord_user_id=int(interaction.user.id),
+            )
             response_payload = await survey_service.get_existing_response_payload(
                 survey_id=self.survey_id,
                 discord_user_id=int(interaction.user.id),
@@ -84,6 +89,24 @@ class _SurveyOpenButton(discord.ui.Button):
                 self.survey_id,
                 getattr(getattr(interaction, "user", None), "id", None),
             )
+        draft_revision = 0
+        drafts_enabled = not (submitted_response_exists and not snapshot.allow_response_change)
+        if drafts_enabled:
+            try:
+                draft = await survey_service.get_survey_response_draft(
+                    survey_id=self.survey_id,
+                    discord_user_id=int(interaction.user.id),
+                )
+            except Exception:
+                logger.exception(
+                    "survey_draft_load_failed survey_id=%s actor_discord_id=%s",
+                    self.survey_id,
+                    getattr(getattr(interaction, "user", None), "id", None),
+                )
+                draft = None
+            if draft is not None:
+                response_payload = draft.payload
+                draft_revision = int(draft.revision)
         panel = SurveyResponsePanel(
             snapshot,
             owner_user_id=int(interaction.user.id),
@@ -92,6 +115,8 @@ class _SurveyOpenButton(discord.ui.Button):
             detail_text_by_option=response_payload.detail_text_by_option,
             rating_answers=response_payload.rating_answers,
             ranking_answers=response_payload.ranking_answers,
+            draft_revision=draft_revision,
+            drafts_enabled=drafts_enabled,
         )
         await send_ephemeral(interaction, panel.content(), view=panel)
 
@@ -129,6 +154,8 @@ class _SurveyQuestionSelect(discord.ui.Select):
         existing_detail = self.parent_view.detail_text_for_question(question)
         self.parent_view.answers[question.question_id] = values
         self.parent_view.set_detail_text_for_question(question, existing_detail)
+        if not await self.parent_view.save_draft(interaction):
+            return
         await self.parent_view.refresh(interaction)
 
 
@@ -235,6 +262,8 @@ class _SurveyRatingButton(discord.ui.Button):
             return
         question = self.parent_view.current_question
         self.parent_view.rating_answers[question.question_id] = self.rating_value
+        if not await self.parent_view.save_draft(interaction):
+            return
         await self.parent_view.refresh(interaction)
 
 
@@ -255,6 +284,8 @@ class _SurveyClearRatingButton(discord.ui.Button):
             return
         question = self.parent_view.current_question
         self.parent_view.rating_answers.pop(question.question_id, None)
+        if not await self.parent_view.save_draft(interaction):
+            return
         await self.parent_view.refresh(interaction)
 
 
@@ -331,6 +362,8 @@ class _SurveyRankingOptionSelect(discord.ui.Select):
             rank_value=self.parent_view.ranking_current_rank(question),
             option_id=option_id,
         )
+        if not await self.parent_view.save_draft(interaction):
+            return
         await self.parent_view.refresh(interaction)
 
 
@@ -353,7 +386,85 @@ class _SurveyClearRankingButton(discord.ui.Button):
         question = self.parent_view.current_question
         self.parent_view.ranking_answers.pop(question.question_id, None)
         self.parent_view.ranking_edit_rank_by_question.pop(question.question_id, None)
+        if not await self.parent_view.save_draft(interaction):
+            return
         await self.parent_view.refresh(interaction)
+
+
+class _SurveySaveDraftButton(discord.ui.Button):
+    def __init__(self, parent_view: SurveyResponsePanel) -> None:
+        super().__init__(
+            label="Save and exit",
+            style=discord.ButtonStyle.secondary,
+            disabled=not parent_view.drafts_enabled,
+        )
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey panel belongs to another player.")
+            return
+        if not await self.parent_view.save_draft(interaction, require_persisted=True):
+            return
+        message = "Survey draft saved. Reopen the survey to resume."
+        self.parent_view.stop()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.edit_message(content=message, view=None)
+                return
+        except Exception:
+            logger.debug("survey_draft_save_ack_response_edit_failed", exc_info=True)
+        try:
+            await interaction.edit_original_response(content=message, view=None)
+        except Exception:
+            logger.debug("survey_draft_save_ack_edit_failed", exc_info=True)
+            await send_ephemeral(interaction, message)
+
+
+class _SurveyDiscardDraftButton(discord.ui.Button):
+    def __init__(self, parent_view: SurveyResponsePanel) -> None:
+        super().__init__(
+            label="Discard draft",
+            style=discord.ButtonStyle.danger,
+            disabled=not parent_view.drafts_enabled,
+        )
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey panel belongs to another player.")
+            return
+        try:
+            result = await survey_service.discard_survey_response_draft(
+                survey_id=self.parent_view.survey_id,
+                discord_user_id=int(interaction.user.id),
+                expected_revision=self.parent_view.draft_revision,
+            )
+        except Exception:
+            logger.exception(
+                "survey_draft_discard_failed survey_id=%s actor_discord_id=%s",
+                self.parent_view.survey_id,
+                getattr(getattr(interaction, "user", None), "id", None),
+            )
+            await send_ephemeral(interaction, "Survey draft could not be discarded.")
+            return
+        if result.status == "stale":
+            await send_ephemeral(interaction, result.message)
+            self.parent_view.stop()
+            return
+        message = result.message or "Survey draft discarded."
+        self.parent_view.stop()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.edit_message(content=message, view=None)
+                return
+        except Exception:
+            logger.debug("survey_draft_discard_ack_response_edit_failed", exc_info=True)
+        try:
+            await interaction.edit_original_response(content=message, view=None)
+        except Exception:
+            logger.debug("survey_draft_discard_ack_edit_failed", exc_info=True)
+            await send_ephemeral(interaction, message)
 
 
 class _SurveySubmitButton(discord.ui.Button):
@@ -431,12 +542,16 @@ class SurveyResponsePanel(discord.ui.View):
         rating_answers: dict[int, int] | None = None,
         ranking_answers: dict[int, tuple[int, ...]] | None = None,
         current_index: int = 0,
+        draft_revision: int | None = 0,
+        drafts_enabled: bool = False,
     ) -> None:
         super().__init__(timeout=600)
         self.snapshot = snapshot
         self.survey_id = int(snapshot.survey_id)
         self.owner_user_id = int(owner_user_id)
         self.current_index = int(current_index)
+        self.draft_revision = draft_revision
+        self.drafts_enabled = bool(drafts_enabled)
         self.answers: dict[int, tuple[int, ...]] = dict(selected_option_ids or {})
         self.text_answers: dict[int, str] = dict(text_answers or {})
         self.detail_text_by_option: dict[tuple[int, int], str] = dict(detail_text_by_option or {})
@@ -540,6 +655,53 @@ class SurveyResponsePanel(discord.ui.View):
                 output[question.question_id] = ranked
         return output
 
+    async def save_draft(
+        self, interaction: discord.Interaction, *, require_persisted: bool = False
+    ) -> bool:
+        if not self.drafts_enabled:
+            return True
+        try:
+            result = await survey_service.save_survey_response_draft(
+                survey_id=self.survey_id,
+                discord_user_id=int(interaction.user.id),
+                answers_by_question_id=self.answers,
+                text_answers_by_question_id=self.text_answers,
+                detail_text_by_question_option=self.normalized_detail_text_by_option(),
+                rating_answers_by_question_id=self.rating_answers,
+                ranking_answers_by_question_id=self.normalized_ranking_answers(),
+                expected_revision=self.draft_revision,
+            )
+        except survey_service.VoteValidationError as exc:
+            await send_ephemeral(interaction, str(exc))
+            return False
+        except Exception:
+            logger.exception(
+                "survey_draft_save_failed survey_id=%s actor_discord_id=%s",
+                self.survey_id,
+                getattr(getattr(interaction, "user", None), "id", None),
+            )
+            await send_ephemeral(interaction, "Survey draft could not be saved.")
+            return False
+        if result.accepted:
+            self.draft_revision = result.revision
+            return True
+        if result.status == "unavailable" and not require_persisted:
+            self.drafts_enabled = False
+            logger.warning(
+                "survey_draft_autosave_unavailable survey_id=%s actor_discord_id=%s",
+                self.survey_id,
+                getattr(getattr(interaction, "user", None), "id", None),
+            )
+            await send_ephemeral(
+                interaction,
+                "Survey draft storage is unavailable. You can keep answering, but progress may not resume if you exit.",
+            )
+            return True
+        await send_ephemeral(interaction, result.message or "Survey draft could not be saved.")
+        if result.status in {"stale", "closed", "change_blocked"}:
+            self.stop()
+        return False
+
     def _rebuild(self) -> None:
         self.clear_items()
         if self.current_question.question_type == SURVEY_QUESTION_RATING:
@@ -558,6 +720,8 @@ class SurveyResponsePanel(discord.ui.View):
                 self.add_item(_SurveyDetailOptionSelect(self))
         self.add_item(_SurveyNavButton(self, direction=-1))
         self.add_item(_SurveyNavButton(self, direction=1))
+        self.add_item(_SurveySaveDraftButton(self))
+        self.add_item(_SurveyDiscardDraftButton(self))
         self.add_item(_SurveySubmitButton(self))
 
     def content(self) -> str:
@@ -671,6 +835,8 @@ class _SurveyTextAnswerModal(discord.ui.Modal):
             self.parent_view.text_answers.pop(question.question_id, None)
         else:
             self.parent_view.text_answers[question.question_id] = text
+        if not await self.parent_view.save_draft(interaction):
+            return
         await self.parent_view.refresh(interaction)
 
 
@@ -700,6 +866,8 @@ class _SurveyDetailModal(discord.ui.Modal):
         question = self.parent_view.current_question
         text = str(self.detail.value or "").strip()
         self.parent_view.set_detail_text_for_question(question, text)
+        if not await self.parent_view.save_draft(interaction):
+            return
         await self.parent_view.refresh(interaction)
 
 

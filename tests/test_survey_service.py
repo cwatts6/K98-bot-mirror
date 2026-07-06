@@ -7,8 +7,10 @@ import pytest
 from voting import survey_service
 from voting.service import VoteValidationError
 from voting.survey_models import (
+    SURVEY_QUESTION_MULTI_SELECT,
     SURVEY_QUESTION_RANKING,
     SURVEY_QUESTION_RATING,
+    SURVEY_QUESTION_SINGLE_CHOICE,
     SURVEY_QUESTION_TEXT,
     SurveyQuestion,
     SurveyQuestionOption,
@@ -24,6 +26,133 @@ def _question(index: int, *, multi: bool = False):
         min_selections=1,
         max_selections=2 if multi else 1,
     )
+
+
+def _draft_snapshot() -> SurveySnapshot:
+    now = datetime(2026, 7, 6, 12, 0, tzinfo=UTC)
+    return SurveySnapshot(
+        survey_id=42,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Planning",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=42,
+                question_key="q1",
+                prompt="Pick one",
+                question_type=SURVEY_QUESTION_SINGLE_CHOICE,
+                sort_order=1,
+                min_selections=1,
+                max_selections=1,
+                options=(
+                    SurveyQuestionOption(101, 10, "opt1", "A", 1),
+                    SurveyQuestionOption(102, 10, "opt2", "B", 2),
+                ),
+                allow_details=True,
+            ),
+            SurveyQuestion(
+                question_id=11,
+                survey_id=42,
+                question_key="q2",
+                prompt="Pick several",
+                question_type=SURVEY_QUESTION_MULTI_SELECT,
+                sort_order=2,
+                min_selections=1,
+                max_selections=2,
+                options=(
+                    SurveyQuestionOption(201, 11, "opt1", "C", 1),
+                    SurveyQuestionOption(202, 11, "opt2", "D", 2),
+                ),
+            ),
+            SurveyQuestion(
+                question_id=12,
+                survey_id=42,
+                question_key="q3",
+                prompt="Explain",
+                question_type=SURVEY_QUESTION_TEXT,
+                sort_order=3,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+            ),
+            SurveyQuestion(
+                question_id=13,
+                survey_id=42,
+                question_key="q4",
+                prompt="Rate",
+                question_type=SURVEY_QUESTION_RATING,
+                sort_order=4,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+            ),
+            SurveyQuestion(
+                question_id=14,
+                survey_id=42,
+                question_key="q5",
+                prompt="Rank",
+                question_type=SURVEY_QUESTION_RANKING,
+                sort_order=5,
+                min_selections=3,
+                max_selections=3,
+                options=(
+                    SurveyQuestionOption(301, 14, "opt1", "E", 1),
+                    SurveyQuestionOption(302, 14, "opt2", "F", 2),
+                    SurveyQuestionOption(303, 14, "opt3", "G", 3),
+                ),
+            ),
+        ),
+    )
+
+
+def test_validate_draft_response_payload_accepts_partial_answers_and_rankings():
+    payload = survey_service.validate_draft_response_payload(
+        _draft_snapshot(),
+        answers_by_question_id={10: (101,), 11: (201,)},
+        text_answers_by_question_id={12: "maybe"},
+        detail_text_by_question_option={(10, 101): "if needed"},
+        rating_answers_by_question_id={13: "4"},
+        ranking_answers_by_question_id={14: (301, 0, 303)},
+    )
+
+    assert payload.selected_option_ids == {10: (101,), 11: (201,)}
+    assert payload.text_answers == {12: "maybe"}
+    assert payload.detail_text_by_option == {(10, 101): "if needed"}
+    assert payload.rating_answers == {13: 4}
+    assert payload.ranking_answers == {14: (301, 0, 303)}
+
+
+def test_validate_draft_response_payload_rejects_invalid_partial_data():
+    snapshot = _draft_snapshot()
+
+    with pytest.raises(VoteValidationError, match="each option can only be ranked once"):
+        survey_service.validate_draft_response_payload(
+            snapshot,
+            ranking_answers_by_question_id={14: (301, 301, 0)},
+        )
+
+    with pytest.raises(VoteValidationError, match="details can only be added"):
+        survey_service.validate_draft_response_payload(
+            snapshot,
+            detail_text_by_question_option={(10, 101): "orphan detail"},
+        )
 
 
 def test_build_survey_create_request_accepts_choice_questions():

@@ -24,6 +24,7 @@ from voting.survey_models import (
     SurveyQuestion,
     SurveyQuestionCreateRequest,
     SurveyQuestionOption,
+    SurveyResponseDraft,
     SurveyResponsePayload,
     SurveySnapshot,
 )
@@ -139,6 +140,13 @@ async def test_survey_opener_sends_private_panel_with_existing_answers(monkeypat
             detail_text_by_option={},
         )
 
+    async def fake_has_submitted_response(**kwargs):
+        assert kwargs == {"survey_id": 7, "discord_user_id": 123}
+        return True
+
+    async def fake_get_survey_response_draft(**_kwargs):
+        raise AssertionError("drafts are disabled when submitted changes are blocked")
+
     async def fake_send_ephemeral(_interaction, content, **kwargs):
         captured["content"] = content
         captured.update(kwargs)
@@ -151,7 +159,21 @@ async def test_survey_opener_sends_private_panel_with_existing_answers(monkeypat
         "ui.views.survey_post_view.survey_service.get_existing_response_payload",
         fake_get_existing_response_payload,
     )
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.has_submitted_response",
+        fake_has_submitted_response,
+    )
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.get_survey_response_draft",
+        fake_get_survey_response_draft,
+    )
     monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+    snapshot = SurveySnapshot(
+        **{
+            **snapshot.__dict__,
+            "allow_response_change": False,
+        }
+    )
 
     interaction = SimpleNamespace(
         response=_Response(),
@@ -168,6 +190,157 @@ async def test_survey_opener_sends_private_panel_with_existing_answers(monkeypat
     select = captured["view"].children[0]
     defaults = {option.value for option in select.options if option.default}
     assert defaults == {"102"}
+    assert captured["view"].drafts_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_survey_opener_prefers_active_draft_when_drafts_enabled(monkeypatch):
+    snapshot = _snapshot()
+    view = SurveyPostView(snapshot)
+    button = view.children[0]
+    captured: dict[str, object] = {}
+    now = datetime.now(UTC)
+
+    async def fake_get_survey_snapshot(_survey_id):
+        return snapshot
+
+    async def fake_has_submitted_response(**kwargs):
+        assert kwargs == {"survey_id": 7, "discord_user_id": 123}
+        return False
+
+    async def fake_get_existing_response_payload(**_kwargs):
+        return SurveyResponsePayload(
+            selected_option_ids={10: (101,)},
+            text_answers={},
+            detail_text_by_option={},
+        )
+
+    async def fake_get_survey_response_draft(**kwargs):
+        assert kwargs == {"survey_id": 7, "discord_user_id": 123}
+        return SurveyResponseDraft(
+            survey_id=7,
+            discord_user_id=123,
+            payload=SurveyResponsePayload(
+                selected_option_ids={10: (102,), 11: (202,)},
+                text_answers={},
+                detail_text_by_option={},
+            ),
+            revision=3,
+            status="Active",
+            created_at_utc=now,
+            updated_at_utc=now,
+        )
+
+    async def fake_send_ephemeral(_interaction, content, **kwargs):
+        captured["content"] = content
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.get_survey_snapshot",
+        fake_get_survey_snapshot,
+    )
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.has_submitted_response",
+        fake_has_submitted_response,
+    )
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.get_existing_response_payload",
+        fake_get_existing_response_payload,
+    )
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.get_survey_response_draft",
+        fake_get_survey_response_draft,
+    )
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    interaction = SimpleNamespace(
+        response=_Response(),
+        user=SimpleNamespace(id=123),
+        message=SimpleNamespace(id=456),
+    )
+
+    await button.callback(interaction)
+
+    panel = captured["view"]
+    assert isinstance(panel, SurveyResponsePanel)
+    assert panel.answers == {10: (102,), 11: (202,)}
+    assert panel.draft_revision == 3
+    assert panel.drafts_enabled is True
+
+
+@pytest.mark.asyncio
+async def test_survey_choice_change_autosaves_draft_before_refresh(monkeypatch):
+    snapshot = _snapshot()
+    panel = SurveyResponsePanel(
+        snapshot,
+        owner_user_id=123,
+        selected_option_ids={11: (201,)},
+        draft_revision=0,
+        drafts_enabled=True,
+    )
+    select = panel.children[0]
+    captured: dict[str, object] = {}
+
+    async def fake_save_survey_response_draft(**kwargs):
+        captured["save_kwargs"] = kwargs
+        return SimpleNamespace(accepted=True, status="saved", revision=1, message="saved")
+
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.save_survey_response_draft",
+        fake_save_survey_response_draft,
+    )
+    monkeypatch.setattr(type(select), "values", property(lambda _self: ["102"]))
+
+    interaction = SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+
+    await select.callback(interaction)
+
+    assert captured["save_kwargs"]["survey_id"] == 7
+    assert captured["save_kwargs"]["discord_user_id"] == 123
+    assert captured["save_kwargs"]["expected_revision"] == 0
+    assert captured["save_kwargs"]["answers_by_question_id"] == {11: (201,), 10: (102,)}
+    assert panel.draft_revision == 1
+    assert interaction.response.edited["view"] is panel
+
+
+@pytest.mark.asyncio
+async def test_survey_choice_change_continues_when_draft_storage_unavailable(monkeypatch):
+    snapshot = _snapshot()
+    panel = SurveyResponsePanel(
+        snapshot,
+        owner_user_id=123,
+        selected_option_ids={11: (201,)},
+        draft_revision=0,
+        drafts_enabled=True,
+    )
+    select = panel.children[0]
+    captured: dict[str, object] = {}
+
+    async def fake_save_survey_response_draft(**_kwargs):
+        return SimpleNamespace(
+            accepted=False,
+            status="unavailable",
+            revision=None,
+            message="draft storage unavailable",
+        )
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        captured["content"] = content
+
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.save_survey_response_draft",
+        fake_save_survey_response_draft,
+    )
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+    monkeypatch.setattr(type(select), "values", property(lambda _self: ["102"]))
+
+    interaction = SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+
+    await select.callback(interaction)
+
+    assert panel.drafts_enabled is False
+    assert "draft storage is unavailable" in str(captured["content"]).casefold()
+    assert interaction.response.edited["view"] is panel
 
 
 @pytest.mark.asyncio

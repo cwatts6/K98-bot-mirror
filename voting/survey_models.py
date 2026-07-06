@@ -128,6 +128,30 @@ class SurveyResponsePayload:
 
 
 @dataclass(frozen=True)
+class SurveyResponseDraft:
+    survey_id: int
+    discord_user_id: int
+    payload: SurveyResponsePayload
+    revision: int
+    status: str
+    created_at_utc: datetime
+    updated_at_utc: datetime
+    expires_at_utc: datetime | None = None
+
+
+@dataclass(frozen=True)
+class SurveyDraftSaveResult:
+    status: str
+    survey_id: int
+    revision: int | None = None
+    message: str = ""
+
+    @property
+    def accepted(self) -> bool:
+        return self.status == "saved"
+
+
+@dataclass(frozen=True)
 class SurveyCreateRequest:
     guild_id: int
     channel_id: int

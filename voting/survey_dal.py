@@ -17,6 +17,7 @@ from voting.survey_models import (
     SurveyAnswerAuditRow,
     SurveyCloseResult,
     SurveyCreateRequest,
+    SurveyDraftSaveResult,
     SurveyLookupChoice,
     SurveyQuestion,
     SurveyQuestionOption,
@@ -25,6 +26,7 @@ from voting.survey_models import (
     SurveyReminder,
     SurveyReportingOptionRow,
     SurveyReportingQuestionRow,
+    SurveyResponseDraft,
     SurveyResponsePayload,
     SurveySnapshot,
     SurveySubmitResult,
@@ -46,6 +48,11 @@ SURVEY_REPORTING_MIGRATION_ID = "20260705_001_add_survey_reporting_views"
 SURVEY_REPORTING_MIGRATION_MESSAGE = (
     "Survey reporting views are unavailable. Deploy SQL migration "
     f"{SURVEY_REPORTING_MIGRATION_ID} before using Survey Export v2."
+)
+SURVEY_DRAFT_MIGRATION_ID = "20260706_001_add_survey_response_drafts"
+SURVEY_DRAFT_MIGRATION_MESSAGE = (
+    "Survey draft storage is unavailable. Deploy SQL migration "
+    f"{SURVEY_DRAFT_MIGRATION_ID} before using survey drafts."
 )
 
 
@@ -182,11 +189,33 @@ async def _survey_reporting_views_exist() -> bool:
     )
 
 
+async def _survey_response_drafts_table_exists() -> bool:
+    row = await run_one_async("""
+        SELECT OBJECT_ID(N'dbo.SurveyResponseDrafts', N'U') AS ObjectId;
+        """)
+    return bool(row and row.get("ObjectId") not in (None, ""))
+
+
+def _survey_response_drafts_table_exists_sync(cur) -> bool:
+    cur.execute("""
+        SELECT OBJECT_ID(N'dbo.SurveyResponseDrafts', N'U') AS ObjectId;
+        """)
+    row = fetch_one_dict(cur)
+    return bool(row and row.get("ObjectId") not in (None, ""))
+
+
 async def _require_survey_reporting_views() -> None:
     if await _survey_reporting_views_exist():
         return
     logger.warning("survey_reporting_views_missing migration=%s", SURVEY_REPORTING_MIGRATION_ID)
     raise VoteValidationError(SURVEY_REPORTING_MIGRATION_MESSAGE)
+
+
+async def _require_survey_response_drafts_table() -> None:
+    if await _survey_response_drafts_table_exists():
+        return
+    logger.warning("survey_response_drafts_missing migration=%s", SURVEY_DRAFT_MIGRATION_ID)
+    raise VoteValidationError(SURVEY_DRAFT_MIGRATION_MESSAGE)
 
 
 def _rows_to_questions(
@@ -910,6 +939,252 @@ async def get_existing_response_payload(
     )
 
 
+async def has_submitted_response(*, survey_id: int, discord_user_id: int) -> bool:
+    row = await run_one_async(
+        """
+        SELECT TOP (1) ResponseID
+        FROM dbo.SurveyResponses
+        WHERE SurveyID = ?
+          AND DiscordUserID = ?;
+        """,
+        (int(survey_id), int(discord_user_id)),
+    )
+    return bool(row)
+
+
+async def get_survey_response_draft(
+    *, survey_id: int, discord_user_id: int
+) -> SurveyResponseDraft | None:
+    if not await _survey_response_drafts_table_exists():
+        logger.warning(
+            "survey_response_drafts_missing_load survey_id=%s discord_user_id=%s migration=%s",
+            survey_id,
+            discord_user_id,
+            SURVEY_DRAFT_MIGRATION_ID,
+        )
+        return None
+    row = await run_one_async(
+        """
+        SELECT TOP (1)
+               SurveyID, DiscordUserID, DraftPayloadJson, Revision, Status,
+               CreatedAtUtc, UpdatedAtUtc, ExpiresAtUtc
+        FROM dbo.SurveyResponseDrafts
+        WHERE SurveyID = ?
+          AND DiscordUserID = ?
+          AND Status = 'Active'
+          AND (ExpiresAtUtc IS NULL OR ExpiresAtUtc > SYSUTCDATETIME());
+        """,
+        (int(survey_id), int(discord_user_id)),
+    )
+    if not row:
+        return None
+    created_at = _aware_utc(row.get("CreatedAtUtc"))
+    updated_at = _aware_utc(row.get("UpdatedAtUtc"))
+    if created_at is None or updated_at is None:
+        logger.warning(
+            "survey_response_draft_missing_timestamps survey_id=%s discord_user_id=%s",
+            survey_id,
+            discord_user_id,
+        )
+        return None
+    return SurveyResponseDraft(
+        survey_id=int(row["SurveyID"]),
+        discord_user_id=int(row["DiscordUserID"]),
+        payload=_payload_from_json_value(row.get("DraftPayloadJson")),
+        revision=int(row.get("Revision") or 0),
+        status=str(row.get("Status") or ""),
+        created_at_utc=created_at,
+        updated_at_utc=updated_at,
+        expires_at_utc=_aware_utc(row.get("ExpiresAtUtc")),
+    )
+
+
+async def save_survey_response_draft(
+    *,
+    survey_id: int,
+    discord_user_id: int,
+    payload: SurveyResponsePayload,
+    expected_revision: int | None,
+    now_utc: datetime,
+) -> SurveyDraftSaveResult:
+    def _callback(cur) -> SurveyDraftSaveResult:
+        if not _survey_response_drafts_table_exists_sync(cur):
+            logger.warning(
+                "survey_response_drafts_missing_save survey_id=%s discord_user_id=%s migration=%s",
+                survey_id,
+                discord_user_id,
+                SURVEY_DRAFT_MIGRATION_ID,
+            )
+            return SurveyDraftSaveResult(
+                "unavailable", int(survey_id), message=SURVEY_DRAFT_MIGRATION_MESSAGE
+            )
+        now = _naive_utc(now_utc)
+        cur.execute(
+            """
+            SELECT SurveyID, Status, AllowResponseChange, ClosesAtUtc
+            FROM dbo.SurveyPosts WITH (UPDLOCK, HOLDLOCK)
+            WHERE SurveyID = ?;
+            """,
+            (int(survey_id),),
+        )
+        survey = fetch_one_dict(cur)
+        if not survey:
+            return SurveyDraftSaveResult(
+                "missing", int(survey_id), message="This survey no longer exists."
+            )
+        closes_at = _aware_utc(survey.get("ClosesAtUtc"))
+        if str(survey.get("Status")) != "Open" or (closes_at is not None and now_utc >= closes_at):
+            return SurveyDraftSaveResult(
+                "closed", int(survey_id), message="This survey is already closed."
+            )
+        cur.execute(
+            """
+            SELECT TOP (1) ResponseID
+            FROM dbo.SurveyResponses WITH (UPDLOCK, HOLDLOCK)
+            WHERE SurveyID = ? AND DiscordUserID = ?;
+            """,
+            (int(survey_id), int(discord_user_id)),
+        )
+        if cur.fetchone() is not None and not _bool(survey.get("AllowResponseChange")):
+            return SurveyDraftSaveResult(
+                "change_blocked",
+                int(survey_id),
+                message="You have already responded and changes are not enabled for this survey.",
+            )
+        cur.execute(
+            """
+            SELECT Revision
+            FROM dbo.SurveyResponseDrafts WITH (UPDLOCK, HOLDLOCK)
+            WHERE SurveyID = ?
+              AND DiscordUserID = ?
+              AND Status = 'Active';
+            """,
+            (int(survey_id), int(discord_user_id)),
+        )
+        row = cur.fetchone()
+        current_revision = int(row[0]) if row else None
+        if expected_revision is not None and int(expected_revision) == 0:
+            if current_revision is not None:
+                return SurveyDraftSaveResult(
+                    "stale",
+                    int(survey_id),
+                    revision=current_revision,
+                    message="A newer draft exists. Reopen the survey to continue.",
+                )
+        elif expected_revision is not None and current_revision != int(expected_revision):
+            return SurveyDraftSaveResult(
+                "stale",
+                int(survey_id),
+                revision=current_revision,
+                message="A newer draft exists. Reopen the survey to continue.",
+            )
+        payload_json = json.dumps(_payload_to_json_dict(payload), ensure_ascii=False)
+        if current_revision is None:
+            new_revision = 1
+            cur.execute(
+                """
+                INSERT INTO dbo.SurveyResponseDrafts
+                    (
+                        SurveyID, DiscordUserID, DraftPayloadJson, Revision, Status,
+                        CreatedAtUtc, UpdatedAtUtc, ExpiresAtUtc
+                    )
+                VALUES (?, ?, ?, ?, 'Active', ?, ?, NULL);
+                """,
+                (
+                    int(survey_id),
+                    int(discord_user_id),
+                    payload_json,
+                    new_revision,
+                    now,
+                    now,
+                ),
+            )
+        else:
+            new_revision = current_revision + 1
+            cur.execute(
+                """
+                UPDATE dbo.SurveyResponseDrafts
+                SET DraftPayloadJson = ?,
+                    Revision = ?,
+                    Status = 'Active',
+                    UpdatedAtUtc = ?,
+                    ExpiresAtUtc = NULL
+                WHERE SurveyID = ?
+                  AND DiscordUserID = ?;
+                """,
+                (
+                    payload_json,
+                    new_revision,
+                    now,
+                    int(survey_id),
+                    int(discord_user_id),
+                ),
+            )
+        return SurveyDraftSaveResult(
+            "saved", int(survey_id), revision=new_revision, message="Survey draft saved."
+        )
+
+    result = await run_blocking_in_thread(
+        _submit_survey_response_sync, _callback, name="survey_draft_save"
+    )
+    if isinstance(result, SurveyDraftSaveResult):
+        return result
+    return SurveyDraftSaveResult(
+        "error", int(survey_id), message="Survey draft could not be saved."
+    )
+
+
+async def discard_survey_response_draft(
+    *, survey_id: int, discord_user_id: int, expected_revision: int | None
+) -> SurveyDraftSaveResult:
+    def _callback(cur) -> SurveyDraftSaveResult:
+        if not _survey_response_drafts_table_exists_sync(cur):
+            return SurveyDraftSaveResult(
+                "unavailable", int(survey_id), message=SURVEY_DRAFT_MIGRATION_MESSAGE
+            )
+        cur.execute(
+            """
+            SELECT Revision
+            FROM dbo.SurveyResponseDrafts WITH (UPDLOCK, HOLDLOCK)
+            WHERE SurveyID = ?
+              AND DiscordUserID = ?
+              AND Status = 'Active';
+            """,
+            (int(survey_id), int(discord_user_id)),
+        )
+        row = cur.fetchone()
+        current_revision = int(row[0]) if row else None
+        if current_revision is None and expected_revision in (None, 0):
+            return SurveyDraftSaveResult(
+                "discarded", int(survey_id), message="Survey draft discarded."
+            )
+        if expected_revision is not None and current_revision != int(expected_revision):
+            return SurveyDraftSaveResult(
+                "stale",
+                int(survey_id),
+                revision=current_revision,
+                message="A newer draft exists. Reopen the survey to continue.",
+            )
+        cur.execute(
+            """
+            DELETE FROM dbo.SurveyResponseDrafts
+            WHERE SurveyID = ?
+              AND DiscordUserID = ?;
+            """,
+            (int(survey_id), int(discord_user_id)),
+        )
+        return SurveyDraftSaveResult("discarded", int(survey_id), message="Survey draft discarded.")
+
+    result = await run_blocking_in_thread(
+        _submit_survey_response_sync, _callback, name="survey_draft_discard"
+    )
+    if isinstance(result, SurveyDraftSaveResult):
+        return result
+    return SurveyDraftSaveResult(
+        "error", int(survey_id), message="Survey draft could not be discarded."
+    )
+
+
 async def submit_survey_response(
     *,
     survey_id: int,
@@ -1230,6 +1505,14 @@ async def submit_survey_response(
                 now,
             ),
         )
+        if _survey_response_drafts_table_exists_sync(cur):
+            cur.execute(
+                """
+                DELETE FROM dbo.SurveyResponseDrafts
+                WHERE SurveyID = ? AND DiscordUserID = ?;
+                """,
+                (int(survey_id), int(discord_user_id)),
+            )
         return SurveySubmitResult(status, int(survey_id), response_id=response_id, message=message)
 
     result = await run_blocking_in_thread(
@@ -1270,6 +1553,84 @@ def _payload_to_json_dict(payload: SurveyResponsePayload) -> dict[str, Any]:
             )
         },
     }
+
+
+def _payload_from_json_value(value: Any) -> SurveyResponsePayload:
+    try:
+        parsed = json.loads(str(value or "{}"))
+    except (TypeError, json.JSONDecodeError):
+        parsed = {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+    choices = parsed.get("choices") if isinstance(parsed.get("choices"), dict) else {}
+    text_answers = parsed.get("text") if isinstance(parsed.get("text"), dict) else {}
+    ratings = parsed.get("ratings") if isinstance(parsed.get("ratings"), dict) else {}
+    rankings = parsed.get("rankings") if isinstance(parsed.get("rankings"), dict) else {}
+    details = parsed.get("details") if isinstance(parsed.get("details"), dict) else {}
+
+    selected_output: dict[int, tuple[int, ...]] = {}
+    for raw_question_id, raw_option_ids in choices.items():
+        if not isinstance(raw_option_ids, list):
+            continue
+        try:
+            question_id = int(raw_question_id)
+            option_ids = tuple(int(option_id) for option_id in raw_option_ids)
+        except (TypeError, ValueError):
+            continue
+        selected_output[question_id] = option_ids
+
+    text_output: dict[int, str] = {}
+    for raw_question_id, raw_text in text_answers.items():
+        try:
+            question_id = int(raw_question_id)
+        except (TypeError, ValueError):
+            continue
+        text = str(raw_text or "").strip()
+        if text:
+            text_output[question_id] = text
+
+    rating_output: dict[int, int] = {}
+    for raw_question_id, raw_rating in ratings.items():
+        try:
+            question_id = int(raw_question_id)
+            rating_output[question_id] = int(raw_rating)
+        except (TypeError, ValueError):
+            continue
+
+    ranking_output: dict[int, tuple[int, ...]] = {}
+    for raw_question_id, raw_option_ids in rankings.items():
+        if not isinstance(raw_option_ids, list):
+            continue
+        try:
+            question_id = int(raw_question_id)
+            ranking_output[question_id] = tuple(int(option_id) for option_id in raw_option_ids)
+        except (TypeError, ValueError):
+            continue
+
+    detail_output: dict[tuple[int, int], str] = {}
+    for raw_question_id, raw_by_option in details.items():
+        if not isinstance(raw_by_option, dict):
+            continue
+        try:
+            question_id = int(raw_question_id)
+        except (TypeError, ValueError):
+            continue
+        for raw_option_id, raw_text in raw_by_option.items():
+            try:
+                option_id = int(raw_option_id)
+            except (TypeError, ValueError):
+                continue
+            text = str(raw_text or "").strip()
+            if text:
+                detail_output[(question_id, option_id)] = text
+
+    return SurveyResponsePayload(
+        selected_option_ids=selected_output,
+        text_answers=text_output,
+        detail_text_by_option=detail_output,
+        rating_answers=rating_output,
+        ranking_answers=ranking_output,
+    )
 
 
 def _current_response_payload(

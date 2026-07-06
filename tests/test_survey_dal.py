@@ -7,7 +7,11 @@ import pytest
 
 from voting import survey_dal
 from voting.service import VoteValidationError
-from voting.survey_models import SurveyCreateRequest, SurveyQuestionCreateRequest
+from voting.survey_models import (
+    SurveyCreateRequest,
+    SurveyQuestionCreateRequest,
+    SurveyResponsePayload,
+)
 
 
 @pytest.mark.asyncio
@@ -224,6 +228,107 @@ async def test_create_survey_missing_ranking_table_has_clear_error(monkeypatch):
 
     with pytest.raises(VoteValidationError, match=survey_dal.SURVEY_RANKING_MIGRATION_ID):
         await survey_dal.create_survey(req)
+
+
+@pytest.mark.asyncio
+async def test_save_survey_response_draft_detects_stale_revision(monkeypatch):
+    now = datetime(2026, 7, 6, 12, 0, tzinfo=UTC)
+
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+        def fetchone(self):
+            if "SELECT TOP (1) ResponseID" in self.last_sql:
+                return None
+            if "SELECT Revision" in self.last_sql:
+                return (2,)
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "OBJECT_ID" in cur.last_sql:
+            return {"ObjectId": 99}
+        return {
+            "SurveyID": 42,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "ClosesAtUtc": datetime(2026, 7, 6, 13, 0, tzinfo=UTC),
+        }
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    def fake_exec_with_cursor(callback):
+        return callback(FakeCursor())
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    result = await survey_dal.save_survey_response_draft(
+        survey_id=42,
+        discord_user_id=123,
+        payload=SurveyResponsePayload({10: (101,)}, {}, {}),
+        expected_revision=1,
+        now_utc=now,
+    )
+
+    assert result.status == "stale"
+    assert result.revision == 2
+    assert "newer draft" in result.message
+
+
+@pytest.mark.asyncio
+async def test_discard_survey_response_draft_allows_missing_initial_draft(monkeypatch):
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+        def fetchone(self):
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "OBJECT_ID" in cur.last_sql:
+            return {"ObjectId": 99}
+        return None
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    def fake_exec_with_cursor(callback):
+        return callback(FakeCursor())
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    result = await survey_dal.discard_survey_response_draft(
+        survey_id=42,
+        discord_user_id=123,
+        expected_revision=0,
+    )
+
+    assert result.status == "discarded"
+
+
+def test_survey_draft_payload_json_round_trip_preserves_answer_types():
+    payload = SurveyResponsePayload(
+        selected_option_ids={10: (101,)},
+        text_answers={11: "free text"},
+        detail_text_by_option={(10, 101): "detail"},
+        rating_answers={12: 5},
+        ranking_answers={13: (201, 0, 203)},
+    )
+
+    round_tripped = survey_dal._payload_from_json_value(
+        json.dumps(survey_dal._payload_to_json_dict(payload))
+    )
+
+    assert round_tripped == payload
 
 
 def test_answer_audit_rows_include_text_and_option_aligned_detail_payloads():

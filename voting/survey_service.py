@@ -23,8 +23,10 @@ from voting.survey_models import (
     SURVEY_QUESTION_TEXT,
     SurveyCloseResult,
     SurveyCreateRequest,
+    SurveyDraftSaveResult,
     SurveyLookupChoice,
     SurveyQuestionCreateRequest,
+    SurveyResponseDraft,
     SurveyResponsePayload,
     SurveySnapshot,
     SurveySubmitResult,
@@ -527,6 +529,185 @@ def validate_response_payload(
     )
 
 
+def validate_draft_response_payload(
+    snapshot: SurveySnapshot,
+    *,
+    answers_by_question_id: Mapping[int, tuple[int, ...]] | None = None,
+    text_answers_by_question_id: Mapping[int, str] | None = None,
+    detail_text_by_question_option: Mapping[tuple[int, int], str] | None = None,
+    rating_answers_by_question_id: Mapping[int, int | str | None] | None = None,
+    ranking_answers_by_question_id: Mapping[int, tuple[int, ...] | list[int] | None] | None = None,
+) -> SurveyResponsePayload:
+    """Validate a partial respondent draft without applying final-submit completeness rules."""
+
+    choice_answers = answers_by_question_id or {}
+    text_answers = text_answers_by_question_id or {}
+    detail_answers = detail_text_by_question_option or {}
+    rating_answers = rating_answers_by_question_id or {}
+    ranking_answers = ranking_answers_by_question_id or {}
+    questions_by_id = {question.question_id: question for question in snapshot.questions}
+    selected_output: dict[int, tuple[int, ...]] = {}
+    text_output: dict[int, str] = {}
+    detail_output: dict[tuple[int, int], str] = {}
+    rating_output: dict[int, int] = {}
+    ranking_output: dict[int, tuple[int, ...]] = {}
+
+    for raw_question_id, raw_selected_ids in choice_answers.items():
+        question_id = _coerce_question_id(raw_question_id)
+        question = questions_by_id.get(question_id)
+        if question is None:
+            raise VoteValidationError("One or more selected answers are not valid.")
+        if question.question_type in {
+            SURVEY_QUESTION_TEXT,
+            SURVEY_QUESTION_RATING,
+            SURVEY_QUESTION_RANKING,
+        }:
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: this question does not accept options."
+            )
+        try:
+            if raw_selected_ids is None or isinstance(raw_selected_ids, (str, bytes)):
+                raise TypeError
+            selected_ids = tuple(sorted({int(option_id) for option_id in raw_selected_ids}))
+        except (TypeError, ValueError):
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: one or more options are not valid."
+            ) from None
+        if not selected_ids:
+            continue
+        if len(selected_ids) > question.max_selections:
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: choose at most {question.max_selections}."
+            )
+        valid_ids = {option.option_id for option in question.options}
+        if any(option_id not in valid_ids for option_id in selected_ids):
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: one or more options are not valid."
+            )
+        selected_output[question_id] = selected_ids
+
+    for raw_question_id, raw_text in text_answers.items():
+        question_id = _coerce_question_id(raw_question_id)
+        question = questions_by_id.get(question_id)
+        if question is None:
+            raise VoteValidationError("One or more text answers are not valid.")
+        if question.question_type != SURVEY_QUESTION_TEXT:
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: this question does not accept text."
+            )
+        clean_text = _clean_limited_text(
+            raw_text,
+            limit=MAX_SURVEY_TEXT_ANSWER_LEN,
+            field_name=f"Answer question {question.sort_order}",
+            required=False,
+        )
+        if clean_text is not None:
+            text_output[question_id] = clean_text
+
+    for raw_question_id, raw_rating in rating_answers.items():
+        question_id = _coerce_question_id(raw_question_id)
+        question = questions_by_id.get(question_id)
+        if question is None:
+            raise VoteValidationError("One or more rating answers are not valid.")
+        if question.question_type != SURVEY_QUESTION_RATING:
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: this question does not accept ratings."
+            )
+        if raw_rating in (None, ""):
+            continue
+        try:
+            rating_value = int(raw_rating)
+        except (TypeError, ValueError):
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: rating must be from 1 to 5."
+            ) from None
+        if rating_value < 1 or rating_value > 5:
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: rating must be from 1 to 5."
+            )
+        rating_output[question_id] = rating_value
+
+    for raw_question_id, raw_ranking in ranking_answers.items():
+        question_id = _coerce_question_id(raw_question_id)
+        question = questions_by_id.get(question_id)
+        if question is None:
+            raise VoteValidationError("One or more ranking answers are not valid.")
+        if question.question_type != SURVEY_QUESTION_RANKING:
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: this question does not accept rankings."
+            )
+        if raw_ranking in (None, (), []):
+            continue
+        try:
+            if isinstance(raw_ranking, (str, bytes)):
+                raise TypeError
+            ranked_option_ids = tuple(int(option_id) for option_id in raw_ranking or ())
+        except (TypeError, ValueError):
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: one or more ranked options are not valid."
+            ) from None
+        if len(ranked_option_ids) > len(question.options):
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: rank at most {len(question.options)} options."
+            )
+        nonzero_option_ids = tuple(option_id for option_id in ranked_option_ids if option_id)
+        if len(set(nonzero_option_ids)) != len(nonzero_option_ids):
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: each option can only be ranked once."
+            )
+        valid_ids = {option.option_id for option in question.options}
+        if any(option_id not in valid_ids for option_id in nonzero_option_ids):
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: one or more ranked options are not valid."
+            )
+        if nonzero_option_ids:
+            ranking_output[question_id] = ranked_option_ids
+
+    for raw_key, text in detail_answers.items():
+        try:
+            question_id, option_id = int(raw_key[0]), int(raw_key[1])
+        except (IndexError, TypeError, ValueError):
+            raise VoteValidationError("One or more detail notes are not valid.") from None
+        question = questions_by_id.get(question_id)
+        if question is None:
+            raise VoteValidationError("One or more detail notes are not valid.")
+        if (
+            question.question_type in {SURVEY_QUESTION_TEXT, SURVEY_QUESTION_RATING}
+            or question.question_type == SURVEY_QUESTION_RANKING
+            or not question.allow_details
+        ):
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: details are not enabled."
+            )
+        if option_id not in selected_output.get(question_id, ()):
+            raise VoteValidationError(
+                f"Answer question {question.sort_order}: details can only be added to selected options."
+            )
+        clean_detail = _clean_limited_text(
+            text,
+            limit=MAX_SURVEY_DETAIL_LEN,
+            field_name=f"Detail for question {question.sort_order}",
+            required=False,
+        )
+        if clean_detail is not None:
+            detail_output[(question_id, option_id)] = clean_detail
+
+    return SurveyResponsePayload(
+        selected_option_ids=selected_output,
+        text_answers=text_output,
+        detail_text_by_option=detail_output,
+        rating_answers=rating_output,
+        ranking_answers=ranking_output,
+    )
+
+
+def _coerce_question_id(value: object) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise VoteValidationError("One or more answers are not valid.") from None
+
+
 async def create_survey_record(req: SurveyCreateRequest) -> SurveySnapshot:
     survey_id = await survey_dal.create_survey(req)
     if survey_id <= 0:
@@ -596,6 +777,84 @@ async def submit_survey_response(
     )
     refreshed = await survey_dal.get_survey_snapshot(int(survey_id)) if result.accepted else None
     return result, refreshed
+
+
+async def has_submitted_response(*, survey_id: int, discord_user_id: int) -> bool:
+    return await survey_dal.has_submitted_response(
+        survey_id=int(survey_id),
+        discord_user_id=int(discord_user_id),
+    )
+
+
+async def get_survey_response_draft(
+    *, survey_id: int, discord_user_id: int
+) -> SurveyResponseDraft | None:
+    return await survey_dal.get_survey_response_draft(
+        survey_id=int(survey_id),
+        discord_user_id=int(discord_user_id),
+    )
+
+
+async def save_survey_response_draft(
+    *,
+    survey_id: int,
+    discord_user_id: int,
+    answers_by_question_id: Mapping[int, tuple[int, ...]],
+    text_answers_by_question_id: Mapping[int, str] | None = None,
+    detail_text_by_question_option: Mapping[tuple[int, int], str] | None = None,
+    rating_answers_by_question_id: Mapping[int, int | str | None] | None = None,
+    ranking_answers_by_question_id: Mapping[int, tuple[int, ...] | list[int] | None] | None = None,
+    expected_revision: int | None = None,
+    now_utc: datetime | None = None,
+) -> SurveyDraftSaveResult:
+    snapshot = await survey_dal.get_survey_snapshot(int(survey_id))
+    if snapshot is None:
+        return SurveyDraftSaveResult(
+            "missing", int(survey_id), message="This survey no longer exists."
+        )
+    validated = validate_draft_response_payload(
+        snapshot,
+        answers_by_question_id=answers_by_question_id,
+        text_answers_by_question_id=text_answers_by_question_id,
+        detail_text_by_question_option=detail_text_by_question_option,
+        rating_answers_by_question_id=rating_answers_by_question_id,
+        ranking_answers_by_question_id=ranking_answers_by_question_id,
+    )
+    result = await survey_dal.save_survey_response_draft(
+        survey_id=int(survey_id),
+        discord_user_id=int(discord_user_id),
+        payload=validated,
+        expected_revision=expected_revision,
+        now_utc=now_utc or datetime.now(UTC),
+    )
+    logger.info(
+        "survey_draft_save status=%s survey_id=%s actor_discord_id=%s revision=%s",
+        result.status,
+        survey_id,
+        discord_user_id,
+        result.revision,
+    )
+    return result
+
+
+async def discard_survey_response_draft(
+    *,
+    survey_id: int,
+    discord_user_id: int,
+    expected_revision: int | None = None,
+) -> SurveyDraftSaveResult:
+    result = await survey_dal.discard_survey_response_draft(
+        survey_id=int(survey_id),
+        discord_user_id=int(discord_user_id),
+        expected_revision=expected_revision,
+    )
+    logger.info(
+        "survey_draft_discard status=%s survey_id=%s actor_discord_id=%s",
+        result.status,
+        survey_id,
+        discord_user_id,
+    )
+    return result
 
 
 async def get_existing_answer_option_ids(
