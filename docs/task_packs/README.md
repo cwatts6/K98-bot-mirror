@@ -264,11 +264,12 @@ Discord Voting Post Framework status:
   UX, answer-type behavior, optional/rating/ranking rules, result/export/dashboard exclusion,
   close/restart/timeout behavior, tests, smoke plan, deployment order, rollback posture, and
   implementation slices before any runtime draft persistence. Rating-scale extensions,
-  emoji/icon support, `/vote_admin` reshaping, cross-survey/workbook exports, retention/redaction
-  policy changes, and optional SQL-native combined reporting views/procedures remain required
-  separate slices. Role-restricted voting, governor-linked voting/reporting, saved templates, and
-  public voter-level/detail export posting are definitely not required unless a later operator
-  decision reverses that status.
+  emoji/icon support, `/vote_admin` reshaping, private dashboard UI implementation over the Phase
+  11 reporting contract, cross-survey/workbook exports, retention/redaction policy changes, and
+  optional SQL-native combined reporting views/procedures remain required separate slices.
+  Role-restricted voting, governor-linked voting/reporting, saved templates, and public
+  voter-level/detail export posting are definitely not required unless a later operator decision
+  reverses that status.
 
 Player Self-Service Command Centre status:
 
@@ -423,4 +424,5 @@ operator approval.
 Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design is the next prepared
 voting slice. It starts with audit/scope confirmation and should decide the safest way to design
 persisted survey draft/resume behavior while keeping all Phase 1 through Phase 11 behaviour
-unchanged until runtime implementation is explicitly approved.
+unchanged until runtime implementation is explicitly approved. Private dashboard UI implementation
+over the Phase 11 reporting contract remains a required separate future slice.

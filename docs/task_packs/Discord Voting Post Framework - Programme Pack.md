@@ -787,6 +787,7 @@ Smoke evidence:
 Explicitly still required after Phase 11 as separate slices:
 
 - Survey Draft/Resume.
+- Private Dashboard UI implementation over the Phase 11 reporting contract.
 - Rating Scale Extensions.
 - Emoji/Icon Support.
 - `/vote_admin` Reshaping.
@@ -887,7 +888,7 @@ Validation and smoke evidence:
 
 Explicitly still out of scope after Phase 11 unless separately approved:
 
-- Dashboard UI, public website, or public dashboard.
+- Private dashboard UI implementation, public website, or public dashboard.
 - New Discord commands or broad `/vote_admin` reshaping.
 - Combined SQL views/procedures or SQL-native cross-survey reporting objects.
 - Cross-survey exports, workbook exports, or longitudinal reports.
@@ -895,6 +896,8 @@ Explicitly still out of scope after Phase 11 unless separately approved:
 - Public raw text/detail or voter-level/detail export posting.
 - Role-restricted voting, governor-linked reporting, saved templates, draft/resume,
   rating-scale extensions, emoji/icon support, and `/vote_admin` reshaping.
+- Actual private dashboard UI delivery remains required future scope over the Phase 11 reporting
+  contract.
 
 ### Phase 12 survey draft/resume outline
 
@@ -907,7 +910,9 @@ leaking unsubmitted answers into public results, dashboards, status summaries, o
 Phase 12 should confirm product value, privacy, SQL persistence shape, permissions, respondent UX,
 answer-type handling, optional/rating/ranking behavior, result/export/dashboard exclusion,
 close/restart/timeout behavior, tests, smoke plan, migration order, rollback posture, and
-implementation slices before any runtime draft persistence.
+implementation slices before any runtime draft persistence. Private dashboard UI implementation
+over the Phase 11 contract remains a separate required future slice and should not be folded into
+Phase 12 unless explicitly approved.
 
 ## 9. Cross-Programme Constraints
 
@@ -922,8 +927,8 @@ implementation slices before any runtime draft persistence.
 - Do not expose voter-level exports publicly without explicit approval.
 - Do not add further advanced voting modes until their product, privacy, permissions, SQL, UX,
   test, and rollout model are explicitly approved.
-- Do not implement draft/resume runtime, rating-scale extensions, emoji/icon support, dashboard UI,
-  public reporting, role-restricted voting, governor-linked voting, saved templates,
+- Do not implement draft/resume runtime, rating-scale extensions, emoji/icon support, private
+  dashboard UI, public reporting, role-restricted voting, governor-linked voting, saved templates,
   cross-survey/workbook exports, SQL-native combined reporting objects, retention/redaction
   behavior changes, or public voter-level exports as part of any voting slice unless separately
   approved.
@@ -1063,4 +1068,4 @@ direction are approved.
 | 2026-07-05 | Phase 10 survey export v2 delivered | SQL PR #35 was merged/deployed. Mirror PR #205 and production PR #512 delivered `/vote_admin survey_export mode:report_bundle`, SQL survey reporting views/procedure, private multi-CSV report bundle output, review hardening, full validation, and successful operator smoke. |
 | 2026-07-05 | Phase 11 private dashboard reporting prepared | Phase 10 task pack and starter were archived. Created the active Phase 11 Private Dashboard Reporting Runtime audit/design task pack and chat starter. Cross-survey/workbook exports, retention/redaction behavior changes, draft/resume, rating-scale extensions, emoji/icon support, and `/vote_admin` reshaping remain separate approval-gated slices. |
 | 2026-07-06 | Phase 11 private dashboard reporting delivered | Mirror PR #206 and production PR #513 delivered private admin/leadership aggregate dashboard-safe vote/survey reporting contracts, review hardening, full validation, and successful operator smoke/regression testing. Dashboard UI, new commands, combined SQL views/procedures, cross-survey/workbook exports, retention/redaction changes, command reshaping, public detail posting, draft/resume, rating-scale extensions, and emoji/icon support remained out of scope. |
-| 2026-07-06 | Phase 12 survey draft/resume prepared | Phase 11 task pack and starter were archived. Created the active Phase 12 Survey Draft Resume audit/design task pack and chat starter. Rating-scale extensions, emoji/icon support, `/vote_admin` reshaping, cross-survey/workbook exports, retention/redaction policy changes, and optional SQL-native combined reporting remain separate approval-gated slices. |
+| 2026-07-06 | Phase 12 survey draft/resume prepared | Phase 11 task pack and starter were archived. Created the active Phase 12 Survey Draft Resume audit/design task pack and chat starter. Private dashboard UI implementation, rating-scale extensions, emoji/icon support, `/vote_admin` reshaping, cross-survey/workbook exports, retention/redaction policy changes, and optional SQL-native combined reporting remain separate approval-gated slices. |

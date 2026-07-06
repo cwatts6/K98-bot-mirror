@@ -15,6 +15,15 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 7 choice-only surveys delivered and smoke tested on 2026-07-03; Phase 8 text/details delivered and smoke tested on 2026-07-04; Phase 9A optional-question semantics delivered and smoke tested on 2026-07-04; Phase 9B fixed 1-5 rating questions delivered and smoke tested on 2026-07-04; Phase 9C complete ranking questions delivered and smoke tested on 2026-07-04; Phase 10 report bundle delivered and smoke tested on 2026-07-05; Phase 11 private aggregate reporting contract delivered and smoke/regression tested on 2026-07-06; privacy approval for storing unsubmitted answers; SQL repo validation; restart and cleanup tests.
 
 ### Deferred Optimisation
+- Area: `voting/reporting_service.py`, future private dashboard UI, approved dashboard surface
+- Type: architecture
+- Description: Phase 11 delivered private admin/leadership aggregate dashboard-safe reporting contracts, but it did not deliver the actual dashboard UI/runtime surface that admins and leadership need to view those summaries. Without an explicit follow-up, the UI delivery could be obscured by broader export/reporting backlog items.
+- Suggested Fix: Prepare a dedicated private dashboard UI slice using the Phase 11 reporting service contract. Confirm whether the surface is a Discord command/view, internal web/dashboard surface, generated dashboard file, or another approved private UI; validate permissions, privacy, HiddenUntilClose live-admin semantics, refresh/loading states, filters/pagination, SQL/reporting performance needs, tests, smoke plan, deployment order, rollback posture, and Codex Security requirements. Keep public dashboard, raw text/detail exposure, per-user identity, cross-survey/workbook exports, and retention/redaction policy changes separate unless explicitly approved.
+- Impact: high
+- Risk: high
+- Dependencies: Phase 11 private aggregate reporting contract delivered and smoke/regression tested on 2026-07-06; operator approval for dashboard UI surface and timing; `k98-discord-command-feature` if implemented in Discord; SQL repo validation if new reporting objects are proposed; Codex Security review before runtime PR handoff.
+
+### Deferred Optimisation
 - Area: `voting/`, future survey rating scale extensions, survey response UX, export/report surfaces
 - Type: architecture
 - Description: Phase 9B intentionally delivered only a fixed 1-5 rating question type. Custom rating scales, 1-10 scales, scale labels, per-rating comments, and richer rating presentation remain out of scope so the first rating slice stays predictable and aggregate-only. Phase 10 exports/report bundles and Phase 11 dashboard-safe aggregates preserve the fixed-scale contract.

@@ -67,6 +67,10 @@ Explicitly not delivered in Phase 11:
 - Draft/resume, rating-scale extensions, emoji/icon support, role-restricted voting,
   governor-linked reporting, saved templates, or public detail exports.
 
+Required future follow-up retained after Phase 11:
+
+- Private dashboard UI implementation over the delivered Phase 11 reporting service contract.
+
 ## 3. Required Reading
 
 Read first:

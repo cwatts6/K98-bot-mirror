@@ -133,7 +133,8 @@ Phase 12 promotes the active survey draft/resume deferred item.
 - Define tests, smoke plan, Codex Security requirement, and promotion gates.
 - Update deferred optimisation status so rating-scale extensions, emoji/icon support,
   `/vote_admin` reshaping, cross-survey/workbook exports, retention/redaction policy changes, and
-  SQL-native combined reporting remain visible but separate.
+  private dashboard UI implementation over the Phase 11 contract, and SQL-native combined
+  reporting remain visible but separate.
 
 ### Candidate Implementation Scope If Approved Later
 
@@ -148,7 +149,7 @@ Implementation is not pre-approved. Possible later runtime work may include:
 
 ## 7. Out Of Scope Unless Separately Approved
 
-- Dashboard UI, public website, or public dashboard.
+- Private dashboard UI implementation, public website, or public dashboard.
 - New top-level commands or broad `/vote_admin` reshaping.
 - Public raw text/detail export posting.
 - Public voter-level/detail export posting.
@@ -170,6 +171,7 @@ Implementation is not pre-approved. Possible later runtime work may include:
 - Rating Scale Extensions.
 - Emoji/Icon Support.
 - `/vote_admin` Reshaping.
+- Private Dashboard UI implementation over the Phase 11 reporting contract.
 - Cross-survey/workbook export redesign.
 - Retention/redaction policy changes.
 - Optional SQL-native combined reporting views/procedures if reporting consumers or performance

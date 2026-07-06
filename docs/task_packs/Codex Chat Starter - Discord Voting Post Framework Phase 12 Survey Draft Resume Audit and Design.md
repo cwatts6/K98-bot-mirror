@@ -97,7 +97,8 @@ Candidate Phase 12 audit scope to confirm:
 - Tests, smoke plan, Codex Security requirement, and promotion gates.
 
 Do not include in Phase 12 unless separately approved:
-- Dashboard UI or public dashboard implementation.
+- Private dashboard UI implementation over the Phase 11 reporting contract.
+- Public dashboard implementation.
 - New top-level commands or broad /vote_admin reshaping.
 - Public raw text/detail export posting.
 - Public voter-level/detail export posting.
@@ -114,6 +115,7 @@ Do not include in Phase 12 unless separately approved:
 - Changing existing submitted survey behavior except as approved for draft compatibility.
 
 Required but separate follow-up slices:
+- Private Dashboard UI implementation over the Phase 11 reporting contract.
 - Rating Scale Extensions.
 - Emoji/Icon Support.
 - /vote_admin Reshaping.
