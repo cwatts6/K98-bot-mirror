@@ -326,6 +326,7 @@ async def test_survey_choice_change_continues_when_draft_storage_unavailable(mon
 
     async def fake_send_ephemeral(_interaction, content, **_kwargs):
         captured["content"] = content
+        captured["warning_after_refresh"] = _interaction.response.done
 
     monkeypatch.setattr(
         "ui.views.survey_post_view.survey_service.save_survey_response_draft",
@@ -340,6 +341,7 @@ async def test_survey_choice_change_continues_when_draft_storage_unavailable(mon
 
     assert panel.drafts_enabled is False
     assert "draft storage is unavailable" in str(captured["content"]).casefold()
+    assert captured["warning_after_refresh"] is True
     assert interaction.response.edited["view"] is panel
 
 

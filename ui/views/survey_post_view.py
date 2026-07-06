@@ -558,6 +558,7 @@ class SurveyResponsePanel(discord.ui.View):
         self.rating_answers: dict[int, int] = dict(rating_answers or {})
         self.ranking_answers: dict[int, tuple[int, ...]] = dict(ranking_answers or {})
         self.ranking_edit_rank_by_question: dict[int, int] = {}
+        self._pending_draft_warning: str | None = None
         self._rebuild()
 
     @property
@@ -687,14 +688,14 @@ class SurveyResponsePanel(discord.ui.View):
             return True
         if result.status == "unavailable" and not require_persisted:
             self.drafts_enabled = False
+            self._pending_draft_warning = (
+                "Survey draft storage is unavailable. You can keep answering, but progress "
+                "may not resume if you exit."
+            )
             logger.warning(
                 "survey_draft_autosave_unavailable survey_id=%s actor_discord_id=%s",
                 self.survey_id,
                 getattr(getattr(interaction, "user", None), "id", None),
-            )
-            await send_ephemeral(
-                interaction,
-                "Survey draft storage is unavailable. You can keep answering, but progress may not resume if you exit.",
             )
             return True
         await send_ephemeral(interaction, result.message or "Survey draft could not be saved.")
@@ -795,13 +796,22 @@ class SurveyResponsePanel(discord.ui.View):
         try:
             if not interaction.response.is_done():
                 await interaction.response.edit_message(content=self.content(), view=self)
+                await self._send_pending_draft_warning(interaction)
                 return
         except Exception:
             logger.debug("survey_panel_edit_response_failed", exc_info=True)
         try:
             await interaction.edit_original_response(content=self.content(), view=self)
+            await self._send_pending_draft_warning(interaction)
         except Exception:
             logger.exception("survey_panel_refresh_failed survey_id=%s", self.survey_id)
+
+    async def _send_pending_draft_warning(self, interaction: discord.Interaction) -> None:
+        if self._pending_draft_warning is None:
+            return
+        message = self._pending_draft_warning
+        self._pending_draft_warning = None
+        await send_ephemeral(interaction, message)
 
 
 class _SurveyTextAnswerModal(discord.ui.Modal):

@@ -281,6 +281,61 @@ async def test_save_survey_response_draft_detects_stale_revision(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_save_survey_response_draft_clears_expired_draft_before_insert(monkeypatch):
+    now = datetime(2026, 7, 6, 12, 0, tzinfo=UTC)
+    executed_sql: list[str] = []
+
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+            executed_sql.append(sql)
+
+        def fetchone(self):
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "OBJECT_ID" in cur.last_sql:
+            return {"ObjectId": 99}
+        return {
+            "SurveyID": 42,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "ClosesAtUtc": datetime(2026, 7, 6, 13, 0, tzinfo=UTC),
+        }
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    def fake_exec_with_cursor(callback):
+        return callback(FakeCursor())
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    result = await survey_dal.save_survey_response_draft(
+        survey_id=42,
+        discord_user_id=123,
+        payload=SurveyResponsePayload({10: (101,)}, {}, {}),
+        expected_revision=0,
+        now_utc=now,
+    )
+
+    assert result.status == "saved"
+    cleanup_index = next(
+        index for index, sql in enumerate(executed_sql) if "ExpiresAtUtc <= SYSUTCDATETIME" in sql
+    )
+    insert_index = next(
+        index
+        for index, sql in enumerate(executed_sql)
+        if "INSERT INTO dbo.SurveyResponseDrafts" in sql
+    )
+    assert cleanup_index < insert_index
+
+
+@pytest.mark.asyncio
 async def test_discard_survey_response_draft_allows_missing_initial_draft(monkeypatch):
     class FakeCursor:
         last_sql = ""

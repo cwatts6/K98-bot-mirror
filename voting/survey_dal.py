@@ -1053,6 +1053,17 @@ async def save_survey_response_draft(
             )
         cur.execute(
             """
+            DELETE FROM dbo.SurveyResponseDrafts
+            WHERE SurveyID = ?
+              AND DiscordUserID = ?
+              AND Status = 'Active'
+              AND ExpiresAtUtc IS NOT NULL
+              AND ExpiresAtUtc <= SYSUTCDATETIME();
+            """,
+            (int(survey_id), int(discord_user_id)),
+        )
+        cur.execute(
+            """
             SELECT Revision
             FROM dbo.SurveyResponseDrafts WITH (UPDLOCK, HOLDLOCK)
             WHERE SurveyID = ?
@@ -1142,6 +1153,17 @@ async def discard_survey_response_draft(
             return SurveyDraftSaveResult(
                 "unavailable", int(survey_id), message=SURVEY_DRAFT_MIGRATION_MESSAGE
             )
+        cur.execute(
+            """
+            DELETE FROM dbo.SurveyResponseDrafts
+            WHERE SurveyID = ?
+              AND DiscordUserID = ?
+              AND Status = 'Active'
+              AND ExpiresAtUtc IS NOT NULL
+              AND ExpiresAtUtc <= SYSUTCDATETIME();
+            """,
+            (int(survey_id), int(discord_user_id)),
+        )
         cur.execute(
             """
             SELECT Revision
