@@ -7,7 +7,8 @@ admin/leadership aggregate dashboard-safe reporting runtime contract. It did not
 new commands, cross-survey/workbook exports, retention/redaction behavior changes, command
 reshaping, public detail posting, or new SQL objects.
 
-Use the active Phase 12 starter in `../` for the next Discord Voting Post Framework slice.
+Phase 12 is also complete and archived. Use the active Phase 13 starter in `../` for the next
+Discord Voting Post Framework slice.
 
 ## Copy/Paste Starter
 

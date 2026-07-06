@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Phase 12 Survey Draft Resume Completed Item
+- Area: `voting/`, `ui/views/survey_post_view.py`, SQL repo survey response draft storage
+- Type: architecture
+- Description: Phase 7 delivered choice-only surveys without persisted partial player response drafts. Later survey phases added text/details, optional questions, fixed 1-5 ratings, complete rankings, report-bundle exports, and dashboard-safe aggregate reporting contracts, but longer surveys still needed a privacy-safe way for respondents to recover in-progress answers after timeout, restart, interruption, or intentional pause.
+- Resolution: Phase 12 delivered SQL-backed persisted survey response drafts for surveys only, keyed by `SurveyID` plus Discord user ID. The implementation supports automatic draft save, explicit `Save and exit`, restart-safe resume from the public `Answer survey` opener, one active draft per survey/respondent, revision-based stale update protection, duplicate panel closeout, choice/text/detail/optional/rating/ranking answer handling, final-submit validation, and rollout-safe missing-table behavior. Unsubmitted draft answers remain excluded from public results, private dashboard summaries, private status totals, totals exports, response-detail exports, and report bundles until final submit. Existing one-choice vote, single-question multi-select vote, and submitted survey behavior was preserved.
+- Validation: Completed through SQL PR #36, mirror PR #207, and production PR #514. Automated validation included focused survey service/DAL/view tests, full pytest (`2337 passed, 2 skipped` after UX smoke-polish updates), pre-commit, architecture and deferred validators, selected-test review, smoke imports, command registration validation, pytest log-noise validation, review-thread resolution, and Codex Security review before runtime handoff. Operator smoke and regression testing completed successfully on 2026-07-06.
+
 ### Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Completed Item
 - Area: `voting/reporting_models.py`, `voting/reporting_service.py`, `voting/reporting_dal.py`, `voting/survey_dal.py`, private dashboard/reporting contracts
 - Type: architecture

@@ -1,13 +1,18 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter. Phase 12 is complete, smoke tested, regression tested, and replaced by
+the active Phase 13 Private Dashboard UI task pack/starter.
 
-Phase 1 through Phase 11 are complete and smoke tested. Phase 11 delivered the private
+Phase 1 through Phase 12 are complete and smoke tested. Phase 11 delivered the private
 admin/leadership aggregate dashboard-safe reporting runtime contract for vote/survey summaries,
 with no Discord identity, raw text, detail text, or per-user answer data in dashboard-safe payloads.
-Smoke testing and regression testing completed successfully on 2026-07-06.
+Phase 12 delivered SQL-backed persisted survey response drafts/resume for surveys only, with
+draft exclusion from public results, private dashboard summaries, private status totals, and all
+existing export profiles until final submit. Smoke testing and regression testing completed
+successfully on 2026-07-06.
 
-Use this starter to begin Phase 12 with audit/scope confirmation before implementation.
+Use this starter only for historical Phase 12 context. Start new voting-framework work from the
+active Phase 13 starter in `../`.
 
 ## Copy/Paste Starter
 
@@ -60,7 +65,7 @@ Read first:
 - docs/reference/deferred_optimisations.md
 - docs/task_packs/Discord Voting Post Framework - Programme Pack.md
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Audit and Design.md
-- docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design.md
+- docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design.md
 
 Use these skills as applicable:
 - k98-architecture-scope

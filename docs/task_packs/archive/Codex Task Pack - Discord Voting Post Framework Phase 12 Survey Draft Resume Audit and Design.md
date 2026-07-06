@@ -5,23 +5,80 @@
 - Task name: `Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design`
 - Date: `2026-07-06`
 - Owner/context: `Follow-up after Phase 11 private dashboard/reporting runtime contract, smoke testing, and regression testing`
-- Task type: `audit | product scope | privacy review | SQL persistence design | Discord interaction design`
-- One-pass approved: `no`
-- Status: `prepared as the next voting-framework slice`
+- Task type: `audit | product scope | privacy review | SQL persistence design | Discord interaction design | implementation`
+- One-pass approved: `approved after audit/scope confirmation`
+- Status: `complete, smoke tested, regression tested, and archived`
 
 ## 2. Objective
 
-Audit and design persisted survey draft/resume readiness for the Discord Voting Post Framework.
+Audit, design, and deliver persisted survey draft/resume readiness for the Discord Voting Post
+Framework.
 
 Phase 11 delivered private admin/leadership aggregate dashboard-safe reporting contracts. Phase 12
 should now decide whether and how survey respondents can save or recover in-progress survey
 answers after timeout, restart, interruption, or intentional pause, without leaking unsubmitted
 answers into public results, dashboards, status summaries, or exports.
 
-Start with audit/scope confirmation. Do not implement persisted drafts, new SQL tables,
-new commands, command reshaping, retention/redaction behavior changes, or Discord interaction
-runtime changes until the product scope, privacy, SQL, permissions, UX direction, tests, smoke
-plan, deployment order, rollback posture, and deferred-scope direction are approved.
+Phase 12 started with audit/scope confirmation. Runtime implementation proceeded only after the
+operator approved the architecture, product scope, privacy, SQL, permissions, and UX direction.
+The delivered implementation is complete and smoke tested.
+
+## 2A. Delivery Summary
+
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#207`
+- Production PR: `cwatts6/k98-bot#514`
+- SQL PR: `cwatts6/K98-bot-SQL-Server#36`
+- SQL deployment: completed before bot runtime smoke
+- Bot smoke and regression testing: completed successfully on `2026-07-06`
+
+Delivered:
+
+- SQL-backed survey response drafts for surveys only, not one-choice or single-question
+  multi-select vote posts.
+- Draft identity keyed by `SurveyID` plus Discord user ID, without governor identity.
+- Automatic draft save on answer changes plus explicit `Save and exit`.
+- Resume from the public `Answer survey` opener after panel timeout, interruption, bot restart, or
+  intentional pause.
+- One active draft per survey/respondent with revision-based stale update protection.
+- Duplicate in-flight panel protection so older panels cannot silently overwrite newer drafts.
+- Stale duplicate panels are edited in place and closed with the user-facing message:
+  `A newer draft exists. Please continue editing in your newer survey panel.`
+- Draft handling for choice, text, detail, optional, fixed 1-5 rating, and complete ranking
+  survey questions.
+- Required-answer validation only at final submit; optional questions may remain skipped.
+- Submitted response semantics preserved, including response-change allowed/blocked behavior.
+- Drafts are excluded from public results, private status totals, dashboard-safe summaries,
+  totals exports, response-detail exports, and report-bundle exports until final submit.
+- Close behavior preserves existing closed controls and rejects post-close draft/submit attempts.
+- Rollout-safe missing-table behavior that lets users continue answering before SQL deployment,
+  while warning that resume may not work.
+- Orange saved-draft acknowledgement that states draft answers are not counted in results or
+  reports until the survey is submitted.
+
+Smoke testing confirmed:
+
+- Basic draft save/resume.
+- Restart-safe resume.
+- Timeout/interruption and voluntary save-and-exit journeys.
+- Duplicate session / stale revision protection.
+- Required/optional final-submit behavior.
+- Choice, text, details, rating, ranking, and optional answer handling.
+- Closed survey behavior.
+- Draft exclusion from public/private result, export, and dashboard-safe reporting surfaces.
+- Existing vote and submitted survey regression behavior.
+
+Validation evidence:
+
+- Focused survey tests passed.
+- Full bot suite passed with `2337 passed, 2 skipped` after smoke-polish updates.
+- `pre_commit run -a` passed.
+- Architecture, deferred, selected-test, smoke-import, command-registration, and pytest log-noise
+  validation passed.
+- Codex Security review was required and completed before runtime handoff during the Phase 12
+  implementation because the change touched Discord interactions, SQL/data access, private data,
+  user-controlled text, and restart-sensitive persistence.
 
 ## 3. Required Reading
 
@@ -39,7 +96,7 @@ Read first:
 - `docs/reference/deferred_optimisations.md`
 - `docs/task_packs/Discord Voting Post Framework - Programme Pack.md`
 - `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Audit and Design.md`
-- `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design.md`
+- `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design.md`
 
 ## 4. Delivered Baseline
 
@@ -65,7 +122,8 @@ Phase 1 through Phase 11 are complete and smoke tested. The voting framework now
 - Audit metadata that records counts/status rather than full answer payloads.
 
 Phase 11 smoke and regression testing on 2026-07-06 confirmed the private aggregate reporting
-runtime contract and preserved regressions.
+runtime contract and preserved regressions. Phase 12 then added persisted survey draft/resume
+without changing existing vote behavior or submitted survey reporting contracts.
 
 ## 5. Source Deferred Item
 
