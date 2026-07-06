@@ -1,0 +1,122 @@
+import pytest
+
+from account_picker import AccountPickerView, build_unique_gov_options
+
+
+def _mk_acc(slot, gid, name=None):
+    d = {"GovernorID": gid}
+    if name is not None:
+        d["GovernorName"] = name
+    return (slot, d)
+
+
+def test_build_unique_gov_options_basic_ordering_and_dedupe():
+    """
+    Ensure preferred slot ordering and duplicate GovernorID dedupe works.
+    """
+    accounts = dict(
+        [
+            _mk_acc("Farm 1", "900", "FarmOne"),
+            _mk_acc("Alt 2", "200", "AltTwo"),
+            _mk_acc("Main", "100", "MainUser"),
+            _mk_acc("Alt 1", "200", "AltTwoDuplicate"),
+            _mk_acc("OtherSlot", "300", "Zed"),
+        ]
+    )
+
+    opts = build_unique_gov_options(accounts)
+    # Values correspond to GovernorID strings, unique and stable ordering (Main first, then Alts/Farm)
+    vals = [o.value for o in opts]
+    assert "100" in vals  # Main must be present
+    # dedupe: 200 appears only once
+    assert vals.count("200") == 1
+    # ensure deterministic presence of the three distinct ids
+    assert set(vals) == {"100", "200", "300", "900"}
+
+
+def test_build_unique_gov_options_labels_and_desc_limits():
+    accounts = {
+        "Main": {"GovernorID": 1, "GovernorName": "A" * 200},
+        "Alt 1": {"GovernorID": 2, "GovernorName": "B"},
+    }
+    opts = build_unique_gov_options(accounts)
+    assert len(opts) == 2
+    # label trimmed to 100 chars by implementation (defensive assumption)
+    assert len(opts[0].label) <= 100
+    assert opts[0].description == "Main"
+
+
+def test_build_unique_gov_options_accepts_account_resolution_summary():
+    from services.governor_account_service import summarize_accounts
+
+    summary = summarize_accounts(
+        {
+            "Farm 1": {"GovernorID": "900", "GovernorName": "FarmOne"},
+            "Alt 1": {"GovernorID": "200", "GovernorName": "AltOne"},
+            "Main": {"GovernorID": "100", "GovernorName": "MainUser"},
+            "Alt 2": {"GovernorID": "200", "GovernorName": "AltDuplicate"},
+        }
+    )
+
+    opts = build_unique_gov_options(summary)
+
+    assert [o.value for o in opts] == ["100", "200", "900"]
+    assert [o.description for o in opts] == ["Main", "Alt 1", "Farm 1"]
+
+
+def test_build_unique_gov_options_summary_falls_back_to_slot_for_unknown_names():
+    from services.governor_account_service import summarize_accounts
+
+    summary = summarize_accounts(
+        {
+            "Main": {"GovernorID": "100", "GovernorName": ""},
+            "Alt 1": {"GovernorID": "200"},
+            "Farm 1": {"GovernorID": "300", "GovernorName": "Unknown"},
+        }
+    )
+
+    opts = build_unique_gov_options(summary)
+
+    assert [o.label for o in opts] == ["Main", "Alt 1", "Farm 1"]
+
+
+def test_build_unique_gov_options_accepts_governor_row_list():
+    rows = [
+        {"GovernorID": "111", "GovernorName": "One"},
+        {"GovernorID": "222", "GovernorName": "Two"},
+        {"GovernorID": "111", "GovernorName": "Duplicate"},
+    ]
+
+    opts = build_unique_gov_options(rows)
+
+    assert [o.value for o in opts] == ["111", "222"]
+    assert [o.label for o in opts] == ["One", "Two"]
+    assert [o.description for o in opts] == ["Account 1", "Account 2"]
+
+
+def test_build_unique_gov_options_accepts_registered_governor_objects():
+    from inventory.models import RegisteredGovernor
+
+    rows = [
+        RegisteredGovernor(111, "One", "Main"),
+        RegisteredGovernor(222, "Two", "Alt 1"),
+    ]
+
+    opts = build_unique_gov_options(rows)
+
+    assert [o.value for o in opts] == ["111", "222"]
+    assert [o.description for o in opts] == ["Main", "Alt 1"]
+
+
+@pytest.mark.asyncio
+async def test_account_picker_uses_generic_governor_placeholder():
+    view = AccountPickerView(
+        ctx=object(),
+        options=build_unique_gov_options({"Main": {"GovernorID": 1, "GovernorName": "Gov"}}),
+        on_select_governor=lambda *_args: None,
+        show_register_btn=False,
+    )
+
+    select = view.children[0]
+
+    assert select.placeholder == "Select Governor"
