@@ -1,14 +1,13 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Audit and Design
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter. Phase 11 is delivered, smoke tested, regression tested, and archived.
 
-Phase 1 through Phase 10 are complete and smoke tested. Phase 10 delivered private Survey Export
-v2 as a multi-CSV report bundle, SQL survey aggregate reporting views/procedure, admin/leadership
-private delivery, Discord names where appropriate, and dashboard readiness as contract-only. The
-report bundle smoke test confirmed private multi-CSV delivery, clean file opening, expected rows,
-and successful regressions.
+Phase 1 through Phase 11 are complete and smoke tested. Phase 11 delivered the private
+admin/leadership aggregate dashboard-safe reporting runtime contract. It did not add dashboard UI,
+new commands, cross-survey/workbook exports, retention/redaction behavior changes, command
+reshaping, public detail posting, or new SQL objects.
 
-Use this starter to begin Phase 11 with audit/scope confirmation before implementation.
+Use the active Phase 12 starter in `../` for the next Discord Voting Post Framework slice.
 
 ## Copy/Paste Starter
 

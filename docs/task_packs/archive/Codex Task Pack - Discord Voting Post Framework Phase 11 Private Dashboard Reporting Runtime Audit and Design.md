@@ -4,10 +4,10 @@
 
 - Task name: `Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Audit and Design`
 - Date: `2026-07-05`
-- Owner/context: `Follow-up after Phase 10 Survey Export v2 report bundle, SQL reporting views, and smoke test`
+- Owner/context: `Completed follow-up after Phase 10 Survey Export v2 report bundle, SQL reporting views, and smoke test`
 - Task type: `audit | product scope | privacy review | dashboard/reporting contract design | SQL reporting design`
 - One-pass approved: `no`
-- Status: `prepared as the next voting-framework slice`
+- Status: `delivered, smoke tested, regression tested, and archived`
 
 ## 2. Objective
 
@@ -15,14 +15,57 @@ Audit and design the next reporting slice: private dashboard/reporting runtime r
 Discord Voting Post Framework.
 
 Phase 10 delivered a private single-survey report bundle and SQL survey aggregate reporting
-contract. Phase 11 should define whether and how the bot should expose private dashboard/reporting
-runtime data for admin/leadership consumers without building a public website, exposing raw
-answers publicly, or reshaping `/vote_admin` broadly.
+contract. Phase 11 defined and delivered private dashboard/reporting runtime data for
+admin/leadership consumers without building a public website, exposing raw answers publicly, or
+reshaping `/vote_admin` broadly.
 
-Start with audit/scope confirmation. Do not implement dashboard UI, new commands, combined SQL
-views/procedures, cross-survey exports, workbook exports, retention/redaction behavior, or command
-reshaping until the architecture, product scope, privacy, SQL, permissions, UX direction, tests,
-smoke plan, deployment order, rollback posture, and deferred-scope direction are approved.
+Phase 11 started with audit/scope confirmation and operator approval for admin/leadership
+aggregate dashboard-safe reporting only. It did not implement dashboard UI, new commands, combined
+SQL views/procedures, cross-survey exports, workbook exports, retention/redaction behavior, or
+command reshaping.
+
+## 2A. Delivery Closeout
+
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#206`
+- Production PR: `cwatts6/k98-bot#513`
+- Bot smoke/regression confirmation: `2026-07-06`
+
+Delivered:
+
+- Private admin/leadership reporting runtime contract for aggregate dashboard-safe vote and survey
+  summaries.
+- `voting/reporting_models.py`, `voting/reporting_dal.py`, and `voting/reporting_service.py`.
+- Vote summary, vote option summary, survey summary, survey question summary, and survey option
+  summary payloads.
+- Combined dashboard payload assembly that supports participation, response/vote counts, open and
+  closed states, PublicLive/HiddenUntilClose result visibility, vote modes, survey answer types,
+  required/optional dimensions, rating aggregates, and ranking aggregates.
+- Dashboard-safe privacy boundary that excludes Discord identity, per-user rows, raw text answers,
+  and choice details from aggregate reporting summaries.
+- Existing private export profiles remain the approved place for Discord IDs, Discord names, raw
+  text answers, detail text, and response-level review.
+- Batched survey reporting DAL reads that preserve caller survey order.
+
+Validation and smoke evidence:
+
+- Focused reporting DAL/service and survey DAL tests passed.
+- Full bot test suite passed with `2323 passed, 2 skipped`.
+- Architecture, deferred, selected-test, smoke-import, command-registration, pre-commit, and Codex
+  Security review gates passed.
+- Operator smoke testing and regression testing completed successfully on 2026-07-06.
+
+Explicitly not delivered in Phase 11:
+
+- Dashboard UI, public website, or public dashboard.
+- New Discord commands or `/vote_admin` reshaping.
+- Combined SQL views/procedures or SQL-native cross-survey reporting objects.
+- Cross-survey exports, workbook exports, or longitudinal reports.
+- Retention/redaction behavior changes.
+- Public raw text/detail, voter-level, or response-detail posting.
+- Draft/resume, rating-scale extensions, emoji/icon support, role-restricted voting,
+  governor-linked reporting, saved templates, or public detail exports.
 
 ## 3. Required Reading
 

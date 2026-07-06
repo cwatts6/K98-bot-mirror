@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Completed Item
+- Area: `voting/reporting_models.py`, `voting/reporting_service.py`, `voting/reporting_dal.py`, `voting/survey_dal.py`, private dashboard/reporting contracts
+- Type: architecture
+- Description: Dashboard/reporting readiness remained required follow-up work after Phase 10. The voting framework had SQL-backed vote and survey data, survey report-bundle exports, and survey aggregate SQL reporting views/procedure, but it did not yet have a combined private dashboard-safe vote/survey runtime contract for participation, outcomes/top selections, result visibility, vote modes, answer types, optional/rating/ranking dimensions, or raw text/detail boundaries.
+- Resolution: Phase 11 delivered a private admin/leadership aggregate-only reporting contract without adding dashboard UI, new commands, cross-survey/workbook exports, retention/redaction behavior changes, command reshaping, public detail posting, or new SQL objects. The runtime contract excludes Discord identity, per-user rows, raw text answers, and choice details from dashboard-safe summaries while preserving existing private export profiles for detailed review. Service/DAL coverage now provides vote and survey summary rows, survey question/option aggregates, combined dashboard payloads, result-visibility semantics, and input-order-stable batched survey reporting reads.
+- Validation: Completed in mirror PR #206 and production PR #513. Automated validation included focused reporting DAL/service and survey DAL tests, full pytest (`2323 passed, 2 skipped`), architecture and deferred validators, selected-test review, smoke imports, command registration validation, pre-commit, and Codex Security diff review with no reportable findings. Operator smoke testing and regression testing completed successfully on 2026-07-06.
+
 ### Discord Voting Post Framework Phase 9C Ranking Survey Questions Completed Item
 - Area: `voting/`, `/vote_admin survey_*`, `ui/views/survey_post_view.py`, SQL repo survey ranking answer model and exports
 - Type: architecture

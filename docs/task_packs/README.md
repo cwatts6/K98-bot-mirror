@@ -244,21 +244,31 @@ Discord Voting Post Framework status:
 - Phase 10 records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 10 Survey Export v2 and Reporting Readiness Audit and Design.md`
   - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 10 Survey Export v2 and Reporting Readiness Audit and Design.md`
+- Phase 11 Private Dashboard Reporting Runtime is delivered in mirror PR #206 and production PR
+  #513. Operator smoke and regression testing on 2026-07-06 confirmed the private aggregate
+  dashboard-safe reporting runtime contract and preserved regression behavior. Phase 11 delivered
+  vote/survey summary contracts for admin/leadership reporting without Discord identity, per-user
+  rows, raw text answers, or choice details in dashboard-safe payloads, and without adding
+  dashboard UI, new commands, cross-survey/workbook exports, retention/redaction behavior changes,
+  command reshaping, public detail posting, or new SQL objects.
+- Phase 11 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Audit and Design.md`
+  - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Audit and Design.md`
 - Active Discord Voting Post Framework files:
   - `Discord Voting Post Framework - Programme Pack.md`
-  - `Codex Task Pack - Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Audit and Design.md`
-  - `Codex Chat Starter - Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Audit and Design.md`
-- Phase 11 is the next prepared voting slice. It starts with audit/scope confirmation for private
-  dashboard/reporting runtime readiness now that Phase 10 delivered the single-survey report
-  bundle and SQL survey reporting views/procedure. It should confirm private consumers, privacy
-  profiles, combined vote/survey reporting contracts, SQL versus service ownership,
-  dashboard-safe output shapes, command/admin UX, text/detail redaction or exclusion policy,
-  tests, smoke plan, migration order, rollback posture, and implementation slices before any
-  runtime dashboard/reporting changes. Cross-survey/workbook exports, retention/redaction behavior
-  changes, draft/resume, rating-scale extensions, emoji/icon support, and `/vote_admin` reshaping
-  remain required separate slices. Role-restricted voting, governor-linked voting/reporting, saved
-  templates, and public voter-level/detail export posting are definitely not required unless a
-  later operator decision reverses that status.
+  - `Codex Task Pack - Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design.md`
+  - `Codex Chat Starter - Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design.md`
+- Phase 12 is the next prepared voting slice. It starts with audit/scope confirmation for
+  persisted survey draft/resume readiness now that Phase 11 delivered private aggregate reporting
+  contracts. It should confirm product value, privacy, SQL persistence, permissions, respondent
+  UX, answer-type behavior, optional/rating/ranking rules, result/export/dashboard exclusion,
+  close/restart/timeout behavior, tests, smoke plan, deployment order, rollback posture, and
+  implementation slices before any runtime draft persistence. Rating-scale extensions,
+  emoji/icon support, `/vote_admin` reshaping, cross-survey/workbook exports, retention/redaction
+  policy changes, and optional SQL-native combined reporting views/procedures remain required
+  separate slices. Role-restricted voting, governor-linked voting/reporting, saved templates, and
+  public voter-level/detail export posting are definitely not required unless a later operator
+  decision reverses that status.
 
 Player Self-Service Command Centre status:
 
@@ -410,7 +420,7 @@ Final removal of temporary deprecated command paths remains captured as deferred
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.
 
-Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime is the next prepared
+Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design is the next prepared
 voting slice. It starts with audit/scope confirmation and should decide the safest way to design
-private dashboard/reporting runtime contracts while keeping all Phase 1 through Phase 10 behaviour
-unchanged.
+persisted survey draft/resume behavior while keeping all Phase 1 through Phase 11 behaviour
+unchanged until runtime implementation is explicitly approved.
