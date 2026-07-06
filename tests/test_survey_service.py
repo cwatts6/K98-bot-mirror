@@ -12,6 +12,7 @@ from voting.survey_models import (
     SURVEY_QUESTION_RATING,
     SURVEY_QUESTION_SINGLE_CHOICE,
     SURVEY_QUESTION_TEXT,
+    SurveyDraftSaveResult,
     SurveyQuestion,
     SurveyQuestionOption,
     SurveySnapshot,
@@ -120,6 +121,11 @@ def _draft_snapshot() -> SurveySnapshot:
             ),
         ),
     )
+
+
+def test_survey_draft_save_result_requires_revision_for_accepted() -> None:
+    assert SurveyDraftSaveResult("saved", 42, revision=1).accepted is True
+    assert SurveyDraftSaveResult("saved", 42, revision=None).accepted is False
 
 
 def test_validate_draft_response_payload_accepts_partial_answers_and_rankings():

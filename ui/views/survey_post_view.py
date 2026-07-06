@@ -684,7 +684,15 @@ class SurveyResponsePanel(discord.ui.View):
             await send_ephemeral(interaction, "Survey draft could not be saved.")
             return False
         if result.accepted:
-            self.draft_revision = result.revision
+            if result.revision is None:
+                logger.error(
+                    "survey_draft_save_missing_revision survey_id=%s actor_discord_id=%s",
+                    self.survey_id,
+                    getattr(getattr(interaction, "user", None), "id", None),
+                )
+                await send_ephemeral(interaction, "Survey draft could not be saved.")
+                return False
+            self.draft_revision = int(result.revision)
             return True
         if result.status == "unavailable" and not require_persisted:
             self.drafts_enabled = False

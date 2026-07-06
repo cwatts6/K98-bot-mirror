@@ -148,7 +148,7 @@ class SurveyDraftSaveResult:
 
     @property
     def accepted(self) -> bool:
-        return self.status == "saved"
+        return self.status == "saved" and self.revision is not None
 
 
 @dataclass(frozen=True)

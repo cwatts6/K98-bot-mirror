@@ -1121,7 +1121,8 @@ async def save_survey_response_draft(
                     UpdatedAtUtc = ?,
                     ExpiresAtUtc = NULL
                 WHERE SurveyID = ?
-                  AND DiscordUserID = ?;
+                  AND DiscordUserID = ?
+                  AND Status = 'Active';
                 """,
                 (
                     payload_json,

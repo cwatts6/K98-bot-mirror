@@ -346,6 +346,46 @@ async def test_survey_choice_change_continues_when_draft_storage_unavailable(mon
 
 
 @pytest.mark.asyncio
+async def test_survey_choice_change_rejects_accepted_draft_without_revision(monkeypatch):
+    snapshot = _snapshot()
+    panel = SurveyResponsePanel(
+        snapshot,
+        owner_user_id=123,
+        selected_option_ids={11: (201,)},
+        draft_revision=0,
+        drafts_enabled=True,
+    )
+    select = panel.children[0]
+    captured: dict[str, object] = {}
+
+    async def fake_save_survey_response_draft(**_kwargs):
+        return SimpleNamespace(
+            accepted=True,
+            status="saved",
+            revision=None,
+            message="saved",
+        )
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        captured["content"] = content
+
+    monkeypatch.setattr(
+        "ui.views.survey_post_view.survey_service.save_survey_response_draft",
+        fake_save_survey_response_draft,
+    )
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+    monkeypatch.setattr(type(select), "values", property(lambda _self: ["102"]))
+
+    interaction = SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+
+    await select.callback(interaction)
+
+    assert panel.draft_revision == 0
+    assert "could not be saved" in str(captured["content"]).casefold()
+    assert not hasattr(interaction.response, "edited")
+
+
+@pytest.mark.asyncio
 async def test_survey_submit_defers_before_persisting(monkeypatch):
     snapshot = _snapshot()
     panel = SurveyResponsePanel(
