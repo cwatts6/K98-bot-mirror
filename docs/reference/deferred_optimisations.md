@@ -6,28 +6,19 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, `ui/views/survey_post_view.py`, `voting/survey_render_service.py`, SQL repo option metadata
-- Type: consistency
-- Description: Per-option emoji/icon support is approved for future voting framework scope because it can make public votes and surveys more readable and engaging. Current vote and survey options have labels and limited button styling but no emoji/icon metadata. Phase 14 smoke testing also showed that long named rating labels and dense distributions remain readable but can crowd generated cards and dashboard summaries, so the next visual polish slice should audit label-density/readability alongside emoji/icon support rather than leaving that observation loose.
-- Suggested Fix: Promoted into the prepared Phase 15 Emoji/Icon Support and Visual Polish audit/design task pack. Scope whether emoji/icons apply to one-choice votes, multi-select votes, survey choice options, ranking options, generated cards, Discord buttons/selects, private status, exports, report bundles, and dashboard summaries. Validate Unicode/custom emoji input, SQL metadata needs, glyph/font fallback, output escaping, privacy boundaries, smoke screenshots, and long-label card/dashboard readability before implementation.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 5 hidden-until-close, Phase 6 MultiSelect, Phase 7 choice-only surveys, Phase 9C ranking questions, Phase 13 dashboard UI, and Phase 14 rating scale extensions are delivered and smoke tested; renderer visual QA with representative emoji/custom emoji and long label cases; operator approval for exact surfaces before runtime changes.
-
-### Deferred Optimisation
 - Area: `ui/views/survey_post_view.py`, `commands/vote_admin_cmds.py`, `voting/survey_service.py`, `voting/survey_dal.py`
 - Type: consistency
 - Description: Phase 15 smoke testing confirmed vote and survey option emoji display works, but exposed a survey authoring gap: survey creation is append-only once a question is added, and there is no `/vote_admin` survey update path for option emoji/icon metadata. If an admin forgets an emoji on an answer in question 1, they must restart the survey build instead of editing the draft question/options before publish or correcting approved display metadata after publish.
-- Suggested Fix: Scope a follow-up survey authoring polish slice that adds guided survey builder edit/review controls for previously added draft questions and their option emoji metadata, plus a narrowly permissioned survey option-icon update path for open surveys if approved. Preserve existing survey answer semantics, draft/submit privacy boundaries, restart-safe public openers, and private reporting/export contracts. Keep this separate from broad `/vote_admin` reshaping.
+- Suggested Fix: Promoted into the prepared Phase 16 Survey Authoring Edit Controls audit/design task pack. Scope guided survey builder review/edit controls for previously added draft questions and their option emoji metadata, plus a narrowly permissioned survey option-icon update path for open surveys if approved. Preserve existing survey answer semantics, draft/submit privacy boundaries, restart-safe public openers, and private reporting/export contracts. Keep this separate from broad `/vote_admin` reshaping.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 15 option emoji metadata and builder controls; operator decision on whether post-publish survey option icon edits are allowed only while open, only before responses, or never after publish.
+- Dependencies: Phase 15 option emoji metadata and builder controls are delivered and smoke tested; operator decision on whether post-publish survey option icon edits are allowed only while open, only before responses, or never after publish.
 
 ### Deferred Optimisation
 - Area: `voting/`, `/vote_admin`, voting command surface
 - Type: architecture
 - Description: `/vote_admin` has grown to cover vote creation, survey creation, update/status/close/export/report/dashboard flows, autocomplete lookups, and multiple export/report modes. It remains functional and approved, but broad command reshaping is now a distinct command-surface governance task rather than a prerequisite for remaining voting feature slices.
-- Suggested Fix: Scope a separate `/vote_admin` reshaping audit after the visual polish and reporting slices that need the current stable command surface. Validate whether subcommand names, grouping, autocomplete, permissions, docs, command registration baselines, smoke references, and migration guidance should change. Do not rename or remove existing command paths without operator approval and a communication plan.
+- Suggested Fix: Scope a separate `/vote_admin` reshaping audit after the survey-authoring polish and any reporting slices that still need the current stable command surface. Validate whether subcommand names, grouping, autocomplete, permissions, docs, command registration baselines, smoke references, and migration guidance should change. Do not rename or remove existing command paths without operator approval and a communication plan.
 - Impact: medium
 - Risk: high
 - Dependencies: Explicit operator approval; canonical command reference updates if command paths change; command registration validation; Codex Security review before runtime PR handoff.

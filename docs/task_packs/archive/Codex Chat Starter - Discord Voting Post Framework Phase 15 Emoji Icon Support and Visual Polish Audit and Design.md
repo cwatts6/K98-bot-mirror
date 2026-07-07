@@ -1,6 +1,7 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 15 Emoji Icon Support and Visual Polish Audit and Design
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter. Phase 15 is complete, review-hardened, smoke/regression tested, and no
+longer the active next slice.
 
 Phase 1 through Phase 14 are complete and smoke tested. Phase 14 delivered configurable survey
 rating scales, including existing fixed 1-5 compatibility, fixed 1-10 ratings, custom min/max
@@ -9,7 +10,12 @@ PublicLive/HiddenUntilClose aggregate output, private export/report/status/dashb
 representation, SQL migration `20260707_001_add_survey_rating_scales`, review hardening, and
 successful operator smoke/regression testing.
 
-Use this starter to begin Phase 15 with audit/scope confirmation before implementation.
+Historical note: Phase 15 delivered Unicode/custom Discord option emoji support, guided
+option-polish controls, Discord/status/dashboard emoji display including animated custom emoji,
+generated-card custom emoji text fallback, and narrow dense-summary readability polish. The survey
+authoring edit gap found during smoke testing is promoted to Phase 16.
+
+Use this starter only for historical context.
 
 ## Copy/Paste Starter
 

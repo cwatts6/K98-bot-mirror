@@ -8,8 +8,9 @@ as a private admin/leadership aggregate dashboard UI over the Phase 11 dashboard
 contract. Smoke testing confirmed vote and survey dashboard pages, refresh, next, previous, close,
 open/closed filters, admin/leadership access control, and no details or Discord names visible.
 
-Historical starter preserved for traceability. Use the active Phase 15 Emoji/Icon Support and
-Visual Polish starter in `docs/task_packs/` for the next Discord Voting Post Framework slice.
+Historical starter preserved for traceability. Phase 15 is also complete and archived; use the
+programme pack or active Phase 16 starter in `docs/task_packs/` for the next Discord Voting Post
+Framework slice.
 
 ## Copy/Paste Starter
 

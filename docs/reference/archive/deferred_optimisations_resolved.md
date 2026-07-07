@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Phase 15 Emoji/Icon Support Completed Item
+- Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, `ui/views/survey_post_view.py`, `voting/survey_render_service.py`, SQL repo option metadata
+- Type: consistency
+- Description: Per-option emoji/icon support was approved because it makes public votes and surveys easier to scan. Before Phase 15, vote and survey options only had labels and limited button styling, while Phase 14 smoke testing also showed that long named rating labels and dense aggregate summaries could crowd generated cards and dashboard summaries.
+- Resolution: Phase 15 delivered additive nullable SQL option emoji metadata for vote and survey option tables, Unicode emoji plus custom Discord emoji support, guided option-polish controls, Discord button/select emoji display, public/status/dashboard aggregate display, generated-card fallback for custom and animated Discord emoji that cannot be fetched or animated by the PNG renderer, and narrow visual-readability polish for dense public cards and private dashboard summaries. Exports and report bundles intentionally did not gain emoji columns. Existing one-choice, multi-select, choice/text/detail/optional/rating/ranking survey behavior, PublicLive/HiddenUntilClose semantics, draft exclusion, private reporting boundaries, and restart-safe public openers were preserved.
+- Validation: Completed through mirror PR #210, production PR #517, and SQL PR #38. The SQL PR was merged and pushed to production before bot rollout. Automated validation included architecture/deferred/select-tests validators, focused vote/survey service/DAL/view/render/dashboard tests, command registration/smoke import checks, pre-commit, pyright/ruff as applicable, git diff checks, Codex Security diff review, SQL validation, and review-thread fixes including narrowed Discord emoji parsing exceptions. Operator smoke/regression testing on 2026-07-07 confirmed Unicode emoji, custom Discord emoji, animated custom emoji display in Discord/status/dashboard, expected generated-card custom emoji text fallback, vote and survey emoji behavior, and existing regression paths.
+
 ### Discord Voting Post Framework Phase 14 Rating Scale Extensions Completed Item
 - Area: `voting/`, `ui/views/survey_post_view.py`, survey rating scale SQL metadata, export/report/dashboard surfaces
 - Type: architecture

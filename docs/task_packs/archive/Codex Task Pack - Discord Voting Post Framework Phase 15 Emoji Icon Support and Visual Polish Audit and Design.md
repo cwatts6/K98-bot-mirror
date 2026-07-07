@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after Phase 14 rating scale extensions delivery and smoke testing`
 - Task type: `audit | product scope | Discord interaction UX | visual output polish | SQL/reporting compatibility review`
 - One-pass approved: `no`
-- Status: `active next voting slice; audit/scope only until architecture, SQL/reporting, privacy, permissions, and UX direction are approved`
+- Status: `complete, review-hardened, smoke/regression tested, and archived`
 
 ## 2. Objective
 
@@ -27,6 +27,22 @@ also exposed a survey authoring gap: after adding question 1 in the guided surve
 cannot edit that draft question's option emoji metadata, and there is no narrow survey option-icon
 update path after publish. Capture this as Phase 15 follow-up scope rather than broad
 `/vote_admin` reshaping.
+
+Delivery closeout on 2026-07-07 confirmed the approved Phase 15 implementation is complete:
+
+- Unicode emoji and custom Discord emoji are supported for delivered option-bearing vote/survey
+  surfaces.
+- Animated custom Discord emoji display correctly in Discord/status/dashboard surfaces.
+- Generated PNG cards use intentional text fallback for custom/animated Discord emoji.
+- Guided option-polish controls are delivered.
+- Additive nullable SQL metadata on both option tables was delivered through SQL PR #38 and pushed
+  to production before bot rollout.
+- Exports and report bundles intentionally did not gain emoji columns.
+- Existing vote/survey answer semantics, PublicLive/HiddenUntilClose behavior, draft exclusion,
+  restart-safe openers, private reporting boundaries, and Phase 14 rating-scale compatibility were
+  preserved.
+- The survey authoring edit gap found during smoke testing is promoted to Phase 16 rather than
+  folded into broad `/vote_admin` reshaping.
 
 Start with audit/scope confirmation. Do not implement SQL migrations, option metadata storage,
 builder controls, player controls, renderer changes, export/report/dashboard shape changes, public
@@ -76,7 +92,7 @@ custom min/max scales, scale endpoint labels, named rating choices, save/draft/r
 
 ## 5. Source Deferred Item
 
-Phase 15 promotes the active emoji/icon and visual polish deferred item.
+Phase 15 promoted the original emoji/icon and visual polish deferred item.
 
 ### Deferred Optimisation
 - Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, `ui/views/survey_post_view.py`, `voting/survey_render_service.py`, SQL repo option metadata
