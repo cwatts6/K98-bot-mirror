@@ -1,6 +1,7 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 13 Private Dashboard UI Audit and Design
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter. Phase 13 private dashboard UI was delivered, review-hardened, and
+operator smoke tested on 2026-07-07.
 
 Phase 1 through Phase 12 are complete and smoke tested. Phase 11 delivered the private
 admin/leadership aggregate dashboard-safe reporting runtime contract for vote/survey summaries,
@@ -9,7 +10,8 @@ Phase 12 delivered persisted survey draft/resume for surveys only, with unsubmit
 excluded from public results, private dashboard summaries, status totals, totals exports,
 response-detail exports, and report bundles until final submit.
 
-Use this starter to begin Phase 13 with audit/scope confirmation before implementation.
+Historical starter preserved for traceability. Use the active Phase 14 Rating Scale Extensions
+starter in `docs/task_packs/` for the next Discord Voting Post Framework slice.
 
 ## Copy/Paste Starter
 

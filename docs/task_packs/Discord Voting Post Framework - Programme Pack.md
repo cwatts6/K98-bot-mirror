@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 through Phase 12 complete and smoke tested; Phase 13 Private Dashboard UI implemented locally and awaiting operator Discord smoke/promotion`
+- Current status: `Phase 1 through Phase 13 complete and smoke tested; Phase 14 Rating Scale Extensions audit/design prepared as the next voting slice`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -953,11 +953,20 @@ Explicitly still out of scope after Phase 13 unless separately approved:
 
 ### Phase 13 private dashboard UI
 
+Status: complete and smoke tested.
+
 Phase 13 implemented the first private admin/leadership dashboard UI over the Phase 11
 dashboard-safe reporting service contract, after Phase 12 confirmed persisted drafts stay excluded
 from dashboard-safe summary payloads until final submit.
 
-Delivered locally:
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#208`
+- Production PR: `cwatts6/k98-bot#515`
+- SQL PR: `not required`
+- Bot smoke and regression testing: `2026-07-07`
+
+Delivered:
 
 - `/vote_admin dashboard` under the existing approved `/vote_admin` group.
 - Private ephemeral admin/leadership delivery.
@@ -966,11 +975,50 @@ Delivered locally:
 - HiddenUntilClose private admin aggregate visibility without public result leakage.
 - Dashboard-safe exclusion of Discord identity, per-user rows, raw text answers, choice detail
   text, and unsubmitted draft answers.
+- Defensive dashboard-safe contract validation that refuses unsafe reporting payloads.
+- Discord field-limit clipping protection for long dashboard option/question summaries.
+- Response-state-aware refresh behavior for deferred and non-deferred interaction paths.
+
+Validation and smoke evidence:
+
+- Focused dashboard/command/reporting tests passed after review hardening with `52 passed`.
+- Full bot suite passed after review hardening with `2346 passed, 2 skipped`.
+- Architecture, deferred, selected-test, smoke-import, command-registration, pre-commit, SQL
+  validation, pytest log-noise, and Codex Security gates passed during Phase 13 delivery.
+- Operator smoke testing confirmed votes and surveys, refresh, next, previous, close, open/closed
+  filters, admin/leadership access control, private delivery, and no detail/Discord-name exposure.
 
 Public dashboards, raw text/detail display, per-user rows, cross-survey workbook exports,
 retention/redaction changes, rating-scale extensions, emoji/icon support, generated dashboard
 cards, optional SQL-native combined reporting objects, and broad `/vote_admin` reshaping remain
 separate approval-gated slices.
+
+Phase 13 records are archived under:
+
+```text
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 13 Private Dashboard UI Audit and Design.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 13 Private Dashboard UI Audit and Design.md
+```
+
+### Phase 14 rating scale extensions audit and design
+
+Status: prepared as the next active voting slice; audit/scope only until operator approval.
+
+Phase 14 promotes the existing rating-scale extension deferred item into a dedicated task pack.
+It starts by deciding whether KD98 needs fixed 1-10 ratings, configurable numeric scales, scale
+labels, named rating choices, per-rating comments, or no rating-scale extension for now.
+
+The slice must preserve existing fixed 1-5 rating questions and responses, Phase 12 draft/resume
+semantics, Phase 13 private dashboard privacy, aggregate-only public outputs, and all existing
+choice/text/detail/optional/ranking/vote behavior unless a specific compatibility change is
+approved.
+
+Active Phase 14 records:
+
+```text
+docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design.md
+docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design.md
+```
 
 ## 9. Cross-Programme Constraints
 
@@ -1083,7 +1131,7 @@ The core programme is successful when:
       validation, draft exclusion from public results/private dashboard summaries/status totals/
       exports/report bundles, rollout-safe migration behavior, and preserved vote/submitted-survey
       behavior.
-- [x] Private dashboard UI is implemented in Phase 13 with `/vote_admin dashboard`, private
+- [x] Private dashboard UI is delivered and smoke tested in Phase 13 with `/vote_admin dashboard`, private
       admin/leadership ephemeral delivery, aggregate vote/survey pages, filters, pagination,
       refresh controls, HiddenUntilClose private aggregate visibility, no new SQL objects, and
       dashboard-safe exclusion of Discord identity, per-user rows, raw text/detail answers, and
@@ -1092,11 +1140,13 @@ The core programme is successful when:
 ## 12. Suggested Next Action
 
 ```text
-Smoke and promote Discord Voting Post Framework Phase 13: Private Dashboard UI.
+Start Discord Voting Post Framework Phase 14: Rating Scale Extensions Audit and Design.
 
-Before promotion, run local validation, Codex Security review, and operator Discord smoke for
-/vote_admin dashboard using open/closed vote and survey examples, HiddenUntilClose content, mixed
-answer types, dashboard filters, pagination, refresh, and normal-user denial.
+Begin with audit/scope only. Confirm whether KD98 needs fixed 1-10 ratings, configurable rating
+scales, scale labels, named rating choices, per-rating comments, or no rating-scale extension for
+now. Validate SQL source-of-truth shape, backward compatibility for existing fixed 1-5 ratings,
+draft/resume compatibility, export/report/dashboard representation, privacy boundaries, tests,
+smoke plan, deployment order, rollback posture, and deferred boundaries before any implementation.
 ```
 
 ## 13. Programme Change Log
@@ -1140,3 +1190,5 @@ answer types, dashboard filters, pagination, refresh, and normal-user denial.
 | 2026-07-06 | Phase 12 survey draft/resume delivered | SQL PR #36, mirror PR #207, and production PR #514 delivered persisted survey drafts/resume for surveys only, automatic and explicit draft save, restart-safe resume, duplicate stale-panel protection, answer-type coverage, final-submit validation, draft exclusion from public/private result and export surfaces, review hardening, full validation, and successful operator smoke/regression testing. |
 | 2026-07-06 | Phase 13 private dashboard UI prepared | Phase 12 task pack and starter were archived. Created the active Phase 13 Private Dashboard UI audit/design task pack and chat starter. Rating-scale extensions, emoji/icon support, `/vote_admin` reshaping, cross-survey/workbook exports, retention/redaction policy changes, optional SQL-native combined reporting, role/governor voting, saved templates, and public detail/voter-level posting remain separate approval-gated or not-required work. |
 | 2026-07-07 | Phase 13 private dashboard UI implemented locally | Added `/vote_admin dashboard`, aggregate-only private dashboard presentation, owner-only ephemeral dashboard view with filters, pagination, refresh, and close controls, command reference updates, focused tests, and removal of the now-resolved active deferred dashboard item. No SQL objects, public dashboards, raw text/detail display, per-user rows, export redesign, retention/redaction changes, or broad `/vote_admin` reshaping were added. |
+| 2026-07-07 | Phase 13 smoke tested and archived | Operator smoke confirmed vote and survey dashboard pages, refresh, next, previous, close, open/closed filters, admin/leadership access control, private delivery, and no details or Discord names visible. Phase 13 task pack and starter were archived. |
+| 2026-07-07 | Phase 14 rating scale extensions prepared | Created the active Phase 14 Rating Scale Extensions audit/design task pack and chat starter. Emoji/icon support, `/vote_admin` reshaping, cross-survey/workbook export redesign, retention/redaction changes, and optional SQL-native combined reporting remain separate approval-gated slices; role/governor voting, saved templates, and public detail/voter-level posting remain not required unless reversed by operator decision. |

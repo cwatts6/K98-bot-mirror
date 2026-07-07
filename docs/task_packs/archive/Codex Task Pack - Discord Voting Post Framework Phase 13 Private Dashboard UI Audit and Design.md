@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after Phase 11 dashboard-safe reporting runtime contract and Phase 12 survey draft/resume delivery`
 - Task type: `audit | product scope | private dashboard UX | Discord interaction design | reporting contract review`
 - One-pass approved: `approved after audit/scope confirmation`
-- Status: `implemented locally; awaiting operator Discord smoke/promotion`
+- Status: `delivered, review-hardened, operator smoke tested, and archived after Phase 13 closeout`
 
 ## 2. Objective
 
@@ -94,6 +94,37 @@ After audit/scope approval, Phase 13 implemented the first private Discord dashb
 No SQL objects, public dashboard, generated card, export format, retention/redaction behavior,
 cross-survey workbook output, rating-scale extension, emoji/icon support, governor-aware reporting,
 role-restricted voting, saved templates, or broad `/vote_admin` reshape were added.
+
+Phase 13 was delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#208`
+- Production PR: `cwatts6/k98-bot#515`
+- SQL PR: `not required`
+- Bot smoke and regression testing: `2026-07-07`
+
+Review hardening delivered after initial implementation:
+
+- Dashboard embed clipping now reserves room for the ellipsis so Discord field limits are not
+  exceeded by long option/question labels.
+- Dashboard rendering now defensively refuses non-dashboard-safe reporting contracts and returns a
+  red unavailable embed without report content if privacy flags indicate raw/detail/identity risk.
+- Dashboard refresh now uses the response-state-aware edit helper after reload so refresh works
+  whether or not the interaction was deferred.
+
+Smoke test confirmed:
+
+- `/vote_admin dashboard` opens privately and renders aggregate vote and survey summaries.
+- Votes and surveys were validated through the dashboard.
+- Refresh, Next, Previous, Close, Open filter, and Closed filter work as expected.
+- Access is correctly limited to leadership and admin.
+- No raw details, Discord names, Discord IDs, or per-user rows are visible.
+- Dashboard footer clearly identifies the surface as an aggregate-only private dashboard.
+
+No new deferred optimisation item was identified during smoke testing. Remaining voting framework
+follow-up work is the already captured set: rating-scale extensions, emoji/icon support,
+`/vote_admin` reshaping, cross-survey/workbook export redesign, retention/redaction policy changes,
+and optional SQL-native combined reporting objects if justified by reporting consumers or
+performance needs.
 
 ## 5. Source Deferred Item
 
