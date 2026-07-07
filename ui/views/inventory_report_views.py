@@ -118,7 +118,7 @@ class InventoryRangeView(discord.ui.View):
                 else discord.ButtonStyle.secondary
             )
 
-    async def refresh(self, interaction: discord.Interaction) -> None:
+    async def refresh_report(self, interaction: discord.Interaction) -> None:
         if int(interaction.user.id) != self.requester_id:
             await interaction.response.send_message(
                 "This inventory report is not yours. Run `/myinventory` to get your own.",
@@ -165,7 +165,7 @@ class InventoryRangeButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         self.parent_view.range_key = self.range_key
-        await self.parent_view.refresh(interaction)
+        await self.parent_view.refresh_report(interaction)
 
 
 class InventoryExportButton(discord.ui.Button):

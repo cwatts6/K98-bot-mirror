@@ -184,7 +184,7 @@ class _SurveyQuestionSelect(discord.ui.Select):
         self.parent_view.set_detail_text_for_question(question, existing_detail)
         if not await self.parent_view.save_draft(interaction):
             return
-        await self.parent_view.refresh(interaction)
+        await self.parent_view.refresh_message(interaction)
 
 
 class _SurveyTextAnswerButton(discord.ui.Button):
@@ -269,7 +269,7 @@ class _SurveyNavButton(discord.ui.Button):
                 self.parent_view.current_index + self.direction,
             ),
         )
-        await self.parent_view.refresh(interaction)
+        await self.parent_view.refresh_message(interaction)
 
 
 class _SurveyRatingButton(discord.ui.Button):
@@ -292,7 +292,7 @@ class _SurveyRatingButton(discord.ui.Button):
         self.parent_view.rating_answers[question.question_id] = self.rating_value
         if not await self.parent_view.save_draft(interaction):
             return
-        await self.parent_view.refresh(interaction)
+        await self.parent_view.refresh_message(interaction)
 
 
 def _rating_question_uses_select(question) -> bool:
@@ -345,7 +345,7 @@ class _SurveyRatingSelect(discord.ui.Select):
         self.parent_view.rating_answers[question.question_id] = rating_value
         if not await self.parent_view.save_draft(interaction):
             return
-        await self.parent_view.refresh(interaction)
+        await self.parent_view.refresh_message(interaction)
 
 
 class _SurveyClearRatingButton(discord.ui.Button):
@@ -367,7 +367,7 @@ class _SurveyClearRatingButton(discord.ui.Button):
         self.parent_view.rating_answers.pop(question.question_id, None)
         if not await self.parent_view.save_draft(interaction):
             return
-        await self.parent_view.refresh(interaction)
+        await self.parent_view.refresh_message(interaction)
 
 
 class _SurveyRankingRankSelect(discord.ui.Select):
@@ -402,7 +402,7 @@ class _SurveyRankingRankSelect(discord.ui.Select):
             await send_ephemeral(interaction, "Rank position was not valid.")
             return
         self.parent_view.ranking_edit_rank_by_question[question.question_id] = rank_value
-        await self.parent_view.refresh(interaction)
+        await self.parent_view.refresh_message(interaction)
 
 
 class _SurveyRankingOptionSelect(discord.ui.Select):
@@ -446,7 +446,7 @@ class _SurveyRankingOptionSelect(discord.ui.Select):
         )
         if not await self.parent_view.save_draft(interaction):
             return
-        await self.parent_view.refresh(interaction)
+        await self.parent_view.refresh_message(interaction)
 
 
 class _SurveyClearRankingButton(discord.ui.Button):
@@ -470,7 +470,7 @@ class _SurveyClearRankingButton(discord.ui.Button):
         self.parent_view.ranking_edit_rank_by_question.pop(question.question_id, None)
         if not await self.parent_view.save_draft(interaction):
             return
-        await self.parent_view.refresh(interaction)
+        await self.parent_view.refresh_message(interaction)
 
 
 class _SurveySaveDraftButton(discord.ui.Button):
@@ -911,7 +911,7 @@ class SurveyResponsePanel(discord.ui.View):
             f"{incomplete_line}"
         )
 
-    async def refresh(self, interaction: discord.Interaction) -> None:
+    async def refresh_message(self, interaction: discord.Interaction) -> None:
         self._rebuild()
         try:
             if not interaction.response.is_done():
@@ -975,7 +975,7 @@ class _SurveyTextAnswerModal(discord.ui.Modal):
             self.parent_view.text_answers[question.question_id] = text
         if not await self.parent_view.save_draft(interaction):
             return
-        await self.parent_view.refresh(interaction)
+        await self.parent_view.refresh_message(interaction)
 
 
 class _SurveyDetailModal(discord.ui.Modal):
@@ -1006,7 +1006,7 @@ class _SurveyDetailModal(discord.ui.Modal):
         self.parent_view.set_detail_text_for_question(question, text)
         if not await self.parent_view.save_draft(interaction):
             return
-        await self.parent_view.refresh(interaction)
+        await self.parent_view.refresh_message(interaction)
 
 
 class SurveyBuilderView(discord.ui.View):
@@ -1151,7 +1151,7 @@ class SurveyBuilderView(discord.ui.View):
         self.draft_rating_high_label = ""
         self.draft_rating_labels = {}
 
-    async def refresh(self, interaction: discord.Interaction, *, prefix: str) -> None:
+    async def refresh_builder(self, interaction: discord.Interaction, *, prefix: str) -> None:
         self._rebuild()
         content = f"{prefix}\n\n{self.summary()}"
         try:
@@ -1382,7 +1382,7 @@ class _BuilderRemoveOptionButton(discord.ui.Button):
                 if index < len(self.parent_view.draft_options)
             }
             self.parent_view._sync_selection_bounds()
-        await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
+        await self.parent_view.refresh_builder(interaction, prefix="Survey builder updated.")
 
 
 class _BuilderSaveQuestionButton(discord.ui.Button):
@@ -1414,7 +1414,7 @@ class _BuilderSaveQuestionButton(discord.ui.Button):
             await send_ephemeral(interaction, f"Question not added: {exc}")
             return
         self.parent_view.questions.append(question)
-        await self.parent_view.refresh(interaction, prefix="Survey question saved.")
+        await self.parent_view.refresh_builder(interaction, prefix="Survey question saved.")
 
 
 class _BuilderClearDraftButton(discord.ui.Button):
@@ -1432,7 +1432,7 @@ class _BuilderClearDraftButton(discord.ui.Button):
             await send_ephemeral(interaction, "This survey builder belongs to another admin.")
             return
         self.parent_view._clear_draft()
-        await self.parent_view.refresh(interaction, prefix="Survey draft cleared.")
+        await self.parent_view.refresh_builder(interaction, prefix="Survey draft cleared.")
 
 
 class _BuilderQuestionTypeSelect(discord.ui.Select):
@@ -1498,7 +1498,7 @@ class _BuilderQuestionTypeSelect(discord.ui.Select):
             self.parent_view._sync_selection_bounds()
         else:
             self.parent_view._sync_selection_bounds()
-        await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
+        await self.parent_view.refresh_builder(interaction, prefix="Survey builder updated.")
 
 
 class _BuilderSelectionSelect(discord.ui.Select):
@@ -1575,7 +1575,7 @@ class _BuilderSelectionSelect(discord.ui.Select):
                     <= self.parent_view.draft_rating_max_value
                 )
             }
-            await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
+            await self.parent_view.refresh_builder(interaction, prefix="Survey builder updated.")
             return
         if self.kind == "min":
             self.parent_view.draft_min_selections = selected
@@ -1586,7 +1586,7 @@ class _BuilderSelectionSelect(discord.ui.Select):
             if self.parent_view.draft_min_selections > selected:
                 self.parent_view.draft_min_selections = selected
         self.parent_view._sync_selection_bounds()
-        await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
+        await self.parent_view.refresh_builder(interaction, prefix="Survey builder updated.")
 
 
 class _BuilderDetailsToggleButton(discord.ui.Button):
@@ -1618,7 +1618,7 @@ class _BuilderDetailsToggleButton(discord.ui.Button):
             await send_ephemeral(interaction, "This question type does not use choice details.")
             return
         self.parent_view.draft_allow_details = not self.parent_view.draft_allow_details
-        await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
+        await self.parent_view.refresh_builder(interaction, prefix="Survey builder updated.")
 
 
 class _BuilderRatingLabelsButton(discord.ui.Button):
@@ -1778,7 +1778,7 @@ class _BuilderRequiredToggleButton(discord.ui.Button):
             await send_ephemeral(interaction, "This survey builder belongs to another admin.")
             return
         self.parent_view.draft_is_required = not self.parent_view.draft_is_required
-        await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
+        await self.parent_view.refresh_builder(interaction, prefix="Survey builder updated.")
 
 
 class _BuilderPublishButton(discord.ui.Button):
@@ -1924,7 +1924,7 @@ class _SurveyRatingScaleLabelsModal(discord.ui.Modal):
         self.parent_view.draft_rating_low_label = str(self.low_label.value or "").strip()
         self.parent_view.draft_rating_high_label = str(self.high_label.value or "").strip()
         self.parent_view.draft_rating_labels = labels
-        await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
+        await self.parent_view.refresh_builder(interaction, prefix="Survey builder updated.")
 
 
 class _SurveyQuestionPromptModal(discord.ui.Modal):
@@ -1956,7 +1956,7 @@ class _SurveyQuestionPromptModal(discord.ui.Modal):
             )
             return
         self.parent_view.draft_prompt = str(self.prompt.value or "").strip()
-        await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
+        await self.parent_view.refresh_builder(interaction, prefix="Survey builder updated.")
 
 
 class _SurveyOptionModal(discord.ui.Modal):
@@ -2007,7 +2007,7 @@ class _SurveyOptionModal(discord.ui.Modal):
             return
         self.parent_view.draft_options.append(label)
         self.parent_view._sync_selection_bounds()
-        await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
+        await self.parent_view.refresh_builder(interaction, prefix="Survey builder updated.")
 
 
 async def _refresh_public_survey_message(

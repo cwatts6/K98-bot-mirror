@@ -41,6 +41,10 @@ async def test_inventory_range_view_exposes_range_and_export_buttons():
     ]
 
 
+def test_inventory_range_view_does_not_shadow_discord_refresh_lifecycle():
+    assert "refresh" not in InventoryRangeView.__dict__
+
+
 def _make_ctx(user_id=42):
     class _Followup:
         def __init__(self):

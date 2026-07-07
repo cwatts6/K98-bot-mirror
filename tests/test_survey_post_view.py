@@ -128,6 +128,11 @@ async def test_survey_post_view_uses_single_persistent_opener():
     assert button.custom_id == "survey:7"
 
 
+def test_survey_views_do_not_shadow_discord_refresh_lifecycle():
+    assert "refresh" not in SurveyBuilderView.__dict__
+    assert "refresh" not in SurveyResponsePanel.__dict__
+
+
 @pytest.mark.asyncio
 async def test_survey_opener_sends_private_panel_with_existing_answers(monkeypatch):
     snapshot = _snapshot()
