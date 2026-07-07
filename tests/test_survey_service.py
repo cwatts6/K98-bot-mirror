@@ -46,6 +46,63 @@ def test_build_question_request_preserves_option_emojis() -> None:
     assert question.option_emojis[1].name == "bravo"
 
 
+@pytest.mark.asyncio
+async def test_update_survey_validates_and_dispatches(monkeypatch):
+    captured: dict[str, object] = {}
+    snapshot = _draft_snapshot()
+
+    async def fake_get_survey_snapshot(survey_id):
+        assert survey_id == 42
+        return snapshot
+
+    async def fake_update_survey_post(**kwargs):
+        captured.update(kwargs)
+        return "updated"
+
+    monkeypatch.setattr(survey_service.survey_dal, "get_survey_snapshot", fake_get_survey_snapshot)
+    monkeypatch.setattr(survey_service.survey_dal, "update_survey_post", fake_update_survey_post)
+
+    result = await survey_service.update_survey(
+        survey_id=42,
+        actor_discord_user_id=123,
+        title="  Updated  ",
+        description="  Body  ",
+        close_time_utc="2h",
+        reminder_offsets="60, 30",
+        reminder_mention_everyone=True,
+        close_mention_everyone=False,
+        allow_response_change=False,
+        result_visibility="HiddenUntilClose",
+        now_utc=datetime(2026, 7, 6, 12, 0, tzinfo=UTC),
+    )
+
+    assert result is snapshot
+    assert captured["survey_id"] == 42
+    assert captured["actor_discord_user_id"] == 123
+    assert captured["title"] == "Updated"
+    assert captured["description"] == "Body"
+    assert captured["reminder_offsets_minutes"] == (60, 30)
+    assert captured["reminder_mention_everyone"] is True
+    assert captured["close_mention_everyone"] is False
+    assert captured["allow_response_change"] is False
+    assert captured["result_visibility"] == "HiddenUntilClose"
+
+
+@pytest.mark.asyncio
+async def test_update_survey_rejects_zero_response_guard_failure(monkeypatch):
+    async def fake_update_survey_post(**_kwargs):
+        return "has_responses"
+
+    monkeypatch.setattr(survey_service.survey_dal, "update_survey_post", fake_update_survey_post)
+
+    with pytest.raises(VoteValidationError, match="after responses exist"):
+        await survey_service.update_survey(
+            survey_id=42,
+            actor_discord_user_id=123,
+            allow_response_change=False,
+        )
+
+
 def _draft_snapshot() -> SurveySnapshot:
     now = datetime(2026, 7, 6, 12, 0, tzinfo=UTC)
     return SurveySnapshot(

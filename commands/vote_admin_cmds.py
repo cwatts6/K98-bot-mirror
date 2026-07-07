@@ -10,6 +10,7 @@ from discord.ext import commands as ext_commands
 from bot_config import GUILD_ID
 from core.interaction_safety import safe_command, safe_defer, send_ephemeral
 from decoraters import is_admin_or_leadership_only, track_usage
+from ui.views.survey_admin_update_view import SurveyAdminUpdateView
 from ui.views.survey_post_view import SurveyBuilderView, SurveyPostView, disabled_survey_view
 from ui.views.vote_admin_dashboard_view import VoteAdminDashboardView
 from ui.views.vote_admin_update_view import VoteAdminUpdateView
@@ -439,6 +440,26 @@ async def _send_vote_update_panel(ctx: discord.ApplicationContext, snapshot) -> 
             logger.exception(
                 "vote_admin_update_followup_failed vote_post_id=%s", snapshot.vote_post_id
             )
+
+    await ctx.interaction.edit_original_response(content=content, view=view)
+
+
+async def _send_survey_update_panel(ctx: discord.ApplicationContext, snapshot) -> None:
+    # architecture-check: allow - Discord response copy, not embedded SQL.
+    content = f"Choose what to update for Survey #{snapshot.survey_id}."
+    view = SurveyAdminUpdateView(snapshot, owner_user_id=int(ctx.user.id))
+    followup = getattr(ctx, "followup", None)
+    if followup is not None and hasattr(followup, "send"):
+        try:
+            await followup.send(content=content, view=view, ephemeral=True)
+            # architecture-check: allow - Discord response copy, not embedded SQL.
+            await ctx.interaction.edit_original_response(
+                # architecture-check: allow - Discord response copy, not embedded SQL.
+                content=f"Update panel opened for Survey #{snapshot.survey_id}."
+            )
+            return
+        except Exception:
+            logger.exception("survey_admin_update_followup_failed survey_id=%s", snapshot.survey_id)
 
     await ctx.interaction.edit_original_response(content=content, view=view)
 
@@ -1073,6 +1094,38 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             content=f"Survey builder opened.\n\n{view.summary()}",
             view=view,
         )
+
+    # architecture-check: allow - "update" is the public command verb, not embedded SQL.
+    @group.command(name="survey_update", description="Change safe fields for an open survey.")
+    @versioned("v1.00")
+    @safe_command
+    @is_admin_or_leadership_only()
+    @track_usage()
+    async def survey_update(
+        ctx: discord.ApplicationContext,
+        survey: str = discord.Option(
+            str,
+            # architecture-check: allow - Discord option copy, not embedded SQL.
+            "Survey to update",
+            autocomplete=_survey_autocomplete,
+        ),
+    ) -> None:
+        await safe_defer(ctx, ephemeral=True)
+        try:
+            survey_id = _parse_survey_id(survey)
+        except ValueError:
+            await ctx.interaction.edit_original_response(content="Choose a valid survey.")
+            return
+        snapshot = await get_survey_snapshot(survey_id)
+        if snapshot is None:
+            await ctx.interaction.edit_original_response(content="Survey was not found.")
+            return
+        if snapshot.status != "Open":
+            await ctx.interaction.edit_original_response(
+                content="Survey not updated: survey is already closed."
+            )
+            return
+        await _send_survey_update_panel(ctx, snapshot)
 
     @group.command(name="survey_close", description="Close a survey early and disable its button.")
     @versioned("v1.00")

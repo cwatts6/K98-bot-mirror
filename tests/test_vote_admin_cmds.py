@@ -150,6 +150,7 @@ def test_vote_admin_registers_dashboard_subcommand() -> None:
 def test_vote_admin_registers_survey_subcommands() -> None:
     assert {
         "survey_create",
+        "survey_update",
         "survey_close",
         "survey_status",
         "survey_export",

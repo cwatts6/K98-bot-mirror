@@ -11,6 +11,7 @@ from stats_alerts.db import exec_with_cursor, run_one_async, run_query_async
 from voting.option_emojis import (
     OPTION_EMOJI_MIGRATION_ID,
     OPTION_EMOJI_MIGRATION_MESSAGE,
+    OptionEmoji,
     option_emoji_from_row,
     option_emoji_sql_values,
 )
@@ -765,6 +766,267 @@ async def update_survey_message(survey_id: int, *, channel_id: int, message_id: 
         (int(channel_id), int(message_id), int(survey_id)),
     )
     return bool(row)
+
+
+async def update_survey_post(
+    *,
+    survey_id: int,
+    actor_discord_user_id: int,
+    title: str | None = None,
+    description: str | None = None,
+    closes_at_utc: datetime | None = None,
+    reminder_offsets_minutes: tuple[int, ...] | None = None,
+    reminder_mention_everyone: bool | None = None,
+    close_mention_everyone: bool | None = None,
+    allow_response_change: bool | None = None,
+    result_visibility: str | None = None,
+) -> str:
+    def _callback(cur) -> str:
+        now = _naive_utc(datetime.now(UTC))
+        cur.execute(
+            """
+            SELECT SurveyID, Status
+            FROM dbo.SurveyPosts WITH (UPDLOCK, HOLDLOCK)
+            WHERE SurveyID = ?;
+            """,
+            (int(survey_id),),
+        )
+        survey = fetch_one_dict(cur)
+        if not survey or str(survey.get("Status")) != "Open":
+            return "not_open"
+        cur.execute(
+            """
+            SELECT COUNT_BIG(1) AS ResponseCount
+            FROM dbo.SurveyResponses
+            WHERE SurveyID = ?;
+            """,
+            (int(survey_id),),
+        )
+        response_row = fetch_one_dict(cur)
+        response_count = int(response_row.get("ResponseCount") or 0) if response_row else 0
+        if response_count > 0 and (
+            allow_response_change is not None or result_visibility is not None
+        ):
+            return "has_responses"
+        if title is not None:
+            cur.execute(
+                "UPDATE dbo.SurveyPosts SET Title = ?, UpdatedAtUtc = ? WHERE SurveyID = ?;",
+                (title, now, int(survey_id)),
+            )
+        if description is not None:
+            cur.execute(
+                "UPDATE dbo.SurveyPosts SET Description = ?, UpdatedAtUtc = ? WHERE SurveyID = ?;",
+                (description, now, int(survey_id)),
+            )
+        if closes_at_utc is not None:
+            cur.execute(
+                "UPDATE dbo.SurveyPosts SET ClosesAtUtc = ?, UpdatedAtUtc = ? WHERE SurveyID = ?;",
+                (_naive_utc(closes_at_utc), now, int(survey_id)),
+            )
+        if reminder_mention_everyone is not None:
+            cur.execute(
+                """
+                UPDATE dbo.SurveyPosts
+                SET ReminderMentionEveryone = ?, UpdatedAtUtc = ?
+                WHERE SurveyID = ?;
+                """,
+                (1 if reminder_mention_everyone else 0, now, int(survey_id)),
+            )
+        if close_mention_everyone is not None:
+            cur.execute(
+                """
+                UPDATE dbo.SurveyPosts
+                SET CloseMentionEveryone = ?, UpdatedAtUtc = ?
+                WHERE SurveyID = ?;
+                """,
+                (1 if close_mention_everyone else 0, now, int(survey_id)),
+            )
+        if allow_response_change is not None:
+            cur.execute(
+                """
+                UPDATE dbo.SurveyPosts
+                SET AllowResponseChange = ?, UpdatedAtUtc = ?
+                WHERE SurveyID = ?;
+                """,
+                (1 if allow_response_change else 0, now, int(survey_id)),
+            )
+        if result_visibility is not None:
+            cur.execute(
+                """
+                UPDATE dbo.SurveyPosts
+                SET ResultVisibility = ?, UpdatedAtUtc = ?
+                WHERE SurveyID = ?;
+                """,
+                (normalize_result_visibility(result_visibility), now, int(survey_id)),
+            )
+        if reminder_offsets_minutes is not None:
+            cur.execute(
+                """
+                DELETE FROM dbo.SurveyReminders
+                WHERE SurveyID = ? AND SentAtUtc IS NULL;
+                """,
+                (int(survey_id),),
+            )
+            close_for_due = closes_at_utc
+            if close_for_due is None:
+                cur.execute(
+                    "SELECT ClosesAtUtc FROM dbo.SurveyPosts WHERE SurveyID = ?;",
+                    (int(survey_id),),
+                )
+                row = cur.fetchone()
+                close_for_due = _aware_utc(row[0]) if row else None
+            if close_for_due is not None:
+                for offset in reminder_offsets_minutes:
+                    cur.execute(
+                        """
+                        INSERT INTO dbo.SurveyReminders
+                            (SurveyID, OffsetMinutesBeforeClose, DueAtUtc, CreatedAtUtc)
+                        VALUES (?, ?, ?, ?);
+                        """,
+                        (
+                            int(survey_id),
+                            int(offset),
+                            _naive_utc(_reminder_due_at(close_for_due, int(offset))),
+                            now,
+                        ),
+                    )
+        cur.execute(
+            """
+            INSERT INTO dbo.SurveyAudit
+                (SurveyID, ActorDiscordUserID, ActionType, DetailsJson, CreatedAtUtc)
+            VALUES (?, ?, 'Updated', ?, ?);
+            """,
+            (
+                int(survey_id),
+                int(actor_discord_user_id),
+                json.dumps(
+                    {
+                        "title": title is not None,
+                        "description": description is not None,
+                        "closes_at": closes_at_utc is not None,
+                        "reminders": reminder_offsets_minutes is not None,
+                        "reminder_mention_everyone": reminder_mention_everyone is not None,
+                        "close_mention_everyone": close_mention_everyone is not None,
+                        "allow_response_change": allow_response_change is not None,
+                        "result_visibility": result_visibility is not None,
+                    },
+                    ensure_ascii=False,
+                ),
+                now,
+            ),
+        )
+        return "updated"
+
+    result = await run_blocking_in_thread(_create_survey_sync, _callback, name="survey_update")
+    return str(result or "error")
+
+
+async def update_survey_option_emoji(
+    *,
+    survey_id: int,
+    option_id: int,
+    emoji: OptionEmoji | None,
+    actor_discord_user_id: int,
+) -> SurveySnapshot:
+    emoji_kind, emoji_text, emoji_name, emoji_id, emoji_animated = option_emoji_sql_values(emoji)
+
+    def _callback(cur) -> str:
+        if not _survey_option_emoji_columns_exist_sync(cur):
+            return "missing_migration"
+        cur.execute(
+            """
+            SELECT SurveyID, Status
+            FROM dbo.SurveyPosts WITH (UPDLOCK, HOLDLOCK)
+            WHERE SurveyID = ?;
+            """,
+            (int(survey_id),),
+        )
+        survey = fetch_one_dict(cur)
+        if not survey or str(survey.get("Status")) != "Open":
+            return "not_open"
+        cur.execute(
+            """
+            SELECT COUNT_BIG(1) AS ResponseCount
+            FROM dbo.SurveyResponses
+            WHERE SurveyID = ?;
+            """,
+            (int(survey_id),),
+        )
+        response_row = fetch_one_dict(cur)
+        if response_row and int(response_row.get("ResponseCount") or 0) > 0:
+            return "has_responses"
+        cur.execute(
+            """
+            UPDATE o
+            SET EmojiKind = ?,
+                EmojiText = ?,
+                EmojiName = ?,
+                EmojiID = ?,
+                EmojiAnimated = ?
+            OUTPUT INSERTED.SurveyOptionID
+            FROM dbo.SurveyQuestionOptions o
+            JOIN dbo.SurveyQuestions q ON q.SurveyQuestionID = o.SurveyQuestionID
+            WHERE q.SurveyID = ? AND o.SurveyOptionID = ?;
+            """,
+            (
+                emoji_kind,
+                emoji_text,
+                emoji_name,
+                emoji_id,
+                emoji_animated,
+                int(survey_id),
+                int(option_id),
+            ),
+        )
+        updated = cur.fetchone() is not None
+        if not updated:
+            return "missing_option"
+        cur.execute(
+            """
+            UPDATE dbo.SurveyPosts
+            SET UpdatedAtUtc = SYSUTCDATETIME()
+            WHERE SurveyID = ?;
+            """,
+            (int(survey_id),),
+        )
+        cur.execute(
+            """
+            INSERT INTO dbo.SurveyAudit
+                (SurveyID, ActorDiscordUserID, ActionType, DetailsJson, CreatedAtUtc)
+            VALUES (?, ?, 'OptionEmojiUpdated', ?, SYSUTCDATETIME());
+            """,
+            (
+                int(survey_id),
+                int(actor_discord_user_id),
+                json.dumps(
+                    {
+                        "option_id": int(option_id),
+                        "emoji_kind": emoji_kind,
+                        "emoji_name": emoji_name,
+                        "emoji_id": emoji_id,
+                        "cleared": emoji is None,
+                    },
+                    ensure_ascii=False,
+                ),
+            ),
+        )
+        return "updated"
+
+    result = await run_blocking_in_thread(
+        _create_survey_sync, _callback, name="survey_option_emoji_update"
+    )
+    if result == "missing_migration":
+        raise ValueError(OPTION_EMOJI_MIGRATION_MESSAGE)
+    if result == "not_open":
+        raise ValueError("Survey was not found or is already closed.")
+    if result == "has_responses":
+        raise ValueError("Survey option icons cannot be changed after responses exist.")
+    if result != "updated":
+        raise ValueError("Survey option was not found.")
+    snapshot = await get_survey_snapshot(survey_id)
+    if snapshot is None:
+        raise ValueError("Survey could not be reloaded after option icon update.")
+    return snapshot
 
 
 async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:

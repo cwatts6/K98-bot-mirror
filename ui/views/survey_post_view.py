@@ -1038,6 +1038,7 @@ class SurveyBuilderView(discord.ui.View):
         self.draft_rating_low_label = ""
         self.draft_rating_high_label = ""
         self.draft_rating_labels: dict[int, str] = {}
+        self.editing_question_index: int | None = None
         self.publish_in_progress = False
         self.published = False
         self.expired = False
@@ -1049,7 +1050,7 @@ class SurveyBuilderView(discord.ui.View):
         self.add_item(_BuilderAddOptionButton(self))
         self.add_item(_BuilderRemoveOptionButton(self))
         self.add_item(_BuilderSaveQuestionButton(self))
-        self.add_item(_BuilderClearDraftButton(self))
+        self.add_item(_BuilderReviewButton(self))
         self.add_item(_BuilderQuestionTypeSelect(self))
         self.add_item(_BuilderSelectionSelect(self, kind="min"))
         self.add_item(_BuilderSelectionSelect(self, kind="max"))
@@ -1080,6 +1081,10 @@ class SurveyBuilderView(discord.ui.View):
             or self.draft_rating_labels
             or self.draft_option_emojis
         )
+
+    @property
+    def editing_saved_question(self) -> bool:
+        return self.editing_question_index is not None
 
     @property
     def draft_question_type(self) -> str:
@@ -1119,7 +1124,10 @@ class SurveyBuilderView(discord.ui.View):
                     and self.draft_max_selections <= len(self.draft_options)
                 )
             )
-            and len(self.questions) < survey_service.MAX_SURVEY_QUESTIONS
+            and (
+                self.editing_saved_question
+                or len(self.questions) < survey_service.MAX_SURVEY_QUESTIONS
+            )
         )
 
     def _sync_selection_bounds(self) -> None:
@@ -1150,6 +1158,58 @@ class SurveyBuilderView(discord.ui.View):
         self.draft_rating_low_label = ""
         self.draft_rating_high_label = ""
         self.draft_rating_labels = {}
+        self.editing_question_index = None
+
+    def load_question_for_edit(self, index: int) -> None:
+        question = self.questions[index]
+        self.draft_prompt = question.prompt
+        self.draft_options = list(question.options)
+        self.draft_option_emojis = {
+            option_index: emoji
+            for option_index, emoji in enumerate(question.option_emojis)
+            if emoji is not None
+        }
+        self.draft_is_text = question.question_type == SURVEY_QUESTION_TEXT
+        self.draft_is_rating = question.question_type == SURVEY_QUESTION_RATING
+        self.draft_is_ranking = question.question_type == SURVEY_QUESTION_RANKING
+        self.draft_min_selections = (
+            1 if self.draft_is_text or self.draft_is_rating else int(question.min_selections)
+        )
+        self.draft_max_selections = (
+            1 if self.draft_is_text or self.draft_is_rating else int(question.max_selections)
+        )
+        self.draft_allow_details = bool(question.allow_details)
+        self.draft_is_required = bool(question.is_required)
+        self.draft_rating_min_value = int(question.rating_min_value)
+        self.draft_rating_max_value = int(question.rating_max_value)
+        self.draft_rating_low_label = question.rating_low_label or ""
+        self.draft_rating_high_label = question.rating_high_label or ""
+        self.draft_rating_labels = {
+            int(item.rating_value): item.label for item in question.rating_labels
+        }
+        self.editing_question_index = int(index)
+        self._sync_selection_bounds()
+
+    def delete_question(self, index: int) -> None:
+        del self.questions[index]
+        if self.editing_question_index == index:
+            self._clear_draft()
+        elif self.editing_question_index is not None and self.editing_question_index > index:
+            self.editing_question_index -= 1
+
+    def move_question(self, index: int, delta: int) -> int:
+        target = index + delta
+        if target < 0 or target >= len(self.questions):
+            return index
+        self.questions[index], self.questions[target] = (
+            self.questions[target],
+            self.questions[index],
+        )
+        if self.editing_question_index == index:
+            self.editing_question_index = target
+        elif self.editing_question_index == target:
+            self.editing_question_index = index
+        return target
 
     async def refresh_builder(self, interaction: discord.Interaction, *, prefix: str) -> None:
         self._rebuild()
@@ -1247,10 +1307,15 @@ class SurveyBuilderView(discord.ui.View):
         else:
             lines.append("Saved: none")
         prompt = self.draft_prompt.strip() or "not set"
+        draft_label = (
+            f"Editing question {self.editing_question_index + 1}"
+            if self.editing_question_index is not None
+            else "Draft question"
+        )
         lines.extend(
             (
                 "",
-                f"Draft question: {prompt} "
+                f"{draft_label}: {prompt} "
                 f"({len(self.draft_prompt.strip())}/{survey_service.MAX_SURVEY_QUESTION_PROMPT_LEN})",
                 f"Draft type: {self.draft_mode_label}",
                 f"Requirement: {'required' if self.draft_is_required else 'optional'}",
@@ -1314,9 +1379,9 @@ def _builder_option_count(parent_view: SurveyBuilderView) -> int:
 
 
 def _builder_disabled(parent_view: SurveyBuilderView) -> bool:
-    return (
-        parent_view.builder_locked
-        or len(parent_view.questions) >= survey_service.MAX_SURVEY_QUESTIONS
+    return parent_view.builder_locked or (
+        len(parent_view.questions) >= survey_service.MAX_SURVEY_QUESTIONS
+        and not parent_view.editing_saved_question
     )
 
 
@@ -1388,7 +1453,7 @@ class _BuilderRemoveOptionButton(discord.ui.Button):
 class _BuilderSaveQuestionButton(discord.ui.Button):
     def __init__(self, parent_view: SurveyBuilderView) -> None:
         super().__init__(
-            label="Save question",
+            label="Save edit" if parent_view.editing_saved_question else "Save question",
             style=discord.ButtonStyle.success,
             disabled=parent_view.builder_locked or not parent_view.draft_ready,
             row=0,
@@ -1402,7 +1467,11 @@ class _BuilderSaveQuestionButton(discord.ui.Button):
         if self.parent_view.builder_locked:
             await send_ephemeral(interaction, "This survey has already been published.")
             return
-        if len(self.parent_view.questions) >= survey_service.MAX_SURVEY_QUESTIONS:
+        edit_index = self.parent_view.editing_question_index
+        if (
+            edit_index is None
+            and len(self.parent_view.questions) >= survey_service.MAX_SURVEY_QUESTIONS
+        ):
             await send_ephemeral(
                 interaction,
                 f"Question not added: surveys support at most {survey_service.MAX_SURVEY_QUESTIONS} questions.",
@@ -1413,8 +1482,16 @@ class _BuilderSaveQuestionButton(discord.ui.Button):
         except (TypeError, ValueError, survey_service.VoteValidationError) as exc:
             await send_ephemeral(interaction, f"Question not added: {exc}")
             return
-        self.parent_view.questions.append(question)
-        await self.parent_view.refresh_builder(interaction, prefix="Survey question saved.")
+        if edit_index is None:
+            self.parent_view.questions.append(question)
+            prefix = "Survey question saved."
+        elif 0 <= edit_index < len(self.parent_view.questions):
+            self.parent_view.questions[edit_index] = question
+            prefix = f"Survey question {edit_index + 1} updated."
+        else:
+            await send_ephemeral(interaction, "Question not updated: choose a valid question.")
+            return
+        await self.parent_view.refresh_builder(interaction, prefix=prefix)
 
 
 class _BuilderClearDraftButton(discord.ui.Button):
@@ -1433,6 +1510,210 @@ class _BuilderClearDraftButton(discord.ui.Button):
             return
         self.parent_view._clear_draft()
         await self.parent_view.refresh_builder(interaction, prefix="Survey draft cleared.")
+
+
+class _BuilderReviewButton(discord.ui.Button):
+    def __init__(self, parent_view: SurveyBuilderView) -> None:
+        super().__init__(
+            label="Review",
+            style=discord.ButtonStyle.secondary,
+            disabled=parent_view.builder_locked
+            or (not parent_view.questions and not parent_view.has_draft),
+            row=0,
+        )
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey builder belongs to another admin.")
+            return
+        view = _SurveyBuilderReviewView(self.parent_view)
+        await interaction.response.edit_message(
+            content=f"Review saved survey questions.\n\n{self.parent_view.summary()}",
+            view=view,
+        )
+
+
+class _ReviewBackButton(discord.ui.Button):
+    def __init__(self, parent_view: SurveyBuilderView) -> None:
+        super().__init__(label="Back", style=discord.ButtonStyle.secondary, row=1)
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey builder belongs to another admin.")
+            return
+        await self.parent_view.refresh_builder(interaction, prefix="Survey builder reopened.")
+
+
+class _ReviewClearDraftButton(discord.ui.Button):
+    def __init__(self, parent_view: SurveyBuilderView) -> None:
+        super().__init__(
+            label="Clear draft",
+            style=discord.ButtonStyle.secondary,
+            disabled=not parent_view.has_draft,
+            row=1,
+        )
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey builder belongs to another admin.")
+            return
+        self.parent_view._clear_draft()
+        await self.parent_view.refresh_builder(interaction, prefix="Survey draft cleared.")
+
+
+class _SurveyBuilderReviewSelect(discord.ui.Select):
+    def __init__(self, parent_view: _SurveyBuilderReviewView) -> None:
+        self.parent_view = parent_view
+        options = [
+            discord.SelectOption(
+                label=f"{index + 1}. {question.prompt}"[:100],
+                value=str(index),
+                description=parent_view.builder_view._question_summary(index + 1, question)[:100],
+            )
+            for index, question in enumerate(parent_view.builder_view.questions)
+        ]
+        super().__init__(
+            placeholder="Question to review",
+            min_values=1,
+            max_values=1,
+            options=options,
+            disabled=not options,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.builder_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey builder belongs to another admin.")
+            return
+        try:
+            question_index = int(self.values[0])
+        except (IndexError, TypeError, ValueError):
+            await send_ephemeral(interaction, "Choose a valid question.")
+            return
+        if question_index < 0 or question_index >= len(self.parent_view.builder_view.questions):
+            await send_ephemeral(interaction, "Choose a valid question.")
+            return
+        view = _SurveyBuilderQuestionActionView(
+            self.parent_view.builder_view,
+            question_index=question_index,
+        )
+        await interaction.response.edit_message(
+            content=(
+                f"Review question {question_index + 1}.\n\n"
+                f"{self.parent_view.builder_view.summary()}"
+            ),
+            view=view,
+        )
+
+
+class _SurveyBuilderReviewView(discord.ui.View):
+    def __init__(self, builder_view: SurveyBuilderView) -> None:
+        super().__init__(timeout=300)
+        self.builder_view = builder_view
+        if builder_view.questions:
+            self.add_item(_SurveyBuilderReviewSelect(self))
+        self.add_item(_ReviewBackButton(builder_view))
+        self.add_item(_ReviewClearDraftButton(builder_view))
+
+
+class _QuestionActionButton(discord.ui.Button):
+    def __init__(
+        self,
+        parent_view: _SurveyBuilderQuestionActionView,
+        *,
+        label: str,
+        action: str,
+        style: discord.ButtonStyle = discord.ButtonStyle.secondary,
+        disabled: bool = False,
+    ) -> None:
+        super().__init__(label=label, style=style, disabled=disabled, row=0)
+        self.parent_view = parent_view
+        self.action = action
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        builder_view = self.parent_view.builder_view
+        if int(getattr(interaction.user, "id", 0)) != builder_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey builder belongs to another admin.")
+            return
+        index = self.parent_view.question_index
+        if index < 0 or index >= len(builder_view.questions):
+            await send_ephemeral(interaction, "Choose a valid question.")
+            return
+        if self.action == "edit":
+            if builder_view.has_draft:
+                await send_ephemeral(
+                    interaction,
+                    "Save or clear the current draft before editing a saved question.",
+                )
+                return
+            builder_view.load_question_for_edit(index)
+            await builder_view.refresh_builder(
+                interaction,
+                prefix=f"Question {index + 1} loaded for editing.",
+            )
+            return
+        if self.action == "delete":
+            builder_view.delete_question(index)
+            await builder_view.refresh_builder(interaction, prefix=f"Question {index + 1} deleted.")
+            return
+        if self.action == "up":
+            new_index = builder_view.move_question(index, -1)
+            await builder_view.refresh_builder(
+                interaction,
+                prefix=f"Question moved to position {new_index + 1}.",
+            )
+            return
+        if self.action == "down":
+            new_index = builder_view.move_question(index, 1)
+            await builder_view.refresh_builder(
+                interaction,
+                prefix=f"Question moved to position {new_index + 1}.",
+            )
+            return
+        await builder_view.refresh_builder(interaction, prefix="Survey builder reopened.")
+
+
+class _SurveyBuilderQuestionActionView(discord.ui.View):
+    def __init__(self, builder_view: SurveyBuilderView, *, question_index: int) -> None:
+        super().__init__(timeout=300)
+        self.builder_view = builder_view
+        self.question_index = int(question_index)
+        self.add_item(
+            _QuestionActionButton(
+                self,
+                label="Edit",
+                action="edit",
+                style=discord.ButtonStyle.primary,
+            )
+        )
+        self.add_item(
+            _QuestionActionButton(
+                self,
+                label="Delete",
+                action="delete",
+                style=discord.ButtonStyle.danger,
+            )
+        )
+        self.add_item(
+            _QuestionActionButton(
+                self,
+                label="Move up",
+                action="up",
+                disabled=question_index <= 0,
+            )
+        )
+        self.add_item(
+            _QuestionActionButton(
+                self,
+                label="Move down",
+                action="down",
+                disabled=question_index >= len(builder_view.questions) - 1,
+            )
+        )
+        self.add_item(_QuestionActionButton(self, label="Back", action="back"))
 
 
 class _BuilderQuestionTypeSelect(discord.ui.Select):

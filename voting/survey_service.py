@@ -911,6 +911,102 @@ async def attach_survey_message(
     return refreshed
 
 
+async def update_survey(
+    *,
+    survey_id: int,
+    actor_discord_user_id: int,
+    title: str | None = None,
+    description: str | None = None,
+    close_time_utc: str | None = None,
+    reminder_offsets: str | None = None,
+    reminder_mention_everyone: bool | None = None,
+    close_mention_everyone: bool | None = None,
+    allow_response_change: bool | None = None,
+    result_visibility: str | None = None,
+    now_utc: datetime | None = None,
+) -> SurveySnapshot:
+    now = now_utc or datetime.now(UTC)
+    closes_at = parse_close_time(close_time_utc, now_utc=now) if close_time_utc else None
+    if closes_at is not None and closes_at <= now:
+        raise VoteValidationError("Updated survey close time must be in the future.")
+    offsets = parse_reminder_offsets(reminder_offsets) if reminder_offsets is not None else None
+    if offsets is not None:
+        close_for_offsets = closes_at
+        if close_for_offsets is None:
+            current = await survey_dal.get_survey_snapshot(int(survey_id))
+            close_for_offsets = current.closes_at_utc if current is not None else None
+        if close_for_offsets is not None:
+            offsets = tuple(
+                offset
+                for offset in offsets
+                if close_for_offsets.timestamp() - (offset * 60) > now.timestamp()
+            )
+    clean_title = str(title or "").strip() if title is not None else None
+    clean_description = (
+        _validate_description(description, blank_as_none=False) if description is not None else None
+    )
+    if clean_title is not None and not clean_title:
+        raise VoteValidationError("Survey title cannot be blank.")
+    if clean_title is not None and len(clean_title) > MAX_TITLE_LEN:
+        raise VoteValidationError(f"Survey title must be {MAX_TITLE_LEN} characters or fewer.")
+    clean_result_visibility: str | None = None
+    if result_visibility is not None:
+        try:
+            clean_result_visibility = normalize_result_visibility(result_visibility)
+        except ValueError as exc:
+            raise VoteValidationError(str(exc)) from exc
+    result = await survey_dal.update_survey_post(
+        survey_id=int(survey_id),
+        actor_discord_user_id=int(actor_discord_user_id),
+        title=clean_title,
+        description=clean_description,
+        closes_at_utc=closes_at,
+        reminder_offsets_minutes=offsets,
+        reminder_mention_everyone=reminder_mention_everyone,
+        close_mention_everyone=close_mention_everyone,
+        allow_response_change=allow_response_change,
+        result_visibility=clean_result_visibility,
+    )
+    if result == "not_open":
+        raise VoteValidationError("Survey was not found or is already closed.")
+    if result == "has_responses":
+        raise VoteValidationError("This survey field cannot be changed after responses exist.")
+    if result != "updated":
+        raise VoteValidationError("Survey could not be updated.")
+    snapshot = await survey_dal.get_survey_snapshot(int(survey_id))
+    if snapshot is None:
+        raise RuntimeError("Survey could not be loaded after update.")
+    logger.info("survey_updated survey_id=%s actor_discord_id=%s", survey_id, actor_discord_user_id)
+    return snapshot
+
+
+async def update_survey_option_emoji(
+    *,
+    survey_id: int,
+    option_id: int,
+    emoji_value: str | None,
+    actor_discord_user_id: int,
+) -> SurveySnapshot:
+    emoji = parse_option_emoji(emoji_value)
+    try:
+        snapshot = await survey_dal.update_survey_option_emoji(
+            survey_id=int(survey_id),
+            option_id=int(option_id),
+            emoji=emoji,
+            actor_discord_user_id=int(actor_discord_user_id),
+        )
+    except ValueError as exc:
+        raise VoteValidationError(str(exc)) from exc
+    logger.info(
+        "survey_option_emoji_updated survey_id=%s option_id=%s actor_discord_id=%s cleared=%s",
+        survey_id,
+        option_id,
+        actor_discord_user_id,
+        emoji is None,
+    )
+    return snapshot
+
+
 async def submit_survey_response(
     *,
     survey_id: int,

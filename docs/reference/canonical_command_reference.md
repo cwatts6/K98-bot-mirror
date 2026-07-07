@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=42 grouped_subcommands_detected=96 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
+primary=42 grouped_subcommands_detected=97 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
 ```
 
 Grouped command summary:
@@ -40,7 +40,7 @@ Grouped command summary:
 | `/registry` | 7 |
 | `/stats` | 1 |
 | `/subscriptions` | 3 |
-| `/vote_admin` | 10 |
+| `/vote_admin` | 11 |
 
 ## Command Surface Rules
 
@@ -216,6 +216,7 @@ Legend:
 | Voting Admin | `/vote_admin dashboard` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral private dashboard view | Standard | Phase 13 Private Dashboard UI | Opens a private aggregate vote/survey dashboard over the Phase 11 dashboard-safe reporting contract, with filters, pagination, refresh, message links, HiddenUntilClose private admin aggregate visibility, and no Discord identity, per-user rows, raw text/detail answers, or unsubmitted drafts. |
 | Voting Admin | `/vote_admin export` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response and private CSV file | Standard | Phase 4 voter-level audit export | Selects a closed vote by autocomplete and privately exports either totals-only CSV results or voter-level audit rows via the `mode` option. Voter audit includes spreadsheet-safe Discord user ID text, resolved Discord name, selected option, original option, vote timestamps, and change flag; governor identity remains deferred. |
 | Voting Admin | `/vote_admin survey_create` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral guided builder; public survey post side effect | Standard | Phase 7 first survey slice | Opens a private admin builder for 2-5 required choice-only survey questions, then publishes a SQL-backed survey with a persistent public Answer survey button, close/reminder controls, response-change setting, and public-live or hidden-until-close result visibility. |
+| Voting Admin | `/vote_admin survey_update` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral guided update panel | Standard | Phase 16 survey authoring and update controls | Selects an open survey by autocomplete and opens an explicit edit-target menu for safe open-survey fields: title, description, close time, unsent reminders, future mention settings, option icons, response-change setting, and result visibility. Option icons, response-change setting, and result visibility are blocked after submitted responses exist; question/option semantics remain locked after publish. |
 | Voting Admin | `/vote_admin survey_close` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response; public close announcement side effect | Standard | Phase 7 first survey slice | Selects an open survey by autocomplete, closes it early, disables the answer button, refreshes the final card, and sends a controlled close announcement. |
 | Voting Admin | `/vote_admin survey_status` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Phase 7 first survey slice | Selects a survey by autocomplete and shows survey state, result visibility, private admin live totals, reminder delivery state, and original message link. |
 | Voting Admin | `/vote_admin survey_export` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response and private CSV file(s) | Standard | Phase 10 Survey Export v2 first runtime slice | Selects one closed survey by autocomplete and privately exports totals, response-detail, or report-bundle CSV output via the `mode` option. Response-detail and report-bundle detail output include spreadsheet-safe Discord user ID text and resolved Discord name for admin/leadership-only reporting. Aggregate report-bundle files exclude raw text/detail answers and per-user rows; the response-detail file remains the private raw/detail profile. |

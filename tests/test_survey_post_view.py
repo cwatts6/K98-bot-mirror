@@ -1400,6 +1400,81 @@ async def test_survey_guided_builder_saves_optional_question(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_survey_builder_edits_saved_question(monkeypatch):
+    async def fake_publish(_interaction, _questions):
+        return True
+
+    async def fake_send_ephemeral(_interaction, _content, **_kwargs):
+        return None
+
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    original = SurveyQuestionCreateRequest(
+        prompt="Original?",
+        question_type="SingleChoice",
+        options=("A", "B"),
+        min_selections=1,
+        max_selections=1,
+        is_required=True,
+    )
+    view = SurveyBuilderView(
+        owner_user_id=123, publish_callback=fake_publish, questions=(original,)
+    )
+    view.load_question_for_edit(0)
+    prompt_modal = _SurveyQuestionPromptModal(view)
+    prompt_modal.prompt.value = "Updated?"
+    await prompt_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    await _button(view, "Save edit").callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    assert len(view.questions) == 1
+    assert view.questions[0].prompt == "Updated?"
+    assert view.editing_question_index is None
+    assert "Draft question: not set" in view.summary()
+
+
+@pytest.mark.asyncio
+async def test_survey_builder_delete_and_reorder_saved_questions():
+    async def fake_publish(_interaction, _questions):
+        return True
+
+    first = SurveyQuestionCreateRequest(
+        prompt="First?",
+        question_type="SingleChoice",
+        options=("A", "B"),
+        min_selections=1,
+        max_selections=1,
+    )
+    second = SurveyQuestionCreateRequest(
+        prompt="Second?",
+        question_type="SingleChoice",
+        options=("C", "D"),
+        min_selections=1,
+        max_selections=1,
+    )
+    third = SurveyQuestionCreateRequest(
+        prompt="Third?",
+        question_type="SingleChoice",
+        options=("E", "F"),
+        min_selections=1,
+        max_selections=1,
+    )
+    view = SurveyBuilderView(
+        owner_user_id=123,
+        publish_callback=fake_publish,
+        questions=(first, second, third),
+    )
+
+    assert view.move_question(2, -1) == 1
+    assert [question.prompt for question in view.questions] == ["First?", "Third?", "Second?"]
+
+    view.delete_question(1)
+
+    assert [question.prompt for question in view.questions] == ["First?", "Second?"]
+
+
+@pytest.mark.asyncio
 async def test_survey_guided_builder_saves_rating_question(monkeypatch):
     async def fake_publish(_interaction, _questions):
         return True

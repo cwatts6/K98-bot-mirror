@@ -887,6 +887,78 @@ async def test_reporting_rows_batch_multiple_surveys(monkeypatch):
     assert len(captured) == 2
 
 
+@pytest.mark.asyncio
+async def test_update_survey_post_blocks_response_sensitive_fields_after_responses(monkeypatch):
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+        def fetchone(self):
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "FROM dbo.SurveyPosts" in cur.last_sql:
+            return {"SurveyID": 42, "Status": "Open"}
+        if "FROM dbo.SurveyResponses" in cur.last_sql:
+            return {"ResponseCount": 1}
+        return {}
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        assert name == "survey_update"
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+    monkeypatch.setattr(survey_dal, "_create_survey_sync", lambda callback: callback(FakeCursor()))
+
+    result = await survey_dal.update_survey_post(
+        survey_id=42,
+        actor_discord_user_id=123,
+        allow_response_change=False,
+    )
+
+    assert result == "has_responses"
+
+
+@pytest.mark.asyncio
+async def test_update_survey_option_emoji_blocks_after_responses(monkeypatch):
+    class FakeCursor:
+        last_sql = ""
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+
+        def fetchone(self):
+            return None
+
+    def fake_fetch_one_dict(cur):
+        if "COL_LENGTH" in cur.last_sql:
+            return {"EmojiKindColumn": 1}
+        if "FROM dbo.SurveyPosts" in cur.last_sql:
+            return {"SurveyID": 42, "Status": "Open"}
+        if "FROM dbo.SurveyResponses" in cur.last_sql:
+            return {"ResponseCount": 1}
+        return {}
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        assert name == "survey_option_emoji_update"
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+    monkeypatch.setattr(survey_dal, "_create_survey_sync", lambda callback: callback(FakeCursor()))
+
+    with pytest.raises(ValueError, match="after responses exist"):
+        await survey_dal.update_survey_option_emoji(
+            survey_id=42,
+            option_id=101,
+            emoji=None,
+            actor_discord_user_id=123,
+        )
+
+
 def test_answer_audit_rows_include_rating_values_and_original_metadata():
     now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
     rows = [
