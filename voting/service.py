@@ -13,6 +13,7 @@ from voting.models import (
     VoteLookupChoice,
     VoteSnapshot,
 )
+from voting.option_emojis import OptionEmoji, normalize_option_emoji
 from voting.result_visibility import (
     RESULT_VISIBILITY_HIDDEN_UNTIL_CLOSE,
     RESULT_VISIBILITY_PUBLIC_LIVE,
@@ -76,6 +77,13 @@ CLOSE_DURATION_CHOICES: dict[str, timedelta] = {
 
 class VoteValidationError(ValueError):
     """Raised when a vote request cannot be accepted."""
+
+
+def parse_option_emoji(value: str | None) -> OptionEmoji | None:
+    try:
+        return normalize_option_emoji(value)
+    except ValueError as exc:
+        raise VoteValidationError(str(exc)) from exc
 
 
 def _validate_description(value: str | None, *, blank_as_none: bool = True) -> str | None:
@@ -447,6 +455,33 @@ async def cancel_vote_launch_failure(
 
 async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
     return await dal.get_vote_snapshot(vote_post_id)
+
+
+async def update_vote_option_emoji(
+    *,
+    vote_post_id: int,
+    option_id: int,
+    emoji_value: str | None,
+    actor_discord_user_id: int,
+) -> VoteSnapshot:
+    emoji = parse_option_emoji(emoji_value)
+    try:
+        snapshot = await dal.update_vote_option_emoji(
+            vote_post_id=vote_post_id,
+            option_id=option_id,
+            emoji=emoji,
+            actor_discord_user_id=actor_discord_user_id,
+        )
+    except ValueError as exc:
+        raise VoteValidationError(str(exc)) from exc
+    logger.info(
+        "vote_option_emoji_updated vote_post_id=%s option_id=%s actor_discord_id=%s cleared=%s",
+        vote_post_id,
+        option_id,
+        actor_discord_user_id,
+        emoji is None,
+    )
+    return snapshot
 
 
 async def get_multi_select_selection_ids(

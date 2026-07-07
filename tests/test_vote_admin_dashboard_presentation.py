@@ -8,6 +8,7 @@ from voting.dashboard_presentation import (
     build_dashboard_embeds,
     filter_dashboard_summaries,
 )
+from voting.option_emojis import normalize_option_emoji
 from voting.reporting_models import (
     REPORT_CONTENT_SURVEY,
     REPORT_CONTENT_VOTE,
@@ -173,6 +174,37 @@ def test_dashboard_embed_fields_are_clipped_to_discord_limit() -> None:
 
     assert len(option_totals) <= 1024
     assert option_totals.endswith("...")
+
+
+def test_dashboard_option_totals_include_display_emoji() -> None:
+    contract = _contract()
+    contract = DashboardReportingContract(
+        generated_at_utc=contract.generated_at_utc,
+        privacy_profile=contract.privacy_profile,
+        summaries=contract.summaries,
+        question_aggregates=contract.question_aggregates,
+        option_aggregates=(
+            DashboardReportingOptionAggregate(
+                content_kind=REPORT_CONTENT_VOTE,
+                content_id=42,
+                option_id=1,
+                option_key="opt1",
+                option_label="A",
+                option_sort_order=1,
+                total_participants=5,
+                selection_count=4,
+                is_top_selection=True,
+                option_emoji=normalize_option_emoji("✅"),
+            ),
+        ),
+    )
+
+    embed = build_dashboard_embeds(contract)[0]
+    option_totals = next(
+        field["value"] for field in embed.to_dict()["fields"] if field["name"] == "Option totals"
+    )
+
+    assert "✅ A" in option_totals
 
 
 def test_dashboard_refuses_to_render_unsafe_contract() -> None:

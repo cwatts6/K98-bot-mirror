@@ -14,6 +14,7 @@ from voting.service import (
     _validate_description,
     parse_close_time,
     parse_reminder_offsets,
+    parse_option_emoji,
 )
 from voting.survey_models import (
     DEFAULT_RATING_MAX_VALUE,
@@ -35,6 +36,7 @@ from voting.survey_models import (
     SurveySnapshot,
     SurveySubmitResult,
 )
+from voting.option_emojis import OptionEmoji
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +103,26 @@ def _validate_survey_option_labels(labels: tuple[str, ...]) -> tuple[str, ...]:
         output.append(clean_label)
     if len(output) < MIN_SURVEY_OPTIONS:
         raise VoteValidationError("Each survey question needs at least two options.")
+    return tuple(output)
+
+
+def _validate_option_emojis(
+    values: tuple[OptionEmoji | str | None, ...] | None,
+    *,
+    option_count: int,
+) -> tuple[OptionEmoji | None, ...]:
+    if not values:
+        return tuple(None for _ in range(option_count))
+    if len(values) > option_count:
+        raise VoteValidationError("Option icons cannot be set for missing options.")
+    output: list[OptionEmoji | None] = []
+    for value in values:
+        if isinstance(value, OptionEmoji) or value is None:
+            output.append(value)
+        else:
+            output.append(parse_option_emoji(value))
+    while len(output) < option_count:
+        output.append(None)
     return tuple(output)
 
 
@@ -249,6 +271,7 @@ def build_question_request(
     rating_low_label: str | None = None,
     rating_high_label: str | None = None,
     rating_labels: Mapping[int, str] | tuple[SurveyRatingLabel, ...] | None = None,
+    option_emojis: tuple[OptionEmoji | str | None, ...] | None = None,
 ) -> SurveyQuestionCreateRequest:
     clean_prompt = str(prompt or "").strip()
     if not clean_prompt:
@@ -277,6 +300,7 @@ def build_question_request(
             prompt=clean_prompt,
             question_type=normalized_type,
             options=(),
+            option_emojis=(),
             min_selections=0,
             max_selections=0,
             allow_details=False,
@@ -295,6 +319,7 @@ def build_question_request(
             prompt=clean_prompt,
             question_type=normalized_type,
             options=clean_options,
+            option_emojis=_validate_option_emojis(option_emojis, option_count=len(clean_options)),
             min_selections=len(clean_options),
             max_selections=len(clean_options),
             allow_details=False,
@@ -309,6 +334,7 @@ def build_question_request(
             prompt=clean_prompt,
             question_type=normalized_type,
             options=(),
+            option_emojis=(),
             min_selections=0,
             max_selections=0,
             allow_details=False,
@@ -324,6 +350,7 @@ def build_question_request(
             prompt=clean_prompt,
             question_type=normalized_type,
             options=clean_options,
+            option_emojis=_validate_option_emojis(option_emojis, option_count=len(clean_options)),
             min_selections=1,
             max_selections=1,
             allow_details=bool(allow_details),
@@ -343,6 +370,7 @@ def build_question_request(
         prompt=clean_prompt,
         question_type=normalized_type,
         options=clean_options,
+        option_emojis=_validate_option_emojis(option_emojis, option_count=len(clean_options)),
         min_selections=minimum,
         max_selections=maximum,
         allow_details=bool(allow_details),

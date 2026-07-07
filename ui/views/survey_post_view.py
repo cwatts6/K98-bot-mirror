@@ -8,6 +8,7 @@ import discord
 
 from core.interaction_safety import send_ephemeral
 from voting import survey_service
+from voting.option_emojis import EMOJI_KIND_CUSTOM_DISCORD, OptionEmoji, option_display_label
 from voting.survey_models import (
     DEFAULT_RATING_MAX_VALUE,
     DEFAULT_RATING_MIN_VALUE,
@@ -48,6 +49,17 @@ SurveyPublishCallback = Callable[
 SurveyBuilderTimeoutCallback = Callable[["SurveyBuilderView"], Awaitable[None]]
 
 _SURVEY_BUILDER_TIMEOUT_SECONDS = 14 * 60
+
+
+def _discord_emoji(emoji: OptionEmoji | None):
+    if emoji is None:
+        return None
+    if emoji.kind == EMOJI_KIND_CUSTOM_DISCORD:
+        try:
+            return discord.PartialEmoji.from_str(emoji.text)
+        except Exception:
+            return None
+    return emoji.text
 
 
 class SurveyPostView(discord.ui.View):
@@ -144,6 +156,7 @@ class _SurveyQuestionSelect(discord.ui.Select):
         options = [
             discord.SelectOption(
                 label=option.label[:100],
+                emoji=_discord_emoji(option.emoji),
                 value=str(option.option_id),
                 default=int(option.option_id) in selected_option_ids,
             )
@@ -402,6 +415,7 @@ class _SurveyRankingOptionSelect(discord.ui.Select):
         options = [
             discord.SelectOption(
                 label=option.label[:100],
+                emoji=_discord_emoji(option.emoji),
                 value=str(option.option_id),
                 default=int(option.option_id) == selected_option_id,
             )
@@ -1011,6 +1025,7 @@ class SurveyBuilderView(discord.ui.View):
         self.questions: list[SurveyQuestionCreateRequest] = list(questions)
         self.draft_prompt = ""
         self.draft_options: list[str] = []
+        self.draft_option_emojis: dict[int, OptionEmoji] = {}
         self.draft_min_selections = 1
         self.draft_max_selections = 1
         self.draft_is_text = False
@@ -1041,6 +1056,7 @@ class SurveyBuilderView(discord.ui.View):
         self.add_item(_BuilderRequiredToggleButton(self))
         self.add_item(_BuilderDetailsToggleButton(self))
         self.add_item(_BuilderRatingLabelsButton(self))
+        self.add_item(_BuilderOptionIconsButton(self))
         self.add_item(_BuilderPublishButton(self))
 
     @property
@@ -1062,6 +1078,7 @@ class SurveyBuilderView(discord.ui.View):
             or self.draft_rating_low_label.strip()
             or self.draft_rating_high_label.strip()
             or self.draft_rating_labels
+            or self.draft_option_emojis
         )
 
     @property
@@ -1120,6 +1137,7 @@ class SurveyBuilderView(discord.ui.View):
     def _clear_draft(self) -> None:
         self.draft_prompt = ""
         self.draft_options = []
+        self.draft_option_emojis = {}
         self.draft_min_selections = 1
         self.draft_max_selections = 1
         self.draft_is_text = False
@@ -1182,6 +1200,14 @@ class SurveyBuilderView(discord.ui.View):
             ),
             options=(
                 () if self.draft_is_text or self.draft_is_rating else tuple(self.draft_options)
+            ),
+            option_emojis=(
+                ()
+                if self.draft_is_text or self.draft_is_rating
+                else tuple(
+                    self.draft_option_emojis.get(index)
+                    for index in range(len(self.draft_options))
+                )
             ),
             min_selections=(
                 0
@@ -1247,7 +1273,10 @@ class SurveyBuilderView(discord.ui.View):
                 f"Draft options: {len(self.draft_options)}/{survey_service.MAX_SURVEY_OPTIONS}"
             )
         if self.draft_options:
-            lines.extend(f"- {option}" for option in self.draft_options)
+            lines.extend(
+                f"- {option_display_label(option, self.draft_option_emojis.get(index))}"
+                for index, option in enumerate(self.draft_options)
+            )
         if self.draft_is_ranking:
             lines.append(f"Ranking: all {len(self.draft_options)} options")
         elif not self.draft_is_text and not self.draft_is_rating:
@@ -1264,16 +1293,20 @@ class SurveyBuilderView(discord.ui.View):
             scale = f"{question.rating_min_value}-{question.rating_max_value}"
             return f"{index}. {question.prompt[:70]} (Rating {scale}, {requirement})"
         if question.question_type == SURVEY_QUESTION_RANKING:
+            icon_count = sum(1 for item in question.option_emojis if item is not None)
+            icon_text = f", {icon_count} icons" if icon_count else ""
             return (
                 f"{index}. {question.prompt[:70]} "
-                f"(Ranking all {len(question.options)} options, {requirement})"
+                f"(Ranking all {len(question.options)} options{icon_text}, {requirement})"
             )
         if question.question_type == SURVEY_QUESTION_TEXT:
             return f"{index}. {question.prompt[:70]} (Text, {requirement})"
+        icon_count = sum(1 for item in question.option_emojis if item is not None)
+        icon_text = f", {icon_count} icons" if icon_count else ""
         return (
             f"{index}. {question.prompt[:70]} "
             f"({question.question_type}, {question.max_selections} max, {len(question.options)} options"
-            f"{', details' if question.allow_details else ''}, {requirement})"
+            f"{icon_text}{', details' if question.allow_details else ''}, {requirement})"
         )
 
 
@@ -1344,6 +1377,11 @@ class _BuilderRemoveOptionButton(discord.ui.Button):
             return
         if self.parent_view.draft_options:
             self.parent_view.draft_options.pop()
+            self.parent_view.draft_option_emojis = {
+                index: emoji
+                for index, emoji in self.parent_view.draft_option_emojis.items()
+                if index < len(self.parent_view.draft_options)
+            }
             self.parent_view._sync_selection_bounds()
         await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
 
@@ -1452,6 +1490,7 @@ class _BuilderQuestionTypeSelect(discord.ui.Select):
             self.parent_view.draft_rating_labels = {}
         if self.parent_view.draft_is_text or self.parent_view.draft_is_rating:
             self.parent_view.draft_options = []
+            self.parent_view.draft_option_emojis = {}
             self.parent_view.draft_min_selections = 1
             self.parent_view.draft_max_selections = 1
             self.parent_view.draft_allow_details = False
@@ -1609,6 +1648,114 @@ class _BuilderRatingLabelsButton(discord.ui.Button):
             await send_ephemeral(interaction, "Scale labels only apply to rating questions.")
             return
         await interaction.response.send_modal(_SurveyRatingScaleLabelsModal(self.parent_view))
+
+
+class _BuilderOptionIconsButton(discord.ui.Button):
+    def __init__(self, parent_view: SurveyBuilderView) -> None:
+        icon_count = len(parent_view.draft_option_emojis)
+        super().__init__(
+            label="Option icons",
+            style=discord.ButtonStyle.success if icon_count else discord.ButtonStyle.secondary,
+            disabled=(
+                parent_view.builder_locked
+                or parent_view.draft_is_text
+                or parent_view.draft_is_rating
+                or not parent_view.draft_options
+            ),
+            row=4,
+        )
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey builder belongs to another admin.")
+            return
+        if self.parent_view.draft_is_text or self.parent_view.draft_is_rating:
+            await send_ephemeral(interaction, "Only option-based questions can use option icons.")
+            return
+        if not self.parent_view.draft_options:
+            await send_ephemeral(interaction, "Add an option before setting icons.")
+            return
+        view = _SurveyBuilderOptionIconView(self.parent_view)
+        await send_ephemeral(interaction, "Choose an option to polish.", view=view)
+
+
+class _SurveyBuilderOptionIconSelect(discord.ui.Select):
+    def __init__(self, parent_view: "_SurveyBuilderOptionIconView") -> None:
+        self.parent_view = parent_view
+        options = [
+            discord.SelectOption(
+                label=label[:100],
+                value=str(index),
+                emoji=_discord_emoji(parent_view.builder_view.draft_option_emojis.get(index)),
+            )
+            for index, label in enumerate(parent_view.builder_view.draft_options)
+        ]
+        super().__init__(
+            placeholder="Option to polish",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This option-icon panel belongs to another admin.")
+            return
+        try:
+            option_index = int(self.values[0])
+        except (IndexError, TypeError, ValueError):
+            await send_ephemeral(interaction, "Choose a valid option.")
+            return
+        if option_index < 0 or option_index >= len(self.parent_view.builder_view.draft_options):
+            await send_ephemeral(interaction, "Choose a valid option.")
+            return
+        await interaction.response.send_modal(
+            _SurveyBuilderOptionIconModal(self.parent_view.builder_view, option_index)
+        )
+
+
+class _SurveyBuilderOptionIconView(discord.ui.View):
+    def __init__(self, builder_view: SurveyBuilderView) -> None:
+        super().__init__(timeout=180)
+        self.builder_view = builder_view
+        self.owner_user_id = int(builder_view.owner_user_id)
+        self.add_item(_SurveyBuilderOptionIconSelect(self))
+
+
+class _SurveyBuilderOptionIconModal(discord.ui.Modal):
+    def __init__(self, parent_view: SurveyBuilderView, option_index: int) -> None:
+        option_label = parent_view.draft_options[option_index]
+        current = parent_view.draft_option_emojis.get(option_index)
+        super().__init__(title="Option icon")
+        self.parent_view = parent_view
+        self.option_index = int(option_index)
+        self.icon = discord.ui.InputText(
+            label=f"Icon for {option_label[:34]}",
+            required=False,
+            max_length=120,
+            placeholder="Unicode emoji or <:name:id>; blank clears",
+            value=current.text if current is not None else "",
+        )
+        self.add_item(self.icon)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey builder belongs to another admin.")
+            return
+        if self.option_index < 0 or self.option_index >= len(self.parent_view.draft_options):
+            await send_ephemeral(interaction, "Option icon not saved: choose a valid option.")
+            return
+        try:
+            emoji = survey_service.parse_option_emoji(str(self.icon.value or ""))
+        except survey_service.VoteValidationError as exc:
+            await send_ephemeral(interaction, f"Option icon not saved: {exc}")
+            return
+        if emoji is None:
+            self.parent_view.draft_option_emojis.pop(self.option_index, None)
+        else:
+            self.parent_view.draft_option_emojis[self.option_index] = emoji
+        await send_ephemeral(interaction, "Option icon saved. Return to the survey builder to continue.")
 
 
 class _BuilderRequiredToggleButton(discord.ui.Button):

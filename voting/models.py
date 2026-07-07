@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
 
+from voting.option_emojis import OptionEmoji
+
 
 @dataclass(frozen=True)
 class VoteOption:
@@ -14,6 +16,7 @@ class VoteOption:
     sort_order: int
     button_style: str | None = None
     vote_count: int = 0
+    emoji: OptionEmoji | None = None
 
 
 @dataclass(frozen=True)

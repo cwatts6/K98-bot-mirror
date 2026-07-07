@@ -7,6 +7,7 @@ import pytest
 
 from ui.views.vote_post_view import MultiSelectVotePanel, VotePostView
 from voting.models import VoteCastResult, VoteOption, VoteSnapshot
+from voting.option_emojis import normalize_option_emoji
 from voting.vote_modes import VOTE_MODE_MULTI_SELECT
 
 
@@ -81,6 +82,34 @@ def _multi_select_snapshot() -> VoteSnapshot:
             "total_selections": 0,
         }
     )
+
+
+@pytest.mark.asyncio
+async def test_vote_post_view_applies_option_emoji_to_public_button() -> None:
+    snapshot = _snapshot()
+    option = VoteOption(9, 7, "opt1", "A", 1, vote_count=1, emoji=normalize_option_emoji("✅"))
+    snapshot = VoteSnapshot(**{**snapshot.__dict__, "options": (option,)})
+
+    view = VotePostView(snapshot)
+
+    button = view.children[0]
+    assert button.label == "A"
+    assert str(button.emoji) == "✅"
+
+
+@pytest.mark.asyncio
+async def test_multi_select_panel_applies_option_emoji_to_select_options() -> None:
+    snapshot = _multi_select_snapshot()
+    options = (
+        VoteOption(1, 7, "opt1", "Option 1", 1, emoji=normalize_option_emoji("✅")),
+        *snapshot.options[1:],
+    )
+    snapshot = VoteSnapshot(**{**snapshot.__dict__, "options": options})
+
+    panel = MultiSelectVotePanel(snapshot, owner_user_id=123)
+    select = panel.children[0]
+
+    assert str(select.options[0].emoji) == "✅"
 
 
 class _Response:

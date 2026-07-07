@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
 
+from voting.option_emojis import OptionEmoji
+
 SURVEY_QUESTION_SINGLE_CHOICE = "SingleChoice"
 SURVEY_QUESTION_MULTI_SELECT = "MultiSelect"
 SURVEY_QUESTION_TEXT = "Text"
@@ -27,6 +29,7 @@ class SurveyQuestionOption:
     option_key: str
     label: str
     sort_order: int
+    emoji: OptionEmoji | None = None
     response_count: int = 0
     ranking_average: float | None = None
     ranking_first_place_count: int = 0
@@ -187,6 +190,7 @@ class SurveyQuestionCreateRequest:
     prompt: str
     question_type: str
     options: tuple[str, ...]
+    option_emojis: tuple[OptionEmoji | None, ...] = ()
     min_selections: int = 1
     max_selections: int = 1
     allow_details: bool = False
@@ -387,6 +391,7 @@ class SurveyReportingOptionRow:
     rank4_count: int
     rank5_count: int
     rank6_count: int
+    option_emoji: OptionEmoji | None = None
 
 
 @dataclass(frozen=True)

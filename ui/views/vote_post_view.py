@@ -9,6 +9,7 @@ from core.interaction_safety import send_ephemeral
 from voting import service as vote_service
 from voting.discord_presentation import build_vote_embed, build_vote_file, no_broad_mentions
 from voting.models import VoteOption, VoteSnapshot
+from voting.option_emojis import EMOJI_KIND_CUSTOM_DISCORD, OptionEmoji, option_display_label
 from voting.vote_modes import VOTE_MODE_MULTI_SELECT, normalize_vote_mode
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,17 @@ def _button_style(value: str | None) -> discord.ButtonStyle:
         "danger": discord.ButtonStyle.danger,
     }
     return mapping.get((value or "").casefold(), discord.ButtonStyle.primary)
+
+
+def _discord_emoji(emoji: OptionEmoji | None):
+    if emoji is None:
+        return None
+    if emoji.kind == EMOJI_KIND_CUSTOM_DISCORD:
+        try:
+            return discord.PartialEmoji.from_str(emoji.text)
+        except Exception:
+            return None
+    return emoji.text
 
 
 class VotePostView(discord.ui.View):
@@ -49,6 +61,7 @@ class _VoteOptionButton(discord.ui.Button):
         label = option.label[:80]
         super().__init__(
             label=label,
+            emoji=_discord_emoji(option.emoji),
             style=_button_style(option.button_style),
             custom_id=f"vote:{int(vote_post_id)}:{int(option.option_id)}",
             disabled=disabled,
@@ -56,7 +69,7 @@ class _VoteOptionButton(discord.ui.Button):
         )
         self.vote_post_id = int(vote_post_id)
         self.option_id = int(option.option_id)
-        self.option_label = option.label
+        self.option_label = option_display_label(option.label, option.emoji)
 
     async def callback(self, interaction: discord.Interaction) -> None:
         try:
@@ -175,6 +188,7 @@ class _MultiSelectOptionSelect(discord.ui.Select):
         options = [
             discord.SelectOption(
                 label=option.label[:100],
+                emoji=_discord_emoji(option.emoji),
                 value=str(option.option_id),
                 default=int(option.option_id) in selected_option_ids,
             )

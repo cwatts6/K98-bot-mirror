@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from core import visual_text
 from voting.models import RenderedVoteCard, VoteSnapshot
+from voting.option_emojis import option_display_label
 from voting.outcomes import vote_outcome
 from voting.result_visibility import public_results_hidden
 from voting.vote_modes import VOTE_MODE_MULTI_SELECT, normalize_vote_mode
@@ -192,7 +193,7 @@ def render_vote_card(
             draw, (stat_x, 218), stat, fill=GOLD if is_winner else MUTED, font=stat_font, bold=True
         )
 
-        label = option.label
+        label = option_display_label(option.label, option.emoji, card_fallback=True)
         label_font = _fit_font(
             draw, label, max_width=int(slot_w) - 12, size=20, min_size=13, bold=True
         )

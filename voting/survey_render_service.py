@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from core import visual_text
+from voting.option_emojis import option_display_label
 from voting.result_visibility import public_results_hidden
 from voting.survey_models import (
     SURVEY_QUESTION_RANKING,
@@ -101,6 +102,13 @@ def _pct(count: int, total: int) -> str:
     return f"{value:.1f}".rstrip("0").rstrip(".") + "%"
 
 
+def _clip_text(value: str, limit: int) -> str:
+    text = str(value or "")
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 3)].rstrip() + "..."
+
+
 def _top_option_line(snapshot: SurveySnapshot) -> str:
     lines: list[str] = []
     total = int(snapshot.total_responses or 0)
@@ -116,7 +124,7 @@ def _top_option_line(snapshot: SurveySnapshot) -> str:
             lines.append(
                 f"Q{question.sort_order}: avg {question.rating_average:.1f} "
                 f"on {rating_scale_text(question)} "
-                f"({answered} ratings; {rating_distribution_text(question)})"
+                f"({answered} ratings; {_clip_text(rating_distribution_text(question), 70)})"
             )
             continue
         if question.question_type == SURVEY_QUESTION_RANKING:
@@ -131,13 +139,13 @@ def _top_option_line(snapshot: SurveySnapshot) -> str:
                 int(option.ranking_first_place_count or 0) for option in ranked_options
             )
             first_place_leaders = [
-                option.label
+                option_display_label(option.label, option.emoji, card_fallback=True)
                 for option in ranked_options
                 if int(option.ranking_first_place_count or 0) == first_place_top
             ]
             best_average = min(float(option.ranking_average or 99) for option in ranked_options)
             average_leaders = [
-                option.label
+                option_display_label(option.label, option.emoji, card_fallback=True)
                 for option in ranked_options
                 if option.ranking_average is not None
                 and abs(float(option.ranking_average) - best_average) < 0.0001
@@ -152,7 +160,7 @@ def _top_option_line(snapshot: SurveySnapshot) -> str:
             continue
         top_count = max(int(option.response_count or 0) for option in question.options)
         leaders = [
-            option.label
+            option_display_label(option.label, option.emoji, card_fallback=True)
             for option in question.options
             if int(option.response_count or 0) == top_count
         ]

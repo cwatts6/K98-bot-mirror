@@ -24,6 +24,7 @@ from voting.discord_presentation import (
     no_broad_mentions,
 )
 from voting.export_service import build_vote_totals_export, build_vote_voter_audit_export
+from voting.option_emojis import option_display_label
 from voting.reporting_service import build_admin_leadership_dashboard_report
 from voting.result_visibility import (
     RESULT_VISIBILITY_PUBLIC_LIVE,
@@ -794,6 +795,16 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             value=snapshot.closes_at_utc.strftime("%Y-%m-%d %H:%M UTC"),
             inline=True,
         )
+        option_label = "selections" if is_multi_select else "votes"
+        option_lines = [
+            f"{option_display_label(option.label, option.emoji)}: {option.vote_count} {option_label}"
+            for option in snapshot.options
+        ] or ["No options configured"]
+        embed.add_field(
+            name="Option totals",
+            value="\n".join(option_lines)[:1024],
+            inline=False,
+        )
         embed.add_field(name="Reminders", value="\n".join(reminder_lines), inline=False)
         if snapshot.message_id:
             embed.add_field(
@@ -1181,7 +1192,7 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                         float(option.ranking_average or 99) for option in ranked_options
                     )
                     average_leaders = [
-                        option.label
+                        option_display_label(option.label, option.emoji)
                         for option in ranked_options
                         if option.ranking_average is not None
                         and abs(float(option.ranking_average) - best_average) < 0.0001
@@ -1190,12 +1201,14 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                         int(option.ranking_first_place_count or 0) for option in ranked_options
                     )
                     first_place_leaders = [
-                        option.label
+                        option_display_label(option.label, option.emoji)
                         for option in ranked_options
                         if int(option.ranking_first_place_count or 0) == first_place_top
                     ]
                     distribution = "; ".join(
-                        f"{option.label}: avg {option.ranking_average:.1f}, first {option.ranking_first_place_count}, "
+                        f"{option_display_label(option.label, option.emoji)}: "
+                        f"avg {option.ranking_average:.1f}, first "
+                        f"{option.ranking_first_place_count}, "
                         + " ".join(
                             f"{rank}:{ranking_count_for_value(option, rank)}"
                             for rank in range(1, len(question.options) + 1)
@@ -1214,7 +1227,11 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                 )
                 continue
             top = max((option.response_count for option in question.options), default=0)
-            leaders = [option.label for option in question.options if option.response_count == top]
+            leaders = [
+                option_display_label(option.label, option.emoji)
+                for option in question.options
+                if option.response_count == top
+            ]
             question_lines.append(
                 f"Q{question.sort_order}: {', '.join(leaders[:2]) if top else 'no responses'} ({top}; {answered} answered, {skipped} skipped, {requirement})"
             )

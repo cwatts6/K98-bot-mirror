@@ -16,6 +16,7 @@ from ui.views.survey_post_view import (
     SurveyResponsePanel,
     _SurveyDetailModal,
     _SurveyDetailOptionSelect,
+    _SurveyBuilderOptionIconModal,
     _SurveyOptionModal,
     _SurveyQuestionPromptModal,
     _SurveyRatingScaleLabelsModal,
@@ -1268,6 +1269,44 @@ async def test_survey_guided_builder_saves_multi_select_from_max_selection(monke
     assert view.questions[0].max_selections == 2
     assert view.questions[0].options == ("Friday", "Saturday", "Sunday")
     assert "Survey question saved." not in captured.get("ephemeral", "")
+
+
+@pytest.mark.asyncio
+async def test_survey_guided_builder_saves_option_icons(monkeypatch):
+    async def fake_publish(_interaction, _questions):
+        return True
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        assert content == "Option icon saved. Return to the survey builder to continue."
+
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    view = SurveyBuilderView(owner_user_id=123, publish_callback=fake_publish)
+    prompt_modal = _SurveyQuestionPromptModal(view)
+    prompt_modal.prompt.value = "Which lane?"
+    await prompt_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    first_option = _SurveyOptionModal(view)
+    first_option.option.value = "Alpha"
+    await first_option.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    second_option = _SurveyOptionModal(view)
+    second_option.option.value = "Bravo"
+    await second_option.callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    icon_modal = _SurveyBuilderOptionIconModal(view, option_index=1)
+    icon_modal.icon.value = "<:bravo:1234567890>"
+    await icon_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    await _button(view, "Save question").callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    assert view.questions[0].options == ("Alpha", "Bravo")
+    assert view.questions[0].option_emojis[0] is None
+    assert view.questions[0].option_emojis[1] is not None
+    assert view.questions[0].option_emojis[1].name == "bravo"
+    assert "1 icons" in view.summary()
 
 
 @pytest.mark.asyncio

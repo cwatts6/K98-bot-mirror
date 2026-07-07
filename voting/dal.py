@@ -18,6 +18,7 @@ from voting.models import (
     VoteSnapshot,
     VoteVoterAuditRow,
 )
+from voting.option_emojis import OptionEmoji, option_emoji_from_row
 from voting.result_visibility import normalize_result_visibility
 from voting.vote_modes import (
     VOTE_MODE_MULTI_SELECT,
@@ -69,8 +70,21 @@ def _rows_to_options(rows: Sequence[dict[str, Any]]) -> tuple[VoteOption, ...]:
             sort_order=int(row.get("SortOrder") or 0),
             button_style=row.get("ButtonStyle"),
             vote_count=int(row.get("VoteCount") or 0),
+            emoji=option_emoji_from_row(row),
         )
         for row in rows
+    )
+
+
+def _emoji_sql_values(emoji: OptionEmoji | None) -> tuple[str | None, str | None, str | None, str | None, int | None]:
+    if emoji is None:
+        return None, None, None, None, None
+    return (
+        emoji.kind,
+        emoji.text,
+        emoji.name,
+        emoji.emoji_id,
+        1 if emoji.animated else 0,
     )
 
 
@@ -469,6 +483,7 @@ async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
     options = await run_query_async(
         """
         SELECT o.OptionID, o.VotePostID, o.OptionKey, o.Label, o.SortOrder, o.ButtonStyle,
+               o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated,
                CASE
                    WHEN COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
                        THEN COUNT(ms.DiscordUserID)
@@ -485,7 +500,8 @@ async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
          AND ms.OptionID = o.OptionID
          AND COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
         WHERE o.VotePostID = ?
-        GROUP BY o.OptionID, o.VotePostID, o.OptionKey, o.Label, o.SortOrder, o.ButtonStyle, p.VoteMode
+        GROUP BY o.OptionID, o.VotePostID, o.OptionKey, o.Label, o.SortOrder, o.ButtonStyle,
+                 o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated, p.VoteMode
         ORDER BY o.SortOrder ASC, o.OptionID ASC;
         """,
         (int(vote_post_id),),
@@ -500,6 +516,81 @@ async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
         (int(vote_post_id),),
     )
     return _snapshot_from_rows(post, options, reminders)
+
+
+async def update_vote_option_emoji(
+    *,
+    vote_post_id: int,
+    option_id: int,
+    emoji: OptionEmoji | None,
+    actor_discord_user_id: int,
+) -> VoteSnapshot:
+    emoji_kind, emoji_text, emoji_name, emoji_id, emoji_animated = _emoji_sql_values(emoji)
+
+    def _callback(cur) -> bool:
+        cur.execute(
+            """
+            UPDATE dbo.VotePostOptions
+            SET EmojiKind = ?,
+                EmojiText = ?,
+                EmojiName = ?,
+                EmojiID = ?,
+                EmojiAnimated = ?
+            OUTPUT INSERTED.OptionID
+            WHERE VotePostID = ? AND OptionID = ?;
+            """,
+            (
+                emoji_kind,
+                emoji_text,
+                emoji_name,
+                emoji_id,
+                emoji_animated,
+                int(vote_post_id),
+                int(option_id),
+            ),
+        )
+        updated = cur.fetchone() is not None
+        if updated:
+            cur.execute(
+                """
+                UPDATE dbo.VotePosts
+                SET UpdatedAtUtc = SYSUTCDATETIME()
+                WHERE VotePostID = ?;
+                """,
+                (int(vote_post_id),),
+            )
+            cur.execute(
+                """
+                INSERT INTO dbo.VotePostAudit
+                    (VotePostID, ActorDiscordUserID, ActionType, DetailsJson, CreatedAtUtc)
+                VALUES (?, ?, 'OptionEmojiUpdated', ?, SYSUTCDATETIME());
+                """,
+                (
+                    int(vote_post_id),
+                    int(actor_discord_user_id),
+                    json.dumps(
+                        {
+                            "option_id": int(option_id),
+                            "emoji_kind": emoji_kind,
+                            "emoji_name": emoji_name,
+                            "emoji_id": emoji_id,
+                            "cleared": emoji is None,
+                        },
+                        ensure_ascii=False,
+                    ),
+                ),
+            )
+        return updated
+
+    updated = await run_blocking_in_thread(
+        _create_vote_post_sync, _callback, name="vote_option_emoji_update"
+    )
+    if not updated:
+        raise ValueError("Vote option was not found.")
+    snapshot = await get_vote_snapshot(vote_post_id)
+    if snapshot is None:
+        raise ValueError("Vote could not be reloaded after option emoji update.")
+    return snapshot
 
 
 async def get_multi_select_selection_ids(

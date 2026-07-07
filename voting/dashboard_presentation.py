@@ -7,6 +7,7 @@ from datetime import UTC
 import discord
 
 from utils import fmt_short
+from voting.option_emojis import option_display_label
 from voting.reporting_models import (
     REPORT_CONTENT_SURVEY,
     REPORT_CONTENT_VOTE,
@@ -284,8 +285,9 @@ def _vote_option_lines(
     for option in option_rows[:12]:
         marker = "top " if option.is_top_selection else ""
         percent = _percentage(option.selection_count, option.total_participants)
+        label = option_display_label(option.option_label, option.option_emoji)
         lines.append(
-            f"{marker}{option.option_label}: {fmt_short(option.selection_count)}" f"{percent}"
+            f"{marker}{label}: {fmt_short(option.selection_count)}" f"{percent}"
         )
     if len(option_rows) > 12:
         lines.append(f"+{len(option_rows) - 12} more option(s)")
@@ -309,7 +311,10 @@ def _survey_question_lines(
     for question in question_rows[:8]:
         requirement = "required" if question.is_required else "optional"
         label = _QUESTION_LABELS.get(question.question_type, question.question_type)
-        detail = _question_detail(question, options_by_question.get(question.question_id, ()))
+        detail = _clip(
+            _question_detail(question, options_by_question.get(question.question_id, ())),
+            220,
+        )
         lines.append(
             f"Q{question.question_sort_order} {label}: {detail} "
             f"({fmt_short(question.answered_responses)} answered, "
@@ -379,7 +384,7 @@ def _question_detail(
             return "no rankings"
         best = min(float(option.average_rank or 99) for option in ranked)
         leaders = [
-            option.option_label
+            option_display_label(option.option_label, option.option_emoji)
             for option in ranked
             if option.average_rank is not None and abs(float(option.average_rank) - best) < 0.0001
         ]
@@ -393,7 +398,9 @@ def _question_detail(
     if not leaders:
         return "no responses"
     top_count = max(option.selection_count for option in leaders)
-    labels = ", ".join(option.option_label for option in leaders[:2])
+    labels = ", ".join(
+        option_display_label(option.option_label, option.option_emoji) for option in leaders[:2]
+    )
     suffix = " each" if len(leaders) > 1 else ""
     return f"top {labels} ({fmt_short(top_count)}{suffix})"
 

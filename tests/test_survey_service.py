@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from voting import survey_service
+from voting.option_emojis import EMOJI_KIND_CUSTOM_DISCORD
 from voting.service import VoteValidationError
 from voting.survey_models import (
     SURVEY_QUESTION_MULTI_SELECT,
@@ -28,6 +29,21 @@ def _question(index: int, *, multi: bool = False):
         min_selections=1,
         max_selections=2 if multi else 1,
     )
+
+
+def test_build_question_request_preserves_option_emojis() -> None:
+    question = survey_service.build_question_request(
+        prompt="Pick a lane",
+        question_type="SingleChoice",
+        options=("Alpha", "Bravo"),
+        option_emojis=("✅", "<:bravo:1234567890>"),
+    )
+
+    assert question.option_emojis[0] is not None
+    assert question.option_emojis[0].text == "✅"
+    assert question.option_emojis[1] is not None
+    assert question.option_emojis[1].kind == EMOJI_KIND_CUSTOM_DISCORD
+    assert question.option_emojis[1].name == "bravo"
 
 
 def _draft_snapshot() -> SurveySnapshot:

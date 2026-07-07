@@ -118,6 +118,7 @@ def _survey_option_aggregate(row: SurveyReportingOptionRow) -> DashboardReportin
         total_participants=row.total_responses,
         selection_count=row.selection_count,
         is_top_selection=row.is_top_selection,
+        option_emoji=row.option_emoji,
         ranked_count=row.ranked_count,
         average_rank=row.average_rank,
         rank1_count=row.rank1_count,

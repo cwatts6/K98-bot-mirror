@@ -8,6 +8,7 @@ from typing import Any
 
 from file_utils import cursor_row_to_dict, fetch_one_dict, run_blocking_in_thread
 from stats_alerts.db import exec_with_cursor, run_one_async, run_query_async
+from voting.option_emojis import OptionEmoji, option_emoji_from_row
 from voting.result_visibility import normalize_result_visibility
 from voting.service import VoteValidationError
 from voting.survey_models import (
@@ -127,6 +128,7 @@ def _rows_to_options(rows: Sequence[dict[str, Any]]) -> dict[int, tuple[SurveyQu
                 option_key=str(row.get("OptionKey") or ""),
                 label=str(row.get("Label") or ""),
                 sort_order=int(row.get("SortOrder") or 0),
+                emoji=option_emoji_from_row(row),
                 response_count=int(row.get("ResponseCount") or 0),
                 ranking_average=(
                     float(row["AverageRank"]) if row.get("AverageRank") not in (None, "") else None
@@ -136,6 +138,18 @@ def _rows_to_options(rows: Sequence[dict[str, Any]]) -> dict[int, tuple[SurveyQu
             )
         )
     return {key: tuple(value) for key, value in grouped.items()}
+
+
+def _emoji_sql_values(emoji: OptionEmoji | None) -> tuple[str | None, str | None, str | None, str | None, int | None]:
+    if emoji is None:
+        return None, None, None, None, None
+    return (
+        emoji.kind,
+        emoji.text,
+        emoji.name,
+        emoji.emoji_id,
+        1 if emoji.animated else 0,
+    )
 
 
 def _rows_to_rating_counts(
@@ -441,6 +455,7 @@ def _reporting_option_from_row(row: Mapping[str, Any]) -> SurveyReportingOptionR
         option_key=str(row.get("OptionKey") or ""),
         option_label=str(row.get("OptionLabel") or ""),
         option_sort_order=int(row.get("OptionSortOrder") or 0),
+        option_emoji=option_emoji_from_row(row),
         total_responses=int(row.get("TotalResponses") or 0),
         selection_count=int(row.get("SelectionCount") or 0),
         is_top_selection=_bool(row.get("IsTopSelection")),
@@ -630,13 +645,36 @@ async def create_survey(req: SurveyCreateRequest) -> int:
                         ),
                     )
             for option_index, label in enumerate(question.options):
+                emoji = (
+                    question.option_emojis[option_index]
+                    if option_index < len(question.option_emojis)
+                    else None
+                )
+                emoji_kind, emoji_text, emoji_name, emoji_id, emoji_animated = _emoji_sql_values(
+                    emoji
+                )
                 cur.execute(
                     """
                     INSERT INTO dbo.SurveyQuestionOptions
-                        (SurveyQuestionID, OptionKey, Label, SortOrder, CreatedAtUtc)
-                    VALUES (?, ?, ?, ?, ?);
+                        (
+                            SurveyQuestionID, OptionKey, Label, SortOrder,
+                            EmojiKind, EmojiText, EmojiName, EmojiID, EmojiAnimated,
+                            CreatedAtUtc
+                        )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                     """,
-                    (question_id, _option_key(option_index), label, option_index + 1, now),
+                    (
+                        question_id,
+                        _option_key(option_index),
+                        label,
+                        option_index + 1,
+                        emoji_kind,
+                        emoji_text,
+                        emoji_name,
+                        emoji_id,
+                        emoji_animated,
+                        now,
+                    ),
                 )
         for offset in req.reminder_offsets_minutes:
             cur.execute(
@@ -899,6 +937,7 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
         f"""
         {option_ranking_cte}
         SELECT o.SurveyOptionID, o.SurveyQuestionID, o.OptionKey, o.Label, o.SortOrder,
+               o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated,
                COUNT(a.DiscordUserID) AS ResponseCount
                {option_ranking_select}
         FROM dbo.SurveyQuestionOptions o
@@ -908,7 +947,8 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
          AND a.SurveyOptionID = o.SurveyOptionID
         {option_ranking_join}
         WHERE q.SurveyID = ?
-        GROUP BY o.SurveyOptionID, o.SurveyQuestionID, o.OptionKey, o.Label, o.SortOrder
+        GROUP BY o.SurveyOptionID, o.SurveyQuestionID, o.OptionKey, o.Label, o.SortOrder,
+                 o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated
                  {', ranking_stats.FirstPlaceCount, ranking_stats.AverageRank, ranking_dist.RankValue, ranking_dist.RankResponseCount' if ranking_answers_available else ''}
         ORDER BY o.SurveyQuestionID ASC, o.SortOrder ASC, o.SurveyOptionID ASC;
         """,
@@ -2132,16 +2172,19 @@ async def list_reporting_option_rows_for_surveys(
     )
     rows = await run_query_async(
         f"""
-        SELECT SurveyID, Title, Status, ResultVisibility, SurveyQuestionID, QuestionKey,
-               Prompt, QuestionType, QuestionSortOrder, IsRequired,
-               SurveyOptionID, OptionKey, OptionLabel, OptionSortOrder,
+        SELECT v.SurveyID, v.Title, v.Status, v.ResultVisibility, v.SurveyQuestionID,
+               v.QuestionKey, v.Prompt, v.QuestionType, v.QuestionSortOrder, v.IsRequired,
+               v.SurveyOptionID, v.OptionKey, v.OptionLabel, v.OptionSortOrder,
+               o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated,
                TotalResponses, SelectionCount, IsTopSelection,
                RankedCount, AverageRank, Rank1Count, Rank2Count,
                Rank3Count, Rank4Count, Rank5Count, Rank6Count
-        FROM dbo.v_SurveyReportingOptionSummary
-        WHERE SurveyID IN ({placeholders})
+        FROM dbo.v_SurveyReportingOptionSummary v
+        LEFT JOIN dbo.SurveyQuestionOptions o
+          ON o.SurveyOptionID = v.SurveyOptionID
+        WHERE v.SurveyID IN ({placeholders})
         ORDER BY CASE SurveyID {order_cases} ELSE {len(normalized_ids)} END ASC,
-                 QuestionSortOrder ASC, OptionSortOrder ASC, SurveyOptionID ASC;
+                 v.QuestionSortOrder ASC, v.OptionSortOrder ASC, v.SurveyOptionID ASC;
         """,
         normalized_ids + normalized_ids,
     )

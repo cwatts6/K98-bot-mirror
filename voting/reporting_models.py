@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from voting.option_emojis import OptionEmoji
+
 REPORT_CONTENT_VOTE = "vote"
 REPORT_CONTENT_SURVEY = "survey"
 
@@ -80,6 +82,7 @@ class DashboardReportingOptionAggregate:
     total_participants: int
     selection_count: int
     is_top_selection: bool
+    option_emoji: OptionEmoji | None = None
     question_id: int | None = None
     question_key: str | None = None
     question_type: str | None = None

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from stats_alerts.db import run_query_async
+from voting.option_emojis import option_emoji_from_row
 from voting.reporting_models import (
     REPORT_CONTENT_SURVEY,
     REPORT_CONTENT_VOTE,
@@ -119,6 +120,7 @@ def _option_from_vote_row(row: Mapping[str, Any]) -> DashboardReportingOptionAgg
         total_participants=int(row.get("TotalParticipants") or 0),
         selection_count=int(row.get("SelectionCount") or 0),
         is_top_selection=_bool(row.get("IsTopSelection")),
+        option_emoji=option_emoji_from_row(row),
     )
 
 
@@ -285,6 +287,7 @@ async def list_vote_dashboard_option_aggregates(
         OptionCounts AS (
             SELECT p.VotePostID, o.OptionID, o.OptionKey, o.Label AS OptionLabel,
                    o.SortOrder AS OptionSortOrder,
+                   o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated,
                    CASE
                        WHEN COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
                            THEN COUNT(ms.DiscordUserID)
@@ -306,7 +309,8 @@ async def list_vote_dashboard_option_aggregates(
              AND ms.OptionID = o.OptionID
              AND COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
             WHERE p.VotePostID IN ({placeholders})
-            GROUP BY p.VotePostID, p.VoteMode, o.OptionID, o.OptionKey, o.Label, o.SortOrder
+            GROUP BY p.VotePostID, p.VoteMode, o.OptionID, o.OptionKey, o.Label, o.SortOrder,
+                     o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated
         ),
         Tops AS (
             SELECT VotePostID, MAX(SelectionCount) AS TopSelectionCount
@@ -314,6 +318,7 @@ async def list_vote_dashboard_option_aggregates(
             GROUP BY VotePostID
         )
         SELECT oc.VotePostID, oc.OptionID, oc.OptionKey, oc.OptionLabel,
+               oc.EmojiKind, oc.EmojiText, oc.EmojiName, oc.EmojiID, oc.EmojiAnimated,
                oc.OptionSortOrder, oc.SelectionCount, pc.TotalParticipants,
                CASE
                    WHEN oc.SelectionCount > 0 AND oc.SelectionCount = t.TopSelectionCount THEN 1
