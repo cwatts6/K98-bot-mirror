@@ -45,7 +45,9 @@ class VoteAdminDashboardView(discord.ui.View):
         super().__init__(timeout=600)
         self.contract = contract
         self.owner_user_id = int(owner_user_id)
-        self.report_loader = report_loader or reporting_service.build_admin_leadership_dashboard_report
+        self.report_loader = (
+            report_loader or reporting_service.build_admin_leadership_dashboard_report
+        )
         self.filter_value = dashboard_presentation.normalize_dashboard_filter(filter_value)
         self.page_index = 0
         self.pages: tuple[discord.Embed, ...] = ()
