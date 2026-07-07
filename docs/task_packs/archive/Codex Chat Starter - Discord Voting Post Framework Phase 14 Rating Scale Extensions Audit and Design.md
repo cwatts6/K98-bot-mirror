@@ -1,13 +1,15 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter. Phase 14 rating scale extensions were delivered, review-hardened, and
+operator smoke/regression tested on 2026-07-07.
 
 Phase 1 through Phase 13 are complete and smoke tested. Phase 13 delivered `/vote_admin dashboard`
 as a private admin/leadership aggregate dashboard UI over the Phase 11 dashboard-safe reporting
 contract. Smoke testing confirmed vote and survey dashboard pages, refresh, next, previous, close,
 open/closed filters, admin/leadership access control, and no details or Discord names visible.
 
-Use this starter to begin Phase 14 with audit/scope confirmation before implementation.
+Historical starter preserved for traceability. Use the active Phase 15 Emoji/Icon Support and
+Visual Polish starter in `docs/task_packs/` for the next Discord Voting Post Framework slice.
 
 ## Copy/Paste Starter
 
@@ -67,7 +69,7 @@ Read first:
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Audit and Design.md
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design.md
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 13 Private Dashboard UI Audit and Design.md
-- docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design.md
+- docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design.md
 
 Use these skills as applicable:
 - k98-architecture-scope

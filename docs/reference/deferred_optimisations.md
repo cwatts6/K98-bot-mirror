@@ -6,40 +6,58 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `voting/`, future survey rating scale extensions, survey response UX, export/report surfaces
-- Type: architecture
-- Description: Phase 9B intentionally delivered only a fixed 1-5 rating question type. Phase 14 now has operator-confirmed product value for configurable numeric min/max scales, an expanded 1-10 scale, scale labels, and named rating choices. Per-rating comments are explicitly not required and must not be treated as deferred scope unless a later operator decision reverses that status. Phase 10 exports/report bundles, Phase 11 dashboard-safe aggregates, Phase 12 drafts, and Phase 13 private dashboard UI preserve the fixed-scale contract until Phase 14 changes are approved and delivered.
-- Suggested Fix: Promoted into the active Phase 14 Rating Scale Extensions audit/design task pack. Design and, after explicit architecture approval, deliver configurable numeric rating scales with backward compatibility for existing 1-5 ratings, SQL-backed scale metadata, private-safe export/report/dashboard representation, public aggregate-only rendering, builder/player UX, persisted draft/resume compatibility, validation, migration order, rollback posture, and smoke coverage. Exclude per-rating comments from Phase 14 and from future deferred scope by default.
+- Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, `ui/views/survey_post_view.py`, `voting/survey_render_service.py`, SQL repo option metadata
+- Type: consistency
+- Description: Per-option emoji/icon support is approved for future voting framework scope because it can make public votes and surveys more readable and engaging. Current vote and survey options have labels and limited button styling but no emoji/icon metadata. Phase 14 smoke testing also showed that long named rating labels and dense distributions remain readable but can crowd generated cards and dashboard summaries, so the next visual polish slice should audit label-density/readability alongside emoji/icon support rather than leaving that observation loose.
+- Suggested Fix: Promoted into the prepared Phase 15 Emoji/Icon Support and Visual Polish audit/design task pack. Scope whether emoji/icons apply to one-choice votes, multi-select votes, survey choice options, ranking options, generated cards, Discord buttons/selects, private status, exports, report bundles, and dashboard summaries. Validate Unicode/custom emoji input, SQL metadata needs, glyph/font fallback, output escaping, privacy boundaries, smoke screenshots, and long-label card/dashboard readability before implementation.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 9B fixed 1-5 rating questions delivered and smoke tested on 2026-07-04; Phase 9C complete ranking questions delivered and smoke tested on 2026-07-04; Phase 10 export/report bundle delivered and smoke tested on 2026-07-05; Phase 11 dashboard/reporting contract delivered and smoke/regression tested on 2026-07-06; Phase 12 persisted survey draft/resume delivered and smoke/regression tested on 2026-07-06; Phase 13 private dashboard UI delivered and smoke tested on 2026-07-07; active Phase 14 task pack prepared on 2026-07-07; operator approval for configurable rating scales, 1-10, scale labels, and named rating choices; SQL repo validation; export/reporting/dashboard shape approval; visual smoke testing for generated cards if rendering changes are approved.
+- Dependencies: Phase 5 hidden-until-close, Phase 6 MultiSelect, Phase 7 choice-only surveys, Phase 9C ranking questions, Phase 13 dashboard UI, and Phase 14 rating scale extensions are delivered and smoke tested; renderer visual QA with representative emoji/custom emoji and long label cases; operator approval for exact surfaces before runtime changes.
 
 ### Deferred Optimisation
-- Area: `voting/`, `/vote_admin`, voting policy and identity future scope
+- Area: `voting/`, `/vote_admin`, voting command surface
 - Type: architecture
-- Description: Role-restricted voting, governor-linked voting/reporting, saved vote/survey templates, and public voter-level/detail export posting are definitely not required for the voting framework roadmap. `/vote_admin` command reshaping remains required follow-up work, but it is a command-surface governance task and not a prerequisite for survey draft/resume, rating-scale extensions, emoji/icon support, or export/reporting follow-up slices.
-- Suggested Fix: Do not implement role-restricted voting, governor-linked voting/reporting, saved vote/survey templates, or public voter-level/detail export posting unless a future operator decision reverses this not-required status. Keep required `/vote_admin` reshaping as a separate approval-gated command-surface task pack that validates command fit, permission/privacy model, docs, tests, smoke plan, and promotion posture before implementation.
+- Description: `/vote_admin` has grown to cover vote creation, survey creation, update/status/close/export/report/dashboard flows, autocomplete lookups, and multiple export/report modes. It remains functional and approved, but broad command reshaping is now a distinct command-surface governance task rather than a prerequisite for remaining voting feature slices.
+- Suggested Fix: Scope a separate `/vote_admin` reshaping audit after the visual polish and reporting slices that need the current stable command surface. Validate whether subcommand names, grouping, autocomplete, permissions, docs, command registration baselines, smoke references, and migration guidance should change. Do not rename or remove existing command paths without operator approval and a communication plan.
 - Impact: medium
 - Risk: high
-- Dependencies: Explicit operator approval; canonical command reference updates if command paths change; SQL repo validation for identity/template storage; Codex Security review before runtime PR handoff.
+- Dependencies: Explicit operator approval; canonical command reference updates if command paths change; command registration validation; Codex Security review before runtime PR handoff.
 
 ### Deferred Optimisation
-- Area: `voting/export_service.py`, future survey export services, SQL repo survey reporting views/procedures
+- Area: `voting/export_service.py`, `voting/survey_export_service.py`, report bundle services, future workbook outputs
 - Type: architecture
-- Description: Phase 7 delivered first-slice survey summary/detail CSV exports only for one closed survey at a time. Phase 8 added approved text/detail response-detail columns and aggregate text-question rows, Phase 9A added optional skipped semantics, Phase 9B added rating export fields, Phase 9C added ranking export rows, Phase 10 delivered private single-survey report-bundle CSV output plus SQL aggregate survey reporting views/procedure, and Phase 11 delivered bot-side dashboard-safe vote/survey aggregate reporting contracts. Cross-survey exports, workbook-style exports, longitudinal reporting, retention/redaction changes, export audit/history summaries, broader export profile redesign, and optional SQL-native combined vote/survey reporting views/procedures remain outside that first dashboard-contract slice.
-- Suggested Fix: Scope follow-up export/reporting slices only with explicit product approval. Candidate slices include cross-survey summaries, workbook outputs, longitudinal reports, export audit/history summaries, retention/redaction policy, and SQL-native combined reporting objects if performance, direct SQL reporting, stability, or long-term sustainability justify them. Preserve private delivery by default and add output-shape regression tests before changing existing export formats. Keep these separate from Phase 14 unless rating-scale compatibility requires a narrowly approved reporting/export adapter.
+- Description: Phase 10 delivered private single-survey report-bundle CSV output and Phase 11 delivered dashboard-safe aggregate reporting contracts. Cross-survey summaries, workbook-style exports, longitudinal reports, export audit/history summaries, and broader export profile redesign remain outside the delivered single-survey report bundle.
+- Suggested Fix: Scope a dedicated cross-survey/workbook export redesign only after concrete reporting consumers or operator workflows are identified. Preserve private delivery by default, keep existing CSV profiles backward-compatible unless explicitly versioned, define workbook tabs/columns before implementation, and add output-shape regression tests for every generated file.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 7 survey data model delivered; Phase 8 text/detail export behavior delivered and smoke tested; Phase 9A optional export behavior delivered and smoke tested; Phase 9B fixed 1-5 rating export behavior delivered and smoke tested; Phase 9C ranking export behavior delivered and smoke tested; Phase 10 report bundle delivered and smoke tested; Phase 11 private aggregate reporting contract delivered and smoke/regression tested; Phase 12 draft/resume exclusion from export/reporting surfaces delivered and smoke/regression tested; reporting consumer requirements; SQL repo validation; no public reporting without separate approval.
+- Dependencies: Phase 10 report bundle delivered and smoke tested; Phase 11 dashboard-safe reporting delivered; Phase 12 draft exclusion delivered; Phase 14 rating-scale export/report compatibility delivered; reporting consumer requirements; SQL repo validation; no public reporting without separate approval.
 
 ### Deferred Optimisation
-- Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, SQL repo `dbo.VotePostOptions`
-- Type: consistency
-- Description: Per-option emoji/icon support is approved for future scope because it makes public votes and surveys more readable and engaging. Current options have labels and nullable `ButtonStyle`, but no emoji/icon metadata. Adding emoji has Discord button UX, CSV/export, dashboard/reporting label, and generated-card font/glyph implications. This remains a later polish slice and should not be bundled into Phase 14 rating-scale extensions unless the operator explicitly reorders the roadmap.
-- Suggested Fix: Required follow-up, but not part of Phase 14 unless separately approved. Prepare a focused polish slice that adds approved option emoji/icon metadata, validates Unicode or custom emoji input, uses Discord button emoji support where practical, updates card rendering with glyph fallback checks, and preserves existing label-length/export behavior.
+- Area: `voting/`, private exports, report bundles, dashboard/reporting summaries, SQL-backed vote/survey data
+- Type: architecture
+- Description: Retention and redaction policy for vote/survey data, exports, reports, audit metadata, and generated artifacts remains intentionally unchanged through Phase 14. The framework now stores richer survey data, drafts, rating labels, ranking answers, private exports, and dashboard summaries, but policy decisions about how long to keep or redact them need a separate privacy/operations task.
+- Suggested Fix: Scope a retention/redaction policy audit that inventories stored vote/survey tables, draft rows, audit events, generated exports, report bundles, dashboard summaries, and any local temporary files. Define default retention windows, manual redaction behavior, admin-only controls, SQL cleanup posture, rollback/audit requirements, and tests before any destructive or privacy-changing implementation.
+- Impact: medium
+- Risk: high
+- Dependencies: Operator privacy policy approval; SQL repo validation; Codex Security review before runtime PR handoff; no destructive cleanup without rollback and smoke plan.
+
+### Deferred Optimisation
+- Area: `voting/reporting_dal.py`, `voting/reporting_service.py`, SQL repo survey/vote reporting views and procedures
+- Type: architecture
+- Description: Optional SQL-native combined vote/survey reporting views or procedures may eventually help direct SQL consumers, performance, or operational reporting, but Phase 11 and Phase 13 intentionally kept the dashboard contract bot-side and Phase 14 only updated rating-scale compatibility. No direct reporting consumer or performance blocker currently justifies a combined SQL-native reporting layer.
+- Suggested Fix: Keep SQL-native combined reporting as an optional later audit. Start only if reporting consumers, performance evidence, or production support needs justify it. Validate exact SQL objects in `C:\K98-bot-SQL-Server`, define additive views/procedures, preserve private/dashboard-safe boundaries, and prove output equivalence with bot-side reporting before adopting it.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 5 hidden-until-close, Phase 6 MultiSelect, and Phase 7 choice-only surveys are delivered; renderer visual QA with representative emoji/custom emoji cases; operator approval for whether emoji applies to one-choice only, MultiSelect, survey options, or all option-bearing voting surfaces.
+- Dependencies: Reporting consumer requirements or performance evidence; SQL owner approval; SQL repo migration/review; existing dashboard/export regression tests.
+
+### Deferred Optimisation
+- Area: `voting/`, voting policy and identity future scope
+- Type: architecture
+- Description: Role-restricted voting, governor-linked voting/reporting, saved vote/survey templates, per-rating comments, and public voter-level/detail export posting are definitely not required for the voting framework roadmap unless a later operator decision reverses that status.
+- Suggested Fix: Do not implement these items by default. If operator direction changes, create a fresh audit/design task pack that validates product value, privacy/permissions, SQL storage, reporting/export impact, migration order, rollback, and Codex Security requirements before implementation.
+- Impact: medium
+- Risk: high
+- Dependencies: Explicit operator reversal; SQL repo validation for identity/template/comment storage; Codex Security review before runtime PR handoff.
 
 ### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks

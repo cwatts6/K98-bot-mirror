@@ -270,21 +270,30 @@ Discord Voting Post Framework status:
 - Phase 13 records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 13 Private Dashboard UI Audit and Design.md`
   - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 13 Private Dashboard UI Audit and Design.md`
+- Phase 14 Rating Scale Extensions is delivered in mirror PR #209, production PR #516, and SQL PR
+  #37. SQL migration `20260707_001_add_survey_rating_scales` was deployed before bot rollout.
+  Operator smoke/regression testing on 2026-07-07 confirmed normal fixed 1-5 rating surveys,
+  1-10 rating surveys, custom min/max scales, scale endpoint labels, named rating choices,
+  save/draft/resume, `/vote_admin dashboard`, export, repost, status, and other regressions.
+- Phase 14 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design.md`
+  - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design.md`
 - Active Discord Voting Post Framework files:
   - `Discord Voting Post Framework - Programme Pack.md`
-  - `Codex Task Pack - Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design.md`
-  - `Codex Chat Starter - Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design.md`
-- Phase 14 is the next prepared voting slice. It starts with audit/scope confirmation for rating
-  scale extensions over the delivered fixed 1-5 rating question type. It should confirm whether
-  KD98 needs fixed 1-10 ratings, configurable scales, scale labels, named rating choices,
-  per-rating comments, or no rating-scale extension for now; validate SQL source-of-truth shape,
-  backward compatibility, draft/resume compatibility, export/report/dashboard representation,
-  privacy boundaries, tests, smoke plan, deployment order, rollback posture, and deferred
-  boundaries before any implementation. Emoji/icon support, `/vote_admin` reshaping,
-  cross-survey/workbook exports, retention/redaction policy changes, and optional SQL-native
-  combined reporting views/procedures remain required separate slices. Role-restricted voting,
-  governor-linked voting/reporting, saved templates, and public voter-level/detail export posting
-  are definitely not required unless a later operator decision reverses that status.
+  - `Codex Task Pack - Discord Voting Post Framework Phase 15 Emoji Icon Support and Visual Polish Audit and Design.md`
+  - `Codex Chat Starter - Discord Voting Post Framework Phase 15 Emoji Icon Support and Visual Polish Audit and Design.md`
+- Phase 15 is the next prepared voting slice. It starts with audit/scope confirmation for
+  per-option emoji/icon support and narrow visual-readability polish for long labels and dense
+  aggregate summaries observed during Phase 14 smoke testing. It should confirm supported
+  Unicode/custom emoji values, SQL source-of-truth shape, backward compatibility, builder/player
+  UX, generated-card glyph fallback, PublicLive/HiddenUntilClose output, private
+  status/export/report/dashboard representation, privacy boundaries, tests, smoke screenshots,
+  deployment order, rollback posture, and deferred boundaries before any implementation.
+  `/vote_admin` reshaping, cross-survey/workbook exports, retention/redaction policy changes, and
+  optional SQL-native combined reporting views/procedures remain required separate slices.
+  Per-rating comments, role-restricted voting, governor-linked voting/reporting, saved templates,
+  and public voter-level/detail export posting are definitely not required unless a later operator
+  decision reverses that status.
 
 Player Self-Service Command Centre status:
 
@@ -436,10 +445,10 @@ Final removal of temporary deprecated command paths remains captured as deferred
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.
 
-Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design is the next
-prepared voting slice. It starts with audit/scope confirmation and should decide whether rating
-scale extensions are needed over the delivered fixed 1-5 rating question type while preserving
-existing rating responses, Phase 12 draft/resume behavior, Phase 13 private dashboard privacy, and
-aggregate-only public outputs. Emoji/icon support, broad `/vote_admin` reshaping, cross-survey
+Discord Voting Post Framework Phase 15 Emoji/Icon Support and Visual Polish Audit and Design is the
+next prepared voting slice. It starts with audit/scope confirmation for per-option emoji/icon
+support and narrow visual-readability polish while preserving delivered vote/survey behavior,
+Phase 12 draft/resume behavior, Phase 13 private dashboard privacy, Phase 14 rating-scale
+compatibility, and aggregate-only public outputs. Broad `/vote_admin` reshaping, cross-survey
 workbook exports, retention/redaction changes, optional SQL-native combined reporting, public
 dashboards, raw text/detail display, and per-user rows remain separate approval-gated slices.

@@ -2,7 +2,7 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
-Discord Voting Post Framework Phase 1 through Phase 12 execution records are archived here. The
+Discord Voting Post Framework Phase 1 through Phase 14 execution records are archived here. The
 programme delivered SQL-backed vote posts, button voting, one-vote-per-Discord-user enforcement,
 vote changes, live Pillow result cards, scheduler reminders, automatic close, manual close,
 persistent views, mention safety, guided admin UX, private totals-only export, private
@@ -14,8 +14,12 @@ complete ranking survey questions, plus Phase 10 private Survey Export v2 report
 and SQL survey reporting views/procedure, and Phase 11 private admin/leadership aggregate
 dashboard-safe reporting contracts, and Phase 12 persisted survey drafts/resume with draft
 exclusion from public results, private dashboard summaries, status totals, and existing export
-profiles until final submit. Operator smoke testing is complete through 2026-07-06.
-The active programme and Phase 13 private dashboard UI audit/design pack remain in `../`.
+profiles until final submit, Phase 13 private aggregate dashboard UI, and Phase 14 configurable
+rating scales with fixed 1-5 compatibility, fixed 1-10 ratings, custom min/max scales, endpoint
+labels, named rating choices, draft/resume compatibility, and private/public aggregate reporting
+compatibility. Operator smoke testing is complete through 2026-07-07.
+The active programme and Phase 15 emoji/icon support and visual polish audit/design pack remain in
+`../`.
 
 Player Self-Service Command Centre completed Phase 1 audit/design, Phase 2 `/me` shell
 foundation, Phase 3 Modern Account Centre, Phase 4 Modern Reminder Centre, Phase 5 Visual

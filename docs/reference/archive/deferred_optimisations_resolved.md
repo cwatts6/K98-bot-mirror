@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Phase 14 Rating Scale Extensions Completed Item
+- Area: `voting/`, `ui/views/survey_post_view.py`, survey rating scale SQL metadata, export/report/dashboard surfaces
+- Type: architecture
+- Description: Phase 9B intentionally delivered only fixed 1-5 survey rating questions. Later export, reporting, draft/resume, and dashboard phases preserved that fixed-scale contract, but KD98 needed configurable numeric min/max rating scales, a first-class 1-10 scale, scale endpoint labels, and named rating choices without breaking existing 1-5 data or privacy boundaries. Per-rating comments were explicitly ruled out.
+- Resolution: Phase 14 delivered backward-compatible configurable rating scales for survey `Rating` questions. The implementation keeps fixed 1-5 as the default, adds SQL-backed min/max and label metadata, supports named rating values, uses select-menu rating controls where needed, preserves draft/resume prefill and final-submit semantics, updates PublicLive and HiddenUntilClose aggregate output, and threads scale metadata through private status, exports, report bundles, and `/vote_admin dashboard`. Public and dashboard-safe outputs remain aggregate-only; draft answers remain excluded until final submit; per-rating comments remain out of scope.
+- Validation: Completed through mirror PR #209, production PR #516, and SQL PR #37. SQL migration `20260707_001_add_survey_rating_scales` was merged and pushed to production before bot rollout. Automated validation included architecture/deferred/select-tests validators, smoke imports, command registration validation, ruff, pyright, full pytest (`2351 passed, 2 skipped` during implementation), focused survey service/DAL/view/export tests, SQL repo validation, git diff checks, Codex Security diff scan with zero findings, and review-thread fixes for migration preflight errors, label validation, SQL collation/BOM/FK/aggregation issues, and rating-label export precedence. Operator smoke and regression testing on 2026-07-07 confirmed fixed 1-5 ratings, 1-10 ratings, custom min/max scales, scale labels, named rating choices, save/draft/resume, `/vote_admin dashboard`, export, repost, status, and all listed regression paths.
+
 ### Discord Voting Post Framework Phase 12 Survey Draft Resume Completed Item
 - Area: `voting/`, `ui/views/survey_post_view.py`, SQL repo survey response draft storage
 - Type: architecture

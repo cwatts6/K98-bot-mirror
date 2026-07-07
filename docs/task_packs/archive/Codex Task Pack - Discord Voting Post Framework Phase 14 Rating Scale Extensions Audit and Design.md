@@ -6,8 +6,8 @@
 - Date: `2026-07-07`
 - Owner/context: `Follow-up after Phase 13 private dashboard UI delivery and smoke testing`
 - Task type: `audit | product scope | SQL-backed survey extension design | Discord interaction UX | reporting/export review`
-- One-pass approved: `no`
-- Status: `active next voting slice; product scope revised for configurable scales; implementation still requires architecture/SQL/reporting approval`
+- One-pass approved: `approved after audit/scope and architecture approval`
+- Status: `delivered, review-hardened, operator smoke tested, and archived after Phase 14 closeout`
 
 ## 2. Objective
 
@@ -24,10 +24,50 @@ scale work into Phase 14 now: configurable numeric min/max scales, the expanded 
 labels, and named rating choices. Per-rating comments are explicitly not required and must not be
 included in Phase 14 or carried as default deferred scope.
 
-Start with audit/scope confirmation. Do not implement SQL migrations, new rating storage shape,
-builder controls, player controls, export/report/dashboard shape changes, public rendering changes,
-or command changes until the product scope, privacy model, SQL posture, compatibility plan, tests,
-smoke plan, deployment order, rollback posture, and deferred boundaries are approved.
+Phase 14 is now delivered. The historical audit-first instruction below is preserved for traceability:
+runtime work was not started until product scope, privacy model, SQL posture, compatibility plan,
+tests, smoke plan, deployment order, rollback posture, and deferred boundaries were approved.
+
+## 2A. Delivered Runtime Shape
+
+Phase 14 delivered configurable survey rating scales while preserving all existing fixed 1-5 rating
+behavior:
+
+- Configurable numeric min/max scales for survey `Rating` questions, bounded to the approved 1-10
+  global range.
+- First-class 1-10 rating surveys.
+- Scale endpoint labels and named rating choices.
+- Backward-compatible default fixed 1-5 rating interpretation for existing questions and
+  responses.
+- SQL-backed rating scale metadata through migration `20260707_001_add_survey_rating_scales`.
+- Player response UX with compact fixed 1-5 behavior preserved and select controls for extended
+  scales.
+- Persisted draft/resume compatibility, including prefilled extended rating answers.
+- PublicLive and HiddenUntilClose aggregate-only public output for extended scales.
+- Private status, export, report bundle, and `/vote_admin dashboard` representation of scale
+  metadata, counts, averages, distributions, and labels.
+- Review hardening for missing SQL migration preflight errors, non-numeric label validation, SQL
+  collation/BOM/FK/aggregation concerns, and rating-label export precedence.
+
+Per-rating comments were explicitly excluded and are not carried as default future deferred scope.
+
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#209`
+- Production PR: `cwatts6/k98-bot#516`
+- SQL PR: `cwatts6/K98-bot-SQL-Server#37`
+- SQL migration: `20260707_001_add_survey_rating_scales`
+- Operator smoke and regression testing: `2026-07-07`
+
+Smoke testing confirmed:
+
+- Normal existing fixed 1-5 rating surveys pass.
+- 1-10 rating surveys pass.
+- Custom min/max scales pass.
+- Scale endpoint labels and named rating choices pass.
+- Save/draft/resume pass.
+- `/vote_admin dashboard`, export, repost, and status pass.
+- Other listed regression tests pass.
 
 ## 3. Required Reading
 
@@ -49,7 +89,7 @@ Read first:
 - `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 11 Private Dashboard Reporting Runtime Audit and Design.md`
 - `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 12 Survey Draft Resume Audit and Design.md`
 - `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 13 Private Dashboard UI Audit and Design.md`
-- `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design.md`
+- `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 14 Rating Scale Extensions Audit and Design.md`
 
 ## 4. Delivered Baseline
 
