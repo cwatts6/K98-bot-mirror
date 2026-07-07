@@ -507,6 +507,15 @@ async def create_survey(req: SurveyCreateRequest) -> int:
                     SURVEY_RANKING_MIGRATION_ID,
                 )
                 return VoteValidationError(SURVEY_RANKING_MIGRATION_MESSAGE)
+        rating_scale_available = _survey_rating_scale_metadata_exists_sync(cur)
+        if not rating_scale_available and any(
+            _question_uses_extended_rating_scale(question) for question in req.questions
+        ):
+            logger.warning(
+                "survey_rating_scale_metadata_missing_create migration=%s",
+                SURVEY_RATING_SCALE_MIGRATION_ID,
+            )
+            return VoteValidationError(SURVEY_RATING_SCALE_MIGRATION_MESSAGE)
         now = _naive_utc(datetime.now(UTC))
         cur.execute(
             """
@@ -540,16 +549,6 @@ async def create_survey(req: SurveyCreateRequest) -> int:
         )
         row = cur.fetchone()
         survey_id = int(row[0]) if row else 0
-        rating_scale_available = _survey_rating_scale_metadata_exists_sync(cur)
-        if not rating_scale_available and any(
-            _question_uses_extended_rating_scale(question) for question in req.questions
-        ):
-            logger.warning(
-                "survey_rating_scale_metadata_missing_create survey_id=%s migration=%s",
-                survey_id,
-                SURVEY_RATING_SCALE_MIGRATION_ID,
-            )
-            raise VoteValidationError(SURVEY_RATING_SCALE_MIGRATION_MESSAGE)
         for question_index, question in enumerate(req.questions):
             if rating_scale_available:
                 cur.execute(

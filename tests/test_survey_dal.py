@@ -303,6 +303,72 @@ async def test_create_survey_missing_ranking_table_has_clear_error(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_create_survey_missing_rating_scale_metadata_has_clear_error(monkeypatch):
+    now = datetime(2026, 7, 7, 12, 0, tzinfo=UTC)
+
+    class FakeCursor:
+        executed: list[str]
+        last_sql = ""
+
+        def __init__(self):
+            self.executed = []
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+            self.executed.append(sql)
+
+    cursor = FakeCursor()
+
+    def fake_fetch_one_dict(cur):
+        assert "RatingMinValue" in cur.last_sql
+        return {"RatingMinValueColumn": None, "LabelsObjectId": None}
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+
+    def fake_exec_with_cursor(callback):
+        try:
+            return callback(cursor)
+        except Exception:
+            return None
+
+    monkeypatch.setattr(survey_dal, "exec_with_cursor", fake_exec_with_cursor)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    req = SurveyCreateRequest(
+        guild_id=1,
+        channel_id=2,
+        created_by_discord_user_id=3,
+        title="Planning",
+        description=None,
+        questions=(
+            SurveyQuestionCreateRequest(
+                prompt="Rate readiness",
+                question_type="Rating",
+                options=(),
+                min_selections=0,
+                max_selections=0,
+                rating_min_value=1,
+                rating_max_value=10,
+            ),
+            SurveyQuestionCreateRequest(
+                prompt="Pick one",
+                question_type="SingleChoice",
+                options=("Yes", "No"),
+            ),
+        ),
+        closes_at_utc=now,
+        reminder_offsets_minutes=(),
+    )
+
+    with pytest.raises(VoteValidationError, match=survey_dal.SURVEY_RATING_SCALE_MIGRATION_ID):
+        await survey_dal.create_survey(req)
+    assert not any("INSERT INTO dbo.SurveyPosts" in sql for sql in cursor.executed)
+
+
+@pytest.mark.asyncio
 async def test_save_survey_response_draft_detects_stale_revision(monkeypatch):
     now = datetime(2026, 7, 6, 12, 0, tzinfo=UTC)
 

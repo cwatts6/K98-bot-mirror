@@ -151,6 +151,13 @@ def _clean_optional_label(value: str | None, *, field_name: str, limit: int) -> 
     return clean
 
 
+def _coerce_rating_scale_value(value: int | str | None, *, field_name: str) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise VoteValidationError(f"{field_name} must be a whole number.") from exc
+
+
 def _validate_rating_scale(
     *,
     min_value: int | None,
@@ -159,8 +166,16 @@ def _validate_rating_scale(
     high_label: str | None,
     rating_labels: Mapping[int, str] | tuple[SurveyRatingLabel, ...] | None,
 ) -> tuple[int, int, str | None, str | None, tuple[SurveyRatingLabel, ...]]:
-    minimum = DEFAULT_RATING_MIN_VALUE if min_value is None else int(min_value)
-    maximum = DEFAULT_RATING_MAX_VALUE if max_value is None else int(max_value)
+    minimum = (
+        DEFAULT_RATING_MIN_VALUE
+        if min_value is None
+        else _coerce_rating_scale_value(min_value, field_name="Rating scale minimum")
+    )
+    maximum = (
+        DEFAULT_RATING_MAX_VALUE
+        if max_value is None
+        else _coerce_rating_scale_value(max_value, field_name="Rating scale maximum")
+    )
     if minimum < DEFAULT_RATING_MIN_VALUE or maximum > MAX_RATING_VALUE:
         raise VoteValidationError(
             f"Rating scales must stay between {DEFAULT_RATING_MIN_VALUE} and {MAX_RATING_VALUE}."
@@ -179,10 +194,23 @@ def _validate_rating_scale(
     )
     raw_items: list[tuple[int, str]] = []
     if isinstance(rating_labels, Mapping):
-        raw_items = [(int(key), str(value or "")) for key, value in rating_labels.items()]
+        raw_items = [
+            (
+                _coerce_rating_scale_value(key, field_name="Rating choice label value"),
+                str(value or ""),
+            )
+            for key, value in rating_labels.items()
+        ]
     else:
         raw_items = [
-            (int(item.rating_value), str(item.label or "")) for item in (rating_labels or ())
+            (
+                _coerce_rating_scale_value(
+                    item.rating_value,
+                    field_name="Rating choice label value",
+                ),
+                str(item.label or ""),
+            )
+            for item in (rating_labels or ())
         ]
     seen: set[int] = set()
     clean_labels: list[SurveyRatingLabel] = []

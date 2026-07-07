@@ -169,6 +169,17 @@ def test_build_rating_question_rejects_invalid_configurable_scale() -> None:
         )
 
 
+def test_build_rating_question_rejects_non_numeric_label_values() -> None:
+    with pytest.raises(VoteValidationError, match="Rating choice label value"):
+        survey_service.build_question_request(
+            prompt="Rate readiness",
+            question_type=SURVEY_QUESTION_RATING,
+            rating_min_value=1,
+            rating_max_value=10,
+            rating_labels={"bad": "Not numeric"},
+        )
+
+
 def test_validate_draft_response_payload_accepts_partial_answers_and_rankings():
     payload = survey_service.validate_draft_response_payload(
         _draft_snapshot(),
