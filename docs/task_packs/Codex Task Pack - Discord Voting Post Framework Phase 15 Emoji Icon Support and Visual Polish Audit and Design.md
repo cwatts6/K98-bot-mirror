@@ -20,6 +20,14 @@ survey choice options, ranking options, generated public cards, private status/e
 surfaces, and `/vote_admin dashboard`, without changing existing vote/survey semantics or exposing
 new private data.
 
+Phase 15 smoke testing later confirmed Discord button/select emoji rendering works for Unicode and
+custom Discord emoji. Generated PNG cards intentionally fall back to custom emoji text such as
+`:alert:` because the renderer does not fetch or animate Discord custom emoji assets. Smoke testing
+also exposed a survey authoring gap: after adding question 1 in the guided survey builder, an admin
+cannot edit that draft question's option emoji metadata, and there is no narrow survey option-icon
+update path after publish. Capture this as Phase 15 follow-up scope rather than broad
+`/vote_admin` reshaping.
+
 Start with audit/scope confirmation. Do not implement SQL migrations, option metadata storage,
 builder controls, player controls, renderer changes, export/report/dashboard shape changes, public
 rendering changes, command changes, or broad card redesign until the product scope, privacy model,
@@ -98,6 +106,10 @@ Phase 15 promotes the active emoji/icon and visual polish deferred item.
   a custom emoji is unavailable, and spreadsheet/export representation.
 - Validate current SQL option tables and whether additive metadata columns/tables are required.
 - Confirm builder UX for safe emoji/icon selection without unsafe free-form values.
+- Confirm whether guided survey builder review/edit controls should allow admins to correct option
+  emoji/icon metadata on already-added draft questions before publish.
+- Confirm whether a narrow post-publish survey option-icon update path is allowed for open surveys,
+  and whether it should be blocked after responses exist or after close.
 - Confirm player UX for buttons/select menus and restart-safe public openers.
 - Confirm generated-card behavior, font/glyph fallback, text wrapping, truncation, and visual QA
   for dense labels and named rating distributions.
@@ -111,6 +123,10 @@ Phase 15 promotes the active emoji/icon and visual polish deferred item.
 
 - Add additive option emoji/icon metadata for the approved surfaces.
 - Update guided vote/survey builder controls for approved emoji/icon entry or selection.
+- Add guided survey builder edit/review controls for previously added draft questions and their
+  option emoji/icon metadata if approved.
+- Add a narrow survey option-icon update path for open surveys if approved, preserving answer
+  semantics and existing privacy/reporting boundaries.
 - Update player-facing buttons/select labels while preserving existing behavior and limits.
 - Update public card rendering with glyph fallback and mobile/desktop readability checks.
 - Update private status/export/report/dashboard representation where approved.
@@ -133,6 +149,7 @@ Phase 15 promotes the active emoji/icon and visual polish deferred item.
 
 ## 8. Required Separate Follow-Up Slices
 
+- Survey builder question/option edit and survey option-icon update polish.
 - `/vote_admin` Reshaping.
 - Cross-survey/workbook export redesign.
 - Retention/redaction policy changes.
@@ -152,6 +169,7 @@ Definitely not required unless a later operator decision reverses the status:
 | Candidate | Impact | Frequency | Risk reduction | Effort | Score | Decision |
 |---|---:|---:|---:|---:|---:|---|
 | Emoji/icon support for option-bearing voting surfaces | 3 | 4 | 2 | 3 | 6 | Good visual-polish batch candidate after rating-scale delivery. |
+| Survey builder edit/update path for missed option emoji | 3 | 3 | 3 | 3 | 6 | Add to Phase 15 follow-up scope; keep separate from broad command reshaping. |
 | Long label/card-density readability polish | 3 | 3 | 3 | 2 | 7 | Include in Phase 15 audit so Phase 14 smoke observation is not lost. |
 | `/vote_admin` reshaping | 3 | 4 | 3 | 4 | 6 | Keep separate because it changes command surface and rollout communication. |
 | Cross-survey/workbook exports | 4 | 2 | 3 | 4 | 5 | Keep separate until reporting consumers are concrete. |

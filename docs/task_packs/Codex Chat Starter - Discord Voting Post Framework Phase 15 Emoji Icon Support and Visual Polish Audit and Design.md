@@ -86,6 +86,8 @@ Candidate Phase 15 audit scope to confirm:
 - Whether emoji/icon support applies to one-choice vote options, multi-select vote options,
   survey choice options, ranking options, public cards, Discord buttons/selects, private status,
   exports, report bundles, and dashboard summaries.
+- Whether generated PNG cards should continue using custom Discord emoji text fallback such as
+  `:alert:` for custom/animated emoji that cannot be fetched or animated by the renderer.
 - Whether rating labels receive no emoji support, or only benefit from visual density/card
   readability polish.
 - Whether supported values are Unicode emoji only, custom Discord emoji only, or both.
@@ -93,6 +95,10 @@ Candidate Phase 15 audit scope to confirm:
 - Whether new SQL columns/tables/check constraints/views/procedures are needed; prefer additive
   backward-compatible changes only when justified.
 - Builder UX for approved emoji/icon entry without unsafe free-form values.
+- Survey builder edit/review UX so admins can correct option emoji/icon metadata on already-added
+  draft questions before publish, instead of restarting the survey.
+- Whether a narrow survey option-icon update path should exist for open surveys after publish, and
+  whether it should be blocked after responses exist or after close.
 - Player response UX, editing/prefill behavior, and restart-safe opener compatibility.
 - PublicLive and HiddenUntilClose aggregate output for emoji/icon options.
 - Private admin/leadership status, export, report bundle, and dashboard representation.
@@ -115,6 +121,7 @@ Do not include in Phase 15 unless separately approved:
   for emoji/icon or visual-readability compatibility.
 
 Required separate follow-up slices:
+- Survey builder question/option edit and survey option-icon update polish.
 - /vote_admin Reshaping.
 - Cross-survey/workbook export redesign.
 - Retention/redaction policy changes.
