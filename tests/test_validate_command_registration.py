@@ -178,7 +178,7 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
         assert set(mapping.values()).issubset(grouped[group_name])
     assert len(grouped["ops"]) == 25
     assert len(grouped["ark"]) == 14
-    assert sum(len(commands) for commands in grouped.values()) == 95
+    assert sum(len(commands) for commands in grouped.values()) == 96
     assert "calendar" in names
     assert "honor_rankings" in names
     assert "player_profile" in names
@@ -189,6 +189,7 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
         "update",
         "close",
         "status",
+        "dashboard",
         "export",
         "survey_create",
         "survey_close",

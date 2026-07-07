@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+from voting.dashboard_presentation import (
+    DASHBOARD_FILTER_OPEN,
+    DASHBOARD_FILTER_SURVEYS,
+    build_dashboard_embeds,
+    filter_dashboard_summaries,
+)
+from voting.reporting_models import (
+    REPORT_CONTENT_SURVEY,
+    REPORT_CONTENT_VOTE,
+    REPORT_PRIVACY_PROFILE,
+    DashboardReportingContract,
+    DashboardReportingOptionAggregate,
+    DashboardReportingQuestionAggregate,
+    DashboardReportingSummary,
+)
+
+
+def _summary(kind: str, content_id: int, *, status: str = "Closed") -> DashboardReportingSummary:
+    now = datetime(2026, 7, 7, 12, 0, tzinfo=UTC)
+    return DashboardReportingSummary(
+        content_kind=kind,
+        content_id=content_id,
+        title=f"{kind} {content_id}",
+        status=status,
+        result_visibility="HiddenUntilClose",
+        created_at_utc=now,
+        closes_at_utc=now,
+        closed_at_utc=None if status == "Open" else now,
+        total_participants=5,
+        total_selections=7,
+        option_count=2,
+        question_count=2 if kind == REPORT_CONTENT_SURVEY else 1,
+        required_question_count=1,
+        optional_question_count=1 if kind == REPORT_CONTENT_SURVEY else 0,
+        vote_mode="MultiSelect" if kind == REPORT_CONTENT_VOTE else None,
+        answer_type_summary="1 text, 1 rating" if kind == REPORT_CONTENT_SURVEY else "",
+        top_summary="Top selection: A (4)",
+        message_link="https://discord.com/channels/1/2/3",
+    )
+
+
+def _contract() -> DashboardReportingContract:
+    now = datetime(2026, 7, 7, 12, 0, tzinfo=UTC)
+    return DashboardReportingContract(
+        generated_at_utc=now,
+        privacy_profile=REPORT_PRIVACY_PROFILE,
+        summaries=(
+            _summary(REPORT_CONTENT_VOTE, 42, status="Open"),
+            _summary(REPORT_CONTENT_SURVEY, 77, status="Closed"),
+        ),
+        question_aggregates=(
+            DashboardReportingQuestionAggregate(
+                content_kind=REPORT_CONTENT_SURVEY,
+                content_id=77,
+                question_id=100,
+                question_key="q1",
+                question_prompt="Tell us why",
+                question_type="Text",
+                question_sort_order=1,
+                is_required=False,
+                allow_details=False,
+                total_responses=5,
+                answered_responses=3,
+                skipped_responses=2,
+                choice_selection_count=0,
+                ranked_option_count=0,
+                ranking_first_place_count=0,
+                average_rating=None,
+                minimum_rating=None,
+                maximum_rating=None,
+                rating1_count=0,
+                rating2_count=0,
+                rating3_count=0,
+                rating4_count=0,
+                rating5_count=0,
+            ),
+            DashboardReportingQuestionAggregate(
+                content_kind=REPORT_CONTENT_SURVEY,
+                content_id=77,
+                question_id=101,
+                question_key="q2",
+                question_prompt="Rate it",
+                question_type="Rating",
+                question_sort_order=2,
+                is_required=True,
+                allow_details=False,
+                total_responses=5,
+                answered_responses=5,
+                skipped_responses=0,
+                choice_selection_count=0,
+                ranked_option_count=0,
+                ranking_first_place_count=0,
+                average_rating=4.2,
+                minimum_rating=3,
+                maximum_rating=5,
+                rating1_count=0,
+                rating2_count=0,
+                rating3_count=1,
+                rating4_count=2,
+                rating5_count=2,
+            ),
+        ),
+        option_aggregates=(
+            DashboardReportingOptionAggregate(
+                content_kind=REPORT_CONTENT_VOTE,
+                content_id=42,
+                option_id=1,
+                option_key="opt1",
+                option_label="A",
+                option_sort_order=1,
+                total_participants=5,
+                selection_count=4,
+                is_top_selection=True,
+            ),
+        ),
+    )
+
+
+def test_dashboard_embeds_are_private_aggregate_only() -> None:
+    embeds = build_dashboard_embeds(_contract(), filter_value=DASHBOARD_FILTER_SURVEYS)
+
+    assert len(embeds) == 1
+    rendered = str(embeds[0].to_dict())
+    assert "private text responses counted only" in rendered
+    assert "avg 4.2/5" in rendered
+    assert "Aggregate-only private dashboard" in rendered
+    assert "DiscordUserID" not in rendered
+    assert "DiscordName" not in rendered
+    assert "AnswerText" not in rendered
+    assert "DetailText" not in rendered
+
+
+def test_dashboard_filter_can_limit_to_open_items() -> None:
+    rows = filter_dashboard_summaries(_contract().summaries, DASHBOARD_FILTER_OPEN)
+
+    assert len(rows) == 1
+    assert rows[0].content_kind == REPORT_CONTENT_VOTE
+    assert rows[0].status == "Open"

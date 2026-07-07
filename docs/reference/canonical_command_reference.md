@@ -1,6 +1,6 @@
 # Canonical Command Reference
 
-Last updated: 2026-07-02
+Last updated: 2026-07-07
 
 This is the maintained command reference for the K98 bot after the completed Command Platform
 Audit & Optimisation Programme. Use
@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=42 grouped_subcommands_detected=95 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
+primary=42 grouped_subcommands_detected=96 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
 ```
 
 Grouped command summary:
@@ -40,7 +40,7 @@ Grouped command summary:
 | `/registry` | 7 |
 | `/stats` | 1 |
 | `/subscriptions` | 3 |
-| `/vote_admin` | 9 |
+| `/vote_admin` | 10 |
 
 ## Command Surface Rules
 
@@ -213,6 +213,7 @@ Legend:
 | Voting Admin | `/vote_admin update` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral guided update panel | Standard | Phase 2 guided voting framework | Selects a vote by autocomplete and opens an explicit edit-target menu for safe open-vote fields: title, description, close time, unsent reminders, and future mention settings. |
 | Voting Admin | `/vote_admin close` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response; public close announcement side effect | Standard | Phase 2 guided voting framework | Selects a vote by autocomplete, closes it early, disables buttons, refreshes the final card, and sends a controlled close announcement with winner, tie, or no-vote summary. |
 | Voting Admin | `/vote_admin status` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Phase 5 hidden-until-close results | Selects a vote by autocomplete and shows vote state, result visibility, private admin totals, reminder delivery state, and original message link. |
+| Voting Admin | `/vote_admin dashboard` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral private dashboard view | Standard | Phase 13 Private Dashboard UI | Opens a private aggregate vote/survey dashboard over the Phase 11 dashboard-safe reporting contract, with filters, pagination, refresh, message links, HiddenUntilClose private admin aggregate visibility, and no Discord identity, per-user rows, raw text/detail answers, or unsubmitted drafts. |
 | Voting Admin | `/vote_admin export` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response and private CSV file | Standard | Phase 4 voter-level audit export | Selects a closed vote by autocomplete and privately exports either totals-only CSV results or voter-level audit rows via the `mode` option. Voter audit includes spreadsheet-safe Discord user ID text, resolved Discord name, selected option, original option, vote timestamps, and change flag; governor identity remains deferred. |
 | Voting Admin | `/vote_admin survey_create` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral guided builder; public survey post side effect | Standard | Phase 7 first survey slice | Opens a private admin builder for 2-5 required choice-only survey questions, then publishes a SQL-backed survey with a persistent public Answer survey button, close/reminder controls, response-change setting, and public-live or hidden-until-close result visibility. |
 | Voting Admin | `/vote_admin survey_close` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response; public close announcement side effect | Standard | Phase 7 first survey slice | Selects an open survey by autocomplete, closes it early, disables the answer button, refreshes the final card, and sends a controlled close announcement. |

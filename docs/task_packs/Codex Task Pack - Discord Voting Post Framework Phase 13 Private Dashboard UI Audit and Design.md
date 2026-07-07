@@ -6,8 +6,8 @@
 - Date: `2026-07-06`
 - Owner/context: `Follow-up after Phase 11 dashboard-safe reporting runtime contract and Phase 12 survey draft/resume delivery`
 - Task type: `audit | product scope | private dashboard UX | Discord interaction design | reporting contract review`
-- One-pass approved: `no`
-- Status: `prepared as the next voting-framework slice`
+- One-pass approved: `approved after audit/scope confirmation`
+- Status: `implemented locally; awaiting operator Discord smoke/promotion`
 
 ## 2. Objective
 
@@ -74,6 +74,26 @@ Phase 1 through Phase 12 are complete and smoke tested. The voting framework now
 Phase 12 smoke and regression testing on 2026-07-06 confirmed persisted survey drafts/resume,
 duplicate stale-session protection, orange saved-draft warning copy, draft exclusion from result
 and export surfaces, and preserved regression behavior.
+
+## 4A. Delivered Runtime Shape
+
+After audit/scope approval, Phase 13 implemented the first private Discord dashboard UI slice:
+
+- Added `/vote_admin dashboard` under the existing approved `/vote_admin` group.
+- Kept the command admin/leadership-gated and ephemeral/private.
+- Reused the Phase 11 `build_admin_leadership_dashboard_report()` aggregate contract.
+- Added a Discord presentation adapter and private non-persistent dashboard view with filters,
+  pagination, refresh, and close controls.
+- Preserved the dashboard-safe boundary: no Discord identity, no per-user rows, no raw text
+  answers, no choice detail text, no unsubmitted survey draft answers, and no public posting.
+- Preserved HiddenUntilClose public privacy while allowing private admin/leadership aggregate
+  visibility through the dashboard.
+- Added focused presentation/view/command-registration tests and updated the canonical command
+  reference.
+
+No SQL objects, public dashboard, generated card, export format, retention/redaction behavior,
+cross-survey workbook output, rating-scale extension, emoji/icon support, governor-aware reporting,
+role-restricted voting, saved templates, or broad `/vote_admin` reshape were added.
 
 ## 5. Source Deferred Item
 

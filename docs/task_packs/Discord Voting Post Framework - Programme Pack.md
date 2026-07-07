@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 through Phase 12 complete and smoke tested; Phase 13 Private Dashboard UI prepared as the next audit/design slice`
+- Current status: `Phase 1 through Phase 12 complete and smoke tested; Phase 13 Private Dashboard UI implemented locally and awaiting operator Discord smoke/promotion`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -939,9 +939,9 @@ Validation and smoke evidence:
   log-noise, and Codex Security gates passed.
 - Operator smoke testing and regression testing completed successfully on 2026-07-06.
 
-Explicitly still out of scope after Phase 12 unless separately approved:
+Explicitly still out of scope after Phase 13 unless separately approved:
 
-- Private dashboard UI implementation, public website, or public dashboard.
+- Public website or public dashboard.
 - New top-level commands or broad `/vote_admin` reshaping.
 - Cross-survey exports, workbook exports, or longitudinal reports.
 - Retention/redaction behavior changes.
@@ -951,20 +951,26 @@ Explicitly still out of scope after Phase 12 unless separately approved:
 - SQL-native combined vote/survey reporting views/procedures unless reporting consumers or
   performance needs justify them.
 
-### Phase 13 private dashboard UI outline
+### Phase 13 private dashboard UI
 
-Phase 13 is the next prepared voting-framework slice. It starts with audit/scope confirmation for
-the private admin/leadership dashboard UI over the Phase 11 dashboard-safe reporting service
-contract, now that Phase 12 has confirmed persisted drafts stay excluded from dashboard-safe
-summary payloads until final submit.
+Phase 13 implemented the first private admin/leadership dashboard UI over the Phase 11
+dashboard-safe reporting service contract, after Phase 12 confirmed persisted drafts stay excluded
+from dashboard-safe summary payloads until final submit.
 
-Phase 13 should confirm the private UI surface, permissions, privacy, command/interaction UX,
-HiddenUntilClose private-admin semantics, answer-type representation, draft exclusion, SQL/reporting
-performance posture, tests, smoke plan, deployment order, rollback posture, and deferred-scope
-direction before any runtime dashboard UI implementation. Public dashboards, raw text/detail
-display, per-user rows, cross-survey workbook exports, retention/redaction changes, rating-scale
-extensions, emoji/icon support, and broad `/vote_admin` reshaping remain separate approval-gated
-slices.
+Delivered locally:
+
+- `/vote_admin dashboard` under the existing approved `/vote_admin` group.
+- Private ephemeral admin/leadership delivery.
+- Aggregate vote/survey dashboard pages with filters, pagination, refresh, and close controls.
+- Reuse of Phase 11 dashboard-safe reporting payloads with no new SQL objects.
+- HiddenUntilClose private admin aggregate visibility without public result leakage.
+- Dashboard-safe exclusion of Discord identity, per-user rows, raw text answers, choice detail
+  text, and unsubmitted draft answers.
+
+Public dashboards, raw text/detail display, per-user rows, cross-survey workbook exports,
+retention/redaction changes, rating-scale extensions, emoji/icon support, generated dashboard
+cards, optional SQL-native combined reporting objects, and broad `/vote_admin` reshaping remain
+separate approval-gated slices.
 
 ## 9. Cross-Programme Constraints
 
@@ -979,8 +985,8 @@ slices.
 - Do not expose voter-level exports publicly without explicit approval.
 - Do not add further advanced voting modes until their product, privacy, permissions, SQL, UX,
   test, and rollout model are explicitly approved.
-- Do not change delivered draft/resume behavior or implement rating-scale extensions, emoji/icon
-  support, private dashboard UI, public reporting, role-restricted voting, governor-linked voting,
+- Do not change delivered draft/resume or private dashboard behavior, or implement rating-scale
+  extensions, emoji/icon support, public reporting, role-restricted voting, governor-linked voting,
   saved templates, cross-survey/workbook exports, SQL-native combined reporting objects,
   retention/redaction behavior changes, or public voter-level exports as part of any voting slice
   unless separately approved.
@@ -1077,17 +1083,20 @@ The core programme is successful when:
       validation, draft exclusion from public results/private dashboard summaries/status totals/
       exports/report bundles, rollout-safe migration behavior, and preserved vote/submitted-survey
       behavior.
+- [x] Private dashboard UI is implemented in Phase 13 with `/vote_admin dashboard`, private
+      admin/leadership ephemeral delivery, aggregate vote/survey pages, filters, pagination,
+      refresh controls, HiddenUntilClose private aggregate visibility, no new SQL objects, and
+      dashboard-safe exclusion of Discord identity, per-user rows, raw text/detail answers, and
+      unsubmitted drafts.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 13: Private Dashboard UI Audit and Design.
+Smoke and promote Discord Voting Post Framework Phase 13: Private Dashboard UI.
 
-Begin with audit/scope confirmation. Do not implement new commands, command reshaping, new SQL
-objects, public dashboards, retention/redaction behavior changes, cross-survey workbook exports,
-raw text/detail exposure, per-user dashboard rows, or Discord interaction runtime changes until
-the Phase 13 architecture, product scope, privacy, SQL/reporting posture, permissions, and UX
-direction are approved.
+Before promotion, run local validation, Codex Security review, and operator Discord smoke for
+/vote_admin dashboard using open/closed vote and survey examples, HiddenUntilClose content, mixed
+answer types, dashboard filters, pagination, refresh, and normal-user denial.
 ```
 
 ## 13. Programme Change Log
@@ -1130,3 +1139,4 @@ direction are approved.
 | 2026-07-06 | Phase 12 survey draft/resume prepared | Phase 11 task pack and starter were archived. Created the active Phase 12 Survey Draft Resume audit/design task pack and chat starter. Private dashboard UI implementation, rating-scale extensions, emoji/icon support, `/vote_admin` reshaping, cross-survey/workbook exports, retention/redaction policy changes, and optional SQL-native combined reporting remain separate approval-gated slices. |
 | 2026-07-06 | Phase 12 survey draft/resume delivered | SQL PR #36, mirror PR #207, and production PR #514 delivered persisted survey drafts/resume for surveys only, automatic and explicit draft save, restart-safe resume, duplicate stale-panel protection, answer-type coverage, final-submit validation, draft exclusion from public/private result and export surfaces, review hardening, full validation, and successful operator smoke/regression testing. |
 | 2026-07-06 | Phase 13 private dashboard UI prepared | Phase 12 task pack and starter were archived. Created the active Phase 13 Private Dashboard UI audit/design task pack and chat starter. Rating-scale extensions, emoji/icon support, `/vote_admin` reshaping, cross-survey/workbook exports, retention/redaction policy changes, optional SQL-native combined reporting, role/governor voting, saved templates, and public detail/voter-level posting remain separate approval-gated or not-required work. |
+| 2026-07-07 | Phase 13 private dashboard UI implemented locally | Added `/vote_admin dashboard`, aggregate-only private dashboard presentation, owner-only ephemeral dashboard view with filters, pagination, refresh, and close controls, command reference updates, focused tests, and removal of the now-resolved active deferred dashboard item. No SQL objects, public dashboards, raw text/detail display, per-user rows, export redesign, retention/redaction changes, or broad `/vote_admin` reshaping were added. |
