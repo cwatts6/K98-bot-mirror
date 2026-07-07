@@ -860,6 +860,7 @@ async def update_survey_post(
                 (normalize_result_visibility(result_visibility), now, int(survey_id)),
             )
         offsets_to_rebuild = reminder_offsets_minutes
+        reminders_changed = reminder_offsets_minutes is not None
         if offsets_to_rebuild is None and closes_at_utc is not None:
             cur.execute(
                 """
@@ -871,6 +872,7 @@ async def update_survey_post(
                 (int(survey_id),),
             )
             offsets_to_rebuild = tuple(int(row[0]) for row in cur.fetchall())
+            reminders_changed = bool(offsets_to_rebuild)
         if offsets_to_rebuild is not None:
             cur.execute(
                 """
@@ -919,7 +921,7 @@ async def update_survey_post(
                         "title": title is not None,
                         "description": description is not None,
                         "closes_at": closes_at_utc is not None,
-                        "reminders": reminder_offsets_minutes is not None,
+                        "reminders": reminders_changed,
                         "reminder_mention_everyone": reminder_mention_everyone is not None,
                         "close_mention_everyone": close_mention_everyone is not None,
                         "allow_response_change": allow_response_change is not None,

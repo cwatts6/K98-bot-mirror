@@ -976,6 +976,10 @@ async def test_update_survey_post_rebuilds_pending_reminders_for_close_change(mo
         survey_dal._naive_utc(close_at - timedelta(minutes=60)),
         survey_dal._naive_utc(close_at - timedelta(minutes=30)),
     ]
+    audit_params = next(
+        params for sql, params in cursor.executed if "INSERT INTO dbo.SurveyAudit" in sql
+    )
+    assert json.loads(str(audit_params[2]))["reminders"] is True
 
 
 @pytest.mark.asyncio
