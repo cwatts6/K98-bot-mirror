@@ -77,6 +77,17 @@ class _Interaction:
         self.followups.append({"args": args, "kwargs": kwargs})
 
 
+class _FailingDeferResponse(_Response):
+    async def defer(self, **_kwargs) -> None:
+        raise RuntimeError("defer failed")
+
+
+class _FailingDeferInteraction(_Interaction):
+    def __init__(self, user_id: int = 123) -> None:
+        super().__init__(user_id=user_id)
+        self.response = _FailingDeferResponse()
+
+
 @pytest.mark.asyncio
 async def test_dashboard_view_starts_with_single_page_controls() -> None:
     view = VoteAdminDashboardView(_contract(), owner_user_id=123)
@@ -114,3 +125,18 @@ async def test_dashboard_refresh_reloads_contract() -> None:
     assert interaction.response.deferred is True
     assert interaction.original_edits
     assert "Refreshed vote" in str(interaction.original_edits[-1]["embed"].to_dict())
+
+
+@pytest.mark.asyncio
+async def test_dashboard_refresh_uses_response_edit_when_defer_fails() -> None:
+    async def loader():
+        return _contract(title="Refreshed without defer")
+
+    view = VoteAdminDashboardView(_contract(), owner_user_id=123, report_loader=loader)
+    interaction = _FailingDeferInteraction(user_id=123)
+
+    await view._on_refresh(interaction)
+
+    assert interaction.original_edits == []
+    assert interaction.response.edits
+    assert "Refreshed without defer" in str(interaction.response.edits[-1]["embed"].to_dict())

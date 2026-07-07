@@ -10,6 +10,7 @@ from utils import fmt_short
 from voting.reporting_models import (
     REPORT_CONTENT_SURVEY,
     REPORT_CONTENT_VOTE,
+    REPORT_PRIVACY_PROFILE,
     DashboardReportingContract,
     DashboardReportingOptionAggregate,
     DashboardReportingQuestionAggregate,
@@ -95,6 +96,9 @@ def build_dashboard_embeds(
     *,
     filter_value: str | None = None,
 ) -> tuple[discord.Embed, ...]:
+    if not _is_dashboard_safe_contract(contract):
+        return (_unsafe_contract_embed(filter_value),)
+
     filtered = filter_dashboard_summaries(contract.summaries, filter_value)
     if not filtered:
         return (_empty_embed(contract, filter_value),)
@@ -114,6 +118,32 @@ def build_dashboard_embeds(
         for index, summary in enumerate(filtered)
     ]
     return tuple(pages)
+
+
+def _is_dashboard_safe_contract(contract: DashboardReportingContract) -> bool:
+    return (
+        contract.dashboard_safe
+        and contract.privacy_profile == REPORT_PRIVACY_PROFILE
+        and not contract.contains_discord_identity
+        and not contract.contains_raw_text_or_detail
+    )
+
+
+def _unsafe_contract_embed(filter_value: str | None) -> discord.Embed:
+    embed = discord.Embed(
+        title="Voting dashboard unavailable",
+        description=(
+            "Dashboard data failed privacy validation, so no report content was rendered."
+        ),
+        color=discord.Color.red(),
+    )
+    embed.set_footer(
+        text=(
+            f"Filter: {dashboard_filter_label(filter_value)} | "
+            "Private dashboard blocked: reporting contract is not dashboard-safe"
+        )
+    )
+    return embed
 
 
 def _questions_by_content(

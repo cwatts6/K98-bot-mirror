@@ -173,3 +173,26 @@ def test_dashboard_embed_fields_are_clipped_to_discord_limit() -> None:
 
     assert len(option_totals) <= 1024
     assert option_totals.endswith("...")
+
+
+def test_dashboard_refuses_to_render_unsafe_contract() -> None:
+    contract = _contract()
+    unsafe = DashboardReportingContract(
+        generated_at_utc=contract.generated_at_utc,
+        privacy_profile=contract.privacy_profile,
+        summaries=(_summary(REPORT_CONTENT_SURVEY, 99, status="Open"),),
+        question_aggregates=contract.question_aggregates,
+        option_aggregates=contract.option_aggregates,
+        dashboard_safe=False,
+        contains_raw_text_or_detail=True,
+        contains_discord_identity=True,
+    )
+
+    embed = build_dashboard_embeds(unsafe)[0]
+    rendered = str(embed.to_dict())
+
+    assert "Voting dashboard unavailable" in rendered
+    assert "failed privacy validation" in rendered
+    assert "survey 99" not in rendered
+    assert "private text responses counted only" not in rendered
+    assert "not dashboard-safe" in rendered

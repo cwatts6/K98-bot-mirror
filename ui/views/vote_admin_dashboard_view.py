@@ -143,7 +143,7 @@ class VoteAdminDashboardView(discord.ui.View):
             await send_ephemeral(interaction, "Dashboard could not be refreshed. Please try again.")
             return
         self.rebuild_pages()
-        await interaction.edit_original_response(embed=self.current_embed(), view=self)
+        await self.edit_current(interaction)
 
     async def _on_close(self, interaction: discord.Interaction) -> None:
         for child in self.children:
