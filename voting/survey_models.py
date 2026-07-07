@@ -78,8 +78,12 @@ def rating_count_for_value(question: SurveyQuestion, rating_value: int) -> int:
 
 
 def rating_values_for_question(question: SurveyQuestion) -> range:
-    minimum = int(getattr(question, "rating_min_value", DEFAULT_RATING_MIN_VALUE) or DEFAULT_RATING_MIN_VALUE)
-    maximum = int(getattr(question, "rating_max_value", DEFAULT_RATING_MAX_VALUE) or DEFAULT_RATING_MAX_VALUE)
+    minimum = int(
+        getattr(question, "rating_min_value", DEFAULT_RATING_MIN_VALUE) or DEFAULT_RATING_MIN_VALUE
+    )
+    maximum = int(
+        getattr(question, "rating_max_value", DEFAULT_RATING_MAX_VALUE) or DEFAULT_RATING_MAX_VALUE
+    )
     if maximum < minimum:
         maximum = minimum
     return range(minimum, maximum + 1)
@@ -99,8 +103,12 @@ def rating_choice_display(question: SurveyQuestion, rating_value: int) -> str:
 
 
 def rating_scale_text(question: SurveyQuestion) -> str:
-    minimum = int(getattr(question, "rating_min_value", DEFAULT_RATING_MIN_VALUE) or DEFAULT_RATING_MIN_VALUE)
-    maximum = int(getattr(question, "rating_max_value", DEFAULT_RATING_MAX_VALUE) or DEFAULT_RATING_MAX_VALUE)
+    minimum = int(
+        getattr(question, "rating_min_value", DEFAULT_RATING_MIN_VALUE) or DEFAULT_RATING_MIN_VALUE
+    )
+    maximum = int(
+        getattr(question, "rating_max_value", DEFAULT_RATING_MAX_VALUE) or DEFAULT_RATING_MAX_VALUE
+    )
     base = f"{minimum}-{maximum}"
     low = str(getattr(question, "rating_low_label", "") or "").strip()
     high = str(getattr(question, "rating_high_label", "") or "").strip()

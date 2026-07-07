@@ -119,12 +119,10 @@ def _clean_limited_text(
 
 def _rating_bounds_for_question(question) -> tuple[int, int]:
     minimum = int(
-        getattr(question, "rating_min_value", DEFAULT_RATING_MIN_VALUE)
-        or DEFAULT_RATING_MIN_VALUE
+        getattr(question, "rating_min_value", DEFAULT_RATING_MIN_VALUE) or DEFAULT_RATING_MIN_VALUE
     )
     maximum = int(
-        getattr(question, "rating_max_value", DEFAULT_RATING_MAX_VALUE)
-        or DEFAULT_RATING_MAX_VALUE
+        getattr(question, "rating_max_value", DEFAULT_RATING_MAX_VALUE) or DEFAULT_RATING_MAX_VALUE
     )
     return minimum, maximum
 
@@ -228,7 +226,13 @@ def _validate_rating_scale(
             continue
         seen.add(rating_value)
         clean_labels.append(SurveyRatingLabel(rating_value=rating_value, label=clean_label))
-    return minimum, maximum, clean_low, clean_high, tuple(sorted(clean_labels, key=lambda item: item.rating_value))
+    return (
+        minimum,
+        maximum,
+        clean_low,
+        clean_high,
+        tuple(sorted(clean_labels, key=lambda item: item.rating_value)),
+    )
 
 
 def build_question_request(

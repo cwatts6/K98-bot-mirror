@@ -800,7 +800,9 @@ async def test_survey_response_panel_uses_select_for_extended_rating():
 
     rating_select._selected_values = ["10"]
     rating_select._interaction = SimpleNamespace(data={})
-    await rating_select.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    await rating_select.callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
 
     assert panel.rating_answers == {10: 10}
     assert "rated 10 - Excellent" in panel.content()

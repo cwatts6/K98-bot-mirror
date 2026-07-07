@@ -168,7 +168,10 @@ def _rows_to_rating_labels(
                 label=label,
             )
         )
-    return {key: tuple(sorted(value, key=lambda item: item.rating_value)) for key, value in grouped.items()}
+    return {
+        key: tuple(sorted(value, key=lambda item: item.rating_value))
+        for key, value in grouped.items()
+    }
 
 
 async def _survey_rating_answers_table_exists() -> bool:
@@ -787,14 +790,10 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
     rating_min_value_expr = "q.RatingMinValue" if rating_scale_available else "1"
     rating_max_value_expr = "q.RatingMaxValue" if rating_scale_available else "5"
     rating_low_label_expr = (
-        "q.RatingLowLabel"
-        if rating_scale_available
-        else "CAST(NULL AS nvarchar(40))"
+        "q.RatingLowLabel" if rating_scale_available else "CAST(NULL AS nvarchar(40))"
     )
     rating_high_label_expr = (
-        "q.RatingHighLabel"
-        if rating_scale_available
-        else "CAST(NULL AS nvarchar(40))"
+        "q.RatingHighLabel" if rating_scale_available else "CAST(NULL AS nvarchar(40))"
     )
     question_sql = f"""
             WITH ChoiceAnswered AS (
@@ -2218,9 +2217,7 @@ def _answer_audit_from_rows(
         updated_at = _aware_utc(row.get("ResponseUpdatedAtUtc"))
         if created_at is None or updated_at is None:
             raise ValueError("Survey response row is missing required UTC timestamps.")
-        rating_value = (
-            int(row["RatingValue"]) if row.get("RatingValue") not in (None, "") else None
-        )
+        rating_value = int(row["RatingValue"]) if row.get("RatingValue") not in (None, "") else None
         original_rating_value = _original_rating_for_question(
             row.get("OriginalAnswersJson"), question_id
         )

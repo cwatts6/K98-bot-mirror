@@ -1203,18 +1203,10 @@ class SurveyBuilderView(discord.ui.View):
                 else self.draft_allow_details
             ),
             is_required=self.draft_is_required,
-            rating_min_value=(
-                self.draft_rating_min_value if self.draft_is_rating else None
-            ),
-            rating_max_value=(
-                self.draft_rating_max_value if self.draft_is_rating else None
-            ),
-            rating_low_label=(
-                self.draft_rating_low_label if self.draft_is_rating else None
-            ),
-            rating_high_label=(
-                self.draft_rating_high_label if self.draft_is_rating else None
-            ),
+            rating_min_value=(self.draft_rating_min_value if self.draft_is_rating else None),
+            rating_max_value=(self.draft_rating_max_value if self.draft_is_rating else None),
+            rating_low_label=(self.draft_rating_low_label if self.draft_is_rating else None),
+            rating_high_label=(self.draft_rating_high_label if self.draft_is_rating else None),
             rating_labels=self.draft_rating_labels if self.draft_is_rating else None,
         )
         self._clear_draft()
@@ -1240,17 +1232,14 @@ class SurveyBuilderView(discord.ui.View):
             )
         )
         if self.draft_is_rating:
-            lines.append(
-                f"Scale: {self.draft_rating_min_value}-{self.draft_rating_max_value}"
-            )
+            lines.append(f"Scale: {self.draft_rating_min_value}-{self.draft_rating_max_value}")
             if self.draft_rating_low_label or self.draft_rating_high_label:
                 low = self.draft_rating_low_label or "not set"
                 high = self.draft_rating_high_label or "not set"
                 lines.append(f"Scale labels: {low} to {high}")
             if self.draft_rating_labels:
                 label_text = "; ".join(
-                    f"{value}={label}"
-                    for value, label in sorted(self.draft_rating_labels.items())
+                    f"{value}={label}" for value, label in sorted(self.draft_rating_labels.items())
                 )
                 lines.append(f"Named ratings: {label_text}")
         else:
@@ -1740,9 +1729,7 @@ class _SurveyRatingScaleLabelsModal(discord.ui.Modal):
                 continue
             separator = "=" if "=" in line else ":"
             if separator not in line:
-                raise survey_service.VoteValidationError(
-                    "Named values must use lines like 1=Poor."
-                )
+                raise survey_service.VoteValidationError("Named values must use lines like 1=Poor.")
             raw_value, raw_label = line.split(separator, 1)
             try:
                 value = int(raw_value.strip())
