@@ -140,3 +140,36 @@ def test_dashboard_filter_can_limit_to_open_items() -> None:
     assert len(rows) == 1
     assert rows[0].content_kind == REPORT_CONTENT_VOTE
     assert rows[0].status == "Open"
+
+
+def test_dashboard_embed_fields_are_clipped_to_discord_limit() -> None:
+    contract = _contract()
+    long_options = tuple(
+        DashboardReportingOptionAggregate(
+            content_kind=REPORT_CONTENT_VOTE,
+            content_id=42,
+            option_id=index,
+            option_key=f"opt{index}",
+            option_label=f"Option {index} " + ("x" * 160),
+            option_sort_order=index,
+            total_participants=5,
+            selection_count=index,
+            is_top_selection=index == 1,
+        )
+        for index in range(1, 13)
+    )
+    contract = DashboardReportingContract(
+        generated_at_utc=contract.generated_at_utc,
+        privacy_profile=contract.privacy_profile,
+        summaries=contract.summaries,
+        question_aggregates=contract.question_aggregates,
+        option_aggregates=long_options,
+    )
+
+    embed = build_dashboard_embeds(contract)[0]
+    option_totals = next(
+        field["value"] for field in embed.to_dict()["fields"] if field["name"] == "Option totals"
+    )
+
+    assert len(option_totals) <= 1024
+    assert option_totals.endswith("...")

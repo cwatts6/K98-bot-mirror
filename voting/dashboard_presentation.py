@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
-from datetime import UTC, datetime
+from datetime import UTC
 
 import discord
 
@@ -119,9 +119,9 @@ def build_dashboard_embeds(
 def _questions_by_content(
     rows: Sequence[DashboardReportingQuestionAggregate],
 ) -> dict[tuple[str, int], tuple[DashboardReportingQuestionAggregate, ...]]:
-    grouped: defaultdict[
-        tuple[str, int], list[DashboardReportingQuestionAggregate]
-    ] = defaultdict(list)
+    grouped: defaultdict[tuple[str, int], list[DashboardReportingQuestionAggregate]] = defaultdict(
+        list
+    )
     for row in rows:
         grouped[(row.content_kind, row.content_id)].append(row)
     return {
@@ -218,9 +218,7 @@ def _state_text(summary: DashboardReportingSummary) -> str:
         if summary.closed_at_utc is not None
         else f"closes {summary.closes_at_utc:%Y-%m-%d %H:%M UTC}"
     )
-    return (
-        f"{summary.status} | {result_visibility_label(summary.result_visibility)} | {closed}"
-    )
+    return f"{summary.status} | {result_visibility_label(summary.result_visibility)} | {closed}"
 
 
 def _participation_text(summary: DashboardReportingSummary) -> str:
@@ -235,8 +233,7 @@ def _participation_text(summary: DashboardReportingSummary) -> str:
 def _structure_text(summary: DashboardReportingSummary) -> str:
     if summary.content_kind == REPORT_CONTENT_VOTE:
         return (
-            f"{vote_mode_label(summary.vote_mode)}\n"
-            f"{fmt_short(summary.option_count)} options"
+            f"{vote_mode_label(summary.vote_mode)}\n" f"{fmt_short(summary.option_count)} options"
         )
     answer_types = summary.answer_type_summary or "no answer types"
     return (
@@ -258,8 +255,7 @@ def _vote_option_lines(
         marker = "top " if option.is_top_selection else ""
         percent = _percentage(option.selection_count, option.total_participants)
         lines.append(
-            f"{marker}{option.option_label}: {fmt_short(option.selection_count)}"
-            f"{percent}"
+            f"{marker}{option.option_label}: {fmt_short(option.selection_count)}" f"{percent}"
         )
     if len(option_rows) > 12:
         lines.append(f"+{len(option_rows) - 12} more option(s)")
@@ -361,7 +357,9 @@ def _clip(value: str, limit: int) -> str:
     text = str(value or "")
     if len(text) <= limit:
         return text or "-"
-    return text[: max(0, limit - 1)].rstrip() + "..."
+    if limit <= 3:
+        return "." * max(0, limit)
+    return text[: max(0, limit - 3)].rstrip() + "..."
 
 
 def _add_privacy_footer(
