@@ -25,7 +25,7 @@ def _button_style(value: str | None) -> discord.ButtonStyle:
     return mapping.get((value or "").casefold(), discord.ButtonStyle.primary)
 
 
-def _discord_emoji(emoji: OptionEmoji | None):
+def _discord_emoji(emoji: OptionEmoji | None) -> discord.PartialEmoji | str | None:
     if emoji is None:
         return None
     if emoji.kind == EMOJI_KIND_CUSTOM_DISCORD:

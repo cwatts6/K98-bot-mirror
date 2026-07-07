@@ -8,7 +8,13 @@ from typing import Any
 
 from file_utils import cursor_row_to_dict, fetch_one_dict, run_blocking_in_thread
 from stats_alerts.db import exec_with_cursor, run_one_async, run_query_async
-from voting.option_emojis import OptionEmoji, option_emoji_from_row
+from voting.option_emojis import (
+    OPTION_EMOJI_MIGRATION_ID,
+    OPTION_EMOJI_MIGRATION_MESSAGE,
+    OptionEmoji,
+    option_emoji_from_row,
+    option_emoji_sql_values,
+)
 from voting.result_visibility import normalize_result_visibility
 from voting.service import VoteValidationError
 from voting.survey_models import (
@@ -140,16 +146,27 @@ def _rows_to_options(rows: Sequence[dict[str, Any]]) -> dict[int, tuple[SurveyQu
     return {key: tuple(value) for key, value in grouped.items()}
 
 
-def _emoji_sql_values(emoji: OptionEmoji | None) -> tuple[str | None, str | None, str | None, str | None, int | None]:
-    if emoji is None:
-        return None, None, None, None, None
-    return (
-        emoji.kind,
-        emoji.text,
-        emoji.name,
-        emoji.emoji_id,
-        1 if emoji.animated else 0,
+async def _survey_option_emoji_columns_exist() -> bool:
+    row = await run_one_async(
+        """
+        SELECT COL_LENGTH(N'dbo.SurveyQuestionOptions', N'EmojiKind') AS EmojiKindColumn;
+        """
     )
+    return bool(row and row.get("EmojiKindColumn") not in (None, ""))
+
+
+def _survey_option_emoji_columns_exist_sync(cur) -> bool:
+    cur.execute(
+        """
+        SELECT COL_LENGTH(N'dbo.SurveyQuestionOptions', N'EmojiKind') AS EmojiKindColumn;
+        """
+    )
+    row = fetch_one_dict(cur)
+    return bool(row and row.get("EmojiKindColumn") not in (None, ""))
+
+
+def _question_uses_option_emojis(question) -> bool:
+    return any(item is not None for item in getattr(question, "option_emojis", ()) or ())
 
 
 def _rows_to_rating_counts(
@@ -534,6 +551,15 @@ async def create_survey(req: SurveyCreateRequest) -> int:
                 SURVEY_RATING_SCALE_MIGRATION_ID,
             )
             return VoteValidationError(SURVEY_RATING_SCALE_MIGRATION_MESSAGE)
+        option_emoji_available = _survey_option_emoji_columns_exist_sync(cur)
+        if not option_emoji_available and any(
+            _question_uses_option_emojis(question) for question in req.questions
+        ):
+            logger.warning(
+                "survey_option_emoji_metadata_missing_create migration=%s",
+                OPTION_EMOJI_MIGRATION_ID,
+            )
+            return VoteValidationError(OPTION_EMOJI_MIGRATION_MESSAGE)
         now = _naive_utc(datetime.now(UTC))
         cur.execute(
             """
@@ -645,37 +671,47 @@ async def create_survey(req: SurveyCreateRequest) -> int:
                         ),
                     )
             for option_index, label in enumerate(question.options):
-                emoji = (
-                    question.option_emojis[option_index]
-                    if option_index < len(question.option_emojis)
-                    else None
-                )
-                emoji_kind, emoji_text, emoji_name, emoji_id, emoji_animated = _emoji_sql_values(
-                    emoji
-                )
-                cur.execute(
-                    """
-                    INSERT INTO dbo.SurveyQuestionOptions
+                if option_emoji_available:
+                    emoji = (
+                        question.option_emojis[option_index]
+                        if option_index < len(question.option_emojis)
+                        else None
+                    )
+                    emoji_kind, emoji_text, emoji_name, emoji_id, emoji_animated = (
+                        option_emoji_sql_values(emoji)
+                    )
+                    cur.execute(
+                        """
+                        INSERT INTO dbo.SurveyQuestionOptions
+                            (
+                                SurveyQuestionID, OptionKey, Label, SortOrder,
+                                EmojiKind, EmojiText, EmojiName, EmojiID, EmojiAnimated,
+                                CreatedAtUtc
+                            )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                        """,
                         (
-                            SurveyQuestionID, OptionKey, Label, SortOrder,
-                            EmojiKind, EmojiText, EmojiName, EmojiID, EmojiAnimated,
-                            CreatedAtUtc
-                        )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-                    """,
-                    (
-                        question_id,
-                        _option_key(option_index),
-                        label,
-                        option_index + 1,
-                        emoji_kind,
-                        emoji_text,
-                        emoji_name,
-                        emoji_id,
-                        emoji_animated,
-                        now,
-                    ),
-                )
+                            question_id,
+                            _option_key(option_index),
+                            label,
+                            option_index + 1,
+                            emoji_kind,
+                            emoji_text,
+                            emoji_name,
+                            emoji_id,
+                            emoji_animated,
+                            now,
+                        ),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO dbo.SurveyQuestionOptions
+                            (SurveyQuestionID, OptionKey, Label, SortOrder, CreatedAtUtc)
+                        VALUES (?, ?, ?, ?, ?);
+                        """,
+                        (question_id, _option_key(option_index), label, option_index + 1, now),
+                    )
         for offset in req.reminder_offsets_minutes:
             cur.execute(
                 """
@@ -933,11 +969,28 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
         if ranking_answers_available
         else ""
     )
+    option_emoji_available = await _survey_option_emoji_columns_exist()
+    option_emoji_select = (
+        "o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated"
+        if option_emoji_available
+        else (
+            "CAST(NULL AS varchar(20)) AS EmojiKind, "
+            "CAST(NULL AS nvarchar(120)) AS EmojiText, "
+            "CAST(NULL AS nvarchar(64)) AS EmojiName, "
+            "CAST(NULL AS varchar(32)) AS EmojiID, "
+            "CAST(NULL AS bit) AS EmojiAnimated"
+        )
+    )
+    option_emoji_group_by = (
+        ", o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated"
+        if option_emoji_available
+        else ""
+    )
     options = await run_query_async(
         f"""
         {option_ranking_cte}
         SELECT o.SurveyOptionID, o.SurveyQuestionID, o.OptionKey, o.Label, o.SortOrder,
-               o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated,
+               {option_emoji_select},
                COUNT(a.DiscordUserID) AS ResponseCount
                {option_ranking_select}
         FROM dbo.SurveyQuestionOptions o
@@ -947,8 +1000,7 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
          AND a.SurveyOptionID = o.SurveyOptionID
         {option_ranking_join}
         WHERE q.SurveyID = ?
-        GROUP BY o.SurveyOptionID, o.SurveyQuestionID, o.OptionKey, o.Label, o.SortOrder,
-                 o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated
+        GROUP BY o.SurveyOptionID, o.SurveyQuestionID, o.OptionKey, o.Label, o.SortOrder{option_emoji_group_by}
                  {', ranking_stats.FirstPlaceCount, ranking_stats.AverageRank, ranking_dist.RankValue, ranking_dist.RankResponseCount' if ranking_answers_available else ''}
         ORDER BY o.SurveyQuestionID ASC, o.SortOrder ASC, o.SurveyOptionID ASC;
         """,
@@ -2170,18 +2222,36 @@ async def list_reporting_option_rows_for_surveys(
     order_cases = " ".join(
         f"WHEN ? THEN {index}" for index, _survey_id in enumerate(normalized_ids)
     )
+    option_emoji_available = await _survey_option_emoji_columns_exist()
+    option_emoji_select = (
+        "o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated"
+        if option_emoji_available
+        else (
+            "CAST(NULL AS varchar(20)) AS EmojiKind, "
+            "CAST(NULL AS nvarchar(120)) AS EmojiText, "
+            "CAST(NULL AS nvarchar(64)) AS EmojiName, "
+            "CAST(NULL AS varchar(32)) AS EmojiID, "
+            "CAST(NULL AS bit) AS EmojiAnimated"
+        )
+    )
+    option_emoji_join = (
+        """
+        LEFT JOIN dbo.SurveyQuestionOptions o
+          ON o.SurveyOptionID = v.SurveyOptionID"""
+        if option_emoji_available
+        else ""
+    )
     rows = await run_query_async(
         f"""
         SELECT v.SurveyID, v.Title, v.Status, v.ResultVisibility, v.SurveyQuestionID,
                v.QuestionKey, v.Prompt, v.QuestionType, v.QuestionSortOrder, v.IsRequired,
                v.SurveyOptionID, v.OptionKey, v.OptionLabel, v.OptionSortOrder,
-               o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated,
+               {option_emoji_select},
                TotalResponses, SelectionCount, IsTopSelection,
                RankedCount, AverageRank, Rank1Count, Rank2Count,
                Rank3Count, Rank4Count, Rank5Count, Rank6Count
         FROM dbo.v_SurveyReportingOptionSummary v
-        LEFT JOIN dbo.SurveyQuestionOptions o
-          ON o.SurveyOptionID = v.SurveyOptionID
+        {option_emoji_join}
         WHERE v.SurveyID IN ({placeholders})
         ORDER BY CASE SurveyID {order_cases} ELSE {len(normalized_ids)} END ASC,
                  v.QuestionSortOrder ASC, v.OptionSortOrder ASC, v.SurveyOptionID ASC;

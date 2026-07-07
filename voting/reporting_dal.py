@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from stats_alerts.db import run_query_async
+from stats_alerts.db import run_one_async, run_query_async
 from voting.option_emojis import option_emoji_from_row
 from voting.reporting_models import (
     REPORT_CONTENT_SURVEY,
@@ -122,6 +122,15 @@ def _option_from_vote_row(row: Mapping[str, Any]) -> DashboardReportingOptionAgg
         is_top_selection=_bool(row.get("IsTopSelection")),
         option_emoji=option_emoji_from_row(row),
     )
+
+
+async def _vote_option_emoji_columns_exist() -> bool:
+    row = await run_one_async(
+        """
+        SELECT COL_LENGTH(N'dbo.VotePostOptions', N'EmojiKind') AS EmojiKindColumn;
+        """
+    )
+    return bool(row and row.get("EmojiKindColumn") not in (None, ""))
 
 
 async def list_vote_dashboard_summaries(
@@ -264,6 +273,23 @@ async def list_vote_dashboard_option_aggregates(
     if not normalized_ids:
         return ()
     placeholders = ", ".join("?" for _ in normalized_ids)
+    emoji_columns_exist = await _vote_option_emoji_columns_exist()
+    emoji_select = (
+        "o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated"
+        if emoji_columns_exist
+        else (
+            "CAST(NULL AS varchar(20)) AS EmojiKind, "
+            "CAST(NULL AS nvarchar(120)) AS EmojiText, "
+            "CAST(NULL AS nvarchar(64)) AS EmojiName, "
+            "CAST(NULL AS varchar(32)) AS EmojiID, "
+            "CAST(NULL AS bit) AS EmojiAnimated"
+        )
+    )
+    emoji_group_by = (
+        ", o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated"
+        if emoji_columns_exist
+        else ""
+    )
     rows = await run_query_async(
         f"""
         WITH ParticipantCounts AS (
@@ -287,7 +313,7 @@ async def list_vote_dashboard_option_aggregates(
         OptionCounts AS (
             SELECT p.VotePostID, o.OptionID, o.OptionKey, o.Label AS OptionLabel,
                    o.SortOrder AS OptionSortOrder,
-                   o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated,
+                   {emoji_select},
                    CASE
                        WHEN COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
                            THEN COUNT(ms.DiscordUserID)
@@ -309,8 +335,7 @@ async def list_vote_dashboard_option_aggregates(
              AND ms.OptionID = o.OptionID
              AND COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
             WHERE p.VotePostID IN ({placeholders})
-            GROUP BY p.VotePostID, p.VoteMode, o.OptionID, o.OptionKey, o.Label, o.SortOrder,
-                     o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated
+            GROUP BY p.VotePostID, p.VoteMode, o.OptionID, o.OptionKey, o.Label, o.SortOrder{emoji_group_by}
         ),
         Tops AS (
             SELECT VotePostID, MAX(SelectionCount) AS TopSelectionCount

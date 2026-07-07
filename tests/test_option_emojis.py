@@ -7,6 +7,7 @@ from voting.option_emojis import (
     EMOJI_KIND_UNICODE,
     option_display_label,
     option_emoji_from_row,
+    option_emoji_sql_values,
     normalize_option_emoji,
 )
 
@@ -49,3 +50,16 @@ def test_option_emoji_from_row_handles_mapping_metadata() -> None:
 
     assert emoji is not None
     assert emoji.card_text == ":ready:"
+
+
+def test_option_emoji_sql_values_serializes_shared_storage_shape() -> None:
+    emoji = normalize_option_emoji("<a:ready:123456789012345678>")
+
+    assert option_emoji_sql_values(emoji) == (
+        EMOJI_KIND_CUSTOM_DISCORD,
+        "<a:ready:123456789012345678>",
+        "ready",
+        "123456789012345678",
+        1,
+    )
+    assert option_emoji_sql_values(None) == (None, None, None, None, None)

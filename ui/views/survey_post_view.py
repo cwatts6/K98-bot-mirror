@@ -51,7 +51,7 @@ SurveyBuilderTimeoutCallback = Callable[["SurveyBuilderView"], Awaitable[None]]
 _SURVEY_BUILDER_TIMEOUT_SECONDS = 14 * 60
 
 
-def _discord_emoji(emoji: OptionEmoji | None):
+def _discord_emoji(emoji: OptionEmoji | None) -> discord.PartialEmoji | str | None:
     if emoji is None:
         return None
     if emoji.kind == EMOJI_KIND_CUSTOM_DISCORD:

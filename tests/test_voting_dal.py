@@ -322,3 +322,46 @@ async def test_cast_multi_select_vote_replaces_selection_set_and_audits(monkeypa
     audit = next(params for sql, params in executed if "INSERT INTO dbo.VotePostAudit" in sql)
     assert "MultiSelectVoteChanged" in audit
     assert '"option_ids": [11, 12]' in str(audit)
+
+
+@pytest.mark.asyncio
+async def test_update_vote_option_emoji_rejects_closed_vote(monkeypatch) -> None:
+    executed: list[str] = []
+
+    class _Cursor:
+        description = None
+
+        def __init__(self) -> None:
+            self._rows: list[tuple[object, ...]] = []
+
+        def execute(self, sql, params=()):
+            text = str(sql)
+            executed.append(text)
+            if "COL_LENGTH" in text:
+                self.description = [("EmojiKindColumn",)]
+                self._rows = [(1,)]
+            elif "FROM dbo.VotePosts WITH" in text:
+                self.description = [("VotePostID",), ("Status",)]
+                self._rows = [(42, "Closed")]
+            else:
+                self.description = None
+                self._rows = []
+
+        def fetchone(self):
+            return self._rows.pop(0) if self._rows else None
+
+    async def fake_run_blocking_in_thread(_sync_func, callback, *, name):
+        assert name == "vote_option_emoji_update"
+        return callback(_Cursor())
+
+    monkeypatch.setattr(dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+
+    with pytest.raises(ValueError, match="already closed"):
+        await dal.update_vote_option_emoji(
+            vote_post_id=42,
+            option_id=10,
+            emoji=None,
+            actor_discord_user_id=99,
+        )
+
+    assert not any("UPDATE dbo.VotePostOptions" in sql for sql in executed)

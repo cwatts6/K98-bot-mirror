@@ -119,12 +119,20 @@ async def test_vote_dashboard_option_aggregates_read_counts_without_identity(mon
             }
         ]
 
+    async def fake_run_one_async(sql, params=()):
+        captured["column_probe"] = sql
+        assert params == ()
+        return {"EmojiKindColumn": None}
+
+    monkeypatch.setattr(reporting_dal, "run_one_async", fake_run_one_async)
     monkeypatch.setattr(reporting_dal, "run_query_async", fake_run_query_async)
 
     rows = await reporting_dal.list_vote_dashboard_option_aggregates((42, 42))
 
     assert captured["params"] == (42, 42)
+    assert "COL_LENGTH" in str(captured["column_probe"])
     assert "VotePostMultiSelectSelections" in str(captured["sql"])
+    assert "CAST(NULL AS varchar(20)) AS EmojiKind" in str(captured["sql"])
     assert "DiscordName" not in str(captured["sql"])
     assert rows[0].content_kind == REPORT_CONTENT_VOTE
     assert rows[0].selection_count == 3

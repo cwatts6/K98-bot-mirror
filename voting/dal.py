@@ -18,7 +18,12 @@ from voting.models import (
     VoteSnapshot,
     VoteVoterAuditRow,
 )
-from voting.option_emojis import OptionEmoji, option_emoji_from_row
+from voting.option_emojis import (
+    OPTION_EMOJI_MIGRATION_MESSAGE,
+    OptionEmoji,
+    option_emoji_from_row,
+    option_emoji_sql_values,
+)
 from voting.result_visibility import normalize_result_visibility
 from voting.vote_modes import (
     VOTE_MODE_MULTI_SELECT,
@@ -76,16 +81,23 @@ def _rows_to_options(rows: Sequence[dict[str, Any]]) -> tuple[VoteOption, ...]:
     )
 
 
-def _emoji_sql_values(emoji: OptionEmoji | None) -> tuple[str | None, str | None, str | None, str | None, int | None]:
-    if emoji is None:
-        return None, None, None, None, None
-    return (
-        emoji.kind,
-        emoji.text,
-        emoji.name,
-        emoji.emoji_id,
-        1 if emoji.animated else 0,
+async def _vote_option_emoji_columns_exist() -> bool:
+    row = await run_one_async(
+        """
+        SELECT COL_LENGTH(N'dbo.VotePostOptions', N'EmojiKind') AS EmojiKindColumn;
+        """
     )
+    return bool(row and row.get("EmojiKindColumn") not in (None, ""))
+
+
+def _vote_option_emoji_columns_exist_sync(cur) -> bool:
+    cur.execute(
+        """
+        SELECT COL_LENGTH(N'dbo.VotePostOptions', N'EmojiKind') AS EmojiKindColumn;
+        """
+    )
+    row = fetch_one_dict(cur)
+    return bool(row and row.get("EmojiKindColumn") not in (None, ""))
 
 
 def _rows_to_reminders(rows: Sequence[dict[str, Any]]) -> tuple[VoteReminder, ...]:
@@ -480,10 +492,27 @@ async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
     )
     if not post:
         return None
+    emoji_columns_exist = await _vote_option_emoji_columns_exist()
+    emoji_select = (
+        "o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated"
+        if emoji_columns_exist
+        else (
+            "CAST(NULL AS varchar(20)) AS EmojiKind, "
+            "CAST(NULL AS nvarchar(120)) AS EmojiText, "
+            "CAST(NULL AS nvarchar(64)) AS EmojiName, "
+            "CAST(NULL AS varchar(32)) AS EmojiID, "
+            "CAST(NULL AS bit) AS EmojiAnimated"
+        )
+    )
+    emoji_group_by = (
+        ", o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated"
+        if emoji_columns_exist
+        else ""
+    )
     options = await run_query_async(
-        """
+        f"""
         SELECT o.OptionID, o.VotePostID, o.OptionKey, o.Label, o.SortOrder, o.ButtonStyle,
-               o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated,
+               {emoji_select},
                CASE
                    WHEN COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
                        THEN COUNT(ms.DiscordUserID)
@@ -501,7 +530,7 @@ async def get_vote_snapshot(vote_post_id: int) -> VoteSnapshot | None:
          AND COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
         WHERE o.VotePostID = ?
         GROUP BY o.OptionID, o.VotePostID, o.OptionKey, o.Label, o.SortOrder, o.ButtonStyle,
-                 o.EmojiKind, o.EmojiText, o.EmojiName, o.EmojiID, o.EmojiAnimated, p.VoteMode
+                 p.VoteMode{emoji_group_by}
         ORDER BY o.SortOrder ASC, o.OptionID ASC;
         """,
         (int(vote_post_id),),
@@ -525,9 +554,22 @@ async def update_vote_option_emoji(
     emoji: OptionEmoji | None,
     actor_discord_user_id: int,
 ) -> VoteSnapshot:
-    emoji_kind, emoji_text, emoji_name, emoji_id, emoji_animated = _emoji_sql_values(emoji)
+    emoji_kind, emoji_text, emoji_name, emoji_id, emoji_animated = option_emoji_sql_values(emoji)
 
-    def _callback(cur) -> bool:
+    def _callback(cur) -> str:
+        if not _vote_option_emoji_columns_exist_sync(cur):
+            return "missing_migration"
+        cur.execute(
+            """
+            SELECT VotePostID, Status
+            FROM dbo.VotePosts WITH (UPDLOCK, HOLDLOCK)
+            WHERE VotePostID = ?;
+            """,
+            (int(vote_post_id),),
+        )
+        post = fetch_one_dict(cur)
+        if not post or str(post.get("Status")) != "Open":
+            return "not_open"
         cur.execute(
             """
             UPDATE dbo.VotePostOptions
@@ -550,42 +592,47 @@ async def update_vote_option_emoji(
             ),
         )
         updated = cur.fetchone() is not None
-        if updated:
-            cur.execute(
-                """
-                UPDATE dbo.VotePosts
-                SET UpdatedAtUtc = SYSUTCDATETIME()
-                WHERE VotePostID = ?;
-                """,
-                (int(vote_post_id),),
-            )
-            cur.execute(
-                """
-                INSERT INTO dbo.VotePostAudit
-                    (VotePostID, ActorDiscordUserID, ActionType, DetailsJson, CreatedAtUtc)
-                VALUES (?, ?, 'OptionEmojiUpdated', ?, SYSUTCDATETIME());
-                """,
-                (
-                    int(vote_post_id),
-                    int(actor_discord_user_id),
-                    json.dumps(
-                        {
-                            "option_id": int(option_id),
-                            "emoji_kind": emoji_kind,
-                            "emoji_name": emoji_name,
-                            "emoji_id": emoji_id,
-                            "cleared": emoji is None,
-                        },
-                        ensure_ascii=False,
-                    ),
+        if not updated:
+            return "missing_option"
+        cur.execute(
+            """
+            UPDATE dbo.VotePosts
+            SET UpdatedAtUtc = SYSUTCDATETIME()
+            WHERE VotePostID = ?;
+            """,
+            (int(vote_post_id),),
+        )
+        cur.execute(
+            """
+            INSERT INTO dbo.VotePostAudit
+                (VotePostID, ActorDiscordUserID, ActionType, DetailsJson, CreatedAtUtc)
+            VALUES (?, ?, 'OptionEmojiUpdated', ?, SYSUTCDATETIME());
+            """,
+            (
+                int(vote_post_id),
+                int(actor_discord_user_id),
+                json.dumps(
+                    {
+                        "option_id": int(option_id),
+                        "emoji_kind": emoji_kind,
+                        "emoji_name": emoji_name,
+                        "emoji_id": emoji_id,
+                        "cleared": emoji is None,
+                    },
+                    ensure_ascii=False,
                 ),
-            )
-        return updated
+            ),
+        )
+        return "updated"
 
-    updated = await run_blocking_in_thread(
+    result = await run_blocking_in_thread(
         _create_vote_post_sync, _callback, name="vote_option_emoji_update"
     )
-    if not updated:
+    if result == "missing_migration":
+        raise ValueError(OPTION_EMOJI_MIGRATION_MESSAGE)
+    if result == "not_open":
+        raise ValueError("Vote was not found or is already closed.")
+    if result != "updated":
         raise ValueError("Vote option was not found.")
     snapshot = await get_vote_snapshot(vote_post_id)
     if snapshot is None:
