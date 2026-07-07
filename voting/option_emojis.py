@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Mapping
+from dataclasses import dataclass
 import re
 from typing import TypeAlias
 
@@ -24,7 +24,9 @@ OptionEmojiSqlValues: TypeAlias = tuple[
     int | None,
 ]
 
-_CUSTOM_EMOJI_RE = re.compile(r"^<(?P<animated>a?):(?P<name>[A-Za-z0-9_]{2,64}):(?P<id>[0-9]{2,32})>$")
+_CUSTOM_EMOJI_RE = re.compile(
+    r"^<(?P<animated>a?):(?P<name>[A-Za-z0-9_]{2,64}):(?P<id>[0-9]{2,32})>$"
+)
 
 
 @dataclass(frozen=True)
@@ -100,7 +102,9 @@ def option_emoji_from_row(row: object) -> OptionEmoji | None:
     return None
 
 
-def option_display_label(label: str, emoji: OptionEmoji | None, *, card_fallback: bool = False) -> str:
+def option_display_label(
+    label: str, emoji: OptionEmoji | None, *, card_fallback: bool = False
+) -> str:
     clean_label = str(label or "").strip()
     if emoji is None:
         return clean_label

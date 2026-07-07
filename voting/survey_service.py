@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 import logging
 
 from voting import survey_dal
+from voting.option_emojis import OptionEmoji
 from voting.result_visibility import normalize_result_visibility
 from voting.service import (
     MAX_CLOSE_REASON_LEN,
@@ -13,8 +14,8 @@ from voting.service import (
     VoteValidationError,
     _validate_description,
     parse_close_time,
-    parse_reminder_offsets,
     parse_option_emoji,
+    parse_reminder_offsets,
 )
 from voting.survey_models import (
     DEFAULT_RATING_MAX_VALUE,
@@ -36,7 +37,6 @@ from voting.survey_models import (
     SurveySnapshot,
     SurveySubmitResult,
 )
-from voting.option_emojis import OptionEmoji
 
 logger = logging.getLogger(__name__)
 

@@ -1205,8 +1205,7 @@ class SurveyBuilderView(discord.ui.View):
                 ()
                 if self.draft_is_text or self.draft_is_rating
                 else tuple(
-                    self.draft_option_emojis.get(index)
-                    for index in range(len(self.draft_options))
+                    self.draft_option_emojis.get(index) for index in range(len(self.draft_options))
                 )
             ),
             min_selections=(
@@ -1681,7 +1680,7 @@ class _BuilderOptionIconsButton(discord.ui.Button):
 
 
 class _SurveyBuilderOptionIconSelect(discord.ui.Select):
-    def __init__(self, parent_view: "_SurveyBuilderOptionIconView") -> None:
+    def __init__(self, parent_view: _SurveyBuilderOptionIconView) -> None:
         self.parent_view = parent_view
         options = [
             discord.SelectOption(
@@ -1755,7 +1754,9 @@ class _SurveyBuilderOptionIconModal(discord.ui.Modal):
             self.parent_view.draft_option_emojis.pop(self.option_index, None)
         else:
             self.parent_view.draft_option_emojis[self.option_index] = emoji
-        await send_ephemeral(interaction, "Option icon saved. Return to the survey builder to continue.")
+        await send_ephemeral(
+            interaction, "Option icon saved. Return to the survey builder to continue."
+        )
 
 
 class _BuilderRequiredToggleButton(discord.ui.Button):

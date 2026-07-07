@@ -286,9 +286,7 @@ def _vote_option_lines(
         marker = "top " if option.is_top_selection else ""
         percent = _percentage(option.selection_count, option.total_participants)
         label = option_display_label(option.option_label, option.option_emoji)
-        lines.append(
-            f"{marker}{label}: {fmt_short(option.selection_count)}" f"{percent}"
-        )
+        lines.append(f"{marker}{label}: {fmt_short(option.selection_count)}" f"{percent}")
     if len(option_rows) > 12:
         lines.append(f"+{len(option_rows) - 12} more option(s)")
     return "\n".join(lines)

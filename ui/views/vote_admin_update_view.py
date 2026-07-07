@@ -15,8 +15,8 @@ from voting.service import (
     MAX_DESCRIPTION_LEN,
     MAX_TITLE_LEN,
     VoteValidationError,
-    update_vote_option_emoji,
     update_vote,
+    update_vote_option_emoji,
 )
 
 logger = logging.getLogger(__name__)
@@ -280,7 +280,9 @@ class _VoteTargetSelect(discord.ui.Select):
 
         if target == "option_icons":
             view = _VoteOptionIconView(self.parent_view)
-            await interaction.response.edit_message(content="Choose an option to polish:", view=view)
+            await interaction.response.edit_message(
+                content="Choose an option to polish:", view=view
+            )
             return
 
         field = (
@@ -299,7 +301,7 @@ class _VoteTargetSelect(discord.ui.Select):
 
 
 class _VoteOptionIconSelect(discord.ui.Select):
-    def __init__(self, parent_view: "_VoteOptionIconView") -> None:
+    def __init__(self, parent_view: _VoteOptionIconView) -> None:
         self.parent_view = parent_view
         options = [
             discord.SelectOption(
@@ -341,14 +343,14 @@ class _VoteOptionIconSelect(discord.ui.Select):
 
 
 class _VoteOptionIconView(discord.ui.View):
-    def __init__(self, update_view: "VoteAdminUpdateView") -> None:
+    def __init__(self, update_view: VoteAdminUpdateView) -> None:
         super().__init__(timeout=180)
         self.update_view = update_view
         self.add_item(_VoteOptionIconSelect(self))
 
 
 class _VoteOptionIconModal(discord.ui.Modal):
-    def __init__(self, parent_view: "VoteAdminUpdateView", *, option_id: int) -> None:
+    def __init__(self, parent_view: VoteAdminUpdateView, *, option_id: int) -> None:
         option = next(
             item for item in parent_view.snapshot.options if int(item.option_id) == int(option_id)
         )

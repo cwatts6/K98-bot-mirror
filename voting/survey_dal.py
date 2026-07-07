@@ -11,7 +11,6 @@ from stats_alerts.db import exec_with_cursor, run_one_async, run_query_async
 from voting.option_emojis import (
     OPTION_EMOJI_MIGRATION_ID,
     OPTION_EMOJI_MIGRATION_MESSAGE,
-    OptionEmoji,
     option_emoji_from_row,
     option_emoji_sql_values,
 )
@@ -147,20 +146,16 @@ def _rows_to_options(rows: Sequence[dict[str, Any]]) -> dict[int, tuple[SurveyQu
 
 
 async def _survey_option_emoji_columns_exist() -> bool:
-    row = await run_one_async(
-        """
+    row = await run_one_async("""
         SELECT COL_LENGTH(N'dbo.SurveyQuestionOptions', N'EmojiKind') AS EmojiKindColumn;
-        """
-    )
+        """)
     return bool(row and row.get("EmojiKindColumn") not in (None, ""))
 
 
 def _survey_option_emoji_columns_exist_sync(cur) -> bool:
-    cur.execute(
-        """
+    cur.execute("""
         SELECT COL_LENGTH(N'dbo.SurveyQuestionOptions', N'EmojiKind') AS EmojiKindColumn;
-        """
-    )
+        """)
     row = fetch_one_dict(cur)
     return bool(row and row.get("EmojiKindColumn") not in (None, ""))
 

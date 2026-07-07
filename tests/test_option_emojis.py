@@ -5,10 +5,10 @@ import pytest
 from voting.option_emojis import (
     EMOJI_KIND_CUSTOM_DISCORD,
     EMOJI_KIND_UNICODE,
+    normalize_option_emoji,
     option_display_label,
     option_emoji_from_row,
     option_emoji_sql_values,
-    normalize_option_emoji,
 )
 
 

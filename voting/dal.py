@@ -82,20 +82,16 @@ def _rows_to_options(rows: Sequence[dict[str, Any]]) -> tuple[VoteOption, ...]:
 
 
 async def _vote_option_emoji_columns_exist() -> bool:
-    row = await run_one_async(
-        """
+    row = await run_one_async("""
         SELECT COL_LENGTH(N'dbo.VotePostOptions', N'EmojiKind') AS EmojiKindColumn;
-        """
-    )
+        """)
     return bool(row and row.get("EmojiKindColumn") not in (None, ""))
 
 
 def _vote_option_emoji_columns_exist_sync(cur) -> bool:
-    cur.execute(
-        """
+    cur.execute("""
         SELECT COL_LENGTH(N'dbo.VotePostOptions', N'EmojiKind') AS EmojiKindColumn;
-        """
-    )
+        """)
     row = fetch_one_dict(cur)
     return bool(row and row.get("EmojiKindColumn") not in (None, ""))
 

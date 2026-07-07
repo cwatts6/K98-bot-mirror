@@ -125,11 +125,9 @@ def _option_from_vote_row(row: Mapping[str, Any]) -> DashboardReportingOptionAgg
 
 
 async def _vote_option_emoji_columns_exist() -> bool:
-    row = await run_one_async(
-        """
+    row = await run_one_async("""
         SELECT COL_LENGTH(N'dbo.VotePostOptions', N'EmojiKind') AS EmojiKindColumn;
-        """
-    )
+        """)
     return bool(row and row.get("EmojiKindColumn") not in (None, ""))
 
 
