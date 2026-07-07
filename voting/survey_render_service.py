@@ -14,7 +14,8 @@ from voting.survey_models import (
     SURVEY_QUESTION_TEXT,
     RenderedSurveyCard,
     SurveySnapshot,
-    rating_count_for_value,
+    rating_distribution_text,
+    rating_scale_text,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -112,12 +113,10 @@ def _top_option_line(snapshot: SurveySnapshot) -> str:
             if answered <= 0 or question.rating_average is None:
                 lines.append(f"Q{question.sort_order}: no ratings yet")
                 continue
-            distribution = " ".join(
-                f"{value}:{rating_count_for_value(question, value)}" for value in range(1, 6)
-            )
             lines.append(
-                f"Q{question.sort_order}: avg {question.rating_average:.1f}/5 "
-                f"({answered} ratings; {distribution})"
+                f"Q{question.sort_order}: avg {question.rating_average:.1f} "
+                f"on {rating_scale_text(question)} "
+                f"({answered} ratings; {rating_distribution_text(question)})"
             )
             continue
         if question.question_type == SURVEY_QUESTION_RANKING:

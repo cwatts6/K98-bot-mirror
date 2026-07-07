@@ -18,6 +18,8 @@ from voting.survey_models import (
     SurveySnapshot,
     ranking_count_for_value,
     rating_count_for_value,
+    rating_distribution_text,
+    rating_labels_text,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,6 +60,12 @@ SURVEY_TOTALS_COLUMNS = (
     "SelectionPercentOfResponses",
     "IsTopSelection",
     "AverageRating",
+    "RatingScaleMin",
+    "RatingScaleMax",
+    "RatingLowLabel",
+    "RatingHighLabel",
+    "RatingLabels",
+    "RatingDistribution",
     "MinimumRating",
     "MaximumRating",
     "Rating1Count",
@@ -65,6 +73,11 @@ SURVEY_TOTALS_COLUMNS = (
     "Rating3Count",
     "Rating4Count",
     "Rating5Count",
+    "Rating6Count",
+    "Rating7Count",
+    "Rating8Count",
+    "Rating9Count",
+    "Rating10Count",
     "AverageRank",
     "FirstPlaceCount",
     "Rank1Count",
@@ -96,7 +109,9 @@ SURVEY_RESPONSE_DETAIL_COLUMNS = (
     "OriginalTextAnswer",
     "TextAnswerChanged",
     "RatingValue",
+    "RatingLabel",
     "OriginalRatingValue",
+    "OriginalRatingLabel",
     "RatingChanged",
     "RankingOptionID",
     "RankingOptionKey",
@@ -157,6 +172,12 @@ SURVEY_REPORT_QUESTION_COLUMNS = (
     "RankedOptionCount",
     "RankingFirstPlaceCount",
     "AverageRating",
+    "RatingScaleMin",
+    "RatingScaleMax",
+    "RatingLowLabel",
+    "RatingHighLabel",
+    "RatingLabels",
+    "RatingDistribution",
     "MinimumRating",
     "MaximumRating",
     "Rating1Count",
@@ -164,6 +185,11 @@ SURVEY_REPORT_QUESTION_COLUMNS = (
     "Rating3Count",
     "Rating4Count",
     "Rating5Count",
+    "Rating6Count",
+    "Rating7Count",
+    "Rating8Count",
+    "Rating9Count",
+    "Rating10Count",
 )
 
 SURVEY_REPORT_OPTION_COLUMNS = (
@@ -371,6 +397,7 @@ def survey_totals_csv_rows(snapshot: SurveySnapshot) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     total = int(snapshot.total_responses or 0)
     for question in snapshot.questions:
+        is_rating = question.question_type == "Rating"
         top_count = max((int(option.response_count or 0) for option in question.options), default=0)
         base_row = {
             "SurveyID": snapshot.survey_id,
@@ -399,6 +426,12 @@ def survey_totals_csv_rows(snapshot: SurveySnapshot) -> list[dict[str, Any]]:
             "AverageRating": (
                 f"{question.rating_average:.2f}" if question.rating_average is not None else ""
             ),
+            "RatingScaleMin": question.rating_min_value if is_rating else "",
+            "RatingScaleMax": question.rating_max_value if is_rating else "",
+            "RatingLowLabel": question.rating_low_label or "" if is_rating else "",
+            "RatingHighLabel": question.rating_high_label or "" if is_rating else "",
+            "RatingLabels": rating_labels_text(question) if is_rating else "",
+            "RatingDistribution": rating_distribution_text(question) if is_rating else "",
             "MinimumRating": question.rating_min,
             "MaximumRating": question.rating_max,
             "Rating1Count": rating_count_for_value(question, 1),
@@ -406,6 +439,11 @@ def survey_totals_csv_rows(snapshot: SurveySnapshot) -> list[dict[str, Any]]:
             "Rating3Count": rating_count_for_value(question, 3),
             "Rating4Count": rating_count_for_value(question, 4),
             "Rating5Count": rating_count_for_value(question, 5),
+            "Rating6Count": rating_count_for_value(question, 6),
+            "Rating7Count": rating_count_for_value(question, 7),
+            "Rating8Count": rating_count_for_value(question, 8),
+            "Rating9Count": rating_count_for_value(question, 9),
+            "Rating10Count": rating_count_for_value(question, 10),
             "AverageRank": "",
             "FirstPlaceCount": 0,
             "Rank1Count": 0,
@@ -516,9 +554,11 @@ def survey_response_detail_csv_rows(
                 "OriginalTextAnswer": row.original_text_answer or "",
                 "TextAnswerChanged": 1 if text_changed else 0,
                 "RatingValue": row.rating_value if row.rating_value is not None else "",
+                "RatingLabel": row.rating_label or "",
                 "OriginalRatingValue": (
                     row.original_rating_value if row.original_rating_value is not None else ""
                 ),
+                "OriginalRatingLabel": row.original_rating_label or "",
                 "RatingChanged": 1 if rating_changed else 0,
                 "RankingOptionID": (
                     row.ranking_option_id if row.ranking_option_id is not None else ""
@@ -623,6 +663,12 @@ def survey_report_question_csv_rows(
             "AverageRating": (
                 f"{row.average_rating:.2f}" if row.average_rating is not None else ""
             ),
+            "RatingScaleMin": row.rating_scale_min,
+            "RatingScaleMax": row.rating_scale_max,
+            "RatingLowLabel": row.rating_low_label or "",
+            "RatingHighLabel": row.rating_high_label or "",
+            "RatingLabels": row.rating_labels,
+            "RatingDistribution": row.rating_distribution,
             "MinimumRating": row.minimum_rating,
             "MaximumRating": row.maximum_rating,
             "Rating1Count": row.rating1_count,
@@ -630,6 +676,11 @@ def survey_report_question_csv_rows(
             "Rating3Count": row.rating3_count,
             "Rating4Count": row.rating4_count,
             "Rating5Count": row.rating5_count,
+            "Rating6Count": row.rating6_count,
+            "Rating7Count": row.rating7_count,
+            "Rating8Count": row.rating8_count,
+            "Rating9Count": row.rating9_count,
+            "Rating10Count": row.rating10_count,
         }
         for row in rows
     ]

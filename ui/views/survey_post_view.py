@@ -9,6 +9,9 @@ import discord
 from core.interaction_safety import send_ephemeral
 from voting import survey_service
 from voting.survey_models import (
+    DEFAULT_RATING_MAX_VALUE,
+    DEFAULT_RATING_MIN_VALUE,
+    MAX_RATING_VALUE,
     SURVEY_QUESTION_MULTI_SELECT,
     SURVEY_QUESTION_RANKING,
     SURVEY_QUESTION_RATING,
@@ -16,6 +19,10 @@ from voting.survey_models import (
     SurveyQuestionCreateRequest,
     SurveyResponsePayload,
     SurveySnapshot,
+    rating_choice_display,
+    rating_label_for_value,
+    rating_scale_text,
+    rating_values_for_question,
 )
 from voting.survey_presentation import (
     build_survey_embed,
@@ -270,6 +277,59 @@ class _SurveyRatingButton(discord.ui.Button):
             return
         question = self.parent_view.current_question
         self.parent_view.rating_answers[question.question_id] = self.rating_value
+        if not await self.parent_view.save_draft(interaction):
+            return
+        await self.parent_view.refresh(interaction)
+
+
+def _rating_question_uses_select(question) -> bool:
+    return bool(
+        int(getattr(question, "rating_min_value", DEFAULT_RATING_MIN_VALUE))
+        != DEFAULT_RATING_MIN_VALUE
+        or int(getattr(question, "rating_max_value", DEFAULT_RATING_MAX_VALUE))
+        != DEFAULT_RATING_MAX_VALUE
+        or str(getattr(question, "rating_low_label", "") or "").strip()
+        or str(getattr(question, "rating_high_label", "") or "").strip()
+        or tuple(getattr(question, "rating_labels", ()) or ())
+    )
+
+
+class _SurveyRatingSelect(discord.ui.Select):
+    def __init__(self, parent_view: SurveyResponsePanel) -> None:
+        self.parent_view = parent_view
+        question = parent_view.current_question
+        selected = parent_view.rating_answers.get(question.question_id)
+        options = [
+            discord.SelectOption(
+                label=rating_choice_display(question, value)[:100],
+                value=str(value),
+                default=selected == value,
+            )
+            for value in rating_values_for_question(question)
+        ]
+        super().__init__(
+            placeholder=f"Rating {rating_scale_text(question)}",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey panel belongs to another player.")
+            return
+        question = self.parent_view.current_question
+        try:
+            rating_value = int(self.values[0])
+        except (IndexError, TypeError, ValueError):
+            await send_ephemeral(interaction, "Selected rating was not valid.")
+            return
+        valid_values = set(rating_values_for_question(question))
+        if rating_value not in valid_values:
+            await send_ephemeral(interaction, "Selected rating is outside this scale.")
+            return
+        self.parent_view.rating_answers[question.question_id] = rating_value
         if not await self.parent_view.save_draft(interaction):
             return
         await self.parent_view.refresh(interaction)
@@ -742,8 +802,11 @@ class SurveyResponsePanel(discord.ui.View):
     def _rebuild(self) -> None:
         self.clear_items()
         if self.current_question.question_type == SURVEY_QUESTION_RATING:
-            for rating_value in range(1, 6):
-                self.add_item(_SurveyRatingButton(self, rating_value))
+            if _rating_question_uses_select(self.current_question):
+                self.add_item(_SurveyRatingSelect(self))
+            else:
+                for rating_value in rating_values_for_question(self.current_question):
+                    self.add_item(_SurveyRatingButton(self, rating_value))
             self.add_item(_SurveyClearRatingButton(self))
         elif self.current_question.question_type == SURVEY_QUESTION_RANKING:
             self.add_item(_SurveyRankingRankSelect(self))
@@ -767,13 +830,20 @@ class SurveyResponsePanel(discord.ui.View):
         if question.question_type == SURVEY_QUESTION_RATING:
             saved = self.rating_answers.get(question.question_id)
             requirement = "Required" if question.is_required else "Optional"
-            state = f"rated {saved}/5" if saved is not None else "not yet complete"
+            if saved is not None:
+                label = rating_label_for_value(question, saved)
+                if label == str(int(saved)):
+                    state = f"rated {saved}/{question.rating_max_value}"
+                else:
+                    state = f"rated {saved} - {label}"
+            else:
+                state = "not yet complete"
             if not question.is_required and saved is None:
                 state = "skipped"
             return (
                 f"Survey #{self.survey_id}: question {question.sort_order} of {len(self.snapshot.questions)}\n"
                 f"{question.prompt}\n"
-                f"{requirement} rating: choose 1-5 ({state})."
+                f"{requirement} rating: choose {rating_scale_text(question)} ({state})."
                 f"{incomplete_line}"
             )
         if question.question_type == SURVEY_QUESTION_RANKING:
@@ -948,6 +1018,11 @@ class SurveyBuilderView(discord.ui.View):
         self.draft_is_ranking = False
         self.draft_allow_details = False
         self.draft_is_required = True
+        self.draft_rating_min_value = DEFAULT_RATING_MIN_VALUE
+        self.draft_rating_max_value = DEFAULT_RATING_MAX_VALUE
+        self.draft_rating_low_label = ""
+        self.draft_rating_high_label = ""
+        self.draft_rating_labels: dict[int, str] = {}
         self.publish_in_progress = False
         self.published = False
         self.expired = False
@@ -965,6 +1040,7 @@ class SurveyBuilderView(discord.ui.View):
         self.add_item(_BuilderSelectionSelect(self, kind="max"))
         self.add_item(_BuilderRequiredToggleButton(self))
         self.add_item(_BuilderDetailsToggleButton(self))
+        self.add_item(_BuilderRatingLabelsButton(self))
         self.add_item(_BuilderPublishButton(self))
 
     @property
@@ -981,6 +1057,11 @@ class SurveyBuilderView(discord.ui.View):
             or self.draft_is_ranking
             or self.draft_allow_details
             or not self.draft_is_required
+            or self.draft_rating_min_value != DEFAULT_RATING_MIN_VALUE
+            or self.draft_rating_max_value != DEFAULT_RATING_MAX_VALUE
+            or self.draft_rating_low_label.strip()
+            or self.draft_rating_high_label.strip()
+            or self.draft_rating_labels
         )
 
     @property
@@ -996,7 +1077,7 @@ class SurveyBuilderView(discord.ui.View):
     @property
     def draft_mode_label(self) -> str:
         if self.draft_is_rating:
-            return "rating 1-5"
+            return f"rating {self.draft_rating_min_value}-{self.draft_rating_max_value}"
         if self.draft_is_ranking:
             return "ranking"
         if self.draft_is_text:
@@ -1046,6 +1127,11 @@ class SurveyBuilderView(discord.ui.View):
         self.draft_is_ranking = False
         self.draft_allow_details = False
         self.draft_is_required = True
+        self.draft_rating_min_value = DEFAULT_RATING_MIN_VALUE
+        self.draft_rating_max_value = DEFAULT_RATING_MAX_VALUE
+        self.draft_rating_low_label = ""
+        self.draft_rating_high_label = ""
+        self.draft_rating_labels = {}
 
     async def refresh(self, interaction: discord.Interaction, *, prefix: str) -> None:
         self._rebuild()
@@ -1117,6 +1203,19 @@ class SurveyBuilderView(discord.ui.View):
                 else self.draft_allow_details
             ),
             is_required=self.draft_is_required,
+            rating_min_value=(
+                self.draft_rating_min_value if self.draft_is_rating else None
+            ),
+            rating_max_value=(
+                self.draft_rating_max_value if self.draft_is_rating else None
+            ),
+            rating_low_label=(
+                self.draft_rating_low_label if self.draft_is_rating else None
+            ),
+            rating_high_label=(
+                self.draft_rating_high_label if self.draft_is_rating else None
+            ),
+            rating_labels=self.draft_rating_labels if self.draft_is_rating else None,
         )
         self._clear_draft()
         return question
@@ -1141,7 +1240,19 @@ class SurveyBuilderView(discord.ui.View):
             )
         )
         if self.draft_is_rating:
-            lines.append("Scale: 1-5")
+            lines.append(
+                f"Scale: {self.draft_rating_min_value}-{self.draft_rating_max_value}"
+            )
+            if self.draft_rating_low_label or self.draft_rating_high_label:
+                low = self.draft_rating_low_label or "not set"
+                high = self.draft_rating_high_label or "not set"
+                lines.append(f"Scale labels: {low} to {high}")
+            if self.draft_rating_labels:
+                label_text = "; ".join(
+                    f"{value}={label}"
+                    for value, label in sorted(self.draft_rating_labels.items())
+                )
+                lines.append(f"Named ratings: {label_text}")
         else:
             lines.append(
                 f"Draft options: {len(self.draft_options)}/{survey_service.MAX_SURVEY_OPTIONS}"
@@ -1161,7 +1272,8 @@ class SurveyBuilderView(discord.ui.View):
     def _question_summary(self, index: int, question: SurveyQuestionCreateRequest) -> str:
         requirement = "required" if question.is_required else "optional"
         if question.question_type == SURVEY_QUESTION_RATING:
-            return f"{index}. {question.prompt[:70]} (Rating 1-5, {requirement})"
+            scale = f"{question.rating_min_value}-{question.rating_max_value}"
+            return f"{index}. {question.prompt[:70]} (Rating {scale}, {requirement})"
         if question.question_type == SURVEY_QUESTION_RANKING:
             return (
                 f"{index}. {question.prompt[:70]} "
@@ -1316,7 +1428,7 @@ class _BuilderQuestionTypeSelect(discord.ui.Select):
             discord.SelectOption(
                 label="Rating",
                 value="rating",
-                description="Fixed 1-5 scale",
+                description="Configurable numeric scale",
                 default=parent_view.draft_is_rating,
             ),
             discord.SelectOption(
@@ -1343,6 +1455,12 @@ class _BuilderQuestionTypeSelect(discord.ui.Select):
         self.parent_view.draft_is_text = selected == "text"
         self.parent_view.draft_is_rating = selected == "rating"
         self.parent_view.draft_is_ranking = selected == "ranking"
+        if not self.parent_view.draft_is_rating:
+            self.parent_view.draft_rating_min_value = DEFAULT_RATING_MIN_VALUE
+            self.parent_view.draft_rating_max_value = DEFAULT_RATING_MAX_VALUE
+            self.parent_view.draft_rating_low_label = ""
+            self.parent_view.draft_rating_high_label = ""
+            self.parent_view.draft_rating_labels = {}
         if self.parent_view.draft_is_text or self.parent_view.draft_is_rating:
             self.parent_view.draft_options = []
             self.parent_view.draft_min_selections = 1
@@ -1360,12 +1478,24 @@ class _BuilderSelectionSelect(discord.ui.Select):
     def __init__(self, parent_view: SurveyBuilderView, *, kind: str) -> None:
         self.parent_view = parent_view
         self.kind = kind
-        option_count = max(1, len(parent_view.draft_options))
-        current = (
-            parent_view.draft_min_selections if kind == "min" else parent_view.draft_max_selections
-        )
-        label = "Minimum selections" if kind == "min" else "Maximum selections"
-        option_label = "Minimum" if kind == "min" else "Maximum"
+        if parent_view.draft_is_rating:
+            option_count = MAX_RATING_VALUE
+            current = (
+                parent_view.draft_rating_min_value
+                if kind == "min"
+                else parent_view.draft_rating_max_value
+            )
+            label = "Rating minimum" if kind == "min" else "Rating maximum"
+            option_label = "Rating minimum" if kind == "min" else "Rating maximum"
+        else:
+            option_count = max(1, len(parent_view.draft_options))
+            current = (
+                parent_view.draft_min_selections
+                if kind == "min"
+                else parent_view.draft_max_selections
+            )
+            label = "Minimum selections" if kind == "min" else "Maximum selections"
+            option_label = "Minimum" if kind == "min" else "Maximum"
         options = [
             discord.SelectOption(
                 label=f"{option_label}: {value}",
@@ -1381,9 +1511,8 @@ class _BuilderSelectionSelect(discord.ui.Select):
             options=options,
             disabled=parent_view.builder_locked
             or parent_view.draft_is_text
-            or parent_view.draft_is_rating
             or parent_view.draft_is_ranking
-            or len(parent_view.draft_options) < 2,
+            or (not parent_view.draft_is_rating and len(parent_view.draft_options) < 2),
             row=2 if kind == "min" else 3,
         )
 
@@ -1395,6 +1524,31 @@ class _BuilderSelectionSelect(discord.ui.Select):
             selected = int(self.values[0])
         except (IndexError, TypeError, ValueError):
             await send_ephemeral(interaction, "Selection count was not valid.")
+            return
+        if self.parent_view.draft_is_rating:
+            if self.kind == "min":
+                selected = min(selected, MAX_RATING_VALUE - 1)
+                self.parent_view.draft_rating_min_value = selected
+                if self.parent_view.draft_rating_max_value <= selected:
+                    self.parent_view.draft_rating_max_value = min(MAX_RATING_VALUE, selected + 1)
+            else:
+                selected = max(selected, DEFAULT_RATING_MIN_VALUE + 1)
+                self.parent_view.draft_rating_max_value = selected
+                if self.parent_view.draft_rating_min_value >= selected:
+                    self.parent_view.draft_rating_min_value = max(
+                        DEFAULT_RATING_MIN_VALUE,
+                        selected - 1,
+                    )
+            self.parent_view.draft_rating_labels = {
+                value: label
+                for value, label in self.parent_view.draft_rating_labels.items()
+                if (
+                    self.parent_view.draft_rating_min_value
+                    <= value
+                    <= self.parent_view.draft_rating_max_value
+                )
+            }
+            await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
             return
         if self.kind == "min":
             self.parent_view.draft_min_selections = selected
@@ -1438,6 +1592,34 @@ class _BuilderDetailsToggleButton(discord.ui.Button):
             return
         self.parent_view.draft_allow_details = not self.parent_view.draft_allow_details
         await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
+
+
+class _BuilderRatingLabelsButton(discord.ui.Button):
+    def __init__(self, parent_view: SurveyBuilderView) -> None:
+        super().__init__(
+            label="Scale labels",
+            style=(
+                discord.ButtonStyle.success
+                if (
+                    parent_view.draft_rating_low_label
+                    or parent_view.draft_rating_high_label
+                    or parent_view.draft_rating_labels
+                )
+                else discord.ButtonStyle.secondary
+            ),
+            disabled=parent_view.builder_locked or not parent_view.draft_is_rating,
+            row=4,
+        )
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey builder belongs to another admin.")
+            return
+        if not self.parent_view.draft_is_rating:
+            await send_ephemeral(interaction, "Scale labels only apply to rating questions.")
+            return
+        await interaction.response.send_modal(_SurveyRatingScaleLabelsModal(self.parent_view))
 
 
 class _BuilderRequiredToggleButton(discord.ui.Button):
@@ -1513,6 +1695,101 @@ class _BuilderPublishButton(discord.ui.Button):
                 )
             except Exception:
                 logger.debug("survey_builder_publish_reenable_failed", exc_info=True)
+
+
+class _SurveyRatingScaleLabelsModal(discord.ui.Modal):
+    def __init__(self, parent_view: SurveyBuilderView) -> None:
+        super().__init__(title="Rating scale labels")
+        self.parent_view = parent_view
+        self.low_label = discord.ui.InputText(
+            label="Low-end caption",
+            required=False,
+            max_length=survey_service.MAX_RATING_SCALE_LABEL_LEN,
+            placeholder="Example: Poor",
+            value=parent_view.draft_rating_low_label,
+        )
+        self.high_label = discord.ui.InputText(
+            label="High-end caption",
+            required=False,
+            max_length=survey_service.MAX_RATING_SCALE_LABEL_LEN,
+            placeholder="Example: Excellent",
+            value=parent_view.draft_rating_high_label,
+        )
+        self.named_labels = discord.ui.InputText(
+            label="Named values",
+            style=discord.InputTextStyle.long,
+            required=False,
+            max_length=500,
+            placeholder="1=Poor\n5=Great",
+            value="\n".join(
+                f"{value}={label}"
+                for value, label in sorted(parent_view.draft_rating_labels.items())
+            ),
+        )
+        self.add_item(self.low_label)
+        self.add_item(self.high_label)
+        self.add_item(self.named_labels)
+
+    def _parse_named_labels(self) -> dict[int, str]:
+        labels: dict[int, str] = {}
+        minimum = self.parent_view.draft_rating_min_value
+        maximum = self.parent_view.draft_rating_max_value
+        for raw_line in str(self.named_labels.value or "").splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            separator = "=" if "=" in line else ":"
+            if separator not in line:
+                raise survey_service.VoteValidationError(
+                    "Named values must use lines like 1=Poor."
+                )
+            raw_value, raw_label = line.split(separator, 1)
+            try:
+                value = int(raw_value.strip())
+            except (TypeError, ValueError):
+                raise survey_service.VoteValidationError(
+                    "Named rating values must be numbers."
+                ) from None
+            if value < minimum or value > maximum:
+                raise survey_service.VoteValidationError(
+                    "Named rating values must be within the current scale."
+                )
+            label = raw_label.strip()
+            if not label:
+                continue
+            if len(label) > survey_service.MAX_OPTION_LABEL_LEN:
+                raise survey_service.VoteValidationError(
+                    f"Named rating labels must be {survey_service.MAX_OPTION_LABEL_LEN} characters or fewer."
+                )
+            if value in labels:
+                raise survey_service.VoteValidationError(
+                    "Named rating values must not be duplicated."
+                )
+            labels[value] = label
+        return labels
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(getattr(interaction.user, "id", 0)) != self.parent_view.owner_user_id:
+            await send_ephemeral(interaction, "This survey builder belongs to another admin.")
+            return
+        try:
+            labels = self._parse_named_labels()
+            survey_service.build_question_request(
+                prompt=self.parent_view.draft_prompt or "Rating preview",
+                question_type=SURVEY_QUESTION_RATING,
+                rating_min_value=self.parent_view.draft_rating_min_value,
+                rating_max_value=self.parent_view.draft_rating_max_value,
+                rating_low_label=str(self.low_label.value or "").strip() or None,
+                rating_high_label=str(self.high_label.value or "").strip() or None,
+                rating_labels=labels,
+            )
+        except survey_service.VoteValidationError as exc:
+            await send_ephemeral(interaction, f"Scale labels not saved: {exc}")
+            return
+        self.parent_view.draft_rating_low_label = str(self.low_label.value or "").strip()
+        self.parent_view.draft_rating_high_label = str(self.high_label.value or "").strip()
+        self.parent_view.draft_rating_labels = labels
+        await self.parent_view.refresh(interaction, prefix="Survey builder updated.")
 
 
 class _SurveyQuestionPromptModal(discord.ui.Modal):

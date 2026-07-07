@@ -738,7 +738,9 @@ Smoke evidence:
 Explicitly still out of scope after Phase 9B unless separately approved:
 
 - Ranking survey questions.
-- Custom rating scales, 1-10 scales, scale labels, emoji/icons, or rating comments.
+- Custom rating scales, 1-10 scales, scale labels, emoji/icons, or rating comments. Phase 14
+  later approved rating scales and labels, while rating comments were explicitly ruled not
+  required.
 - Persisted partial player drafts/resume.
 - Dashboard/reporting implementation or cross-survey export redesign.
 - Role-restricted voting, governor-linked voting, saved templates, public voter-level/detail
@@ -1002,11 +1004,13 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 14 rating scale extensions audit and design
 
-Status: prepared as the next active voting slice; audit/scope only until operator approval.
+Status: active next voting slice; product scope revised for configurable scales, with
+implementation still gated on architecture/SQL/reporting approval.
 
 Phase 14 promotes the existing rating-scale extension deferred item into a dedicated task pack.
-It starts by deciding whether KD98 needs fixed 1-10 ratings, configurable numeric scales, scale
-labels, named rating choices, per-rating comments, or no rating-scale extension for now.
+The initial audit confirmed KD98 value in delivering configurable numeric min/max scales, an
+expanded 1-10 scale, scale labels, and named rating choices in this phase. Per-rating comments are
+explicitly not required and should not be carried as default deferred scope.
 
 The slice must preserve existing fixed 1-5 rating questions and responses, Phase 12 draft/resume
 semantics, Phase 13 private dashboard privacy, aggregate-only public outputs, and all existing
@@ -1142,11 +1146,11 @@ The core programme is successful when:
 ```text
 Start Discord Voting Post Framework Phase 14: Rating Scale Extensions Audit and Design.
 
-Begin with audit/scope only. Confirm whether KD98 needs fixed 1-10 ratings, configurable rating
-scales, scale labels, named rating choices, per-rating comments, or no rating-scale extension for
-now. Validate SQL source-of-truth shape, backward compatibility for existing fixed 1-5 ratings,
-draft/resume compatibility, export/report/dashboard representation, privacy boundaries, tests,
-smoke plan, deployment order, rollback posture, and deferred boundaries before any implementation.
+Begin with the approved richer rating-scale scope: configurable numeric min/max scales, expanded
+1-10 ratings, scale labels, and named rating choices. Do not include per-rating comments. Validate
+SQL source-of-truth shape, backward compatibility for existing fixed 1-5 ratings, draft/resume
+compatibility, export/report/dashboard representation, privacy boundaries, tests, smoke plan,
+deployment order, rollback posture, and deferred boundaries before implementation.
 ```
 
 ## 13. Programme Change Log

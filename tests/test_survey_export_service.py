@@ -17,6 +17,7 @@ from voting.survey_models import (
     SurveyQuestionOption,
     SurveyRankingCount,
     SurveyRatingCount,
+    SurveyRatingLabel,
     SurveyReportingOptionRow,
     SurveyReportingQuestionRow,
     SurveySnapshot,
@@ -151,6 +152,12 @@ def test_survey_totals_rows_include_text_question_metadata_without_raw_answers()
             "SelectionPercentOfResponses": "100%",
             "IsTopSelection": 0,
             "AverageRating": "",
+            "RatingScaleMin": "",
+            "RatingScaleMax": "",
+            "RatingLowLabel": "",
+            "RatingHighLabel": "",
+            "RatingLabels": "",
+            "RatingDistribution": "",
             "MinimumRating": None,
             "MaximumRating": None,
             "Rating1Count": 0,
@@ -158,6 +165,11 @@ def test_survey_totals_rows_include_text_question_metadata_without_raw_answers()
             "Rating3Count": 0,
             "Rating4Count": 0,
             "Rating5Count": 0,
+            "Rating6Count": 0,
+            "Rating7Count": 0,
+            "Rating8Count": 0,
+            "Rating9Count": 0,
+            "Rating10Count": 0,
             "AverageRank": "",
             "FirstPlaceCount": 0,
             "Rank1Count": 0,
@@ -257,11 +269,19 @@ def test_survey_totals_rows_include_rating_aggregates():
                 answered_response_count=2,
                 rating_counts=(
                     SurveyRatingCount(3, 1),
-                    SurveyRatingCount(5, 1),
+                    SurveyRatingCount(10, 1),
                 ),
-                rating_average=4.0,
+                rating_average=6.5,
                 rating_min=3,
-                rating_max=5,
+                rating_max=10,
+                rating_min_value=1,
+                rating_max_value=10,
+                rating_low_label="Poor",
+                rating_high_label="Excellent",
+                rating_labels=(
+                    SurveyRatingLabel(1, "Poor"),
+                    SurveyRatingLabel(10, "Excellent"),
+                ),
             ),
         ),
     )
@@ -271,11 +291,17 @@ def test_survey_totals_rows_include_rating_aggregates():
     assert rows[0]["QuestionType"] == "Rating"
     assert rows[0]["AnsweredResponses"] == 2
     assert rows[0]["SkippedResponses"] == 1
-    assert rows[0]["AverageRating"] == "4.00"
+    assert rows[0]["AverageRating"] == "6.50"
+    assert rows[0]["RatingScaleMin"] == 1
+    assert rows[0]["RatingScaleMax"] == 10
+    assert rows[0]["RatingLowLabel"] == "Poor"
+    assert rows[0]["RatingHighLabel"] == "Excellent"
+    assert rows[0]["RatingLabels"] == "1=Poor; 10=Excellent"
+    assert rows[0]["RatingDistribution"] == "Poor:0 2:0 3:1 4:0 5:0 6:0 7:0 8:0 9:0 Excellent:1"
     assert rows[0]["MinimumRating"] == 3
-    assert rows[0]["MaximumRating"] == 5
+    assert rows[0]["MaximumRating"] == 10
     assert rows[0]["Rating3Count"] == 1
-    assert rows[0]["Rating5Count"] == 1
+    assert rows[0]["Rating10Count"] == 1
 
 
 def test_survey_totals_rows_include_ranking_aggregates():

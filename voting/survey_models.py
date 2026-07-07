@@ -9,6 +9,9 @@ SURVEY_QUESTION_MULTI_SELECT = "MultiSelect"
 SURVEY_QUESTION_TEXT = "Text"
 SURVEY_QUESTION_RATING = "Rating"
 SURVEY_QUESTION_RANKING = "Ranking"
+DEFAULT_RATING_MIN_VALUE = 1
+DEFAULT_RATING_MAX_VALUE = 5
+MAX_RATING_VALUE = 10
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,12 @@ class SurveyRatingCount:
 
 
 @dataclass(frozen=True)
+class SurveyRatingLabel:
+    rating_value: int
+    label: str
+
+
+@dataclass(frozen=True)
 class SurveyQuestion:
     question_id: int
     survey_id: int
@@ -54,6 +63,11 @@ class SurveyQuestion:
     rating_average: float | None = None
     rating_min: int | None = None
     rating_max: int | None = None
+    rating_min_value: int = DEFAULT_RATING_MIN_VALUE
+    rating_max_value: int = DEFAULT_RATING_MAX_VALUE
+    rating_low_label: str | None = None
+    rating_high_label: str | None = None
+    rating_labels: tuple[SurveyRatingLabel, ...] = ()
 
 
 def rating_count_for_value(question: SurveyQuestion, rating_value: int) -> int:
@@ -61,6 +75,59 @@ def rating_count_for_value(question: SurveyQuestion, rating_value: int) -> int:
         if int(item.rating_value) == int(rating_value):
             return int(item.response_count)
     return 0
+
+
+def rating_values_for_question(question: SurveyQuestion) -> range:
+    minimum = int(getattr(question, "rating_min_value", DEFAULT_RATING_MIN_VALUE) or DEFAULT_RATING_MIN_VALUE)
+    maximum = int(getattr(question, "rating_max_value", DEFAULT_RATING_MAX_VALUE) or DEFAULT_RATING_MAX_VALUE)
+    if maximum < minimum:
+        maximum = minimum
+    return range(minimum, maximum + 1)
+
+
+def rating_label_for_value(question: SurveyQuestion, rating_value: int) -> str:
+    for item in getattr(question, "rating_labels", ()):
+        if int(item.rating_value) == int(rating_value):
+            return item.label
+    return str(int(rating_value))
+
+
+def rating_choice_display(question: SurveyQuestion, rating_value: int) -> str:
+    label = rating_label_for_value(question, rating_value)
+    value = int(rating_value)
+    return str(value) if label == str(value) else f"{value} - {label}"
+
+
+def rating_scale_text(question: SurveyQuestion) -> str:
+    minimum = int(getattr(question, "rating_min_value", DEFAULT_RATING_MIN_VALUE) or DEFAULT_RATING_MIN_VALUE)
+    maximum = int(getattr(question, "rating_max_value", DEFAULT_RATING_MAX_VALUE) or DEFAULT_RATING_MAX_VALUE)
+    base = f"{minimum}-{maximum}"
+    low = str(getattr(question, "rating_low_label", "") or "").strip()
+    high = str(getattr(question, "rating_high_label", "") or "").strip()
+    if low and high:
+        return f"{base} ({low} to {high})"
+    if low:
+        return f"{base} ({low} low)"
+    if high:
+        return f"{base} ({high} high)"
+    return base
+
+
+def rating_distribution_text(question: SurveyQuestion) -> str:
+    return " ".join(
+        f"{rating_label_for_value(question, value)}:{rating_count_for_value(question, value)}"
+        for value in rating_values_for_question(question)
+    )
+
+
+def rating_labels_text(question: SurveyQuestion) -> str:
+    return "; ".join(
+        f"{int(item.rating_value)}={item.label}"
+        for item in sorted(
+            getattr(question, "rating_labels", ()) or (),
+            key=lambda rating_label: int(rating_label.rating_value),
+        )
+    )
 
 
 def ranking_count_for_value(option: SurveyQuestionOption, rank_value: int) -> int:
@@ -116,6 +183,11 @@ class SurveyQuestionCreateRequest:
     max_selections: int = 1
     allow_details: bool = False
     is_required: bool = True
+    rating_min_value: int = DEFAULT_RATING_MIN_VALUE
+    rating_max_value: int = DEFAULT_RATING_MAX_VALUE
+    rating_low_label: str | None = None
+    rating_high_label: str | None = None
+    rating_labels: tuple[SurveyRatingLabel, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -228,6 +300,8 @@ class SurveyAnswerAuditRow:
     original_selected_option_detail_notes: tuple[str, ...] = ()
     rating_value: int | None = None
     original_rating_value: int | None = None
+    rating_label: str | None = None
+    original_rating_label: str | None = None
     ranking_option_id: int | None = None
     ranking_option_key: str | None = None
     ranking_option_label: str | None = None
@@ -265,6 +339,17 @@ class SurveyReportingQuestionRow:
     rating3_count: int
     rating4_count: int
     rating5_count: int
+    rating_scale_min: int = DEFAULT_RATING_MIN_VALUE
+    rating_scale_max: int = DEFAULT_RATING_MAX_VALUE
+    rating_low_label: str | None = None
+    rating_high_label: str | None = None
+    rating_labels: str = ""
+    rating_distribution: str = ""
+    rating6_count: int = 0
+    rating7_count: int = 0
+    rating8_count: int = 0
+    rating9_count: int = 0
+    rating10_count: int = 0
 
 
 @dataclass(frozen=True)

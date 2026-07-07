@@ -10,6 +10,7 @@ from voting.service import VoteValidationError
 from voting.survey_models import (
     SurveyCreateRequest,
     SurveyQuestionCreateRequest,
+    SurveyRatingLabel,
     SurveyResponsePayload,
 )
 
@@ -78,6 +79,77 @@ async def test_get_survey_snapshot_skips_rating_queries_when_rating_table_missin
     assert snapshot is not None
     assert snapshot.questions[0].rating_counts == ()
     assert executed_queries
+
+
+def test_snapshot_rows_include_rating_scale_metadata_and_labels():
+    now = datetime(2026, 7, 7, 12, 0, tzinfo=UTC)
+    snapshot = survey_dal._snapshot_from_rows(
+        {
+            "SurveyID": 42,
+            "GuildID": 1,
+            "ChannelID": 2,
+            "MessageID": 3,
+            "CreatedByDiscordUserID": 4,
+            "Title": "Planning",
+            "Description": None,
+            "Status": "Open",
+            "AllowResponseChange": 1,
+            "LaunchMentionEveryone": 0,
+            "ReminderMentionEveryone": 0,
+            "CloseMentionEveryone": 0,
+            "OpensAtUtc": None,
+            "ClosesAtUtc": now,
+            "ClosedAtUtc": None,
+            "ClosedByDiscordUserID": None,
+            "ClosedReason": None,
+            "TotalResponses": 2,
+            "CreatedAtUtc": now,
+            "UpdatedAtUtc": now,
+            "ResultVisibility": "PublicLive",
+        },
+        [
+            {
+                "SurveyQuestionID": 10,
+                "SurveyID": 42,
+                "QuestionKey": "q1",
+                "Prompt": "Rate readiness",
+                "QuestionType": "Rating",
+                "SortOrder": 1,
+                "IsRequired": 1,
+                "MinSelections": 0,
+                "MaxSelections": 0,
+                "AllowDetails": 0,
+                "AnsweredResponseCount": 2,
+                "AverageRating": 6.5,
+                "MinimumRating": 3,
+                "MaximumRating": 10,
+                "RatingMinValue": 1,
+                "RatingMaxValue": 10,
+                "RatingLowLabel": "Poor",
+                "RatingHighLabel": "Excellent",
+            }
+        ],
+        [],
+        [
+            {"SurveyQuestionID": 10, "RatingValue": 3, "ResponseCount": 1},
+            {"SurveyQuestionID": 10, "RatingValue": 10, "ResponseCount": 1},
+        ],
+        [],
+        [
+            {"SurveyQuestionID": 10, "RatingValue": 1, "Label": "Poor"},
+            {"SurveyQuestionID": 10, "RatingValue": 10, "Label": "Excellent"},
+        ],
+    )
+
+    question = snapshot.questions[0]
+    assert question.rating_min_value == 1
+    assert question.rating_max_value == 10
+    assert question.rating_low_label == "Poor"
+    assert question.rating_high_label == "Excellent"
+    assert question.rating_labels == (
+        SurveyRatingLabel(1, "Poor"),
+        SurveyRatingLabel(10, "Excellent"),
+    )
 
 
 @pytest.mark.asyncio

@@ -56,6 +56,17 @@ class DashboardReportingQuestionAggregate:
     rating3_count: int
     rating4_count: int
     rating5_count: int
+    rating_scale_min: int = 1
+    rating_scale_max: int = 5
+    rating_low_label: str | None = None
+    rating_high_label: str | None = None
+    rating_labels: str = ""
+    rating_distribution: str = ""
+    rating6_count: int = 0
+    rating7_count: int = 0
+    rating8_count: int = 0
+    rating9_count: int = 0
+    rating10_count: int = 0
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after Phase 13 private dashboard UI delivery and smoke testing`
 - Task type: `audit | product scope | SQL-backed survey extension design | Discord interaction UX | reporting/export review`
 - One-pass approved: `no`
-- Status: `active next voting slice; audit/scope only until operator approval`
+- Status: `active next voting slice; product scope revised for configurable scales; implementation still requires architecture/SQL/reporting approval`
 
 ## 2. Objective
 
@@ -18,6 +18,11 @@ then taught exports, reporting contracts, persisted drafts, and the private dash
 represent that fixed scale safely. Phase 14 should decide whether and how to extend rating scales
 without breaking existing 1-5 rating responses, public aggregate rendering, private exports,
 dashboard summaries, draft/resume behavior, or report bundles.
+
+Operator direction after initial audit confirms real KD98 value in bringing the broader rating
+scale work into Phase 14 now: configurable numeric min/max scales, the expanded 1-10 scale, scale
+labels, and named rating choices. Per-rating comments are explicitly not required and must not be
+included in Phase 14 or carried as default deferred scope.
 
 Start with audit/scope confirmation. Do not implement SQL migrations, new rating storage shape,
 builder controls, player controls, export/report/dashboard shape changes, public rendering changes,
@@ -73,23 +78,27 @@ Phase 14 promotes the active rating-scale extension deferred item.
 ### Deferred Optimisation
 - Area: `voting/`, future survey rating scale extensions, survey response UX, export/report surfaces
 - Type: architecture
-- Description: Phase 9B intentionally delivered only a fixed 1-5 rating question type. Custom rating scales, 1-10 scales, scale labels, per-rating comments, and richer rating presentation remain out of scope so the first rating slice stays predictable and aggregate-only. Phase 10 exports/report bundles, Phase 11 dashboard-safe aggregates, Phase 12 drafts, and Phase 13 private dashboard UI preserve the fixed-scale contract.
-- Suggested Fix: Prepare a dedicated rating-scale polish slice. Confirm product value, privacy, SQL storage shape, backward compatibility for existing 1-5 ratings, export/report columns, public aggregate rendering, private dashboard representation, builder UX, player editing UX, validation, migration order, rollback posture, and smoke plan before implementation.
+- Description: Phase 9B intentionally delivered only a fixed 1-5 rating question type. Phase 14 now has operator-confirmed product value for configurable numeric min/max scales, an expanded 1-10 scale, scale labels, and named rating choices. Per-rating comments are explicitly not required and must not be treated as deferred scope unless a later operator decision reverses that status. Phase 10 exports/report bundles, Phase 11 dashboard-safe aggregates, Phase 12 drafts, and Phase 13 private dashboard UI preserve the fixed-scale contract until Phase 14 changes are approved and delivered.
+- Suggested Fix: Design and, after explicit architecture approval, deliver configurable numeric rating scales with backward compatibility for existing 1-5 ratings, SQL-backed scale metadata, private-safe export/report/dashboard representation, public aggregate-only rendering, builder/player UX, persisted draft/resume compatibility, validation, migration order, rollback posture, and smoke coverage. Exclude per-rating comments from Phase 14 and from future deferred scope by default.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 9B fixed 1-5 rating questions delivered and smoke tested on 2026-07-04; Phase 10 export/report bundle delivered and smoke tested on 2026-07-05; Phase 11 dashboard/reporting contract delivered and smoke/regression tested on 2026-07-06; Phase 12 persisted survey draft/resume delivered and smoke/regression tested on 2026-07-06; Phase 13 private dashboard UI delivered and smoke tested on 2026-07-07; operator approval for scale extension scope; SQL repo validation; export/report/dashboard shape approval; Codex Security review before runtime handoff if implemented.
+- Dependencies: Phase 9B fixed 1-5 rating questions delivered and smoke tested on 2026-07-04; Phase 10 export/report bundle delivered and smoke tested on 2026-07-05; Phase 11 dashboard/reporting contract delivered and smoke/regression tested on 2026-07-06; Phase 12 persisted survey draft/resume delivered and smoke/regression tested on 2026-07-06; Phase 13 private dashboard UI delivered and smoke tested on 2026-07-07; operator approval for configurable rating scales, 1-10, scale labels, and named rating choices; SQL repo validation; export/report/dashboard shape approval; Codex Security review before runtime handoff if implemented.
 
 ## 6. Candidate Phase 14 Scope To Confirm
 
+### Confirmed Product Scope For Phase 14
+
+- Add configurable numeric min/max scales for survey `Rating` questions.
+- Add an expanded 1-10 rating scale as an approved first-class scale option.
+- Add scale labels such as low/high captions for rating questions.
+- Add named rating choices so numeric values can have player-facing/admin-facing labels.
+- Preserve fixed 1-5 as the default and the backward-compatible interpretation for all existing
+  rating questions and responses.
+- Exclude per-rating comments. They are not required for Phase 14 and should not be kept as a
+  default future deferred item.
+
 ### In Scope For Audit/Design
 
-- Confirm whether KD98 needs:
-  - fixed 1-10 ratings,
-  - configurable min/max numeric scales,
-  - scale labels such as low/high captions,
-  - named rating choices,
-  - per-rating comments,
-  - or no rating-scale extension for now.
 - Confirm whether custom scales apply only to survey `Rating` questions or also affect public
   vote/survey result cards, private status, exports, report bundles, and the private dashboard.
 - Confirm backward compatibility for all existing fixed 1-5 rating questions and answers.
@@ -105,6 +114,27 @@ Phase 14 promotes the active rating-scale extension deferred item.
 - Define tests, smoke plan, Codex Security requirement, deployment order, rollback posture, and
   deferred follow-up work.
 
+### Recommended Architecture Direction To Approve
+
+- Keep `QuestionType = Rating`; do not create separate question types such as `Rating10`.
+- Store scale metadata with the rating question, not with each response.
+- Preserve submitted answers as one scalar numeric `RatingValue` per response/question.
+- Use an additive SQL shape:
+  - `SurveyQuestions` metadata for numeric bounds and low/high scale captions, or a narrow
+    companion metadata table if SQL deployment review prefers not to widen `SurveyQuestions`.
+  - A dedicated per-value label table for named rating choices, keyed by survey/question/value.
+  - A widened `SurveyRatingAnswers` value constraint that supports the approved global bounds.
+- Make service validation authoritative for each question's min/max range and labels.
+- Use Discord-safe guided builder controls only; do not allow arbitrary unsafe free-form scale
+  definitions.
+- Use a select menu for larger or named scales if button count/label length makes buttons awkward;
+  fixed 1-5 may keep the existing compact button UX.
+- Keep PublicLive and HiddenUntilClose aggregate-only. Public output may show count, average,
+  min/max, and distribution by value/label, but never per-user ratings.
+- Keep private response-detail export as the only profile that includes per-response rating values.
+- Keep dashboard summaries aggregate-only and free of Discord identity, raw text/detail, and draft
+  data.
+
 ### Candidate Implementation Scope If Approved Later
 
 - Add a backward-compatible rating-scale model for survey `Rating` questions.
@@ -119,6 +149,7 @@ Phase 14 promotes the active rating-scale extension deferred item.
 ## 7. Out Of Scope Unless Separately Approved
 
 - Per-option emoji/icon support.
+- Per-rating comments.
 - Broad `/vote_admin` reshaping.
 - Cross-survey workbook exports or export schema redesign beyond rating-scale compatibility.
 - Retention/redaction policy changes.
@@ -144,6 +175,7 @@ Phase 14 promotes the active rating-scale extension deferred item.
 
 Definitely not required unless a later operator decision reverses the status:
 
+- Per-rating comments.
 - Role-restricted voting.
 - Governor-linked voting or governor-aware reporting.
 - Saved vote/survey templates.
@@ -167,8 +199,12 @@ Definitely not required unless a later operator decision reverses the status:
 - Current `dbo.SurveyQuestions` question-type and rating metadata shape.
 - Current `dbo.SurveyRatingAnswers` check constraints, indexes, uniqueness, and FK behavior.
 - Whether fixed 1-5 responses can remain valid with default scale metadata.
-- Whether scale metadata belongs on `SurveyQuestions`, a dedicated rating-scale table, or another
-  additive structure.
+- Whether scale metadata belongs on `SurveyQuestions`, a dedicated rating-scale metadata table, or
+  another additive structure.
+- Whether named rating choices should be stored in a dedicated per-value label table and how to
+  enforce one label per rating value.
+- Whether `SurveyRatingAnswers.RatingValue` should allow the approved global numeric bounds while
+  service validation enforces each question's exact min/max range.
 - How exports/report bundles/dashboard aggregates should represent custom scale bounds and labels.
 - Whether existing SQL reporting views/procedure require changes, and whether bot-side adapters are
   sufficient.
@@ -205,15 +241,16 @@ and Codex Security review before runtime handoff if implementation is approved.
 Candidate smoke plan if runtime implementation is approved:
 
 1. Create a default fixed 1-5 rating survey and confirm unchanged behavior.
-2. Create an approved extended-scale rating survey.
-3. Submit required and optional ratings, including optional skip/clear.
-4. Reopen submitted responses and confirm rating prefill/editing.
-5. Save/resume an unsubmitted draft and confirm extended ratings are excluded until final submit.
-6. Confirm PublicLive and HiddenUntilClose aggregate-only rating output.
-7. Confirm private status, report bundle, exports, and dashboard represent scale metadata safely.
-8. Confirm no raw details, Discord names, Discord IDs, or per-user rows appear in public or
+2. Create an expanded 1-10 rating survey.
+3. Create a custom min/max rating survey with scale labels and named rating choices.
+4. Submit required and optional ratings, including optional skip/clear.
+5. Reopen submitted responses and confirm rating prefill/editing.
+6. Save/resume an unsubmitted draft and confirm extended ratings are excluded until final submit.
+7. Confirm PublicLive and HiddenUntilClose aggregate-only rating output.
+8. Confirm private status, report bundle, exports, and dashboard represent scale metadata safely.
+9. Confirm no raw details, Discord names, Discord IDs, or per-user rows appear in public or
    dashboard-safe outputs.
-9. Confirm existing one-choice, multi-select, choice/text/detail/optional/ranking survey behavior
+10. Confirm existing one-choice, multi-select, choice/text/detail/optional/ranking survey behavior
    remains compatible.
 
 ## 13. Stop Point

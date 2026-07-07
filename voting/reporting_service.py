@@ -90,6 +90,17 @@ def _survey_question_aggregate(
         rating3_count=row.rating3_count,
         rating4_count=row.rating4_count,
         rating5_count=row.rating5_count,
+        rating_scale_min=row.rating_scale_min,
+        rating_scale_max=row.rating_scale_max,
+        rating_low_label=row.rating_low_label,
+        rating_high_label=row.rating_high_label,
+        rating_labels=row.rating_labels,
+        rating_distribution=row.rating_distribution,
+        rating6_count=row.rating6_count,
+        rating7_count=row.rating7_count,
+        rating8_count=row.rating8_count,
+        rating9_count=row.rating9_count,
+        rating10_count=row.rating10_count,
     )
 
 

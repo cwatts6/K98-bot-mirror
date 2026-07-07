@@ -57,7 +57,8 @@ from voting.survey_models import (
     SURVEY_QUESTION_RATING,
     SURVEY_QUESTION_TEXT,
     ranking_count_for_value,
-    rating_count_for_value,
+    rating_distribution_text,
+    rating_scale_text,
 )
 from voting.survey_presentation import (
     build_survey_close_embed,
@@ -1160,14 +1161,10 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
                 continue
             if question.question_type == SURVEY_QUESTION_RATING:
                 if answered and question.rating_average is not None:
-                    distribution = " ".join(
-                        f"{value}:{rating_count_for_value(question, value)}"
-                        for value in range(1, 6)
-                    )
                     rating_summary = (
-                        f"avg {question.rating_average:.1f}/5, "
+                        f"avg {question.rating_average:.1f} on {rating_scale_text(question)}, "
                         f"min {question.rating_min or '-'}, max {question.rating_max or '-'}, "
-                        f"{distribution}"
+                        f"{rating_distribution_text(question)}"
                     )
                 else:
                     rating_summary = "no ratings"

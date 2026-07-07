@@ -18,6 +18,7 @@ from ui.views.survey_post_view import (
     _SurveyDetailOptionSelect,
     _SurveyOptionModal,
     _SurveyQuestionPromptModal,
+    _SurveyRatingScaleLabelsModal,
     _SurveyTextAnswerModal,
 )
 from voting import survey_service
@@ -27,6 +28,7 @@ from voting.survey_models import (
     SurveyQuestion,
     SurveyQuestionCreateRequest,
     SurveyQuestionOption,
+    SurveyRatingLabel,
     SurveyResponseDraft,
     SurveyResponsePayload,
     SurveySnapshot,
@@ -741,6 +743,70 @@ async def test_survey_response_panel_allows_skipped_optional_rating():
 
 
 @pytest.mark.asyncio
+async def test_survey_response_panel_uses_select_for_extended_rating():
+    now = datetime.now(UTC)
+    snapshot = SurveySnapshot(
+        survey_id=7,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Survey",
+        description=None,
+        status="Open",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now + timedelta(hours=1),
+        closed_at_utc=None,
+        closed_by_discord_user_id=None,
+        closed_reason=None,
+        total_responses=0,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=10,
+                survey_id=7,
+                question_key="q1",
+                prompt="Rate readiness",
+                question_type="Rating",
+                sort_order=1,
+                min_selections=0,
+                max_selections=0,
+                options=(),
+                rating_min_value=1,
+                rating_max_value=10,
+                rating_low_label="Poor",
+                rating_high_label="Excellent",
+                rating_labels=(
+                    SurveyRatingLabel(1, "Poor"),
+                    SurveyRatingLabel(10, "Excellent"),
+                ),
+            ),
+        ),
+    )
+    panel = SurveyResponsePanel(snapshot, owner_user_id=123)
+
+    rating_select = next(
+        child for child in panel.children if getattr(child, "placeholder", "").startswith("Rating")
+    )
+    assert len(rating_select.options) == 10
+    assert rating_select.options[0].label == "1 - Poor"
+    assert rating_select.options[-1].label == "10 - Excellent"
+    assert "Required rating: choose 1-10 (Poor to Excellent)" in panel.content()
+
+    rating_select._selected_values = ["10"]
+    rating_select._interaction = SimpleNamespace(data={})
+    await rating_select.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    assert panel.rating_answers == {10: 10}
+    assert "rated 10 - Excellent" in panel.content()
+
+
+@pytest.mark.asyncio
 async def test_survey_response_panel_supports_ranking_entry_and_duplicate_prevention():
     now = datetime.now(UTC)
     snapshot = SurveySnapshot(
@@ -1313,6 +1379,52 @@ async def test_survey_guided_builder_saves_rating_question(monkeypatch):
     assert view.questions[0].min_selections == 0
     assert view.questions[0].max_selections == 0
     assert "Rating 1-5" in view.summary()
+
+
+@pytest.mark.asyncio
+async def test_survey_guided_builder_saves_extended_rating_question(monkeypatch):
+    async def fake_publish(_interaction, _questions):
+        return True
+
+    async def fake_send_ephemeral(_interaction, _content, **_kwargs):
+        return None
+
+    monkeypatch.setattr("ui.views.survey_post_view.send_ephemeral", fake_send_ephemeral)
+
+    view = SurveyBuilderView(owner_user_id=123, publish_callback=fake_publish)
+    type_select = _select(view, "Question type")
+    type_select._selected_values = ["rating"]
+    type_select._interaction = SimpleNamespace(data={})
+    await type_select.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    max_select = _select(view, "Rating maximum")
+    max_select._selected_values = ["10"]
+    max_select._interaction = SimpleNamespace(data={})
+    await max_select.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    scale_modal = _SurveyRatingScaleLabelsModal(view)
+    scale_modal.low_label.value = "Poor"
+    scale_modal.high_label.value = "Excellent"
+    scale_modal.named_labels.value = "1=Poor\n10=Excellent"
+    await scale_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+
+    prompt_modal = _SurveyQuestionPromptModal(view)
+    prompt_modal.prompt.value = "Rate readiness"
+    await prompt_modal.callback(SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123)))
+    await _button(view, "Save question").callback(
+        SimpleNamespace(response=_Response(), user=SimpleNamespace(id=123))
+    )
+
+    question = view.questions[0]
+    assert question.question_type == SURVEY_QUESTION_RATING
+    assert question.rating_min_value == 1
+    assert question.rating_max_value == 10
+    assert question.rating_low_label == "Poor"
+    assert question.rating_high_label == "Excellent"
+    assert question.rating_labels == (
+        SurveyRatingLabel(1, "Poor"),
+        SurveyRatingLabel(10, "Excellent"),
+    )
 
 
 @pytest.mark.asyncio

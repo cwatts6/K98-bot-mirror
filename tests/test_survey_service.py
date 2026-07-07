@@ -15,6 +15,7 @@ from voting.survey_models import (
     SurveyDraftSaveResult,
     SurveyQuestion,
     SurveyQuestionOption,
+    SurveyRatingLabel,
     SurveySnapshot,
 )
 
@@ -126,6 +127,46 @@ def _draft_snapshot() -> SurveySnapshot:
 def test_survey_draft_save_result_requires_revision_for_accepted() -> None:
     assert SurveyDraftSaveResult("saved", 42, revision=1).accepted is True
     assert SurveyDraftSaveResult("saved", 42, revision=None).accepted is False
+
+
+def test_build_rating_question_accepts_configurable_scale_and_labels() -> None:
+    question = survey_service.build_question_request(
+        prompt="Rate readiness",
+        question_type=SURVEY_QUESTION_RATING,
+        rating_min_value=1,
+        rating_max_value=10,
+        rating_low_label="Poor",
+        rating_high_label="Excellent",
+        rating_labels={1: "Poor", 10: "Excellent"},
+    )
+
+    assert question.rating_min_value == 1
+    assert question.rating_max_value == 10
+    assert question.rating_low_label == "Poor"
+    assert question.rating_high_label == "Excellent"
+    assert question.rating_labels == (
+        SurveyRatingLabel(1, "Poor"),
+        SurveyRatingLabel(10, "Excellent"),
+    )
+
+
+def test_build_rating_question_rejects_invalid_configurable_scale() -> None:
+    with pytest.raises(VoteValidationError, match="between 1 and 10"):
+        survey_service.build_question_request(
+            prompt="Rate readiness",
+            question_type=SURVEY_QUESTION_RATING,
+            rating_min_value=0,
+            rating_max_value=10,
+        )
+
+    with pytest.raises(VoteValidationError, match="within the rating scale"):
+        survey_service.build_question_request(
+            prompt="Rate readiness",
+            question_type=SURVEY_QUESTION_RATING,
+            rating_min_value=3,
+            rating_max_value=7,
+            rating_labels={8: "Too high"},
+        )
 
 
 def test_validate_draft_response_payload_accepts_partial_answers_and_rankings():

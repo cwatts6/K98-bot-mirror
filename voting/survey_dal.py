@@ -11,6 +11,7 @@ from stats_alerts.db import exec_with_cursor, run_one_async, run_query_async
 from voting.result_visibility import normalize_result_visibility
 from voting.service import VoteValidationError
 from voting.survey_models import (
+    MAX_RATING_VALUE,
     SURVEY_QUESTION_RANKING,
     SURVEY_QUESTION_RATING,
     SURVEY_QUESTION_SINGLE_CHOICE,
@@ -23,6 +24,7 @@ from voting.survey_models import (
     SurveyQuestionOption,
     SurveyRankingCount,
     SurveyRatingCount,
+    SurveyRatingLabel,
     SurveyReminder,
     SurveyReportingOptionRow,
     SurveyReportingQuestionRow,
@@ -38,6 +40,11 @@ SURVEY_RATING_MIGRATION_ID = "20260704_002_add_survey_rating_questions"
 SURVEY_RATING_MIGRATION_MESSAGE = (
     "Survey rating storage is unavailable. Deploy SQL migration "
     f"{SURVEY_RATING_MIGRATION_ID} before using rating survey questions."
+)
+SURVEY_RATING_SCALE_MIGRATION_ID = "20260707_001_add_survey_rating_scales"
+SURVEY_RATING_SCALE_MIGRATION_MESSAGE = (
+    "Survey rating scale metadata is unavailable. Deploy SQL migration "
+    f"{SURVEY_RATING_SCALE_MIGRATION_ID} before using extended rating scales."
 )
 SURVEY_RANKING_MIGRATION_ID = "20260704_003_add_survey_ranking_questions"
 SURVEY_RANKING_MIGRATION_MESSAGE = (
@@ -146,6 +153,24 @@ def _rows_to_rating_counts(
     return {key: tuple(value) for key, value in grouped.items()}
 
 
+def _rows_to_rating_labels(
+    rows: Sequence[dict[str, Any]],
+) -> dict[int, tuple[SurveyRatingLabel, ...]]:
+    grouped: dict[int, list[SurveyRatingLabel]] = {}
+    for row in rows:
+        question_id = int(row["SurveyQuestionID"])
+        label = str(row.get("Label") or "").strip()
+        if not label:
+            continue
+        grouped.setdefault(question_id, []).append(
+            SurveyRatingLabel(
+                rating_value=int(row.get("RatingValue") or 0),
+                label=label,
+            )
+        )
+    return {key: tuple(sorted(value, key=lambda item: item.rating_value)) for key, value in grouped.items()}
+
+
 async def _survey_rating_answers_table_exists() -> bool:
     row = await run_one_async("""
         SELECT OBJECT_ID(N'dbo.SurveyRatingAnswers', N'U') AS ObjectId;
@@ -159,6 +184,45 @@ def _survey_rating_answers_table_exists_sync(cur) -> bool:
         """)
     row = fetch_one_dict(cur)
     return bool(row and row.get("ObjectId") not in (None, ""))
+
+
+async def _survey_rating_scale_metadata_exists() -> bool:
+    row = await run_one_async("""
+        SELECT
+            COL_LENGTH(N'dbo.SurveyQuestions', N'RatingMinValue') AS RatingMinValueColumn,
+            OBJECT_ID(N'dbo.SurveyRatingChoiceLabels', N'U') AS LabelsObjectId;
+        """)
+    return bool(
+        row
+        and row.get("RatingMinValueColumn") not in (None, "")
+        and row.get("LabelsObjectId") not in (None, "")
+    )
+
+
+def _survey_rating_scale_metadata_exists_sync(cur) -> bool:
+    cur.execute("""
+        SELECT
+            COL_LENGTH(N'dbo.SurveyQuestions', N'RatingMinValue') AS RatingMinValueColumn,
+            OBJECT_ID(N'dbo.SurveyRatingChoiceLabels', N'U') AS LabelsObjectId;
+        """)
+    row = fetch_one_dict(cur)
+    return bool(
+        row
+        and row.get("RatingMinValueColumn") not in (None, "")
+        and row.get("LabelsObjectId") not in (None, "")
+    )
+
+
+def _question_uses_extended_rating_scale(question) -> bool:
+    if str(getattr(question, "question_type", "")) != SURVEY_QUESTION_RATING:
+        return False
+    return bool(
+        int(getattr(question, "rating_min_value", 1) or 1) != 1
+        or int(getattr(question, "rating_max_value", 5) or 5) != 5
+        or str(getattr(question, "rating_low_label", "") or "").strip()
+        or str(getattr(question, "rating_high_label", "") or "").strip()
+        or tuple(getattr(question, "rating_labels", ()) or ())
+    )
 
 
 async def _survey_ranking_answers_table_exists() -> bool:
@@ -222,9 +286,11 @@ def _rows_to_questions(
     question_rows: Sequence[dict[str, Any]],
     option_rows: Sequence[dict[str, Any]],
     rating_rows: Sequence[dict[str, Any]] = (),
+    rating_label_rows: Sequence[dict[str, Any]] = (),
 ) -> tuple[SurveyQuestion, ...]:
     options_by_question_id = _rows_to_options(option_rows)
     rating_counts_by_question_id = _rows_to_rating_counts(rating_rows)
+    rating_labels_by_question_id = _rows_to_rating_labels(rating_label_rows)
     return tuple(
         SurveyQuestion(
             question_id=int(row["SurveyQuestionID"]),
@@ -257,6 +323,19 @@ def _rows_to_questions(
             rating_max=(
                 int(row["MaximumRating"]) if row.get("MaximumRating") not in (None, "") else None
             ),
+            rating_min_value=int(row.get("RatingMinValue") or 1),
+            rating_max_value=int(row.get("RatingMaxValue") or 5),
+            rating_low_label=(
+                str(row.get("RatingLowLabel") or "").strip()
+                if row.get("RatingLowLabel") not in (None, "")
+                else None
+            ),
+            rating_high_label=(
+                str(row.get("RatingHighLabel") or "").strip()
+                if row.get("RatingHighLabel") not in (None, "")
+                else None
+            ),
+            rating_labels=rating_labels_by_question_id.get(int(row["SurveyQuestionID"]), ()),
         )
         for row in question_rows
     )
@@ -284,6 +363,8 @@ def _rows_to_reminders(rows: Sequence[dict[str, Any]]) -> tuple[SurveyReminder, 
 
 
 def _reporting_question_from_row(row: Mapping[str, Any]) -> SurveyReportingQuestionRow:
+    rating_label_summary = str(row.get("RatingLabels") or "").strip()
+    rating_distribution = str(row.get("RatingDistribution") or "").strip()
     return SurveyReportingQuestionRow(
         survey_id=int(row["SurveyID"]),
         title=str(row.get("Title") or ""),
@@ -319,6 +400,25 @@ def _reporting_question_from_row(row: Mapping[str, Any]) -> SurveyReportingQuest
         rating3_count=int(row.get("Rating3Count") or 0),
         rating4_count=int(row.get("Rating4Count") or 0),
         rating5_count=int(row.get("Rating5Count") or 0),
+        rating_scale_min=int(row.get("RatingMinValue") or 1),
+        rating_scale_max=int(row.get("RatingMaxValue") or 5),
+        rating_low_label=(
+            str(row.get("RatingLowLabel") or "").strip()
+            if row.get("RatingLowLabel") not in (None, "")
+            else None
+        ),
+        rating_high_label=(
+            str(row.get("RatingHighLabel") or "").strip()
+            if row.get("RatingHighLabel") not in (None, "")
+            else None
+        ),
+        rating_labels=rating_label_summary,
+        rating_distribution=rating_distribution,
+        rating6_count=int(row.get("Rating6Count") or 0),
+        rating7_count=int(row.get("Rating7Count") or 0),
+        rating8_count=int(row.get("Rating8Count") or 0),
+        rating9_count=int(row.get("Rating9Count") or 0),
+        rating10_count=int(row.get("Rating10Count") or 0),
     )
 
 
@@ -360,6 +460,7 @@ def _snapshot_from_rows(
     option_rows: Sequence[dict[str, Any]],
     rating_rows: Sequence[dict[str, Any]],
     reminder_rows: Sequence[dict[str, Any]],
+    rating_label_rows: Sequence[dict[str, Any]] = (),
 ) -> SurveySnapshot:
     closes_at = _aware_utc(survey.get("ClosesAtUtc"))
     created_at = _aware_utc(survey.get("CreatedAtUtc"))
@@ -391,7 +492,7 @@ def _snapshot_from_rows(
         total_responses=int(survey.get("TotalResponses") or 0),
         created_at_utc=created_at,
         updated_at_utc=updated_at,
-        questions=_rows_to_questions(question_rows, option_rows, rating_rows),
+        questions=_rows_to_questions(question_rows, option_rows, rating_rows, rating_label_rows),
         reminders=_rows_to_reminders(reminder_rows),
         result_visibility=normalize_result_visibility(survey.get("ResultVisibility")),
     )
@@ -439,32 +540,93 @@ async def create_survey(req: SurveyCreateRequest) -> int:
         )
         row = cur.fetchone()
         survey_id = int(row[0]) if row else 0
-        for question_index, question in enumerate(req.questions):
-            cur.execute(
-                """
-                INSERT INTO dbo.SurveyQuestions
-                    (
-                        SurveyID, QuestionKey, Prompt, QuestionType, SortOrder,
-                        IsRequired, MinSelections, MaxSelections, AllowDetails, CreatedAtUtc
-                    )
-                OUTPUT INSERTED.SurveyQuestionID
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-                """,
-                (
-                    survey_id,
-                    _question_key(question_index),
-                    question.prompt,
-                    question.question_type,
-                    question_index + 1,
-                    1 if question.is_required else 0,
-                    int(question.min_selections),
-                    int(question.max_selections),
-                    1 if question.allow_details else 0,
-                    now,
-                ),
+        rating_scale_available = _survey_rating_scale_metadata_exists_sync(cur)
+        if not rating_scale_available and any(
+            _question_uses_extended_rating_scale(question) for question in req.questions
+        ):
+            logger.warning(
+                "survey_rating_scale_metadata_missing_create survey_id=%s migration=%s",
+                survey_id,
+                SURVEY_RATING_SCALE_MIGRATION_ID,
             )
+            raise VoteValidationError(SURVEY_RATING_SCALE_MIGRATION_MESSAGE)
+        for question_index, question in enumerate(req.questions):
+            if rating_scale_available:
+                cur.execute(
+                    """
+                    INSERT INTO dbo.SurveyQuestions
+                        (
+                            SurveyID, QuestionKey, Prompt, QuestionType, SortOrder,
+                            IsRequired, MinSelections, MaxSelections, AllowDetails,
+                            RatingMinValue, RatingMaxValue, RatingLowLabel, RatingHighLabel,
+                            CreatedAtUtc
+                        )
+                    OUTPUT INSERTED.SurveyQuestionID
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        survey_id,
+                        _question_key(question_index),
+                        question.prompt,
+                        question.question_type,
+                        question_index + 1,
+                        1 if question.is_required else 0,
+                        int(question.min_selections),
+                        int(question.max_selections),
+                        1 if question.allow_details else 0,
+                        int(question.rating_min_value),
+                        int(question.rating_max_value),
+                        question.rating_low_label,
+                        question.rating_high_label,
+                        now,
+                    ),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO dbo.SurveyQuestions
+                        (
+                            SurveyID, QuestionKey, Prompt, QuestionType, SortOrder,
+                            IsRequired, MinSelections, MaxSelections, AllowDetails, CreatedAtUtc
+                        )
+                    OUTPUT INSERTED.SurveyQuestionID
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        survey_id,
+                        _question_key(question_index),
+                        question.prompt,
+                        question.question_type,
+                        question_index + 1,
+                        1 if question.is_required else 0,
+                        int(question.min_selections),
+                        int(question.max_selections),
+                        1 if question.allow_details else 0,
+                        now,
+                    ),
+                )
             question_row = cur.fetchone()
             question_id = int(question_row[0]) if question_row else 0
+            if rating_scale_available and question.question_type == SURVEY_QUESTION_RATING:
+                for item in question.rating_labels:
+                    cur.execute(
+                        """
+                        INSERT INTO dbo.SurveyRatingChoiceLabels
+                            (
+                                SurveyID, SurveyQuestionID, RatingValue, Label, CreatedAtUtc,
+                                UpdatedAtUtc
+                            )
+                        VALUES (?, ?, ?, ?, ?, ?);
+                        """,
+                        (
+                            survey_id,
+                            question_id,
+                            int(item.rating_value),
+                            item.label,
+                            now,
+                            now,
+                        ),
+                    )
             for option_index, label in enumerate(question.options):
                 cur.execute(
                     """
@@ -551,6 +713,7 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
     if not survey:
         return None
     rating_answers_available = await _survey_rating_answers_table_exists()
+    rating_scale_available = await _survey_rating_scale_metadata_exists()
     ranking_answers_available = await _survey_ranking_answers_table_exists()
     if not rating_answers_available:
         logger.warning(
@@ -622,6 +785,18 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
     rating_max_expr = (
         "rating_counts.MaximumRating" if rating_answers_available else "CAST(NULL AS tinyint)"
     )
+    rating_min_value_expr = "q.RatingMinValue" if rating_scale_available else "1"
+    rating_max_value_expr = "q.RatingMaxValue" if rating_scale_available else "5"
+    rating_low_label_expr = (
+        "q.RatingLowLabel"
+        if rating_scale_available
+        else "CAST(NULL AS nvarchar(40))"
+    )
+    rating_high_label_expr = (
+        "q.RatingHighLabel"
+        if rating_scale_available
+        else "CAST(NULL AS nvarchar(40))"
+    )
     question_sql = f"""
             WITH ChoiceAnswered AS (
                 SELECT SurveyID, SurveyQuestionID, COUNT_BIG(1) AS AnsweredResponseCount
@@ -653,7 +828,11 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
                    ) AS AnsweredResponseCount,
                    {rating_average_expr} AS AverageRating,
                    {rating_min_expr} AS MinimumRating,
-                   {rating_max_expr} AS MaximumRating
+                   {rating_max_expr} AS MaximumRating,
+                   {rating_min_value_expr} AS RatingMinValue,
+                   {rating_max_value_expr} AS RatingMaxValue,
+                   {rating_low_label_expr} AS RatingLowLabel,
+                   {rating_high_label_expr} AS RatingHighLabel
             FROM dbo.SurveyQuestions q
             LEFT JOIN ChoiceAnswered choice_counts
               ON choice_counts.SurveyID = q.SurveyID
@@ -755,6 +934,19 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
         if rating_answers_available
         else []
     )
+    rating_labels = (
+        await run_query_async(
+            """
+            SELECT SurveyQuestionID, RatingValue, Label
+            FROM dbo.SurveyRatingChoiceLabels
+            WHERE SurveyID = ?
+            ORDER BY SurveyQuestionID ASC, RatingValue ASC;
+            """,
+            (int(survey_id),),
+        )
+        if rating_scale_available
+        else []
+    )
     reminders = await run_query_async(
         """
         SELECT ReminderID, SurveyID, OffsetMinutesBeforeClose, DueAtUtc, SentAtUtc, MessageID
@@ -764,7 +956,7 @@ async def get_survey_snapshot(survey_id: int) -> SurveySnapshot | None:
         """,
         (int(survey_id),),
     )
-    return _snapshot_from_rows(survey, questions, options, ratings, reminders)
+    return _snapshot_from_rows(survey, questions, options, ratings, reminders, rating_labels)
 
 
 async def list_open_surveys() -> list[SurveySnapshot]:
@@ -1770,6 +1962,7 @@ def _submit_survey_response_sync(callback) -> Any:
 
 async def list_answer_audit_rows(survey_id: int) -> tuple[SurveyAnswerAuditRow, ...]:
     rating_answers_available = await _survey_rating_answers_table_exists()
+    rating_scale_available = await _survey_rating_scale_metadata_exists()
     ranking_answers_available = await _survey_ranking_answers_table_exists()
     if not rating_answers_available:
         logger.warning(
@@ -1853,7 +2046,20 @@ async def list_answer_audit_rows(survey_id: int) -> tuple[SurveyAnswerAuditRow, 
         """,
         (int(survey_id),),
     )
-    return _answer_audit_from_rows(rows)
+    rating_labels = (
+        await run_query_async(
+            """
+            SELECT SurveyQuestionID, RatingValue, Label
+            FROM dbo.SurveyRatingChoiceLabels
+            WHERE SurveyID = ?
+            ORDER BY SurveyQuestionID ASC, RatingValue ASC;
+            """,
+            (int(survey_id),),
+        )
+        if rating_scale_available
+        else []
+    )
+    return _answer_audit_from_rows(rows, rating_labels)
 
 
 async def list_reporting_question_rows(
@@ -1869,9 +2075,25 @@ async def list_reporting_question_rows_for_surveys(
     if not normalized_ids:
         return ()
     await _require_survey_reporting_views()
+    rating_scale_available = await _survey_rating_scale_metadata_exists()
     placeholders = ", ".join("?" for _ in normalized_ids)
     order_cases = " ".join(
         f"WHEN ? THEN {index}" for index, _survey_id in enumerate(normalized_ids)
+    )
+    rating_scale_columns = (
+        """
+               RatingMinValue, RatingMaxValue, RatingLowLabel, RatingHighLabel,
+               RatingLabels, RatingDistribution, Rating6Count, Rating7Count,
+               Rating8Count, Rating9Count, Rating10Count"""
+        if rating_scale_available
+        else """
+               1 AS RatingMinValue, 5 AS RatingMaxValue,
+               CAST(NULL AS nvarchar(40)) AS RatingLowLabel,
+               CAST(NULL AS nvarchar(40)) AS RatingHighLabel,
+               CAST('' AS nvarchar(max)) AS RatingLabels,
+               CAST('' AS nvarchar(max)) AS RatingDistribution,
+               0 AS Rating6Count, 0 AS Rating7Count, 0 AS Rating8Count,
+               0 AS Rating9Count, 0 AS Rating10Count"""
     )
     rows = await run_query_async(
         f"""
@@ -1881,7 +2103,8 @@ async def list_reporting_question_rows_for_surveys(
                OptionCount, AnsweredResponses, SkippedResponses, ChoiceSelectionCount,
                RankedOptionCount, RankingFirstPlaceCount, AverageRating, MinimumRating,
                MaximumRating, Rating1Count, Rating2Count, Rating3Count, Rating4Count,
-               Rating5Count
+               Rating5Count,
+               {rating_scale_columns}
         FROM dbo.v_SurveyReportingQuestionSummary
         WHERE SurveyID IN ({placeholders})
         ORDER BY CASE SurveyID {order_cases} ELSE {len(normalized_ids)} END ASC,
@@ -1927,7 +2150,24 @@ async def list_reporting_option_rows_for_surveys(
     return tuple(_reporting_option_from_row(row) for row in rows)
 
 
-def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswerAuditRow, ...]:
+def _answer_rating_label(
+    labels_by_question_id: Mapping[int, tuple[SurveyRatingLabel, ...]],
+    question_id: int,
+    rating_value: int | None,
+) -> str | None:
+    if rating_value is None:
+        return None
+    for item in labels_by_question_id.get(question_id, ()):
+        if int(item.rating_value) == int(rating_value):
+            return item.label
+    return None
+
+
+def _answer_audit_from_rows(
+    rows: Sequence[dict[str, Any]],
+    rating_label_rows: Sequence[dict[str, Any]] = (),
+) -> tuple[SurveyAnswerAuditRow, ...]:
+    labels_by_question_id = _rows_to_rating_labels(rating_label_rows)
     grouped: dict[tuple[int, int], dict[str, Any]] = {}
     for row in rows:
         key = (int(row["ResponseID"]), int(row["SurveyQuestionID"]))
@@ -1979,6 +2219,12 @@ def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswe
         updated_at = _aware_utc(row.get("ResponseUpdatedAtUtc"))
         if created_at is None or updated_at is None:
             raise ValueError("Survey response row is missing required UTC timestamps.")
+        rating_value = (
+            int(row["RatingValue"]) if row.get("RatingValue") not in (None, "") else None
+        )
+        original_rating_value = _original_rating_for_question(
+            row.get("OriginalAnswersJson"), question_id
+        )
         base_kwargs = dict(
             survey_id=int(row["SurveyID"]),
             title=str(row.get("Title") or ""),
@@ -2004,11 +2250,17 @@ def _answer_audit_from_rows(rows: Sequence[dict[str, Any]]) -> tuple[SurveyAnswe
             original_text_answer=_original_text_for_question(
                 row.get("OriginalAnswersJson"), question_id
             ),
-            rating_value=(
-                int(row["RatingValue"]) if row.get("RatingValue") not in (None, "") else None
+            rating_value=rating_value,
+            original_rating_value=original_rating_value,
+            rating_label=_answer_rating_label(
+                labels_by_question_id,
+                question_id,
+                rating_value,
             ),
-            original_rating_value=_original_rating_for_question(
-                row.get("OriginalAnswersJson"), question_id
+            original_rating_label=_answer_rating_label(
+                labels_by_question_id,
+                question_id,
+                original_rating_value,
             ),
             selected_option_detail_notes=_format_detail_notes(
                 item["selected_ids"],
@@ -2098,7 +2350,7 @@ def _original_rating_for_question(value: Any, question_id: int) -> int | None:
         rating = int(raw)
     except (TypeError, ValueError):
         return None
-    if rating < 1 or rating > 5:
+    if rating < 1 or rating > MAX_RATING_VALUE:
         return None
     return rating
 

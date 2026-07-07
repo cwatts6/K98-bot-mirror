@@ -16,6 +16,9 @@ from voting.service import (
     parse_reminder_offsets,
 )
 from voting.survey_models import (
+    DEFAULT_RATING_MAX_VALUE,
+    DEFAULT_RATING_MIN_VALUE,
+    MAX_RATING_VALUE,
     SURVEY_QUESTION_MULTI_SELECT,
     SURVEY_QUESTION_RANKING,
     SURVEY_QUESTION_RATING,
@@ -26,6 +29,7 @@ from voting.survey_models import (
     SurveyDraftSaveResult,
     SurveyLookupChoice,
     SurveyQuestionCreateRequest,
+    SurveyRatingLabel,
     SurveyResponseDraft,
     SurveyResponsePayload,
     SurveySnapshot,
@@ -41,6 +45,7 @@ MAX_SURVEY_OPTIONS = 6
 MAX_SURVEY_QUESTION_PROMPT_LEN = 180
 MAX_SURVEY_TEXT_ANSWER_LEN = 500
 MAX_SURVEY_DETAIL_LEN = 300
+MAX_RATING_SCALE_LABEL_LEN = 40
 SURVEY_QUESTION_TYPE_CHOICES: dict[str, str] = {
     SURVEY_QUESTION_SINGLE_CHOICE: "Single choice",
     SURVEY_QUESTION_MULTI_SELECT: "Multi-select",
@@ -112,15 +117,106 @@ def _clean_limited_text(
     return clean
 
 
+def _rating_bounds_for_question(question) -> tuple[int, int]:
+    minimum = int(
+        getattr(question, "rating_min_value", DEFAULT_RATING_MIN_VALUE)
+        or DEFAULT_RATING_MIN_VALUE
+    )
+    maximum = int(
+        getattr(question, "rating_max_value", DEFAULT_RATING_MAX_VALUE)
+        or DEFAULT_RATING_MAX_VALUE
+    )
+    return minimum, maximum
+
+
+def _rating_range_message(question) -> str:
+    minimum, maximum = _rating_bounds_for_question(question)
+    low = str(getattr(question, "rating_low_label", "") or "").strip()
+    high = str(getattr(question, "rating_high_label", "") or "").strip()
+    if low and high:
+        return f"from {minimum} to {maximum} ({low} to {high})"
+    if low:
+        return f"from {minimum} to {maximum} ({low} low)"
+    if high:
+        return f"from {minimum} to {maximum} ({high} high)"
+    return f"from {minimum} to {maximum}"
+
+
+def _clean_optional_label(value: str | None, *, field_name: str, limit: int) -> str | None:
+    clean = str(value or "").strip()
+    if not clean:
+        return None
+    if len(clean) > limit:
+        raise VoteValidationError(f"{field_name} must be {limit} characters or fewer.")
+    return clean
+
+
+def _validate_rating_scale(
+    *,
+    min_value: int | None,
+    max_value: int | None,
+    low_label: str | None,
+    high_label: str | None,
+    rating_labels: Mapping[int, str] | tuple[SurveyRatingLabel, ...] | None,
+) -> tuple[int, int, str | None, str | None, tuple[SurveyRatingLabel, ...]]:
+    minimum = DEFAULT_RATING_MIN_VALUE if min_value is None else int(min_value)
+    maximum = DEFAULT_RATING_MAX_VALUE if max_value is None else int(max_value)
+    if minimum < DEFAULT_RATING_MIN_VALUE or maximum > MAX_RATING_VALUE:
+        raise VoteValidationError(
+            f"Rating scales must stay between {DEFAULT_RATING_MIN_VALUE} and {MAX_RATING_VALUE}."
+        )
+    if maximum <= minimum:
+        raise VoteValidationError("Rating scale maximum must be greater than the minimum.")
+    clean_low = _clean_optional_label(
+        low_label,
+        field_name="Rating low label",
+        limit=MAX_RATING_SCALE_LABEL_LEN,
+    )
+    clean_high = _clean_optional_label(
+        high_label,
+        field_name="Rating high label",
+        limit=MAX_RATING_SCALE_LABEL_LEN,
+    )
+    raw_items: list[tuple[int, str]] = []
+    if isinstance(rating_labels, Mapping):
+        raw_items = [(int(key), str(value or "")) for key, value in rating_labels.items()]
+    else:
+        raw_items = [
+            (int(item.rating_value), str(item.label or "")) for item in (rating_labels or ())
+        ]
+    seen: set[int] = set()
+    clean_labels: list[SurveyRatingLabel] = []
+    for rating_value, label in raw_items:
+        if rating_value < minimum or rating_value > maximum:
+            raise VoteValidationError("Rating choice labels must be within the rating scale.")
+        if rating_value in seen:
+            raise VoteValidationError("Rating choice labels must use each value only once.")
+        clean_label = _clean_optional_label(
+            label,
+            field_name=f"Rating label {rating_value}",
+            limit=MAX_OPTION_LABEL_LEN,
+        )
+        if clean_label is None:
+            continue
+        seen.add(rating_value)
+        clean_labels.append(SurveyRatingLabel(rating_value=rating_value, label=clean_label))
+    return minimum, maximum, clean_low, clean_high, tuple(sorted(clean_labels, key=lambda item: item.rating_value))
+
+
 def build_question_request(
     *,
     prompt: str,
     question_type: str | None,
-    options: tuple[str, ...],
+    options: tuple[str, ...] | None = None,
     min_selections: int | None = None,
     max_selections: int | None = None,
     allow_details: bool = False,
     is_required: bool = True,
+    rating_min_value: int | None = None,
+    rating_max_value: int | None = None,
+    rating_low_label: str | None = None,
+    rating_high_label: str | None = None,
+    rating_labels: Mapping[int, str] | tuple[SurveyRatingLabel, ...] | None = None,
 ) -> SurveyQuestionCreateRequest:
     clean_prompt = str(prompt or "").strip()
     if not clean_prompt:
@@ -132,11 +228,19 @@ def build_question_request(
     minimum = 1 if min_selections is None else int(min_selections)
     maximum = 1 if max_selections is None else int(max_selections)
     normalized_type = _normalize_question_type(question_type, max_selections=maximum)
+    raw_options = tuple(options or ())
     if normalized_type == SURVEY_QUESTION_RATING:
-        if tuple(str(item or "").strip() for item in options if str(item or "").strip()):
+        if tuple(str(item or "").strip() for item in raw_options if str(item or "").strip()):
             raise VoteValidationError("Rating survey questions do not use options.")
         if allow_details:
             raise VoteValidationError("Rating survey questions cannot allow choice details.")
+        scale_min, scale_max, low_label, high_label, clean_rating_labels = _validate_rating_scale(
+            min_value=rating_min_value,
+            max_value=rating_max_value,
+            low_label=rating_low_label,
+            high_label=rating_high_label,
+            rating_labels=rating_labels,
+        )
         return SurveyQuestionCreateRequest(
             prompt=clean_prompt,
             question_type=normalized_type,
@@ -145,9 +249,14 @@ def build_question_request(
             max_selections=0,
             allow_details=False,
             is_required=bool(is_required),
+            rating_min_value=scale_min,
+            rating_max_value=scale_max,
+            rating_low_label=low_label,
+            rating_high_label=high_label,
+            rating_labels=clean_rating_labels,
         )
     if normalized_type == SURVEY_QUESTION_RANKING:
-        clean_options = _validate_survey_option_labels(options)
+        clean_options = _validate_survey_option_labels(raw_options)
         if allow_details:
             raise VoteValidationError("Ranking survey questions cannot allow choice details.")
         return SurveyQuestionCreateRequest(
@@ -160,7 +269,7 @@ def build_question_request(
             is_required=bool(is_required),
         )
     if normalized_type == SURVEY_QUESTION_TEXT:
-        if tuple(str(item or "").strip() for item in options if str(item or "").strip()):
+        if tuple(str(item or "").strip() for item in raw_options if str(item or "").strip()):
             raise VoteValidationError("Text survey questions do not use options.")
         if allow_details:
             raise VoteValidationError("Text survey questions cannot allow choice details.")
@@ -173,7 +282,7 @@ def build_question_request(
             allow_details=False,
             is_required=bool(is_required),
         )
-    clean_options = _validate_survey_option_labels(options)
+    clean_options = _validate_survey_option_labels(raw_options)
     if normalized_type == SURVEY_QUESTION_SINGLE_CHOICE:
         if minimum != 1 or maximum != 1:
             raise VoteValidationError(
@@ -393,18 +502,19 @@ def validate_response_payload(
             if raw_rating in (None, ""):
                 if question.is_required:
                     raise VoteValidationError(
-                        f"Answer question {question.sort_order}: choose a rating from 1 to 5."
+                        f"Answer question {question.sort_order}: choose a rating {_rating_range_message(question)}."
                     )
                 continue
             try:
                 rating_value = int(raw_rating)
             except (TypeError, ValueError):
                 raise VoteValidationError(
-                    f"Answer question {question.sort_order}: rating must be from 1 to 5."
+                    f"Answer question {question.sort_order}: rating must be {_rating_range_message(question)}."
                 ) from None
-            if rating_value < 1 or rating_value > 5:
+            rating_min, rating_max = _rating_bounds_for_question(question)
+            if rating_value < rating_min or rating_value > rating_max:
                 raise VoteValidationError(
-                    f"Answer question {question.sort_order}: rating must be from 1 to 5."
+                    f"Answer question {question.sort_order}: rating must be {_rating_range_message(question)}."
                 )
             rating_output[question.question_id] = rating_value
             continue
@@ -619,11 +729,12 @@ def validate_draft_response_payload(
             rating_value = int(raw_rating)
         except (TypeError, ValueError):
             raise VoteValidationError(
-                f"Answer question {question.sort_order}: rating must be from 1 to 5."
+                f"Answer question {question.sort_order}: rating must be {_rating_range_message(question)}."
             ) from None
-        if rating_value < 1 or rating_value > 5:
+        rating_min, rating_max = _rating_bounds_for_question(question)
+        if rating_value < rating_min or rating_value > rating_max:
             raise VoteValidationError(
-                f"Answer question {question.sort_order}: rating must be from 1 to 5."
+                f"Answer question {question.sort_order}: rating must be {_rating_range_message(question)}."
             )
         rating_output[question_id] = rating_value
 

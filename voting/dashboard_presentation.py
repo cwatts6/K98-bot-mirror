@@ -329,22 +329,49 @@ def _question_detail(
     if question.question_type == SURVEY_QUESTION_RATING:
         if question.average_rating is None:
             return "no ratings"
-        distribution = " ".join(
-            (
-                f"{value}:{fmt_short(count)}"
-                for value, count in (
-                    (1, question.rating1_count),
-                    (2, question.rating2_count),
-                    (3, question.rating3_count),
-                    (4, question.rating4_count),
-                    (5, question.rating5_count),
-                )
-            )
+        counts_by_value = {
+            1: question.rating1_count,
+            2: question.rating2_count,
+            3: question.rating3_count,
+            4: question.rating4_count,
+            5: question.rating5_count,
+            6: question.rating6_count,
+            7: question.rating7_count,
+            8: question.rating8_count,
+            9: question.rating9_count,
+            10: question.rating10_count,
+        }
+        distribution = question.rating_distribution or " ".join(
+            f"{value}:{fmt_short(counts_by_value.get(value, 0))}"
+            for value in range(question.rating_scale_min, question.rating_scale_max + 1)
+        )
+        default_scale = (
+            question.rating_scale_min == 1
+            and question.rating_scale_max == 5
+            and not question.rating_low_label
+            and not question.rating_high_label
+            and not question.rating_labels
+        )
+        if default_scale:
+            average = f"avg {question.average_rating:.1f}/5"
+        else:
+            scale = f"{question.rating_scale_min}-{question.rating_scale_max}"
+            if question.rating_low_label and question.rating_high_label:
+                scale = f"{scale} ({question.rating_low_label} to {question.rating_high_label})"
+            elif question.rating_low_label:
+                scale = f"{scale} ({question.rating_low_label} low)"
+            elif question.rating_high_label:
+                scale = f"{scale} ({question.rating_high_label} high)"
+            average = f"avg {question.average_rating:.1f} on {scale}"
+        labels = (
+            f"; labels {question.rating_labels}"
+            if question.rating_labels and question.rating_labels not in distribution
+            else ""
         )
         return (
-            f"avg {question.average_rating:.1f}/5, "
+            f"{average}, "
             f"min {question.minimum_rating or '-'}, max {question.maximum_rating or '-'}, "
-            f"{distribution}"
+            f"{distribution}{labels}"
         )
     if question.question_type == SURVEY_QUESTION_RANKING:
         ranked = [option for option in option_rows if option.average_rank is not None]
