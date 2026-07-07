@@ -31,7 +31,7 @@ def _discord_emoji(emoji: OptionEmoji | None) -> discord.PartialEmoji | str | No
     if emoji.kind == EMOJI_KIND_CUSTOM_DISCORD:
         try:
             return discord.PartialEmoji.from_str(emoji.text)
-        except Exception:
+        except (TypeError, ValueError):
             return None
     return emoji.text
 
