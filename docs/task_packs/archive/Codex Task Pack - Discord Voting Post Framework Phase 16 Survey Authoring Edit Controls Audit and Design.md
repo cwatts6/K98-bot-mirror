@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after Phase 15 emoji/icon support delivery and smoke testing`
 - Task type: `audit | product scope | Discord interaction UX | survey builder polish | SQL/reporting compatibility review`
 - One-pass approved: `no`
-- Status: `active next voting slice; audit/scope only until architecture, SQL/reporting, privacy, permissions, and UX direction are approved`
+- Status: `complete, review-hardened, smoke/regression tested, and archived`
 
 ## 2. Objective
 
@@ -27,6 +27,26 @@ shape changes, or broad `/vote_admin` reshaping until the product scope, privacy
 compatibility plan, permissions, tests, smoke plan, deployment order, rollback posture, and deferred
 boundaries are approved.
 
+Delivery closeout on 2026-07-07 confirmed the approved Phase 16 implementation is complete:
+
+- Guided survey builder review/edit controls are delivered for already-added draft questions.
+- Draft admins can edit question text, required/optional state, option labels, and option emoji
+  metadata where those fields exist.
+- Draft admins can delete and reorder questions before publish.
+- `/vote_admin survey_update` is delivered for open published surveys, covering title,
+  description, close time, reminder offsets, reminder `@everyone`, close `@everyone`, option
+  icons, response changes, and result visibility.
+- Post-publish option icons, response changes, and result visibility are allowed only while the
+  survey is open and before submitted responses exist.
+- Survey update locks correctly after a submitted response exists, and closed surveys are locked.
+- Close-time updates rebuild pending reminders and audit the changed reminder schedule accurately.
+- Submitted survey response semantics, option IDs, export/report/dashboard shapes,
+  PublicLive/HiddenUntilClose behavior, draft/resume privacy boundaries, and restart-safe public
+  openers were preserved.
+- No SQL migration was required beyond the existing Phase 15 nullable emoji metadata.
+- Broad `/vote_admin` reshaping, cross-survey/workbook exports, retention/redaction changes, and
+  optional SQL-native combined reporting remain separate follow-up slices.
+
 ## 3. Required Reading
 
 Read first:
@@ -43,7 +63,7 @@ Read first:
 - `docs/reference/deferred_optimisations.md`
 - `docs/task_packs/Discord Voting Post Framework - Programme Pack.md`
 - `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 15 Emoji Icon Support and Visual Polish Audit and Design.md`
-- `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md`
+- `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md`
 
 ## 4. Delivered Baseline
 
@@ -144,6 +164,38 @@ Definitely not required unless a later operator decision reverses the status:
 - Governor-linked voting or governor-aware reporting.
 - Saved vote/survey templates.
 - Public voter-level/detail export posting.
+
+## 8A. Delivery Validation And Smoke Evidence
+
+Delivered through:
+
+- Mirror PR: `cwatts6/K98-bot-mirror#211`
+- Production PR: `cwatts6/K98-bot#518`
+- SQL PR: `not required`
+- Bot smoke test: `2026-07-07`
+
+Automated validation included:
+
+- `.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py`
+- `.\.venv\Scripts\python.exe scripts\validate_deferred_items.py`
+- `.\.venv\Scripts\python.exe scripts\select_tests.py`
+- `.\.venv\Scripts\python.exe scripts\smoke_imports.py`
+- `.\.venv\Scripts\python.exe scripts\validate_command_registration.py`
+- focused survey admin update/view/DAL/post-view tests
+- full pytest during implementation: `2379 passed, 2 skipped`
+- pre-commit on touched files
+- Codex Security diff scan with zero findings before the app report-publish race
+
+Review hardening included the audit-row fix where close-time changes that rebuild pending
+reminders now record `reminders: true` in `DetailsJson`.
+
+Operator smoke/regression testing confirmed:
+
+- Pre-publish review, edit, delete, and reorder all succeeded.
+- Post-publish updates all succeeded.
+- Survey update locks after a response is recorded.
+- Survey updates are locked after close.
+- Existing regression tests completed.
 
 ## 9. Codex Skills To Use
 

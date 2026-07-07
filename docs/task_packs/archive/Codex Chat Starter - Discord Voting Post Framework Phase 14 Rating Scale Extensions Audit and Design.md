@@ -9,8 +9,8 @@ contract. Smoke testing confirmed vote and survey dashboard pages, refresh, next
 open/closed filters, admin/leadership access control, and no details or Discord names visible.
 
 Historical starter preserved for traceability. Phase 15 is also complete and archived; use the
-programme pack or active Phase 16 starter in `docs/task_packs/` for the next Discord Voting Post
-Framework slice.
+programme pack or the current active starter in `docs/task_packs/` for the next Discord Voting
+Post Framework slice.
 
 ## Copy/Paste Starter
 

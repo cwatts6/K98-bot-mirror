@@ -1,6 +1,7 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter. Phase 16 is complete, review-hardened, smoke/regression tested, and no
+longer the active next slice.
 
 Phase 1 through Phase 15 are complete and smoke tested. Phase 15 delivered additive nullable vote
 and survey option emoji metadata, Unicode/custom Discord emoji support, guided option-polish
@@ -8,7 +9,14 @@ controls, Discord button/select display, private status/dashboard emoji display 
 custom emoji, generated-card custom emoji text fallback, no export/report schema expansion, review
 hardening, SQL PR #38 production deployment, and successful operator smoke/regression testing.
 
-Use this starter to begin Phase 16 with audit/scope confirmation before implementation.
+Historical note: Phase 16 delivered guided survey builder review/edit controls for already-added
+draft questions, including edit, delete, and reorder, plus `/vote_admin survey_update` for open
+published surveys. The update path covers title, description, close time, reminder offsets,
+reminder `@everyone`, close `@everyone`, option icons, response changes, and result visibility.
+Option icons, response changes, and result visibility are blocked once submitted responses exist,
+and closed surveys are locked. Broad `/vote_admin` reshaping is promoted to Phase 17.
+
+Use this starter only for historical context.
 
 ## Copy/Paste Starter
 
@@ -66,7 +74,7 @@ Read first:
 - docs/reference/deferred_optimisations.md
 - docs/task_packs/Discord Voting Post Framework - Programme Pack.md
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 15 Emoji Icon Support and Visual Polish Audit and Design.md
-- docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md
+- docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md
 
 Use these skills as applicable:
 - k98-architecture-scope

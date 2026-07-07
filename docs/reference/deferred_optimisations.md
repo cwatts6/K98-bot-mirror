@@ -6,36 +6,27 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `ui/views/survey_post_view.py`, `commands/vote_admin_cmds.py`, `voting/survey_service.py`, `voting/survey_dal.py`
-- Type: consistency
-- Description: Phase 15 smoke testing confirmed vote and survey option emoji display works, but exposed a survey authoring gap: survey creation is append-only once a question is added, and there is no `/vote_admin` survey update path for option emoji/icon metadata. If an admin forgets an emoji on an answer in question 1, they must restart the survey build instead of editing the draft question/options before publish or correcting approved display metadata after publish.
-- Suggested Fix: Promoted into the prepared Phase 16 Survey Authoring Edit Controls audit/design task pack. Scope guided survey builder review/edit controls for previously added draft questions and their option emoji metadata, plus a narrowly permissioned survey option-icon update path for open surveys if approved. Preserve existing survey answer semantics, draft/submit privacy boundaries, restart-safe public openers, and private reporting/export contracts. Keep this separate from broad `/vote_admin` reshaping.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 15 option emoji metadata and builder controls are delivered and smoke tested; operator decision on whether post-publish survey option icon edits are allowed only while open, only before responses, or never after publish.
-
-### Deferred Optimisation
 - Area: `voting/`, `/vote_admin`, voting command surface
 - Type: architecture
 - Description: `/vote_admin` has grown to cover vote creation, survey creation, update/status/close/export/report/dashboard flows, autocomplete lookups, and multiple export/report modes. It remains functional and approved, but broad command reshaping is now a distinct command-surface governance task rather than a prerequisite for remaining voting feature slices.
-- Suggested Fix: Scope a separate `/vote_admin` reshaping audit after the survey-authoring polish and any reporting slices that still need the current stable command surface. Validate whether subcommand names, grouping, autocomplete, permissions, docs, command registration baselines, smoke references, and migration guidance should change. Do not rename or remove existing command paths without operator approval and a communication plan.
+- Suggested Fix: Promoted into the prepared Phase 17 `/vote_admin` Reshaping audit/design task pack. Validate whether subcommand names, grouping, autocomplete, permissions, docs, command registration baselines, smoke references, and migration guidance should change. Do not rename, remove, or alias existing command paths without operator approval, Codex Security review, updated canonical command documentation, and a communication plan.
 - Impact: medium
 - Risk: high
-- Dependencies: Explicit operator approval; canonical command reference updates if command paths change; command registration validation; Codex Security review before runtime PR handoff.
+- Dependencies: Phase 16 survey authoring edit controls and `/vote_admin survey_update` delivered and smoke tested; explicit operator approval after Phase 17 audit; canonical command reference updates if command paths change; command registration validation; Codex Security review before runtime PR handoff.
 
 ### Deferred Optimisation
 - Area: `voting/export_service.py`, `voting/survey_export_service.py`, report bundle services, future workbook outputs
 - Type: architecture
-- Description: Phase 10 delivered private single-survey report-bundle CSV output and Phase 11 delivered dashboard-safe aggregate reporting contracts. Cross-survey summaries, workbook-style exports, longitudinal reports, export audit/history summaries, and broader export profile redesign remain outside the delivered single-survey report bundle.
+- Description: Phase 10 delivered private single-survey report-bundle CSV output, Phase 11 delivered dashboard-safe aggregate reporting contracts, and Phase 16 preserved the existing report/export shapes while adding safe survey metadata updates. Cross-survey summaries, workbook-style exports, longitudinal reports, export audit/history summaries, and broader export profile redesign remain outside the delivered single-survey report bundle.
 - Suggested Fix: Scope a dedicated cross-survey/workbook export redesign only after concrete reporting consumers or operator workflows are identified. Preserve private delivery by default, keep existing CSV profiles backward-compatible unless explicitly versioned, define workbook tabs/columns before implementation, and add output-shape regression tests for every generated file.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 10 report bundle delivered and smoke tested; Phase 11 dashboard-safe reporting delivered; Phase 12 draft exclusion delivered; Phase 14 rating-scale export/report compatibility delivered; reporting consumer requirements; SQL repo validation; no public reporting without separate approval.
+- Dependencies: Phase 10 report bundle delivered and smoke tested; Phase 11 dashboard-safe reporting delivered; Phase 12 draft exclusion delivered; Phase 14 rating-scale export/report compatibility delivered; Phase 16 survey update preserves current export/report schema; reporting consumer requirements; SQL repo validation; no public reporting without separate approval.
 
 ### Deferred Optimisation
 - Area: `voting/`, private exports, report bundles, dashboard/reporting summaries, SQL-backed vote/survey data
 - Type: architecture
-- Description: Retention and redaction policy for vote/survey data, exports, reports, audit metadata, and generated artifacts remains intentionally unchanged through Phase 14. The framework now stores richer survey data, drafts, rating labels, ranking answers, private exports, and dashboard summaries, but policy decisions about how long to keep or redact them need a separate privacy/operations task.
+- Description: Retention and redaction policy for vote/survey data, exports, reports, audit metadata, and generated artifacts remains intentionally unchanged through Phase 16. The framework now stores richer survey data, drafts, rating labels, ranking answers, option emoji metadata, survey update audit rows, private exports, and dashboard summaries, but policy decisions about how long to keep or redact them need a separate privacy/operations task.
 - Suggested Fix: Scope a retention/redaction policy audit that inventories stored vote/survey tables, draft rows, audit events, generated exports, report bundles, dashboard summaries, and any local temporary files. Define default retention windows, manual redaction behavior, admin-only controls, SQL cleanup posture, rollback/audit requirements, and tests before any destructive or privacy-changing implementation.
 - Impact: medium
 - Risk: high
@@ -44,7 +35,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `voting/reporting_dal.py`, `voting/reporting_service.py`, SQL repo survey/vote reporting views and procedures
 - Type: architecture
-- Description: Optional SQL-native combined vote/survey reporting views or procedures may eventually help direct SQL consumers, performance, or operational reporting, but Phase 11 and Phase 13 intentionally kept the dashboard contract bot-side and Phase 14 only updated rating-scale compatibility. No direct reporting consumer or performance blocker currently justifies a combined SQL-native reporting layer.
+- Description: Optional SQL-native combined vote/survey reporting views or procedures may eventually help direct SQL consumers, performance, or operational reporting, but Phase 11 and Phase 13 intentionally kept the dashboard contract bot-side and Phase 14 through Phase 16 only updated compatibility metadata and bot-side presentation/update paths. No direct reporting consumer or performance blocker currently justifies a combined SQL-native reporting layer.
 - Suggested Fix: Keep SQL-native combined reporting as an optional later audit. Start only if reporting consumers, performance evidence, or production support needs justify it. Validate exact SQL objects in `C:\K98-bot-SQL-Server`, define additive views/procedures, preserve private/dashboard-safe boundaries, and prove output equivalence with bot-side reporting before adopting it.
 - Impact: medium
 - Risk: medium

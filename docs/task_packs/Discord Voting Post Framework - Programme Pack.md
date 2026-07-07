@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 through Phase 15 complete and smoke tested; Phase 16 Survey Authoring Edit Controls audit/design prepared as the next voting slice`
+- Current status: `Phase 1 through Phase 16 complete and smoke tested; Phase 17 Vote Admin Reshaping audit/design prepared as the next voting slice`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -1117,28 +1117,68 @@ docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 15
 docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 15 Emoji Icon Support and Visual Polish Audit and Design.md
 ```
 
-### Phase 16 survey authoring edit controls audit and design
+### Phase 16 survey authoring edit controls and survey update
 
-Status: active next voting slice; audit/scope only until product, privacy, SQL/reporting,
-permissions, and UX direction are approved.
+Status: complete, review-hardened, smoke/regression tested, and archived.
 
-Phase 16 promotes the Phase 15 smoke-testing gap where survey creation remains append-only once a
-question is added. If an admin forgets an emoji on an answer in question 1, they must currently
-restart the survey build. The next slice should audit and design guided survey builder
-review/edit controls for already-added draft questions and their option emoji metadata, plus a
-narrow post-publish survey option-icon update path for open surveys if approved.
+Delivered through:
 
-The slice must preserve delivered survey answer semantics, submitted responses, one response per
-Discord user, response changes when enabled, Phase 12 draft/resume privacy boundaries, Phase 15
-emoji metadata, PublicLive/HiddenUntilClose aggregate behavior, restart-safe public openers,
+- Mirror PR: `cwatts6/K98-bot-mirror#211`
+- Production PR: `cwatts6/K98-bot#518`
+- SQL PR: `not required`
+- Bot smoke test: `2026-07-07`
+
+Phase 16 delivered guided survey builder review/edit controls so admins can correct already-added
+draft questions before publish. Draft admins can edit question text, required/optional state,
+option labels, and option emoji metadata where those fields exist. Draft question delete and
+reorder are also delivered.
+
+Phase 16 also delivered `/vote_admin survey_update` for open published surveys. The update path
+covers title, description, close time, reminder offsets, reminder `@everyone`, close `@everyone`,
+option icons, response changes, and result visibility. Post-publish option icons, response changes,
+and result visibility are allowed only while the survey is open and before submitted responses
+exist. Survey update locks after a submitted response exists, and closed surveys are locked.
+Close-time updates rebuild pending reminders and record the changed reminder schedule accurately in
+audit metadata.
+
+The implementation preserved delivered survey answer semantics, submitted responses, option IDs,
+one response per Discord user, Phase 12 draft/resume privacy boundaries, Phase 15 emoji metadata,
+PublicLive/HiddenUntilClose aggregate behavior, restart-safe public openers,
 private status/dashboard/report/export contracts, and existing choice/text/detail/optional/rating/
-ranking behavior. It must stay separate from broad `/vote_admin` reshaping.
+ranking behavior. Broad `/vote_admin` reshaping stayed separate and is promoted to Phase 17.
 
-Active Phase 16 records:
+Smoke testing confirmed pre-publish review, edit, delete, and reorder; post-publish updates; locks
+after response submission; closed-survey locks; and existing regression paths.
+
+Phase 16 records are archived under:
 
 ```text
-docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md
-docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md
+```
+
+### Phase 17 vote admin reshaping audit and design
+
+Status: active next voting slice; audit/scope only until command architecture, permissions,
+compatibility, docs, tests, rollout, rollback, and operator communication direction are approved.
+
+Phase 17 promotes the deferred `/vote_admin` command-surface governance item. The command group is
+functional and approved, but it now covers vote creation/update/status/close/export, survey
+creation/status/close/export/report/dashboard, autocomplete lookups, multiple export/report modes,
+and Phase 16 `/vote_admin survey_update`.
+
+The slice should audit whether the safest next step is command reshaping, a private
+`/vote_admin` launch/help panel, documentation improvements, no runtime command change, or a staged
+combination. It must preserve existing command behavior, permissions, private delivery defaults,
+usage tracking, autocomplete expectations, command registration guardrails, canonical command
+documentation, smoke references, and operator communication requirements unless a later approved
+implementation plan explicitly changes them.
+
+Active Phase 17 records:
+
+```text
+docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md
+docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md
 ```
 
 ## 9. Cross-Programme Constraints
@@ -1154,9 +1194,9 @@ docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 16 Surv
 - Do not expose voter-level exports publicly without explicit approval.
 - Do not add further advanced voting modes until their product, privacy, permissions, SQL, UX,
   test, and rollout model are explicitly approved.
-- Do not change delivered draft/resume, private dashboard, or rating-scale behavior, or implement
-  emoji/icon support, public reporting, role-restricted voting, governor-linked voting, saved
-  templates, cross-survey/workbook exports, SQL-native combined reporting objects,
+- Do not change delivered draft/resume, private dashboard, rating-scale, emoji/icon, Phase 16
+  survey authoring/update locks, public reporting, role-restricted voting, governor-linked voting,
+  saved templates, cross-survey/workbook exports, SQL-native combined reporting objects,
   retention/redaction behavior changes, public voter-level exports, or post-publish survey
   semantic edits as part of any voting slice unless separately approved.
 
@@ -1267,18 +1307,25 @@ The core programme is successful when:
       option-polish controls, Discord button/select display, private status/dashboard display
       including animated custom emoji, generated-card custom emoji text fallback, no export/report
       schema expansion, and preserved vote/survey behavior.
+- [x] Survey authoring edit controls and `/vote_admin survey_update` are delivered and smoke
+      tested in Phase 16 with pre-publish review/edit/delete/reorder controls, safe open-survey
+      updates for title, description, close time, reminders, broad-mention flags, option icons,
+      response changes, and result visibility, response-sensitive locks, closed-survey locks,
+      reminder audit accuracy, no SQL migration, and preserved export/report/dashboard shapes.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 16: Survey Authoring Edit Controls Audit and Design.
+Start Discord Voting Post Framework Phase 17: Vote Admin Reshaping Audit and Design.
 
-Begin with audit/scope confirmation for guided survey builder review/edit controls over already
-added draft questions, option emoji metadata correction before publish, and any narrowly approved
-post-publish survey option-icon update path. Confirm answer-semantics protection, response-change
-rules, draft/resume privacy boundaries, SQL posture, permissions, restart safety,
-PublicLive/HiddenUntilClose behavior, private status/export/report/dashboard representation, tests,
-smoke plan, deployment order, rollback posture, and deferred boundaries before implementation.
+Begin with audit/scope confirmation for the `/vote_admin` command surface now that vote and survey
+admin flows include create, update, status, close, export, report bundle, dashboard, and
+survey_update. Confirm whether the safest next step is command reshaping, a private launch/help
+panel, documentation improvements, no runtime command change, or a staged combination. Confirm
+compatibility for existing command paths, permissions, autocomplete, usage tracking, command
+registration baselines, canonical command reference updates, smoke references, operator
+communication, tests, security review, deployment order, rollback posture, and deferred boundaries
+before implementation.
 ```
 
 ## 13. Programme Change Log
@@ -1328,3 +1375,5 @@ smoke plan, deployment order, rollback posture, and deferred boundaries before i
 | 2026-07-07 | Phase 14 archived and Phase 15 prepared | Phase 14 task pack and starter were archived. Created the active Phase 15 Emoji/Icon Support and Visual Polish audit/design task pack and chat starter. `/vote_admin` reshaping, cross-survey/workbook export redesign, retention/redaction changes, optional SQL-native combined reporting, role/governor voting, saved templates, per-rating comments, and public detail/voter-level posting remain separate approval-gated or not-required work. |
 | 2026-07-07 | Phase 15 emoji/icon support delivered | SQL PR #38, mirror PR #210, and production PR #517 delivered additive nullable vote/survey option emoji metadata, Unicode/custom Discord emoji support, guided option-polish controls, Discord button/select display, public card fallback, private status/dashboard emoji display including animated custom emoji, visual readability polish, review hardening, Codex Security review, and successful operator smoke/regression testing. |
 | 2026-07-07 | Phase 15 archived and Phase 16 prepared | Phase 15 task pack and starter were archived. Created the active Phase 16 Survey Authoring Edit Controls audit/design task pack and chat starter. The survey builder question/option edit gap is promoted into Phase 16; `/vote_admin` reshaping, cross-survey/workbook export redesign, retention/redaction changes, optional SQL-native combined reporting, role/governor voting, saved templates, per-rating comments, and public detail/voter-level posting remain separate approval-gated or not-required work. |
+| 2026-07-07 | Phase 16 survey authoring edit controls delivered | Mirror PR #211 and production PR #518 delivered pre-publish survey review/edit/delete/reorder controls, `/vote_admin survey_update` for safe open-survey metadata updates, response-sensitive locks for option icons/response changes/result visibility, closed-survey locks, reminder audit accuracy, review hardening, Codex Security review, and successful operator smoke/regression testing. |
+| 2026-07-07 | Phase 16 archived and Phase 17 prepared | Phase 16 task pack and starter were archived. Created the active Phase 17 Vote Admin Reshaping audit/design task pack and chat starter. `/vote_admin` command-surface governance is promoted into Phase 17; cross-survey/workbook export redesign, retention/redaction changes, optional SQL-native combined reporting, role/governor voting, saved templates, per-rating comments, generated-card custom emoji fetching/animation, and public detail/voter-level posting remain separate approval-gated or not-required work. |

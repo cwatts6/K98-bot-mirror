@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Completed Item
+- Area: `ui/views/survey_post_view.py`, `commands/vote_admin_cmds.py`, `voting/survey_service.py`, `voting/survey_dal.py`
+- Type: consistency
+- Description: Phase 15 smoke testing confirmed vote and survey option emoji display works, but exposed a survey authoring gap: survey creation was append-only once a question was added, and there was no `/vote_admin` survey update path for option emoji/icon metadata. If an admin forgot an emoji on an answer in question 1, they had to restart the survey build instead of editing the draft question/options before publish or correcting approved display metadata after publish.
+- Resolution: Phase 16 delivered guided survey builder review/edit controls for already-added draft questions, including draft question text, required/optional state, option labels, option emoji metadata, draft question delete, and question reorder. It also delivered `/vote_admin survey_update` for already-published open surveys, covering title, description, close time, reminder offsets, reminder `@everyone`, close `@everyone`, option icons, response changes, and result visibility. Post-publish option icons, response changes, and result visibility are blocked once submitted responses exist; closed surveys are locked. Close-time updates rebuild pending reminders and audit changed reminder schedules accurately. Submitted survey response semantics, option IDs, export/report/dashboard shapes, PublicLive/HiddenUntilClose behavior, draft/resume privacy boundaries, and restart-safe public openers were preserved.
+- Validation: Completed through mirror PR #211 and production PR #518. Automated validation included architecture/deferred/select-tests validators, smoke imports, command registration validation, focused survey admin update/view/DAL/post-view tests, pre-commit, full pytest during implementation (`2379 passed, 2 skipped`), review-thread fixes, and a Codex Security diff scan with zero findings before the app report-publish race. Operator smoke/regression testing on 2026-07-07 confirmed pre-publish review, edit, delete, and reorder; post-publish updates; survey update locks after a response is recorded; closed-survey locking; and existing regression tests.
+
 ### Discord Voting Post Framework Phase 15 Emoji/Icon Support Completed Item
 - Area: `voting/discord_presentation.py`, `voting/render_service.py`, `ui/views/vote_post_view.py`, `ui/views/survey_post_view.py`, `voting/survey_render_service.py`, SQL repo option metadata
 - Type: consistency
