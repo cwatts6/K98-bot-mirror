@@ -304,6 +304,52 @@ def test_survey_totals_rows_include_rating_aggregates():
     assert rows[0]["Rating10Count"] == 1
 
 
+def test_survey_totals_rows_omit_rating_labels_for_non_rating_questions():
+    now = datetime(2026, 7, 7, 12, 0, tzinfo=UTC)
+    snapshot = SurveySnapshot(
+        survey_id=47,
+        guild_id=1,
+        channel_id=2,
+        message_id=3,
+        created_by_discord_user_id=4,
+        title="Planning",
+        description=None,
+        status="Closed",
+        allow_response_change=True,
+        launch_mention_everyone=False,
+        reminder_mention_everyone=False,
+        close_mention_everyone=False,
+        opens_at_utc=None,
+        closes_at_utc=now,
+        closed_at_utc=now,
+        closed_by_discord_user_id=4,
+        closed_reason="done",
+        total_responses=1,
+        created_at_utc=now,
+        updated_at_utc=now,
+        questions=(
+            SurveyQuestion(
+                question_id=30,
+                survey_id=47,
+                question_key="q1",
+                prompt="Pick one",
+                question_type="SingleChoice",
+                sort_order=1,
+                min_selections=1,
+                max_selections=1,
+                options=(SurveyQuestionOption(301, 30, "opt1", "Yes", 1, response_count=1),),
+                rating_low_label="Should not export",
+                rating_high_label="Should not export",
+            ),
+        ),
+    )
+
+    rows = survey_totals_csv_rows(snapshot)
+
+    assert rows[0]["RatingLowLabel"] == ""
+    assert rows[0]["RatingHighLabel"] == ""
+
+
 def test_survey_totals_rows_include_ranking_aggregates():
     now = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
     snapshot = SurveySnapshot(
