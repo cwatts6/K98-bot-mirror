@@ -11,6 +11,7 @@ from ui.views.survey_admin_update_view import (
     _SurveyResultVisibilitySelect,
 )
 from voting.option_emojis import normalize_option_emoji
+from voting.service import VoteValidationError
 from voting.survey_models import SurveyQuestion, SurveyQuestionOption, SurveySnapshot
 
 
@@ -128,6 +129,31 @@ async def test_survey_option_icon_modal_updates_and_refreshes(monkeypatch):
     }
     assert captured["refreshed"] is updated
     assert captured["ephemeral"] == "Option icon saved for \u2705 A."
+
+
+@pytest.mark.asyncio
+async def test_survey_option_icon_modal_handles_stale_missing_option(monkeypatch):
+    sent: list[str] = []
+
+    async def fake_update_survey_option_emoji(**_kwargs):
+        raise VoteValidationError("Survey option was not found.")
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        sent.append(content)
+
+    monkeypatch.setattr(
+        "ui.views.survey_admin_update_view.update_survey_option_emoji",
+        fake_update_survey_option_emoji,
+    )
+    monkeypatch.setattr("ui.views.survey_admin_update_view.send_ephemeral", fake_send_ephemeral)
+
+    view = SurveyAdminUpdateView(_snapshot(), owner_user_id=123)
+    modal = _SurveyOptionIconModal(view, option_id=999)
+    modal.icon.value = ""
+
+    await modal.callback(SimpleNamespace(user=SimpleNamespace(id=123), client=object()))
+
+    assert sent == ["Option icon not saved: Survey option was not found."]
 
 
 @pytest.mark.asyncio

@@ -487,20 +487,25 @@ class _SurveyOptionIconView(discord.ui.View):
 class _SurveyOptionIconModal(discord.ui.Modal):
     def __init__(self, parent_view: SurveyAdminUpdateView, *, option_id: int) -> None:
         option = next(
-            option
-            for question in parent_view.snapshot.questions
-            for option in question.options
-            if int(option.option_id) == int(option_id)
+            (
+                option
+                for question in parent_view.snapshot.questions
+                for option in question.options
+                if int(option.option_id) == int(option_id)
+            ),
+            None,
         )
         super().__init__(title="Survey option icon", timeout=300)
         self.parent_view = parent_view
         self.option_id = int(option_id)
+        current_value = option.emoji.text if option is not None and option.emoji is not None else ""
+        option_label = option.label[:34] if option is not None else "option"
         self.icon = discord.ui.InputText(
-            label=f"Icon for {option.label[:34]}",
+            label=f"Icon for {option_label}",
             required=False,
             max_length=120,
             placeholder="Unicode emoji or <:name:id>; blank clears",
-            value=option.emoji.text if option.emoji is not None else "",
+            value=current_value,
         )
         self.add_item(self.icon)
 

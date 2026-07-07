@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import json
 
 import pytest
@@ -920,6 +920,62 @@ async def test_update_survey_post_blocks_response_sensitive_fields_after_respons
     )
 
     assert result == "has_responses"
+
+
+@pytest.mark.asyncio
+async def test_update_survey_post_rebuilds_pending_reminders_for_close_change(monkeypatch):
+    close_at = datetime.now(UTC) + timedelta(hours=3)
+
+    class FakeCursor:
+        last_sql = ""
+
+        def __init__(self) -> None:
+            self.executed: list[tuple[str, tuple[object, ...]]] = []
+
+        def execute(self, sql, params=()):
+            self.last_sql = sql
+            self.executed.append((sql, tuple(params)))
+
+        def fetchone(self):
+            return None
+
+        def fetchall(self):
+            return [(60,), (30,)]
+
+    cursor = FakeCursor()
+
+    def fake_fetch_one_dict(cur):
+        if "FROM dbo.SurveyPosts" in cur.last_sql:
+            return {"SurveyID": 42, "Status": "Open"}
+        if "FROM dbo.SurveyResponses" in cur.last_sql:
+            return {"ResponseCount": 0}
+        return {}
+
+    async def fake_run_blocking_in_thread(func, callback, *, name=None):
+        assert name == "survey_update"
+        return func(callback)
+
+    monkeypatch.setattr(survey_dal, "fetch_one_dict", fake_fetch_one_dict)
+    monkeypatch.setattr(survey_dal, "run_blocking_in_thread", fake_run_blocking_in_thread)
+    monkeypatch.setattr(survey_dal, "_create_survey_sync", lambda callback: callback(cursor))
+
+    result = await survey_dal.update_survey_post(
+        survey_id=42,
+        actor_discord_user_id=123,
+        closes_at_utc=close_at,
+    )
+
+    assert result == "updated"
+    assert any("SELECT OffsetMinutesBeforeClose" in sql for sql, _params in cursor.executed)
+    assert any("DELETE FROM dbo.SurveyReminders" in sql for sql, _params in cursor.executed)
+    reminder_inserts = [
+        params for sql, params in cursor.executed if "INSERT INTO dbo.SurveyReminders" in sql
+    ]
+    assert [params[1] for params in reminder_inserts] == [60, 30]
+    assert [params[2] for params in reminder_inserts] == [
+        survey_dal._naive_utc(close_at - timedelta(minutes=60)),
+        survey_dal._naive_utc(close_at - timedelta(minutes=30)),
+    ]
 
 
 @pytest.mark.asyncio

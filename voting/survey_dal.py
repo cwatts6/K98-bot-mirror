@@ -859,7 +859,19 @@ async def update_survey_post(
                 """,
                 (normalize_result_visibility(result_visibility), now, int(survey_id)),
             )
-        if reminder_offsets_minutes is not None:
+        offsets_to_rebuild = reminder_offsets_minutes
+        if offsets_to_rebuild is None and closes_at_utc is not None:
+            cur.execute(
+                """
+                SELECT OffsetMinutesBeforeClose
+                FROM dbo.SurveyReminders
+                WHERE SurveyID = ? AND SentAtUtc IS NULL
+                ORDER BY OffsetMinutesBeforeClose DESC;
+                """,
+                (int(survey_id),),
+            )
+            offsets_to_rebuild = tuple(int(row[0]) for row in cur.fetchall())
+        if offsets_to_rebuild is not None:
             cur.execute(
                 """
                 DELETE FROM dbo.SurveyReminders
@@ -876,7 +888,10 @@ async def update_survey_post(
                 row = cur.fetchone()
                 close_for_due = _aware_utc(row[0]) if row else None
             if close_for_due is not None:
-                for offset in reminder_offsets_minutes:
+                for offset in offsets_to_rebuild:
+                    due_at = _reminder_due_at(close_for_due, int(offset))
+                    if due_at <= _aware_utc(now):
+                        continue
                     cur.execute(
                         """
                         INSERT INTO dbo.SurveyReminders
@@ -886,7 +901,7 @@ async def update_survey_post(
                         (
                             int(survey_id),
                             int(offset),
-                            _naive_utc(_reminder_due_at(close_for_due, int(offset))),
+                            _naive_utc(due_at),
                             now,
                         ),
                     )
