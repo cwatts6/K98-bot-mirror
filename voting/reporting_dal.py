@@ -33,6 +33,12 @@ def _aware_utc(value: Any) -> datetime | None:
     return None
 
 
+def _naive_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
+
+
 def _bool(value: Any) -> bool:
     return bool(int(value or 0))
 
@@ -388,6 +394,8 @@ async def list_vote_dashboard_option_aggregates(
 async def list_vote_engagement_items(
     *, start_at_utc: datetime, end_at_utc: datetime
 ) -> tuple[EngagementItemSummary, ...]:
+    start_at = _naive_utc(start_at_utc)
+    end_at = _naive_utc(end_at_utc)
     rows = await run_query_async(
         """
         SELECT 'vote' AS ContentKind,
@@ -396,11 +404,12 @@ async def list_vote_engagement_items(
                p.Status
         FROM dbo.VotePosts p
         WHERE p.MessageID IS NOT NULL
+          AND p.Status = 'Closed'
           AND p.CreatedAtUtc >= ?
           AND p.CreatedAtUtc < ?
         ORDER BY p.CreatedAtUtc DESC, p.VotePostID DESC;
         """,
-        (start_at_utc, end_at_utc),
+        (start_at, end_at),
     )
     return tuple(_engagement_item_from_row(row) for row in rows)
 
@@ -408,6 +417,8 @@ async def list_vote_engagement_items(
 async def list_survey_engagement_items(
     *, start_at_utc: datetime, end_at_utc: datetime
 ) -> tuple[EngagementItemSummary, ...]:
+    start_at = _naive_utc(start_at_utc)
+    end_at = _naive_utc(end_at_utc)
     rows = await run_query_async(
         """
         SELECT 'survey' AS ContentKind,
@@ -416,11 +427,12 @@ async def list_survey_engagement_items(
                p.Status
         FROM dbo.SurveyPosts p
         WHERE p.MessageID IS NOT NULL
+          AND p.Status = 'Closed'
           AND p.CreatedAtUtc >= ?
           AND p.CreatedAtUtc < ?
         ORDER BY p.CreatedAtUtc DESC, p.SurveyID DESC;
         """,
-        (start_at_utc, end_at_utc),
+        (start_at, end_at),
     )
     return tuple(_engagement_item_from_row(row) for row in rows)
 
@@ -428,6 +440,8 @@ async def list_survey_engagement_items(
 async def list_vote_engagement_participants(
     *, start_at_utc: datetime, end_at_utc: datetime
 ) -> tuple[EngagementParticipant, ...]:
+    start_at = _naive_utc(start_at_utc)
+    end_at = _naive_utc(end_at_utc)
     rows = await run_query_async(
         """
         SELECT 'vote' AS ContentKind,
@@ -438,6 +452,7 @@ async def list_vote_engagement_participants(
         JOIN dbo.VotePostVotes v
           ON v.VotePostID = p.VotePostID
         WHERE p.MessageID IS NOT NULL
+          AND p.Status = 'Closed'
           AND COALESCE(p.VoteMode, 'OneChoice') <> 'MultiSelect'
           AND p.CreatedAtUtc >= ?
           AND p.CreatedAtUtc < ?
@@ -450,12 +465,13 @@ async def list_vote_engagement_participants(
         JOIN dbo.VotePostMultiSelectVotes mv
           ON mv.VotePostID = p.VotePostID
         WHERE p.MessageID IS NOT NULL
+          AND p.Status = 'Closed'
           AND COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
           AND p.CreatedAtUtc >= ?
           AND p.CreatedAtUtc < ?
         ORDER BY ContentID DESC, DiscordUserID ASC;
         """,
-        (start_at_utc, end_at_utc, start_at_utc, end_at_utc),
+        (start_at, end_at, start_at, end_at),
     )
     return tuple(_engagement_participant_from_row(row) for row in rows)
 
@@ -463,6 +479,8 @@ async def list_vote_engagement_participants(
 async def list_survey_engagement_participants(
     *, start_at_utc: datetime, end_at_utc: datetime
 ) -> tuple[EngagementParticipant, ...]:
+    start_at = _naive_utc(start_at_utc)
+    end_at = _naive_utc(end_at_utc)
     rows = await run_query_async(
         """
         SELECT 'survey' AS ContentKind,
@@ -473,10 +491,11 @@ async def list_survey_engagement_participants(
         JOIN dbo.SurveyResponses r
           ON r.SurveyID = p.SurveyID
         WHERE p.MessageID IS NOT NULL
+          AND p.Status = 'Closed'
           AND p.CreatedAtUtc >= ?
           AND p.CreatedAtUtc < ?
         ORDER BY p.SurveyID DESC, r.DiscordUserID ASC;
         """,
-        (start_at_utc, end_at_utc),
+        (start_at, end_at),
     )
     return tuple(_engagement_participant_from_row(row) for row in rows)

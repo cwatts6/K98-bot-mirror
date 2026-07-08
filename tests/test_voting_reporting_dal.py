@@ -152,6 +152,7 @@ async def test_vote_dashboard_option_aggregates_skip_empty_id_list(monkeypatch):
 @pytest.mark.asyncio
 async def test_vote_engagement_participants_read_one_row_per_discord_voter(monkeypatch):
     now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+    naive_now = now.replace(tzinfo=None)
     captured: dict[str, object] = {}
 
     async def fake_run_query_async(sql, params=()):
@@ -174,10 +175,11 @@ async def test_vote_engagement_participants_read_one_row_per_discord_voter(monke
     )
 
     sql = str(captured["sql"])
-    assert captured["params"] == (now, now, now, now)
+    assert captured["params"] == (naive_now, naive_now, naive_now, naive_now)
     assert "dbo.VotePostVotes" in sql
     assert "dbo.VotePostMultiSelectVotes" in sql
     assert "VotePostMultiSelectSelections" not in sql
+    assert sql.count("p.Status = 'Closed'") == 2
     assert "DiscordName" not in sql
     assert rows[0].content_kind == REPORT_CONTENT_VOTE
     assert rows[0].discord_user_id == 100
@@ -186,6 +188,7 @@ async def test_vote_engagement_participants_read_one_row_per_discord_voter(monke
 @pytest.mark.asyncio
 async def test_survey_engagement_participants_exclude_drafts_and_detail_answers(monkeypatch):
     now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+    naive_now = now.replace(tzinfo=None)
     captured: dict[str, object] = {}
 
     async def fake_run_query_async(sql, params=()):
@@ -208,8 +211,9 @@ async def test_survey_engagement_participants_exclude_drafts_and_detail_answers(
     )
 
     sql = str(captured["sql"])
-    assert captured["params"] == (now, now)
+    assert captured["params"] == (naive_now, naive_now)
     assert "dbo.SurveyResponses" in sql
+    assert "p.Status = 'Closed'" in sql
     assert "SurveyResponseDrafts" not in sql
     assert "SurveyTextAnswers" not in sql
     assert "AnswerText" not in sql
@@ -218,8 +222,9 @@ async def test_survey_engagement_participants_exclude_drafts_and_detail_answers(
 
 
 @pytest.mark.asyncio
-async def test_engagement_items_use_published_posts_in_window(monkeypatch):
+async def test_engagement_items_use_closed_published_posts_in_window(monkeypatch):
     now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+    naive_now = now.replace(tzinfo=None)
     captured: list[dict[str, object]] = []
 
     async def fake_run_query_async(sql, params=()):
@@ -248,6 +253,9 @@ async def test_engagement_items_use_published_posts_in_window(monkeypatch):
     assert "dbo.VotePosts" in str(captured[0]["sql"])
     assert "dbo.SurveyPosts" in str(captured[1]["sql"])
     assert "MessageID IS NOT NULL" in str(captured[0]["sql"])
-    assert captured[0]["params"] == (now, now)
+    assert "p.Status = 'Closed'" in str(captured[0]["sql"])
+    assert "p.Status = 'Closed'" in str(captured[1]["sql"])
+    assert captured[0]["params"] == (naive_now, naive_now)
+    assert captured[1]["params"] == (naive_now, naive_now)
     assert vote_rows[0].content_kind == REPORT_CONTENT_VOTE
     assert survey_rows[0].content_kind == REPORT_CONTENT_SURVEY

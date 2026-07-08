@@ -235,7 +235,7 @@ async def test_engagement_report_dedupes_discord_users_and_excludes_no_role_memb
     now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
     items = (
         EngagementItemSummary(REPORT_CONTENT_VOTE, 1, now, "Closed"),
-        EngagementItemSummary(REPORT_CONTENT_SURVEY, 2, now, "Open"),
+        EngagementItemSummary(REPORT_CONTENT_SURVEY, 2, now, "Closed"),
     )
     participants = (
         EngagementParticipant(REPORT_CONTENT_VOTE, 1, 100, now),
@@ -297,6 +297,43 @@ async def test_engagement_report_dedupes_discord_users_and_excludes_no_role_memb
     assert report.actual_participations == 3
     assert report.engagement_rate == pytest.approx(0.75)
     assert [row.discord_user_id for row in report.user_summaries] == [300, 100]
+
+
+@pytest.mark.asyncio
+async def test_engagement_report_keeps_duplicate_role_names_paired_with_role_ids(monkeypatch):
+    now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+
+    async def fake_empty_rows(**_kwargs):
+        return ()
+
+    monkeypatch.setattr(
+        reporting_service.reporting_dal, "list_vote_engagement_items", fake_empty_rows
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_survey_engagement_items",
+        fake_empty_rows,
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_vote_engagement_participants",
+        fake_empty_rows,
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_survey_engagement_participants",
+        fake_empty_rows,
+    )
+
+    report = await reporting_service.build_admin_leadership_engagement_report(
+        eligible_users=(EngagementEligibleUser(400, "Dana", (30, 40), ("Shared", "Shared")),),
+        role_filter_value="role:40",
+        now=now,
+    )
+
+    assert report.role_filter_label == "Shared"
+    assert report.eligible_user_count == 1
+    assert report.user_summaries[0].role_names == ("Shared", "Shared")
 
 
 @pytest.mark.asyncio

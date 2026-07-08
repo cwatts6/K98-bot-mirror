@@ -237,8 +237,7 @@ def _dedupe_eligible_users(
     by_id: dict[int, EngagementEligibleUser] = {}
     for user in users:
         user_id = int(user.discord_user_id)
-        role_ids = tuple(dict.fromkeys(int(role_id) for role_id in user.role_ids))
-        role_names = tuple(dict.fromkeys(str(name).strip() for name in user.role_names if name))
+        role_ids, role_names = _dedupe_role_pairs(user.role_ids, user.role_names)
         display_name = str(user.display_name or "").strip() or str(user_id)
         existing = by_id.get(user_id)
         if existing is None:
@@ -249,8 +248,10 @@ def _dedupe_eligible_users(
                 role_names=role_names,
             )
             continue
-        merged_role_ids = tuple(dict.fromkeys(existing.role_ids + role_ids))
-        merged_role_names = tuple(dict.fromkeys(existing.role_names + role_names))
+        merged_role_ids, merged_role_names = _dedupe_role_pairs(
+            existing.role_ids + role_ids,
+            existing.role_names + role_names,
+        )
         by_id[user_id] = EngagementEligibleUser(
             discord_user_id=user_id,
             display_name=existing.display_name or display_name,
@@ -258,6 +259,20 @@ def _dedupe_eligible_users(
             role_names=merged_role_names,
         )
     return tuple(sorted(by_id.values(), key=lambda row: row.display_name.casefold()))
+
+
+def _dedupe_role_pairs(
+    role_ids: tuple[int, ...],
+    role_names: tuple[str, ...],
+) -> tuple[tuple[int, ...], tuple[str, ...]]:
+    by_id: dict[int, str] = {}
+    for index, raw_role_id in enumerate(role_ids):
+        role_id = int(raw_role_id)
+        role_name = str(role_names[index]).strip() if index < len(role_names) else ""
+        existing_name = by_id.get(role_id)
+        if existing_name is None or (not existing_name and role_name):
+            by_id[role_id] = role_name
+    return tuple(by_id), tuple(by_id.values())
 
 
 def _role_filter_label(
