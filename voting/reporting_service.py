@@ -2,18 +2,25 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from voting import reporting_dal, survey_dal
 from voting.reporting_models import (
     REPORT_CONTENT_SURVEY,
     REPORT_CONTENT_VOTE,
+    ENGAGEMENT_PRIVACY_PROFILE,
     REPORT_PRIVACY_PROFILE,
     DashboardReportingContract,
     DashboardReportingOptionAggregate,
     DashboardReportingQuestionAggregate,
     DashboardReportingSummary,
+    EngagementEligibleUser,
+    EngagementItemSummary,
+    EngagementMonthlyBucket,
+    EngagementParticipant,
+    EngagementReportingContract,
+    EngagementUserSummary,
 )
 from voting.service import VoteValidationError
 
@@ -22,6 +29,17 @@ if TYPE_CHECKING:
 
 
 MAX_DASHBOARD_REPORT_ITEMS = 50
+ENGAGEMENT_WINDOW_LAST_MONTH = "last_month"
+ENGAGEMENT_WINDOW_LAST_3_MONTHS = "last_3_months"
+ENGAGEMENT_WINDOW_LAST_6_MONTHS = "last_6_months"
+ENGAGEMENT_ROLE_FILTER_EXPECTED = "expected"
+ENGAGEMENT_ROLE_FILTER_ALL = "all"
+
+_ENGAGEMENT_WINDOWS = {
+    ENGAGEMENT_WINDOW_LAST_MONTH: ("Last month", 31),
+    ENGAGEMENT_WINDOW_LAST_3_MONTHS: ("Last 3 months", 92),
+    ENGAGEMENT_WINDOW_LAST_6_MONTHS: ("Last 6 months", 184),
+}
 
 
 def _cap_limit(limit: int) -> int:
@@ -176,4 +194,273 @@ async def build_admin_leadership_dashboard_report(*, limit: int = 25) -> Dashboa
         summaries=tuple(enriched_summaries),
         question_aggregates=tuple(question_aggregates),
         option_aggregates=tuple(option_aggregates),
+    )
+
+
+def normalize_engagement_window(value: str | None) -> str:
+    text = str(value or "").strip().casefold()
+    for candidate in _ENGAGEMENT_WINDOWS:
+        if text == candidate.casefold():
+            return candidate
+    return ENGAGEMENT_WINDOW_LAST_3_MONTHS
+
+
+def engagement_window_label(value: str | None) -> str:
+    return _ENGAGEMENT_WINDOWS[normalize_engagement_window(value)][0]
+
+
+def _window_bounds(window_key: str, *, now: datetime | None = None) -> tuple[datetime, datetime]:
+    end_at = now or datetime.now(UTC)
+    end_at = end_at.replace(tzinfo=UTC) if end_at.tzinfo is None else end_at.astimezone(UTC)
+    _label, days = _ENGAGEMENT_WINDOWS[normalize_engagement_window(window_key)]
+    return end_at - timedelta(days=days), end_at
+
+
+def normalize_engagement_role_filter(value: str | None) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ENGAGEMENT_ROLE_FILTER_EXPECTED
+    if text.casefold() == ENGAGEMENT_ROLE_FILTER_ALL:
+        return ENGAGEMENT_ROLE_FILTER_ALL
+    if text.casefold() == ENGAGEMENT_ROLE_FILTER_EXPECTED:
+        return ENGAGEMENT_ROLE_FILTER_EXPECTED
+    if text.casefold().startswith("role:"):
+        suffix = text.split(":", 1)[1].strip()
+        if suffix.isdigit():
+            return f"role:{int(suffix)}"
+    return ENGAGEMENT_ROLE_FILTER_EXPECTED
+
+
+def _dedupe_eligible_users(
+    users: tuple[EngagementEligibleUser, ...],
+) -> tuple[EngagementEligibleUser, ...]:
+    by_id: dict[int, EngagementEligibleUser] = {}
+    for user in users:
+        user_id = int(user.discord_user_id)
+        role_ids = tuple(dict.fromkeys(int(role_id) for role_id in user.role_ids))
+        role_names = tuple(dict.fromkeys(str(name).strip() for name in user.role_names if name))
+        display_name = str(user.display_name or "").strip() or str(user_id)
+        existing = by_id.get(user_id)
+        if existing is None:
+            by_id[user_id] = EngagementEligibleUser(
+                discord_user_id=user_id,
+                display_name=display_name,
+                role_ids=role_ids,
+                role_names=role_names,
+            )
+            continue
+        merged_role_ids = tuple(dict.fromkeys(existing.role_ids + role_ids))
+        merged_role_names = tuple(dict.fromkeys(existing.role_names + role_names))
+        by_id[user_id] = EngagementEligibleUser(
+            discord_user_id=user_id,
+            display_name=existing.display_name or display_name,
+            role_ids=merged_role_ids,
+            role_names=merged_role_names,
+        )
+    return tuple(sorted(by_id.values(), key=lambda row: row.display_name.casefold()))
+
+
+def _role_filter_label(
+    users: tuple[EngagementEligibleUser, ...],
+    role_filter_value: str,
+) -> str:
+    normalized = normalize_engagement_role_filter(role_filter_value)
+    if normalized == ENGAGEMENT_ROLE_FILTER_ALL:
+        return "All non-bot members"
+    if normalized == ENGAGEMENT_ROLE_FILTER_EXPECTED:
+        return "Expected roles"
+    role_id = int(normalized.split(":", 1)[1])
+    for user in users:
+        for index, candidate_id in enumerate(user.role_ids):
+            if int(candidate_id) == role_id and index < len(user.role_names):
+                return user.role_names[index]
+    return f"Role {role_id}"
+
+
+def _filter_eligible_users(
+    users: tuple[EngagementEligibleUser, ...],
+    role_filter_value: str,
+) -> tuple[EngagementEligibleUser, ...]:
+    normalized = normalize_engagement_role_filter(role_filter_value)
+    if normalized == ENGAGEMENT_ROLE_FILTER_ALL:
+        return users
+    if normalized == ENGAGEMENT_ROLE_FILTER_EXPECTED:
+        return tuple(user for user in users if user.role_ids)
+    role_id = int(normalized.split(":", 1)[1])
+    return tuple(user for user in users if role_id in {int(value) for value in user.role_ids})
+
+
+def _engagement_rate(actual: int, possible: int) -> float:
+    if possible <= 0:
+        return 0.0
+    return float(actual) / float(possible)
+
+
+def _month_key(value: datetime) -> str:
+    return value.astimezone(UTC).strftime("%Y-%m")
+
+
+def _month_label(month_key: str) -> str:
+    return datetime.strptime(month_key, "%Y-%m").replace(tzinfo=UTC).strftime("%B %Y")
+
+
+def _unique_participation_events(
+    participants: tuple[EngagementParticipant, ...],
+    *,
+    selected_item_keys: set[tuple[str, int]],
+    eligible_user_ids: set[int],
+) -> dict[tuple[str, int, int], datetime]:
+    events: dict[tuple[str, int, int], datetime] = {}
+    for participant in participants:
+        user_id = int(participant.discord_user_id)
+        item_key = (participant.content_kind, int(participant.content_id))
+        if user_id not in eligible_user_ids or item_key not in selected_item_keys:
+            continue
+        event_key = (participant.content_kind, int(participant.content_id), user_id)
+        participated_at = participant.participated_at_utc.astimezone(UTC)
+        previous = events.get(event_key)
+        if previous is None or participated_at > previous:
+            events[event_key] = participated_at
+    return events
+
+
+def _monthly_buckets(
+    items: tuple[EngagementItemSummary, ...],
+    events: dict[tuple[str, int, int], datetime],
+    *,
+    eligible_count: int,
+) -> tuple[EngagementMonthlyBucket, ...]:
+    items_by_month: defaultdict[str, list[EngagementItemSummary]] = defaultdict(list)
+    item_month_by_key: dict[tuple[str, int], str] = {}
+    for item in items:
+        key = _month_key(item.created_at_utc)
+        items_by_month[key].append(item)
+        item_month_by_key[(item.content_kind, int(item.content_id))] = key
+
+    actual_by_month: defaultdict[str, int] = defaultdict(int)
+    for content_kind, content_id, _user_id in events:
+        month_key = item_month_by_key.get((content_kind, int(content_id)))
+        if month_key:
+            actual_by_month[month_key] += 1
+
+    buckets: list[EngagementMonthlyBucket] = []
+    for key in sorted(items_by_month, reverse=True):
+        month_items = items_by_month[key]
+        vote_count = sum(1 for item in month_items if item.content_kind == REPORT_CONTENT_VOTE)
+        survey_count = sum(1 for item in month_items if item.content_kind == REPORT_CONTENT_SURVEY)
+        possible = eligible_count * len(month_items)
+        actual = actual_by_month[key]
+        buckets.append(
+            EngagementMonthlyBucket(
+                month_key=key,
+                month_label=_month_label(key),
+                vote_post_count=vote_count,
+                survey_post_count=survey_count,
+                possible_participations=possible,
+                actual_participations=actual,
+                engagement_rate=_engagement_rate(actual, possible),
+            )
+        )
+    return tuple(buckets)
+
+
+def _user_summaries(
+    users: tuple[EngagementEligibleUser, ...],
+    events: dict[tuple[str, int, int], datetime],
+    *,
+    item_count: int,
+) -> tuple[EngagementUserSummary, ...]:
+    counts_by_user: defaultdict[int, int] = defaultdict(int)
+    last_by_user: dict[int, datetime] = {}
+    for _content_kind, _content_id, user_id in events:
+        counts_by_user[int(user_id)] += 1
+        participated_at = events[(_content_kind, _content_id, user_id)]
+        previous = last_by_user.get(int(user_id))
+        if previous is None or participated_at > previous:
+            last_by_user[int(user_id)] = participated_at
+
+    summaries = [
+        EngagementUserSummary(
+            discord_user_id=int(user.discord_user_id),
+            display_name=user.display_name,
+            role_names=user.role_names,
+            participation_count=counts_by_user[int(user.discord_user_id)],
+            possible_count=item_count,
+            engagement_rate=_engagement_rate(counts_by_user[int(user.discord_user_id)], item_count),
+            last_participated_at_utc=last_by_user.get(int(user.discord_user_id)),
+        )
+        for user in users
+    ]
+    return tuple(
+        sorted(
+            summaries,
+            key=lambda row: (
+                row.engagement_rate,
+                row.participation_count,
+                row.display_name.casefold(),
+            ),
+        )
+    )
+
+
+async def build_admin_leadership_engagement_report(
+    *,
+    eligible_users: tuple[EngagementEligibleUser, ...],
+    window_key: str | None = None,
+    role_filter_value: str | None = None,
+    now: datetime | None = None,
+) -> EngagementReportingContract:
+    """Build a private Discord-user engagement summary for leadership follow-up."""
+
+    normalized_window = normalize_engagement_window(window_key)
+    normalized_role_filter = normalize_engagement_role_filter(role_filter_value)
+    start_at, end_at = _window_bounds(normalized_window, now=now)
+    all_users = _dedupe_eligible_users(eligible_users)
+    selected_users = _filter_eligible_users(all_users, normalized_role_filter)
+    eligible_user_ids = {int(user.discord_user_id) for user in selected_users}
+
+    vote_items = await reporting_dal.list_vote_engagement_items(
+        start_at_utc=start_at,
+        end_at_utc=end_at,
+    )
+    survey_items = await reporting_dal.list_survey_engagement_items(
+        start_at_utc=start_at,
+        end_at_utc=end_at,
+    )
+    vote_participants = await reporting_dal.list_vote_engagement_participants(
+        start_at_utc=start_at,
+        end_at_utc=end_at,
+    )
+    survey_participants = await reporting_dal.list_survey_engagement_participants(
+        start_at_utc=start_at,
+        end_at_utc=end_at,
+    )
+
+    items = tuple(sorted(vote_items + survey_items, key=lambda row: row.created_at_utc))
+    selected_item_keys = {(item.content_kind, int(item.content_id)) for item in items}
+    events = _unique_participation_events(
+        vote_participants + survey_participants,
+        selected_item_keys=selected_item_keys,
+        eligible_user_ids=eligible_user_ids,
+    )
+
+    possible = len(selected_users) * len(items)
+    actual = len(events)
+    return EngagementReportingContract(
+        generated_at_utc=datetime.now(UTC),
+        privacy_profile=ENGAGEMENT_PRIVACY_PROFILE,
+        window_key=normalized_window,
+        window_label=engagement_window_label(normalized_window),
+        window_start_utc=start_at,
+        window_end_utc=end_at,
+        role_filter_value=normalized_role_filter,
+        role_filter_label=_role_filter_label(all_users, normalized_role_filter),
+        eligible_user_count=len(selected_users),
+        vote_post_count=len(vote_items),
+        survey_post_count=len(survey_items),
+        possible_participations=possible,
+        actual_participations=actual,
+        engagement_rate=_engagement_rate(actual, possible),
+        user_summaries=_user_summaries(selected_users, events, item_count=len(items)),
+        monthly_buckets=_monthly_buckets(items, events, eligible_count=len(selected_users)),
     )

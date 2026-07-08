@@ -7,12 +7,16 @@ import pytest
 
 from voting import reporting_service
 from voting.reporting_models import (
+    ENGAGEMENT_PRIVACY_PROFILE,
     REPORT_CONTENT_SURVEY,
     REPORT_CONTENT_VOTE,
     REPORT_PRIVACY_PROFILE,
     DashboardReportingOptionAggregate,
     DashboardReportingQuestionAggregate,
     DashboardReportingSummary,
+    EngagementEligibleUser,
+    EngagementItemSummary,
+    EngagementParticipant,
 )
 from voting.service import VoteValidationError
 from voting.survey_models import SurveyReportingOptionRow, SurveyReportingQuestionRow
@@ -222,3 +226,128 @@ def test_dashboard_reporting_contract_models_do_not_expose_discord_identity_fiel
 async def test_dashboard_report_limit_must_be_positive():
     with pytest.raises(VoteValidationError, match="limit"):
         await reporting_service.build_admin_leadership_dashboard_report(limit=0)
+
+
+@pytest.mark.asyncio
+async def test_engagement_report_dedupes_discord_users_and_excludes_no_role_members(
+    monkeypatch,
+):
+    now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+    items = (
+        EngagementItemSummary(REPORT_CONTENT_VOTE, 1, now, "Closed"),
+        EngagementItemSummary(REPORT_CONTENT_SURVEY, 2, now, "Open"),
+    )
+    participants = (
+        EngagementParticipant(REPORT_CONTENT_VOTE, 1, 100, now),
+        EngagementParticipant(REPORT_CONTENT_SURVEY, 2, 100, now),
+        EngagementParticipant(REPORT_CONTENT_VOTE, 1, 200, now),
+        EngagementParticipant(REPORT_CONTENT_SURVEY, 2, 300, now),
+    )
+
+    async def fake_vote_items(**_kwargs):
+        return (items[0],)
+
+    async def fake_survey_items(**_kwargs):
+        return (items[1],)
+
+    async def fake_vote_participants(**_kwargs):
+        return participants[:2:2] + participants[2:3]
+
+    async def fake_survey_participants(**_kwargs):
+        return participants[1:2] + participants[3:]
+
+    monkeypatch.setattr(
+        reporting_service.reporting_dal, "list_vote_engagement_items", fake_vote_items
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_survey_engagement_items",
+        fake_survey_items,
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_vote_engagement_participants",
+        fake_vote_participants,
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_survey_engagement_participants",
+        fake_survey_participants,
+    )
+
+    report = await reporting_service.build_admin_leadership_engagement_report(
+        eligible_users=(
+            EngagementEligibleUser(100, "Alice", (10,), ("Kingdom Leadership",)),
+            EngagementEligibleUser(100, "Alice Alt Governor", (10,), ("Kingdom Leadership",)),
+            EngagementEligibleUser(200, "NoRole"),
+            EngagementEligibleUser(300, "Cara", (20,), ("R4",)),
+        ),
+        window_key=reporting_service.ENGAGEMENT_WINDOW_LAST_3_MONTHS,
+        role_filter_value=reporting_service.ENGAGEMENT_ROLE_FILTER_EXPECTED,
+        now=now,
+    )
+
+    assert report.privacy_profile == ENGAGEMENT_PRIVACY_PROFILE
+    assert report.contains_discord_identity is True
+    assert report.contains_raw_text_or_detail is False
+    assert report.eligible_user_count == 2
+    assert report.vote_post_count == 1
+    assert report.survey_post_count == 1
+    assert report.possible_participations == 4
+    assert report.actual_participations == 3
+    assert report.engagement_rate == pytest.approx(0.75)
+    assert [row.discord_user_id for row in report.user_summaries] == [300, 100]
+
+
+@pytest.mark.asyncio
+async def test_engagement_report_can_filter_to_specific_discord_role(monkeypatch):
+    now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+
+    async def fake_vote_items(**_kwargs):
+        return (EngagementItemSummary(REPORT_CONTENT_VOTE, 1, now, "Closed"),)
+
+    async def fake_survey_items(**_kwargs):
+        return (EngagementItemSummary(REPORT_CONTENT_SURVEY, 2, now, "Closed"),)
+
+    async def fake_vote_participants(**_kwargs):
+        return (EngagementParticipant(REPORT_CONTENT_VOTE, 1, 100, now),)
+
+    async def fake_survey_participants(**_kwargs):
+        return (
+            EngagementParticipant(REPORT_CONTENT_SURVEY, 2, 100, now),
+            EngagementParticipant(REPORT_CONTENT_SURVEY, 2, 300, now),
+        )
+
+    monkeypatch.setattr(
+        reporting_service.reporting_dal, "list_vote_engagement_items", fake_vote_items
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_survey_engagement_items",
+        fake_survey_items,
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_vote_engagement_participants",
+        fake_vote_participants,
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_survey_engagement_participants",
+        fake_survey_participants,
+    )
+
+    report = await reporting_service.build_admin_leadership_engagement_report(
+        eligible_users=(
+            EngagementEligibleUser(100, "Alice", (10,), ("Kingdom Leadership",)),
+            EngagementEligibleUser(300, "Cara", (20,), ("R4",)),
+        ),
+        role_filter_value="role:10",
+        now=now,
+    )
+
+    assert report.role_filter_label == "Kingdom Leadership"
+    assert report.eligible_user_count == 1
+    assert report.possible_participations == 2
+    assert report.actual_participations == 2
+    assert report.user_summaries[0].discord_user_id == 100

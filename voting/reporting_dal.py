@@ -9,6 +9,8 @@ from voting.option_emojis import option_emoji_from_row
 from voting.reporting_models import (
     REPORT_CONTENT_SURVEY,
     REPORT_CONTENT_VOTE,
+    EngagementItemSummary,
+    EngagementParticipant,
     DashboardReportingOptionAggregate,
     DashboardReportingSummary,
 )
@@ -121,6 +123,30 @@ def _option_from_vote_row(row: Mapping[str, Any]) -> DashboardReportingOptionAgg
         selection_count=int(row.get("SelectionCount") or 0),
         is_top_selection=_bool(row.get("IsTopSelection")),
         option_emoji=option_emoji_from_row(row),
+    )
+
+
+def _engagement_item_from_row(row: Mapping[str, Any]) -> EngagementItemSummary:
+    created_at = _aware_utc(row.get("CreatedAtUtc"))
+    if created_at is None:
+        raise ValueError("Engagement item row is missing CreatedAtUtc.")
+    return EngagementItemSummary(
+        content_kind=str(row.get("ContentKind") or ""),
+        content_id=int(row["ContentID"]),
+        created_at_utc=created_at,
+        status=str(row.get("Status") or ""),
+    )
+
+
+def _engagement_participant_from_row(row: Mapping[str, Any]) -> EngagementParticipant:
+    participated_at = _aware_utc(row.get("ParticipatedAtUtc"))
+    if participated_at is None:
+        raise ValueError("Engagement participant row is missing ParticipatedAtUtc.")
+    return EngagementParticipant(
+        content_kind=str(row.get("ContentKind") or ""),
+        content_id=int(row["ContentID"]),
+        discord_user_id=int(row["DiscordUserID"]),
+        participated_at_utc=participated_at,
     )
 
 
@@ -357,3 +383,100 @@ async def list_vote_dashboard_option_aggregates(
         normalized_ids + normalized_ids,
     )
     return tuple(_option_from_vote_row(row) for row in rows)
+
+
+async def list_vote_engagement_items(
+    *, start_at_utc: datetime, end_at_utc: datetime
+) -> tuple[EngagementItemSummary, ...]:
+    rows = await run_query_async(
+        """
+        SELECT 'vote' AS ContentKind,
+               p.VotePostID AS ContentID,
+               p.CreatedAtUtc,
+               p.Status
+        FROM dbo.VotePosts p
+        WHERE p.MessageID IS NOT NULL
+          AND p.CreatedAtUtc >= ?
+          AND p.CreatedAtUtc < ?
+        ORDER BY p.CreatedAtUtc DESC, p.VotePostID DESC;
+        """,
+        (start_at_utc, end_at_utc),
+    )
+    return tuple(_engagement_item_from_row(row) for row in rows)
+
+
+async def list_survey_engagement_items(
+    *, start_at_utc: datetime, end_at_utc: datetime
+) -> tuple[EngagementItemSummary, ...]:
+    rows = await run_query_async(
+        """
+        SELECT 'survey' AS ContentKind,
+               p.SurveyID AS ContentID,
+               p.CreatedAtUtc,
+               p.Status
+        FROM dbo.SurveyPosts p
+        WHERE p.MessageID IS NOT NULL
+          AND p.CreatedAtUtc >= ?
+          AND p.CreatedAtUtc < ?
+        ORDER BY p.CreatedAtUtc DESC, p.SurveyID DESC;
+        """,
+        (start_at_utc, end_at_utc),
+    )
+    return tuple(_engagement_item_from_row(row) for row in rows)
+
+
+async def list_vote_engagement_participants(
+    *, start_at_utc: datetime, end_at_utc: datetime
+) -> tuple[EngagementParticipant, ...]:
+    rows = await run_query_async(
+        """
+        SELECT 'vote' AS ContentKind,
+               p.VotePostID AS ContentID,
+               v.DiscordUserID,
+               v.UpdatedAtUtc AS ParticipatedAtUtc
+        FROM dbo.VotePosts p
+        JOIN dbo.VotePostVotes v
+          ON v.VotePostID = p.VotePostID
+        WHERE p.MessageID IS NOT NULL
+          AND COALESCE(p.VoteMode, 'OneChoice') <> 'MultiSelect'
+          AND p.CreatedAtUtc >= ?
+          AND p.CreatedAtUtc < ?
+        UNION ALL
+        SELECT 'vote' AS ContentKind,
+               p.VotePostID AS ContentID,
+               mv.DiscordUserID,
+               mv.UpdatedAtUtc AS ParticipatedAtUtc
+        FROM dbo.VotePosts p
+        JOIN dbo.VotePostMultiSelectVotes mv
+          ON mv.VotePostID = p.VotePostID
+        WHERE p.MessageID IS NOT NULL
+          AND COALESCE(p.VoteMode, 'OneChoice') = 'MultiSelect'
+          AND p.CreatedAtUtc >= ?
+          AND p.CreatedAtUtc < ?
+        ORDER BY ContentID DESC, DiscordUserID ASC;
+        """,
+        (start_at_utc, end_at_utc, start_at_utc, end_at_utc),
+    )
+    return tuple(_engagement_participant_from_row(row) for row in rows)
+
+
+async def list_survey_engagement_participants(
+    *, start_at_utc: datetime, end_at_utc: datetime
+) -> tuple[EngagementParticipant, ...]:
+    rows = await run_query_async(
+        """
+        SELECT 'survey' AS ContentKind,
+               p.SurveyID AS ContentID,
+               r.DiscordUserID,
+               r.UpdatedAtUtc AS ParticipatedAtUtc
+        FROM dbo.SurveyPosts p
+        JOIN dbo.SurveyResponses r
+          ON r.SurveyID = p.SurveyID
+        WHERE p.MessageID IS NOT NULL
+          AND p.CreatedAtUtc >= ?
+          AND p.CreatedAtUtc < ?
+        ORDER BY p.SurveyID DESC, r.DiscordUserID ASC;
+        """,
+        (start_at_utc, end_at_utc),
+    )
+    return tuple(_engagement_participant_from_row(row) for row in rows)

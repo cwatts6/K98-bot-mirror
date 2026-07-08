@@ -9,6 +9,7 @@ REPORT_CONTENT_VOTE = "vote"
 REPORT_CONTENT_SURVEY = "survey"
 
 REPORT_PRIVACY_PROFILE = "admin_leadership_private_dashboard_safe"
+ENGAGEMENT_PRIVACY_PROFILE = "admin_leadership_private_engagement_identity"
 
 
 @dataclass(frozen=True)
@@ -107,3 +108,73 @@ class DashboardReportingContract:
     contains_raw_text_or_detail: bool = False
     contains_discord_identity: bool = False
     raw_detail_access_profile: str = "private_exports_only"
+
+
+@dataclass(frozen=True)
+class EngagementEligibleUser:
+    discord_user_id: int
+    display_name: str
+    role_ids: tuple[int, ...] = ()
+    role_names: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class EngagementItemSummary:
+    content_kind: str
+    content_id: int
+    created_at_utc: datetime
+    status: str
+
+
+@dataclass(frozen=True)
+class EngagementParticipant:
+    content_kind: str
+    content_id: int
+    discord_user_id: int
+    participated_at_utc: datetime
+
+
+@dataclass(frozen=True)
+class EngagementUserSummary:
+    discord_user_id: int
+    display_name: str
+    role_names: tuple[str, ...]
+    participation_count: int
+    possible_count: int
+    engagement_rate: float
+    last_participated_at_utc: datetime | None
+
+
+@dataclass(frozen=True)
+class EngagementMonthlyBucket:
+    month_key: str
+    month_label: str
+    vote_post_count: int
+    survey_post_count: int
+    possible_participations: int
+    actual_participations: int
+    engagement_rate: float
+
+
+@dataclass(frozen=True)
+class EngagementReportingContract:
+    generated_at_utc: datetime
+    privacy_profile: str
+    window_key: str
+    window_label: str
+    window_start_utc: datetime
+    window_end_utc: datetime
+    role_filter_value: str
+    role_filter_label: str
+    eligible_user_count: int
+    vote_post_count: int
+    survey_post_count: int
+    possible_participations: int
+    actual_participations: int
+    engagement_rate: float
+    user_summaries: tuple[EngagementUserSummary, ...]
+    monthly_buckets: tuple[EngagementMonthlyBucket, ...]
+    dashboard_safe: bool = True
+    contains_raw_text_or_detail: bool = False
+    contains_discord_identity: bool = True
+    raw_detail_access_profile: str = "not_included"

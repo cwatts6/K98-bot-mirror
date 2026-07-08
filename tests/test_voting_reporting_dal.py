@@ -147,3 +147,107 @@ async def test_vote_dashboard_option_aggregates_skip_empty_id_list(monkeypatch):
     monkeypatch.setattr(reporting_dal, "run_query_async", fake_run_query_async)
 
     assert await reporting_dal.list_vote_dashboard_option_aggregates(()) == ()
+
+
+@pytest.mark.asyncio
+async def test_vote_engagement_participants_read_one_row_per_discord_voter(monkeypatch):
+    now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+    captured: dict[str, object] = {}
+
+    async def fake_run_query_async(sql, params=()):
+        captured["sql"] = sql
+        captured["params"] = params
+        return [
+            {
+                "ContentKind": "vote",
+                "ContentID": 42,
+                "DiscordUserID": 100,
+                "ParticipatedAtUtc": now,
+            }
+        ]
+
+    monkeypatch.setattr(reporting_dal, "run_query_async", fake_run_query_async)
+
+    rows = await reporting_dal.list_vote_engagement_participants(
+        start_at_utc=now,
+        end_at_utc=now,
+    )
+
+    sql = str(captured["sql"])
+    assert captured["params"] == (now, now, now, now)
+    assert "dbo.VotePostVotes" in sql
+    assert "dbo.VotePostMultiSelectVotes" in sql
+    assert "VotePostMultiSelectSelections" not in sql
+    assert "DiscordName" not in sql
+    assert rows[0].content_kind == REPORT_CONTENT_VOTE
+    assert rows[0].discord_user_id == 100
+
+
+@pytest.mark.asyncio
+async def test_survey_engagement_participants_exclude_drafts_and_detail_answers(monkeypatch):
+    now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+    captured: dict[str, object] = {}
+
+    async def fake_run_query_async(sql, params=()):
+        captured["sql"] = sql
+        captured["params"] = params
+        return [
+            {
+                "ContentKind": "survey",
+                "ContentID": 77,
+                "DiscordUserID": 100,
+                "ParticipatedAtUtc": now,
+            }
+        ]
+
+    monkeypatch.setattr(reporting_dal, "run_query_async", fake_run_query_async)
+
+    rows = await reporting_dal.list_survey_engagement_participants(
+        start_at_utc=now,
+        end_at_utc=now,
+    )
+
+    sql = str(captured["sql"])
+    assert captured["params"] == (now, now)
+    assert "dbo.SurveyResponses" in sql
+    assert "SurveyResponseDrafts" not in sql
+    assert "SurveyTextAnswers" not in sql
+    assert "AnswerText" not in sql
+    assert rows[0].content_kind == REPORT_CONTENT_SURVEY
+    assert rows[0].discord_user_id == 100
+
+
+@pytest.mark.asyncio
+async def test_engagement_items_use_published_posts_in_window(monkeypatch):
+    now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+    captured: list[dict[str, object]] = []
+
+    async def fake_run_query_async(sql, params=()):
+        captured.append({"sql": sql, "params": params})
+        content_kind = "vote" if "VotePosts" in str(sql) else "survey"
+        return [
+            {
+                "ContentKind": content_kind,
+                "ContentID": 1,
+                "CreatedAtUtc": now,
+                "Status": "Closed",
+            }
+        ]
+
+    monkeypatch.setattr(reporting_dal, "run_query_async", fake_run_query_async)
+
+    vote_rows = await reporting_dal.list_vote_engagement_items(
+        start_at_utc=now,
+        end_at_utc=now,
+    )
+    survey_rows = await reporting_dal.list_survey_engagement_items(
+        start_at_utc=now,
+        end_at_utc=now,
+    )
+
+    assert "dbo.VotePosts" in str(captured[0]["sql"])
+    assert "dbo.SurveyPosts" in str(captured[1]["sql"])
+    assert "MessageID IS NOT NULL" in str(captured[0]["sql"])
+    assert captured[0]["params"] == (now, now)
+    assert vote_rows[0].content_kind == REPORT_CONTENT_VOTE
+    assert survey_rows[0].content_kind == REPORT_CONTENT_SURVEY

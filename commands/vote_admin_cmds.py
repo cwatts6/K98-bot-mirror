@@ -12,7 +12,7 @@ from core.interaction_safety import safe_command, safe_defer, send_ephemeral
 from decoraters import is_admin_or_leadership_only, track_usage
 from ui.views.survey_admin_update_view import SurveyAdminUpdateView
 from ui.views.survey_post_view import SurveyBuilderView, SurveyPostView, disabled_survey_view
-from ui.views.vote_admin_dashboard_view import VoteAdminDashboardView
+from ui.views.vote_admin_dashboard_view import VoteAdminDashboardView, eligible_users_from_guild
 from ui.views.vote_admin_update_view import VoteAdminUpdateView
 from ui.views.vote_post_view import VotePostView, disabled_vote_view
 from versioning import versioned
@@ -857,7 +857,11 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
             )
             return
 
-        view = VoteAdminDashboardView(contract, owner_user_id=int(ctx.user.id))
+        view = VoteAdminDashboardView(
+            contract,
+            owner_user_id=int(ctx.user.id),
+            eligible_users=eligible_users_from_guild(ctx.guild),
+        )
         await ctx.interaction.edit_original_response(embed=view.current_embed(), view=view)
 
     @group.command(name="export", description="Export closed vote totals or voter audit.")

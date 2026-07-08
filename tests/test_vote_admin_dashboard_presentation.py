@@ -6,10 +6,12 @@ from voting.dashboard_presentation import (
     DASHBOARD_FILTER_OPEN,
     DASHBOARD_FILTER_SURVEYS,
     build_dashboard_embeds,
+    build_engagement_dashboard_embeds,
     filter_dashboard_summaries,
 )
 from voting.option_emojis import normalize_option_emoji
 from voting.reporting_models import (
+    ENGAGEMENT_PRIVACY_PROFILE,
     REPORT_CONTENT_SURVEY,
     REPORT_CONTENT_VOTE,
     REPORT_PRIVACY_PROFILE,
@@ -17,6 +19,9 @@ from voting.reporting_models import (
     DashboardReportingOptionAggregate,
     DashboardReportingQuestionAggregate,
     DashboardReportingSummary,
+    EngagementMonthlyBucket,
+    EngagementReportingContract,
+    EngagementUserSummary,
 )
 
 
@@ -228,3 +233,85 @@ def test_dashboard_refuses_to_render_unsafe_contract() -> None:
     assert "survey 99" not in rendered
     assert "private text responses counted only" not in rendered
     assert "not dashboard-safe" in rendered
+
+
+def test_engagement_dashboard_renders_private_identity_summary() -> None:
+    now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+    contract = EngagementReportingContract(
+        generated_at_utc=now,
+        privacy_profile=ENGAGEMENT_PRIVACY_PROFILE,
+        window_key="last_3_months",
+        window_label="Last 3 months",
+        window_start_utc=now,
+        window_end_utc=now,
+        role_filter_value="role:10",
+        role_filter_label="Kingdom Leadership",
+        eligible_user_count=2,
+        vote_post_count=1,
+        survey_post_count=1,
+        possible_participations=4,
+        actual_participations=3,
+        engagement_rate=0.75,
+        user_summaries=(
+            EngagementUserSummary(
+                discord_user_id=100,
+                display_name="Alice",
+                role_names=("Kingdom Leadership",),
+                participation_count=1,
+                possible_count=2,
+                engagement_rate=0.5,
+                last_participated_at_utc=now,
+            ),
+        ),
+        monthly_buckets=(
+            EngagementMonthlyBucket(
+                month_key="2026-07",
+                month_label="July 2026",
+                vote_post_count=1,
+                survey_post_count=1,
+                possible_participations=4,
+                actual_participations=3,
+                engagement_rate=0.75,
+            ),
+        ),
+    )
+
+    embed = build_engagement_dashboard_embeds(contract)[0]
+    rendered = str(embed.to_dict())
+
+    assert "Kingdom Leadership" in rendered
+    assert "Alice" in rendered
+    assert "3/4" in rendered
+    assert "Private leadership engagement" in rendered
+    assert "AnswerText" not in rendered
+    assert "DetailText" not in rendered
+
+
+def test_engagement_dashboard_refuses_raw_detail_contract() -> None:
+    now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+    contract = EngagementReportingContract(
+        generated_at_utc=now,
+        privacy_profile=ENGAGEMENT_PRIVACY_PROFILE,
+        window_key="last_month",
+        window_label="Last month",
+        window_start_utc=now,
+        window_end_utc=now,
+        role_filter_value="expected",
+        role_filter_label="Expected roles",
+        eligible_user_count=1,
+        vote_post_count=1,
+        survey_post_count=0,
+        possible_participations=1,
+        actual_participations=0,
+        engagement_rate=0.0,
+        user_summaries=(
+            EngagementUserSummary(100, "Alice", ("Kingdom Leadership",), 0, 1, 0.0, None),
+        ),
+        monthly_buckets=(),
+        contains_raw_text_or_detail=True,
+    )
+
+    rendered = str(build_engagement_dashboard_embeds(contract)[0].to_dict())
+
+    assert "Voting engagement unavailable" in rendered
+    assert "Alice" not in rendered

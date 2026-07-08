@@ -9,6 +9,7 @@ import discord
 from utils import fmt_short
 from voting.option_emojis import option_display_label
 from voting.reporting_models import (
+    ENGAGEMENT_PRIVACY_PROFILE,
     REPORT_CONTENT_SURVEY,
     REPORT_CONTENT_VOTE,
     REPORT_PRIVACY_PROFILE,
@@ -16,6 +17,7 @@ from voting.reporting_models import (
     DashboardReportingOptionAggregate,
     DashboardReportingQuestionAggregate,
     DashboardReportingSummary,
+    EngagementReportingContract,
 )
 from voting.result_visibility import result_visibility_label
 from voting.survey_models import (
@@ -38,12 +40,21 @@ DASHBOARD_FILTER_VALUES = {
     DASHBOARD_FILTER_CLOSED,
 }
 
+DASHBOARD_MODE_ITEMS = "items"
+DASHBOARD_MODE_ENGAGEMENT = "engagement"
+DASHBOARD_MODE_VALUES = {DASHBOARD_MODE_ITEMS, DASHBOARD_MODE_ENGAGEMENT}
+
 _FILTER_LABELS = {
     DASHBOARD_FILTER_ALL: "All",
     DASHBOARD_FILTER_VOTES: "Votes",
     DASHBOARD_FILTER_SURVEYS: "Surveys",
     DASHBOARD_FILTER_OPEN: "Open",
     DASHBOARD_FILTER_CLOSED: "Closed",
+}
+
+_MODE_LABELS = {
+    DASHBOARD_MODE_ITEMS: "Items",
+    DASHBOARD_MODE_ENGAGEMENT: "Engagement",
 }
 
 _QUESTION_LABELS = {
@@ -72,6 +83,22 @@ def dashboard_filter_options(selected: str | None = None) -> list[discord.Select
     return [
         discord.SelectOption(label=label, value=value, default=value == normalized)
         for value, label in _FILTER_LABELS.items()
+    ]
+
+
+def normalize_dashboard_mode(value: str | None) -> str:
+    text = str(value or "").strip().casefold()
+    for candidate in DASHBOARD_MODE_VALUES:
+        if candidate.casefold() == text:
+            return candidate
+    return DASHBOARD_MODE_ITEMS
+
+
+def dashboard_mode_options(selected: str | None = None) -> list[discord.SelectOption]:
+    normalized = normalize_dashboard_mode(selected)
+    return [
+        discord.SelectOption(label=label, value=value, default=value == normalized)
+        for value, label in _MODE_LABELS.items()
     ]
 
 
@@ -121,11 +148,78 @@ def build_dashboard_embeds(
     return tuple(pages)
 
 
+def build_engagement_dashboard_embeds(
+    contract: EngagementReportingContract,
+) -> tuple[discord.Embed, ...]:
+    if not _is_engagement_safe_contract(contract):
+        return (_unsafe_engagement_contract_embed(),)
+
+    embed = discord.Embed(
+        title="Voting engagement",
+        description=(
+            f"{contract.window_label} | {contract.role_filter_label} | "
+            f"{contract.window_start_utc:%Y-%m-%d} to {contract.window_end_utc:%Y-%m-%d}"
+        ),
+        color=discord.Color.blurple(),
+    )
+    total_items = contract.vote_post_count + contract.survey_post_count
+    embed.add_field(
+        name="Published items",
+        value=(
+            f"{fmt_short(total_items)} total\n"
+            f"{fmt_short(contract.vote_post_count)} vote(s), "
+            f"{fmt_short(contract.survey_post_count)} survey(s)"
+        ),
+        inline=True,
+    )
+    embed.add_field(
+        name="Eligible users",
+        value=f"{fmt_short(contract.eligible_user_count)} Discord user(s)",
+        inline=True,
+    )
+    embed.add_field(
+        name="Participation",
+        value=(
+            f"{fmt_short(contract.actual_participations)}/"
+            f"{fmt_short(contract.possible_participations)}\n"
+            f"{_rate_text(contract.engagement_rate)}"
+        ),
+        inline=True,
+    )
+    embed.add_field(
+        name="Monthly buckets",
+        value=_clip(_engagement_month_lines(contract), 1024),
+        inline=False,
+    )
+    embed.add_field(
+        name="Lowest participation",
+        value=_clip(_engagement_user_lines(contract), 1024),
+        inline=False,
+    )
+    generated = contract.generated_at_utc.astimezone(UTC)
+    embed.set_footer(
+        text=(
+            f"Generated {generated:%Y-%m-%d %H:%M UTC} | "
+            "Private leadership engagement. Discord names included."
+        )
+    )
+    return (embed,)
+
+
 def _is_dashboard_safe_contract(contract: DashboardReportingContract) -> bool:
     return (
         contract.dashboard_safe
         and contract.privacy_profile == REPORT_PRIVACY_PROFILE
         and not contract.contains_discord_identity
+        and not contract.contains_raw_text_or_detail
+    )
+
+
+def _is_engagement_safe_contract(contract: EngagementReportingContract) -> bool:
+    return (
+        contract.dashboard_safe
+        and contract.privacy_profile == ENGAGEMENT_PRIVACY_PROFILE
+        and contract.contains_discord_identity
         and not contract.contains_raw_text_or_detail
     )
 
@@ -143,6 +237,20 @@ def _unsafe_contract_embed(filter_value: str | None) -> discord.Embed:
             f"Filter: {dashboard_filter_label(filter_value)} | "
             "Private dashboard blocked: reporting contract is not dashboard-safe"
         )
+    )
+    return embed
+
+
+def _unsafe_engagement_contract_embed() -> discord.Embed:
+    embed = discord.Embed(
+        title="Voting engagement unavailable",
+        description=(
+            "Engagement data failed privacy validation, so no report content was rendered."
+        ),
+        color=discord.Color.red(),
+    )
+    embed.set_footer(
+        text="Private engagement blocked: reporting contract is not identity-dashboard-safe"
     )
     return embed
 
@@ -415,6 +523,49 @@ def _percentage(count: int, total: int) -> str:
     return f" ({(count / total) * 100:.0f}%)"
 
 
+def _rate_text(rate: float) -> str:
+    return f"{max(0.0, min(1.0, float(rate))) * 100:.0f}%"
+
+
+def _engagement_month_lines(contract: EngagementReportingContract) -> str:
+    if not contract.monthly_buckets:
+        return "No published vote or survey items in this window."
+    lines = []
+    for bucket in contract.monthly_buckets[:6]:
+        total_items = bucket.vote_post_count + bucket.survey_post_count
+        lines.append(
+            f"{bucket.month_label}: {fmt_short(total_items)} item(s), "
+            f"{fmt_short(bucket.actual_participations)}/"
+            f"{fmt_short(bucket.possible_participations)} ({_rate_text(bucket.engagement_rate)})"
+        )
+    if len(contract.monthly_buckets) > 6:
+        lines.append(f"+{len(contract.monthly_buckets) - 6} more month(s)")
+    return "\n".join(lines)
+
+
+def _engagement_user_lines(contract: EngagementReportingContract) -> str:
+    if contract.eligible_user_count <= 0:
+        return "No eligible Discord users match this role filter."
+    if not contract.user_summaries:
+        return "No eligible Discord users match this role filter."
+    lines = []
+    for row in contract.user_summaries[:12]:
+        last_seen = (
+            row.last_participated_at_utc.astimezone(UTC).strftime("%Y-%m-%d")
+            if row.last_participated_at_utc is not None
+            else "never"
+        )
+        roles = ", ".join(row.role_names[:2]) if row.role_names else "no roles"
+        lines.append(
+            f"{row.display_name}: {fmt_short(row.participation_count)}/"
+            f"{fmt_short(row.possible_count)} ({_rate_text(row.engagement_rate)}), "
+            f"last {last_seen}, {roles}"
+        )
+    if len(contract.user_summaries) > 12:
+        lines.append(f"+{len(contract.user_summaries) - 12} more user(s)")
+    return "\n".join(lines)
+
+
 def _clip(value: str, limit: int) -> str:
     text = str(value or "")
     if len(text) <= limit:
@@ -449,9 +600,15 @@ __all__ = [
     "DASHBOARD_FILTER_SURVEYS",
     "DASHBOARD_FILTER_VALUES",
     "DASHBOARD_FILTER_VOTES",
+    "DASHBOARD_MODE_ENGAGEMENT",
+    "DASHBOARD_MODE_ITEMS",
+    "DASHBOARD_MODE_VALUES",
+    "build_engagement_dashboard_embeds",
     "build_dashboard_embeds",
     "dashboard_filter_label",
     "dashboard_filter_options",
+    "dashboard_mode_options",
     "filter_dashboard_summaries",
     "normalize_dashboard_filter",
+    "normalize_dashboard_mode",
 ]
