@@ -297,6 +297,10 @@ async def test_engagement_report_dedupes_discord_users_and_excludes_no_role_memb
     assert report.actual_participations == 3
     assert report.engagement_rate == pytest.approx(0.75)
     assert [row.discord_user_id for row in report.user_summaries] == [300, 100]
+    assert report.user_summaries[0].vote_participation_count == 0
+    assert report.user_summaries[0].survey_participation_count == 1
+    assert report.user_summaries[1].vote_participation_count == 1
+    assert report.user_summaries[1].survey_participation_count == 1
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,6 @@
 # Canonical Command Reference
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 This is the maintained command reference for the K98 bot after the completed Command Platform
 Audit & Optimisation Programme. Use
@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=42 grouped_subcommands_detected=97 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
+primary=42 grouped_subcommands_detected=98 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
 ```
 
 Grouped command summary:
@@ -40,7 +40,7 @@ Grouped command summary:
 | `/registry` | 7 |
 | `/stats` | 1 |
 | `/subscriptions` | 3 |
-| `/vote_admin` | 11 |
+| `/vote_admin` | 12 |
 
 ## Command Surface Rules
 
@@ -214,6 +214,7 @@ Legend:
 | Voting Admin | `/vote_admin close` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response; public close announcement side effect | Standard | Phase 2 guided voting framework | Selects a vote by autocomplete, closes it early, disables buttons, refreshes the final card, and sends a controlled close announcement with winner, tie, or no-vote summary. |
 | Voting Admin | `/vote_admin status` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Phase 5 hidden-until-close results | Selects a vote by autocomplete and shows vote state, result visibility, private admin totals, reminder delivery state, and original message link. |
 | Voting Admin | `/vote_admin dashboard` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral private dashboard view | Standard | Phase 13 Private Dashboard UI | Opens a private aggregate vote/survey dashboard over the Phase 11 dashboard-safe reporting contract, with filters, pagination, refresh, message links, HiddenUntilClose private admin aggregate visibility, and no Discord identity, per-user rows, raw text/detail answers, or unsubmitted drafts. |
+| Voting Admin | `/vote_admin engagement` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral private export controls and private CSV file | Standard | Phase 20 Per-User Engagement Export | Opens private select-driven engagement controls for window and audience, then exports a CSV with all eligible Discord users sorted highest engagement first. Includes spreadsheet-safe Discord user ID, display name, role names, eligible opportunities, vote/survey participation split, total participation, missed count, engagement rate, and last participation date. Raw text/detail answers, per-answer detail, public output, graph output, workbook output, governor-linked reporting, and SQL-native combined reporting remain out of scope. |
 | Voting Admin | `/vote_admin export` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response and private CSV file | Standard | Phase 4 voter-level audit export | Selects a closed vote by autocomplete and privately exports either totals-only CSV results or voter-level audit rows via the `mode` option. Voter audit includes spreadsheet-safe Discord user ID text, resolved Discord name, selected option, original option, vote timestamps, and change flag; governor identity remains deferred. |
 | Voting Admin | `/vote_admin survey_create` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral guided builder; public survey post side effect | Standard | Phase 7 first survey slice | Opens a private admin builder for 2-5 required choice-only survey questions, then publishes a SQL-backed survey with a persistent public Answer survey button, close/reminder controls, response-change setting, and public-live or hidden-until-close result visibility. |
 | Voting Admin | `/vote_admin survey_update` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral guided update panel | Standard | Phase 16 survey authoring and update controls | Selects an open survey by autocomplete and opens an explicit edit-target menu for safe open-survey fields: title, description, close time, unsent reminders, future mention settings, option icons, response-change setting, and result visibility. Option icons, response-change setting, and result visibility are blocked after submitted responses exist; question/option semantics remain locked after publish. |
@@ -289,6 +290,11 @@ Legend:
   changes, export/report/dashboard changes, or public-rendering changes were approved. Leadership
   is comfortable with the current naming convention, and the small operator set does not need a
   runtime help surface.
+- Discord Voting Post Framework Phase 20 split leadership engagement reporting out of
+  `/vote_admin dashboard` into `/vote_admin engagement` after operator approval. The dashboard is
+  now focused on individual vote/survey item inspection again, while engagement owns select-driven
+  private CSV export controls. This is a grouped `/vote_admin` addition, not a new top-level
+  command or `/vote_admin` rename.
 
 ## Validation Expectations
 

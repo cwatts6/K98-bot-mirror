@@ -147,6 +147,10 @@ def test_vote_admin_registers_dashboard_subcommand() -> None:
     assert "dashboard" in _vote_admin_command_names()
 
 
+def test_vote_admin_registers_engagement_subcommand() -> None:
+    assert "engagement" in _vote_admin_command_names()
+
+
 def test_vote_admin_registers_survey_subcommands() -> None:
     assert {
         "survey_create",

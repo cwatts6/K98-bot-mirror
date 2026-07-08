@@ -41,21 +41,12 @@ DASHBOARD_FILTER_VALUES = {
     DASHBOARD_FILTER_CLOSED,
 }
 
-DASHBOARD_MODE_ITEMS = "items"
-DASHBOARD_MODE_ENGAGEMENT = "engagement"
-DASHBOARD_MODE_VALUES = {DASHBOARD_MODE_ITEMS, DASHBOARD_MODE_ENGAGEMENT}
-
 _FILTER_LABELS = {
     DASHBOARD_FILTER_ALL: "All",
     DASHBOARD_FILTER_VOTES: "Votes",
     DASHBOARD_FILTER_SURVEYS: "Surveys",
     DASHBOARD_FILTER_OPEN: "Open",
     DASHBOARD_FILTER_CLOSED: "Closed",
-}
-
-_MODE_LABELS = {
-    DASHBOARD_MODE_ITEMS: "Items",
-    DASHBOARD_MODE_ENGAGEMENT: "Engagement",
 }
 
 _QUESTION_LABELS = {
@@ -84,22 +75,6 @@ def dashboard_filter_options(selected: str | None = None) -> list[discord.Select
     return [
         discord.SelectOption(label=label, value=value, default=value == normalized)
         for value, label in _FILTER_LABELS.items()
-    ]
-
-
-def normalize_dashboard_mode(value: str | None) -> str:
-    text = str(value or "").strip().casefold()
-    for candidate in DASHBOARD_MODE_VALUES:
-        if candidate.casefold() == text:
-            return candidate
-    return DASHBOARD_MODE_ITEMS
-
-
-def dashboard_mode_options(selected: str | None = None) -> list[discord.SelectOption]:
-    normalized = normalize_dashboard_mode(selected)
-    return [
-        discord.SelectOption(label=label, value=value, default=value == normalized)
-        for value, label in _MODE_LABELS.items()
     ]
 
 
@@ -596,15 +571,10 @@ __all__ = [
     "DASHBOARD_FILTER_SURVEYS",
     "DASHBOARD_FILTER_VALUES",
     "DASHBOARD_FILTER_VOTES",
-    "DASHBOARD_MODE_ENGAGEMENT",
-    "DASHBOARD_MODE_ITEMS",
-    "DASHBOARD_MODE_VALUES",
     "build_dashboard_embeds",
     "build_engagement_dashboard_embeds",
     "dashboard_filter_label",
     "dashboard_filter_options",
-    "dashboard_mode_options",
     "filter_dashboard_summaries",
     "normalize_dashboard_filter",
-    "normalize_dashboard_mode",
 ]

@@ -12,7 +12,8 @@ from core.interaction_safety import safe_command, safe_defer, send_ephemeral
 from decoraters import is_admin_or_leadership_only, track_usage
 from ui.views.survey_admin_update_view import SurveyAdminUpdateView
 from ui.views.survey_post_view import SurveyBuilderView, SurveyPostView, disabled_survey_view
-from ui.views.vote_admin_dashboard_view import VoteAdminDashboardView, eligible_users_from_guild
+from ui.views.vote_admin_dashboard_view import VoteAdminDashboardView
+from ui.views.vote_admin_engagement_view import VoteAdminEngagementView, eligible_users_from_guild
 from ui.views.vote_admin_update_view import VoteAdminUpdateView
 from ui.views.vote_post_view import VotePostView, disabled_vote_view
 from versioning import versioned
@@ -26,7 +27,10 @@ from voting.discord_presentation import (
 )
 from voting.export_service import build_vote_totals_export, build_vote_voter_audit_export
 from voting.option_emojis import option_display_label
-from voting.reporting_service import build_admin_leadership_dashboard_report
+from voting.reporting_service import (
+    build_admin_leadership_dashboard_report,
+    build_admin_leadership_engagement_report,
+)
 from voting.result_visibility import (
     RESULT_VISIBILITY_PUBLIC_LIVE,
     result_visibility_label,
@@ -860,7 +864,40 @@ def register_vote_admin(bot: ext_commands.Bot) -> None:
         view = VoteAdminDashboardView(
             contract,
             owner_user_id=int(ctx.user.id),
-            eligible_users=eligible_users_from_guild(ctx.guild),
+        )
+        await ctx.interaction.edit_original_response(embed=view.current_embed(), view=view)
+
+    @group.command(
+        name="engagement",
+        description="Open private engagement export controls.",
+    )
+    @versioned("v1.00")
+    @safe_command
+    @is_admin_or_leadership_only()
+    @track_usage()
+    async def vote_engagement(ctx: discord.ApplicationContext) -> None:
+        await safe_defer(ctx, ephemeral=True)
+        eligible_users = eligible_users_from_guild(ctx.guild)
+        try:
+            contract = await build_admin_leadership_engagement_report(
+                eligible_users=eligible_users,
+            )
+        except VoteValidationError as exc:
+            await ctx.interaction.edit_original_response(
+                content=f"Engagement export not opened: {exc}"
+            )
+            return
+        except Exception:
+            logger.exception("vote_admin_engagement_failed")
+            await ctx.interaction.edit_original_response(
+                content="Engagement export controls could not be opened. Please try again."
+            )
+            return
+
+        view = VoteAdminEngagementView(
+            owner_user_id=int(ctx.user.id),
+            eligible_users=eligible_users,
+            contract=contract,
         )
         await ctx.interaction.edit_original_response(embed=view.current_embed(), view=view)
 

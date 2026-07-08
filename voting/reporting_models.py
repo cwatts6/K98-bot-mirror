@@ -144,6 +144,8 @@ class EngagementUserSummary:
     possible_count: int
     engagement_rate: float
     last_participated_at_utc: datetime | None
+    vote_participation_count: int = 0
+    survey_participation_count: int = 0
 
 
 @dataclass(frozen=True)

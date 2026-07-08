@@ -6,13 +6,13 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `voting/reporting_service.py`, `voting/reporting_dal.py`, `/vote_admin dashboard`, future private engagement exports/lists/graphs
+- Area: `voting/engagement_export_service.py`, `/vote_admin engagement`, future private engagement graphs
 - Type: architecture
-- Description: Phase 19 delivered the compact private leadership engagement dashboard and intentionally removed the long lowest-participation user list from the embed. Leadership still needs an audit/design slice for a richer private per-user engagement breakdown that may be an export, scrollable/paged list, graph, or staged combination. Candidate fields include Discord user identity, role context, eligible opportunities, participation count, missed count, engagement rate, and last participation date, using the Phase 19 time-window and role-filter semantics.
-- Suggested Fix: Promoted into the active Phase 20 Per-User Engagement Export List and Graph audit/design task pack. Confirm whether first delivery should be CSV, workbook, private paged/scrollable dashboard list, attached graph/image, or staged combination; whether the graph is survey-only, combined vote/survey, or separate vote/survey series; allowed per-user fields; privacy boundaries for Discord identity and non-participation inference; file-handling/export safety; SQL source contracts; tests; Codex Security review; rollout; and rollback before implementation.
+- Description: Phase 20 delivers the private per-user engagement CSV export and intentionally removes paged Discord lists from scope because they are hard to manage and add little value for large user counts. Graph output is deferred until leadership has reviewed CSV data and can identify one or two specific visual questions worth rendering.
+- Suggested Fix: After CSV smoke feedback, scope a small graph-only Phase 21 candidate if needed. Confirm whether the graph should be a distribution summary, lowest-participation capped chart, combined vote/survey participation chart, separate vote/survey series, or survey-only view; define user-count limits, privacy copy, artifact generation/cleanup, tests, and Codex Security review before implementation.
 - Impact: medium
-- Risk: high
-- Dependencies: Phase 19 private engagement dashboard delivered and smoke/regression tested; active Phase 20 audit/design approval; SQL validation in `C:\K98-bot-SQL-Server`; privacy approval for private Discord-name participation/non-participation reporting; Codex Security review before runtime PR handoff if implementation touches private exports/files, Discord interactions, SQL/data access, generated graph artifacts, user-controlled input, or restart-sensitive flows.
+- Risk: medium
+- Dependencies: Phase 20 private CSV export delivered and operator smoke reviewed; concrete leadership graph question; graph/image artifact privacy and file-handling approval.
 
 ### Deferred Optimisation
 - Area: `voting/`, private exports, report bundles, dashboard/reporting summaries, SQL-backed vote/survey data

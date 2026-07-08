@@ -387,10 +387,16 @@ def _user_summaries(
     item_count: int,
 ) -> tuple[EngagementUserSummary, ...]:
     counts_by_user: defaultdict[int, int] = defaultdict(int)
+    vote_counts_by_user: defaultdict[int, int] = defaultdict(int)
+    survey_counts_by_user: defaultdict[int, int] = defaultdict(int)
     last_by_user: dict[int, datetime] = {}
-    for _content_kind, _content_id, user_id in events:
+    for content_kind, content_id, user_id in events:
         counts_by_user[int(user_id)] += 1
-        participated_at = events[(_content_kind, _content_id, user_id)]
+        if content_kind == REPORT_CONTENT_VOTE:
+            vote_counts_by_user[int(user_id)] += 1
+        elif content_kind == REPORT_CONTENT_SURVEY:
+            survey_counts_by_user[int(user_id)] += 1
+        participated_at = events[(content_kind, content_id, user_id)]
         previous = last_by_user.get(int(user_id))
         if previous is None or participated_at > previous:
             last_by_user[int(user_id)] = participated_at
@@ -404,6 +410,8 @@ def _user_summaries(
             possible_count=item_count,
             engagement_rate=_engagement_rate(counts_by_user[int(user.discord_user_id)], item_count),
             last_participated_at_utc=last_by_user.get(int(user.discord_user_id)),
+            vote_participation_count=vote_counts_by_user[int(user.discord_user_id)],
+            survey_participation_count=survey_counts_by_user[int(user.discord_user_id)],
         )
         for user in users
     ]
