@@ -141,6 +141,7 @@ def _engagement_item_from_row(row: Mapping[str, Any]) -> EngagementItemSummary:
         content_id=int(row["ContentID"]),
         created_at_utc=created_at,
         status=str(row.get("Status") or ""),
+        title=str(row.get("Title") or ""),
     )
 
 
@@ -400,6 +401,7 @@ async def list_vote_engagement_items(
         """
         SELECT 'vote' AS ContentKind,
                p.VotePostID AS ContentID,
+               p.Title,
                p.CreatedAtUtc,
                p.Status
         FROM dbo.VotePosts p
@@ -423,6 +425,7 @@ async def list_survey_engagement_items(
         """
         SELECT 'survey' AS ContentKind,
                p.SurveyID AS ContentID,
+               p.Title,
                p.CreatedAtUtc,
                p.Status
         FROM dbo.SurveyPosts p

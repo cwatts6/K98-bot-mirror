@@ -234,6 +234,7 @@ async def test_engagement_items_use_closed_published_posts_in_window(monkeypatch
             {
                 "ContentKind": content_kind,
                 "ContentID": 1,
+                "Title": f"{content_kind} title",
                 "CreatedAtUtc": now,
                 "Status": "Closed",
             }
@@ -253,9 +254,13 @@ async def test_engagement_items_use_closed_published_posts_in_window(monkeypatch
     assert "dbo.VotePosts" in str(captured[0]["sql"])
     assert "dbo.SurveyPosts" in str(captured[1]["sql"])
     assert "MessageID IS NOT NULL" in str(captured[0]["sql"])
+    assert "p.Title" in str(captured[0]["sql"])
+    assert "p.Title" in str(captured[1]["sql"])
     assert "p.Status = 'Closed'" in str(captured[0]["sql"])
     assert "p.Status = 'Closed'" in str(captured[1]["sql"])
     assert captured[0]["params"] == (naive_now, naive_now)
     assert captured[1]["params"] == (naive_now, naive_now)
     assert vote_rows[0].content_kind == REPORT_CONTENT_VOTE
+    assert vote_rows[0].title == "vote title"
     assert survey_rows[0].content_kind == REPORT_CONTENT_SURVEY
+    assert survey_rows[0].title == "survey title"

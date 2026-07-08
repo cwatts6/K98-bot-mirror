@@ -388,3 +388,68 @@ async def test_engagement_report_can_filter_to_specific_discord_role(monkeypatch
     assert report.possible_participations == 2
     assert report.actual_participations == 2
     assert report.user_summaries[0].discord_user_id == 100
+
+
+@pytest.mark.asyncio
+async def test_engagement_report_includes_best_and_worst_poll_with_newest_tie_breaker(
+    monkeypatch,
+):
+    now = datetime(2026, 7, 8, 12, 0, tzinfo=UTC)
+    older = datetime(2026, 7, 6, 12, 0, tzinfo=UTC)
+    newer = datetime(2026, 7, 7, 12, 0, tzinfo=UTC)
+    items = (
+        EngagementItemSummary(REPORT_CONTENT_VOTE, 1, older, "Closed", "Old low poll"),
+        EngagementItemSummary(REPORT_CONTENT_VOTE, 2, newer, "Closed", "New low poll"),
+        EngagementItemSummary(REPORT_CONTENT_SURVEY, 3, now, "Closed", "Best poll"),
+    )
+
+    async def fake_vote_items(**_kwargs):
+        return items[:2]
+
+    async def fake_survey_items(**_kwargs):
+        return items[2:]
+
+    async def fake_vote_participants(**_kwargs):
+        return ()
+
+    async def fake_survey_participants(**_kwargs):
+        return (
+            EngagementParticipant(REPORT_CONTENT_SURVEY, 3, 100, now),
+            EngagementParticipant(REPORT_CONTENT_SURVEY, 3, 200, now),
+        )
+
+    monkeypatch.setattr(
+        reporting_service.reporting_dal, "list_vote_engagement_items", fake_vote_items
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_survey_engagement_items",
+        fake_survey_items,
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_vote_engagement_participants",
+        fake_vote_participants,
+    )
+    monkeypatch.setattr(
+        reporting_service.reporting_dal,
+        "list_survey_engagement_participants",
+        fake_survey_participants,
+    )
+
+    report = await reporting_service.build_admin_leadership_engagement_report(
+        eligible_users=(
+            EngagementEligibleUser(100, "Alice", (10,), ("Kingdom Leadership",)),
+            EngagementEligibleUser(200, "Bob", (10,), ("Kingdom Leadership",)),
+        ),
+        role_filter_value=reporting_service.ENGAGEMENT_ROLE_FILTER_EXPECTED,
+        now=now,
+    )
+
+    assert report.best_item is not None
+    assert report.best_item.title == "Best poll"
+    assert report.best_item.actual_participations == 2
+    assert report.best_item.possible_participations == 2
+    assert report.worst_item is not None
+    assert report.worst_item.title == "New low poll"
+    assert report.worst_item.engagement_rate == pytest.approx(0.0)

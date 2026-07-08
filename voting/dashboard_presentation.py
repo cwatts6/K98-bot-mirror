@@ -17,6 +17,7 @@ from voting.reporting_models import (
     DashboardReportingOptionAggregate,
     DashboardReportingQuestionAggregate,
     DashboardReportingSummary,
+    EngagementItemParticipation,
     EngagementReportingContract,
 )
 from voting.result_visibility import result_visibility_label
@@ -164,7 +165,7 @@ def build_engagement_dashboard_embeds(
     )
     total_items = contract.vote_post_count + contract.survey_post_count
     embed.add_field(
-        name="Published items",
+        name="Total Polls",
         value=(
             f"{fmt_short(total_items)} total\n"
             f"{fmt_short(contract.vote_post_count)} vote(s), "
@@ -173,12 +174,12 @@ def build_engagement_dashboard_embeds(
         inline=True,
     )
     embed.add_field(
-        name="Eligible users",
+        name="Total Users",
         value=f"{fmt_short(contract.eligible_user_count)} Discord user(s)",
         inline=True,
     )
     embed.add_field(
-        name="Participation",
+        name="Participation levels",
         value=(
             f"{fmt_short(contract.actual_participations)}/"
             f"{fmt_short(contract.possible_participations)}\n"
@@ -187,20 +188,25 @@ def build_engagement_dashboard_embeds(
         inline=True,
     )
     embed.add_field(
-        name="Monthly buckets",
+        name="Monthly Snapshots",
         value=_clip(_engagement_month_lines(contract), 1024),
         inline=False,
     )
     embed.add_field(
-        name="Lowest participation",
-        value=_clip(_engagement_user_lines(contract), 1024),
-        inline=False,
+        name="Best single Poll",
+        value=_clip(_engagement_item_participation_line(contract.best_item), 1024),
+        inline=True,
+    )
+    embed.add_field(
+        name="Worst single Poll",
+        value=_clip(_engagement_item_participation_line(contract.worst_item), 1024),
+        inline=True,
     )
     generated = contract.generated_at_utc.astimezone(UTC)
     embed.set_footer(
         text=(
             f"Generated {generated:%Y-%m-%d %H:%M UTC} | "
-            "Private leadership engagement. Discord names included."
+            "Private leadership engagement. Raw answers not included."
         )
     )
     return (embed,)
@@ -543,27 +549,17 @@ def _engagement_month_lines(contract: EngagementReportingContract) -> str:
     return "\n".join(lines)
 
 
-def _engagement_user_lines(contract: EngagementReportingContract) -> str:
-    if contract.eligible_user_count <= 0:
-        return "No eligible Discord users match this role filter."
-    if not contract.user_summaries:
-        return "No eligible Discord users match this role filter."
-    lines = []
-    for row in contract.user_summaries[:12]:
-        last_seen = (
-            row.last_participated_at_utc.astimezone(UTC).strftime("%Y-%m-%d")
-            if row.last_participated_at_utc is not None
-            else "never"
-        )
-        roles = ", ".join(row.role_names[:2]) if row.role_names else "no roles"
-        lines.append(
-            f"{row.display_name}: {fmt_short(row.participation_count)}/"
-            f"{fmt_short(row.possible_count)} ({_rate_text(row.engagement_rate)}), "
-            f"last {last_seen}, {roles}"
-        )
-    if len(contract.user_summaries) > 12:
-        lines.append(f"+{len(contract.user_summaries) - 12} more user(s)")
-    return "\n".join(lines)
+def _engagement_item_participation_line(item: EngagementItemParticipation | None) -> str:
+    if item is None:
+        return "No closed poll data in this window."
+    title = item.title.strip() or (
+        f"{'Vote' if item.content_kind == REPORT_CONTENT_VOTE else 'Survey'} #{item.content_id}"
+    )
+    return (
+        f"{_clip(title, 180)}\n"
+        f"{fmt_short(item.actual_participations)}/"
+        f"{fmt_short(item.possible_participations)} ({_rate_text(item.engagement_rate)})"
+    )
 
 
 def _clip(value: str, limit: int) -> str:

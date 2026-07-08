@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
+import discord
 
 from ui.views.vote_admin_dashboard_view import VoteAdminDashboardView, eligible_users_from_guild
 from voting import dashboard_presentation
@@ -92,6 +93,11 @@ class _FailingDeferInteraction(_Interaction):
         self.response = _FailingDeferResponse()
 
 
+class _FailingOriginalEditInteraction(_Interaction):
+    async def edit_original_response(self, **_kwargs) -> None:
+        raise discord.NotFound(SimpleNamespace(status=404, reason="missing"), "missing")
+
+
 class _Role:
     def __init__(self, role_id: int, name: str) -> None:
         self.id = role_id
@@ -170,6 +176,23 @@ async def test_dashboard_refresh_uses_response_edit_when_defer_fails() -> None:
     assert interaction.original_edits == []
     assert interaction.response.edits
     assert "Refreshed without defer" in str(interaction.response.edits[-1]["embed"].to_dict())
+
+
+@pytest.mark.asyncio
+async def test_dashboard_edit_failure_sends_retry_guidance(monkeypatch) -> None:
+    sent: list[str] = []
+
+    async def fake_send_ephemeral(_interaction, content, **_kwargs):
+        sent.append(content)
+
+    monkeypatch.setattr("ui.views.vote_admin_dashboard_view.send_ephemeral", fake_send_ephemeral)
+    view = VoteAdminDashboardView(_contract(), owner_user_id=123)
+    interaction = _FailingOriginalEditInteraction(user_id=123)
+    interaction.response.done = True
+
+    await view.edit_current(interaction)
+
+    assert sent == ["Dashboard update took too long for Discord to accept. Please press Refresh."]
 
 
 def test_eligible_users_from_guild_includes_roles_and_excludes_bots() -> None:

@@ -124,6 +124,7 @@ class EngagementItemSummary:
     content_id: int
     created_at_utc: datetime
     status: str
+    title: str = ""
 
 
 @dataclass(frozen=True)
@@ -157,6 +158,17 @@ class EngagementMonthlyBucket:
 
 
 @dataclass(frozen=True)
+class EngagementItemParticipation:
+    content_kind: str
+    content_id: int
+    title: str
+    created_at_utc: datetime
+    possible_participations: int
+    actual_participations: int
+    engagement_rate: float
+
+
+@dataclass(frozen=True)
 class EngagementReportingContract:
     generated_at_utc: datetime
     privacy_profile: str
@@ -174,6 +186,8 @@ class EngagementReportingContract:
     engagement_rate: float
     user_summaries: tuple[EngagementUserSummary, ...]
     monthly_buckets: tuple[EngagementMonthlyBucket, ...]
+    best_item: EngagementItemParticipation | None = None
+    worst_item: EngagementItemParticipation | None = None
     dashboard_safe: bool = True
     contains_raw_text_or_detail: bool = False
     contains_discord_identity: bool = True

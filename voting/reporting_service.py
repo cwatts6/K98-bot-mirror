@@ -17,6 +17,7 @@ from voting.reporting_models import (
     DashboardReportingSummary,
     EngagementEligibleUser,
     EngagementItemSummary,
+    EngagementItemParticipation,
     EngagementMonthlyBucket,
     EngagementParticipant,
     EngagementReportingContract,
@@ -418,6 +419,58 @@ def _user_summaries(
     )
 
 
+def _item_participation_summaries(
+    items: tuple[EngagementItemSummary, ...],
+    events: dict[tuple[str, int, int], datetime],
+    *,
+    eligible_count: int,
+) -> tuple[EngagementItemParticipation, ...]:
+    actual_by_item: defaultdict[tuple[str, int], int] = defaultdict(int)
+    for content_kind, content_id, _user_id in events:
+        actual_by_item[(content_kind, int(content_id))] += 1
+
+    return tuple(
+        EngagementItemParticipation(
+            content_kind=item.content_kind,
+            content_id=int(item.content_id),
+            title=item.title,
+            created_at_utc=item.created_at_utc,
+            possible_participations=eligible_count,
+            actual_participations=actual_by_item[(item.content_kind, int(item.content_id))],
+            engagement_rate=_engagement_rate(
+                actual_by_item[(item.content_kind, int(item.content_id))],
+                eligible_count,
+            ),
+        )
+        for item in items
+    )
+
+
+def _best_item_participation(
+    item_summaries: tuple[EngagementItemParticipation, ...],
+) -> EngagementItemParticipation | None:
+    if not item_summaries:
+        return None
+    return max(
+        item_summaries,
+        key=lambda row: (row.engagement_rate, row.created_at_utc.astimezone(UTC)),
+    )
+
+
+def _worst_item_participation(
+    item_summaries: tuple[EngagementItemParticipation, ...],
+) -> EngagementItemParticipation | None:
+    if not item_summaries:
+        return None
+    return min(
+        item_summaries,
+        key=lambda row: (
+            row.engagement_rate,
+            -row.created_at_utc.astimezone(UTC).timestamp(),
+        ),
+    )
+
+
 async def build_admin_leadership_engagement_report(
     *,
     eligible_users: tuple[EngagementEligibleUser, ...],
@@ -461,6 +514,11 @@ async def build_admin_leadership_engagement_report(
 
     possible = len(selected_users) * len(items)
     actual = len(events)
+    item_summaries = _item_participation_summaries(
+        items,
+        events,
+        eligible_count=len(selected_users),
+    )
     return EngagementReportingContract(
         generated_at_utc=datetime.now(UTC),
         privacy_profile=ENGAGEMENT_PRIVACY_PROFILE,
@@ -478,4 +536,6 @@ async def build_admin_leadership_engagement_report(
         engagement_rate=_engagement_rate(actual, possible),
         user_summaries=_user_summaries(selected_users, events, item_count=len(items)),
         monthly_buckets=_monthly_buckets(items, events, eligible_count=len(selected_users)),
+        best_item=_best_item_participation(item_summaries),
+        worst_item=_worst_item_participation(item_summaries),
     )

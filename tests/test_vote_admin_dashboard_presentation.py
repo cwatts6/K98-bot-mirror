@@ -19,6 +19,7 @@ from voting.reporting_models import (
     DashboardReportingOptionAggregate,
     DashboardReportingQuestionAggregate,
     DashboardReportingSummary,
+    EngagementItemParticipation,
     EngagementMonthlyBucket,
     EngagementReportingContract,
     EngagementUserSummary,
@@ -252,6 +253,24 @@ def test_engagement_dashboard_renders_private_identity_summary() -> None:
         possible_participations=4,
         actual_participations=3,
         engagement_rate=0.75,
+        best_item=EngagementItemParticipation(
+            content_kind=REPORT_CONTENT_SURVEY,
+            content_id=77,
+            title="Best planning poll",
+            created_at_utc=now,
+            possible_participations=2,
+            actual_participations=2,
+            engagement_rate=1.0,
+        ),
+        worst_item=EngagementItemParticipation(
+            content_kind=REPORT_CONTENT_VOTE,
+            content_id=42,
+            title="Worst planning poll",
+            created_at_utc=now,
+            possible_participations=2,
+            actual_participations=1,
+            engagement_rate=0.5,
+        ),
         user_summaries=(
             EngagementUserSummary(
                 discord_user_id=100,
@@ -280,7 +299,19 @@ def test_engagement_dashboard_renders_private_identity_summary() -> None:
     rendered = str(embed.to_dict())
 
     assert "Kingdom Leadership" in rendered
-    assert "Alice" in rendered
+    assert "Total Polls" in rendered
+    assert "Total Users" in rendered
+    assert "Participation levels" in rendered
+    assert "Monthly Snapshots" in rendered
+    assert "Best single Poll" in rendered
+    assert "Worst single Poll" in rendered
+    assert "Best planning poll" in rendered
+    assert "Worst planning poll" in rendered
+    assert "Alice" not in rendered
+    assert "Published items" not in rendered
+    assert "Eligible users" not in rendered
+    assert "Monthly buckets" not in rendered
+    assert "Lowest participation" not in rendered
     assert "3/4" in rendered
     assert "Private leadership engagement" in rendered
     assert "AnswerText" not in rendered

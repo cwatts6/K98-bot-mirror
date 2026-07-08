@@ -232,10 +232,17 @@ class VoteAdminDashboardView(discord.ui.View):
 
     async def edit_current(self, interaction: discord.Interaction) -> None:
         embed = self.current_embed()
-        if interaction.response.is_done():
-            await interaction.edit_original_response(embed=embed, view=self)
-        else:
-            await interaction.response.edit_message(embed=embed, view=self)
+        try:
+            if interaction.response.is_done():
+                await interaction.edit_original_response(embed=embed, view=self)
+            else:
+                await interaction.response.edit_message(embed=embed, view=self)
+        except (discord.Forbidden, discord.HTTPException, discord.NotFound):
+            logger.warning("vote_admin_dashboard_edit_failed", exc_info=True)
+            await send_ephemeral(
+                interaction,
+                "Dashboard update took too long for Discord to accept. Please press Refresh.",
+            )
 
     def _update_buttons(self) -> None:
         total_pages = len(self.pages)
@@ -250,11 +257,7 @@ class VoteAdminDashboardView(discord.ui.View):
         if self.engagement_contract is not None:
             return True
         self._refresh_eligible_users_from_interaction(interaction)
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
-        except Exception:
-            logger.debug("vote_admin_dashboard_engagement_defer_failed", exc_info=True)
+        await _defer_dashboard_interaction(interaction)
         try:
             self.engagement_contract = await self.engagement_report_loader(
                 eligible_users=self.eligible_users,
@@ -281,11 +284,7 @@ class VoteAdminDashboardView(discord.ui.View):
         await self.edit_current(interaction)
 
     async def _on_refresh(self, interaction: discord.Interaction) -> None:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
-        except Exception:
-            logger.debug("vote_admin_dashboard_refresh_defer_failed", exc_info=True)
+        await _defer_dashboard_interaction(interaction)
         try:
             if self.mode_value == dashboard_presentation.DASHBOARD_MODE_ENGAGEMENT:
                 self._refresh_eligible_users_from_interaction(interaction)
@@ -319,6 +318,27 @@ class VoteAdminDashboardView(discord.ui.View):
         users = eligible_users_from_guild(guild)
         if users:
             self.eligible_users = users
+
+
+async def _defer_dashboard_interaction(interaction: discord.Interaction) -> bool:
+    if interaction.response.is_done():
+        return True
+    try:
+        await interaction.response.defer()
+        return True
+    except TypeError:
+        try:
+            await interaction.response.defer(ephemeral=True)
+            return True
+        except Exception:
+            logger.debug("vote_admin_dashboard_defer_failed", exc_info=True)
+            return False
+    except (discord.Forbidden, discord.HTTPException, discord.NotFound):
+        logger.warning("vote_admin_dashboard_defer_rejected", exc_info=True)
+        return False
+    except Exception:
+        logger.debug("vote_admin_dashboard_defer_failed", exc_info=True)
+        return False
 
 
 def eligible_users_from_guild(guild) -> tuple[EngagementEligibleUser, ...]:
