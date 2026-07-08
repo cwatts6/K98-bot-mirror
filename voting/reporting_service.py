@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 
 from voting import reporting_dal, survey_dal
 from voting.reporting_models import (
+    ENGAGEMENT_PRIVACY_PROFILE,
     REPORT_CONTENT_SURVEY,
     REPORT_CONTENT_VOTE,
-    ENGAGEMENT_PRIVACY_PROFILE,
     REPORT_PRIVACY_PROFILE,
     DashboardReportingContract,
     DashboardReportingOptionAggregate,

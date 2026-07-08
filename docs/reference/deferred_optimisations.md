@@ -6,22 +6,13 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `voting/`, `/vote_admin`, voting command surface
+- Area: `voting/reporting_service.py`, `voting/reporting_dal.py`, `/vote_admin dashboard`, future private leadership reporting
 - Type: architecture
-- Description: `/vote_admin` has grown to cover vote creation, survey creation, update/status/close/export/report/dashboard flows, autocomplete lookups, and multiple export/report modes. It remains functional and approved, but broad command reshaping is now a distinct command-surface governance task rather than a prerequisite for remaining voting feature slices.
-- Suggested Fix: Promoted into the prepared Phase 17 `/vote_admin` Reshaping audit/design task pack. Validate whether subcommand names, grouping, autocomplete, permissions, docs, command registration baselines, smoke references, and migration guidance should change. Do not rename, remove, or alias existing command paths without operator approval, Codex Security review, updated canonical command documentation, and a communication plan.
+- Description: Phase 19 is in progress as an audit/design slice for a higher-level private participation and engagement summary over vote/survey activity by time window. Candidate measures include published vote/survey counts, total possible participation opportunities, actual vote/survey participation counts, aggregate engagement rate, monthly trend rows, and private per-Discord-user participation counts/names so leadership can understand whether vote/survey volume is appropriate and whether specific players are not engaging.
+- Suggested Fix: Promoted into the active Phase 19 Leadership Engagement Summary Reporting audit/design task pack. Confirm the product workflow, time-window choices such as last month/3 months/6 months/monthly buckets, whether votes and surveys should be combined or separated, how to count one user across multi-question surveys, whether only closed items should count, privacy boundaries for Discord names and non-participation inference, command/dashboard/report ownership, SQL source contracts, tests, Codex Security review, rollout, and rollback before implementation.
 - Impact: medium
 - Risk: high
-- Dependencies: Phase 16 survey authoring edit controls and `/vote_admin survey_update` delivered and smoke tested; explicit operator approval after Phase 17 audit; canonical command reference updates if command paths change; command registration validation; Codex Security review before runtime PR handoff.
-
-### Deferred Optimisation
-- Area: `voting/export_service.py`, `voting/survey_export_service.py`, report bundle services, future workbook outputs
-- Type: architecture
-- Description: Phase 10 delivered private single-survey report-bundle CSV output, Phase 11 delivered dashboard-safe aggregate reporting contracts, and Phase 16 preserved the existing report/export shapes while adding safe survey metadata updates. Cross-survey summaries, workbook-style exports, longitudinal reports, export audit/history summaries, and broader export profile redesign remain outside the delivered single-survey report bundle.
-- Suggested Fix: Scope a dedicated cross-survey/workbook export redesign only after concrete reporting consumers or operator workflows are identified. Preserve private delivery by default, keep existing CSV profiles backward-compatible unless explicitly versioned, define workbook tabs/columns before implementation, and add output-shape regression tests for every generated file.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 10 report bundle delivered and smoke tested; Phase 11 dashboard-safe reporting delivered; Phase 12 draft exclusion delivered; Phase 14 rating-scale export/report compatibility delivered; Phase 16 survey update preserves current export/report schema; reporting consumer requirements; SQL repo validation; no public reporting without separate approval.
+- Dependencies: Phase 18 closed workbook/cross-survey export redesign as not required; active Phase 19 audit/design approval; SQL validation in `C:\K98-bot-SQL-Server`; privacy approval for Discord-name participation/non-participation reporting; Codex Security review before runtime PR handoff.
 
 ### Deferred Optimisation
 - Area: `voting/`, private exports, report bundles, dashboard/reporting summaries, SQL-backed vote/survey data

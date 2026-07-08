@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 through Phase 16 complete and smoke tested; Phase 17 Vote Admin Reshaping audit/design prepared as the next voting slice`
+- Current status: `Phase 1 through Phase 18 complete or audit-closed; Phase 19 Leadership Engagement Summary Reporting audit/design is in progress`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -1159,26 +1159,80 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 17 vote admin reshaping audit and design
 
-Status: active next voting slice; audit/scope only until command architecture, permissions,
-compatibility, docs, tests, rollout, rollback, and operator communication direction are approved.
+Status: complete; audit closed with no runtime command change.
 
 Phase 17 promotes the deferred `/vote_admin` command-surface governance item. The command group is
 functional and approved, but it now covers vote creation/update/status/close/export, survey
 creation/status/close/export/report/dashboard, autocomplete lookups, multiple export/report modes,
 and Phase 16 `/vote_admin survey_update`.
 
-The slice should audit whether the safest next step is command reshaping, a private
-`/vote_admin` launch/help panel, documentation improvements, no runtime command change, or a staged
-combination. It must preserve existing command behavior, permissions, private delivery defaults,
-usage tracking, autocomplete expectations, command registration guardrails, canonical command
-documentation, smoke references, and operator communication requirements unless a later approved
-implementation plan explicitly changes them.
+The audit selected Option D: keep `/vote_admin` as-is. Existing command paths, permissions,
+private delivery defaults, usage tracking, autocomplete expectations, command registration
+guardrails, canonical command documentation, smoke references, and operator expectations remain
+unchanged. No command renames, aliases, new top-level commands, nested groups, launch/help panels,
+player controls, SQL/DAL changes, export/report/dashboard shape changes, public rendering changes,
+or broad `/vote_admin` reshaping are needed now.
 
-Active Phase 17 records:
+The operator rationale is that the commands work, leadership is comfortable with the naming
+convention, only one or two people realistically create or update votes/surveys, and the delivered
+goal is structured, consistently coded commands that serve the team.
+
+Phase 17 records are archived under:
 
 ```text
-docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md
-docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md
+```
+
+### Phase 18 cross survey workbook export redesign audit and design
+
+Status: complete; audit closed with no runtime export or documentation-guidance change.
+
+Phase 18 promoted the deferred cross-survey/workbook export redesign item. The framework already
+has private vote totals and voter-audit CSV exports, private survey totals and response-detail CSV
+exports, private single-survey report-bundle CSV output, private dashboard-safe aggregate reporting
+contracts, and `/vote_admin dashboard`. The remaining question was whether concrete operator or
+leadership workflows need cross-survey summaries, workbook-style output, longitudinal reports,
+export audit/history summaries, or broader export profile redesign.
+
+The audit outcome is no runtime export change and no documentation-only guidance. Existing private
+CSV exports and report bundles have been well received and are understood by leadership. A
+single-survey private workbook export would only repackage the current single-survey report bundle
+into workbook form, and a cross-survey private aggregate workbook/report would be the broader
+comparison/summary version. Neither has a current operator or leadership use case, so the
+cross-survey/workbook export redesign item is closed as not required now rather than kept as
+active deferred work.
+
+Phase 18 records are archived under:
+
+```text
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 18 Cross Survey Workbook Export Redesign Audit and Design.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 18 Cross Survey Workbook Export Redesign Audit and Design.md
+```
+
+### Phase 19 leadership engagement summary reporting audit and design
+
+Status: in progress; audit/scope only until reporting product scope, privacy, SQL posture,
+compatibility, docs, tests, rollout, rollback, and operator communication direction are approved.
+
+Phase 19 promotes the leadership engagement summary reporting item. The reporting need is not
+workbook-style export redesign. The useful candidate is a higher-level private leadership summary
+over vote/survey activity and engagement across time windows. Candidate outputs include counts of
+votes and surveys published, possible participation opportunities, actual participation counts,
+aggregate engagement rates, monthly buckets such as June or July, rolling windows such as last
+month/last 3 months/last 6 months, and private per-Discord-name participation counts so leadership
+can identify whether vote/survey volume is too high or whether specific players are not engaging.
+
+This needs a separate audit before implementation because it touches private identity reporting,
+non-participation inference, SQL-backed vote/survey data, dashboard/report ownership, time-window
+semantics, output shape, tests, Codex Security review, rollout, and rollback. It should not reopen
+cross-survey workbook export redesign unless a concrete workbook/comparison consumer appears.
+
+Active Phase 19 records:
+
+```text
+docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md
+docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md
 ```
 
 ## 9. Cross-Programme Constraints
@@ -1312,20 +1366,27 @@ The core programme is successful when:
       updates for title, description, close time, reminders, broad-mention flags, option icons,
       response changes, and result visibility, response-sensitive locks, closed-survey locks,
       reminder audit accuracy, no SQL migration, and preserved export/report/dashboard shapes.
+- [x] `/vote_admin` reshaping audit is closed in Phase 17 with no runtime command change. Existing
+      `/vote_admin` paths, permissions, autocomplete, usage tracking, command registration,
+      canonical docs, private surfaces, exports/reports/dashboard behavior, and survey update
+      locks remain unchanged. The command-surface deferred item is resolved and archived.
+- [x] Cross-survey/workbook export redesign audit is closed in Phase 18 with no runtime export
+      change and no documentation-guidance change. Existing private CSV exports, single-survey
+      report bundles, and `/vote_admin dashboard` remain unchanged; single-survey workbook output
+      and cross-survey aggregate workbook/report output are not required now.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 17: Vote Admin Reshaping Audit and Design.
+Continue Discord Voting Post Framework Phase 19: Leadership Engagement Summary Reporting Audit and
+Design.
 
-Begin with audit/scope confirmation for the `/vote_admin` command surface now that vote and survey
-admin flows include create, update, status, close, export, report bundle, dashboard, and
-survey_update. Confirm whether the safest next step is command reshaping, a private launch/help
-panel, documentation improvements, no runtime command change, or a staged combination. Confirm
-compatibility for existing command paths, permissions, autocomplete, usage tracking, command
-registration baselines, canonical command reference updates, smoke references, operator
-communication, tests, security review, deployment order, rollback posture, and deferred boundaries
-before implementation.
+Begin with audit/scope confirmation for a private leadership summary that reports vote/survey
+published counts, possible participation opportunities, actual participation, aggregate engagement
+rates, monthly or rolling-window trends, and private per-Discord-name participation counts. Confirm
+time windows, vote/survey counting rules, identity/privacy boundaries, dashboard/report ownership,
+SQL posture, tests, Codex Security review, deployment order, rollback posture, and operator
+communication before implementation.
 ```
 
 ## 13. Programme Change Log
@@ -1377,3 +1438,7 @@ before implementation.
 | 2026-07-07 | Phase 15 archived and Phase 16 prepared | Phase 15 task pack and starter were archived. Created the active Phase 16 Survey Authoring Edit Controls audit/design task pack and chat starter. The survey builder question/option edit gap is promoted into Phase 16; `/vote_admin` reshaping, cross-survey/workbook export redesign, retention/redaction changes, optional SQL-native combined reporting, role/governor voting, saved templates, per-rating comments, and public detail/voter-level posting remain separate approval-gated or not-required work. |
 | 2026-07-07 | Phase 16 survey authoring edit controls delivered | Mirror PR #211 and production PR #518 delivered pre-publish survey review/edit/delete/reorder controls, `/vote_admin survey_update` for safe open-survey metadata updates, response-sensitive locks for option icons/response changes/result visibility, closed-survey locks, reminder audit accuracy, review hardening, Codex Security review, and successful operator smoke/regression testing. |
 | 2026-07-07 | Phase 16 archived and Phase 17 prepared | Phase 16 task pack and starter were archived. Created the active Phase 17 Vote Admin Reshaping audit/design task pack and chat starter. `/vote_admin` command-surface governance is promoted into Phase 17; cross-survey/workbook export redesign, retention/redaction changes, optional SQL-native combined reporting, role/governor voting, saved templates, per-rating comments, generated-card custom emoji fetching/animation, and public detail/voter-level posting remain separate approval-gated or not-required work. |
+| 2026-07-07 | Phase 17 vote admin reshaping audit closed | Operator selected Option D after audit: keep `/vote_admin` as-is because the commands work, leadership is comfortable with the naming convention, and only a small operator set creates or updates votes/surveys. No command renames, aliases, new top-level commands, help/launch panels, command-registration changes, SQL/DAL changes, export/report/dashboard changes, public rendering changes, rollout, or operator retraining are required. The `/vote_admin` deferred item is resolved and archived. |
+| 2026-07-07 | Phase 17 archived and Phase 18 prepared | Phase 17 task pack and starter were archived. Created the active Phase 18 Cross Survey Workbook Export Redesign audit/design task pack and chat starter. Cross-survey/workbook export redesign is promoted into Phase 18; retention/redaction changes and optional SQL-native combined reporting remain separate approval-gated slices unless Phase 18 audit explicitly justifies them. Role/governor voting, saved templates, per-rating comments, generated-card custom emoji fetching/animation, and public detail/voter-level posting remain not required unless later operator direction reverses that status. |
+| 2026-07-08 | Phase 18 cross-survey workbook export redesign audit closed | Operator confirmed existing private exports are well received and understood by leadership. Single-survey private workbook output and cross-survey private aggregate workbook/report output are not required now, and no documentation-only guidance is needed. The active cross-survey/workbook deferred item is closed as not required rather than kept in backlog. A separate higher-level leadership engagement summary/reporting need was identified as the next candidate audit. |
+| 2026-07-08 | Phase 19 leadership engagement summary reporting prepared | Created the active Phase 19 Leadership Engagement Summary Reporting audit/design task pack and chat starter. The slice is audit/scope only until product scope, identity/privacy model, SQL/data contract, command/dashboard/report ownership, tests, Codex Security review, rollout, rollback, and operator communication are approved. No runtime command, dashboard, export, SQL/DAL, or public reporting changes are approved by the preparation step. |

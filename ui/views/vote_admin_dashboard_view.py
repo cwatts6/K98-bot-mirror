@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from collections import Counter
+from collections.abc import Awaitable, Callable
 import logging
 
 import discord
@@ -333,9 +333,9 @@ def eligible_users_from_guild(guild) -> tuple[EngagementEligibleUser, ...]:
         ]
         users.append(
             EngagementEligibleUser(
-                discord_user_id=int(getattr(member, "id")),
+                discord_user_id=int(member.id),
                 display_name=_discord_display_name(member),
-                role_ids=tuple(int(getattr(role, "id")) for role in roles),
+                role_ids=tuple(int(role.id) for role in roles),
                 role_names=tuple(str(getattr(role, "name", "") or "") for role in roles),
             )
         )

@@ -1,6 +1,12 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design
 
-Status: active starter for the next Discord Voting Post Framework slice.
+Status: archived starter. Phase 17 is complete and closed with no runtime command change.
+
+Phase 17 audit outcome: keep `/vote_admin` as-is. The existing command paths, top-level group,
+permissions, autocomplete, usage tracking, command registration baseline, canonical documentation,
+private surfaces, exports, reports, dashboard contracts, and survey update locks remain unchanged.
+Leadership is comfortable with the current naming convention, only a small operator set creates or
+updates votes/surveys, and no runtime help panel is needed.
 
 Phase 1 through Phase 16 are complete and smoke tested. Phase 16 delivered guided survey builder
 review/edit/delete/reorder controls for already-added draft survey questions and
@@ -66,7 +72,7 @@ Read first:
 - docs/reference/deferred_optimisations.md
 - docs/task_packs/Discord Voting Post Framework - Programme Pack.md
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md
-- docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md
+- docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md
 
 Use these skills as applicable:
 - k98-architecture-scope

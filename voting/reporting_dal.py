@@ -9,10 +9,10 @@ from voting.option_emojis import option_emoji_from_row
 from voting.reporting_models import (
     REPORT_CONTENT_SURVEY,
     REPORT_CONTENT_VOTE,
-    EngagementItemSummary,
-    EngagementParticipant,
     DashboardReportingOptionAggregate,
     DashboardReportingSummary,
+    EngagementItemSummary,
+    EngagementParticipant,
 )
 from voting.result_visibility import normalize_result_visibility
 from voting.vote_modes import normalize_vote_mode

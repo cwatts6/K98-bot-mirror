@@ -294,22 +294,38 @@ Discord Voting Post Framework status:
 - Phase 16 records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md`
   - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md`
+- Phase 17 Vote Admin Reshaping Audit and Design is complete and closed with no runtime command
+  change. Operator decision D keeps `/vote_admin` as-is because the commands work, leadership is
+  comfortable with the naming convention, and only a small operator set creates or updates
+  votes/surveys. No aliases, new top-level commands, help/launch panels, command-registration
+  changes, SQL/DAL changes, export/report/dashboard changes, public rendering changes, rollout, or
+  operator retraining are required.
+- Phase 17 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md`
+  - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md`
+- Phase 18 Cross Survey Workbook Export Redesign Audit and Design is complete and closed with no
+  runtime export change and no documentation-guidance change. Existing private exports and report
+  bundles are well received and understood by leadership. Single-survey private workbook output
+  and cross-survey private aggregate workbook/report output are not required now.
+- Phase 18 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 18 Cross Survey Workbook Export Redesign Audit and Design.md`
+  - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 18 Cross Survey Workbook Export Redesign Audit and Design.md`
 - Active Discord Voting Post Framework files:
   - `Discord Voting Post Framework - Programme Pack.md`
-  - `Codex Task Pack - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md`
-  - `Codex Chat Starter - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md`
-- Phase 17 is the next prepared voting slice. It starts with audit/scope confirmation for the
-  `/vote_admin` command surface after Phase 16 added `survey_update`. It should confirm whether
-  the safest next step is command reshaping, a private launch/help panel, documentation
-  improvements, no runtime command change, or a staged combination. Existing command paths,
-  permissions, autocomplete, usage tracking, command registration baselines, canonical command
-  reference updates, smoke references, operator communication, tests, security review, deployment
-  order, rollback posture, and deferred boundaries must be confirmed before implementation.
-  Cross-survey/workbook exports, retention/redaction policy changes, and optional SQL-native
-  combined reporting views/procedures remain required separate slices. Per-rating comments,
-  role-restricted voting, governor-linked voting/reporting, saved templates, generated-card custom
-  emoji asset fetching/animation, and public voter-level/detail export posting are definitely not
-  required unless a later operator decision reverses that status.
+  - `Codex Task Pack - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
+  - `Codex Chat Starter - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
+- Phase 19 Leadership Engagement Summary Reporting Audit and Design is in progress. It is an
+  audit/scope-only slice for a private leadership engagement summary: vote/survey published
+  counts, possible participation opportunities, actual participation, aggregate engagement rates,
+  monthly or rolling-window trends, and private per-Discord-name participation counts. It requires
+  approval of the product scope, identity/privacy model, SQL/data contract, command/dashboard/report
+  ownership, tests, Codex Security review, rollout, rollback, and operator communication before any
+  implementation.
+  Retention/redaction policy changes and optional SQL-native combined reporting views/procedures
+  remain required separate slices unless a future audit explicitly justifies them. Per-rating
+  comments, role-restricted voting, governor-linked voting/reporting, saved templates,
+  generated-card custom emoji asset fetching/animation, and public voter-level/detail export
+  posting are definitely not required unless a later operator decision reverses that status.
 
 Player Self-Service Command Centre status:
 

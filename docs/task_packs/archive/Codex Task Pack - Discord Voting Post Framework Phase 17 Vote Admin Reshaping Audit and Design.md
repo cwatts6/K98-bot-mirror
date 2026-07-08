@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after Phase 16 survey authoring edit controls and survey_update delivery`
 - Task type: `audit | command-surface governance | Discord interaction UX | permissions review | documentation planning`
 - One-pass approved: `no`
-- Status: `active next voting slice; audit/scope only until command architecture, permissions, compatibility, docs, tests, rollout, and operator communication direction are approved`
+- Status: `complete; audit closed with no runtime command change`
 
 ## 2. Objective
 
@@ -25,6 +25,22 @@ SQL/DAL changes, export/report/dashboard shape changes, or broad `/vote_admin` r
 operator approves the architecture, product scope, permissions, compatibility, docs, tests,
 rollout, rollback, and communication plan.
 
+Delivery closeout on 2026-07-07 confirmed the approved Phase 17 decision:
+
+- Keep the existing `/vote_admin` top-level command group.
+- Keep all current command paths stable.
+- Do not add command aliases, nested command groups, a new top-level command, a launch/help panel,
+  or command-registration baseline changes.
+- Treat the current naming convention as operator-approved. Leadership is comfortable with the
+  split between vote verbs and `survey_*` verbs, and only a very small operator set creates or
+  updates votes and surveys.
+- Do not add runtime help because the current command surface is already discoverable enough for
+  the actual admin audience.
+- Mark the source deferred optimisation as resolved rather than carrying it as active backlog.
+- Preserve all Phase 1 through Phase 16 behavior, permissions, autocomplete, usage tracking,
+  private surfaces, exports, reports, dashboard contracts, public rendering, and survey update
+  locks unchanged.
+
 ## 3. Required Reading
 
 Read first:
@@ -41,7 +57,7 @@ Read first:
 - `docs/reference/deferred_optimisations.md`
 - `docs/task_packs/Discord Voting Post Framework - Programme Pack.md`
 - `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 16 Survey Authoring Edit Controls Audit and Design.md`
-- `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md`
+- `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design.md`
 
 ## 4. Delivered Baseline
 
@@ -191,3 +207,56 @@ The audit/scope packet is ready when it clearly answers:
 - What tests, smoke checks, deployment order, rollback posture, and security review are required.
 
 Stop after the audit/scope packet unless the operator explicitly approves implementation.
+
+## 12. Phase 17 Audit Outcome
+
+The audit confirmed that broad `/vote_admin` reshaping is not needed now. The delivered command
+group is structured, consistently coded, command-registration safe, and works for the team. The
+operator decision is Option D: leave `/vote_admin` as-is.
+
+### Current Command Shape To Preserve
+
+```text
+/vote_admin create
+/vote_admin update
+/vote_admin status
+/vote_admin close
+/vote_admin export
+/vote_admin dashboard
+/vote_admin survey_create
+/vote_admin survey_update
+/vote_admin survey_status
+/vote_admin survey_close
+/vote_admin survey_export
+```
+
+### Validation Evidence
+
+Audit validation completed successfully:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
+.\.venv\Scripts\python.exe scripts\validate_deferred_items.py
+.\.venv\Scripts\python.exe scripts\select_tests.py
+.\.venv\Scripts\python.exe scripts\smoke_imports.py
+.\.venv\Scripts\python.exe scripts\validate_command_registration.py
+.\.venv\Scripts\python.exe -m pytest -q tests\test_vote_admin_cmds.py tests\test_validate_command_registration.py
+```
+
+Focused pytest result: `37 passed`.
+
+Command registration remained stable:
+
+```text
+primary=42 grouped_subcommands_detected=97 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
+/vote_admin: 11 subcommands
+```
+
+### Security And Rollout
+
+Codex Security review was not required for Phase 17 closeout because no runtime code,
+permissions, Discord interactions, command routing, SQL/data access, exports, reports, dashboard
+payloads, file handling, user-controlled input, or restart-sensitive flows changed.
+
+No production rollout, rollback plan, player communication, or operator retraining is required
+because the audit ended with no runtime command change.

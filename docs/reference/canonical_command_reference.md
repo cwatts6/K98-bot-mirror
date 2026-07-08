@@ -282,6 +282,13 @@ Legend:
   workflow rolls out.
 - Public calendar and KVK calendar paths remain flat pending a dedicated UX redesign.
 - `/ping` remains flat for simple health/debug discoverability.
+- Discord Voting Post Framework Phase 17 audited the expanded `/vote_admin` group after
+  `/vote_admin survey_update` delivery and explicitly retained the existing command shape. No
+  `/vote_admin` renames, aliases, nested groups, new top-level commands, launch/help panels,
+  command-registration baseline changes, permission changes, autocomplete changes, usage-tracking
+  changes, export/report/dashboard changes, or public-rendering changes were approved. Leadership
+  is comfortable with the current naming convention, and the small operator set does not need a
+  runtime help surface.
 
 ## Validation Expectations
 
