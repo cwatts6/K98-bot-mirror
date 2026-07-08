@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after Phase 19 delivered the compact private leadership engagement dashboard`
 - Task type: `audit | private leadership reporting product scope | privacy review | private CSV export implementation | SQL/data compatibility review`
 - One-pass approved: `no`
-- Status: `implementation approved and delivered locally; awaiting review, Codex Security sign-off, and operator smoke before archive`
+- Status: `archived; delivered in mirror PR #213 and production promotion branch, smoke/regression tested on 2026-07-08`
 
 ## 2. Objective
 
@@ -27,6 +27,43 @@ highest engagement first.
 Paged Discord lists, workbook output, graph/image output, public reporting, retention/redaction
 changes, SQL-native combined reporting, command aliases, top-level commands, and raw/per-answer
 detail remain out of scope unless separately approved.
+
+## 2A. Completion Update
+
+Phase 20 is complete. It delivered the approved private per-user engagement CSV export under the
+separate `/vote_admin engagement` subcommand, with:
+
+- Private select-driven controls for engagement window and audience/role filter.
+- `/vote_admin dashboard` engagement controls removed so dashboard returns to vote/survey
+  inspection only.
+- All eligible users included by default and sorted highest engagement first.
+- CSV fields for spreadsheet-safe Discord user ID, display name, role names, eligible
+  opportunities, vote participation count, survey participation count, combined participation
+  count, missed count, engagement rate, and last participation date.
+- Phase 19 window and role-filter inheritance for last month, last 3 months, last 6 months,
+  expected roles, all non-bot members, and individual roles such as `Kingdom Leadership`.
+- One Discord user counted once, regardless of multiple roles or governor IDs.
+- One closed published vote or survey item counted as one opportunity; multi-question surveys and
+  single-question multi-select votes each count as one opportunity.
+- Vote changes and survey response changes not multiplying participation.
+- Unsubmitted survey drafts excluded.
+- Raw text/detail answers and per-answer detail excluded.
+- Private CSV delivery only; no public output, paged Discord list, workbook, graph/image, SQL
+  schema change, SQL-native combined reporting, retention/redaction change, command alias, or new
+  top-level command.
+
+Validation included pre-commit, architecture/deferred validators, selected-test review, smoke
+imports, command registration validation, UI import coverage, focused engagement/export/dashboard
+tests, full pytest (`2399 passed, 2 skipped`), and a Codex Security diff scan with zero open
+findings after a stale component-permission candidate was fixed by revalidating current
+admin/leadership status on every engagement view interaction.
+
+Operator smoke/regression testing on 2026-07-08 confirmed the CSV export is done, exported data is
+as expected, controls work well, role filters behave as planned, and regression tests are
+successful.
+
+The only near-term voting follow-up promoted from this slice is Phase 21: an audit/design pass to
+decide whether any private graph is worth delivering after reviewing the Phase 20 CSV data.
 
 ## 3. Required Reading
 

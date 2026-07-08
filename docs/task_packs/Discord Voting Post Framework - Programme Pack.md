@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 through Phase 19 complete or audit-closed; Phase 20 per-user engagement CSV export is implemented locally and awaiting review/smoke`
+- Current status: `Phase 1 through Phase 20 complete or audit-closed; Phase 21 private engagement graph assessment audit/design is prepared`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -1242,8 +1242,7 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 20 per-user engagement CSV export
 
-Status: implementation approved and delivered locally; awaiting review, security sign-off, and
-operator smoke before archive.
+Status: complete, review-hardened, security-reviewed, smoke/regression tested, and archived.
 
 Phase 20 carries forward the Phase 19 follow-up: the top-level embed was intentionally compact, so
 the larger per-user participation breakdown now lives in a private CSV export under the separate
@@ -1254,15 +1253,52 @@ the engagement window and role filter.
 The approved product scope is CSV-only for now. Rows include all eligible users sorted highest
 engagement first, Discord identity, role names, eligible opportunities, vote participation count,
 survey participation count, combined participation count, missed count, engagement rate, and last
-participation date. Graphs, workbooks, and paged Discord lists are deferred; raw answers and
-per-answer response detail remain out of scope.
+participation date. Operator smoke confirmed the CSV export is done, data is as expected, controls
+work well, role filters behave as planned, and regression tests are successful. Graphs, workbooks,
+and paged Discord lists are deferred; raw answers and per-answer response detail remain out of
+scope.
 
-Active Phase 20 records:
+Archived Phase 20 records:
 
 ```text
-docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md
-docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md
 ```
+
+### Phase 21 private engagement graph assessment audit and design
+
+Status: prepared; audit/scope only until graph value, semantics, privacy, file/artifact handling,
+tests, rollout, rollback, and operator communication are approved.
+
+Phase 21 is the only near-term voting follow-up promoted from Phase 20. It should review the
+delivered per-user CSV output and decide whether one or two private graphs would add enough value
+to justify implementation. Candidate graph questions include participation distribution,
+lowest-participation capped chart, combined vote/survey participation by user, separate vote/survey
+series, or survey-only participation. The audit may also conclude that CSV export is sufficient and
+no graph should be built now.
+
+Active Phase 21 records:
+
+```text
+docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design.md
+docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design.md
+```
+
+### Remaining voting follow-up inventory
+
+Core voting runtime is now complete through the approved Phase 20 CSV export. Remaining work is
+approval-gated and should not be treated as required delivery unless the operator selects it:
+
+- Phase 21 private engagement graph assessment, graph implementation only if the audit identifies a
+  concrete graph that is worth building.
+- Retention/redaction policy audit for vote/survey data, exports, reports, audit metadata, and
+  generated artifacts.
+- Optional SQL-native combined vote/survey reporting only if performance evidence, a direct SQL
+  consumer, or production support need appears.
+- Not required unless a later operator decision reverses status: role-restricted voting,
+  governor-linked voting/reporting, saved vote/survey templates, per-rating comments, public
+  voter-level/detail export posting, cross-survey workbook output, paged Discord per-user lists,
+  and public engagement dashboards/graphs.
 
 ## 9. Cross-Programme Constraints
 
@@ -1409,20 +1445,25 @@ The core programme is successful when:
       Discord roles, one-Discord-user counting regardless of governor IDs, raw-answer exclusion,
       no public reporting, no export schema changes, no SQL-native combined reporting, and
       successful smoke/regression testing.
-- [ ] Private per-user engagement CSV export is delivered in Phase 20 with separate
+- [x] Private per-user engagement CSV export is delivered and smoke tested in Phase 20 with separate
       `/vote_admin engagement` controls, all eligible users sorted highest engagement first, role
       names, vote/survey split counts, no paged Discord list, no graph/workbook output, raw-answer
-      exclusion, no SQL schema change, and successful review/smoke before archive.
+      exclusion, no SQL schema change, and successful review/smoke.
+- [ ] Phase 21 private engagement graph assessment decides whether any graph is worth implementing
+      after reviewing the Phase 20 CSV output; graph runtime delivery remains unapproved until that
+      audit is complete.
 
 ## 12. Suggested Next Action
 
 ```text
-Review and smoke Discord Voting Post Framework Phase 20: Per-User Engagement CSV Export.
+Start Discord Voting Post Framework Phase 21: Private Engagement Graph Assessment Audit and
+Design.
 
-Phase 20 now has a local CSV-only implementation under `/vote_admin engagement`. Review the
-separate select-driven engagement flow, verify the private CSV fields and sorting, confirm
-`/vote_admin dashboard` no longer exposes engagement controls, complete Codex Security review, and
-smoke with an admin/leadership account before archive or promotion.
+Phase 20 delivered the private per-user CSV export under `/vote_admin engagement`, and smoke
+testing confirmed the data, controls, and role filters are working as expected. Begin Phase 21 by
+reviewing the exported data and deciding whether one or two private graphs would add value. Confirm
+graph semantics, user-count limits, privacy wording, artifact/file handling, command/view ownership,
+tests, Codex Security review, rollout, rollback, and operator communication before implementation.
 ```
 
 ## 13. Programme Change Log
@@ -1480,4 +1521,6 @@ smoke with an admin/leadership account before archive or promotion.
 | 2026-07-08 | Phase 19 leadership engagement summary reporting prepared | Created the active Phase 19 Leadership Engagement Summary Reporting audit/design task pack and chat starter. The slice is audit/scope only until product scope, identity/privacy model, SQL/data contract, command/dashboard/report ownership, tests, Codex Security review, rollout, rollback, and operator communication are approved. No runtime command, dashboard, export, SQL/DAL, or public reporting changes are approved by the preparation step. |
 | 2026-07-08 | Phase 19 leadership engagement dashboard delivered | Mirror PR #212 and production PR #519 delivered the private `/vote_admin dashboard` engagement mode with role-filtered eligibility, fixed rolling windows, compact top-level metrics, monthly snapshots, best/worst single poll, raw-answer exclusion, graceful dashboard timeout handling, review hardening, successful automated validation, and successful operator smoke/regression testing. |
 | 2026-07-08 | Phase 20 per-user engagement export/list/graph prepared | Archived Phase 19 task pack and starter. Created the active Phase 20 audit/design task pack and chat starter for the richer private per-user breakdown, including export/list/graph shape, role/window filter inheritance, Discord identity privacy, file handling, tests, security review, rollout, rollback, and operator communication scope. |
-| 2026-07-08 | Phase 20 per-user engagement CSV export implemented locally | Operator approved CSV-only first slice, no paged Discord list, graph deferral, role names and vote/survey split columns, all eligible users sorted highest engagement first, and a separate `/vote_admin engagement` select-driven flow. Local implementation removes engagement from `/vote_admin dashboard`, adds private CSV export controls, keeps raw/detail answers excluded, makes no SQL schema changes, and leaves graphs/workbooks for a later approved slice. |
+| 2026-07-08 | Phase 20 per-user engagement CSV export delivered | Operator approved and smoke tested the CSV-only first slice: no paged Discord list, graph deferral, role names and vote/survey split columns, all eligible users sorted highest engagement first, and a separate `/vote_admin engagement` select-driven flow. The delivered implementation removes engagement from `/vote_admin dashboard`, adds private CSV export controls, keeps raw/detail answers excluded, makes no SQL schema changes, and leaves graphs/workbooks for a later approved slice. |
+| 2026-07-08 | Phase 20 per-user engagement CSV export smoke tested and archived | Operator smoke confirmed Export CSV is done, data is as expected, controls work well, role filters behave as planned, and regression tests are successful. Phase 20 task pack and starter were archived. |
+| 2026-07-08 | Phase 21 private engagement graph assessment prepared | Created the active Phase 21 audit/design task pack and chat starter to decide whether any private engagement graph should be implemented after reviewing Phase 20 CSV output. Graph runtime generation, public graphs, paged Discord lists, workbook output, CSV schema changes, retention/redaction changes, and SQL-native reporting remain unapproved. |

@@ -8,11 +8,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `voting/engagement_export_service.py`, `/vote_admin engagement`, future private engagement graphs
 - Type: architecture
-- Description: Phase 20 delivers the private per-user engagement CSV export and intentionally removes paged Discord lists from scope because they are hard to manage and add little value for large user counts. Graph output is deferred until leadership has reviewed CSV data and can identify one or two specific visual questions worth rendering.
-- Suggested Fix: After CSV smoke feedback, scope a small graph-only Phase 21 candidate if needed. Confirm whether the graph should be a distribution summary, lowest-participation capped chart, combined vote/survey participation chart, separate vote/survey series, or survey-only view; define user-count limits, privacy copy, artifact generation/cleanup, tests, and Codex Security review before implementation.
+- Description: Phase 20 delivered the private per-user engagement CSV export and intentionally removed paged Discord lists from scope because they are hard to manage and add little value for large user counts. Operator smoke confirmed the CSV data, controls, and role filters are working as expected. Graph output remains deferred until leadership reviews the CSV data and identifies one or two specific visual questions worth rendering.
+- Suggested Fix: Promoted into Phase 21 Private Engagement Graph Assessment Audit and Design. Confirm whether a graph should be built at all; if yes, decide whether it should be a distribution summary, lowest-participation capped chart, combined vote/survey participation chart, separate vote/survey series, or survey-only view. Define user-count limits, privacy copy, artifact generation/cleanup, tests, rollout, rollback, and Codex Security review before implementation.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 20 private CSV export delivered and operator smoke reviewed; concrete leadership graph question; graph/image artifact privacy and file-handling approval.
+- Dependencies: Phase 20 private CSV export delivered and smoke/regression tested; active Phase 21 audit/design approval; concrete leadership graph question; graph/image artifact privacy and file-handling approval.
 
 ### Deferred Optimisation
 - Area: `voting/`, private exports, report bundles, dashboard/reporting summaries, SQL-backed vote/survey data

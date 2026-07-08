@@ -293,8 +293,9 @@ Legend:
 - Discord Voting Post Framework Phase 20 split leadership engagement reporting out of
   `/vote_admin dashboard` into `/vote_admin engagement` after operator approval. The dashboard is
   now focused on individual vote/survey item inspection again, while engagement owns select-driven
-  private CSV export controls. This is a grouped `/vote_admin` addition, not a new top-level
-  command or `/vote_admin` rename.
+  private CSV export controls. Operator smoke testing confirmed the CSV data, controls, and role
+  filters on 2026-07-08. This is a grouped `/vote_admin` addition, not a new top-level command or
+  `/vote_admin` rename.
 
 ## Validation Expectations
 

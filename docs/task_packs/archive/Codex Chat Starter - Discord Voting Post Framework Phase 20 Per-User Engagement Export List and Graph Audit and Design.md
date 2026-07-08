@@ -1,5 +1,14 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design
 
+Archived: Phase 20 is complete, delivered in mirror PR #213, promoted toward production on
+`prod/phase20-engagement-csv`, and smoke/regression tested on 2026-07-08. The delivered slice is
+CSV-only under `/vote_admin engagement`; paged Discord lists, workbooks, graphs/images, raw/detail
+answers, public reporting, and SQL-native combined reporting remain out of scope. Use this
+historical starter only for context; the active next slice is Phase 21 Private Engagement Graph
+Assessment Audit and Design.
+
+Original starter:
+
 Use this to start the Phase 20 audit/design slice.
 
 ```text
