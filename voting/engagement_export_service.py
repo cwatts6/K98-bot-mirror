@@ -148,7 +148,9 @@ def build_engagement_csv_bytes(contract: EngagementReportingContract) -> io.Byte
     )
     writer.writeheader()
     for row in engagement_csv_rows(contract):
-        writer.writerow({header: _csv_cell(row.get(header)) for header in ENGAGEMENT_EXPORT_COLUMNS})
+        writer.writerow(
+            {header: _csv_cell(row.get(header)) for header in ENGAGEMENT_EXPORT_COLUMNS}
+        )
     out = io.BytesIO(text_buffer.getvalue().encode("utf-8-sig"))
     out.seek(0)
     return out
@@ -175,4 +177,3 @@ def build_engagement_csv_export(
         contract.role_filter_value,
     )
     return export
-

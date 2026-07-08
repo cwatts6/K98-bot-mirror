@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import csv
-import io
 from datetime import UTC, datetime
+import io
 
 from voting.engagement_export_service import (
     build_engagement_csv_bytes,
@@ -92,4 +92,3 @@ def test_build_engagement_csv_export_names_file_and_rewinds_bytes() -> None:
     assert export.row_count == 2
     assert export.csv_bytes.tell() == 0
     assert export.is_oversized() is False
-

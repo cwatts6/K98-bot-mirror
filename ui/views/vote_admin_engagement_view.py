@@ -82,7 +82,9 @@ class VoteAdminEngagementView(discord.ui.View):
         self.owner_user_id = int(owner_user_id)
         self.eligible_users = tuple(eligible_users)
         self.contract = contract
-        self.report_loader = report_loader or reporting_service.build_admin_leadership_engagement_report
+        self.report_loader = (
+            report_loader or reporting_service.build_admin_leadership_engagement_report
+        )
         self.window_value = reporting_service.normalize_engagement_window(
             window_value or (contract.window_key if contract else None)
         )
@@ -210,7 +212,9 @@ class VoteAdminEngagementView(discord.ui.View):
         for child in self.children:
             child.disabled = True
         if interaction.response.is_done():
-            await interaction.edit_original_response(content="Engagement export controls closed.", view=self)
+            await interaction.edit_original_response(
+                content="Engagement export controls closed.", view=self
+            )
         else:
             await interaction.response.edit_message(
                 content="Engagement export controls closed.",
