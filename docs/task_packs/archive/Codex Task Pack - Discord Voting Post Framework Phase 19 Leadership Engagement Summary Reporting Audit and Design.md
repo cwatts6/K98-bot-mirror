@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after Phase 18 closed cross-survey/workbook export redesign as not required`
 - Task type: `audit | private leadership reporting product scope | privacy review | SQL/data compatibility review | dashboard/report design`
 - One-pass approved: `no`
-- Status: `active; audit/scope only until reporting product scope, privacy, SQL posture, compatibility, docs, tests, rollout, rollback, and operator communication direction are approved`
+- Status: `archived; delivered in mirror PR #212 and production PR #519, smoke/regression tested on 2026-07-08`
 
 ## 2. Objective
 
@@ -29,6 +29,39 @@ behavior, or SQL-native combined reporting until the operator approves product s
 boundaries, data contract, compatibility, documentation, tests, rollout, rollback, and
 communication plan.
 
+## 2A. Completion Update
+
+Phase 19 is complete. It delivered a compact private engagement mode in `/vote_admin dashboard`
+with:
+
+- `Total Polls`, `Total Users`, `Participation levels`, and `Monthly Snapshots`.
+- Last month, last 3 months, and last 6 months windows.
+- Role-filtered eligibility covering expected roles, all non-bot members, and individual Discord
+  roles such as `Kingdom Leadership`.
+- One-Discord-user counting regardless of multiple governor IDs.
+- One participation opportunity per closed published vote or survey item; multi-select votes and
+  multi-question surveys each count as one opportunity.
+- Vote/response changes that update participation without multiplying it.
+- Unsubmitted survey drafts excluded.
+- Best and worst single poll in the selected time slice, with newest poll date as the tie-breaker.
+- Graceful dashboard timeout/edit-failure handling.
+
+The initial long per-user lowest-participation list was removed from the embed after smoke-test
+feedback. The richer private per-user breakdown is now split into Phase 20 as a separate
+audit/design task for an export, scrollable/paged list, graph, or staged combination.
+
+Phase 19 did not add public reporting, raw text/detail answers, per-answer response detail,
+existing export/report-bundle CSV schema changes, workbook outputs, retention/redaction changes,
+command reshaping, top-level commands, governor-linked reporting, role-restricted voting, or
+SQL-native combined reporting views/procedures.
+
+Validation included focused vote-admin dashboard/reporting tests (`28 passed`), architecture and
+deferred validators, selected-test review, smoke imports, command registration validation, UI import
+coverage, full pytest (`2391 passed, 2 skipped`), SQL source validation for vote/survey title
+columns, production promotion checks, pytest log-noise validation, review feedback resolution, and
+a Codex Security diff scan with zero findings. Operator smoke/regression testing on 2026-07-08
+confirmed the compact output, best/worst polls, role filtering, and raw-answer exclusion.
+
 ## 3. Required Reading
 
 Read first:
@@ -45,7 +78,7 @@ Read first:
 - `docs/reference/deferred_optimisations.md`
 - `docs/task_packs/Discord Voting Post Framework - Programme Pack.md`
 - `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 18 Cross Survey Workbook Export Redesign Audit and Design.md`
-- `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
+- `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
 
 ## 4. Delivered Baseline
 
@@ -78,8 +111,8 @@ permissions, autocomplete, usage tracking, SQL, exports, reports, dashboards, or
 ### Deferred Optimisation
 - Area: `voting/reporting_service.py`, `voting/reporting_dal.py`, `/vote_admin dashboard`, future private leadership reporting
 - Type: architecture
-- Description: Phase 19 is in progress as an audit/design slice for a higher-level private participation and engagement summary over vote/survey activity by time window. Candidate measures include published vote/survey counts, total possible participation opportunities, actual vote/survey participation counts, aggregate engagement rate, monthly trend rows, and private per-Discord-user participation counts/names so leadership can understand whether vote/survey volume is appropriate and whether specific players are not engaging.
-- Suggested Fix: Promoted into this active Phase 19 audit/design task pack. Confirm the product workflow, time-window choices such as last month/3 months/6 months/monthly buckets, whether votes and surveys should be combined or separated, how to count one user across multi-question surveys, whether only closed items should count, privacy boundaries for Discord names and non-participation inference, command/dashboard/report ownership, SQL source contracts, tests, Codex Security review, rollout, and rollback before implementation.
+- Description: Phase 19 audited and then delivered a higher-level private participation and engagement summary over vote/survey activity by time window. Delivered measures include published vote/survey counts, total possible participation opportunities, actual vote/survey participation counts, aggregate engagement rate, monthly snapshots, role-filtered eligibility, and best/worst single poll. The long per-user participation breakdown was intentionally split into Phase 20 because it is too large for a focused embed.
+- Suggested Fix: Completed through the Phase 19 private `/vote_admin dashboard` engagement mode. Follow-up per-user export/list/graph work is promoted into Phase 20 and remains approval-gated before implementation.
 - Impact: medium
 - Risk: high
 - Dependencies: Phase 18 closed workbook/cross-survey export redesign as not required; active Phase 19 audit/design approval; SQL validation in `C:\K98-bot-SQL-Server`; privacy approval for Discord-name participation/non-participation reporting; Codex Security review before runtime PR handoff.

@@ -1,6 +1,10 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design
 
-Use this to start the Phase 19 audit/design slice.
+Archived: Phase 19 is complete, delivered in mirror PR #212 and production PR #519, and
+smoke/regression tested on 2026-07-08. Use this historical starter only for context; the active next
+slice is Phase 20 Per-User Engagement Export List and Graph Audit and Design.
+
+Original starter:
 
 ```text
 Codex, start Discord Voting Post Framework Phase 19: Leadership Engagement Summary Reporting Audit and Design.

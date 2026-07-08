@@ -310,16 +310,25 @@ Discord Voting Post Framework status:
 - Phase 18 records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 18 Cross Survey Workbook Export Redesign Audit and Design.md`
   - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 18 Cross Survey Workbook Export Redesign Audit and Design.md`
+- Phase 19 Leadership Engagement Summary Reporting is complete, review-hardened, smoke/regression
+  tested, and archived. It delivered the private `/vote_admin dashboard` engagement mode with
+  compact `Total Polls`, `Total Users`, `Participation levels`, `Monthly Snapshots`, best/worst
+  single poll, role-filtered eligibility, fixed rolling windows, one-Discord-user counting
+  regardless of governor IDs, raw-answer exclusion, no public reporting, no export schema changes,
+  and no SQL-native combined reporting.
+- Phase 19 records are archived under `archive/`:
+  - `archive/Codex Task Pack - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
+  - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
 - Active Discord Voting Post Framework files:
   - `Discord Voting Post Framework - Programme Pack.md`
-  - `Codex Task Pack - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
-  - `Codex Chat Starter - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
-- Phase 19 Leadership Engagement Summary Reporting Audit and Design is in progress. It is an
-  audit/scope-only slice for a private leadership engagement summary: vote/survey published
-  counts, possible participation opportunities, actual participation, aggregate engagement rates,
-  monthly or rolling-window trends, and private per-Discord-name participation counts. It requires
-  approval of the product scope, identity/privacy model, SQL/data contract, command/dashboard/report
-  ownership, tests, Codex Security review, rollout, rollback, and operator communication before any
+  - `Codex Task Pack - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md`
+  - `Codex Chat Starter - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md`
+- Phase 20 Per-User Engagement Export List and Graph Audit and Design is prepared. It is an
+  audit/scope-only slice for the richer private per-user breakdown intentionally kept out of the
+  Phase 19 embed: export, scrollable/paged list, graph, or staged combination. It requires approval
+  of the output format, per-user fields, role/window filter inheritance, whether graphing is
+  survey-only or combined vote/survey, identity/privacy model, file-handling posture, SQL/data
+  contract, tests, Codex Security review, rollout, rollback, and operator communication before any
   implementation.
   Retention/redaction policy changes and optional SQL-native combined reporting views/procedures
   remain required separate slices unless a future audit explicitly justifies them. Per-rating

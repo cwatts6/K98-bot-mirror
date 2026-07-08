@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 through Phase 18 complete or audit-closed; Phase 19 Leadership Engagement Summary Reporting audit/design is in progress`
+- Current status: `Phase 1 through Phase 19 complete or audit-closed; Phase 20 Per-User Engagement Export/List/Graph audit/design is prepared`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -1210,29 +1210,60 @@ docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 18
 docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 18 Cross Survey Workbook Export Redesign Audit and Design.md
 ```
 
-### Phase 19 leadership engagement summary reporting audit and design
+### Phase 19 leadership engagement summary reporting
 
-Status: in progress; audit/scope only until reporting product scope, privacy, SQL posture,
-compatibility, docs, tests, rollout, rollback, and operator communication direction are approved.
+Status: complete, review-hardened, smoke/regression tested, and archived.
 
-Phase 19 promotes the leadership engagement summary reporting item. The reporting need is not
-workbook-style export redesign. The useful candidate is a higher-level private leadership summary
-over vote/survey activity and engagement across time windows. Candidate outputs include counts of
-votes and surveys published, possible participation opportunities, actual participation counts,
-aggregate engagement rates, monthly buckets such as June or July, rolling windows such as last
-month/last 3 months/last 6 months, and private per-Discord-name participation counts so leadership
-can identify whether vote/survey volume is too high or whether specific players are not engaging.
+Phase 19 delivered a private leadership engagement summary inside `/vote_admin dashboard`. The
+dashboard keeps the output focused on top-level numbers: `Total Polls`, `Total Users`,
+`Participation levels`, `Monthly Snapshots`, and the best/worst single poll in the selected time
+slice. It supports last month, last 3 months, and last 6 months windows, plus role-based eligibility
+filters such as expected roles, all non-bot members, and individual Discord roles such as
+`Kingdom Leadership`.
 
-This needs a separate audit before implementation because it touches private identity reporting,
-non-participation inference, SQL-backed vote/survey data, dashboard/report ownership, time-window
-semantics, output shape, tests, Codex Security review, rollout, and rollback. It should not reopen
-cross-survey workbook export redesign unless a concrete workbook/comparison consumer appears.
+Counting rules were finalized as one opportunity per closed published vote or survey item per
+eligible Discord user. One Discord user counts once even if they have multiple governor IDs.
+Multi-select votes and multi-question surveys each count as one participation opportunity.
+Submitted vote/survey changes do not multiply participation, unsubmitted survey drafts are
+excluded, and raw text/detail answers are never included. Best/worst single poll tie-breaks use the
+newest poll date.
 
-Active Phase 19 records:
+Phase 19 intentionally did not add public reporting, raw-answer display, per-answer detail,
+retention/redaction behavior changes, command reshaping, top-level commands, existing export schema
+changes, workbook output, SQL-native combined reporting views/procedures, governor-linked
+reporting, or role-restricted voting.
+
+Phase 19 records are archived under:
 
 ```text
-docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md
-docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md
+```
+
+### Phase 20 per-user engagement export/list/graph audit and design
+
+Status: prepared; audit/scope only until product scope, privacy model, data contract, output
+format, file-handling posture, docs, tests, rollout, rollback, and operator communication direction
+are approved.
+
+Phase 20 carries forward the Phase 19 follow-up: the top-level embed is now intentionally compact,
+so the larger per-user participation breakdown should become a richer private export, scrollable
+list, graph, or staged combination. The first audit must decide whether the initial output is a CSV
+or workbook export, a private paged/scrollable Discord list, an attached graph/image, or a staged
+combination such as CSV first and graph/list later.
+
+The likely product goal is a private leadership-only breakdown over the same Phase 19 time-window
+and role-filter semantics, with rows or visuals for Discord user, role context, eligible
+opportunities, participation count, missed count, engagement rate, and last participation date. It
+must clarify whether the graph is combined vote/survey participation, survey-only counts by user,
+separate vote/survey series, or all of those in separate private views. Raw answers and per-answer
+response detail remain out of scope.
+
+Active Phase 20 records:
+
+```text
+docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md
+docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md
 ```
 
 ## 9. Cross-Programme Constraints
@@ -1374,19 +1405,26 @@ The core programme is successful when:
       change and no documentation-guidance change. Existing private CSV exports, single-survey
       report bundles, and `/vote_admin dashboard` remain unchanged; single-survey workbook output
       and cross-survey aggregate workbook/report output are not required now.
+- [x] Private leadership engagement dashboard is delivered in Phase 19 with compact top-level
+      `Total Polls`, `Total Users`, `Participation levels`, `Monthly Snapshots`, best/worst single
+      poll, fixed rolling windows, role-filtered eligibility including expected roles and specific
+      Discord roles, one-Discord-user counting regardless of governor IDs, raw-answer exclusion,
+      no public reporting, no export schema changes, no SQL-native combined reporting, and
+      successful smoke/regression testing.
 
 ## 12. Suggested Next Action
 
 ```text
-Continue Discord Voting Post Framework Phase 19: Leadership Engagement Summary Reporting Audit and
+Start Discord Voting Post Framework Phase 20: Per-User Engagement Export List and Graph Audit and
 Design.
 
-Begin with audit/scope confirmation for a private leadership summary that reports vote/survey
-published counts, possible participation opportunities, actual participation, aggregate engagement
-rates, monthly or rolling-window trends, and private per-Discord-name participation counts. Confirm
-time windows, vote/survey counting rules, identity/privacy boundaries, dashboard/report ownership,
-SQL posture, tests, Codex Security review, deployment order, rollback posture, and operator
-communication before implementation.
+Phase 19 delivered the compact private leadership engagement dashboard. Begin Phase 20 with
+audit/scope confirmation for the richer per-user breakdown that was intentionally kept out of the
+embed: private export, scrollable/paged list, graph, or staged combination. Confirm the output
+format, per-user fields, role/window filter inheritance, whether graphing is survey-only or
+combined vote/survey, privacy boundaries for Discord identity and non-participation inference, file
+handling, SQL/data posture, tests, Codex Security review, deployment order, rollback posture, and
+operator communication before implementation.
 ```
 
 ## 13. Programme Change Log
@@ -1442,3 +1480,5 @@ communication before implementation.
 | 2026-07-07 | Phase 17 archived and Phase 18 prepared | Phase 17 task pack and starter were archived. Created the active Phase 18 Cross Survey Workbook Export Redesign audit/design task pack and chat starter. Cross-survey/workbook export redesign is promoted into Phase 18; retention/redaction changes and optional SQL-native combined reporting remain separate approval-gated slices unless Phase 18 audit explicitly justifies them. Role/governor voting, saved templates, per-rating comments, generated-card custom emoji fetching/animation, and public detail/voter-level posting remain not required unless later operator direction reverses that status. |
 | 2026-07-08 | Phase 18 cross-survey workbook export redesign audit closed | Operator confirmed existing private exports are well received and understood by leadership. Single-survey private workbook output and cross-survey private aggregate workbook/report output are not required now, and no documentation-only guidance is needed. The active cross-survey/workbook deferred item is closed as not required rather than kept in backlog. A separate higher-level leadership engagement summary/reporting need was identified as the next candidate audit. |
 | 2026-07-08 | Phase 19 leadership engagement summary reporting prepared | Created the active Phase 19 Leadership Engagement Summary Reporting audit/design task pack and chat starter. The slice is audit/scope only until product scope, identity/privacy model, SQL/data contract, command/dashboard/report ownership, tests, Codex Security review, rollout, rollback, and operator communication are approved. No runtime command, dashboard, export, SQL/DAL, or public reporting changes are approved by the preparation step. |
+| 2026-07-08 | Phase 19 leadership engagement dashboard delivered | Mirror PR #212 and production PR #519 delivered the private `/vote_admin dashboard` engagement mode with role-filtered eligibility, fixed rolling windows, compact top-level metrics, monthly snapshots, best/worst single poll, raw-answer exclusion, graceful dashboard timeout handling, review hardening, successful automated validation, and successful operator smoke/regression testing. |
+| 2026-07-08 | Phase 20 per-user engagement export/list/graph prepared | Archived Phase 19 task pack and starter. Created the active Phase 20 audit/design task pack and chat starter for the richer private per-user breakdown, including export/list/graph shape, role/window filter inheritance, Discord identity privacy, file handling, tests, security review, rollout, rollback, and operator communication scope. |

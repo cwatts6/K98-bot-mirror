@@ -2,7 +2,7 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
-Discord Voting Post Framework Phase 1 through Phase 18 execution records are archived here. The
+Discord Voting Post Framework Phase 1 through Phase 19 execution records are archived here. The
 programme delivered SQL-backed vote posts, button voting, one-vote-per-Discord-user enforcement,
 vote changes, live Pillow result cards, scheduler reminders, automatic close, manual close,
 persistent views, mention safety, guided admin UX, private totals-only export, private
@@ -24,9 +24,12 @@ survey builder review/edit/delete/reorder controls and `/vote_admin survey_updat
 open-survey metadata updates with response-sensitive and closed-survey locks, plus Phase 17
 `/vote_admin` command-surface audit closure with no runtime command change, plus Phase 18
 cross-survey/workbook export redesign audit closure with no runtime export or documentation
-guidance change because the current private exports are sufficient and understood. Operator smoke
-testing is complete through 2026-07-07.
-The active programme pack and Phase 19 leadership engagement summary reporting audit/design pack
+guidance change because the current private exports are sufficient and understood, plus Phase 19
+private leadership engagement dashboard delivery with compact top-level engagement metrics,
+role-filtered eligibility, fixed rolling windows, best/worst single poll, one-Discord-user
+counting regardless of governor IDs, raw-answer exclusion, and graceful dashboard timeout handling.
+Operator smoke/regression testing is complete through 2026-07-08.
+The active programme pack and Phase 20 per-user engagement export/list/graph audit/design pack
 remain in `../`.
 
 Player Self-Service Command Centre completed Phase 1 audit/design, Phase 2 `/me` shell

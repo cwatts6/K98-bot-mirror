@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Completed Item
+- Area: `voting/reporting_service.py`, `voting/reporting_dal.py`, `/vote_admin dashboard`, private leadership engagement reporting
+- Type: architecture
+- Description: Phase 19 audited and then delivered a higher-level private leadership engagement summary over vote/survey activity by time window. The scope covered published vote/survey counts, possible participation opportunities, actual participation counts, aggregate engagement rates, monthly snapshots, best/worst single poll, Discord role-filtered eligibility, and one-Discord-user counting regardless of governor IDs.
+- Resolution: Mirror PR #212 and production PR #519 delivered the private `/vote_admin dashboard` engagement mode with compact top-level embed output: `Total Polls`, `Total Users`, `Participation levels`, `Monthly Snapshots`, best single poll, and worst single poll. Role filtering supports expected roles, all non-bot members, and individual Discord roles such as `Kingdom Leadership`; members with no expected role can be excluded from expected-participation reporting. Raw text/detail answers, per-answer response detail, public reporting, existing export schema changes, workbook outputs, retention/redaction changes, governor-linked reporting, and SQL-native combined reporting objects were not added. The richer per-user breakdown was intentionally split into the active Phase 20 export/list/graph audit/design item.
+- Validation: Automated validation included architecture/deferred/select-tests validators, smoke imports, command registration validation, focused vote-admin dashboard/reporting tests (`28 passed`), UI import coverage, full pytest (`2391 passed, 2 skipped`), production promotion checks, SQL source validation for `VotePosts.Title` and `SurveyPosts.Title`, git diff checks, pytest log-noise validation, review-thread fixes, and a Codex Security diff scan with zero findings. Operator smoke/regression testing on 2026-07-08 confirmed the compact engagement embed, best/worst poll output, role filtering for expected roles and `Kingdom Leadership`, raw-answer exclusion, and successful regression behavior.
+
 ### Discord Voting Post Framework Phase 18 Cross Survey Workbook Export Redesign Audit Completed Item
 - Area: `voting/export_service.py`, `voting/survey_export_service.py`, report bundle services, future workbook outputs
 - Type: architecture
