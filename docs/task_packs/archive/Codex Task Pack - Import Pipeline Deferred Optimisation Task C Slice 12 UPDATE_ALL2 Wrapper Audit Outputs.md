@@ -7,7 +7,7 @@
 - Owner/context: `Chris Watts / K98 bot import architecture`
 - Task type: `deferred optimisation batch | SQL instrumentation | import audit observability`
 - One-pass approved: `no`
-- Status: `active next-slice task pack, starts with audit/scope and SQL implementation-boundary confirmation`
+- Status: `completed and archived after mirror PR #215, production PR #522, SQL PR #41, and production smoke validation`
 
 ## 2. Required Reading
 
@@ -280,3 +280,37 @@ Smoke after deployment:
 - [ ] No historical production audit rows are backfilled.
 - [ ] Focused tests and SQL validation pass or any skips are justified.
 - [ ] Remaining SQL/Python cleanup items remain documented.
+
+## 15. Completion Notes
+
+Task C Slice 12 delivered the approved non-invasive `dbo.UPDATE_ALL2` audit-output boundary.
+
+Delivered changes:
+
+- SQL PR #41 added in-procedure phase audit output rows to `dbo.UPDATE_ALL2` while preserving
+  existing output tables, `SP_TaskStatus` writes, and the final 8-column summary result set.
+- Mirror PR #215 and production PR #522 parsed optional UPDATE_ALL2 phase result sets in
+  `update_all2_log_manager.py` and projected them through existing best-effort generic
+  `ImportAuditPhase` writers in `stats_module.py`.
+- Review follow-ups removed BOMs, accumulated multiple phase-shaped result sets, normalized
+  skipped phase timestamps/current phase context, cast SQL phase names before offload metadata
+  serialization, and removed the internal `_update_all2_phase_results` payload from terminal
+  coarse phase/batch details.
+
+Production smoke on 2026-07-09 confirmed:
+
+- Full fallback import behavior and timing remained normal.
+- Batch `67` recorded the existing `fallback_update_all2` coarse phase plus 13 durable
+  `update_all2_*` subphase rows.
+- Subphase rows included structured `DetailsJson`, sane timestamps, and useful `RowsOut`
+  evidence for rebuild/output phases.
+- `update_all2_summary_proc` dominated the first observed sample at about 78 seconds.
+- After bot restart onto the review-fix commit, the internal `_update_all2_phase_results` key no
+  longer leaked into coarse phase details.
+
+Follow-up:
+
+- Task C Slice 13 should not decompose `dbo.UPDATE_ALL2` immediately. It should first collect and
+  analyze a small production baseline, quantify missing/coarse timing gaps, and scope whether
+  `dbo.SUMMARY_PROC` or another downstream boundary deserves a later SQL performance or
+  decomposition slice.

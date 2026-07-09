@@ -33,22 +33,22 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Task B raw staging path deployed; Task C Slice 2 generic batch audit and SQL validation available; production smoke baseline for full and partial fallback imports.
 
 ### Deferred Optimisation
-- Area: SQL repo `dbo.UPDATE_ALL2` and downstream stats/dashboard rebuild procedures
+- Area: SQL repo `dbo.UPDATE_ALL2`, SQL repo `dbo.SUMMARY_PROC`, and downstream stats/dashboard rebuild procedures
 - Type: performance
-- Description: `dbo.UPDATE_ALL2` may eventually need decomposition, but there is not yet durable evidence showing which phase fails most often or dominates runtime. Decomposing it before instrumentation risks optimizing or changing the wrong boundary.
-- Suggested Fix: Use audit data from the `UPDATE_ALL2` wrapper/audit-output slice to identify phase boundaries and runtime/failure hotspots. Only then prepare a SQL-specific decomposition task pack that splits the procedure into phase procedures with compatibility wrappers, migration order, rollback scripts, and before/after runtime validation.
+- Description: Task C Slice 12 delivered durable `update_all2_*` phase audit evidence for fallback imports. The first production smoke sample showed `update_all2_summary_proc` dominating visible subphase runtime at about 78 seconds, with additional coarse-to-subphase time still outside the emitted phase rows. There are not yet enough production samples to justify decomposing `dbo.UPDATE_ALL2` or `dbo.SUMMARY_PROC`.
+- Suggested Fix: Run Task C Slice 13 to collect and analyze a short production baseline of recent fallback `ImportAuditBatch`/`ImportAuditPhase` rows. Quantify per-phase duration, failures/skips, coarse `fallback_update_all2` duration, missing timing gaps, and whether `dbo.SUMMARY_PROC` consistently dominates. Only after that evidence review should a SQL-specific `SUMMARY_PROC` or `UPDATE_ALL2` performance/decomposition task pack be prepared.
 - Impact: high
 - Risk: high
-- Dependencies: `UPDATE_ALL2` wrapper/audit outputs deployed long enough to gather baseline evidence; SQL owner approval for phase procedure design and migration plan.
+- Dependencies: Task C Slice 12 UPDATE_ALL2 wrapper/audit outputs deployed and smoke tested; several post-rollout fallback imports with `update_all2_*` phase rows; SQL owner approval before phase procedure design, tuning, or migration work.
 
 ### Deferred Optimisation
 - Area: `stats_module.py`, import service modules, import DAL modules
 - Type: refactor
-- Description: Task C Slice 1 extracted fallback import file orchestration and DAL helpers, but `stats_module.py` still remains the compatibility entry point for the current worker/route/command flow and still owns mixed step sequencing around Excel processing, secondary archive, SQL execution, and result aggregation.
-- Suggested Fix: After durable audit and SQL instrumentation are stable, continue extracting residual import orchestration from `stats_module.py` into import-specific services while keeping the module as a thin compatibility shim until route or command callers are explicitly migrated. Preserve all current caller behavior and tests during each slice.
+- Description: Task C Slice 1 extracted fallback import file orchestration and DAL helpers, and Task C Slice 12 added UPDATE_ALL2 audit-output projection, but `stats_module.py` still remains the compatibility entry point for the current worker/route/command flow and still owns mixed step sequencing around Excel processing, secondary archive, SQL execution, audit phase projection, and result aggregation.
+- Suggested Fix: After Slice 13 completes the UPDATE_ALL2 evidence review and confirms the SQL instrumentation boundary is stable, continue extracting residual import orchestration from `stats_module.py` into import-specific services while keeping the module as a thin compatibility shim until route or command callers are explicitly migrated. Preserve all current caller behavior and tests during each slice.
 - Impact: medium
 - Risk: medium
-- Dependencies: Task C Slice 1 wrappers complete; durable audit foundation and route/worker adoption sequence agreed.
+- Dependencies: Task C Slice 1 wrappers complete; durable audit foundation complete; Task C Slice 12 UPDATE_ALL2 audit-output projection deployed; Task C Slice 13 evidence review should confirm no further tiny audit integration is needed before service extraction resumes.
 
 ### Deferred Optimisation
 - Area: `commands/stats_cmds.py`, `commands/telemetry_cmds.py`, `commands/prekvk_cmds.py`, `scripts/validate_command_registration.py`, `docs/reference/canonical_command_reference.md`
