@@ -284,6 +284,56 @@ async def test_run_stats_copy_archive_uses_stdout_failure_message(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_run_stats_copy_archive_records_update_all2_subphase_audit(monkeypatch):
+    audit_calls = []
+
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "start_batch_best_effort",
+        lambda **kwargs: 123,
+    )
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "record_phase_best_effort",
+        lambda batch_ref, **kwargs: audit_calls.append(("phase", kwargs)),
+    )
+    monkeypatch.setattr(
+        stats_module.import_audit_service,
+        "complete_batch_best_effort",
+        lambda batch_ref, **kwargs: audit_calls.append(("complete", kwargs)),
+    )
+
+    async def fake_run_sql_procedure(
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+    ):
+        import_metadata["_update_all2_phase_results"] = [
+            {
+                "phase_name": "update_all2_create_averages",
+                "phase_status": "completed",
+                "duration_ms": 42,
+                "details_json": '{"procedure": "CREATE_THE_AVERAGES"}',
+            }
+        ]
+        await asyncio.sleep(0)
+        return True, "[SUCCESS] fake sql", None
+
+    monkeypatch.setattr(stats_module, "run_sql_procedure", fake_run_sql_procedure)
+
+    success, _combined_log, _steps = await stats_module.run_stats_copy_archive()
+
+    assert success is True
+    phase_calls = [call[1] for call in audit_calls if call[0] == "phase"]
+    phase_names = [call["phase_name"] for call in phase_calls]
+    assert "fallback_update_all2" in phase_names
+    assert "update_all2_create_averages" in phase_names
+    subphase = next(
+        call for call in phase_calls if call["phase_name"] == "update_all2_create_averages"
+    )
+    assert subphase["duration_ms"] == 42
+    assert subphase["details"]["sql_details"] == {"procedure": "CREATE_THE_AVERAGES"}
+
+
+@pytest.mark.asyncio
 async def test_run_stats_copy_archive_marks_audit_cancelled(monkeypatch):
     audit_calls = []
 

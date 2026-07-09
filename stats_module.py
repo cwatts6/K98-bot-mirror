@@ -20,6 +20,7 @@ Apply this file in place of the existing stats_module.py.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -150,6 +151,20 @@ def _step_display_message(success: bool, stdout: str, stderr: str) -> str:
     return stdout if success else (stderr or stdout)
 
 
+def _details_from_update_all2_phase(row: dict) -> dict:
+    details = {
+        "source": "dbo.UPDATE_ALL2",
+        "sql_phase": row.get("phase_name"),
+    }
+    raw_details = row.get("details_json")
+    if raw_details:
+        try:
+            details["sql_details"] = json.loads(raw_details)
+        except Exception:
+            details["sql_details"] = raw_details
+    return details
+
+
 # === Excel Processing ===
 def process_excel_file(source_filepath):
     return process_fallback_source_file(
@@ -267,6 +282,11 @@ async def run_sql_procedure(
                 if not result["success"]:
                     raise RuntimeError(f"UPDATE_ALL2 failed: {result.get('error', 'unknown')}")
 
+                if isinstance(import_metadata, dict):
+                    import_metadata["_update_all2_phase_results"] = (
+                        result.get("phase_results") or []
+                    )
+
                 # Log telemetry
                 trigger_results = result.get("trigger_results") or {}
                 logger.info(
@@ -286,6 +306,7 @@ async def run_sql_procedure(
                         "log_after": result.get("log_after"),
                         "backups_triggered": trigger_results.get("backups_triggered", 0),
                         "triggers_processed": trigger_results.get("triggers_processed", 0),
+                        "internal_phase_count": len(result.get("phase_results") or []),
                     }
                 )
 
@@ -472,6 +493,37 @@ async def run_stats_copy_archive(
             meta={"import_kind": FALLBACK_AUDIT_IMPORT_KIND, "phase": phase_name},
         )
 
+    async def _record_update_all2_subphases() -> None:
+        if not audit_ref:
+            return
+        phase_rows = current_import_metadata.get("_update_all2_phase_results") or []
+        if not isinstance(phase_rows, list):
+            return
+
+        for row in phase_rows:
+            if not isinstance(row, dict):
+                continue
+            phase_name = row.get("phase_name")
+            if not phase_name:
+                continue
+            await _offload_callable_py(
+                lambda row=row, phase_name=phase_name: import_audit_service.record_phase_best_effort(
+                    audit_ref,
+                    phase_name=str(phase_name),
+                    phase_status=str(row.get("phase_status") or "completed"),
+                    started_at_utc=row.get("started_at_utc"),
+                    completed_at_utc=row.get("completed_at_utc"),
+                    rows_in=row.get("rows_in"),
+                    rows_out=row.get("rows_out"),
+                    duration_ms=row.get("duration_ms"),
+                    error_type=row.get("error_type"),
+                    error_text=row.get("error_text"),
+                    details=_details_from_update_all2_phase(row),
+                ),
+                name="import_audit_update_all2_phase",
+                meta={"import_kind": FALLBACK_AUDIT_IMPORT_KIND, "phase": phase_name},
+            )
+
     if source_filename:
         source_filename_for_import = source_filename
 
@@ -597,6 +649,8 @@ async def run_stats_copy_archive(
                 completed_at_utc=step_completed_at_utc,
                 duration_ms=duration_ms,
             )
+            if key == "sql":
+                await _record_update_all2_subphases()
 
             status_icon = "✅" if success else "❌"
             message = _step_display_message(success, stdout, stderr)

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Update ALL2 Log Management Module
 ==================================
 Thin wrapper that integrates existing log_health and log_backup modules
@@ -68,6 +68,68 @@ def _safe_emit_telemetry(payload: dict) -> None:
             emit_telemetry_event(payload)
     except Exception:
         logger.debug("Telemetry emission failed (non-fatal)", exc_info=True)
+
+
+def _cursor_column_names(cursor) -> list[str]:
+    try:
+        return [str(col[0]) for col in (cursor.description or [])]
+    except Exception:
+        return []
+
+
+def _row_dict(columns: list[str], row) -> dict[str, Any]:
+    values: dict[str, Any] = {}
+    for index, column in enumerate(columns):
+        try:
+            values[column] = row[index]
+        except Exception:
+            values[column] = None
+    return values
+
+
+def _coerce_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _is_update_all2_phase_result(columns: list[str]) -> bool:
+    required = {
+        "PhaseName",
+        "PhaseStatus",
+        "StartedAtUtc",
+        "CompletedAtUtc",
+        "DurationMs",
+    }
+    return required.issubset(set(columns))
+
+
+def _parse_update_all2_phase_rows(columns: list[str], rows) -> list[dict[str, Any]]:
+    phases: list[dict[str, Any]] = []
+    for row in rows or []:
+        data = _row_dict(columns, row)
+        phase_name = data.get("PhaseName")
+        phase_status = data.get("PhaseStatus")
+        if not phase_name or not phase_status:
+            continue
+        phases.append(
+            {
+                "phase_name": str(phase_name),
+                "phase_status": str(phase_status),
+                "started_at_utc": data.get("StartedAtUtc"),
+                "completed_at_utc": data.get("CompletedAtUtc"),
+                "duration_ms": _coerce_int(data.get("DurationMs")),
+                "rows_in": _coerce_int(data.get("RowsIn")),
+                "rows_out": _coerce_int(data.get("RowsOut")),
+                "details_json": data.get("DetailsJson"),
+                "error_type": data.get("ErrorType"),
+                "error_text": data.get("ErrorText"),
+            }
+        )
+    return phases
 
 
 def get_log_space_usage(cursor) -> float | None:
@@ -415,6 +477,7 @@ def execute_update_all2_with_log_management(
         Dictionary containing:
             - success: bool
             - sp_result: Result from UPDATE_ALL2
+            - phase_results: Optional internal UPDATE_ALL2 phase timing rows
             - log_before: Log usage before execution
             - log_after: Log usage after execution
             - trigger_results: Results from trigger processing
@@ -426,6 +489,7 @@ def execute_update_all2_with_log_management(
     result = {
         "success": False,
         "sp_result": None,
+        "phase_results": [],
         "log_before": None,
         "log_after": None,
         "trigger_results": None,
@@ -460,11 +524,7 @@ def execute_update_all2_with_log_management(
         else:
             cursor.execute("EXEC dbo.UPDATE_ALL2")
 
-        # Consume ALL result sets (UPDATE_ALL2 returns 4 result sets)
-        # 1. xp_cmdshell output ("1 file(s) moved.")
-        # 2. Index maintenance log (table variable)
-        # 3. Phase A summary (5 columns)
-        # 4. Phase B final (8 columns) ← This is what we want
+        # Consume all result sets. The final 8-column summary must stay last.
         try:
             all_results = []
             result_count = 0
@@ -472,10 +532,13 @@ def execute_update_all2_with_log_management(
             # Loop through all result sets
             while True:
                 try:
+                    columns = _cursor_column_names(cursor)
                     rows = cursor.fetchall()
                     result_count += 1
                     if rows:
-                        all_results.append(rows)
+                        all_results.append({"columns": columns, "rows": rows})
+                        if _is_update_all2_phase_result(columns):
+                            result["phase_results"] = _parse_update_all2_phase_rows(columns, rows)
                         logger.debug(
                             f"Result set #{result_count}: {len(rows)} row(s), "
                             f"{len(rows[0]) if rows else 0} column(s)"
@@ -494,9 +557,8 @@ def execute_update_all2_with_log_management(
                 f"UPDATE_ALL2 returned {result_count} result set(s), {len(all_results)} non-empty"
             )
 
-            # The LAST result set should be Phase B final (8 columns)
             if all_results:
-                final_result_set = all_results[-1]
+                final_result_set = all_results[-1]["rows"]
                 if final_result_set and len(final_result_set) > 0:
                     sp_result_row = final_result_set[-1]  # Last row of final result set
 
@@ -535,6 +597,12 @@ def execute_update_all2_with_log_management(
                     logger.warning("Final result set is empty")
             else:
                 logger.warning("UPDATE_ALL2 returned no non-empty result sets")
+
+            if result["phase_results"]:
+                logger.info(
+                    "UPDATE_ALL2 emitted %d internal phase audit row(s)",
+                    len(result["phase_results"]),
+                )
 
         except Exception as e:
             logger.exception("Error parsing UPDATE_ALL2 results")

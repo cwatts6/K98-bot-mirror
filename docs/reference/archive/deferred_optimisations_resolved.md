@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Task C Slice 12 Completed Item
+- Area: SQL repo `dbo.UPDATE_ALL2`, `update_all2_log_manager.py`, `stats_module.py`
+- Type: architecture
+- Description: `dbo.UPDATE_ALL2` remained a broad downstream rebuild procedure observed only through `SP_TaskStatus` counter/status polling and one coarse `fallback_update_all2` generic audit phase.
+- Resolution: Task C Slice 12 added non-invasive SQL phase-output rows from existing `UPDATE_ALL2` downstream timing boundaries, preserved the final 8-column summary result set and `SP_TaskStatus` polling behavior, parsed those rows in `update_all2_log_manager.py`, and projected them through existing best-effort generic `ImportAuditPhase` writers while keeping the original `fallback_update_all2` phase.
+- Validation: Focused UPDATE_ALL2 wrapper/import-audit tests, architecture and deferred validators, SQL repo validation, import smoke, command registration, full pytest, pytest log-noise validation, and diff whitespace checks passed. The later `UPDATE_ALL2` decomposition item remains active until enough production phase-output evidence exists.
+
 ### Discord Voting Post Framework Phase 22 SQL Rollout Completed Item
 - Area: `C:\K98-bot-SQL-Server` Phase 22 vote/survey admin delete rollout
 - Type: architecture

@@ -24,15 +24,6 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: SQL repo validation in `C:\K98-bot-SQL-Server`; operator approval before changing reporting view semantics or retiring the view.
 
 ### Deferred Optimisation
-- Area: SQL repo `dbo.UPDATE_ALL2`, `update_all2_log_manager.py`, `stats/dal/fallback_import_dal.py`, `stats_module.py`
-- Type: architecture
-- Description: `dbo.UPDATE_ALL2` remains a broad downstream rebuild procedure, and Python currently observes completion through `SP_TaskStatus` counter/status polling. There is not yet a durable per-phase audit output that explains which downstream phase failed or dominated runtime.
-- Suggested Fix: After Task C Slice 2's generic batch audit foundation is deployed, add a wrapper or non-invasive audit output around `dbo.UPDATE_ALL2` that records start/end, status, duration, and phase-level markers without changing output tables or player-visible behavior. Use the resulting baseline before deciding whether to split the procedure.
-- Impact: high
-- Risk: medium
-- Dependencies: Task C Slice 2 generic import batch audit foundation; Task C Slice 11 timestamp normalization delivered and smoke tested; SQL validation in `C:\K98-bot-SQL-Server`; no wholesale `UPDATE_ALL2` replacement in this slice. Promoted into the prepared Task C Slice 12 task pack for audit/scope and SQL implementation-boundary confirmation.
-
-### Deferred Optimisation
 - Area: SQL repo `dbo.IMPORT_STAGING_PROC`, raw fallback staging, `dbo.IMPORT_STAGING_CSV`, `dbo.IMPORT_STAGING`
 - Type: refactor
 - Description: `dbo.IMPORT_STAGING_PROC` owns multiple responsibilities around fallback staging, raw text conversion, typed conversion, metadata-sensitive partial fallback behavior, and final staging/output handoff. Task B intentionally preserved procedure shape to reduce risk while fixing Unicode preservation.
