@@ -33,6 +33,8 @@ class _FakeCursor:
 def test_execute_update_all2_parses_internal_phase_result_set(monkeypatch):
     phase_started = datetime(2026, 7, 9, 12, 0, 0)
     phase_completed = datetime(2026, 7, 9, 12, 0, 1)
+    second_phase_started = datetime(2026, 7, 9, 12, 0, 2)
+    second_phase_completed = datetime(2026, 7, 9, 12, 0, 3)
     cursor = _FakeCursor(
         [
             (
@@ -43,6 +45,18 @@ def test_execute_update_all2_parses_internal_phase_result_set(monkeypatch):
                         "completed",
                         phase_started,
                         phase_completed,
+                        1000,
+                    )
+                ],
+            ),
+            (
+                ["PhaseName", "PhaseStatus", "StartedAtUtc", "CompletedAtUtc", "DurationMs"],
+                [
+                    (
+                        "update_all2_rebuild_excel_dashboard",
+                        "completed",
+                        second_phase_started,
+                        second_phase_completed,
                         1000,
                     )
                 ],
@@ -85,6 +99,18 @@ def test_execute_update_all2_parses_internal_phase_result_set(monkeypatch):
             "phase_status": "completed",
             "started_at_utc": phase_started,
             "completed_at_utc": phase_completed,
+            "duration_ms": 1000,
+            "rows_in": None,
+            "rows_out": None,
+            "details_json": None,
+            "error_type": None,
+            "error_text": None,
+        },
+        {
+            "phase_name": "update_all2_rebuild_excel_dashboard",
+            "phase_status": "completed",
+            "started_at_utc": second_phase_started,
+            "completed_at_utc": second_phase_completed,
             "duration_ms": 1000,
             "rows_in": None,
             "rows_out": None,

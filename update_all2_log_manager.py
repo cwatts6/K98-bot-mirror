@@ -1,4 +1,4 @@
-﻿"""
+"""
 Update ALL2 Log Management Module
 ==================================
 Thin wrapper that integrates existing log_health and log_backup modules
@@ -538,7 +538,9 @@ def execute_update_all2_with_log_management(
                     if rows:
                         all_results.append({"columns": columns, "rows": rows})
                         if _is_update_all2_phase_result(columns):
-                            result["phase_results"] = _parse_update_all2_phase_rows(columns, rows)
+                            result["phase_results"].extend(
+                                _parse_update_all2_phase_rows(columns, rows)
+                            )
                         logger.debug(
                             f"Result set #{result_count}: {len(rows)} row(s), "
                             f"{len(rows[0]) if rows else 0} column(s)"
