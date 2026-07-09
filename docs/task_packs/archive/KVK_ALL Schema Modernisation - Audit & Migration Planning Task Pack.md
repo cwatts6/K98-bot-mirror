@@ -1,4 +1,8 @@
 KVK_ALL Schema Modernisation — Audit & Migration Planning Task Pack
+
+Status: archived completed audit pack. The KVK_ALL Schema Modernisation programme is complete
+through Phase 11 and this audit/planning pack is retained as historical planning context only.
+
 Objective
 
 Perform a full end-to-end audit and migration assessment of the KVK_ALL ingestion, recompute, export, reporting, and downstream analytics pipeline following the introduction of the new KVK_ALL workbook schema.

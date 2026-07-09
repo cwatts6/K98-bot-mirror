@@ -1,4 +1,9 @@
 KVK_ALL Schema Modernisation — Full Optimisation Task Pack
+
+Status: archived completed programme. Phases 1 through 11 are complete, deployed or represented
+in the SQL source-of-truth, smoke tested, and closed. This file is retained as the final programme
+record and should not be used as an active task pack.
+
 Objective
 Modernise the full KVK_ALL pipeline around the new workbook schema.
 
@@ -40,6 +45,11 @@ Phase 8 is complete and deployed.
 Phase 9 is complete and deployed.
 
 Phase 10 is complete and smoke-tested.
+
+Phase 11 is complete and smoke-tested.
+
+The KVK_ALL Schema Modernisation programme is closed. Future KVK_ALL work should start from a
+fresh task pack rather than continuing this programme as Phase 12.
 
 Completed Phase 1 scope:
 
@@ -123,9 +133,10 @@ the KVK_ALL upload routing follow-up was captured structurally in docs/deferred_
 
 Phase 8 did not introduce Basic Data ingestion, summary tab ingestion, Discord reporting display changes, Google Sheets export contract changes, KVK export result-set changes, admin command redesign, automatic cleanup execution, or Phase 9 performance/restart hardening.
 
-Next phase:
+Programme closure:
 
-Phase 11 — Acclaim Output Contract Polish
+Phase 11 Acclaim Output Contract Polish completed the final open KVK_ALL output-contract items.
+No further KVK_ALL Schema Modernisation phase is planned.
 
 Completion Rule
 This work is not complete until all items previously identified as deferred optimisations are implemented or explicitly resolved inside this programme.
@@ -655,7 +666,7 @@ Tests cover recompute formulas using representative fixture data.
 Completion Notes
 Implemented:
 
-docs/task_packs/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md
 sql/kvk_all_phase4_recompute_modernisation.sql
 tests/test_kvk_all_recompute_sql_contract.py
 
@@ -1180,7 +1191,7 @@ C:\K98-bot-SQL-Server\sql_schema\KVK.sp_KVK_Recompute_Windows.StoredProcedure.sq
 sql/kvk_all_phase10_recompute_correctness.sql
 scripts/diagnose_kvk_all_phase10.py
 tests/test_kvk_all_recompute_sql_contract.py
-docs/task_packs/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md
+docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md
 docs/task_packs/archive/KVK_ALL Schema Modernisation - Phase 10 Initiation Statement.md
 
 SQL delivery:
@@ -1269,3 +1280,74 @@ KVK.sp_KVK_Get_Exports remains at 10 result sets unless an explicit contract cha
 Existing Discord reporting display remains unchanged.
 No Basic Data or summary tab ingestion is introduced.
 Focused tests cover the output removal/aliasing contract and tab/result-set stability.
+
+Completion Notes
+
+Implemented:
+
+sql/kvk_all_phase11_acclaim_output_contract.sql
+KVK.sp_KVK_Get_Exports.StoredProcedure.sql in the SQL source-of-truth
+KVK.vw_FightingDataset.View.sql in the SQL source-of-truth
+kvk/services/kvk_export_service.py
+gsheet_module.py
+kvk/dal/kvk_reporting_dal.py
+kvk/services/kvk_reporting_service.py
+tests/test_kvk_all_recompute_sql_contract.py
+tests/test_kvk_export_service.py
+tests/test_kvk_reporting_service.py
+tests/test_gsheet_module.py
+
+SQL/output delivery:
+
+KVK.sp_KVK_Get_Exports still returns the established 10 result sets in the same order.
+Player, kingdom, and camp export result sets no longer surface max_contribute_gain.
+cur_contribute_gain is surfaced as acclaim_gain in player, kingdom, camp, full, windowed, Google
+Sheets, comparison, and structured reporting output contracts where applicable.
+KVK.vw_FightingDataset now uses an explicit player-facing projection and exposes acclaim_gain
+without exposing max_contribute_gain.
+max_contribute_gain remains stored internally in the SQL windowed tables for diagnostics and
+future analysis.
+Existing Google Sheets spreadsheet names and tab names were preserved.
+Existing Discord reporting display was preserved; Acclaim was not added to Discord embeds.
+
+Smoke evidence:
+
+KVK.vw_FightingDataset was updated and returned the expected player-facing acclaim_gain column.
+Observed smoke row:
+
+KVK_NO=15, WindowName=Pass 9, governor_id=44452, name=执政官44452, kingdom=1058, campid=4,
+kp_gain=0, kp_gain_recalc=0, kills_gain=0, t4_kills=0, t5_kills=0, kp_loss=0,
+healed_troops=0, deads=0, starting_power=6331190, dkp=0, last_scan_id=63,
+computed_at_utc=2026-06-30 16:12:54, acclaim_gain=0.
+
+Google Sheets export showed the expected acclaim_gain output column and no Highest Acclaim gain
+output in the player-facing export shape. Observed smoke row:
+
+KVK_NO=15, WindowName=3rd Altar, camp_name=Earth, kp_gain=1161500598,
+kills_gain=63365241, t4_kills=10732871, t5_kills=52632370, kp_loss=520370720,
+healed_troops=26018536, deads=235140, acclaim_gain=14518423, dkp=1169381710,
+last_scan_id=49, computed_at_utc=2026-06-30 16:12:57.
+
+KVK_ALL imports and export completed successfully after the Phase 11 output-contract changes.
+
+Validation completed:
+
+python -m pytest -q tests/test_kvk_all_recompute_sql_contract.py tests/test_kvk_export_service.py tests/test_kvk_reporting_service.py tests/test_gsheet_module.py
+
+No Basic Data ingestion, summary tab ingestion, import return-shape changes, recompute formula
+changes beyond already completed Phase 10 semantics, KVK export result-set count/order changes,
+Google Sheets spreadsheet or tab name changes, Discord embed contribution display changes,
+internal SQL storage removals, automatic cleanup execution, or unrelated admin/reporting redesigns
+were introduced in Phase 11.
+
+Deferred Optimisations
+
+None for the KVK_ALL Schema Modernisation programme. The two Phase 11 source deferred items were
+resolved by preserving internal max_contribute_gain storage, removing Highest Acclaim gain from
+player-facing outputs, and exposing current Acclaim as acclaim_gain.
+
+Archive Notes
+
+The full optimisation pack, audit and migration planning pack, Phase 4 metric source rules,
+Phase 10 metric source correction, and Phase 11 initiation statement are archived under
+docs/task_packs/archive/ as completed KVK_ALL programme records.

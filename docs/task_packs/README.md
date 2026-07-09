@@ -23,6 +23,23 @@ material.
 Player self-service workflow redesign and public calendar/KVK calendar UX redesign remain separate
 deferred optimisation programmes, not additional command-platform phases.
 
+KVK_ALL Schema Modernisation status:
+
+- The KVK_ALL Schema Modernisation programme is complete through Phase 11 and archived. Phase 11
+  Acclaim Output Contract Polish was smoke tested successfully: KVK.vw_FightingDataset exposes
+  acclaim_gain, Google Sheets exports expose acclaim_gain without Highest Acclaim gain, and KVK_ALL
+  imports plus export completed successfully.
+- KVK_ALL records are archived under `archive/`:
+  - `archive/KVK_ALL Schema Modernisation - Full Optimisation Task Pack.md`
+  - `archive/KVK_ALL Schema Modernisation - Audit & Migration Planning Task Pack.md`
+  - `archive/KVK_ALL Schema Modernisation - Phase 4 Metric Source Rules.md`
+  - `archive/KVK_ALL Schema Modernisation - Phase 10 Metric Source Correction.md`
+  - `archive/KVK_ALL Schema Modernisation - Phase 11 Initiation Statement.md`
+- The Phase 4 metric source rules and Phase 10 metric source correction docs also remain mirrored
+  at their active `docs/task_packs/` paths because SQL contract tests assert those references.
+- Future KVK_ALL work should start from a fresh task pack rather than continuing the schema
+  modernisation programme as Phase 12.
+
 Import pipeline status:
 
 - Task A Import Process Schema Resilience and Shield Time Support is delivered in mirror PR #179,

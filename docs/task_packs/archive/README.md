@@ -47,8 +47,18 @@ here. The active programme pack and next-phase task pack remain in `docs/task_pa
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,
 PreKvK schema standardisation, completed KVK Player Experience Redesign execution phases,
-completed KVK_ALL phase initiation statements, and the DL_bot upload-routing and startup/lifecycle
-programmes.
+completed KVK_ALL phase initiation statements, the completed KVK_ALL Schema Modernisation
+programme pack and supporting metric/source references, and the DL_bot upload-routing and
+startup/lifecycle programmes.
+
+KVK_ALL Schema Modernisation is complete through Phase 11. Phase 11 Acclaim Output Contract Polish
+closed the final output-contract items by keeping max_contribute_gain internal, exposing
+cur_contribute_gain as acclaim_gain in player-facing outputs, preserving the 10-result-set export
+contract, preserving Google Sheets spreadsheet and tab names, and leaving Discord embeds unchanged.
+Operator smoke evidence confirmed KVK.vw_FightingDataset now exposes acclaim_gain, Google Sheets
+exports show acclaim_gain without Highest Acclaim gain, and KVK_ALL imports plus export completed
+successfully. Future KVK_ALL work should start from a fresh task pack rather than continuing the
+schema modernisation programme as Phase 12.
 
 Import pipeline archives include Task A Import Process Schema Resilience and Shield Time Support,
 which delivered fallback `Credit` / `Conduct Score` compatibility, interim auto partial fallback
