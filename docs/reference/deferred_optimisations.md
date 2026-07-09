@@ -6,33 +6,6 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `C:\K98-bot-SQL-Server` Phase 22 vote/survey admin delete rollout
-- Type: architecture
-- Description: Phase 22 implementation is PR-ready, but production SQL deployment and smoke verification for `dbo.VoteSurveyDeletionAudit` and `dbo.usp_VoteSurveyAdminDelete` are not complete yet. Until the SQL PR is merged, deployed, and smoke checked, operators should not treat the SQL-admin cleanup path as available in production.
-- Suggested Fix: After SQL PR `cwatts6/K98-bot-SQL-Server#39` is merged, run the SQL promotion gate, confirm backup readiness, deploy migration `20260709_001_add_vote_survey_admin_delete`, execute dry-run/readback only against an operator-selected closed test vote or survey, verify row counts and deletion-audit readback, then separately approve any confirmed hard delete.
-- Impact: medium
-- Risk: high
-- Dependencies: SQL PR merge; SQL promotion approval; backup readiness; production SQL deployment window; operator-selected closed test/training vote or survey for dry-run smoke.
-
-### Deferred Optimisation
-- Area: `voting/reporting_dal.py`, `voting/reporting_service.py`, SQL repo survey/vote reporting views and procedures
-- Type: architecture
-- Description: Optional SQL-native combined vote/survey reporting views or procedures may eventually help direct SQL consumers, performance, or operational reporting, but Phase 11 and Phase 13 intentionally kept the dashboard contract bot-side and Phase 14 through Phase 16 only updated compatibility metadata and bot-side presentation/update paths. No direct reporting consumer or performance blocker currently justifies a combined SQL-native reporting layer.
-- Suggested Fix: Keep SQL-native combined reporting as an optional later audit. Start only if reporting consumers, performance evidence, or production support needs justify it. Validate exact SQL objects in `C:\K98-bot-SQL-Server`, define additive views/procedures, preserve private/dashboard-safe boundaries, and prove output equivalence with bot-side reporting before adopting it.
-- Impact: medium
-- Risk: medium
-- Dependencies: Reporting consumer requirements or performance evidence; SQL owner approval; SQL repo migration/review; existing dashboard/export regression tests.
-
-### Deferred Optimisation
-- Area: `voting/`, voting policy and identity future scope
-- Type: architecture
-- Description: Role-restricted voting, governor-linked voting/reporting, saved vote/survey templates, per-rating comments, and public voter-level/detail export posting are definitely not required for the voting framework roadmap unless a later operator decision reverses that status.
-- Suggested Fix: Do not implement these items by default. If operator direction changes, create a fresh audit/design task pack that validates product value, privacy/permissions, SQL storage, reporting/export impact, migration order, rollback, and Codex Security requirements before implementation.
-- Impact: medium
-- Risk: high
-- Dependencies: Explicit operator reversal; SQL repo validation for identity/template/comment storage; Codex Security review before runtime PR handoff.
-
-### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks
 - Type: architecture
 - Description: Inventory import lifecycle coordination remains intentionally view-heavy. `ui/views/inventory_views.py` routes upload-first messages, command-session continuations, multi-governor selection, review interactions, correction modals, additional-material continuation, approval, rejection, cancellation, timeout, admin-debug posting, and original-upload cleanup. Task C Slice 8 adopted generic audit without redesigning this workflow and smoke testing confirmed the behavior-preserving audit contract.

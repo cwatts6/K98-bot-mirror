@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `implementation complete; Phase 1 through Phase 22 delivered or audit-closed; production SQL rollout/smoke pending`
+- Current status: `complete; Phase 1 through Phase 22 delivered, smoke tested, or audit-closed`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -1284,9 +1284,7 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 22 vote/survey retention redaction policy and SQL-admin delete
 
-Status: implementation complete; SQL-only admin delete contract delivered with no bot runtime/UI
-changes. Production availability remains pending until the SQL PR is merged, deployed, and
-smoke-checked.
+Status: complete, SQL deployed, smoke tested, and no bot runtime/UI changes required.
 
 Phase 22 closed the final active voting deferred item. It inventoried vote/survey stored data,
 confirmed the retention/redaction posture, and delivered a strictly SQL-side admin function to
@@ -1302,6 +1300,9 @@ Delivered:
 - `dbo.usp_VoteSurveyAdminDelete`, a manual SQL-admin procedure with dry-run default, mandatory
   reason, mandatory operator identity, explicit confirmation, closed-item enforcement, row-count
   output, item-local audit summary capture, `XACT_ABORT ON`, and dependency-order hard deletes.
+- SQL PR #39 delivered the migration and schema objects; SQL PR #40 fixed the deployment syntax
+  issue with `RowCount` aliases. Both SQL changes were merged, pushed to production, and smoke
+  tested successfully on 2026-07-09.
 - Same retention/redaction posture for votes, surveys, text answers, and detail answers.
 - Public Discord message handling remains manual and outside SQL.
 - Rollback after confirmed hard delete is backup/pre-delete-script restore only.
@@ -1325,18 +1326,16 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Remaining voting follow-up inventory
 
-Core voting runtime and the final SQL-side data-lifecycle cleanup implementation are complete.
-Production SQL rollout and smoke verification remain tracked in
-`docs/reference/deferred_optimisations.md` until SQL PR `cwatts6/K98-bot-SQL-Server#39` is merged,
-deployed, and smoke-checked. Product development in this programme is closed; later voting
-development or enhancements should start a new programme pack.
+Core voting runtime and the final SQL-side data-lifecycle cleanup implementation are complete,
+merged, deployed, and smoke tested. No active Discord Voting Post Framework deferred optimisation
+remains. Product development in this programme is closed; later voting development or enhancements
+should start a new programme pack rather than reopening this one.
 
-- Optional SQL-native combined vote/survey reporting only if performance evidence, a direct SQL
-  consumer, or production support need appears.
-- Not required unless a later operator decision reverses status: role-restricted voting,
-  governor-linked voting/reporting, saved vote/survey templates, per-rating comments, public
-  voter-level/detail export posting, cross-survey workbook output, paged Discord per-user lists,
-  and public engagement dashboards/graphs.
+Previously deferred optional SQL-native combined reporting, role-restricted voting,
+governor-linked voting/reporting, saved vote/survey templates, per-rating comments, public
+voter-level/detail export posting, cross-survey workbook output, paged Discord per-user lists, and
+public engagement dashboards/graphs are closed as not required now. If operator direction changes
+later, start a new programme pack.
 
 ## 9. Cross-Programme Constraints
 
@@ -1503,9 +1502,9 @@ The core programme is successful when:
 No further product design or implementation action remains for the Discord Voting Post Framework
 programme.
 
-Phase 22 closed the final approved programme slice. Production availability of the SQL-admin
-cleanup path remains gated by SQL PR merge, deployment, dry-run/readback smoke, and operator
-approval for any confirmed delete. Later voting enhancements, policy expansions, or reporting
+Phase 22 closed the final approved programme slice. The SQL-admin cleanup path is deployed and
+smoke tested, with confirmed hard delete still requiring explicit operator approval under the
+approved manual SQL-admin-only process. Later voting enhancements, policy expansions, or reporting
 changes should start in a new programme pack with fresh scope, approval gates, validation, rollout,
 rollback, and operator communication.
 ```
@@ -1571,3 +1570,4 @@ rollback, and operator communication.
 | 2026-07-08 | Phase 21 private engagement graph assessment audit closed | Operator confirmed no graph is required now. Phase 20 CSV export provides the data, and leadership can create graphs from the CSV if a specific need appears. The graph deferred item was removed from the active backlog, and Phase 21 records were archived. |
 | 2026-07-08 | Phase 22 final retention/redaction audit prepared | Created the final active Phase 22 task pack and chat starter for vote/survey retention and redaction policy plus a cautious SQL-side-only admin delete function for test votes/surveys and results. No bot-side delete command, Discord UI, dashboard control, scheduled job, or SQL implementation is approved by preparation. |
 | 2026-07-09 | Phase 22 delivered and programme closed | Delivered SQL migration `20260709_001_add_vote_survey_admin_delete` with `dbo.VoteSurveyDeletionAudit` and SQL-admin-only `dbo.usp_VoteSurveyAdminDelete`. The procedure defaults to dry-run, requires closed items, confirmation, reason, and operator identity, summarizes local audit rows outside the deleted tree, hard-deletes dependent rows in transaction order, allows break-glass production deletion, and leaves Discord messages/manual communication outside SQL. No bot command, Discord UI, dashboard control, scheduled job, export schema, response semantic, or runtime code change was added. |
+| 2026-07-09 | Phase 22 SQL rollout smoke tested and programme fully closed | SQL PR #39 and follow-up SQL PR #40 were merged, pushed to production, and smoke tested successfully. The temporary active rollout deferred item was moved to resolved history. No Discord Voting Post Framework deferred optimisations remain active; future voting work must start in a new programme pack. |

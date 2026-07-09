@@ -3,6 +3,27 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### Discord Voting Post Framework Phase 22 SQL Rollout Completed Item
+- Area: `C:\K98-bot-SQL-Server` Phase 22 vote/survey admin delete rollout
+- Type: architecture
+- Description: Phase 22 implementation delivered `dbo.VoteSurveyDeletionAudit` and SQL-admin-only `dbo.usp_VoteSurveyAdminDelete`, but production SQL deployment and smoke verification initially remained tracked as an active gate after bot/docs PR review.
+- Resolution: SQL PR #39 was merged, follow-up SQL PR #40 fixed the `RowCount` alias deployment syntax issue, and the SQL changes were pushed to production. Operator SQL smoke testing completed successfully on 2026-07-09, including deployment/compile success and non-destructive readback/guard validation. The SQL-admin cleanup path is now available under the approved manual SQL-admin-only process, with confirmed hard delete still requiring explicit operator approval, backup posture, closed item selection, reason, operator identity, and confirmation.
+- Validation: `.\deploy\Validate-SqlRepo.ps1` passed for the follow-up fix, with only pre-existing older migration DROP/TRUNCATE warnings. Production deployment smoke succeeded after SQL PR #40.
+
+### Discord Voting Post Framework Optional SQL-Native Combined Reporting Closed Item
+- Area: `voting/reporting_dal.py`, `voting/reporting_service.py`, SQL repo survey/vote reporting views and procedures
+- Type: architecture
+- Description: Optional SQL-native combined vote/survey reporting views or procedures were kept as a possible future optimisation if direct SQL consumers, performance evidence, or production support needs appeared.
+- Resolution: The Discord Voting Post Framework closed after Phase 22 with no direct SQL reporting consumer and no performance blocker that justifies SQL-native combined vote/survey reporting. Existing bot-side dashboard/reporting/export contracts remain sufficient. This item is no longer active; any later SQL-native reporting work must start in a new programme pack with fresh consumer requirements, SQL validation, privacy boundaries, migration order, rollback, and tests.
+- Validation: No runtime change was required. The active deferred item was archived during final Phase 22 closeout after SQL rollout and smoke testing completed.
+
+### Discord Voting Post Framework Future Identity Template Comment Scope Closed Item
+- Area: `voting/`, voting policy and identity future scope
+- Type: architecture
+- Description: Role-restricted voting, governor-linked voting/reporting, saved vote/survey templates, per-rating comments, and public voter-level/detail export posting were explicitly not required unless a later operator decision reversed that status.
+- Resolution: The Discord Voting Post Framework closed after Phase 22 without approving or requiring these future-scope items. They are not active deferred work. If operator direction changes, the work must start in a new programme pack with fresh product value, privacy/permissions, SQL storage, reporting/export impact, migration order, rollback, and Codex Security review.
+- Validation: No runtime change was required. The active deferred item was archived during final Phase 22 closeout after SQL rollout and smoke testing completed.
+
 ### Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Completed Item
 - Area: `voting/reporting_service.py`, `voting/reporting_dal.py`, `/vote_admin dashboard`, private leadership engagement reporting
 - Type: architecture
