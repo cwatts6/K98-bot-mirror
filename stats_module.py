@@ -151,10 +151,14 @@ def _step_display_message(success: bool, stdout: str, stderr: str) -> str:
     return stdout if success else (stderr or stdout)
 
 
+def _json_safe_str(value) -> str | None:
+    return str(value) if value is not None else None
+
+
 def _details_from_update_all2_phase(row: dict) -> dict:
     details = {
         "source": "dbo.UPDATE_ALL2",
-        "sql_phase": row.get("phase_name"),
+        "sql_phase": _json_safe_str(row.get("phase_name")),
     }
     raw_details = row.get("details_json")
     if raw_details:
@@ -503,13 +507,13 @@ async def run_stats_copy_archive(
         for row in phase_rows:
             if not isinstance(row, dict):
                 continue
-            phase_name = row.get("phase_name")
+            phase_name = _json_safe_str(row.get("phase_name"))
             if not phase_name:
                 continue
             await _offload_callable_py(
                 lambda row=row, phase_name=phase_name: import_audit_service.record_phase_best_effort(
                     audit_ref,
-                    phase_name=str(phase_name),
+                    phase_name=phase_name,
                     phase_status=str(row.get("phase_status") or "completed"),
                     started_at_utc=row.get("started_at_utc"),
                     completed_at_utc=row.get("completed_at_utc"),
@@ -650,7 +654,10 @@ async def run_stats_copy_archive(
                 duration_ms=duration_ms,
             )
             if key == "sql":
-                await _record_update_all2_subphases()
+                try:
+                    await _record_update_all2_subphases()
+                finally:
+                    current_import_metadata.pop("_update_all2_phase_results", None)
 
             status_icon = "✅" if success else "❌"
             message = _step_display_message(success, stdout, stderr)

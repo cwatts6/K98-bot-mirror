@@ -286,6 +286,7 @@ async def test_run_stats_copy_archive_uses_stdout_failure_message(monkeypatch):
 @pytest.mark.asyncio
 async def test_run_stats_copy_archive_records_update_all2_subphase_audit(monkeypatch):
     audit_calls = []
+    offload_metas = []
 
     monkeypatch.setattr(
         stats_module.import_audit_service,
@@ -303,12 +304,18 @@ async def test_run_stats_copy_archive_records_update_all2_subphase_audit(monkeyp
         lambda batch_ref, **kwargs: audit_calls.append(("complete", kwargs)),
     )
 
+    async def direct_offload(fn, *args, name=None, meta=None):
+        offload_metas.append((name, meta))
+        return fn(*args)
+
+    monkeypatch.setattr(stats_module, "_offload_callable_py", direct_offload)
+
     async def fake_run_sql_procedure(
         rank=None, seed=None, timeout_seconds=600, import_metadata=None
     ):
         import_metadata["_update_all2_phase_results"] = [
             {
-                "phase_name": "update_all2_create_averages",
+                "phase_name": b"update_all2_create_averages",
                 "phase_status": "completed",
                 "duration_ms": 42,
                 "details_json": '{"procedure": "CREATE_THE_AVERAGES"}',
@@ -325,12 +332,20 @@ async def test_run_stats_copy_archive_records_update_all2_subphase_audit(monkeyp
     phase_calls = [call[1] for call in audit_calls if call[0] == "phase"]
     phase_names = [call["phase_name"] for call in phase_calls]
     assert "fallback_update_all2" in phase_names
-    assert "update_all2_create_averages" in phase_names
+    assert "b'update_all2_create_averages'" in phase_names
     subphase = next(
-        call for call in phase_calls if call["phase_name"] == "update_all2_create_averages"
+        call for call in phase_calls if call["phase_name"] == "b'update_all2_create_averages'"
     )
     assert subphase["duration_ms"] == 42
+    assert subphase["details"]["sql_phase"] == "b'update_all2_create_averages'"
     assert subphase["details"]["sql_details"] == {"procedure": "CREATE_THE_AVERAGES"}
+    subphase_meta = next(
+        meta for name, meta in offload_metas if name == "import_audit_update_all2_phase"
+    )
+    assert subphase_meta["phase"] == "b'update_all2_create_averages'"
+    assert isinstance(subphase_meta["phase"], str)
+    complete = next(call[1] for call in audit_calls if call[0] == "complete")
+    assert "_update_all2_phase_results" not in complete["details"]
 
 
 @pytest.mark.asyncio
