@@ -319,20 +319,23 @@ Discord Voting Post Framework status:
 - Phase 19 records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
   - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
-- Active Discord Voting Post Framework files:
+- Discord Voting Post Framework is complete and archived through Phase 22. The programme pack
+  remains as the closed record:
   - `Discord Voting Post Framework - Programme Pack.md`
-  - `Codex Task Pack - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md`
-  - `Codex Chat Starter - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md`
-- Phase 20 Per-User Engagement Export List and Graph Audit and Design is prepared. It is an
-  audit/scope-only slice for the richer private per-user breakdown intentionally kept out of the
-  Phase 19 embed: export, scrollable/paged list, graph, or staged combination. It requires approval
-  of the output format, per-user fields, role/window filter inheritance, whether graphing is
-  survey-only or combined vote/survey, identity/privacy model, file-handling posture, SQL/data
-  contract, tests, Codex Security review, rollout, rollback, and operator communication before any
-  implementation.
-  Retention/redaction policy changes and optional SQL-native combined reporting views/procedures
-  remain required separate slices unless a future audit explicitly justifies them. Per-rating
-  comments, role-restricted voting, governor-linked voting/reporting, saved templates,
+- Phase 20 Per-User Engagement Export List and Graph Audit and Design is complete, smoke tested,
+  and archived. It delivered the private CSV export under `/vote_admin engagement`.
+- Phase 21 Private Engagement Graph Assessment Audit and Design is audit-closed as not required now
+  and archived. The Phase 20 CSV export remains the data path; any future graph work needs a fresh
+  concrete leadership requirement.
+- Phase 22 Vote Survey Retention Redaction Policy is complete. It delivered SQL-only
+  `dbo.VoteSurveyDeletionAudit` and `dbo.usp_VoteSurveyAdminDelete` through SQL migration
+  `20260709_001_add_vote_survey_admin_delete`, with dry-run/readback, closed-item enforcement,
+  explicit confirmation, mandatory reason/operator identity, local audit summary capture,
+  dependency-order hard deletes, break-glass production support, and no bot-side delete command,
+  Discord UI, dashboard control, scheduled job, public output, or runtime code change.
+  Optional SQL-native combined reporting views/procedures remain separate approval-gated slices
+  unless a future audit explicitly justifies them.
+  Per-rating comments, role-restricted voting, governor-linked voting/reporting, saved templates,
   generated-card custom emoji asset fetching/animation, and public voter-level/detail export
   posting are definitely not required unless a later operator decision reverses that status.
 
@@ -486,10 +489,5 @@ Final removal of temporary deprecated command paths remains captured as deferred
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.
 
-Discord Voting Post Framework Phase 17 Vote Admin Reshaping Audit and Design is the next prepared
-voting slice. It starts with audit/scope confirmation for `/vote_admin` command-surface governance
-while preserving delivered vote/survey behavior, Phase 12 draft/resume behavior, Phase 13 private
-dashboard privacy, Phase 14 rating-scale compatibility, Phase 15 option emoji metadata, Phase 16
-survey update locks, and aggregate-only public outputs. Cross-survey workbook exports,
-retention/redaction changes, optional SQL-native combined reporting, public dashboards, raw
-text/detail display, and per-user rows remain separate approval-gated slices.
+Discord Voting Post Framework is closed after Phase 22. Future voting enhancements should start in
+a new programme pack rather than continuing this programme as Phase 23.

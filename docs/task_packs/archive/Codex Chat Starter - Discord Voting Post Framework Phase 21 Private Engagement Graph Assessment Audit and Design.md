@@ -1,6 +1,7 @@
 # Codex Chat Starter - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design
 
-Use this to start the Phase 21 audit/design slice.
+Archived historical starter for the Phase 21 audit/design slice. Phase 21 was audit-closed on
+2026-07-08 with no graph requirement and no runtime implementation.
 
 ```text
 Codex, start Discord Voting Post Framework Phase 21: Private Engagement Graph Assessment Audit and
@@ -37,7 +38,7 @@ Read first:
 - docs/reference/deferred_optimisations.md
 - docs/task_packs/Discord Voting Post Framework - Programme Pack.md
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md
-- docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design.md
+- docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design.md
 
 Use these skills as applicable:
 - k98-architecture-scope

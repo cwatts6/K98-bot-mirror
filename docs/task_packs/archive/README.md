@@ -2,7 +2,7 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
-Discord Voting Post Framework Phase 1 through Phase 19 execution records are archived here. The
+Discord Voting Post Framework Phase 1 through Phase 22 execution records are archived here. The
 programme delivered SQL-backed vote posts, button voting, one-vote-per-Discord-user enforcement,
 vote changes, live Pillow result cards, scheduler reminders, automatic close, manual close,
 persistent views, mention safety, guided admin UX, private totals-only export, private
@@ -27,10 +27,15 @@ cross-survey/workbook export redesign audit closure with no runtime export or do
 guidance change because the current private exports are sufficient and understood, plus Phase 19
 private leadership engagement dashboard delivery with compact top-level engagement metrics,
 role-filtered eligibility, fixed rolling windows, best/worst single poll, one-Discord-user
-counting regardless of governor IDs, raw-answer exclusion, and graceful dashboard timeout handling.
-Operator smoke/regression testing is complete through 2026-07-08.
-The active programme pack and Phase 20 per-user engagement export/list/graph audit/design pack
-remain in `../`.
+counting regardless of governor IDs, raw-answer exclusion, and graceful dashboard timeout handling,
+plus Phase 20 private per-user engagement CSV export delivery under `/vote_admin engagement`, and
+Phase 21 private engagement graph assessment audit closure with no runtime graph implementation
+because the CSV export remains sufficient until leadership defines a concrete graph requirement,
+plus Phase 22 final retention/redaction policy and SQL-only admin delete delivery through
+`dbo.VoteSurveyDeletionAudit` and `dbo.usp_VoteSurveyAdminDelete` with no bot runtime/UI changes.
+Operator smoke/regression testing is complete through 2026-07-08, with SQL-only Phase 22
+deployment/smoke pending production SQL rollout.
+The closed programme pack remains in `../`.
 
 Player Self-Service Command Centre completed Phase 1 audit/design, Phase 2 `/me` shell
 foundation, Phase 3 Modern Account Centre, Phase 4 Modern Reminder Centre, Phase 5 Visual

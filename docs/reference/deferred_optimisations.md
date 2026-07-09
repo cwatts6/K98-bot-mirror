@@ -6,24 +6,6 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
-- Area: `voting/engagement_export_service.py`, `/vote_admin engagement`, future private engagement graphs
-- Type: architecture
-- Description: Phase 20 delivered the private per-user engagement CSV export and intentionally removed paged Discord lists from scope because they are hard to manage and add little value for large user counts. Operator smoke confirmed the CSV data, controls, and role filters are working as expected. Graph output remains deferred until leadership reviews the CSV data and identifies one or two specific visual questions worth rendering.
-- Suggested Fix: Promoted into Phase 21 Private Engagement Graph Assessment Audit and Design. Confirm whether a graph should be built at all; if yes, decide whether it should be a distribution summary, lowest-participation capped chart, combined vote/survey participation chart, separate vote/survey series, or survey-only view. Define user-count limits, privacy copy, artifact generation/cleanup, tests, rollout, rollback, and Codex Security review before implementation.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 20 private CSV export delivered and smoke/regression tested; active Phase 21 audit/design approval; concrete leadership graph question; graph/image artifact privacy and file-handling approval.
-
-### Deferred Optimisation
-- Area: `voting/`, private exports, report bundles, dashboard/reporting summaries, SQL-backed vote/survey data
-- Type: architecture
-- Description: Retention and redaction policy for vote/survey data, exports, reports, audit metadata, and generated artifacts remains intentionally unchanged through Phase 16. The framework now stores richer survey data, drafts, rating labels, ranking answers, option emoji metadata, survey update audit rows, private exports, and dashboard summaries, but policy decisions about how long to keep or redact them need a separate privacy/operations task.
-- Suggested Fix: Scope a retention/redaction policy audit that inventories stored vote/survey tables, draft rows, audit events, generated exports, report bundles, dashboard summaries, and any local temporary files. Define default retention windows, manual redaction behavior, admin-only controls, SQL cleanup posture, rollback/audit requirements, and tests before any destructive or privacy-changing implementation.
-- Impact: medium
-- Risk: high
-- Dependencies: Operator privacy policy approval; SQL repo validation; Codex Security review before runtime PR handoff; no destructive cleanup without rollback and smoke plan.
-
-### Deferred Optimisation
 - Area: `voting/reporting_dal.py`, `voting/reporting_service.py`, SQL repo survey/vote reporting views and procedures
 - Type: architecture
 - Description: Optional SQL-native combined vote/survey reporting views or procedures may eventually help direct SQL consumers, performance, or operational reporting, but Phase 11 and Phase 13 intentionally kept the dashboard contract bot-side and Phase 14 through Phase 16 only updated compatibility metadata and bot-side presentation/update paths. No direct reporting consumer or performance blocker currently justifies a combined SQL-native reporting layer.

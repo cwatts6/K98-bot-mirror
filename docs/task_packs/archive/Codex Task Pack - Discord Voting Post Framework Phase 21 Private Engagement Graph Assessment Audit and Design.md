@@ -7,7 +7,7 @@
 - Owner/context: `Follow-up after Phase 20 delivered the private per-user engagement CSV export`
 - Task type: `audit | private leadership reporting product scope | graph value assessment | privacy review | file/artifact handling review`
 - One-pass approved: `no`
-- Status: `active; audit/scope only until graph value, semantics, privacy, data contract, file-handling posture, docs, tests, rollout, rollback, and operator communication direction are approved`
+- Status: `archived; audit closed as not required on 2026-07-08 with no runtime graph implementation and no active deferred item`
 
 ## 2. Objective
 
@@ -25,6 +25,30 @@ behavior, public output, retention/redaction behavior, or SQL-native combined re
 operator approves product scope, privacy boundaries, data contract, compatibility, documentation,
 tests, rollout, rollback, and communication plan.
 
+## 2A. Completion Update
+
+Phase 21 is audit-closed. After reviewing the Phase 20 CSV output and operator workflow, the
+operator confirmed there is no current requirement for a generated engagement graph. The CSV export
+already provides the full private data set, and leadership can create ad hoc graphs from the export
+when needed. If a graph proves useful later, it should return as a new requirement with concrete
+semantics, audience, privacy, artifact-handling, tests, rollout, rollback, and communication scope.
+
+No runtime implementation is approved or required from this phase:
+
+- no graph/image generation;
+- no `/vote_admin engagement` control changes;
+- no `/vote_admin dashboard` changes;
+- no command options, aliases, or new commands;
+- no SQL/DAL changes;
+- no CSV schema changes;
+- no workbook output;
+- no public output;
+- no file cleanup, retention, or redaction behavior changes;
+- no SQL-native combined reporting.
+
+The active deferred optimisation item for future private engagement graphs has been removed rather
+than left in the backlog.
+
 ## 3. Required Reading
 
 Read first:
@@ -41,7 +65,7 @@ Read first:
 - `docs/reference/deferred_optimisations.md`
 - `docs/task_packs/Discord Voting Post Framework - Programme Pack.md`
 - `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md`
-- `docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design.md`
+- `docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design.md`
 
 Use these skills as applicable:
 
@@ -75,7 +99,7 @@ Phase 20 intentionally did not add graphs, workbooks, paged Discord lists, publi
 answer/detail reporting, retention/redaction changes, SQL-native combined reporting, governor-linked
 reporting, role-restricted voting, templates, or per-rating comments.
 
-## 5. Source Deferred Item
+## 5. Closed Source Deferred Item
 
 ### Deferred Optimisation
 - Area: `voting/engagement_export_service.py`, `/vote_admin engagement`, future private engagement graphs
@@ -86,43 +110,24 @@ reporting, role-restricted voting, templates, or per-rating comments.
 - Risk: medium
 - Dependencies: Phase 20 private CSV export delivered and smoke/regression tested; active Phase 21 audit/design approval; concrete leadership graph question; graph/image artifact privacy and file-handling approval.
 
-## 6. Candidate Phase 21 Scope To Confirm
+Closeout: the operator confirmed there is no current graph requirement. This item was removed from
+`docs/reference/deferred_optimisations.md` rather than kept as active deferred work.
 
-### In Scope For Audit/Design
+## 6. Candidate Phase 21 Scope Confirmed
 
-- Confirm whether graph output is needed at all after reviewing Phase 20 CSV data.
-- Confirm the graph question:
-  - participation distribution summary;
-  - lowest-participation capped chart;
-  - combined vote/survey participation by user;
-  - separate vote and survey participation series;
-  - survey-only participation;
-  - another operator-approved graph question.
-- Confirm graph ownership:
-  - private attachment generated from `/vote_admin engagement`;
-  - private summary embed plus attachment;
-  - no graph output if CSV is sufficient;
-  - avoid `/vote_admin dashboard` unless the audit proves the graph belongs there.
-- Confirm graph input contract:
-  - reuse the Phase 20 engagement reporting/export contract if possible;
-  - no CSV schema changes unless separately approved;
-  - no SQL-native combined reporting unless performance or consumer needs justify it;
-  - no raw text/detail answers or per-answer detail.
-- Confirm graph limits:
-  - user-count cap for named-user charts;
-  - fallback to distribution summary for large audiences;
-  - label truncation and privacy wording;
-  - deterministic ordering and tie-breaks;
-  - behavior for zero-data or all-zero participation.
-- Confirm generated artifact posture:
-  - private admin/leadership delivery only;
-  - no public graph;
-  - Discord upload size limits;
-  - temporary file or in-memory image generation;
-  - cleanup behavior if files are written;
-  - graceful timeout/error handling.
-- Confirm tests, Codex Security requirement, deployment order, rollback posture, smoke checks, and
-  deferred follow-up work.
+Phase 21 selected the `no graph output because CSV is sufficient` outcome.
+
+### Audit Findings
+
+- The Phase 20 CSV export remains the correct ownership surface for private per-user engagement
+  detail.
+- No generated graph should be built without a concrete leadership requirement.
+- Graphs can be created externally from the CSV if leadership needs ad hoc visual analysis.
+- If a recurring graph proves useful, it should be defined in a fresh task pack rather than kept as
+  an open-ended deferred item.
+- `/vote_admin dashboard` should remain focused on private vote/survey inspection.
+- `/vote_admin engagement` should remain the private select-driven CSV export flow.
+- Public engagement graphs and public voter-level/detail output remain out of scope.
 
 ### Explicitly Out Of Scope Unless Separately Approved
 
@@ -144,39 +149,26 @@ reporting, role-restricted voting, templates, or per-rating comments.
 - Per-rating comments.
 - Generated-card custom emoji asset fetching or animation.
 
-## 7. Initial Design Questions
+## 7. Closed Design Decision
 
-Implementation must not start until the operator approves these decisions:
-
-- Does leadership actually need a graph after reviewing the Phase 20 CSV output?
-- Which graph question has the strongest value?
-- Should named-user charts be avoided for large audiences in favor of a distribution summary?
-- Should graph output be combined vote/survey, separate vote/survey, survey-only, lowest
-  participation, or distribution-only?
-- Should the graph show all eligible users, only the lowest-participation users, or no names at all?
-- Should the graph be attached from `/vote_admin engagement`, and should it reuse the current
-  select-driven window/audience controls?
-- What user-count and label limits should apply?
-- Should the graph be generated in memory or written to a temporary file with explicit cleanup?
-- Is the proposed test, Codex Security, rollout, rollback, and smoke plan approved?
+No graph/image output is required now. Future graph work should begin only after leadership can name
+the specific graph question and confirm that the CSV-derived ad hoc approach is not sufficient.
 
 ## 8. Recommended Starting Posture
 
-Recommended first-slice design posture:
+Final design posture:
 
-- Treat Phase 21 as audit-only until leadership confirms the graph question.
-- Prefer no graph if the CSV already answers the leadership workflow.
-- If a graph is useful, prefer a distribution summary or capped lowest-participation chart over a
-  dense all-user chart.
-- Reuse the existing `/vote_admin engagement` private select-driven flow if implementation is later
-  approved.
-- Keep implementation bot-side and contract-reuse-first; do not add SQL-native reporting without
-  performance evidence or a direct SQL consumer.
-- Require Codex Security review before runtime handoff for any graph/file implementation.
+- Keep Phase 20 CSV export as the deeper private engagement data path.
+- Close the private engagement graph deferred item as not required now.
+- Do not add graph/image generation, graph files, extra controls, SQL-native graph contracts, or
+  dashboard graph placement.
+- If future graph requirements emerge, start with a new audit/design slice and require Codex
+  Security review before runtime handoff because generated artifacts, Discord interactions, private
+  data, file handling, and SQL/data access would be touched.
 
 ## 9. Test Strategy
 
-For this audit/docs-only slice, run:
+For this audit/docs-only closeout, run:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\validate_architecture_boundaries.py
@@ -186,7 +178,7 @@ For this audit/docs-only slice, run:
 .\.venv\Scripts\python.exe scripts\validate_command_registration.py
 ```
 
-If graph implementation is approved later, add or update:
+If graph implementation is approved in a future fresh task, add or update:
 
 - graph data-shaping tests for selected graph semantics, limits, sorting, and zero-data behavior;
 - graph/image generation tests with deterministic dimensions and labels;
@@ -196,6 +188,13 @@ If graph implementation is approved later, add or update:
 - Codex Security diff scan before runtime PR handoff.
 
 ## 10. Rollout / Rollback / Smoke Direction
+
+Phase 21 has no runtime rollout:
+
+- no bot deployment required;
+- no SQL deployment required;
+- no rollback required beyond reverting documentation if needed;
+- no smoke test required beyond preserving the already smoke-tested Phase 20 CSV export.
 
 If bot-side graph implementation is approved with no SQL migration:
 

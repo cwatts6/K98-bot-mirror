@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `Phase 1 through Phase 20 complete or audit-closed; Phase 21 private engagement graph assessment audit/design is prepared`
+- Current status: `complete; Phase 1 through Phase 22 delivered or audit-closed`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -1267,32 +1267,66 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 21 private engagement graph assessment audit and design
 
-Status: prepared; audit/scope only until graph value, semantics, privacy, file/artifact handling,
-tests, rollout, rollback, and operator communication are approved.
+Status: audit-closed as not required now; no runtime graph implementation.
 
-Phase 21 is the only near-term voting follow-up promoted from Phase 20. It should review the
-delivered per-user CSV output and decide whether one or two private graphs would add enough value
-to justify implementation. Candidate graph questions include participation distribution,
-lowest-participation capped chart, combined vote/survey participation by user, separate vote/survey
-series, or survey-only participation. The audit may also conclude that CSV export is sufficient and
-no graph should be built now.
+Phase 21 reviewed the delivered per-user CSV output and operator workflow. The operator confirmed
+that graph output is not required now: the CSV export provides the private data set, and leadership
+can create ad hoc graphs from the CSV if needed. If a graph later proves useful, it should return as
+a fresh requirement with concrete graph semantics, privacy boundaries, artifact/file handling,
+tests, rollout, rollback, and operator communication.
 
-Active Phase 21 records:
+Archived Phase 21 records:
 
 ```text
-docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design.md
-docs/task_packs/Codex Chat Starter - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design.md
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design.md
+```
+
+### Phase 22 vote/survey retention redaction policy and SQL-admin delete
+
+Status: complete; SQL-only admin delete contract delivered with no bot runtime/UI changes.
+
+Phase 22 closed the final active voting deferred item. It inventoried vote/survey stored data,
+confirmed the retention/redaction posture, and delivered a strictly SQL-side admin function to
+delete closed votes and surveys, including their result data, when training/test records pollute
+leadership stats. Break-glass production deletion is allowed for SQL admins, but expected use is
+test/training cleanup.
+
+Delivered:
+
+- SQL migration `20260709_001_add_vote_survey_admin_delete`.
+- `dbo.VoteSurveyDeletionAudit`, a durable deletion audit/readback table outside the deleted
+  vote/survey item tree.
+- `dbo.usp_VoteSurveyAdminDelete`, a manual SQL-admin procedure with dry-run default, mandatory
+  reason, mandatory operator identity, explicit confirmation, closed-item enforcement, row-count
+  output, item-local audit summary capture, `XACT_ABORT ON`, and dependency-order hard deletes.
+- Same retention/redaction posture for votes, surveys, text answers, and detail answers.
+- Public Discord message handling remains manual and outside SQL.
+- Rollback after confirmed hard delete is backup/pre-delete-script restore only.
+
+Not delivered:
+
+- no `/vote_admin delete`;
+- no dashboard control;
+- no Discord UI, modal, select, or autocomplete;
+- no bot-side DAL/service delete path;
+- no scheduled cleanup job;
+- no public output;
+- no export schema, response semantic, Phase 16 lock, or Discord message deletion change.
+
+Archived Phase 22 records:
+
+```text
+docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 22 Vote Survey Retention Redaction Policy Audit and Design.md
+docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase 22 Vote Survey Retention Redaction Policy Audit and Design.md
 ```
 
 ### Remaining voting follow-up inventory
 
-Core voting runtime is now complete through the approved Phase 20 CSV export. Remaining work is
-approval-gated and should not be treated as required delivery unless the operator selects it:
+Core voting runtime and the final SQL-side data-lifecycle cleanup path are complete. This
+programme pack is closed; future voting development or enhancements should start a new programme
+pack.
 
-- Phase 21 private engagement graph assessment, graph implementation only if the audit identifies a
-  concrete graph that is worth building.
-- Retention/redaction policy audit for vote/survey data, exports, reports, audit metadata, and
-  generated artifacts.
 - Optional SQL-native combined vote/survey reporting only if performance evidence, a direct SQL
   consumer, or production support need appears.
 - Not required unless a later operator decision reverses status: role-restricted voting,
@@ -1316,8 +1350,10 @@ approval-gated and should not be treated as required delivery unless the operato
 - Do not change delivered draft/resume, private dashboard, rating-scale, emoji/icon, Phase 16
   survey authoring/update locks, public reporting, role-restricted voting, governor-linked voting,
   saved templates, cross-survey/workbook exports, SQL-native combined reporting objects,
-  retention/redaction behavior changes, public voter-level exports, or post-publish survey
-  semantic edits as part of any voting slice unless separately approved.
+  public voter-level exports, or post-publish survey semantic edits as part of any voting slice
+  unless separately approved.
+- Do not continue this programme as Phase 23. Start a fresh programme pack for any later voting
+  enhancement or policy expansion.
 
 ## 10. Validation Strategy
 
@@ -1449,21 +1485,22 @@ The core programme is successful when:
       `/vote_admin engagement` controls, all eligible users sorted highest engagement first, role
       names, vote/survey split counts, no paged Discord list, no graph/workbook output, raw-answer
       exclusion, no SQL schema change, and successful review/smoke.
-- [ ] Phase 21 private engagement graph assessment decides whether any graph is worth implementing
-      after reviewing the Phase 20 CSV output; graph runtime delivery remains unapproved until that
-      audit is complete.
+- [x] Phase 21 private engagement graph assessment is audit-closed as not required now. The Phase
+      20 CSV export remains the data path, leadership can create ad hoc graphs externally if
+      needed, and no active graph deferred item remains.
+- [x] Phase 22 final retention/redaction and SQL-only delete posture is delivered. It keeps runtime
+      behavior unchanged, adds SQL-only `dbo.VoteSurveyDeletionAudit` and
+      `dbo.usp_VoteSurveyAdminDelete`, requires closed items, dry-run/readback, confirmation,
+      reason, and operator identity, and closes the Discord Voting Post Framework programme.
 
 ## 12. Suggested Next Action
 
 ```text
-Start Discord Voting Post Framework Phase 21: Private Engagement Graph Assessment Audit and
-Design.
+No active next action remains for the Discord Voting Post Framework programme.
 
-Phase 20 delivered the private per-user CSV export under `/vote_admin engagement`, and smoke
-testing confirmed the data, controls, and role filters are working as expected. Begin Phase 21 by
-reviewing the exported data and deciding whether one or two private graphs would add value. Confirm
-graph semantics, user-count limits, privacy wording, artifact/file handling, command/view ownership,
-tests, Codex Security review, rollout, rollback, and operator communication before implementation.
+Phase 22 closed the final approved programme slice. Future voting enhancements, policy expansions,
+or reporting changes should start in a new programme pack with fresh scope, approval gates,
+validation, rollout, rollback, and operator communication.
 ```
 
 ## 13. Programme Change Log
@@ -1524,3 +1561,6 @@ tests, Codex Security review, rollout, rollback, and operator communication befo
 | 2026-07-08 | Phase 20 per-user engagement CSV export delivered | Operator approved and smoke tested the CSV-only first slice: no paged Discord list, graph deferral, role names and vote/survey split columns, all eligible users sorted highest engagement first, and a separate `/vote_admin engagement` select-driven flow. The delivered implementation removes engagement from `/vote_admin dashboard`, adds private CSV export controls, keeps raw/detail answers excluded, makes no SQL schema changes, and leaves graphs/workbooks for a later approved slice. |
 | 2026-07-08 | Phase 20 per-user engagement CSV export smoke tested and archived | Operator smoke confirmed Export CSV is done, data is as expected, controls work well, role filters behave as planned, and regression tests are successful. Phase 20 task pack and starter were archived. |
 | 2026-07-08 | Phase 21 private engagement graph assessment prepared | Created the active Phase 21 audit/design task pack and chat starter to decide whether any private engagement graph should be implemented after reviewing Phase 20 CSV output. Graph runtime generation, public graphs, paged Discord lists, workbook output, CSV schema changes, retention/redaction changes, and SQL-native reporting remain unapproved. |
+| 2026-07-08 | Phase 21 private engagement graph assessment audit closed | Operator confirmed no graph is required now. Phase 20 CSV export provides the data, and leadership can create graphs from the CSV if a specific need appears. The graph deferred item was removed from the active backlog, and Phase 21 records were archived. |
+| 2026-07-08 | Phase 22 final retention/redaction audit prepared | Created the final active Phase 22 task pack and chat starter for vote/survey retention and redaction policy plus a cautious SQL-side-only admin delete function for test votes/surveys and results. No bot-side delete command, Discord UI, dashboard control, scheduled job, or SQL implementation is approved by preparation. |
+| 2026-07-09 | Phase 22 delivered and programme closed | Delivered SQL migration `20260709_001_add_vote_survey_admin_delete` with `dbo.VoteSurveyDeletionAudit` and SQL-admin-only `dbo.usp_VoteSurveyAdminDelete`. The procedure defaults to dry-run, requires closed items, confirmation, reason, and operator identity, summarizes local audit rows outside the deleted tree, hard-deletes dependent rows in transaction order, allows break-glass production deletion, and leaves Discord messages/manual communication outside SQL. No bot command, Discord UI, dashboard control, scheduled job, export schema, response semantic, or runtime code change was added. |
