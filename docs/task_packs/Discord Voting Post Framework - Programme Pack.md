@@ -10,7 +10,7 @@
 - Owner/context: `KD98 Discord bot / leadership and admin voting workflow`
 - Programme type: `Product UX | Discord command architecture | SQL/data | visual output | operations`
 - One-pass approved: `no`
-- Current status: `complete; Phase 1 through Phase 22 delivered or audit-closed`
+- Current status: `implementation complete; Phase 1 through Phase 22 delivered or audit-closed; production SQL rollout/smoke pending`
 - Headline: `Make voting simple, guided, durable, and good-looking.`
 
 ## 2. Programme Vision
@@ -1284,7 +1284,9 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Phase 22 vote/survey retention redaction policy and SQL-admin delete
 
-Status: complete; SQL-only admin delete contract delivered with no bot runtime/UI changes.
+Status: implementation complete; SQL-only admin delete contract delivered with no bot runtime/UI
+changes. Production availability remains pending until the SQL PR is merged, deployed, and
+smoke-checked.
 
 Phase 22 closed the final active voting deferred item. It inventoried vote/survey stored data,
 confirmed the retention/redaction posture, and delivered a strictly SQL-side admin function to
@@ -1323,9 +1325,11 @@ docs/task_packs/archive/Codex Chat Starter - Discord Voting Post Framework Phase
 
 ### Remaining voting follow-up inventory
 
-Core voting runtime and the final SQL-side data-lifecycle cleanup path are complete. This
-programme pack is closed; future voting development or enhancements should start a new programme
-pack.
+Core voting runtime and the final SQL-side data-lifecycle cleanup implementation are complete.
+Production SQL rollout and smoke verification remain tracked in
+`docs/reference/deferred_optimisations.md` until SQL PR `cwatts6/K98-bot-SQL-Server#39` is merged,
+deployed, and smoke-checked. Product development in this programme is closed; later voting
+development or enhancements should start a new programme pack.
 
 - Optional SQL-native combined vote/survey reporting only if performance evidence, a direct SQL
   consumer, or production support need appears.
@@ -1496,11 +1500,14 @@ The core programme is successful when:
 ## 12. Suggested Next Action
 
 ```text
-No active next action remains for the Discord Voting Post Framework programme.
+No further product design or implementation action remains for the Discord Voting Post Framework
+programme.
 
-Phase 22 closed the final approved programme slice. Future voting enhancements, policy expansions,
-or reporting changes should start in a new programme pack with fresh scope, approval gates,
-validation, rollout, rollback, and operator communication.
+Phase 22 closed the final approved programme slice. Production availability of the SQL-admin
+cleanup path remains gated by SQL PR merge, deployment, dry-run/readback smoke, and operator
+approval for any confirmed delete. Later voting enhancements, policy expansions, or reporting
+changes should start in a new programme pack with fresh scope, approval gates, validation, rollout,
+rollback, and operator communication.
 ```
 
 ## 13. Programme Change Log

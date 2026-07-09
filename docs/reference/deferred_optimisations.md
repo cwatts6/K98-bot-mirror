@@ -6,6 +6,15 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
+- Area: `C:\K98-bot-SQL-Server` Phase 22 vote/survey admin delete rollout
+- Type: architecture
+- Description: Phase 22 implementation is PR-ready, but production SQL deployment and smoke verification for `dbo.VoteSurveyDeletionAudit` and `dbo.usp_VoteSurveyAdminDelete` are not complete yet. Until the SQL PR is merged, deployed, and smoke checked, operators should not treat the SQL-admin cleanup path as available in production.
+- Suggested Fix: After SQL PR `cwatts6/K98-bot-SQL-Server#39` is merged, run the SQL promotion gate, confirm backup readiness, deploy migration `20260709_001_add_vote_survey_admin_delete`, execute dry-run/readback only against an operator-selected closed test vote or survey, verify row counts and deletion-audit readback, then separately approve any confirmed hard delete.
+- Impact: medium
+- Risk: high
+- Dependencies: SQL PR merge; SQL promotion approval; backup readiness; production SQL deployment window; operator-selected closed test/training vote or survey for dry-run smoke.
+
+### Deferred Optimisation
 - Area: `voting/reporting_dal.py`, `voting/reporting_service.py`, SQL repo survey/vote reporting views and procedures
 - Type: architecture
 - Description: Optional SQL-native combined vote/survey reporting views or procedures may eventually help direct SQL consumers, performance, or operational reporting, but Phase 11 and Phase 13 intentionally kept the dashboard contract bot-side and Phase 14 through Phase 16 only updated compatibility metadata and bot-side presentation/update paths. No direct reporting consumer or performance blocker currently justifies a combined SQL-native reporting layer.

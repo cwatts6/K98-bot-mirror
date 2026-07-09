@@ -38,7 +38,7 @@ Read first:
 - docs/task_packs/Discord Voting Post Framework - Programme Pack.md
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 20 Per-User Engagement Export List and Graph Audit and Design.md
 - docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 21 Private Engagement Graph Assessment Audit and Design.md
-- docs/task_packs/Codex Task Pack - Discord Voting Post Framework Phase 22 Vote Survey Retention Redaction Policy Audit and Design.md
+- docs/task_packs/archive/Codex Task Pack - Discord Voting Post Framework Phase 22 Vote Survey Retention Redaction Policy Audit and Design.md
 
 Use these skills as applicable:
 - k98-architecture-scope

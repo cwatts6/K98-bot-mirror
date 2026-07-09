@@ -319,20 +319,22 @@ Discord Voting Post Framework status:
 - Phase 19 records are archived under `archive/`:
   - `archive/Codex Task Pack - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
   - `archive/Codex Chat Starter - Discord Voting Post Framework Phase 19 Leadership Engagement Summary Reporting Audit and Design.md`
-- Discord Voting Post Framework is complete and archived through Phase 22. The programme pack
-  remains as the closed record:
+- Discord Voting Post Framework implementation is complete and archived through Phase 22. The
+  programme pack remains as the closed record:
   - `Discord Voting Post Framework - Programme Pack.md`
 - Phase 20 Per-User Engagement Export List and Graph Audit and Design is complete, smoke tested,
   and archived. It delivered the private CSV export under `/vote_admin engagement`.
 - Phase 21 Private Engagement Graph Assessment Audit and Design is audit-closed as not required now
   and archived. The Phase 20 CSV export remains the data path; any future graph work needs a fresh
   concrete leadership requirement.
-- Phase 22 Vote Survey Retention Redaction Policy is complete. It delivered SQL-only
+- Phase 22 Vote Survey Retention Redaction Policy implementation is complete. It delivered SQL-only
   `dbo.VoteSurveyDeletionAudit` and `dbo.usp_VoteSurveyAdminDelete` through SQL migration
   `20260709_001_add_vote_survey_admin_delete`, with dry-run/readback, closed-item enforcement,
   explicit confirmation, mandatory reason/operator identity, local audit summary capture,
   dependency-order hard deletes, break-glass production support, and no bot-side delete command,
   Discord UI, dashboard control, scheduled job, public output, or runtime code change.
+  Production SQL availability remains pending until the companion SQL PR is merged, deployed, and
+  smoke-checked; that rollout gate is tracked in `docs/reference/deferred_optimisations.md`.
   Optional SQL-native combined reporting views/procedures remain separate approval-gated slices
   unless a future audit explicitly justifies them.
   Per-rating comments, role-restricted voting, governor-linked voting/reporting, saved templates,

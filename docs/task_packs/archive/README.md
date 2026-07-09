@@ -33,8 +33,9 @@ Phase 21 private engagement graph assessment audit closure with no runtime graph
 because the CSV export remains sufficient until leadership defines a concrete graph requirement,
 plus Phase 22 final retention/redaction policy and SQL-only admin delete delivery through
 `dbo.VoteSurveyDeletionAudit` and `dbo.usp_VoteSurveyAdminDelete` with no bot runtime/UI changes.
-Operator smoke/regression testing is complete through 2026-07-08, with SQL-only Phase 22
-deployment/smoke pending production SQL rollout.
+Operator smoke/regression testing is complete through 2026-07-08. SQL-only Phase 22
+deployment/smoke remains pending production SQL rollout and is tracked in
+`../../reference/deferred_optimisations.md` until the SQL PR is merged, deployed, and smoke-checked.
 The closed programme pack remains in `../`.
 
 Player Self-Service Command Centre completed Phase 1 audit/design, Phase 2 `/me` shell
