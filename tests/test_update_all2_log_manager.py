@@ -117,5 +117,5 @@ def test_execute_update_all2_parses_internal_phase_result_set(monkeypatch):
             "details_json": None,
             "error_type": None,
             "error_text": None,
-        }
+        },
     ]
