@@ -44,6 +44,13 @@ Dashboard Card and Preferences Hub, Phase 6 Guided Management Cards and Workflow
 and Phase 7 Unified Reminder Centre and Dashboard Card Alignment execution records are archived
 here. The active programme pack and next-phase task pack remain in `docs/task_packs/`.
 
+Player Self-Service Command Centre v2 / GovernorOS completed its Phase 1 Governor Dashboard Product
+Blueprint and Audit and Phase 2 Governor Context and Dashboard Data Foundation. The Phase 1 report,
+Phase 2 task pack, and Phase 2 chat starter are archived here. Phase 2 delivered in mirror PR #216
+and production PR #523, with successful operator smoke and full regression validation on
+2026-07-10. The active v2 programme pack plus the prepared Phase 3 Governor Selector and Dashboard
+Shell task pack/chat starter remain in `docs/task_packs/`.
+
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,
 PreKvK schema standardisation, completed KVK Player Experience Redesign execution phases,

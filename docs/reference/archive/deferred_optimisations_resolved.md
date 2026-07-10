@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### GovernorOS v2 Phase 2 Foundation Completed Item
+- Area: `player_self_service/governor_dashboard_models.py`, `player_self_service/governor_dashboard_service.py`, `player_self_service/governor_dashboard_dal.py`
+- Type: architecture
+- Description: Personal stats, profile, registry, and inventory data lacked one renderer-independent governor dashboard contract with explicit self-view access and privacy separation.
+- Resolution: Phase 2 added typed governor options/context/resolution/payload models, no/one/multiple journey resolution, default-deny unlinked self-view access, explicit future inspect opt-in, approved-field DAL/service assembly, self-view versus inspect-safe separation, null-safe handling, and complete Olympia exclusion without changing visible commands.
+- Validation: Mirror PR #216 and production PR #523 include review hardening for DAL failure degradation, large numeric conversion, inspect default-deny behavior, and focused command-surface invariants. Operator smoke testing confirmed all existing `/me` and named legacy commands work; full pytest and repository validation passed on 2026-07-10.
+
 ### Task C Slice 12 Completed Item
 - Area: SQL repo `dbo.UPDATE_ALL2`, `update_all2_log_manager.py`, `stats_module.py`
 - Type: architecture

@@ -412,8 +412,12 @@ Player Self-Service Command Centre status:
   `archive/`.
 - Active Player Self-Service v2 files:
   - `Player Self-Service Command Centre v2 - Programme Pack.md`
-  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 1 Stats Profile Inventory Audit and Design.md`
-  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 1 Stats Profile Inventory Audit and Design.md`
+  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 3 Governor Selector and Dashboard Shell.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 3 Governor Selector and Dashboard Shell.md`
+- GovernorOS v2 Phase 1 blueprint/audit and Phase 2 governor context/data foundation are complete.
+  Their report, task pack, and chat starter are archived under `archive/`. Phase 2 delivered in
+  mirror PR #216 and production PR #523; operator smoke and full regression validation passed on
+  2026-07-10 without changing the visible `/me` or legacy command behavior.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -509,9 +513,12 @@ tuning/decomposition, residual `stats_module.py` cleanup, legacy PreKvK SQL clea
 cumulative view cleanup, and inventory view-orchestration extraction remain separate later slices
 unless explicitly approved.
 
-Player Self-Service Command Centre v2 Phase 1 Stats, Profile, and Inventory Audit and Design is
-the next prepared player self-service slice. It starts with audit/scope only for `/my_stats`,
-`/stats player`, `/player_profile`, `/myinventory`, and the product fit of `/mykvkcrystaltech`.
+Player Self-Service Command Centre v2 Phase 3 Governor Selector and Dashboard Shell is the next
+prepared player self-service slice. It changes `/me dashboard` to resolve no/one/multiple linked
+governor states privately, uses a dashboard-specific author-gated selector for multiple accounts,
+and renders a selected-governor fallback shell from the completed Phase 2 payload. The premium PNG
+renderer, new `/me` subcommands, inspect flow, redirects, removals, and legacy behavior changes
+remain outside Phase 3.
 Final removal of temporary deprecated command paths remains captured as deferred cleanup for
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.

@@ -4,10 +4,45 @@
 
 - Task name: `Player Self-Service Command Centre v2 Phase 2 Governor Context and Dashboard Data Foundation`
 - Date: `2026-07-09`
+- Completed: `2026-07-10`
 - Owner/context: Follow-on from Phase 1 Governor Dashboard Product Blueprint and Audit. Operator direction: go big and bold for the player dashboard, but ignore Olympia data because it is not currently in the source system.
 - Task type: `feature foundation | service/DAL implementation | Discord command architecture preparation | SQL-backed data contract`
 - One-pass approved: `No`
-- Status: `prepared - ready to start`
+- Status: `complete - delivered, reviewed, smoke tested, and regression validated`
+
+## Completion Record
+
+Phase 2 delivered the renderer-independent governor dashboard foundation without changing the
+visible `/me` journey or any legacy command behavior.
+
+Delivered:
+
+- Typed governor dashboard context, resolution, payload, and field-group models.
+- Linked-governor option resolution for no, one, and multiple account states.
+- Default-deny self-view access for unlinked governors.
+- Explicit opt-in gating for any future unlinked inspect context.
+- Dashboard DAL/service assembly for the approved Phase 2 fields.
+- Separate self-view-only and future inspect-safe payload data.
+- Null-safe handling for missing values, missing VIP, and zero Ark joined.
+- Accurate `Conduct` to Conduct Score and `Civilization` to Civilisation mapping.
+- Complete exclusion of Olympia fields.
+- Focused access, payload, data-mapping, failure-degradation, and command-compatibility tests.
+
+Review hardening added DAL failure degradation, large integer/decimal preservation, safe inspect
+defaults, and removal of unrelated hard-coded command-count assertions from the Phase 2 tests.
+
+Validation evidence:
+
+- Operator smoke testing confirmed all existing `/me` and named legacy commands remain working.
+- Full regression pytest completed successfully (`2414 passed, 2 skipped`).
+- Architecture, deferred-item, test-selection, smoke-import, command-registration, and pre-commit
+  validation passed.
+- Security review completed for the access/data/privacy surface.
+
+PR records:
+
+- Mirror PR: `K98-bot-mirror#216`
+- Production PR: `K98-bot#523`
 
 ## 2. Required Reading
 

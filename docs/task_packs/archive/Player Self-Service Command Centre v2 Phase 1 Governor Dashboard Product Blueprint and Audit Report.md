@@ -1,6 +1,6 @@
 # Player Self-Service Command Centre v2 Phase 1 Governor Dashboard Product Blueprint and Audit Report
 
-Status: Phase 1 audit/design complete. No runtime command, SQL, renderer, redirect, or permission changes are included in this slice.
+Status: Phase 1 audit/design complete and archived after the Phase 2 foundation was delivered. No runtime command, SQL, renderer, redirect, or permission changes are included in this slice.
 
 ## 1. Summary
 

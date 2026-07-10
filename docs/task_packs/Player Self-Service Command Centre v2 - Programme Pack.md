@@ -4,13 +4,13 @@
 
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
-- Date: `2026-07-09`
-- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486 and Phase 1 v2 audit completed
+- Date: `2026-07-10`
+- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486, the v2 Phase 1 blueprint completed, and the Phase 2 governor context/data foundation delivered
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
 
-## 2. Phase 1 Audit Conclusion
+## 2. Phase 1 and Phase 2 Conclusion
 
 Phase 1 confirmed that the original `/me` work created the right foundation, but the current experience is still primarily a Discord-user setup hub. It helps players manage accounts, reminders, preferences, exports, and inventory, but it does not yet feel like the daily governor dashboard players should open to understand their account.
 
@@ -27,6 +27,13 @@ The future state is clear:
 The audit also confirmed that legacy and adjacent commands must be treated carefully. `/my_stats`, `/myinventory`, `/stats player`, `/player_profile`, `/mykvkcrystaltech`, and `/kvk history` all serve established workflows and should not be redirected, removed, or silently changed during the first implementation phases.
 
 The operator decision after Phase 1 is that Olympia data should be ignored for now. Olympia fights and Olympia win ratio are not currently in the source system, so they must not be included in Phase 2 or the first dashboard build. They can be added later if a reliable source/data contract is introduced.
+
+Phase 2 is now complete. It delivered typed governor context and payload contracts, linked-governor
+resolution for no/one/multiple states, default-deny self-view access checks, explicitly gated future
+inspect context, a validated dashboard DAL/service, self-view versus inspect-safe data separation,
+null-safe field handling, and focused regression coverage. The visible `/me` journey and every
+legacy command remained unchanged. Operator smoke testing confirmed all existing `/me` and named
+legacy commands work, and the full pytest and repository validation suite passed.
 
 ## 3. Programme Vision
 
@@ -376,7 +383,7 @@ No runtime command, SQL, renderer, redirect, or permission changes were made.
 
 ### Phase 2 — Governor Context and Dashboard Data Foundation
 
-Status: `next`.
+Status: `complete`.
 
 Goal: build the safe service/DAL foundation for the bold dashboard before changing the visible `/me` journey.
 
@@ -392,9 +399,20 @@ Deliver:
 
 Runtime change type: service/DAL foundation; no visible command redesign unless explicitly approved during implementation.
 
+Delivered in mirror PR `K98-bot-mirror#216` and production PR `K98-bot#523`:
+
+- `GovernorDashboardContext`, resolution, option, payload, and field-group models.
+- Linked-governor option resolution and no/one/multiple journey states.
+- Self-service access denial for unlinked governors.
+- Explicit opt-in required before any future unlinked inspect context can be allowed.
+- Dashboard DAL/service assembly for approved fields only, with no Olympia data.
+- Self-view-only account type/VIP separation from future inspect-safe data.
+- Safe missing/null behavior, Ark zero-join handling, SQL mapping, and DAL failure degradation.
+- Focused tests plus successful operator smoke and full regression validation.
+
 ### Phase 3 — Governor Selector and Dashboard Shell
 
-Status: `proposed`.
+Status: `next - task pack prepared`.
 
 Deliver:
 
@@ -405,6 +423,18 @@ Deliver:
 - Change governor affordance.
 - Compatibility access to Accounts, Reminders, Preferences, Inventory, and Exports.
 - Initial fallback embed/dashboard shell while premium renderer is completed.
+
+Selector architecture decision:
+
+- Phase 2 did not create or wire a Discord selector.
+- Phase 3 should add a dashboard-specific, private, author-gated selector/view that renders and
+  switches dashboard context in place.
+- Do not use the shared `AccountPickerView` directly: it is a one-shot selector that also owns
+  lookup/register/refresh behavior and does not match the dashboard's persistent context-switching
+  contract.
+- Reuse Phase 2 governor options/context/access services and established interaction-safety,
+  timeout, and message-edit patterns.
+- Recheck governor access on every selected-governor action and selection callback.
 
 ### Phase 4 — Premium Governor Dashboard Renderer
 
@@ -667,10 +697,11 @@ Do not include these in early phases unless separately approved:
 ## 20. Suggested Next Action
 
 ```text
-Start Player Self-Service Command Centre v2 Phase 2: Governor Context and Dashboard Data Foundation.
+Start Player Self-Service Command Centre v2 Phase 3: Governor Selector and Dashboard Shell.
 ```
 
-Phase 2 should build the service/DAL foundation and tests without changing the visible `/me` user journey yet.
+Phase 3 should make `/me dashboard` governor-first using the completed Phase 2 foundation, while
+preserving all existing `/me` subcommands and legacy paths. The premium PNG renderer remains Phase 4.
 
 ## 21. Programme Change Log
 
@@ -678,3 +709,4 @@ Phase 2 should build the service/DAL foundation and tests without changing the v
 |---|---|---|
 | 2026-06-27 | Initial v2 programme pack created | Follow-on from original Player Self-Service Command Centre programme. |
 | 2026-07-09 | Programme updated after Phase 1 audit | Reframed as GovernorOS, added bold dashboard vision, revised phase plan, removed Olympia from initial scope, and made Phase 2 the service/data foundation. |
+| 2026-07-10 | Phase 2 completed and Phase 3 prepared | Recorded the delivered governor context/data foundation, successful smoke/regression validation, explicit selector architecture decision, and Phase 3 as the next slice. |

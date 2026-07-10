@@ -1,6 +1,7 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 2 Governor Context and Dashboard Data Foundation
 
-Status: ready to start Phase 2 after Phase 1 audit completion.
+Status: archived after Phase 2 delivery, review hardening, smoke testing, and regression validation
+completed on 2026-07-10. Superseded by the Phase 3 Governor Selector and Dashboard Shell starter.
 
 ## Copy/Paste Starter
 

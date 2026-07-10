@@ -96,13 +96,22 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 9 `/me exports` option windows smoke tested; Phase 13 audit/scope drafted; operator approved export entry-point redirects; production PR #486 delivered and smoke tested the redirects successfully on 2026-06-27; player communication and no-feedback monitoring before final removal.
 
 ### Deferred Optimisation
-- Area: `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `commands/telemetry_cmds.py`, `/my_stats`, `/stats player`, `/player_profile`, `/myinventory`, player self-service v2 programme docs/tests
+- Area: `commands/me_cmds.py`, `ui/views/player_self_service_views.py`, `player_self_service/governor_dashboard_*`, `/me dashboard`, player self-service v2 docs/tests
 - Type: architecture
-- Description: The full player self-service modernisation still has larger personal stats, leadership/profile, and detailed inventory report surfaces outside Phase 13. `/my_stats`, `/stats player`, and `/player_profile` are too large for the first programme pack and need a Player Self-Service v2 scope; `/myinventory` remains valuable but needs product/design alignment with the new command group model; `/mykvkcrystaltech` is a unique channel-gated personal workflow and is not included in the immediate v2 redirect cleanup.
-- Suggested Fix: Use `docs/task_packs/Player Self-Service Command Centre v2 - Programme Pack.md` and `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 1 Stats Profile Inventory Audit and Design.md` to run an audit-only v2 slice. The audit should classify stats report, leadership/profile lookup, and detailed inventory report journeys, define whether they stay flat/channel-gated or gain `/me`/grouped entry points, preserve public/private channel rules, and avoid folding CrystalTech into the same implementation slice until its product fit is decided.
+- Description: GovernorOS v2 Phase 2 delivered the typed governor context, no/one/multiple resolution, self-view access checks, renderer-independent payload, SQL-backed dashboard DAL/service, and self-view versus inspect-safe data separation. The visible `/me dashboard` journey, Discord governor selector, premium renderer, direct inventory actions, private history, inspect flow, and usage-led legacy migration remain intentionally outside the completed foundation slice.
+- Suggested Fix: Execute the prepared Phase 3 Governor Selector and Dashboard Shell task pack first, using a dashboard-specific author-gated view and the Phase 2 access/payload services. Follow with the separate Phase 4 premium renderer and later action/inspect/history phases only after their own approval and validation. Preserve all existing `/me` and legacy command paths through the initial dashboard rollout.
 - Impact: high
 - Risk: medium
-- Dependencies: Original Player Self-Service Command Centre programme completed in production PR #486; v2 programme pack and Phase 1 audit starter prepared; operator approval to start the v2 audit; production usage evidence for `/my_stats`, `/stats player`, `/player_profile`, `/myinventory`, and `/mykvkcrystaltech` before any command-surface changes.
+- Dependencies: Phase 1 blueprint complete; Phase 2 delivered in mirror PR #216 and production PR #523 with successful operator smoke and full regression validation; Phase 3 registry-linkage trust checkpoint and implementation approval.
+
+### Deferred Optimisation
+- Area: `registry/`, `services/governor_account_service.py`, player self-service governor access policy and tests
+- Type: architecture
+- Description: Phase 2 authorizes self-view from the current Discord-user-to-governor registry linkage, matching established self-service behavior. The ownership-assurance and recovery policy for that linkage predates GovernorOS and has not yet been formally approved as the trust boundary for an expanded personal dashboard.
+- Suggested Fix: Define and approve the governor-link ownership verification, conflict, transfer, and recovery policy. Add service-level enforcement and regression tests before exposing any future dashboard data classified as more sensitive than existing self-service surfaces. Keep Phase 3 default-deny for unlinked governors and do not enable unlinked inspect access.
+- Impact: high
+- Risk: medium
+- Dependencies: Operator product/security decision; identify an authoritative verification source or approved manual verification path before implementation.
 
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `inventory/export_service.py`, `inventory/dal/`, SQL repo export views/tables, export docs/tests

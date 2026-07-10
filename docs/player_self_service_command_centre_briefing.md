@@ -1,6 +1,14 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-06-27
+Last updated: 2026-07-10
+
+GovernorOS v2 status: Phase 2 Governor Context and Dashboard Data Foundation is complete in mirror
+PR #216 and production PR #523. It added typed governor resolution/context/payload contracts, a
+dashboard DAL/service, linked-governor self-view access checks, self-view versus future inspect-safe
+data separation, null-safe field handling, and focused regression coverage without changing the
+visible `/me` journey. Operator smoke testing confirmed all existing `/me` and named legacy
+commands work, and the full pytest and repository validation suite passed. Phase 3 Governor
+Selector and Dashboard Shell is the next prepared slice; the premium PNG renderer remains Phase 4.
 
 Status: Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and
 production PR #481, and smoke tested successfully on 2026-06-26. Phase 11B KVK Renderer Migration
@@ -407,8 +415,13 @@ Current status:
   matching `/me` centre.
 - Final command-registration removal remains deferred until player communication, a no-feedback
   monitoring window, production usage review, and operator approval.
-- Next prepared work is Player Self-Service Command Centre v2 Phase 1: audit/design for
-  `/my_stats`, `/stats player`, `/player_profile`, `/myinventory`, and the product fit of
-  `/mykvkcrystaltech`.
+- GovernorOS v2 Phase 1 product blueprint/audit and Phase 2 governor context/data foundation are
+  complete and archived as execution records.
+- Phase 2 created no Discord governor selector and made no visible `/me` change.
+- Next prepared work is GovernorOS v2 Phase 3: a dashboard-specific private selector, no/one/multiple
+  governor journey, selected-governor fallback shell, and in-place Change Governor behavior.
+- The generic `AccountPickerView` will not be wired directly into the dashboard because its
+  one-shot lookup/register/refresh flow does not fit persistent dashboard context switching.
+- The premium PNG governor dashboard renderer remains Phase 4.
 - Export schema/format redesign remains a separate export-output programme unless explicitly
   narrowed later.
