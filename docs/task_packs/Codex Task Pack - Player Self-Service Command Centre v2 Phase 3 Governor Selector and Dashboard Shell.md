@@ -39,8 +39,8 @@ correction now reads cumulative acclaim, Ark, and Autarch values from the latest
 disables expired controls through the original ephemeral response, and preserves the selected
 governor across compatibility-page navigation while still rechecking registry access on return.
 
-Automated validation completed with 110 focused DAL/service/view tests and the full repository
-suite (`2442 passed, 2 skipped`). Architecture, deferred-item, test-selection, smoke-import,
+Automated validation completed with 111 focused DAL/service/view tests and the full repository
+suite (`2443 passed, 2 skipped`). Architecture, deferred-item, test-selection, smoke-import,
 command-registration, full pre-commit, and diff checks passed. The Codex Security plugin was not
 exposed to this task and the local CLI could not be launched, so an independent security-focused
 diff review was used as the documented fallback. It found and drove closure of one interaction
@@ -194,10 +194,10 @@ Show, when present:
 
 - Governor name and Governor ID.
 - Self-view account type and optional VIP.
-- Alliance, Civilisation, and Conduct Score.
+- Alliance, Civilisation, Location, and Conduct Score.
 - Power, Kill Points, Highest Acclaim, Dead, Helps, and Healed.
 - Ark joined, won, and guarded win ratio.
-- Times Named Autarch.
+- Times Named Autarch and Times Autarch Participated.
 - Freshness/update timestamp or a clear unavailable state.
 
 Shell rules:
@@ -323,8 +323,9 @@ Use test users or controlled registry fixtures representing each state:
 6. Timeout: controls disable and the private message shows an expiry instruction without Discord's
    `This interaction failed` banner.
 7. Live fields: civilisation is a player-facing name; Highest Acclaim, Ark joined/won/win ratio,
-   and Autarch count match the latest scan; large battle values use compact notation; scan order is
-   absent.
+   Named Autarch count, Autarch participation count, and `X:Y` location match their authoritative
+   sources; large battle values use compact notation, VIP labels do not repeat `VIP`, and scan
+   order is absent.
 8. Foreign interaction: another user cannot operate the view.
 9. Missing data/VIP: shell remains readable and uses safe fallback values.
 10. Existing `/me accounts`, `/me reminders`, `/me preferences`, `/me inventory`, and `/me exports`

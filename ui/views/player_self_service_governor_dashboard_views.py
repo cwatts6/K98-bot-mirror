@@ -87,6 +87,19 @@ def _format_freshness(value: Any) -> str:
     return _safe_text(value, missing="No recent scan available")
 
 
+def _format_vip(value: Any) -> str:
+    label = str(value or "").strip()
+    if not label:
+        return "VIP: Not set"
+    return label if label.casefold().startswith("vip") else f"VIP: {label}"
+
+
+def _format_location(x: int | None, y: int | None) -> str:
+    if x is None or y is None:
+        return _MISSING
+    return f"{x}:{y}"
+
+
 def _option_label(option: GovernorDashboardOption) -> str:
     label = " ".join(str(option.governor_name or "").split()) or option.governor_id_str
     return label[:100]
@@ -133,7 +146,7 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
             (
                 f"Governor ID: `{identity.governor_id}`",
                 f"Account type: {_safe_text(getattr(self_view, 'account_type', None))}",
-                f"VIP: {_safe_text(getattr(self_view, 'vip_level_label', None), missing='Not set')}",
+                _format_vip(getattr(self_view, "vip_level_label", None)),
             )
         ),
         inline=False,
@@ -144,6 +157,7 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
             (
                 f"Alliance: {_safe_text(identity.alliance)}",
                 f"Civilisation: {_safe_text(identity.civilisation)}",
+                f"Location: {_format_location(identity.location_x, identity.location_y)}",
                 f"Conduct Score: {_format_number(profile.conduct_score)}",
             )
         ),
@@ -171,6 +185,8 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
                 f"Ark won: {_format_number(honours.ark_won)}",
                 f"Ark win ratio: {_safe_text(honours.ark_win_ratio_label)}",
                 f"Times Named Autarch: {_format_number(history.times_named_autarch)}",
+                "Times Autarch Participated: "
+                f"{_format_number(history.times_autarch_participated)}",
             )
         ),
         inline=False,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -146,6 +147,8 @@ def _payload(
             governor_id=context.selected_governor_id or 0,
             alliance=None if missing else "KD98",
             civilisation=None if missing else "France",
+            location_x=None if missing else 123,
+            location_y=None if missing else 456,
         ),
         latest_metrics=GovernorDashboardLatestMetrics(
             power=None if missing else 123456789,
@@ -157,6 +160,7 @@ def _payload(
         historical_highlights=GovernorDashboardHistoricalHighlights(
             highest_acclaim=None if missing else 88,
             times_named_autarch=None if missing else 3,
+            times_autarch_participated=None if missing else 6,
         ),
         activity_honours=GovernorDashboardActivityHonours(
             ark_joined=0 if missing else 10,
@@ -249,6 +253,8 @@ async def test_one_governor_opens_dashboard_directly_after_access_resolution() -
     assert "Power: 123.5M" in edited["embed"].fields[2].value
     assert "Kill Points: 987.7M" in edited["embed"].fields[2].value
     assert "Healed: 10K" in edited["embed"].fields[2].value
+    assert "Location: 123:456" in edited["embed"].fields[1].value
+    assert "Times Autarch Participated: 6" in edited["embed"].fields[3].value
     assert "scan order" not in str(edited["embed"].fields[-1].value).casefold()
     assert "me:dashboard:change" not in _custom_ids(edited["view"])
 
@@ -517,6 +523,23 @@ def test_short_number_format_matches_existing_dashboard_style() -> None:
     assert views._format_short_number(74_000) == "74K"
 
 
+def test_vip_label_does_not_repeat_vip_prefix() -> None:
+    option = _option(111, name="Main Gov")
+    payload = _payload(_context(option))
+    payload = replace(
+        payload,
+        self_view=GovernorDashboardSelfView(
+            account_type="Alt 1",
+            vip_level_label="VIP 14 or less",
+        ),
+    )
+
+    embed = views.build_governor_dashboard_embed(payload)
+
+    assert "VIP 14 or less" in embed.fields[0].value
+    assert "VIP: VIP" not in embed.fields[0].value
+
+
 @pytest.mark.asyncio
 async def test_author_gate_and_expired_view_fail_privately() -> None:
     option = _option(111)
@@ -574,6 +597,8 @@ def test_missing_values_missing_vip_and_zero_ark_are_safe_and_no_olympia_text() 
     assert "vip: not set" in rendered
     assert "ark win ratio: n/a" in rendered
     assert "power: n/a" in rendered
+    assert "location: n/a" in rendered
+    assert "times autarch participated: n/a" in rendered
     assert "no recent scan available" in rendered
     assert "olympia" not in rendered
 

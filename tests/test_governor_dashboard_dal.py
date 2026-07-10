@@ -22,8 +22,11 @@ class _Cursor:
             ("AOOJoined",),
             ("AOOWon",),
             ("AutarchTimes",),
+            ("KvKPlayed",),
             ("Conduct",),
             ("Civilization",),
+            ("LocationX",),
+            ("LocationY",),
             ("UpdatedAtUtc",),
             ("ScanOrder",),
         ]
@@ -40,8 +43,11 @@ class _Cursor:
             12,
             8,
             4,
+            7,
             100,
             "Britain",
+            123,
+            456,
             datetime(2026, 7, 10, 9, 17, tzinfo=UTC),
             1002,
         )
@@ -77,8 +83,14 @@ def test_dashboard_dal_uses_latest_scan_fields_and_civilisation_mapping(monkeypa
     assert "s.AOOJoined" in sql
     assert "s.AOOWon" in sql
     assert "s.AutarchTimes" in sql
+    assert "s.KvKPlayed" in sql
+    assert "s.GovernorID = CONVERT(FLOAT, ?)" in sql
+    assert "ORDER BY s.SCANORDER DESC, s.AsOfDate DESC, s.ScanDate DESC" in sql
+    assert "TRY_CONVERT(BIGINT, s.GovernorID)" not in sql
     assert "dbo.Civilization_Mapping" in sql
     assert "cm.Civilization_Name" in sql
+    assert "dbo.PlayerLocation" in sql
+    assert "pl.GovernorID = r.GovernorID" in sql
     assert "ALL_STATS_FOR_DASHBOARD" not in sql
     assert connection.cursor_instance.executed_params == (2_441_482, 2_441_482)
     assert connection.closed is True
@@ -86,4 +98,7 @@ def test_dashboard_dal_uses_latest_scan_fields_and_civilisation_mapping(monkeypa
     assert result.ark_joined == 12
     assert result.ark_won == 8
     assert result.times_named_autarch == 4
+    assert result.kvk_played == 7
     assert result.civilization == "Britain"
+    assert result.location_x == 123
+    assert result.location_y == 456

@@ -342,15 +342,17 @@ Recommended data fields for the first dashboard payload:
 | Alliance | Latest stats/profile | Optional fallback |
 | Power | Latest stats | Optional fallback |
 | Kill Points | Latest stats / aggregate | Optional fallback |
-| Highest Acclaim | KVK/export aggregate/history | Optional fallback |
+| Highest Acclaim | latest `KingdomScanData4.HighestAcclaim` | Optional fallback |
 | Dead | Latest stats | Optional fallback |
 | Helps | Latest stats | Optional fallback |
 | Healed | Latest stats | Optional fallback |
-| Ark joined/won | `AOOJoined`, `AOOWon` aggregate source | Null/zero guarded |
+| Ark joined/won | latest `KingdomScanData4.AOOJoined`, `AOOWon` | Null/zero guarded |
 | Ark win ratio | Derived | Show `N/A` if no joined value |
-| Times Named Autarch | `AutarchTimes` aggregate/history | Optional fallback |
+| Times Named Autarch | latest `KingdomScanData4.AutarchTimes` | Optional fallback |
+| Times Autarch Participated | latest `KingdomScanData4.KvKPlayed` | Optional fallback |
 | Conduct Score | SQL field `Conduct` | UI label `Conduct Score` |
 | Civilisation | SQL field `Civilization` | UI label `Civilisation` |
+| Location | `PlayerLocation.X`, `PlayerLocation.Y` | Show `X:Y`; optional fallback |
 | Updated timestamp | latest scan/data source | Required if available |
 
 Excluded until a source exists:
@@ -450,6 +452,10 @@ Delivered locally on 2026-07-10:
   `KingdomScanData4` row, map numeric civilisation through `Civilization_Mapping`, use compact
   player-facing numbers, omit scan order, disable controls through the original ephemeral response
   on timeout, and retain selected-governor context across compatibility-page navigation.
+- Second-pass smoke corrections add `KvKPlayed` as Times Autarch Participated, add the indexed
+  `PlayerLocation` `X:Y` lookup, avoid repeated `VIP` wording, and make the governor predicate
+  index-seekable. Mixed generated-card/embed transitions are explicitly parked for the Phase 4-6
+  renderer upgrades, with SQL execution-plan measurement captured before any new view/index/table.
 - Accounts, Reminders, Preferences, Inventory, and Exports remain reachable with unchanged
   semantics; all existing `/me` and named legacy command registrations remain intact.
 - The operator approved active registry linkage as the Phase 3 self-view authority, backed by

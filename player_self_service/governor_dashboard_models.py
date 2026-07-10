@@ -67,6 +67,8 @@ class GovernorDashboardIdentity:
     governor_id: int
     alliance: str | None = None
     civilisation: str | None = None
+    location_x: int | None = None
+    location_y: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +84,7 @@ class GovernorDashboardLatestMetrics:
 class GovernorDashboardHistoricalHighlights:
     highest_acclaim: int | None = None
     times_named_autarch: int | None = None
+    times_autarch_participated: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,8 +125,11 @@ class GovernorDashboardDataRow:
     ark_joined: int | None = None
     ark_won: int | None = None
     times_named_autarch: int | None = None
+    kvk_played: int | None = None
     conduct: float | None = None
     civilization: str | None = None
+    location_x: int | None = None
+    location_y: int | None = None
     updated_at_utc: Any | None = None
     scan_order: int | None = None
 

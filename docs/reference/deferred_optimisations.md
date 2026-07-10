@@ -96,6 +96,24 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 9 `/me exports` option windows smoke tested; Phase 13 audit/scope drafted; operator approved export entry-point redirects; production PR #486 delivered and smoke tested the redirects successfully on 2026-06-27; player communication and no-feedback monitoring before final removal.
 
 ### Deferred Optimisation
+- Area: `player_self_service/governor_dashboard_dal.py`, SQL repo `dbo.KingdomScanData4` dashboard-read indexes, optional dashboard read view
+- Type: performance
+- Description: Phase 3 reads one latest `KingdomScanData4` row per selected governor and joins primary-key lookup tables. The smoke review identified that the original `TRY_CONVERT` around `GovernorID` could inhibit the existing `(GovernorID, SCANORDER DESC, AsOfDate DESC, ScanDate DESC)` access path; the bot query now converts the parameter instead. The source table is approximately 387k rows and growing, but there is no representative execution-plan, logical-read, duration, or concurrency baseline demonstrating that a new view, covering index, or maintained snapshot table is required.
+- Suggested Fix: Run a SQL performance evidence slice using representative early/middle/recent Governor IDs with actual execution plans plus `SET STATISTICS IO, TIME ON`. Confirm an index seek on the GovernorID/scan-order index, one-row lookup behavior, and the clustered `PlayerLocation`/`Civilization_Mapping` joins. Record warm/cold logical reads and duration under expected dashboard concurrency. Introduce a canonical view only for contract reuse, add covering includes only if key-lookup cost is evidenced, and consider a snapshot table only if measured demand justifies explicit refresh, staleness, failure, deployment, and rollback contracts.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 3 smoke correction deployed for representative measurement; production SQL execution-plan access; observed dashboard usage/concurrency; SQL owner approval before index, view, or maintained-table changes.
+
+### Deferred Optimisation
+- Area: `ui/views/player_self_service_views.py`, `ui/views/player_self_service_governor_dashboard_views.py`, Phase 4-6 dashboard/page renderer migration
+- Type: consistency
+- Description: Phase 3 smoke shows that moving between generated `/me` page cards and the fallback governor embed can leave the previous card attachment visible above the new embed even though the interaction remains private and functional. Repeatedly polishing this transitional mixed renderer path would overlap the approved Phase 4-6 embed/card upgrades.
+- Suggested Fix: Resolve the visual transition during the Phase 4-6 renderer work by defining one attachment replacement/clearing contract for every `/me` page transition, applying it through the shared send/edit helper, and adding Discord-view regression coverage for card-to-card, card-to-embed, and embed-to-card switches. Preserve selected-governor access rechecks and in-place private navigation.
+- Impact: medium
+- Risk: low
+- Dependencies: Approved Phase 4 premium governor renderer and subsequent `/me` embed/page upgrades; operator visual acceptance criteria for the final renderer family.
+
+### Deferred Optimisation
 - Area: `commands/me_cmds.py`, `ui/views/player_self_service_views.py`, `player_self_service/governor_dashboard_*`, `/me dashboard`, player self-service v2 docs/tests
 - Type: architecture
 - Description: GovernorOS v2 Phase 3 delivered the private governor-first `/me dashboard` selector and fallback shell over the Phase 2 context/access/payload foundation. The premium renderer, direct governor-specific inventory actions, private history, required admin/leadership inspect flow, and usage-led legacy migration remain intentionally outside this interaction slice.

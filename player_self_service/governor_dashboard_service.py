@@ -400,10 +400,16 @@ def _missing_fields(
         "healed": latest_metrics.healed,
         "highest_acclaim": historical_highlights.highest_acclaim,
         "times_named_autarch": historical_highlights.times_named_autarch,
+        "times_autarch_participated": historical_highlights.times_autarch_participated,
         "ark_joined": activity_honours.ark_joined,
         "ark_won": activity_honours.ark_won,
         "conduct_score": profile_status.conduct_score,
         "updated_at_utc": freshness.updated_at_utc,
+        "location": (
+            identity.location_x
+            if identity.location_x is not None and identity.location_y is not None
+            else None
+        ),
     }
     if self_view is not None:
         values["vip_level_label"] = self_view.vip_level_label
@@ -444,6 +450,8 @@ async def build_governor_dashboard_payload(
         governor_id=int(context.selected_governor_id),
         alliance=data.alliance,
         civilisation=data.civilization,
+        location_x=data.location_x,
+        location_y=data.location_y,
     )
     latest_metrics = GovernorDashboardLatestMetrics(
         power=data.power,
@@ -455,6 +463,7 @@ async def build_governor_dashboard_payload(
     historical_highlights = GovernorDashboardHistoricalHighlights(
         highest_acclaim=data.highest_acclaim,
         times_named_autarch=data.times_named_autarch,
+        times_autarch_participated=data.kvk_played,
     )
     ark_ratio, ark_ratio_label = _ark_ratio(data.ark_joined, data.ark_won)
     activity_honours = GovernorDashboardActivityHonours(

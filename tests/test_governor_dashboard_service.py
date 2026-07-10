@@ -135,8 +135,11 @@ async def test_payload_assembles_approved_fields_and_self_view_data() -> None:
             ark_joined=10,
             ark_won=7,
             times_named_autarch=3,
+            kvk_played=6,
             conduct=94.5,
             civilization="France",
+            location_x=123,
+            location_y=456,
             updated_at_utc=scan,
             scan_order=456,
         )
@@ -154,6 +157,8 @@ async def test_payload_assembles_approved_fields_and_self_view_data() -> None:
     assert payload.identity.governor_id == 111
     assert payload.identity.alliance == "KD98"
     assert payload.identity.civilisation == "France"
+    assert payload.identity.location_x == 123
+    assert payload.identity.location_y == 456
     assert payload.latest_metrics.power == 123456789
     assert payload.latest_metrics.kill_points == 987654321
     assert payload.latest_metrics.dead == 12345
@@ -161,6 +166,7 @@ async def test_payload_assembles_approved_fields_and_self_view_data() -> None:
     assert payload.latest_metrics.healed == 55555
     assert payload.historical_highlights.highest_acclaim == 88
     assert payload.historical_highlights.times_named_autarch == 3
+    assert payload.historical_highlights.times_autarch_participated == 6
     assert payload.activity_honours.ark_joined == 10
     assert payload.activity_honours.ark_won == 7
     assert payload.activity_honours.ark_win_ratio == pytest.approx(0.7)
@@ -203,6 +209,8 @@ async def test_payload_handles_missing_values_missing_vip_and_zero_ark_joined() 
     assert "vip_level_label" in payload.missing_fields
     assert "alliance" in payload.missing_fields
     assert "conduct_score" in payload.missing_fields
+    assert "location" in payload.missing_fields
+    assert "times_autarch_participated" in payload.missing_fields
     assert "updated_at_utc" in payload.missing_fields
 
 

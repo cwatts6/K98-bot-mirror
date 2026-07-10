@@ -41,9 +41,9 @@ Phase 13 legacy redirect planning started with audit/scope only. After reviewing
 Use it to check:
 
 - governor identity, account type, and optional VIP
-- alliance, Civilisation, Conduct Score, and data freshness
+- alliance, Civilisation, `X:Y` Location, Conduct Score, and data freshness
 - power, Kill Points, Highest Acclaim, Dead, Helps, and Healed
-- Ark joined, won, win ratio, and Times Named Autarch
+- Ark joined, won, win ratio, Times Named Autarch, and Times Autarch Participated
 - where to manage Accounts, Reminders, Preferences, Inventory, and Exports
 
 The dashboard includes a visual summary card when image rendering succeeds. If image rendering or
@@ -427,6 +427,9 @@ Current status:
 - Initial Phase 3 smoke corrections cover graceful expiry, clean in-place page switching, retained
   selected-governor context, latest-scan acclaim/Ark/Autarch values, civilisation-name mapping,
   compact numbers, and removal of scan order; operator re-smoke remains before rollout.
+- Second-pass smoke adds `KvKPlayed` participation, indexed `PlayerLocation` coordinates, clearer
+  VIP wording, and a seekable governor lookup. Mixed page-card/embed visuals are parked for the
+  Phase 4-6 renderer upgrades; SQL plan/IO measurement is captured before any new read model.
 - The premium PNG governor dashboard renderer remains Phase 4.
 - Admin/leadership inspect is a required later permission-gated slice, not optional future polish.
 - Export schema/format redesign remains a separate export-output programme unless explicitly

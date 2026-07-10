@@ -61,8 +61,11 @@ def _row_to_dashboard_data(
         ark_joined=_to_int(row.get("AOOJoined")),
         ark_won=_to_int(row.get("AOOWon")),
         times_named_autarch=_to_int(row.get("AutarchTimes")),
+        kvk_played=_to_int(row.get("KvKPlayed")),
         conduct=_to_float(row.get("Conduct")),
         civilization=_clean_text(row.get("Civilization")),
+        location_x=_to_int(row.get("LocationX")),
+        location_y=_to_int(row.get("LocationY")),
         updated_at_utc=row.get("UpdatedAtUtc"),
         scan_order=_to_int(row.get("ScanOrder")),
     )
@@ -89,13 +92,14 @@ def fetch_governor_dashboard_data(governor_id: int) -> GovernorDashboardDataRow:
                 TRY_CONVERT(BIGINT, s.AOOJoined) AS AOOJoined,
                 TRY_CONVERT(INT, s.AOOWon) AS AOOWon,
                 TRY_CONVERT(BIGINT, s.AutarchTimes) AS AutarchTimes,
+                TRY_CONVERT(INT, s.KvKPlayed) AS KvKPlayed,
                 s.Conduct,
                 LTRIM(RTRIM(s.Civilization)) AS Civilization,
                 s.ScanDate AS UpdatedAtUtc,
                 CAST(s.SCANORDER AS BIGINT) AS ScanOrder
             FROM dbo.KingdomScanData4 AS s WITH (NOLOCK)
-            WHERE TRY_CONVERT(BIGINT, s.GovernorID) = ?
-            ORDER BY s.SCANORDER DESC, s.ScanDate DESC
+            WHERE s.GovernorID = CONVERT(FLOAT, ?)
+            ORDER BY s.SCANORDER DESC, s.AsOfDate DESC, s.ScanDate DESC
         )
         SELECT
             r.GovernorID,
@@ -110,15 +114,20 @@ def fetch_governor_dashboard_data(governor_id: int) -> GovernorDashboardDataRow:
             ls.AOOJoined,
             ls.AOOWon,
             ls.AutarchTimes,
+            ls.KvKPlayed,
             ls.Conduct,
             COALESCE(NULLIF(cm.Civilization_Name, ''), NULLIF(ls.Civilization, ''))
                 AS Civilization,
+            pl.X AS LocationX,
+            pl.Y AS LocationY,
             ls.UpdatedAtUtc,
             ls.ScanOrder
         FROM Requested AS r
         LEFT JOIN LatestScan AS ls ON ls.GovernorID = r.GovernorID
         LEFT JOIN dbo.Civilization_Mapping AS cm WITH (NOLOCK)
-            ON cm.Civilization = TRY_CONVERT(INT, NULLIF(ls.Civilization, ''));
+            ON cm.Civilization = TRY_CONVERT(INT, NULLIF(ls.Civilization, ''))
+        LEFT JOIN dbo.PlayerLocation AS pl WITH (NOLOCK)
+            ON pl.GovernorID = r.GovernorID;
     """
     conn = get_conn_with_retries()
     try:
