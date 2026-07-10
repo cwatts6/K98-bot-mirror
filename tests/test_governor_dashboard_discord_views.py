@@ -68,11 +68,11 @@ class _User:
 
 
 class _Interaction:
-    def __init__(self, user_id: int = 42) -> None:
+    def __init__(self, user_id: int = 42, *, component: bool = True) -> None:
         self.user = _User(user_id)
         self.response = _Response()
         self.followup = _Followup()
-        self.message = SimpleNamespace(id=123)
+        self.message = SimpleNamespace(id=123) if component else None
         self.original_edits: list[dict] = []
 
     async def edit_original_response(self, **kwargs):
@@ -182,7 +182,7 @@ def _payload(
 
 
 def _ctx() -> SimpleNamespace:
-    interaction = _Interaction()
+    interaction = _Interaction(component=False)
     return SimpleNamespace(user=interaction.user, interaction=interaction)
 
 
@@ -246,7 +246,10 @@ async def test_one_governor_opens_dashboard_directly_after_access_resolution() -
     edited = ctx.interaction.original_edits[-1]
     assert order == ["access", "payload"]
     assert edited["embed"].title == "Governor Dashboard — Main Gov"
-    assert "123,456,789" in edited["embed"].fields[2].value
+    assert "Power: 123.5M" in edited["embed"].fields[2].value
+    assert "Kill Points: 987.7M" in edited["embed"].fields[2].value
+    assert "Healed: 10K" in edited["embed"].fields[2].value
+    assert "scan order" not in str(edited["embed"].fields[-1].value).casefold()
     assert "me:dashboard:change" not in _custom_ids(edited["view"])
 
 
@@ -349,7 +352,7 @@ async def test_forged_selection_is_rechecked_and_denied_before_payload_fetch() -
 
     assert calls == [(42, "999", {"viewer_mode": "self"})]
     assert interaction.original_edits[-1]["embed"].title == "Governor Access Denied"
-    assert interaction.response.deferred == [{"ephemeral": True}]
+    assert interaction.response.deferred == [{}]
 
 
 @pytest.mark.asyncio
@@ -465,6 +468,56 @@ async def test_change_governor_is_multi_only_and_returns_to_selector_without_pay
 
 
 @pytest.mark.asyncio
+async def test_navigation_preserves_selected_governor_and_edits_component_message(
+    monkeypatch,
+) -> None:
+    from ui.views import player_self_service_views as page_views
+
+    option = _option(111, name="Main Gov")
+
+    async def summary_loader(_user_id: int):
+        return SimpleNamespace()
+
+    async def fake_page_response(*_args, **_kwargs):
+        return discord.Embed(title="Accounts"), []
+
+    monkeypatch.setattr(page_views, "_build_page_response", fake_page_response)
+    dashboard_view = views.GovernorDashboardView(
+        author_id=42,
+        display_name="Tester",
+        resolution=_selected_resolution(option),
+        summary_loader=summary_loader,
+    )
+    interaction = _Interaction()
+
+    await dashboard_view.open_page(interaction, page_views.PAGE_ACCOUNTS)
+
+    assert interaction.response.deferred == [{}]
+    edited = interaction.original_edits[-1]
+    assert edited["attachments"] == []
+    page_view = edited["view"]
+    assert page_view.dashboard_governor_id == 111
+
+    dashboard_calls = []
+
+    async def fake_dashboard(target, **kwargs):
+        dashboard_calls.append((target, kwargs))
+
+    monkeypatch.setattr(views, "show_governor_dashboard_for_interaction", fake_dashboard)
+    return_interaction = _Interaction()
+
+    await page_view._show_page(return_interaction, page_views.PAGE_DASHBOARD)
+
+    assert dashboard_calls[0][0] is return_interaction
+    assert dashboard_calls[0][1]["governor_id"] == 111
+
+
+def test_short_number_format_matches_existing_dashboard_style() -> None:
+    assert views._format_short_number(182_200_000) == "182.2M"
+    assert views._format_short_number(74_000) == "74K"
+
+
+@pytest.mark.asyncio
 async def test_author_gate_and_expired_view_fail_privately() -> None:
     option = _option(111)
     view = views.GovernorDashboardView(
@@ -488,6 +541,24 @@ async def test_author_gate_and_expired_view_fail_privately() -> None:
     assert await view.interaction_check(stale) is False
     assert stale.response.sent[-1][1]["ephemeral"] is True
     assert "expired" in stale.response.sent[-1][0][0]
+
+
+@pytest.mark.asyncio
+async def test_timeout_edits_original_ephemeral_response_gracefully() -> None:
+    view = views.GovernorDashboardView(
+        author_id=42,
+        display_name="Tester",
+        resolution=_selected_resolution(_option(111)),
+    )
+    interaction = _Interaction()
+    view.set_timeout_target(interaction)
+
+    await view.on_timeout()
+
+    edited = interaction.original_edits[-1]
+    assert "expired" in edited["content"]
+    assert edited["view"] is view
+    assert all(child.disabled for child in view.children)
 
 
 def test_missing_values_missing_vip_and_zero_ark_are_safe_and_no_olympia_text() -> None:

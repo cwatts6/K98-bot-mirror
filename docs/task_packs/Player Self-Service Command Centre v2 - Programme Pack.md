@@ -412,7 +412,7 @@ Delivered in mirror PR `K98-bot-mirror#216` and production PR `K98-bot#523`:
 
 ### Phase 3 — Governor Selector and Dashboard Shell
 
-Status: `implementation complete - local validation passed; operator smoke pending`.
+Status: `implementation correction complete - operator re-smoke pending`.
 
 Deliver:
 
@@ -446,6 +446,10 @@ Delivered locally on 2026-07-10:
   on timeout, and paginates safely beyond Discord's 25-option select limit.
 - The fallback shell shows the approved Phase 2 identity, profile, battle, Ark, honour, and
   freshness fields with predictable missing-value behavior and no Olympia content.
+- Initial operator smoke corrections source acclaim, Ark, and Autarch values from the latest
+  `KingdomScanData4` row, map numeric civilisation through `Civilization_Mapping`, use compact
+  player-facing numbers, omit scan order, disable controls through the original ephemeral response
+  on timeout, and retain selected-governor context across compatibility-page navigation.
 - Accounts, Reminders, Preferences, Inventory, and Exports remain reachable with unchanged
   semantics; all existing `/me` and named legacy command registrations remain intact.
 - The operator approved active registry linkage as the Phase 3 self-view authority, backed by

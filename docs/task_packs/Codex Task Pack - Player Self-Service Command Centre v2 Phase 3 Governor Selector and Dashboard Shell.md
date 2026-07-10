@@ -8,7 +8,7 @@
 - Task type: `Discord interaction feature | private governor selection | dashboard shell integration`
 - One-pass approved: `No`
 - Implementation approved: `Yes - registry authority checkpoint confirmed 2026-07-10`
-- Status: `implementation complete - local validation passed; operator smoke pending`
+- Status: `implementation correction complete - operator re-smoke pending`
 
 ## Completion Record
 
@@ -32,13 +32,21 @@ Delivered:
 - `/me dashboard` version increment from `v1.00` to `v1.01`; command counts unchanged.
 - Selector pagination for more than 25 linked governors without using `AccountPickerView`.
 
-Automated validation completed with 108 focused service/view/command tests and the full repository
-suite (`2435 passed, 2 skipped`). Architecture, deferred-item, test-selection, smoke-import,
+Initial operator smoke on 2026-07-10 identified live-data and interaction presentation gaps. The
+correction now reads cumulative acclaim, Ark, and Autarch values from the latest
+`dbo.KingdomScanData4` row, resolves numeric civilisation through
+`dbo.Civilization_Mapping`, uses compact player-facing numbers, removes scan order from the shell,
+disables expired controls through the original ephemeral response, and preserves the selected
+governor across compatibility-page navigation while still rechecking registry access on return.
+
+Automated validation completed with 110 focused DAL/service/view tests and the full repository
+suite (`2442 passed, 2 skipped`). Architecture, deferred-item, test-selection, smoke-import,
 command-registration, full pre-commit, and diff checks passed. The Codex Security plugin was not
 exposed to this task and the local CLI could not be launched, so an independent security-focused
 diff review was used as the documented fallback. It found and drove closure of one interaction
 integrity issue around concurrent/stale/timeout transitions, then completed with no reportable
-findings. Operator Discord smoke remains before rollout.
+findings. A security-focused re-review of the initial smoke corrections also completed with no
+reportable findings. Operator Discord re-smoke remains before rollout.
 
 Product direction confirmed during the approval checkpoint: admin/leadership inspect is required
 for kingdom management and player support. It remains outside Phase 3 and must be delivered as a
@@ -310,11 +318,18 @@ Use test users or controlled registry fixtures representing each state:
 2. One linked governor: dashboard shell opens directly with the correct Governor ID.
 3. Multiple linked governors: selector opens privately; each account loads its own shell.
 4. Change Governor: returns to the selector and switches the same private message in place.
-5. Foreign interaction: another user cannot operate the view.
-6. Missing data/VIP: shell remains readable and uses safe fallback values.
-7. Existing `/me accounts`, `/me reminders`, `/me preferences`, `/me inventory`, and `/me exports`
+5. Accounts/Reminders/Preferences/Inventory/Exports replace the same private message; returning to
+   Dashboard keeps the selected governor without another selector step.
+6. Timeout: controls disable and the private message shows an expiry instruction without Discord's
+   `This interaction failed` banner.
+7. Live fields: civilisation is a player-facing name; Highest Acclaim, Ark joined/won/win ratio,
+   and Autarch count match the latest scan; large battle values use compact notation; scan order is
+   absent.
+8. Foreign interaction: another user cannot operate the view.
+9. Missing data/VIP: shell remains readable and uses safe fallback values.
+10. Existing `/me accounts`, `/me reminders`, `/me preferences`, `/me inventory`, and `/me exports`
    continue to work.
-8. Legacy `/my_stats`, `/myinventory`, `/stats player`, `/player_profile`, `/mykvkcrystaltech`, and
+11. Legacy `/my_stats`, `/myinventory`, `/stats player`, `/player_profile`, `/mykvkcrystaltech`, and
    `/kvk history` continue to work unchanged.
 
 ## 15. Acceptance Criteria

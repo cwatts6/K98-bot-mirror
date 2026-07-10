@@ -85,6 +85,10 @@ def fetch_governor_dashboard_data(governor_id: int) -> GovernorDashboardDataRow:
                 CAST(s.Deads AS BIGINT) AS Dead,
                 CAST(s.Helps AS BIGINT) AS Helps,
                 CAST(s.HealedTroops AS BIGINT) AS Healed,
+                TRY_CONVERT(BIGINT, s.HighestAcclaim) AS HighestAcclaim,
+                TRY_CONVERT(BIGINT, s.AOOJoined) AS AOOJoined,
+                TRY_CONVERT(INT, s.AOOWon) AS AOOWon,
+                TRY_CONVERT(BIGINT, s.AutarchTimes) AS AutarchTimes,
                 s.Conduct,
                 LTRIM(RTRIM(s.Civilization)) AS Civilization,
                 s.ScanDate AS UpdatedAtUtc,
@@ -92,54 +96,34 @@ def fetch_governor_dashboard_data(governor_id: int) -> GovernorDashboardDataRow:
             FROM dbo.KingdomScanData4 AS s WITH (NOLOCK)
             WHERE TRY_CONVERT(BIGINT, s.GovernorID) = ?
             ORDER BY s.SCANORDER DESC, s.ScanDate DESC
-        ),
-        DashboardAgg AS (
-            SELECT
-                CAST(d.[Gov_ID] AS BIGINT) AS GovernorID,
-                MAX(TRY_CONVERT(BIGINT, d.[HighestAcclaim])) AS HighestAcclaim,
-                MAX(TRY_CONVERT(BIGINT, d.[AOOJoined])) AS AOOJoined,
-                MAX(TRY_CONVERT(INT, d.[AOOWon])) AS AOOWon,
-                MAX(TRY_CONVERT(BIGINT, d.[AutarchTimes])) AS AutarchTimes
-            FROM dbo.ALL_STATS_FOR_DASHBOARD AS d WITH (NOLOCK)
-            WHERE d.[Gov_ID] = ?
-            GROUP BY d.[Gov_ID]
-        ),
-        LatestDashboard AS (
-            SELECT TOP (1)
-                CAST(d.[Gov_ID] AS BIGINT) AS GovernorID,
-                LTRIM(RTRIM(d.[Governor_Name])) AS GovernorName,
-                LTRIM(RTRIM(d.[Civilization])) AS Civilization,
-                d.[Conduct]
-            FROM dbo.ALL_STATS_FOR_DASHBOARD AS d WITH (NOLOCK)
-            WHERE d.[Gov_ID] = ?
-            ORDER BY d.[KVK_NO] DESC
         )
         SELECT
             r.GovernorID,
-            COALESCE(NULLIF(ls.GovernorName, ''), NULLIF(ld.GovernorName, '')) AS GovernorName,
+            NULLIF(ls.GovernorName, '') AS GovernorName,
             NULLIF(ls.Alliance, '') AS Alliance,
             ls.Power,
             ls.KillPoints,
             ls.Dead,
             ls.Helps,
             ls.Healed,
-            da.HighestAcclaim,
-            da.AOOJoined,
-            da.AOOWon,
-            da.AutarchTimes,
-            COALESCE(ls.Conduct, ld.Conduct) AS Conduct,
-            COALESCE(NULLIF(ls.Civilization, ''), NULLIF(ld.Civilization, '')) AS Civilization,
+            ls.HighestAcclaim,
+            ls.AOOJoined,
+            ls.AOOWon,
+            ls.AutarchTimes,
+            ls.Conduct,
+            COALESCE(NULLIF(cm.Civilization_Name, ''), NULLIF(ls.Civilization, ''))
+                AS Civilization,
             ls.UpdatedAtUtc,
             ls.ScanOrder
         FROM Requested AS r
         LEFT JOIN LatestScan AS ls ON ls.GovernorID = r.GovernorID
-        LEFT JOIN DashboardAgg AS da ON da.GovernorID = r.GovernorID
-        LEFT JOIN LatestDashboard AS ld ON ld.GovernorID = r.GovernorID;
+        LEFT JOIN dbo.Civilization_Mapping AS cm WITH (NOLOCK)
+            ON cm.Civilization = TRY_CONVERT(INT, NULLIF(ls.Civilization, ''));
     """
     conn = get_conn_with_retries()
     try:
         cur = conn.cursor()
-        cur.execute(sql, (gid, gid, gid, gid))
+        cur.execute(sql, (gid, gid))
         return _row_to_dashboard_data(fetch_one_dict(cur), gid)
     finally:
         conn.close()

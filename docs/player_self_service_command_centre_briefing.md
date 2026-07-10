@@ -2,8 +2,8 @@
 
 Last updated: 2026-07-10
 
-GovernorOS v2 status: Phase 3 Governor Selector and Dashboard Shell is implemented locally with
-focused and full repository validation passed; operator Discord smoke remains. `/me dashboard` is
+GovernorOS v2 status: Phase 3 Governor Selector and Dashboard Shell is implemented locally;
+initial operator smoke corrections are complete and re-smoke remains. `/me dashboard` is
 now governor-first: no linked governor shows setup guidance, one opens directly, and multiple use a
 private author-gated selector before dashboard data is fetched. Every selected governor is checked
 again against the active registry. The operator approved that registry authority based on Discord
@@ -424,7 +424,9 @@ Current status:
   options/access services and supports safe in-place context switching.
 - Existing registry linkage is approved for Phase 3 self-view access under the operator's onboarding,
   monthly reconciliation, and transfer-control process.
-- Phase 3 operator Discord smoke remains before rollout.
+- Initial Phase 3 smoke corrections cover graceful expiry, clean in-place page switching, retained
+  selected-governor context, latest-scan acclaim/Ark/Autarch values, civilisation-name mapping,
+  compact numbers, and removal of scan order; operator re-smoke remains before rollout.
 - The premium PNG governor dashboard renderer remains Phase 4.
 - Admin/leadership inspect is a required later permission-gated slice, not optional future polish.
 - Export schema/format redesign remains a separate export-output programme unless explicitly

@@ -702,7 +702,7 @@ async def test_dashboard_inventory_button_opens_inventory_page() -> None:
     await button.callback(interaction)
 
     edited = interaction.original_edits[-1]
-    assert interaction.response.deferred == [{"ephemeral": True}]
+    assert interaction.response.deferred == [{}]
     assert edited["embed"].image.url.startswith("attachment://me_inventory_")
     assert [file.filename for file in edited["files"]] == ["me_inventory_42.png"]
     assert isinstance(edited["view"], views.PlayerSelfServiceView)
@@ -2023,7 +2023,7 @@ async def test_view_navigation_loads_summary_and_edits_message() -> None:
 
     edited = interaction.original_edits[-1]
     assert order == ["defer", "loader"]
-    assert interaction.response.deferred[-1]["ephemeral"] is True
+    assert interaction.response.deferred[-1] == {}
     assert edited["content"] is None
     assert edited["embed"].image.url.startswith("attachment://me_reminders_")
     assert edited["attachments"] == []
@@ -2110,6 +2110,7 @@ async def test_view_navigation_defer_type_error_falls_back_without_logging(caplo
 
     caplog.set_level("DEBUG")
     interaction.response.defer = defer
+    interaction.message = None
 
     await view._show_page(interaction, views.PAGE_REMINDERS)
 
@@ -2132,7 +2133,7 @@ async def test_view_navigation_failure_after_defer_uses_private_followup() -> No
 
     await view._show_page(interaction, views.PAGE_ACCOUNTS)
 
-    assert interaction.response.deferred[-1]["ephemeral"] is True
+    assert interaction.response.deferred[-1] == {}
     args, kwargs, _message = interaction.followup.sent[-1]
     assert "temporarily unavailable" in args[0]
     assert kwargs["ephemeral"] is True
@@ -2163,6 +2164,7 @@ async def test_account_completion_navigation_defer_type_error_falls_back() -> No
         await original_defer(**kwargs)
 
     interaction.response.defer = defer
+    interaction.message = None
 
     await view._show_page(interaction, views.PAGE_ACCOUNTS)
 

@@ -448,6 +448,7 @@ class PlayerSelfServiceView(discord.ui.View):
         page: PlayerSelfServicePage = PAGE_DASHBOARD,
         summary: PlayerSelfServiceSummary | None = None,
         summary_loader: SummaryLoader = build_player_self_service_summary,
+        dashboard_governor_id: int | None = None,
         timeout: float = 180,
     ):
         super().__init__(timeout=timeout, disable_on_timeout=True)
@@ -456,7 +457,9 @@ class PlayerSelfServiceView(discord.ui.View):
         self.page = page
         self.summary = summary
         self.summary_loader = summary_loader
+        self.dashboard_governor_id = dashboard_governor_id
         self._message_ref: discord.Message | None = None
+        self._timeout_editor: Callable[..., Awaitable[Any]] | None = None
         self._expired = False
         self._apply_page_state()
 
@@ -467,6 +470,11 @@ class PlayerSelfServiceView(discord.ui.View):
                 self._message = message
             except Exception:
                 logger.debug("player_self_service_internal_message_ref_failed", exc_info=True)
+
+    def set_timeout_target(self, target: Any) -> None:
+        editor = getattr(target, "edit_original_response", None)
+        if callable(editor):
+            self._timeout_editor = editor
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if self._expired:
@@ -586,12 +594,16 @@ class PlayerSelfServiceView(discord.ui.View):
                 interaction,
                 author_id=self.author_id,
                 display_name=self.display_name,
+                governor_id=self.dashboard_governor_id,
                 summary_loader=self.summary_loader,
                 timeout=self.timeout or 180,
             )
             return True
         try:
-            await interaction.response.defer(ephemeral=True)
+            if getattr(interaction, "message", None) is not None:
+                await interaction.response.defer()
+            else:
+                await interaction.response.defer(ephemeral=True)
         except TypeError:
             try:
                 await interaction.response.defer()
@@ -649,6 +661,7 @@ class PlayerSelfServiceView(discord.ui.View):
             page=page,
             summary=summary,
             summary_loader=self.summary_loader,
+            dashboard_governor_id=self.dashboard_governor_id,
             timeout=self.timeout or 180,
         )
         embed, files = await _build_page_response(page, summary, display_name=self.display_name)
@@ -671,6 +684,7 @@ class PlayerSelfServiceView(discord.ui.View):
                 files=files,
             )
             view.set_message_ref(getattr(interaction, "message", None) or edited)
+            view.set_timeout_target(interaction)
             return True
         except asyncio.CancelledError:
             raise
@@ -1174,10 +1188,18 @@ class PlayerSelfServiceView(discord.ui.View):
         for child in self.children:
             child.disabled = True
         message = self._message_ref or getattr(self, "message", None)
+        timeout_content = "This private /me menu has expired. Run `/me dashboard` again."
+        edited = False
         try:
-            if message:
+            if self._timeout_editor is not None:
+                await self._timeout_editor(content=timeout_content, view=self)
+                edited = True
+        except Exception:
+            logger.debug("player_self_service_timeout_original_edit_failed", exc_info=True)
+        try:
+            if not edited and message:
                 await message.edit(
-                    content="This private /me menu has expired. Run `/me dashboard` again.",
+                    content=timeout_content,
                     view=self,
                 )
         except Exception:
@@ -1192,6 +1214,7 @@ async def show_player_self_service_page_for_interaction(
     display_name: str,
     page: PlayerSelfServicePage,
     summary_loader: SummaryLoader = build_player_self_service_summary,
+    dashboard_governor_id: int | None = None,
     timeout: float = 180,
     can_edit: Callable[[], bool] | None = None,
 ) -> bool:
@@ -1201,6 +1224,7 @@ async def show_player_self_service_page_for_interaction(
         display_name=display_name,
         page=page,
         summary_loader=summary_loader,
+        dashboard_governor_id=dashboard_governor_id,
         timeout=timeout,
     )
     return await router._show_page(interaction, page, can_edit=can_edit)
@@ -1254,3 +1278,4 @@ async def send_player_self_service_page(
         files=files,
     )
     view.set_message_ref(message)
+    view.set_timeout_target(ctx.interaction)

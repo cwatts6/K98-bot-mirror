@@ -27,6 +27,7 @@ from player_self_service.service import (
     PlayerSelfServiceSummary,
     build_player_self_service_summary,
 )
+from utils import fmt_short
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,20 @@ def _format_number(value: int | float | None) -> str:
     except (TypeError, ValueError):
         return _MISSING
     return f"{number:,.2f}".rstrip("0").rstrip(".")
+
+
+def _format_short_number(value: int | float | None) -> str:
+    if value is None or isinstance(value, bool):
+        return _MISSING
+    try:
+        rendered = fmt_short(value)
+    except (TypeError, ValueError):
+        return _MISSING
+    if rendered.endswith("k"):
+        rendered = f"{rendered[:-1]}K"
+    if len(rendered) >= 3 and rendered[-1] in "KMB" and rendered[-3:-1] == ".0":
+        rendered = f"{rendered[:-3]}{rendered[-1]}"
+    return rendered
 
 
 def _format_freshness(value: Any) -> str:
@@ -138,12 +153,12 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
         name="Power & Battle",
         value="\n".join(
             (
-                f"Power: {_format_number(metrics.power)}",
-                f"Kill Points: {_format_number(metrics.kill_points)}",
-                f"Highest Acclaim: {_format_number(history.highest_acclaim)}",
-                f"Dead: {_format_number(metrics.dead)}",
-                f"Helps: {_format_number(metrics.helps)}",
-                f"Healed: {_format_number(metrics.healed)}",
+                f"Power: {_format_short_number(metrics.power)}",
+                f"Kill Points: {_format_short_number(metrics.kill_points)}",
+                f"Highest Acclaim: {_format_short_number(history.highest_acclaim)}",
+                f"Dead: {_format_short_number(metrics.dead)}",
+                f"Helps: {_format_short_number(metrics.helps)}",
+                f"Healed: {_format_short_number(metrics.healed)}",
             )
         ),
         inline=False,
@@ -161,10 +176,8 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
         inline=False,
     )
     freshness = _format_freshness(payload.freshness.updated_at_utc)
-    if payload.freshness.scan_order is not None:
-        freshness += f"\nScan order: {_format_number(payload.freshness.scan_order)}"
     embed.add_field(name="Freshness", value=freshness, inline=False)
-    embed.set_footer(text="Private self-view • Linked governor access is rechecked on selection.")
+    embed.set_footer(text="Private self-view • Data shown for your linked governor.")
     return embed
 
 
@@ -253,7 +266,10 @@ async def _defer_private(interaction: discord.Interaction) -> None:
     try:
         if interaction.response.is_done():
             return
-        await interaction.response.defer(ephemeral=True)
+        if getattr(interaction, "message", None) is not None:
+            await interaction.response.defer()
+        else:
+            await interaction.response.defer(ephemeral=True)
     except TypeError:
         if not interaction.response.is_done():
             await interaction.response.defer()
@@ -345,6 +361,7 @@ class GovernorDashboardView(discord.ui.View):
         self.summary_loader = summary_loader
         self.selector_page = max(0, int(selector_page))
         self._message_ref: discord.Message | None = None
+        self._timeout_editor: Callable[..., Awaitable[Any]] | None = None
         self._expired = False
         self._busy = False
         self._timed_out = False
@@ -391,6 +408,11 @@ class GovernorDashboardView(discord.ui.View):
                 self._message = message
             except Exception:
                 logger.debug("governor_dashboard_internal_message_ref_failed", exc_info=True)
+
+    def set_timeout_target(self, target: Any) -> None:
+        editor = getattr(target, "edit_original_response", None)
+        if callable(editor):
+            self._timeout_editor = editor
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if self._expired:
@@ -501,6 +523,11 @@ class GovernorDashboardView(discord.ui.View):
                     display_name=self.display_name,
                     page=page,
                     summary_loader=self.summary_loader,
+                    dashboard_governor_id=(
+                        self.resolution.context.selected_governor_id
+                        if self.resolution.context is not None
+                        else None
+                    ),
                     can_edit=lambda: self._transition_is_current(interaction),
                 ),
                 timeout=self._transition_timeout_remaining(),
@@ -638,6 +665,7 @@ class GovernorDashboardView(discord.ui.View):
             if not self._transition_is_current(interaction):
                 return
             view.set_message_ref(getattr(interaction, "message", None) or edited)
+            view.set_timeout_target(interaction)
             self.stop()
         except asyncio.CancelledError:
             raise
@@ -676,10 +704,18 @@ class GovernorDashboardView(discord.ui.View):
         for child in self.children:
             child.disabled = True
         message = self._message_ref or getattr(self, "message", None)
+        timeout_content = "This private governor dashboard has expired. Run `/me dashboard` again."
+        edited = False
         try:
-            if message:
+            if self._timeout_editor is not None:
+                await self._timeout_editor(content=timeout_content, view=self)
+                edited = True
+        except Exception:
+            logger.debug("governor_dashboard_timeout_original_edit_failed", exc_info=True)
+        try:
+            if not edited and message:
                 await message.edit(
-                    content="This private governor dashboard has expired. Run `/me dashboard` again.",
+                    content=timeout_content,
                     view=self,
                 )
         except Exception:
@@ -709,6 +745,7 @@ async def _edit_dashboard_response(
         if can_edit is not None and not can_edit():
             return False
         view.set_message_ref(getattr(target, "message", None) or edited)
+        view.set_timeout_target(target)
         return True
     except asyncio.CancelledError:
         raise
@@ -829,6 +866,7 @@ async def show_governor_dashboard_for_interaction(
     *,
     author_id: int,
     display_name: str,
+    governor_id: int | str | None = None,
     context_resolver: ContextResolver = resolve_dashboard_context,
     payload_loader: PayloadLoader = build_governor_dashboard_payload,
     summary_loader: SummaryLoader = build_player_self_service_summary,
@@ -837,7 +875,14 @@ async def show_governor_dashboard_for_interaction(
     """Replace an existing private ``/me`` message with the governor journey."""
     await _defer_private(interaction)
     try:
-        resolution = await context_resolver(int(author_id), viewer_mode="self")
+        if governor_id is None:
+            resolution = await context_resolver(int(author_id), viewer_mode="self")
+        else:
+            resolution = await context_resolver(
+                int(author_id),
+                governor_id,
+                viewer_mode="self",
+            )
     except asyncio.CancelledError:
         raise
     except Exception:
