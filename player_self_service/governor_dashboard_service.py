@@ -155,6 +155,7 @@ async def resolve_dashboard_context(
     governor_id: int | str | None = None,
     *,
     viewer_mode: GovernorDashboardViewerMode = "self",
+    allow_unlinked_inspect: bool = False,
     account_loader: AccountLoader = get_account_summary_for_user,
 ) -> GovernorDashboardResolution:
     if viewer_mode not in ("self", "inspect"):
@@ -184,13 +185,33 @@ async def resolve_dashboard_context(
             options[0] if options else None,
         )
         linked_option = _find_option(options, requested_gid)
+        if linked_option is None and not allow_unlinked_inspect:
+            context = _context_for_option(
+                discord_user_id=int(discord_user_id),
+                option=None,
+                governor_id=requested_gid,
+                viewer_mode=viewer_mode,
+                allowed=False,
+                reason=("inspect mode requires an explicit unlinked-governor permission gate"),
+            )
+            return GovernorDashboardResolution(
+                state="denied",
+                options=options,
+                default_option=default_option,
+                context=context,
+                reason=context.access_decision.reason,
+            )
         context = _context_for_option(
             discord_user_id=int(discord_user_id),
             option=linked_option,
             governor_id=requested_gid,
             viewer_mode=viewer_mode,
             allowed=True,
-            reason="inspect mode",
+            reason=(
+                "inspect mode"
+                if linked_option is not None
+                else "inspect mode unlinked access explicitly allowed"
+            ),
         )
         return GovernorDashboardResolution(
             state="selected",
@@ -267,13 +288,34 @@ async def resolve_dashboard_context(
             reason=context.access_decision.reason,
         )
 
+    if viewer_mode == "inspect" and linked_option is None and not allow_unlinked_inspect:
+        context = _context_for_option(
+            discord_user_id=int(discord_user_id),
+            option=None,
+            governor_id=requested_gid,
+            viewer_mode=viewer_mode,
+            allowed=False,
+            reason="inspect mode requires an explicit unlinked-governor permission gate",
+        )
+        return GovernorDashboardResolution(
+            state="denied",
+            options=options,
+            default_option=default_option,
+            context=context,
+            reason=context.access_decision.reason,
+        )
+
     context = _context_for_option(
         discord_user_id=int(discord_user_id),
         option=linked_option,
         governor_id=requested_gid,
         viewer_mode=viewer_mode,
         allowed=True,
-        reason="inspect mode" if viewer_mode == "inspect" else "linked governor selected",
+        reason=(
+            "inspect mode unlinked access explicitly allowed"
+            if viewer_mode == "inspect" and linked_option is None
+            else "inspect mode" if viewer_mode == "inspect" else "linked governor selected"
+        ),
     )
     return GovernorDashboardResolution(
         state="selected",

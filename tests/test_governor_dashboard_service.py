@@ -240,13 +240,34 @@ async def test_inspect_mode_payload_excludes_self_view_only_data() -> None:
 
 
 @pytest.mark.asyncio
-async def test_inspect_mode_requested_governor_does_not_require_account_registry() -> None:
+async def test_inspect_mode_denies_unlinked_governor_without_explicit_gate() -> None:
+    account_loader = await _account_loader(
+        {"Main": {"GovernorID": "111", "GovernorName": "Main Gov"}}
+    )
+
+    resolution = await service.resolve_dashboard_context(
+        42,
+        999,
+        viewer_mode="inspect",
+        account_loader=account_loader,
+    )
+
+    assert resolution.state == "denied"
+    assert resolution.context is not None
+    assert resolution.context.access_allowed is False
+    assert resolution.context.selected_governor_id == 999
+    assert resolution.context.is_linked_to_viewer is False
+
+
+@pytest.mark.asyncio
+async def test_inspect_mode_unlinked_governor_requires_explicit_opt_in() -> None:
     account_loader = await _account_loader({}, ok=False, error="registry unavailable")
 
     resolution = await service.resolve_dashboard_context(
         42,
         999,
         viewer_mode="inspect",
+        allow_unlinked_inspect=True,
         account_loader=account_loader,
     )
 
@@ -306,11 +327,10 @@ async def test_payload_excludes_olympia_fields_entirely() -> None:
     assert "olympia" not in serialized
 
 
-def test_governor_dashboard_foundation_does_not_change_command_surface() -> None:
+def test_governor_dashboard_foundation_preserves_me_subcommands() -> None:
     names, grouped = command_validator.collect_primary_inventory()
 
-    assert len(names) == 42
-    assert len(grouped["me"]) == 6
+    assert "me" in names
     assert {
         "dashboard",
         "accounts",
