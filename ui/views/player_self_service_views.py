@@ -333,12 +333,18 @@ def build_page_embed(
     return build_dashboard_embed(summary, display_name=display_name)
 
 
-def _reset_files(files: list[discord.File] | None) -> None:
+def _close_files(files: list[discord.File] | None) -> None:
     for file in files or []:
         try:
-            file.reset(seek=True)
+            file.close()
         except Exception:
-            logger.debug("player_self_service_file_reset_failed", exc_info=True)
+            logger.debug("player_self_service_file_close_failed", exc_info=True)
+        stream = getattr(file, "fp", None)
+        try:
+            if stream is not None and not getattr(stream, "closed", False):
+                stream.close()
+        except Exception:
+            logger.debug("player_self_service_stream_close_failed", exc_info=True)
 
 
 async def _build_page_response(
@@ -647,6 +653,7 @@ class PlayerSelfServiceView(discord.ui.View):
         )
         embed, files = await _build_page_response(page, summary, display_name=self.display_name)
         if can_edit is not None and not can_edit():
+            _close_files(files)
             logger.info(
                 "player_self_service_stale_navigation_render_suppressed user_id=%s page=%s",
                 self.author_id,
@@ -671,7 +678,6 @@ class PlayerSelfServiceView(discord.ui.View):
             logger.debug("player_self_service_edit_message_failed", exc_info=True)
             if can_edit is not None and not can_edit():
                 return False
-            _reset_files(files)
             sent = await interaction.followup.send(
                 embed=build_page_embed(page, summary, display_name=self.display_name),
                 view=view,
@@ -679,6 +685,8 @@ class PlayerSelfServiceView(discord.ui.View):
             )
             view.set_message_ref(sent)
             return True
+        finally:
+            _close_files(files)
 
     @discord.ui.button(
         label="Accounts",

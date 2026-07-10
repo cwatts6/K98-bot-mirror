@@ -2033,6 +2033,37 @@ async def test_view_navigation_loads_summary_and_edits_message() -> None:
 
 
 @pytest.mark.asyncio
+async def test_stale_navigation_closes_rendered_files(monkeypatch) -> None:
+    async def loader(_user_id: int):
+        return _summary()
+
+    stream = BytesIO(b"rendered-card")
+    rendered_file = SimpleNamespace(fp=stream, close=lambda: None)
+
+    async def fake_build(*_args, **_kwargs):
+        return object(), [rendered_file]
+
+    monkeypatch.setattr(views, "_build_page_response", fake_build)
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        summary_loader=loader,
+    )
+    interaction = _Interaction()
+    checks = iter((True, False))
+
+    result = await view._show_page(
+        interaction,
+        views.PAGE_REMINDERS,
+        can_edit=lambda: next(checks),
+    )
+
+    assert result is False
+    assert stream.closed is True
+    assert interaction.original_edits == []
+
+
+@pytest.mark.asyncio
 async def test_view_navigation_propagates_edit_cancellation(monkeypatch) -> None:
     async def loader(_user_id: int):
         return _summary()

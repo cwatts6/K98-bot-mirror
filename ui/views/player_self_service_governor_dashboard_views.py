@@ -37,6 +37,8 @@ SummaryLoader = Callable[[int], Awaitable[PlayerSelfServiceSummary]]
 _SELECT_PAGE_SIZE = 25
 _VIEW_TIMEOUT_SECONDS = 180.0
 _MISSING = "N/A"
+_DASHBOARD_TITLE_PREFIX = "Governor Dashboard — "
+_DISCORD_EMBED_TITLE_LIMIT = 256
 
 
 def _safe_text(value: Any, *, missing: str = _MISSING) -> str:
@@ -75,6 +77,14 @@ def _option_label(option: GovernorDashboardOption) -> str:
     return label[:100]
 
 
+def _governor_dashboard_title(name: Any, *, fallback: str) -> str:
+    safe_name = " ".join(str(name or "").split()) or fallback
+    safe_name = safe_name.replace("@", "@\u200b")
+    safe_name = safe_name.replace("<", "‹").replace(">", "›")
+    available = _DISCORD_EMBED_TITLE_LIMIT - len(_DASHBOARD_TITLE_PREFIX)
+    return f"{_DASHBOARD_TITLE_PREFIX}{safe_name[:available]}"
+
+
 def _is_authorized_self_context(context: GovernorDashboardContext, author_id: int) -> bool:
     return bool(
         context.viewer_mode == "self"
@@ -95,7 +105,10 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
     profile = payload.profile_status
 
     embed = discord.Embed(
-        title=f"Governor Dashboard — {identity.governor_name}",
+        title=_governor_dashboard_title(
+            identity.governor_name,
+            fallback=f"Governor {identity.governor_id}",
+        ),
         description="Your private KD98 governor overview.",
         color=discord.Color.blurple(),
     )
@@ -214,10 +227,12 @@ def build_governor_denied_embed() -> discord.Embed:
 
 
 def build_governor_payload_error_embed(context: GovernorDashboardContext) -> discord.Embed:
-    name = context.selected_governor_name or "Governor Dashboard"
     governor_id = context.selected_governor_id
     embed = discord.Embed(
-        title=f"Governor Dashboard — {name}",
+        title=_governor_dashboard_title(
+            context.selected_governor_name,
+            fallback=f"Governor {governor_id}" if governor_id is not None else "Governor",
+        ),
         description=(
             "The governor is linked, but dashboard data is temporarily unavailable. No values "
             "have been guessed."

@@ -507,6 +507,23 @@ def test_missing_values_missing_vip_and_zero_ark_are_safe_and_no_olympia_text() 
     assert "olympia" not in rendered
 
 
+def test_dashboard_titles_sanitize_untrusted_names_and_respect_discord_limit() -> None:
+    unsafe_name = "  @everyone <@123>  " + ("x" * 300)
+    option = _option(111, name=unsafe_name)
+    context = _context(option)
+
+    dashboard_title = views.build_governor_dashboard_embed(_payload(context)).title or ""
+    error_title = views.build_governor_payload_error_embed(context).title or ""
+
+    for title in (dashboard_title, error_title):
+        assert len(title) <= 256
+        assert "@everyone" not in title
+        assert "<" not in title
+        assert ">" not in title
+        assert "\n" not in title
+        assert "@\u200beveryone ‹@\u200b123›" in title
+
+
 @pytest.mark.asyncio
 async def test_payload_failure_renders_safe_missing_data_shell() -> None:
     option = _option(111, name="Main Gov")
