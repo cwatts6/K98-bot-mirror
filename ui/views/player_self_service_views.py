@@ -565,8 +565,25 @@ class PlayerSelfServiceView(discord.ui.View):
                 child.disabled = disabled
 
     async def _show_page(
-        self, interaction: discord.Interaction, page: PlayerSelfServicePage
-    ) -> None:
+        self,
+        interaction: discord.Interaction,
+        page: PlayerSelfServicePage,
+        *,
+        can_edit: Callable[[], bool] | None = None,
+    ) -> bool:
+        if page == PAGE_DASHBOARD:
+            from ui.views.player_self_service_governor_dashboard_views import (
+                show_governor_dashboard_for_interaction,
+            )
+
+            await show_governor_dashboard_for_interaction(
+                interaction,
+                author_id=self.author_id,
+                display_name=self.display_name,
+                summary_loader=self.summary_loader,
+                timeout=self.timeout or 180,
+            )
+            return True
         try:
             await interaction.response.defer(ephemeral=True)
         except TypeError:
@@ -610,7 +627,15 @@ class PlayerSelfServiceView(discord.ui.View):
                 raise
             except Exception:
                 logger.debug("player_self_service_view_error_followup_failed", exc_info=True)
-            return
+            return False
+
+        if can_edit is not None and not can_edit():
+            logger.info(
+                "player_self_service_stale_navigation_suppressed user_id=%s page=%s",
+                self.author_id,
+                page,
+            )
+            return False
 
         view = PlayerSelfServiceView(
             author_id=self.author_id,
@@ -621,6 +646,13 @@ class PlayerSelfServiceView(discord.ui.View):
             timeout=self.timeout or 180,
         )
         embed, files = await _build_page_response(page, summary, display_name=self.display_name)
+        if can_edit is not None and not can_edit():
+            logger.info(
+                "player_self_service_stale_navigation_render_suppressed user_id=%s page=%s",
+                self.author_id,
+                page,
+            )
+            return False
         try:
             edited = await _edit_original_with_image_fallback(
                 interaction,
@@ -632,10 +664,13 @@ class PlayerSelfServiceView(discord.ui.View):
                 files=files,
             )
             view.set_message_ref(getattr(interaction, "message", None) or edited)
+            return True
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.debug("player_self_service_edit_message_failed", exc_info=True)
+            if can_edit is not None and not can_edit():
+                return False
             _reset_files(files)
             sent = await interaction.followup.send(
                 embed=build_page_embed(page, summary, display_name=self.display_name),
@@ -643,6 +678,7 @@ class PlayerSelfServiceView(discord.ui.View):
                 ephemeral=True,
             )
             view.set_message_ref(sent)
+            return True
 
     @discord.ui.button(
         label="Accounts",
@@ -1139,6 +1175,27 @@ class PlayerSelfServiceView(discord.ui.View):
         except Exception:
             logger.debug("player_self_service_timeout_edit_failed", exc_info=True)
         await super().on_timeout()
+
+
+async def show_player_self_service_page_for_interaction(
+    interaction: discord.Interaction,
+    *,
+    author_id: int,
+    display_name: str,
+    page: PlayerSelfServicePage,
+    summary_loader: SummaryLoader = build_player_self_service_summary,
+    timeout: float = 180,
+    can_edit: Callable[[], bool] | None = None,
+) -> bool:
+    """Open an existing Discord-user-level ``/me`` page in the current message."""
+    router = PlayerSelfServiceView(
+        author_id=author_id,
+        display_name=display_name,
+        page=page,
+        summary_loader=summary_loader,
+        timeout=timeout,
+    )
+    return await router._show_page(interaction, page, can_edit=can_edit)
 
 
 async def send_player_self_service_page(

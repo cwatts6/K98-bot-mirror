@@ -66,7 +66,7 @@ def test_me_commands_are_decorated_and_thin() -> None:
     source = inspect.getsource(me_cmds.register_me)
 
     assert source.count("@versioned(") == 6
-    assert '@versioned("v1.01")' in source
+    assert source.count('@versioned("v1.01")') == 2
     assert source.count("@safe_command") == 6
     assert source.count("@track_usage()") == 6
     assert "set_user_config" not in source
@@ -76,20 +76,20 @@ def test_me_commands_are_decorated_and_thin() -> None:
 
 
 @pytest.mark.asyncio
-async def test_me_dashboard_hands_off_to_page_sender(monkeypatch) -> None:
+async def test_me_dashboard_hands_off_to_governor_dashboard_sender(monkeypatch) -> None:
     me_cmds, group, _bot = _register_me(monkeypatch)
     handler = _unwrap(group.commands["dashboard"])
     calls = []
 
-    async def fake_sender(ctx, *, page):
-        calls.append((ctx, page))
+    async def fake_sender(ctx):
+        calls.append(ctx)
 
-    monkeypatch.setattr(me_cmds, "send_player_self_service_page", fake_sender)
+    monkeypatch.setattr(me_cmds, "send_governor_dashboard", fake_sender)
     ctx = SimpleNamespace()
 
     await handler(ctx)
 
-    assert calls == [(ctx, me_cmds.PAGE_DASHBOARD)]
+    assert calls == [ctx]
 
 
 @pytest.mark.asyncio

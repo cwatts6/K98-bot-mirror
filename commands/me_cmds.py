@@ -6,9 +6,9 @@ from discord.ext import commands as ext_commands
 from bot_config import GUILD_ID
 from core.interaction_safety import safe_command
 from decoraters import track_usage
+from ui.views.player_self_service_governor_dashboard_views import send_governor_dashboard
 from ui.views.player_self_service_views import (
     PAGE_ACCOUNTS,
-    PAGE_DASHBOARD,
     PAGE_EXPORTS,
     PAGE_INVENTORY,
     PAGE_PREFERENCES,
@@ -30,11 +30,11 @@ def register_me(bot: ext_commands.Bot) -> None:
         description="Open your private K98 personal command centre",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.00")
+    @versioned("v1.01")
     @safe_command
     @track_usage()
     async def me_dashboard(ctx: discord.ApplicationContext) -> None:
-        await send_player_self_service_page(ctx, page=PAGE_DASHBOARD)
+        await send_governor_dashboard(ctx)
 
     @me_group.command(
         name="accounts",

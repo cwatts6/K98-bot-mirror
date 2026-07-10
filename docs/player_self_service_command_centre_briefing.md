@@ -2,13 +2,14 @@
 
 Last updated: 2026-07-10
 
-GovernorOS v2 status: Phase 2 Governor Context and Dashboard Data Foundation is complete in mirror
-PR #216 and production PR #523. It added typed governor resolution/context/payload contracts, a
-dashboard DAL/service, linked-governor self-view access checks, self-view versus future inspect-safe
-data separation, null-safe field handling, and focused regression coverage without changing the
-visible `/me` journey. Operator smoke testing confirmed all existing `/me` and named legacy
-commands work, and the full pytest and repository validation suite passed. Phase 3 Governor
-Selector and Dashboard Shell is the next prepared slice; the premium PNG renderer remains Phase 4.
+GovernorOS v2 status: Phase 3 Governor Selector and Dashboard Shell is implemented locally with
+focused and full repository validation passed; operator Discord smoke remains. `/me dashboard` is
+now governor-first: no linked governor shows setup guidance, one opens directly, and multiple use a
+private author-gated selector before dashboard data is fetched. Every selected governor is checked
+again against the active registry. The operator approved that registry authority based on Discord
+onboarding audit, monthly in-game reconciliation, and owner-approved transfer controls. The premium
+PNG renderer remains Phase 4. Admin/leadership inspect is confirmed as required and remains a
+separate permission-gated slice using the Phase 2 inspect-safe contract.
 
 Status: Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and
 production PR #481, and smoke tested successfully on 2026-06-26. Phase 11B KVK Renderer Migration
@@ -35,15 +36,15 @@ Phase 13 legacy redirect planning started with audit/scope only. After reviewing
 
 ## Player Briefing
 
-`/me dashboard` is the new private starting point for personal setup.
+`/me dashboard` is the private starting point for your linked governor overview.
 
 Use it to check:
 
-- whether your main account is set
-- how many accounts are linked
-- whether KVK reminders and calendar reminders are on
-- your inventory visibility preference
-- where to manage inventory and exports
+- governor identity, account type, and optional VIP
+- alliance, Civilisation, Conduct Score, and data freshness
+- power, Kill Points, Highest Acclaim, Dead, Helps, and Healed
+- Ark joined, won, win ratio, and Times Named Autarch
+- where to manage Accounts, Reminders, Preferences, Inventory, and Exports
 
 The dashboard includes a visual summary card when image rendering succeeds. If image rendering or
 delivery fails, the bot falls back to the private embed dashboard. Phase 9 removes dashboard Quick
@@ -415,13 +416,16 @@ Current status:
   matching `/me` centre.
 - Final command-registration removal remains deferred until player communication, a no-feedback
   monitoring window, production usage review, and operator approval.
-- GovernorOS v2 Phase 1 product blueprint/audit and Phase 2 governor context/data foundation are
-  complete and archived as execution records.
-- Phase 2 created no Discord governor selector and made no visible `/me` change.
-- Next prepared work is GovernorOS v2 Phase 3: a dashboard-specific private selector, no/one/multiple
-  governor journey, selected-governor fallback shell, and in-place Change Governor behavior.
-- The generic `AccountPickerView` will not be wired directly into the dashboard because its
-  one-shot lookup/register/refresh flow does not fit persistent dashboard context switching.
+- GovernorOS v2 Phase 1 blueprint/audit and Phase 2 governor context/data foundation are complete
+  and archived as execution records.
+- GovernorOS v2 Phase 3 is implemented locally with a dashboard-specific private selector,
+  no/one/multiple/unavailable/denied journey, fallback shell, and in-place Change Governor behavior.
+- The generic `AccountPickerView` was not wired into the dashboard; the new view reuses Phase 2
+  options/access services and supports safe in-place context switching.
+- Existing registry linkage is approved for Phase 3 self-view access under the operator's onboarding,
+  monthly reconciliation, and transfer-control process.
+- Phase 3 operator Discord smoke remains before rollout.
 - The premium PNG governor dashboard renderer remains Phase 4.
+- Admin/leadership inspect is a required later permission-gated slice, not optional future polish.
 - Export schema/format redesign remains a separate export-output programme unless explicitly
   narrowed later.

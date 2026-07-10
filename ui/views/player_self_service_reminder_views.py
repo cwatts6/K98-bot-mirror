@@ -881,47 +881,18 @@ class ReminderCompletionView(discord.ui.View):
         return False
 
     async def _show_page(self, interaction: discord.Interaction, page: str) -> None:
-        await _defer_private(interaction)
-        try:
-            summary = await self.summary_loader(self.author_id)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception(
-                "player_self_service_reminder_completion_summary_failed user_id=%s page=%s",
-                self.author_id,
-                page,
-            )
-            await interaction.followup.send(
-                "Personal status is temporarily unavailable. Please try again in a moment.",
-                ephemeral=True,
-            )
-            return
-
         from ui.views.player_self_service_views import (
-            PlayerSelfServiceView,
-            _build_page_response,
-            _edit_original_with_image_fallback,
+            show_player_self_service_page_for_interaction,
         )
 
-        view = PlayerSelfServiceView(
+        await show_player_self_service_page_for_interaction(
+            interaction,
             author_id=self.author_id,
             display_name=self.display_name,
             page=page,
-            summary=summary,
             summary_loader=self.summary_loader,
+            timeout=self.timeout or 120,
         )
-        embed, files = await _build_page_response(page, summary, display_name=self.display_name)
-        edited = await _edit_original_with_image_fallback(
-            interaction,
-            page=page,
-            summary=summary,
-            display_name=self.display_name,
-            view=view,
-            embed=embed,
-            files=files,
-        )
-        view.set_message_ref(getattr(interaction, "message", None) or edited)
 
     @discord.ui.button(label="Reminder Centre", style=discord.ButtonStyle.primary)
     async def reminders_button(

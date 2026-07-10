@@ -412,7 +412,7 @@ Delivered in mirror PR `K98-bot-mirror#216` and production PR `K98-bot#523`:
 
 ### Phase 3 — Governor Selector and Dashboard Shell
 
-Status: `next - task pack prepared`.
+Status: `implementation complete - local validation passed; operator smoke pending`.
 
 Deliver:
 
@@ -436,9 +436,27 @@ Selector architecture decision:
   timeout, and message-edit patterns.
 - Recheck governor access on every selected-governor action and selection callback.
 
+Delivered locally on 2026-07-10:
+
+- `/me dashboard` now resolves the private no/one/multiple/unavailable/denied governor journey.
+- One linked governor opens directly; multiple linked governors use a dashboard-specific selector
+  before any dashboard payload fetch.
+- Selected and changed governors are re-resolved against the active registry before payload access.
+- The private author-gated view edits in place, rejects foreign/stale/forged interactions, disables
+  on timeout, and paginates safely beyond Discord's 25-option select limit.
+- The fallback shell shows the approved Phase 2 identity, profile, battle, Ark, honour, and
+  freshness fields with predictable missing-value behavior and no Olympia content.
+- Accounts, Reminders, Preferences, Inventory, and Exports remain reachable with unchanged
+  semantics; all existing `/me` and named legacy command registrations remain intact.
+- The operator approved active registry linkage as the Phase 3 self-view authority, backed by
+  Discord onboarding audit, monthly reconciliation against in-game records, and owner-approved
+  account transfer controls.
+- Admin/leadership inspect was reconfirmed as a required programme outcome. It remains a separate
+  permission-gated slice so Phase 3 does not silently enable arbitrary-governor access.
+
 ### Phase 4 — Premium Governor Dashboard Renderer
 
-Status: `proposed`.
+Status: `next proposed slice after Phase 3 operator smoke`.
 
 Deliver:
 
@@ -697,11 +715,12 @@ Do not include these in early phases unless separately approved:
 ## 20. Suggested Next Action
 
 ```text
-Start Player Self-Service Command Centre v2 Phase 3: Governor Selector and Dashboard Shell.
+Complete Phase 3 operator smoke, then start Phase 4: Premium Governor Dashboard Renderer.
 ```
 
-Phase 3 should make `/me dashboard` governor-first using the completed Phase 2 foundation, while
-preserving all existing `/me` subcommands and legacy paths. The premium PNG renderer remains Phase 4.
+Phase 3 now makes `/me dashboard` governor-first using the completed Phase 2 foundation while
+preserving all existing `/me` subcommands and legacy paths. Phase 4 should replace the fallback
+shell with the premium PNG card without changing the service or access contract.
 
 ## 21. Programme Change Log
 
@@ -710,3 +729,4 @@ preserving all existing `/me` subcommands and legacy paths. The premium PNG rend
 | 2026-06-27 | Initial v2 programme pack created | Follow-on from original Player Self-Service Command Centre programme. |
 | 2026-07-09 | Programme updated after Phase 1 audit | Reframed as GovernorOS, added bold dashboard vision, revised phase plan, removed Olympia from initial scope, and made Phase 2 the service/data foundation. |
 | 2026-07-10 | Phase 2 completed and Phase 3 prepared | Recorded the delivered governor context/data foundation, successful smoke/regression validation, explicit selector architecture decision, and Phase 3 as the next slice. |
+| 2026-07-10 | Phase 3 implemented locally | Added the private governor-first selector and fallback shell, recorded registry trust approval and required future inspect direction, and passed focused plus full repository validation pending operator smoke. |

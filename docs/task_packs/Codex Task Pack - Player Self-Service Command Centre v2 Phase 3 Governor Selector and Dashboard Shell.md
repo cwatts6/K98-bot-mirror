@@ -7,7 +7,42 @@
 - Owner/context: Follow-on from the completed Phase 2 governor context and dashboard data foundation.
 - Task type: `Discord interaction feature | private governor selection | dashboard shell integration`
 - One-pass approved: `No`
-- Status: `prepared - next programme slice`
+- Implementation approved: `Yes - registry authority checkpoint confirmed 2026-07-10`
+- Status: `implementation complete - local validation passed; operator smoke pending`
+
+## Completion Record
+
+Phase 3 delivered the dashboard-specific private governor journey without adding or removing slash
+commands. The operator approved existing active registry linkage as the self-view authorization
+source, supported by Discord onboarding audit, monthly admin reconciliation against in-game
+records, and owner-approved account transfer controls.
+
+Delivered:
+
+- Private no/one/multiple/unavailable/denied journey handling.
+- Direct single-governor opening and pre-fetch multi-governor selection.
+- Access re-resolution before every selected-governor payload fetch.
+- Author gating, timeout disabling, stale/replaced-view rejection, forged selection denial, and
+  private failure behavior.
+- In-place Change Governor for multiple linked accounts.
+- A renderer-independent fallback embed containing only the approved Phase 2 fields.
+- Safe missing metrics, absent VIP, zero Ark joined, and complete Olympia exclusion.
+- Existing Accounts, Reminders, Preferences, Inventory, Exports, `/me`, and legacy command
+  compatibility.
+- `/me dashboard` version increment from `v1.00` to `v1.01`; command counts unchanged.
+- Selector pagination for more than 25 linked governors without using `AccountPickerView`.
+
+Automated validation completed with 108 focused service/view/command tests and the full repository
+suite (`2435 passed, 2 skipped`). Architecture, deferred-item, test-selection, smoke-import,
+command-registration, full pre-commit, and diff checks passed. The Codex Security plugin was not
+exposed to this task and the local CLI could not be launched, so an independent security-focused
+diff review was used as the documented fallback. It found and drove closure of one interaction
+integrity issue around concurrent/stale/timeout transitions, then completed with no reportable
+findings. Operator Discord smoke remains before rollout.
+
+Product direction confirmed during the approval checkpoint: admin/leadership inspect is required
+for kingdom management and player support. It remains outside Phase 3 and must be delivered as a
+separate permission-gated slice using the existing inspect-safe payload boundary.
 
 ## 2. Objective
 
@@ -284,21 +319,21 @@ Use test users or controlled registry fixtures representing each state:
 
 ## 15. Acceptance Criteria
 
-- [ ] `/me dashboard` uses the Phase 2 governor resolution service.
-- [ ] No/one/multiple/unavailable/denied states are represented safely.
-- [ ] Multiple-account users receive a private dashboard-specific selector.
-- [ ] One-account users open the selected dashboard shell directly.
-- [ ] Every selected governor is access-checked again before payload fetch.
-- [ ] Foreign and stale interactions are rejected safely.
-- [ ] Change Governor works in place for multiple linked governors.
-- [ ] The fallback shell renders approved Phase 2 fields and excludes Olympia.
-- [ ] Accounts, Reminders, Preferences, Inventory, and Exports remain reachable.
-- [ ] No top-level or grouped subcommand count changes occur.
-- [ ] Legacy commands remain behavior-compatible.
-- [ ] No SQL schema change is introduced.
-- [ ] Focused, regression, validator, and manual smoke evidence is recorded.
-- [ ] Codex Security review is completed or a blocker is documented.
-- [ ] Deferred findings are captured structurally.
+- [x] `/me dashboard` uses the Phase 2 governor resolution service.
+- [x] No/one/multiple/unavailable/denied states are represented safely.
+- [x] Multiple-account users receive a private dashboard-specific selector.
+- [x] One-account users open the selected dashboard shell directly.
+- [x] Every selected governor is access-checked again before payload fetch.
+- [x] Foreign and stale interactions are rejected safely.
+- [x] Change Governor works in place for multiple linked governors.
+- [x] The fallback shell renders approved Phase 2 fields and excludes Olympia.
+- [x] Accounts, Reminders, Preferences, Inventory, and Exports remain reachable.
+- [x] No top-level or grouped subcommand count changes occur.
+- [x] Legacy commands remain behavior-compatible.
+- [x] No SQL schema change is introduced.
+- [ ] Focused, regression, and validator evidence is recorded; operator Discord smoke remains.
+- [x] Security-focused diff review completed with no reportable findings after hardening.
+- [x] Deferred findings are captured structurally.
 
 ## 16. Delivery Output
 

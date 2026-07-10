@@ -98,20 +98,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `commands/me_cmds.py`, `ui/views/player_self_service_views.py`, `player_self_service/governor_dashboard_*`, `/me dashboard`, player self-service v2 docs/tests
 - Type: architecture
-- Description: GovernorOS v2 Phase 2 delivered the typed governor context, no/one/multiple resolution, self-view access checks, renderer-independent payload, SQL-backed dashboard DAL/service, and self-view versus inspect-safe data separation. The visible `/me dashboard` journey, Discord governor selector, premium renderer, direct inventory actions, private history, inspect flow, and usage-led legacy migration remain intentionally outside the completed foundation slice.
-- Suggested Fix: Execute the prepared Phase 3 Governor Selector and Dashboard Shell task pack first, using a dashboard-specific author-gated view and the Phase 2 access/payload services. Follow with the separate Phase 4 premium renderer and later action/inspect/history phases only after their own approval and validation. Preserve all existing `/me` and legacy command paths through the initial dashboard rollout.
+- Description: GovernorOS v2 Phase 3 delivered the private governor-first `/me dashboard` selector and fallback shell over the Phase 2 context/access/payload foundation. The premium renderer, direct governor-specific inventory actions, private history, required admin/leadership inspect flow, and usage-led legacy migration remain intentionally outside this interaction slice.
+- Suggested Fix: Complete Phase 3 operator smoke, then execute the separate Phase 4 premium renderer without changing the service/access contract. Deliver admin/leadership inspect as its own permission-gated slice using the inspect-safe payload boundary, followed by the separately approved action/history phases. Preserve all existing `/me` and legacy command paths through the initial dashboard rollout.
 - Impact: high
 - Risk: medium
-- Dependencies: Phase 1 blueprint complete; Phase 2 delivered in mirror PR #216 and production PR #523 with successful operator smoke and full regression validation; Phase 3 registry-linkage trust checkpoint and implementation approval.
-
-### Deferred Optimisation
-- Area: `registry/`, `services/governor_account_service.py`, player self-service governor access policy and tests
-- Type: architecture
-- Description: Phase 2 authorizes self-view from the current Discord-user-to-governor registry linkage, matching established self-service behavior. The ownership-assurance and recovery policy for that linkage predates GovernorOS and has not yet been formally approved as the trust boundary for an expanded personal dashboard.
-- Suggested Fix: Define and approve the governor-link ownership verification, conflict, transfer, and recovery policy. Add service-level enforcement and regression tests before exposing any future dashboard data classified as more sensitive than existing self-service surfaces. Keep Phase 3 default-deny for unlinked governors and do not enable unlinked inspect access.
-- Impact: high
-- Risk: medium
-- Dependencies: Operator product/security decision; identify an authoritative verification source or approved manual verification path before implementation.
+- Dependencies: Phase 1 blueprint complete; Phase 2 delivered in mirror PR #216 and production PR #523; Phase 3 implementation and automated validation complete; operator Discord smoke before rollout; separate approval/design for inspect permissions and lookup UX.
 
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `inventory/export_service.py`, `inventory/dal/`, SQL repo export views/tables, export docs/tests

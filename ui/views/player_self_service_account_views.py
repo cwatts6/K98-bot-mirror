@@ -911,69 +911,18 @@ class AccountCompletionView(discord.ui.View):
         return False
 
     async def _show_page(self, interaction: discord.Interaction, page: str) -> None:
-        try:
-            await interaction.response.defer(ephemeral=True)
-        except TypeError:
-            try:
-                await interaction.response.defer()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.debug(
-                    "player_self_service_account_completion_defer_failed user_id=%s page=%s",
-                    self.author_id,
-                    page,
-                    exc_info=True,
-                )
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.debug(
-                "player_self_service_account_completion_defer_failed user_id=%s page=%s",
-                self.author_id,
-                page,
-                exc_info=True,
-            )
-        try:
-            summary = await self.summary_loader(self.author_id)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception(
-                "player_self_service_account_completion_summary_failed user_id=%s page=%s",
-                self.author_id,
-                page,
-            )
-            await interaction.followup.send(
-                "Personal status is temporarily unavailable. Please try again in a moment.",
-                ephemeral=True,
-            )
-            return
-
         from ui.views.player_self_service_views import (
-            PlayerSelfServiceView,
-            _build_page_response,
-            _edit_original_with_image_fallback,
+            show_player_self_service_page_for_interaction,
         )
 
-        view = PlayerSelfServiceView(
+        await show_player_self_service_page_for_interaction(
+            interaction,
             author_id=self.author_id,
             display_name=self.display_name,
             page=page,
-            summary=summary,
             summary_loader=self.summary_loader,
+            timeout=self.timeout or 120,
         )
-        embed, files = await _build_page_response(page, summary, display_name=self.display_name)
-        edited = await _edit_original_with_image_fallback(
-            interaction,
-            page=page,
-            summary=summary,
-            display_name=self.display_name,
-            view=view,
-            embed=embed,
-            files=files,
-        )
-        view.set_message_ref(getattr(interaction, "message", None) or edited)
 
     @discord.ui.button(label="Account Centre", style=discord.ButtonStyle.primary)
     async def accounts_button(

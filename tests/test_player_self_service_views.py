@@ -35,6 +35,7 @@ from player_self_service.service import (
 )
 from ui.views import (
     player_self_service_account_views as account_views,
+    player_self_service_governor_dashboard_views as governor_dashboard_views,
     player_self_service_preference_views as preference_views,
     player_self_service_reminder_views as reminder_views,
     player_self_service_views as views,
@@ -2140,7 +2141,7 @@ async def test_account_completion_navigation_defer_type_error_falls_back() -> No
 
 
 @pytest.mark.asyncio
-async def test_account_completion_navigation_sets_message_ref() -> None:
+async def test_account_completion_navigation_opens_governor_dashboard(monkeypatch) -> None:
     async def loader(_user_id: int):
         return _summary()
 
@@ -2151,20 +2152,29 @@ async def test_account_completion_navigation_sets_message_ref() -> None:
         summary_loader=loader,
     )
     interaction = _Interaction()
+    calls = []
+
+    async def fake_show(target, **kwargs):
+        calls.append((target, kwargs))
+
+    monkeypatch.setattr(
+        governor_dashboard_views,
+        "show_governor_dashboard_for_interaction",
+        fake_show,
+    )
 
     await view._show_page(interaction, views.PAGE_DASHBOARD)
 
-    edited = interaction.original_edits[-1]
-    assert edited["content"] is None
-    assert edited["embed"].image.url.startswith("attachment://me_dashboard_")
-    assert [file.filename for file in edited["files"]] == ["me_dashboard_42.png"]
-    new_view = interaction.original_edits[-1]["view"]
-    assert isinstance(new_view, views.PlayerSelfServiceView)
-    assert new_view._message_ref is interaction.message
+    assert calls[0][0] is interaction
+    assert calls[0][1]["author_id"] == 42
+    assert calls[0][1]["display_name"] == "Tester"
+    assert calls[0][1]["summary_loader"] is loader
 
 
 @pytest.mark.asyncio
-async def test_reminder_completion_dashboard_navigation_uses_generated_card() -> None:
+async def test_reminder_completion_dashboard_navigation_uses_governor_journey(
+    monkeypatch,
+) -> None:
     async def loader(_user_id: int):
         return _summary()
 
@@ -2175,14 +2185,23 @@ async def test_reminder_completion_dashboard_navigation_uses_generated_card() ->
         summary_loader=loader,
     )
     interaction = _Interaction()
+    calls = []
+
+    async def fake_show(target, **kwargs):
+        calls.append((target, kwargs))
+
+    monkeypatch.setattr(
+        governor_dashboard_views,
+        "show_governor_dashboard_for_interaction",
+        fake_show,
+    )
 
     await view._show_page(interaction, views.PAGE_DASHBOARD)
 
-    edited = interaction.original_edits[-1]
-    assert edited["content"] is None
-    assert edited["embed"].image.url.startswith("attachment://me_dashboard_")
-    assert [file.filename for file in edited["files"]] == ["me_dashboard_42.png"]
-    assert isinstance(edited["view"], views.PlayerSelfServiceView)
+    assert calls[0][0] is interaction
+    assert calls[0][1]["author_id"] == 42
+    assert calls[0][1]["display_name"] == "Tester"
+    assert calls[0][1]["summary_loader"] is loader
 
 
 @pytest.mark.asyncio

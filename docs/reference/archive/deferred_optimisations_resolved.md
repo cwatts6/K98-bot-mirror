@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### GovernorOS Registry Authority Approval
+- Area: `registry/`, `services/governor_account_service.py`, player self-service governor access policy
+- Type: architecture
+- Description: Phase 2 used active Discord-user-to-governor registry linkage for self-view authorization, but the expanded dashboard required explicit operator confirmation that this remained an acceptable ownership boundary.
+- Resolution: The operator approved active registry linkage for Phase 3 self-view access. The process is supported by admin audit when new users register on the Discord server, monthly reconciliation of registrations against in-game records, and a transfer rule requiring the existing owner's permission. Phase 3 remains default-deny for unlinked governors and does not enable inspect mode.
+- Validation: Phase 3 tests cover linked access, unavailable/denied states, forged and unlinked selection denial, foreign/stale interactions, and access re-resolution before payload fetch. Admin/leadership inspect remains a separate required permission-gated slice.
+
 ### GovernorOS v2 Phase 2 Foundation Completed Item
 - Area: `player_self_service/governor_dashboard_models.py`, `player_self_service/governor_dashboard_service.py`, `player_self_service/governor_dashboard_dal.py`
 - Type: architecture
