@@ -2,6 +2,11 @@
 
 Status: Phase 1 audit/design complete and archived after the Phase 2 foundation was delivered. No runtime command, SQL, renderer, redirect, or permission changes are included in this slice.
 
+Historical sequencing note: the active programme pack supersedes this audit's provisional later
+phase numbering. The authoritative remaining order is Phase 4 premium renderer, Phase 5 direct
+inventory actions, Phase 6 Export Stats integration, Phase 7 private `/me history`, Phase 8 required
+admin/leadership `/me inspect`, and Phase 9 usage-led migration review.
+
 ## 1. Summary
 
 `/me` should become the governor-first daily command centre. The safest target journey is:

@@ -108,19 +108,28 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Area: `ui/views/player_self_service_views.py`, `ui/views/player_self_service_governor_dashboard_views.py`, Phase 4-6 dashboard/page renderer migration
 - Type: consistency
 - Description: Phase 3 smoke shows that moving between generated `/me` page cards and the fallback governor embed can leave the previous card attachment visible above the new embed even though the interaction remains private and functional. Repeatedly polishing this transitional mixed renderer path would overlap the approved Phase 4-6 embed/card upgrades.
-- Suggested Fix: Resolve the visual transition during the Phase 4-6 renderer work by defining one attachment replacement/clearing contract for every `/me` page transition, applying it through the shared send/edit helper, and adding Discord-view regression coverage for card-to-card, card-to-embed, and embed-to-card switches. Preserve selected-governor access rechecks and in-place private navigation.
+- Suggested Fix: This item is promoted into the Phase 4 premium renderer task pack. Define one attachment replacement/clearing and file-stream cleanup contract for selector-to-card, card-to-selector, card-to-page, page-to-card, card-to-card, card-to-embed, and embed-to-card transitions; apply it through the governor-dashboard/shared send-edit boundary; and add Discord-view regression coverage. Keep this item active until Phase 4 visual smoke confirms no mixed attachment remains.
 - Impact: medium
 - Risk: low
-- Dependencies: Approved Phase 4 premium governor renderer and subsequent `/me` embed/page upgrades; operator visual acceptance criteria for the final renderer family.
+- Dependencies: Phase 4 task pack and starter prepared on 2026-07-10; operator scope/visual approval; Phase 4 implementation and Discord smoke evidence.
 
 ### Deferred Optimisation
 - Area: `commands/me_cmds.py`, `ui/views/player_self_service_views.py`, `player_self_service/governor_dashboard_*`, `/me dashboard`, player self-service v2 docs/tests
 - Type: architecture
-- Description: GovernorOS v2 Phase 3 delivered the private governor-first `/me dashboard` selector and fallback shell over the Phase 2 context/access/payload foundation. The premium renderer, direct governor-specific inventory actions, private history, required admin/leadership inspect flow, and usage-led legacy migration remain intentionally outside this interaction slice.
-- Suggested Fix: Execute the separate Phase 4 premium renderer without changing the service/access contract. Deliver admin/leadership inspect as its own permission-gated slice using the inspect-safe payload boundary, followed by the separately approved action/history phases. Preserve all existing `/me` and legacy command paths through the initial dashboard rollout.
+- Description: GovernorOS v2 Phases 1-3 are complete. The remaining committed roadmap is Phase 4 premium renderer; Phase 5 direct Resources/Materials/Speedups; Phase 6 Export Stats integration after a selected-governor versus all-linked decision; Phase 7 private `/me history`; Phase 8 required permission-gated admin/leadership `/me inspect`; and Phase 9 usage-led migration review. Phase 10 sticky features are a future programme candidate rather than committed implementation. Each remaining phase has a distinct command, privacy, compatibility, or product-decision boundary and must not be collapsed into one broad PR.
+- Suggested Fix: Execute Phases 4-9 as separate task-packed slices in the authoritative programme order. Preserve the Phase 2 payload/privacy boundary and Phase 3 access/selector journey; require the documented operator checkpoint for Phase 4 visuals/assets, Phase 5 report visibility and grouped command count, Phase 6 export scope, Phase 7 history controls, Phase 8 permissions/VIP/lookup/telemetry, and every Phase 9 migration decision. Create a new successor pack before any Phase 10 implementation.
 - Impact: high
 - Risk: medium
-- Dependencies: Phase 1 blueprint complete; Phase 2 delivered in mirror PR #216 and production PR #523; Phase 3 implementation, automated validation, and operator Discord smoke completed on 2026-07-10; separate approval/design for inspect permissions and lookup UX.
+- Dependencies: Phase 1 blueprint archived; Phase 2 delivered in mirror PR #216 and production PR #523; Phase 3 delivered in mirror PR #217 and production PR #524 with automated validation and operator Discord smoke completed on 2026-07-10; Phase 4 active task pack/starter; explicit approval for each later phase gate.
+
+### Deferred Optimisation
+- Area: `player_self_service/governor_dashboard_renderer.py`, `core/visual_text.py`, `player_self_service/page_cards.py`, KVK and inventory renderer families
+- Type: consistency
+- Description: Shared glyph-safe text primitives already live in `core.visual_text`, but page-card, KVK, inventory, and the planned governor dashboard layouts intentionally remain domain-specific. Creating a broad visual framework before the Phase 4 governor card is accepted would risk coupling unrelated payloads/themes and replacing working renderers without evidence of useful duplication.
+- Suggested Fix: Build Phase 4 as a dedicated governor renderer that reuses `core.visual_text`. After operator visual acceptance, compare only concrete duplicated low-level primitives (for example panel drawing, cached background loading, or PNG export) and promote a small shared-helper slice only where reuse is measurable and output contracts can remain unchanged.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 4 implementation and visual acceptance; renderer profiling and duplication evidence; focused visual regression coverage for every renderer family proposed for migration.
 
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `inventory/export_service.py`, `inventory/dal/`, SQL repo export views/tables, export docs/tests

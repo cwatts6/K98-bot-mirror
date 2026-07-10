@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### GovernorOS v2 Phase 3 Governor-First Dashboard Completed Item
+- Area: `commands/me_cmds.py`, `ui/views/player_self_service_governor_dashboard_views.py`, `player_self_service/governor_dashboard_*`, Phase 3 docs/tests
+- Type: architecture
+- Description: The completed Phase 2 payload/access foundation was not yet wired into `/me dashboard`; the visible command still needed private no/one/multiple governor resolution, a purpose-built selector, selected-governor rendering, access rechecks, safe interaction lifecycle handling, and compatibility navigation.
+- Resolution: Phase 3 delivered the private governor-first journey, direct single-governor opening, multi-governor selector and Change Governor flow, access re-resolution before payload fetch, author/stale/forged/timeout/concurrency safeguards, and an approved renderer-independent fallback embed. Smoke corrections aligned the live source mapping, Civilisation, `X:Y` Location, compact numbers, Ark and Autarch values, VIP wording, freshness, graceful expiry, and selected-context navigation. No command was added or removed, no SQL schema changed, and Olympia remained absent.
+- Validation: Mirror PR #217 and production PR #524 include the final implementation and documentation. Automated validation passed with 111 focused tests and the full suite (`2443 passed, 2 skipped`), plus architecture, deferred, test-selection, smoke-import, command-registration, pre-commit, security-focused review, and GitHub checks. Operator smoke on 2026-07-10 passed no-governor, single-governor, multiple-governor, Change Governor, and final data-presentation journeys.
+
 ### GovernorOS Registry Authority Approval
 - Area: `registry/`, `services/governor_account_service.py`, player self-service governor access policy
 - Type: architecture

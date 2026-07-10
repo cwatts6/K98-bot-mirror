@@ -5,12 +5,12 @@
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
 - Date: `2026-07-10`
-- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486, the v2 Phase 1 blueprint completed, and the Phase 2 governor context/data foundation delivered
+- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486 and GovernorOS v2 Phases 1-3 completed through mirror PR #217 and production PR #524
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
 
-## 2. Phase 1 and Phase 2 Conclusion
+## 2. Phases 1-3 Conclusion
 
 Phase 1 confirmed that the original `/me` work created the right foundation, but the current experience is still primarily a Discord-user setup hub. It helps players manage accounts, reminders, preferences, exports, and inventory, but it does not yet feel like the daily governor dashboard players should open to understand their account.
 
@@ -34,6 +34,11 @@ inspect context, a validated dashboard DAL/service, self-view versus inspect-saf
 null-safe field handling, and focused regression coverage. The visible `/me` journey and every
 legacy command remained unchanged. Operator smoke testing confirmed all existing `/me` and named
 legacy commands work, and the full pytest and repository validation suite passed.
+
+Phase 3 is also complete. It wired that foundation into `/me dashboard`, delivered the private
+no/one/multiple governor journey, rechecked access before payload fetch, preserved selected context
+through current navigation, and retained every existing `/me` and named legacy command. Operator
+smoke passed all journey states and the corrected live-data presentation on 2026-07-10.
 
 ## 3. Programme Vision
 
@@ -306,7 +311,7 @@ Design watchouts:
 
 ## 11. Target Data / Service Contract
 
-Phase 2 should introduce a stable data foundation before the visible dashboard changes.
+Phase 2 introduced the stable data foundation now used by the visible dashboard.
 
 Recommended service-level concepts:
 
@@ -429,7 +434,7 @@ Deliver:
 Selector architecture decision:
 
 - Phase 2 did not create or wire a Discord selector.
-- Phase 3 should add a dashboard-specific, private, author-gated selector/view that renders and
+- Phase 3 added a dashboard-specific, private, author-gated selector/view that renders and
   switches dashboard context in place.
 - Do not use the shared `AccountPickerView` directly: it is a one-shot selector that also owns
   lookup/register/refresh behavior and does not match the dashboard's persistent context-switching
@@ -438,7 +443,7 @@ Selector architecture decision:
   timeout, and message-edit patterns.
 - Recheck governor access on every selected-governor action and selection callback.
 
-Delivered locally on 2026-07-10:
+Delivered in mirror PR `K98-bot-mirror#217` and production PR `K98-bot#524` on 2026-07-10:
 
 - `/me dashboard` now resolves the private no/one/multiple/unavailable/denied governor journey.
 - One linked governor opens directly; multiple linked governors use a dashboard-specific selector
@@ -469,81 +474,140 @@ Delivered locally on 2026-07-10:
 
 ### Phase 4 — Premium Governor Dashboard Renderer
 
-Status: `next proposed slice`.
+Status: `next slice - task pack and chat starter ready for scope/visual approval`.
+
+Goal: replace the successful selected-governor fallback shell with a premium generated card without
+changing the delivered data, access, selector, or command contracts.
 
 Deliver:
 
-- Dedicated governor dashboard PNG renderer.
-- Fallback embed.
-- Visual tests/golden-dimension checks.
-- Discord-like desktop/mobile preview review.
-- Premium card layout using identity, metrics, honours, status, and action zones.
-- No Olympia fields.
+- Dedicated deterministic Pillow renderer consuming the existing `GovernorDashboardPayload`.
+- Wide premium card benchmarked at `1180x640`, or an operator-approved equivalent after prototype
+  review.
+- Identity, battle metrics, profile/status, Ark/Autarch honours, and freshness zones.
+- Glyph-safe responsive text fitting and deliberate missing-value presentation.
+- Existing fallback embed retained for render/file/send failures.
+- Off-event-loop rendering and complete file-stream cleanup.
+- One attachment replacement/clearing contract across selector, card, fallback embed, and all
+  current `/me` page transitions.
+- Visual sample review at original, Discord-desktop, and Discord-mobile scales.
+- No Olympia fields, placeholders, icons, or empty zones.
+
+Approval gate:
+
+- Confirm the visual hierarchy, target dimensions, and asset/background provenance before coding.
+- Any new field, SQL/data change, new action, or broad shared renderer framework requires separate
+  approval.
+
+Command/data impact: `/me dashboard` version increment only; no command-count, SQL, DAL, payload,
+permission, registry-authority, inventory, export, history, or inspect change.
 
 ### Phase 5 — Direct Inventory Action Upgrade
 
 Status: `proposed`.
 
+Goal: let the selected governor open a specific existing inventory report without returning to the
+all-report picker.
+
 Deliver:
 
-- `/me resources`.
-- `/me materials`.
-- `/me speedups`.
-- Direct dashboard buttons for each report type.
-- Reuse existing inventory report services/views.
-- Preserve `/me inventory` and `/myinventory`.
-- Start visual alignment plan for inventory cards.
+- `/me resources`, `/me materials`, and `/me speedups` grouped subcommands, subject to command
+  registration approval.
+- Matching dashboard actions carrying the selected governor context.
+- Access re-resolution before every report fetch/action.
+- Reuse existing inventory reporting services, views, ranges, export controls, and approved
+  visibility semantics; do not duplicate report SQL or business logic.
+- Preserve `/me inventory`, `/myinventory`, inventory imports, schemas, and output contracts.
+- Attachment/page-transition alignment with the Phase 4 card contract.
+
+Approval gate: confirm whether direct `/me` reports always remain private or intentionally continue
+the player's existing Inventory visibility preference. Record the grouped-subcommand count change
+before implementation.
 
 ### Phase 6 — Export Stats Action Decision and Integration
 
 Status: `proposed`.
 
+Goal: add a dashboard Export Stats action only after its governor scope is unambiguous.
+
 Deliver:
 
-- Product decision: selected-governor export versus all-linked-governor export.
-- Dashboard row/button action for Export Stats.
-- Preserve `/me exports`, `/my_stats_export`, and current export compatibility.
-- Tests for privacy and export semantics.
+- Explicit product decision between selected-governor export and the current all-linked/user-level
+  export behavior.
+- Dashboard action that calls the existing service-backed export path under the approved scope.
+- Clear copy when the selected dashboard governor does not narrow the resulting file.
+- Preserve `/me exports`, the existing `/my_stats_export` redirect, file formats, schemas, date
+  windows, Google Sheets behavior, and Inventory export behavior.
+- Privacy, selected-context, filename/content, and compatibility tests.
+
+Approval gate: operator must approve selected-governor versus all-linked semantics. Any schema,
+header, worksheet, format, or SQL export-contract redesign remains a separate programme.
 
 ### Phase 7 — Private `/me history` Entry Point
 
 Status: `proposed`.
 
+Goal: give the selected governor a private personal-history path without changing the social/public
+KVK command.
+
 Deliver:
 
-- Private selected-governor KVK history entry point from `/me`.
-- Reuse current modern KVK history service/renderer.
-- Preserve `/kvk history` public/channel-gated behavior.
-- Compatibility tests proving `/kvk history` is unchanged.
+- Private `/me history` grouped subcommand and dashboard action.
+- Re-resolve selected-governor access before loading history.
+- Reuse the modern KVK history service/payload/renderer through a private delivery adapter.
+- Preserve `/kvk history` command registration, channel gate, public behavior, filters, and output.
+- No implicit redirect between `/me history` and `/kvk history`.
+- Focused privacy, access, missing-history, rendering, and compatibility tests.
+
+Approval gate: confirm `/me history` option shape and whether it initially opens the established
+default history view or exposes private controls. Record the grouped-subcommand count change.
 
 ### Phase 8 — Leadership/Admin `/me inspect`
 
 Status: `proposed`.
 
+Goal: provide the required kingdom-management and player-support dashboard for authorized
+leadership/admin users without weakening the self-view trust boundary.
+
 Deliver:
 
-- Permission-gated `/me inspect`.
-- Governor ID and fuzzy name lookup.
-- Ambiguous match selector.
-- Inspection-safe payload and renderer mode.
-- No Discord-user private data leakage.
-- Usage tracking and explicit inspect telemetry.
-- Preserve `/stats player` and `/player_profile` until separate migration approval.
+- Private, permission-gated `/me inspect` grouped subcommand.
+- Governor ID and normalized/fuzzy name lookup with a private ambiguity selector.
+- Explicit unlinked inspect authorization path; self-view remains default-deny for unlinked IDs.
+- Inspection-safe payload/card mode containing approved in-game governor metrics only.
+- Exclude Discord account linkage, account type/slot, reminders, timezone, language, inventory
+  visibility, export preferences, and other Discord-user relationship metadata.
+- Decide explicitly whether player-maintained VIP is sufficiently authoritative for inspect; omit
+  it until approved.
+- Usage tracking plus structured inspect telemetry that identifies authorized use without logging
+  unnecessary private values.
+- Preserve `/stats player` and `/player_profile` until a later usage-led migration approval.
+
+Approval gate: define the exact admin/leadership permission policy, inspect-safe VIP decision,
+lookup behavior, audit fields/retention, and grouped-subcommand count change. Run a dedicated Codex
+Security review for permission, privacy, lookup-input, and telemetry boundaries.
 
 ### Phase 9 — Usage-Led Migration Review
 
 Status: `proposed`.
 
+Goal: use real adoption evidence to decide whether any compatibility command should change.
+
 Deliver:
 
-- Fresh `BotCommandUsage` analysis.
-- Player/leadership communication plan.
-- Proposed redirects, copy nudges, or removals only where justified.
-- Operator approval checkpoint for every legacy path.
+- Fresh `dbo.BotCommandUsage` evidence after Phases 4-8 have had an agreed observation window.
+- Separate player and leadership workflow analysis for `/my_stats`, `/myinventory`, `/stats player`,
+  `/player_profile`, `/mykvkcrystaltech`, and `/kvk history`.
+- Player/leadership communication and rollback plan.
+- Proposed copy nudges, redirects, deprecations, or removals one command at a time.
+- Command-registration/canonical-document impact and an explicit operator decision for every path.
+
+Approval gate: no migration is implied by this review. Each command change requires evidence,
+communication, a no-feedback window where appropriate, and explicit operator approval.
 
 ### Phase 10 — Future “Sticky” Player Features
 
-Status: `future opportunity`.
+Status: `future programme candidate - not a committed implementation slice`.
 
 Candidate ideas:
 
@@ -557,7 +621,14 @@ Candidate ideas:
 - Visual achievement badges.
 - Website-ready profile endpoint or export.
 
-These should not block the core dashboard build, but Phase 2 should avoid data shapes that make them hard later.
+Entry gate:
+
+- Complete and observe the core dashboard/action/inspect rollout first.
+- Select a measurable player value hypothesis and validated source for each proposed metric.
+- Validate privacy, freshness, historic comparability, SQL performance, and website/API boundaries.
+- Create a new task pack or successor programme before implementation.
+
+These ideas must not block or silently expand Phases 4-9.
 
 ## 13. In Scope for the Programme
 
@@ -697,11 +768,11 @@ For broader runtime phases, also consider:
 
 The programme is complete when:
 
-- [ ] `/me dashboard` is governor-first and opens the correct no/one/multiple governor journey.
+- [x] `/me dashboard` is governor-first and opens the correct no/one/multiple governor journey.
 - [ ] The governor dashboard card is visually premium, readable, and meaningfully better than legacy embeds.
-- [ ] The dashboard uses validated data sources and excludes Olympia until a source exists.
-- [ ] Governor context is preserved safely through dashboard actions.
-- [ ] Accounts, Reminders, and Preferences remain correctly Discord-user-level.
+- [x] The dashboard uses validated data sources and excludes Olympia until a source exists.
+- [x] Governor context is preserved safely through the dashboard and current compatibility actions.
+- [x] Accounts, Reminders, and Preferences remain correctly Discord-user-level.
 - [ ] Direct Resources, Materials, and Speedups paths exist while `/me inventory` and `/myinventory` remain compatible.
 - [ ] Export Stats semantics are explicitly decided and tested before dashboard integration.
 - [ ] A private `/me history` path exists while `/kvk history` remains unchanged.
@@ -735,6 +806,11 @@ Phase 3 now makes `/me dashboard` governor-first using the completed Phase 2 fou
 preserving all existing `/me` subcommands and legacy paths. Phase 4 should replace the fallback
 shell with the premium PNG card without changing the service or access contract.
 
+Use:
+
+- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 4 Premium Governor Dashboard Renderer.md`
+- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 4 Premium Governor Dashboard Renderer.md`
+
 ## 21. Programme Change Log
 
 | Date | Change | Notes |
@@ -742,5 +818,6 @@ shell with the premium PNG card without changing the service or access contract.
 | 2026-06-27 | Initial v2 programme pack created | Follow-on from original Player Self-Service Command Centre programme. |
 | 2026-07-09 | Programme updated after Phase 1 audit | Reframed as GovernorOS, added bold dashboard vision, revised phase plan, removed Olympia from initial scope, and made Phase 2 the service/data foundation. |
 | 2026-07-10 | Phase 2 completed and Phase 3 prepared | Recorded the delivered governor context/data foundation, successful smoke/regression validation, explicit selector architecture decision, and Phase 3 as the next slice. |
-| 2026-07-10 | Phase 3 implemented locally | Added the private governor-first selector and fallback shell, recorded registry trust approval and required future inspect direction, and passed focused plus full repository validation pending operator smoke. |
-| 2026-07-10 | Phase 3 operator smoke completed | Confirmed no-governor, single-governor, multiple-governor, Change Governor, and corrected dashboard-data journeys; Phase 4 is now the next proposed slice. |
+| 2026-07-10 | Initial Phase 3 implementation validated | Added the private governor-first selector and fallback shell, recorded registry trust approval and required future inspect direction, and passed focused plus full repository validation before operator smoke corrections. |
+| 2026-07-10 | Phase 3 operator smoke completed | Confirmed no-governor, single-governor, multiple-governor, Change Governor, and corrected dashboard-data journeys; Phase 4 became the next slice. |
+| 2026-07-10 | Phase 4 scope pack prepared and remaining roadmap reconciled | Archived the completed Phase 3 execution pack/starter, created the Phase 4 task pack/starter, made Phase 7 history and Phase 8 inspect ordering authoritative, and added explicit approval gates for Phases 4-10. |

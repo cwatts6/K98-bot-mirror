@@ -7,9 +7,11 @@ passed on 2026-07-10. `/me dashboard` is now governor-first: no linked governor 
 guidance, one opens directly, and multiple use a private author-gated selector before dashboard
 data is fetched. Every selected governor is checked again against the active registry. The
 operator approved that registry authority based on Discord onboarding audit, monthly in-game
-reconciliation, and owner-approved transfer controls. The premium PNG renderer is the next Phase 4
-slice. Admin/leadership inspect is confirmed as required and remains a separate permission-gated
-slice using the Phase 2 inspect-safe contract.
+reconciliation, and owner-approved transfer controls. Mirror PR #217 and production PR #524 carry
+the completed Phase 3 implementation and recorded smoke evidence. The premium PNG renderer is the
+next Phase 4 slice; its task pack and chat starter are ready for scope/visual approval.
+Admin/leadership inspect is confirmed as required Phase 8 work and remains a separate
+permission-gated slice using the Phase 2 inspect-safe contract.
 
 Status: Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and
 production PR #481, and smoke tested successfully on 2026-06-26. Phase 11B KVK Renderer Migration
@@ -46,11 +48,13 @@ Use it to check:
 - Ark joined, won, win ratio, Times Named Autarch, and Times Autarch Participated
 - where to manage Accounts, Reminders, Preferences, Inventory, and Exports
 
-The dashboard includes a visual summary card when image rendering succeeds. If image rendering or
-delivery fails, the bot falls back to the private embed dashboard. Phase 9 removes dashboard Quick
-Launch links for `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` because those
-commands have channel and public-output rules that should stay exactly where players already use
-them. The dashboard now keeps only safe private handoffs for Inventory and Exports.
+The governor dashboard currently uses the operator-approved private fallback embed. Phase 4 will
+make a dedicated premium PNG governor card the primary successful presentation and retain this
+embed when rendering or delivery fails. Existing generated cards for the older setup pages remain
+unchanged until their approved phase work. Quick Launch links for `/kvk stats`, `/kvk targets`,
+`/kvk history`, and `/kvk rankings` remain absent because those commands have channel and
+public-output rules that should stay exactly where players already use them. The dashboard keeps
+only safe private handoffs for the currently delivered Inventory and Exports pages.
 
 The account centre supports account review, Governor ID lookup, registration, replacement, and
 removal with confirmation through one primary Manage journey. Lookup results can continue into
@@ -418,8 +422,9 @@ Current status:
   monitoring window, production usage review, and operator approval.
 - GovernorOS v2 Phase 1 blueprint/audit and Phase 2 governor context/data foundation are complete
   and archived as execution records.
-- GovernorOS v2 Phase 3 is implemented locally with a dashboard-specific private selector,
-  no/one/multiple/unavailable/denied journey, fallback shell, and in-place Change Governor behavior.
+- GovernorOS v2 Phase 3 is complete in mirror PR #217 and production PR #524 with a
+  dashboard-specific private selector, no/one/multiple/unavailable/denied journey, fallback shell,
+  and in-place Change Governor behavior; operator smoke passed on 2026-07-10.
 - The generic `AccountPickerView` was not wired into the dashboard; the new view reuses Phase 2
   options/access services and supports safe in-place context switching.
 - Existing registry linkage is approved for Phase 3 self-view access under the operator's onboarding,
@@ -432,7 +437,18 @@ Current status:
   Phase 4-6 renderer upgrades; SQL plan/IO measurement is captured before any new read model.
 - Final operator smoke passed the no-governor, single-governor, multiple-governor, Change Governor,
   and corrected dashboard-data journeys on 2026-07-10.
-- The premium PNG governor dashboard renderer remains Phase 4.
-- Admin/leadership inspect is a required later permission-gated slice, not optional future polish.
+- The premium PNG governor dashboard renderer is the next Phase 4 slice. Its active task pack and
+  chat starter define the fixed renderer/payload boundary, fallback, attachment lifecycle, visual
+  QA, and explicit no-SQL/no-new-action scope.
+- Phase 5 adds direct selected-governor Resources, Materials, and Speedups only after report
+  visibility semantics and command-count impact are approved.
+- Phase 6 adds Export Stats only after selected-governor versus all-linked semantics are approved;
+  export schema/format redesign remains outside GovernorOS.
+- Phase 7 adds private selected-governor `/me history` while preserving public/channel-gated
+  `/kvk history` unchanged.
+- Phase 8 delivers the required permission-gated admin/leadership inspect journey, with an explicit
+  permissions, inspect-safe VIP, lookup, and telemetry approval checkpoint.
+- Phase 9 is an evidence-only usage-led migration review; no legacy redirect/removal is implied.
+- Phase 10 sticky features are a future programme candidate, not a committed implementation slice.
 - Export schema/format redesign remains a separate export-output programme unless explicitly
   narrowed later.
