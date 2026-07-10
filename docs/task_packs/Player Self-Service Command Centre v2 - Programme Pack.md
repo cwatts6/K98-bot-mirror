@@ -414,7 +414,7 @@ Delivered in mirror PR `K98-bot-mirror#216` and production PR `K98-bot#523`:
 
 ### Phase 3 — Governor Selector and Dashboard Shell
 
-Status: `implementation correction complete - operator re-smoke pending`.
+Status: `complete - operator smoke passed 2026-07-10`.
 
 Deliver:
 
@@ -463,10 +463,13 @@ Delivered locally on 2026-07-10:
   account transfer controls.
 - Admin/leadership inspect was reconfirmed as a required programme outcome. It remains a separate
   permission-gated slice so Phase 3 does not silently enable arbitrary-governor access.
+- Final operator smoke passed the no-governor setup journey, single-governor direct open,
+  multiple-governor selector, Change Governor, and corrected dashboard-data presentation on
+  2026-07-10.
 
 ### Phase 4 — Premium Governor Dashboard Renderer
 
-Status: `next proposed slice after Phase 3 operator smoke`.
+Status: `next proposed slice`.
 
 Deliver:
 
@@ -725,7 +728,7 @@ Do not include these in early phases unless separately approved:
 ## 20. Suggested Next Action
 
 ```text
-Complete Phase 3 operator smoke, then start Phase 4: Premium Governor Dashboard Renderer.
+Start Phase 4: Premium Governor Dashboard Renderer.
 ```
 
 Phase 3 now makes `/me dashboard` governor-first using the completed Phase 2 foundation while
@@ -740,3 +743,4 @@ shell with the premium PNG card without changing the service or access contract.
 | 2026-07-09 | Programme updated after Phase 1 audit | Reframed as GovernorOS, added bold dashboard vision, revised phase plan, removed Olympia from initial scope, and made Phase 2 the service/data foundation. |
 | 2026-07-10 | Phase 2 completed and Phase 3 prepared | Recorded the delivered governor context/data foundation, successful smoke/regression validation, explicit selector architecture decision, and Phase 3 as the next slice. |
 | 2026-07-10 | Phase 3 implemented locally | Added the private governor-first selector and fallback shell, recorded registry trust approval and required future inspect direction, and passed focused plus full repository validation pending operator smoke. |
+| 2026-07-10 | Phase 3 operator smoke completed | Confirmed no-governor, single-governor, multiple-governor, Change Governor, and corrected dashboard-data journeys; Phase 4 is now the next proposed slice. |

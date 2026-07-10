@@ -8,7 +8,7 @@
 - Task type: `Discord interaction feature | private governor selection | dashboard shell integration`
 - One-pass approved: `No`
 - Implementation approved: `Yes - registry authority checkpoint confirmed 2026-07-10`
-- Status: `implementation correction complete - operator re-smoke pending`
+- Status: `complete - operator smoke passed 2026-07-10`
 
 ## Completion Record
 
@@ -45,8 +45,14 @@ command-registration, full pre-commit, and diff checks passed. The Codex Securit
 exposed to this task and the local CLI could not be launched, so an independent security-focused
 diff review was used as the documented fallback. It found and drove closure of one interaction
 integrity issue around concurrent/stale/timeout transitions, then completed with no reportable
-findings. A security-focused re-review of the initial smoke corrections also completed with no
-reportable findings. Operator Discord re-smoke remains before rollout.
+findings. Security-focused re-reviews of both smoke-correction slices also completed with no
+reportable findings.
+
+Operator Discord smoke completed successfully on 2026-07-10 after the correction slices. The
+operator confirmed the no-governor setup journey, single-governor direct open, multiple-governor
+selector, Change Governor flow, and final dashboard data presentation all passed. The accepted
+shell showed mapped civilisation, `X:Y` location, compact battle values, Ark results, Named
+Autarch count, Autarch participation count, VIP presentation, and freshness correctly.
 
 Product direction confirmed during the approval checkpoint: admin/leadership inspect is required
 for kingdom management and player support. It remains outside Phase 3 and must be delivered as a
@@ -347,7 +353,7 @@ Use test users or controlled registry fixtures representing each state:
 - [x] No top-level or grouped subcommand count changes occur.
 - [x] Legacy commands remain behavior-compatible.
 - [x] No SQL schema change is introduced.
-- [ ] Focused, regression, and validator evidence is recorded; operator Discord smoke remains.
+- [x] Focused, regression, validator, and successful operator Discord smoke evidence is recorded.
 - [x] Security-focused diff review completed with no reportable findings after hardening.
 - [x] Deferred findings are captured structurally.
 

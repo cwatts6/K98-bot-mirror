@@ -2,14 +2,14 @@
 
 Last updated: 2026-07-10
 
-GovernorOS v2 status: Phase 3 Governor Selector and Dashboard Shell is implemented locally;
-initial operator smoke corrections are complete and re-smoke remains. `/me dashboard` is
-now governor-first: no linked governor shows setup guidance, one opens directly, and multiple use a
-private author-gated selector before dashboard data is fetched. Every selected governor is checked
-again against the active registry. The operator approved that registry authority based on Discord
-onboarding audit, monthly in-game reconciliation, and owner-approved transfer controls. The premium
-PNG renderer remains Phase 4. Admin/leadership inspect is confirmed as required and remains a
-separate permission-gated slice using the Phase 2 inspect-safe contract.
+GovernorOS v2 status: Phase 3 Governor Selector and Dashboard Shell is complete and operator smoke
+passed on 2026-07-10. `/me dashboard` is now governor-first: no linked governor shows setup
+guidance, one opens directly, and multiple use a private author-gated selector before dashboard
+data is fetched. Every selected governor is checked again against the active registry. The
+operator approved that registry authority based on Discord onboarding audit, monthly in-game
+reconciliation, and owner-approved transfer controls. The premium PNG renderer is the next Phase 4
+slice. Admin/leadership inspect is confirmed as required and remains a separate permission-gated
+slice using the Phase 2 inspect-safe contract.
 
 Status: Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and
 production PR #481, and smoke tested successfully on 2026-06-26. Phase 11B KVK Renderer Migration
@@ -426,10 +426,12 @@ Current status:
   monthly reconciliation, and transfer-control process.
 - Initial Phase 3 smoke corrections cover graceful expiry, clean in-place page switching, retained
   selected-governor context, latest-scan acclaim/Ark/Autarch values, civilisation-name mapping,
-  compact numbers, and removal of scan order; operator re-smoke remains before rollout.
+  compact numbers, and removal of scan order.
 - Second-pass smoke adds `KvKPlayed` participation, indexed `PlayerLocation` coordinates, clearer
   VIP wording, and a seekable governor lookup. Mixed page-card/embed visuals are parked for the
   Phase 4-6 renderer upgrades; SQL plan/IO measurement is captured before any new read model.
+- Final operator smoke passed the no-governor, single-governor, multiple-governor, Change Governor,
+  and corrected dashboard-data journeys on 2026-07-10.
 - The premium PNG governor dashboard renderer remains Phase 4.
 - Admin/leadership inspect is a required later permission-gated slice, not optional future polish.
 - Export schema/format redesign remains a separate export-output programme unless explicitly

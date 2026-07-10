@@ -117,10 +117,10 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Area: `commands/me_cmds.py`, `ui/views/player_self_service_views.py`, `player_self_service/governor_dashboard_*`, `/me dashboard`, player self-service v2 docs/tests
 - Type: architecture
 - Description: GovernorOS v2 Phase 3 delivered the private governor-first `/me dashboard` selector and fallback shell over the Phase 2 context/access/payload foundation. The premium renderer, direct governor-specific inventory actions, private history, required admin/leadership inspect flow, and usage-led legacy migration remain intentionally outside this interaction slice.
-- Suggested Fix: Complete Phase 3 operator smoke, then execute the separate Phase 4 premium renderer without changing the service/access contract. Deliver admin/leadership inspect as its own permission-gated slice using the inspect-safe payload boundary, followed by the separately approved action/history phases. Preserve all existing `/me` and legacy command paths through the initial dashboard rollout.
+- Suggested Fix: Execute the separate Phase 4 premium renderer without changing the service/access contract. Deliver admin/leadership inspect as its own permission-gated slice using the inspect-safe payload boundary, followed by the separately approved action/history phases. Preserve all existing `/me` and legacy command paths through the initial dashboard rollout.
 - Impact: high
 - Risk: medium
-- Dependencies: Phase 1 blueprint complete; Phase 2 delivered in mirror PR #216 and production PR #523; Phase 3 implementation and automated validation complete; operator Discord smoke before rollout; separate approval/design for inspect permissions and lookup UX.
+- Dependencies: Phase 1 blueprint complete; Phase 2 delivered in mirror PR #216 and production PR #523; Phase 3 implementation, automated validation, and operator Discord smoke completed on 2026-07-10; separate approval/design for inspect permissions and lookup UX.
 
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `inventory/export_service.py`, `inventory/dal/`, SQL repo export views/tables, export docs/tests
