@@ -71,7 +71,7 @@ def _format_freshness(value: Any) -> str:
 
 
 def _option_label(option: GovernorDashboardOption) -> str:
-    label = option.governor_name.strip() or option.governor_id_str
+    label = " ".join(str(option.governor_name or "").split()) or option.governor_id_str
     return label[:100]
 
 
@@ -173,7 +173,7 @@ def build_governor_selector_embed(
     if default_option is not None:
         embed.add_field(
             name="Default account",
-            value=f"{default_option.governor_name} (`{default_option.governor_id_str}`)",
+            value=f"{_option_label(default_option)} (`{default_option.governor_id_str}`)",
             inline=False,
         )
     embed.set_footer(text=f"Private selector • Page {page + 1} of {total_pages}")
@@ -361,9 +361,7 @@ class GovernorDashboardView(discord.ui.View):
         return True
 
     def _transition_is_current(self, interaction: discord.Interaction) -> bool:
-        return bool(
-            not self._timed_out and self._active_transition_id == id(interaction)
-        )
+        return bool(not self._timed_out and self._active_transition_id == id(interaction))
 
     def _transition_timeout_remaining(self) -> float:
         expiry = getattr(self, "_timeout_expiry", None)

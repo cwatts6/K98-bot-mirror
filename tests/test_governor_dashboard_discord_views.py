@@ -253,7 +253,7 @@ async def test_one_governor_opens_dashboard_directly_after_access_resolution() -
 @pytest.mark.asyncio
 async def test_multiple_governors_show_selector_before_payload_fetch() -> None:
     options = (
-        _option(111, name="Main Gov", is_default=True),
+        _option(111, name="  Main\r\n  Gov  ", is_default=True),
         _option(222, name="Alt Gov", account_type="Alt 1"),
     )
     ctx = _ctx()
@@ -279,7 +279,15 @@ async def test_multiple_governors_show_selector_before_payload_fetch() -> None:
     selector = next(
         child for child in edited["view"].children if isinstance(child, discord.ui.Select)
     )
+    assert [choice.label for choice in selector.options] == ["Main Gov", "Alt Gov"]
     assert [choice.value for choice in selector.options] == ["111", "222"]
+    assert edited["embed"].fields[0].value == "Main Gov (`111`)"
+
+
+def test_governor_option_label_falls_back_to_id_after_whitespace_sanitization() -> None:
+    option = _option(111, name=" \r\n\t ")
+
+    assert views._option_label(option) == "111"
 
 
 @pytest.mark.asyncio
