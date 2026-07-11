@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from io import BytesIO
 import logging
 from math import ceil
 import time
@@ -18,6 +19,7 @@ from player_self_service.governor_dashboard_models import (
     GovernorDashboardPayload,
     GovernorDashboardResolution,
 )
+from player_self_service.governor_dashboard_renderer import render_governor_dashboard
 from player_self_service.governor_dashboard_service import (
     GovernorDashboardAccessDenied,
     build_governor_dashboard_payload,
@@ -40,6 +42,7 @@ _VIEW_TIMEOUT_SECONDS = 180.0
 _MISSING = "N/A"
 _DASHBOARD_TITLE_PREFIX = "Governor Dashboard — "
 _DISCORD_EMBED_TITLE_LIMIT = 256
+_AVATAR_READ_TIMEOUT_SECONDS = 3.0
 
 
 def _safe_text(value: Any, *, missing: str = _MISSING) -> str:
@@ -195,6 +198,51 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
     embed.add_field(name="Freshness", value=freshness, inline=False)
     embed.set_footer(text="Private self-view • Data shown for your linked governor.")
     return embed
+
+
+def build_governor_dashboard_card_embed(filename: str) -> discord.Embed:
+    embed = discord.Embed(color=discord.Color.from_rgb(74, 54, 117))
+    embed.set_image(url=f"attachment://{filename}")
+    return embed
+
+
+async def _read_avatar_bytes(user: Any, *, expected_user_id: int) -> bytes | None:
+    try:
+        if user is None or int(getattr(user, "id", -1)) != int(expected_user_id):
+            return None
+    except (TypeError, ValueError):
+        return None
+    avatar = getattr(user, "display_avatar", None) or getattr(user, "avatar", None)
+    if avatar is None:
+        return None
+    try:
+        if hasattr(avatar, "with_size"):
+            avatar = avatar.with_size(256)
+        if hasattr(avatar, "read"):
+            return await asyncio.wait_for(avatar.read(), timeout=_AVATAR_READ_TIMEOUT_SECONDS)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.debug(
+            "governor_dashboard_avatar_read_failed user_id=%s",
+            getattr(user, "id", None),
+            exc_info=True,
+        )
+    return None
+
+
+def _close_files(files: list[discord.File] | None) -> None:
+    for file in files or []:
+        try:
+            file.close()
+        except Exception:
+            logger.debug("governor_dashboard_file_close_failed", exc_info=True)
+        stream = getattr(file, "fp", None)
+        try:
+            if stream is not None and not getattr(stream, "closed", False):
+                stream.close()
+        except Exception:
+            logger.debug("governor_dashboard_stream_close_failed", exc_info=True)
 
 
 def build_governor_selector_embed(
@@ -724,7 +772,9 @@ class GovernorDashboardView(discord.ui.View):
         edited = False
         try:
             if self._timeout_editor is not None:
-                await self._timeout_editor(content=timeout_content, view=self)
+                await self._timeout_editor(
+                    content=timeout_content, embed=None, view=self, attachments=[]
+                )
                 edited = True
         except Exception:
             logger.debug("governor_dashboard_timeout_original_edit_failed", exc_info=True)
@@ -732,7 +782,9 @@ class GovernorDashboardView(discord.ui.View):
             if not edited and message:
                 await message.edit(
                     content=timeout_content,
+                    embed=None,
                     view=self,
+                    attachments=[],
                 )
         except Exception:
             logger.debug("governor_dashboard_timeout_edit_failed", exc_info=True)
@@ -744,15 +796,26 @@ async def _edit_dashboard_response(
     *,
     embed: discord.Embed,
     view: GovernorDashboardView,
+    files: list[discord.File] | None = None,
+    fallback_embed: discord.Embed | None = None,
     can_edit: Callable[[], bool] | None = None,
     timeout_remaining: Callable[[], float] | None = None,
 ) -> bool:
+    files = files or []
+    fallback_embed = fallback_embed or embed
     if can_edit is not None and not can_edit():
+        _close_files(files)
         return False
     try:
-        edit_call = target.edit_original_response(
-            content=None, embed=embed, view=view, attachments=[]
-        )
+        kwargs: dict[str, Any] = {
+            "content": None,
+            "embed": embed,
+            "view": view,
+            "attachments": [],
+        }
+        if files:
+            kwargs["files"] = files
+        edit_call = target.edit_original_response(**kwargs)
         edited = (
             await asyncio.wait_for(edit_call, timeout=timeout_remaining())
             if timeout_remaining is not None
@@ -772,8 +835,30 @@ async def _edit_dashboard_response(
         logger.debug("governor_dashboard_edit_failed_falling_back", exc_info=True)
         if can_edit is not None and not can_edit():
             return False
+        if files:
+            try:
+                fallback_call = target.edit_original_response(
+                    content=None,
+                    embed=fallback_embed,
+                    view=view,
+                    attachments=[],
+                )
+                edited = (
+                    await asyncio.wait_for(fallback_call, timeout=timeout_remaining())
+                    if timeout_remaining is not None
+                    else await fallback_call
+                )
+                if can_edit is not None and not can_edit():
+                    return False
+                view.set_message_ref(getattr(target, "message", None) or edited)
+                view.set_timeout_target(target)
+                return True
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.debug("governor_dashboard_embed_retry_failed", exc_info=True)
         try:
-            followup_call = target.followup.send(embed=embed, view=view, ephemeral=True)
+            followup_call = target.followup.send(embed=fallback_embed, view=view, ephemeral=True)
             sent = (
                 await asyncio.wait_for(followup_call, timeout=timeout_remaining())
                 if timeout_remaining is not None
@@ -786,6 +871,8 @@ async def _edit_dashboard_response(
             return False
         view.set_message_ref(sent)
         return True
+    finally:
+        _close_files(files)
 
 
 async def _render_resolution(
@@ -802,6 +889,8 @@ async def _render_resolution(
     timeout_remaining: Callable[[], float] | None = None,
 ) -> bool:
     embed: discord.Embed
+    fallback_embed: discord.Embed | None = None
+    files: list[discord.File] = []
     if resolution.state == "selected":
         context = resolution.context
         if context is None or not _is_authorized_self_context(context, author_id):
@@ -825,7 +914,31 @@ async def _render_resolution(
                     )
                     embed = build_governor_denied_embed()
                 else:
-                    embed = build_governor_dashboard_embed(payload)
+                    fallback_embed = build_governor_dashboard_embed(payload)
+                    try:
+                        avatar_bytes = await _read_avatar_bytes(
+                            getattr(target, "user", None), expected_user_id=author_id
+                        )
+                        rendered_card = await asyncio.to_thread(
+                            render_governor_dashboard,
+                            payload,
+                            avatar_bytes=avatar_bytes,
+                        )
+                        file = discord.File(
+                            BytesIO(rendered_card.image_bytes),
+                            filename=rendered_card.filename,
+                        )
+                        files = [file]
+                        embed = build_governor_dashboard_card_embed(rendered_card.filename)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:
+                        logger.exception(
+                            "governor_dashboard_card_render_failed user_id=%s governor_id=%s",
+                            author_id,
+                            context.selected_governor_id,
+                        )
+                        embed = fallback_embed
             except GovernorDashboardAccessDenied:
                 logger.warning(
                     "governor_dashboard_payload_access_denied user_id=%s governor_id=%s",
@@ -869,6 +982,8 @@ async def _render_resolution(
         target,
         embed=embed,
         view=view,
+        files=files,
+        fallback_embed=fallback_embed,
         can_edit=can_edit,
         timeout_remaining=timeout_remaining,
     )

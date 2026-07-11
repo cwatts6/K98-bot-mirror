@@ -111,7 +111,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Suggested Fix: This item is promoted into the Phase 4 premium renderer task pack. Define one attachment replacement/clearing and file-stream cleanup contract for selector-to-card, card-to-selector, card-to-page, page-to-card, card-to-card, card-to-embed, and embed-to-card transitions; apply it through the governor-dashboard/shared send-edit boundary; and add Discord-view regression coverage. Keep this item active until Phase 4 visual smoke confirms no mixed attachment remains.
 - Impact: medium
 - Risk: low
-- Dependencies: Phase 4 task pack and starter prepared on 2026-07-10; operator scope/visual approval; Phase 4 implementation and Discord smoke evidence.
+- Dependencies: Phase 4 implementation and local visual/automated validation completed on 2026-07-10; keep active until operator Discord smoke confirms attachment replacement across the live journey.
 
 ### Deferred Optimisation
 - Area: `commands/me_cmds.py`, `ui/views/player_self_service_views.py`, `player_self_service/governor_dashboard_*`, `/me dashboard`, player self-service v2 docs/tests
@@ -125,7 +125,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `player_self_service/governor_dashboard_renderer.py`, `core/visual_text.py`, `player_self_service/page_cards.py`, KVK and inventory renderer families
 - Type: consistency
-- Description: Shared glyph-safe text primitives already live in `core.visual_text`, but page-card, KVK, inventory, and the planned governor dashboard layouts intentionally remain domain-specific. Creating a broad visual framework before the Phase 4 governor card is accepted would risk coupling unrelated payloads/themes and replacing working renderers without evidence of useful duplication.
+- Description: Shared glyph-safe text primitives already live in `core.visual_text`, while page-card, KVK, inventory, and the delivered governor dashboard layouts intentionally remain domain-specific. Creating a broad visual framework without concrete post-delivery evidence would risk coupling unrelated payloads/themes and replacing working renderers without useful duplication.
 - Suggested Fix: Build Phase 4 as a dedicated governor renderer that reuses `core.visual_text`. After operator visual acceptance, compare only concrete duplicated low-level primitives (for example panel drawing, cached background loading, or PNG export) and promote a small shared-helper slice only where reuse is measurable and output contracts can remain unchanged.
 - Impact: medium
 - Risk: medium

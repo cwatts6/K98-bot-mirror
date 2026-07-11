@@ -8,7 +8,18 @@
 - Task type: `Generated visual card | Discord attachment integration | fallback-safe renderer migration`
 - One-pass approved: `No`
 - Implementation approved: `No - scope and visual direction require operator confirmation`
-- Status: `ready for scope approval`
+- Status: `implemented and locally validated - operator Discord smoke pending`
+
+## Implementation Record
+
+- Operator approved the 1180x640 wide visual direction and the operator-created
+  `assets/me/cards/me.png` background.
+- The invoking player's Discord avatar is fetched best-effort in the Discord view layer and passed
+  as optional bytes to the off-thread renderer; the payload contract is unchanged.
+- Missing or invalid avatars use a KD98 medallion fallback. Render, file, and delivery failures use
+  the existing embed without another payload fetch.
+- Complete, sparse, long-name, CJK, and emoji samples were reviewed at original, desktop, and
+  mobile scale. Focused/full automated validation passed; operator Discord smoke remains pending.
 
 ## 2. Objective
 

@@ -27,6 +27,18 @@ from player_self_service.governor_dashboard_models import (
 from ui.views import player_self_service_governor_dashboard_views as views
 
 
+@pytest.fixture(autouse=True)
+def _fast_governor_card_renderer(monkeypatch):
+    monkeypatch.setattr(
+        views,
+        "render_governor_dashboard",
+        lambda payload, *, avatar_bytes=None: SimpleNamespace(
+            filename="governor_dashboard.png",
+            image_bytes=b"rendered-governor-card",
+        ),
+    )
+
+
 class _Response:
     def __init__(self) -> None:
         self.deferred: list[dict] = []
@@ -249,14 +261,121 @@ async def test_one_governor_opens_dashboard_directly_after_access_resolution() -
 
     edited = ctx.interaction.original_edits[-1]
     assert order == ["access", "payload"]
-    assert edited["embed"].title == "Governor Dashboard — Main Gov"
-    assert "Power: 123.5M" in edited["embed"].fields[2].value
-    assert "Kill Points: 987.7M" in edited["embed"].fields[2].value
-    assert "Healed: 10K" in edited["embed"].fields[2].value
-    assert "Location: 123:456" in edited["embed"].fields[1].value
-    assert "Times Autarch Participated: 6" in edited["embed"].fields[3].value
-    assert "scan order" not in str(edited["embed"].fields[-1].value).casefold()
+    assert edited["embed"].image.url == "attachment://governor_dashboard.png"
+    assert edited["attachments"] == []
+    assert [item.filename for item in edited["files"]] == ["governor_dashboard.png"]
+    assert edited["files"][0].fp.closed is True
     assert "me:dashboard:change" not in _custom_ids(edited["view"])
+
+
+@pytest.mark.asyncio
+async def test_selected_card_uses_invoking_players_discord_avatar(monkeypatch) -> None:
+    option = _option(111, name="Main Gov", is_default=True)
+    ctx = _ctx()
+    captured: dict[str, object] = {}
+
+    class Avatar:
+        def with_size(self, size):
+            captured["size"] = size
+            return self
+
+        async def read(self):
+            return b"discord-avatar"
+
+    ctx.user.display_avatar = Avatar()
+
+    def fake_render(payload, *, avatar_bytes=None):
+        captured["avatar_bytes"] = avatar_bytes
+        return SimpleNamespace(filename="governor_dashboard.png", image_bytes=b"card")
+
+    monkeypatch.setattr(views, "render_governor_dashboard", fake_render)
+
+    async def resolver(_user_id: int, **_kwargs):
+        return _selected_resolution(option)
+
+    async def payload_loader(context):
+        return _payload(context)
+
+    await views.send_governor_dashboard(
+        ctx, context_resolver=resolver, payload_loader=payload_loader
+    )
+
+    assert captured == {"size": 256, "avatar_bytes": b"discord-avatar"}
+
+
+@pytest.mark.asyncio
+async def test_avatar_reader_rejects_a_different_discord_user() -> None:
+    foreign = _User(99)
+
+    class Avatar:
+        async def read(self):
+            raise AssertionError("foreign avatar must not be read")
+
+    foreign.display_avatar = Avatar()
+    assert await views._read_avatar_bytes(foreign, expected_user_id=42) is None
+
+
+@pytest.mark.asyncio
+async def test_render_failure_uses_same_payload_fallback_without_second_fetch(monkeypatch) -> None:
+    option = _option(111, name="Main Gov", is_default=True)
+    ctx = _ctx()
+    payload_calls = 0
+
+    def broken_render(payload, *, avatar_bytes=None):
+        raise RuntimeError("render failed")
+
+    monkeypatch.setattr(views, "render_governor_dashboard", broken_render)
+
+    async def resolver(_user_id: int, **_kwargs):
+        return _selected_resolution(option)
+
+    async def payload_loader(context):
+        nonlocal payload_calls
+        payload_calls += 1
+        return _payload(context)
+
+    await views.send_governor_dashboard(
+        ctx, context_resolver=resolver, payload_loader=payload_loader
+    )
+
+    edited = ctx.interaction.original_edits[-1]
+    assert payload_calls == 1
+    assert edited["embed"].title == "Governor Dashboard — Main Gov"
+    assert edited["attachments"] == []
+    assert "files" not in edited
+
+
+@pytest.mark.asyncio
+async def test_image_delivery_failure_retries_embed_and_closes_file() -> None:
+    option = _option(111, name="Main Gov", is_default=True)
+    ctx = _ctx()
+    payload_calls = 0
+    attempts: list[dict] = []
+
+    async def resolver(_user_id: int, **_kwargs):
+        return _selected_resolution(option)
+
+    async def payload_loader(context):
+        nonlocal payload_calls
+        payload_calls += 1
+        return _payload(context)
+
+    async def flaky_edit(**kwargs):
+        attempts.append(kwargs)
+        if kwargs.get("files"):
+            raise RuntimeError("attachment rejected")
+        return SimpleNamespace(id=456)
+
+    ctx.interaction.edit_original_response = flaky_edit
+    await views.send_governor_dashboard(
+        ctx, context_resolver=resolver, payload_loader=payload_loader
+    )
+
+    assert payload_calls == 1
+    assert len(attempts) == 2
+    assert attempts[0]["files"][0].fp.closed is True
+    assert attempts[1]["embed"].title == "Governor Dashboard — Main Gov"
+    assert attempts[1]["attachments"] == []
 
 
 @pytest.mark.asyncio
@@ -426,7 +545,9 @@ async def test_valid_selection_rechecks_access_before_payload_and_edits_in_place
 
     assert order == ["access", "payload"]
     edited = interaction.original_edits[-1]
-    assert edited["embed"].title == "Governor Dashboard — Alt Gov"
+    assert edited["embed"].image.url == "attachment://governor_dashboard.png"
+    assert [item.filename for item in edited["files"]] == ["governor_dashboard.png"]
+    assert edited["files"][0].fp.closed is True
     assert "me:dashboard:change" in _custom_ids(edited["view"])
     assert interaction.followup.sent == []
 
@@ -470,7 +591,10 @@ async def test_change_governor_is_multi_only_and_returns_to_selector_without_pay
 
     await multi_view.change_governor(interaction)
 
-    assert interaction.original_edits[-1]["embed"].title == "Choose a Governor"
+    edited = interaction.original_edits[-1]
+    assert edited["embed"].title == "Choose a Governor"
+    assert edited["attachments"] == []
+    assert "files" not in edited
 
 
 @pytest.mark.asyncio
@@ -689,7 +813,10 @@ async def test_inflight_selection_rejects_concurrent_navigation(monkeypatch) -> 
 
     assert navigation_calls == []
     assert "stale" in navigation_interaction.response.sent[-1][0][0]
-    assert selection_interaction.original_edits[-1]["embed"].title.endswith("Alt Gov")
+    assert (
+        selection_interaction.original_edits[-1]["embed"].image.url
+        == "attachment://governor_dashboard.png"
+    )
 
 
 @pytest.mark.asyncio

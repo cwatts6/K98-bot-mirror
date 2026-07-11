@@ -232,12 +232,19 @@ def draw_text(
     font: ImageFont.ImageFont,
     fill: tuple[int, int, int] | tuple[int, int, int, int],
     bold: bool = False,
+    embedded_color: bool = False,
 ) -> None:
     x, y = xy
     for cluster in text_clusters(text):
         base_size = getattr(font, "size", 20)
         cluster_font = font_for_text(cluster, cluster_font_size(cluster, base_size), bold=bold)
-        draw.text((x, y), cluster, fill=fill, font=cluster_font)
+        draw.text(
+            (x, y),
+            cluster,
+            fill=fill,
+            font=cluster_font,
+            embedded_color=embedded_color,
+        )
         box = draw.textbbox((0, 0), cluster, font=cluster_font)
         x += int(box[2] - box[0])
 

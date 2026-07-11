@@ -66,7 +66,8 @@ def test_me_commands_are_decorated_and_thin() -> None:
     source = inspect.getsource(me_cmds.register_me)
 
     assert source.count("@versioned(") == 6
-    assert source.count('@versioned("v1.01")') == 2
+    assert source.count('@versioned("v1.02")') == 1
+    assert source.count('@versioned("v1.01")') == 1
     assert source.count("@safe_command") == 6
     assert source.count("@track_usage()") == 6
     assert "set_user_config" not in source

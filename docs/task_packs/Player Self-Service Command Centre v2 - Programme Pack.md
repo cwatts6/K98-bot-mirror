@@ -474,7 +474,7 @@ Delivered in mirror PR `K98-bot-mirror#217` and production PR `K98-bot#524` on 2
 
 ### Phase 4 — Premium Governor Dashboard Renderer
 
-Status: `next slice - task pack and chat starter ready for scope/visual approval`.
+Status: `implemented and locally validated - operator Discord smoke pending`.
 
 Goal: replace the successful selected-governor fallback shell with a premium generated card without
 changing the delivered data, access, selector, or command contracts.
@@ -492,6 +492,15 @@ Deliver:
   current `/me` page transitions.
 - Visual sample review at original, Discord-desktop, and Discord-mobile scales.
 - No Olympia fields, placeholders, icons, or empty zones.
+
+Implementation record:
+
+- Approved `assets/me/cards/me.png` as the operator-created background at the 1180x640 target.
+- Uses the invoking player's Discord avatar in the medallion when available, with a KD98 fallback.
+- Retains the Phase 3 embed from the same payload when avatar retrieval, rendering, file creation,
+  or image delivery fails.
+- Focused tests, repository validators, pre-commit, full pytest, and complete/sparse/Unicode visual
+  samples passed; operator Discord smoke remains the final checkpoint.
 
 Approval gate:
 

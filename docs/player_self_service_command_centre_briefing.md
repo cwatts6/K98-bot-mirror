@@ -8,8 +8,9 @@ guidance, one opens directly, and multiple use a private author-gated selector b
 data is fetched. Every selected governor is checked again against the active registry. The
 operator approved that registry authority based on Discord onboarding audit, monthly in-game
 reconciliation, and owner-approved transfer controls. Mirror PR #217 and production PR #524 carry
-the completed Phase 3 implementation and recorded smoke evidence. The premium PNG renderer is the
-next Phase 4 slice; its task pack and chat starter are ready for scope/visual approval.
+the completed Phase 3 implementation and recorded smoke evidence. The Phase 4 premium PNG
+renderer is implemented and locally validated; operator Discord smoke is the remaining delivery
+checkpoint.
 Admin/leadership inspect is confirmed as required Phase 8 work and remains a separate
 permission-gated slice using the Phase 2 inspect-safe contract.
 
@@ -48,9 +49,10 @@ Use it to check:
 - Ark joined, won, win ratio, Times Named Autarch, and Times Autarch Participated
 - where to manage Accounts, Reminders, Preferences, Inventory, and Exports
 
-The governor dashboard currently uses the operator-approved private fallback embed. Phase 4 will
-make a dedicated premium PNG governor card the primary successful presentation and retain this
-embed when rendering or delivery fails. Existing generated cards for the older setup pages remain
+The governor dashboard now uses a dedicated 1180x640 premium PNG governor card as the primary
+successful presentation, with the invoking player's Discord avatar in the medallion where
+available. The operator-approved private embed remains the fallback when avatar retrieval,
+rendering, file creation, or image delivery fails. Existing generated cards for the older setup pages remain
 unchanged until their approved phase work. Quick Launch links for `/kvk stats`, `/kvk targets`,
 `/kvk history`, and `/kvk rankings` remain absent because those commands have channel and
 public-output rules that should stay exactly where players already use them. The dashboard keeps
@@ -437,9 +439,9 @@ Current status:
   Phase 4-6 renderer upgrades; SQL plan/IO measurement is captured before any new read model.
 - Final operator smoke passed the no-governor, single-governor, multiple-governor, Change Governor,
   and corrected dashboard-data journeys on 2026-07-10.
-- The premium PNG governor dashboard renderer is the next Phase 4 slice. Its active task pack and
-  chat starter define the fixed renderer/payload boundary, fallback, attachment lifecycle, visual
-  QA, and explicit no-SQL/no-new-action scope.
+- The Phase 4 premium PNG governor dashboard renderer is implemented with the approved `me.png`
+  background, optional invoking-player Discord avatar, fixed renderer/payload boundary, fallback,
+  attachment lifecycle, and no-SQL/no-new-action scope. Operator Discord smoke remains pending.
 - Phase 5 adds direct selected-governor Resources, Materials, and Speedups only after report
   visibility semantics and command-count impact are approved.
 - Phase 6 adds Export Stats only after selected-governor versus all-linked semantics are approved;

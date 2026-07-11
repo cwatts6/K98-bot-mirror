@@ -30,7 +30,7 @@ def register_me(bot: ext_commands.Bot) -> None:
         description="Open your private K98 personal command centre",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.01")
+    @versioned("v1.02")
     @safe_command
     @track_usage()
     async def me_dashboard(ctx: discord.ApplicationContext) -> None:
