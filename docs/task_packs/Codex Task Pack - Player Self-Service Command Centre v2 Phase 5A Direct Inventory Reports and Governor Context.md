@@ -3,12 +3,36 @@
 ## 1. Task Header
 
 - Task name: `Player Self-Service Command Centre v2 Phase 5A Direct Inventory Reports and Governor Context`
-- Date: `2026-07-11`
+- Date: `2026-07-12`
 - Owner/context: Follow-on from the completed and operator-smoke-approved Phase 4 premium governor dashboard renderer.
 - Task type: `Discord grouped commands | governor-specific inventory reports | private attachment interaction flow`
 - One-pass approved: `No`
-- Implementation approved: `No - private visibility, command surface, and control layout require operator confirmation`
-- Status: `scope prepared - awaiting operator approval`
+- Implementation approved: `Yes - revised scope approved 2026-07-12`
+- Status: `implemented and automated validation complete - operator smoke pending`
+
+## Implementation Record — 2026-07-12
+
+- Added private `/me resources`, `/me materials`, and `/me speedups` at `v1.00`; `/me dashboard`
+  is `v1.03`.
+- Added the dedicated non-persistent player-self-service Inventory report adapter with strict
+  selected-governor rechecks, report/range switching, private exports, same-payload fallback,
+  governor paging, Dashboard return, timeout handling, attachment replacement, and stream cleanup.
+- Updated selected dashboards to the approved navigation and governor-only entry selector.
+- Added selected-governor-only latest RSS, combined Speedups days, and legendary-equivalent
+  Materials totals to the 1180x760 dashboard and fallback embed.
+- Preserved `/me inventory`, `/myinventory`, Inventory visibility preferences, the standalone
+  1400x980 Inventory renderer, ranges, filenames, exports, imports, calculations, SQL, and DAL
+  result shapes.
+- Automated validation passed: 209 focused tests; architecture, deferred-item, test-selection,
+  smoke-import, and command-registration validators; full pre-commit; full pytest with 2475 passed
+  and 2 skipped; and pytest production-log isolation with the same result.
+- Original, Discord-desktop, and Discord-mobile dashboard samples plus Resources, Speedups, and
+  Materials report samples were rendered and visually inspected. Live Discord operator smoke is
+  still required.
+- The requested Codex Security skill was not exposed and the local Codex CLI remained blocked by
+  Windows access controls. The documented independent security-focused diff review found no
+  reportable issue after checking self-only authorization, visibility, forged/stale state,
+  attachments, streams, exports, filenames, fallback delivery, and concurrent transitions.
 
 ## 2. Objective
 
@@ -43,6 +67,33 @@ Confirm these recommendations before implementation:
 If the operator wants `/me` reports to honor public Inventory visibility, wants command options
 instead of three grouped paths, or wants a new renderer, stop and revise this task pack before
 coding.
+
+### Operator-approved scope revision — 2026-07-12
+
+This revision supersedes conflicting Phase 5A statements below:
+
+- Keep `/me resources`, `/me materials`, and `/me speedups`; the dashboard label for Resources is
+  `RSS`.
+- Keep `/me inventory` registered and behavior-compatible, but remove its button from the selected
+  governor dashboard. Its future need will be reviewed separately.
+- The selected dashboard rows are Accounts/Reminders/Preferences primary, Exports secondary,
+  RSS/Materials/Speedups success, Change Governor next, and governor-page buttons last only when
+  required.
+- The multiple-governor entry state contains only the governor dropdown, plus Previous/Next paging
+  controls when more than 25 options make paging unavoidable. It has no other navigation.
+- Direct-report rows are report tabs, ranges, private exports, Dashboard (plus Previous/Next when
+  required), and Change Governor on row five.
+- Extend the selected-governor dashboard payload with latest approved totals for that governor
+  only: total RSS, combined Speedups days, and legendary-equivalent Materials including choice
+  chests.
+- Increase the governor dashboard from 1180x640 to 1180x760 and add the three Inventory totals as
+  a third metric row below Dead/Helps/Healed. This is an explicitly approved exception to the
+  original no-dashboard-renderer/no-dashboard-data wording. It does not authorize an Inventory
+  renderer, calculation, SQL, DAL, asset, import, export, or `/myinventory` redesign.
+- Category-specific no-data states remain private, preserve report controls, and link the configured
+  Inventory upload channel with `/inventory import` guidance.
+- The existing standalone 1400x980 Inventory renderer remains accepted for Phase 5A. A future
+  visual-quality review is deferred rather than folded into this implementation.
 
 ## 4. Required Reading
 
@@ -274,7 +325,7 @@ Paging changes only the view and must preserve the current attachment, report ty
 Likely create:
 
 - `ui/views/player_self_service_inventory_report_views.py`
-- `tests/test_player_self_service_inventory_report_views.py`
+- `tests/test_me_inventory_report_views.py`
 
 Likely modify:
 
@@ -343,7 +394,7 @@ Compatibility/privacy:
 Use `k98-test-selection` after the exact touched-file set is known. Expected focused commands:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q tests/test_player_self_service_inventory_report_views.py
+.\.venv\Scripts\python.exe -m pytest -q tests/test_me_inventory_report_views.py
 .\.venv\Scripts\python.exe -m pytest -q tests/test_governor_dashboard_discord_views.py tests/test_me_cmds.py
 .\.venv\Scripts\python.exe -m pytest -q tests/test_inventory_report_views.py tests/test_inventory_reporting_service.py tests/test_inventory_report_image_renderer.py
 .\.venv\Scripts\python.exe -m pytest -q tests/test_player_self_service_views.py tests/test_ui_imports.py

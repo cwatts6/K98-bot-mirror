@@ -6,6 +6,15 @@ to GitHub issues/task packs.
 Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 
 ### Deferred Optimisation
+- Area: `inventory/report_image_renderer.py`, Inventory report assets, Discord desktop/mobile report presentation
+- Type: consistency
+- Description: GovernorOS v2 Phase 5A deliberately retains the established standalone 1400x980 Resources, Materials, and Speedups renderer while the selected-governor dashboard advances to a polished 1180x760 layout. Operator review may later find that the older Inventory cards no longer meet the GovernorOS visual-quality bar, but redesigning them during Phase 5A would mix entry-point/security integration with a material report-renderer change.
+- Suggested Fix: After Phase 5A operator smoke, review representative Resources, Materials, and Speedups cards at original, Discord desktop, and mobile scales against the accepted governor dashboard. If a quality gap is confirmed, prepare a separate renderer task pack covering visual hierarchy, assets/provenance, typography, chart readability, dimensions, fallback compatibility, filenames, and regression samples without changing Inventory calculations, SQL, DAL result shapes, imports, ranges, exports, or `/myinventory` visibility behavior.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 5A implementation and operator smoke; explicit visual-direction approval before changing the existing Inventory renderer or assets.
+
+### Deferred Optimisation
 - Area: `ui/views/inventory_views.py`, `inventory/inventory_service.py`, inventory import lifecycle callbacks
 - Type: architecture
 - Description: Inventory import lifecycle coordination remains intentionally view-heavy. `ui/views/inventory_views.py` routes upload-first messages, command-session continuations, multi-governor selection, review interactions, correction modals, additional-material continuation, approval, rejection, cancellation, timeout, admin-debug posting, and original-upload cleanup. Task C Slice 8 adopted generic audit without redesigning this workflow and smoke testing confirmed the behavior-preserving audit contract.

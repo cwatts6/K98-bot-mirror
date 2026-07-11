@@ -1,6 +1,6 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 GovernorOS v2 status: Phase 4 Premium Governor Dashboard Renderer is complete and operator smoke
 passed on 2026-07-11. `/me dashboard` is governor-first: no linked governor shows setup
@@ -12,6 +12,15 @@ the completed Phase 3 implementation and recorded smoke evidence. Mirror PR #218
 Phase 4 premium PNG renderer and final smoke evidence.
 Admin/leadership inspect is confirmed as required Phase 8 work and remains a separate
 permission-gated slice using the Phase 2 inspect-safe contract.
+
+GovernorOS v2 Phase 5A revised scope was approved and implemented on 2026-07-12; automated
+validation is complete and operator Discord smoke is pending.
+It adds private selected-governor `/me resources`, `/me materials`, and `/me speedups` reports,
+keeps `/me inventory` and `/myinventory` behavior unchanged, and removes the selected-dashboard
+Inventory button in favor of direct RSS/Materials/Speedups actions. The selected dashboard grows
+to 1180x760 and adds latest approved RSS, combined Speedups days, and legendary-equivalent
+Materials totals for the selected governor only. Multiple-governor entry is governor-selector
+only. The existing 1400x980 Inventory report renderer remains unchanged in this phase.
 
 Status: Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and
 production PR #481, and smoke tested successfully on 2026-06-26. Phase 11B KVK Renderer Migration

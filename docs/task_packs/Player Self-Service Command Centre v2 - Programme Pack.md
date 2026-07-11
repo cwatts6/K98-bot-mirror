@@ -558,7 +558,7 @@ permission, registry-authority, inventory, export, history, or inspect change.
 
 ### Phase 5A — Direct Inventory Reports and Governor Context
 
-Status: `scope prepared - operator approval required`.
+Status: `implemented and automated validation complete - operator smoke pending`.
 
 Goal: let the selected governor open a specific existing inventory report without returning to the
 all-report picker.
@@ -590,6 +590,19 @@ Command impact: no top-level command-count change; `/me` grouped subcommands inc
 Approval gate: confirm the recommended private-only `/me` report policy, the three grouped
 subcommands, the dashboard action layout, and the compact report-control layout before
 implementation.
+
+Operator decision on 2026-07-12:
+
+- Approved private `/me resources`, `/me materials`, and `/me speedups`; Resources uses an `RSS`
+  dashboard label.
+- Approved keeping `/me inventory` unchanged but removing its selected-dashboard button.
+- Approved a governor-only multiple-account entry selector.
+- Approved selected-governor-only latest RSS, combined Speedups days, and legendary-equivalent
+  Materials totals on a new third dashboard metric row.
+- Approved expanding the governor dashboard to 1180x760 while retaining the existing 1400x980
+  Inventory reports unchanged for this phase.
+- Approved direct-report rows for type, range, private export, Dashboard/paging, and Change
+  Governor; missing report data links the configured upload channel.
 
 ### Phase 5B — Existing `/me` Page Presentation Alignment
 
@@ -896,7 +909,8 @@ Do not include these in early phases unless separately approved:
 ## 20. Suggested Next Action
 
 ```text
-Approve and start Phase 5A: Direct Inventory Reports and Governor Context.
+Run Phase 5A operator Discord smoke for direct reports, dashboard actions, no-data guidance,
+governor switching, private exports, and desktop/mobile presentation.
 ```
 
 Phase 4 is complete and operator accepted. Phase 5A should add private direct selected-governor
@@ -921,3 +935,4 @@ Use:
 | 2026-07-10 | Phase 4 scope pack prepared and remaining roadmap reconciled | Archived the completed Phase 3 execution pack/starter, created the Phase 4 task pack/starter, made Phase 7 history and Phase 8 inspect ordering authoritative, and added explicit approval gates for Phases 4-10. |
 | 2026-07-11 | Phase 4 operator smoke completed | Accepted the wider standalone premium card as materially larger and easier to read, exercised every linked-governor option, and confirmed the author-gated Change Governor dropdown. Future `/me` page presentation alignment remains a separately phase-gated consistency item. |
 | 2026-07-11 | Phase 4 archived and Phase 5A/5B scoped | Archived the completed Phase 4 task pack/starter, made Phase 5A direct inventory reports the next approval-gated slice, assigned existing `/me` summary-page standalone delivery to Phase 5B, and made the Phase 4 standalone/blue-navigation/governor-dropdown contract authoritative for later phases. |
+| 2026-07-12 | Phase 5A revised scope approved | Approved the three private report commands, governor-only entry selector, selected-governor Inventory totals, 1180x760 dashboard, revised navigation, retained `/me inventory`, and unchanged 1400x980 Inventory renderer. |

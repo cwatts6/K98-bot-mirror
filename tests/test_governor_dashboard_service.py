@@ -12,6 +12,7 @@ from player_self_service import governor_dashboard_dal as dal, governor_dashboar
 from player_self_service.governor_dashboard_models import (
     GovernorDashboardContext,
     GovernorDashboardDataRow,
+    GovernorDashboardInventoryHighlights,
 )
 from scripts import validate_command_registration as command_validator
 from services.governor_account_service import summarize_accounts
@@ -38,6 +39,13 @@ def _self_context(governor_id: int = 111) -> GovernorDashboardContext:
         ),
         privacy_profile="self_view",
     )
+
+
+async def _empty_inventory_loader(
+    _governor_id: int,
+    _governor_name: str,
+) -> GovernorDashboardInventoryHighlights:
+    return GovernorDashboardInventoryHighlights()
 
 
 @pytest.mark.asyncio
@@ -151,6 +159,7 @@ async def test_payload_assembles_approved_fields_and_self_view_data() -> None:
         _self_context(),
         data_loader=data_loader,
         vip_profile_loader=vip_loader,
+        inventory_loader=_empty_inventory_loader,
     )
 
     assert payload.identity.governor_name == "SQL Gov"
@@ -199,6 +208,7 @@ async def test_payload_handles_missing_values_missing_vip_and_zero_ark_joined() 
         _self_context(),
         data_loader=data_loader,
         vip_profile_loader=vip_loader,
+        inventory_loader=_empty_inventory_loader,
     )
 
     assert payload.identity.governor_name == "Linked Gov"
@@ -212,6 +222,39 @@ async def test_payload_handles_missing_values_missing_vip_and_zero_ark_joined() 
     assert "location" in payload.missing_fields
     assert "times_autarch_participated" in payload.missing_fields
     assert "updated_at_utc" in payload.missing_fields
+
+
+@pytest.mark.asyncio
+async def test_payload_inventory_highlights_are_selected_governor_only() -> None:
+    calls = []
+
+    async def data_loader(governor_id: int):
+        return GovernorDashboardDataRow(governor_id=governor_id, governor_name="Selected Gov")
+
+    async def vip_loader(_governor_id: int):
+        return SimpleNamespace(vip_level_label=None)
+
+    async def inventory_loader(governor_id: int, governor_name: str):
+        calls.append((governor_id, governor_name))
+        return GovernorDashboardInventoryHighlights(
+            total_resources=100_700_000_000,
+            total_speedup_days=4_372.4,
+            total_legendary_materials=176.9,
+        )
+
+    payload = await service.build_governor_dashboard_payload(
+        _self_context(111),
+        data_loader=data_loader,
+        vip_profile_loader=vip_loader,
+        inventory_loader=inventory_loader,
+    )
+
+    assert calls == [(111, "Linked Gov")]
+    assert payload.inventory.total_resources == 100_700_000_000
+    assert payload.inventory.total_speedup_days == pytest.approx(4_372.4)
+    assert payload.inventory.total_legendary_materials == pytest.approx(176.9)
+    assert "inventory" not in payload.available_actions
+    assert {"resources", "materials", "speedups"}.issubset(payload.available_actions)
 
 
 @pytest.mark.asyncio
@@ -240,6 +283,7 @@ async def test_inspect_mode_payload_excludes_self_view_only_data() -> None:
         context,
         data_loader=data_loader,
         vip_profile_loader=vip_loader,
+        inventory_loader=_empty_inventory_loader,
     )
 
     assert payload.self_view is None
@@ -303,6 +347,7 @@ async def test_default_dashboard_data_fetch_degrades_to_empty_payload(monkeypatc
     payload = await service.build_governor_dashboard_payload(
         _self_context(555),
         vip_profile_loader=vip_loader,
+        inventory_loader=_empty_inventory_loader,
     )
 
     assert payload.identity.governor_id == 555
@@ -329,6 +374,7 @@ async def test_payload_excludes_olympia_fields_entirely() -> None:
         _self_context(),
         data_loader=data_loader,
         vip_profile_loader=vip_loader,
+        inventory_loader=_empty_inventory_loader,
     )
 
     serialized = str(asdict(payload)).casefold()

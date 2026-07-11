@@ -6,7 +6,9 @@ from discord.ext import commands as ext_commands
 from bot_config import GUILD_ID
 from core.interaction_safety import safe_command
 from decoraters import track_usage
+from inventory.models import InventoryReportView
 from ui.views.player_self_service_governor_dashboard_views import send_governor_dashboard
+from ui.views.player_self_service_inventory_report_views import send_player_inventory_report
 from ui.views.player_self_service_views import (
     PAGE_ACCOUNTS,
     PAGE_EXPORTS,
@@ -30,7 +32,7 @@ def register_me(bot: ext_commands.Bot) -> None:
         description="Open your private K98 personal command centre",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.02")
+    @versioned("v1.03")
     @safe_command
     @track_usage()
     async def me_dashboard(ctx: discord.ApplicationContext) -> None:
@@ -79,6 +81,39 @@ def register_me(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def me_inventory(ctx: discord.ApplicationContext) -> None:
         await send_player_self_service_page(ctx, page=PAGE_INVENTORY)
+
+    @me_group.command(
+        name="resources",
+        description="Open your private selected-governor Resources report",
+        guild_ids=[GUILD_ID],
+    )
+    @versioned("v1.00")
+    @safe_command
+    @track_usage()
+    async def me_resources(ctx: discord.ApplicationContext) -> None:
+        await send_player_inventory_report(ctx, report_view=InventoryReportView.RESOURCES)
+
+    @me_group.command(
+        name="materials",
+        description="Open your private selected-governor Materials report",
+        guild_ids=[GUILD_ID],
+    )
+    @versioned("v1.00")
+    @safe_command
+    @track_usage()
+    async def me_materials(ctx: discord.ApplicationContext) -> None:
+        await send_player_inventory_report(ctx, report_view=InventoryReportView.MATERIALS)
+
+    @me_group.command(
+        name="speedups",
+        description="Open your private selected-governor Speedups report",
+        guild_ids=[GUILD_ID],
+    )
+    @versioned("v1.00")
+    @safe_command
+    @track_usage()
+    async def me_speedups(ctx: discord.ApplicationContext) -> None:
+        await send_player_inventory_report(ctx, report_view=InventoryReportView.SPEEDUPS)
 
     @me_group.command(
         name="exports",

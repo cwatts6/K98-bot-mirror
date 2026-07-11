@@ -199,6 +199,42 @@ async def resolve_governor_for_report(
     return None
 
 
+async def resolve_self_service_governor_for_report(
+    *,
+    discord_user_id: int,
+    governor_id: int,
+) -> RegisteredGovernor:
+    """Resolve a report governor without the legacy administrator override."""
+    governors = await get_registered_governors_for_user(int(discord_user_id))
+    selected = next(
+        (item for item in governors if int(item.governor_id) == int(governor_id)),
+        None,
+    )
+    if selected is None:
+        raise PermissionError("You can only view inventory for governors registered to you.")
+    return selected
+
+
+async def build_self_service_inventory_report_payload(
+    *,
+    discord_user_id: int,
+    governor_id: int,
+    view: InventoryReportView,
+    range_key: InventoryReportRange,
+) -> InventoryReportPayload:
+    """Recheck self-service access and assemble one existing report payload."""
+    governor = await resolve_self_service_governor_for_report(
+        discord_user_id=int(discord_user_id),
+        governor_id=int(governor_id),
+    )
+    return await build_inventory_report_payload(
+        discord_user_id=int(discord_user_id),
+        governor=governor,
+        view=view,
+        range_key=range_key,
+    )
+
+
 async def build_latest_inventory_snapshot(
     governors: list[RegisteredGovernor] | tuple[RegisteredGovernor, ...],
 ) -> LatestInventorySnapshot:

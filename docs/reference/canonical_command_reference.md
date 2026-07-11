@@ -1,6 +1,6 @@
 # Canonical Command Reference
 
-Last updated: 2026-07-10
+Last updated: 2026-07-12
 
 This is the maintained command reference for the K98 bot after the completed Command Platform
 Audit & Optimisation Programme. Use
@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=42 grouped_subcommands_detected=98 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
+primary=42 grouped_subcommands_detected=101 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
 ```
 
 Grouped command summary:
@@ -33,7 +33,7 @@ Grouped command summary:
 | `/kvk` | 4 |
 | `/kvk_admin` | 7 |
 | `/location` | 2 |
-| `/me` | 6 |
+| `/me` | 9 |
 | `/mge` | 6 |
 | `/ops` | 25 |
 | `/prekvk` | 2 |
@@ -142,11 +142,14 @@ Legend:
 | MGE | `/mge refresh_award_reminders` | `commands/mge_cmds.py` | Grouped | Decorator-gated admin path | Ephemeral | Standard | Preserve | Refreshes MGE award reminders. |
 | MGE | `/mge commanders` | `commands/mge_cmds.py` | Grouped | Decorator-gated admin path | Ephemeral | Standard | Preserve | MGE commander controls. |
 | MGE | `/mge admin_completion` | `commands/mge_cmds.py` | Grouped | Decorator-gated admin path | Ephemeral | Standard | Preserve | Admin completion controls. |
-| Player Self-Service | `/me dashboard` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.02`) | Preserve; GovernorOS v2 Phase 4 premium renderer smoke tested 2026-07-11 | Private governor-first command centre. No linked governor shows setup guidance, one opens directly, and multiple use an author-gated selector before payload fetch. Selected governors are rechecked against the registry and multiple-governor cards expose an author-gated Change Governor dropdown below the navigation. Successful selected-governor responses use the 1180x640 premium PNG as a standalone attachment for wider Discord display, with the invoking player's Discord avatar where available; the approved Phase 3 embed remains the private fallback. Accounts, Reminders, Preferences, Inventory, and Exports remain private compatibility navigation. |
+| Player Self-Service | `/me dashboard` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.03`) | Preserve; GovernorOS v2 Phase 5A direct Inventory integration | Private governor-first command centre. No linked governor shows setup guidance, one opens directly, and multiple use an author-gated governor-only selector before payload fetch. The selected-governor standalone card is 1180x760 and adds latest approved RSS, Speedups, and legendary-equivalent Materials totals for that governor only. Selected dashboards expose Accounts, Reminders, Preferences, Exports, direct RSS/Materials/Speedups actions, and Change Governor where applicable. The approved private embed remains the same-payload fallback. |
 | Player Self-Service | `/me accounts` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 6 generated card and guided Manage flow smoke tested | Private account centre for account review, Governor ID lookup, registration, replacement, and removal with confirmation through one guided Manage journey. |
 | Player Self-Service | `/me reminders` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 7 unified KVK and calendar reminder centre delivered | Private reminder centre for KVK event reminder review/autosave/remove-all plus calendar reminder status and service-backed calendar reminder configuration. Phase 13 redirects `/subscribe`, `/modify_subscription`, `/unsubscribe`, and `/calendar_reminder_config` here. |
 | Player Self-Service | `/me preferences` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 12B adds SQL-backed Discord-user profile preferences | Private preference status with service-backed inventory visibility controls, access to the existing Governor VIP update flow, and Manage Profile dropdown controls for Discord-user-level timezone, location country, and preferred language. Location country is stored as a two-letter code and displayed with a derived readable country name; the private manager child window is replaced after profile updates. |
 | Player Self-Service | `/me inventory` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 10 inventory summary card delivered and smoke tested | Private Inventory summary card using latest approved resources, speedups, and materials data for the player's registered governors, with no-data upload guidance and an Open Report handoff to the preserved `/myinventory` journey. |
+| Player Self-Service | `/me resources` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.00`) | GovernorOS v2 Phase 5A | Private selected-governor Resources report using the existing 1400x980 Inventory renderer, 1M/3M/6M/12M ranges, private exports, report tabs, Dashboard navigation, and paged Change Governor controls. |
+| Player Self-Service | `/me materials` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.00`) | GovernorOS v2 Phase 5A | Private selected-governor Materials report using the existing report renderer and interaction contract. |
+| Player Self-Service | `/me speedups` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.00`) | GovernorOS v2 Phase 5A | Private selected-governor Speedups report using the existing report renderer and interaction contract. |
 | Player Self-Service | `/me exports` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 9 preferred export route with option windows | Private personal export centre with `Export Stats` and `Export Inventory` child option windows. Stats supports Excel, CSV, and Google Sheets formats plus day-window selection. Inventory supports format, view, registered-governor scope, and day-window selection. Phase 13 redirects legacy `/my_stats_export` and `/export_inventory` here while preserving export schemas/services. |
 | Ops | `/ops summary` | `commands/admin_cmds.py` | Grouped | Public command-level access | Public | Standard | Preserve | Daily file-processing summary. |
 | Ops | `/ops weeksummary` | `commands/admin_cmds.py` | Grouped | Public command-level access | Public | Standard | Preserve | Seven-day file-processing summary. |
@@ -269,6 +272,11 @@ Legend:
   `/me preferences` while preserving Inventory visibility, Inventory VIP, and the current
   session-based local-time toggle. Manage Profile uses guided dropdowns and replaces the private
   manager child window after updates.
+- GovernorOS v2 Phase 5A adds private `/me resources`, `/me materials`, and `/me speedups`
+  selected-governor reports while preserving `/me inventory` and `/myinventory`. It keeps the
+  top-level count at 42, increases `/me` from 6 to 9 subcommands, makes the multiple-governor
+  dashboard entry selector governor-only, and adds selected-governor Inventory totals plus direct
+  report actions to the 1180x760 dashboard.
 - Player Self-Service Command Centre Phase 13 started legacy redirect planning with audit/scope
   only. The operator-provided SQL extract and dated JSONL files showed nonzero broad usage for
   every audited legacy and related personal path, recent direct usage for several legacy paths, and

@@ -55,6 +55,9 @@ def test_register_me_declares_player_self_service_group(monkeypatch) -> None:
         "reminders",
         "preferences",
         "inventory",
+        "resources",
+        "materials",
+        "speedups",
         "exports",
     }
     assert bot.added == [group]
@@ -65,11 +68,12 @@ def test_me_commands_are_decorated_and_thin() -> None:
 
     source = inspect.getsource(me_cmds.register_me)
 
-    assert source.count("@versioned(") == 6
-    assert source.count('@versioned("v1.02")') == 1
+    assert source.count("@versioned(") == 9
+    assert source.count('@versioned("v1.03")') == 1
     assert source.count('@versioned("v1.01")') == 1
-    assert source.count("@safe_command") == 6
-    assert source.count("@track_usage()") == 6
+    assert source.count('@versioned("v1.00")') == 7
+    assert source.count("@safe_command") == 9
+    assert source.count("@track_usage()") == 9
     assert "set_user_config" not in source
     assert "remove_user" not in source
     assert "export_service" not in source
@@ -108,6 +112,35 @@ async def test_me_inventory_hands_off_to_page_sender(monkeypatch) -> None:
     await handler(ctx)
 
     assert calls == [(ctx, me_cmds.PAGE_INVENTORY)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("command_name", "expected_view"),
+    (
+        ("resources", "RESOURCES"),
+        ("materials", "MATERIALS"),
+        ("speedups", "SPEEDUPS"),
+    ),
+)
+async def test_direct_inventory_commands_handoff_fixed_report_type(
+    monkeypatch,
+    command_name,
+    expected_view,
+) -> None:
+    me_cmds, group, _bot = _register_me(monkeypatch)
+    handler = _unwrap(group.commands[command_name])
+    calls = []
+
+    async def fake_sender(ctx, *, report_view):
+        calls.append((ctx, report_view))
+
+    monkeypatch.setattr(me_cmds, "send_player_inventory_report", fake_sender)
+    ctx = SimpleNamespace()
+
+    await handler(ctx)
+
+    assert calls == [(ctx, getattr(me_cmds.InventoryReportView, expected_view))]
 
 
 def test_me_command_module_has_no_sql_or_mutation_imports() -> None:

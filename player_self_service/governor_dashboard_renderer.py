@@ -15,7 +15,7 @@ from player_self_service.governor_dashboard_models import GovernorDashboardPaylo
 from utils import fmt_short
 
 WIDTH = 1180
-HEIGHT = 640
+HEIGHT = 760
 FILENAME = "governor_dashboard.png"
 
 _BACKGROUND = Path(__file__).resolve().parent.parent / "assets" / "me" / "cards" / "me.png"
@@ -64,6 +64,18 @@ def _number(value: int | float | None) -> str:
         return f"{float(value):,.2f}".rstrip("0").rstrip(".")
     except (TypeError, ValueError):
         return "N/A"
+
+
+def _days(value: float | None) -> str:
+    if value is None:
+        return "NO DATA"
+    return f"{int(round(value)):,}d"
+
+
+def _legendary(value: float | None) -> str:
+    if value is None:
+        return "NO DATA"
+    return f"{value:,.0f}"
 
 
 def _location(x: int | None, y: int | None) -> str:
@@ -156,6 +168,7 @@ def render_governor_dashboard(
     metrics = payload.latest_metrics
     history = payload.historical_highlights
     honours = payload.activity_honours
+    inventory = payload.inventory
     self_view = payload.self_view
 
     _panel(draw, (315, 35, 885, 145), radius=18)
@@ -217,6 +230,22 @@ def render_governor_dashboard(
         y0 = 164 + row * 112
         _metric(draw, (x0, y0, x0 + 180, y0 + 96), label, value)
 
+    inventory_values = (
+        (
+            "TOTAL RSS",
+            (
+                _compact(inventory.total_resources)
+                if inventory.total_resources is not None
+                else "NO DATA"
+            ),
+        ),
+        ("SPEEDUPS", _days(inventory.total_speedup_days)),
+        ("MATERIALS", _legendary(inventory.total_legendary_materials)),
+    )
+    for index, (label, value) in enumerate(inventory_values):
+        x0 = 315 + index * 195
+        _metric(draw, (x0, 388, x0 + 180, 484), label, value)
+
     honour_values = (
         ("ARK JOINED", _number(honours.ark_joined)),
         ("ARK WON", _number(honours.ark_won)),
@@ -226,12 +255,12 @@ def render_governor_dashboard(
     )
     for index, (label, value) in enumerate(honour_values):
         x0 = 88 + index * 207
-        _text(draw, (x0, 498), value, size=31, min_size=21, width=175, bold=True)
-        _text(draw, (x0, 538), label, size=15, min_size=11, width=175, fill=_MUTED, bold=True)
+        _text(draw, (x0, 618), value, size=31, min_size=21, width=175, bold=True)
+        _text(draw, (x0, 658), label, size=15, min_size=11, width=175, fill=_MUTED, bold=True)
 
     _text(
         draw,
-        (88, 598),
+        (88, 718),
         _freshness(payload.freshness.updated_at_utc),
         size=15,
         min_size=12,
@@ -240,7 +269,7 @@ def render_governor_dashboard(
     )
     _text(
         draw,
-        (870, 598),
+        (870, 718),
         "KD98 GOVERNOR DASHBOARD",
         size=15,
         min_size=12,
@@ -250,5 +279,11 @@ def render_governor_dashboard(
     )
 
     output = BytesIO()
-    canvas.convert("RGB").save(output, format="PNG", optimize=True)
-    return RenderedGovernorDashboard(filename=FILENAME, image_bytes=output.getvalue())
+    try:
+        with canvas.convert("RGB") as rendered_canvas:
+            rendered_canvas.save(output, format="PNG", optimize=True)
+        image_bytes = output.getvalue()
+    finally:
+        output.close()
+        canvas.close()
+    return RenderedGovernorDashboard(filename=FILENAME, image_bytes=image_bytes)

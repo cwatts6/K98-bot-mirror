@@ -103,6 +103,14 @@ def _format_location(x: int | None, y: int | None) -> str:
     return f"{x}:{y}"
 
 
+def _format_inventory_days(value: float | None) -> str:
+    return _MISSING if value is None else f"{int(round(value)):,}d"
+
+
+def _format_inventory_materials(value: float | None) -> str:
+    return _MISSING if value is None else f"{value:,.0f} legendary"
+
+
 def _option_label(option: GovernorDashboardOption) -> str:
     label = " ".join(str(option.governor_name or "").split()) or option.governor_id_str
     return label[:100]
@@ -134,6 +142,7 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
     history = payload.historical_highlights
     honours = payload.activity_honours
     profile = payload.profile_status
+    inventory = payload.inventory
 
     embed = discord.Embed(
         title=_governor_dashboard_title(
@@ -190,6 +199,17 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
                 f"Times Named Autarch: {_format_number(history.times_named_autarch)}",
                 "Times Autarch Participated: "
                 f"{_format_number(history.times_autarch_participated)}",
+            )
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Latest Approved Inventory",
+        value="\n".join(
+            (
+                f"RSS: {_format_short_number(inventory.total_resources)}",
+                f"Speedups: {_format_inventory_days(inventory.total_speedup_days)}",
+                "Materials: " f"{_format_inventory_materials(inventory.total_legendary_materials)}",
             )
         ),
         inline=False,
@@ -524,34 +544,47 @@ class GovernorDashboardView(discord.ui.View):
                     )
                 )
 
-        selected_with_multiple = (
-            self.resolution.state == "selected" and len(self.resolution.options) > 1
-        )
+            # The entry screen is intentionally governor-selection only.
+            return
 
-        navigation_row = 2 if selecting else 0
-        secondary_row = 3 if selecting else 1
         from ui.views.player_self_service_views import (
             PAGE_ACCOUNTS,
             PAGE_EXPORTS,
-            PAGE_INVENTORY,
             PAGE_PREFERENCES,
             PAGE_REMINDERS,
         )
 
+        if self.resolution.state == "requires_setup":
+            self.add_item(
+                _DashboardButton(
+                    label="Accounts",
+                    custom_id="me:dashboard:navigate:accounts",
+                    style=discord.ButtonStyle.success,
+                    row=0,
+                    action=lambda interaction: self.open_page(interaction, PAGE_ACCOUNTS),
+                )
+            )
+            return
+
+        if self.resolution.state != "selected":
+            return
+
+        selected_with_multiple = (
+            self.resolution.state == "selected" and len(self.resolution.options) > 1
+        )
+
         navigation = (
-            ("Accounts", PAGE_ACCOUNTS, navigation_row),
-            ("Reminders", PAGE_REMINDERS, navigation_row),
-            ("Preferences", PAGE_PREFERENCES, navigation_row),
-            ("Inventory", PAGE_INVENTORY, secondary_row),
-            ("Exports", PAGE_EXPORTS, secondary_row),
+            ("Accounts", PAGE_ACCOUNTS, 0),
+            ("Reminders", PAGE_REMINDERS, 0),
+            ("Preferences", PAGE_PREFERENCES, 0),
+            ("Exports", PAGE_EXPORTS, 1),
         )
         for label, page, row in navigation:
-            if label == "Accounts" and self.resolution.state == "requires_setup":
-                style = discord.ButtonStyle.success
-            elif label in {"Accounts", "Reminders", "Preferences"}:
-                style = discord.ButtonStyle.primary
-            else:
-                style = discord.ButtonStyle.secondary
+            style = (
+                discord.ButtonStyle.primary
+                if label in {"Accounts", "Reminders", "Preferences"}
+                else discord.ButtonStyle.secondary
+            )
             self.add_item(
                 _DashboardButton(
                     label=label,
@@ -559,6 +592,26 @@ class GovernorDashboardView(discord.ui.View):
                     style=style,
                     row=row,
                     action=lambda interaction, target=page: self.open_page(interaction, target),
+                )
+            )
+
+        from inventory.models import InventoryReportView
+
+        for label, report_view in (
+            ("RSS", InventoryReportView.RESOURCES),
+            ("Materials", InventoryReportView.MATERIALS),
+            ("Speedups", InventoryReportView.SPEEDUPS),
+        ):
+            self.add_item(
+                _DashboardButton(
+                    label=label,
+                    custom_id=f"me:dashboard:report:{report_view.value}",
+                    style=discord.ButtonStyle.success,
+                    row=2,
+                    action=lambda interaction, target=report_view: self.open_inventory_report(
+                        interaction,
+                        target,
+                    ),
                 )
             )
 
@@ -583,7 +636,7 @@ class GovernorDashboardView(discord.ui.View):
                     self,
                     page_options,
                     placeholder="Change Governor",
-                    row=2,
+                    row=3,
                 )
             )
             if total_pages > 1:
@@ -592,7 +645,7 @@ class GovernorDashboardView(discord.ui.View):
                         label="Previous Governors",
                         custom_id="me:dashboard:change:previous",
                         style=discord.ButtonStyle.secondary,
-                        row=3,
+                        row=4,
                         action=self.previous_selector_page,
                     )
                 )
@@ -601,10 +654,44 @@ class GovernorDashboardView(discord.ui.View):
                         label="Next Governors",
                         custom_id="me:dashboard:change:next",
                         style=discord.ButtonStyle.secondary,
-                        row=3,
+                        row=4,
                         action=self.next_selector_page,
                     )
                 )
+
+    async def open_inventory_report(
+        self,
+        interaction: discord.Interaction,
+        report_view: Any,
+    ) -> None:
+        from ui.views.player_self_service_inventory_report_views import (
+            show_player_inventory_report_for_interaction,
+        )
+
+        if not await self._claim_transition(interaction):
+            return
+        self._lock_for_transition()
+        context = self.resolution.context
+        try:
+            await asyncio.wait_for(
+                show_player_inventory_report_for_interaction(
+                    interaction,
+                    author_id=self.author_id,
+                    display_name=self.display_name,
+                    governor_id=context.selected_governor_id if context is not None else None,
+                    report_view=report_view,
+                    timeout=self.timeout or _VIEW_TIMEOUT_SECONDS,
+                ),
+                timeout=self._transition_timeout_remaining(),
+            )
+            if self._transition_is_current(interaction):
+                self.stop()
+        except TimeoutError:
+            logger.info(
+                "governor_dashboard_inventory_navigation_timed_out user_id=%s report=%s",
+                self.author_id,
+                getattr(report_view, "value", report_view),
+            )
 
     async def open_page(self, interaction: discord.Interaction, page: str) -> None:
         from ui.views.player_self_service_views import show_player_self_service_page_for_interaction

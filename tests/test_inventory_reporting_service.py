@@ -370,3 +370,51 @@ async def test_resolve_governor_for_report_rejects_unregistered_governor(monkeyp
             governor_id=999,
             discord_user=types.SimpleNamespace(id=42),
         )
+
+
+@pytest.mark.asyncio
+async def test_self_service_report_payload_rechecks_governor_before_fetch(monkeypatch):
+    governor = RegisteredGovernor(111, "Main Gov", "Main")
+    calls = []
+
+    async def governors(_user_id):
+        calls.append("access")
+        return [governor]
+
+    async def payload(**kwargs):
+        calls.append(("payload", kwargs))
+        return object()
+
+    monkeypatch.setattr(reporting_service, "get_registered_governors_for_user", governors)
+    monkeypatch.setattr(reporting_service, "build_inventory_report_payload", payload)
+
+    result = await reporting_service.build_self_service_inventory_report_payload(
+        discord_user_id=42,
+        governor_id=111,
+        view=InventoryReportView.RESOURCES,
+        range_key=InventoryReportRange.ONE_MONTH,
+    )
+
+    assert result is not None
+    assert calls[0] == "access"
+    assert calls[1][1]["governor"] == governor
+
+
+@pytest.mark.asyncio
+async def test_self_service_report_payload_denies_unlinked_before_fetch(monkeypatch):
+    async def governors(_user_id):
+        return [RegisteredGovernor(111, "Main Gov", "Main")]
+
+    async def payload(**_kwargs):
+        raise AssertionError("denied report must not fetch payload")
+
+    monkeypatch.setattr(reporting_service, "get_registered_governors_for_user", governors)
+    monkeypatch.setattr(reporting_service, "build_inventory_report_payload", payload)
+
+    with pytest.raises(PermissionError):
+        await reporting_service.build_self_service_inventory_report_payload(
+            discord_user_id=42,
+            governor_id=999,
+            view=InventoryReportView.RESOURCES,
+            range_key=InventoryReportRange.ONE_MONTH,
+        )

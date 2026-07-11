@@ -44,13 +44,18 @@ Confirm before implementation:
 - /me resources, /me materials, and /me speedups are always private/ephemeral
 - /myinventory continues to honor the existing Only Me/Public preference unchanged
 - top-level command count remains 42 and /me grouped count increases from 6 to 9
-- dashboard rows remain Accounts/Reminders/Preferences blue, Inventory/Exports secondary,
-  Resources/Materials/Speedups actions next, and Change Governor last
+- selected-dashboard rows are Accounts/Reminders/Preferences blue, Exports secondary,
+  RSS/Materials/Speedups actions next, Change Governor next, and governor paging last only when
+  required; `/me inventory` remains registered but has no selected-dashboard button
+- the multiple-governor entry screen is governor-dropdown-only, with paging controls only when
+  more than 25 options require them
 - direct reports use report tabs, 1M/3M/6M/12M ranges, private exports,
-  Dashboard/Inventory/Exports navigation, and Change Governor on the final row
+  Dashboard navigation, and Change Governor on the final row
 - for more than 25 governors, keep Dashboard and use the compact navigation row for Previous/Next
   governor-page buttons so the view remains within Discord's five-row component limit
 - the existing 1400x980 Inventory renderer/assets are reused without visual redesign
+- the selected dashboard grows to 1180x760 and adds selected-governor-only latest RSS, combined
+  Speedups days, and legendary-equivalent Materials totals as its third metric row
 
 Objective:
 Create a dedicated player-self-service Inventory report interaction adapter. Add the three grouped

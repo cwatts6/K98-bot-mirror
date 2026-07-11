@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 GovernorDashboardViewerMode = Literal["self", "inspect"]
@@ -112,6 +112,15 @@ class GovernorDashboardFreshness:
 
 
 @dataclass(frozen=True, slots=True)
+class GovernorDashboardInventoryHighlights:
+    """Latest approved Inventory totals for the selected governor only."""
+
+    total_resources: int | None = None
+    total_speedup_days: float | None = None
+    total_legendary_materials: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class GovernorDashboardDataRow:
     governor_id: int
     governor_name: str | None = None
@@ -146,3 +155,6 @@ class GovernorDashboardPayload:
     available_actions: tuple[str, ...]
     missing_fields: tuple[str, ...]
     self_view: GovernorDashboardSelfView | None = None
+    inventory: GovernorDashboardInventoryHighlights = field(
+        default_factory=GovernorDashboardInventoryHighlights
+    )

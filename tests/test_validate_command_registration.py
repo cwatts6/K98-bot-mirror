@@ -167,8 +167,12 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
         "reminders",
         "preferences",
         "inventory",
+        "resources",
+        "materials",
+        "speedups",
         "exports",
     }.issubset(grouped["me"])
+    assert len(grouped["me"]) == 9
     assert moved_to_ops.isdisjoint(names)
     assert moved_to_ops.issubset(grouped["ops"])
     assert set(moved_to_ark).isdisjoint(names)
@@ -178,7 +182,7 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
         assert set(mapping.values()).issubset(grouped[group_name])
     assert len(grouped["ops"]) == 25
     assert len(grouped["ark"]) == 14
-    assert sum(len(commands) for commands in grouped.values()) == 98
+    assert sum(len(commands) for commands in grouped.values()) == 101
     assert "calendar" in names
     assert "honor_rankings" in names
     assert "player_profile" in names

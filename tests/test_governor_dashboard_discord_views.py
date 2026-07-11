@@ -17,6 +17,7 @@ from player_self_service.governor_dashboard_models import (
     GovernorDashboardFreshness,
     GovernorDashboardHistoricalHighlights,
     GovernorDashboardIdentity,
+    GovernorDashboardInventoryHighlights,
     GovernorDashboardLatestMetrics,
     GovernorDashboardOption,
     GovernorDashboardPayload,
@@ -188,7 +189,20 @@ def _payload(
             scan_order=None if missing else 456,
             source=None if missing else "KingdomScanData4",
         ),
-        available_actions=("accounts", "reminders", "preferences", "inventory", "exports"),
+        inventory=GovernorDashboardInventoryHighlights(
+            total_resources=None if missing else 100_700_000_000,
+            total_speedup_days=None if missing else 4_372,
+            total_legendary_materials=None if missing else 177,
+        ),
+        available_actions=(
+            "accounts",
+            "reminders",
+            "preferences",
+            "exports",
+            "resources",
+            "materials",
+            "speedups",
+        ),
         missing_fields=("vip_level_label",) if missing else (),
         self_view=GovernorDashboardSelfView(
             account_type=context.account_type_for_self_view,
@@ -410,6 +424,7 @@ async def test_multiple_governors_show_selector_before_payload_fetch() -> None:
     assert [choice.label for choice in selector.options] == ["Main Gov", "Alt Gov"]
     assert [choice.value for choice in selector.options] == ["111", "222"]
     assert edited["embed"].fields[0].value == "Main Gov (`111`)"
+    assert len(edited["view"].children) == 1
 
 
 def test_governor_option_label_falls_back_to_id_after_whitespace_sanitization() -> None:
@@ -594,7 +609,7 @@ async def test_change_governor_is_multi_only_dropdown_below_blue_navigation() ->
         child for child in multi_view.children if isinstance(child, discord.ui.Select)
     )
     assert change_select.placeholder == "Change Governor"
-    assert change_select.row == 2
+    assert change_select.row == 3
     top_buttons = [
         child
         for child in multi_view.children
@@ -602,6 +617,14 @@ async def test_change_governor_is_multi_only_dropdown_below_blue_navigation() ->
     ]
     assert [button.label for button in top_buttons] == ["Accounts", "Reminders", "Preferences"]
     assert all(button.style is discord.ButtonStyle.primary for button in top_buttons)
+    report_buttons = [
+        child
+        for child in multi_view.children
+        if isinstance(child, discord.ui.Button) and child.row == 2
+    ]
+    assert [button.label for button in report_buttons] == ["RSS", "Materials", "Speedups"]
+    assert all(button.style is discord.ButtonStyle.success for button in report_buttons)
+    assert "me:dashboard:navigate:inventory" not in _custom_ids(multi_view)
     interaction = _Interaction()
 
     await multi_view.select_governor(interaction, "222")
@@ -656,6 +679,52 @@ async def test_navigation_preserves_selected_governor_and_edits_component_messag
 
     assert dashboard_calls[0][0] is return_interaction
     assert dashboard_calls[0][1]["governor_id"] == 111
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("report_view", "expected"),
+    (
+        ("RESOURCES", "resources"),
+        ("MATERIALS", "materials"),
+        ("SPEEDUPS", "speedups"),
+    ),
+)
+async def test_dashboard_report_actions_preserve_selected_governor(
+    monkeypatch,
+    report_view,
+    expected,
+) -> None:
+    from inventory.models import InventoryReportView
+    from ui.views import player_self_service_inventory_report_views as report_views
+
+    calls = []
+
+    async def fake_report(interaction, **kwargs):
+        calls.append((interaction, kwargs))
+
+    monkeypatch.setattr(
+        report_views,
+        "show_player_inventory_report_for_interaction",
+        fake_report,
+    )
+    option = _option(111, name="Main Gov")
+    dashboard = views.GovernorDashboardView(
+        author_id=42,
+        display_name="Tester",
+        resolution=_selected_resolution(option),
+    )
+    interaction = _Interaction()
+
+    await dashboard.open_inventory_report(
+        interaction,
+        getattr(InventoryReportView, report_view),
+    )
+
+    assert calls[0][0] is interaction
+    assert calls[0][1]["author_id"] == 42
+    assert calls[0][1]["governor_id"] == 111
+    assert calls[0][1]["report_view"].value == expected
 
 
 def test_short_number_format_matches_existing_dashboard_style() -> None:

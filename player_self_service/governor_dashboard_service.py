@@ -8,7 +8,8 @@ from dataclasses import replace
 import logging
 from typing import Any
 
-from inventory import profile_service
+from inventory import profile_service, reporting_service
+from inventory.models import RegisteredGovernor
 from player_self_service import governor_dashboard_dal
 from player_self_service.governor_dashboard_models import (
     GovernorDashboardAccessDecision,
@@ -18,6 +19,7 @@ from player_self_service.governor_dashboard_models import (
     GovernorDashboardFreshness,
     GovernorDashboardHistoricalHighlights,
     GovernorDashboardIdentity,
+    GovernorDashboardInventoryHighlights,
     GovernorDashboardLatestMetrics,
     GovernorDashboardOption,
     GovernorDashboardPayload,
@@ -37,8 +39,17 @@ logger = logging.getLogger(__name__)
 AccountLoader = Callable[[int], Awaitable[AccountResolutionSummary]]
 DashboardDataLoader = Callable[[int], Awaitable[GovernorDashboardDataRow | None]]
 VipProfileLoader = Callable[[int], Awaitable[Any]]
+InventoryHighlightsLoader = Callable[[int, str], Awaitable[GovernorDashboardInventoryHighlights]]
 
-SELF_VIEW_ACTIONS = ("accounts", "reminders", "preferences", "inventory", "exports")
+SELF_VIEW_ACTIONS = (
+    "accounts",
+    "reminders",
+    "preferences",
+    "exports",
+    "resources",
+    "materials",
+    "speedups",
+)
 INSPECT_VIEW_ACTIONS: tuple[str, ...] = ()
 
 
@@ -358,6 +369,50 @@ async def _fetch_dashboard_data(governor_id: int) -> GovernorDashboardDataRow:
         return GovernorDashboardDataRow(governor_id=int(governor_id))
 
 
+async def _fetch_inventory_highlights(
+    governor_id: int,
+    governor_name: str,
+) -> GovernorDashboardInventoryHighlights:
+    """Load selected-governor Inventory totals without changing Inventory contracts."""
+    governor = RegisteredGovernor(
+        governor_id=int(governor_id),
+        governor_name=str(governor_name),
+        account_type="Self",
+    )
+    try:
+        snapshot = await reporting_service.build_latest_inventory_snapshot([governor])
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception(
+            "governor_dashboard_inventory_fetch_failed governor_id=%s using_empty_highlights=True",
+            governor_id,
+        )
+        return GovernorDashboardInventoryHighlights()
+
+    resources = snapshot.resources[0] if snapshot.resources else None
+    speedups = snapshot.speedups[0] if snapshot.speedups else None
+    materials = snapshot.materials[0] if snapshot.materials else None
+    speedup_days = None
+    if speedups is not None:
+        speedup_days = sum(
+            (
+                float(speedups.building_days),
+                float(speedups.research_days),
+                float(speedups.training_days),
+                float(speedups.healing_days),
+                float(speedups.universal_days),
+            )
+        )
+    return GovernorDashboardInventoryHighlights(
+        total_resources=resources.total if resources is not None else None,
+        total_speedup_days=speedup_days,
+        total_legendary_materials=(
+            float(materials.total_legendary) if materials is not None else None
+        ),
+    )
+
+
 def _missing_label(value: Any) -> bool:
     if value is None:
         return True
@@ -421,20 +476,33 @@ async def build_governor_dashboard_payload(
     *,
     data_loader: DashboardDataLoader = _fetch_dashboard_data,
     vip_profile_loader: VipProfileLoader = profile_service.fetch_inventory_profile,
+    inventory_loader: InventoryHighlightsLoader = _fetch_inventory_highlights,
 ) -> GovernorDashboardPayload:
     if not context.access_allowed or context.selected_governor_id is None:
         raise GovernorDashboardAccessDenied(context.access_decision.reason)
 
+    selected_governor_name = context.selected_governor_name or str(context.selected_governor_id)
     data_task = data_loader(int(context.selected_governor_id))
     vip_task = None
+    inventory_task = None
     if context.viewer_mode == "self":
         vip_task = vip_profile_loader(int(context.selected_governor_id))
+        inventory_task = inventory_loader(
+            int(context.selected_governor_id),
+            selected_governor_name,
+        )
 
     if vip_task is None:
         data = await data_task
+        inventory = GovernorDashboardInventoryHighlights()
         vip_label = None
     else:
-        data, vip_profile = await asyncio.gather(data_task, vip_task)
+        assert inventory_task is not None
+        data, vip_profile, inventory = await asyncio.gather(
+            data_task,
+            vip_task,
+            inventory_task,
+        )
         vip_label = _vip_label(getattr(vip_profile, "vip_level_label", None))
 
     if data is None:
@@ -494,6 +562,7 @@ async def build_governor_dashboard_payload(
         activity_honours=activity_honours,
         profile_status=profile_status,
         freshness=freshness,
+        inventory=inventory,
         available_actions=(
             SELF_VIEW_ACTIONS if context.viewer_mode == "self" else INSPECT_VIEW_ACTIONS
         ),

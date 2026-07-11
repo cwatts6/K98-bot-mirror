@@ -14,6 +14,7 @@ from player_self_service.governor_dashboard_models import (
     GovernorDashboardFreshness,
     GovernorDashboardHistoricalHighlights,
     GovernorDashboardIdentity,
+    GovernorDashboardInventoryHighlights,
     GovernorDashboardLatestMetrics,
     GovernorDashboardPayload,
     GovernorDashboardProfileStatus,
@@ -66,6 +67,11 @@ def _payload(
         freshness=GovernorDashboardFreshness(
             updated_at_utc=datetime(2026, 7, 10, 12, 30, tzinfo=UTC)
         ),
+        inventory=GovernorDashboardInventoryHighlights(
+            total_resources=100_700_000_000,
+            total_speedup_days=4_372,
+            total_legendary_materials=176.9,
+        ),
         available_actions=("accounts",),
         missing_fields=(),
         self_view=GovernorDashboardSelfView("Main", "VIP 19"),
@@ -76,10 +82,10 @@ def test_renderer_outputs_stable_png_contract() -> None:
     rendered = renderer.render_governor_dashboard(_payload())
 
     assert rendered.filename == "governor_dashboard.png"
-    assert (rendered.width, rendered.height) == (1180, 640)
+    assert (rendered.width, rendered.height) == (1180, 760)
     assert rendered.image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
     with Image.open(BytesIO(rendered.image_bytes)) as image:
-        assert image.size == (1180, 640)
+        assert image.size == (1180, 760)
         assert image.format == "PNG"
 
 
@@ -109,6 +115,9 @@ def test_renderer_draws_every_approved_field_and_no_olympia(monkeypatch) -> None
         "DEAD",
         "HELPS",
         "HEALED",
+        "TOTAL RSS",
+        "SPEEDUPS",
+        "MATERIALS",
         "ARK JOINED",
         "ARK WON",
         "WIN RATIO",
@@ -139,6 +148,8 @@ def test_identity_and_battle_panel_edges_align(monkeypatch) -> None:
     assert (705, 164, 885, 260) in panels
     assert (315, 276, 495, 372) in panels
     assert (705, 276, 885, 372) in panels
+    assert (315, 388, 495, 484) in panels
+    assert (705, 388, 885, 484) in panels
 
 
 def test_renderer_handles_sparse_zero_negative_huge_and_unicode_values() -> None:
@@ -172,7 +183,7 @@ def test_renderer_handles_sparse_zero_negative_huge_and_unicode_values() -> None
 
     rendered = renderer.render_governor_dashboard(payload)
     with Image.open(BytesIO(rendered.image_bytes)) as image:
-        assert image.size == (1180, 640)
+        assert image.size == (1180, 760)
         assert image.convert("RGB").getpixel((1100, 20)) != (0, 0, 0)
 
 
