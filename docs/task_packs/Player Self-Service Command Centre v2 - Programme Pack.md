@@ -497,6 +497,11 @@ Implementation record:
 
 - Approved `assets/me/cards/me.png` as the operator-created background at the 1180x640 target.
 - Uses the invoking player's Discord avatar in the medallion when available, with a KD98 fallback.
+- Posts the successful PNG as a standalone attachment for wider Discord presentation, aligns the
+  identity and battle-metric edges, uses blue primary navigation, and places the author-gated
+  Change Governor dropdown below the navigation.
+- Shows the operator-approved `Last Login: TBC` presentation placeholder without changing the
+  Phase 2 payload, DAL, or SQL contract; future data wiring remains separately deferred.
 - Retains the Phase 3 embed from the same payload when avatar retrieval, rendering, file creation,
   or image delivery fails.
 - Focused tests, repository validators, pre-commit, full pytest, and complete/sparse/Unicode visual

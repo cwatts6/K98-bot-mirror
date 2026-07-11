@@ -158,7 +158,7 @@ def render_governor_dashboard(
     honours = payload.activity_honours
     self_view = payload.self_view
 
-    _panel(draw, (315, 35, 900, 145), radius=18)
+    _panel(draw, (315, 35, 885, 145), radius=18)
     name = _clean(identity.governor_name, missing=f"Governor {identity.governor_id}")
     _text(draw, (337, 48), name, size=49, min_size=27, width=535, bold=True)
     _text(
@@ -199,16 +199,8 @@ def render_governor_dashboard(
         _text(draw, (944, y), label, size=16, min_size=13, width=182, fill=_MUTED, bold=True)
         _text(draw, (944, y + 27), value, size=29, min_size=19, width=182, bold=True)
         y += 92
-    _text(
-        draw,
-        (944, 376),
-        "PRIVATE SELF-VIEW",
-        size=15,
-        min_size=12,
-        width=182,
-        fill=_BLUE,
-        bold=True,
-    )
+    _text(draw, (944, 366), "LAST LOGIN", size=15, min_size=12, width=182, fill=_MUTED, bold=True)
+    _text(draw, (944, 390), "TBC", size=19, min_size=15, width=182, fill=_BLUE, bold=True)
 
     metric_values = (
         ("POWER", _compact(metrics.power)),

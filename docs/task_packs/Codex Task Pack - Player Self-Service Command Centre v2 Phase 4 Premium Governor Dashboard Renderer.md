@@ -18,6 +18,9 @@
   as optional bytes to the off-thread renderer; the payload contract is unchanged.
 - Missing or invalid avatars use a KD98 medallion fallback. Render, file, and delivery failures use
   the existing embed without another payload fetch.
+- Initial operator smoke confirmed the dashboard works and requested a standalone attachment for
+  wider display, exact identity/metric panel alignment, blue primary navigation, an in-card
+  Change Governor dropdown, and `Last Login: TBC` until its future data contract is delivered.
 - Complete, sparse, long-name, CJK, and emoji samples were reviewed at original, desktop, and
   mobile scale. Focused/full automated validation passed; operator Discord smoke remains pending.
 

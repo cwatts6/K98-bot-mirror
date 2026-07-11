@@ -52,7 +52,10 @@ Use it to check:
 The governor dashboard now uses a dedicated 1180x640 premium PNG governor card as the primary
 successful presentation, with the invoking player's Discord avatar in the medallion where
 available. The operator-approved private embed remains the fallback when avatar retrieval,
-rendering, file creation, or image delivery fails. Existing generated cards for the older setup pages remain
+rendering, file creation, or image delivery fails. The successful card is delivered as a
+standalone attachment for the wider KVK-style Discord presentation. Multiple-governor cards use a
+Change Governor dropdown below the blue primary navigation row. `Last Login: TBC` is presentation
+only until its separately approved dataset/SQL contract is delivered. Existing generated cards for the older setup pages remain
 unchanged until their approved phase work. Quick Launch links for `/kvk stats`, `/kvk targets`,
 `/kvk history`, and `/kvk rankings` remain absent because those commands have channel and
 public-output rules that should stay exactly where players already use them. The dashboard keeps

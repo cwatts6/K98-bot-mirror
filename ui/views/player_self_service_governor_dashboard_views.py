@@ -200,12 +200,6 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
     return embed
 
 
-def build_governor_dashboard_card_embed(filename: str) -> discord.Embed:
-    embed = discord.Embed(color=discord.Color.from_rgb(74, 54, 117))
-    embed.set_image(url=f"attachment://{filename}")
-    return embed
-
-
 async def _read_avatar_bytes(user: Any, *, expected_user_id: int) -> bytes | None:
     try:
         if user is None or int(getattr(user, "id", -1)) != int(expected_user_id):
@@ -360,6 +354,9 @@ class _GovernorSelect(discord.ui.Select):
         self,
         parent: GovernorDashboardView,
         options: tuple[GovernorDashboardOption, ...],
+        *,
+        placeholder: str = "Select a linked governor",
+        row: int = 0,
     ) -> None:
         choices = [
             discord.SelectOption(
@@ -371,12 +368,12 @@ class _GovernorSelect(discord.ui.Select):
             for option in options
         ]
         super().__init__(
-            placeholder="Select a linked governor",
+            placeholder=placeholder,
             min_values=1,
             max_values=1,
             options=choices,
             custom_id="me:dashboard:governor",
-            row=0,
+            row=row,
         )
         self.parent_view = parent
 
@@ -413,7 +410,7 @@ class GovernorDashboardView(discord.ui.View):
         context_resolver: ContextResolver = resolve_dashboard_context,
         payload_loader: PayloadLoader = build_governor_dashboard_payload,
         summary_loader: SummaryLoader = build_player_self_service_summary,
-        selector_page: int = 0,
+        selector_page: int | None = None,
         timeout: float = _VIEW_TIMEOUT_SECONDS,
     ) -> None:
         super().__init__(timeout=timeout, disable_on_timeout=True)
@@ -423,7 +420,8 @@ class GovernorDashboardView(discord.ui.View):
         self.context_resolver = context_resolver
         self.payload_loader = payload_loader
         self.summary_loader = summary_loader
-        self.selector_page = max(0, int(selector_page))
+        self._selector_page_explicit = selector_page is not None
+        self.selector_page = max(0, int(selector_page or 0))
         self._message_ref: discord.Message | None = None
         self._timeout_editor: Callable[..., Awaitable[Any]] | None = None
         self._expired = False
@@ -529,19 +527,9 @@ class GovernorDashboardView(discord.ui.View):
         selected_with_multiple = (
             self.resolution.state == "selected" and len(self.resolution.options) > 1
         )
-        if selected_with_multiple:
-            self.add_item(
-                _DashboardButton(
-                    label="Change Governor",
-                    custom_id="me:dashboard:change",
-                    style=discord.ButtonStyle.success,
-                    row=0,
-                    action=self.change_governor,
-                )
-            )
 
-        navigation_row = 2 if selecting else 1
-        secondary_row = 3 if selecting else 2
+        navigation_row = 2 if selecting else 0
+        secondary_row = 3 if selecting else 1
         from ui.views.player_self_service_views import (
             PAGE_ACCOUNTS,
             PAGE_EXPORTS,
@@ -558,11 +546,12 @@ class GovernorDashboardView(discord.ui.View):
             ("Exports", PAGE_EXPORTS, secondary_row),
         )
         for label, page, row in navigation:
-            style = (
-                discord.ButtonStyle.success
-                if label == "Accounts" and self.resolution.state == "requires_setup"
-                else discord.ButtonStyle.secondary
-            )
+            if label == "Accounts" and self.resolution.state == "requires_setup":
+                style = discord.ButtonStyle.success
+            elif label in {"Accounts", "Reminders", "Preferences"}:
+                style = discord.ButtonStyle.primary
+            else:
+                style = discord.ButtonStyle.secondary
             self.add_item(
                 _DashboardButton(
                     label=label,
@@ -572,6 +561,50 @@ class GovernorDashboardView(discord.ui.View):
                     action=lambda interaction, target=page: self.open_page(interaction, target),
                 )
             )
+
+        if selected_with_multiple:
+            total_pages = max(1, ceil(len(self.resolution.options) / _SELECT_PAGE_SIZE))
+            if not self._selector_page_explicit and self.resolution.context is not None:
+                selected_id = self.resolution.context.selected_governor_id
+                selected_index = next(
+                    (
+                        index
+                        for index, option in enumerate(self.resolution.options)
+                        if option.governor_id == selected_id
+                    ),
+                    0,
+                )
+                self.selector_page = selected_index // _SELECT_PAGE_SIZE
+            self.selector_page = min(self.selector_page, total_pages - 1)
+            start = self.selector_page * _SELECT_PAGE_SIZE
+            page_options = self.resolution.options[start : start + _SELECT_PAGE_SIZE]
+            self.add_item(
+                _GovernorSelect(
+                    self,
+                    page_options,
+                    placeholder="Change Governor",
+                    row=2,
+                )
+            )
+            if total_pages > 1:
+                self.add_item(
+                    _DashboardButton(
+                        label="Previous Governors",
+                        custom_id="me:dashboard:change:previous",
+                        style=discord.ButtonStyle.secondary,
+                        row=3,
+                        action=self.previous_selector_page,
+                    )
+                )
+                self.add_item(
+                    _DashboardButton(
+                        label="Next Governors",
+                        custom_id="me:dashboard:change:next",
+                        style=discord.ButtonStyle.secondary,
+                        row=3,
+                        action=self.next_selector_page,
+                    )
+                )
 
     async def open_page(self, interaction: discord.Interaction, page: str) -> None:
         from ui.views.player_self_service_views import show_player_self_service_page_for_interaction
@@ -659,40 +692,6 @@ class GovernorDashboardView(discord.ui.View):
                 self._busy = False
                 self._active_transition_id = None
 
-    async def change_governor(self, interaction: discord.Interaction) -> None:
-        if not await self._claim_transition(interaction):
-            return
-        self._lock_for_transition()
-        await _defer_private(interaction)
-        try:
-            resolution = await self.context_resolver(self.author_id, viewer_mode="self")
-            rendered = await _render_resolution(
-                interaction,
-                author_id=self.author_id,
-                display_name=self.display_name,
-                resolution=resolution,
-                context_resolver=self.context_resolver,
-                payload_loader=self.payload_loader,
-                summary_loader=self.summary_loader,
-                timeout=self.timeout or _VIEW_TIMEOUT_SECONDS,
-                can_edit=lambda: self._transition_is_current(interaction),
-                timeout_remaining=self._transition_timeout_remaining,
-            )
-            if rendered:
-                self.stop()
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("governor_dashboard_change_failed user_id=%s", self.author_id)
-            await _send_private_error(
-                interaction,
-                "Linked governors could not be refreshed. Please try again.",
-            )
-        finally:
-            if not self._expired:
-                self._busy = False
-                self._active_transition_id = None
-
     async def _show_selector_page(
         self,
         interaction: discord.Interaction,
@@ -755,11 +754,67 @@ class GovernorDashboardView(discord.ui.View):
             view.set_message_ref(sent)
             self.stop()
 
+    async def _show_selected_selector_page(
+        self,
+        interaction: discord.Interaction,
+        page: int,
+    ) -> None:
+        if not await self._claim_transition(interaction):
+            return
+        self._lock_for_transition()
+        total_pages = max(1, ceil(len(self.resolution.options) / _SELECT_PAGE_SIZE))
+        next_page = min(max(0, page), total_pages - 1)
+        view = GovernorDashboardView(
+            author_id=self.author_id,
+            display_name=self.display_name,
+            resolution=self.resolution,
+            context_resolver=self.context_resolver,
+            payload_loader=self.payload_loader,
+            summary_loader=self.summary_loader,
+            selector_page=next_page,
+            timeout=self.timeout or _VIEW_TIMEOUT_SECONDS,
+        )
+        try:
+            if not self._transition_is_current(interaction):
+                return
+            edited = await asyncio.wait_for(
+                interaction.response.edit_message(view=view),
+                timeout=self._transition_timeout_remaining(),
+            )
+            if not self._transition_is_current(interaction):
+                return
+            view.set_message_ref(getattr(interaction, "message", None) or edited)
+            view.set_timeout_target(interaction)
+            self.stop()
+        except asyncio.CancelledError:
+            raise
+        except TimeoutError:
+            logger.info(
+                "governor_dashboard_change_selector_page_timed_out user_id=%s",
+                self.author_id,
+            )
+        except Exception:
+            logger.debug(
+                "governor_dashboard_change_selector_page_edit_failed",
+                exc_info=True,
+            )
+            if self._transition_is_current(interaction):
+                await _send_private_error(
+                    interaction,
+                    "The governor list could not be updated. Run `/me dashboard` again.",
+                )
+
     async def previous_selector_page(self, interaction: discord.Interaction) -> None:
-        await self._show_selector_page(interaction, self.selector_page - 1)
+        if self.resolution.state == "selected":
+            await self._show_selected_selector_page(interaction, self.selector_page - 1)
+        else:
+            await self._show_selector_page(interaction, self.selector_page - 1)
 
     async def next_selector_page(self, interaction: discord.Interaction) -> None:
-        await self._show_selector_page(interaction, self.selector_page + 1)
+        if self.resolution.state == "selected":
+            await self._show_selected_selector_page(interaction, self.selector_page + 1)
+        else:
+            await self._show_selector_page(interaction, self.selector_page + 1)
 
     async def on_timeout(self) -> None:
         self._timed_out = True
@@ -794,7 +849,7 @@ class GovernorDashboardView(discord.ui.View):
 async def _edit_dashboard_response(
     target: Any,
     *,
-    embed: discord.Embed,
+    embed: discord.Embed | None,
     view: GovernorDashboardView,
     files: list[discord.File] | None = None,
     fallback_embed: discord.Embed | None = None,
@@ -888,7 +943,7 @@ async def _render_resolution(
     can_edit: Callable[[], bool] | None = None,
     timeout_remaining: Callable[[], float] | None = None,
 ) -> bool:
-    embed: discord.Embed
+    embed: discord.Embed | None
     fallback_embed: discord.Embed | None = None
     files: list[discord.File] = []
     if resolution.state == "selected":
@@ -929,7 +984,7 @@ async def _render_resolution(
                             filename=rendered_card.filename,
                         )
                         files = [file]
-                        embed = build_governor_dashboard_card_embed(rendered_card.filename)
+                        embed = None
                     except asyncio.CancelledError:
                         raise
                     except Exception:

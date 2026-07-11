@@ -115,9 +115,30 @@ def test_renderer_draws_every_approved_field_and_no_olympia(monkeypatch) -> None
         "NAMED AUTARCH",
         "AUTARCH PARTICIPATED",
         "CONDUCT SCORE",
+        "LAST LOGIN",
+        "TBC",
     ):
         assert expected in output
     assert "Olympia" not in output
+    assert "PRIVATE SELF-VIEW" not in output
+
+
+def test_identity_and_battle_panel_edges_align(monkeypatch) -> None:
+    panels: list[tuple[int, int, int, int]] = []
+    original = renderer._panel
+
+    def recording_panel(draw, box, *, radius=16):
+        panels.append(box)
+        return original(draw, box, radius=radius)
+
+    monkeypatch.setattr(renderer, "_panel", recording_panel)
+    renderer.render_governor_dashboard(_payload())
+
+    assert (315, 35, 885, 145) in panels
+    assert (315, 164, 495, 260) in panels
+    assert (705, 164, 885, 260) in panels
+    assert (315, 276, 495, 372) in panels
+    assert (705, 276, 885, 372) in panels
 
 
 def test_renderer_handles_sparse_zero_negative_huge_and_unicode_values() -> None:

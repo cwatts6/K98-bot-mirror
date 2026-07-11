@@ -261,7 +261,7 @@ async def test_one_governor_opens_dashboard_directly_after_access_resolution() -
 
     edited = ctx.interaction.original_edits[-1]
     assert order == ["access", "payload"]
-    assert edited["embed"].image.url == "attachment://governor_dashboard.png"
+    assert edited["embed"] is None
     assert edited["attachments"] == []
     assert [item.filename for item in edited["files"]] == ["governor_dashboard.png"]
     assert edited["files"][0].fp.closed is True
@@ -340,42 +340,6 @@ async def test_render_failure_uses_same_payload_fallback_without_second_fetch(mo
 
     edited = ctx.interaction.original_edits[-1]
     assert payload_calls == 1
-    assert edited["embed"].title == "Governor Dashboard — Main Gov"
-    assert edited["attachments"] == []
-    assert "files" not in edited
-
-
-@pytest.mark.asyncio
-async def test_card_embed_failure_closes_and_clears_created_file(monkeypatch) -> None:
-    option = _option(111, name="Main Gov", is_default=True)
-    ctx = _ctx()
-    created_files: list[discord.File] = []
-    original_file = views.discord.File
-
-    def tracking_file(*args, **kwargs):
-        file = original_file(*args, **kwargs)
-        created_files.append(file)
-        return file
-
-    def broken_card_embed(_filename: str):
-        raise RuntimeError("attachment embed failed")
-
-    monkeypatch.setattr(views.discord, "File", tracking_file)
-    monkeypatch.setattr(views, "build_governor_dashboard_card_embed", broken_card_embed)
-
-    async def resolver(_user_id: int, **_kwargs):
-        return _selected_resolution(option)
-
-    async def payload_loader(context):
-        return _payload(context)
-
-    await views.send_governor_dashboard(
-        ctx, context_resolver=resolver, payload_loader=payload_loader
-    )
-
-    edited = ctx.interaction.original_edits[-1]
-    assert len(created_files) == 1
-    assert created_files[0].fp.closed is True
     assert edited["embed"].title == "Governor Dashboard — Main Gov"
     assert edited["attachments"] == []
     assert "files" not in edited
@@ -581,10 +545,10 @@ async def test_valid_selection_rechecks_access_before_payload_and_edits_in_place
 
     assert order == ["access", "payload"]
     edited = interaction.original_edits[-1]
-    assert edited["embed"].image.url == "attachment://governor_dashboard.png"
+    assert edited["embed"] is None
     assert [item.filename for item in edited["files"]] == ["governor_dashboard.png"]
     assert edited["files"][0].fp.closed is True
-    assert "me:dashboard:change" in _custom_ids(edited["view"])
+    assert "me:dashboard:governor" in _custom_ids(edited["view"])
     assert interaction.followup.sent == []
 
     raced_stale_interaction = _Interaction()
@@ -593,7 +557,7 @@ async def test_valid_selection_rechecks_access_before_payload_and_edits_in_place
 
 
 @pytest.mark.asyncio
-async def test_change_governor_is_multi_only_and_returns_to_selector_without_payload() -> None:
+async def test_change_governor_is_multi_only_dropdown_below_blue_navigation() -> None:
     main = _option(111, name="Main Gov", is_default=True)
     alt = _option(222, name="Alt Gov", account_type="Alt 1")
     single_view = views.GovernorDashboardView(
@@ -601,19 +565,21 @@ async def test_change_governor_is_multi_only_and_returns_to_selector_without_pay
         display_name="Tester",
         resolution=_selected_resolution(main),
     )
-    assert "me:dashboard:change" not in _custom_ids(single_view)
+    assert "me:dashboard:governor" not in _custom_ids(single_view)
 
     multi_resolution = _selected_resolution(main, options=(main, alt))
 
-    async def resolver(_user_id: int, **_kwargs):
-        return GovernorDashboardResolution(
-            state="requires_selection",
-            options=(main, alt),
-            default_option=main,
-        )
+    selected_alt = _selected_resolution(alt, options=(main, alt))
+    order: list[str] = []
 
-    async def payload_loader(_context):
-        raise AssertionError("Change Governor selector must not load a payload")
+    async def resolver(_user_id: int, governor_id: str, **_kwargs):
+        assert governor_id == "222"
+        order.append("access")
+        return selected_alt
+
+    async def payload_loader(context):
+        order.append("payload")
+        return _payload(context)
 
     multi_view = views.GovernorDashboardView(
         author_id=42,
@@ -622,15 +588,29 @@ async def test_change_governor_is_multi_only_and_returns_to_selector_without_pay
         context_resolver=resolver,
         payload_loader=payload_loader,
     )
-    assert "me:dashboard:change" in _custom_ids(multi_view)
+    assert "me:dashboard:change" not in _custom_ids(multi_view)
+    assert "me:dashboard:governor" in _custom_ids(multi_view)
+    change_select = next(
+        child for child in multi_view.children if isinstance(child, discord.ui.Select)
+    )
+    assert change_select.placeholder == "Change Governor"
+    assert change_select.row == 2
+    top_buttons = [
+        child
+        for child in multi_view.children
+        if isinstance(child, discord.ui.Button) and child.row == 0
+    ]
+    assert [button.label for button in top_buttons] == ["Accounts", "Reminders", "Preferences"]
+    assert all(button.style is discord.ButtonStyle.primary for button in top_buttons)
     interaction = _Interaction()
 
-    await multi_view.change_governor(interaction)
+    await multi_view.select_governor(interaction, "222")
 
+    assert order == ["access", "payload"]
     edited = interaction.original_edits[-1]
-    assert edited["embed"].title == "Choose a Governor"
+    assert edited["embed"] is None
     assert edited["attachments"] == []
-    assert "files" not in edited
+    assert [item.filename for item in edited["files"]] == ["governor_dashboard.png"]
 
 
 @pytest.mark.asyncio
@@ -849,10 +829,7 @@ async def test_inflight_selection_rejects_concurrent_navigation(monkeypatch) -> 
 
     assert navigation_calls == []
     assert "stale" in navigation_interaction.response.sent[-1][0][0]
-    assert (
-        selection_interaction.original_edits[-1]["embed"].image.url
-        == "attachment://governor_dashboard.png"
-    )
+    assert selection_interaction.original_edits[-1]["embed"] is None
 
 
 @pytest.mark.asyncio
@@ -1136,3 +1113,35 @@ async def test_selector_supports_more_than_twenty_five_linked_governors() -> Non
 
     assert len(selector.options) == 25
     assert "me:dashboard:selector:next" in _custom_ids(first)
+
+
+@pytest.mark.asyncio
+async def test_selected_change_dropdown_pages_without_replacing_card_attachment() -> None:
+    options = tuple(
+        _option(100 + index, account_type="Main" if index == 0 else f"Farm {index}")
+        for index in range(26)
+    )
+    resolution = _selected_resolution(options[25], options=options)
+    view = views.GovernorDashboardView(
+        author_id=42,
+        display_name="Tester",
+        resolution=resolution,
+    )
+    selector = next(child for child in view.children if isinstance(child, discord.ui.Select))
+
+    assert view.selector_page == 1
+    assert [option.value for option in selector.options] == ["125"]
+    assert "me:dashboard:change:previous" in _custom_ids(view)
+
+    interaction = _Interaction()
+    await view.previous_selector_page(interaction)
+
+    assert interaction.response.edited
+    edit_kwargs = interaction.response.edited[-1]
+    assert set(edit_kwargs) == {"view"}
+    replacement = edit_kwargs["view"]
+    replacement_selector = next(
+        child for child in replacement.children if isinstance(child, discord.ui.Select)
+    )
+    assert replacement.selector_page == 0
+    assert len(replacement_selector.options) == 25
