@@ -933,6 +933,8 @@ async def _render_resolution(
                     except asyncio.CancelledError:
                         raise
                     except Exception:
+                        _close_files(files)
+                        files = []
                         logger.exception(
                             "governor_dashboard_card_render_failed user_id=%s governor_id=%s",
                             author_id,

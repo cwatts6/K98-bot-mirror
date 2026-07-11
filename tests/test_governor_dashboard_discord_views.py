@@ -346,6 +346,42 @@ async def test_render_failure_uses_same_payload_fallback_without_second_fetch(mo
 
 
 @pytest.mark.asyncio
+async def test_card_embed_failure_closes_and_clears_created_file(monkeypatch) -> None:
+    option = _option(111, name="Main Gov", is_default=True)
+    ctx = _ctx()
+    created_files: list[discord.File] = []
+    original_file = views.discord.File
+
+    def tracking_file(*args, **kwargs):
+        file = original_file(*args, **kwargs)
+        created_files.append(file)
+        return file
+
+    def broken_card_embed(_filename: str):
+        raise RuntimeError("attachment embed failed")
+
+    monkeypatch.setattr(views.discord, "File", tracking_file)
+    monkeypatch.setattr(views, "build_governor_dashboard_card_embed", broken_card_embed)
+
+    async def resolver(_user_id: int, **_kwargs):
+        return _selected_resolution(option)
+
+    async def payload_loader(context):
+        return _payload(context)
+
+    await views.send_governor_dashboard(
+        ctx, context_resolver=resolver, payload_loader=payload_loader
+    )
+
+    edited = ctx.interaction.original_edits[-1]
+    assert len(created_files) == 1
+    assert created_files[0].fp.closed is True
+    assert edited["embed"].title == "Governor Dashboard — Main Gov"
+    assert edited["attachments"] == []
+    assert "files" not in edited
+
+
+@pytest.mark.asyncio
 async def test_image_delivery_failure_retries_embed_and_closes_file() -> None:
     option = _option(111, name="Main Gov", is_default=True)
     ctx = _ctx()
