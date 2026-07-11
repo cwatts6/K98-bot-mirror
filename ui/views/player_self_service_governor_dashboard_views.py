@@ -209,7 +209,7 @@ def build_governor_dashboard_embed(payload: GovernorDashboardPayload) -> discord
             (
                 f"RSS: {_format_short_number(inventory.total_resources)}",
                 f"Speedups: {_format_inventory_days(inventory.total_speedup_days)}",
-                "Materials: " f"{_format_inventory_materials(inventory.total_legendary_materials)}",
+                f"Materials: {_format_inventory_materials(inventory.total_legendary_materials)}",
             )
         ),
         inline=False,
@@ -686,11 +686,23 @@ class GovernorDashboardView(discord.ui.View):
             )
             if self._transition_is_current(interaction):
                 self.stop()
+        except asyncio.CancelledError:
+            raise
         except TimeoutError:
             logger.info(
                 "governor_dashboard_inventory_navigation_timed_out user_id=%s report=%s",
                 self.author_id,
                 getattr(report_view, "value", report_view),
+            )
+        except Exception:
+            logger.exception(
+                "governor_dashboard_inventory_navigation_failed user_id=%s report=%s",
+                self.author_id,
+                getattr(report_view, "value", report_view),
+            )
+            await _send_private_error(
+                interaction,
+                "That private Inventory report could not be opened. Please try again.",
             )
 
     async def open_page(self, interaction: discord.Interaction, page: str) -> None:

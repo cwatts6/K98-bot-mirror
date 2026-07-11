@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from io import BytesIO
 from types import SimpleNamespace
@@ -45,6 +46,28 @@ class _Response:
         self.edited.append(kwargs)
         self._done = True
         return SimpleNamespace(id=777)
+
+
+@pytest.mark.asyncio
+async def test_component_defer_omits_ephemeral_flag() -> None:
+    interaction = _Interaction(component=True)
+
+    await views._defer_private(interaction)
+
+    assert interaction.response.deferred == [{}]
+
+
+@pytest.mark.asyncio
+async def test_private_error_propagates_cancellation() -> None:
+    interaction = _Interaction(component=True)
+
+    async def cancelled_send(*_args, **_kwargs):
+        raise asyncio.CancelledError
+
+    interaction.response.send_message = cancelled_send
+
+    with pytest.raises(asyncio.CancelledError):
+        await views._private_error(interaction, "cancelled")
 
 
 class _Followup:
@@ -539,6 +562,60 @@ async def test_foreign_timeout_and_concurrent_actions_fail_privately() -> None:
     await view.on_timeout()
     assert timeout_target.original_edits[-1]["attachments"] == []
     assert all(child.disabled for child in view.children)
+
+
+@pytest.mark.asyncio
+async def test_failed_component_defer_does_not_leave_report_busy(monkeypatch) -> None:
+    option = _option(111, default=True)
+
+    async def resolver(*_args, **_kwargs):
+        return _selected(option)
+
+    async def render_resolution(*_args, **_kwargs):
+        return True
+
+    view = views.PlayerInventoryReportView(
+        author_id=42,
+        display_name="Tester",
+        resolution=_selected(option),
+        report_view=InventoryReportView.RESOURCES,
+        context_resolver=resolver,
+    )
+    interaction = _Interaction()
+
+    async def rejected_defer(**_kwargs):
+        raise discord.HTTPException(SimpleNamespace(status=404, reason="expired"), "expired")
+
+    interaction.response.defer = rejected_defer
+    monkeypatch.setattr(views, "_render_resolution", render_resolution)
+
+    await view.change_report(interaction, range_key=InventoryReportRange.THREE_MONTHS)
+
+    assert view._busy is False
+    assert view._active_transition_id is None
+
+
+@pytest.mark.asyncio
+async def test_cancelled_component_defer_releases_report_claim() -> None:
+    option = _option(111, default=True)
+    view = views.PlayerInventoryReportView(
+        author_id=42,
+        display_name="Tester",
+        resolution=_selected(option),
+        report_view=InventoryReportView.RESOURCES,
+    )
+    interaction = _Interaction()
+
+    async def cancelled_defer(**_kwargs):
+        raise asyncio.CancelledError
+
+    interaction.response.defer = cancelled_defer
+
+    with pytest.raises(asyncio.CancelledError):
+        await view.change_report(interaction, range_key=InventoryReportRange.THREE_MONTHS)
+
+    assert view._busy is False
+    assert view._active_transition_id is None
 
 
 @pytest.mark.asyncio

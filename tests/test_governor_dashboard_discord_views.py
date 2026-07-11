@@ -727,6 +727,33 @@ async def test_dashboard_report_actions_preserve_selected_governor(
     assert calls[0][1]["report_view"].value == expected
 
 
+@pytest.mark.asyncio
+async def test_dashboard_report_action_reports_unexpected_failure_privately(monkeypatch) -> None:
+    from inventory.models import InventoryReportView
+    from ui.views import player_self_service_inventory_report_views as report_views
+
+    async def failed_report(*_args, **_kwargs):
+        raise RuntimeError("discord edit failed")
+
+    monkeypatch.setattr(
+        report_views,
+        "show_player_inventory_report_for_interaction",
+        failed_report,
+    )
+    option = _option(111, name="Main Gov")
+    dashboard = views.GovernorDashboardView(
+        author_id=42,
+        display_name="Tester",
+        resolution=_selected_resolution(option),
+    )
+    interaction = _Interaction()
+
+    await dashboard.open_inventory_report(interaction, InventoryReportView.RESOURCES)
+
+    assert interaction.response.sent[-1][1]["ephemeral"] is True
+    assert "could not be opened" in interaction.response.sent[-1][0][0]
+
+
 def test_short_number_format_matches_existing_dashboard_style() -> None:
     assert views._format_short_number(182_200_000) == "182.2M"
     assert views._format_short_number(74_000) == "74K"

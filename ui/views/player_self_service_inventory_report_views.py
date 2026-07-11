@@ -166,11 +166,24 @@ def _close_files(files: list[discord.File] | None) -> None:
 
 async def _defer_private(interaction: discord.Interaction) -> None:
     try:
-        if not interaction.response.is_done():
+        if interaction.response.is_done():
+            return
+        if getattr(interaction, "message", None) is not None:
+            await interaction.response.defer()
+        else:
             await interaction.response.defer(ephemeral=True)
     except TypeError:
-        if not interaction.response.is_done():
-            await interaction.response.defer()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug("player_inventory_report_interaction_defer_failed", exc_info=True)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.debug("player_inventory_report_interaction_defer_failed", exc_info=True)
 
 
 async def _private_error(interaction: discord.Interaction, content: str) -> None:
@@ -179,6 +192,8 @@ async def _private_error(interaction: discord.Interaction, content: str) -> None
             await interaction.response.send_message(content, ephemeral=True)
         else:
             await interaction.followup.send(content, ephemeral=True)
+    except asyncio.CancelledError:
+        raise
     except Exception:
         logger.debug("player_inventory_report_private_error_failed", exc_info=True)
 
@@ -493,8 +508,8 @@ class PlayerInventoryReportView(discord.ui.View):
     ) -> None:
         if not await self._claim(interaction):
             return
-        await _defer_private(interaction)
         try:
+            await _defer_private(interaction)
             resolution = await self._resolve_current()
             await _render_resolution(
                 interaction,
@@ -522,8 +537,8 @@ class PlayerInventoryReportView(discord.ui.View):
     async def select_governor(self, interaction: discord.Interaction, governor_id: str) -> None:
         if not await self._claim(interaction):
             return
-        await _defer_private(interaction)
         try:
+            await _defer_private(interaction)
             resolution = await self.context_resolver(
                 self.author_id, governor_id, viewer_mode="self"
             )
@@ -633,10 +648,10 @@ class PlayerInventoryReportView(discord.ui.View):
     ) -> None:
         if not await self._claim(interaction):
             return
-        await _defer_private(interaction)
         export_file = None
         discord_file = None
         try:
+            await _defer_private(interaction)
             resolution = await self._resolve_current()
             context = resolution.context
             if (
