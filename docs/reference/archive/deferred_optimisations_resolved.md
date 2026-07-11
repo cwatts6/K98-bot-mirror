@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### GovernorOS v2 Phase 4 Shared Renderer Framework Decision
+- Area: `player_self_service/governor_dashboard_renderer.py`, `core/visual_text.py`, `player_self_service/page_cards.py`, KVK and inventory renderer families
+- Type: consistency
+- Description: Phase 4 needed a dedicated governor renderer, but a possible post-delivery shared visual framework remained under consideration if concrete duplicated low-level primitives justified coupling the page-card, governor, KVK, and Inventory renderer families.
+- Resolution: Phase 4 reused the established glyph-safe `core.visual_text` primitives and kept its payload/layout/background/export contract domain-specific. Post-delivery review and operator acceptance found no measured duplication or output-contract benefit that justifies a broader shared renderer framework. Phase 5A will likewise reuse the existing Inventory renderer as-is, and Phase 5B will change Discord delivery rather than renderer architecture. Any future shared-helper proposal requires new profiling/duplication evidence and a separately scoped item.
+- Validation: Phase 4 renderer, visual-text, Discord-view, focused/full tests, pre-commit, and operator desktop/mobile smoke passed through 2026-07-11. The accepted governor and Inventory outputs have distinct dimensions, assets, payloads, and control contracts, supporting closure rather than speculative consolidation.
+
 ### GovernorOS v2 Phase 4 Attachment Lifecycle Completed Item
 - Area: `ui/views/player_self_service_views.py`, `ui/views/player_self_service_governor_dashboard_views.py`, Phase 4-6 dashboard/page renderer migration
 - Type: consistency

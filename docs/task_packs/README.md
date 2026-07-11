@@ -412,12 +412,15 @@ Player Self-Service Command Centre status:
   `archive/`.
 - Active Player Self-Service v2 files:
   - `Player Self-Service Command Centre v2 - Programme Pack.md`
-  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 3 Governor Selector and Dashboard Shell.md`
-  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 3 Governor Selector and Dashboard Shell.md`
-- GovernorOS v2 Phase 1 blueprint/audit and Phase 2 governor context/data foundation are complete.
-  Their report, task pack, and chat starter are archived under `archive/`. Phase 2 delivered in
-  mirror PR #216 and production PR #523; operator smoke and full regression validation passed on
-  2026-07-10 without changing the visible `/me` or legacy command behavior.
+  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 5A Direct Inventory Reports and Governor Context.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5A Direct Inventory Reports and Governor Context.md`
+- GovernorOS v2 Phases 1-4 are complete. Their reports/task packs/chat starters are archived under
+  `archive/`. Phase 2 delivered in mirror PR #216 and production PR #523, Phase 3 delivered in
+  mirror PR #217 and production PR #524, and Phase 4 delivered in mirror PR #218. Phase 4 operator
+  smoke on 2026-07-11 accepted the materially wider standalone card and gated Change Governor
+  dropdown. Phase 5A is the next approval-gated implementation slice; Phase 5B owns standalone
+  presentation alignment for the existing Accounts, Reminders, Preferences, Inventory, and Exports
+  summary pages.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -513,12 +516,13 @@ tuning/decomposition, residual `stats_module.py` cleanup, legacy PreKvK SQL clea
 cumulative view cleanup, and inventory view-orchestration extraction remain separate later slices
 unless explicitly approved.
 
-Player Self-Service Command Centre v2 Phase 3 Governor Selector and Dashboard Shell is the next
-prepared player self-service slice. It changes `/me dashboard` to resolve no/one/multiple linked
-governor states privately, uses a dashboard-specific author-gated selector for multiple accounts,
-and renders a selected-governor fallback shell from the completed Phase 2 payload. The premium PNG
-renderer, new `/me` subcommands, inspect flow, redirects, removals, and legacy behavior changes
-remain outside Phase 3.
+Player Self-Service Command Centre v2 Phase 5A Direct Inventory Reports and Governor Context is the
+next prepared player self-service slice. It proposes private `/me resources`, `/me materials`, and
+`/me speedups`, matching dashboard actions, no/one/multiple governor resolution, and the accepted
+paged Change Governor dropdown while reusing the existing standalone inventory renderer and
+service/DAL contracts. Phase 5B page-presentation alignment, export integration, history, inspect,
+migration decisions, renderer redesign, SQL changes, and legacy behavior changes remain outside
+Phase 5A.
 Final removal of temporary deprecated command paths remains captured as deferred cleanup for
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.

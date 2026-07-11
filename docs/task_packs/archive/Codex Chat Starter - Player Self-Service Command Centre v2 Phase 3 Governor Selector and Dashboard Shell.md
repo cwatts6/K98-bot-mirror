@@ -1,8 +1,8 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 3 Governor Selector and Dashboard Shell
 
 Status: archived execution starter. Phase 3 completed and operator smoke passed on 2026-07-10 in
-mirror PR #217 and production PR #524. Use the active Phase 4 premium renderer starter for the next
-slice.
+mirror PR #217 and production PR #524. Phase 4 has also completed; use the active Phase 5A direct
+inventory report starter for the next slice.
 
 The copy/paste block below is retained as historical execution context and should not be used to
 start new work.

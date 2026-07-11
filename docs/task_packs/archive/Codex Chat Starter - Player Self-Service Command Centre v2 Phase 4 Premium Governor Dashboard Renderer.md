@@ -1,6 +1,11 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 4 Premium Governor Dashboard Renderer
 
-Status: completed; operator Discord smoke passed 2026-07-11. Retained as the execution starter.
+Status: archived execution starter. Phase 4 completed and operator Discord smoke passed on
+2026-07-11 in mirror PR #218. Use the active Phase 5A direct inventory report starter for the next
+slice.
+
+The copy/paste block below is retained as historical execution context and should not be used to
+start new work.
 
 ## Copy/Paste Starter
 
@@ -18,7 +23,7 @@ Read first:
 - README-DEV.md
 - docs/reference/README.md
 - docs/task_packs/Player Self-Service Command Centre v2 - Programme Pack.md
-- docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 4 Premium Governor Dashboard Renderer.md
+- docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 4 Premium Governor Dashboard Renderer.md
 - docs/task_packs/archive/Player Self-Service Command Centre v2 Phase 1 Governor Dashboard Product Blueprint and Audit Report.md
 - docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 2 Governor Context and Dashboard Data Foundation.md
 - docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 3 Governor Selector and Dashboard Shell.md

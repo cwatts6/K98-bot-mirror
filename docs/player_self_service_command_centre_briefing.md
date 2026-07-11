@@ -447,9 +447,16 @@ Current status:
   attachment lifecycle, and no-SQL/no-new-action scope. Operator smoke on 2026-07-11 exercised all
   governor options, confirmed the gated Change Governor dropdown, and accepted the materially
   larger, easier-to-read standalone image. Matching presentation changes for the other `/me` pages
-  remain separately phase-gated follow-up work.
-- Phase 5 adds direct selected-governor Resources, Materials, and Speedups only after report
-  visibility semantics and command-count impact are approved.
+  are assigned explicitly to Phase 5B rather than remaining unowned debt.
+- Phase 5A is the next proposed slice. It adds private direct selected-governor Resources,
+  Materials, and Speedups using the existing 1400x980 standalone inventory renderer, report ranges,
+  and exports. It adds the same author-gated paged Change Governor dropdown on governor-specific
+  reports, preserves report type/range while switching, and increases `/me` grouped subcommands
+  from 6 to 9 without changing the top-level command count. Implementation awaits approval of the
+  private-only `/me` visibility and control layout.
+- Phase 5B then migrates Accounts, Reminders, Preferences, Inventory, and Exports summary cards to
+  the wider standalone attachment presentation and blue navigation pattern without changing their
+  data, actions, or user-level/all-governor semantics. Those pages do not show Change Governor.
 - Phase 6 adds Export Stats only after selected-governor versus all-linked semantics are approved;
   export schema/format redesign remains outside GovernorOS.
 - Phase 7 adds private selected-governor `/me history` while preserving public/channel-gated

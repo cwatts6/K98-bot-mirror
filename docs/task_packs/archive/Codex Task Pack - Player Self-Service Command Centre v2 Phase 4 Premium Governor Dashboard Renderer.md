@@ -59,7 +59,7 @@ is required, stop and obtain approval rather than expanding this slice.
 - `README-DEV.md`
 - `docs/reference/README.md`
 - `docs/task_packs/Player Self-Service Command Centre v2 - Programme Pack.md`
-- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 4 Premium Governor Dashboard Renderer.md`
+- `docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 4 Premium Governor Dashboard Renderer.md`
 - `docs/task_packs/archive/Player Self-Service Command Centre v2 Phase 1 Governor Dashboard Product Blueprint and Audit Report.md`
 - `docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 2 Governor Context and Dashboard Data Foundation.md`
 - `docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 3 Governor Selector and Dashboard Shell.md`
