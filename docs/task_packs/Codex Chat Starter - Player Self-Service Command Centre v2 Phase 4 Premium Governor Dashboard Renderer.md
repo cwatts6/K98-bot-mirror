@@ -1,6 +1,6 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 4 Premium Governor Dashboard Renderer
 
-Status: ready to start after operator approval of the Phase 4 scope and visual direction.
+Status: completed; operator Discord smoke passed 2026-07-11. Retained as the execution starter.
 
 ## Copy/Paste Starter
 

@@ -105,22 +105,13 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 3 smoke correction deployed for representative measurement; production SQL execution-plan access; observed dashboard usage/concurrency; SQL owner approval before index, view, or maintained-table changes.
 
 ### Deferred Optimisation
-- Area: `ui/views/player_self_service_views.py`, `ui/views/player_self_service_governor_dashboard_views.py`, Phase 4-6 dashboard/page renderer migration
-- Type: consistency
-- Description: Phase 3 smoke shows that moving between generated `/me` page cards and the fallback governor embed can leave the previous card attachment visible above the new embed even though the interaction remains private and functional. Repeatedly polishing this transitional mixed renderer path would overlap the approved Phase 4-6 embed/card upgrades.
-- Suggested Fix: This item is promoted into the Phase 4 premium renderer task pack. Define one attachment replacement/clearing and file-stream cleanup contract for selector-to-card, card-to-selector, card-to-page, page-to-card, card-to-card, card-to-embed, and embed-to-card transitions; apply it through the governor-dashboard/shared send-edit boundary; and add Discord-view regression coverage. Keep this item active until Phase 4 visual smoke confirms no mixed attachment remains.
-- Impact: medium
-- Risk: low
-- Dependencies: Phase 4 implementation and local visual/automated validation completed on 2026-07-10; keep active until operator Discord smoke confirms attachment replacement across the live journey.
-
-### Deferred Optimisation
 - Area: `commands/me_cmds.py`, `ui/views/player_self_service_views.py`, `player_self_service/governor_dashboard_*`, `/me dashboard`, player self-service v2 docs/tests
 - Type: architecture
-- Description: GovernorOS v2 Phases 1-3 are complete. The remaining committed roadmap is Phase 4 premium renderer; Phase 5 direct Resources/Materials/Speedups; Phase 6 Export Stats integration after a selected-governor versus all-linked decision; Phase 7 private `/me history`; Phase 8 required permission-gated admin/leadership `/me inspect`; and Phase 9 usage-led migration review. Phase 10 sticky features are a future programme candidate rather than committed implementation. Each remaining phase has a distinct command, privacy, compatibility, or product-decision boundary and must not be collapsed into one broad PR.
-- Suggested Fix: Execute Phases 4-9 as separate task-packed slices in the authoritative programme order. Preserve the Phase 2 payload/privacy boundary and Phase 3 access/selector journey; require the documented operator checkpoint for Phase 4 visuals/assets, Phase 5 report visibility and grouped command count, Phase 6 export scope, Phase 7 history controls, Phase 8 permissions/VIP/lookup/telemetry, and every Phase 9 migration decision. Create a new successor pack before any Phase 10 implementation.
+- Description: GovernorOS v2 Phases 1-4 are complete. The remaining committed roadmap is Phase 5 direct Resources/Materials/Speedups; Phase 6 Export Stats integration after a selected-governor versus all-linked decision; Phase 7 private `/me history`; Phase 8 required permission-gated admin/leadership `/me inspect`; and Phase 9 usage-led migration review. Phase 10 sticky features are a future programme candidate rather than committed implementation. Each remaining phase has a distinct command, privacy, compatibility, or product-decision boundary and must not be collapsed into one broad PR.
+- Suggested Fix: Execute Phases 5-9 as separate task-packed slices in the authoritative programme order. Preserve the Phase 2 payload/privacy boundary, Phase 3 access/selector journey, and Phase 4 renderer/delivery contract; require the documented operator checkpoint for Phase 5 report visibility and grouped command count, Phase 6 export scope, Phase 7 history controls, Phase 8 permissions/VIP/lookup/telemetry, and every Phase 9 migration decision. Create a new successor pack before any Phase 10 implementation.
 - Impact: high
 - Risk: medium
-- Dependencies: Phase 1 blueprint archived; Phase 2 delivered in mirror PR #216 and production PR #523; Phase 3 delivered in mirror PR #217 and production PR #524 with automated validation and operator Discord smoke completed on 2026-07-10; Phase 4 active task pack/starter; explicit approval for each later phase gate.
+- Dependencies: Phase 1 blueprint archived; Phase 2 delivered in mirror PR #216 and production PR #523; Phase 3 delivered in mirror PR #217 and production PR #524 with automated validation and operator Discord smoke completed on 2026-07-10; Phase 4 delivered in mirror PR #218 with operator Discord smoke completed on 2026-07-11; explicit approval for each later phase gate.
 
 ### Deferred Optimisation
 - Area: `player_self_service/governor_dashboard_renderer.py`, `core/visual_text.py`, `player_self_service/page_cards.py`, KVK and inventory renderer families
@@ -139,6 +130,15 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: medium
 - Dependencies: Operator approval of the Phase 4 placeholder; authoritative `KingdomScanData4` SQL migration and source-population contract; `k98-sql-validation` before implementation.
+
+### Deferred Optimisation
+- Area: `ui/views/player_self_service_views.py`, `player_self_service/page_cards.py`, `player_self_service/dashboard_card.py`, Accounts/Reminders/Preferences/Inventory/Exports `/me` page delivery
+- Type: consistency
+- Description: Phase 4 operator smoke confirmed the governor dashboard's standalone PNG attachment is materially larger and easier to read than generated `/me` pages still delivered inside embed image containers. Those pages also need the same blue-primary navigation and attachment-lifecycle consistency where their page-specific controls allow it. Expanding them in Phase 4 would broaden the accepted governor-renderer slice.
+- Suggested Fix: In the next approved `/me` page phases, migrate each successful generated page card from embed-wrapped `attachment://` presentation to standalone attachments, retain the existing private embed fallback, preserve per-page actions and disabled states, apply the blue primary top-row pattern consistently, and add page-to-page/card/fallback/timeout cleanup plus desktop/mobile smoke coverage. Roll out per approved phase rather than as a broad shared renderer refactor.
+- Impact: medium
+- Risk: medium
+- Dependencies: Phase 4 operator acceptance on 2026-07-11; page-specific scope approval and smoke tests; preserve existing Accounts, Reminders, Preferences, Inventory, and Exports semantics.
 
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `inventory/export_service.py`, `inventory/dal/`, SQL repo export views/tables, export docs/tests

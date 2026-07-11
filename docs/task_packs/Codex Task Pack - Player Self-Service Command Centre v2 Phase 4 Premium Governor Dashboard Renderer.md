@@ -7,8 +7,8 @@
 - Owner/context: Follow-on from the completed and operator-smoke-approved Phase 3 governor selector and dashboard shell.
 - Task type: `Generated visual card | Discord attachment integration | fallback-safe renderer migration`
 - One-pass approved: `No`
-- Implementation approved: `No - scope and visual direction require operator confirmation`
-- Status: `implemented and locally validated - operator Discord smoke pending`
+- Implementation approved: `Yes - visual direction approved and operator smoke accepted`
+- Status: `complete - operator smoke passed 2026-07-11`
 
 ## Implementation Record
 
@@ -22,7 +22,9 @@
   wider display, exact identity/metric panel alignment, blue primary navigation, an in-card
   Change Governor dropdown, and `Last Login: TBC` until its future data contract is delivered.
 - Complete, sparse, long-name, CJK, and emoji samples were reviewed at original, desktop, and
-  mobile scale. Focused/full automated validation passed; operator Discord smoke remains pending.
+  mobile scale. Focused/full automated validation passed. Final operator smoke on 2026-07-11
+  exercised every linked-governor option, confirmed the author-gated Change Governor dropdown,
+  and accepted the standalone card as materially larger and easier to read.
 
 ## 2. Objective
 
@@ -313,18 +315,18 @@ review is required unless the approved scope changes.
 
 ## 16. Acceptance Criteria
 
-- [ ] Operator confirms the visual direction and prototype/background choice.
-- [ ] The selected governor is presented primarily as a premium PNG card.
-- [ ] The existing embed remains a tested safe fallback.
-- [ ] Every approved Phase 3 field is represented safely and Olympia is completely absent.
-- [ ] Long, Unicode, missing, zero, and large values remain readable.
-- [ ] Rendering is off the event loop and performs no IO outside local asset/font reads.
-- [ ] Attachment lifecycle is correct across every current `/me` transition.
-- [ ] File streams are released on success, failure, cancellation, timeout, and stale suppression.
-- [ ] Selector, access, privacy, navigation, and timeout contracts are unchanged.
-- [ ] No command-count, SQL, DAL, export, inventory, history, or inspect change is introduced.
-- [ ] Focused/full validation, visual QA, operator smoke, and security review are recorded.
-- [ ] Programme, briefing, command, task-pack, starter, and deferred documents reflect delivery.
+- [x] Operator confirms the visual direction and prototype/background choice.
+- [x] The selected governor is presented primarily as a premium PNG card.
+- [x] The existing embed remains a tested safe fallback.
+- [x] Every approved Phase 3 field is represented safely and Olympia is completely absent.
+- [x] Long, Unicode, missing, zero, and large values remain readable.
+- [x] Rendering is off the event loop and performs no IO outside local asset/font reads.
+- [x] Attachment lifecycle is correct across every current `/me` transition.
+- [x] File streams are released on success, failure, cancellation, timeout, and stale suppression.
+- [x] Selector, access, privacy, navigation, and timeout contracts are unchanged.
+- [x] No command-count, SQL, DAL, export, inventory, history, or inspect change is introduced.
+- [x] Focused/full validation, visual QA, operator smoke, and security-focused review are recorded.
+- [x] Programme, briefing, command, task-pack, starter, and deferred documents reflect delivery.
 
 ## 17. Delivery Output
 

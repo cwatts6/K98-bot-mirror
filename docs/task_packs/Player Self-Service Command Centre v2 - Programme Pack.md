@@ -474,7 +474,7 @@ Delivered in mirror PR `K98-bot-mirror#217` and production PR `K98-bot#524` on 2
 
 ### Phase 4 — Premium Governor Dashboard Renderer
 
-Status: `implemented and locally validated - operator Discord smoke pending`.
+Status: `complete - operator smoke passed 2026-07-11`.
 
 Goal: replace the successful selected-governor fallback shell with a premium generated card without
 changing the delivered data, access, selector, or command contracts.
@@ -505,7 +505,9 @@ Implementation record:
 - Retains the Phase 3 embed from the same payload when avatar retrieval, rendering, file creation,
   or image delivery fails.
 - Focused tests, repository validators, pre-commit, full pytest, and complete/sparse/Unicode visual
-  samples passed; operator Discord smoke remains the final checkpoint.
+  samples passed. Operator Discord smoke on 2026-07-11 exercised every linked-governor option,
+  confirmed the author-gated dropdown, and accepted the materially larger, easier-to-read
+  standalone card.
 
 Approval gate:
 
@@ -835,3 +837,4 @@ Use:
 | 2026-07-10 | Initial Phase 3 implementation validated | Added the private governor-first selector and fallback shell, recorded registry trust approval and required future inspect direction, and passed focused plus full repository validation before operator smoke corrections. |
 | 2026-07-10 | Phase 3 operator smoke completed | Confirmed no-governor, single-governor, multiple-governor, Change Governor, and corrected dashboard-data journeys; Phase 4 became the next slice. |
 | 2026-07-10 | Phase 4 scope pack prepared and remaining roadmap reconciled | Archived the completed Phase 3 execution pack/starter, created the Phase 4 task pack/starter, made Phase 7 history and Phase 8 inspect ordering authoritative, and added explicit approval gates for Phases 4-10. |
+| 2026-07-11 | Phase 4 operator smoke completed | Accepted the wider standalone premium card as materially larger and easier to read, exercised every linked-governor option, and confirmed the author-gated Change Governor dropdown. Future `/me` page presentation alignment remains a separately phase-gated consistency item. |

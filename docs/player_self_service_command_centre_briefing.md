@@ -1,16 +1,15 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
-GovernorOS v2 status: Phase 3 Governor Selector and Dashboard Shell is complete and operator smoke
-passed on 2026-07-10. `/me dashboard` is now governor-first: no linked governor shows setup
+GovernorOS v2 status: Phase 4 Premium Governor Dashboard Renderer is complete and operator smoke
+passed on 2026-07-11. `/me dashboard` is governor-first: no linked governor shows setup
 guidance, one opens directly, and multiple use a private author-gated selector before dashboard
 data is fetched. Every selected governor is checked again against the active registry. The
 operator approved that registry authority based on Discord onboarding audit, monthly in-game
 reconciliation, and owner-approved transfer controls. Mirror PR #217 and production PR #524 carry
-the completed Phase 3 implementation and recorded smoke evidence. The Phase 4 premium PNG
-renderer is implemented and locally validated; operator Discord smoke is the remaining delivery
-checkpoint.
+the completed Phase 3 implementation and recorded smoke evidence. Mirror PR #218 carries the
+Phase 4 premium PNG renderer and final smoke evidence.
 Admin/leadership inspect is confirmed as required Phase 8 work and remains a separate
 permission-gated slice using the Phase 2 inspect-safe contract.
 
@@ -55,8 +54,9 @@ available. The operator-approved private embed remains the fallback when avatar 
 rendering, file creation, or image delivery fails. The successful card is delivered as a
 standalone attachment for the wider KVK-style Discord presentation. Multiple-governor cards use a
 Change Governor dropdown below the blue primary navigation row. `Last Login: TBC` is presentation
-only until its separately approved dataset/SQL contract is delivered. Existing generated cards for the older setup pages remain
-unchanged until their approved phase work. Quick Launch links for `/kvk stats`, `/kvk targets`,
+only until its separately approved dataset/SQL contract is delivered. Existing generated cards for
+the older setup pages remain unchanged until their approved phase work. Quick Launch links for
+`/kvk stats`, `/kvk targets`,
 `/kvk history`, and `/kvk rankings` remain absent because those commands have channel and
 public-output rules that should stay exactly where players already use them. The dashboard keeps
 only safe private handoffs for the currently delivered Inventory and Exports pages.
@@ -442,9 +442,12 @@ Current status:
   Phase 4-6 renderer upgrades; SQL plan/IO measurement is captured before any new read model.
 - Final operator smoke passed the no-governor, single-governor, multiple-governor, Change Governor,
   and corrected dashboard-data journeys on 2026-07-10.
-- The Phase 4 premium PNG governor dashboard renderer is implemented with the approved `me.png`
+- GovernorOS v2 Phase 4 is complete. The premium PNG governor dashboard uses the approved `me.png`
   background, optional invoking-player Discord avatar, fixed renderer/payload boundary, fallback,
-  attachment lifecycle, and no-SQL/no-new-action scope. Operator Discord smoke remains pending.
+  attachment lifecycle, and no-SQL/no-new-action scope. Operator smoke on 2026-07-11 exercised all
+  governor options, confirmed the gated Change Governor dropdown, and accepted the materially
+  larger, easier-to-read standalone image. Matching presentation changes for the other `/me` pages
+  remain separately phase-gated follow-up work.
 - Phase 5 adds direct selected-governor Resources, Materials, and Speedups only after report
   visibility semantics and command-count impact are approved.
 - Phase 6 adds Export Stats only after selected-governor versus all-linked semantics are approved;

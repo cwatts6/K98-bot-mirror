@@ -3,6 +3,13 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### GovernorOS v2 Phase 4 Attachment Lifecycle Completed Item
+- Area: `ui/views/player_self_service_views.py`, `ui/views/player_self_service_governor_dashboard_views.py`, Phase 4-6 dashboard/page renderer migration
+- Type: consistency
+- Description: Phase 3 smoke showed that moving between generated `/me` page cards and the fallback governor embed could leave the previous card attachment visible above the new embed. Phase 4 therefore required one replacement/clearing and stream-cleanup contract across selector, card, page, fallback, denial, setup, timeout, cancellation, and stale-render paths.
+- Resolution: Phase 4 delivers the governor card as a standalone primary attachment, clears or replaces superseded attachments across selector/card/page/embed transitions, closes and resets file streams across success and failure paths, and preserves the active card while paging the author-gated Change Governor dropdown. The existing private embed remains the no-refetch fallback.
+- Validation: Automated validation passed with 113 focused tests and the full suite (`2453 passed, 2 skipped`), plus architecture, deferred-item, test-selection, smoke-import, command-registration, pre-commit, security-focused review, and GitHub checks. Operator smoke on 2026-07-11 exercised every governor option, confirmed the gated dropdown, and accepted the standalone image as materially larger and easier to read without mixed attachments.
+
 ### GovernorOS v2 Phase 3 Governor-First Dashboard Completed Item
 - Area: `commands/me_cmds.py`, `ui/views/player_self_service_governor_dashboard_views.py`, `player_self_service/governor_dashboard_*`, Phase 3 docs/tests
 - Type: architecture
