@@ -756,6 +756,12 @@ async def _edit_report_response(
         return True
     except asyncio.CancelledError:
         raise
+    except TimeoutError:
+        logger.info(
+            "player_inventory_report_image_edit_timed_out user_id=%s",
+            view.author_id,
+        )
+        return False
     except Exception:
         logger.debug("player_inventory_report_image_edit_failed", exc_info=True)
         if can_edit is not None and not can_edit():
@@ -779,6 +785,12 @@ async def _edit_report_response(
             return True
         except asyncio.CancelledError:
             raise
+        except TimeoutError:
+            logger.info(
+                "player_inventory_report_fallback_edit_timed_out user_id=%s",
+                view.author_id,
+            )
+            return False
         except Exception:
             logger.debug("player_inventory_report_fallback_edit_failed", exc_info=True)
             if can_edit is not None and not can_edit():

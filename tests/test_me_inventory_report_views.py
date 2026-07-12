@@ -513,6 +513,75 @@ async def test_image_delivery_failure_retries_same_payload_fallback_and_closes_s
 
 
 @pytest.mark.asyncio
+async def test_image_delivery_timeout_is_terminal_and_closes_stream() -> None:
+    option = _option(111, default=True)
+    interaction = _Interaction(component=True)
+    view = views.PlayerInventoryReportView(
+        author_id=42,
+        display_name="Tester",
+        resolution=_selected(option),
+        report_view=InventoryReportView.RESOURCES,
+    )
+    edits = []
+    report_file = discord.File(BytesIO(b"png"), filename="report.png")
+
+    async def timed_out_edit(**kwargs):
+        edits.append(kwargs)
+        raise TimeoutError
+
+    interaction.edit_original_response = timed_out_edit
+
+    rendered = await views._edit_report_response(
+        interaction,
+        content=None,
+        embed=None,
+        fallback_embed=discord.Embed(title="Fallback"),
+        view=view,
+        files=[report_file],
+        timeout_remaining=lambda: 1.0,
+    )
+
+    assert rendered is False
+    assert len(edits) == 1
+    assert interaction.followup.sent == []
+    assert report_file.fp.closed is True
+
+
+@pytest.mark.asyncio
+async def test_fallback_delivery_timeout_does_not_attempt_followup() -> None:
+    option = _option(111, default=True)
+    interaction = _Interaction(component=True)
+    view = views.PlayerInventoryReportView(
+        author_id=42,
+        display_name="Tester",
+        resolution=_selected(option),
+        report_view=InventoryReportView.RESOURCES,
+    )
+    edits = []
+
+    async def failing_edits(**kwargs):
+        edits.append(kwargs)
+        if len(edits) == 1:
+            raise RuntimeError("attachment rejected")
+        raise TimeoutError
+
+    interaction.edit_original_response = failing_edits
+
+    rendered = await views._edit_report_response(
+        interaction,
+        content=None,
+        embed=None,
+        fallback_embed=discord.Embed(title="Fallback"),
+        view=view,
+        timeout_remaining=lambda: 1.0,
+    )
+
+    assert rendered is False
+    assert len(edits) == 2
+    assert interaction.followup.sent == []
+
+
+@pytest.mark.asyncio
 async def test_selected_paging_preserves_attachment_and_keeps_change_governor_last() -> None:
     options = tuple(_option(100 + index, default=index == 0) for index in range(26))
     resolution = _selected(options[25], options=options)
