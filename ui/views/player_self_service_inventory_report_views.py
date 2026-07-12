@@ -405,8 +405,8 @@ class PlayerInventoryReportView(discord.ui.View):
 
         for label, report_view in (
             ("Resources", InventoryReportView.RESOURCES),
-            ("Materials", InventoryReportView.MATERIALS),
             ("Speedups", InventoryReportView.SPEEDUPS),
+            ("Materials", InventoryReportView.MATERIALS),
         ):
             self.add_item(
                 _ActionButton(
@@ -766,6 +766,39 @@ async def _edit_report_response(
         logger.debug("player_inventory_report_image_edit_failed", exc_info=True)
         if can_edit is not None and not can_edit():
             return False
+        component_message = getattr(target, "message", None)
+        if component_message is not None and callable(getattr(component_message, "edit", None)):
+            try:
+                call = component_message.edit(
+                    content=None,
+                    embed=fallback_embed,
+                    view=view,
+                    attachments=[],
+                )
+                edited = (
+                    await asyncio.wait_for(call, timeout_remaining())
+                    if timeout_remaining
+                    else await call
+                )
+                if can_edit is not None and not can_edit():
+                    return False
+                view.set_message_ref(edited)
+                view.set_timeout_target(target)
+                return True
+            except asyncio.CancelledError:
+                raise
+            except TimeoutError:
+                logger.info(
+                    "player_inventory_report_component_fallback_timed_out user_id=%s",
+                    view.author_id,
+                )
+                return False
+            except Exception:
+                logger.debug(
+                    "player_inventory_report_component_fallback_edit_failed",
+                    exc_info=True,
+                )
+                return False
         try:
             call = target.edit_original_response(
                 content=None,

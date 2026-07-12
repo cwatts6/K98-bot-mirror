@@ -622,7 +622,7 @@ async def test_change_governor_is_multi_only_dropdown_below_blue_navigation() ->
         for child in multi_view.children
         if isinstance(child, discord.ui.Button) and child.row == 2
     ]
-    assert [button.label for button in report_buttons] == ["RSS", "Materials", "Speedups"]
+    assert [button.label for button in report_buttons] == ["RSS", "Speedups", "Materials"]
     assert all(button.style is discord.ButtonStyle.success for button in report_buttons)
     assert "me:dashboard:navigate:inventory" not in _custom_ids(multi_view)
     interaction = _Interaction()

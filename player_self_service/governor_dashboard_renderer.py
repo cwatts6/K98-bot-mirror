@@ -68,13 +68,13 @@ def _number(value: int | float | None) -> str:
 
 def _days(value: float | None) -> str:
     if value is None:
-        return "NO DATA"
+        return "Not recorded"
     return f"{int(round(value)):,}d"
 
 
 def _legendary(value: float | None) -> str:
     if value is None:
-        return "NO DATA"
+        return "Not recorded"
     return f"{value:,.0f}"
 
 
@@ -146,11 +146,25 @@ def _avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> None:
 
 
 def _metric(
-    draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], label: str, value: str
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    label: str,
+    value: str,
+    *,
+    subtle: bool = False,
 ) -> None:
     _panel(draw, box, radius=13)
     x0, y0, x1, _ = box
-    _text(draw, (x0 + 14, y0 + 12), value, size=35, min_size=24, width=x1 - x0 - 28, bold=True)
+    _text(
+        draw,
+        (x0 + 14, y0 + (20 if subtle else 12)),
+        value,
+        size=20 if subtle else 35,
+        min_size=16 if subtle else 24,
+        width=x1 - x0 - 28,
+        fill=_MUTED if subtle else _TEXT,
+        bold=not subtle,
+    )
     _text(draw, (x0 + 14, y0 + 53), label, size=17, min_size=14, width=x1 - x0 - 28, fill=_MUTED)
 
 
@@ -236,15 +250,24 @@ def render_governor_dashboard(
             (
                 _compact(inventory.total_resources)
                 if inventory.total_resources is not None
-                else "NO DATA"
+                else "Not recorded"
             ),
+            inventory.total_resources is None,
         ),
-        ("SPEEDUPS", _days(inventory.total_speedup_days)),
-        ("MATERIALS", _legendary(inventory.total_legendary_materials)),
+        (
+            "SPEEDUPS",
+            _days(inventory.total_speedup_days),
+            inventory.total_speedup_days is None,
+        ),
+        (
+            "MATERIALS",
+            _legendary(inventory.total_legendary_materials),
+            inventory.total_legendary_materials is None,
+        ),
     )
-    for index, (label, value) in enumerate(inventory_values):
+    for index, (label, value, subtle) in enumerate(inventory_values):
         x0 = 315 + index * 195
-        _metric(draw, (x0, 388, x0 + 180, 484), label, value)
+        _metric(draw, (x0, 388, x0 + 180, 484), label, value, subtle=subtle)
 
     honour_values = (
         ("ARK JOINED", _number(honours.ark_joined)),

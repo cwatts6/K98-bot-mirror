@@ -152,6 +152,29 @@ def test_identity_and_battle_panel_edges_align(monkeypatch) -> None:
     assert (705, 388, 885, 484) in panels
 
 
+def test_missing_inventory_uses_subtle_not_recorded_treatment(monkeypatch) -> None:
+    drawn: list[tuple[str, dict]] = []
+    original = renderer.visual_text.draw_text
+
+    def recording_draw(draw, xy, text, **kwargs):
+        drawn.append((text, kwargs))
+        return original(draw, xy, text, **kwargs)
+
+    monkeypatch.setattr(renderer.visual_text, "draw_text", recording_draw)
+    payload = replace(
+        _payload(),
+        inventory=GovernorDashboardInventoryHighlights(),
+    )
+
+    renderer.render_governor_dashboard(payload)
+
+    missing = [kwargs for text, kwargs in drawn if text == "Not recorded"]
+    assert len(missing) == 3
+    assert all(kwargs["fill"] == renderer._MUTED for kwargs in missing)
+    assert all(kwargs["bold"] is False for kwargs in missing)
+    assert all(text != "NO DATA" for text, _kwargs in drawn)
+
+
 def test_renderer_handles_sparse_zero_negative_huge_and_unicode_values() -> None:
     payload = _payload(
         name="ãƒ… 义Vìper🦊‍🔥 with a deliberately very long governor name",

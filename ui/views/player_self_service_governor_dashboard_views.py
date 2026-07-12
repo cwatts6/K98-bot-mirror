@@ -599,8 +599,8 @@ class GovernorDashboardView(discord.ui.View):
 
         for label, report_view in (
             ("RSS", InventoryReportView.RESOURCES),
-            ("Materials", InventoryReportView.MATERIALS),
             ("Speedups", InventoryReportView.SPEEDUPS),
+            ("Materials", InventoryReportView.MATERIALS),
         ):
             self.add_item(
                 _DashboardButton(

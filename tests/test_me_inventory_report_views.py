@@ -272,8 +272,8 @@ async def test_selected_report_is_private_standalone_and_has_approved_rows(monke
     report_view = edit["view"]
     assert [(child.label, child.row) for child in report_view.children] == [
         ("Resources", 0),
-        ("Materials", 0),
         ("Speedups", 0),
+        ("Materials", 0),
         ("1M", 1),
         ("3M", 1),
         ("6M", 1),
@@ -319,6 +319,55 @@ async def test_no_data_uses_same_payload_upload_guidance_without_render(monkeypa
     assert "Upload Inventory" == edit["embed"].fields[0].name
     assert "/inventory import" in edit["embed"].fields[0].value
     assert "files" not in edit
+
+
+@pytest.mark.asyncio
+async def test_component_no_data_replaces_dashboard_instead_of_sending_followup(
+    monkeypatch,
+) -> None:
+    option = _option(111, default=True)
+    interaction = _Interaction(component=True)
+
+    class EditableMessage:
+        def __init__(self) -> None:
+            self.edits = []
+
+        async def edit(self, **kwargs):
+            self.edits.append(kwargs)
+            return self
+
+    message = EditableMessage()
+    interaction.message = message
+
+    async def failed_original_edit(**_kwargs):
+        raise RuntimeError("component original response unavailable")
+
+    async def resolver(*_args, **_kwargs):
+        return _selected(option)
+
+    async def payload_loader(**_kwargs):
+        return _payload(with_data=False)
+
+    interaction.edit_original_response = failed_original_edit
+    monkeypatch.setattr(
+        views,
+        "render_inventory_reports",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("no-data must not render")),
+    )
+
+    await views.show_player_inventory_report_for_interaction(
+        interaction,
+        author_id=42,
+        display_name="Tester",
+        report_view=InventoryReportView.RESOURCES,
+        context_resolver=resolver,
+        payload_loader=payload_loader,
+    )
+
+    assert len(message.edits) == 1
+    assert message.edits[0]["attachments"] == []
+    assert message.edits[0]["embed"].fields[0].name == "Upload Inventory"
+    assert interaction.followup.sent == []
 
 
 @pytest.mark.asyncio
