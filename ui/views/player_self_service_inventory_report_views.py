@@ -219,6 +219,55 @@ async def _render_files(payload: InventoryReportPayload) -> list[discord.File]:
         raise
 
 
+async def _replace_attached_component_message(
+    target: Any,
+    *,
+    content: str | None,
+    embed: discord.Embed | None,
+    view: PlayerInventoryReportView,
+    can_edit: Callable[[], bool] | None,
+    timeout_remaining: Callable[[], float] | None,
+) -> bool:
+    component_message = getattr(target, "message", None)
+    try:
+        delete_call = component_message.delete()
+        if timeout_remaining:
+            await asyncio.wait_for(delete_call, timeout_remaining())
+        else:
+            await delete_call
+        if can_edit is not None and not can_edit():
+            return False
+        send_call = target.followup.send(
+            content=content,
+            embed=embed,
+            view=view,
+            ephemeral=True,
+        )
+        sent = (
+            await asyncio.wait_for(send_call, timeout_remaining())
+            if timeout_remaining
+            else await send_call
+        )
+        if can_edit is not None and not can_edit():
+            return False
+        view.set_message_ref(sent)
+        return True
+    except asyncio.CancelledError:
+        raise
+    except TimeoutError:
+        logger.info(
+            "player_inventory_report_component_replace_timed_out user_id=%s",
+            view.author_id,
+        )
+        return False
+    except Exception:
+        logger.debug(
+            "player_inventory_report_component_replace_failed",
+            exc_info=True,
+        )
+        return False
+
+
 class _ActionButton(discord.ui.Button):
     def __init__(
         self,
@@ -736,6 +785,21 @@ async def _edit_report_response(
     if can_edit is not None and not can_edit():
         _close_files(files)
         return False
+    component_message = getattr(target, "message", None)
+    if (
+        not files
+        and component_message is not None
+        and getattr(component_message, "attachments", ())
+        and callable(getattr(component_message, "delete", None))
+    ):
+        return await _replace_attached_component_message(
+            target,
+            content=content,
+            embed=embed or fallback_embed,
+            view=view,
+            can_edit=can_edit,
+            timeout_remaining=timeout_remaining,
+        )
     try:
         kwargs: dict[str, Any] = {
             "content": content,

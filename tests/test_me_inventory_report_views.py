@@ -371,6 +371,56 @@ async def test_component_no_data_replaces_dashboard_instead_of_sending_followup(
 
 
 @pytest.mark.asyncio
+async def test_component_no_data_deletes_attached_dashboard_before_private_replacement(
+    monkeypatch,
+) -> None:
+    option = _option(111, default=True)
+    interaction = _Interaction(component=True)
+
+    class AttachedMessage:
+        def __init__(self) -> None:
+            self.attachments = [SimpleNamespace(id=999)]
+            self.deleted = False
+
+        async def delete(self):
+            self.deleted = True
+
+    message = AttachedMessage()
+    interaction.message = message
+
+    async def unexpected_original_edit(**_kwargs):
+        raise AssertionError("attached dashboard must be deleted before replacement")
+
+    async def resolver(*_args, **_kwargs):
+        return _selected(option)
+
+    async def payload_loader(**_kwargs):
+        return _payload(with_data=False)
+
+    interaction.edit_original_response = unexpected_original_edit
+    monkeypatch.setattr(
+        views,
+        "render_inventory_reports",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("no-data must not render")),
+    )
+
+    await views.show_player_inventory_report_for_interaction(
+        interaction,
+        author_id=42,
+        display_name="Tester",
+        report_view=InventoryReportView.RESOURCES,
+        context_resolver=resolver,
+        payload_loader=payload_loader,
+    )
+
+    assert message.deleted is True
+    assert len(interaction.followup.sent) == 1
+    followup = interaction.followup.sent[0]
+    assert followup[1]["ephemeral"] is True
+    assert followup[1]["embed"].fields[0].name == "Upload Inventory"
+
+
+@pytest.mark.asyncio
 async def test_range_change_rechecks_access_before_payload_and_preserves_type(monkeypatch) -> None:
     option = _option(111, default=True)
     initial = _selected(option)
