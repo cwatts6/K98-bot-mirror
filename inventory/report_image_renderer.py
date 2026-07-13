@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
+from PIL import Image, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
 
 from core import visual_text
 from inventory.capacity_calculations import (
@@ -25,6 +25,7 @@ from inventory.models import (
 ROOT = Path(__file__).resolve().parents[1]
 ASSET_DIR = ROOT / "assets"
 CARD_ASSET_DIR = ASSET_DIR / "Inventory" / "cards"
+ICON_ASSET_DIR = ASSET_DIR / "Inventory" / "icons"
 
 WIDTH = 1400
 HEIGHT = 980
@@ -134,20 +135,25 @@ def _paste_icon(canvas: Image.Image, path: Path, box: tuple[int, int, int, int])
     try:
         with Image.open(path) as source:
             icon = source.convert("RGBA")
+        icon.thumbnail((box[2] - box[0], box[3] - box[1]), Image.Resampling.LANCZOS)
         corners = (
             icon.getpixel((0, 0)),
             icon.getpixel((max(icon.width - 1, 0), 0)),
             icon.getpixel((0, max(icon.height - 1, 0))),
             icon.getpixel((max(icon.width - 1, 0), max(icon.height - 1, 0))),
         )
-        if sum(all(channel >= 245 for channel in pixel[:3]) for pixel in corners) >= 3:
+
+        def is_light_neutral(pixel: tuple[int, ...]) -> bool:
+            rgb = pixel[:3]
+            return min(rgb) >= 235 and max(rgb) - min(rgb) <= 8
+
+        if sum(is_light_neutral(pixel) for pixel in corners) >= 3:
             pixels = icon.load()
             for y in range(icon.height):
                 for x in range(icon.width):
                     pixel = pixels[x, y]
-                    if all(channel >= 245 for channel in pixel[:3]):
+                    if is_light_neutral(pixel):
                         pixels[x, y] = (*pixel[:3], 0)
-        icon.thumbnail((box[2] - box[0], box[3] - box[1]), Image.Resampling.LANCZOS)
         x = box[0] + ((box[2] - box[0]) - icon.width) // 2
         y = box[1] + ((box[3] - box[1]) - icon.height) // 2
         canvas.alpha_composite(icon, (x, y))
@@ -166,14 +172,31 @@ def _draw_header(
     range_key: str,
     avatar_bytes: bytes | None,
 ) -> None:
-    _paste_icon(canvas, logo, (44, 32, 116, 104))
-    _draw_text(draw, (132, 38), title, fill=TEXT, font=_font(36, bold=True), bold=True)
+    avatar_drawn = False
+    if avatar_bytes:
+        try:
+            with Image.open(BytesIO(avatar_bytes)) as source:
+                avatar = ImageOps.fit(
+                    ImageOps.exif_transpose(source).convert("RGBA"),
+                    (72, 72),
+                    method=Image.Resampling.LANCZOS,
+                )
+            mask = Image.new("L", avatar.size, 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, 71, 71), fill=255)
+            canvas.paste(avatar, (44, 32), mask)
+            draw.ellipse((42, 30, 118, 106), outline=PANEL_OUTLINE, width=2)
+            avatar_drawn = True
+        except Exception:
+            pass
+    if not avatar_drawn:
+        _paste_icon(canvas, logo, (44, 32, 116, 104))
+    _draw_text(draw, (132, 36), title, fill=TEXT, font=_font(38, bold=True), bold=True)
     context = f"{governor_name} ({governor_id})  |  Range {range_key}"
     context_font = _fit_font(
         draw,
         context,
-        max_width=1100 if avatar_bytes else 1210,
-        size=20,
+        max_width=1210,
+        size=21,
         min_size=14,
     )
     _draw_text(
@@ -183,12 +206,6 @@ def _draw_header(
         fill=MUTED,
         font=context_font,
     )
-    if avatar_bytes:
-        try:
-            avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA").resize((76, 76))
-            canvas.alpha_composite(avatar, (1280, 34))
-        except Exception:
-            pass
 
 
 def _panel(
@@ -300,15 +317,15 @@ def _draw_kpi(
     content_x = x1 + 34 if accent else x1 + 20
     content_w = x2 - content_x - 18
     if icon:
-        _paste_icon(canvas, icon, (content_x, y1 + 16, content_x + 42, y1 + 58))
-        title_x = content_x + 52
+        _paste_icon(canvas, icon, (content_x, y1 + 14, content_x + 48, y1 + 62))
+        title_x = content_x + 58
         title_w = x2 - title_x - 18
     else:
         title_x = content_x
         title_w = content_w
-    title_font = _fit_font(draw, title, max_width=title_w, size=18, min_size=13, bold=True)
-    value_font = _fit_font(draw, value, max_width=content_w, size=34, min_size=24, bold=True)
-    delta_font = _fit_font(draw, delta, max_width=content_w, size=20, min_size=11, bold=True)
+    title_font = _fit_font(draw, title, max_width=title_w, size=19, min_size=13, bold=True)
+    value_font = _fit_font(draw, value, max_width=content_w, size=36, min_size=24, bold=True)
+    delta_font = _fit_font(draw, delta, max_width=content_w, size=21, min_size=11, bold=True)
     _draw_text(draw, (title_x, y1 + 20), title, fill=MUTED, font=title_font, bold=True)
     value_xy = (content_x, y1 + 68)
     _draw_text(draw, value_xy, value, fill=TEXT, font=value_font, bold=True)
@@ -350,15 +367,15 @@ def _draw_empty_kpi(
     x1, y1, x2, y2 = xy
     content_x = x1 + 34 if accent else x1 + 20
     if icon:
-        _paste_icon(canvas, icon, (content_x, y1 + 16, content_x + 42, y1 + 58))
-        title_x = content_x + 52
+        _paste_icon(canvas, icon, (content_x, y1 + 14, content_x + 48, y1 + 62))
+        title_x = content_x + 58
     else:
         title_x = content_x
     title_font = _fit_font(
         draw,
         title,
         max_width=x2 - title_x - 18,
-        size=18,
+        size=19,
         min_size=13,
         bold=True,
     )
@@ -400,8 +417,8 @@ def _render_empty_report(
         range_key=payload.range_key.value,
         avatar_bytes=avatar_bytes,
     )
-    for xy, kpi_title, _icon in kpis:
-        _draw_empty_kpi(canvas, draw, xy, title=kpi_title, icon=None, accent=accent)
+    for xy, kpi_title, icon in kpis:
+        _draw_empty_kpi(canvas, draw, xy, title=kpi_title, icon=icon, accent=accent)
 
     _panel(draw, chart_xy, fill=PANEL_2)
     x1, y1, x2, y2 = chart_xy
@@ -523,7 +540,7 @@ def _line_chart(
         y = plot[3] - ((tick - min_v) / span) * (plot[3] - plot[1])
         draw.line((plot[0], y, plot[2], y), fill=GRID, width=1)
         label = _axis_label(tick, suffix=y_suffix)
-        _draw_text(draw, (x1 + 20, y - 9), label, fill=AXIS, font=_font(15))
+        _draw_text(draw, (x1 + 20, y - 9), label, fill=AXIS, font=_font(16))
     draw.line((plot[0], plot[1], plot[0], plot[3]), fill=AXIS, width=2)
     draw.line((plot[0], plot[3], plot[2], plot[3]), fill=AXIS, width=2)
 
@@ -536,7 +553,7 @@ def _line_chart(
             (x - 24, plot[3] + 12),
             _date_axis_label(labels[idx]),
             fill=AXIS,
-            font=_font(15),
+            font=_font(16),
         )
 
     series_with_colors = list(zip(series.items(), colors, strict=False))
@@ -567,7 +584,7 @@ def _line_chart(
     legend_x = plot[0]
     for name, color in zip(series.keys(), colors, strict=False):
         draw.rounded_rectangle((legend_x, y2 - 42, legend_x + 22, y2 - 22), radius=4, fill=color)
-        _draw_text(draw, (legend_x + 30, y2 - 46), name, fill=TEXT, font=_font(17))
+        _draw_text(draw, (legend_x + 30, y2 - 46), name, fill=TEXT, font=_font(18))
         legend_x += 180
 
 
@@ -601,11 +618,11 @@ def render_resources_report(
             )
             for idx, (title, icon) in enumerate(
                 [
-                    ("Food", ASSET_DIR / "RSS" / "food.png"),
-                    ("Wood", ASSET_DIR / "RSS" / "wood.png"),
-                    ("Stone", ASSET_DIR / "RSS" / "stone.png"),
-                    ("Gold", ASSET_DIR / "RSS" / "gold.png"),
-                    ("Total RSS", ASSET_DIR / "RSS" / "total.png"),
+                    ("Food", ICON_ASSET_DIR / "RSS" / "food.png"),
+                    ("Wood", ICON_ASSET_DIR / "RSS" / "wood.png"),
+                    ("Stone", ICON_ASSET_DIR / "RSS" / "stone.png"),
+                    ("Gold", ICON_ASSET_DIR / "RSS" / "gold.png"),
+                    ("Total RSS", ICON_ASSET_DIR / "RSS" / "total.png"),
                 ]
             )
         ]
@@ -618,8 +635,14 @@ def render_resources_report(
             for idx, (title, icon) in enumerate(
                 [
                     ("RSS Velocity", None),
-                    ("RSS Troop Training Capacity", ASSET_DIR / "Training" / "Training.png"),
-                    ("RSS Troop Healing Capacity", ASSET_DIR / "healing" / "healing.png"),
+                    (
+                        "RSS Troop Training Capacity",
+                        ICON_ASSET_DIR / "Speedups" / "Training.png",
+                    ),
+                    (
+                        "RSS Troop Healing Capacity",
+                        ICON_ASSET_DIR / "Speedups" / "healing.png",
+                    ),
                     ("RSS Forecast", None),
                 ]
             )
@@ -649,14 +672,14 @@ def render_resources_report(
     )
     latest = payload.resources[-1]
     attrs = [
-        ("Food", "food", ASSET_DIR / "RSS" / "food.png"),
-        ("Wood", "wood", ASSET_DIR / "RSS" / "wood.png"),
-        ("Stone", "stone", ASSET_DIR / "RSS" / "stone.png"),
-        ("Gold", "gold", ASSET_DIR / "RSS" / "gold.png"),
-        ("Total RSS", "total", ASSET_DIR / "RSS" / "total.png"),
+        ("Food", "food", ICON_ASSET_DIR / "RSS" / "food.png"),
+        ("Wood", "wood", ICON_ASSET_DIR / "RSS" / "wood.png"),
+        ("Stone", "stone", ICON_ASSET_DIR / "RSS" / "stone.png"),
+        ("Gold", "gold", ICON_ASSET_DIR / "RSS" / "gold.png"),
+        ("Total RSS", "total", ICON_ASSET_DIR / "RSS" / "total.png"),
     ]
     box_w = 250
-    for idx, (title, attr, _icon) in enumerate(attrs):
+    for idx, (title, attr, icon) in enumerate(attrs):
         value, delta = _latest_delta(payload.resources, attr)
         delta_label, color = _delta_text(delta)
         _draw_kpi(
@@ -667,6 +690,7 @@ def render_resources_report(
             value=_compact(value),
             delta=delta_label,
             delta_color=color,
+            icon=icon,
             accent=RESOURCE_ACCENT,
         )
 
@@ -696,7 +720,7 @@ def render_resources_report(
                 f"{train_capacity.power_millions:,.1f}m Power | "
                 f"{train_capacity.mge_points_millions:,.1f}m MGE"
             ),
-            ASSET_DIR / "Training" / "Training.png",
+            ICON_ASSET_DIR / "Speedups" / "Training.png",
             TEXT,
         ),
         (
@@ -708,12 +732,12 @@ def render_resources_report(
                 f"{heal_capacity.kill_points_millions or 0:,.1f}m KP | "
                 f"{heal_capacity.vip_note}"
             ),
-            ASSET_DIR / "healing" / "healing.png",
+            ICON_ASSET_DIR / "Speedups" / "healing.png",
             TEXT,
         ),
         ("RSS Forecast", _compact(forecast), "30 days", None, TEXT),
     ]
-    for idx, (title, value, delta, _icon, color) in enumerate(insight_boxes):
+    for idx, (title, value, delta, icon, color) in enumerate(insight_boxes):
         _draw_kpi(
             canvas,
             draw,
@@ -722,6 +746,7 @@ def render_resources_report(
             value=value,
             delta=delta,
             delta_color=color,
+            icon=icon,
             accent=RESOURCE_ACCENT,
         )
 
@@ -768,18 +793,30 @@ def render_speedups_report(
             logo=ASSET_DIR / "speedup_logo.png",
             filename=f"inventory_speedups_{payload.governor_id}_{payload.range_key.value}.png",
             kpis=[
-                ((60, 148, 440, 300), "Universal", ASSET_DIR / "Universal" / "Universal.png"),
-                ((490, 148, 870, 300), "Training", ASSET_DIR / "Training" / "Training.png"),
-                ((920, 148, 1300, 300), "Healing", ASSET_DIR / "healing" / "healing.png"),
+                (
+                    (60, 148, 440, 300),
+                    "Universal",
+                    ICON_ASSET_DIR / "Speedups" / "Universal.png",
+                ),
+                (
+                    (490, 148, 870, 300),
+                    "Training",
+                    ICON_ASSET_DIR / "Speedups" / "Training.png",
+                ),
+                (
+                    (920, 148, 1300, 300),
+                    "Healing",
+                    ICON_ASSET_DIR / "Speedups" / "healing.png",
+                ),
                 (
                     (140, 338, 650, 498),
                     "Total Speedup Training Capacity",
-                    ASSET_DIR / "Training" / "Training.png",
+                    ICON_ASSET_DIR / "Speedups" / "Training.png",
                 ),
                 (
                     (750, 338, 1260, 498),
                     "Total Healing Speedup Capacity",
-                    ASSET_DIR / "healing" / "healing.png",
+                    ICON_ASSET_DIR / "Speedups" / "healing.png",
                 ),
             ],
             chart_xy=(44, 540, 1356, 924),
@@ -798,11 +835,15 @@ def render_speedups_report(
         avatar_bytes=avatar_bytes,
     )
     attrs = [
-        ("Universal", "universal_days", ASSET_DIR / "Universal" / "Universal.png"),
-        ("Training", "training_days", ASSET_DIR / "Training" / "Training.png"),
-        ("Healing", "healing_days", ASSET_DIR / "healing" / "healing.png"),
+        (
+            "Universal",
+            "universal_days",
+            ICON_ASSET_DIR / "Speedups" / "Universal.png",
+        ),
+        ("Training", "training_days", ICON_ASSET_DIR / "Speedups" / "Training.png"),
+        ("Healing", "healing_days", ICON_ASSET_DIR / "Speedups" / "healing.png"),
     ]
-    for idx, (title, attr, _icon) in enumerate(attrs):
+    for idx, (title, attr, icon) in enumerate(attrs):
         value, delta = _latest_delta(payload.speedups, attr)
         delta_label, color = _delta_text(delta, days=True)
         _draw_kpi(
@@ -813,6 +854,7 @@ def render_speedups_report(
             value=f"{int(round(value)):,}d",
             delta=delta_label,
             delta_color=color,
+            icon=icon,
             accent=SPEEDUP_ACCENT,
         )
 
@@ -830,7 +872,7 @@ def render_speedups_report(
                 f"{train_capacity.mge_points_millions or 0:,.1f}m MGE | "
                 f"{train_capacity.vip_note}"
             ),
-            ASSET_DIR / "Training" / "Training.png",
+            ICON_ASSET_DIR / "Speedups" / "Training.png",
         ),
         (
             "Total Healing Speedup Capacity",
@@ -841,10 +883,10 @@ def render_speedups_report(
                 f"{heal_capacity.kill_points_millions or 0:,.1f}m KP | "
                 f"{heal_capacity.vip_note}"
             ),
-            ASSET_DIR / "healing" / "healing.png",
+            ICON_ASSET_DIR / "Speedups" / "healing.png",
         ),
     ]
-    for idx, (title, value, detail, _icon) in enumerate(capacity_boxes):
+    for idx, (title, value, detail, icon) in enumerate(capacity_boxes):
         _draw_kpi(
             canvas,
             draw,
@@ -853,6 +895,7 @@ def render_speedups_report(
             value=value,
             delta=detail,
             delta_color=TEXT,
+            icon=icon,
             accent=SPEEDUP_ACCENT,
         )
 
@@ -901,9 +944,20 @@ def render_materials_report(
                 (
                     (44 + idx * (box_w + 16), 144, 44 + idx * (box_w + 16) + box_w, 286),
                     title,
-                    None,
+                    icon,
                 )
-                for idx, title in enumerate(["Bone", "Leather", "Ebony", "Iron", "Choice Chests"])
+                for idx, (title, icon) in enumerate(
+                    [
+                        ("Bone", ICON_ASSET_DIR / "Materials" / "bone.png"),
+                        ("Leather", ICON_ASSET_DIR / "Materials" / "leather.png"),
+                        ("Ebony", ICON_ASSET_DIR / "Materials" / "ebony.png"),
+                        ("Iron", ICON_ASSET_DIR / "Materials" / "iron.png"),
+                        (
+                            "Choice Chests",
+                            ICON_ASSET_DIR / "Materials" / "choicechest.png",
+                        ),
+                    ]
+                )
             ]
             + [
                 ((72, 326, 650, 474), "Total Legendary Materials", None),
@@ -926,14 +980,30 @@ def render_materials_report(
     )
     latest = payload.materials[-1]
     kpis = [
-        ("Bone", latest.animal_bone_legendary),
-        ("Leather", latest.leather_legendary),
-        ("Ebony", latest.ebony_legendary),
-        ("Iron", latest.iron_ore_legendary),
-        ("Choice Chests", latest.choice_chest_legendary),
+        (
+            "Bone",
+            latest.animal_bone_legendary,
+            ICON_ASSET_DIR / "Materials" / "bone.png",
+        ),
+        (
+            "Leather",
+            latest.leather_legendary,
+            ICON_ASSET_DIR / "Materials" / "leather.png",
+        ),
+        (
+            "Ebony",
+            latest.ebony_legendary,
+            ICON_ASSET_DIR / "Materials" / "ebony.png",
+        ),
+        ("Iron", latest.iron_ore_legendary, ICON_ASSET_DIR / "Materials" / "iron.png"),
+        (
+            "Choice Chests",
+            latest.choice_chest_legendary,
+            ICON_ASSET_DIR / "Materials" / "choicechest.png",
+        ),
     ]
     box_w = 246
-    for idx, (title, value) in enumerate(kpis):
+    for idx, (title, value, icon) in enumerate(kpis):
         attr = {
             "Bone": "animal_bone_legendary",
             "Leather": "leather_legendary",
@@ -951,6 +1021,7 @@ def render_materials_report(
             value=f"{value:,.1f}",
             delta=delta_label,
             delta_color=color,
+            icon=icon,
             accent=MATERIAL_ACCENT,
         )
 

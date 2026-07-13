@@ -657,7 +657,11 @@ Delivery record:
   implementation; the 2800x1960 `_master_2x` files remain source-only.
 - The renderer-only refresh uses the three report-specific production backdrops and aligns panels,
   charts, typography, spacing, contrast, long-name handling, and native no-data presentation.
-- Automated validation passed 191 focused/Inventory tests and the full suite (`2495 passed, 2
+- Operator visual review accepted the premium theme/content direction and requested restoration of
+  the supplied item icons, use of the invoking player's Discord avatar in the top-left identity
+  position, and a safe readability increase. The follow-up applies to populated and native no-data
+  reports while retaining the report-logo fallback when avatar retrieval is unavailable.
+- Automated validation passed 252 focused Inventory/dashboard tests and the full suite (`2500 passed, 2
   skipped`) plus architecture, deferred-item, import, registration, formatting, type, and secret
   checks.
 - Original-size, Discord desktop, and Discord mobile samples cover populated and honest no-data

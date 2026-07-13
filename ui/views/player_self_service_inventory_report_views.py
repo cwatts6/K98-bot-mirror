@@ -36,6 +36,7 @@ PayloadLoader = Callable[..., Awaitable[InventoryReportPayload]]
 
 _SELECT_PAGE_SIZE = 25
 _VIEW_TIMEOUT_SECONDS = 180.0
+_AVATAR_READ_TIMEOUT_SECONDS = 3.0
 
 
 def _safe_name(value: Any, *, fallback: str) -> str:
@@ -167,6 +168,31 @@ def _close_files(files: list[discord.File] | None) -> None:
             logger.debug("player_inventory_report_stream_close_failed", exc_info=True)
 
 
+async def _read_avatar_bytes(user: Any, *, expected_user_id: int) -> bytes | None:
+    try:
+        if user is None or int(getattr(user, "id", -1)) != int(expected_user_id):
+            return None
+    except (TypeError, ValueError):
+        return None
+    avatar = getattr(user, "display_avatar", None) or getattr(user, "avatar", None)
+    if avatar is None:
+        return None
+    try:
+        if hasattr(avatar, "with_size"):
+            avatar = avatar.with_size(256)
+        if hasattr(avatar, "read"):
+            return await asyncio.wait_for(avatar.read(), timeout=_AVATAR_READ_TIMEOUT_SECONDS)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.debug(
+            "player_inventory_report_avatar_read_failed user_id=%s",
+            getattr(user, "id", None),
+            exc_info=True,
+        )
+    return None
+
+
 async def _defer_private(interaction: discord.Interaction) -> None:
     try:
         if interaction.response.is_done():
@@ -201,8 +227,14 @@ async def _private_error(interaction: discord.Interaction, content: str) -> None
         logger.debug("player_inventory_report_private_error_failed", exc_info=True)
 
 
-async def _render_files(payload: InventoryReportPayload) -> list[discord.File]:
-    rendered = await asyncio.to_thread(render_inventory_reports, payload, avatar_bytes=None)
+async def _render_files(
+    payload: InventoryReportPayload, *, avatar_bytes: bytes | None
+) -> list[discord.File]:
+    rendered = await asyncio.to_thread(
+        render_inventory_reports,
+        payload,
+        avatar_bytes=avatar_bytes,
+    )
     if not rendered:
         raise RuntimeError("Inventory renderer returned no image for the selected report")
     files: list[discord.File] = []
@@ -883,7 +915,11 @@ async def _render_resolution(
                 )
                 fallback_embed = build_report_fallback_embed(payload)
                 try:
-                    files = await _render_files(payload)
+                    avatar_bytes = await _read_avatar_bytes(
+                        getattr(target, "user", None),
+                        expected_user_id=author_id,
+                    )
+                    files = await _render_files(payload, avatar_bytes=avatar_bytes)
                     content = _report_content(payload)
                 except asyncio.CancelledError:
                     raise

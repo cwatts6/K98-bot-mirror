@@ -43,6 +43,35 @@ def test_inventory_backdrop_assets_match_runtime_and_master_contract():
             assert master.size == (2800, 1960)
 
 
+def test_inventory_kpi_icon_assets_exist_and_decode():
+    expected = {
+        "RSS/food.png",
+        "RSS/wood.png",
+        "RSS/stone.png",
+        "RSS/gold.png",
+        "RSS/total.png",
+        "Speedups/Universal.png",
+        "Speedups/Training.png",
+        "Speedups/healing.png",
+        "Materials/bone.png",
+        "Materials/leather.png",
+        "Materials/ebony.png",
+        "Materials/iron.png",
+        "Materials/choicechest.png",
+    }
+    icon_dir = report_image_renderer.ICON_ASSET_DIR
+
+    assert expected <= {path.relative_to(icon_dir).as_posix() for path in icon_dir.rglob("*.png")}
+    for relative_path in expected:
+        path = icon_dir / relative_path
+        assert path.stat().st_size > 0
+        with Image.open(path) as icon:
+            icon.load()
+            assert icon.format == "PNG"
+            assert icon.width > 0
+            assert icon.height > 0
+
+
 def test_selected_empty_reports_use_their_report_specific_backdrops():
     now = datetime.now(UTC)
     sample_pixel = (830, 0)
@@ -87,6 +116,50 @@ def test_runtime_renderer_never_loads_master_backdrops(monkeypatch):
     assert any(path.endswith("inventory_speedups_governoros_backdrop.png") for path in opened_paths)
     assert all("_master_2x" not in path for path in opened_paths)
     rendered[0].image_bytes.close()
+
+
+def test_empty_reports_keep_report_specific_item_icons(monkeypatch):
+    captured = {}
+
+    def capture_empty_kpi(*_args, **kwargs):
+        captured.setdefault(current_view, []).append((kwargs["title"], kwargs["icon"]))
+
+    monkeypatch.setattr(report_image_renderer, "_draw_empty_kpi", capture_empty_kpi)
+    now = datetime.now(UTC)
+    for current_view in (
+        InventoryReportView.RESOURCES,
+        InventoryReportView.SPEEDUPS,
+        InventoryReportView.MATERIALS,
+    ):
+        payload = InventoryReportPayload(
+            governor_id=111,
+            governor_name="Empty Governor",
+            view=current_view,
+            range_key=InventoryReportRange.ONE_MONTH,
+            generated_at_utc=now,
+        )
+        rendered = render_inventory_reports(payload)
+        rendered[0].image_bytes.close()
+
+    assert [path.name for _title, path in captured[InventoryReportView.RESOURCES][:5]] == [
+        "food.png",
+        "wood.png",
+        "stone.png",
+        "gold.png",
+        "total.png",
+    ]
+    assert [path.name for _title, path in captured[InventoryReportView.SPEEDUPS][:3]] == [
+        "Universal.png",
+        "Training.png",
+        "healing.png",
+    ]
+    assert [path.name for _title, path in captured[InventoryReportView.MATERIALS][:5]] == [
+        "bone.png",
+        "leather.png",
+        "ebony.png",
+        "iron.png",
+        "choicechest.png",
+    ]
 
 
 def test_missing_corrupt_and_wrong_sized_backdrops_use_safe_fallback(tmp_path, monkeypatch):
@@ -192,12 +265,36 @@ def test_white_icon_background_cleanup_uses_pillow_11_compatible_pixel_access(mo
 
     report_image_renderer._paste_icon(
         canvas,
-        report_image_renderer.ASSET_DIR / "speedup_logo.png",
+        report_image_renderer.ICON_ASSET_DIR / "Speedups" / "Universal.png",
         (8, 8, 88, 88),
     )
 
     assert canvas.getbbox() is not None
     assert canvas.getpixel((8, 8))[3] == 0
+
+
+def test_discord_avatar_replaces_header_logo_without_adding_a_right_avatar():
+    avatar_bytes = BytesIO()
+    Image.new("RGB", (96, 96), (220, 20, 30)).save(avatar_bytes, format="PNG")
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name="Avatar Governor",
+        view=InventoryReportView.RESOURCES,
+        range_key=InventoryReportRange.ONE_MONTH,
+        generated_at_utc=datetime.now(UTC),
+    )
+
+    with_avatar = render_inventory_reports(payload, avatar_bytes=avatar_bytes.getvalue())[0]
+    without_avatar = render_inventory_reports(payload)[0]
+
+    with Image.open(BytesIO(with_avatar.image_bytes.getvalue())) as avatar_output:
+        pixel = avatar_output.convert("RGB").getpixel((80, 68))
+        assert pixel[0] > 180 and pixel[1] < 60 and pixel[2] < 70
+        right_pixel = avatar_output.convert("RGB").getpixel((1318, 70))
+    with Image.open(BytesIO(without_avatar.image_bytes.getvalue())) as fallback_output:
+        assert right_pixel == fallback_output.convert("RGB").getpixel((1318, 70))
+    with_avatar.image_bytes.close()
+    without_avatar.image_bytes.close()
 
 
 def test_inventory_wrap_text_uses_glyph_safe_width():
@@ -440,6 +537,19 @@ def test_resources_preserve_kpi_values_deltas_chart_series_and_legend(monkeypatc
         ("Gold", "4.4B", "+400M"),
         ("Total RSS", "11B", "+1B"),
     ]
+    assert [item["icon"].name for item in kpis[:5]] == [
+        "food.png",
+        "wood.png",
+        "stone.png",
+        "gold.png",
+        "total.png",
+    ]
+    assert [item["icon"].name if item["icon"] else None for item in kpis[5:]] == [
+        None,
+        "Training.png",
+        "healing.png",
+        None,
+    ]
     assert chart["series"] == {
         "Food": [1_000_000_000.0, 1_100_000_000.0],
         "Wood": [2_000_000_000.0, 2_200_000_000.0],
@@ -488,6 +598,13 @@ def test_speedups_preserve_days_deltas_chart_series_and_units(monkeypatch):
         ("Training", "27d", "+7d"),
         ("Healing", "29d", "-1d"),
     ]
+    assert [item["icon"].name for item in kpis] == [
+        "Universal.png",
+        "Training.png",
+        "healing.png",
+        "Training.png",
+        "healing.png",
+    ]
     assert chart["series"] == {
         "Universal": [10, 15],
         "Training": [20, 27],
@@ -534,6 +651,13 @@ def test_materials_preserve_values_deltas_chart_series_and_legend(monkeypatch):
         ("Ebony", "40.0", "+10"),
         ("Iron", "50.0", "+10"),
         ("Choice Chests", "60.0", "+10"),
+    ]
+    assert [item["icon"].name for item in kpis[:5]] == [
+        "bone.png",
+        "leather.png",
+        "ebony.png",
+        "iron.png",
+        "choicechest.png",
     ]
     assert chart["series"] == {
         "Bone": [10, 20],
@@ -647,7 +771,7 @@ def test_long_unicode_governor_context_uses_header_width_fitting(monkeypatch):
 
     rendered = render_inventory_reports(payload)
 
-    assert calls == [{"max_width": 1210, "size": 20, "min_size": 14}]
+    assert calls == [{"max_width": 1210, "size": 21, "min_size": 14}]
     with Image.open(BytesIO(rendered[0].image_bytes.getvalue())) as image:
         assert image.size == (1400, 980)
     rendered[0].image_bytes.close()

@@ -15,6 +15,10 @@ backdrops for Resources, Speedups, Materials, and their honest native no-data re
 2800x1960 masters remain source-only. The visual refresh intentionally applies to private direct
 `/me` reports and legacy `/myinventory`; data, calculations, visibility, controls, exports,
 filenames, fallback, attachment lifecycle, and every interaction contract remain unchanged.
+Operator visual review accepted the premium theme and content direction, then requested restoration
+of the report item icons, the invoking player's Discord avatar in the top-left identity position,
+and a safe readability increase. Those follow-up presentation changes are implemented and locally
+validated across populated and honest no-data reports at original and Discord mobile size.
 
 Phase 5B now awaits operator Discord smoke and final visual acceptance. Its active task pack and
 chat starter remain in `docs/task_packs/` until that checkpoint completes. Later Phase 5C-5G slices

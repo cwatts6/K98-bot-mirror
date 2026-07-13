@@ -305,12 +305,18 @@ though authorization and data access should not change.
 
 Implementation record (2026-07-13):
 
-- Modified only `inventory/report_image_renderer.py`, its focused renderer tests, and delivery docs.
+- Modified the shared Inventory renderer, the direct private report view's best-effort avatar
+  handoff, their focused tests, the supplied Inventory item icons, and delivery docs. No service,
+  DAL, SQL, calculation, export, command, registration, visibility, or interaction-state code changed.
 - Runtime loads only the fixed 1400x980 report-specific assets; missing, corrupt, or wrong-sized
   assets fall back to the established safe canvas without changing filenames or stream behavior.
 - Generated populated, sparse/Unicode, and honest no-data samples at original, Discord desktop, and
   Discord mobile sizes for each report type.
-- Passed 191 focused/Inventory tests and the full suite (`2495 passed, 2 skipped`) plus architecture,
+- Operator visual review accepted the premium theme/content direction and identified the missing
+  item icons as a significant regression. The follow-up restores the supplied Resources, Speedups,
+  and Materials icons to populated/no-data KPI shells, uses the invoking player's circular Discord
+  avatar at top-left with the report logo as fallback, and increases fitted KPI/chart typography.
+- Passed 252 focused Inventory/dashboard tests and the full suite (`2500 passed, 2 skipped`) plus architecture,
   deferred-item, import, registration, formatting, type, and secret checks.
 - The requested Codex Security skill was unavailable in this session; a manual security-focused
   diff review found no permission, privacy, user-input, path-selection, attachment, or cleanup

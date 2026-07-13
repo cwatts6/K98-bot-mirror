@@ -163,7 +163,7 @@ def _ids(view: discord.ui.View) -> set[str]:
 
 @pytest.mark.asyncio
 async def test_render_files_accepts_existing_renderer_bytesio_contract() -> None:
-    files = await views._render_files(_payload())
+    files = await views._render_files(_payload(), avatar_bytes=None)
 
     assert [file.filename for file in files] == ["inventory_resources_111_1M.png"]
     assert files[0].fp.closed is False
@@ -291,6 +291,17 @@ async def test_no_data_renders_private_standalone_empty_state_from_same_payload(
 ) -> None:
     option = _option(111, default=True)
     interaction = _Interaction(component=False)
+    avatar_payload = b"discord-avatar"
+
+    class Avatar:
+        def with_size(self, size):
+            assert size == 256
+            return self
+
+        async def read(self):
+            return avatar_payload
+
+    interaction.user.display_avatar = Avatar()
     calls = 0
 
     async def resolver(*_args, **_kwargs):
@@ -326,11 +337,27 @@ async def test_no_data_renders_private_standalone_empty_state_from_same_payload(
     edit = interaction.original_edits[-1]
     assert calls == 1
     assert rendered_payloads[0][0].resources == []
-    assert rendered_payloads[0][1] is None
+    assert rendered_payloads[0][1] == avatar_payload
     assert "/inventory import" in edit["content"]
     assert edit["embed"] is None
     assert edit["files"][0].filename == "inventory_resources_111_1M.png"
     assert edit["files"][0].fp.closed is True
+
+
+@pytest.mark.asyncio
+async def test_avatar_reader_rejects_a_foreign_user_before_reading() -> None:
+    reads = 0
+
+    class Avatar:
+        async def read(self):
+            nonlocal reads
+            reads += 1
+            return b"foreign-avatar"
+
+    user = SimpleNamespace(id=99, display_avatar=Avatar())
+
+    assert await views._read_avatar_bytes(user, expected_user_id=42) is None
+    assert reads == 0
 
 
 @pytest.mark.asyncio
