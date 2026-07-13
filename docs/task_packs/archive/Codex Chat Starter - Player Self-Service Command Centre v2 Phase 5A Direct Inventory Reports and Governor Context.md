@@ -1,7 +1,8 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5A Direct Inventory Reports and Governor Context
 
-Status: ready to start after operator approval of the Phase 5A private visibility, command surface,
-dashboard action layout, and report-control layout.
+Status: complete and archived. Phase 5A operator smoke passed on 2026-07-13. This starter is retained
+as the original execution prompt; the accepted implementation record is in the archived task pack
+and authoritative programme pack.
 
 ## Copy/Paste Starter
 

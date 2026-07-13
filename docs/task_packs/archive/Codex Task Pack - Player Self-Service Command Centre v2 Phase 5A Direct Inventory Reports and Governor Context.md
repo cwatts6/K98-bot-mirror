@@ -8,7 +8,7 @@
 - Task type: `Discord grouped commands | governor-specific inventory reports | private attachment interaction flow`
 - One-pass approved: `No`
 - Implementation approved: `Yes - revised scope approved 2026-07-12`
-- Status: `implemented and automated validation complete - operator smoke pending`
+- Status: `complete - operator smoke passed 2026-07-13; archived execution record`
 
 ## Implementation Record — 2026-07-12
 
@@ -20,19 +20,28 @@
 - Updated selected dashboards to the approved navigation and governor-only entry selector.
 - Added selected-governor-only latest RSS, combined Speedups days, and legendary-equivalent
   Materials totals to the 1180x760 dashboard and fallback embed.
-- Preserved `/me inventory`, `/myinventory`, Inventory visibility preferences, the standalone
-  1400x980 Inventory renderer, ranges, filenames, exports, imports, calculations, SQL, and DAL
-  result shapes.
-- Automated validation passed: 209 focused tests; architecture, deferred-item, test-selection,
-  smoke-import, and command-registration validators; full pre-commit; full pytest with 2475 passed
-  and 2 skipped; and pytest production-log isolation with the same result.
-- Original, Discord-desktop, and Discord-mobile dashboard samples plus Resources, Speedups, and
-  Materials report samples were rendered and visually inspected. Live Discord operator smoke is
-  still required.
-- The requested Codex Security skill was not exposed and the local Codex CLI remained blocked by
-  Windows access controls. The documented independent security-focused diff review found no
-  reportable issue after checking self-only authorization, visibility, forged/stale state,
-  attachments, streams, exports, filenames, fallback delivery, and concurrent transitions.
+- Preserved `/me inventory`, `/myinventory`, Inventory visibility preferences, report ranges,
+  filenames, exports, imports, calculations, SQL, and DAL result shapes.
+- After live Discord exposed unreliable ephemeral attachment clearing for an embed-only no-data
+  response, the operator approved one narrow renderer exception: selected empty Resources,
+  Speedups, and Materials reports now render the normal 1400x980 report shell with muted
+  `Not recorded` cards, an honest no-approved-data panel, and linked upload guidance. No dummy
+  values or trend lines are fabricated. Populated report visuals remained unchanged in Phase 5A.
+- Final automated validation passed: 106 focused renderer/report/dashboard/interaction tests;
+  architecture, deferred-item, test-selection, smoke-import, and command-registration validators;
+  full pre-commit; full pytest with 2487 passed and 2 skipped; and pytest production-log isolation
+  with the same result. Mirror and production hosted command-governance, quality, and security
+  checks passed.
+- Original, Discord-desktop, and Discord-mobile dashboard samples plus populated and empty-state
+  Resources, Speedups, and Materials report samples were rendered and visually inspected.
+- Operator smoke was declared complete on 2026-07-13. It accepted the final dashboard hierarchy,
+  muted missing totals, private report navigation, renderer-native no-data experience, linked
+  upload guidance, and Change Governor behavior that preserves the current report and range.
+- Security-focused diff review and the hosted production security scan found no reportable issue
+  after checking self-only authorization, visibility, forged/stale state, attachments, streams,
+  exports, filenames, fallback delivery, and concurrent transitions.
+- Six operator-supplied Inventory backdrop assets were added to the Phase 5A PR as dormant inputs
+  for Phase 5B. Phase 5A does not load or apply them.
 
 ## 2. Objective
 
@@ -437,19 +446,20 @@ and fallback delivery are in scope. SQL security review is not required unless s
 
 ## 17. Acceptance Criteria
 
-- [ ] Operator approves private-only `/me` direct reports, three grouped commands, and control layout.
-- [ ] `/me resources`, `/me materials`, and `/me speedups` deliver the requested existing report.
-- [ ] Dashboard actions carry and revalidate the selected governor.
-- [ ] No/one/multiple and more-than-25 governor journeys are private and safe.
-- [ ] Change Governor appears only when relevant and preserves report type/range.
-- [ ] Existing 1400x980 renderer, report calculations, ranges, exports, and filenames are reused.
-- [ ] Successful output is a standalone image with same-payload private fallback.
-- [ ] Attachments and streams are correct across every success/failure/stale transition.
-- [ ] New `/me` paths are private and `/myinventory` visibility behavior is unchanged.
-- [ ] Top-level count is unchanged and `/me` grouped count is exactly 9.
-- [ ] No SQL, DAL query, data field, import, export schema, or renderer redesign is introduced.
-- [ ] Focused/full validation, visual smoke, and security review are recorded.
-- [ ] Programme, briefing, canonical command, task-pack, starter, and deferred docs reflect delivery.
+- [x] Operator approves private-only `/me` direct reports, three grouped commands, and control layout.
+- [x] `/me resources`, `/me materials`, and `/me speedups` deliver the requested existing report.
+- [x] Dashboard actions carry and revalidate the selected governor.
+- [x] No/one/multiple and more-than-25 governor journeys are private and safe.
+- [x] Change Governor appears only when relevant and preserves report type/range.
+- [x] The 1400x980 dimensions, populated report calculations, ranges, exports, and filenames are reused;
+  the approved empty-state renderer exception is recorded above.
+- [x] Successful output is a standalone image with same-payload private fallback.
+- [x] Attachments and streams are correct across every success/failure/stale transition.
+- [x] New `/me` paths are private and `/myinventory` visibility behavior is unchanged.
+- [x] Top-level count is unchanged and `/me` grouped count is exactly 9.
+- [x] No SQL, DAL query, data field, import, or export schema change is introduced.
+- [x] Focused/full validation, visual smoke, and security review are recorded.
+- [x] Programme, briefing, canonical command, task-pack, starter, and deferred docs reflect delivery.
 
 ## 18. Delivery Output
 

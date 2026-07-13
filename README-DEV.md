@@ -7,6 +7,18 @@ Before repo work, read `AGENTS.md` and the indexed core docs in
 domain, promotion, and operations references so routine work does not require reading the
 entire `docs/reference` folder.
 
+## Current GovernorOS Programme
+
+GovernorOS v2 Phase 5A is complete and operator smoke passed on 2026-07-13. It delivered the
+private selected-governor dashboard plus direct Resources, Speedups, and Materials reports while
+preserving `/myinventory`, Inventory visibility preferences, imports, ranges, and exports.
+
+The next proposed slice is Phase 5B Premium Inventory Report Backdrops and Visual Alignment. Its
+active task pack and chat starter live in `docs/task_packs/`. The completed Phase 5A task pack and
+starter are archived in `docs/task_packs/archive/`. Later Phase 5C-5G slices own the premium
+Accounts, Reminders, Preferences, Inventory summary, and Exports cards separately; those
+Discord-user/all-governor pages must not show the selected-governor dropdown.
+
 ## Quality Automation
 
 Run before committing:

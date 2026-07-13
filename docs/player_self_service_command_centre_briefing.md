@@ -1,6 +1,6 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 GovernorOS v2 status: Phase 4 Premium Governor Dashboard Renderer is complete and operator smoke
 passed on 2026-07-11. `/me dashboard` is governor-first: no linked governor shows setup
@@ -13,14 +13,16 @@ Phase 4 premium PNG renderer and final smoke evidence.
 Admin/leadership inspect is confirmed as required Phase 8 work and remains a separate
 permission-gated slice using the Phase 2 inspect-safe contract.
 
-GovernorOS v2 Phase 5A revised scope was approved and implemented on 2026-07-12; automated
-validation is complete and operator Discord smoke is pending.
-It adds private selected-governor `/me resources`, `/me materials`, and `/me speedups` reports,
+GovernorOS v2 Phase 5A is complete in mirror PR #219 and production PR #526. Automated validation
+and operator Discord smoke passed on 2026-07-13.
+It delivered private selected-governor `/me resources`, `/me materials`, and `/me speedups` reports,
 keeps `/me inventory` and `/myinventory` behavior unchanged, and removes the selected-dashboard
-Inventory button in favor of direct RSS/Materials/Speedups actions. The selected dashboard grows
+Inventory button in favor of direct RSS/Speedups/Materials actions. The selected dashboard grew
 to 1180x760 and adds latest approved RSS, combined Speedups days, and legendary-equivalent
 Materials totals for the selected governor only. Multiple-governor entry is governor-selector
-only. The existing 1400x980 Inventory report renderer remains unchanged in this phase.
+only. Populated and honest native no-data report journeys, private exports, Dashboard navigation,
+and report-preserving Change Governor controls all passed smoke. The existing 1400x980 Inventory
+report renderer remained visually unchanged in Phase 5A.
 
 Status: Phase 11A Shared Visual-Card Renderer Consolidation is delivered in mirror PR #173 and
 production PR #481, and smoke tested successfully on 2026-06-26. Phase 11B KVK Renderer Migration
@@ -55,9 +57,10 @@ Use it to check:
 - alliance, Civilisation, `X:Y` Location, Conduct Score, and data freshness
 - power, Kill Points, Highest Acclaim, Dead, Helps, and Healed
 - Ark joined, won, win ratio, Times Named Autarch, and Times Autarch Participated
-- where to manage Accounts, Reminders, Preferences, Inventory, and Exports
+- where to manage Accounts, Reminders, Preferences, and Exports, or open RSS, Speedups, and
+  Materials directly
 
-The governor dashboard now uses a dedicated 1180x640 premium PNG governor card as the primary
+The governor dashboard now uses a dedicated 1180x760 premium PNG governor card as the primary
 successful presentation, with the invoking player's Discord avatar in the medallion where
 available. The operator-approved private embed remains the fallback when avatar retrieval,
 rendering, file creation, or image delivery fails. The successful card is delivered as a
@@ -68,7 +71,7 @@ the older setup pages remain unchanged until their approved phase work. Quick La
 `/kvk stats`, `/kvk targets`,
 `/kvk history`, and `/kvk rankings` remain absent because those commands have channel and
 public-output rules that should stay exactly where players already use them. The dashboard keeps
-only safe private handoffs for the currently delivered Inventory and Exports pages.
+only safe private handoffs for the currently delivered direct Inventory reports and Exports page.
 
 The account centre supports account review, Governor ID lookup, registration, replacement, and
 removal with confirmation through one primary Manage journey. Lookup results can continue into
@@ -455,17 +458,21 @@ Current status:
   background, optional invoking-player Discord avatar, fixed renderer/payload boundary, fallback,
   attachment lifecycle, and no-SQL/no-new-action scope. Operator smoke on 2026-07-11 exercised all
   governor options, confirmed the gated Change Governor dropdown, and accepted the materially
-  larger, easier-to-read standalone image. Matching presentation changes for the other `/me` pages
-  are assigned explicitly to Phase 5B rather than remaining unowned debt.
-- Phase 5A is the next proposed slice. It adds private direct selected-governor Resources,
-  Materials, and Speedups using the existing 1400x980 standalone inventory renderer, report ranges,
-  and exports. It adds the same author-gated paged Change Governor dropdown on governor-specific
-  reports, preserves report type/range while switching, and increases `/me` grouped subcommands
-  from 6 to 9 without changing the top-level command count. Implementation awaits approval of the
-  private-only `/me` visibility and control layout.
-- Phase 5B then migrates Accounts, Reminders, Preferences, Inventory, and Exports summary cards to
-  the wider standalone attachment presentation and blue navigation pattern without changing their
-  data, actions, or user-level/all-governor semantics. Those pages do not show Change Governor.
+  larger, easier-to-read standalone image.
+- GovernorOS v2 Phase 5A is complete. It delivered private direct selected-governor Resources,
+  Materials, and Speedups using the existing 1400x980 standalone Inventory renderer, report
+  ranges, private exports, honest native no-data output, and the author-gated paged Change Governor
+  control. It preserves report type/range while switching, increases `/me` grouped subcommands
+  from 6 to 9, and keeps the top-level count at 42. Operator smoke passed on 2026-07-13.
+- Phase 5B is the next proposed slice. It adopts the six supplied report-specific premium backdrop
+  assets in the shared Inventory renderer and aligns Resources, Speedups, Materials, and no-data
+  presentation without changing 1400x980 dimensions, filenames, data, calculations, ranges,
+  exports, privacy, controls, or `/myinventory` behavior. The 2800x1960 masters remain source-only;
+  runtime uses the 1400x980 variants. No dummy values or invented trends are permitted.
+- Phases 5C-5G independently migrate Accounts, Reminders, Preferences, Inventory summary, and
+  Exports summary as matching operator-approved backdrops arrive. These Discord-user/all-governor
+  pages do not show Change Governor; they retain selected governor context only for returning to a
+  governor-specific page.
 - Phase 6 adds Export Stats only after selected-governor versus all-linked semantics are approved;
   export schema/format redesign remains outside GovernorOS.
 - Phase 7 adds private selected-governor `/me history` while preserving public/channel-gated

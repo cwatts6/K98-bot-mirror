@@ -412,15 +412,17 @@ Player Self-Service Command Centre status:
   `archive/`.
 - Active Player Self-Service v2 files:
   - `Player Self-Service Command Centre v2 - Programme Pack.md`
-  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 5A Direct Inventory Reports and Governor Context.md`
-  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5A Direct Inventory Reports and Governor Context.md`
-- GovernorOS v2 Phases 1-4 are complete. Their reports/task packs/chat starters are archived under
+  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 5B Premium Inventory Report Backdrops and Visual Alignment.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5B Premium Inventory Report Backdrops and Visual Alignment.md`
+- GovernorOS v2 Phases 1-5A are complete. Their reports/task packs/chat starters are archived under
   `archive/`. Phase 2 delivered in mirror PR #216 and production PR #523, Phase 3 delivered in
   mirror PR #217 and production PR #524, and Phase 4 delivered in mirror PR #218. Phase 4 operator
   smoke on 2026-07-11 accepted the materially wider standalone card and gated Change Governor
-  dropdown. Phase 5A is the next approval-gated implementation slice; Phase 5B owns standalone
-  presentation alignment for the existing Accounts, Reminders, Preferences, Inventory, and Exports
-  summary pages.
+  dropdown. Phase 5A delivered in mirror PR #219 and production PR #526; operator smoke passed its
+  direct reports, honest no-data output, and governor switching on 2026-07-13. Phase 5B is the next
+  approval-gated slice and owns premium visual alignment for the shared Inventory report renderer.
+  Separate Phases 5C-5G own Accounts, Reminders, Preferences, Inventory summary, and Exports
+  summary page alignment as their approved backdrops become available.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR

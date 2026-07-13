@@ -3,11 +3,19 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### GovernorOS v2 Inventory Renderer Visual Gap Promoted — 2026-07-13
+
+- Area: `inventory/report_image_renderer.py`, `assets/Inventory/cards/`, Discord desktop/mobile report presentation
+- Type: consistency
+- Description: Phase 5A deliberately preserved the established standalone 1400x980 Resources, Materials, and Speedups visuals while integrating direct private governor-specific reports. Operator smoke then confirmed that those visuals no longer meet the premium GovernorOS v2.0 quality bar.
+- Resolution: Promoted from unowned deferred work into the approval-gated Phase 5B Premium Inventory Report Backdrops and Visual Alignment task pack and chat starter. Six operator-supplied assets are committed dormant with Phase 5A: three 1400x980 runtime candidates and three 2800x1960 `_master_2x` source masters. Phase 5B will align the shared report renderer while preserving dimensions, filenames, real data, calculations, ranges, exports, direct-report governor controls, `/myinventory` visibility, imports, and Google Sheets behavior. No dummy data or invented trend is permitted.
+- Validation: All six files decode as PNG; production variants are 1400x980 and master variants are 2800x1960. Visual inspection confirmed distinct Resources, Materials, and Speedups backdrops. Runtime adoption remains unimplemented pending the Phase 5B approval checkpoint.
+
 ### GovernorOS v2 Phase 4 Shared Renderer Framework Decision
 - Area: `player_self_service/governor_dashboard_renderer.py`, `core/visual_text.py`, `player_self_service/page_cards.py`, KVK and inventory renderer families
 - Type: consistency
 - Description: Phase 4 needed a dedicated governor renderer, but a possible post-delivery shared visual framework remained under consideration if concrete duplicated low-level primitives justified coupling the page-card, governor, KVK, and Inventory renderer families.
-- Resolution: Phase 4 reused the established glyph-safe `core.visual_text` primitives and kept its payload/layout/background/export contract domain-specific. Post-delivery review and operator acceptance found no measured duplication or output-contract benefit that justifies a broader shared renderer framework. Phase 5A will likewise reuse the existing Inventory renderer as-is, and Phase 5B will change Discord delivery rather than renderer architecture. Any future shared-helper proposal requires new profiling/duplication evidence and a separately scoped item.
+- Resolution: Phase 4 reused the established glyph-safe `core.visual_text` primitives and kept its payload/layout/background/export contract domain-specific. Post-delivery review and operator acceptance found no measured duplication or output-contract benefit that justifies a broader shared renderer framework. Phase 5A likewise reused the existing Inventory renderer architecture. Phase 5B may refresh that renderer's domain-specific visual layout and backdrops but must not create a broad shared framework. Any future shared-helper proposal requires new profiling/duplication evidence and a separately scoped item.
 - Validation: Phase 4 renderer, visual-text, Discord-view, focused/full tests, pre-commit, and operator desktop/mobile smoke passed through 2026-07-11. The accepted governor and Inventory outputs have distinct dimensions, assets, payloads, and control contracts, supporting closure rather than speculative consolidation.
 
 ### GovernorOS v2 Phase 4 Attachment Lifecycle Completed Item
