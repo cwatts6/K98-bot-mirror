@@ -77,10 +77,13 @@ def _report_label(view: InventoryReportView) -> str:
 
 def _report_content(payload: InventoryReportPayload) -> str:
     name = _safe_name(payload.governor_name, fallback=str(payload.governor_id))
-    return (
+    content = (
         f"Inventory report for **{name}** (`{payload.governor_id}`) — "
         f"{_report_label(payload.view)} — `{payload.range_key.value}`"
     )
+    if not _has_requested_data(payload):
+        return f"{content}\n{_upload_guidance()}"
+    return content
 
 
 def build_report_fallback_embed(payload: InventoryReportPayload) -> discord.Embed:
@@ -200,6 +203,8 @@ async def _private_error(interaction: discord.Interaction, content: str) -> None
 
 async def _render_files(payload: InventoryReportPayload) -> list[discord.File]:
     rendered = await asyncio.to_thread(render_inventory_reports, payload, avatar_bytes=None)
+    if not rendered:
+        raise RuntimeError("Inventory renderer returned no image for the selected report")
     files: list[discord.File] = []
     try:
         for item in rendered:
@@ -217,55 +222,6 @@ async def _render_files(payload: InventoryReportPayload) -> list[discord.File]:
     except Exception:
         _close_files(files)
         raise
-
-
-async def _replace_attached_component_message(
-    target: Any,
-    *,
-    content: str | None,
-    embed: discord.Embed | None,
-    view: PlayerInventoryReportView,
-    can_edit: Callable[[], bool] | None,
-    timeout_remaining: Callable[[], float] | None,
-) -> bool:
-    component_message = getattr(target, "message", None)
-    try:
-        delete_call = component_message.delete()
-        if timeout_remaining:
-            await asyncio.wait_for(delete_call, timeout_remaining())
-        else:
-            await delete_call
-        if can_edit is not None and not can_edit():
-            return False
-        send_call = target.followup.send(
-            content=content,
-            embed=embed,
-            view=view,
-            ephemeral=True,
-        )
-        sent = (
-            await asyncio.wait_for(send_call, timeout_remaining())
-            if timeout_remaining
-            else await send_call
-        )
-        if can_edit is not None and not can_edit():
-            return False
-        view.set_message_ref(sent)
-        return True
-    except asyncio.CancelledError:
-        raise
-    except TimeoutError:
-        logger.info(
-            "player_inventory_report_component_replace_timed_out user_id=%s",
-            view.author_id,
-        )
-        return False
-    except Exception:
-        logger.debug(
-            "player_inventory_report_component_replace_failed",
-            exc_info=True,
-        )
-        return False
 
 
 class _ActionButton(discord.ui.Button):
@@ -785,21 +741,6 @@ async def _edit_report_response(
     if can_edit is not None and not can_edit():
         _close_files(files)
         return False
-    component_message = getattr(target, "message", None)
-    if (
-        not files
-        and component_message is not None
-        and getattr(component_message, "attachments", ())
-        and callable(getattr(component_message, "delete", None))
-    ):
-        return await _replace_attached_component_message(
-            target,
-            content=content,
-            embed=embed or fallback_embed,
-            view=view,
-            can_edit=can_edit,
-            timeout_remaining=timeout_remaining,
-        )
     try:
         kwargs: dict[str, Any] = {
             "content": content,
@@ -941,20 +882,17 @@ async def _render_resolution(
                     range_key=range_key,
                 )
                 fallback_embed = build_report_fallback_embed(payload)
-                if _has_requested_data(payload):
-                    try:
-                        files = await _render_files(payload)
-                        content = _report_content(payload)
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception:
-                        logger.exception(
-                            "player_inventory_report_render_failed user_id=%s governor_id=%s",
-                            author_id,
-                            context.selected_governor_id,
-                        )
-                        embed = fallback_embed
-                else:
+                try:
+                    files = await _render_files(payload)
+                    content = _report_content(payload)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    logger.exception(
+                        "player_inventory_report_render_failed user_id=%s governor_id=%s",
+                        author_id,
+                        context.selected_governor_id,
+                    )
                     embed = fallback_embed
             except PermissionError:
                 logger.warning("player_inventory_report_access_denied user_id=%s", author_id)

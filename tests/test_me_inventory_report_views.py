@@ -286,7 +286,9 @@ async def test_selected_report_is_private_standalone_and_has_approved_rows(monke
 
 
 @pytest.mark.asyncio
-async def test_no_data_uses_same_payload_upload_guidance_without_render(monkeypatch) -> None:
+async def test_no_data_renders_private_standalone_empty_state_from_same_payload(
+    monkeypatch,
+) -> None:
     option = _option(111, default=True)
     interaction = _Interaction(component=False)
     calls = 0
@@ -299,11 +301,18 @@ async def test_no_data_uses_same_payload_upload_guidance_without_render(monkeypa
         calls += 1
         return _payload(with_data=False)
 
-    monkeypatch.setattr(
-        views,
-        "render_inventory_reports",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("no-data must not render")),
-    )
+    rendered_payloads = []
+
+    def render(payload, *, avatar_bytes=None):
+        rendered_payloads.append((payload, avatar_bytes))
+        return [
+            SimpleNamespace(
+                filename="inventory_resources_111_1M.png",
+                image_bytes=BytesIO(b"empty-state-png"),
+            )
+        ]
+
+    monkeypatch.setattr(views, "render_inventory_reports", render)
 
     await views.show_player_inventory_report_for_interaction(
         interaction,
@@ -316,9 +325,12 @@ async def test_no_data_uses_same_payload_upload_guidance_without_render(monkeypa
 
     edit = interaction.original_edits[-1]
     assert calls == 1
-    assert "Upload Inventory" == edit["embed"].fields[0].name
-    assert "/inventory import" in edit["embed"].fields[0].value
-    assert "files" not in edit
+    assert rendered_payloads[0][0].resources == []
+    assert rendered_payloads[0][1] is None
+    assert "/inventory import" in edit["content"]
+    assert edit["embed"] is None
+    assert edit["files"][0].filename == "inventory_resources_111_1M.png"
+    assert edit["files"][0].fp.closed is True
 
 
 @pytest.mark.asyncio
@@ -371,7 +383,7 @@ async def test_component_no_data_replaces_dashboard_instead_of_sending_followup(
 
 
 @pytest.mark.asyncio
-async def test_component_no_data_deletes_attached_dashboard_before_private_replacement(
+async def test_component_no_data_replaces_attached_dashboard_with_empty_state_png(
     monkeypatch,
 ) -> None:
     option = _option(111, default=True)
@@ -380,16 +392,12 @@ async def test_component_no_data_deletes_attached_dashboard_before_private_repla
     class AttachedMessage:
         def __init__(self) -> None:
             self.attachments = [SimpleNamespace(id=999)]
-            self.deleted = False
 
         async def delete(self):
-            self.deleted = True
+            raise AssertionError("the attached dashboard must not be deleted")
 
     message = AttachedMessage()
     interaction.message = message
-
-    async def unexpected_original_edit(**_kwargs):
-        raise AssertionError("attached dashboard must be deleted before replacement")
 
     async def resolver(*_args, **_kwargs):
         return _selected(option)
@@ -397,11 +405,15 @@ async def test_component_no_data_deletes_attached_dashboard_before_private_repla
     async def payload_loader(**_kwargs):
         return _payload(with_data=False)
 
-    interaction.edit_original_response = unexpected_original_edit
     monkeypatch.setattr(
         views,
         "render_inventory_reports",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("no-data must not render")),
+        lambda *_args, **_kwargs: [
+            SimpleNamespace(
+                filename="inventory_resources_111_1M.png",
+                image_bytes=BytesIO(b"empty-state-png"),
+            )
+        ],
     )
 
     await views.show_player_inventory_report_for_interaction(
@@ -413,11 +425,12 @@ async def test_component_no_data_deletes_attached_dashboard_before_private_repla
         payload_loader=payload_loader,
     )
 
-    assert message.deleted is True
-    assert len(interaction.followup.sent) == 1
-    followup = interaction.followup.sent[0]
-    assert followup[1]["ephemeral"] is True
-    assert followup[1]["embed"].fields[0].name == "Upload Inventory"
+    assert len(interaction.original_edits) == 1
+    edit = interaction.original_edits[0]
+    assert edit["embed"] is None
+    assert edit["attachments"] == []
+    assert edit["files"][0].filename == "inventory_resources_111_1M.png"
+    assert interaction.followup.sent == []
 
 
 @pytest.mark.asyncio

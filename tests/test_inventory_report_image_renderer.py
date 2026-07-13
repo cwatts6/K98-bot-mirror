@@ -205,6 +205,42 @@ def test_render_inventory_reports_returns_png_files_for_resources_and_speedups()
         assert item.image_bytes.getvalue().startswith(b"\x89PNG")
 
 
+def test_render_selected_empty_report_returns_standalone_png_for_each_tab():
+    now = datetime.now(UTC)
+    expected = {
+        InventoryReportView.RESOURCES: "inventory_resources_111_1M.png",
+        InventoryReportView.SPEEDUPS: "inventory_speedups_111_1M.png",
+        InventoryReportView.MATERIALS: "inventory_materials_111_1M.png",
+    }
+
+    for view, filename in expected.items():
+        payload = InventoryReportPayload(
+            governor_id=111,
+            governor_name="Empty Governor",
+            view=view,
+            range_key=InventoryReportRange.ONE_MONTH,
+            generated_at_utc=now,
+        )
+
+        rendered = render_inventory_reports(payload)
+
+        assert [item.filename for item in rendered] == [filename]
+        image = Image.open(BytesIO(rendered[0].image_bytes.getvalue()))
+        assert image.size == (report_image_renderer.WIDTH, report_image_renderer.HEIGHT)
+
+
+def test_render_all_empty_preserves_legacy_no_report_output():
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name="Empty Governor",
+        view=InventoryReportView.ALL,
+        range_key=InventoryReportRange.ONE_MONTH,
+        generated_at_utc=datetime.now(UTC),
+    )
+
+    assert render_inventory_reports(payload) == []
+
+
 def test_chart_ticks_expand_flat_values():
     ticks = report_image_renderer._chart_ticks(100, 100)
 

@@ -18,6 +18,7 @@ from inventory.capacity_calculations import (
 )
 from inventory.models import (
     InventoryReportPayload,
+    InventoryReportView,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -256,6 +257,126 @@ def _draw_kpi(
         )
 
 
+def _draw_empty_kpi(
+    canvas: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[int, int, int, int],
+    *,
+    title: str,
+    icon: Path | None = None,
+) -> None:
+    _panel(draw, xy, fill=(18, 65, 118))
+    x1, y1, x2, y2 = xy
+    if icon:
+        _paste_icon(canvas, icon, (x1 + 16, y1 + 18, x1 + 62, y1 + 64))
+        title_x = x1 + 72
+    else:
+        title_x = x1 + 20
+    title_font = _fit_font(
+        draw,
+        title,
+        max_width=x2 - title_x - 18,
+        size=18,
+        min_size=13,
+        bold=True,
+    )
+    _draw_text(draw, (title_x, y1 + 20), title, fill=MUTED, font=title_font, bold=True)
+    _draw_text(draw, (x1 + 20, y1 + 66), "—", fill=(115, 156, 194), font=_font(32))
+    separator_y = min(y1 + 108, y2 - 38)
+    draw.line((x1 + 18, separator_y, x2 - 18, separator_y), fill=(48, 103, 158), width=1)
+    _draw_text(
+        draw,
+        (x1 + 20, separator_y + 10),
+        "Not recorded",
+        fill=(115, 156, 194),
+        font=_font(17),
+    )
+
+
+def _render_empty_report(
+    payload: InventoryReportPayload,
+    *,
+    title: str,
+    report_label: str,
+    logo: Path,
+    filename: str,
+    kpis: list[tuple[tuple[int, int, int, int], str, Path | None]],
+    chart_xy: tuple[int, int, int, int],
+    avatar_bytes: bytes | None,
+) -> RenderedInventoryImage:
+    canvas = Image.new("RGBA", (WIDTH, HEIGHT), BG)
+    draw = ImageDraw.Draw(canvas, "RGBA")
+    _draw_header(
+        canvas,
+        draw,
+        title=title,
+        logo=logo,
+        governor_name=payload.governor_name,
+        governor_id=payload.governor_id,
+        range_key=payload.range_key.value,
+        avatar_bytes=avatar_bytes,
+    )
+    for xy, kpi_title, icon in kpis:
+        _draw_empty_kpi(canvas, draw, xy, title=kpi_title, icon=icon)
+
+    _panel(draw, chart_xy, fill=(9, 36, 78))
+    x1, y1, x2, y2 = chart_xy
+    for idx in range(1, 5):
+        y = y1 + ((y2 - y1) * idx / 5)
+        draw.line((x1 + 48, y, x2 - 48, y), fill=(24, 68, 116), width=1)
+
+    overlay_w = min(860, x2 - x1 - 96)
+    overlay_h = min(224, y2 - y1 - 64)
+    overlay_x1 = x1 + ((x2 - x1 - overlay_w) // 2)
+    overlay_y1 = y1 + ((y2 - y1 - overlay_h) // 2)
+    overlay = (overlay_x1, overlay_y1, overlay_x1 + overlay_w, overlay_y1 + overlay_h)
+    draw.rounded_rectangle(
+        overlay,
+        radius=18,
+        fill=(13, 54, 104, 246),
+        outline=(74, 145, 207),
+        width=2,
+    )
+    heading = f"No approved {report_label} data recorded"
+    heading_font = _fit_font(
+        draw,
+        heading,
+        max_width=overlay_w - 72,
+        size=32,
+        min_size=24,
+        bold=True,
+    )
+    heading_width = _text_width(draw, heading, heading_font, bold=True)
+    _draw_text(
+        draw,
+        (overlay_x1 + ((overlay_w - heading_width) / 2), overlay_y1 + 34),
+        heading,
+        fill=TEXT,
+        font=heading_font,
+        bold=True,
+    )
+    guidance = "Upload a matching Inventory screenshot to start this report."
+    guidance_width = _text_width(draw, guidance, _font(22))
+    _draw_text(
+        draw,
+        (overlay_x1 + ((overlay_w - guidance_width) / 2), overlay_y1 + 92),
+        guidance,
+        fill=MUTED,
+        font=_font(22),
+    )
+    action = "Use /inventory import or upload in the Inventory channel"
+    action_width = _text_width(draw, action, _font(20, bold=True), bold=True)
+    _draw_text(
+        draw,
+        (overlay_x1 + ((overlay_w - action_width) / 2), overlay_y1 + 142),
+        action,
+        fill=GOLD,
+        font=_font(20, bold=True),
+        bold=True,
+    )
+    return _export(canvas, filename, source_label="Waiting for an approved inventory import")
+
+
 def _chart_ticks(min_v: float, max_v: float, *, count: int = 5) -> list[float]:
     if count <= 1:
         return [max_v]
@@ -385,7 +506,50 @@ def render_resources_report(
     payload: InventoryReportPayload, *, avatar_bytes: bytes | None = None
 ) -> RenderedInventoryImage | None:
     if not payload.resources:
-        return None
+        if payload.view != InventoryReportView.RESOURCES:
+            return None
+        box_w = 250
+        kpis = [
+            (
+                (44 + idx * (box_w + 16), 140, 44 + idx * (box_w + 16) + box_w, 284),
+                title,
+                icon,
+            )
+            for idx, (title, icon) in enumerate(
+                [
+                    ("Food", ASSET_DIR / "RSS" / "food.png"),
+                    ("Wood", ASSET_DIR / "RSS" / "wood.png"),
+                    ("Stone", ASSET_DIR / "RSS" / "stone.png"),
+                    ("Gold", ASSET_DIR / "RSS" / "gold.png"),
+                    ("Total RSS", ASSET_DIR / "RSS" / "total.png"),
+                ]
+            )
+        ]
+        kpis.extend(
+            (
+                (44 + idx * 330, 314, 344 + idx * 330, 470),
+                title,
+                icon,
+            )
+            for idx, (title, icon) in enumerate(
+                [
+                    ("RSS Velocity", None),
+                    ("RSS Troop Training Capacity", ASSET_DIR / "Training" / "Training.png"),
+                    ("RSS Troop Healing Capacity", ASSET_DIR / "healing" / "healing.png"),
+                    ("RSS Forecast", None),
+                ]
+            )
+        )
+        return _render_empty_report(
+            payload,
+            title="Resources Inventory",
+            report_label="Resources",
+            logo=ASSET_DIR / "rss_logo.png",
+            filename=f"inventory_resources_{payload.governor_id}_{payload.range_key.value}.png",
+            kpis=kpis,
+            chart_xy=(44, 510, 1356, 924),
+            avatar_bytes=avatar_bytes,
+        )
     canvas = Image.new("RGBA", (WIDTH, HEIGHT), BG)
     draw = ImageDraw.Draw(canvas, "RGBA")
     _draw_header(
@@ -509,7 +673,32 @@ def render_speedups_report(
     payload: InventoryReportPayload, *, avatar_bytes: bytes | None = None
 ) -> RenderedInventoryImage | None:
     if not payload.speedups:
-        return None
+        if payload.view != InventoryReportView.SPEEDUPS:
+            return None
+        return _render_empty_report(
+            payload,
+            title="Speedups Inventory",
+            report_label="Speedups",
+            logo=ASSET_DIR / "speedup_logo.png",
+            filename=f"inventory_speedups_{payload.governor_id}_{payload.range_key.value}.png",
+            kpis=[
+                ((60, 148, 440, 300), "Universal", ASSET_DIR / "Universal" / "Universal.png"),
+                ((490, 148, 870, 300), "Training", ASSET_DIR / "Training" / "Training.png"),
+                ((920, 148, 1300, 300), "Healing", ASSET_DIR / "healing" / "healing.png"),
+                (
+                    (140, 338, 650, 498),
+                    "Total Speedup Training Capacity",
+                    ASSET_DIR / "Training" / "Training.png",
+                ),
+                (
+                    (750, 338, 1260, 498),
+                    "Total Healing Speedup Capacity",
+                    ASSET_DIR / "healing" / "healing.png",
+                ),
+            ],
+            chart_xy=(44, 540, 1356, 924),
+            avatar_bytes=avatar_bytes,
+        )
     canvas = Image.new("RGBA", (WIDTH, HEIGHT), BG)
     draw = ImageDraw.Draw(canvas, "RGBA")
     _draw_header(
@@ -612,7 +801,30 @@ def render_materials_report(
     payload: InventoryReportPayload, *, avatar_bytes: bytes | None = None
 ) -> RenderedInventoryImage | None:
     if not payload.materials:
-        return None
+        if payload.view != InventoryReportView.MATERIALS:
+            return None
+        box_w = 246
+        return _render_empty_report(
+            payload,
+            title="Materials Inventory",
+            report_label="Materials",
+            logo=ASSET_DIR / "materials_logo.png",
+            filename=f"inventory_materials_{payload.governor_id}_{payload.range_key.value}.png",
+            kpis=[
+                (
+                    (44 + idx * (box_w + 16), 144, 44 + idx * (box_w + 16) + box_w, 286),
+                    title,
+                    None,
+                )
+                for idx, title in enumerate(["Bone", "Leather", "Ebony", "Iron", "Choice Chests"])
+            ]
+            + [
+                ((72, 326, 650, 474), "Total Legendary Materials", None),
+                ((750, 326, 1328, 474), f"Net Change ({payload.range_key.value})", None),
+            ],
+            chart_xy=(44, 520, 1356, 924),
+            avatar_bytes=avatar_bytes,
+        )
     canvas = Image.new("RGBA", (WIDTH, HEIGHT), BG)
     draw = ImageDraw.Draw(canvas, "RGBA")
     _draw_header(
@@ -719,12 +931,17 @@ def render_inventory_reports(
     return [item for item in rendered if item is not None]
 
 
-def _export(canvas: Image.Image, filename: str) -> RenderedInventoryImage:
+def _export(
+    canvas: Image.Image,
+    filename: str,
+    *,
+    source_label: str = "Generated from approved inventory imports",
+) -> RenderedInventoryImage:
     generated = ImageDraw.Draw(canvas)
     _draw_text(
         generated,
         (44, 944),
-        "Generated from approved inventory imports",
+        source_label,
         fill=MUTED,
         font=_font(16),
     )
