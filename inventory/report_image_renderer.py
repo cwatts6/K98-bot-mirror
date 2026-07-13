@@ -141,12 +141,12 @@ def _paste_icon(canvas: Image.Image, path: Path, box: tuple[int, int, int, int])
             icon.getpixel((max(icon.width - 1, 0), max(icon.height - 1, 0))),
         )
         if sum(all(channel >= 245 for channel in pixel[:3]) for pixel in corners) >= 3:
-            icon.putdata(
-                [
-                    (*pixel[:3], 0) if all(channel >= 245 for channel in pixel[:3]) else pixel
-                    for pixel in icon.get_flattened_data()
-                ]
-            )
+            pixels = icon.load()
+            for y in range(icon.height):
+                for x in range(icon.width):
+                    pixel = pixels[x, y]
+                    if all(channel >= 245 for channel in pixel[:3]):
+                        pixels[x, y] = (*pixel[:3], 0)
         icon.thumbnail((box[2] - box[0], box[3] - box[1]), Image.Resampling.LANCZOS)
         x = box[0] + ((box[2] - box[0]) - icon.width) // 2
         y = box[1] + ((box[3] - box[1]) - icon.height) // 2

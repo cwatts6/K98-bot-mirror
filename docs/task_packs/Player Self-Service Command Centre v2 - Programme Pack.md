@@ -657,7 +657,7 @@ Delivery record:
   implementation; the 2800x1960 `_master_2x` files remain source-only.
 - The renderer-only refresh uses the three report-specific production backdrops and aligns panels,
   charts, typography, spacing, contrast, long-name handling, and native no-data presentation.
-- Automated validation passed 190 focused/Inventory tests and the full suite (`2495 passed, 2
+- Automated validation passed 191 focused/Inventory tests and the full suite (`2495 passed, 2
   skipped`) plus architecture, deferred-item, import, registration, formatting, type, and secret
   checks.
 - Original-size, Discord desktop, and Discord mobile samples cover populated and honest no-data

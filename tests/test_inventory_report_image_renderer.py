@@ -178,6 +178,28 @@ def test_inventory_renderer_text_helpers_delegate_to_visual_text(monkeypatch):
     report_image_renderer._font.cache_clear()
 
 
+def test_white_icon_background_cleanup_uses_pillow_11_compatible_pixel_access(monkeypatch):
+    def fail_if_newer_api_is_used(_image):
+        raise AssertionError("Pillow 11.3 does not provide get_flattened_data")
+
+    monkeypatch.setattr(
+        Image.Image,
+        "get_flattened_data",
+        fail_if_newer_api_is_used,
+        raising=False,
+    )
+    canvas = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
+
+    report_image_renderer._paste_icon(
+        canvas,
+        report_image_renderer.ASSET_DIR / "speedup_logo.png",
+        (8, 8, 88, 88),
+    )
+
+    assert canvas.getbbox() is not None
+    assert canvas.getpixel((8, 8))[3] == 0
+
+
 def test_inventory_wrap_text_uses_glyph_safe_width():
     image = Image.new("RGBA", (420, 80))
     draw = report_image_renderer.ImageDraw.Draw(image)

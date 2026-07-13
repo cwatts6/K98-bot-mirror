@@ -310,7 +310,7 @@ Implementation record (2026-07-13):
   assets fall back to the established safe canvas without changing filenames or stream behavior.
 - Generated populated, sparse/Unicode, and honest no-data samples at original, Discord desktop, and
   Discord mobile sizes for each report type.
-- Passed 190 focused/Inventory tests and the full suite (`2495 passed, 2 skipped`) plus architecture,
+- Passed 191 focused/Inventory tests and the full suite (`2495 passed, 2 skipped`) plus architecture,
   deferred-item, import, registration, formatting, type, and secret checks.
 - The requested Codex Security skill was unavailable in this session; a manual security-focused
   diff review found no permission, privacy, user-input, path-selection, attachment, or cleanup

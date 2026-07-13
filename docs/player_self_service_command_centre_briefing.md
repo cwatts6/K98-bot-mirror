@@ -469,7 +469,7 @@ Current status:
   production backdrops for Resources, Speedups, Materials, and honest native no-data output. The
   2800x1960 masters remain source-only, and filenames, data, calculations, ranges, exports,
   privacy, controls, attachment lifecycle, and `/myinventory` behavior remain unchanged. Automated
-  validation passed 190 focused/Inventory tests and the full suite (`2495 passed, 2 skipped`).
+  validation passed 191 focused/Inventory tests and the full suite (`2495 passed, 2 skipped`).
 - Phases 5C-5G independently migrate Accounts, Reminders, Preferences, Inventory summary, and
   Exports summary as matching operator-approved backdrops arrive. These Discord-user/all-governor
   pages do not show Change Governor; they retain selected governor context only for returning to a
