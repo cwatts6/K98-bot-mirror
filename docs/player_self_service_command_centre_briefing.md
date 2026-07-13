@@ -464,8 +464,9 @@ Current status:
   ranges, private exports, honest native no-data output, and the author-gated paged Change Governor
   control. It preserves report type/range while switching, increases `/me` grouped subcommands
   from 6 to 9, and keeps the top-level count at 42. Operator smoke passed on 2026-07-13.
-- GovernorOS v2 Phase 5B is implemented and locally validated, awaiting operator Discord smoke and
-  final visual acceptance. The shared Inventory renderer uses the three supplied 1400x980 premium
+- GovernorOS v2 Phase 5B is complete. Operator smoke and final visual acceptance passed on
+  2026-07-13; the operator described the finished reports as premium. The shared Inventory renderer
+  uses the three supplied 1400x980 premium
   production backdrops for Resources, Speedups, Materials, and honest native no-data output. The
   2800x1960 masters remain source-only, and filenames, data, calculations, ranges, exports,
   privacy, controls, attachment lifecycle, and `/myinventory` behavior remain unchanged. Operator
@@ -475,11 +476,20 @@ Current status:
   available, and fitted KPI/chart typography is modestly larger. The final chart presentation pass
   replaces the fixed first/middle/last date labels with up to six evenly spaced genuine upload
   dates and adds density-aware diamond markers for every plotted upload. Automated validation
-  passed 255 focused Inventory/dashboard tests and the full suite (`2503 passed, 2 skipped`).
-- Phases 5C-5G independently migrate Accounts, Reminders, Preferences, Inventory summary, and
-  Exports summary as matching operator-approved backdrops arrive. These Discord-user/all-governor
-  pages do not show Change Governor; they retain selected governor context only for returning to a
-  governor-specific page.
+  passed 255 focused Inventory/dashboard tests and the full suite (`2503 passed, 2 skipped`). The
+  completed Phase 5B task pack and starter are archived.
+- Phase 5C Premium Accounts Summary Card is next and starts with an operator visual/product
+  workshop. Unless explicitly changed at that checkpoint, it retains the current 1702x924 output
+  and stable filename, migrates successful presentation from an embed-wrapped image to a standalone
+  private attachment, uses the invoking player's avatar best-effort, and preserves the same-payload
+  embed fallback and guided Manage journey. Accounts is a Discord-user/all-linked-governor page:
+  it does not show Change Governor. Optional selected-governor context exists only so Dashboard can
+  return to the prior governor; direct `/me accounts` entry follows normal dashboard resolution.
+- Phases 5D-5G independently apply the same format and transition contract to Reminders,
+  Preferences, Inventory summary, and Exports summary. They preserve current page actions,
+  disabled states, privacy, payloads, filenames, attachment cleanup, and service ownership; none
+  shows Change Governor. Governor-specific child actions must perform their own explicit selection
+  and access recheck rather than treating retained return context as a page filter.
 - Phase 6 adds Export Stats only after selected-governor versus all-linked semantics are approved;
   export schema/format redesign remains outside GovernorOS.
 - Phase 7 adds private selected-governor `/me history` while preserving public/channel-gated

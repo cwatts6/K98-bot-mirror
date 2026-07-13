@@ -9,24 +9,23 @@ entire `docs/reference` folder.
 
 ## Current GovernorOS Programme
 
-GovernorOS v2 Phase 5B Premium Inventory Report Backdrops and Visual Alignment is implemented and
-locally validated. The shared 1400x980 renderer now uses the approved report-specific production
-backdrops for Resources, Speedups, Materials, and their honest native no-data reports while the
-2800x1960 masters remain source-only. The visual refresh intentionally applies to private direct
-`/me` reports and legacy `/myinventory`; data, calculations, visibility, controls, exports,
-filenames, fallback, attachment lifecycle, and every interaction contract remain unchanged.
-Operator visual review accepted the premium theme and content direction, then requested restoration
-of the report item icons, the invoking player's Discord avatar in the top-left identity position,
-and a safe readability increase. Those follow-up presentation changes are implemented and locally
-validated across populated and honest no-data reports at original and Discord mobile size. A final
-chart-readability follow-up now labels up to six evenly spaced genuine upload dates and draws a
-density-aware diamond at every plotted upload, making history depth explicit without changing the
-underlying series or report payload.
+GovernorOS v2 Phase 5B Premium Inventory Report Backdrops and Visual Alignment is complete.
+Operator smoke and final visual acceptance passed on 2026-07-13 across the premium Resources,
+Speedups, Materials, and honest no-data reports. The shared 1400x980 renderer uses the approved
+report-specific production backdrops, restored item icons, the invoking player's best-effort
+Discord avatar, fitted typography, up to six genuine upload-date labels, and density-aware markers
+for every plotted upload. The 2800x1960 masters remain source-only. Private direct `/me` reports
+and legacy `/myinventory` intentionally share the visual refresh while data, calculations,
+visibility, controls, exports, filenames, fallback, attachment lifecycle, and every interaction
+contract remain unchanged. The completed Phase 5B task pack and starter are archived.
 
-Phase 5B now awaits operator Discord smoke and final visual acceptance. Its active task pack and
-chat starter remain in `docs/task_packs/` until that checkpoint completes. Later Phase 5C-5G slices
-own the premium Accounts, Reminders, Preferences, Inventory summary, and Exports cards separately;
-those Discord-user/all-governor pages must not show the selected-governor dropdown.
+Phase 5C Premium Accounts Summary Card is the next approval-gated slice. It begins with an operator
+visual/product workshop before implementation. The default contract is the existing 1702x924
+summary-card output and stable filename delivered as a standalone private attachment, with the
+current same-payload embed fallback, guided Manage flow, blue navigation, optional selected-
+governor return context, and invoking-player avatar treatment preserved. Accounts is a Discord-
+user/all-linked-governor page, so it must not show Change Governor. Phases 5D-5G apply the same
+baseline independently to Reminders, Preferences, Inventory summary, and Exports summary.
 
 ## Quality Automation
 

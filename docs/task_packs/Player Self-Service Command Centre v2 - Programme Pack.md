@@ -5,7 +5,7 @@
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
 - Date: `2026-07-13`
-- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486 and GovernorOS v2 Phase 5A completed in mirror PR #219 and production PR #526
+- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486 and GovernorOS v2 Phases 1-5B completed through mirror PR #220 and production PR #527
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
@@ -350,8 +350,8 @@ the presentation rules independently:
 Delivery ownership:
 
 - Phase 5A applied the contract to direct governor-specific Resources, Materials, and Speedups.
-- Phase 5B refreshes the shared 1400x980 Inventory report renderer with approved premium backdrops
-  without changing report data or interaction behavior.
+- Phase 5B completed the shared 1400x980 Inventory report renderer refresh with approved premium
+  backdrops without changing report data or interaction behavior.
 - Phases 5C-5G migrate Accounts, Reminders, Preferences, Inventory, and Exports summary cards one
   page at a time as matching operator-approved assets become available.
 - Phases 6-8 must use the same contract for Exports actions, History, and Inspect respectively.
@@ -629,7 +629,7 @@ Completion record:
 
 ### Phase 5B — Premium Inventory Report Backdrops and Visual Alignment
 
-Status: `implemented and locally validated; awaiting operator Discord smoke and final visual acceptance`.
+Status: `complete - operator smoke and final visual acceptance passed 2026-07-13`.
 
 Goal: bring the existing Resources, Speedups, Materials, and honest no-data Inventory report PNGs
 up to the accepted premium GovernorOS v2.0 visual standard using the approved report-specific
@@ -668,24 +668,111 @@ Delivery record:
   skipped`) plus architecture, deferred-item, import, registration, formatting, type, and secret
   checks.
 - Original-size, Discord desktop, and Discord mobile samples cover populated and honest no-data
-  Resources, Speedups, and Materials; operator Discord smoke and final visual acceptance remain.
+  Resources, Speedups, and Materials.
+- Operator smoke and final visual acceptance passed on 2026-07-13. The operator confirmed the
+  finished reports look premium, with populated/no-data data fidelity and the existing interaction
+  behavior preserved. The completed task pack and chat starter are archived.
 
 ### Phase 5C-5G — Premium `/me` Summary Cards
 
-Status: `proposed as five independent asset-led slices after Phase 5B`.
+Status: `Phase 5C Accounts is the next approval-gated visual/product workshop; Phases 5D-5G remain separately scoped`.
 
-- Phase 5C: Premium Accounts Summary Card.
-- Phase 5D: Premium Reminders Summary Card.
-- Phase 5E: Premium Preferences Summary Card.
-- Phase 5F: Premium Inventory Summary Card.
-- Phase 5G: Premium Exports Summary Card.
+The five summary pages share a presentation and interaction baseline but remain independent PR-sized
+slices. A later page must reuse the accepted rules from earlier pages without creating a broad
+renderer/view framework or silently inheriting page-specific decisions.
 
-Each slice owns one existing Discord-user or all-governor page, its operator-approved backdrop,
-standalone attachment migration where still required, same-payload private fallback, current
-actions/disabled states, blue-primary global navigation, attachment/stream cleanup, and
-desktop/mobile smoke. These pages must not show Change Governor. Selected governor context may be
-retained only for returning to the governor dashboard or an explicitly governor-specific action.
-No slice changes page data, service ownership, permissions, visibility, or export behavior.
+Shared premium summary-card contract:
+
+- Keep the current 1702x924 output and stable `me_<page>_<discord_user_id>.png` filename by default.
+  A different dimension requires explicit page-specific approval after original-size, Discord
+  desktop, and Discord mobile comparison; source masters must not be loaded at runtime.
+- Deliver the successful generated PNG as a standalone private attachment for full Discord width,
+  not inside an embed image container. Retain the concise private embed built from the same already-
+  authorized summary payload as the rendering/delivery fallback.
+- Render off the event loop, replace prior attachments deliberately, preserve the fallback without
+  a second data fetch, and close every file/stream on success, fallback, timeout, cancellation,
+  stale suppression, and concurrent navigation.
+- Use the invoking player's Discord avatar best-effort in the approved identity position, with a
+  safe local page/KD98 fallback. Keep long/Unicode display names fitted and readable.
+- Keep genuine current page values, states, names, action guidance, and empty/unavailable wording.
+  Do not invent figures, trends, governors, status, or next actions to fill the backdrop.
+- Keep global navigation as real Discord components: blue-primary `Accounts`, `Reminders`, and
+  `Preferences` on the first row; secondary `Dashboard`, `Inventory`, and `Exports` on the second;
+  page-specific success actions below; the active page remains disabled. Do not paint fake buttons
+  into the image.
+- Accounts, Reminders, Preferences, Inventory summary, and Exports summary are Discord-user or all-
+  linked-governor pages. They must not show `Change Governor`, even when more than one governor is
+  linked. The view may carry an optional selected governor only so `Dashboard` returns to the same
+  governor. Direct `/me <page>` entry has no implicit governor filter and uses the normal dashboard
+  no/one/multiple-governor resolution when the player returns.
+- A governor-specific child action, such as Inventory VIP or a report, must perform its own explicit
+  governor selection/resolution and current access recheck. Retained Dashboard-return context must
+  never silently narrow a user-level page or bypass authorization.
+- Preserve private/ephemeral delivery, author gating, current timeouts, stale/foreign/forged/
+  concurrent denial, action disabled states, services, DAL contracts, persistence, command
+  registration, and command versions unless a phase explicitly approves a version-only update.
+- For each page, test direct-command entry, navigation from a selected dashboard, fallback from the
+  same payload, render/delivery failure, attachment replacement, stream cleanup, timeout/stale/
+  foreign/concurrent paths, empty/unavailable data, long names, and original/desktop/mobile output.
+
+#### Phase 5C - Premium Accounts Summary Card
+
+Status: `next - scope prepared; awaiting operator ideas, visual hierarchy, and asset approval`.
+
+Current contract to preserve:
+
+- `/me accounts` is private and summarizes the invoking Discord user's complete linked-governor
+  registry, not one selected governor.
+- The current summary payload supplies main-account label/state, linked count/state, account names,
+  and service-owned next-action guidance. Phase 5C does not add fields or query data.
+- `Manage` opens the existing guided private journey for Governor ID lookup, add/register into an
+  available slot, replace, and remove with confirmation and current-state revalidation. Successful
+  mutations refresh the host Accounts card.
+- The current generated card uses `assets/me/cards/me accounts.png`, renders at 1702x924, uses the
+  stable `me_accounts_<discord_user_id>.png` filename, and is wrapped in an attachment embed. The
+  asset is an existing input, not automatic approval for the new premium composition.
+
+Approval workshop before implementation:
+
+- Work through the operator's Accounts improvement ideas and agree the visual hierarchy for player
+  identity, main governor, linked count, named account slots, open capacity, status, and Manage
+  guidance using only fields already present in the authorized payload.
+- Approve backdrop provenance, runtime dimensions, source-master policy, avatar placement, icon
+  treatment, panel density, typography, empty/unavailable treatment, and desktop/mobile samples.
+- Confirm whether the current 1702x924 backdrop is retained/reworked or replaced. If requested
+  content needs a new field, slot-level property, SQL query, calculation, or workflow behavior,
+  stop and split that work into an explicitly approved data/behavior slice.
+
+Phase 5C does not change account slots, registry authority, lookup matching, ownership/claim rules,
+write confirmation/revalidation, service/DAL/SQL behavior, redirects, command registration, or any
+other `/me` page.
+
+#### Phase 5D - Premium Reminders Summary Card
+
+Preserve combined KVK/calendar reminder states, event/time summaries, the existing guided `Manage`
+child flow, persistence/restart behavior, and author gating. No reminder scheduling, event source,
+lead-time, DM, calendar, or SQL change; no Change Governor.
+
+#### Phase 5E - Premium Preferences Summary Card
+
+Preserve Inventory visibility state/actions, Inventory VIP, Discord-user timezone/location/language,
+`Set Public`/`Set Private`, `Update VIP`, and `Manage Profile` behavior. VIP remains an explicitly
+governor-resolved child action; the page itself is user-level and has no Change Governor. No profile
+schema, preference, visibility, Google Sheets, or SQL change.
+
+#### Phase 5F - Premium Inventory Summary Card
+
+Preserve the existing all-linked-governor Resources/Speedups/Materials coverage summary, upload
+guidance, and `Open Report` journey. This phase does not migrate or redesign the Phase 5B direct
+1400x980 reports, does not add a selected-governor page filter, and does not change imports,
+calculations, visibility, ranges, exports, filenames, or Google Sheets behavior.
+
+#### Phase 5G - Premium Exports Summary Card
+
+Preserve the current all-linked/user-level Stats and Inventory export availability, guidance,
+disabled states, private option windows, schemas, formats, date windows, filenames, and Google
+Sheets behavior. No Change Governor; any selected-governor export decision remains owned by the
+separate Phase 6 approval gate.
 
 ### Phase 6 — Export Stats Action Decision and Integration
 
@@ -969,18 +1056,20 @@ Do not include these in early phases unless separately approved:
 ## 20. Suggested Next Action
 
 ```text
-Run Phase 5B operator Discord smoke against populated, partial, and honest no-data Resources,
-Speedups, and Materials, then record final visual acceptance before archiving the Phase 5B pack.
+Start the Phase 5C Accounts visual/product workshop. Review the operator's improvement ideas and
+agree the content hierarchy, backdrop/runtime dimensions, avatar/icon treatment, standalone format,
+empty/unavailable presentation, and desktop/mobile prototype before implementation approval.
 ```
 
-Phase 5A is complete and operator accepted. Phase 5B is deliberately presentation-only: the
-existing shared report renderer adopts the supplied premium backdrops while every data,
-calculation, command, interaction, privacy, export, and compatibility contract remains stable.
+Phases 1-5B are complete and operator accepted. Phase 5C is deliberately approval-gated: the
+Accounts page may be visually re-composed and moved to standalone attachment delivery, but its
+Discord-user/all-linked-governor payload, guided Manage workflow, private behavior, and service/DAL
+contracts remain stable. It does not show Change Governor.
 
 Use:
 
-- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5B Premium Inventory Report Backdrops and Visual Alignment.md`
-- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5B Premium Inventory Report Backdrops and Visual Alignment.md`
+- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5C Premium Accounts Summary Card.md`
+- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5C Premium Accounts Summary Card.md`
 
 ## 21. Programme Change Log
 
@@ -997,3 +1086,4 @@ Use:
 | 2026-07-12 | Phase 5A revised scope approved | Approved the three private report commands, governor-only entry selector, selected-governor Inventory totals, 1180x760 dashboard, revised navigation, retained `/me inventory`, and unchanged 1400x980 Inventory renderer. |
 | 2026-07-13 | Phase 5A completed and Phase 5B prepared | Recorded successful direct-report and no-data smoke, archived the completed pack/starter, accepted the Inventory visual-quality gap, added six dormant premium backdrop assets, made their renderer-only adoption the new Phase 5B, and separated the five user-level summary pages into Phases 5C-5G with no governor dropdown. |
 | 2026-07-13 | Phase 5B implemented and locally validated | Adopted the three 1400x980 report-specific runtime backdrops in the shared Inventory renderer, retained source-only 2x masters and stable behavior, added failure/data/stream/visual coverage, and passed focused plus full automated validation. Operator Discord smoke and final visual acceptance remain. |
+| 2026-07-13 | Phase 5B completed and Phase 5C prepared | Recorded successful Phase 5B operator smoke and final premium visual acceptance; archived its task pack/starter; made Accounts the next approval-gated visual/product workshop; and defined the shared 1702x924-default standalone summary-card, avatar, navigation, fallback, cleanup, and no-Change-Governor contract for Phases 5C-5G. |
