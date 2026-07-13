@@ -472,8 +472,10 @@ Current status:
   visual review accepted the premium theme/content direction and requested a presentation follow-up:
   the supplied Resources, Speedups, and Materials item icons are restored to populated and native
   no-data KPI shells, the invoking player's Discord avatar replaces the top-left report logo when
-  available, and fitted KPI/chart typography is modestly larger. Automated validation passed 252
-  focused Inventory/dashboard tests and the full suite (`2500 passed, 2 skipped`).
+  available, and fitted KPI/chart typography is modestly larger. The final chart presentation pass
+  replaces the fixed first/middle/last date labels with up to six evenly spaced genuine upload
+  dates and adds density-aware diamond markers for every plotted upload. Automated validation
+  passed 255 focused Inventory/dashboard tests and the full suite (`2503 passed, 2 skipped`).
 - Phases 5C-5G independently migrate Accounts, Reminders, Preferences, Inventory summary, and
   Exports summary as matching operator-approved backdrops arrive. These Discord-user/all-governor
   pages do not show Change Governor; they retain selected governor context only for returning to a

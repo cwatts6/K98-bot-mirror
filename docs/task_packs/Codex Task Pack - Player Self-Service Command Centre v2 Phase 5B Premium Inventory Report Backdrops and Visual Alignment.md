@@ -316,7 +316,10 @@ Implementation record (2026-07-13):
   item icons as a significant regression. The follow-up restores the supplied Resources, Speedups,
   and Materials icons to populated/no-data KPI shells, uses the invoking player's circular Discord
   avatar at top-left with the report logo as fallback, and increases fitted KPI/chart typography.
-- Passed 252 focused Inventory/dashboard tests and the full suite (`2500 passed, 2 skipped`) plus architecture,
+- The final chart-readability follow-up replaces the fixed first/middle/last date labels with up to
+  six evenly spaced genuine upload dates and adds a density-aware diamond at every plotted upload.
+  This exposes history depth without changing series values or fabricating observations.
+- Passed 255 focused Inventory/dashboard tests and the full suite (`2503 passed, 2 skipped`) plus architecture,
   deferred-item, import, registration, formatting, type, and secret checks.
 - The requested Codex Security skill was unavailable in this session; a manual security-focused
   diff review found no permission, privacy, user-input, path-selection, attachment, or cleanup

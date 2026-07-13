@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from core import visual_text
 from inventory import report_image_renderer
@@ -485,6 +485,43 @@ def test_series_values_flattens_visible_series_for_y_scale():
     )
 
     assert values == [10, 20, 5, 7, 1, 2]
+
+
+def test_chart_date_indices_show_all_small_histories_and_six_evenly_spaced_dense_dates():
+    assert report_image_renderer._chart_date_indices(0) == []
+    assert report_image_renderer._chart_date_indices(3) == [0, 1, 2]
+    assert report_image_renderer._chart_date_indices(8) == [0, 1, 3, 4, 6, 7]
+    assert report_image_renderer._chart_date_indices(30) == [0, 6, 12, 17, 23, 29]
+
+
+def test_chart_marker_radius_reduces_for_dense_histories():
+    assert report_image_renderer._chart_marker_radius(3) == 5
+    assert report_image_renderer._chart_marker_radius(30) == 4
+    assert report_image_renderer._chart_marker_radius(60) == 3
+    assert report_image_renderer._chart_marker_radius(90) == 2
+
+
+def test_line_chart_draws_one_marker_for_every_genuine_series_point(monkeypatch):
+    canvas = Image.new("RGBA", (1400, 980), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(canvas, "RGBA")
+    markers = []
+
+    def capture_marker(_draw, point, color, *, radius):
+        markers.append((point, color, radius))
+
+    monkeypatch.setattr(report_image_renderer, "_draw_data_marker", capture_marker)
+
+    report_image_renderer._line_chart(
+        canvas,
+        draw,
+        (44, 510, 1356, 924),
+        {"Food": [10, 20, 30], "Wood": [5, 7, 9]},
+        ["2026-07-01", "2026-07-05", "2026-07-10"],
+        [(82, 196, 113), (181, 116, 62)],
+    )
+
+    assert len(markers) == 6
+    assert {marker[2] for marker in markers} == {5}
 
 
 def test_resource_chart_colours_are_distinct():

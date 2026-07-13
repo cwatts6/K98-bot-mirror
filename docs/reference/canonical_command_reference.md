@@ -279,7 +279,9 @@ Legend:
   report actions to the 1180x760 dashboard. Operator smoke passed populated, honest no-data, and
   report-preserving governor-switch journeys on 2026-07-13. Phase 5B locally completed its shared
   1400x980 premium renderer refresh without changing this command surface or interaction contract;
-  operator Discord smoke and final visual acceptance remain.
+  the presentation includes restored item icons, the invoking-player avatar with safe fallback,
+  fitted typography, up to six evenly spaced genuine upload dates, and density-aware markers for
+  every plotted upload. Operator Discord smoke and final visual acceptance remain.
 - Player Self-Service Command Centre Phase 13 started legacy redirect planning with audit/scope
   only. The operator-provided SQL extract and dated JSONL files showed nonzero broad usage for
   every audited legacy and related personal path, recent direct usage for several legacy paths, and

@@ -18,7 +18,10 @@ filenames, fallback, attachment lifecycle, and every interaction contract remain
 Operator visual review accepted the premium theme and content direction, then requested restoration
 of the report item icons, the invoking player's Discord avatar in the top-left identity position,
 and a safe readability increase. Those follow-up presentation changes are implemented and locally
-validated across populated and honest no-data reports at original and Discord mobile size.
+validated across populated and honest no-data reports at original and Discord mobile size. A final
+chart-readability follow-up now labels up to six evenly spaced genuine upload dates and draws a
+density-aware diamond at every plotted upload, making history depth explicit without changing the
+underlying series or report payload.
 
 Phase 5B now awaits operator Discord smoke and final visual acceptance. Its active task pack and
 chat starter remain in `docs/task_packs/` until that checkpoint completes. Later Phase 5C-5G slices

@@ -42,6 +42,7 @@ AXIS = (173, 184, 216)
 PANEL_OUTLINE = (151, 109, 199, 225)
 SEPARATOR = (124, 91, 164, 225)
 CHART_FILL_ALPHA = 6
+CHART_MAX_DATE_LABELS = 6
 RESOURCE_ACCENT = (96, 204, 120)
 SPEEDUP_ACCENT = (50, 190, 222)
 MATERIAL_ACCENT = (255, 139, 61)
@@ -506,6 +507,46 @@ def _series_values(series: dict[str, list[float]]) -> list[float]:
     return [max(float(value), 0.0) for values in series.values() for value in values]
 
 
+def _chart_date_indices(point_count: int, *, max_labels: int = CHART_MAX_DATE_LABELS) -> list[int]:
+    """Return evenly spaced upload indices for readable date labels."""
+
+    if point_count <= 0 or max_labels <= 0:
+        return []
+    if point_count <= max_labels:
+        return list(range(point_count))
+    if max_labels == 1:
+        return [0]
+    return sorted(
+        {round(label_idx * (point_count - 1) / (max_labels - 1)) for label_idx in range(max_labels)}
+    )
+
+
+def _chart_marker_radius(point_count: int) -> int:
+    if point_count <= 12:
+        return 5
+    if point_count <= 31:
+        return 4
+    if point_count <= 60:
+        return 3
+    return 2
+
+
+def _draw_data_marker(
+    draw: ImageDraw.ImageDraw,
+    point: tuple[float, float],
+    color: tuple[int, int, int],
+    *,
+    radius: int,
+) -> None:
+    x, y = (round(point[0]), round(point[1]))
+    draw.polygon(
+        ((x, y - radius), (x + radius, y), (x, y + radius), (x - radius, y)),
+        fill=color,
+        outline=PANEL_2[:3],
+        width=1 if radius <= 2 else 2,
+    )
+
+
 def _line_chart(
     canvas: Image.Image,
     draw: ImageDraw.ImageDraw,
@@ -544,16 +585,18 @@ def _line_chart(
     draw.line((plot[0], plot[1], plot[0], plot[3]), fill=AXIS, width=2)
     draw.line((plot[0], plot[3], plot[2], plot[3]), fill=AXIS, width=2)
 
-    axis_indices = sorted({0, len(labels) // 2, len(labels) - 1})
-    for idx in axis_indices:
+    date_font = _font(16)
+    for idx in _chart_date_indices(len(labels)):
         x = plot[0] + (plot[2] - plot[0]) * idx / max(len(labels) - 1, 1)
         draw.line((x, plot[3], x, plot[3] + 6), fill=AXIS, width=1)
+        date_label = _date_axis_label(labels[idx])
+        label_width = _text_width(draw, date_label, date_font)
         _draw_text(
             draw,
-            (x - 24, plot[3] + 12),
-            _date_axis_label(labels[idx]),
+            (x - (label_width / 2), plot[3] + 12),
+            date_label,
             fill=AXIS,
-            font=_font(16),
+            font=date_font,
         )
 
     series_with_colors = list(zip(series.items(), colors, strict=False))
@@ -581,6 +624,9 @@ def _line_chart(
             pts.append((x, y))
         if len(pts) >= 2:
             draw.line(pts, fill=color, width=4)
+        marker_radius = _chart_marker_radius(len(pts))
+        for point in pts:
+            _draw_data_marker(draw, point, color, radius=marker_radius)
     legend_x = plot[0]
     for name, color in zip(series.keys(), colors, strict=False):
         draw.rounded_rectangle((legend_x, y2 - 42, legend_x + 22, y2 - 22), radius=4, fill=color)
