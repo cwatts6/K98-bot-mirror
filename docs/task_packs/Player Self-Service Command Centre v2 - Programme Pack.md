@@ -629,7 +629,7 @@ Completion record:
 
 ### Phase 5B — Premium Inventory Report Backdrops and Visual Alignment
 
-Status: `next proposed slice; task pack and chat starter prepared`.
+Status: `implemented and locally validated; awaiting operator Discord smoke and final visual acceptance`.
 
 Goal: bring the existing Resources, Speedups, Materials, and honest no-data Inventory report PNGs
 up to the accepted premium GovernorOS v2.0 visual standard using the approved report-specific
@@ -651,8 +651,17 @@ Deliver:
 - No SQL, DAL, service, command, view, export schema, filename, dimension, import, or Google Sheets
   behavior change.
 
-Approval gate: approve the shared-renderer impact, backdrop/runtime policy, visual hierarchy, and
-representative Resources, Speedups, Materials, and no-data prototypes before implementation.
+Delivery record:
+
+- Operator approved the shared-renderer impact and retained 1400x980 runtime/output policy before
+  implementation; the 2800x1960 `_master_2x` files remain source-only.
+- The renderer-only refresh uses the three report-specific production backdrops and aligns panels,
+  charts, typography, spacing, contrast, long-name handling, and native no-data presentation.
+- Automated validation passed 190 focused/Inventory tests and the full suite (`2495 passed, 2
+  skipped`) plus architecture, deferred-item, import, registration, formatting, type, and secret
+  checks.
+- Original-size, Discord desktop, and Discord mobile samples cover populated and honest no-data
+  Resources, Speedups, and Materials; operator Discord smoke and final visual acceptance remain.
 
 ### Phase 5C-5G — Premium `/me` Summary Cards
 
@@ -953,8 +962,8 @@ Do not include these in early phases unless separately approved:
 ## 20. Suggested Next Action
 
 ```text
-Approve Phase 5B's backdrop/runtime policy and representative Resources, Speedups, Materials, and
-honest no-data visual direction, then implement the renderer-only refresh.
+Run Phase 5B operator Discord smoke against populated, partial, and honest no-data Resources,
+Speedups, and Materials, then record final visual acceptance before archiving the Phase 5B pack.
 ```
 
 Phase 5A is complete and operator accepted. Phase 5B is deliberately presentation-only: the
@@ -980,3 +989,4 @@ Use:
 | 2026-07-11 | Phase 4 archived and Phase 5A/5B scoped | Archived the completed Phase 4 task pack/starter, made Phase 5A direct inventory reports the next approval-gated slice, assigned existing `/me` summary-page standalone delivery to Phase 5B, and made the Phase 4 standalone/blue-navigation/governor-dropdown contract authoritative for later phases. |
 | 2026-07-12 | Phase 5A revised scope approved | Approved the three private report commands, governor-only entry selector, selected-governor Inventory totals, 1180x760 dashboard, revised navigation, retained `/me inventory`, and unchanged 1400x980 Inventory renderer. |
 | 2026-07-13 | Phase 5A completed and Phase 5B prepared | Recorded successful direct-report and no-data smoke, archived the completed pack/starter, accepted the Inventory visual-quality gap, added six dormant premium backdrop assets, made their renderer-only adoption the new Phase 5B, and separated the five user-level summary pages into Phases 5C-5G with no governor dropdown. |
+| 2026-07-13 | Phase 5B implemented and locally validated | Adopted the three 1400x980 report-specific runtime backdrops in the shared Inventory renderer, retained source-only 2x masters and stable behavior, added failure/data/stream/visual coverage, and passed focused plus full automated validation. Operator Discord smoke and final visual acceptance remain. |

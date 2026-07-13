@@ -1,5 +1,9 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5B Premium Inventory Report Backdrops and Visual Alignment
 
+Status on 2026-07-13: implementation and local automated/visual validation are complete. Retain this
+starter until operator Discord smoke and final visual acceptance are recorded in the active task
+pack; do not treat local validation as operator acceptance.
+
 Use this prompt to start the next GovernorOS v2 slice after Phase 5A.
 
 ---

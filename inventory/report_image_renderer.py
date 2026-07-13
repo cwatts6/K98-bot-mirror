@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
 from io import BytesIO
+import logging
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 
 from core import visual_text
 from inventory.capacity_calculations import (
@@ -23,20 +24,26 @@ from inventory.models import (
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSET_DIR = ROOT / "assets"
+CARD_ASSET_DIR = ASSET_DIR / "Inventory" / "cards"
 
 WIDTH = 1400
 HEIGHT = 980
 BG = (12, 48, 96)
-PANEL = (22, 74, 132)
-PANEL_2 = (29, 91, 154)
+PANEL = (5, 8, 20, 222)
+PANEL_2 = (8, 12, 28, 232)
 TEXT = (245, 250, 255)
-MUTED = (174, 205, 232)
+MUTED = (190, 191, 209)
 GREEN = (73, 222, 128)
 RED = (248, 113, 113)
 GOLD = (250, 204, 21)
-GRID = (31, 83, 139)
-AXIS = (122, 168, 210)
-CHART_FILL_ALPHA = 14
+GRID = (78, 89, 121, 205)
+AXIS = (173, 184, 216)
+PANEL_OUTLINE = (151, 109, 199, 225)
+SEPARATOR = (124, 91, 164, 225)
+CHART_FILL_ALPHA = 6
+RESOURCE_ACCENT = (96, 204, 120)
+SPEEDUP_ACCENT = (50, 190, 222)
+MATERIAL_ACCENT = (255, 139, 61)
 RESOURCE_CHART_COLORS = {
     "Food": (82, 196, 113),
     "Wood": (181, 116, 62),
@@ -51,11 +58,46 @@ MATERIAL_CHART_COLORS = {
     "Choice Chests": (255, 207, 0),
 }
 
+REPORT_BACKDROP_PATHS = {
+    InventoryReportView.RESOURCES: (CARD_ASSET_DIR / "inventory_resources_governoros_backdrop.png"),
+    InventoryReportView.SPEEDUPS: (CARD_ASSET_DIR / "inventory_speedups_governoros_backdrop.png"),
+    InventoryReportView.MATERIALS: (CARD_ASSET_DIR / "inventory_materials_governoros_backdrop.png"),
+}
+
+REPORT_ACCENTS = {
+    InventoryReportView.RESOURCES: RESOURCE_ACCENT,
+    InventoryReportView.SPEEDUPS: SPEEDUP_ACCENT,
+    InventoryReportView.MATERIALS: MATERIAL_ACCENT,
+}
+
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class RenderedInventoryImage:
     filename: str
     image_bytes: BytesIO
+
+
+def _report_canvas(view: InventoryReportView) -> Image.Image:
+    """Load an approved production backdrop or return the legacy-safe background."""
+
+    path = REPORT_BACKDROP_PATHS[view]
+    try:
+        with Image.open(path) as source:
+            if source.size != (WIDTH, HEIGHT):
+                raise ValueError(
+                    f"Inventory backdrop must be {WIDTH}x{HEIGHT}; received {source.size}"
+                )
+            return source.convert("RGBA")
+    except (OSError, ValueError, UnidentifiedImageError):
+        logger.warning(
+            "inventory_report_backdrop_unavailable view=%s path=%s",
+            view.value,
+            path,
+            exc_info=True,
+        )
+        return Image.new("RGBA", (WIDTH, HEIGHT), BG)
 
 
 @lru_cache(maxsize=32)
@@ -90,7 +132,21 @@ def _paste_icon(canvas: Image.Image, path: Path, box: tuple[int, int, int, int])
     if not path.exists():
         return
     try:
-        icon = Image.open(path).convert("RGBA")
+        with Image.open(path) as source:
+            icon = source.convert("RGBA")
+        corners = (
+            icon.getpixel((0, 0)),
+            icon.getpixel((max(icon.width - 1, 0), 0)),
+            icon.getpixel((0, max(icon.height - 1, 0))),
+            icon.getpixel((max(icon.width - 1, 0), max(icon.height - 1, 0))),
+        )
+        if sum(all(channel >= 245 for channel in pixel[:3]) for pixel in corners) >= 3:
+            icon.putdata(
+                [
+                    (*pixel[:3], 0) if all(channel >= 245 for channel in pixel[:3]) else pixel
+                    for pixel in icon.get_flattened_data()
+                ]
+            )
         icon.thumbnail((box[2] - box[0], box[3] - box[1]), Image.Resampling.LANCZOS)
         x = box[0] + ((box[2] - box[0]) - icon.width) // 2
         y = box[1] + ((box[3] - box[1]) - icon.height) // 2
@@ -111,13 +167,21 @@ def _draw_header(
     avatar_bytes: bytes | None,
 ) -> None:
     _paste_icon(canvas, logo, (44, 32, 116, 104))
-    _draw_text(draw, (132, 40), title, fill=TEXT, font=_font(34, bold=True), bold=True)
+    _draw_text(draw, (132, 38), title, fill=TEXT, font=_font(36, bold=True), bold=True)
+    context = f"{governor_name} ({governor_id})  |  Range {range_key}"
+    context_font = _fit_font(
+        draw,
+        context,
+        max_width=1100 if avatar_bytes else 1210,
+        size=20,
+        min_size=14,
+    )
     _draw_text(
         draw,
         (132, 82),
-        f"{governor_name} ({governor_id})  |  Range {range_key}",
+        context,
         fill=MUTED,
-        font=_font(20),
+        font=context_font,
     )
     if avatar_bytes:
         try:
@@ -127,8 +191,21 @@ def _draw_header(
             pass
 
 
-def _panel(draw: ImageDraw.ImageDraw, xy: tuple[int, int, int, int], fill=PANEL) -> None:
-    draw.rounded_rectangle(xy, radius=14, fill=fill, outline=(71, 139, 202), width=2)
+def _panel(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[int, int, int, int],
+    fill=PANEL,
+    *,
+    accent: tuple[int, int, int] | None = None,
+) -> None:
+    draw.rounded_rectangle(xy, radius=14, fill=fill, outline=PANEL_OUTLINE, width=1)
+    if accent is not None:
+        x1, y1, _x2, y2 = xy
+        draw.rounded_rectangle(
+            (x1 + 14, y1 + 15, x1 + 23, y2 - 15),
+            radius=5,
+            fill=(*accent, 245),
+        )
 
 
 def _text_width(
@@ -216,27 +293,30 @@ def _draw_kpi(
     delta: str,
     delta_color: tuple[int, int, int],
     icon: Path | None = None,
+    accent: tuple[int, int, int] | None = None,
 ) -> None:
-    _panel(draw, xy)
+    _panel(draw, xy, accent=accent)
     x1, y1, x2, y2 = xy
-    content_w = x2 - x1 - 40
+    content_x = x1 + 34 if accent else x1 + 20
+    content_w = x2 - content_x - 18
     if icon:
-        _paste_icon(canvas, icon, (x1 + 16, y1 + 18, x1 + 62, y1 + 64))
-        title_x = x1 + 72
+        _paste_icon(canvas, icon, (content_x, y1 + 16, content_x + 42, y1 + 58))
+        title_x = content_x + 52
         title_w = x2 - title_x - 18
     else:
-        title_x = x1 + 20
+        title_x = content_x
         title_w = content_w
     title_font = _fit_font(draw, title, max_width=title_w, size=18, min_size=13, bold=True)
     value_font = _fit_font(draw, value, max_width=content_w, size=34, min_size=24, bold=True)
     delta_font = _fit_font(draw, delta, max_width=content_w, size=20, min_size=11, bold=True)
     _draw_text(draw, (title_x, y1 + 20), title, fill=MUTED, font=title_font, bold=True)
-    value_xy = (x1 + 20, y1 + 68)
+    value_xy = (content_x, y1 + 68)
     _draw_text(draw, value_xy, value, fill=TEXT, font=value_font, bold=True)
     value_box = draw.textbbox(value_xy, value, font=value_font)
     separator_y = min(max(value_box[3] + 14, y1 + 108), y2 - 36)
-    draw.line((x1 + 18, separator_y, x2 - 18, separator_y), fill=(65, 127, 187), width=1)
+    draw.line((content_x, separator_y, x2 - 18, separator_y), fill=SEPARATOR, width=1)
     max_delta_lines = 1 if _text_width(draw, delta, delta_font, bold=True) <= content_w else 2
+    delta_line_step = max(14, int(getattr(delta_font, "size", 12)) + 3)
     for idx, line in enumerate(
         _wrap_text(
             draw,
@@ -249,7 +329,7 @@ def _draw_kpi(
     ):
         _draw_text(
             draw,
-            (x1 + 20, separator_y + 10 + (idx * 22)),
+            (content_x, separator_y + 7 + (idx * delta_line_step)),
             line,
             fill=delta_color,
             font=delta_font,
@@ -264,14 +344,16 @@ def _draw_empty_kpi(
     *,
     title: str,
     icon: Path | None = None,
+    accent: tuple[int, int, int] | None = None,
 ) -> None:
-    _panel(draw, xy, fill=(18, 65, 118))
+    _panel(draw, xy, fill=(7, 10, 23, 210), accent=accent)
     x1, y1, x2, y2 = xy
+    content_x = x1 + 34 if accent else x1 + 20
     if icon:
-        _paste_icon(canvas, icon, (x1 + 16, y1 + 18, x1 + 62, y1 + 64))
-        title_x = x1 + 72
+        _paste_icon(canvas, icon, (content_x, y1 + 16, content_x + 42, y1 + 58))
+        title_x = content_x + 52
     else:
-        title_x = x1 + 20
+        title_x = content_x
     title_font = _fit_font(
         draw,
         title,
@@ -281,14 +363,14 @@ def _draw_empty_kpi(
         bold=True,
     )
     _draw_text(draw, (title_x, y1 + 20), title, fill=MUTED, font=title_font, bold=True)
-    _draw_text(draw, (x1 + 20, y1 + 66), "—", fill=(115, 156, 194), font=_font(32))
+    _draw_text(draw, (content_x, y1 + 66), "—", fill=(131, 136, 157), font=_font(32))
     separator_y = min(y1 + 108, y2 - 38)
-    draw.line((x1 + 18, separator_y, x2 - 18, separator_y), fill=(48, 103, 158), width=1)
+    draw.line((content_x, separator_y, x2 - 18, separator_y), fill=SEPARATOR, width=1)
     _draw_text(
         draw,
-        (x1 + 20, separator_y + 10),
+        (content_x, separator_y + 10),
         "Not recorded",
-        fill=(115, 156, 194),
+        fill=(131, 136, 157),
         font=_font(17),
     )
 
@@ -303,9 +385,11 @@ def _render_empty_report(
     kpis: list[tuple[tuple[int, int, int, int], str, Path | None]],
     chart_xy: tuple[int, int, int, int],
     avatar_bytes: bytes | None,
+    view: InventoryReportView,
 ) -> RenderedInventoryImage:
-    canvas = Image.new("RGBA", (WIDTH, HEIGHT), BG)
+    canvas = _report_canvas(view)
     draw = ImageDraw.Draw(canvas, "RGBA")
+    accent = REPORT_ACCENTS[view]
     _draw_header(
         canvas,
         draw,
@@ -316,14 +400,14 @@ def _render_empty_report(
         range_key=payload.range_key.value,
         avatar_bytes=avatar_bytes,
     )
-    for xy, kpi_title, icon in kpis:
-        _draw_empty_kpi(canvas, draw, xy, title=kpi_title, icon=icon)
+    for xy, kpi_title, _icon in kpis:
+        _draw_empty_kpi(canvas, draw, xy, title=kpi_title, icon=None, accent=accent)
 
-    _panel(draw, chart_xy, fill=(9, 36, 78))
+    _panel(draw, chart_xy, fill=PANEL_2)
     x1, y1, x2, y2 = chart_xy
     for idx in range(1, 5):
         y = y1 + ((y2 - y1) * idx / 5)
-        draw.line((x1 + 48, y, x2 - 48, y), fill=(24, 68, 116), width=1)
+        draw.line((x1 + 48, y, x2 - 48, y), fill=GRID, width=1)
 
     overlay_w = min(860, x2 - x1 - 96)
     overlay_h = min(224, y2 - y1 - 64)
@@ -333,9 +417,9 @@ def _render_empty_report(
     draw.rounded_rectangle(
         overlay,
         radius=18,
-        fill=(13, 54, 104, 246),
-        outline=(74, 145, 207),
-        width=2,
+        fill=(7, 10, 23, 238),
+        outline=PANEL_OUTLINE,
+        width=1,
     )
     heading = f"No approved {report_label} data recorded"
     heading_font = _fit_font(
@@ -415,7 +499,7 @@ def _line_chart(
     *,
     y_suffix: str = "",
 ) -> None:
-    _panel(draw, xy, fill=(9, 36, 78))
+    _panel(draw, xy, fill=PANEL_2)
     x1, y1, x2, y2 = xy
     visible_values = _series_values(series)
     if len(labels) < 2 or not visible_values:
@@ -542,6 +626,7 @@ def render_resources_report(
         )
         return _render_empty_report(
             payload,
+            view=InventoryReportView.RESOURCES,
             title="Resources Inventory",
             report_label="Resources",
             logo=ASSET_DIR / "rss_logo.png",
@@ -550,7 +635,7 @@ def render_resources_report(
             chart_xy=(44, 510, 1356, 924),
             avatar_bytes=avatar_bytes,
         )
-    canvas = Image.new("RGBA", (WIDTH, HEIGHT), BG)
+    canvas = _report_canvas(InventoryReportView.RESOURCES)
     draw = ImageDraw.Draw(canvas, "RGBA")
     _draw_header(
         canvas,
@@ -571,7 +656,7 @@ def render_resources_report(
         ("Total RSS", "total", ASSET_DIR / "RSS" / "total.png"),
     ]
     box_w = 250
-    for idx, (title, attr, icon) in enumerate(attrs):
+    for idx, (title, attr, _icon) in enumerate(attrs):
         value, delta = _latest_delta(payload.resources, attr)
         delta_label, color = _delta_text(delta)
         _draw_kpi(
@@ -582,7 +667,7 @@ def render_resources_report(
             value=_compact(value),
             delta=delta_label,
             delta_color=color,
-            icon=icon,
+            accent=RESOURCE_ACCENT,
         )
 
     total_latest, total_delta = _latest_delta(payload.resources, "total")
@@ -628,7 +713,7 @@ def render_resources_report(
         ),
         ("RSS Forecast", _compact(forecast), "30 days", None, TEXT),
     ]
-    for idx, (title, value, delta, icon, color) in enumerate(insight_boxes):
+    for idx, (title, value, delta, _icon, color) in enumerate(insight_boxes):
         _draw_kpi(
             canvas,
             draw,
@@ -637,7 +722,7 @@ def render_resources_report(
             value=value,
             delta=delta,
             delta_color=color,
-            icon=icon,
+            accent=RESOURCE_ACCENT,
         )
 
     if len(payload.resources) >= 2:
@@ -677,6 +762,7 @@ def render_speedups_report(
             return None
         return _render_empty_report(
             payload,
+            view=InventoryReportView.SPEEDUPS,
             title="Speedups Inventory",
             report_label="Speedups",
             logo=ASSET_DIR / "speedup_logo.png",
@@ -699,7 +785,7 @@ def render_speedups_report(
             chart_xy=(44, 540, 1356, 924),
             avatar_bytes=avatar_bytes,
         )
-    canvas = Image.new("RGBA", (WIDTH, HEIGHT), BG)
+    canvas = _report_canvas(InventoryReportView.SPEEDUPS)
     draw = ImageDraw.Draw(canvas, "RGBA")
     _draw_header(
         canvas,
@@ -716,7 +802,7 @@ def render_speedups_report(
         ("Training", "training_days", ASSET_DIR / "Training" / "Training.png"),
         ("Healing", "healing_days", ASSET_DIR / "healing" / "healing.png"),
     ]
-    for idx, (title, attr, icon) in enumerate(attrs):
+    for idx, (title, attr, _icon) in enumerate(attrs):
         value, delta = _latest_delta(payload.speedups, attr)
         delta_label, color = _delta_text(delta, days=True)
         _draw_kpi(
@@ -727,7 +813,7 @@ def render_speedups_report(
             value=f"{int(round(value)):,}d",
             delta=delta_label,
             delta_color=color,
-            icon=icon,
+            accent=SPEEDUP_ACCENT,
         )
 
     latest = payload.speedups[-1]
@@ -758,7 +844,7 @@ def render_speedups_report(
             ASSET_DIR / "healing" / "healing.png",
         ),
     ]
-    for idx, (title, value, detail, icon) in enumerate(capacity_boxes):
+    for idx, (title, value, detail, _icon) in enumerate(capacity_boxes):
         _draw_kpi(
             canvas,
             draw,
@@ -767,7 +853,7 @@ def render_speedups_report(
             value=value,
             delta=detail,
             delta_color=TEXT,
-            icon=icon,
+            accent=SPEEDUP_ACCENT,
         )
 
     if len(payload.speedups) >= 2:
@@ -806,6 +892,7 @@ def render_materials_report(
         box_w = 246
         return _render_empty_report(
             payload,
+            view=InventoryReportView.MATERIALS,
             title="Materials Inventory",
             report_label="Materials",
             logo=ASSET_DIR / "materials_logo.png",
@@ -825,7 +912,7 @@ def render_materials_report(
             chart_xy=(44, 520, 1356, 924),
             avatar_bytes=avatar_bytes,
         )
-    canvas = Image.new("RGBA", (WIDTH, HEIGHT), BG)
+    canvas = _report_canvas(InventoryReportView.MATERIALS)
     draw = ImageDraw.Draw(canvas, "RGBA")
     _draw_header(
         canvas,
@@ -864,6 +951,7 @@ def render_materials_report(
             value=f"{value:,.1f}",
             delta=delta_label,
             delta_color=color,
+            accent=MATERIAL_ACCENT,
         )
 
     total_delta = (
@@ -880,6 +968,7 @@ def render_materials_report(
         value=f"{latest.total_legendary:,.2f}",
         delta=total_delta_label,
         delta_color=total_delta_color,
+        accent=MATERIAL_ACCENT,
     )
     _draw_kpi(
         canvas,
@@ -889,6 +978,7 @@ def render_materials_report(
         value=total_delta_label,
         delta="range delta",
         delta_color=total_delta_color,
+        accent=MATERIAL_ACCENT,
     )
 
     if len(payload.materials) >= 2:

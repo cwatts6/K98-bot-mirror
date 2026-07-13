@@ -464,11 +464,12 @@ Current status:
   ranges, private exports, honest native no-data output, and the author-gated paged Change Governor
   control. It preserves report type/range while switching, increases `/me` grouped subcommands
   from 6 to 9, and keeps the top-level count at 42. Operator smoke passed on 2026-07-13.
-- Phase 5B is the next proposed slice. It adopts the six supplied report-specific premium backdrop
-  assets in the shared Inventory renderer and aligns Resources, Speedups, Materials, and no-data
-  presentation without changing 1400x980 dimensions, filenames, data, calculations, ranges,
-  exports, privacy, controls, or `/myinventory` behavior. The 2800x1960 masters remain source-only;
-  runtime uses the 1400x980 variants. No dummy values or invented trends are permitted.
+- GovernorOS v2 Phase 5B is implemented and locally validated, awaiting operator Discord smoke and
+  final visual acceptance. The shared Inventory renderer uses the three supplied 1400x980 premium
+  production backdrops for Resources, Speedups, Materials, and honest native no-data output. The
+  2800x1960 masters remain source-only, and filenames, data, calculations, ranges, exports,
+  privacy, controls, attachment lifecycle, and `/myinventory` behavior remain unchanged. Automated
+  validation passed 190 focused/Inventory tests and the full suite (`2495 passed, 2 skipped`).
 - Phases 5C-5G independently migrate Accounts, Reminders, Preferences, Inventory summary, and
   Exports summary as matching operator-approved backdrops arrive. These Discord-user/all-governor
   pages do not show Change Governor; they retain selected governor context only for returning to a

@@ -17,6 +17,102 @@ from inventory.models import (
 from inventory.report_image_renderer import render_inventory_reports
 
 
+def test_inventory_backdrop_assets_match_runtime_and_master_contract():
+    expected_runtime_names = {
+        InventoryReportView.RESOURCES: "inventory_resources_governoros_backdrop.png",
+        InventoryReportView.SPEEDUPS: "inventory_speedups_governoros_backdrop.png",
+        InventoryReportView.MATERIALS: "inventory_materials_governoros_backdrop.png",
+    }
+
+    assert set(report_image_renderer.REPORT_BACKDROP_PATHS) == set(expected_runtime_names)
+    for view, expected_name in expected_runtime_names.items():
+        path = report_image_renderer.REPORT_BACKDROP_PATHS[view]
+        assert path.name == expected_name
+        assert path.stat().st_size > 0
+        assert "_master_2x" not in path.name
+        with Image.open(path) as image:
+            image.load()
+            assert image.format == "PNG"
+            assert image.size == (1400, 980)
+
+        master_path = path.with_name(path.stem + "_master_2x.png")
+        assert master_path.stat().st_size > 0
+        with Image.open(master_path) as master:
+            master.load()
+            assert master.format == "PNG"
+            assert master.size == (2800, 1960)
+
+
+def test_selected_empty_reports_use_their_report_specific_backdrops():
+    now = datetime.now(UTC)
+    sample_pixel = (830, 0)
+
+    for view, path in report_image_renderer.REPORT_BACKDROP_PATHS.items():
+        payload = InventoryReportPayload(
+            governor_id=111,
+            governor_name="Backdrop Governor",
+            view=view,
+            range_key=InventoryReportRange.ONE_MONTH,
+            generated_at_utc=now,
+        )
+
+        rendered = render_inventory_reports(payload)
+
+        with Image.open(path) as backdrop:
+            expected_pixel = backdrop.convert("RGB").getpixel(sample_pixel)
+        with Image.open(BytesIO(rendered[0].image_bytes.getvalue())) as output:
+            assert output.getpixel(sample_pixel) == expected_pixel
+        rendered[0].image_bytes.close()
+
+
+def test_runtime_renderer_never_loads_master_backdrops(monkeypatch):
+    opened_paths = []
+    real_open = report_image_renderer.Image.open
+
+    def recording_open(path, *args, **kwargs):
+        opened_paths.append(str(path))
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(report_image_renderer.Image, "open", recording_open)
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name="Runtime Governor",
+        view=InventoryReportView.SPEEDUPS,
+        range_key=InventoryReportRange.ONE_MONTH,
+        generated_at_utc=datetime.now(UTC),
+    )
+
+    rendered = render_inventory_reports(payload)
+
+    assert any(path.endswith("inventory_speedups_governoros_backdrop.png") for path in opened_paths)
+    assert all("_master_2x" not in path for path in opened_paths)
+    rendered[0].image_bytes.close()
+
+
+def test_missing_corrupt_and_wrong_sized_backdrops_use_safe_fallback(tmp_path, monkeypatch):
+    view = InventoryReportView.RESOURCES
+    candidates = [tmp_path / "missing.png", tmp_path / "corrupt.png", tmp_path / "wrong.png"]
+    candidates[1].write_bytes(b"not-a-png")
+    Image.new("RGB", (40, 40), (1, 2, 3)).save(candidates[2], format="PNG")
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name="Fallback Governor",
+        view=view,
+        range_key=InventoryReportRange.ONE_MONTH,
+        generated_at_utc=datetime.now(UTC),
+    )
+
+    for path in candidates:
+        monkeypatch.setitem(report_image_renderer.REPORT_BACKDROP_PATHS, view, path)
+        rendered = render_inventory_reports(payload)
+
+        assert [item.filename for item in rendered] == ["inventory_resources_111_1M.png"]
+        with Image.open(BytesIO(rendered[0].image_bytes.getvalue())) as output:
+            assert output.size == (1400, 980)
+            assert output.getpixel((830, 0)) == report_image_renderer.BG
+        rendered[0].image_bytes.close()
+
+
 def test_inventory_renderer_text_helpers_delegate_to_visual_text(monkeypatch):
     image = Image.new("RGBA", (240, 80))
     draw = report_image_renderer.ImageDraw.Draw(image)
@@ -203,6 +299,10 @@ def test_render_inventory_reports_returns_png_files_for_resources_and_speedups()
     ]
     for item in rendered:
         assert item.image_bytes.getvalue().startswith(b"\x89PNG")
+        assert item.image_bytes.tell() == 0
+        assert not item.image_bytes.closed
+        item.image_bytes.close()
+        assert item.image_bytes.closed
 
 
 def test_render_selected_empty_report_returns_standalone_png_for_each_tab():
@@ -279,6 +379,154 @@ def test_resource_chart_colours_are_distinct():
     )
 
 
+def test_resources_preserve_kpi_values_deltas_chart_series_and_legend(monkeypatch):
+    now = datetime.now(UTC)
+    points = [
+        InventoryResourcePoint(
+            now - timedelta(days=7), 1_000_000_000, 2_000_000_000, 3_000_000_000, 4_000_000_000
+        ),
+        InventoryResourcePoint(now, 1_100_000_000, 2_200_000_000, 3_300_000_000, 4_400_000_000),
+    ]
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name="Gov",
+        view=InventoryReportView.RESOURCES,
+        range_key=InventoryReportRange.ONE_MONTH,
+        resources=points,
+        generated_at_utc=now,
+    )
+    kpis = []
+    chart = {}
+
+    monkeypatch.setattr(
+        report_image_renderer,
+        "_draw_kpi",
+        lambda *_args, **kwargs: kpis.append(kwargs),
+    )
+
+    def capture_chart(*args, **kwargs):
+        chart.update(series=args[3], labels=args[4], colors=args[5], kwargs=kwargs)
+
+    monkeypatch.setattr(report_image_renderer, "_line_chart", capture_chart)
+
+    rendered = report_image_renderer.render_resources_report(payload)
+
+    assert [(item["title"], item["value"], item["delta"]) for item in kpis[:5]] == [
+        ("Food", "1.1B", "+100M"),
+        ("Wood", "2.2B", "+200M"),
+        ("Stone", "3.3B", "+300M"),
+        ("Gold", "4.4B", "+400M"),
+        ("Total RSS", "11B", "+1B"),
+    ]
+    assert chart["series"] == {
+        "Food": [1_000_000_000.0, 1_100_000_000.0],
+        "Wood": [2_000_000_000.0, 2_200_000_000.0],
+        "Stone": [3_000_000_000.0, 3_300_000_000.0],
+        "Gold": [4_000_000_000.0, 4_400_000_000.0],
+    }
+    assert chart["colors"] == [
+        report_image_renderer.RESOURCE_CHART_COLORS[name] for name in chart["series"]
+    ]
+    assert chart["kwargs"] == {}
+    assert rendered is not None
+    rendered.image_bytes.close()
+
+
+def test_speedups_preserve_days_deltas_chart_series_and_units(monkeypatch):
+    now = datetime.now(UTC)
+    points = [
+        InventorySpeedupPoint(now - timedelta(days=7), 1, 2, 20, 30, 10),
+        InventorySpeedupPoint(now, 2, 3, 27, 29, 15),
+    ]
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name="Gov",
+        view=InventoryReportView.SPEEDUPS,
+        range_key=InventoryReportRange.ONE_MONTH,
+        speedups=points,
+        generated_at_utc=now,
+    )
+    kpis = []
+    chart = {}
+    monkeypatch.setattr(
+        report_image_renderer,
+        "_draw_kpi",
+        lambda *_args, **kwargs: kpis.append(kwargs),
+    )
+
+    def capture_chart(*args, **kwargs):
+        chart.update(series=args[3], colors=args[5], kwargs=kwargs)
+
+    monkeypatch.setattr(report_image_renderer, "_line_chart", capture_chart)
+
+    rendered = report_image_renderer.render_speedups_report(payload)
+
+    assert [(item["title"], item["value"], item["delta"]) for item in kpis[:3]] == [
+        ("Universal", "15d", "+5d"),
+        ("Training", "27d", "+7d"),
+        ("Healing", "29d", "-1d"),
+    ]
+    assert chart["series"] == {
+        "Universal": [10, 15],
+        "Training": [20, 27],
+        "Healing": [30, 29],
+    }
+    assert chart["colors"] == [(250, 204, 21), (96, 165, 250), (248, 113, 113)]
+    assert chart["kwargs"] == {"y_suffix": "d"}
+    assert rendered is not None
+    rendered.image_bytes.close()
+
+
+def test_materials_preserve_values_deltas_chart_series_and_legend(monkeypatch):
+    now = datetime.now(UTC)
+    points = [
+        InventoryMaterialPoint(now - timedelta(days=7), 10, 20, 30, 40, 50),
+        InventoryMaterialPoint(now, 20, 30, 40, 50, 60),
+    ]
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name="Gov",
+        view=InventoryReportView.MATERIALS,
+        range_key=InventoryReportRange.ONE_MONTH,
+        materials=points,
+        generated_at_utc=now,
+    )
+    kpis = []
+    chart = {}
+    monkeypatch.setattr(
+        report_image_renderer,
+        "_draw_kpi",
+        lambda *_args, **kwargs: kpis.append(kwargs),
+    )
+
+    def capture_chart(*args, **_kwargs):
+        chart.update(series=args[3], colors=args[5])
+
+    monkeypatch.setattr(report_image_renderer, "_line_chart", capture_chart)
+
+    rendered = report_image_renderer.render_materials_report(payload)
+
+    assert [(item["title"], item["value"], item["delta"]) for item in kpis[:5]] == [
+        ("Bone", "20.0", "+10"),
+        ("Leather", "30.0", "+10"),
+        ("Ebony", "40.0", "+10"),
+        ("Iron", "50.0", "+10"),
+        ("Choice Chests", "60.0", "+10"),
+    ]
+    assert chart["series"] == {
+        "Bone": [10, 20],
+        "Leather": [20, 30],
+        "Ebony": [30, 40],
+        "Iron": [40, 50],
+        "Choice Chests": [50, 60],
+    }
+    assert chart["colors"] == [
+        report_image_renderer.MATERIAL_CHART_COLORS[name] for name in chart["series"]
+    ]
+    assert rendered is not None
+    rendered.image_bytes.close()
+
+
 def test_render_inventory_reports_supports_stored_vip_profile():
     now = datetime.now(UTC)
     payload = InventoryReportPayload(
@@ -352,3 +600,32 @@ def test_render_inventory_reports_handles_special_character_governor_name():
     assert [item.filename for item in rendered] == ["inventory_resources_111_1M.png"]
     image = Image.open(BytesIO(rendered[0].image_bytes.getvalue()))
     assert image.size == (report_image_renderer.WIDTH, report_image_renderer.HEIGHT)
+
+
+def test_long_unicode_governor_context_uses_header_width_fitting(monkeypatch):
+    now = datetime.now(UTC)
+    governor_name = ("義【K98】👩‍🚀 กษัตริย์ ") * 10
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name=governor_name,
+        view=InventoryReportView.MATERIALS,
+        range_key=InventoryReportRange.TWELVE_MONTHS,
+        materials=[InventoryMaterialPoint(now, 10, 20, 30, 40, 50)],
+        generated_at_utc=now,
+    )
+    calls = []
+    real_fit_font = report_image_renderer._fit_font
+
+    def recording_fit_font(draw, text, **kwargs):
+        if text.startswith(governor_name):
+            calls.append(kwargs)
+        return real_fit_font(draw, text, **kwargs)
+
+    monkeypatch.setattr(report_image_renderer, "_fit_font", recording_fit_font)
+
+    rendered = render_inventory_reports(payload)
+
+    assert calls == [{"max_width": 1210, "size": 20, "min_size": 14}]
+    with Image.open(BytesIO(rendered[0].image_bytes.getvalue())) as image:
+        assert image.size == (1400, 980)
+    rendered[0].image_bytes.close()

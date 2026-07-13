@@ -7,8 +7,8 @@
 - Owner/context: Follow-on from completed GovernorOS v2 Phase 5A and operator-supplied Inventory backdrop assets.
 - Task type: `visual renderer refresh | Inventory reports | premium v2.0 presentation`
 - One-pass approved: `No`
-- Implementation approved: `No - scope and visual approval required before coding`
-- Status: `next proposed GovernorOS slice; ready for operator approval`
+- Implementation approved: `Yes - operator confirmed the shared-renderer, 1400x980, source-master, presentation-only, honest no-data, and unchanged-interaction checkpoints on 2026-07-13`
+- Status: `implemented and locally validated; awaiting operator Discord smoke and final visual acceptance`
 
 ## 2. Required Reading
 
@@ -292,16 +292,29 @@ though authorization and data access should not change.
 
 ## 16. Acceptance Criteria
 
-- [ ] Operator approves the three backdrop directions and runtime/master asset policy.
-- [ ] Correct report-specific 1400x980 backdrop is applied to every report type.
-- [ ] The output is materially aligned with the accepted GovernorOS premium v2.0 standard.
-- [ ] Existing values, calculations, charts, dimensions, filenames, and footer meaning are preserved.
-- [ ] Empty reports remain honest, useful, and visually consistent without dummy data.
-- [ ] Direct `/me` governor dropdown, paging, privacy, tabs, ranges, exports, and Dashboard behavior are unchanged.
-- [ ] `/myinventory` visibility, selector, controls, exports, and compatibility remain unchanged.
-- [ ] Asset failure and renderer failure degrade safely without duplicate fetch or data exposure.
+- [x] Operator approves the three backdrop directions and runtime/master asset policy.
+- [x] Correct report-specific 1400x980 backdrop is applied to every report type.
+- [ ] The output is materially aligned with the accepted GovernorOS premium v2.0 standard; final operator visual acceptance remains.
+- [x] Existing values, calculations, charts, dimensions, filenames, and footer meaning are preserved.
+- [x] Empty reports remain honest, useful, and visually consistent without dummy data.
+- [x] Direct `/me` governor dropdown, paging, privacy, tabs, ranges, exports, and Dashboard behavior are unchanged.
+- [x] `/myinventory` visibility, selector, controls, exports, and compatibility remain unchanged.
+- [x] Asset failure and renderer failure degrade safely without duplicate fetch or data exposure.
 - [ ] Focused/full validation, visual samples, operator smoke, and security review are recorded.
-- [ ] Programme, briefing, canonical, task-pack, starter, and deferred docs reflect delivery.
+- [x] Programme, briefing, canonical, task-pack, starter, and deferred docs reflect local delivery; final operator result remains to record.
+
+Implementation record (2026-07-13):
+
+- Modified only `inventory/report_image_renderer.py`, its focused renderer tests, and delivery docs.
+- Runtime loads only the fixed 1400x980 report-specific assets; missing, corrupt, or wrong-sized
+  assets fall back to the established safe canvas without changing filenames or stream behavior.
+- Generated populated, sparse/Unicode, and honest no-data samples at original, Discord desktop, and
+  Discord mobile sizes for each report type.
+- Passed 190 focused/Inventory tests and the full suite (`2495 passed, 2 skipped`) plus architecture,
+  deferred-item, import, registration, formatting, type, and secret checks.
+- The requested Codex Security skill was unavailable in this session; a manual security-focused
+  diff review found no permission, privacy, user-input, path-selection, attachment, or cleanup
+  regression. Operator Discord smoke and final visual acceptance remain.
 
 ## 17. Remaining Phase 5 Handoff
 
