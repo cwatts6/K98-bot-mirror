@@ -51,10 +51,10 @@ def register_me(bot: ext_commands.Bot) -> None:
 
     @me_group.command(
         name="reminders",
-        description="Review your private KVK reminder setup status",
+        description="Review your private KVK and calendar reminders",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.00")
+    @versioned("v1.01")
     @safe_command
     @track_usage()
     async def me_reminders(ctx: discord.ApplicationContext) -> None:

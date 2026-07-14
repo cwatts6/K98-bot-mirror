@@ -366,7 +366,7 @@ async def test_subpage_response_falls_back_to_embed_when_card_render_fails(monke
     def fake_render(*_args, **_kwargs):
         raise RuntimeError("asset unavailable")
 
-    monkeypatch.setattr(views.page_cards, "render_page_card", fake_render)
+    monkeypatch.setattr(views.reminders_renderer, "render_reminders_card", fake_render)
 
     embed, files = await views._build_page_response(
         views.PAGE_REMINDERS,
@@ -449,6 +449,55 @@ async def test_dashboard_image_send_failure_retries_embed_only() -> None:
 
 
 @pytest.mark.asyncio
+async def test_reminders_image_send_failure_uses_same_payload_without_refetch(monkeypatch) -> None:
+    summary = _summary()
+    fallback_calls = []
+    real_builder = views.build_page_embed
+
+    def tracked_builder(page, received, **kwargs):
+        fallback_calls.append((page, received))
+        return real_builder(page, received, **kwargs)
+
+    monkeypatch.setattr(views, "build_page_embed", tracked_builder)
+
+    class Target:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def edit_original_response(self, **kwargs):
+            self.calls.append(kwargs)
+            if kwargs.get("files"):
+                raise RuntimeError("attachment rejected")
+            return SimpleNamespace(id=999)
+
+    embed, files = await views._build_page_response(
+        views.PAGE_REMINDERS,
+        summary,
+        display_name="Tester",
+    )
+    try:
+        target = Target()
+        message = await views._edit_original_with_image_fallback(
+            target,
+            page=views.PAGE_REMINDERS,
+            summary=summary,
+            display_name="Tester",
+            view=views.PlayerSelfServiceView(author_id=42, display_name="Tester"),
+            embed=embed,
+            files=files,
+        )
+
+        assert message.id == 999
+        assert len(target.calls) == 2
+        assert target.calls[0]["embed"] is None
+        assert target.calls[0]["files"]
+        assert target.calls[1]["embed"].title == "Reminder Centre"
+        assert fallback_calls[-1] == (views.PAGE_REMINDERS, summary)
+    finally:
+        views._close_files(files)
+
+
+@pytest.mark.asyncio
 async def test_image_send_failure_logs_safely_without_payloads(monkeypatch) -> None:
     fallback_embed = object()
     monkeypatch.setattr(
@@ -515,8 +564,10 @@ def test_reminders_embed_invites_service_backed_controls() -> None:
     embed = views.build_reminders_embed(_summary(), display_name="Tester")
 
     assert embed.title == "Reminder Centre"
-    assert "Manage auto-saves" in embed.fields[1].value
-    assert "Manage Calendar Reminders" in embed.fields[1].value
+    assert embed.fields[0].name in {"ACTIVE", "REVIEW", "OFF"}
+    assert embed.fields[1].name == "REMINDER COVERAGE"
+    assert embed.fields[-1].name == "Manage reminders"
+    assert "Choose KVK and calendar events" in embed.fields[-1].value
     assert "/modify_subscription" not in embed.fields[1].value
 
 
@@ -2095,7 +2146,7 @@ async def test_reminder_autosave_refreshes_visible_reminder_card(monkeypatch) ->
 
     message_id, edit = interaction.followup.edited[-1]
     assert message_id == host_message.id
-    assert edit["embed"].image.url.startswith("attachment://me_reminders_")
+    assert edit["embed"] is None
     assert [file.filename for file in edit["files"]] == ["me_reminders_42.png"]
 
 
@@ -2165,7 +2216,7 @@ async def test_view_navigation_loads_summary_and_edits_message() -> None:
     assert order == ["defer", "loader"]
     assert interaction.response.deferred[-1] == {}
     assert edited["content"] is None
-    assert edited["embed"].image.url.startswith("attachment://me_reminders_")
+    assert edited["embed"] is None
     assert edited["attachments"] == []
     assert [file.filename for file in edited["files"]] == ["me_reminders_42.png"]
     assert isinstance(edited["view"], views.PlayerSelfServiceView)

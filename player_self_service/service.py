@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 import logging
 from typing import Any
 
@@ -16,7 +17,8 @@ from event_calendar.reminder_config_service import (
 from inventory import profile_service, reporting_service
 from inventory.models import InventoryReportVisibility, RegisteredGovernor
 from inventory.parsing import format_resource_value
-from player_self_service import profile_preference_service
+from player_self_service import profile_preference_service, reminders_summary
+from player_self_service.reminders_summary import RemindersSummaryPayload
 from services.governor_account_service import (
     AccountResolutionSummary,
     get_account_summary_for_user,
@@ -157,6 +159,7 @@ class PlayerSelfServiceSummary:
     preferences: PreferenceStatus
     exports: ExportStatus
     inventory: InventoryStatus = field(default_factory=_default_inventory_status)
+    reminders_summary: RemindersSummaryPayload | None = None
 
 
 AccountLoader = Callable[[int], Awaitable[AccountResolutionSummary]]
@@ -170,6 +173,8 @@ VipProfileLoader = Callable[[int], Awaitable[Any]]
 InventorySnapshotLoader = Callable[
     [list[RegisteredGovernor]], Awaitable[reporting_service.LatestInventorySnapshot]
 ]
+CalendarEventCatalogLoader = Callable[[], reminders_summary.CalendarEventCatalog]
+UtcClock = Callable[[], datetime]
 
 
 def summarize_account_status(summary: AccountResolutionSummary) -> AccountStatus:
@@ -657,6 +662,10 @@ async def build_player_self_service_summary(
     inventory_snapshot_loader: InventorySnapshotLoader = (
         reporting_service.build_latest_inventory_snapshot
     ),
+    calendar_event_catalog_loader: CalendarEventCatalogLoader = (
+        reminders_summary.load_calendar_event_catalog
+    ),
+    utc_clock: UtcClock = lambda: datetime.now(UTC),
 ) -> PlayerSelfServiceSummary:
     account_summary_task = account_loader(int(discord_user_id))
     preference_task = summarize_preference_status(
@@ -675,11 +684,14 @@ async def build_player_self_service_summary(
         snapshot_loader=inventory_snapshot_loader,
     )
 
+    reminder_config: object = None
+    kvk_source_available = True
     try:
         reminder_config = await asyncio.to_thread(reminder_loader, int(discord_user_id))
     except asyncio.CancelledError:
         raise
     except Exception as exc:
+        kvk_source_available = False
         logger.exception(
             "player_self_service_reminders_unavailable user_id=%s",
             discord_user_id,
@@ -694,6 +706,8 @@ async def build_player_self_service_summary(
     else:
         reminders = summarize_reminder_status(reminder_config)
 
+    calendar_state: CalendarReminderConfigState | None = None
+    calendar_source_available = True
     try:
         calendar_state = await asyncio.to_thread(
             calendar_reminder_loader,
@@ -702,6 +716,7 @@ async def build_player_self_service_summary(
     except asyncio.CancelledError:
         raise
     except Exception as exc:
+        calendar_source_available = False
         logger.exception(
             "player_self_service_calendar_reminders_unavailable user_id=%s",
             discord_user_id,
@@ -717,6 +732,40 @@ async def build_player_self_service_summary(
         calendar = summarize_calendar_reminder_status(calendar_state)
     reminders = replace(reminders, calendar=calendar)
 
+    try:
+        calendar_catalog = await asyncio.to_thread(calendar_event_catalog_loader)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception(
+            "player_self_service_calendar_event_catalog_unavailable user_id=%s",
+            discord_user_id,
+        )
+        calendar_catalog = reminders_summary.CalendarEventCatalog(
+            available=False,
+            event_types=(),
+        )
+
+    calendar_prefs: dict[str, Any] = {"enabled": False, "by_event_type": {}}
+    if calendar_state is not None:
+        calendar_prefs = {
+            "enabled": calendar_state.enabled,
+            "by_event_type": {
+                event_type: list(calendar_state.selected_offsets)
+                for event_type in calendar_state.selected_types
+            },
+        }
+    reminders_payload = reminders_summary.build_reminders_summary_payload(
+        viewer_discord_id=int(discord_user_id),
+        display_name="",
+        kvk_config=reminder_config,
+        calendar_prefs=calendar_prefs,
+        calendar_catalog=calendar_catalog,
+        generated_at_utc=utc_clock(),
+        kvk_source_available=kvk_source_available,
+        calendar_source_available=calendar_source_available,
+    )
+
     accounts = summarize_account_status(account_summary)
     return PlayerSelfServiceSummary(
         discord_user_id=int(discord_user_id),
@@ -725,4 +774,5 @@ async def build_player_self_service_summary(
         preferences=preferences,
         exports=summarize_export_status(accounts),
         inventory=inventory,
+        reminders_summary=reminders_payload,
     )

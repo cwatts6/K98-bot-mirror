@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from io import BytesIO
 import logging
 from types import SimpleNamespace
@@ -23,10 +24,13 @@ from player_self_service import (
     preference_service,
     profile_preference_service,
     reminder_service,
+    reminders_renderer,
+    reminders_summary,
 )
 from player_self_service.account_service import AccountCentreState
 from player_self_service.accounts_models import AccountsPortfolioPayload
 from player_self_service.reminder_service import ReminderCentreState
+from player_self_service.reminders_summary import RemindersSummaryPayload
 from player_self_service.service import (
     PlayerSelfServiceSummary,
     build_player_self_service_summary,
@@ -232,46 +236,104 @@ def build_accounts_portfolio_fallback(
     return embed
 
 
+def _reminders_payload(
+    summary: PlayerSelfServiceSummary,
+    *,
+    display_name: str,
+) -> RemindersSummaryPayload:
+    payload = summary.reminders_summary
+    if payload is None:
+        legacy = summary.reminders
+        kvk_config = None
+        if legacy.state.strip().lower() != "off":
+            kvk_config = {
+                "subscriptions": ["all"],
+                "reminder_times": [
+                    token
+                    for token in ("24h", "12h", "4h", "1h", "now")
+                    if token in legacy.time_summary.lower()
+                ],
+            }
+        calendar_enabled = legacy.calendar.state.strip().lower() == "on"
+        calendar_prefs = {
+            "enabled": calendar_enabled,
+            "by_event_type": ({"all": ["24h"]} if calendar_enabled else {}),
+        }
+        payload = reminders_summary.build_reminders_summary_payload(
+            viewer_discord_id=summary.discord_user_id,
+            display_name=display_name,
+            kvk_config=kvk_config,
+            calendar_prefs=calendar_prefs,
+            calendar_catalog=reminders_summary.CalendarEventCatalog(
+                available=False,
+                event_types=(),
+            ),
+            generated_at_utc=datetime.now(UTC),
+        )
+    return reminders_summary.with_display_name(payload, display_name)
+
+
 def build_reminders_embed(
     summary: PlayerSelfServiceSummary,
     *,
     display_name: str,
 ) -> discord.Embed:
-    reminders = summary.reminders
+    payload = _reminders_payload(summary, display_name=display_name)
     embed = discord.Embed(
         title="Reminder Centre",
-        description=f"Private KVK reminder status for {display_name}",
-        color=discord.Color.gold(),
+        description=f"{payload.display_name} ({payload.kingdom_id})",
+        color={
+            "ACTIVE": discord.Color.green(),
+            "REVIEW": discord.Color.gold(),
+            "OFF": discord.Color.dark_grey(),
+        }[payload.configuration_state.value],
     )
     embed.add_field(
-        name="Current Status",
+        name=payload.configuration_state.value,
+        value=payload.state_supporting_text,
+        inline=False,
+    )
+    embed.add_field(
+        name=payload.hero.headline,
+        value=_field_value([payload.hero.primary_line, payload.hero.secondary_line]),
+        inline=False,
+    )
+    embed.add_field(
+        name="KVK REMINDERS",
         value=_field_value(
             [
-                f"KVK reminders: {reminders.state}",
-                f"Events: {reminders.event_summary}",
-                f"Times: {reminders.time_summary}",
-                f"Calendar reminders: {reminders.calendar.state}",
-                f"Calendar events: {reminders.calendar.event_summary}",
-                f"Calendar lead times: {reminders.calendar.time_summary}",
+                payload.kvk.state_count_line,
+                payload.kvk.event_summary,
+                payload.kvk.time_summary,
+                payload.kvk.coverage_label,
             ]
         ),
-        inline=False,
+        inline=True,
     )
     embed.add_field(
-        name="Available Actions",
+        name="CALENDAR REMINDERS",
         value=_field_value(
             [
-                "Manage auto-saves KVK event type and reminder time changes.",
-                "Manage Calendar Reminders switches to calendar event types and lead times.",
-                "Remove All unsubscribes from KVK event reminders.",
+                payload.calendar.state_count_line,
+                payload.calendar.event_summary,
+                payload.calendar.time_summary,
+                payload.calendar.coverage_label,
             ]
         ),
+        inline=True,
+    )
+    embed.add_field(
+        name="REMINDER INSIGHT",
+        value=payload.insight,
         inline=False,
     )
     embed.add_field(
-        name="DM Check",
-        value="A confirmation DM is sent after changes. If it does not arrive, check server DM settings.",
+        name="Manage reminders",
+        value="Choose KVK and calendar events and when each alert is sent.",
         inline=False,
+    )
+    embed.set_footer(
+        text=(f"Refreshed {payload.generated_at_utc:%H:%M UTC} • " "Schedule times shown in UTC")
     )
     return embed
 
@@ -466,6 +528,13 @@ async def _build_page_response(
                 summary,
                 display_name=display_name,
             )
+        elif page == PAGE_REMINDERS:
+            if summary is None:
+                raise ValueError("Reminders render requires a summary")
+            rendered = await asyncio.to_thread(
+                reminders_renderer.render_reminders_card,
+                _reminders_payload(summary, display_name=display_name),
+            )
         else:
             if summary is None:
                 raise ValueError(f"{page} render requires a summary")
@@ -493,7 +562,7 @@ async def _build_page_response(
     file = discord.File(image_source, filename=rendered.filename)
     embed = (
         None
-        if page == PAGE_ACCOUNTS
+        if page in {PAGE_ACCOUNTS, PAGE_REMINDERS}
         else (
             build_dashboard_card_embed(rendered.filename)
             if page == PAGE_DASHBOARD
@@ -1381,7 +1450,11 @@ class PlayerSelfServiceView(discord.ui.View):
         for child in self.children:
             child.disabled = True
         message = self._message_ref or getattr(self, "message", None)
-        timeout_content = "This private /me menu has expired. Run `/me dashboard` again."
+        timeout_content = (
+            "This private reminder report has expired. Run `/me reminders` again."
+            if self.page == PAGE_REMINDERS
+            else "This private /me menu has expired. Run `/me dashboard` again."
+        )
         edited = False
         try:
             if self._timeout_editor is not None:

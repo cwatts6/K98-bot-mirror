@@ -19,6 +19,11 @@ from player_self_service.reminder_service import (
     ReminderMessage,
     ReminderUnsubscribeConfirmation,
 )
+from player_self_service.reminders_summary import (
+    alert_time_label,
+    calendar_event_label,
+    kvk_event_label,
+)
 from player_self_service.service import (
     PlayerSelfServiceSummary,
     build_player_self_service_summary,
@@ -42,7 +47,7 @@ def _option_desc(key: str) -> str:
 def _event_options(selected: tuple[str, ...]) -> list[discord.SelectOption]:
     return [
         discord.SelectOption(
-            label=event_type,
+            label=kvk_event_label(event_type),
             value=event_type,
             description=_option_desc(event_type),
             default=event_type in selected,
@@ -54,9 +59,9 @@ def _event_options(selected: tuple[str, ...]) -> list[discord.SelectOption]:
 def _time_options(selected: tuple[str, ...]) -> list[discord.SelectOption]:
     return [
         discord.SelectOption(
-            label=reminder_time,
+            label=alert_time_label(reminder_time),
             value=reminder_time,
-            description=f"{reminder_time.upper()} reminder",
+            description=f"{alert_time_label(reminder_time)} reminder",
             default=reminder_time in selected,
         )
         for reminder_time in DEFAULT_REMINDER_TIMES
@@ -79,7 +84,9 @@ def _calendar_event_options(
     event_types = ("all", *tuple(sorted(set(known_event_types) | (selected_set - {"all"}))))
     return [
         discord.SelectOption(
-            label=event_type,
+            label=(
+                "All calendar events" if event_type == "all" else calendar_event_label(event_type)
+            ),
             value=event_type,
             description=(
                 "Every calendar event"
@@ -96,9 +103,9 @@ def _calendar_time_options(selected: tuple[str, ...]) -> list[discord.SelectOpti
     selected_set = set(selected)
     return [
         discord.SelectOption(
-            label=offset,
+            label=alert_time_label(offset),
             value=offset,
-            description=f"{offset.upper()} lead time",
+            description=f"{alert_time_label(offset)} lead time",
             default=offset in selected_set,
         )
         for offset in REMINDER_OFFSETS_ORDERED
@@ -145,12 +152,14 @@ async def _refresh_host_page(
 ) -> None:
     if host_message is None:
         return
+    files: list[discord.File] = []
     try:
         summary = await summary_loader(int(author_id))
         from ui.views.player_self_service_views import (
             PAGE_REMINDERS,
             PlayerSelfServiceView,
             _build_page_response,
+            _close_files,
             _edit_original_with_image_fallback,
         )
 
@@ -194,6 +203,9 @@ async def _refresh_host_page(
         raise
     except Exception:
         logger.debug("player_self_service_reminder_host_refresh_failed", exc_info=True)
+    finally:
+        if files:
+            _close_files(files)
 
 
 class ReminderEventSelect(discord.ui.Select):

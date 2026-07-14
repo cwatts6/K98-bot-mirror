@@ -494,12 +494,24 @@ Current status:
   coordinates remain private. There is no Change Governor, and optional selected-governor context
   exists only for a validated Dashboard return. The completed Phase 5C task pack and starter are
   archived.
-- Phase 5D Premium Reminders Summary Card is the next active product/visual workshop;
-  implementation is not yet approved. It starts from the existing combined KVK/calendar reminder
-  state and guided Manage journey plus the accepted standalone 1702x924/avatar/fallback/timeout
-  baseline. Reminders is Discord-user-level and never shows Change Governor. The workshop will
-  decide the hierarchy, genuine headline values, guidance, backdrop/avatar treatment, and exact
-  page-relevant controls before code changes.
+- Phase 5D Premium Reminders Summary Card is implemented and locally validated; operator Discord
+  smoke remains pending. The no-avatar standalone 1702x924 card earns ACTIVE/REVIEW/OFF from the
+  existing KVK and Calendar settings, presents friendly event labels, canonical alert-time labels,
+  genuine counts and deterministic overflow, saved inactive choices, compact coverage, and exactly
+  one priority-ordered Reminder Insight. Repository inspection found no reusable side-effect-free
+  cross-system next-alert projection, so runtime uses the approved REMINDER COVERAGE hero and records
+  projection extraction separately instead of copying scheduler rules. KVK autosave/update wording
+  and confirmation DM, Calendar Settings, Remove All revalidation, persistence, restart/rehydration,
+  duplicate-send protection, retries, schedulers, event sources, and dispatch remain unchanged.
+  Delivery remains private, author-gated, same-payload on fallback, and has no Change Governor;
+  selected Dashboard governor context is return-only. Focused tests passed 147, selected reminder/
+  scheduler tests passed 193, and full pytest passed 2551 with 2 skipped. The ten-state native,
+  desktop, and mobile visual matrix passed local review. The final host-refresh path now explicitly
+  closes regenerated attachment streams in `finally`; 108 focused tests, full pytest, log-noise
+  validation, and pre-commit passed on the corrected tree. Codex Security scan
+  `8fcf96f6-44e0-4d87-8521-7de721444ef7` sealed with 85/85 review receipts and 42/42 candidate
+  ledgers. It found no Phase 5D security issue; its 20 reportable findings (16 Medium, 4 Low) belong
+  to pre-existing authorization/import/Ark/MGE repository surfaces.
 - Phases 5D-5G independently apply the same format and transition contract to Reminders,
   Preferences, Inventory summary, and Exports summary. They preserve current page actions,
   disabled states, privacy, payloads, filenames, attachment cleanup, and service ownership; none

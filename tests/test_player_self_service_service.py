@@ -431,11 +431,20 @@ async def test_build_summary_uses_read_only_loaders() -> None:
             selected_offsets=("24h",),
         )
 
+    def calendar_event_catalog_loader():
+        calls.append(("calendar_catalog", None))
+        return service.reminders_summary.CalendarEventCatalog(
+            available=True,
+            event_types=("raid",),
+        )
+
     summary = await service.build_player_self_service_summary(
         42,
         account_loader=account_loader,
         reminder_loader=reminder_loader,
         calendar_reminder_loader=calendar_reminder_loader,
+        calendar_event_catalog_loader=calendar_event_catalog_loader,
+        utc_clock=lambda: datetime(2026, 7, 14, 15, 30, tzinfo=UTC),
         preference_loader=preference_loader,
         profile_preference_loader=profile_preference_loader,
         vip_profile_loader=vip_profile_loader,
@@ -449,6 +458,7 @@ async def test_build_summary_uses_read_only_loaders() -> None:
     assert ("account", 42) in calls
     assert ("reminder", 42) in calls
     assert ("calendar_reminder", 42) in calls
+    assert ("calendar_catalog", None) in calls
     assert ("preference", 42) in calls
     assert ("profile_preference", 42) in calls
     assert ("vip", 111) in calls
@@ -456,6 +466,10 @@ async def test_build_summary_uses_read_only_loaders() -> None:
     assert summary.preferences.vip_summary == "Main Gov - 19"
     assert summary.preferences.location_country == "United Kingdom (GB)"
     assert summary.reminders.calendar.state == "on"
+    assert summary.reminders_summary is not None
+    assert summary.reminders_summary.configuration_state.value == "ACTIVE"
+    assert summary.reminders_summary.calendar.event_summary == "Raid"
+    assert summary.reminders_summary.generated_at_utc == datetime(2026, 7, 14, 15, 30, tzinfo=UTC)
     assert summary.exports.action_state == "actionable"
     assert summary.inventory.state == "empty"
 

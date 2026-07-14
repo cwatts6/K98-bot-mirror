@@ -70,8 +70,8 @@ def test_me_commands_are_decorated_and_thin() -> None:
 
     assert source.count("@versioned(") == 9
     assert source.count('@versioned("v1.03")') == 1
-    assert source.count('@versioned("v1.01")') == 1
-    assert source.count('@versioned("v1.00")') == 7
+    assert source.count('@versioned("v1.01")') == 2
+    assert source.count('@versioned("v1.00")') == 6
     assert source.count("@safe_command") == 9
     assert source.count("@track_usage()") == 9
     assert "set_user_config" not in source
