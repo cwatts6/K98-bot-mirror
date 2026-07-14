@@ -397,6 +397,17 @@ def _close_files(files: list[discord.File] | None) -> None:
             logger.debug("player_self_service_stream_close_failed", exc_info=True)
 
 
+def _payload_user_id(
+    summary: PlayerSelfServiceSummary | None,
+    accounts_payload: AccountsPortfolioPayload | None,
+) -> int | None:
+    if accounts_payload is not None:
+        return accounts_payload.discord_user_id
+    if summary is not None:
+        return summary.discord_user_id
+    return None
+
+
 async def _build_page_response(
     page: PlayerSelfServicePage,
     summary: PlayerSelfServiceSummary | None,
@@ -441,7 +452,7 @@ async def _build_page_response(
     except Exception:
         logger.exception(
             "player_self_service_card_render_failed user_id=%s page=%s",
-            accounts_payload.discord_user_id if accounts_payload else summary.discord_user_id,
+            _payload_user_id(summary, accounts_payload),
             page,
         )
         return fallback_embed, []
@@ -505,7 +516,7 @@ async def _edit_original_with_image_fallback(
             raise
         logger.exception(
             "player_self_service_card_send_failed user_id=%s page=%s",
-            accounts_payload.discord_user_id if accounts_payload else summary.discord_user_id,
+            _payload_user_id(summary, accounts_payload),
             page,
         )
         fallback_embed = build_page_embed(

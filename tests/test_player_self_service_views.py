@@ -356,6 +356,25 @@ async def test_subpage_response_falls_back_to_embed_when_card_render_fails(monke
 
 
 @pytest.mark.asyncio
+async def test_page_response_render_failure_logs_safely_without_payloads(monkeypatch) -> None:
+    fallback_embed = object()
+    monkeypatch.setattr(
+        views,
+        "build_page_embed",
+        lambda *_args, **_kwargs: fallback_embed,
+    )
+
+    embed, files = await views._build_page_response(
+        views.PAGE_DASHBOARD,
+        None,
+        display_name="Tester",
+    )
+
+    assert embed is fallback_embed
+    assert files == []
+
+
+@pytest.mark.asyncio
 async def test_dashboard_page_response_propagates_card_render_cancellation(
     monkeypatch,
 ) -> None:
@@ -403,6 +422,41 @@ async def test_dashboard_image_send_failure_retries_embed_only() -> None:
     assert target.calls[0]["files"]
     assert "files" not in target.calls[1]
     assert getattr(target.calls[1]["embed"].image, "url", None) is None
+
+
+@pytest.mark.asyncio
+async def test_image_send_failure_logs_safely_without_payloads(monkeypatch) -> None:
+    fallback_embed = object()
+    monkeypatch.setattr(
+        views,
+        "build_page_embed",
+        lambda *_args, **_kwargs: fallback_embed,
+    )
+
+    class Target:
+        def __init__(self) -> None:
+            self.calls = []
+
+        async def edit_original_response(self, **kwargs):
+            self.calls.append(kwargs)
+            if kwargs.get("files"):
+                raise RuntimeError("attachment rejected")
+            return SimpleNamespace(id=999)
+
+    target = Target()
+    message = await views._edit_original_with_image_fallback(
+        target,
+        page=views.PAGE_DASHBOARD,
+        summary=None,
+        display_name="Tester",
+        view=views.PlayerSelfServiceView(author_id=42, display_name="Tester"),
+        embed=views.build_dashboard_embed(_summary(), display_name="Tester"),
+        files=[SimpleNamespace(filename="me_dashboard_42.png")],
+    )
+
+    assert message.id == 999
+    assert len(target.calls) == 2
+    assert target.calls[1]["embed"] is fallback_embed
 
 
 @pytest.mark.asyncio
