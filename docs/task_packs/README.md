@@ -412,18 +412,20 @@ Player Self-Service Command Centre status:
   `archive/`.
 - Active Player Self-Service v2 files:
   - `Player Self-Service Command Centre v2 - Programme Pack.md`
-  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 5C Premium Accounts Summary Card.md`
-  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5C Premium Accounts Summary Card.md`
-- GovernorOS v2 Phases 1-5B are complete. Their reports/task packs/chat starters are archived under
+  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md`
+- GovernorOS v2 Phases 1-5C are complete. Their reports/task packs/chat starters are archived under
   `archive/`. Phase 2 delivered in mirror PR #216 and production PR #523, Phase 3 delivered in
   mirror PR #217 and production PR #524, and Phase 4 delivered in mirror PR #218. Phase 4 operator
   smoke on 2026-07-11 accepted the materially wider standalone card and gated Change Governor
   dropdown. Phase 5A delivered in mirror PR #219 and production PR #526; operator smoke passed its
   direct reports, honest no-data output, and governor switching on 2026-07-13. Phase 5B delivered
   in mirror PR #220 and production PR #527; operator smoke and final visual acceptance passed on
-  2026-07-13. Its completed task pack and chat starter are archived under `archive/`. Phase 5C
-  Accounts is the next approval-gated visual/product workshop. Separate Phases
-  5D-5G own Reminders, Preferences, Inventory summary, and Exports summary page alignment.
+  2026-07-13. Phase 5C delivered in mirror PR #221 and production PR #528; final operator smoke and
+  premium visual acceptance passed on 2026-07-14. The completed Phase 5C task pack and chat starter
+  are archived under `archive/`. Phase 5D Reminders is the next approval-gated product/visual
+  workshop; implementation is not yet approved. Separate Phases 5E-5G own Preferences, Inventory
+  summary, and Exports summary page alignment.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -519,14 +521,15 @@ tuning/decomposition, residual `stats_module.py` cleanup, legacy PreKvK SQL clea
 cumulative view cleanup, and inventory view-orchestration extraction remain separate later slices
 unless explicitly approved.
 
-Player Self-Service Command Centre v2 Phase 5C Premium Accounts Summary Card is the next prepared
-player self-service slice. It starts with the operator's improvement ideas and an approval-gated
-visual/product workshop, then may migrate the current 1702x924 Accounts card from embed-wrapped to
-standalone private delivery while preserving the same-payload fallback and guided Manage flow.
-Accounts remains a Discord-user/all-linked-governor page and does not show Change Governor;
-selected governor context is retained only for Dashboard return. Phases 5D-5G remain separate
-page-specific slices, and later export, history, inspect, migration, SQL, and behavior changes stay
-outside Phase 5C.
+Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card is the next prepared
+player self-service slice. It starts with repository inspection and the operator's improvement
+ideas in an approval-gated product/visual workshop; implementation is not yet approved. Reminders
+remains a Discord-user-level combined KVK/calendar page and does not show Change Governor; selected
+governor context is retained only for Dashboard return. The accepted standalone 1702x924/avatar/
+same-payload-fallback/cleanup baseline carries forward, while hierarchy, genuine headline values,
+guidance, backdrop, and exact page-relevant controls remain workshop decisions. Phases 5E-5G remain
+separate page-specific slices, and later export, history, inspect, migration, SQL, or reminder-
+behavior changes stay outside Phase 5D unless separately approved.
 Final removal of temporary deprecated command paths remains captured as deferred cleanup for
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.

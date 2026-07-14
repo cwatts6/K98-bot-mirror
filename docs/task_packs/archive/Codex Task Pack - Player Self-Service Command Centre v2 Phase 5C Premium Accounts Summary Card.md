@@ -8,7 +8,7 @@
 - Task type: `data/service/DAL | premium Accounts renderer | private Account Summary report | Discord interaction`
 - One-pass approved: `Yes - within the locked product, data, visual, interaction, and compatibility contract below`
 - Implementation approved: `Yes`
-- Status: `implemented and locally validated - operator Discord smoke pending`
+- Status: `complete and operator accepted on 2026-07-14`
 - Approved runtime backdrop: `assets/me/cards/me_accounts.png`
 - Approved production canvas: `1702 × 924 PNG`
 
@@ -881,7 +881,8 @@ After automated validation:
 - [x] RSS Total reuses the canonical current Inventory holdings calculation.
 - [x] Latest-scan and DATA-state logic uses one global Kingdom 1198 `MAX(ScanDate)`.
 - [x] READY/REVIEW/SETUP is earned from the approved registry/scan rules.
-- [x] The full-width roster, overflow row, and deterministic Portfolio Insight are implemented.
+- [x] The smoke-refined two-column governor-tile roster, overflow row, and deterministic Portfolio
+  Insight are implemented.
 - [x] `Manage Accounts` remains behaviorally unchanged and refreshes the new host card.
 - [x] `Account Summary` provides private Overview, Combat, and Economy visual pages for all governors.
 - [x] The complete private CSV contains the approved columns once each and exact values.
@@ -889,7 +890,7 @@ After automated validation:
 - [x] Read-only DAL/service/payload expansion is set-based and validated against the SQL repository.
 - [x] No SQL schema, persistence, registry-authority, ownership, or mutation redesign is introduced.
 - [x] Same-payload fallbacks, attachment replacement, and all stream cleanup paths are tested.
-- [ ] Focused/full validation, security review, visual samples, and operator Discord smoke are recorded.
+- [x] Focused/full validation, security review, visual samples, and operator Discord smoke are recorded.
 - [x] Programme, briefing, canonical, task-pack, starter, and deferred documents reflect delivery.
 
 ## 20A. Implementation And Validation Evidence
@@ -897,20 +898,25 @@ After automated validation:
 - Branch: `codex/phase-5c-premium-accounts-summary` against the scrubbed mirror.
 - SQL contract: Kingdom 1198 scan, location, civilisation, registry, and Inventory sources were
   checked against `C:\K98-bot-SQL-Server`; no schema, view, index, or persistence change was needed.
-- Focused/selected validation: 189 tests passed. Full regression: 2,521 passed and 2 skipped.
+- Focused/selected validation passed throughout implementation; the final smoke-refinement suite
+  passed 151 tests. Final full regression passed 2,535 tests with 2 skipped.
 - Repository gates: architecture boundaries, deferred-item structure, selected-test analysis, smoke
   imports, and command registration all passed; Ruff passed and Pyright reported no errors.
 - Visual QA: main Accounts and all three Account Summary sections were rendered at original,
   Discord desktop, and Discord mobile sizes under the task's Codex visualization directory.
-- Codex Security: repository-wide ranked review plus explicit Phase 5C privacy, authorization, SQL,
-  CSV, filename, attachment, and stream-lifetime coverage was run. Any unrelated repository finding
-  is recorded separately and is not silently folded into this feature scope.
-- Remaining gate: operator Discord smoke against the mirror PR. Do not promote or deploy before it
-  passes.
+- Codex Security: diff scan `c0289c7f-654b-4ecc-9d31-22df965fd3f0` completed all changed runtime-file
+  receipts with zero Phase 5C reportable findings and explicit privacy, authorization, SQL, CSV,
+  filename, avatar, timeout, attachment, and stream-lifetime coverage. Unrelated repository
+  findings are captured separately in the deferred backlog and were not silently folded into this
+  feature scope.
+- Operator Discord smoke completed successfully on 2026-07-14. The final Accounts, Overview,
+  Combat, Economy, CSV, avatar, typography, navigation, and graceful-timeout presentation were
+  accepted as complete and premium. Mirror PR #221 and production PR #528 are ready for their
+  normal merge/promotion process; deployment remains a separate operator action.
 
 ## 21. Remaining Decisions And Escalation Gates
 
-There are no known blocking product or visual decisions.
+There are no remaining Phase 5C product, visual, data, or interaction decisions.
 
 Stop and ask the operator only if repository inspection proves one of the following:
 
@@ -927,7 +933,7 @@ account-capacity denominator, or redesign Manage to work around a blocker.
 
 ## 22. Remaining Summary-Card Handoff
 
-After Phase 5C completes, execute separately:
+Phase 5C is complete. Continue separately:
 
 - Phase 5D: Premium Reminders Summary Card
 - Phase 5E: Premium Preferences Summary Card

@@ -1,8 +1,7 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5C Premium Accounts Summary Card
 
-Status: implementation complete on the mirror feature branch; automated validation is recorded in
-the task pack/PR and operator Discord smoke remains the final acceptance gate. Retained as the exact
-execution prompt.
+Status: complete and operator accepted on 2026-07-14. Retained as the exact historical execution
+prompt; do not rerun it as active work.
 
 ## Copy/Paste Starter
 

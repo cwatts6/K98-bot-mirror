@@ -19,18 +19,23 @@ and legacy `/myinventory` intentionally share the visual refresh while data, cal
 visibility, controls, exports, filenames, fallback, attachment lifecycle, and every interaction
 contract remain unchanged. The completed Phase 5B task pack and starter are archived.
 
-Phase 5C Premium Accounts Summary Card is implemented on its mirror feature branch and is awaiting
-operator Discord smoke. `/me accounts` now resolves every linked registry entry through set-based
-Kingdom 1198 and canonical Inventory reads, renders the approved 1702x924 avatar-enabled portfolio card
-as a standalone private attachment, preserves the guided Manage workflow, and adds a private,
-avatar-enabled paginated Overview/Combat/Economy Account Summary with VIP, compact power,
-KP Loss/Tanking Score,
-percentage-labelled Tanking, Conduct in Economy, UTC date-times, and a complete formula-safe CSV.
-The main roster uses a larger two-column governor-tile grid with prominent Power values and no
-duplicate Main-governor header line. Same-payload
-fallbacks, author gates, attachment replacement, and stream cleanup are retained; no SQL schema,
-registry, ownership, direct Inventory, or existing export contract changed. Phase 5D Reminders is
-the next separately scoped summary-card slice after Phase 5C operator acceptance.
+Phase 5C Premium Accounts Summary Card is complete and operator accepted in mirror PR #221 and
+production PR #528. `/me accounts` resolves every linked registry entry through set-based Kingdom
+1198 and canonical Inventory reads, renders the approved 1702x924 avatar-enabled portfolio card as
+a standalone private attachment, preserves the guided Manage workflow, and adds a private,
+avatar-enabled paginated Overview/Combat/Economy Account Summary with VIP, compact power, KP
+Loss/Tanking Score, percentage-labelled Tanking, Conduct in Economy, UTC date-times, and a complete
+formula-safe CSV. The main roster uses a larger two-column governor-tile grid with prominent Power
+values and no duplicate Main-governor header line. Same-payload fallbacks, author gates, graceful
+timeouts, attachment replacement, and stream cleanup are retained; no SQL schema, registry,
+ownership, direct Inventory, or existing export contract changed. The completed Phase 5C task pack
+and starter are archived.
+
+Phase 5D Premium Reminders Summary Card is the next active GovernorOS slice. It begins with an
+approval-gated product/visual workshop around the operator's improvement ideas; implementation is
+not yet approved. Reminders remains a Discord-user-level combined KVK/calendar centre with no
+Change Governor. The accepted standalone 1702x924 format, author avatar, same-payload fallback,
+page-relevant navigation, graceful timeout, and attachment cleanup are the starting baseline.
 
 ## Quality Automation
 

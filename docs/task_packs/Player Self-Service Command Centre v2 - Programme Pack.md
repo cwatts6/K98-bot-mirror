@@ -5,7 +5,7 @@
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
 - Date: `2026-07-14`
-- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486, GovernorOS v2 Phases 1-5B completed through mirror PR #220 and production PR #527, and the Phase 5C Accounts product/visual contract approved on 2026-07-14
+- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486, GovernorOS v2 Phases 1-5B completed through mirror PR #220 and production PR #527, and Phase 5C Accounts completed and operator accepted in mirror PR #221 and production PR #528 on 2026-07-14
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
@@ -58,11 +58,12 @@ Resources, Materials, and Speedups renderer with approved room-specific backdrop
 typography, restored icons, Discord avatar handling, genuine upload dates, and honest populated/no-
 data presentation.
 
-Phase 5C product and visual design is now approved. `/me accounts` will become a private linked-
-governor portfolio with earned READY/REVIEW/SETUP state, four latest-snapshot metrics, a scan-health
-roster, one deterministic portfolio insight, the unchanged guided Manage journey, and a new private
-paginated Account Summary plus complete CSV. The approved `1702x924` runtime backdrop is
-`assets/me/cards/me_accounts.png`. Implementation is the next programme action.
+Phase 5C is complete and operator accepted. `/me accounts` is now a private linked-governor
+portfolio with earned READY/REVIEW/SETUP state, four latest-snapshot metrics, a two-column
+scan-health roster, one deterministic portfolio insight, the unchanged guided Manage journey, and
+a private avatar-enabled paginated Account Summary plus complete CSV. The accepted `1702x924`
+runtime backdrop is `assets/me/cards/me_accounts.png`. Phase 5D Reminders is the next product and
+visual workshop; its implementation is not approved until that workshop is complete.
 
 ## 3. Programme Vision
 
@@ -365,7 +366,7 @@ Delivery ownership:
 - Phase 5A applied the contract to direct governor-specific Resources, Materials, and Speedups.
 - Phase 5B completed the shared 1400x980 Inventory report renderer refresh with approved premium
   backdrops without changing report data or interaction behavior.
-- Phase 5C implements the approved Accounts portfolio and Account Summary using
+- Phase 5C completed the approved Accounts portfolio and Account Summary using
   `assets/me/cards/me_accounts.png`; Phases 5D-5G continue Reminders, Preferences, Inventory, and
   Exports one page at a time as matching operator-approved assets and contracts become available.
 - Phases 6-8 must use the same contract for Exports actions, History, and Inspect respectively.
@@ -723,7 +724,7 @@ Delivery record:
 
 ### Phase 5C-5G — Premium `/me` Summary Cards
 
-Status: `Phase 5C Accounts is implemented with automated validation complete and operator Discord smoke pending; Phases 5D-5G remain separately scoped`.
+Status: `Phase 5C Accounts is complete and operator accepted; Phase 5D Reminders is the next product workshop; Phases 5E-5G remain separately scoped`.
 
 The five summary pages share a presentation and interaction baseline but remain independent PR-sized
 slices. A later page must reuse the accepted rules from earlier pages without creating a broad
@@ -740,16 +741,18 @@ Shared premium summary-card contract:
 - Render off the event loop, replace prior attachments deliberately, preserve the fallback without
   a second data fetch, and close every file/stream on success, fallback, timeout, cancellation,
   stale suppression, and concurrent navigation.
-- Avatar use is page-specific and requires an approved position. Phase 5C Accounts uses the
-  invoking user's best-effort avatar at the upper left after operator smoke feedback; reads remain
-  author-validated and bounded. Other pages retain their own approved avatar/fallback decisions.
-  Keep long/Unicode names fitted.
+- The accepted personal-summary identity baseline is the invoking user's best-effort Discord avatar
+  at the upper left, author-validated and timeout-bounded, with a clean local/no-avatar fallback.
+  Phase 5C applies it to Accounts and every Account Summary section. Phases 5D-5G should start from
+  that baseline; omitting or repositioning it requires an explicit page workshop decision. Keep
+  long/Unicode display names fitted and do not derive identity from a selected governor.
 - Keep genuine current page values, states, names, action guidance, and empty/unavailable wording.
   Do not invent figures, trends, governors, status, or next actions to fill the backdrop.
 - Keep global navigation as real Discord components: blue-primary `Accounts`, `Reminders`, and
-  `Preferences` on the first row; secondary `Dashboard`, `Inventory`, and `Exports` on the second;
-  page-specific success actions below; the active page remains disabled. Do not paint fake buttons
-  into the image.
+  `Preferences` on the first row; secondary navigation and page-specific actions below; the active
+  page remains disabled. Start each workshop from the current page's genuine actions and the
+  accepted Accounts visual language, but approve the exact second/third rows page by page rather
+  than mechanically copying an irrelevant button. Do not paint fake buttons into the image.
 - Accounts, Reminders, Preferences, Inventory summary, and Exports summary are Discord-user or all-
   linked-governor pages. They must not show `Change Governor`, even when more than one governor is
   linked. The view may carry an optional selected governor only so `Dashboard` returns to the same
@@ -758,6 +761,17 @@ Shared premium summary-card contract:
 - A governor-specific child action, such as Inventory VIP or a report, must perform its own explicit
   governor selection/resolution and current access recheck. Retained Dashboard-return context must
   never silently narrow a user-level page or bypass authorization.
+- Governor dropdown routing is fixed across the remaining programme:
+  - Dashboard and selected-governor Resources, Materials, Speedups, future History, and any future
+    export explicitly approved as selected-governor scoped may show the author-gated paged Change
+    Governor control when more than one governor is linked.
+  - Accounts, Account Summary, Reminders, Preferences, Inventory summary, and Exports summary never
+    show Change Governor because their data is Discord-user-level or all-linked-governor scoped.
+  - Preferences `Update VIP` and Inventory `Open Report` are governor-specific child journeys: they
+    use an explicit governor picker/resolver and recheck access, while their parent pages remain
+    unfiltered and dropdown-free.
+  - Phase 6 must decide selected-governor versus all-linked Export Stats semantics before a
+    dashboard export can inherit a governor dropdown.
 - Preserve private/ephemeral delivery, author gating, current timeouts, stale/foreign/forged/
   concurrent denial, action disabled states, persistence, and command registration. A page may
   expand read-only services/DAL/payloads only when its phase explicitly approves that scope; Phase
@@ -766,9 +780,26 @@ Shared premium summary-card contract:
   same payload, render/delivery failure, attachment replacement, stream cleanup, timeout/stale/
   foreign/concurrent paths, empty/unavailable data, long names, and original/desktop/mobile output.
 
+Remaining-phase consistency matrix:
+
+| Phase | Parent scope | Premium output baseline | Governor routing | Product/behavior boundary |
+|---|---|---|---|---|
+| 5D Reminders | Discord user | 1702x924 standalone, avatar, same-payload fallback, graceful timeout | No Change Governor | Workshop hierarchy/guidance/actions; preserve KVK/calendar persistence, scheduling, DM, and Manage by default |
+| 5E Preferences | Discord user | Same premium baseline, page-approved backdrop and controls | No parent dropdown; Update VIP resolves governor explicitly | Preserve visibility/profile/VIP services and SQL contracts unless separately approved |
+| 5F Inventory summary | All linked/user | Same premium baseline; direct 1400x980 reports remain separate | No parent dropdown; Open Report explicitly selects and report pages may switch governor | Preserve calculations, imports, ranges, visibility, export, filename, and Sheets contracts |
+| 5G Exports summary | User/all-linked | Same premium baseline and private option windows | No Change Governor under current scope | Preserve schemas, formats, windows, filenames, services, and Sheets behavior |
+| 6 Export Stats action | Decision gated | Accepted attachment/navigation lifecycle | Dropdown only if selected-governor export is approved | Decide selected versus all-linked before implementation; no schema redesign |
+| 7 History | Selected governor | Accepted selected-governor standalone lifecycle | Paged Change Governor with access recheck | Preserve public/channel-gated `/kvk history`; add private `/me history` only |
+| 8 Inspect | Explicit lookup target, inspect-safe | Private permission-gated premium output | Inspect lookup/ambiguity resolution, not the viewer's linked-governor dropdown | Approve permissions, safe fields/VIP, lookup, and telemetry first |
+| 9 Migration review | Evidence only | No new renderer implied | No selector change implied | Usage-led recommendations only; redirects/removals need explicit later approval |
+
+Every phase starts with repository inspection and an approval-gated product contract. A completed
+phase's page-specific choices do not silently approve another page's metrics, workflow changes,
+asset, or component rows.
+
 #### Phase 5C - Premium Accounts Summary Card
 
-Status: `implemented and locally validated - operator Discord smoke pending`.
+Status: `complete and operator accepted on 2026-07-14`.
 
 Approved product outcome:
 
@@ -784,7 +815,7 @@ Approved product outcome:
   - `LATEST SNAPSHOTS` with exactly four metrics: Linked, Portfolio Power, T4+T5 Kills, and current
     Inventory-backed RSS Total;
   - role breakdown and honest `n/N reporting` coverage;
-  - a full-width `SLOT | GOVERNOR | ID | POWER | DATA` roster;
+  - a readable two-column governor-tile roster with Slot, Governor, ID, prominent Power, and Data;
   - one deterministic `PORTFOLIO INSIGHT` line;
   - the existing Manage guidance and explicit UTC date-time `Refreshed` footer.
 - Do not display linked count against configured capacity. The configured slot limit is not a
@@ -837,13 +868,24 @@ Approved technical scope:
 - run focused/full validation, original/desktop/mobile samples, and Codex Security review before
   operator Discord smoke.
 
-The complete implementation contract is authoritative in the Phase 5C task pack and chat starter.
+The complete implementation contract is retained as the archived Phase 5C task pack and chat
+starter. Mirror PR #221 and production PR #528 contain the accepted implementation.
 
 #### Phase 5D - Premium Reminders Summary Card
 
+Status: `next product/visual workshop - implementation not yet approved`.
+
+Start from the existing private 1702x924 card, current combined KVK/calendar reminder payload, and
+the accepted Phase 5C visual/delivery baseline. Workshop the operator's improvement ideas before
+locking the information hierarchy, status language, metrics, insight/guidance, avatar placement,
+backdrop decision, and exact component rows.
+
 Preserve combined KVK/calendar reminder states, event/time summaries, the existing guided `Manage`
-child flow, persistence/restart behavior, and author gating. No reminder scheduling, event source,
-lead-time, DM, calendar, or SQL change; no Change Governor.
+child flow, KVK autosave/update/remove-all confirmation, Calendar Settings handoff, confirmation DM,
+persistence/restart behavior, duplicate-send protections, and author gating unless the workshop
+explicitly approves a separately scoped behavior change. Reminders is Discord-user-level: no Change
+Governor and no implicit selected-governor filter. No reminder scheduling, event source, lead-time,
+DM, calendar, persistence, or SQL change is pre-approved.
 
 #### Phase 5E - Premium Preferences Summary Card
 
@@ -1133,9 +1175,9 @@ The programme is complete when:
 - [ ] A private `/me history` path exists while `/kvk history` remains unchanged.
 - [ ] `/me inspect` is permission-gated, private by default, and excludes Discord-user private data.
 - [ ] Legacy commands are only redirected/removed after usage evidence and explicit operator approval.
-- [x] Documentation and canonical command references reflect completed phases through Phase 5B.
-- [x] Phase 5C documentation, canonical references, and automated validation are recorded; operator
-  Discord smoke remains the final acceptance gate.
+- [x] Documentation and canonical command references reflect completed phases through Phase 5C.
+- [x] Phase 5C documentation, canonical references, automated validation, security review, visual
+  samples, and successful operator Discord smoke are recorded.
 - [x] Command registration validation remains green through Phase 5C.
 - [x] No new direct SQL exists in command/view layers through Phase 5C.
 - [x] Deferred findings from completed phases are captured structurally.
@@ -1156,22 +1198,22 @@ Do not include these in early phases unless separately approved:
 ## 20. Suggested Next Action
 
 ```text
-Run the Phase 5C operator Discord smoke from its task pack against the mirror PR. Confirm genuine
-portfolio values/states, Manage mutation refresh, every Account Summary section/page, the complete
-private CSV, fallback/privacy behavior, and original/desktop/mobile presentation. Do not promote or
-begin Phase 5D until that operator acceptance is recorded.
+Run the Phase 5D Reminders product/visual workshop. Begin by reviewing the current 1702x924
+embed-wrapped card, combined KVK/calendar status payload, real Manage/Calendar Settings journeys,
+accepted Phase 5C standalone format, and the operator's improvement ideas. Record and approve the
+Reminders hierarchy, meaningful status/metrics, avatar/backdrop treatment, exact controls, fallback,
+and smoke examples before authorizing implementation.
 ```
 
-The production backdrop is present at `assets/me/cards/me_accounts.png` and is locked at `1702x924`.
-The approved scope includes the premium Accounts portfolio, read-only bulk data expansion, earned
-scan-health states, deterministic insight, unchanged guided Manage behavior, standalone/fallback
-delivery, and the new private paginated Account Summary with complete CSV. It does not include
-Change Governor, public delivery, SQL schema changes, registry redesign, or another `/me` page.
+The current Reminders runtime backdrop is present at `assets/me/cards/me reminders.png` and is
+exactly `1702x924`, but retention/replacement and final presentation remain workshop decisions.
+Phase 5D does not inherit permission to change reminder scheduling, event sources, lead times, DMs,
+calendar behavior, persisted state, SQL, or another `/me` page.
 
 Use:
 
-- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5C Premium Accounts Summary Card.md`
-- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5C Premium Accounts Summary Card.md`
+- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md`
+- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md`
 
 ## 21. Programme Change Log
 
@@ -1194,3 +1236,4 @@ Use:
 | 2026-07-14 | Phase 5C operator smoke refinement | Removed Inventory navigation from Accounts/Summary, added author avatar and Discord-name suffix deduplication, increased/rebalanced typography, added UTC date-times and VIP, moved Helps to Economy, added compact combat/economy values plus KP Loss/Tanking Score, extended the exact CSV, and made Summary timeout visibly disable controls while preserving the private report. No SQL schema or registry mutation contract changed. |
 | 2026-07-14 | Phase 5C operator smoke refinement 2 | Replaced the sparse main roster table with a larger two-column governor-tile grid, compacted Overview Power/Troop Power, renamed the visual section to Combat, displayed Tanking as a percentage with higher-is-better guidance, and moved Conduct from Combat to Economy. Payload, exact CSV, SQL, Manage, privacy, attachment, and timeout contracts remain unchanged. |
 | 2026-07-14 | Phase 5C operator smoke refinement 3 | Removed the redundant Main-governor header line, enlarged the reclaimed Accounts header/metric typography, made governor-tile Power values prominent, and carried the existing bounded author avatar through Overview, Combat, and Economy renders. Payload, SQL, CSV, Manage, privacy, attachment, and timeout contracts remain unchanged. |
+| 2026-07-14 | Phase 5C completed and Phase 5D prepared | Recorded successful final operator smoke and premium visual acceptance for Accounts and all Account Summary sections, archived the completed Phase 5C pack/starter, made Reminders the next approval-gated product workshop, and fixed the shared standalone/avatar/navigation plus governor-dropdown routing contract for Phases 5D-9. |

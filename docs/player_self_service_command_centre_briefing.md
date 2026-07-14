@@ -1,6 +1,6 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 GovernorOS v2 status: Phase 4 Premium Governor Dashboard Renderer is complete and operator smoke
 passed on 2026-07-11. `/me dashboard` is governor-first: no linked governor shows setup
@@ -66,8 +66,10 @@ available. The operator-approved private embed remains the fallback when avatar 
 rendering, file creation, or image delivery fails. The successful card is delivered as a
 standalone attachment for the wider KVK-style Discord presentation. Multiple-governor cards use a
 Change Governor dropdown below the blue primary navigation row. `Last Login: TBC` is presentation
-only until its separately approved dataset/SQL contract is delivered. Existing generated cards for
-the older setup pages remain unchanged until their approved phase work. Quick Launch links for
+only until its separately approved dataset/SQL contract is delivered. Accounts now uses the
+accepted premium Phase 5C portfolio/summary presentation; Reminders, Preferences, Inventory
+summary, and Exports summary retain their current cards until their own approved slices. Quick
+Launch links for
 `/kvk stats`, `/kvk targets`,
 `/kvk history`, and `/kvk rankings` remain absent because those commands have channel and
 public-output rules that should stay exactly where players already use them. The dashboard keeps
@@ -478,7 +480,8 @@ Current status:
   dates and adds density-aware diamond markers for every plotted upload. Automated validation
   passed 255 focused Inventory/dashboard tests and the full suite (`2503 passed, 2 skipped`). The
   completed Phase 5B task pack and starter are archived.
-- Phase 5C Premium Accounts Summary Card is implemented and awaiting operator Discord smoke. The
+- Phase 5C Premium Accounts Summary Card is complete and operator accepted in mirror PR #221 and
+  production PR #528 after final smoke on 2026-07-14. The
   avatar-enabled 1702x924 Accounts portfolio uses all linked registry entries, earned scan-health and
   coverage states, the four approved metrics, canonical current Inventory RSS, deterministic
   insight, standalone private delivery, and same-payload fallback. The unchanged guided Manage
@@ -489,7 +492,14 @@ Current status:
   Main-governor header line. The invoking-user avatar is retained across all three summary
   sections. UTC date-times, graceful timeout controls, and a complete formula-safe CSV are retained;
   coordinates remain private. There is no Change Governor, and optional selected-governor context
-  exists only for a validated Dashboard return.
+  exists only for a validated Dashboard return. The completed Phase 5C task pack and starter are
+  archived.
+- Phase 5D Premium Reminders Summary Card is the next active product/visual workshop;
+  implementation is not yet approved. It starts from the existing combined KVK/calendar reminder
+  state and guided Manage journey plus the accepted standalone 1702x924/avatar/fallback/timeout
+  baseline. Reminders is Discord-user-level and never shows Change Governor. The workshop will
+  decide the hierarchy, genuine headline values, guidance, backdrop/avatar treatment, and exact
+  page-relevant controls before code changes.
 - Phases 5D-5G independently apply the same format and transition contract to Reminders,
   Preferences, Inventory summary, and Exports summary. They preserve current page actions,
   disabled states, privacy, payloads, filenames, attachment cleanup, and service ownership; none
