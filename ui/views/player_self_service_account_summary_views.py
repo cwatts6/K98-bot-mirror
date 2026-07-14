@@ -35,7 +35,7 @@ def build_account_summary_fallback(page: AccountSummaryPage) -> discord.Embed:
     """Build a concise same-payload fallback for the currently selected private page."""
     labels = {
         "overview": "Overview",
-        "combat": "Combat & Participation",
+        "combat": "Combat",
         "economy": "Economy & Activity",
     }
     embed = discord.Embed(
@@ -50,14 +50,15 @@ def build_account_summary_fallback(page: AccountSummaryPage) -> discord.Embed:
                 f"T4+T5 {row.t4_t5_kills if row.t4_t5_kills is not None else '—'} • "
                 f"Deads {row.deads if row.deads is not None else '—'} • "
                 f"KP Loss {row.kp_loss if row.kp_loss is not None else '—'} • "
-                f"Tanking {row.tanking_score if row.tanking_score is not None else '—'}"
+                f"Tanking {accounts_renderer.format_tanking_score(row.tanking_score)}"
             )
         elif page.section == "economy":
             value = (
                 f"Gathered {row.rss_gathered if row.rss_gathered is not None else '—'} • "
                 f"Assistance {row.rss_assistance if row.rss_assistance is not None else '—'} • "
                 f"Current {row.rss_total if row.rss_total is not None else '—'} • "
-                f"Helps {row.helps if row.helps is not None else '—'}"
+                f"Helps {row.helps if row.helps is not None else '—'} • "
+                f"Conduct {accounts_renderer.format_whole_number(row.conduct)}"
             )
         else:
             location = (
@@ -74,7 +75,10 @@ def build_account_summary_fallback(page: AccountSummaryPage) -> discord.Embed:
         embed.add_field(name=f"{row.slot} • {row.display_name}", value=value[:1024], inline=False)
     if not page.rows:
         embed.description += "\nNo linked governors to show."
-    embed.set_footer(text=f"Refreshed {page.payload.refreshed_at_utc:%d %b %Y %H:%M UTC}")
+    footer = f"Refreshed {page.payload.refreshed_at_utc:%d %b %Y %H:%M UTC}"
+    if page.section == "combat":
+        footer = f"Combat all linked governors (Tanking: Higher = Better) • {footer}"
+    embed.set_footer(text=footer)
     return embed
 
 

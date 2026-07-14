@@ -135,12 +135,12 @@ Account Summary:
 - no Change Governor
 - 8 governor rows per page; Main first then slot order; support hundreds of governors
 - three visual sections:
-  1. Overview: Slot, Governor, Civilisation, City Hall, VIP, Power, Troop Power,
+  1. Overview: Slot, Governor, Civilisation, City Hall, VIP, compact Power, compact Troop Power,
      Location X:Y, Last Scan
-  2. Combat & Participation: Slot, Governor, Kill Points, T4+T5 Kills, Deads, Healed Troops,
-     Highest Acclaim, KP Loss, Tanking Score, Conduct
+  2. Combat: Slot, Governor, Kill Points, T4+T5 Kills, Deads, Healed Troops,
+     Highest Acclaim, KP Loss, Tanking Score shown as a percentage; footer explains higher is better
   3. Economy & Activity: Slot, Governor, RSS Gathered, RSS Assistance, RSS Total, Helps,
-     Inventory As Of
+     Conduct, Inventory As Of
 - repeated compact portfolio header includes total Power, Troop Power, T4+T5 Kills, and RSS Total
 - additive fields may use SUM; Highest Acclaim uses MAX; never aggregate IDs, names, coordinates, or dates
 - section change resets to page 1

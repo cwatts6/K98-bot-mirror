@@ -173,7 +173,9 @@ A genuine reported zero remains `0`.
 
 ### 6.4 Linked-governor roster
 
-Use one full-width, five-column roster:
+Use one full-width roster panel containing a two-column governor-tile grid. Read entries
+left-to-right, then top-to-bottom. Each tile presents the same five roster values with a large
+slot/name line and a compact ID/Power/Data line:
 
 ```text
 SLOT | GOVERNOR | ID | POWER | DATA
@@ -499,7 +501,10 @@ Last Scan
 When registered and latest-scanned names differ, show the current Governor name as primary and the
 registered name as a restrained secondary note, subject to fitted bounds.
 
-#### Combat & Participation
+Power and Troop Power use compact player-facing values on this visual page; exact values remain in
+the CSV.
+
+#### Combat
 
 ```text
 Slot
@@ -511,8 +516,10 @@ Healed Troops
 Highest Acclaim
 KP Loss
 Tanking Score
-Conduct
 ```
+
+Tanking Score is displayed with a `%` suffix. The footer explains
+`Tanking: Higher = Better`.
 
 #### Economy & Activity
 
@@ -523,6 +530,7 @@ RSS Gathered
 RSS Assistance
 RSS Total
 Helps
+Conduct
 Inventory As Of
 ```
 
@@ -534,7 +542,8 @@ Scope labels must remain honest:
 - `Inventory As Of` identifies the Inventory snapshot used.
 - `Last Scan` identifies the governor scan, not the card render time.
 - `Last Scan` and `Refreshed` include both UTC date and time.
-- Summary tables use compact player-facing values; exact values remain in the CSV.
+- Summary tables use compact player-facing values; Conduct is whole-number display; exact values
+  remain in the CSV.
 
 ### 10.3 Pagination
 

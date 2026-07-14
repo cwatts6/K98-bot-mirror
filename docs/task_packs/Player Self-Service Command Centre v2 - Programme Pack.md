@@ -810,11 +810,11 @@ Approved interaction expansion:
   ownership/claim, slot, audit, and host-refresh behavior.
 - `Account Summary` is a new private, read-only, all-governor child journey using the same backdrop,
   standalone attachment delivery, eight rows per page, and three sections:
-  - Overview: identity, Civilisation, City Hall, VIP, Power, Troop Power, Location, Last Scan UTC;
-  - Combat & Participation: compact Kill Points, T4+T5 Kills, Deads, Healed, Highest Acclaim,
-    calculated KP Loss/Tanking Score, and whole-number Conduct;
-  - Economy & Activity: compact RSS Gathered, RSS Assistance, current RSS Total, Helps, and
-    Inventory As Of.
+  - Overview: identity, Civilisation, City Hall, VIP, compact Power/Troop Power, Location, Last Scan UTC;
+  - Combat: compact Kill Points, T4+T5 Kills, Deads, Healed, Highest Acclaim, calculated KP Loss,
+    and percentage-labelled Tanking Score with a higher-is-better footer note;
+  - Economy & Activity: compact RSS Gathered, RSS Assistance, current RSS Total, Helps,
+    whole-number Conduct, and Inventory As Of.
 - Summary controls provide section tabs, Previous/Next, complete private CSV, and Back to Accounts.
   The CSV contains exact values for every linked row and includes registered/current names, VIP,
   T4 and T5 components, KP Loss/Tanking Score, coordinates, data state, scan time, and Inventory
@@ -1190,3 +1190,4 @@ Use:
 | 2026-07-14 | Phase 5C Accounts product, data, interaction, and backdrop contract approved | Locked the four-metric Accounts portfolio, global Kingdom 1198 latest-scan DATA/READY rules, arbitrary-size roster behavior, deterministic insight, unchanged Manage flow, private paginated Account Summary/CSV, no-avatar page layout, standalone delivery, scoped read-only DAL expansion, and approved `assets/me/cards/me_accounts.png` for implementation. |
 | 2026-07-14 | Phase 5C Accounts implemented; operator smoke pending | Added typed all-linked portfolio models, set-based latest Kingdom 1198 and canonical current-RSS reads, the approved standalone 1702x924 Accounts renderer, unchanged Manage refresh, private three-section paginated Account Summary, complete formula-safe CSV, same-payload fallbacks, attachment cleanup, focused/full validation, visual samples, and Codex Security review. No SQL schema, registry, ownership, or existing report/export contract changed. |
 | 2026-07-14 | Phase 5C operator smoke refinement | Removed Inventory navigation from Accounts/Summary, added author avatar and Discord-name suffix deduplication, increased/rebalanced typography, added UTC date-times and VIP, moved Helps to Economy, added compact combat/economy values plus KP Loss/Tanking Score, extended the exact CSV, and made Summary timeout visibly disable controls while preserving the private report. No SQL schema or registry mutation contract changed. |
+| 2026-07-14 | Phase 5C operator smoke refinement 2 | Replaced the sparse main roster table with a larger two-column governor-tile grid, compacted Overview Power/Troop Power, renamed the visual section to Combat, displayed Tanking as a percentage with higher-is-better guidance, and moved Conduct from Combat to Economy. Payload, exact CSV, SQL, Manage, privacy, attachment, and timeout contracts remain unchanged. |

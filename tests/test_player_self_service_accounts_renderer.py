@@ -99,6 +99,15 @@ def test_governor_count_label_uses_singular_and_plural_grammar() -> None:
     assert accounts_renderer.format_governor_count(2) == "2 governors"
 
 
+def test_linked_governor_tiles_preserve_order_and_overflow_contract() -> None:
+    entries = accounts_renderer._linked_governor_entries(_payload(10))
+
+    assert len(entries) == 8
+    assert entries[0][:2] == ("Main", "Current Governor 0")
+    assert entries[1][:2] == ("Farm 1", "Current Governor 1")
+    assert entries[-1] == ("", "+ 3 more — open Account Summary", "", "", "")
+
+
 def test_account_summary_renderer_supports_all_three_sections() -> None:
     payload = _payload(9)
     for section in ("overview", "combat", "economy"):
@@ -120,6 +129,8 @@ def test_summary_columns_and_values_follow_smoke_contract() -> None:
     assert "DATA" not in overview_labels
     assert "VIP" in overview_labels
     assert "VIP 18" in overview_values
+    assert "1B" in overview_values
+    assert "500M" in overview_values
     assert "14 Jul 2026 08:30 UTC" in overview_values
 
     combat = accounts_service.build_account_summary_page(payload, section="combat", page=1)
@@ -128,13 +139,20 @@ def test_summary_columns_and_values_follow_smoke_contract() -> None:
     assert "HELPS" not in combat_labels
     assert "KP LOSS" in combat_labels
     assert "TANKING" in combat_labels
+    assert "CONDUCT" not in combat_labels
     assert "1.5M" in combat_values
-    assert combat_values[-1] == "99"
+    assert combat_values[-1] == "129%"
+    assert accounts_renderer._summary_section_label("combat") == "COMBAT"
+    assert accounts_renderer._summary_footer_label("combat") == (
+        "Combat all linked governors (Tanking: Higher = Better)"
+    )
 
     economy = accounts_service.build_account_summary_page(payload, section="economy", page=1)
     economy_labels = [label for label, _width in accounts_renderer._summary_columns(economy)]
     economy_values = accounts_renderer._summary_values(economy, row)
     assert "HELPS" in economy_labels
+    assert "CONDUCT" in economy_labels
     assert "DATA" not in economy_labels
     assert "10K" in economy_values
+    assert "99" in economy_values
     assert accounts_renderer._compact_detail(8_515_574_404) == "8.52B"

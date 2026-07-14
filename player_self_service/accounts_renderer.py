@@ -89,7 +89,7 @@ def _date(value: datetime | None, *, include_time: bool = False) -> str:
     return stamp.strftime("%d %b %Y %H:%M UTC") if include_time else stamp.strftime("%d %b %Y")
 
 
-def _whole_number(value: Any) -> str:
+def format_whole_number(value: Any) -> str:
     if value is None:
         return "—"
     try:
@@ -104,6 +104,12 @@ def _score(value: Decimal | None) -> str:
         return "—"
     rendered = f"{value:.1f}"
     return rendered.removesuffix(".0")
+
+
+def format_tanking_score(value: Decimal | None) -> str:
+    if value is None:
+        return "—"
+    return f"{_score(value)}%"
 
 
 def _discord_heading(display_name: str) -> str:
@@ -227,6 +233,32 @@ def format_governor_count(count: int) -> str:
     return f"{count} {'governor' if count == 1 else 'governors'}"
 
 
+def _linked_governor_entries(
+    payload: AccountsPortfolioPayload,
+) -> tuple[tuple[str, str, str, str, str], ...]:
+    if len(payload.rows) <= 8:
+        source_rows = payload.rows
+        overflow = 0
+    else:
+        source_rows = payload.rows[:7]
+        overflow = len(payload.rows) - 7
+    entries = [
+        (
+            row.slot,
+            row.display_name,
+            str(row.governor_id) if row.governor_id is not None else "—",
+            _compact(row.power),
+            row.data_state,
+        )
+        for row in source_rows
+    ]
+    if overflow:
+        entries.append(("", f"+ {overflow} more — open Account Summary", "", "", ""))
+    if not entries:
+        entries.append(("—", "No linked governors", "—", "—", "UNRESOLVED"))
+    return tuple(entries)
+
+
 def render_accounts_card(
     payload: AccountsPortfolioPayload,
     *,
@@ -283,52 +315,49 @@ def render_accounts_card(
     )
 
     _panel(draw, (68, 374, 1634, 697))
-    _text(draw, (92, 392), "LINKED GOVERNORS", width=600, size=18, fill=_BLUE, bold=True)
-    columns = (
-        ("SLOT", 92, 155),
-        ("GOVERNOR", 260, 330),
-        ("ID", 620, 190),
-        ("POWER", 845, 205),
-        ("DATA", 1100, 250),
-    )
-    for label, x, width in columns:
-        _text(draw, (x, 426), label, width=width, size=15, fill=_MUTED, bold=True)
-    draw.line((92, 451, 1610, 451), fill=(91, 140, 190, 110), width=1)
-    visible_rows: list[tuple[str, str, str, str, str]] = []
-    if len(payload.rows) <= 8:
-        source_rows = payload.rows
-        overflow = 0
-    else:
-        source_rows = payload.rows[:7]
-        overflow = len(payload.rows) - 7
-    for row in source_rows:
-        visible_rows.append(
-            (
-                row.slot,
-                row.display_name,
-                str(row.governor_id) if row.governor_id is not None else "—",
-                _compact(row.power),
-                row.data_state,
-            )
+    _text(draw, (92, 392), "LINKED GOVERNORS", width=600, size=20, fill=_BLUE, bold=True)
+    tile_width = 755
+    for index, (slot, governor, governor_id, power, data_state) in enumerate(
+        _linked_governor_entries(payload)
+    ):
+        column = index % 2
+        row_index = index // 2
+        x = 88 + column * 771
+        y = 423 + row_index * 65
+        draw.rounded_rectangle(
+            (x, y, x + tile_width, y + 57),
+            radius=8,
+            fill=(5, 18, 35, 205),
+            outline=(76, 150, 212, 92),
+            width=1,
         )
-    if overflow:
-        visible_rows.append(("", f"+ {overflow} more — open Account Summary", "", "", ""))
-    if not visible_rows:
-        visible_rows.append(("—", "No linked governors", "—", "—", "UNRESOLVED"))
-    for index, values in enumerate(visible_rows):
-        y = 464 + index * 28
-        for value, (_label, x, width) in zip(values, columns, strict=True):
-            colour = _data_colour(value) if _label == "DATA" else _TEXT
-            _text(
-                draw,
-                (x, y),
-                value,
-                width=width,
-                size=21,
-                min_size=15,
-                fill=colour,
-                bold=_label == "SLOT",
-            )
+        if not slot:
+            _text(draw, (x + 16, y + 17), governor, width=720, size=21, min_size=16, fill=_BLUE)
+            continue
+        _text(draw, (x + 14, y + 7), slot, width=105, size=20, min_size=16, bold=True)
+        _text(draw, (x + 122, y + 5), governor, width=405, size=23, min_size=17)
+        _text(
+            draw,
+            (x + 592, y + 8),
+            data_state,
+            width=145,
+            size=17,
+            min_size=13,
+            fill=_data_colour(data_state),
+            bold=True,
+        )
+        _text(
+            draw,
+            (x + 14, y + 34),
+            f"ID  {governor_id}",
+            width=245,
+            size=16,
+            min_size=13,
+            fill=_MUTED,
+        )
+        _text(
+            draw, (x + 285, y + 34), f"POWER  {power}", width=270, size=16, min_size=13, fill=_MUTED
+        )
 
     _panel(draw, (68, 714, 1634, 795), 13)
     _text(draw, (92, 730), "PORTFOLIO INSIGHT", width=285, size=16, fill=_GOLD, bold=True)
@@ -358,26 +387,26 @@ def render_accounts_card(
 def _summary_columns(page: AccountSummaryPage) -> tuple[tuple[str, int], ...]:
     if page.section == "combat":
         return (
-            ("SLOT", 95),
-            ("GOVERNOR", 210),
-            ("KILL POINTS", 150),
-            ("T4+T5", 140),
-            ("DEADS", 125),
-            ("HEALED", 135),
-            ("ACCLAIM", 130),
-            ("KP LOSS", 140),
-            ("TANKING", 155),
-            ("CONDUCT", 120),
+            ("SLOT", 100),
+            ("GOVERNOR", 250),
+            ("KILL POINTS", 180),
+            ("T4+T5", 155),
+            ("DEADS", 145),
+            ("HEALED", 160),
+            ("ACCLAIM", 150),
+            ("KP LOSS", 160),
+            ("TANKING", 170),
         )
     if page.section == "economy":
         return (
-            ("SLOT", 110),
-            ("GOVERNOR", 230),
+            ("SLOT", 100),
+            ("GOVERNOR", 240),
             ("RSS GATHERED", 200),
-            ("RSS ASSISTANCE", 200),
+            ("RSS ASSISTANCE", 210),
             ("RSS TOTAL", 170),
             ("HELPS", 145),
-            ("INVENTORY AS OF", 250),
+            ("CONDUCT", 130),
+            ("INVENTORY AS OF", 280),
         )
     return (
         ("SLOT", 100),
@@ -403,8 +432,7 @@ def _summary_values(page: AccountSummaryPage, row: AccountPortfolioRow) -> tuple
             _compact_detail(row.healed_troops),
             _compact_detail(row.highest_acclaim),
             _compact_detail(row.kp_loss),
-            _score(row.tanking_score),
-            _whole_number(row.conduct),
+            format_tanking_score(row.tanking_score),
         )
     if page.section == "economy":
         return (
@@ -414,6 +442,7 @@ def _summary_values(page: AccountSummaryPage, row: AccountPortfolioRow) -> tuple
             _compact_detail(row.rss_assistance),
             _compact_detail(row.rss_total),
             _compact_detail(row.helps),
+            format_whole_number(row.conduct),
             _date(row.inventory_as_of),
         )
     location = (
@@ -427,11 +456,25 @@ def _summary_values(page: AccountSummaryPage, row: AccountPortfolioRow) -> tuple
         _clean(row.civilisation),
         _number(row.city_hall),
         _clean(row.vip_level),
-        _number(row.power),
-        _number(row.troop_power),
+        _compact_detail(row.power),
+        _compact_detail(row.troop_power),
         location,
         _date(row.last_governor_scan, include_time=True),
     )
+
+
+def _summary_section_label(section: str) -> str:
+    return {
+        "overview": "OVERVIEW",
+        "combat": "COMBAT",
+        "economy": "ECONOMY & ACTIVITY",
+    }[section]
+
+
+def _summary_footer_label(section: str) -> str:
+    if section == "combat":
+        return "Combat all linked governors (Tanking: Higher = Better)"
+    return f"{_summary_section_label(section).title()} • all linked governors"
 
 
 def render_account_summary_card(
@@ -473,11 +516,7 @@ def render_account_summary_card(
             draw, (x0, 135, x0 + 377, 248), label, _compact(metric.value), _coverage(metric)
         )
 
-    section_label = {
-        "overview": "OVERVIEW",
-        "combat": "COMBAT & PARTICIPATION",
-        "economy": "ECONOMY & ACTIVITY",
-    }[page.section]
+    section_label = _summary_section_label(page.section)
     _text(draw, (68, 275), section_label, width=850, size=23, fill=_BLUE, bold=True)
     _text(
         draw, (1405, 278), f"Page {page.page} / {page.page_count}", width=225, size=18, fill=_MUTED
@@ -511,11 +550,12 @@ def render_account_summary_card(
                 bold=label == "SLOT",
             )
 
+    footer_label = _summary_footer_label(page.section)
     _text(
         draw,
         (68, 842),
-        f"{section_label.title()} • all linked governors",
-        width=900,
+        footer_label,
+        width=1050,
         size=17,
         fill=_MUTED,
     )

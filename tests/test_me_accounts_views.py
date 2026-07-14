@@ -25,10 +25,17 @@ def _payload(count: int = 9) -> AccountsPortfolioPayload:
             governor_id=1000 + index,
             power=100,
             troop_power=50,
+            kill_points=200,
             t4_kills=10,
             t5_kills=20,
             t4_t5_kills=30,
+            deads=10,
+            healed_troops=5,
+            helps=7,
+            rss_gathered=300,
+            rss_assistance=200,
             rss_total=400,
+            conduct=98.5,
             data_state="CURRENT",
             last_governor_scan=now,
             inventory_as_of=now,
@@ -111,6 +118,29 @@ def test_overview_fallback_includes_vip_and_last_scan_datetime() -> None:
 
     assert "VIP" in embed.fields[0].value
     assert "Last scan 14 Jul 2026 08:30 UTC" in embed.fields[0].value
+
+
+def test_combat_fallback_uses_short_title_percentage_and_helpful_footer() -> None:
+    page = summary_views.accounts_service.build_account_summary_page(
+        _payload(), section="combat", page=1
+    )
+
+    embed = summary_views.build_account_summary_fallback(page)
+
+    assert embed.title == "Account Summary • Combat"
+    assert "Tanking 181.8%" in embed.fields[0].value
+    assert "Conduct" not in embed.fields[0].value
+    assert embed.footer.text.startswith("Combat all linked governors (Tanking: Higher = Better)")
+
+
+def test_economy_fallback_includes_conduct() -> None:
+    page = summary_views.accounts_service.build_account_summary_page(
+        _payload(), section="economy", page=1
+    )
+
+    embed = summary_views.build_account_summary_fallback(page)
+
+    assert "Conduct 99" in embed.fields[0].value
 
 
 @pytest.mark.asyncio
