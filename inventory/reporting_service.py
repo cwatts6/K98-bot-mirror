@@ -269,6 +269,34 @@ async def build_latest_inventory_snapshot(
     )
 
 
+async def build_latest_resource_points_by_governor(
+    governor_ids: list[int] | tuple[int, ...],
+) -> dict[int, InventoryResourcePoint]:
+    """Return canonical current-RSS points via one bulk DAL read for the requested governors."""
+    ids = tuple(dict.fromkeys(int(value) for value in governor_ids if int(value) > 0))
+    if not ids:
+        return {}
+    rows = await asyncio.to_thread(
+        inventory_reporting_dal.fetch_latest_resource_rows_bulk,
+        ids,
+    )
+    rows_by_governor: dict[int, list[dict[str, Any]]] = {governor_id: [] for governor_id in ids}
+    for row in rows:
+        try:
+            governor_id = int(row.get("GovernorID"))
+        except (TypeError, ValueError):
+            continue
+        if governor_id in rows_by_governor:
+            rows_by_governor[governor_id].append(row)
+
+    points: dict[int, InventoryResourcePoint] = {}
+    for governor_id, governor_rows in rows_by_governor.items():
+        grouped = _group_resource_points(governor_rows)
+        if grouped:
+            points[governor_id] = grouped[-1]
+    return points
+
+
 async def _build_latest_inventory_points_for_governor(
     governor: RegisteredGovernor,
     semaphore: asyncio.Semaphore,

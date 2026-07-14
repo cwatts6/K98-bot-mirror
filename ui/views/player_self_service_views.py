@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from io import BytesIO
 import logging
 from types import SimpleNamespace
 from typing import Any
@@ -15,6 +16,8 @@ from inventory import reporting_service
 from inventory.models import InventoryReportVisibility
 from player_self_service import (
     account_service,
+    accounts_renderer,
+    accounts_service,
     dashboard_card,
     page_cards,
     preference_service,
@@ -22,6 +25,7 @@ from player_self_service import (
     reminder_service,
 )
 from player_self_service.account_service import AccountCentreState
+from player_self_service.accounts_models import AccountsPortfolioPayload
 from player_self_service.reminder_service import ReminderCentreState
 from player_self_service.service import (
     PlayerSelfServiceSummary,
@@ -43,6 +47,7 @@ logger = logging.getLogger(__name__)
 
 PlayerSelfServicePage = str
 SummaryLoader = Callable[[int], Awaitable[PlayerSelfServiceSummary]]
+AccountsLoader = Callable[[int], Awaitable[AccountsPortfolioPayload]]
 
 PAGE_DASHBOARD = "dashboard"
 PAGE_ACCOUNTS = "accounts"
@@ -160,6 +165,44 @@ def build_accounts_embed(
         ),
         inline=False,
     )
+    return embed
+
+
+def build_accounts_portfolio_fallback(
+    payload: AccountsPortfolioPayload,
+    *,
+    display_name: str,
+) -> discord.Embed:
+    """Concise same-payload fallback; deliberately excludes private coordinates."""
+    embed = discord.Embed(
+        title="Account Centre",
+        description=f"Private account portfolio for {display_name}",
+        color={
+            "READY": discord.Color.green(),
+            "REVIEW": discord.Color.gold(),
+            "SETUP": discord.Color.blue(),
+        }[payload.state],
+    )
+    main = payload.main_row
+    embed.add_field(
+        name=f"{payload.state} • {payload.linked_count} governors",
+        value=_field_value(
+            [
+                f"Main: {main.display_name if main else 'not set'}",
+                f"Power: {payload.power.value if payload.power.value is not None else '—'} "
+                f"({payload.power.reporting_count}/{payload.power.expected_count})",
+                f"T4+T5 kills: "
+                f"{payload.t4_t5_kills.value if payload.t4_t5_kills.value is not None else '—'} "
+                f"({payload.t4_t5_kills.reporting_count}/{payload.t4_t5_kills.expected_count})",
+                f"RSS total: "
+                f"{payload.rss_total.value if payload.rss_total.value is not None else '—'} "
+                f"({payload.rss_total.reporting_count}/{payload.rss_total.expected_count})",
+            ]
+        ),
+        inline=False,
+    )
+    embed.add_field(name="Portfolio Insight", value=payload.insight[:1024], inline=False)
+    embed.set_footer(text=f"Refreshed {payload.refreshed_at_utc:%H:%M UTC}")
     return embed
 
 
@@ -316,12 +359,19 @@ def build_inventory_embed(
 
 def build_page_embed(
     page: PlayerSelfServicePage,
-    summary: PlayerSelfServiceSummary,
+    summary: PlayerSelfServiceSummary | None,
     *,
     display_name: str,
+    accounts_payload: AccountsPortfolioPayload | None = None,
 ) -> discord.Embed:
     if page == PAGE_ACCOUNTS:
+        if accounts_payload is not None:
+            return build_accounts_portfolio_fallback(accounts_payload, display_name=display_name)
+        if summary is None:
+            raise ValueError("Accounts fallback requires an authorised portfolio payload")
         return build_accounts_embed(summary, display_name=display_name)
+    if summary is None:
+        raise ValueError(f"{page} requires a player self-service summary")
     if page == PAGE_REMINDERS:
         return build_reminders_embed(summary, display_name=display_name)
     if page == PAGE_PREFERENCES:
@@ -349,19 +399,37 @@ def _close_files(files: list[discord.File] | None) -> None:
 
 async def _build_page_response(
     page: PlayerSelfServicePage,
-    summary: PlayerSelfServiceSummary,
+    summary: PlayerSelfServiceSummary | None,
     *,
     display_name: str,
-) -> tuple[discord.Embed, list[discord.File]]:
-    fallback_embed = build_page_embed(page, summary, display_name=display_name)
+    accounts_payload: AccountsPortfolioPayload | None = None,
+) -> tuple[discord.Embed | None, list[discord.File]]:
+    fallback_embed = build_page_embed(
+        page,
+        summary,
+        display_name=display_name,
+        accounts_payload=accounts_payload,
+    )
     try:
-        if page == PAGE_DASHBOARD:
+        if page == PAGE_ACCOUNTS:
+            if accounts_payload is None:
+                raise ValueError("Accounts render requires an authorised portfolio payload")
+            rendered = await asyncio.to_thread(
+                accounts_renderer.render_accounts_card,
+                accounts_payload,
+                display_name=display_name,
+            )
+        elif page == PAGE_DASHBOARD:
+            if summary is None:
+                raise ValueError("Dashboard render requires a summary")
             rendered = await asyncio.to_thread(
                 dashboard_card.render_dashboard_card,
                 summary,
                 display_name=display_name,
             )
         else:
+            if summary is None:
+                raise ValueError(f"{page} render requires a summary")
             rendered = await asyncio.to_thread(
                 page_cards.render_page_card,
                 page,
@@ -373,23 +441,32 @@ async def _build_page_response(
     except Exception:
         logger.exception(
             "player_self_service_card_render_failed user_id=%s page=%s",
-            summary.discord_user_id,
+            accounts_payload.discord_user_id if accounts_payload else summary.discord_user_id,
             page,
         )
         return fallback_embed, []
 
-    file = discord.File(rendered.image_bytes, filename=rendered.filename)
+    image_source = (
+        BytesIO(rendered.image_bytes)
+        if isinstance(rendered.image_bytes, (bytes, bytearray))
+        else rendered.image_bytes
+    )
+    file = discord.File(image_source, filename=rendered.filename)
     embed = (
-        build_dashboard_card_embed(rendered.filename)
-        if page == PAGE_DASHBOARD
-        else build_card_embed(rendered.filename)
+        None
+        if page == PAGE_ACCOUNTS
+        else (
+            build_dashboard_card_embed(rendered.filename)
+            if page == PAGE_DASHBOARD
+            else build_card_embed(rendered.filename)
+        )
     )
     return embed, [file]
 
 
 def _edit_kwargs(
     *,
-    embed: discord.Embed,
+    embed: discord.Embed | None,
     view: discord.ui.View,
     files: list[discord.File],
 ) -> dict[str, object]:
@@ -408,10 +485,11 @@ async def _edit_original_with_image_fallback(
     target: Any,
     *,
     page: PlayerSelfServicePage,
-    summary: PlayerSelfServiceSummary,
+    summary: PlayerSelfServiceSummary | None,
+    accounts_payload: AccountsPortfolioPayload | None = None,
     display_name: str,
     view: discord.ui.View,
-    embed: discord.Embed,
+    embed: discord.Embed | None,
     files: list[discord.File],
 ) -> object:
     try:
@@ -427,10 +505,15 @@ async def _edit_original_with_image_fallback(
             raise
         logger.exception(
             "player_self_service_card_send_failed user_id=%s page=%s",
-            summary.discord_user_id,
+            accounts_payload.discord_user_id if accounts_payload else summary.discord_user_id,
             page,
         )
-        fallback_embed = build_page_embed(page, summary, display_name=display_name)
+        fallback_embed = build_page_embed(
+            page,
+            summary,
+            display_name=display_name,
+            accounts_payload=accounts_payload,
+        )
         return await target.edit_original_response(
             content=None,
             embed=fallback_embed,
@@ -448,6 +531,8 @@ class PlayerSelfServiceView(discord.ui.View):
         page: PlayerSelfServicePage = PAGE_DASHBOARD,
         summary: PlayerSelfServiceSummary | None = None,
         summary_loader: SummaryLoader = build_player_self_service_summary,
+        accounts_payload: AccountsPortfolioPayload | None = None,
+        accounts_loader: AccountsLoader = accounts_service.build_accounts_portfolio,
         dashboard_governor_id: int | None = None,
         timeout: float = 180,
     ):
@@ -457,6 +542,8 @@ class PlayerSelfServiceView(discord.ui.View):
         self.page = page
         self.summary = summary
         self.summary_loader = summary_loader
+        self.accounts_payload = accounts_payload
+        self.accounts_loader = accounts_loader
         self.dashboard_governor_id = dashboard_governor_id
         self._message_ref: discord.Message | None = None
         self._timeout_editor: Callable[..., Awaitable[Any]] | None = None
@@ -529,6 +616,15 @@ class PlayerSelfServiceView(discord.ui.View):
                 if str(child.custom_id or "").startswith("me:export:"):
                     continue
                 child.disabled = child.custom_id == f"me:{self.page}"
+        if self.page == PAGE_ACCOUNTS:
+            self._apply_accounts_button_state()
+
+    def _apply_accounts_button_state(self) -> None:
+        for child in self.children:
+            if isinstance(child, discord.ui.Button) and child.custom_id == "me:account:summary":
+                child.disabled = not bool(
+                    self.accounts_payload and self.accounts_payload.has_linked_governors
+                )
 
     def _apply_visible_action_rows(self) -> None:
         action_prefixes = (
@@ -626,8 +722,13 @@ class PlayerSelfServiceView(discord.ui.View):
                 exc_info=True,
             )
 
+        summary: PlayerSelfServiceSummary | None = None
+        accounts_payload: AccountsPortfolioPayload | None = None
         try:
-            summary = await self.summary_loader(self.author_id)
+            if page == PAGE_ACCOUNTS:
+                accounts_payload = await self.accounts_loader(self.author_id)
+            else:
+                summary = await self.summary_loader(self.author_id)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -661,10 +762,17 @@ class PlayerSelfServiceView(discord.ui.View):
             page=page,
             summary=summary,
             summary_loader=self.summary_loader,
+            accounts_payload=accounts_payload,
+            accounts_loader=self.accounts_loader,
             dashboard_governor_id=self.dashboard_governor_id,
             timeout=self.timeout or 180,
         )
-        embed, files = await _build_page_response(page, summary, display_name=self.display_name)
+        embed, files = await _build_page_response(
+            page,
+            summary,
+            display_name=self.display_name,
+            accounts_payload=accounts_payload,
+        )
         if can_edit is not None and not can_edit():
             _close_files(files)
             logger.info(
@@ -678,6 +786,7 @@ class PlayerSelfServiceView(discord.ui.View):
                 interaction,
                 page=page,
                 summary=summary,
+                accounts_payload=accounts_payload,
                 display_name=self.display_name,
                 view=view,
                 embed=embed,
@@ -693,7 +802,12 @@ class PlayerSelfServiceView(discord.ui.View):
             if can_edit is not None and not can_edit():
                 return False
             sent = await interaction.followup.send(
-                embed=build_page_embed(page, summary, display_name=self.display_name),
+                embed=build_page_embed(
+                    page,
+                    summary,
+                    display_name=self.display_name,
+                    accounts_payload=accounts_payload,
+                ),
                 view=view,
                 ephemeral=True,
             )
@@ -918,7 +1032,7 @@ class PlayerSelfServiceView(discord.ui.View):
         return state
 
     @discord.ui.button(
-        label="Manage",
+        label="Manage Accounts",
         style=discord.ButtonStyle.success,
         custom_id="me:account:manage",
         row=3,
@@ -941,6 +1055,31 @@ class PlayerSelfServiceView(discord.ui.View):
                 summary_loader=self.summary_loader,
             ),
             ephemeral=True,
+        )
+
+    @discord.ui.button(
+        label="Account Summary",
+        style=discord.ButtonStyle.secondary,
+        custom_id="me:account:summary",
+        row=3,
+    )
+    async def account_summary_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        from ui.views.player_self_service_account_summary_views import (
+            show_account_summary_for_interaction,
+        )
+
+        await show_account_summary_for_interaction(
+            interaction,
+            author_id=self.author_id,
+            display_name=self.display_name,
+            accounts_loader=self.accounts_loader,
+            summary_loader=self.summary_loader,
+            dashboard_governor_id=self.dashboard_governor_id,
+            timeout=self.timeout or 180,
         )
 
     async def _load_reminder_state(
@@ -1214,6 +1353,7 @@ async def show_player_self_service_page_for_interaction(
     display_name: str,
     page: PlayerSelfServicePage,
     summary_loader: SummaryLoader = build_player_self_service_summary,
+    accounts_loader: AccountsLoader = accounts_service.build_accounts_portfolio,
     dashboard_governor_id: int | None = None,
     timeout: float = 180,
     can_edit: Callable[[], bool] | None = None,
@@ -1224,6 +1364,7 @@ async def show_player_self_service_page_for_interaction(
         display_name=display_name,
         page=page,
         summary_loader=summary_loader,
+        accounts_loader=accounts_loader,
         dashboard_governor_id=dashboard_governor_id,
         timeout=timeout,
     )
@@ -1238,8 +1379,13 @@ async def send_player_self_service_page(
 ) -> None:
     await safe_defer(ctx, ephemeral=True)
     display_name = _display_name(getattr(ctx, "user", None))
+    summary: PlayerSelfServiceSummary | None = None
+    accounts_payload: AccountsPortfolioPayload | None = None
     try:
-        summary = await summary_loader(int(ctx.user.id))
+        if page == PAGE_ACCOUNTS:
+            accounts_payload = await accounts_service.build_accounts_portfolio(int(ctx.user.id))
+        else:
+            summary = await summary_loader(int(ctx.user.id))
     except Exception:
         logger.exception(
             "player_self_service_initial_summary_failed user_id=%s page=%s",
@@ -1266,16 +1412,26 @@ async def send_player_self_service_page(
         page=page,
         summary=summary,
         summary_loader=summary_loader,
+        accounts_payload=accounts_payload,
     )
-    embed, files = await _build_page_response(page, summary, display_name=display_name)
-    message = await _edit_original_with_image_fallback(
-        ctx.interaction,
-        page=page,
-        summary=summary,
+    embed, files = await _build_page_response(
+        page,
+        summary,
         display_name=display_name,
-        view=view,
-        embed=embed,
-        files=files,
+        accounts_payload=accounts_payload,
     )
-    view.set_message_ref(message)
-    view.set_timeout_target(ctx.interaction)
+    try:
+        message = await _edit_original_with_image_fallback(
+            ctx.interaction,
+            page=page,
+            summary=summary,
+            accounts_payload=accounts_payload,
+            display_name=display_name,
+            view=view,
+            embed=embed,
+            files=files,
+        )
+        view.set_message_ref(message)
+        view.set_timeout_target(ctx.interaction)
+    finally:
+        _close_files(files)

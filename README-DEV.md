@@ -19,13 +19,14 @@ and legacy `/myinventory` intentionally share the visual refresh while data, cal
 visibility, controls, exports, filenames, fallback, attachment lifecycle, and every interaction
 contract remain unchanged. The completed Phase 5B task pack and starter are archived.
 
-Phase 5C Premium Accounts Summary Card is the next approval-gated slice. It begins with an operator
-visual/product workshop before implementation. The default contract is the existing 1702x924
-summary-card output and stable filename delivered as a standalone private attachment, with the
-current same-payload embed fallback, guided Manage flow, blue navigation, optional selected-
-governor return context, and invoking-player avatar treatment preserved. Accounts is a Discord-
-user/all-linked-governor page, so it must not show Change Governor. Phases 5D-5G apply the same
-baseline independently to Reminders, Preferences, Inventory summary, and Exports summary.
+Phase 5C Premium Accounts Summary Card is implemented on its mirror feature branch and is awaiting
+operator Discord smoke. `/me accounts` now resolves every linked registry entry through set-based
+Kingdom 1198 and canonical Inventory reads, renders the approved 1702x924 no-avatar portfolio card
+as a standalone private attachment, preserves the guided Manage workflow, and adds a private,
+paginated Overview/Combat/Economy Account Summary with a complete formula-safe CSV. Same-payload
+fallbacks, author gates, attachment replacement, and stream cleanup are retained; no SQL schema,
+registry, ownership, direct Inventory, or existing export contract changed. Phase 5D Reminders is
+the next separately scoped summary-card slice after Phase 5C operator acceptance.
 
 ## Quality Automation
 

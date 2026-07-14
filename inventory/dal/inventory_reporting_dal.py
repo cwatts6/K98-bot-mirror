@@ -8,6 +8,8 @@ from inventory.models import InventoryReportVisibility
 
 logger = logging.getLogger(__name__)
 
+_BULK_GOVERNOR_CHUNK_SIZE = 500
+
 
 def _get_conn():
     from file_utils import get_conn_with_retries
@@ -140,6 +142,61 @@ def fetch_latest_resource_rows(governor_id: int) -> list[dict[str, Any]]:
             (int(governor_id),),
         )
         return _rows_to_dicts(cur)
+    finally:
+        conn.close()
+
+
+def fetch_latest_resource_rows_bulk(
+    governor_ids: list[int] | tuple[int, ...],
+) -> list[dict[str, Any]]:
+    """Fetch the latest approved complete-resource candidate batches in set-based chunks."""
+    ids = tuple(dict.fromkeys(int(value) for value in governor_ids if int(value) > 0))
+    if not ids:
+        return []
+
+    rows: list[dict[str, Any]] = []
+    conn = _get_conn()
+    try:
+        for start in range(0, len(ids), _BULK_GOVERNOR_CHUNK_SIZE):
+            chunk = ids[start : start + _BULK_GOVERNOR_CHUNK_SIZE]
+            values_sql = ", ".join("(?)" for _ in chunk)
+            cur = conn.cursor()
+            cur.execute(
+                f"""
+                WITH Requested(GovernorID) AS (
+                    SELECT CAST(v.GovernorID AS BIGINT)
+                    FROM (VALUES {values_sql}) AS v(GovernorID)
+                ),
+                RankedBatch AS (
+                    SELECT
+                        b.GovernorID,
+                        b.ImportBatchID,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY b.GovernorID
+                            ORDER BY b.ApprovedAtUtc DESC, b.ImportBatchID DESC
+                        ) AS rn
+                    FROM dbo.InventoryImportBatch AS b
+                    INNER JOIN Requested AS requested
+                        ON requested.GovernorID = b.GovernorID
+                    WHERE b.ImportType = N'resources'
+                      AND b.Status = N'approved'
+                )
+                SELECT r.ImportBatchID,
+                       r.GovernorID,
+                       r.ScanUtc,
+                       r.ResourceType,
+                       r.FromItemsValue,
+                       r.TotalResourcesValue
+                FROM dbo.GovernorResourceInventory AS r
+                INNER JOIN RankedBatch AS latest
+                    ON latest.ImportBatchID = r.ImportBatchID
+                   AND latest.rn = 1
+                ORDER BY r.GovernorID ASC, r.ResourceType ASC
+                """,
+                tuple(chunk),
+            )
+            rows.extend(_rows_to_dicts(cur))
+        return rows
     finally:
         conn.close()
 

@@ -246,6 +246,44 @@ async def test_build_latest_inventory_snapshot_groups_latest_rows(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_build_latest_resource_points_by_governor_reuses_canonical_grouping(monkeypatch):
+    now = datetime.now(UTC)
+    calls = []
+
+    def bulk(ids):
+        calls.append(ids)
+        rows = []
+        for governor_id in ids:
+            for resource_type, value in (
+                ("food", governor_id),
+                ("wood", 2),
+                ("stone", 3),
+                ("gold", 4),
+            ):
+                rows.append(
+                    {
+                        "GovernorID": governor_id,
+                        "ScanUtc": now,
+                        "ResourceType": resource_type,
+                        "TotalResourcesValue": value,
+                    }
+                )
+        return rows
+
+    monkeypatch.setattr(
+        reporting_service.inventory_reporting_dal,
+        "fetch_latest_resource_rows_bulk",
+        bulk,
+    )
+
+    points = await reporting_service.build_latest_resource_points_by_governor((111, 222, 111))
+
+    assert calls == [(111, 222)]
+    assert points[111].total == 120
+    assert points[222].total == 231
+
+
+@pytest.mark.asyncio
 async def test_build_latest_inventory_snapshot_fetches_governors_with_bounded_concurrency(
     monkeypatch,
 ):

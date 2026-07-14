@@ -10,13 +10,14 @@ from typing import Literal
 import discord
 
 from core.interaction_safety import send_or_followup
-from player_self_service import account_service
+from player_self_service import account_service, accounts_service
 from player_self_service.account_service import (
     AccountAction,
     AccountCentreState,
     AccountConfirmation,
     AccountSlot,
 )
+from player_self_service.accounts_models import AccountsPortfolioPayload
 from player_self_service.service import (
     PlayerSelfServiceSummary,
     build_player_self_service_summary,
@@ -25,6 +26,7 @@ from player_self_service.service import (
 logger = logging.getLogger(__name__)
 
 SummaryLoader = Callable[[int], Awaitable[PlayerSelfServiceSummary]]
+AccountsLoader = Callable[[int], Awaitable[AccountsPortfolioPayload]]
 
 
 def _account_option_label(slot: str | AccountSlot) -> str:
@@ -706,22 +708,31 @@ async def _refresh_host_page(
 ) -> None:
     if host_message is None or not hasattr(host_message, "edit"):
         return
+    from player_self_service.accounts_service import build_accounts_portfolio
+    from ui.views.player_self_service_views import (
+        PlayerSelfServiceView,
+        _build_page_response,
+        _close_files,
+        _edit_original_with_image_fallback,
+    )
+
+    files = []
     try:
-        summary = await summary_loader(int(author_id))
-        from ui.views.player_self_service_views import (
-            PlayerSelfServiceView,
-            _build_page_response,
-            _edit_original_with_image_fallback,
-        )
+        accounts_payload = await build_accounts_portfolio(int(author_id))
 
         view = PlayerSelfServiceView(
             author_id=int(author_id),
             display_name=display_name,
             page=page,
-            summary=summary,
             summary_loader=summary_loader,
+            accounts_payload=accounts_payload,
         )
-        embed, files = await _build_page_response(page, summary, display_name=display_name)
+        embed, files = await _build_page_response(
+            page,
+            None,
+            display_name=display_name,
+            accounts_payload=accounts_payload,
+        )
 
         class _MessageTarget:
             async def edit_original_response(self, **kwargs):
@@ -730,7 +741,8 @@ async def _refresh_host_page(
         edited = await _edit_original_with_image_fallback(
             _MessageTarget(),
             page=page,
-            summary=summary,
+            summary=None,
+            accounts_payload=accounts_payload,
             display_name=display_name,
             view=view,
             embed=embed,
@@ -741,6 +753,8 @@ async def _refresh_host_page(
         raise
     except Exception:
         logger.debug("player_self_service_account_host_refresh_failed", exc_info=True)
+    finally:
+        _close_files(files)
 
 
 class AccountGovernorInputModal(discord.ui.Modal):
@@ -896,6 +910,7 @@ class AccountCompletionView(discord.ui.View):
         display_name: str,
         message: str,
         summary_loader: SummaryLoader = build_player_self_service_summary,
+        accounts_loader: AccountsLoader = accounts_service.build_accounts_portfolio,
         timeout: float = 120,
     ) -> None:
         super().__init__(timeout=timeout)
@@ -903,6 +918,7 @@ class AccountCompletionView(discord.ui.View):
         self.display_name = display_name
         self.message = message
         self.summary_loader = summary_loader
+        self.accounts_loader = accounts_loader
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user and int(interaction.user.id) == self.author_id:
@@ -921,6 +937,7 @@ class AccountCompletionView(discord.ui.View):
             display_name=self.display_name,
             page=page,
             summary_loader=self.summary_loader,
+            accounts_loader=self.accounts_loader,
             timeout=self.timeout or 120,
         )
 

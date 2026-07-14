@@ -13,6 +13,8 @@ from typing import Any
 
 import discord
 
+from player_self_service import accounts_service
+from player_self_service.accounts_models import AccountsPortfolioPayload
 from player_self_service.governor_dashboard_models import (
     GovernorDashboardContext,
     GovernorDashboardOption,
@@ -36,6 +38,7 @@ logger = logging.getLogger(__name__)
 ContextResolver = Callable[..., Awaitable[GovernorDashboardResolution]]
 PayloadLoader = Callable[[GovernorDashboardContext], Awaitable[GovernorDashboardPayload]]
 SummaryLoader = Callable[[int], Awaitable[PlayerSelfServiceSummary]]
+AccountsLoader = Callable[[int], Awaitable[AccountsPortfolioPayload]]
 
 _SELECT_PAGE_SIZE = 25
 _VIEW_TIMEOUT_SECONDS = 180.0
@@ -430,6 +433,7 @@ class GovernorDashboardView(discord.ui.View):
         context_resolver: ContextResolver = resolve_dashboard_context,
         payload_loader: PayloadLoader = build_governor_dashboard_payload,
         summary_loader: SummaryLoader = build_player_self_service_summary,
+        accounts_loader: AccountsLoader = accounts_service.build_accounts_portfolio,
         selector_page: int | None = None,
         timeout: float = _VIEW_TIMEOUT_SECONDS,
     ) -> None:
@@ -440,6 +444,7 @@ class GovernorDashboardView(discord.ui.View):
         self.context_resolver = context_resolver
         self.payload_loader = payload_loader
         self.summary_loader = summary_loader
+        self.accounts_loader = accounts_loader
         self._selector_page_explicit = selector_page is not None
         self.selector_page = max(0, int(selector_page or 0))
         self._message_ref: discord.Message | None = None
@@ -719,6 +724,7 @@ class GovernorDashboardView(discord.ui.View):
                     display_name=self.display_name,
                     page=page,
                     summary_loader=self.summary_loader,
+                    accounts_loader=self.accounts_loader,
                     dashboard_governor_id=(
                         self.resolution.context.selected_governor_id
                         if self.resolution.context is not None
@@ -808,6 +814,7 @@ class GovernorDashboardView(discord.ui.View):
             context_resolver=self.context_resolver,
             payload_loader=self.payload_loader,
             summary_loader=self.summary_loader,
+            accounts_loader=self.accounts_loader,
             selector_page=next_page,
             timeout=self.timeout or _VIEW_TIMEOUT_SECONDS,
         )
@@ -870,6 +877,7 @@ class GovernorDashboardView(discord.ui.View):
             context_resolver=self.context_resolver,
             payload_loader=self.payload_loader,
             summary_loader=self.summary_loader,
+            accounts_loader=self.accounts_loader,
             selector_page=next_page,
             timeout=self.timeout or _VIEW_TIMEOUT_SECONDS,
         )

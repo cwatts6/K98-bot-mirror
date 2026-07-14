@@ -1003,19 +1003,19 @@ async def test_real_timeout_during_payload_suppresses_late_dashboard_edit() -> N
 @pytest.mark.asyncio
 async def test_real_timeout_cancels_slow_page_navigation_before_edit() -> None:
     option = _option(111, name="Main Gov")
-    summary_started = asyncio.Event()
-    release_summary = asyncio.Event()
+    accounts_started = asyncio.Event()
+    release_accounts = asyncio.Event()
 
-    async def summary_loader(_user_id: int):
-        summary_started.set()
-        await release_summary.wait()
-        raise AssertionError("timed-out navigation must cancel the summary load")
+    async def accounts_loader(_user_id: int):
+        accounts_started.set()
+        await release_accounts.wait()
+        raise AssertionError("timed-out navigation must cancel the Accounts load")
 
     view = views.GovernorDashboardView(
         author_id=42,
         display_name="Tester",
         resolution=_selected_resolution(option),
-        summary_loader=summary_loader,
+        accounts_loader=accounts_loader,
         timeout=0.01,
     )
     interaction = _Interaction()
@@ -1024,9 +1024,9 @@ async def test_real_timeout_cancels_slow_page_navigation_before_edit() -> None:
     view._start_listening_from_store(SimpleNamespace(remove_view=lambda _view: None))
 
     navigation_task = asyncio.create_task(view.open_page(interaction, "accounts"))
-    await summary_started.wait()
+    await accounts_started.wait()
     await asyncio.sleep(0.05)
-    release_summary.set()
+    release_accounts.set()
     await navigation_task
 
     assert view._timed_out is True

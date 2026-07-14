@@ -4,8 +4,8 @@
 
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
-- Date: `2026-07-13`
-- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486 and GovernorOS v2 Phases 1-5B completed through mirror PR #220 and production PR #527
+- Date: `2026-07-14`
+- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486, GovernorOS v2 Phases 1-5B completed through mirror PR #220 and production PR #527, and the Phase 5C Accounts product/visual contract approved on 2026-07-14
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
@@ -52,6 +52,17 @@ the 1180x760 dashboard, honest native no-data reports, private exports, and repo
 Change Governor controls. Operator smoke on 2026-07-13 accepted the desktop/mobile presentation,
 no-data journey, and governor switching. `/me inventory`, `/myinventory`, Inventory visibility,
 imports, reporting data, ranges, exports, filenames, and Google Sheets behavior remain unchanged.
+
+Phase 5B is complete and operator accepted. It applied the GovernorOS visual standard to the shared
+Resources, Materials, and Speedups renderer with approved room-specific backdrops, larger readable
+typography, restored icons, Discord avatar handling, genuine upload dates, and honest populated/no-
+data presentation.
+
+Phase 5C product and visual design is now approved. `/me accounts` will become a private linked-
+governor portfolio with earned READY/REVIEW/SETUP state, four latest-snapshot metrics, a scan-health
+roster, one deterministic portfolio insight, the unchanged guided Manage journey, and a new private
+paginated Account Summary plus complete CSV. The approved `1702x924` runtime backdrop is
+`assets/me/cards/me_accounts.png`. Implementation is the next programme action.
 
 ## 3. Programme Vision
 
@@ -100,6 +111,8 @@ Create a premium governor dashboard experience that answers these questions for 
 - What can I do next without remembering another command?
 - Where are my resources, materials, speedups, history, preferences, reminders, and exports?
 - Has the data been updated recently enough to trust?
+- Across all my linked governors, what are my combined Power, T4+T5 Kills, and current RSS holdings?
+- Which linked account is stale, missing, unusually concentrated, or otherwise needs attention?
 
 For leadership, the long-term goal is a separate inspection journey that answers a different question:
 
@@ -157,7 +170,7 @@ For leadership, the long-term goal is a separate inspection journey that answers
 
 ```text
 /me dashboard      = personal governor command centre
-/me accounts       = Discord-user/account linkage management
+/me accounts       = all-linked-governor portfolio, scan health, management, and private Account Summary
 /me reminders      = Discord-user reminder settings
 /me preferences    = Discord-user preference settings
 /me inventory      = all-in-one inventory report journey
@@ -352,8 +365,9 @@ Delivery ownership:
 - Phase 5A applied the contract to direct governor-specific Resources, Materials, and Speedups.
 - Phase 5B completed the shared 1400x980 Inventory report renderer refresh with approved premium
   backdrops without changing report data or interaction behavior.
-- Phases 5C-5G migrate Accounts, Reminders, Preferences, Inventory, and Exports summary cards one
-  page at a time as matching operator-approved assets become available.
+- Phase 5C implements the approved Accounts portfolio and Account Summary using
+  `assets/me/cards/me_accounts.png`; Phases 5D-5G continue Reminders, Preferences, Inventory, and
+  Exports one page at a time as matching operator-approved assets and contracts become available.
 - Phases 6-8 must use the same contract for Exports actions, History, and Inspect respectively.
 
 ## 11. Target Data / Service Contract
@@ -413,6 +427,40 @@ Excluded until a source exists:
 Olympia fights
 Olympia win ratio
 ```
+
+### Phase 5C Accounts portfolio data contract
+
+Phase 5C explicitly approves a read-only, set-based data/service expansion for the all-linked-
+governor Accounts portfolio and private Account Summary. It does not approve SQL schema or
+persistence changes.
+
+Recommended service-level concepts:
+
+```text
+AccountsPortfolioPayload
+- Discord-user identity and generated time
+- global latest Kingdom 1198 scan date
+- READY | REVIEW | SETUP state
+- linked and role counts
+- Main governor
+- Portfolio Power, T4+T5 Kills, and current RSS Total with coverage
+- ordered linked-governor rows
+- deterministic Portfolio Insight
+
+LinkedGovernorPortfolioRow
+- slot, role, registered name, current scanned name, Governor ID
+- Civilisation, City Hall, Power, Troop Power
+- Kill Points, T4 kills, T5 kills, Deads, Healed, Highest Acclaim, Helps
+- RSS Gathered, RSS Assistance, canonical current RSS Total
+- Conduct, Location X:Y, last governor scan, Inventory snapshot time
+- CURRENT | STALE | NO DATA | UNRESOLVED
+```
+
+Freshness is deliberately simple because Kingdom 1198 is the only dataset: compare every linked
+Governor ID's `MAX(ScanDate)` with the single global `MAX(ScanDate)`. Inventory coverage is reported
+separately and does not redefine governor DATA state. Portfolio queries must be bulk/set-based and
+designed for hundreds of linked accounts. The canonical Inventory RSS calculation must be reused,
+not copied or redefined.
 
 ## 12. Programme Phases
 
@@ -675,7 +723,7 @@ Delivery record:
 
 ### Phase 5C-5G — Premium `/me` Summary Cards
 
-Status: `Phase 5C Accounts is the next approval-gated visual/product workshop; Phases 5D-5G remain separately scoped`.
+Status: `Phase 5C Accounts is implemented with automated validation complete and operator Discord smoke pending; Phases 5D-5G remain separately scoped`.
 
 The five summary pages share a presentation and interaction baseline but remain independent PR-sized
 slices. A later page must reuse the accepted rules from earlier pages without creating a broad
@@ -692,8 +740,9 @@ Shared premium summary-card contract:
 - Render off the event loop, replace prior attachments deliberately, preserve the fallback without
   a second data fetch, and close every file/stream on success, fallback, timeout, cancellation,
   stale suppression, and concurrent navigation.
-- Use the invoking player's Discord avatar best-effort in the approved identity position, with a
-  safe local page/KD98 fallback. Keep long/Unicode display names fitted and readable.
+- Avatar use is page-specific and requires an approved position. Phase 5C Accounts intentionally
+  omits an avatar because its approved Registry layout is portfolio-led and has no portrait aperture.
+  Other pages retain their own approved avatar/fallback decisions. Keep long/Unicode names fitted.
 - Keep genuine current page values, states, names, action guidance, and empty/unavailable wording.
   Do not invent figures, trends, governors, status, or next actions to fill the backdrop.
 - Keep global navigation as real Discord components: blue-primary `Accounts`, `Reminders`, and
@@ -709,43 +758,78 @@ Shared premium summary-card contract:
   governor selection/resolution and current access recheck. Retained Dashboard-return context must
   never silently narrow a user-level page or bypass authorization.
 - Preserve private/ephemeral delivery, author gating, current timeouts, stale/foreign/forged/
-  concurrent denial, action disabled states, services, DAL contracts, persistence, command
-  registration, and command versions unless a phase explicitly approves a version-only update.
+  concurrent denial, action disabled states, persistence, and command registration. A page may
+  expand read-only services/DAL/payloads only when its phase explicitly approves that scope; Phase
+  5C does so for the Accounts portfolio and Account Summary.
 - For each page, test direct-command entry, navigation from a selected dashboard, fallback from the
   same payload, render/delivery failure, attachment replacement, stream cleanup, timeout/stale/
   foreign/concurrent paths, empty/unavailable data, long names, and original/desktop/mobile output.
 
 #### Phase 5C - Premium Accounts Summary Card
 
-Status: `next - scope prepared; awaiting operator ideas, visual hierarchy, and asset approval`.
+Status: `implemented and locally validated - operator Discord smoke pending`.
 
-Current contract to preserve:
+Approved product outcome:
 
-- `/me accounts` is private and summarizes the invoking Discord user's complete linked-governor
-  registry, not one selected governor.
-- The current summary payload supplies main-account label/state, linked count/state, account names,
-  and service-owned next-action guidance. Phase 5C does not add fields or query data.
-- `Manage` opens the existing guided private journey for Governor ID lookup, add/register into an
-  available slot, replace, and remove with confirmation and current-state revalidation. Successful
-  mutations refresh the host Accounts card.
-- The current generated card uses `assets/me/cards/me accounts.png`, renders at 1702x924, uses the
-  stable `me_accounts_<discord_user_id>.png` filename, and is wrapped in an attachment embed. The
-  asset is an existing input, not automatic approval for the new premium composition.
+- `/me accounts` remains private, author-gated, and scoped to the invoking Discord user's complete
+  linked-governor registry rather than one selected governor.
+- Successful output becomes a standalone `1702x924` PNG using the approved runtime asset
+  `assets/me/cards/me_accounts.png` and stable `me_accounts_<discord_user_id>.png` filename.
+- The page-specific approved layout omits a Discord avatar and renders:
+  - `ACCOUNT CENTRE` with earned `READY`, `REVIEW`, or `SETUP` state;
+  - Discord display name, Kingdom 1198, linked-governor count, and Main governor;
+  - `LATEST SNAPSHOTS` with exactly four metrics: Linked, Portfolio Power, T4+T5 Kills, and current
+    Inventory-backed RSS Total;
+  - role breakdown and honest `n/N reporting` coverage;
+  - a full-width `SLOT | GOVERNOR | ID | POWER | DATA` roster;
+  - one deterministic `PORTFOLIO INSIGHT` line;
+  - the existing Manage guidance and `Refreshed <UTC>` footer.
+- Do not display linked count against configured capacity. The configured slot limit is not a
+  player-facing account maximum.
+- Main-card roster capacity is eight rows; with more than eight, show seven rows plus `+ N more`
+  guidance. This is display overflow only. Account Summary covers every linked governor.
 
-Approval workshop before implementation:
+Approved scan/state rules:
 
-- Work through the operator's Accounts improvement ideas and agree the visual hierarchy for player
-  identity, main governor, linked count, named account slots, open capacity, status, and Manage
-  guidance using only fields already present in the authorized payload.
-- Approve backdrop provenance, runtime dimensions, source-master policy, avatar placement, icon
-  treatment, panel density, typography, empty/unavailable treatment, and desktop/mobile samples.
-- Confirm whether the current 1702x924 backdrop is retained/reworked or replaced. If requested
-  content needs a new field, slot-level property, SQL query, calculation, or workflow behavior,
-  stop and split that work into an explicitly approved data/behavior slice.
+- Kingdom 1198 is the only governor dataset.
+- Global freshness is the dataset's `MAX(ScanDate)`; each governor uses its own `MAX(ScanDate)`.
+- DATA states are `CURRENT`, `STALE`, `NO DATA`, and `UNRESOLVED`.
+- `READY` requires a configured Main, unique/resolved linked IDs, and every governor in the latest
+  scan; `REVIEW` covers stale/missing/unresolved/duplicate entries; `SETUP` covers no governors or no
+  Main.
+- Portfolio aggregates deduplicate by Governor ID, preserve nulls, and never treat missing as zero.
+- RSS Total reuses the exact canonical current Inventory holdings calculation. RSS Gathered and RSS
+  Assistance remain lifetime fields and are not the headline RSS value.
 
-Phase 5C does not change account slots, registry authority, lookup matching, ownership/claim rules,
-write confirmation/revalidation, service/DAL/SQL behavior, redirects, command registration, or any
-other `/me` page.
+Approved interaction expansion:
+
+- Main page rows remain blue `Accounts`/`Reminders`/`Preferences`, secondary
+  `Dashboard`/`Inventory`/`Exports`, then `Manage Accounts` and new `Account Summary`.
+- `Manage Accounts` preserves the existing lookup/add/replace/remove/confirm/cancel/revalidation,
+  ownership/claim, slot, audit, and host-refresh behavior.
+- `Account Summary` is a new private, read-only, all-governor child journey using the same backdrop,
+  standalone attachment delivery, eight rows per page, and three sections:
+  - Overview: identity, Civilisation, City Hall, Power, Troop Power, Location, DATA, Last Scan;
+  - Combat & Participation: Kill Points, T4+T5 Kills, Deads, Healed, Highest Acclaim, Helps, Conduct;
+  - Economy & Activity: RSS Gathered, RSS Assistance, current RSS Total, Inventory As Of, DATA.
+- Summary controls provide section tabs, Previous/Next, complete private CSV, and Back to Accounts.
+  The CSV contains exact values for every linked row and includes registered/current names, T4 and
+  T5 components, coordinates, data state, scan time, and Inventory time once each.
+- No Change Governor appears on Accounts or Account Summary. Optional selected-governor context is
+  retained only for validated Dashboard return.
+
+Approved technical scope:
+
+- read-only typed service/DAL/payload expansion is in scope and must be bulk/set-based;
+- validate SQL field mappings against `C:\K98-bot-SQL-Server`;
+- no SQL schema/table/view/index, persistence, registry-authority, slot, ownership, claim, lookup, or
+  mutation redesign is approved;
+- preserve same-payload fallbacks, off-event-loop rendering, attachment replacement, stream cleanup,
+  command registration, privacy, author gating, and existing legacy redirects;
+- run focused/full validation, original/desktop/mobile samples, and Codex Security review before
+  operator Discord smoke.
+
+The complete implementation contract is authoritative in the Phase 5C task pack and chat starter.
 
 #### Phase 5D - Premium Reminders Summary Card
 
@@ -893,6 +977,8 @@ These ideas must not block or silently expand Phases 5A-9.
 - Governor context preservation across dashboard actions.
 - Dashboard data service/DAL foundation.
 - Premium governor dashboard card and fallback embed.
+- Premium all-linked-governor Accounts portfolio, scan health, insight, guided management, and
+  private paginated Account Summary/CSV.
 - Direct selected-governor inventory actions.
 - Private `/me` KVK history entry point.
 - Leadership/admin `/me inspect`, later and separately permission-gated.
@@ -971,6 +1057,8 @@ Likely SQL-backed objects:
 - `dbo.v_EXCEL_FOR_KVK_All`
 - `dbo.v_EXCEL_FOR_KVK_Started`
 - `dbo.GovernorInventoryProfile`
+- latest Kingdom 1198 governor scan source, including `KingdomScanData4` where authoritative
+- `dbo.PlayerLocation` or its current repository equivalent
 - `dbo.BotCommandUsage`
 
 ## 16. Cross-Programme Constraints
@@ -1030,14 +1118,18 @@ The programme is complete when:
 - [x] The dashboard uses validated data sources and excludes Olympia until a source exists.
 - [x] Governor context is preserved safely through the dashboard and current compatibility actions.
 - [x] Accounts, Reminders, and Preferences remain correctly Discord-user-level.
-- [ ] Direct Resources, Materials, and Speedups paths exist while `/me inventory` and `/myinventory` remain compatible.
+- [x] Direct Resources, Materials, and Speedups paths exist while `/me inventory` and `/myinventory` remain compatible.
+- [x] Phase 5C Accounts delivers the approved portfolio card, scan health, insight, unchanged
+  Manage flow, and private complete Account Summary/CSV.
 - [ ] Export Stats semantics are explicitly decided and tested before dashboard integration.
 - [ ] A private `/me history` path exists while `/kvk history` remains unchanged.
 - [ ] `/me inspect` is permission-gated, private by default, and excludes Discord-user private data.
 - [ ] Legacy commands are only redirected/removed after usage evidence and explicit operator approval.
-- [x] Documentation and canonical command references reflect the completed Phases 1-4.
-- [x] Command registration validation remains green through Phase 4.
-- [x] No new direct SQL exists in command/view layers through Phase 4.
+- [x] Documentation and canonical command references reflect completed phases through Phase 5B.
+- [x] Phase 5C documentation, canonical references, and automated validation are recorded; operator
+  Discord smoke remains the final acceptance gate.
+- [x] Command registration validation remains green through Phase 5C.
+- [x] No new direct SQL exists in command/view layers through Phase 5C.
 - [x] Deferred findings from completed phases are captured structurally.
 
 ## 19. Deferred / Future Opportunities
@@ -1056,15 +1148,17 @@ Do not include these in early phases unless separately approved:
 ## 20. Suggested Next Action
 
 ```text
-Start the Phase 5C Accounts visual/product workshop. Review the operator's improvement ideas and
-agree the content hierarchy, backdrop/runtime dimensions, avatar/icon treatment, standalone format,
-empty/unavailable presentation, and desktop/mobile prototype before implementation approval.
+Run the Phase 5C operator Discord smoke from its task pack against the mirror PR. Confirm genuine
+portfolio values/states, Manage mutation refresh, every Account Summary section/page, the complete
+private CSV, fallback/privacy behavior, and original/desktop/mobile presentation. Do not promote or
+begin Phase 5D until that operator acceptance is recorded.
 ```
 
-Phases 1-5B are complete and operator accepted. Phase 5C is deliberately approval-gated: the
-Accounts page may be visually re-composed and moved to standalone attachment delivery, but its
-Discord-user/all-linked-governor payload, guided Manage workflow, private behavior, and service/DAL
-contracts remain stable. It does not show Change Governor.
+The production backdrop is present at `assets/me/cards/me_accounts.png` and is locked at `1702x924`.
+The approved scope includes the premium Accounts portfolio, read-only bulk data expansion, earned
+scan-health states, deterministic insight, unchanged guided Manage behavior, standalone/fallback
+delivery, and the new private paginated Account Summary with complete CSV. It does not include
+Change Governor, public delivery, SQL schema changes, registry redesign, or another `/me` page.
 
 Use:
 
@@ -1086,4 +1180,6 @@ Use:
 | 2026-07-12 | Phase 5A revised scope approved | Approved the three private report commands, governor-only entry selector, selected-governor Inventory totals, 1180x760 dashboard, revised navigation, retained `/me inventory`, and unchanged 1400x980 Inventory renderer. |
 | 2026-07-13 | Phase 5A completed and Phase 5B prepared | Recorded successful direct-report and no-data smoke, archived the completed pack/starter, accepted the Inventory visual-quality gap, added six dormant premium backdrop assets, made their renderer-only adoption the new Phase 5B, and separated the five user-level summary pages into Phases 5C-5G with no governor dropdown. |
 | 2026-07-13 | Phase 5B implemented and locally validated | Adopted the three 1400x980 report-specific runtime backdrops in the shared Inventory renderer, retained source-only 2x masters and stable behavior, added failure/data/stream/visual coverage, and passed focused plus full automated validation. Operator Discord smoke and final visual acceptance remain. |
-| 2026-07-13 | Phase 5B completed and Phase 5C prepared | Recorded successful Phase 5B operator smoke and final premium visual acceptance; archived its task pack/starter; made Accounts the next approval-gated visual/product workshop; and defined the shared 1702x924-default standalone summary-card, avatar, navigation, fallback, cleanup, and no-Change-Governor contract for Phases 5C-5G. |
+| 2026-07-13 | Phase 5B completed and Phase 5C prepared | Recorded successful Phase 5B operator smoke and final premium visual acceptance; archived its task pack/starter; made Accounts the next approval-gated visual/product workshop; and defined the shared 1702x924-default standalone summary-card, page-specific avatar, navigation, fallback, cleanup, and no-Change-Governor contract for Phases 5C-5G. |
+| 2026-07-14 | Phase 5C Accounts product, data, interaction, and backdrop contract approved | Locked the four-metric Accounts portfolio, global Kingdom 1198 latest-scan DATA/READY rules, arbitrary-size roster behavior, deterministic insight, unchanged Manage flow, private paginated Account Summary/CSV, no-avatar page layout, standalone delivery, scoped read-only DAL expansion, and approved `assets/me/cards/me_accounts.png` for implementation. |
+| 2026-07-14 | Phase 5C Accounts implemented; operator smoke pending | Added typed all-linked portfolio models, set-based latest Kingdom 1198 and canonical current-RSS reads, the approved standalone 1702x924 Accounts renderer, unchanged Manage refresh, private three-section paginated Account Summary, complete formula-safe CSV, same-payload fallbacks, attachment cleanup, focused/full validation, visual samples, and Codex Security review. No SQL schema, registry, ownership, or existing report/export contract changed. |

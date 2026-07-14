@@ -478,13 +478,14 @@ Current status:
   dates and adds density-aware diamond markers for every plotted upload. Automated validation
   passed 255 focused Inventory/dashboard tests and the full suite (`2503 passed, 2 skipped`). The
   completed Phase 5B task pack and starter are archived.
-- Phase 5C Premium Accounts Summary Card is next and starts with an operator visual/product
-  workshop. Unless explicitly changed at that checkpoint, it retains the current 1702x924 output
-  and stable filename, migrates successful presentation from an embed-wrapped image to a standalone
-  private attachment, uses the invoking player's avatar best-effort, and preserves the same-payload
-  embed fallback and guided Manage journey. Accounts is a Discord-user/all-linked-governor page:
-  it does not show Change Governor. Optional selected-governor context exists only so Dashboard can
-  return to the prior governor; direct `/me accounts` entry follows normal dashboard resolution.
+- Phase 5C Premium Accounts Summary Card is implemented and awaiting operator Discord smoke. The
+  no-avatar 1702x924 Accounts portfolio uses all linked registry entries, earned scan-health and
+  coverage states, the four approved metrics, canonical current Inventory RSS, deterministic
+  insight, standalone private delivery, and same-payload fallback. The unchanged guided Manage
+  journey refreshes the new payload after successful mutations. Private Account Summary provides
+  Overview, Combat, and Economy pages for every linked entry plus a complete formula-safe CSV;
+  coordinates remain private. There is no Change Governor, and optional selected-governor context
+  exists only for a validated Dashboard return.
 - Phases 5D-5G independently apply the same format and transition contract to Reminders,
   Preferences, Inventory summary, and Exports summary. They preserve current page actions,
   disabled states, privacy, payloads, filenames, attachment cleanup, and service ownership; none

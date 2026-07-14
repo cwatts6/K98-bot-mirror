@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -11,6 +12,11 @@ from player_self_service.account_service import (
     AccountCentreState,
     AccountConfirmation,
     AccountMutationResult,
+)
+from player_self_service.accounts_models import (
+    AccountMetricTotal,
+    AccountPortfolioRow,
+    AccountsPortfolioPayload,
 )
 from player_self_service.preference_service import PreferenceMutationResult
 from player_self_service.profile_preference_service import (
@@ -123,6 +129,42 @@ def _no_account_summary() -> PlayerSelfServiceSummary:
             action_state="unavailable",
             action_summary="Register an account first.",
         ),
+    )
+
+
+def _accounts_payload() -> AccountsPortfolioPayload:
+    now = datetime(2026, 7, 14, 8, 30, tzinfo=UTC)
+    row = AccountPortfolioRow(
+        slot="Main",
+        role="Main",
+        registered_name="Main Gov",
+        current_governor_name="Main Gov",
+        governor_id=111,
+        power=100,
+        troop_power=50,
+        t4_kills=10,
+        t5_kills=20,
+        t4_t5_kills=30,
+        rss_total=400,
+        data_state="CURRENT",
+        last_governor_scan=now,
+        inventory_as_of=now,
+    )
+    metric = AccountMetricTotal(100, 1, 1)
+    return AccountsPortfolioPayload(
+        discord_user_id=42,
+        state="READY",
+        rows=(row,),
+        linked_count=1,
+        main_row=row,
+        role_counts=(("Main", 1), ("Alt", 0), ("Farm", 0)),
+        power=metric,
+        troop_power=metric,
+        t4_t5_kills=metric,
+        rss_total=metric,
+        insight="All linked governors are current.",
+        refreshed_at_utc=now,
+        latest_scan_date=now,
     )
 
 
@@ -265,25 +307,24 @@ async def test_dashboard_page_response_falls_back_to_embed_when_card_render_fail
 async def test_subpage_response_includes_generated_card(monkeypatch) -> None:
     calls = []
 
-    def fake_render(page, summary, *, display_name):
-        calls.append((page, summary.discord_user_id, display_name))
-        return views.page_cards.RenderedPageCard(
+    def fake_render(payload, *, display_name):
+        calls.append((payload.discord_user_id, display_name))
+        return views.accounts_renderer.RenderedAccountsCard(
             filename="me_accounts_42.png",
-            image_bytes=BytesIO(b"png"),
+            image_bytes=b"png",
         )
 
-    monkeypatch.setattr(views.page_cards, "render_page_card", fake_render)
+    monkeypatch.setattr(views.accounts_renderer, "render_accounts_card", fake_render)
 
     embed, files = await views._build_page_response(
         views.PAGE_ACCOUNTS,
-        _summary(),
+        None,
         display_name="Tester",
+        accounts_payload=_accounts_payload(),
     )
 
-    assert calls == [(views.PAGE_ACCOUNTS, 42, "Tester")]
-    assert embed.title is None
-    assert embed.fields == []
-    assert embed.image.url == "attachment://me_accounts_42.png"
+    assert calls == [(42, "Tester")]
+    assert embed is None
     assert [file.filename for file in files] == ["me_accounts_42.png"]
 
 
@@ -471,6 +512,7 @@ def _assert_button_layout(
         display_name="Tester",
         page=page,
         summary=_summary(),
+        accounts_payload=_accounts_payload() if page == views.PAGE_ACCOUNTS else None,
     )
 
     assert _button_layout(view) == expected
@@ -509,7 +551,8 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Reminders", 0, primary, False),
             ("Preferences", 0, primary, False),
             *nav_row,
-            ("Manage", 2, success, False),
+            ("Manage Accounts", 2, success, False),
+            ("Account Summary", 2, secondary, False),
         ],
     )
     _assert_button_layout(
@@ -566,7 +609,8 @@ async def test_accounts_view_keeps_inventory_and_exports_navigation() -> None:
     )
 
     labels = [getattr(child, "label", None) for child in view.children]
-    assert "Manage" in labels
+    assert "Manage Accounts" in labels
+    assert "Account Summary" in labels
     assert not {"Find ID", "Register", "Replace", "Remove"}.intersection(set(labels))
     assert "Inventory" in labels
     assert "Exports" in labels
@@ -1145,7 +1189,15 @@ async def test_account_confirmation_refreshes_visible_account_card(monkeypatch) 
     async def loader(_user_id: int):
         return _summary()
 
+    async def accounts_loader(_user_id: int):
+        return _accounts_payload()
+
     monkeypatch.setattr(account_views.account_service, "confirm_register", fake_confirm)
+    monkeypatch.setattr(
+        account_views.accounts_service,
+        "build_accounts_portfolio",
+        accounts_loader,
+    )
     host_message = _EditableMessage()
     view = account_views.AccountConfirmationView(
         author_id=42,
@@ -1168,7 +1220,7 @@ async def test_account_confirmation_refreshes_visible_account_card(monkeypatch) 
 
     await button.callback(interaction)
 
-    assert host_message.edits[-1]["embed"].image.url.startswith("attachment://me_accounts_")
+    assert host_message.edits[-1]["embed"] is None
     assert [file.filename for file in host_message.edits[-1]["files"]] == ["me_accounts_42.png"]
 
 
@@ -2047,7 +2099,7 @@ async def test_stale_navigation_closes_rendered_files(monkeypatch) -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
-        summary_loader=loader,
+        accounts_loader=loader,
     )
     interaction = _Interaction()
     checks = iter((True, False))
@@ -2127,7 +2179,7 @@ async def test_view_navigation_failure_after_defer_uses_private_followup() -> No
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
-        summary_loader=loader,
+        accounts_loader=loader,
     )
     interaction = _Interaction()
 
@@ -2143,15 +2195,15 @@ async def test_view_navigation_failure_after_defer_uses_private_followup() -> No
 async def test_account_completion_navigation_defer_type_error_falls_back() -> None:
     order = []
 
-    async def loader(_user_id: int):
+    async def accounts_loader(_user_id: int):
         order.append("loader")
-        return _summary()
+        return _accounts_payload()
 
     view = account_views.AccountCompletionView(
         author_id=42,
         display_name="Tester",
         message="Done",
-        summary_loader=loader,
+        accounts_loader=accounts_loader,
     )
     interaction = _Interaction()
     original_defer = interaction.response.defer
@@ -2170,7 +2222,10 @@ async def test_account_completion_navigation_defer_type_error_falls_back() -> No
 
     assert order == ["defer-ephemeral", "defer-fallback", "loader"]
     assert interaction.response.deferred[-1] == {}
-    assert interaction.original_edits[-1]["embed"].image.url.startswith("attachment://me_accounts_")
+    assert interaction.original_edits[-1]["embed"] is None
+    assert [file.filename for file in interaction.original_edits[-1]["files"]] == [
+        "me_accounts_42.png"
+    ]
 
 
 @pytest.mark.asyncio
