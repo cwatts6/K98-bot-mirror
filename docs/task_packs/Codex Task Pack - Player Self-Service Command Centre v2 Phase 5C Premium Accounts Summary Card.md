@@ -119,7 +119,7 @@ PORTFOLIO INSIGHT
 Manage accounts
 Find an ID, add, replace or remove a linked governor.
 
-Refreshed <HH:MM UTC>
+Refreshed <DD Mon YYYY HH:MM UTC>
 ```
 
 Use singular/plural grammar correctly, for example `1 governor` and `5 governors`.
@@ -135,9 +135,10 @@ Render:
 - `MAIN GOVERNOR  <name> • <ID>` when a Main exists;
 - an honest setup/missing-Main message when it does not.
 
-The approved page-specific design does **not** require a Discord avatar. The clean backdrop has no
-portrait aperture, and the approved hierarchy is portfolio-led. This is an intentional Phase 5C
-exception to any broader best-effort-avatar default used by other GovernorOS pages.
+The operator smoke refinement adds the invoking Discord user's best-effort avatar at the upper
+left. Avatar reads remain author-validated and timeout-bounded; a failed read leaves the clean
+header intact. If the Discord display name already ends in `(1198)`, do not append the Kingdom
+suffix a second time.
 
 ### 6.3 Latest snapshot metrics
 
@@ -253,12 +254,12 @@ Find an ID, add, replace or remove a linked governor.
 Render:
 
 ```text
-Refreshed <HH:MM UTC>
+Refreshed <DD Mon YYYY HH:MM UTC>
 ```
 
-`Refreshed` means the UTC time at which the card was generated/refreshed. It must not be presented as
-the governor scan date. Per-governor scan dates remain available through DATA state and Account
-Summary.
+`Refreshed` means the UTC date and time at which the card was generated/refreshed. It must not be
+presented as the governor scan date. Per-governor scan date-times remain available through DATA
+state and Account Summary.
 
 ## 7. Approved Backdrop Geometry
 
@@ -423,6 +424,7 @@ Names may follow repository conventions, but the responsibility split must remai
 | Current governor name and last scan | Latest usable scan row for that Governor ID |
 | Civilisation | Existing `Civilization` source/mapping; player-facing label may use `Civilisation` |
 | Power, City Hall, Troop Power, Kill Points | Latest governor scan/profile source already used by GovernorOS |
+| VIP | Existing `dbo.GovernorInventoryProfile.VipLevelCode/VipLevelLabel` profile source |
 | T4 and T5 kills | Latest cumulative T4/T5 fields; sum only those two tiers |
 | Deads, Healed Troops, Highest Acclaim, Helps | Latest authoritative governor scan/profile fields |
 | RSS Gathered, RSS Assistance | Existing cumulative/lifetime governor fields |
@@ -430,6 +432,8 @@ Names may follow repository conventions, but the responsibility split must remai
 | Conduct | SQL/source field `Conduct`; use existing player-facing formatter |
 | Location | Current `PlayerLocation.X` and `PlayerLocation.Y` source already used by GovernorOS |
 | Inventory As Of | Timestamp of the Inventory snapshot used for that governor |
+| KP Loss | Calculated from exact Healed Troops as `Healed Troops * 20` |
+| Tanking Score | Calculated as `Kill Points / (KP Loss + Deads) * 100`; null for missing/zero denominator |
 
 Do not duplicate the Inventory RSS formula in a new renderer or view. Reuse/extract the canonical
 Inventory calculation through an appropriate service boundary.
@@ -483,13 +487,12 @@ Then render one of three sections.
 ```text
 Slot
 Governor
-Governor ID
 Civilisation
 City Hall
+VIP
 Power
 Troop Power
 Location (X:Y)
-Data
 Last Scan
 ```
 
@@ -506,7 +509,8 @@ T4+T5 Kills
 Deads
 Healed Troops
 Highest Acclaim
-Helps
+KP Loss
+Tanking Score
 Conduct
 ```
 
@@ -518,8 +522,8 @@ Governor
 RSS Gathered
 RSS Assistance
 RSS Total
+Helps
 Inventory As Of
-Data
 ```
 
 Scope labels must remain honest:
@@ -529,6 +533,8 @@ Scope labels must remain honest:
 - RSS Total is current holdings.
 - `Inventory As Of` identifies the Inventory snapshot used.
 - `Last Scan` identifies the governor scan, not the card render time.
+- `Last Scan` and `Refreshed` include both UTC date and time.
+- Summary tables use compact player-facing values; exact values remain in the CSV.
 
 ### 10.3 Pagination
 
@@ -564,6 +570,7 @@ Current Governor Name
 Governor ID
 Civilisation
 City Hall
+VIP
 Power
 Troop Power
 Kill Points
@@ -572,6 +579,8 @@ T5 Kills
 T4+T5 Kills
 Deads
 Healed Troops
+KP Loss
+Tanking Score
 Highest Acclaim
 Helps
 RSS Gathered
@@ -602,7 +611,7 @@ Retain global navigation and use real Discord controls. Recommended rows:
 
 ```text
 Row 0: Accounts (blue, disabled) | Reminders (blue) | Preferences (blue)
-Row 1: Dashboard | Inventory | Exports
+Row 1: Dashboard | Exports
 Row 2: Overview | Combat | Economy
 Row 3: Previous | Next | Download CSV | Back to Accounts
 ```
@@ -622,7 +631,7 @@ The main card uses:
 
 ```text
 Row 0: Accounts (blue, disabled) | Reminders (blue) | Preferences (blue)
-Row 1: Dashboard | Inventory | Exports
+Row 1: Dashboard | Exports
 Row 2: Manage Accounts | Account Summary
 ```
 
@@ -638,6 +647,8 @@ new read-only report. Do not paint either button into the PNG.
 - Stable filename: `me_accounts_<discord_user_id>.png`.
 - Successful output: standalone private attachment, not an embed-wrapped image.
 - Fallback: concise private Accounts embed built from the same already-authorized portfolio payload.
+- On timeout, preserve the existing private card/fallback, disable every control, and add a concise
+  rerun instruction without refetching or rerendering.
 
 ### 12.2 Account Summary pages
 
@@ -647,6 +658,8 @@ new read-only report. Do not paint either button into the PNG.
 - Successful output: standalone private attachment.
 - Fallback: concise private embed/text representation of the current section/page from the same
   already-loaded summary payload. Do not attempt to place hundreds of rows in one fallback embed.
+- On timeout, preserve the current private page, disable every control, and add a concise `/me
+  accounts` rerun instruction without refetching or rerendering.
 
 ### 12.3 Shared renderer requirements
 
@@ -785,7 +798,7 @@ Cover:
 - long/Unicode Discord and governor names;
 - very large numbers;
 - CURRENT/STALE/NO DATA/UNRESOLVED labels;
-- no-avatar approved layout;
+- best-effort invoking-user avatar, failed-read fallback, and duplicate `(1198)` suffix prevention;
 - empty, partial, unavailable, and all-current samples;
 - Account Summary Overview, Combat, and Economy samples;
 - eight-row pagination pages;
@@ -798,6 +811,7 @@ Cover:
 - standalone successful delivery and same-payload fallback;
 - exact main component rows and button labels;
 - Account Summary entry, tabs, boundary-disabled pagination, CSV, and Back to Accounts;
+- graceful main/summary timeout preserving the report while disabling controls;
 - no Change Governor for one, multiple, more-than-25, and 500 governors;
 - direct `/me accounts` entry and selected-dashboard-to-Accounts-to-Dashboard return;
 - unchanged Manage lookup/add/replace/remove/confirm/cancel/revalidation;

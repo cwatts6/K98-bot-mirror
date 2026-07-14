@@ -479,11 +479,12 @@ Current status:
   passed 255 focused Inventory/dashboard tests and the full suite (`2503 passed, 2 skipped`). The
   completed Phase 5B task pack and starter are archived.
 - Phase 5C Premium Accounts Summary Card is implemented and awaiting operator Discord smoke. The
-  no-avatar 1702x924 Accounts portfolio uses all linked registry entries, earned scan-health and
+  avatar-enabled 1702x924 Accounts portfolio uses all linked registry entries, earned scan-health and
   coverage states, the four approved metrics, canonical current Inventory RSS, deterministic
   insight, standalone private delivery, and same-payload fallback. The unchanged guided Manage
   journey refreshes the new payload after successful mutations. Private Account Summary provides
-  Overview, Combat, and Economy pages for every linked entry plus a complete formula-safe CSV;
+  larger Overview, Combat, and Economy pages for every linked entry, VIP and KP Loss/Tanking Score,
+  UTC date-times, graceful timeout controls, plus a complete formula-safe CSV;
   coordinates remain private. There is no Change Governor, and optional selected-governor context
   exists only for a validated Dashboard return.
 - Phases 5D-5G independently apply the same format and transition contract to Reminders,

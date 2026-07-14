@@ -24,6 +24,7 @@ def _payload(row_count: int = 10) -> AccountsPortfolioPayload:
             governor_id=100_000 + index,
             civilisation="Rome",
             city_hall=25,
+            vip_level="VIP 18",
             power=1_000_000_000 + index,
             troop_power=500_000_000,
             kill_points=2_000_000,
@@ -73,6 +74,25 @@ def test_main_accounts_renderer_uses_locked_dimensions_and_stable_filename() -> 
         assert image.mode == "RGB"
 
 
+def test_main_accounts_renderer_draws_avatar_and_deduplicates_kingdom_suffix() -> None:
+    avatar = BytesIO()
+    Image.new("RGB", (256, 256), (220, 20, 60)).save(avatar, format="PNG")
+
+    rendered = accounts_renderer.render_accounts_card(
+        _payload(),
+        display_name="Test Player (1198)",
+        avatar_bytes=avatar.getvalue(),
+    )
+
+    assert accounts_renderer._discord_heading("Test Player (1198)") == "Test Player (1198)"
+    assert accounts_renderer._discord_heading("Test Player") == "Test Player (1198)"
+    with Image.open(BytesIO(rendered.image_bytes)) as image:
+        red, green, blue = image.getpixel((109, 83))
+        assert red > 180
+        assert green < 60
+        assert blue < 90
+
+
 def test_governor_count_label_uses_singular_and_plural_grammar() -> None:
     assert accounts_renderer.format_governor_count(0) == "0 governors"
     assert accounts_renderer.format_governor_count(1) == "1 governor"
@@ -87,3 +107,34 @@ def test_account_summary_renderer_supports_all_three_sections() -> None:
         assert rendered.filename == "me_account_summary_42.png"
         with Image.open(BytesIO(rendered.image_bytes)) as image:
             assert image.size == (1702, 924)
+
+
+def test_summary_columns_and_values_follow_smoke_contract() -> None:
+    payload = _payload(1)
+    row = payload.rows[0]
+
+    overview = accounts_service.build_account_summary_page(payload, section="overview", page=1)
+    overview_labels = [label for label, _width in accounts_renderer._summary_columns(overview)]
+    overview_values = accounts_renderer._summary_values(overview, row)
+    assert "GOVERNOR ID" not in overview_labels
+    assert "DATA" not in overview_labels
+    assert "VIP" in overview_labels
+    assert "VIP 18" in overview_values
+    assert "14 Jul 2026 08:30 UTC" in overview_values
+
+    combat = accounts_service.build_account_summary_page(payload, section="combat", page=1)
+    combat_labels = [label for label, _width in accounts_renderer._summary_columns(combat)]
+    combat_values = accounts_renderer._summary_values(combat, row)
+    assert "HELPS" not in combat_labels
+    assert "KP LOSS" in combat_labels
+    assert "TANKING" in combat_labels
+    assert "1.5M" in combat_values
+    assert combat_values[-1] == "99"
+
+    economy = accounts_service.build_account_summary_page(payload, section="economy", page=1)
+    economy_labels = [label for label, _width in accounts_renderer._summary_columns(economy)]
+    economy_values = accounts_renderer._summary_values(economy, row)
+    assert "HELPS" in economy_labels
+    assert "DATA" not in economy_labels
+    assert "10K" in economy_values
+    assert accounts_renderer._compact_detail(8_515_574_404) == "8.52B"

@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 PlayerSelfServicePage = str
 SummaryLoader = Callable[[int], Awaitable[PlayerSelfServiceSummary]]
 AccountsLoader = Callable[[int], Awaitable[AccountsPortfolioPayload]]
+_AVATAR_READ_TIMEOUT_SECONDS = 5.0
 
 PAGE_DASHBOARD = "dashboard"
 PAGE_ACCOUNTS = "accounts"
@@ -63,6 +64,31 @@ def _display_name(user: object) -> str:
         or str(getattr(user, "name", "") or "").strip()
         or "player"
     )
+
+
+async def _read_avatar_bytes(user: object | None, *, expected_user_id: int) -> bytes | None:
+    try:
+        if user is None or int(getattr(user, "id", -1)) != int(expected_user_id):
+            return None
+    except (TypeError, ValueError):
+        return None
+    avatar = getattr(user, "display_avatar", None) or getattr(user, "avatar", None)
+    if avatar is None:
+        return None
+    try:
+        if hasattr(avatar, "with_size"):
+            avatar = avatar.with_size(256)
+        if hasattr(avatar, "read"):
+            return await asyncio.wait_for(avatar.read(), timeout=_AVATAR_READ_TIMEOUT_SECONDS)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.debug(
+            "player_self_service_avatar_read_failed user_id=%s",
+            getattr(user, "id", None),
+            exc_info=True,
+        )
+    return None
 
 
 def _field_value(lines: list[str]) -> str:
@@ -202,7 +228,7 @@ def build_accounts_portfolio_fallback(
         inline=False,
     )
     embed.add_field(name="Portfolio Insight", value=payload.insight[:1024], inline=False)
-    embed.set_footer(text=f"Refreshed {payload.refreshed_at_utc:%H:%M UTC}")
+    embed.set_footer(text=f"Refreshed {payload.refreshed_at_utc:%d %b %Y %H:%M UTC}")
     return embed
 
 
@@ -414,6 +440,7 @@ async def _build_page_response(
     *,
     display_name: str,
     accounts_payload: AccountsPortfolioPayload | None = None,
+    avatar_bytes: bytes | None = None,
 ) -> tuple[discord.Embed | None, list[discord.File]]:
     fallback_embed = build_page_embed(
         page,
@@ -429,6 +456,7 @@ async def _build_page_response(
                 accounts_renderer.render_accounts_card,
                 accounts_payload,
                 display_name=display_name,
+                avatar_bytes=avatar_bytes,
             )
         elif page == PAGE_DASHBOARD:
             if summary is None:
@@ -544,10 +572,11 @@ class PlayerSelfServiceView(discord.ui.View):
         summary_loader: SummaryLoader = build_player_self_service_summary,
         accounts_payload: AccountsPortfolioPayload | None = None,
         accounts_loader: AccountsLoader = accounts_service.build_accounts_portfolio,
+        avatar_bytes: bytes | None = None,
         dashboard_governor_id: int | None = None,
         timeout: float = 180,
     ):
-        super().__init__(timeout=timeout, disable_on_timeout=True)
+        super().__init__(timeout=timeout, disable_on_timeout=False)
         self.author_id = int(author_id)
         self.display_name = display_name
         self.page = page
@@ -555,6 +584,7 @@ class PlayerSelfServiceView(discord.ui.View):
         self.summary_loader = summary_loader
         self.accounts_payload = accounts_payload
         self.accounts_loader = accounts_loader
+        self.avatar_bytes = avatar_bytes
         self.dashboard_governor_id = dashboard_governor_id
         self._message_ref: discord.Message | None = None
         self._timeout_editor: Callable[..., Awaitable[Any]] | None = None
@@ -622,6 +652,10 @@ class PlayerSelfServiceView(discord.ui.View):
         if self.page == PAGE_EXPORTS:
             self._apply_export_button_state()
         self._apply_visible_action_rows()
+        if self.page == PAGE_ACCOUNTS:
+            for child in list(self.children):
+                if isinstance(child, discord.ui.Button) and child.custom_id == "me:inventory":
+                    self.remove_item(child)
         for child in self.children:
             if isinstance(child, discord.ui.Button):
                 if str(child.custom_id or "").startswith("me:export:"):
@@ -735,6 +769,7 @@ class PlayerSelfServiceView(discord.ui.View):
 
         summary: PlayerSelfServiceSummary | None = None
         accounts_payload: AccountsPortfolioPayload | None = None
+        avatar_bytes = self.avatar_bytes
         try:
             if page == PAGE_ACCOUNTS:
                 accounts_payload = await self.accounts_loader(self.author_id)
@@ -767,6 +802,11 @@ class PlayerSelfServiceView(discord.ui.View):
             )
             return False
 
+        if page == PAGE_ACCOUNTS and avatar_bytes is None:
+            avatar_bytes = await _read_avatar_bytes(
+                getattr(interaction, "user", None), expected_user_id=self.author_id
+            )
+
         view = PlayerSelfServiceView(
             author_id=self.author_id,
             display_name=self.display_name,
@@ -775,6 +815,7 @@ class PlayerSelfServiceView(discord.ui.View):
             summary_loader=self.summary_loader,
             accounts_payload=accounts_payload,
             accounts_loader=self.accounts_loader,
+            avatar_bytes=avatar_bytes,
             dashboard_governor_id=self.dashboard_governor_id,
             timeout=self.timeout or 180,
         )
@@ -783,6 +824,7 @@ class PlayerSelfServiceView(discord.ui.View):
             summary,
             display_name=self.display_name,
             accounts_payload=accounts_payload,
+            avatar_bytes=avatar_bytes,
         )
         if can_edit is not None and not can_edit():
             _close_files(files)
@@ -1088,6 +1130,7 @@ class PlayerSelfServiceView(discord.ui.View):
             author_id=self.author_id,
             display_name=self.display_name,
             accounts_loader=self.accounts_loader,
+            avatar_bytes=self.avatar_bytes,
             summary_loader=self.summary_loader,
             dashboard_governor_id=self.dashboard_governor_id,
             timeout=self.timeout or 180,
@@ -1365,6 +1408,7 @@ async def show_player_self_service_page_for_interaction(
     page: PlayerSelfServicePage,
     summary_loader: SummaryLoader = build_player_self_service_summary,
     accounts_loader: AccountsLoader = accounts_service.build_accounts_portfolio,
+    avatar_bytes: bytes | None = None,
     dashboard_governor_id: int | None = None,
     timeout: float = 180,
     can_edit: Callable[[], bool] | None = None,
@@ -1376,6 +1420,7 @@ async def show_player_self_service_page_for_interaction(
         page=page,
         summary_loader=summary_loader,
         accounts_loader=accounts_loader,
+        avatar_bytes=avatar_bytes,
         dashboard_governor_id=dashboard_governor_id,
         timeout=timeout,
     )
@@ -1392,9 +1437,11 @@ async def send_player_self_service_page(
     display_name = _display_name(getattr(ctx, "user", None))
     summary: PlayerSelfServiceSummary | None = None
     accounts_payload: AccountsPortfolioPayload | None = None
+    avatar_bytes: bytes | None = None
     try:
         if page == PAGE_ACCOUNTS:
             accounts_payload = await accounts_service.build_accounts_portfolio(int(ctx.user.id))
+            avatar_bytes = await _read_avatar_bytes(ctx.user, expected_user_id=int(ctx.user.id))
         else:
             summary = await summary_loader(int(ctx.user.id))
     except Exception:
@@ -1424,12 +1471,14 @@ async def send_player_self_service_page(
         summary=summary,
         summary_loader=summary_loader,
         accounts_payload=accounts_payload,
+        avatar_bytes=avatar_bytes,
     )
     embed, files = await _build_page_response(
         page,
         summary,
         display_name=display_name,
         accounts_payload=accounts_payload,
+        avatar_bytes=avatar_bytes,
     )
     try:
         message = await _edit_original_with_image_fallback(

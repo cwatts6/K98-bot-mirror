@@ -55,7 +55,7 @@ Locked main card:
 - private/ephemeral, author-gated, all-linked-governor scope
 - standalone 1702x924 attachment using `assets/me/cards/me_accounts.png`
 - stable `me_accounts_<discord_user_id>.png` filename
-- no Discord avatar on this page
+- best-effort invoking-user Discord avatar at the upper left, with author validation and bounded read
 - no Change Governor and no implicit selected-governor filter
 - optional selected dashboard governor may be retained only as validated Dashboard-return context
 - successful render uses a standalone attachment; concise fallback uses the same already-loaded
@@ -78,7 +78,7 @@ PORTFOLIO INSIGHT
 Manage accounts
 Find an ID, add, replace or remove a linked governor.
 
-Refreshed <HH:MM UTC>
+Refreshed <DD Mon YYYY HH:MM UTC>
 
 Metric rules:
 - Linked is the real linked count only; never show count against configured capacity
@@ -119,7 +119,7 @@ kills-per-power ratio.
 
 Main component rows:
 - Row 0: Accounts (blue, disabled) | Reminders (blue) | Preferences (blue)
-- Row 1: Dashboard | Inventory | Exports
+- Row 1: Dashboard | Exports
 - Row 2: Manage Accounts | Account Summary
 
 Manage Accounts:
@@ -135,19 +135,19 @@ Account Summary:
 - no Change Governor
 - 8 governor rows per page; Main first then slot order; support hundreds of governors
 - three visual sections:
-  1. Overview: Slot, Governor, Governor ID, Civilisation, City Hall, Power, Troop Power,
-     Location X:Y, Data, Last Scan
+  1. Overview: Slot, Governor, Civilisation, City Hall, VIP, Power, Troop Power,
+     Location X:Y, Last Scan
   2. Combat & Participation: Slot, Governor, Kill Points, T4+T5 Kills, Deads, Healed Troops,
-     Highest Acclaim, Helps, Conduct
-  3. Economy & Activity: Slot, Governor, RSS Gathered, RSS Assistance, RSS Total,
-     Inventory As Of, Data
+     Highest Acclaim, KP Loss, Tanking Score, Conduct
+  3. Economy & Activity: Slot, Governor, RSS Gathered, RSS Assistance, RSS Total, Helps,
+     Inventory As Of
 - repeated compact portfolio header includes total Power, Troop Power, T4+T5 Kills, and RSS Total
 - additive fields may use SUM; Highest Acclaim uses MAX; never aggregate IDs, names, coordinates, or dates
 - section change resets to page 1
 
 Account Summary controls:
 - Row 0: Accounts (blue, disabled) | Reminders (blue) | Preferences (blue)
-- Row 1: Dashboard | Inventory | Exports
+- Row 1: Dashboard | Exports
 - Row 2: Overview | Combat | Economy
 - Row 3: Previous | Next | Download CSV | Back to Accounts
 - active/boundary controls disabled appropriately
@@ -157,9 +157,9 @@ Complete CSV:
 - one row per linked registry entry
 - exact non-compact values
 - columns, in order:
-  Slot, Role, Registered Name, Current Governor Name, Governor ID, Civilisation, City Hall,
+  Slot, Role, Registered Name, Current Governor Name, Governor ID, Civilisation, City Hall, VIP,
   Power, Troop Power, Kill Points, T4 Kills, T5 Kills, T4+T5 Kills, Deads, Healed Troops,
-  Highest Acclaim, Helps, RSS Gathered, RSS Assistance, RSS Total, Conduct, Location X,
+  KP Loss, Tanking Score, Highest Acclaim, Helps, RSS Gathered, RSS Assistance, RSS Total, Conduct, Location X,
   Location Y, Data State, Last Governor Scan, Inventory As Of
 - Helps appears once
 - UTF-8, existing export conventions, CSV formula-injection protection, safe filename, and complete
@@ -172,6 +172,8 @@ Approved data scope:
 - validate actual SQL sources against `C:\K98-bot-SQL-Server`
 - reuse the canonical Inventory RSS calculation; do not duplicate or redefine it
 - preserve nulls and exact values in models/CSV; formatting belongs in the renderer
+- KP Loss is `Healed Troops * 20`; Tanking Score is
+  `Kill Points / (KP Loss + Deads) * 100`, with no zero-denominator value
 - no SQL schema/table/view/index change is approved
 - no registry, slot, ownership, claim, lookup, or persistence redesign is approved
 
@@ -180,6 +182,7 @@ Delivery and safety:
 - no second data fetch merely because rendering/edit/delivery fails
 - same-payload fallback for main and current summary page
 - deliberate attachment replacement on every transition
+- graceful timeout preserves the current private report, disables controls, and gives a rerun instruction
 - close all image/file/CSV streams on success and every failure/timeout/stale/cancel path
 - keep coordinates and the complete report private
 - protect CSV from formula injection and filenames from user-controlled path content

@@ -9,6 +9,7 @@ import logging
 from typing import Any
 
 from inventory import reporting_service
+from inventory.vip_levels import vip_label
 from player_self_service import accounts_dal
 from player_self_service.accounts_models import (
     AccountMetricTotal,
@@ -46,6 +47,19 @@ def _role(slot: str) -> str:
     if lowered.startswith("farm"):
         return "Farm"
     return "Other"
+
+
+def _vip_level(scan: AccountsScanRow | None) -> str | None:
+    if scan is None:
+        return None
+    if scan.vip_level_label:
+        return scan.vip_level_label.strip() or None
+    if not scan.vip_level_code:
+        return None
+    try:
+        return vip_label(scan.vip_level_code)
+    except ValueError:
+        return scan.vip_level_code.strip() or None
 
 
 def _same_scan(left: datetime | None, right: datetime | None) -> bool:
@@ -224,6 +238,7 @@ async def build_accounts_portfolio(discord_user_id: int) -> AccountsPortfolioPay
                 current_governor_name=scan.governor_name if scan else None,
                 civilisation=scan.civilisation if scan else None,
                 city_hall=scan.city_hall if scan else None,
+                vip_level=_vip_level(scan),
                 power=scan.power if scan else None,
                 troop_power=scan.troop_power if scan else None,
                 kill_points=scan.kill_points if scan else None,

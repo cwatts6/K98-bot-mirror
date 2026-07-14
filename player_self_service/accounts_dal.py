@@ -49,6 +49,8 @@ def _map_row(row: dict[str, Any]) -> AccountsScanRow:
         governor_name=_clean(row.get("GovernorName")),
         civilisation=_clean(row.get("Civilisation")),
         city_hall=_to_int(row.get("CityHall")),
+        vip_level_code=_clean(row.get("VipLevelCode")),
+        vip_level_label=_clean(row.get("VipLevelLabel")),
         power=_to_int(row.get("Power")),
         troop_power=_to_int(row.get("TroopPower")),
         kill_points=_to_int(row.get("KillPoints")),
@@ -123,6 +125,8 @@ def fetch_latest_accounts_scan_rows(governor_ids: Iterable[int]) -> tuple[Accoun
                     COALESCE(NULLIF(cm.Civilization_Name, ''), ranked.RawCivilisation)
                         AS Civilisation,
                     ranked.CityHall,
+                    profile.VipLevelCode,
+                    NULLIF(LTRIM(RTRIM(profile.VipLevelLabel)), '') AS VipLevelLabel,
                     ranked.Power,
                     ranked.TroopPower,
                     ranked.KillPoints,
@@ -147,6 +151,8 @@ def fetch_latest_accounts_scan_rows(governor_ids: Iterable[int]) -> tuple[Accoun
                     ON cm.Civilization = TRY_CONVERT(INT, NULLIF(ranked.RawCivilisation, ''))
                 LEFT JOIN dbo.PlayerLocation AS pl WITH (NOLOCK)
                     ON pl.GovernorID = r.GovernorID
+                LEFT JOIN dbo.GovernorInventoryProfile AS profile WITH (NOLOCK)
+                    ON profile.GovernorID = r.GovernorID
                 ORDER BY r.GovernorID;
             """
             cursor = conn.cursor()

@@ -705,6 +705,7 @@ async def _refresh_host_page(
     display_name: str,
     summary_loader: SummaryLoader,
     page: str,
+    user: object | None = None,
 ) -> None:
     if host_message is None or not hasattr(host_message, "edit"):
         return
@@ -714,11 +715,13 @@ async def _refresh_host_page(
         _build_page_response,
         _close_files,
         _edit_original_with_image_fallback,
+        _read_avatar_bytes,
     )
 
     files = []
     try:
         accounts_payload = await build_accounts_portfolio(int(author_id))
+        avatar_bytes = await _read_avatar_bytes(user, expected_user_id=int(author_id))
 
         view = PlayerSelfServiceView(
             author_id=int(author_id),
@@ -726,12 +729,14 @@ async def _refresh_host_page(
             page=page,
             summary_loader=summary_loader,
             accounts_payload=accounts_payload,
+            avatar_bytes=avatar_bytes,
         )
         embed, files = await _build_page_response(
             page,
             None,
             display_name=display_name,
             accounts_payload=accounts_payload,
+            avatar_bytes=avatar_bytes,
         )
 
         class _MessageTarget:
@@ -867,6 +872,7 @@ class AccountConfirmationView(discord.ui.View):
                 display_name=self.display_name,
                 summary_loader=self.summary_loader,
                 page=PAGE_ACCOUNTS,
+                user=getattr(interaction, "user", None),
             )
 
         view = AccountCompletionView(

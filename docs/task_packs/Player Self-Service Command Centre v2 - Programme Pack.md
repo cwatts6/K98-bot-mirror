@@ -740,9 +740,10 @@ Shared premium summary-card contract:
 - Render off the event loop, replace prior attachments deliberately, preserve the fallback without
   a second data fetch, and close every file/stream on success, fallback, timeout, cancellation,
   stale suppression, and concurrent navigation.
-- Avatar use is page-specific and requires an approved position. Phase 5C Accounts intentionally
-  omits an avatar because its approved Registry layout is portfolio-led and has no portrait aperture.
-  Other pages retain their own approved avatar/fallback decisions. Keep long/Unicode names fitted.
+- Avatar use is page-specific and requires an approved position. Phase 5C Accounts uses the
+  invoking user's best-effort avatar at the upper left after operator smoke feedback; reads remain
+  author-validated and bounded. Other pages retain their own approved avatar/fallback decisions.
+  Keep long/Unicode names fitted.
 - Keep genuine current page values, states, names, action guidance, and empty/unavailable wording.
   Do not invent figures, trends, governors, status, or next actions to fill the backdrop.
 - Keep global navigation as real Discord components: blue-primary `Accounts`, `Reminders`, and
@@ -775,7 +776,7 @@ Approved product outcome:
   linked-governor registry rather than one selected governor.
 - Successful output becomes a standalone `1702x924` PNG using the approved runtime asset
   `assets/me/cards/me_accounts.png` and stable `me_accounts_<discord_user_id>.png` filename.
-- The page-specific approved layout omits a Discord avatar and renders:
+- The smoke-refined layout includes a best-effort Discord avatar and renders:
   - `ACCOUNT CENTRE` with earned `READY`, `REVIEW`, or `SETUP` state;
   - Discord display name, Kingdom 1198, linked-governor count, and Main governor;
   - `LATEST SNAPSHOTS` with exactly four metrics: Linked, Portfolio Power, T4+T5 Kills, and current
@@ -783,7 +784,7 @@ Approved product outcome:
   - role breakdown and honest `n/N reporting` coverage;
   - a full-width `SLOT | GOVERNOR | ID | POWER | DATA` roster;
   - one deterministic `PORTFOLIO INSIGHT` line;
-  - the existing Manage guidance and `Refreshed <UTC>` footer.
+  - the existing Manage guidance and explicit UTC date-time `Refreshed` footer.
 - Do not display linked count against configured capacity. The configured slot limit is not a
   player-facing account maximum.
 - Main-card roster capacity is eight rows; with more than eight, show seven rows plus `+ N more`
@@ -804,17 +805,22 @@ Approved scan/state rules:
 Approved interaction expansion:
 
 - Main page rows remain blue `Accounts`/`Reminders`/`Preferences`, secondary
-  `Dashboard`/`Inventory`/`Exports`, then `Manage Accounts` and new `Account Summary`.
+  `Dashboard`/`Exports`, then `Manage Accounts` and new `Account Summary`.
 - `Manage Accounts` preserves the existing lookup/add/replace/remove/confirm/cancel/revalidation,
   ownership/claim, slot, audit, and host-refresh behavior.
 - `Account Summary` is a new private, read-only, all-governor child journey using the same backdrop,
   standalone attachment delivery, eight rows per page, and three sections:
-  - Overview: identity, Civilisation, City Hall, Power, Troop Power, Location, DATA, Last Scan;
-  - Combat & Participation: Kill Points, T4+T5 Kills, Deads, Healed, Highest Acclaim, Helps, Conduct;
-  - Economy & Activity: RSS Gathered, RSS Assistance, current RSS Total, Inventory As Of, DATA.
+  - Overview: identity, Civilisation, City Hall, VIP, Power, Troop Power, Location, Last Scan UTC;
+  - Combat & Participation: compact Kill Points, T4+T5 Kills, Deads, Healed, Highest Acclaim,
+    calculated KP Loss/Tanking Score, and whole-number Conduct;
+  - Economy & Activity: compact RSS Gathered, RSS Assistance, current RSS Total, Helps, and
+    Inventory As Of.
 - Summary controls provide section tabs, Previous/Next, complete private CSV, and Back to Accounts.
-  The CSV contains exact values for every linked row and includes registered/current names, T4 and
-  T5 components, coordinates, data state, scan time, and Inventory time once each.
+  The CSV contains exact values for every linked row and includes registered/current names, VIP,
+  T4 and T5 components, KP Loss/Tanking Score, coordinates, data state, scan time, and Inventory
+  time once each.
+- Accounts and Account Summary preserve the current private attachment/fallback on timeout, disable
+  every control, and show a concise rerun instruction without refetching or rerendering.
 - No Change Governor appears on Accounts or Account Summary. Optional selected-governor context is
   retained only for validated Dashboard return.
 
@@ -1183,3 +1189,4 @@ Use:
 | 2026-07-13 | Phase 5B completed and Phase 5C prepared | Recorded successful Phase 5B operator smoke and final premium visual acceptance; archived its task pack/starter; made Accounts the next approval-gated visual/product workshop; and defined the shared 1702x924-default standalone summary-card, page-specific avatar, navigation, fallback, cleanup, and no-Change-Governor contract for Phases 5C-5G. |
 | 2026-07-14 | Phase 5C Accounts product, data, interaction, and backdrop contract approved | Locked the four-metric Accounts portfolio, global Kingdom 1198 latest-scan DATA/READY rules, arbitrary-size roster behavior, deterministic insight, unchanged Manage flow, private paginated Account Summary/CSV, no-avatar page layout, standalone delivery, scoped read-only DAL expansion, and approved `assets/me/cards/me_accounts.png` for implementation. |
 | 2026-07-14 | Phase 5C Accounts implemented; operator smoke pending | Added typed all-linked portfolio models, set-based latest Kingdom 1198 and canonical current-RSS reads, the approved standalone 1702x924 Accounts renderer, unchanged Manage refresh, private three-section paginated Account Summary, complete formula-safe CSV, same-payload fallbacks, attachment cleanup, focused/full validation, visual samples, and Codex Security review. No SQL schema, registry, ownership, or existing report/export contract changed. |
+| 2026-07-14 | Phase 5C operator smoke refinement | Removed Inventory navigation from Accounts/Summary, added author avatar and Discord-name suffix deduplication, increased/rebalanced typography, added UTC date-times and VIP, moved Helps to Economy, added compact combat/economy values plus KP Loss/Tanking Score, extended the exact CSV, and made Summary timeout visibly disable controls while preserving the private report. No SQL schema or registry mutation contract changed. |

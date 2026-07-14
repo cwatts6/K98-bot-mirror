@@ -21,9 +21,10 @@ contract remain unchanged. The completed Phase 5B task pack and starter are arch
 
 Phase 5C Premium Accounts Summary Card is implemented on its mirror feature branch and is awaiting
 operator Discord smoke. `/me accounts` now resolves every linked registry entry through set-based
-Kingdom 1198 and canonical Inventory reads, renders the approved 1702x924 no-avatar portfolio card
+Kingdom 1198 and canonical Inventory reads, renders the approved 1702x924 avatar-enabled portfolio card
 as a standalone private attachment, preserves the guided Manage workflow, and adds a private,
-paginated Overview/Combat/Economy Account Summary with a complete formula-safe CSV. Same-payload
+paginated Overview/Combat/Economy Account Summary with VIP, KP Loss/Tanking Score, compact visual
+metrics, UTC date-times, and a complete formula-safe CSV. Same-payload
 fallbacks, author gates, attachment replacement, and stream cleanup are retained; no SQL schema,
 registry, ownership, direct Inventory, or existing export contract changed. Phase 5D Reminders is
 the next separately scoped summary-card slice after Phase 5C operator acceptance.

@@ -102,6 +102,17 @@ def _layout(view) -> list[tuple[str, int, bool]]:
     ]
 
 
+def test_overview_fallback_includes_vip_and_last_scan_datetime() -> None:
+    page = summary_views.accounts_service.build_account_summary_page(
+        _payload(), section="overview", page=1
+    )
+
+    embed = summary_views.build_account_summary_fallback(page)
+
+    assert "VIP" in embed.fields[0].value
+    assert "Last scan 14 Jul 2026 08:30 UTC" in embed.fields[0].value
+
+
 @pytest.mark.asyncio
 async def test_account_summary_controls_match_locked_rows_and_boundaries() -> None:
     view = summary_views.AccountSummaryView(
@@ -115,7 +126,6 @@ async def test_account_summary_controls_match_locked_rows_and_boundaries() -> No
         ("Reminders", 0, False),
         ("Preferences", 0, False),
         ("Dashboard", 1, False),
-        ("Inventory", 1, False),
         ("Exports", 1, False),
         ("Overview", 2, True),
         ("Combat", 2, False),
@@ -137,6 +147,28 @@ async def test_account_summary_disables_csv_for_empty_payload() -> None:
 
     csv_button = next(child for child in view.children if child.label == "Download CSV")
     assert csv_button.disabled is True
+
+
+@pytest.mark.asyncio
+async def test_account_summary_timeout_disables_controls_and_preserves_report() -> None:
+    interaction = _Interaction()
+    view = summary_views.AccountSummaryView(
+        author_id=42,
+        display_name="Tester",
+        payload=_payload(),
+    )
+    view.set_timeout_target(interaction)
+
+    await view.on_timeout()
+
+    assert all(child.disabled for child in view.children)
+    assert "expired" in interaction.original_edits[-1]["content"]
+    assert "attachments" not in interaction.original_edits[-1]
+    assert "files" not in interaction.original_edits[-1]
+
+    click = _Interaction()
+    assert await view.interaction_check(click) is False
+    assert click.response.sent[-1][1]["ephemeral"] is True
 
 
 @pytest.mark.asyncio

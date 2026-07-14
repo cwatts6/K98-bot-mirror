@@ -16,6 +16,8 @@ class _Cursor:
                 "GovernorName",
                 "Civilisation",
                 "CityHall",
+                "VipLevelCode",
+                "VipLevelLabel",
                 "Power",
                 "TroopPower",
                 "KillPoints",
@@ -48,6 +50,8 @@ class _Cursor:
                 f"Gov {governor_id}",
                 "Rome",
                 25,
+                "VIP_18",
+                "VIP 18",
                 1_000,
                 400,
                 200,
@@ -90,6 +94,8 @@ def test_accounts_dal_uses_one_set_based_latest_scan_query(monkeypatch) -> None:
     assert [row.governor_id for row in rows] == [222, 111]
     assert rows[0].t4_t5_kills == 70
     assert rows[0].conduct == Decimal("98.50")
+    assert rows[0].vip_level_code == "VIP_18"
+    assert rows[0].vip_level_label == "VIP 18"
     assert connection.closed is True
     assert len(connection.cursor_instance.executions) == 1
     sql, params = connection.cursor_instance.executions[0]
@@ -99,6 +105,8 @@ def test_accounts_dal_uses_one_set_based_latest_scan_query(monkeypatch) -> None:
     assert "dbo.KingdomScanData4" in sql
     assert "dbo.Civilization_Mapping" in sql
     assert "dbo.PlayerLocation" in sql
+    assert "dbo.GovernorInventoryProfile" in sql
+    assert "VipLevelLabel" in sql
     assert "RSSAssistance" in sql
 
 

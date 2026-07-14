@@ -33,6 +33,8 @@ async def test_build_accounts_portfolio_uses_distinct_ids_and_canonical_rss(monk
             AccountsScanRow(
                 governor_id=gid,
                 governor_name="Current Main" if gid == 111 else "Alt",
+                vip_level_code="VIP_18" if gid == 111 else None,
+                vip_level_label="VIP 18" if gid == 111 else None,
                 power=gid * 10,
                 troop_power=gid,
                 t4_kills=gid,
@@ -72,6 +74,50 @@ async def test_build_accounts_portfolio_uses_distinct_ids_and_canonical_rss(monk
     assert payload.rows[0].registered_name == "Registered Main"
     assert payload.rows[0].current_governor_name == "Current Main"
     assert payload.rows[0].rss_total == 120
+    assert payload.rows[0].vip_level == "VIP 18"
+    assert payload.rows[1].vip_level is None
+
+
+def test_kp_loss_and_tanking_score_preserve_missing_and_zero_denominator() -> None:
+    from decimal import Decimal
+
+    from player_self_service.accounts_models import AccountPortfolioRow
+
+    row = AccountPortfolioRow(
+        slot="Main",
+        role="Main",
+        registered_name="Main",
+        governor_id=111,
+        kill_points=1_000,
+        healed_troops=20,
+        deads=100,
+    )
+    assert row.kp_loss == 400
+    assert row.tanking_score == Decimal(200)
+
+    missing = AccountPortfolioRow(
+        slot="Alt 1",
+        role="Alt",
+        registered_name="Alt",
+        governor_id=222,
+        kill_points=1_000,
+        healed_troops=None,
+        deads=100,
+    )
+    assert missing.kp_loss is None
+    assert missing.tanking_score is None
+
+    zero = AccountPortfolioRow(
+        slot="Alt 2",
+        role="Alt",
+        registered_name="Zero",
+        governor_id=333,
+        kill_points=1_000,
+        healed_troops=0,
+        deads=0,
+    )
+    assert zero.kp_loss == 0
+    assert zero.tanking_score is None
 
 
 @pytest.mark.asyncio

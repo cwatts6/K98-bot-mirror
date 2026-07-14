@@ -19,6 +19,8 @@ class AccountsScanRow:
     governor_name: str | None = None
     civilisation: str | None = None
     city_hall: int | None = None
+    vip_level_code: str | None = None
+    vip_level_label: str | None = None
     power: int | None = None
     troop_power: int | None = None
     kill_points: int | None = None
@@ -59,6 +61,7 @@ class AccountPortfolioRow:
     current_governor_name: str | None = None
     civilisation: str | None = None
     city_hall: int | None = None
+    vip_level: str | None = None
     power: int | None = None
     troop_power: int | None = None
     kill_points: int | None = None
@@ -83,6 +86,22 @@ class AccountPortfolioRow:
     @property
     def display_name(self) -> str:
         return self.current_governor_name or self.registered_name or "Unknown"
+
+    @property
+    def kp_loss(self) -> int | None:
+        if self.healed_troops is None:
+            return None
+        return int(self.healed_troops) * 20
+
+    @property
+    def tanking_score(self) -> Decimal | None:
+        kp_loss = self.kp_loss
+        if self.kill_points is None or kp_loss is None or self.deads is None:
+            return None
+        denominator = kp_loss + int(self.deads)
+        if denominator <= 0:
+            return None
+        return Decimal(int(self.kill_points)) * Decimal(100) / Decimal(denominator)
 
 
 @dataclass(frozen=True, slots=True)

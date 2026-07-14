@@ -22,6 +22,7 @@ def test_accounts_csv_has_locked_columns_exact_values_unicode_and_formula_protec
         governor_id=123456789,
         civilisation="Rome",
         city_hall=25,
+        vip_level="VIP 18",
         power=1_234_567_890,
         troop_power=987_654_321,
         kill_points=111,
@@ -66,8 +67,11 @@ def test_accounts_csv_has_locked_columns_exact_values_unicode_and_formula_protec
     assert len(rows[1]) == len(accounts_export.CSV_COLUMNS)
     assert rows[1][2].startswith("'=")
     assert rows[1][3] == "Gövérnor 東京"
-    assert rows[1][7] == "1234567890"
-    assert rows[1][12] == "55"
-    assert rows[1][16] == "88"
-    assert rows[1][21:23] == ["123", "456"]
+    assert rows[1][7] == "VIP 18"
+    assert rows[1][8] == "1234567890"
+    assert rows[1][13] == "55"
+    assert rows[1][16] == "1320"
+    assert rows[1][17] == str(row.tanking_score)
+    assert rows[1][19] == "88"
+    assert rows[1][24:26] == ["123", "456"]
     assert export.filename == "me_account_summary_42_20260714_083000.csv"

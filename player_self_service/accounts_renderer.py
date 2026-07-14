@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 from core import visual_text
 from player_self_service.accounts_models import (
@@ -56,6 +57,21 @@ def _compact(value: int | None) -> str:
     return text
 
 
+def _compact_detail(value: int | None) -> str:
+    if value is None:
+        return "—"
+    numeric = Decimal(int(value))
+    for scale, suffix in (
+        (Decimal(1_000_000_000), "B"),
+        (Decimal(1_000_000), "M"),
+        (Decimal(1_000), "K"),
+    ):
+        if abs(numeric) >= scale:
+            rendered = f"{numeric / scale:.2f}".rstrip("0").rstrip(".")
+            return f"{rendered}{suffix}"
+    return str(int(value))
+
+
 def _number(value: Any) -> str:
     if value is None:
         return "—"
@@ -70,7 +86,31 @@ def _date(value: datetime | None, *, include_time: bool = False) -> str:
     if value is None:
         return "—"
     stamp = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-    return stamp.strftime("%d %b %Y %H:%M") if include_time else stamp.strftime("%d %b %Y")
+    return stamp.strftime("%d %b %Y %H:%M UTC") if include_time else stamp.strftime("%d %b %Y")
+
+
+def _whole_number(value: Any) -> str:
+    if value is None:
+        return "—"
+    try:
+        rounded = Decimal(str(value)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        return str(rounded)
+    except (InvalidOperation, TypeError, ValueError):
+        return _clean(value)
+
+
+def _score(value: Decimal | None) -> str:
+    if value is None:
+        return "—"
+    rendered = f"{value:.1f}"
+    return rendered.removesuffix(".0")
+
+
+def _discord_heading(display_name: str) -> str:
+    cleaned = _clean(display_name)
+    if cleaned.casefold().endswith("(1198)"):
+        return cleaned
+    return f"{cleaned} (1198)"
 
 
 def _text(
@@ -117,6 +157,28 @@ def _canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
         canvas = source.convert("RGBA")
     canvas = Image.alpha_composite(canvas, Image.new("RGBA", canvas.size, (0, 5, 17, 76)))
     return canvas, ImageDraw.Draw(canvas, "RGBA")
+
+
+def _avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> bool:
+    if not avatar_bytes:
+        return False
+    size = 82
+    try:
+        with Image.open(BytesIO(avatar_bytes)) as source:
+            avatar = ImageOps.fit(
+                ImageOps.exif_transpose(source).convert("RGBA"),
+                (size, size),
+                method=Image.Resampling.LANCZOS,
+            )
+        mask = Image.new("L", (size, size), 0)
+        ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+        canvas.paste(avatar, (68, 42), mask)
+        ImageDraw.Draw(canvas, "RGBA").ellipse(
+            (67, 41, 150, 124), outline=(92, 174, 255, 190), width=2
+        )
+        return True
+    except Exception:
+        return False
 
 
 def _encode(canvas: Image.Image, filename: str) -> RenderedAccountsCard:
@@ -169,9 +231,13 @@ def render_accounts_card(
     payload: AccountsPortfolioPayload,
     *,
     display_name: str,
+    avatar_bytes: bytes | None = None,
 ) -> RenderedAccountsCard:
     canvas, draw = _canvas()
-    _text(draw, (68, 40), "ACCOUNT CENTRE", width=900, size=34, bold=True)
+    has_avatar = _avatar(canvas, avatar_bytes)
+    draw = ImageDraw.Draw(canvas, "RGBA")
+    heading_x = 170 if has_avatar else 68
+    _text(draw, (heading_x, 40), "ACCOUNT CENTRE", width=900, size=36, bold=True)
     _text(
         draw,
         (1385, 45),
@@ -182,7 +248,7 @@ def render_accounts_card(
         fill=_state_colour(payload.state),
         bold=True,
     )
-    _text(draw, (68, 91), f"{_clean(display_name)} (1198)", width=1150, size=31, bold=True)
+    _text(draw, (heading_x, 91), _discord_heading(display_name), width=1150, size=32, bold=True)
     _text(
         draw,
         (1385, 96),
@@ -219,11 +285,11 @@ def render_accounts_card(
     _panel(draw, (68, 374, 1634, 697))
     _text(draw, (92, 392), "LINKED GOVERNORS", width=600, size=18, fill=_BLUE, bold=True)
     columns = (
-        ("SLOT", 92, 170),
-        ("GOVERNOR", 280, 515),
-        ("ID", 815, 230),
-        ("POWER", 1065, 250),
-        ("DATA", 1350, 230),
+        ("SLOT", 92, 155),
+        ("GOVERNOR", 260, 330),
+        ("ID", 620, 190),
+        ("POWER", 845, 205),
+        ("DATA", 1100, 250),
     )
     for label, x, width in columns:
         _text(draw, (x, 426), label, width=width, size=15, fill=_MUTED, bold=True)
@@ -250,7 +316,7 @@ def render_accounts_card(
     if not visible_rows:
         visible_rows.append(("—", "No linked governors", "—", "—", "UNRESOLVED"))
     for index, values in enumerate(visible_rows):
-        y = 464 + index * 27
+        y = 464 + index * 28
         for value, (_label, x, width) in zip(values, columns, strict=True):
             colour = _data_colour(value) if _label == "DATA" else _TEXT
             _text(
@@ -258,8 +324,8 @@ def render_accounts_card(
                 (x, y),
                 value,
                 width=width,
-                size=17,
-                min_size=13,
+                size=21,
+                min_size=15,
                 fill=colour,
                 bold=_label == "SLOT",
             )
@@ -280,10 +346,10 @@ def render_accounts_card(
     _text(
         draw,
         (1390, 850),
-        f"Refreshed {refreshed:%H:%M UTC}",
+        f"Refreshed {refreshed:%d %b %Y %H:%M UTC}",
         width=244,
-        size=16,
-        min_size=13,
+        size=15,
+        min_size=11,
         fill=_MUTED,
     )
     return _encode(canvas, f"me_accounts_{payload.discord_user_id}.png")
@@ -292,37 +358,37 @@ def render_accounts_card(
 def _summary_columns(page: AccountSummaryPage) -> tuple[tuple[str, int], ...]:
     if page.section == "combat":
         return (
-            ("SLOT", 105),
-            ("GOVERNOR", 230),
-            ("KILL POINTS", 165),
-            ("T4+T5", 145),
-            ("DEADS", 135),
-            ("HEALED", 145),
+            ("SLOT", 95),
+            ("GOVERNOR", 210),
+            ("KILL POINTS", 150),
+            ("T4+T5", 140),
+            ("DEADS", 125),
+            ("HEALED", 135),
             ("ACCLAIM", 130),
-            ("HELPS", 115),
-            ("CONDUCT", 125),
+            ("KP LOSS", 140),
+            ("TANKING", 155),
+            ("CONDUCT", 120),
         )
     if page.section == "economy":
         return (
-            ("SLOT", 125),
-            ("GOVERNOR", 300),
-            ("RSS GATHERED", 225),
-            ("RSS ASSISTANCE", 235),
-            ("RSS TOTAL", 210),
-            ("INVENTORY AS OF", 235),
-            ("DATA", 150),
+            ("SLOT", 110),
+            ("GOVERNOR", 230),
+            ("RSS GATHERED", 200),
+            ("RSS ASSISTANCE", 200),
+            ("RSS TOTAL", 170),
+            ("HELPS", 145),
+            ("INVENTORY AS OF", 250),
         )
     return (
-        ("SLOT", 95),
+        ("SLOT", 100),
         ("GOVERNOR", 220),
-        ("GOVERNOR ID", 155),
-        ("CIVILISATION", 165),
-        ("CH", 65),
-        ("POWER", 130),
-        ("TROOP POWER", 140),
-        ("LOCATION", 115),
-        ("DATA", 105),
-        ("LAST SCAN", 175),
+        ("CIVILISATION", 170),
+        ("CH", 70),
+        ("VIP", 145),
+        ("POWER", 165),
+        ("TROOP POWER", 175),
+        ("LOCATION", 135),
+        ("LAST SCAN", 275),
     )
 
 
@@ -331,23 +397,24 @@ def _summary_values(page: AccountSummaryPage, row: AccountPortfolioRow) -> tuple
         return (
             row.slot,
             row.display_name,
-            _number(row.kill_points),
-            _number(row.t4_t5_kills),
-            _number(row.deads),
-            _number(row.healed_troops),
-            _number(row.highest_acclaim),
-            _number(row.helps),
-            _clean(row.conduct),
+            _compact_detail(row.kill_points),
+            _compact_detail(row.t4_t5_kills),
+            _compact_detail(row.deads),
+            _compact_detail(row.healed_troops),
+            _compact_detail(row.highest_acclaim),
+            _compact_detail(row.kp_loss),
+            _score(row.tanking_score),
+            _whole_number(row.conduct),
         )
     if page.section == "economy":
         return (
             row.slot,
             row.display_name,
-            _number(row.rss_gathered),
-            _number(row.rss_assistance),
-            _number(row.rss_total),
+            _compact_detail(row.rss_gathered),
+            _compact_detail(row.rss_assistance),
+            _compact_detail(row.rss_total),
+            _compact_detail(row.helps),
             _date(row.inventory_as_of),
-            row.data_state,
         )
     location = (
         f"{row.location_x}:{row.location_y}"
@@ -357,14 +424,13 @@ def _summary_values(page: AccountSummaryPage, row: AccountPortfolioRow) -> tuple
     return (
         row.slot,
         row.display_name,
-        str(row.governor_id or "—"),
         _clean(row.civilisation),
         _number(row.city_hall),
+        _clean(row.vip_level),
         _number(row.power),
         _number(row.troop_power),
         location,
-        row.data_state,
-        _date(row.last_governor_scan),
+        _date(row.last_governor_scan, include_time=True),
     )
 
 
@@ -376,7 +442,7 @@ def render_account_summary_card(
     payload = page.payload
     canvas, draw = _canvas()
     _text(draw, (68, 38), "ACCOUNT SUMMARY", width=820, size=33, bold=True)
-    _text(draw, (68, 86), f"{_clean(display_name)} (1198)", width=1000, size=25, bold=True)
+    _text(draw, (68, 86), _discord_heading(display_name), width=1000, size=27, bold=True)
     _text(
         draw,
         (1375, 43),
@@ -422,7 +488,7 @@ def render_account_summary_card(
     x = 88
     for label, width in columns:
         x_positions.append(x)
-        _text(draw, (x, 340), label, width=width - 10, size=14, min_size=10, fill=_MUTED, bold=True)
+        _text(draw, (x, 340), label, width=width - 10, size=17, min_size=11, fill=_MUTED, bold=True)
         x += width
     draw.line((88, 372, 1614, 372), fill=(91, 140, 190, 120), width=1)
     if not page.rows:
@@ -439,8 +505,8 @@ def render_account_summary_card(
                 (x, y),
                 value,
                 width=width - 10,
-                size=16,
-                min_size=10,
+                size=21,
+                min_size=13,
                 fill=colour,
                 bold=label == "SLOT",
             )
@@ -457,10 +523,10 @@ def render_account_summary_card(
     _text(
         draw,
         (1388, 842),
-        f"Refreshed {refreshed:%H:%M UTC}",
+        f"Refreshed {refreshed:%d %b %Y %H:%M UTC}",
         width=245,
-        size=16,
-        min_size=12,
+        size=15,
+        min_size=10,
         fill=_MUTED,
     )
     return _encode(canvas, f"me_account_summary_{payload.discord_user_id}.png")

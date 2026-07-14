@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from io import BytesIO
 import logging
 
@@ -21,6 +22,13 @@ logger = logging.getLogger(__name__)
 
 AccountsLoader = Callable[[int], Awaitable[AccountsPortfolioPayload]]
 SummaryLoader = Callable[[int], Awaitable[PlayerSelfServiceSummary]]
+
+
+def _utc_date_time(value: datetime | None) -> str:
+    if value is None:
+        return "—"
+    stamp = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return stamp.strftime("%d %b %Y %H:%M UTC")
 
 
 def build_account_summary_fallback(page: AccountSummaryPage) -> discord.Embed:
@@ -41,14 +49,15 @@ def build_account_summary_fallback(page: AccountSummaryPage) -> discord.Embed:
                 f"KP {row.kill_points if row.kill_points is not None else '—'} • "
                 f"T4+T5 {row.t4_t5_kills if row.t4_t5_kills is not None else '—'} • "
                 f"Deads {row.deads if row.deads is not None else '—'} • "
-                f"Helps {row.helps if row.helps is not None else '—'}"
+                f"KP Loss {row.kp_loss if row.kp_loss is not None else '—'} • "
+                f"Tanking {row.tanking_score if row.tanking_score is not None else '—'}"
             )
         elif page.section == "economy":
             value = (
                 f"Gathered {row.rss_gathered if row.rss_gathered is not None else '—'} • "
                 f"Assistance {row.rss_assistance if row.rss_assistance is not None else '—'} • "
                 f"Current {row.rss_total if row.rss_total is not None else '—'} • "
-                f"{row.data_state}"
+                f"Helps {row.helps if row.helps is not None else '—'}"
             )
         else:
             location = (
@@ -57,15 +66,15 @@ def build_account_summary_fallback(page: AccountSummaryPage) -> discord.Embed:
                 else "—"
             )
             value = (
-                f"ID {row.governor_id or '—'} • {row.civilisation or '—'} • "
+                f"{row.civilisation or '—'} • VIP {row.vip_level or '—'} • "
                 f"CH {row.city_hall if row.city_hall is not None else '—'} • "
                 f"Power {row.power if row.power is not None else '—'} • "
-                f"Location {location} • {row.data_state}"
+                f"Location {location} • Last scan {_utc_date_time(row.last_governor_scan)}"
             )
         embed.add_field(name=f"{row.slot} • {row.display_name}", value=value[:1024], inline=False)
     if not page.rows:
         embed.description += "\nNo linked governors to show."
-    embed.set_footer(text=f"Refreshed {page.payload.refreshed_at_utc:%H:%M UTC}")
+    embed.set_footer(text=f"Refreshed {page.payload.refreshed_at_utc:%d %b %Y %H:%M UTC}")
     return embed
 
 
@@ -103,11 +112,12 @@ class AccountSummaryView(discord.ui.View):
         section: AccountSummarySection = "overview",
         page: int = 1,
         accounts_loader: AccountsLoader = accounts_service.build_accounts_portfolio,
+        avatar_bytes: bytes | None = None,
         summary_loader: SummaryLoader = build_player_self_service_summary,
         dashboard_governor_id: int | None = None,
         timeout: float = 180,
     ) -> None:
-        super().__init__(timeout=timeout, disable_on_timeout=True)
+        super().__init__(timeout=timeout, disable_on_timeout=False)
         self.author_id = int(author_id)
         self.display_name = display_name
         self.payload = payload
@@ -117,11 +127,34 @@ class AccountSummaryView(discord.ui.View):
             page=page,
         )
         self.accounts_loader = accounts_loader
+        self.avatar_bytes = avatar_bytes
         self.summary_loader = summary_loader
         self.dashboard_governor_id = dashboard_governor_id
+        self._message_ref: discord.Message | None = None
+        self._timeout_editor: Callable[..., Awaitable[object]] | None = None
+        self._expired = False
         self._apply_state()
 
+    def set_message_ref(self, message: discord.Message | None) -> None:
+        self._message_ref = message
+        if message is not None and hasattr(message, "flags") and hasattr(message, "channel"):
+            try:
+                self._message = message
+            except Exception:
+                logger.debug("account_summary_internal_message_ref_failed", exc_info=True)
+
+    def set_timeout_target(self, target: object) -> None:
+        editor = getattr(target, "edit_original_response", None)
+        if callable(editor):
+            self._timeout_editor = editor
+
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if self._expired:
+            await interaction.response.send_message(
+                "This private Account Summary has expired. Run `/me accounts` again.",
+                ephemeral=True,
+            )
+            return False
         if interaction.user and int(interaction.user.id) == self.author_id:
             return True
         await interaction.response.send_message(
@@ -169,6 +202,7 @@ class AccountSummaryView(discord.ui.View):
             section=summary_page.section,
             page=summary_page.page,
             accounts_loader=self.accounts_loader,
+            avatar_bytes=self.avatar_bytes,
             summary_loader=self.summary_loader,
             dashboard_governor_id=self.dashboard_governor_id,
             timeout=self.timeout or 180,
@@ -186,21 +220,25 @@ class AccountSummaryView(discord.ui.View):
                     section,
                     page,
                 )
-                await interaction.edit_original_response(
+                edited = await interaction.edit_original_response(
                     content=None,
                     embed=build_account_summary_fallback(summary_page),
                     view=view,
                     attachments=[],
                 )
+                view.set_message_ref(edited)
+                view.set_timeout_target(interaction)
                 return
             try:
-                await interaction.edit_original_response(
+                edited = await interaction.edit_original_response(
                     content=None,
                     embed=None,
                     view=view,
                     attachments=[],
                     files=[file],
                 )
+                view.set_message_ref(edited)
+                view.set_timeout_target(interaction)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -210,12 +248,14 @@ class AccountSummaryView(discord.ui.View):
                     section,
                     page,
                 )
-                await interaction.edit_original_response(
+                edited = await interaction.edit_original_response(
                     content=None,
                     embed=build_account_summary_fallback(summary_page),
                     view=view,
                     attachments=[],
                 )
+                view.set_message_ref(edited)
+                view.set_timeout_target(interaction)
         finally:
             _close_file(file)
 
@@ -229,6 +269,7 @@ class AccountSummaryView(discord.ui.View):
             page=target_page,
             summary_loader=self.summary_loader,
             accounts_loader=self.accounts_loader,
+            avatar_bytes=self.avatar_bytes,
             dashboard_governor_id=self.dashboard_governor_id,
             timeout=self.timeout or 180,
         )
@@ -262,14 +303,6 @@ class AccountSummaryView(discord.ui.View):
         from ui.views.player_self_service_views import PAGE_DASHBOARD
 
         await self._navigate(interaction, PAGE_DASHBOARD)
-
-    @discord.ui.button(label="Inventory", style=discord.ButtonStyle.secondary, row=1)
-    async def inventory_button(
-        self, button: discord.ui.Button, interaction: discord.Interaction
-    ) -> None:
-        from ui.views.player_self_service_views import PAGE_INVENTORY
-
-        await self._navigate(interaction, PAGE_INVENTORY)
 
     @discord.ui.button(label="Exports", style=discord.ButtonStyle.secondary, row=1)
     async def exports_button(
@@ -354,6 +387,7 @@ class AccountSummaryView(discord.ui.View):
             page=PAGE_ACCOUNTS,
             accounts_payload=self.payload,
             accounts_loader=self.accounts_loader,
+            avatar_bytes=self.avatar_bytes,
             summary_loader=self.summary_loader,
             dashboard_governor_id=self.dashboard_governor_id,
             timeout=self.timeout or 180,
@@ -363,19 +397,22 @@ class AccountSummaryView(discord.ui.View):
             None,
             display_name=self.display_name,
             accounts_payload=self.payload,
+            avatar_bytes=self.avatar_bytes,
         )
         try:
-            await interaction.edit_original_response(
+            edited = await interaction.edit_original_response(
                 content=None,
                 embed=embed,
                 view=view,
                 attachments=[],
                 files=files,
             )
+            view.set_message_ref(edited)
+            view.set_timeout_target(interaction)
         except Exception:
             from ui.views.player_self_service_views import build_accounts_portfolio_fallback
 
-            await interaction.edit_original_response(
+            edited = await interaction.edit_original_response(
                 content=None,
                 embed=build_accounts_portfolio_fallback(
                     self.payload,
@@ -384,8 +421,29 @@ class AccountSummaryView(discord.ui.View):
                 view=view,
                 attachments=[],
             )
+            view.set_message_ref(edited)
+            view.set_timeout_target(interaction)
         finally:
             _close_files(files)
+
+    async def on_timeout(self) -> None:
+        self._expired = True
+        for child in self.children:
+            child.disabled = True
+        content = "This private Account Summary has expired. Run `/me accounts` again."
+        edited = False
+        try:
+            if self._timeout_editor is not None:
+                await self._timeout_editor(content=content, view=self)
+                edited = True
+        except Exception:
+            logger.debug("account_summary_timeout_original_edit_failed", exc_info=True)
+        try:
+            if not edited and self._message_ref is not None:
+                await self._message_ref.edit(content=content, view=self)
+        except Exception:
+            logger.debug("account_summary_timeout_message_edit_failed", exc_info=True)
+        await super().on_timeout()
 
 
 async def show_account_summary_for_interaction(
@@ -394,6 +452,7 @@ async def show_account_summary_for_interaction(
     author_id: int,
     display_name: str,
     accounts_loader: AccountsLoader = accounts_service.build_accounts_portfolio,
+    avatar_bytes: bytes | None = None,
     summary_loader: SummaryLoader = build_player_self_service_summary,
     dashboard_governor_id: int | None = None,
     timeout: float = 180,
@@ -420,6 +479,7 @@ async def show_account_summary_for_interaction(
         display_name=display_name,
         payload=payload,
         accounts_loader=accounts_loader,
+        avatar_bytes=avatar_bytes,
         summary_loader=summary_loader,
         dashboard_governor_id=dashboard_governor_id,
         timeout=timeout,
@@ -432,30 +492,36 @@ async def show_account_summary_for_interaction(
             raise
         except Exception:
             logger.exception("account_summary_initial_render_failed user_id=%s", author_id)
-            await interaction.edit_original_response(
+            edited = await interaction.edit_original_response(
                 content=None,
                 embed=build_account_summary_fallback(page),
                 view=view,
                 attachments=[],
             )
+            view.set_message_ref(edited)
+            view.set_timeout_target(interaction)
             return
         try:
-            await interaction.edit_original_response(
+            edited = await interaction.edit_original_response(
                 content=None,
                 embed=None,
                 view=view,
                 attachments=[],
                 files=[file],
             )
+            view.set_message_ref(edited)
+            view.set_timeout_target(interaction)
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("account_summary_initial_delivery_failed user_id=%s", author_id)
-            await interaction.edit_original_response(
+            edited = await interaction.edit_original_response(
                 content=None,
                 embed=build_account_summary_fallback(page),
                 view=view,
                 attachments=[],
             )
+            view.set_message_ref(edited)
+            view.set_timeout_target(interaction)
     finally:
         _close_file(file)

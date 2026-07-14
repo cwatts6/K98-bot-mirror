@@ -316,8 +316,8 @@ async def test_dashboard_page_response_falls_back_to_embed_when_card_render_fail
 async def test_subpage_response_includes_generated_card(monkeypatch) -> None:
     calls = []
 
-    def fake_render(payload, *, display_name):
-        calls.append((payload.discord_user_id, display_name))
+    def fake_render(payload, *, display_name, avatar_bytes):
+        calls.append((payload.discord_user_id, display_name, avatar_bytes))
         return views.accounts_renderer.RenderedAccountsCard(
             filename="me_accounts_42.png",
             image_bytes=b"png",
@@ -330,11 +330,35 @@ async def test_subpage_response_includes_generated_card(monkeypatch) -> None:
         None,
         display_name="Tester",
         accounts_payload=_accounts_payload(),
+        avatar_bytes=b"avatar",
     )
 
-    assert calls == [(42, "Tester")]
+    assert calls == [(42, "Tester", b"avatar")]
     assert embed is None
     assert [file.filename for file in files] == ["me_accounts_42.png"]
+
+
+@pytest.mark.asyncio
+async def test_accounts_avatar_read_is_author_scoped() -> None:
+    class Avatar:
+        def __init__(self) -> None:
+            self.reads = 0
+
+        def with_size(self, size):
+            assert size == 256
+            return self
+
+        async def read(self):
+            self.reads += 1
+            return b"avatar"
+
+    avatar = Avatar()
+    owner = SimpleNamespace(id=42, display_avatar=avatar, avatar=None)
+    foreign = SimpleNamespace(id=99, display_avatar=avatar, avatar=None)
+
+    assert await views._read_avatar_bytes(owner, expected_user_id=42) == b"avatar"
+    assert await views._read_avatar_bytes(foreign, expected_user_id=42) is None
+    assert avatar.reads == 1
 
 
 @pytest.mark.asyncio
@@ -613,7 +637,8 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Accounts", 0, primary, True),
             ("Reminders", 0, primary, False),
             ("Preferences", 0, primary, False),
-            *nav_row,
+            ("Dashboard", 1, secondary, False),
+            ("Exports", 1, secondary, False),
             ("Manage Accounts", 2, success, False),
             ("Account Summary", 2, secondary, False),
         ],
@@ -664,7 +689,7 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
 
 
 @pytest.mark.asyncio
-async def test_accounts_view_keeps_inventory_and_exports_navigation() -> None:
+async def test_accounts_view_removes_inventory_and_keeps_exports_navigation() -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -675,7 +700,7 @@ async def test_accounts_view_keeps_inventory_and_exports_navigation() -> None:
     assert "Manage Accounts" in labels
     assert "Account Summary" in labels
     assert not {"Find ID", "Register", "Replace", "Remove"}.intersection(set(labels))
-    assert "Inventory" in labels
+    assert "Inventory" not in labels
     assert "Exports" in labels
 
 
@@ -2371,6 +2396,8 @@ async def test_view_timeout_disables_controls() -> None:
     assert all(child.disabled for child in view.children)
     assert edits[-1]["view"] is view
     assert "expired" in edits[-1]["content"]
+    assert "attachments" not in edits[-1]
+    assert "files" not in edits[-1]
 
 
 @pytest.mark.asyncio
