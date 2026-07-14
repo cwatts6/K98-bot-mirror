@@ -97,11 +97,16 @@ def _close_file(file: discord.File | None) -> None:
         logger.debug("account_summary_stream_close_failed", exc_info=True)
 
 
-async def _render_summary(page: AccountSummaryPage, display_name: str) -> discord.File:
+async def _render_summary(
+    page: AccountSummaryPage,
+    display_name: str,
+    avatar_bytes: bytes | None = None,
+) -> discord.File:
     rendered = await asyncio.to_thread(
         accounts_renderer.render_account_summary_card,
         page,
         display_name=display_name,
+        avatar_bytes=avatar_bytes,
     )
     return discord.File(BytesIO(rendered.image_bytes), filename=rendered.filename)
 
@@ -214,7 +219,7 @@ class AccountSummaryView(discord.ui.View):
         file: discord.File | None = None
         try:
             try:
-                file = await _render_summary(summary_page, self.display_name)
+                file = await _render_summary(summary_page, self.display_name, self.avatar_bytes)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -491,7 +496,7 @@ async def show_account_summary_for_interaction(
     file: discord.File | None = None
     try:
         try:
-            file = await _render_summary(page, display_name)
+            file = await _render_summary(page, display_name, avatar_bytes)
         except asyncio.CancelledError:
             raise
         except Exception:

@@ -209,7 +209,8 @@ async def test_section_change_resets_page_without_refetch(monkeypatch) -> None:
         calls.append("load")
         return _payload()
 
-    async def render(_page, _display_name):
+    async def render(_page, _display_name, avatar_bytes):
+        assert avatar_bytes is None
         return discord.File(BytesIO(b"png"), filename="me_account_summary_42.png")
 
     monkeypatch.setattr(summary_views, "_render_summary", render)
@@ -241,7 +242,8 @@ async def test_account_summary_entry_refetches_once_and_delivery_is_standalone(m
         calls.append(user_id)
         return _payload()
 
-    async def render(_page, _display_name):
+    async def render(_page, _display_name, avatar_bytes):
+        assert avatar_bytes == b"avatar"
         return discord.File(BytesIO(b"png"), filename="me_account_summary_42.png")
 
     monkeypatch.setattr(summary_views, "_render_summary", render)
@@ -252,6 +254,7 @@ async def test_account_summary_entry_refetches_once_and_delivery_is_standalone(m
         author_id=42,
         display_name="Tester",
         accounts_loader=loader,
+        avatar_bytes=b"avatar",
     )
 
     assert calls == [42]
@@ -270,7 +273,7 @@ async def test_render_failure_uses_same_payload_without_second_fetch(monkeypatch
         calls.append(user_id)
         return _payload()
 
-    async def failing_render(_page, _display_name):
+    async def failing_render(_page, _display_name, _avatar_bytes):
         raise RuntimeError("pillow failed")
 
     monkeypatch.setattr(summary_views, "_render_summary", failing_render)

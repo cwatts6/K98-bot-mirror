@@ -485,8 +485,9 @@ Current status:
   journey refreshes the new payload after successful mutations. Private Account Summary provides
   larger Overview, Combat, and Economy pages for every linked entry, VIP, compact Power/Troop
   Power, KP Loss and percentage-labelled Tanking Score, with Conduct grouped under Economy. The
-  main roster uses a two-column governor-tile grid to improve density and readability. UTC
-  date-times, graceful timeout controls, and a complete formula-safe CSV are retained;
+  main roster uses a two-column governor-tile grid with prominent Power values and no redundant
+  Main-governor header line. The invoking-user avatar is retained across all three summary
+  sections. UTC date-times, graceful timeout controls, and a complete formula-safe CSV are retained;
   coordinates remain private. There is no Change Governor, and optional selected-governor context
   exists only for a validated Dashboard return.
 - Phases 5D-5G independently apply the same format and transition contract to Reminders,

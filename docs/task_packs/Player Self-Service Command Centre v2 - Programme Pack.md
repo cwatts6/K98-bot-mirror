@@ -776,9 +776,11 @@ Approved product outcome:
   linked-governor registry rather than one selected governor.
 - Successful output becomes a standalone `1702x924` PNG using the approved runtime asset
   `assets/me/cards/me_accounts.png` and stable `me_accounts_<discord_user_id>.png` filename.
-- The smoke-refined layout includes a best-effort Discord avatar and renders:
+- The smoke-refined layout includes a best-effort Discord avatar on Accounts and every Account
+  Summary section, and renders:
   - `ACCOUNT CENTRE` with earned `READY`, `REVIEW`, or `SETUP` state;
-  - Discord display name, Kingdom 1198, linked-governor count, and Main governor;
+  - Discord display name, Kingdom 1198, and linked-governor count, with Main retained as the first
+    roster tile rather than repeated in a separate header line;
   - `LATEST SNAPSHOTS` with exactly four metrics: Linked, Portfolio Power, T4+T5 Kills, and current
     Inventory-backed RSS Total;
   - role breakdown and honest `n/N reporting` coverage;
@@ -1191,3 +1193,4 @@ Use:
 | 2026-07-14 | Phase 5C Accounts implemented; operator smoke pending | Added typed all-linked portfolio models, set-based latest Kingdom 1198 and canonical current-RSS reads, the approved standalone 1702x924 Accounts renderer, unchanged Manage refresh, private three-section paginated Account Summary, complete formula-safe CSV, same-payload fallbacks, attachment cleanup, focused/full validation, visual samples, and Codex Security review. No SQL schema, registry, ownership, or existing report/export contract changed. |
 | 2026-07-14 | Phase 5C operator smoke refinement | Removed Inventory navigation from Accounts/Summary, added author avatar and Discord-name suffix deduplication, increased/rebalanced typography, added UTC date-times and VIP, moved Helps to Economy, added compact combat/economy values plus KP Loss/Tanking Score, extended the exact CSV, and made Summary timeout visibly disable controls while preserving the private report. No SQL schema or registry mutation contract changed. |
 | 2026-07-14 | Phase 5C operator smoke refinement 2 | Replaced the sparse main roster table with a larger two-column governor-tile grid, compacted Overview Power/Troop Power, renamed the visual section to Combat, displayed Tanking as a percentage with higher-is-better guidance, and moved Conduct from Combat to Economy. Payload, exact CSV, SQL, Manage, privacy, attachment, and timeout contracts remain unchanged. |
+| 2026-07-14 | Phase 5C operator smoke refinement 3 | Removed the redundant Main-governor header line, enlarged the reclaimed Accounts header/metric typography, made governor-tile Power values prominent, and carried the existing bounded author avatar through Overview, Combat, and Economy renders. Payload, SQL, CSV, Manage, privacy, attachment, and timeout contracts remain unchanged. |

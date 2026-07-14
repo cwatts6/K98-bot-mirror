@@ -101,7 +101,6 @@ The populated card should follow this hierarchy:
 ```text
 ACCOUNT CENTRE                                           READY
 <Discord display name> (1198)                       <N> governors
-MAIN GOVERNOR  <main governor name> • <governor ID>
 
 LATEST SNAPSHOTS
 
@@ -132,13 +131,13 @@ Render:
 - the earned state pill: `READY`, `REVIEW`, or `SETUP`;
 - the invoking Discord display name and fixed Kingdom 1198 context;
 - the linked-governor count at the upper right;
-- `MAIN GOVERNOR  <name> • <ID>` when a Main exists;
-- an honest setup/missing-Main message when it does not.
+- no redundant Main-governor identity line; Main remains the first authoritative roster tile and
+  missing Main remains reflected honestly by the earned `SETUP` state.
 
 The operator smoke refinement adds the invoking Discord user's best-effort avatar at the upper
-left. Avatar reads remain author-validated and timeout-bounded; a failed read leaves the clean
-header intact. If the Discord display name already ends in `(1198)`, do not append the Kingdom
-suffix a second time.
+left on Accounts and all Account Summary sections. Avatar reads remain author-validated and
+timeout-bounded; a failed read leaves the clean header intact. If the Discord display name already
+ends in `(1198)`, do not append the Kingdom suffix a second time.
 
 ### 6.3 Latest snapshot metrics
 

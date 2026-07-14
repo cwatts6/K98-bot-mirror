@@ -207,12 +207,41 @@ def _metric_box(
     label: str,
     value: str,
     helper: str,
+    *,
+    large: bool = False,
 ) -> None:
     _panel(draw, box, 13)
     x0, y0, x1, _ = box
-    _text(draw, (x0 + 18, y0 + 13), label, width=x1 - x0 - 36, size=17, fill=_BLUE, bold=True)
-    _text(draw, (x0 + 18, y0 + 42), value, width=x1 - x0 - 36, size=34, min_size=24, bold=True)
-    _text(draw, (x0 + 18, y0 + 84), helper, width=x1 - x0 - 36, size=15, min_size=12, fill=_MUTED)
+    label_y = y0 + (18 if large else 13)
+    value_y = y0 + (52 if large else 42)
+    helper_y = y0 + (112 if large else 84)
+    _text(
+        draw,
+        (x0 + 18, label_y),
+        label,
+        width=x1 - x0 - 36,
+        size=19 if large else 17,
+        fill=_BLUE,
+        bold=True,
+    )
+    _text(
+        draw,
+        (x0 + 18, value_y),
+        value,
+        width=x1 - x0 - 36,
+        size=40 if large else 34,
+        min_size=27 if large else 24,
+        bold=True,
+    )
+    _text(
+        draw,
+        (x0 + 18, helper_y),
+        helper,
+        width=x1 - x0 - 36,
+        size=17 if large else 15,
+        min_size=13 if large else 12,
+        fill=_MUTED,
+    )
 
 
 def _state_colour(state: str) -> tuple[int, int, int, int]:
@@ -269,7 +298,7 @@ def render_accounts_card(
     has_avatar = _avatar(canvas, avatar_bytes)
     draw = ImageDraw.Draw(canvas, "RGBA")
     heading_x = 170 if has_avatar else 68
-    _text(draw, (heading_x, 40), "ACCOUNT CENTRE", width=900, size=36, bold=True)
+    _text(draw, (heading_x, 35), "ACCOUNT CENTRE", width=900, size=40, bold=True)
     _text(
         draw,
         (1385, 45),
@@ -280,7 +309,7 @@ def render_accounts_card(
         fill=_state_colour(payload.state),
         bold=True,
     )
-    _text(draw, (heading_x, 91), _discord_heading(display_name), width=1150, size=32, bold=True)
+    _text(draw, (heading_x, 91), _discord_heading(display_name), width=1150, size=36, bold=True)
     _text(
         draw,
         (1385, 96),
@@ -290,18 +319,23 @@ def render_accounts_card(
         min_size=16,
         fill=_MUTED,
     )
-    main = payload.main_row
-    main_label = (
-        f"{main.display_name} • {main.governor_id or '—'}" if main is not None else "Not configured"
-    )
-    _text(draw, (68, 143), "MAIN GOVERNOR", width=230, size=17, fill=_GOLD, bold=True)
-    _text(draw, (298, 139), main_label, width=1050, size=24, min_size=17, bold=True)
-
-    _text(draw, (68, 194), "LATEST SNAPSHOTS", width=500, size=17, fill=_BLUE, bold=True)
-    boxes = [(68 + index * 397, 224, 445 + index * 397, 342) for index in range(4)]
-    _metric_box(draw, boxes[0], "LINKED", str(payload.linked_count), _role_helper(payload))
+    _text(draw, (68, 151), "LATEST SNAPSHOTS", width=500, size=20, fill=_BLUE, bold=True)
+    boxes = [(68 + index * 397, 184, 445 + index * 397, 342) for index in range(4)]
     _metric_box(
-        draw, boxes[1], "PORTFOLIO POWER", _compact(payload.power.value), _coverage(payload.power)
+        draw,
+        boxes[0],
+        "LINKED",
+        str(payload.linked_count),
+        _role_helper(payload),
+        large=True,
+    )
+    _metric_box(
+        draw,
+        boxes[1],
+        "PORTFOLIO POWER",
+        _compact(payload.power.value),
+        _coverage(payload.power),
+        large=True,
     )
     _metric_box(
         draw,
@@ -309,9 +343,15 @@ def render_accounts_card(
         "T4+T5 KILLS",
         _compact(payload.t4_t5_kills.value),
         _coverage(payload.t4_t5_kills),
+        large=True,
     )
     _metric_box(
-        draw, boxes[3], "RSS TOTAL", _compact(payload.rss_total.value), _coverage(payload.rss_total)
+        draw,
+        boxes[3],
+        "RSS TOTAL",
+        _compact(payload.rss_total.value),
+        _coverage(payload.rss_total),
+        large=True,
     )
 
     _panel(draw, (68, 374, 1634, 697))
@@ -356,7 +396,23 @@ def render_accounts_card(
             fill=_MUTED,
         )
         _text(
-            draw, (x + 285, y + 34), f"POWER  {power}", width=270, size=16, min_size=13, fill=_MUTED
+            draw,
+            (x + 285, y + 35),
+            "POWER",
+            width=75,
+            size=14,
+            min_size=12,
+            fill=_MUTED,
+            bold=True,
+        )
+        _text(
+            draw,
+            (x + 365, y + 29),
+            power,
+            width=190,
+            size=23,
+            min_size=17,
+            bold=True,
         )
 
     _panel(draw, (68, 714, 1634, 795), 13)
@@ -481,11 +537,15 @@ def render_account_summary_card(
     page: AccountSummaryPage,
     *,
     display_name: str,
+    avatar_bytes: bytes | None = None,
 ) -> RenderedAccountsCard:
     payload = page.payload
     canvas, draw = _canvas()
-    _text(draw, (68, 38), "ACCOUNT SUMMARY", width=820, size=33, bold=True)
-    _text(draw, (68, 86), _discord_heading(display_name), width=1000, size=27, bold=True)
+    has_avatar = _avatar(canvas, avatar_bytes)
+    draw = ImageDraw.Draw(canvas, "RGBA")
+    heading_x = 170 if has_avatar else 68
+    _text(draw, (heading_x, 38), "ACCOUNT SUMMARY", width=820, size=33, bold=True)
+    _text(draw, (heading_x, 86), _discord_heading(display_name), width=1000, size=27, bold=True)
     _text(
         draw,
         (1375, 43),

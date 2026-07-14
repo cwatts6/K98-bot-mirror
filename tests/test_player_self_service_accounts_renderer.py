@@ -110,12 +110,22 @@ def test_linked_governor_tiles_preserve_order_and_overflow_contract() -> None:
 
 def test_account_summary_renderer_supports_all_three_sections() -> None:
     payload = _payload(9)
+    avatar = BytesIO()
+    Image.new("RGB", (256, 256), (220, 20, 60)).save(avatar, format="PNG")
     for section in ("overview", "combat", "economy"):
         page = accounts_service.build_account_summary_page(payload, section=section, page=2)
-        rendered = accounts_renderer.render_account_summary_card(page, display_name="Player")
+        rendered = accounts_renderer.render_account_summary_card(
+            page,
+            display_name="Player",
+            avatar_bytes=avatar.getvalue(),
+        )
         assert rendered.filename == "me_account_summary_42.png"
         with Image.open(BytesIO(rendered.image_bytes)) as image:
             assert image.size == (1702, 924)
+            red, green, blue = image.getpixel((109, 83))
+            assert red > 180
+            assert green < 60
+            assert blue < 90
 
 
 def test_summary_columns_and_values_follow_smoke_contract() -> None:

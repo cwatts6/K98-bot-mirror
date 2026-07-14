@@ -55,7 +55,8 @@ Locked main card:
 - private/ephemeral, author-gated, all-linked-governor scope
 - standalone 1702x924 attachment using `assets/me/cards/me_accounts.png`
 - stable `me_accounts_<discord_user_id>.png` filename
-- best-effort invoking-user Discord avatar at the upper left, with author validation and bounded read
+- best-effort invoking-user Discord avatar at the upper left on Accounts and every Account Summary
+  section, with author validation and bounded read
 - no Change Governor and no implicit selected-governor filter
 - optional selected dashboard governor may be retained only as validated Dashboard-return context
 - successful render uses a standalone attachment; concise fallback uses the same already-loaded
@@ -64,7 +65,6 @@ Locked main card:
 Locked hierarchy:
 ACCOUNT CENTRE                                      READY/REVIEW/SETUP
 <Discord display name> (1198)                       <N> governors
-MAIN GOVERNOR  <name> • <ID>
 
 LATEST SNAPSHOTS
 [ LINKED ] [ PORTFOLIO POWER ] [ T4+T5 KILLS ] [ RSS TOTAL ]

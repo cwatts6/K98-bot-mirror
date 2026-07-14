@@ -23,9 +23,11 @@ Phase 5C Premium Accounts Summary Card is implemented on its mirror feature bran
 operator Discord smoke. `/me accounts` now resolves every linked registry entry through set-based
 Kingdom 1198 and canonical Inventory reads, renders the approved 1702x924 avatar-enabled portfolio card
 as a standalone private attachment, preserves the guided Manage workflow, and adds a private,
-paginated Overview/Combat/Economy Account Summary with VIP, compact power, KP Loss/Tanking Score,
+avatar-enabled paginated Overview/Combat/Economy Account Summary with VIP, compact power,
+KP Loss/Tanking Score,
 percentage-labelled Tanking, Conduct in Economy, UTC date-times, and a complete formula-safe CSV.
-The main roster uses a larger two-column governor-tile grid. Same-payload
+The main roster uses a larger two-column governor-tile grid with prominent Power values and no
+duplicate Main-governor header line. Same-payload
 fallbacks, author gates, attachment replacement, and stream cleanup are retained; no SQL schema,
 registry, ownership, direct Inventory, or existing export contract changed. Phase 5D Reminders is
 the next separately scoped summary-card slice after Phase 5C operator acceptance.
