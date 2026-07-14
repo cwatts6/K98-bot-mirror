@@ -46,8 +46,7 @@ async def test_build_accounts_portfolio_uses_distinct_ids_and_canonical_rss(monk
     async def inventory(ids):
         assert ids == (111, 222)
         return {
-            gid: InventoryResourcePoint(latest.replace(tzinfo=UTC), gid, 2, 3, 4)
-            for gid in ids
+            gid: InventoryResourcePoint(latest.replace(tzinfo=UTC), gid, 2, 3, 4) for gid in ids
         }
 
     monkeypatch.setattr(
@@ -78,9 +77,7 @@ async def test_build_accounts_portfolio_uses_distinct_ids_and_canonical_rss(monk
 @pytest.mark.asyncio
 async def test_duplicate_ids_are_review_and_totals_do_not_double_count(monkeypatch) -> None:
     latest = datetime(2026, 7, 14, 8, 0)
-    resolution = summarize_accounts(
-        _accounts(Main=(111, "Main"), **{"Alt 1": (111, "Duplicate")})
-    )
+    resolution = summarize_accounts(_accounts(Main=(111, "Main"), **{"Alt 1": (111, "Duplicate")}))
 
     async def account_summary(_user_id):
         return resolution
@@ -239,6 +236,9 @@ def test_summary_pagination_supports_hundreds_and_section_change_resets_external
     assert page.page == 26
     assert len(page.rows) == 5
     assert page.rows[0].governor_id == 1200
-    assert accounts_service.build_account_summary_page(
-        replace(payload), section="economy", page=1
-    ).page == 1
+    assert (
+        accounts_service.build_account_summary_page(
+            replace(payload), section="economy", page=1
+        ).page
+        == 1
+    )

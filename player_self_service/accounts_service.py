@@ -280,7 +280,9 @@ async def build_accounts_portfolio(discord_user_id: int) -> AccountsPortfolioPay
         rss_total=rss_total,
     )
     if not resolution.ok:
-        insight = "Account registry data is temporarily unavailable; try again before managing links."
+        insight = (
+            "Account registry data is temporarily unavailable; try again before managing links."
+        )
     return AccountsPortfolioPayload(
         discord_user_id=user_id,
         state=state,

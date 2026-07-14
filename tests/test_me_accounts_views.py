@@ -128,6 +128,18 @@ async def test_account_summary_controls_match_locked_rows_and_boundaries() -> No
 
 
 @pytest.mark.asyncio
+async def test_account_summary_disables_csv_for_empty_payload() -> None:
+    view = summary_views.AccountSummaryView(
+        author_id=42,
+        display_name="Tester",
+        payload=_payload(0),
+    )
+
+    csv_button = next(child for child in view.children if child.label == "Download CSV")
+    assert csv_button.disabled is True
+
+
+@pytest.mark.asyncio
 async def test_section_change_resets_page_without_refetch(monkeypatch) -> None:
     calls = []
 

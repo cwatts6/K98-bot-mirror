@@ -124,7 +124,9 @@ class AccountSummaryView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user and int(interaction.user.id) == self.author_id:
             return True
-        await interaction.response.send_message("This private report is not for you.", ephemeral=True)
+        await interaction.response.send_message(
+            "This private report is not for you.", ephemeral=True
+        )
         return False
 
     def _apply_state(self) -> None:
@@ -136,6 +138,8 @@ class AccountSummaryView(discord.ui.View):
                 child.disabled = self.summary_page.page <= 1
             elif custom_id == "me:account-summary:next":
                 child.disabled = self.summary_page.page >= self.summary_page.page_count
+            elif custom_id == "me:account-summary:csv":
+                child.disabled = not self.payload.rows
 
     async def _defer(self, interaction: discord.Interaction) -> None:
         try:
@@ -230,48 +234,73 @@ class AccountSummaryView(discord.ui.View):
         )
 
     @discord.ui.button(label="Accounts", style=discord.ButtonStyle.primary, disabled=True, row=0)
-    async def accounts_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def accounts_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         return None
 
     @discord.ui.button(label="Reminders", style=discord.ButtonStyle.primary, row=0)
-    async def reminders_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def reminders_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         from ui.views.player_self_service_views import PAGE_REMINDERS
+
         await self._navigate(interaction, PAGE_REMINDERS)
 
     @discord.ui.button(label="Preferences", style=discord.ButtonStyle.primary, row=0)
-    async def preferences_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def preferences_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         from ui.views.player_self_service_views import PAGE_PREFERENCES
+
         await self._navigate(interaction, PAGE_PREFERENCES)
 
     @discord.ui.button(label="Dashboard", style=discord.ButtonStyle.secondary, row=1)
-    async def dashboard_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def dashboard_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         from ui.views.player_self_service_views import PAGE_DASHBOARD
+
         await self._navigate(interaction, PAGE_DASHBOARD)
 
     @discord.ui.button(label="Inventory", style=discord.ButtonStyle.secondary, row=1)
-    async def inventory_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def inventory_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         from ui.views.player_self_service_views import PAGE_INVENTORY
+
         await self._navigate(interaction, PAGE_INVENTORY)
 
     @discord.ui.button(label="Exports", style=discord.ButtonStyle.secondary, row=1)
-    async def exports_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def exports_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         from ui.views.player_self_service_views import PAGE_EXPORTS
+
         await self._navigate(interaction, PAGE_EXPORTS)
 
     @discord.ui.button(label="Overview", custom_id="me:account-summary:overview", row=2)
-    async def overview_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def overview_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         await self._replace(interaction, section="overview", page=1)
 
     @discord.ui.button(label="Combat", custom_id="me:account-summary:combat", row=2)
-    async def combat_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def combat_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         await self._replace(interaction, section="combat", page=1)
 
     @discord.ui.button(label="Economy", custom_id="me:account-summary:economy", row=2)
-    async def economy_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def economy_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         await self._replace(interaction, section="economy", page=1)
 
     @discord.ui.button(label="Previous", custom_id="me:account-summary:previous", row=3)
-    async def previous_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def previous_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         await self._replace(
             interaction,
             section=self.summary_page.section,
@@ -279,7 +308,9 @@ class AccountSummaryView(discord.ui.View):
         )
 
     @discord.ui.button(label="Next", custom_id="me:account-summary:next", row=3)
-    async def next_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def next_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         await self._replace(
             interaction,
             section=self.summary_page.section,
@@ -306,7 +337,9 @@ class AccountSummaryView(discord.ui.View):
             _close_file(file)
 
     @discord.ui.button(label="Back to Accounts", custom_id="me:account-summary:back", row=3)
-    async def back_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
+    async def back_button(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
         from ui.views.player_self_service_views import (
             PAGE_ACCOUNTS,
             PlayerSelfServiceView,
@@ -341,6 +374,7 @@ class AccountSummaryView(discord.ui.View):
             )
         except Exception:
             from ui.views.player_self_service_views import build_accounts_portfolio_fallback
+
             await interaction.edit_original_response(
                 content=None,
                 embed=build_accounts_portfolio_fallback(

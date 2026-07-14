@@ -65,9 +65,7 @@ def _map_row(row: dict[str, Any]) -> AccountsScanRow:
         location_y=_to_int(row.get("LocationY")),
         scan_date=row.get("ScanDate") if isinstance(row.get("ScanDate"), datetime) else None,
         latest_scan_date=(
-            row.get("LatestScanDate")
-            if isinstance(row.get("LatestScanDate"), datetime)
-            else None
+            row.get("LatestScanDate") if isinstance(row.get("LatestScanDate"), datetime) else None
         ),
     )
 

@@ -168,6 +168,15 @@ def _accounts_payload() -> AccountsPortfolioPayload:
     )
 
 
+def test_accounts_portfolio_fallback_uses_singular_governor_label() -> None:
+    embed = views.build_accounts_portfolio_fallback(
+        _accounts_payload(),
+        display_name="Tester",
+    )
+
+    assert embed.fields[0].name == "READY • 1 governor"
+
+
 class _Response:
     def __init__(self) -> None:
         self.sent = []
@@ -2099,7 +2108,7 @@ async def test_stale_navigation_closes_rendered_files(monkeypatch) -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
-        accounts_loader=loader,
+        summary_loader=loader,
     )
     interaction = _Interaction()
     checks = iter((True, False))

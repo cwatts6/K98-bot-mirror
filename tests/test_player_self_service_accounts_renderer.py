@@ -73,6 +73,12 @@ def test_main_accounts_renderer_uses_locked_dimensions_and_stable_filename() -> 
         assert image.mode == "RGB"
 
 
+def test_governor_count_label_uses_singular_and_plural_grammar() -> None:
+    assert accounts_renderer.format_governor_count(0) == "0 governors"
+    assert accounts_renderer.format_governor_count(1) == "1 governor"
+    assert accounts_renderer.format_governor_count(2) == "2 governors"
+
+
 def test_account_summary_renderer_supports_all_three_sections() -> None:
     payload = _payload(9)
     for section in ("overview", "combat", "economy"):

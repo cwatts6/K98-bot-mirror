@@ -125,4 +125,3 @@ class AccountSummaryPage:
     page: int
     page_count: int
     rows: tuple[AccountPortfolioRow, ...]
-

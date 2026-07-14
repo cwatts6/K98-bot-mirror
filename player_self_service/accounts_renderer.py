@@ -160,6 +160,11 @@ def _role_helper(payload: AccountsPortfolioPayload) -> str:
     return " • ".join(parts) or "No linked roles"
 
 
+def format_governor_count(count: int) -> str:
+    """Return a compact linked-governor count with correct grammar."""
+    return f"{count} {'governor' if count == 1 else 'governors'}"
+
+
 def render_accounts_card(
     payload: AccountsPortfolioPayload,
     *,
@@ -181,7 +186,7 @@ def render_accounts_card(
     _text(
         draw,
         (1385, 96),
-        f"{payload.linked_count} governors",
+        format_governor_count(payload.linked_count),
         width=245,
         size=21,
         min_size=16,
@@ -213,7 +218,13 @@ def render_accounts_card(
 
     _panel(draw, (68, 374, 1634, 697))
     _text(draw, (92, 392), "LINKED GOVERNORS", width=600, size=18, fill=_BLUE, bold=True)
-    columns = (("SLOT", 92, 170), ("GOVERNOR", 280, 515), ("ID", 815, 230), ("POWER", 1065, 250), ("DATA", 1350, 230))
+    columns = (
+        ("SLOT", 92, 170),
+        ("GOVERNOR", 280, 515),
+        ("ID", 815, 230),
+        ("POWER", 1065, 250),
+        ("DATA", 1350, 230),
+    )
     for label, x, width in columns:
         _text(draw, (x, 426), label, width=width, size=15, fill=_MUTED, bold=True)
     draw.line((92, 451, 1610, 451), fill=(91, 140, 190, 110), width=1)
@@ -242,7 +253,16 @@ def render_accounts_card(
         y = 464 + index * 27
         for value, (_label, x, width) in zip(values, columns, strict=True):
             colour = _data_colour(value) if _label == "DATA" else _TEXT
-            _text(draw, (x, y), value, width=width, size=17, min_size=13, fill=colour, bold=_label == "SLOT")
+            _text(
+                draw,
+                (x, y),
+                value,
+                width=width,
+                size=17,
+                min_size=13,
+                fill=colour,
+                bold=_label == "SLOT",
+            )
 
     _panel(draw, (68, 714, 1634, 795), 13)
     _text(draw, (92, 730), "PORTFOLIO INSIGHT", width=285, size=16, fill=_GOLD, bold=True)
@@ -257,41 +277,77 @@ def render_accounts_card(
         fill=_MUTED,
     )
     refreshed = payload.refreshed_at_utc.astimezone(UTC)
-    _text(draw, (1390, 850), f"Refreshed {refreshed:%H:%M UTC}", width=244, size=16, min_size=13, fill=_MUTED)
+    _text(
+        draw,
+        (1390, 850),
+        f"Refreshed {refreshed:%H:%M UTC}",
+        width=244,
+        size=16,
+        min_size=13,
+        fill=_MUTED,
+    )
     return _encode(canvas, f"me_accounts_{payload.discord_user_id}.png")
 
 
 def _summary_columns(page: AccountSummaryPage) -> tuple[tuple[str, int], ...]:
     if page.section == "combat":
         return (
-            ("SLOT", 105), ("GOVERNOR", 230), ("KILL POINTS", 165), ("T4+T5", 145),
-            ("DEADS", 135), ("HEALED", 145), ("ACCLAIM", 130), ("HELPS", 115),
+            ("SLOT", 105),
+            ("GOVERNOR", 230),
+            ("KILL POINTS", 165),
+            ("T4+T5", 145),
+            ("DEADS", 135),
+            ("HEALED", 145),
+            ("ACCLAIM", 130),
+            ("HELPS", 115),
             ("CONDUCT", 125),
         )
     if page.section == "economy":
         return (
-            ("SLOT", 125), ("GOVERNOR", 300), ("RSS GATHERED", 225),
-            ("RSS ASSISTANCE", 235), ("RSS TOTAL", 210), ("INVENTORY AS OF", 235),
+            ("SLOT", 125),
+            ("GOVERNOR", 300),
+            ("RSS GATHERED", 225),
+            ("RSS ASSISTANCE", 235),
+            ("RSS TOTAL", 210),
+            ("INVENTORY AS OF", 235),
             ("DATA", 150),
         )
     return (
-        ("SLOT", 95), ("GOVERNOR", 220), ("GOVERNOR ID", 155), ("CIVILISATION", 165),
-        ("CH", 65), ("POWER", 130), ("TROOP POWER", 140), ("LOCATION", 115),
-        ("DATA", 105), ("LAST SCAN", 175),
+        ("SLOT", 95),
+        ("GOVERNOR", 220),
+        ("GOVERNOR ID", 155),
+        ("CIVILISATION", 165),
+        ("CH", 65),
+        ("POWER", 130),
+        ("TROOP POWER", 140),
+        ("LOCATION", 115),
+        ("DATA", 105),
+        ("LAST SCAN", 175),
     )
 
 
 def _summary_values(page: AccountSummaryPage, row: AccountPortfolioRow) -> tuple[str, ...]:
     if page.section == "combat":
         return (
-            row.slot, row.display_name, _number(row.kill_points), _number(row.t4_t5_kills),
-            _number(row.deads), _number(row.healed_troops), _number(row.highest_acclaim),
-            _number(row.helps), _clean(row.conduct),
+            row.slot,
+            row.display_name,
+            _number(row.kill_points),
+            _number(row.t4_t5_kills),
+            _number(row.deads),
+            _number(row.healed_troops),
+            _number(row.highest_acclaim),
+            _number(row.helps),
+            _clean(row.conduct),
         )
     if page.section == "economy":
         return (
-            row.slot, row.display_name, _number(row.rss_gathered), _number(row.rss_assistance),
-            _number(row.rss_total), _date(row.inventory_as_of), row.data_state,
+            row.slot,
+            row.display_name,
+            _number(row.rss_gathered),
+            _number(row.rss_assistance),
+            _number(row.rss_total),
+            _date(row.inventory_as_of),
+            row.data_state,
         )
     location = (
         f"{row.location_x}:{row.location_y}"
@@ -299,9 +355,16 @@ def _summary_values(page: AccountSummaryPage, row: AccountPortfolioRow) -> tuple
         else "—"
     )
     return (
-        row.slot, row.display_name, str(row.governor_id or "—"), _clean(row.civilisation),
-        _number(row.city_hall), _number(row.power), _number(row.troop_power), location,
-        row.data_state, _date(row.last_governor_scan),
+        row.slot,
+        row.display_name,
+        str(row.governor_id or "—"),
+        _clean(row.civilisation),
+        _number(row.city_hall),
+        _number(row.power),
+        _number(row.troop_power),
+        location,
+        row.data_state,
+        _date(row.last_governor_scan),
     )
 
 
@@ -315,10 +378,22 @@ def render_account_summary_card(
     _text(draw, (68, 38), "ACCOUNT SUMMARY", width=820, size=33, bold=True)
     _text(draw, (68, 86), f"{_clean(display_name)} (1198)", width=1000, size=25, bold=True)
     _text(
-        draw, (1375, 43), payload.state, width=255, size=25,
-        fill=_state_colour(payload.state), bold=True,
+        draw,
+        (1375, 43),
+        payload.state,
+        width=255,
+        size=25,
+        fill=_state_colour(payload.state),
+        bold=True,
     )
-    _text(draw, (1375, 84), f"{payload.linked_count} governors", width=255, size=18, fill=_MUTED)
+    _text(
+        draw,
+        (1375, 84),
+        format_governor_count(payload.linked_count),
+        width=255,
+        size=18,
+        fill=_MUTED,
+    )
 
     labels = (
         ("TOTAL POWER", payload.power),
@@ -328,7 +403,9 @@ def render_account_summary_card(
     )
     for index, (label, metric) in enumerate(labels):
         x0 = 68 + index * 397
-        _metric_box(draw, (x0, 135, x0 + 377, 248), label, _compact(metric.value), _coverage(metric))
+        _metric_box(
+            draw, (x0, 135, x0 + 377, 248), label, _compact(metric.value), _coverage(metric)
+        )
 
     section_label = {
         "overview": "OVERVIEW",
@@ -336,7 +413,9 @@ def render_account_summary_card(
         "economy": "ECONOMY & ACTIVITY",
     }[page.section]
     _text(draw, (68, 275), section_label, width=850, size=23, fill=_BLUE, bold=True)
-    _text(draw, (1405, 278), f"Page {page.page} / {page.page_count}", width=225, size=18, fill=_MUTED)
+    _text(
+        draw, (1405, 278), f"Page {page.page} / {page.page_count}", width=225, size=18, fill=_MUTED
+    )
     _panel(draw, (68, 318, 1634, 816))
     columns = _summary_columns(page)
     x_positions: list[int] = []
@@ -355,9 +434,33 @@ def render_account_summary_card(
             draw.rounded_rectangle((80, y - 7, 1620, y + 34), radius=7, fill=(35, 64, 96, 58))
         for value, (label, width), x in zip(values, columns, x_positions, strict=True):
             colour = _data_colour(value) if label == "DATA" else _TEXT
-            _text(draw, (x, y), value, width=width - 10, size=16, min_size=10, fill=colour, bold=label == "SLOT")
+            _text(
+                draw,
+                (x, y),
+                value,
+                width=width - 10,
+                size=16,
+                min_size=10,
+                fill=colour,
+                bold=label == "SLOT",
+            )
 
-    _text(draw, (68, 842), f"{section_label.title()} • all linked governors", width=900, size=17, fill=_MUTED)
+    _text(
+        draw,
+        (68, 842),
+        f"{section_label.title()} • all linked governors",
+        width=900,
+        size=17,
+        fill=_MUTED,
+    )
     refreshed = payload.refreshed_at_utc.astimezone(UTC)
-    _text(draw, (1388, 842), f"Refreshed {refreshed:%H:%M UTC}", width=245, size=16, min_size=12, fill=_MUTED)
+    _text(
+        draw,
+        (1388, 842),
+        f"Refreshed {refreshed:%H:%M UTC}",
+        width=245,
+        size=16,
+        min_size=12,
+        fill=_MUTED,
+    )
     return _encode(canvas, f"me_account_summary_{payload.discord_user_id}.png")

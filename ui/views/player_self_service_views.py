@@ -185,7 +185,7 @@ def build_accounts_portfolio_fallback(
     )
     main = payload.main_row
     embed.add_field(
-        name=f"{payload.state} • {payload.linked_count} governors",
+        name=f"{payload.state} • {accounts_renderer.format_governor_count(payload.linked_count)}",
         value=_field_value(
             [
                 f"Main: {main.display_name if main else 'not set'}",

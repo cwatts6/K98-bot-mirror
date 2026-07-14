@@ -17,7 +17,7 @@ def test_accounts_csv_has_locked_columns_exact_values_unicode_and_formula_protec
     row = AccountPortfolioRow(
         slot="Main",
         role="Main",
-        registered_name="=HYPERLINK(\"bad\")",
+        registered_name='=HYPERLINK("bad")',
         current_governor_name="Gövérnor 東京",
         governor_id=123456789,
         civilisation="Rome",
