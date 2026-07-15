@@ -494,8 +494,8 @@ Current status:
   coordinates remain private. There is no Change Governor, and optional selected-governor context
   exists only for a validated Dashboard return. The completed Phase 5C task pack and starter are
   archived.
-- Phase 5D Premium Reminders Summary Card is implemented and locally validated; final operator
-  visual re-smoke remains pending. The standalone 1702x924 card uses the invoking Discord avatar
+- Phase 5D Premium Reminders Summary Card is complete and operator accepted after final smoke on
+  2026-07-15. The standalone 1702x924 card uses the invoking Discord avatar
   with a safe fallback and earns ACTIVE/REVIEW/OFF from the
   existing KVK and Calendar settings, presents friendly event labels, canonical alert-time labels,
   genuine counts and deterministic overflow, saved inactive choices, compact coverage, and exactly
@@ -513,11 +513,19 @@ Current status:
   `8fcf96f6-44e0-4d87-8521-7de721444ef7` sealed with 85/85 review receipts and 42/42 candidate
   ledgers. It found no Phase 5D security issue; its 20 reportable findings (16 Medium, 4 Low) belong
   to pre-existing authorization/import/Ark/MGE repository surfaces.
-  Initial operator smoke on 2026-07-15 accepted Manage refresh and timeout behavior; the follow-up
-  removes deprecated Inventory navigation, deduplicates `(1198)`, right-aligns the state support,
-  and splits the UTC footer with a full refreshed date-time.
-- Phases 5D-5G independently apply the same format and transition contract to Reminders,
-  Preferences, Inventory summary, and Exports summary. They preserve current page actions,
+  Final operator smoke accepted Manage refresh, reflected updates, graceful timeout, the invoking-
+  user avatar, duplicate-safe `(1198)` identity, removal of deprecated Inventory navigation,
+  right-aligned state support, and the split UTC footer with a full refreshed date-time. The
+  completed Phase 5D task pack and starter are archived.
+- Phase 5D.1 Authoritative Next Scheduled Alert Projection is the agreed next slice before
+  Preferences. Existing `/calendar_next_event`, `/next_kvk_event`, and `/next_kvk_fight` prove the
+  reusable Calendar/KVK bulk occurrence-reader paths, but do not apply reminder preferences,
+  offsets, KVK's 48-hour horizon, duplicate state, Calendar grace, or sent-key rules. Phase 5D.1
+  therefore requires narrow pure candidate helpers shared by live dispatch and read-only Player
+  Self-Service projection, exact UTC and deterministic parity tests, and no jobs, DMs, writes, SQL,
+  new source, or command change. The active task pack and chat starter define the implementation gate.
+- Phases 5E-5G independently apply the same format and transition contract to Preferences,
+  Inventory summary, and Exports summary. They preserve current page actions,
   disabled states, privacy, payloads, filenames, attachment cleanup, and service ownership; none
   shows Change Governor. Governor-specific child actions must perform their own explicit selection
   and access recheck rather than treating retained return context as a page filter.

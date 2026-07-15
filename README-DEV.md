@@ -31,11 +31,21 @@ timeouts, attachment replacement, and stream cleanup are retained; no SQL schema
 ownership, direct Inventory, or existing export contract changed. The completed Phase 5C task pack
 and starter are archived.
 
-Phase 5D Premium Reminders Summary Card is the next active GovernorOS slice. It begins with an
-approval-gated product/visual workshop around the operator's improvement ideas; implementation is
-not yet approved. Reminders remains a Discord-user-level combined KVK/calendar centre with no
-Change Governor. The accepted standalone 1702x924 format, author avatar, same-payload fallback,
-page-relevant navigation, graceful timeout, and attachment cleanup are the starting baseline.
+Phase 5D Premium Reminders Summary Card is complete and operator accepted in mirror PR #222 and
+production PR #529 after final smoke on 2026-07-15. `/me reminders` now provides the private,
+avatar-enabled 1702x924 ACTIVE/REVIEW/OFF card, truthful coverage hero, friendly KVK/Calendar
+summaries, deterministic insight, duplicate-safe identity, page-relevant navigation without the
+deprecated Inventory button, aligned state support, a full UTC footer, same-payload fallback, and
+graceful timeout. Manage refresh and all existing reminder behavior remain intact. The completed
+Phase 5D task pack and starter are archived.
+
+Phase 5D.1 Authoritative Next Scheduled Alert Projection is the next active GovernorOS slice before
+Phase 5E Preferences. It will reuse the bulk occurrence readers already exercised by
+`/calendar_next_event`, `/next_kvk_event`, and `/next_kvk_fight`, while extracting narrow pure
+candidate eligibility shared with live KVK and Calendar dispatch. The goal is an exact, read-only
+NEXT/NO UPCOMING/UNAVAILABLE hero with no jobs, DMs, acknowledgements, persistence writes, SQL,
+new event source, scheduler-policy change, or command-surface change. Its task pack and chat starter
+are prepared; runtime implementation remains separately started/approved.
 
 ## Quality Automation
 

@@ -4,8 +4,8 @@
 
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
-- Date: `2026-07-14`
-- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486, GovernorOS v2 Phases 1-5B completed through mirror PR #220 and production PR #527, Phase 5C Accounts completed and operator accepted in mirror PR #221 and production PR #528 on 2026-07-14, and the Phase 5D Reminders product/content/visual contract plus approved Herald's Watch backdrop recorded on 2026-07-14
+- Date: `2026-07-15`
+- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486, GovernorOS v2 Phases 1-5B completed through mirror PR #220 and production PR #527, Phase 5C Accounts completed and operator accepted in mirror PR #221 and production PR #528 on 2026-07-14, Phase 5D Reminders completed and operator accepted in mirror PR #222 and production PR #529 on 2026-07-15, and Phase 5D.1 Authoritative Next Scheduled Alert Projection prepared as the next active slice
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
@@ -64,14 +64,22 @@ scan-health roster, one deterministic portfolio insight, the unchanged guided Ma
 a private avatar-enabled paginated Account Summary plus complete CSV. The accepted `1702x924`
 runtime backdrop is `assets/me/cards/me_accounts.png`.
 
-Phase 5D has passed operator functional smoke for Manage refresh and timeout; the refined visual
-card remains subject to final operator re-smoke.
+Phase 5D is complete and operator accepted after final smoke on 2026-07-15.
 `/me reminders` is now a private premium operational summary with earned ACTIVE/REVIEW/OFF state,
 the approved truthful coverage hero, friendly KVK and Calendar summaries, one deterministic Reminder
 Insight, and the unchanged guided Manage journey. The strict `1702x924` runtime backdrop is
 `assets/me/cards/me_reminders.png`. Repository inspection confirmed that an exact cross-system next-
 alert projection would duplicate materially different KVK and Calendar scheduler eligibility, so
-that opportunity is deferred rather than copied into the summary service.
+that logic was not copied into the summary service. Final smoke accepted Manage refresh/reflected
+updates, graceful timeout, invoking-user avatar, duplicate-safe identity, removal of deprecated
+Inventory navigation, right-aligned state support, and the split full UTC footer.
+
+Phase 5D.1 Authoritative Next Scheduled Alert Projection is the agreed next active slice before
+Phase 5E Preferences. It promotes the projection item out of the deferred backlog. Existing
+`/calendar_next_event`, `/next_kvk_event`, and `/next_kvk_fight` provide reusable Calendar/KVK bulk
+occurrence-reader evidence, while the implementation must extract narrow pure candidate eligibility
+shared with live dispatch to preserve KVK horizon/tracker and Calendar grace/sent-key parity. No
+command, SQL, persistence, event-source, scheduler policy, DM, or delivery behavior change is implied.
 
 ## 3. Programme Vision
 
@@ -786,7 +794,7 @@ Delivery record:
 
 ### Phase 5C-5G — Premium `/me` Summary Cards
 
-Status: `Phase 5C Accounts is complete and operator accepted; Phase 5D Reminders passed functional smoke with visual re-smoke pending; Phases 5E-5G remain separately scoped`.
+Status: `Phase 5C Accounts and Phase 5D Reminders are complete and operator accepted; Phase 5D.1 is the next active slice; Phases 5E-5G remain separately scoped`.
 
 The five summary pages share a presentation and interaction baseline but remain independent PR-sized
 slices. A later page must reuse the accepted rules from earlier pages without creating a broad
@@ -845,7 +853,8 @@ Remaining-phase consistency matrix:
 
 | Phase | Parent scope | Premium output baseline | Governor routing | Product/behavior boundary |
 |---|---|---|---|---|
-| 5D Reminders | Discord user | 1702x924 standalone, invoking-user avatar with safe fallback, same-payload fallback, graceful timeout | No Change Governor | Locked ACTIVE/REVIEW/OFF state, conditional next-alert/coverage hero, friendly KVK/Calendar summaries, one deterministic insight; preserve persistence, scheduling, DM, and Manage |
+| 5D Reminders | Discord user | 1702x924 standalone, invoking-user avatar with safe fallback, same-payload fallback, graceful timeout | No Change Governor | Complete and operator accepted; ACTIVE/REVIEW/OFF, truthful coverage hero, friendly KVK/Calendar summaries, one deterministic insight, unchanged persistence/scheduling/DM/Manage |
+| 5D.1 Next alert | Discord user | Existing accepted Phase 5D card and delivery contract | No Change Governor | Shared pure scheduler-parity projection produces NEXT/NO UPCOMING/UNAVAILABLE without jobs, DMs, writes, new sources, SQL, or command changes |
 | 5E Preferences | Discord user | Same premium baseline, page-approved backdrop and controls | No parent dropdown; Update VIP resolves governor explicitly | Preserve visibility/profile/VIP services and SQL contracts unless separately approved |
 | 5F Inventory summary | All linked/user | Same premium baseline; direct 1400x980 reports remain separate | No parent dropdown; Open Report explicitly selects and report pages may switch governor | Preserve calculations, imports, ranges, visibility, export, filename, and Sheets contracts |
 | 5G Exports summary | User/all-linked | Same premium baseline and private option windows | No Change Governor under current scope | Preserve schemas, formats, windows, filenames, services, and Sheets behavior |
@@ -934,7 +943,7 @@ starter. Mirror PR #221 and production PR #528 contain the accepted implementati
 
 #### Phase 5D - Premium Reminders Summary Card
 
-Status: `operator functional smoke passed - visual refinement re-smoke pending`.
+Status: `complete and operator accepted on 2026-07-15`.
 
 Implementation evidence recorded on 2026-07-14:
 
@@ -962,14 +971,15 @@ Implementation evidence recorded on 2026-07-14:
 - Operator smoke on 2026-07-15 accepted Manage refresh and timeout behavior. The requested visual
   refinement adds the shared avatar, prevents duplicate `(1198)`, removes deprecated Inventory
   navigation from Reminders, right-aligns state support, and splits the UTC footer with full date-time;
-  final visual re-smoke remains pending.
+  final visual re-smoke passed.
   Refinement validation passed `83` renderer/view tests, `146` focused cross-system regressions, full
   pytest (`2562 passed, 2 skipped`), pre-commit, architecture/deferred checks, smoke imports, command
   registration, log-noise analysis, and native-size visual review.
 - The approved coverage hero is used because no existing pure cross-system projection can be reused
-  without copying scheduler rules. The separately scoped extraction is recorded in the deferred
-  optimisation backlog.
-- Operator Discord smoke and final live visual/behavior acceptance remain pending.
+  without copying scheduler rules. The separately scoped extraction has been promoted from the
+  deferred backlog into the active Phase 5D.1 task pack.
+- Final operator Discord smoke accepted genuine reflected settings, Manage behavior, graceful
+  timeout, avatar/identity, navigation, alignment, footer, and live visual presentation.
 
 Approved product outcome:
 
@@ -977,7 +987,8 @@ Approved product outcome:
   governor. It has no `Change Governor`; optional Dashboard governor context is return context only.
 - Successful output becomes a standalone `1702x924` PNG using the approved runtime asset
   `assets/me/cards/me_reminders.png` and stable `me_reminders_<discord_user_id>.png` filename.
-- The approved alert/configuration-led layout omits a Discord avatar and renders:
+- The accepted alert/configuration-led layout uses the invoking user's bounded circular Discord
+  avatar with a safe fallback and renders:
   - `REMINDER CENTRE` with earned `ACTIVE`, `REVIEW`, or `OFF` state;
   - invoking Discord display name, Kingdom 1198 context, and concise system-enablement/review copy;
   - one hero: `NEXT SCHEDULED ALERT`, `NO UPCOMING ALERT`, `REMINDER COVERAGE`, or
@@ -1041,7 +1052,7 @@ Approved interaction and technical scope:
   autosave/update wording and confirmation DM, Calendar Settings handoff, Remove All confirmation,
   current-state revalidation, persistence/restart behavior, scheduled/sent cleanup, duplicate-send
   protections, scheduler, event sources, DMs, and host refresh behavior unchanged.
-- Main component rows remain Accounts/Reminders/Preferences, Dashboard/Inventory/Exports, then the
+- Main component rows remain Accounts/Reminders/Preferences, Dashboard/Exports, then the
   existing Manage action; no separate KVK or Calendar host button is added.
 - Phase 5D may add cohesive typed read-only summary models, friendly normalisation, deterministic
   state/coverage/insight helpers, and an optional side-effect-free next-alert projection. Commands and
@@ -1060,8 +1071,37 @@ Approved interaction and technical scope:
 - Focused/full repository validation, scheduler/dispatch regressions, Codex Security review, and
   operator Discord smoke are required before completion/promotion.
 
-The authoritative implementation detail is retained in the active Phase 5D task pack and chat
-starter. The backdrop-generation task is complete; runtime must use only the production-size asset.
+The authoritative implementation detail is retained in the archived Phase 5D task pack and chat
+starter. The backdrop-generation task is complete; runtime uses only the production-size asset.
+
+#### Phase 5D.1 - Authoritative Next Scheduled Alert Projection
+
+Status: `prepared - next active GovernorOS slice`.
+
+Approved direction:
+
+- Complete the accepted Reminders hero before Phase 5E Preferences by projecting the earliest
+  genuine future KVK or Calendar alert from authoritative, side-effect-free scheduler semantics.
+- Reuse the bulk occurrence-reader paths already exercised by `/calendar_next_event`,
+  `/next_kvk_event`, and `/next_kvk_fight`. Those commands are evidence, not an alert contract: they
+  do not combine player settings/offsets with KVK's 48-hour horizon and tracker rules or Calendar's
+  grace and sent-key rules.
+- Extract narrow pure candidate helpers that accept injected UTC time and already-loaded state, and
+  make live dispatch consume the same semantics. Player Self-Service must not own a parallel scheduler.
+- Choose the earliest candidate deterministically and map it into the existing typed
+  `NEXT SCHEDULED ALERT`; use `NO UPCOMING ALERT` only for healthy empty projections and
+  `SCHEDULE UNAVAILABLE` for request-level source/projection failure. Never imply delivery success.
+- Preserve scheduled-versus-sent distinctions, restart/rehydration, retry, duplicate-send,
+  unsubscribe/Remove All, Manage, source, lead-time, event-type, persistence, DM, and Calendar behavior.
+- Preserve the complete accepted Phase 5D visual/interaction contract and the three existing
+  next-event commands without registration or behavior changes.
+- Introduce no SQL, schema, new persistence, new event source, N+1 occurrence reads, jobs, DMs,
+  acknowledgements, cache refreshes, network calls, or tracker writes in the projection path.
+- Require deterministic-clock dispatch parity, source-health, no-side-effect, restart, duplicate,
+  Player Self-Service delivery, full regression, K98 PR-review/promotion, and Codex Security gates.
+
+The authoritative implementation and escalation contract is in the active Phase 5D.1 task pack and
+chat starter. Runtime implementation is not started by this documentation-only programme close-out.
 
 #### Phase 5E - Premium Preferences Summary Card
 
@@ -1354,18 +1394,21 @@ The programme is complete when:
 - [x] Phase 5D Reminders locally delivers the approved ACTIVE/REVIEW/OFF card, truthful coverage
   hero, friendly KVK/Calendar summaries, deterministic insight, unchanged Manage behavior, and
   automated/visual validation.
-- [ ] Phase 5D Reminders final operator visual re-smoke confirms the refined avatar, identity,
-  navigation, alignment, footer, and desktop/mobile presentation. Initial smoke already confirmed
-  genuine settings, Manage refresh, private standalone delivery, and timeout behavior.
+- [x] Phase 5D Reminders final operator visual re-smoke confirms genuine settings, reflected Manage
+  updates, graceful timeout, refined avatar/identity, navigation, alignment, full UTC footer, and
+  accepted live presentation on 2026-07-15.
+- [x] Phase 5D.1 Authoritative Next Scheduled Alert Projection is promoted from the deferred backlog
+  into an active task pack and chat starter, with existing next-event reader evidence and strict
+  scheduler-parity/no-side-effect boundaries recorded.
 - [ ] Export Stats semantics are explicitly decided and tested before dashboard integration.
 - [ ] A private `/me history` path exists while `/kvk history` remains unchanged.
 - [ ] `/me inspect` is permission-gated, private by default, and excludes Discord-user private data.
 - [ ] Legacy commands are only redirected/removed after usage evidence and explicit operator approval.
-- [x] Documentation and canonical command references reflect completed phases through Phase 5C.
+- [x] Documentation and canonical command references reflect completed phases through Phase 5D.
 - [x] Phase 5C documentation, canonical references, automated validation, security review, visual
   samples, and successful operator Discord smoke are recorded.
-- [x] Command registration validation remains green through Phase 5C.
-- [x] No new direct SQL exists in command/view layers through Phase 5C.
+- [x] Command registration validation remains green through Phase 5D.
+- [x] No new direct SQL exists in command/view layers through Phase 5D.
 - [x] Deferred findings from completed phases are captured structurally.
 
 ## 19. Deferred / Future Opportunities
@@ -1384,26 +1427,26 @@ Do not include these in early phases unless separately approved:
 ## 20. Suggested Next Action
 
 ```text
-Complete the required Codex Security review, then present the locally validated Phase 5D mirror
-build for operator Discord smoke. Exercise genuine ACTIVE/REVIEW/OFF configurations, saved inactive
-choices, friendly labels and canonical alert times, coverage, unchanged KVK/Calendar Manage
-mutations, standalone/fallback delivery, timeout, navigation, and desktop/mobile readability. Do not
-mark Phase 5D complete or begin Phase 5E until the operator records the smoke result.
+Start Phase 5D.1 from its active task pack and chat starter. Audit the existing bulk occurrence
+readers behind /calendar_next_event, /next_kvk_event, and /next_kvk_fight, then extract narrow pure
+KVK and Calendar candidate eligibility shared with live dispatch. Prove deterministic-clock parity,
+healthy-empty versus unavailable source handling, scheduled/sent and grace semantics, no side
+effects, no N+1 reads, and unchanged commands/Manage before mapping the result into the accepted
+Reminders hero. Complete this slice before beginning Phase 5E Preferences.
 ```
 
-The approved Reminders runtime backdrop is present at `assets/me/cards/me_reminders.png` and is locked
-at exactly `1702x924`. The product and visual workshop is complete. Failure to obtain an exact next-
-alert projection without duplicating scheduler logic is not an approval blocker: use the approved
-coverage hero and record the projection as deferred.
+The accepted Reminders runtime backdrop remains `assets/me/cards/me_reminders.png` at exactly
+`1702x924`. Phase 5D.1 changes the authoritative hero data, not the accepted card hierarchy,
+components, renderer, fallback, Manage journey, or timeout contract.
 
-Phase 5D does not inherit permission to change reminder scheduling, event sources, event/time choices,
-lead times, DMs, Calendar behavior, persisted state, SQL, another `/me` page, or the existing guided
-Manage workflow.
+Phase 5D.1 does not inherit permission to change reminder scheduling behavior, event sources,
+event/time choices, lead times, grace, retries, DMs, Calendar behavior, persisted state, SQL,
+another `/me` page, the three existing next-event commands, or the guided Manage workflow.
 
 Use:
 
-- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md`
-- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md`
+- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5D.1 Authoritative Next Scheduled Alert Projection.md`
+- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5D.1 Authoritative Next Scheduled Alert Projection.md`
 
 ## 21. Programme Change Log
 
@@ -1431,3 +1474,4 @@ Use:
 | 2026-07-14 | Phase 5D Reminders implemented and locally validated | Added the typed dual-system summary, strict no-avatar 1702x924 renderer, approved coverage hero, friendly labels/times/counts/overflow/insight, standalone same-payload delivery, and unchanged Manage behavior. Focused tests passed 147, scheduler/reminder selection passed 193, full pytest passed 2551 with 2 skipped, and the ten-state original/desktop/mobile matrix passed visual review. Exact next-alert projection is deferred; operator Discord smoke remains pending. |
 | 2026-07-14 | Phase 5D final security and cleanup validation | Closed the explicit host-refresh attachment stream lifecycle, reran focused/full/pre-commit/log-noise gates, and sealed Codex Security scan `8fcf96f6-44e0-4d87-8521-7de721444ef7` with 85/85 reviews, 42/42 candidate ledgers, 20 pre-existing wider-repository findings, and no Phase 5D security finding. Operator Discord smoke remains pending. |
 | 2026-07-15 | Phase 5D operator smoke refinement | Manage refresh and timeout passed operator smoke. Added the shared invoking-user avatar with safe fallback, duplicate-safe `(1198)` identity, removed deprecated Inventory navigation from Reminders, right-aligned state support with the state pill, and split the footer into left UTC guidance plus right full refreshed date-time. Final visual re-smoke remains pending. |
+| 2026-07-15 | Phase 5D completed and Phase 5D.1 prepared | Recorded successful final operator smoke and visual acceptance, archived the completed Phase 5D task pack/starter, promoted the authoritative next-alert projection out of the deferred backlog, and created the active Phase 5D.1 task pack/starter. Existing `/calendar_next_event`, `/next_kvk_event`, and `/next_kvk_fight` are recorded as reusable bulk reader evidence; shared live/projection parity, no side effects, no N+1 reads, and unchanged reminder/command behavior are the implementation boundary before Phase 5E Preferences. |

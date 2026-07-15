@@ -1,7 +1,8 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card
 
-Status: approved implementation task. Phase 5C is complete and the Phase 5D product, content, visual,
-interaction, and compatibility contract is locked.
+Status: `complete and archived`. Phase 5D passed operator smoke and final visual acceptance on
+2026-07-15. This starter is retained as historical implementation evidence; use the active Phase
+5D.1 starter for the next Reminders slice.
 
 ```text
 Codex, implement Player Self-Service Command Centre v2 Phase 5D: Premium Reminders Summary Card.
@@ -21,7 +22,7 @@ Read first:
 - README-DEV.md
 - docs/reference/README.md
 - docs/task_packs/Player Self-Service Command Centre v2 - Programme Pack.md
-- docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md
+- docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md
 - docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5C Premium Accounts Summary Card.md
 - docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre Phase 4 Modern Reminder Centre.md
 - docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre Phase 7 Unified Reminder Centre and Dashboard Card Alignment.md

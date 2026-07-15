@@ -9,7 +9,7 @@
 - One-pass approved: `Yes - after the prerequisite gates below and within the locked product, data, visual, interaction, and compatibility contract`
 - Product/content scope approved: `Yes`
 - Runtime implementation approved: `Yes - prerequisite gates satisfied on 2026-07-14`
-- Status: `operator functional smoke passed - visual refinement re-smoke pending`
+- Status: `complete - operator smoke and final visual acceptance passed 2026-07-15`
 - Planned runtime backdrop: `assets/me/cards/me_reminders.png`
 - Approved production canvas: `1702 × 924 PNG`
 - Stable output filename: `me_reminders_<discord_user_id>.png`
@@ -45,7 +45,7 @@ Read before implementation:
 - `README-DEV.md`
 - `docs/reference/README.md`
 - `docs/task_packs/Player Self-Service Command Centre v2 - Programme Pack.md`
-- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md`
+- `docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md`
 - `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5C Premium Accounts Summary Card.md`
 - the completed Phase 5B Inventory visual-alignment task pack in the archive
 - the completed Phase 4 Premium Governor Dashboard Renderer task pack in the archive
@@ -657,7 +657,8 @@ Preferred implementation order:
 2. Extract a narrow pure/read-only projection helper from the scheduler's existing domain logic,
    keeping dispatch side effects separate.
 3. If neither is possible without broad redesign, use the approved `REMINDER COVERAGE` hero and
-   record the next-alert projection as deferred.
+   record the next-alert projection as deferred for Phase 5D; it was promoted into the active
+   Phase 5D.1 task pack after operator acceptance.
 
 The projection must:
 
@@ -817,7 +818,8 @@ copy when a friendly label has already been resolved in the payload.
 - Existing legacy redirects or aliases to `/me reminders` remain unchanged.
 - Command registration and top-level command count remain unchanged.
 - A version-only command metadata increment is permitted if repository conventions require it.
-- Existing Accounts/Reminders/Preferences and Dashboard/Inventory/Exports navigation remains.
+- Existing Accounts/Reminders/Preferences and Dashboard/Exports navigation remains; the deprecated
+  Inventory host-page button is absent.
 - No Change Governor.
 - The guided Manage journey remains behaviourally unchanged.
 - Existing KVK/Calendar enabled flags, event selections, alert-time selections, persistence, restart
@@ -1042,7 +1044,7 @@ Implementation evidence recorded on 2026-07-14:
 - Operator smoke on 2026-07-15 accepted Manage refresh and timeout behavior and requested the final
   visual refinement: shared Discord avatar, duplicate-safe Kingdom suffix, no deprecated Inventory
   navigation, right-aligned state support, and a split UTC footer with full refreshed date-time.
-  These corrections are implemented and await the operator's final visual re-smoke.
+  These corrections were implemented and accepted in the operator's final visual re-smoke.
 - The refinement passed `83` renderer/view tests, `146` focused Accounts/Reminders/scheduler/
   dispatch regressions, full pytest (`2562 passed, 2 skipped`), architecture and deferred-item
   validation, smoke imports, command registration, pytest log-noise analysis, and all pre-commit
@@ -1067,7 +1069,9 @@ Implementation evidence recorded on 2026-07-14:
   workspace; those wider findings are not silently folded into this visual-only phase.
 - No SQL, scheduler, event source, event type, lead time, persistence, retry, dispatch, DM, or
   duplicate-send behavior changed.
-- Operator Discord smoke remains the final external gate and is intentionally not marked complete.
+- Final operator Discord smoke passed on 2026-07-15. Manage opened successfully, saved updates were
+  reflected in the card, graceful timeout preserved and disabled the report, and the refined avatar,
+  identity, navigation, state alignment, and dated UTC footer were accepted.
 
 - [x] Phase 5C operator Discord smoke is recorded as passed before Phase 5D runtime work begins.
 - [x] Approved `assets/me/cards/me_reminders.png` exists at exactly `1702 × 924`.
@@ -1088,7 +1092,7 @@ Implementation evidence recorded on 2026-07-14:
       implemented and tested.
 - [x] No SQL schema, scheduler, event-source, lead-time, calendar, DM, or persistence redesign is introduced.
 - [x] Focused/full validation, visual samples, and Codex Security review are recorded.
-- [ ] Operator Discord smoke is recorded.
+- [x] Operator Discord smoke is recorded.
 - [x] Programme, briefing, canonical command reference, task-pack status, and deferred items are updated
       after delivery.
 
@@ -1098,7 +1102,8 @@ There are no known blocking product or visual decisions.
 
 The following is **not** an escalation: if the existing architecture cannot expose an exact next-alert
 projection without creating parallel scheduler logic or widening scope, implement the approved
-`REMINDER COVERAGE` hero and record the projection as deferred.
+`REMINDER COVERAGE` hero and record the projection as deferred. After Phase 5D acceptance, that
+item was promoted into the active Phase 5D.1 task pack.
 
 Stop and ask the operator only if repository inspection proves one of the following:
 
@@ -1119,6 +1124,7 @@ add a third reminder category, or redesign Manage to work around a blocker.
 
 After Phase 5D automated validation and operator acceptance, execute separately:
 
+- Phase 5D.1: Authoritative Next Scheduled Alert Projection
 - Phase 5E: Premium Preferences Summary Card
 - Phase 5F: Premium Inventory Summary Card
 - Phase 5G: Premium Exports Summary Card

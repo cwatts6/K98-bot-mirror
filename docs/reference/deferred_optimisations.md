@@ -204,15 +204,6 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Operator confirmation of production leadership role IDs, duplicate-role policy, and allowed-channel ACLs; preserve intended admin and leadership access; run focused permission/telemetry tests, command registration, full pytest, and operator smoke.
 
 ### Deferred Optimisation
-- Area: `player_self_service/reminders_summary.py`, `event_scheduler.py`, `event_calendar/reminders.py`, KVK and Calendar occurrence readers
-- Type: architecture
-- Description: GovernorOS v2 Phase 5D correctly uses the approved `REMINDER COVERAGE` hero because the repository does not expose one side-effect-free, cross-system next-alert projection with exact parity to both KVK and Calendar dispatch eligibility. Recreating the KVK 48-hour candidate window, late/immediate handling, tracker exclusions, Calendar grace windows, per-event preferences, and sent-key rules inside the summary service would create parallel scheduler logic and a drift risk.
-- Suggested Fix: In a separately approved scheduler-domain slice, extract shared pure eligibility/candidate helpers used by both live dispatch and a bulk read-only projection. Accept an injected UTC clock and already-loaded occurrences/preferences, return exact future candidates without jobs, DMs, acknowledgements, tracker writes, or persistence mutations, and add parity fixtures for KVK and Calendar including passed windows, at-start alerts, retries, source failure, and duplicate-send exclusions. Only then replace the Phase 5D coverage hero with `NEXT SCHEDULED ALERT`, `NO UPCOMING ALERT`, or request-level `SCHEDULE UNAVAILABLE` where authoritative.
-- Impact: medium
-- Risk: high
-- Dependencies: Separate scheduler-domain approval; authoritative set-based KVK and Calendar occurrence reads; exact parity tests against current dispatch behavior; no changes to event sources, persistence, lead times, retries, DM policy, or duplicate-send protection.
-
-### Deferred Optimisation
 - Area: `DL_bot.py` fast-path attachment handlers, `upload_routes/`, `file_utils.py`, import worker admission and operational telemetry
 - Type: security
 - Description: The Phase 5C Codex Security repository scan validated that eight attachment fast paths can hand overlapping work directly to workbook parsing, worker subprocesses, audit writes, and SQL-backed imports without one shared in-flight bound, cooldown, or backpressure control. A bounded local harness observed two concurrent real-route importer handoffs. Discord limits and unknown production channel ACLs reduce likelihood, but they do not cap bot-side in-flight work; final severity is low/P3.
