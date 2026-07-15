@@ -678,7 +678,7 @@ async def build_player_self_service_summary(
         reporting_service.build_latest_inventory_snapshot
     ),
     calendar_event_catalog_loader: CalendarEventCatalogLoader | None = None,
-    kvk_event_snapshot_loader: KvkEventSnapshotLoader = get_upcoming_event_cache_snapshot,
+    kvk_event_snapshot_loader: KvkEventSnapshotLoader | None = None,
     kvk_tracker_snapshot_loader: KvkTrackerSnapshotLoader = snapshot_dm_trackers,
     calendar_runtime_cache_loader: CalendarRuntimeCacheLoader = load_runtime_cache,
     calendar_reminder_state_loader: CalendarReminderStateLoader = CalendarReminderState.load,
@@ -771,7 +771,13 @@ async def build_player_self_service_summary(
     calendar_dispatch_state: CalendarReminderState | None = None
 
     try:
-        kvk_event_snapshot = await asyncio.to_thread(kvk_event_snapshot_loader)
+        if kvk_event_snapshot_loader is None:
+            kvk_event_snapshot = await asyncio.to_thread(
+                get_upcoming_event_cache_snapshot,
+                now_utc=generated_at,
+            )
+        else:
+            kvk_event_snapshot = await asyncio.to_thread(kvk_event_snapshot_loader)
     except asyncio.CancelledError:
         raise
     except Exception:

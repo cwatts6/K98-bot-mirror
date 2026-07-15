@@ -143,6 +143,49 @@ async def test_service_bulk_loads_each_projection_source_once_and_selects_earlie
 
 
 @pytest.mark.asyncio
+async def test_default_kvk_snapshot_uses_projection_clock(monkeypatch) -> None:
+    event = _kvk_event(start=NOW + timedelta(seconds=1))
+    observed_now_values: list[datetime | None] = []
+
+    def default_snapshot_loader(
+        *, now_utc: datetime | None = None, max_age_hours: int = 12
+    ) -> UpcomingEventCacheSnapshot:
+        del max_age_hours
+        observed_now_values.append(now_utc)
+        effective_now = now_utc or NOW + timedelta(seconds=2)
+        events = (event,) if event["start_time"] > effective_now else ()
+        return UpcomingEventCacheSnapshot(True, events, NOW, False)
+
+    monkeypatch.setattr(service, "get_upcoming_event_cache_snapshot", default_snapshot_loader)
+
+    summary = await service.build_player_self_service_summary(
+        42,
+        account_loader=_account_loader,
+        reminder_loader=lambda _uid: {
+            "subscriptions": ["ruins"],
+            "reminder_times": ["now"],
+        },
+        calendar_prefs_loader=lambda _uid: {
+            "enabled": False,
+            "by_event_type": {},
+        },
+        preference_loader=_preference_loader,
+        profile_preference_loader=_profile_preference_loader,
+        kvk_tracker_snapshot_loader=lambda: KvkDmTrackerSnapshot({}, {}),
+        calendar_runtime_cache_loader=lambda: {"ok": True, "events": []},
+        calendar_reminder_state_loader=lambda: CalendarReminderState(
+            path=Path("unused.json"),
+            sent={},
+        ),
+        utc_clock=lambda: NOW,
+    )
+
+    assert observed_now_values == [NOW]
+    assert summary.reminders_summary is not None
+    assert summary.reminders_summary.hero.kind is ReminderHeroKind.NEXT_ALERT
+
+
+@pytest.mark.asyncio
 async def test_event_source_failure_makes_schedule_unavailable_without_false_review() -> None:
     summary = await service.build_player_self_service_summary(
         42,
