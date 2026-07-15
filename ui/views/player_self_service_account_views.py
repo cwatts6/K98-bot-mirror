@@ -195,7 +195,12 @@ class AccountManageActionSelect(discord.ui.Select):
                 label="Find Governor ID",
                 value="lookup",
                 description="Search by full or partial governor name",
-            )
+            ),
+            discord.SelectOption(
+                label="Update VIP",
+                value="update_vip",
+                description="Update VIP for a linked governor",
+            ),
         ]
         if state.can_register:
             options.append(
@@ -279,6 +284,21 @@ class AccountManageView(discord.ui.View):
             )
             return
         await _defer_private(interaction)
+        if action == "update_vip":
+            from ui.views.player_self_service_account_vip_views import (
+                show_account_vip_update,
+            )
+
+            self.stop()
+            await show_account_vip_update(
+                interaction,
+                author_id=self.author_id,
+                display_name=self.display_name,
+                host_message=self.host_message,
+                summary_loader=self.summary_loader,
+                timeout=self.timeout or 120,
+            )
+            return
         if action == "register":
             if not self.state.can_register:
                 await interaction.followup.send(
@@ -706,9 +726,9 @@ async def _refresh_host_page(
     summary_loader: SummaryLoader,
     page: str,
     user: object | None = None,
-) -> None:
+) -> bool:
     if host_message is None or not hasattr(host_message, "edit"):
-        return
+        return False
     from player_self_service.accounts_service import build_accounts_portfolio
     from ui.views.player_self_service_views import (
         PlayerSelfServiceView,
@@ -754,10 +774,12 @@ async def _refresh_host_page(
             files=files,
         )
         view.set_message_ref(edited or host_message)
+        return True
     except asyncio.CancelledError:
         raise
     except Exception:
         logger.debug("player_self_service_account_host_refresh_failed", exc_info=True)
+        return False
     finally:
         _close_files(files)
 

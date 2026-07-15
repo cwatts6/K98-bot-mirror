@@ -157,6 +157,10 @@ def modify_governor(
         )
         return False, f"Failed to update registration: {del_msg}"
 
+    # The soft-delete is already committed by the DAL. Invalidate immediately
+    # so a replacement-insert failure cannot leave the old owner authoritative.
+    registry_cache.invalidate(reason="modify_governor_soft_delete")
+
     # Insert replacement
     ins_code, ins_msg = registry_dal.insert(
         discord_user_id=uid,
@@ -177,7 +181,6 @@ def modify_governor(
             new_governor_name,
             updated_by or "self",
         )
-        registry_cache.invalidate(reason="modify_governor")
         return True, None
 
     # Partial failure: old row superseded but new row not created.

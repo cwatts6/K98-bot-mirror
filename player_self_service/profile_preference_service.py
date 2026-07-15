@@ -15,6 +15,110 @@ logger = logging.getLogger(__name__)
 
 ProfileField = Literal["timezone", "country", "language"]
 
+
+@dataclass(frozen=True, slots=True)
+class ProfilePreferenceChoice:
+    label: str
+    value: str
+    description: str = ""
+
+
+TIMEZONE_CHOICES: tuple[ProfilePreferenceChoice, ...] = (
+    ProfilePreferenceChoice("UTC", "UTC", "Coordinated Universal Time"),
+    ProfilePreferenceChoice("United Kingdom", "Europe/London", "Europe/London"),
+    ProfilePreferenceChoice(
+        "Central Europe", "Europe/Berlin", "Germany, Italy, Netherlands, Poland"
+    ),
+    ProfilePreferenceChoice("France / Spain", "Europe/Paris", "Europe/Paris"),
+    ProfilePreferenceChoice("Eastern Europe", "Europe/Kyiv", "Ukraine and nearby regions"),
+    ProfilePreferenceChoice("Turkey", "Europe/Istanbul", "Europe/Istanbul"),
+    ProfilePreferenceChoice("Dubai / Gulf", "Asia/Dubai", "Asia/Dubai"),
+    ProfilePreferenceChoice("India", "Asia/Kolkata", "Asia/Kolkata"),
+    ProfilePreferenceChoice("Thailand / Vietnam", "Asia/Bangkok", "Asia/Bangkok"),
+    ProfilePreferenceChoice("Indonesia West", "Asia/Jakarta", "Asia/Jakarta"),
+    ProfilePreferenceChoice("Philippines", "Asia/Manila", "Asia/Manila"),
+    ProfilePreferenceChoice("Singapore / Malaysia", "Asia/Singapore", "Asia/Singapore"),
+    ProfilePreferenceChoice("China", "Asia/Shanghai", "Asia/Shanghai"),
+    ProfilePreferenceChoice("Japan", "Asia/Tokyo", "Asia/Tokyo"),
+    ProfilePreferenceChoice("Australia East", "Australia/Sydney", "Australia/Sydney"),
+    ProfilePreferenceChoice("New Zealand", "Pacific/Auckland", "Pacific/Auckland"),
+    ProfilePreferenceChoice("US Eastern", "America/New_York", "America/New_York"),
+    ProfilePreferenceChoice("US Central", "America/Chicago", "America/Chicago"),
+    ProfilePreferenceChoice("US Mountain", "America/Denver", "America/Denver"),
+    ProfilePreferenceChoice("US Pacific", "America/Los_Angeles", "America/Los_Angeles"),
+    ProfilePreferenceChoice("Brazil", "America/Sao_Paulo", "America/Sao_Paulo"),
+    ProfilePreferenceChoice("Mexico City", "America/Mexico_City", "America/Mexico_City"),
+    ProfilePreferenceChoice("South Africa", "Africa/Johannesburg", "Africa/Johannesburg"),
+    ProfilePreferenceChoice("Egypt", "Africa/Cairo", "Africa/Cairo"),
+)
+
+COUNTRY_CHOICES: tuple[ProfilePreferenceChoice, ...] = tuple(
+    ProfilePreferenceChoice(label, code)
+    for label, code in (
+        ("United Kingdom (GB)", "GB"),
+        ("United States (US)", "US"),
+        ("Germany (DE)", "DE"),
+        ("France (FR)", "FR"),
+        ("Spain (ES)", "ES"),
+        ("Italy (IT)", "IT"),
+        ("Netherlands (NL)", "NL"),
+        ("Poland (PL)", "PL"),
+        ("Ukraine (UA)", "UA"),
+        ("Romania (RO)", "RO"),
+        ("Turkey (TR)", "TR"),
+        ("Brazil (BR)", "BR"),
+        ("Mexico (MX)", "MX"),
+        ("Canada (CA)", "CA"),
+        ("Australia (AU)", "AU"),
+        ("New Zealand (NZ)", "NZ"),
+        ("India (IN)", "IN"),
+        ("Indonesia (ID)", "ID"),
+        ("Philippines (PH)", "PH"),
+        ("Singapore (SG)", "SG"),
+        ("Malaysia (MY)", "MY"),
+        ("Japan (JP)", "JP"),
+        ("South Korea (KR)", "KR"),
+        ("South Africa (ZA)", "ZA"),
+    )
+)
+
+LANGUAGE_CHOICES: tuple[ProfilePreferenceChoice, ...] = tuple(
+    ProfilePreferenceChoice(label, tag)
+    for label, tag in (
+        ("English", "en"),
+        ("English (UK)", "en-GB"),
+        ("English (US)", "en-US"),
+        ("German / Deutsch", "de"),
+        ("French / Francais", "fr"),
+        ("Spanish / Espanol", "es"),
+        ("Portuguese", "pt"),
+        ("Portuguese (Brazil)", "pt-BR"),
+        ("Italian", "it"),
+        ("Dutch", "nl"),
+        ("Polish", "pl"),
+        ("Ukrainian", "uk"),
+        ("Turkish", "tr"),
+        ("Russian", "ru"),
+        ("Arabic", "ar"),
+        ("Hindi", "hi"),
+        ("Indonesian", "id"),
+        ("Malay", "ms"),
+        ("Thai", "th"),
+        ("Vietnamese", "vi"),
+        ("Chinese", "zh"),
+        ("Chinese (Simplified)", "zh-CN"),
+        ("Chinese (Traditional)", "zh-TW"),
+        ("Japanese", "ja"),
+        ("Korean", "ko"),
+    )
+)
+
+PROFILE_CHOICES: dict[ProfileField, tuple[ProfilePreferenceChoice, ...]] = {
+    "timezone": TIMEZONE_CHOICES,
+    "country": COUNTRY_CHOICES,
+    "language": LANGUAGE_CHOICES,
+}
+
 COUNTRY_NAMES: dict[str, str] = {
     "AD": "Andorra",
     "AE": "United Arab Emirates",
@@ -365,7 +469,7 @@ class UserProfilePreferenceMutationResult:
 
 
 ProfileReader = Callable[[int], dict[str, Any] | None]
-ProfileWriter = Callable[..., None]
+ProfileWriter = Callable[..., dict[str, Any]]
 
 
 def _clean(value: str | None) -> str:
@@ -476,15 +580,47 @@ def language_display_name(tag: str | None) -> str:
     return f"{name} ({normalized})" if name else normalized
 
 
+def timezone_display_name(timezone_name: str | None) -> str:
+    normalized, error = normalize_timezone(timezone_name)
+    if error or normalized is None:
+        return "Saved value unavailable" if _clean(timezone_name) else "Not set"
+    known = next((choice.label for choice in TIMEZONE_CHOICES if choice.value == normalized), None)
+    return known or normalized.replace("_", " ")
+
+
+def profile_value_display(
+    field: ProfileField,
+    value: str | None,
+) -> tuple[bool, bool, str, str | None]:
+    """Return set/available/friendly-label/code without exposing unknown raw keys."""
+    raw = _clean(value)
+    if not raw:
+        return False, True, "Not set", None
+    if field == "timezone":
+        normalized, error = normalize_timezone(raw)
+        if error or normalized is None:
+            return True, False, "Saved timezone unavailable", None
+        return True, True, timezone_display_name(normalized), normalized
+    if field == "country":
+        normalized, error = normalize_country(raw)
+        if error or normalized is None:
+            return True, False, "Saved location unavailable", None
+        return True, True, country_display_name(normalized), normalized
+    if field == "language":
+        normalized, error = normalize_language(raw)
+        if error or normalized is None:
+            return True, False, "Saved language unavailable", None
+        return True, True, language_display_name(normalized), normalized
+    raise ValueError(f"Unsupported profile preference field: {field}")
+
+
 def _profile_from_row(row: dict[str, Any] | None) -> UserProfilePreference:
     if not row:
         return UserProfilePreference()
     return UserProfilePreference(
         timezone_name=_clean(row.get("TimezoneName")) or None,
         location_country_code=(_clean(row.get("LocationCountryCode")).upper() or None),
-        preferred_language_tag=(
-            _canonical_language_tag(_clean(row.get("PreferredLanguageTag"))) or None
-        ),
+        preferred_language_tag=_clean(row.get("PreferredLanguageTag")) or None,
         updated_at_utc=row.get("UpdatedAtUtc"),
     )
 
@@ -504,20 +640,21 @@ async def read_user_profile_preference(
     return UserProfilePreferenceRead(ok=True, profile=_profile_from_row(row))
 
 
-async def _write_profile(
+async def _write_field(
     discord_user_id: int,
-    profile: UserProfilePreference,
+    field: ProfileField,
+    value: str | None,
     *,
-    writer: ProfileWriter = user_profile_preference_dal.upsert_profile_preference,
-) -> None:
-    await asyncio.to_thread(
+    writer: ProfileWriter = user_profile_preference_dal.upsert_profile_preference_field,
+) -> UserProfilePreference:
+    row = await asyncio.to_thread(
         writer,
         discord_user_id=int(discord_user_id),
-        timezone_name=profile.timezone_name,
-        location_country_code=profile.location_country_code,
-        preferred_language_tag=profile.preferred_language_tag,
+        field=field,
+        value=value,
         updated_by_discord_user_id=int(discord_user_id),
     )
+    return _profile_from_row(row)
 
 
 async def set_profile_preference(
@@ -526,35 +663,24 @@ async def set_profile_preference(
     value: str,
     *,
     reader: ProfileReader = user_profile_preference_dal.fetch_profile_preference,
-    writer: ProfileWriter = user_profile_preference_dal.upsert_profile_preference,
+    writer: ProfileWriter = user_profile_preference_dal.upsert_profile_preference_field,
 ) -> UserProfilePreferenceMutationResult:
-    current = await read_user_profile_preference(int(discord_user_id), reader=reader)
-    if not current.ok:
+    _ = reader  # Retained for compatibility; the atomic writer returns the authoritative row.
+    if field == "timezone":
+        normalized, error = normalize_timezone(value)
+    elif field == "country":
+        normalized, error = normalize_country(value)
+    elif field == "language":
+        normalized, error = normalize_language(value)
+    else:
         return UserProfilePreferenceMutationResult(
             ok=False,
-            message="Profile preferences are temporarily unavailable. Please try again in a moment.",
-            error=current.error,
+            message="Profile preference field was not recognised.",
         )
-
-    timezone_name = current.profile.timezone_name
-    country_code = current.profile.location_country_code
-    language_tag = current.profile.preferred_language_tag
-    if field == "timezone":
-        timezone_name, error = normalize_timezone(value)
-    elif field == "country":
-        country_code, error = normalize_country(value)
-    else:
-        language_tag, error = normalize_language(value)
     if error:
         return UserProfilePreferenceMutationResult(ok=False, message=error)
-
-    updated = UserProfilePreference(
-        timezone_name=timezone_name,
-        location_country_code=country_code,
-        preferred_language_tag=language_tag,
-    )
     try:
-        await _write_profile(int(discord_user_id), updated, writer=writer)
+        updated = await _write_field(int(discord_user_id), field, normalized, writer=writer)
     except asyncio.CancelledError:
         raise
     except Exception as exc:
@@ -587,24 +713,16 @@ async def clear_profile_preference(
     field: ProfileField,
     *,
     reader: ProfileReader = user_profile_preference_dal.fetch_profile_preference,
-    writer: ProfileWriter = user_profile_preference_dal.upsert_profile_preference,
+    writer: ProfileWriter = user_profile_preference_dal.upsert_profile_preference_field,
 ) -> UserProfilePreferenceMutationResult:
-    current = await read_user_profile_preference(int(discord_user_id), reader=reader)
-    if not current.ok:
+    _ = reader  # Retained for compatibility; no read-before-write is required for a field clear.
+    if field not in PROFILE_CHOICES:
         return UserProfilePreferenceMutationResult(
             ok=False,
-            message="Profile preferences are temporarily unavailable. Please try again in a moment.",
-            error=current.error,
+            message="Profile preference field was not recognised.",
         )
-    updated = UserProfilePreference(
-        timezone_name=None if field == "timezone" else current.profile.timezone_name,
-        location_country_code=None if field == "country" else current.profile.location_country_code,
-        preferred_language_tag=(
-            None if field == "language" else current.profile.preferred_language_tag
-        ),
-    )
     try:
-        await _write_profile(int(discord_user_id), updated, writer=writer)
+        updated = await _write_field(int(discord_user_id), field, None, writer=writer)
     except asyncio.CancelledError:
         raise
     except Exception as exc:

@@ -42,24 +42,21 @@ def test_timezone_validation_rejects_malformed_keys(timezone_name: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_set_profile_preference_preserves_other_fields_and_writes_country() -> None:
+async def test_set_profile_preference_writes_only_country_and_returns_full_row() -> None:
     writes = []
-
-    def reader(_user_id: int):
-        return {
-            "TimezoneName": "Europe/London",
-            "LocationCountryCode": None,
-            "PreferredLanguageTag": "en-GB",
-        }
 
     def writer(**kwargs):
         writes.append(kwargs)
+        return {
+            "TimezoneName": "Europe/London",
+            "LocationCountryCode": "GB",
+            "PreferredLanguageTag": "en-GB",
+        }
 
     result = await svc.set_profile_preference(
         42,
         "country",
         "United Kingdom",
-        reader=reader,
         writer=writer,
     )
 
@@ -70,37 +67,39 @@ async def test_set_profile_preference_preserves_other_fields_and_writes_country(
     assert writes == [
         {
             "discord_user_id": 42,
-            "timezone_name": "Europe/London",
-            "location_country_code": "GB",
-            "preferred_language_tag": "en-GB",
+            "field": "country",
+            "value": "GB",
             "updated_by_discord_user_id": 42,
         }
     ]
 
 
 @pytest.mark.asyncio
-async def test_clear_profile_preference_preserves_other_fields() -> None:
+async def test_clear_profile_preference_writes_only_selected_field() -> None:
     writes = []
 
-    def reader(_user_id: int):
+    def writer(**kwargs):
+        writes.append(kwargs)
         return {
-            "TimezoneName": "Europe/London",
+            "TimezoneName": None,
             "LocationCountryCode": "GB",
             "PreferredLanguageTag": "en-GB",
         }
 
-    def writer(**kwargs):
-        writes.append(kwargs)
-
-    result = await svc.clear_profile_preference(42, "timezone", reader=reader, writer=writer)
+    result = await svc.clear_profile_preference(42, "timezone", writer=writer)
 
     assert result.ok is True
     assert result.profile is not None
     assert result.profile.timezone_name is None
     assert result.profile.location_country_code == "GB"
-    assert writes[0]["timezone_name"] is None
-    assert writes[0]["location_country_code"] == "GB"
-    assert writes[0]["preferred_language_tag"] == "en-GB"
+    assert writes == [
+        {
+            "discord_user_id": 42,
+            "field": "timezone",
+            "value": None,
+            "updated_by_discord_user_id": 42,
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -189,7 +188,7 @@ async def test_set_profile_preference_success_log_excludes_profile_value(caplog)
         return None
 
     def writer(**_kwargs):
-        return None
+        return {"LocationCountryCode": "GB"}
 
     caplog.set_level(logging.INFO)
 
@@ -207,9 +206,9 @@ async def test_set_profile_preference_success_log_excludes_profile_value(caplog)
 
 
 @pytest.mark.asyncio
-async def test_profile_preference_propagates_cancellation() -> None:
-    def reader(_user_id: int):
+async def test_profile_preference_write_propagates_cancellation() -> None:
+    def writer(**_kwargs):
         raise asyncio.CancelledError()
 
     with pytest.raises(asyncio.CancelledError):
-        await svc.set_profile_preference(42, "language", "English", reader=reader)
+        await svc.set_profile_preference(42, "language", "English", writer=writer)

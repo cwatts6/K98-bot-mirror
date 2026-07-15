@@ -62,10 +62,10 @@ def register_me(bot: ext_commands.Bot) -> None:
 
     @me_group.command(
         name="preferences",
-        description="Review your private inventory preferences",
+        description="Review your private Personal Settings",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.00")
+    @versioned("v1.01")
     @safe_command
     @track_usage()
     async def me_preferences(ctx: discord.ApplicationContext) -> None:

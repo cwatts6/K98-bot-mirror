@@ -3,12 +3,12 @@
 Last updated: 2026-07-15
 
 GovernorOS v2 Phase 5D.1 is complete and operator accepted in mirror PR #223 and production
-PR #530 after final Discord smoke on 2026-07-15. `/me reminders` now uses shared live/projection
-eligibility to show the deterministic earliest future KVK or Calendar alert, healthy
-`NO UPCOMING ALERT`, or request-level `SCHEDULE UNAVAILABLE` without implying delivery. The final
-card makes the authoritative event-start UTC date-time prominent in bold gold. Phase 5E Premium
-Preferences Summary Card is next, but its task pack/background will be supplied separately by the
-operator and runtime implementation is not yet approved.
+PR #530 after final Discord smoke on 2026-07-15. Phase 5E Premium Preferences Summary Card is in
+implementation and local validation. It turns `/me preferences` into the private Personal Settings
+centre for the three-field regional profile, DST-aware local-time context, and Inventory privacy;
+uses the approved Governor's Accord backdrop and invoking-user avatar; removes Inventory navigation
+and all VIP content from Preferences; and moves the unchanged governor-specific VIP editor to
+Manage Accounts -> Update VIP with explicit governor resolution and a current-access recheck.
 
 GovernorOS v2 status: Phase 4 Premium Governor Dashboard Renderer is complete and operator smoke
 passed on 2026-07-11. `/me dashboard` is governor-first: no linked governor shows setup
@@ -93,9 +93,12 @@ distinguishes healthy no-upcoming state from a request-level unavailable schedul
 labels and absolute UTC times, highlights the event start, and never claims that Discord delivery
 has occurred. The same Manage journey can open Calendar Settings for calendar reminder event types
 and lead times.
-`/me preferences` can update inventory report visibility between private and public output, open
-the existing Governor VIP update flow, and manage profile preferences for timezone, location
-country, and preferred language through dropdowns.
+`/me preferences` shows Personal Settings for saved timezone, location country, preferred-language
+metadata, a DST-aware local-time reference, and Inventory privacy. One Manage settings journey
+updates regional fields or changes Inventory visibility after explicit confirmation. Inventory
+visibility controls whether detailed `/me inventory` and `/myinventory` reports may post in the
+channel; private direct `/me resources`, `/me materials`, and `/me speedups` remain private. VIP is
+managed from Manage Accounts -> Update VIP, not from Preferences.
 `/me inventory` shows a private summary of latest approved resources, speedups, and materials for
 your registered governors. If no approved inventory data exists yet, it points you toward the
 inventory upload process. Open Report keeps the existing inventory report picker, range controls,
@@ -544,16 +547,16 @@ Current status:
   default KVK snapshot uses the same injected UTC clock as projection; the final card highlights
   `Event starts` in bold gold. Mirror PR #223 and production PR #530 carry the reviewed delivery,
   and the completed task pack/starter are archived.
-- Phase 5E Preferences is the next separately scoped slice. The operator will supply its task pack
-  and background; runtime implementation is not yet approved. It should apply the accepted premium
-  1702x924 standalone/private/same-payload-fallback lifecycle by default while preserving the
-  existing Inventory visibility, Update VIP, and Manage Profile services and saved semantics.
-  Preferences remains Discord-user scoped and never shows a parent Change Governor. Update VIP is
-  a governor-specific child journey that must explicitly select/resolve a linked governor and
-  recheck current access; retained Dashboard context is return-only and must not filter the page.
-  The Phase 5E checkpoint owns the exact hero, backdrop, avatar treatment, hierarchy, labels,
-  guidance, and component rows. No profile schema, SQL, persistence, default, preference-semantic,
-  Google Sheets, command, or legacy-redirect change is implied.
+- Phase 5E Preferences is in implementation/local validation using the approved 1702x924
+  Governor's Accord backdrop, invoking-user avatar, standalone private attachment, same-payload
+  fallback, and graceful timeout. Preferences is Discord-user scoped; retained Dashboard governor
+  context is return-only and never filters the page, sets local time, or preselects VIP. The main
+  page removes Inventory navigation and old direct actions in favour of one Manage settings child
+  journey. Profile values retain existing validation/null semantics and now use an atomic
+  field-specific DAL upsert; no SQL repo object or schema changes. Inventory visibility retains its
+  existing persistence meaning with explicit confirmation and stale-state revalidation. Update VIP
+  moves to Manage Accounts with an explicit linked-governor selector and unchanged access recheck,
+  labels, not-set meaning, persistence, and host refresh.
 - Phases 5F-5G independently apply the same format and transition contract to Inventory summary
   and Exports summary. They preserve current page actions,
   disabled states, privacy, payloads, filenames, attachment cleanup, and service ownership; none

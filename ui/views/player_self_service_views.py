@@ -14,21 +14,23 @@ import discord
 
 from core.interaction_safety import safe_defer
 from inventory import reporting_service
-from inventory.models import InventoryReportVisibility
 from player_self_service import (
     account_service,
     accounts_renderer,
     accounts_service,
     dashboard_card,
     page_cards,
-    preference_service,
-    profile_preference_service,
+    preferences_renderer,
     reminder_service,
     reminders_renderer,
     reminders_summary,
 )
 from player_self_service.account_service import AccountCentreState
 from player_self_service.accounts_models import AccountsPortfolioPayload
+from player_self_service.preferences_summary import (
+    PreferencesSummaryPayload,
+    build_preferences_summary,
+)
 from player_self_service.reminder_service import ReminderCentreState
 from player_self_service.reminders_summary import RemindersSummaryPayload
 from player_self_service.service import (
@@ -38,11 +40,13 @@ from player_self_service.service import (
 from ui.views import player_self_service_export_views as export_views
 from ui.views.inventory_report_views import (
     send_inventory_preference_prompt,
-    send_inventory_vip_preference_prompt,
     start_myinventory_command,
 )
 from ui.views.player_self_service_account_views import AccountManageView
-from ui.views.player_self_service_preference_views import ProfilePreferenceManageView
+from ui.views.player_self_service_preference_views import (
+    PreferencesJourneyState,
+    show_preferences_manage_settings,
+)
 from ui.views.player_self_service_reminder_views import (
     ReminderSetupView,
 )
@@ -52,6 +56,7 @@ logger = logging.getLogger(__name__)
 PlayerSelfServicePage = str
 SummaryLoader = Callable[[int], Awaitable[PlayerSelfServiceSummary]]
 AccountsLoader = Callable[[int], Awaitable[AccountsPortfolioPayload]]
+PreferencesLoader = Callable[..., Awaitable[PreferencesSummaryPayload]]
 _AVATAR_READ_TIMEOUT_SECONDS = 5.0
 
 PAGE_DASHBOARD = "dashboard"
@@ -345,40 +350,44 @@ def build_reminders_embed(
 
 
 def build_preferences_embed(
-    summary: PlayerSelfServiceSummary,
-    *,
-    display_name: str,
+    payload: PreferencesSummaryPayload,
 ) -> discord.Embed:
-    preferences = summary.preferences
+    visibility = payload.inventory_visibility
+    profile = payload.regional_profile
     embed = discord.Embed(
-        title="Preferences",
-        description=f"Private preference status for {display_name}",
-        color=discord.Color.teal(),
+        title="Personal Settings",
+        description=f"Private settings for {payload.display_name}",
+        color=discord.Color.gold() if visibility.is_public else discord.Color.teal(),
     )
     embed.add_field(
-        name="Current Status",
+        name=f"{visibility.state_label} • {payload.profile_supporting_text}",
         value=_field_value(
             [
-                f"Inventory visibility: {preferences.inventory_visibility}",
-                f"VIP levels: {preferences.vip_summary}",
-                f"Timezone: {preferences.timezone}",
-                f"Location: {preferences.location_country}",
-                f"Language: {preferences.preferred_language}",
+                f"{payload.time_reference.heading}: {payload.time_reference.display_time}",
+                payload.time_reference.supporting_line,
+                f"Timezone: {profile.timezone.friendly_label}",
+                f"Location: {profile.location.friendly_label}",
+                f"Preferred language: {profile.preferred_language.friendly_label}",
             ]
         ),
         inline=False,
     )
     embed.add_field(
-        name="Available Actions",
-        value=_field_value(
-            [
-                "Use the visibility toggle to choose how inventory reports are posted.",
-                "Use Update VIP to keep inventory capacity assumptions accurate.",
-                "Use Manage Profile to save timezone, country, and language.",
-            ]
-        ),
+        name=f"Inventory visibility: {visibility.state_label}",
+        value=visibility.consequence_text,
         inline=False,
     )
+    embed.add_field(
+        name="Settings insight",
+        value=payload.settings_insight,
+        inline=False,
+    )
+    embed.add_field(
+        name="Manage settings",
+        value="Update your regional profile and Inventory privacy.",
+        inline=False,
+    )
+    embed.set_footer(text=f"Refreshed {payload.generated_at_utc:%d %B %Y %H:%M UTC}")
     return embed
 
 
@@ -457,6 +466,7 @@ def build_page_embed(
     *,
     display_name: str,
     accounts_payload: AccountsPortfolioPayload | None = None,
+    preferences_payload: PreferencesSummaryPayload | None = None,
 ) -> discord.Embed:
     if page == PAGE_ACCOUNTS:
         if accounts_payload is not None:
@@ -464,12 +474,14 @@ def build_page_embed(
         if summary is None:
             raise ValueError("Accounts fallback requires an authorised portfolio payload")
         return build_accounts_embed(summary, display_name=display_name)
+    if page == PAGE_PREFERENCES:
+        if preferences_payload is None:
+            raise ValueError("Preferences fallback requires an authorised payload")
+        return build_preferences_embed(preferences_payload)
     if summary is None:
         raise ValueError(f"{page} requires a player self-service summary")
     if page == PAGE_REMINDERS:
         return build_reminders_embed(summary, display_name=display_name)
-    if page == PAGE_PREFERENCES:
-        return build_preferences_embed(summary, display_name=display_name)
     if page == PAGE_EXPORTS:
         return build_exports_embed(summary, display_name=display_name)
     if page == PAGE_INVENTORY:
@@ -494,11 +506,14 @@ def _close_files(files: list[discord.File] | None) -> None:
 def _payload_user_id(
     summary: PlayerSelfServiceSummary | None,
     accounts_payload: AccountsPortfolioPayload | None,
+    preferences_payload: PreferencesSummaryPayload | None = None,
 ) -> int | None:
     if accounts_payload is not None:
         return accounts_payload.discord_user_id
     if summary is not None:
         return summary.discord_user_id
+    if preferences_payload is not None:
+        return preferences_payload.discord_user_id
     return None
 
 
@@ -508,6 +523,7 @@ async def _build_page_response(
     *,
     display_name: str,
     accounts_payload: AccountsPortfolioPayload | None = None,
+    preferences_payload: PreferencesSummaryPayload | None = None,
     avatar_bytes: bytes | None = None,
 ) -> tuple[discord.Embed | None, list[discord.File]]:
     fallback_embed = build_page_embed(
@@ -515,6 +531,7 @@ async def _build_page_response(
         summary,
         display_name=display_name,
         accounts_payload=accounts_payload,
+        preferences_payload=preferences_payload,
     )
     try:
         if page == PAGE_ACCOUNTS:
@@ -542,6 +559,14 @@ async def _build_page_response(
                 _reminders_payload(summary, display_name=display_name),
                 avatar_bytes=avatar_bytes,
             )
+        elif page == PAGE_PREFERENCES:
+            if preferences_payload is None:
+                raise ValueError("Preferences render requires an authorised payload")
+            rendered = await asyncio.to_thread(
+                preferences_renderer.render_preferences_card,
+                preferences_payload,
+                avatar_bytes=avatar_bytes,
+            )
         else:
             if summary is None:
                 raise ValueError(f"{page} render requires a summary")
@@ -556,7 +581,7 @@ async def _build_page_response(
     except Exception:
         logger.exception(
             "player_self_service_card_render_failed user_id=%s page=%s",
-            _payload_user_id(summary, accounts_payload),
+            _payload_user_id(summary, accounts_payload, preferences_payload),
             page,
         )
         return fallback_embed, []
@@ -566,10 +591,27 @@ async def _build_page_response(
         if isinstance(rendered.image_bytes, (bytes, bytearray))
         else rendered.image_bytes
     )
-    file = discord.File(image_source, filename=rendered.filename)
+    try:
+        file = discord.File(image_source, filename=rendered.filename)
+    except asyncio.CancelledError:
+        try:
+            image_source.close()
+        finally:
+            raise
+    except Exception:
+        try:
+            image_source.close()
+        except Exception:
+            logger.debug("player_self_service_stream_close_failed", exc_info=True)
+        logger.exception(
+            "player_self_service_file_create_failed user_id=%s page=%s",
+            _payload_user_id(summary, accounts_payload, preferences_payload),
+            page,
+        )
+        return fallback_embed, []
     embed = (
         None
-        if page in {PAGE_ACCOUNTS, PAGE_REMINDERS}
+        if page in {PAGE_ACCOUNTS, PAGE_REMINDERS, PAGE_PREFERENCES}
         else (
             build_dashboard_card_embed(rendered.filename)
             if page == PAGE_DASHBOARD
@@ -602,6 +644,7 @@ async def _edit_original_with_image_fallback(
     page: PlayerSelfServicePage,
     summary: PlayerSelfServiceSummary | None,
     accounts_payload: AccountsPortfolioPayload | None = None,
+    preferences_payload: PreferencesSummaryPayload | None = None,
     display_name: str,
     view: discord.ui.View,
     embed: discord.Embed | None,
@@ -620,7 +663,7 @@ async def _edit_original_with_image_fallback(
             raise
         logger.exception(
             "player_self_service_card_send_failed user_id=%s page=%s",
-            _payload_user_id(summary, accounts_payload),
+            _payload_user_id(summary, accounts_payload, preferences_payload),
             page,
         )
         fallback_embed = build_page_embed(
@@ -628,6 +671,7 @@ async def _edit_original_with_image_fallback(
             summary,
             display_name=display_name,
             accounts_payload=accounts_payload,
+            preferences_payload=preferences_payload,
         )
         return await target.edit_original_response(
             content=None,
@@ -648,6 +692,10 @@ class PlayerSelfServiceView(discord.ui.View):
         summary_loader: SummaryLoader = build_player_self_service_summary,
         accounts_payload: AccountsPortfolioPayload | None = None,
         accounts_loader: AccountsLoader = accounts_service.build_accounts_portfolio,
+        preferences_payload: PreferencesSummaryPayload | None = None,
+        preferences_loader: PreferencesLoader = build_preferences_summary,
+        preferences_journey: PreferencesJourneyState | None = None,
+        preferences_generation: int | None = None,
         avatar_bytes: bytes | None = None,
         dashboard_governor_id: int | None = None,
         timeout: float = 180,
@@ -660,11 +708,20 @@ class PlayerSelfServiceView(discord.ui.View):
         self.summary_loader = summary_loader
         self.accounts_payload = accounts_payload
         self.accounts_loader = accounts_loader
+        self.preferences_payload = preferences_payload
+        self.preferences_loader = preferences_loader
+        self.preferences_journey = preferences_journey or PreferencesJourneyState()
+        self.preferences_generation = (
+            self.preferences_journey.advance()
+            if page == PAGE_PREFERENCES and preferences_generation is None
+            else preferences_generation
+        )
         self.avatar_bytes = avatar_bytes
         self.dashboard_governor_id = dashboard_governor_id
         self._message_ref: discord.Message | None = None
         self._timeout_editor: Callable[..., Awaitable[Any]] | None = None
         self._expired = False
+        self._transition_generation = 0
         self._apply_page_state()
 
     def set_message_ref(self, message: discord.Message | None) -> None:
@@ -684,6 +741,16 @@ class PlayerSelfServiceView(discord.ui.View):
         if self._expired:
             await interaction.response.send_message(
                 "This private menu has expired. Run `/me dashboard` again.",
+                ephemeral=True,
+            )
+            return False
+        if (
+            self.page == PAGE_PREFERENCES
+            and self.preferences_generation is not None
+            and not self.preferences_journey.is_current(self.preferences_generation)
+        ):
+            await interaction.response.send_message(
+                "This Preferences window was superseded. Use the current private window.",
                 ephemeral=True,
             )
             return False
@@ -723,12 +790,10 @@ class PlayerSelfServiceView(discord.ui.View):
                     "me:inventory:"
                 ):
                     self.remove_item(child)
-        if self.page == PAGE_PREFERENCES:
-            self._apply_preference_toggle_state()
         if self.page == PAGE_EXPORTS:
             self._apply_export_button_state()
         self._apply_visible_action_rows()
-        if self.page in {PAGE_ACCOUNTS, PAGE_REMINDERS}:
+        if self.page in {PAGE_ACCOUNTS, PAGE_REMINDERS, PAGE_PREFERENCES}:
             for child in list(self.children):
                 if isinstance(child, discord.ui.Button) and child.custom_id == "me:inventory":
                     self.remove_item(child)
@@ -761,29 +826,6 @@ class PlayerSelfServiceView(discord.ui.View):
             ):
                 child.row = 2
 
-    def _apply_preference_toggle_state(self) -> None:
-        visibility = ""
-        if self.summary is not None:
-            visibility = self.summary.preferences.inventory_visibility.strip().lower()
-        for child in self.children:
-            if (
-                isinstance(child, discord.ui.Button)
-                and child.custom_id == "me:preference:visibility"
-            ):
-                if visibility == "private":
-                    child.label = "Set Public"
-                    child.style = discord.ButtonStyle.success
-                elif visibility == "public":
-                    child.label = "Set Private"
-                    child.style = discord.ButtonStyle.success
-                elif visibility == "unknown":
-                    child.label = "Set Visibility"
-                    child.style = discord.ButtonStyle.success
-                    child.disabled = True
-                else:
-                    child.label = "Set Private"
-                    child.style = discord.ButtonStyle.success
-
     def _apply_export_button_state(self) -> None:
         action_state = ""
         if self.summary is not None:
@@ -802,6 +844,16 @@ class PlayerSelfServiceView(discord.ui.View):
         *,
         can_edit: Callable[[], bool] | None = None,
     ) -> bool:
+        self._transition_generation += 1
+        transition_generation = self._transition_generation
+        external_can_edit = can_edit
+
+        def transition_is_current() -> bool:
+            return self._transition_generation == transition_generation and (
+                external_can_edit is None or external_can_edit()
+            )
+
+        can_edit = transition_is_current
         if page == PAGE_DASHBOARD:
             from ui.views.player_self_service_governor_dashboard_views import (
                 show_governor_dashboard_for_interaction,
@@ -845,10 +897,16 @@ class PlayerSelfServiceView(discord.ui.View):
 
         summary: PlayerSelfServiceSummary | None = None
         accounts_payload: AccountsPortfolioPayload | None = None
+        preferences_payload: PreferencesSummaryPayload | None = None
         avatar_bytes = self.avatar_bytes
         try:
             if page == PAGE_ACCOUNTS:
                 accounts_payload = await self.accounts_loader(self.author_id)
+            elif page == PAGE_PREFERENCES:
+                preferences_payload = await self.preferences_loader(
+                    self.author_id,
+                    display_name=self.display_name,
+                )
             else:
                 summary = await self.summary_loader(self.author_id)
         except asyncio.CancelledError:
@@ -878,7 +936,7 @@ class PlayerSelfServiceView(discord.ui.View):
             )
             return False
 
-        if page in {PAGE_ACCOUNTS, PAGE_REMINDERS} and avatar_bytes is None:
+        if page in {PAGE_ACCOUNTS, PAGE_REMINDERS, PAGE_PREFERENCES} and avatar_bytes is None:
             avatar_bytes = await _read_avatar_bytes(
                 getattr(interaction, "user", None), expected_user_id=self.author_id
             )
@@ -891,6 +949,9 @@ class PlayerSelfServiceView(discord.ui.View):
             summary_loader=self.summary_loader,
             accounts_payload=accounts_payload,
             accounts_loader=self.accounts_loader,
+            preferences_payload=preferences_payload,
+            preferences_loader=self.preferences_loader,
+            preferences_journey=self.preferences_journey,
             avatar_bytes=avatar_bytes,
             dashboard_governor_id=self.dashboard_governor_id,
             timeout=self.timeout or 180,
@@ -900,6 +961,7 @@ class PlayerSelfServiceView(discord.ui.View):
             summary,
             display_name=self.display_name,
             accounts_payload=accounts_payload,
+            preferences_payload=preferences_payload,
             avatar_bytes=avatar_bytes,
         )
         if can_edit is not None and not can_edit():
@@ -916,6 +978,7 @@ class PlayerSelfServiceView(discord.ui.View):
                 page=page,
                 summary=summary,
                 accounts_payload=accounts_payload,
+                preferences_payload=preferences_payload,
                 display_name=self.display_name,
                 view=view,
                 embed=embed,
@@ -936,6 +999,7 @@ class PlayerSelfServiceView(discord.ui.View):
                     summary,
                     display_name=self.display_name,
                     accounts_payload=accounts_payload,
+                    preferences_payload=preferences_payload,
                 ),
                 view=view,
                 ephemeral=True,
@@ -1285,183 +1349,51 @@ class PlayerSelfServiceView(discord.ui.View):
         )
         setup_view.set_message_ref(sent)
 
-    async def _save_inventory_visibility(
-        self,
-        interaction: discord.Interaction,
-        visibility: InventoryReportVisibility,
-    ) -> None:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
-        except TypeError:
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.defer()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.debug("player_self_service_preference_defer_failed", exc_info=True)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.debug("player_self_service_preference_defer_failed", exc_info=True)
-
-        result = await preference_service.save_inventory_visibility(
-            self.author_id,
-            visibility,
-        )
-        await interaction.followup.send(result.message, ephemeral=True)
-        if not result.ok:
-            return
-
-        try:
-            summary = await self.summary_loader(self.author_id)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception(
-                "player_self_service_preference_refresh_failed user_id=%s",
-                self.author_id,
-            )
-            return
-
-        view = PlayerSelfServiceView(
-            author_id=self.author_id,
-            display_name=self.display_name,
-            page=PAGE_PREFERENCES,
-            summary=summary,
-            summary_loader=self.summary_loader,
-            timeout=self.timeout or 180,
-        )
-        embed, files = await _build_page_response(
-            PAGE_PREFERENCES,
-            summary,
-            display_name=self.display_name,
-        )
-        try:
-            edited = await _edit_original_with_image_fallback(
-                interaction,
-                page=PAGE_PREFERENCES,
-                summary=summary,
-                display_name=self.display_name,
-                view=view,
-                embed=embed,
-                files=files,
-            )
-            view.set_message_ref(getattr(interaction, "message", None) or edited)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.debug("player_self_service_preference_refresh_edit_failed", exc_info=True)
-
     @discord.ui.button(
-        label="Set Visibility",
+        label="Manage settings",
         style=discord.ButtonStyle.success,
-        custom_id="me:preference:visibility",
+        custom_id="me:preference:manage",
         row=4,
     )
-    async def preference_visibility_button(
+    async def preference_manage_button(
         self,
         button: discord.ui.Button,
         interaction: discord.Interaction,
     ) -> None:
-        visibility = ""
-        if self.summary is not None:
-            visibility = self.summary.preferences.inventory_visibility.strip().lower()
-        target = (
-            InventoryReportVisibility.PUBLIC
-            if visibility == "private"
-            else InventoryReportVisibility.ONLY_ME
-        )
-        await self._save_inventory_visibility(interaction, target)
-
-    @discord.ui.button(
-        label="Update VIP",
-        style=discord.ButtonStyle.success,
-        custom_id="me:preference:vip",
-        row=4,
-    )
-    async def preference_vip_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
-        except TypeError:
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.defer()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.debug("player_self_service_preference_vip_defer_failed", exc_info=True)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.debug("player_self_service_preference_vip_defer_failed", exc_info=True)
-
-        await send_inventory_vip_preference_prompt(
-            interaction=interaction,
-            requester_id=self.author_id,
-        )
-
-    @discord.ui.button(
-        label="Manage Profile",
-        style=discord.ButtonStyle.success,
-        custom_id="me:preference:profile",
-        row=4,
-    )
-    async def preference_profile_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
-        except TypeError:
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.defer()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.debug("player_self_service_preference_profile_defer_failed", exc_info=True)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.debug("player_self_service_preference_profile_defer_failed", exc_info=True)
-
-        result = await profile_preference_service.read_user_profile_preference(self.author_id)
-        if not result.ok:
-            await interaction.followup.send(
-                "Profile preferences are temporarily unavailable. Please try again in a moment.",
+        if self.preferences_payload is None:
+            await interaction.response.send_message(
+                "Preferences are temporarily unavailable. Run `/me preferences` again.",
                 ephemeral=True,
             )
             return
-        await interaction.followup.send(
-            "\n".join(result.profile.summary_lines),
-            view=ProfilePreferenceManageView(
-                author_id=self.author_id,
-                display_name=self.display_name,
-                profile=result.profile,
-                host_message=getattr(interaction, "message", None),
-                summary_loader=self.summary_loader,
-            ),
-            ephemeral=True,
+        await show_preferences_manage_settings(
+            interaction,
+            author_id=self.author_id,
+            display_name=self.display_name,
+            payload=self.preferences_payload,
+            preferences_loader=self.preferences_loader,
+            avatar_bytes=self.avatar_bytes,
+            dashboard_governor_id=self.dashboard_governor_id,
+            journey=self.preferences_journey,
+            source_generation=self.preferences_generation,
+            timeout=self.timeout or 180,
         )
 
     async def on_timeout(self) -> None:
         self._expired = True
+        if self.page == PAGE_PREFERENCES and self.preferences_generation is not None:
+            self.preferences_journey.expire(self.preferences_generation)
         for child in self.children:
             child.disabled = True
         message = self._message_ref or getattr(self, "message", None)
         timeout_content = (
             "This private reminder report has expired. Run `/me reminders` again."
             if self.page == PAGE_REMINDERS
-            else "This private /me menu has expired. Run `/me dashboard` again."
+            else (
+                "This private Preferences page has expired. Run `/me preferences` again."
+                if self.page == PAGE_PREFERENCES
+                else "This private /me menu has expired. Run `/me dashboard` again."
+            )
         )
         edited = False
         try:
@@ -1489,6 +1421,7 @@ async def show_player_self_service_page_for_interaction(
     page: PlayerSelfServicePage,
     summary_loader: SummaryLoader = build_player_self_service_summary,
     accounts_loader: AccountsLoader = accounts_service.build_accounts_portfolio,
+    preferences_loader: PreferencesLoader = build_preferences_summary,
     avatar_bytes: bytes | None = None,
     dashboard_governor_id: int | None = None,
     timeout: float = 180,
@@ -1501,6 +1434,7 @@ async def show_player_self_service_page_for_interaction(
         page=page,
         summary_loader=summary_loader,
         accounts_loader=accounts_loader,
+        preferences_loader=preferences_loader,
         avatar_bytes=avatar_bytes,
         dashboard_governor_id=dashboard_governor_id,
         timeout=timeout,
@@ -1513,18 +1447,25 @@ async def send_player_self_service_page(
     *,
     page: PlayerSelfServicePage = PAGE_DASHBOARD,
     summary_loader: SummaryLoader = build_player_self_service_summary,
+    preferences_loader: PreferencesLoader = build_preferences_summary,
 ) -> None:
     await safe_defer(ctx, ephemeral=True)
     display_name = _display_name(getattr(ctx, "user", None))
     summary: PlayerSelfServiceSummary | None = None
     accounts_payload: AccountsPortfolioPayload | None = None
+    preferences_payload: PreferencesSummaryPayload | None = None
     avatar_bytes: bytes | None = None
     try:
         if page == PAGE_ACCOUNTS:
             accounts_payload = await accounts_service.build_accounts_portfolio(int(ctx.user.id))
+        elif page == PAGE_PREFERENCES:
+            preferences_payload = await preferences_loader(
+                int(ctx.user.id),
+                display_name=display_name,
+            )
         else:
             summary = await summary_loader(int(ctx.user.id))
-        if page in {PAGE_ACCOUNTS, PAGE_REMINDERS}:
+        if page in {PAGE_ACCOUNTS, PAGE_REMINDERS, PAGE_PREFERENCES}:
             avatar_bytes = await _read_avatar_bytes(ctx.user, expected_user_id=int(ctx.user.id))
     except Exception:
         logger.exception(
@@ -1553,6 +1494,8 @@ async def send_player_self_service_page(
         summary=summary,
         summary_loader=summary_loader,
         accounts_payload=accounts_payload,
+        preferences_payload=preferences_payload,
+        preferences_loader=preferences_loader,
         avatar_bytes=avatar_bytes,
     )
     embed, files = await _build_page_response(
@@ -1560,6 +1503,7 @@ async def send_player_self_service_page(
         summary,
         display_name=display_name,
         accounts_payload=accounts_payload,
+        preferences_payload=preferences_payload,
         avatar_bytes=avatar_bytes,
     )
     try:
@@ -1568,6 +1512,7 @@ async def send_player_self_service_page(
             page=page,
             summary=summary,
             accounts_payload=accounts_payload,
+            preferences_payload=preferences_payload,
             display_name=display_name,
             view=view,
             embed=embed,

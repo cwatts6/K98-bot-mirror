@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from io import BytesIO
 
 from PIL import Image, ImageDraw
+import pytest
 
 from player_self_service.page_cards import (
     HEIGHT,
@@ -91,7 +92,7 @@ def _summary() -> PlayerSelfServiceSummary:
 
 
 def test_render_page_cards_output_pngs_for_remaining_me_pages() -> None:
-    for page in ("dashboard", "accounts", "reminders", "preferences", "inventory", "exports"):
+    for page in ("dashboard", "accounts", "reminders", "inventory", "exports"):
         rendered = render_page_card(
             page,
             _summary(),
@@ -142,13 +143,8 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
     )
     assert _page_copy("reminders", summary)[2] == "Actions available: Manage"
     assert "manage calendar reminders" in _page_copy("reminders", summary)[3]
-    assert _page_copy("preferences", summary)[0] == "Preferences"
-    assert _page_copy("preferences", summary)[2] == (
-        "Actions available: Update VIP, Manage Profile"
-    )
-    assert _page_copy("preferences", summary)[3] == (
-        "Switch inventory visibility, update VIP, or manage profile details."
-    )
+    with pytest.raises(ValueError, match="Unsupported /me page card: preferences"):
+        _page_copy("preferences", summary)
     assert _page_copy("inventory", summary)[0] == "Inventory"
     assert _page_copy("exports", summary)[1] == "private"
     assert _page_copy("dashboard", summary)[2] == (
@@ -314,8 +310,8 @@ def test_page_card_account_and_vip_lines_show_full_summary() -> None:
     )
 
     assert "Farm 2" in _page_copy("accounts", summary)[4][2]
-    assert _page_copy("preferences", summary)[4][1] == "VIP levels: Main - 19, Alt 1 - 15"
-    assert _page_copy("preferences", summary)[4][3] == "Location: not set"
+    with pytest.raises(ValueError, match="Unsupported /me page card: preferences"):
+        _page_copy("preferences", summary)
 
 
 def test_page_card_reminder_lines_include_calendar_status() -> None:

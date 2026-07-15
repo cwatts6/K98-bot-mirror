@@ -6,17 +6,15 @@ from typing import Any
 
 import discord
 
-from inventory import export_service, profile_service, reporting_service
+from inventory import export_service, reporting_service
 from inventory.models import (
     InventoryExportFormat,
-    InventoryGovernorProfile,
     InventoryReportRange,
     InventoryReportView,
     InventoryReportVisibility,
     RegisteredGovernor,
 )
 from inventory.report_image_renderer import render_inventory_reports
-from inventory.vip_levels import VIP_LABELS, InventoryVipLevel, normalize_vip_level
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +24,6 @@ REPORT_VIEW_OPTIONS = {
     "Speedups": InventoryReportView.SPEEDUPS,
     "Materials": InventoryReportView.MATERIALS,
 }
-
-VIP_SELECT_OPTIONS = [
-    InventoryVipLevel.UNKNOWN,
-    InventoryVipLevel.VIP_14_OR_LESS,
-    InventoryVipLevel.VIP_15,
-    InventoryVipLevel.VIP_16,
-    InventoryVipLevel.VIP_17,
-    InventoryVipLevel.VIP_18,
-    InventoryVipLevel.VIP_19,
-    InventoryVipLevel.SVIP,
-]
 
 
 async def _avatar_bytes(user: Any) -> bytes | None:
@@ -348,275 +335,12 @@ class InventoryPreferenceView(discord.ui.View):
     async def public(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
         await self._save(interaction, InventoryReportVisibility.PUBLIC)
 
-    @discord.ui.button(
-        label="Update Governor VIP",
-        style=discord.ButtonStyle.secondary,
-        custom_id="inventory_pref_vip",
-    )
-    async def update_vip(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
-        if int(interaction.user.id) != self.requester_id:
-            await interaction.response.send_message(
-                "This preference prompt is not for you.", ephemeral=True
-            )
-            return
-        await interaction.response.defer(ephemeral=True)
-        await send_inventory_vip_preference_prompt(
-            interaction=interaction,
-            requester_id=self.requester_id,
-        )
-
-
-class InventoryVipPreferenceView(discord.ui.View):
-    def __init__(
-        self,
-        *,
-        requester_id: int,
-        governors: list[RegisteredGovernor],
-        profiles_by_governor_id: dict[int, InventoryGovernorProfile] | None = None,
-    ) -> None:
-        super().__init__(timeout=300)
-        self.requester_id = int(requester_id)
-        self.governors_by_id = {item.governor_id: item for item in governors}
-        self.profiles_by_governor_id: dict[int, InventoryGovernorProfile] = (
-            profiles_by_governor_id or {}
-        )
-        self.message: discord.Message | None = None
-        initial_governor_id = governors[0].governor_id if len(governors) == 1 else None
-        self.selected_governor_id = initial_governor_id
-        initial_profile = (
-            self.profiles_by_governor_id.get(initial_governor_id)
-            if initial_governor_id is not None
-            else None
-        )
-        self.selected_vip_level = normalize_vip_level(
-            initial_profile.vip_level_code if initial_profile else None
-        )
-        self._completed = False
-        if len(governors) > 1:
-            self.add_item(InventoryVipGovernorSelect(governors))
-        self.add_item(
-            InventoryVipLevelSelect(
-                initial_level=(
-                    self.selected_vip_level
-                    if initial_profile and initial_profile.vip_level_code
-                    else None
-                )
-            )
-        )
-
-    async def on_timeout(self) -> None:
-        for item in self.children:
-            item.disabled = True
-        try:
-            if self.message:
-                await self.message.edit(view=self)
-        except Exception:
-            pass
-
-    async def save(self, interaction: discord.Interaction) -> None:
-        if int(interaction.user.id) != self.requester_id:
-            await interaction.response.send_message(
-                "This VIP preference prompt is not for you.", ephemeral=True
-            )
-            return
-        if self._completed:
-            await interaction.response.send_message(
-                "This VIP preference prompt has already been used. Run `/inventory_preferences` again to update another governor.",
-                ephemeral=True,
-            )
-            return
-        if self.selected_governor_id is None:
-            await interaction.response.send_message("Choose a governor first.", ephemeral=True)
-            return
-        await interaction.response.defer(ephemeral=True)
-        try:
-            profile = await profile_service.update_inventory_vip(
-                discord_user_id=self.requester_id,
-                governor_id=int(self.selected_governor_id),
-                vip_level_code=self.selected_vip_level.value,
-                discord_user=interaction.user,
-            )
-        except PermissionError as exc:
-            await interaction.followup.send(
-                str(exc) or "You do not have permission to update this governor's VIP preference.",
-                ephemeral=True,
-            )
-            return
-        except ValueError as exc:
-            await interaction.followup.send(
-                str(exc) or "The selected VIP preference is invalid.",
-                ephemeral=True,
-            )
-            return
-        except Exception:
-            logger.exception("inventory_vip_preference_save_failed")
-            await interaction.followup.send(
-                "Unable to save the VIP preference right now. Please try again later.",
-                ephemeral=True,
-            )
-            return
-        self._completed = True
-        for item in self.children:
-            item.disabled = True
-        self.stop()
-        governor = self.governors_by_id.get(int(self.selected_governor_id))
-        governor_label = (
-            f"{governor.governor_name} (`{governor.governor_id}`)"
-            if governor
-            else f"`{self.selected_governor_id}`"
-        )
-        await interaction.followup.send(
-            _vip_saved_message(governor_label, profile.vip_level_label),
-            ephemeral=True,
-        )
-        try:
-            await interaction.edit_original_response(view=self)
-        except Exception:
-            logger.debug("inventory_vip_preference_prompt_update_failed", exc_info=True)
-
-    @discord.ui.button(
-        label="Save VIP",
-        style=discord.ButtonStyle.primary,
-        custom_id="inventory_vip_save",
-        row=2,
-    )
-    async def save_button(
-        self, button: discord.ui.Button, interaction: discord.Interaction
-    ) -> None:
-        await self.save(interaction)
-
-
-class InventoryVipGovernorSelect(discord.ui.Select):
-    def __init__(self, governors: list[RegisteredGovernor]) -> None:
-        options = [
-            discord.SelectOption(
-                label=item.governor_name[:100],
-                value=str(item.governor_id),
-                description=item.account_type[:100],
-            )
-            for item in governors
-        ]
-        super().__init__(
-            placeholder="Select Governor",
-            min_values=1,
-            max_values=1,
-            options=options,
-            row=0,
-        )
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        view = self.view
-        if not isinstance(view, InventoryVipPreferenceView):
-            return
-        if view._completed:
-            await interaction.response.send_message(
-                "This VIP preference prompt has already been used.", ephemeral=True
-            )
-            return
-        if int(interaction.user.id) != view.requester_id:
-            await interaction.response.send_message("This selector is not for you.", ephemeral=True)
-            return
-        view.selected_governor_id = int(self.values[0])
-        profile = view.profiles_by_governor_id.get(view.selected_governor_id)
-        view.selected_vip_level = normalize_vip_level(profile.vip_level_code if profile else None)
-        for option in self.options:
-            option.default = option.value == self.values[0]
-        for child in view.children:
-            if isinstance(child, InventoryVipLevelSelect):
-                child.sync_default(
-                    view.selected_vip_level if profile and profile.vip_level_code else None
-                )
-        await _refresh_select_message(interaction, view)
-
-
-class InventoryVipLevelSelect(discord.ui.Select):
-    def __init__(self, initial_level: InventoryVipLevel | None = None) -> None:
-        options = [
-            discord.SelectOption(
-                label=VIP_LABELS[level],
-                value=level.value,
-                default=initial_level is not None and level == initial_level,
-            )
-            for level in VIP_SELECT_OPTIONS
-        ]
-        super().__init__(
-            placeholder="Select VIP",
-            min_values=1,
-            max_values=1,
-            options=options,
-            row=1,
-        )
-
-    def sync_default(self, selected_level: InventoryVipLevel | None) -> None:
-        for option in self.options:
-            option.default = selected_level is not None and option.value == selected_level.value
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        view = self.view
-        if not isinstance(view, InventoryVipPreferenceView):
-            return
-        if view._completed:
-            await interaction.response.send_message(
-                "This VIP preference prompt has already been used.", ephemeral=True
-            )
-            return
-        if int(interaction.user.id) != view.requester_id:
-            await interaction.response.send_message("This selector is not for you.", ephemeral=True)
-            return
-        view.selected_vip_level = normalize_vip_level(self.values[0])
-        self.sync_default(view.selected_vip_level)
-        await _refresh_select_message(interaction, view)
-
-
-async def _refresh_select_message(interaction: discord.Interaction, view: discord.ui.View) -> None:
-    try:
-        await interaction.response.edit_message(view=view)
-    except Exception:
-        logger.debug("inventory_select_message_refresh_failed", exc_info=True)
-        try:
-            await interaction.response.defer(ephemeral=True)
-        except Exception:
-            pass
-
-
-def _vip_saved_message(governor_label: str, vip_level_label: str) -> str:
-    message = f"VIP saved for {governor_label}: **{vip_level_label}**."
-    if vip_level_label == VIP_LABELS[InventoryVipLevel.UNKNOWN]:
-        return f"{message} Default capacity assumptions will be used."
-    return message
-
 
 async def send_inventory_preference_prompt(ctx: discord.ApplicationContext) -> None:
     await ctx.followup.send(
-        "Choose how `/myinventory` should post your reports, or update a governor VIP level.",
+        "Choose how `/myinventory` should post your reports. "
+        "Governor VIP is managed from `/me accounts` → Manage Accounts → Update VIP.",
         view=InventoryPreferenceView(requester_id=int(ctx.user.id)),
-        ephemeral=True,
-    )
-
-
-async def send_inventory_vip_preference_prompt(
-    *,
-    interaction: discord.Interaction,
-    requester_id: int,
-) -> None:
-    governors = await reporting_service.get_registered_governors_for_user(int(requester_id))
-    if not governors:
-        await interaction.followup.send(
-            "I do not see any governors registered to you. Use `/register_governor` first.",
-            ephemeral=True,
-        )
-        return
-    profiles = await asyncio.gather(
-        *(profile_service.fetch_inventory_profile(g.governor_id) for g in governors)
-    )
-    profiles_by_governor_id = {p.governor_id: p for p in profiles}
-    await interaction.followup.send(
-        "Choose a governor and VIP level:",
-        view=InventoryVipPreferenceView(
-            requester_id=int(requester_id),
-            governors=governors,
-            profiles_by_governor_id=profiles_by_governor_id,
-        ),
         ephemeral=True,
     )
 

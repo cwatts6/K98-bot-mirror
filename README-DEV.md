@@ -50,13 +50,17 @@ tracker, rehydration, retry, command, Calendar, persistence, and DM contracts re
 from the separately authorised KVK at-start eligibility correction. The completed task pack and
 starter are archived.
 
-Phase 5E Premium Preferences Summary Card is the next separately scoped GovernorOS slice. Its task
-pack and background will be supplied separately by the operator; no runtime implementation is yet
-approved. The slice must begin from the accepted premium standalone/private/fallback lifecycle,
-keep Preferences Discord-user scoped with no parent `Change Governor`, preserve current Inventory
-visibility and profile services, and resolve `Update VIP` through its own explicit governor picker
-and current-access recheck. No SQL, schema, persistence, default, or preference-semantic change is
-implied by the visual alignment work.
+Phase 5E Premium Preferences Summary Card is in implementation and local validation. `/me
+preferences` is the private Discord-user-level Personal Settings centre with an avatar-enabled
+1702x924 standalone card, DST-aware local-time context, regional-profile coverage, truthful
+Inventory privacy copy, deterministic insight, one in-place `Manage settings` journey, and a
+same-payload fallback. Preferences has no Inventory navigation, VIP content, direct visibility
+toggle, or parent `Change Governor`. Inventory visibility keeps its existing service/persistence
+contract with confirmation-time revalidation. `Update VIP` now belongs to the existing Manage
+Accounts task selector and explicitly resolves a currently linked governor before the unchanged VIP
+service rechecks access and writes. Profile saves use a narrow atomic field-specific DAL upsert so
+concurrent edits to different fields do not overwrite one another. No SQL repository object, schema,
+migration, procedure, view, index, data, default, or preference meaning changes in Phase 5E.
 
 ## Quality Automation
 

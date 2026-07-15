@@ -5,7 +5,7 @@
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
 - Date: `2026-07-15`
-- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486, GovernorOS v2 Phases 1-5B completed through mirror PR #220 and production PR #527, Phase 5C Accounts completed and operator accepted in mirror PR #221 and production PR #528 on 2026-07-14, Phase 5D Reminders completed and operator accepted in mirror PR #222 and production PR #529 on 2026-07-15, and Phase 5D.1 Authoritative Next Scheduled Alert Projection completed and operator accepted in mirror PR #223 and production PR #530 on 2026-07-15
+- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486, GovernorOS v2 Phases 1-5B completed through mirror PR #220 and production PR #527, Phase 5C Accounts completed and operator accepted in mirror PR #221 and production PR #528 on 2026-07-14, Phase 5D Reminders completed and operator accepted in mirror PR #222 and production PR #529 on 2026-07-15, Phase 5D.1 Authoritative Next Scheduled Alert Projection completed and operator accepted in mirror PR #223 and production PR #530 on 2026-07-15, and the Phase 5E Preferences product/content/interaction contract, Governor's Accord backdrop, task pack, and chat starter approved for the next implementation slice on 2026-07-15
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
@@ -84,6 +84,16 @@ horizon, tracker, task, retry, rehydration, cleanup, and duplicate-send ownershi
 Calendar, command, SQL, persistence, event-source/type, lead-time, cadence, or DM-content change was
 introduced. The final card uses bold gold for the authoritative event-start date-time, and the
 default KVK cache snapshot shares the projection's injected UTC clock.
+
+Phase 5E Preferences is now product-, content-, interaction-, and backdrop-approved as the next
+implementation slice. `/me preferences` becomes the private **Personal Settings** centre for the
+invoking Discord user's regional profile and Inventory privacy. It adds a deterministic local-time
+reference from the saved timezone, current DST-aware UTC offset, three-field profile coverage, one
+Settings Insight, and the approved `assets/me/cards/me_preferences.png` Governor's Accord backdrop.
+The main action surface is simplified to one `Manage settings` journey. Governor-specific VIP editing
+moves out of Preferences and into the existing `Manage Accounts` task flow while reusing the current
+VIP selection, validation, authorization, and persistence contract. No new setting, SQL schema,
+profile meaning, visibility rule, account rule, command, or broad renderer framework is approved.
 
 ## 3. Programme Vision
 
@@ -193,7 +203,7 @@ For leadership, the long-term goal is a separate inspection journey that answers
 /me dashboard      = personal governor command centre
 /me accounts       = all-linked-governor portfolio, scan health, management, and private Account Summary
 /me reminders      = Discord-user reminder settings
-/me preferences    = Discord-user preference settings
+/me preferences    = Discord-user regional profile, local-time reference, and Inventory privacy
 /me inventory      = all-in-one inventory report journey
 /me resources      = direct selected-governor resource report
 /me materials      = direct selected-governor materials report
@@ -387,8 +397,9 @@ Delivery ownership:
 - Phase 5B completed the shared 1400x980 Inventory report renderer refresh with approved premium
   backdrops without changing report data or interaction behavior.
 - Phase 5C completed the approved Accounts portfolio and Account Summary using
-  `assets/me/cards/me_accounts.png`; Phases 5D-5G continue Reminders, Preferences, Inventory, and
-  Exports one page at a time as matching operator-approved assets and contracts become available.
+  `assets/me/cards/me_accounts.png`; Phase 5D and 5D.1 completed Reminders; Phase 5E is now approved
+  for implementation using `assets/me/cards/me_preferences.png`; Phases 5F-5G continue Inventory and
+  Exports one page at a time under separately approved contracts.
 - Phases 6-8 must use the same contract for Exports actions, History, and Inspect respectively.
 
 ## 11. Target Data / Service Contract
@@ -536,6 +547,60 @@ mark delivery, acknowledge an alert, or mutate persistence.
 Raw event/time keys remain internal. The UI reuses the authoritative player-facing catalog and order,
 normalises equivalent `now`/`start` presentation to `At start`, shows genuine counts and deterministic
 `+ N more` overflow, and never infers a favourite event or community recommendation.
+
+### Phase 5E Preferences summary data contract
+
+Phase 5E approves a cohesive read-only summary expansion for the private Personal Settings card and
+a narrow re-hosting of existing mutations. It does not approve a new profile field, a new privacy
+meaning, a VIP data-model change, a SQL schema change, or a cross-module time-display preference.
+
+Recommended service-level concepts:
+
+```text
+PreferencesSummaryPayload
+- Discord-user identity and one aware generated-at UTC value
+- PRIVATE | PUBLIC Inventory-visibility state and exact player-facing consequence text
+- RegionalProfileSummary for timezone, location, and preferred language
+- TimeReferenceSummary for LOCAL or UTC_FALLBACK presentation
+- recognised profile-details-set count out of three
+- one deterministic Settings Insight
+- warnings / unavailable saved values
+
+RegionalProfileSummary
+- timezone PreferenceValueSummary
+- location PreferenceValueSummary
+- preferred-language PreferenceValueSummary
+
+PreferenceValueSummary
+- set / unset state
+- recognised / unavailable state
+- stored key or code retained internally
+- friendly label and optional player-facing code
+
+TimeReferenceSummary
+- LOCAL | UTC_FALLBACK
+- 24-hour display time
+- friendly saved-timezone label when usable
+- current DST-aware UTC-offset label when usable
+- supporting location/language context where available
+```
+
+The same injected UTC timestamp drives the local-time hero and the full refreshed footer. Timezone
+conversion is deterministic, side-effect free, and network free; it creates no timer, job, cache
+refresh, or reminder behavior. Missing or unavailable timezone data produces an honest UTC-reference
+variant rather than inferred location-based time. Location and language remain optional metadata;
+profile coverage counts recognised usable values and does not create a pass/fail profile state.
+
+Settings Insight priority is: unavailable saved metadata, no usable timezone, public Inventory
+visibility, partial optional profile, then complete/private neutral-positive guidance. The service
+must not infer that location and timezone should match, infer nationality or fluency, expose raw
+unknown keys, or recommend settings from cross-player behavior.
+
+Inventory visibility remains a Discord-user-level mutation owned by Preferences and must be explained
+using the exact existing report-visibility contract. Private direct `/me resources`, `/me materials`,
+and `/me speedups` remain private. VIP editing is removed from the Preferences payload and is
+re-hosted inside `Manage Accounts`; the existing governor selection, current-linkage authorization,
+VIP labels/range/not-set semantics, persistence, and read-only display elsewhere remain unchanged.
 
 ## 12. Programme Phases
 
@@ -798,7 +863,7 @@ Delivery record:
 
 ### Phase 5C-5G — Premium `/me` Summary Cards
 
-Status: `Phases 5C Accounts, 5D Reminders, and 5D.1 Next Alert are complete and operator accepted; Phase 5E Preferences is next and awaits its separately supplied task pack/background; Phases 5F-5G remain separately scoped`.
+Status: `Phases 5C Accounts, 5D Reminders, and 5D.1 Next Alert are complete and operator accepted; Phase 5E Preferences has an approved product/content/interaction contract, runtime backdrop, task pack, and chat starter and is the next implementation slice; Phases 5F-5G remain separately scoped`.
 
 The five summary pages share a presentation and interaction baseline but remain independent PR-sized
 slices. A later page must reuse the accepted rules from earlier pages without creating a broad
@@ -817,8 +882,9 @@ Shared premium summary-card contract:
   stale suppression, and concurrent navigation.
 - The invoking-user avatar remains a page-specific design decision. Phase 5C applies the accepted
   bounded avatar treatment to Accounts and every Account Summary section. Following operator smoke,
-  Phase 5D reuses that bounded circular avatar with a safe no-avatar fallback. Keep long/Unicode
-  display names fitted and never derive a user-level page identity from a selected governor.
+  Phase 5D reuses that bounded circular avatar with a safe no-avatar fallback. Phase 5E reuses the
+  same bounded identity treatment on the Personal Settings card. Keep long/Unicode display names
+  fitted and never derive a user-level page identity from a selected governor.
 - Keep genuine current page values, states, names, action guidance, and empty/unavailable wording.
   Do not invent figures, trends, governors, status, or next actions to fill the backdrop.
 - Keep global navigation as real Discord components: blue-primary `Accounts`, `Reminders`, and
@@ -831,18 +897,19 @@ Shared premium summary-card contract:
   linked. The view may carry an optional selected governor only so `Dashboard` returns to the same
   governor. Direct `/me <page>` entry has no implicit governor filter and uses the normal dashboard
   no/one/multiple-governor resolution when the player returns.
-- A governor-specific child action, such as Inventory VIP or a report, must perform its own explicit
-  governor selection/resolution and current access recheck. Retained Dashboard-return context must
-  never silently narrow a user-level page or bypass authorization.
+- A governor-specific child action, such as `Manage Accounts -> Update VIP` or Inventory
+  `Open Report`, must perform its own explicit governor selection/resolution and current access
+  recheck. Retained Dashboard-return context must never silently narrow a user-level page or bypass
+  authorization.
 - Governor dropdown routing is fixed across the remaining programme:
   - Dashboard and selected-governor Resources, Materials, Speedups, future History, and any future
     export explicitly approved as selected-governor scoped may show the author-gated paged Change
     Governor control when more than one governor is linked.
   - Accounts, Account Summary, Reminders, Preferences, Inventory summary, and Exports summary never
     show Change Governor because their data is Discord-user-level or all-linked-governor scoped.
-  - Preferences `Update VIP` and Inventory `Open Report` are governor-specific child journeys: they
-    use an explicit governor picker/resolver and recheck access, while their parent pages remain
-    unfiltered and dropdown-free.
+  - Inventory `Open Report` remains a governor-specific child journey. VIP editing is owned by
+    `Manage Accounts -> Update VIP`, where it explicitly resolves a linked governor and rechecks
+    access. Preferences contains no VIP editor or governor picker.
   - Phase 6 must decide selected-governor versus all-linked Export Stats semantics before a
     dashboard export can inherit a governor dropdown.
 - Preserve private/ephemeral delivery, author gating, current timeouts, stale/foreign/forged/
@@ -859,7 +926,7 @@ Remaining-phase consistency matrix:
 |---|---|---|---|---|
 | 5D Reminders | Discord user | 1702x924 standalone, invoking-user avatar with safe fallback, same-payload fallback, graceful timeout | No Change Governor | Complete and operator accepted; ACTIVE/REVIEW/OFF, truthful coverage hero, friendly KVK/Calendar summaries, one deterministic insight, unchanged persistence/scheduling/DM/Manage |
 | 5D.1 Next alert | Discord user | Existing accepted Phase 5D card and delivery contract; bold-gold event start | No Change Governor | Complete and operator accepted; shared pure scheduler-parity projection produces NEXT/NO UPCOMING/UNAVAILABLE without jobs, DMs, writes, new sources, SQL, or command changes |
-| 5E Preferences | Discord user | Next separately scoped slice; accepted 1702x924 standalone/private/same-payload-fallback lifecycle by default, with page-approved backdrop, avatar treatment, content, and controls | No parent dropdown; Update VIP resolves governor explicitly and rechecks access | Preserve visibility/profile/VIP services, guided child-window replacement, saved profile semantics, defaults, and SQL contracts unless separately approved |
+| 5E Preferences | Discord user | Approved 1702x924 standalone card using `assets/me/cards/me_preferences.png`, invoking-user avatar, same-payload fallback, and graceful timeout | No parent dropdown; no VIP editor; Accounts Manage resolves VIP governor explicitly | Personal Settings owns regional profile/local-time reference/Inventory privacy; one Manage Settings action; VIP moves to Manage Accounts without schema, meaning, or persistence redesign |
 | 5F Inventory summary | All linked/user | Same premium baseline; direct 1400x980 reports remain separate | No parent dropdown; Open Report explicitly selects and report pages may switch governor | Preserve calculations, imports, ranges, visibility, export, filename, and Sheets contracts |
 | 5G Exports summary | User/all-linked | Same premium baseline and private option windows | No Change Governor under current scope | Preserve schemas, formats, windows, filenames, services, and Sheets behavior |
 | 6 Export Stats action | Decision gated | Accepted attachment/navigation lifecycle | Dropdown only if selected-governor export is approved | Decide selected versus all-linked before implementation; no schema redesign |
@@ -1126,39 +1193,146 @@ future candidate is shown, with KVK first on an exact tie.
 
 #### Phase 5E - Premium Preferences Summary Card
 
-Status: `next separately scoped slice; operator will supply the task pack and background; runtime implementation is not yet approved`.
+Status: `product/content/interaction/backdrop contract approved on 2026-07-15; task pack and chat starter prepared; next active implementation slice`.
 
-Continuation contract:
+Approved product ownership:
 
-- Apply the accepted premium summary-card language and private standalone attachment lifecycle to
-  the existing Preferences page. Keep `1702x924`, the stable user-scoped filename, same-payload
-  fallback, off-event-loop rendering, deliberate attachment replacement, stream cleanup, graceful
-  timeout, author gate, and blue navigation by default unless the Phase 5E product checkpoint
-  explicitly approves a page-specific alternative after original/desktop/mobile comparison.
-- Audit the existing Preferences payload, service, view, renderer/fallback, Manage Profile child
-  window, Inventory visibility controls, and Update VIP handoff before editing. Use genuine saved
-  state and friendly labels; do not invent status, recommendations, or profile completeness.
-- Preserve Inventory visibility state/actions, Inventory VIP, Discord-user timezone/location/
-  language, `Set Public`/`Set Private`, `Update VIP`, and `Manage Profile` behavior. Preserve guided
-  dropdowns, save/clear behavior, readable country labels backed by stored country codes, and
-  replacement of the existing private child window rather than opening duplicates.
-- Keep the parent page Discord-user scoped and free of `Change Governor`, including when entered
-  from a selected Dashboard. Optional selected-governor context exists only for a validated return
-  to Dashboard and must never filter the Preferences payload.
-- Keep `Update VIP` as a governor-specific child journey. It must explicitly select or resolve a
-  linked governor and recheck current access; retained Dashboard context must not silently choose
-  the governor. Reuse the accepted paged selector contract if the existing flow requires selection.
-- Preserve the saved timezone/profile metadata contract separately from any session-only local-time
-  display toggle. No profile schema, preference meaning, visibility behavior, default, SQL,
-  persistence, Google Sheets, command registration, or legacy redirect change is implied.
-- Cover direct entry, selected-Dashboard return, no/one/multiple linked governors, Set Public/
-  Private, Update VIP selection/access denial, Manage Profile save/clear/replacement, render/edit/
-  send failures, same-payload fallback, timeout, stale/foreign/forged/concurrent interactions,
-  attachment replacement/cleanup, long/Unicode content, and original/desktop/mobile presentation.
+- `/me preferences` remains private, author-gated, Discord-user scoped, and independent of any
+  selected governor. Optional selected Dashboard context exists only for a validated Dashboard
+  return and never filters Preferences content.
+- The page becomes the **Personal Settings** centre for saved timezone, location, preferred-language
+  metadata, derived local-time context, and Inventory privacy.
+- Preferences is not a catch-all. Account data, reminder configuration, export controls, report
+  controls, and unrelated defaults remain with their owning modules.
+- Inventory visibility remains the single user-level privacy mutation owned by Preferences.
+- Governor-specific VIP editing leaves Preferences and becomes an `Update VIP` task inside the
+  existing `Manage Accounts` child journey. Existing VIP labels, range, not-set semantics,
+  persistence, authorization, and read-only display elsewhere are preserved.
 
-The separate Phase 5E task pack/background must resolve the exact hero, information hierarchy,
-avatar treatment, backdrop, labels, insight/guidance, and component rows before implementation.
-It must not widen the slice into profile redesign, new preferences, SQL work, or a shared framework.
+Approved output and visual hierarchy:
+
+- Successful output is a standalone private `1702x924` PNG using the fully opaque runtime asset
+  `assets/me/cards/me_preferences.png` and stable `me_preferences_<discord_user_id>.png` filename.
+- Use the invoking user's bounded circular Discord avatar with the accepted safe fallback,
+  long/Unicode fitting, and duplicate-safe Kingdom 1198 identity treatment.
+- Retain the same-authorized-payload private fallback, off-event-loop rendering, deliberate
+  attachment replacement, complete stream cleanup, and graceful timeout behavior established by
+  Accounts and Reminders.
+- The accepted card hierarchy is:
+
+```text
+PERSONAL SETTINGS                                      PRIVATE | PUBLIC
+<Discord display name and Kingdom 1198>                <0-3 of 3 profile details set>
+
+LOCAL TIME REFERENCE | UTC REFERENCE
+<24-hour local time or UTC time>
+<saved timezone and current DST-aware UTC offset, or set-timezone guidance>
+<location and preferred-language context where available>
+
+REGIONAL PROFILE                         PRIVACY & SHARING
+Timezone                                 Inventory visibility: PRIVATE | PUBLIC
+Location                                 Exact current visibility consequence
+Preferred language
+
+SETTINGS INSIGHT
+<one deterministic sentence>
+
+Manage settings
+Update your regional profile and inventory privacy.
+
+<local-time/reminder-UTC context>                       Refreshed <full UTC date-time>
+```
+
+- Header state is exactly `PRIVATE` or `PUBLIC`, based on Inventory visibility. `PUBLIC` is an
+  amber/gold awareness state, not an error; `PRIVATE` uses the restrained positive treatment.
+- Profile coverage counts recognised usable timezone, location, and preferred-language values.
+  Optional unset fields are neutral. Do not invent READY/REVIEW/SETUP for this page.
+- A valid saved timezone produces a 24-hour local-time snapshot and current UTC offset from one
+  injected aware UTC timestamp, including daylight-saving and non-whole-hour offsets. The card is
+  not a ticking clock and creates no timer, job, network call, or reminder behavior.
+- Missing or unavailable timezone produces an honest UTC-reference hero. Do not infer timezone from
+  location, language, Discord locale, device, or IP information.
+- Reuse authoritative timezone/country/language catalogs and show friendly labels. Unknown legacy
+  keys remain internal and are surfaced as reviewable unavailable values, not silently treated as
+  valid or unset.
+- Preferred language remains profile metadata; Phase 5E does not promise or implement full UI
+  localization.
+- Privacy copy must be traced to the exact existing Inventory visibility behavior and must not imply
+  that private direct `/me resources`, `/me materials`, or `/me speedups` become public.
+- Render exactly one deterministic Settings Insight using this priority: unavailable saved metadata;
+  no usable timezone; public Inventory visibility; partial optional profile; complete/private
+  neutral-positive guidance. Do not infer a location/timezone mismatch, nationality, fluency,
+  favourite event time, or cross-player recommendation.
+
+Approved components and child journey:
+
+```text
+Row 1: Accounts | Reminders | Preferences (active/disabled)
+Row 2: Dashboard | Exports
+Row 3: Manage settings
+```
+
+- Remove deprecated Inventory navigation from Preferences.
+- Remove the direct `Set Public`/`Set Private`, `Update VIP`, and `Manage Profile` main buttons.
+- `Manage settings` replaces the current private content in place and does not create duplicate
+  child windows. It provides Regional Profile and Privacy & Sharing controls plus Back to
+  Preferences.
+- Preserve existing timezone/location/language catalogs, validation, save/autosave, clear/null, and
+  persistence semantics. Move the three permanent top-level Clear buttons into the relevant
+  field-specific update flow as a deliberate `Not set`/`Clear` choice.
+- Inventory visibility changes are state-aware, explain the exact consequence, require explicit
+  confirmation in both directions, revalidate current state at confirmation time, and refresh the
+  parent so the privacy pill immediately reflects the saved result. Cancellation performs no write.
+- Timeout preserves the last valid private content, disables controls, rejects late interactions,
+  and does not refetch or rerender merely to mark timeout.
+
+Approved VIP migration:
+
+```text
+Manage Accounts
+-> Update VIP
+-> explicitly select/resolve linked governor
+-> select VIP level
+-> save through existing service
+-> recheck current linkage/access before write
+-> refresh/return to Accounts management surface
+```
+
+- Add Update VIP at the current Manage Accounts task-selection level, not as a new Accounts main-card
+  button.
+- Zero linked governors receive register-account guidance and no write. Multiple and more-than-25
+  governors use the accepted paged resolver where required. Retained Dashboard context never
+  silently chooses the governor.
+- Preserve existing find/register/replace/remove/confirm/cancel, slot, ownership, claim, registry,
+  logging, and host-refresh behavior. Do not change Account Summary or Inventory VIP calculations.
+- Preferences no longer displays or fetches per-governor VIP solely for rendering and contains no
+  VIP action or governor selector.
+
+Approved technical boundary and validation:
+
+- Phase 5E may add a cohesive typed Preferences summary model/service and page-specific renderer,
+  deterministic clock/label/coverage/insight helpers, and the narrow view refactor required for
+  Manage Settings and the Accounts VIP handoff. Commands and views remain thin.
+- Validate current profile, visibility, and `GovernorInventoryProfile` contracts against
+  `C:\K98-bot-SQL-Server`; no SQL schema/table/view/index/procedure deployment, data migration, new
+  persistence, or changed preference meaning is approved.
+- No new command, grouped subcommand, redirect, default governor, time-format preference,
+  application-wide local/UTC toggle, automatic detection, localization, visibility telemetry,
+  broad renderer/view framework, Inventory report behavior, export behavior, or Google Sheets
+  change is approved.
+- Test direct entry, selected-Dashboard return, no/one/multiple/>25 linked governors, complete and
+  partial profiles, DST and unusual UTC offsets, missing/unavailable saved values, public/private
+  copy, deterministic insight priority, avatar/fallback, long/Unicode labels, same-payload fallback,
+  render/edit/send failure, attachment cleanup, timeout/stale/foreign/forged/concurrent paths,
+  Manage Settings save/clear/confirmation/cancel, and the complete VIP migration/Accounts regression.
+- Produce original-size, Discord desktop, and mobile visual samples for private/public, complete,
+  partial, unset-timezone, unavailable-value, long-name, and avatar-fallback states. Run focused and
+  full repository validation, SQL-contract checks, Codex Security, K98 PR review, mirror deployment,
+  operator Discord smoke, and production promotion checks before completion.
+
+The authoritative implementation and escalation detail is retained in the active Phase 5E task pack
+and chat starter. The backdrop-generation task is complete; runtime uses only the production-size
+asset already present at `assets/me/cards/me_preferences.png`.
 
 #### Phase 5F - Premium Inventory Summary Card
 
@@ -1297,6 +1471,10 @@ These ideas must not block or silently expand Phases 5A-9.
   private paginated Account Summary/CSV.
 - Premium Discord-user Reminders summary with earned configuration state, truthful next-alert or
   coverage hero, friendly KVK/Calendar summaries, deterministic insight, and unchanged Manage flow.
+- Premium Discord-user Personal Settings summary with deterministic local-time reference, regional-
+  profile coverage, Inventory privacy explanation, one Settings Insight, and one Manage Settings flow.
+- Narrow migration of the existing governor-specific VIP editor into Manage Accounts without changing
+  VIP data or account-management semantics.
 - Direct selected-governor inventory actions.
 - Private `/me` KVK history entry point.
 - Leadership/admin `/me inspect`, later and separately permission-gated.
@@ -1315,6 +1493,8 @@ These ideas must not block or silently expand Phases 5A-9.
 - Folding CrystalTech into `/me`.
 - Website or external dashboard work.
 - Public launch comms before the visible dashboard is ready.
+- New Preferences fields, automatic timezone/location detection, default governor, time-format
+  preference, application-wide local/UTC toggle, or full localization without a separate approval.
 
 ## 15. Likely Source Commands and Areas
 
@@ -1385,6 +1565,9 @@ Likely SQL-backed objects:
 - Preserve top-level command count unless explicitly approved.
 - Prefer grouped `/me` subcommands over new flat commands.
 - Keep all player dashboard output private unless a specific action intentionally uses the user's visibility preference.
+- Keep settings ownership singular: Preferences owns regional profile and Inventory privacy; Accounts
+  owns governor-specific VIP editing; Inventory may consume those values without becoming a second
+  editor.
 - Recheck access for governor-specific actions.
 - Do not leak Discord-user private settings into leadership inspect mode.
 - Avoid direct SQL in command and view layers.
@@ -1453,11 +1636,18 @@ The programme is complete when:
 - [x] Phase 5D.1 delivers the authoritative NEXT/NO UPCOMING/UNAVAILABLE hero, deterministic shared
   clock and tie behavior, unchanged reminder contracts, final bold-gold event-start presentation,
   review/promotion evidence, and successful operator Discord smoke on 2026-07-15.
+- [x] Phase 5E Preferences product/content/interaction contract, Governor's Accord backdrop, typed
+  summary outline, one-action Manage Settings journey, Accounts-owned VIP migration, task pack, and
+  implementation starter are recorded and approved.
+- [ ] Phase 5E runtime delivers the approved Personal Settings card, local-time/UTC fallback, regional
+  profile, Inventory privacy flow, deterministic insight, VIP migration, automated/visual validation,
+  security review, and successful operator Discord smoke.
 - [ ] Export Stats semantics are explicitly decided and tested before dashboard integration.
 - [ ] A private `/me history` path exists while `/kvk history` remains unchanged.
 - [ ] `/me inspect` is permission-gated, private by default, and excludes Discord-user private data.
 - [ ] Legacy commands are only redirected/removed after usage evidence and explicit operator approval.
-- [x] Documentation and canonical command references reflect completed phases through Phase 5D.1.
+- [x] Documentation and canonical command references reflect completed phases through Phase 5D.1
+  and the approved active Phase 5E implementation contract.
 - [x] Phase 5C documentation, canonical references, automated validation, security review, visual
   samples, and successful operator Discord smoke are recorded.
 - [x] Command registration validation remains green through Phase 5D.
@@ -1476,30 +1666,37 @@ Do not include these in early phases unless separately approved:
 - Website/API dashboard endpoint.
 - CrystalTech integration into `/me`.
 - Automated player-facing launch campaign.
+- A default governor preference only after multiple GovernorOS modules have a proven need for it.
+- A 12/24-hour display preference, application-wide local/UTC toggle, or full localization programme.
 
 ## 20. Suggested Next Action
 
 ```text
-Prepare the separate Phase 5E Premium Preferences Summary Card task pack and background at the
-operator's product checkpoint. Start from the accepted premium standalone/private/fallback
-lifecycle and current Preferences services. Keep the parent page Discord-user scoped with no
-Change Governor; make Update VIP explicitly resolve and recheck its governor. Do not begin runtime
-implementation until that pack and visual/content contract are explicitly approved.
+Execute Phase 5E: Premium Preferences Summary Card using the approved task pack and chat starter.
+Begin with the required repository audit, SQL-contract validation, and architecture/file-manifest
+report, then stop at the documented approval gates before coding. Treat the Personal Settings
+hierarchy, Governor's Accord asset, PRIVATE/PUBLIC state, local-time/UTC-reference hero, regional
+profile, deterministic Settings Insight, one Manage Settings action, and Accounts-owned Update VIP
+migration as locked product decisions.
 ```
 
-The accepted Reminders runtime backdrop remains `assets/me/cards/me_reminders.png` at exactly
-`1702x924`. Phase 5D.1 is closed and archived; its final event-start emphasis did not change the
-card hierarchy, components, payload, fallback, Manage journey, or timeout contract.
+The approved Preferences runtime backdrop is present at
+`assets/me/cards/me_preferences.png`, exactly `1702x924` and fully opaque. Runtime uses only this
+production-size asset. The active delivery records are:
 
-Except for the explicitly authorised KVK `now` truthiness correction recorded above, Phase 5D.1
-does not inherit permission to change reminder scheduling behavior, event sources,
-event/time choices, lead times, grace, retries, DMs, Calendar behavior, persisted state, SQL,
-another `/me` page, the three existing next-event commands, or the guided Manage workflow.
+- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5E Premium Preferences Summary Card.md`
+- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5E Premium Preferences Summary Card.md`
 
-Completed delivery records:
+Completed Phase 5D.1 records remain archived:
 
 - `docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5D.1 Authoritative Next Scheduled Alert Projection.md`
 - `docs/task_packs/archive/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5D.1 Authoritative Next Scheduled Alert Projection.md`
+
+Phase 5E does not inherit permission to add settings, change profile or Inventory-visibility meaning,
+redesign VIP or account registry behavior, change SQL schema/persistence, alter private direct
+Inventory reports, introduce localization/time-format/default-governor behavior, change another
+`/me` page, or create a broad shared renderer/view framework. After Phase 5E is operator accepted and
+archived, prepare Phase 5F Premium Inventory Summary Card separately.
 
 ## 21. Programme Change Log
 
@@ -1530,3 +1727,4 @@ Completed delivery records:
 | 2026-07-15 | Phase 5D completed and Phase 5D.1 prepared | Recorded successful final operator smoke and visual acceptance, archived the completed Phase 5D task pack/starter, promoted the authoritative next-alert projection out of the deferred backlog, and created the active Phase 5D.1 task pack/starter. Existing `/calendar_next_event`, `/next_kvk_event`, and `/next_kvk_fight` are recorded as reusable bulk reader evidence; shared live/projection parity, no side effects, no N+1 reads, and unchanged reminder/command behavior are the implementation boundary before Phase 5E Preferences. |
 | 2026-07-15 | Phase 5D.1 implemented and locally validated | Added shared pure KVK/Calendar eligibility and a typed bulk-loaded cross-system projection for NEXT/NO UPCOMING/UNAVAILABLE. Live dispatch consumes the same rules; projection performs no tasks, DMs, acknowledgements, refreshes, network calls, or writes. The operator authorised correcting KVK `now` zero-duration eligibility while preserving existing task/tracker/rehydration/retry behavior. Native/desktop/mobile visual evidence passed; final operator Discord smoke remains pending. |
 | 2026-07-15 | Phase 5D.1 completed and Phase 5E handoff fixed | Recorded successful operator Discord smoke and final bold-gold event-start acceptance; retained the deterministic earliest-candidate/KVK-tie behavior and single injected UTC clock; archived the completed task pack/starter; and made Preferences the next separately scoped slice. Phase 5E keeps the accepted premium lifecycle, has no parent Change Governor, preserves current visibility/profile/VIP services, and resolves Update VIP through an explicit governor child journey. The operator will supply its task pack/background separately before runtime approval. |
+| 2026-07-15 | Phase 5E Preferences contract, backdrop, task pack, and starter approved | Narrowed Preferences to Personal Settings for regional profile/local-time context and Inventory privacy; approved PRIVATE/PUBLIC state, three-field coverage, deterministic Settings Insight, one Manage Settings action, field-specific clears, deliberate privacy confirmation, and the fully opaque `assets/me/cards/me_preferences.png` Governor's Accord backdrop. Moved the existing Update VIP editor into Manage Accounts with explicit governor resolution and unchanged persistence/account rules. Runtime implementation is the next gated slice. |

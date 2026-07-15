@@ -9,6 +9,7 @@ from inventory.dal import inventory_profile_dal
 from inventory.inventory_service import user_can_import_for_governor
 from inventory.models import InventoryGovernorProfile
 from inventory.vip_levels import normalize_vip_level, persisted_vip_code, vip_label
+from registry import registry_service
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,14 @@ async def update_inventory_vip(
         is_admin=admin,
     ):
         raise PermissionError("You can only update VIP for governors registered to you.")
+
+    if not admin:
+        current_owner = await asyncio.to_thread(
+            registry_service.get_discord_user_for_governor,
+            int(governor_id),
+        )
+        if not current_owner or int(current_owner["DiscordUserID"]) != int(discord_user_id):
+            raise PermissionError("You can only update VIP for governors registered to you.")
 
     level = normalize_vip_level(vip_level_code)
     persisted_code = persisted_vip_code(level)

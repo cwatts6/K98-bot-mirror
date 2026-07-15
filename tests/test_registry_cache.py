@@ -379,6 +379,33 @@ def test_modify_governor_success_invalidates_cache(monkeypatch):
         assert rc._cache_ts == 0.0
 
 
+def test_modify_governor_partial_failure_invalidates_after_soft_delete(monkeypatch):
+    """A committed soft-delete must invalidate stale authority even if insert fails."""
+    _reset_cache(monkeypatch)
+    monkeypatch.setattr(rc, "_CACHE_TTL", 9999.0)
+    rc.store_cache(_SAMPLE_DICT)
+
+    _patch_dal(
+        monkeypatch,
+        by_discord=_EXISTING_SLOT,
+        by_governor=None,
+        soft_delete_result=(0, "OK"),
+        insert_result=(9, "DB write failed"),
+    )
+
+    ok, _err = svc.modify_governor(
+        discord_user_id=111,
+        discord_name="Alice",
+        account_type="Main",
+        new_governor_id="9999999",
+        new_governor_name="NewGov",
+    )
+
+    assert ok is False
+    with rc._cache_lock:
+        assert rc._cache_ts == 0.0
+
+
 def test_remove_governor_success_invalidates_cache(monkeypatch):
     """Successful remove_governor() invalidates the cache."""
     _reset_cache(monkeypatch)
