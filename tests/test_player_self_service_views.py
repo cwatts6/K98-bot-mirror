@@ -266,6 +266,14 @@ def test_dashboard_embed_is_status_first_and_compact() -> None:
     assert "/register_governor" not in embed.fields[0].value
 
 
+def test_reminders_fallback_identity_and_footer_match_card_contract() -> None:
+    embed = views.build_reminders_embed(_summary(), display_name="Chrislos (1198)")
+
+    assert embed.description == "Chrislos (1198)"
+    assert embed.footer.text.startswith("Scheduled times shown in UTC • Refreshed ")
+    assert embed.footer.text.endswith(" UTC")
+
+
 @pytest.mark.asyncio
 async def test_dashboard_page_response_includes_generated_card(monkeypatch) -> None:
     calls = []
@@ -336,6 +344,33 @@ async def test_subpage_response_includes_generated_card(monkeypatch) -> None:
     assert calls == [(42, "Tester", b"avatar")]
     assert embed is None
     assert [file.filename for file in files] == ["me_accounts_42.png"]
+
+
+@pytest.mark.asyncio
+async def test_reminders_response_passes_author_avatar_to_renderer(monkeypatch) -> None:
+    calls = []
+
+    def fake_render(payload, *, avatar_bytes):
+        calls.append((payload.viewer_discord_id, avatar_bytes))
+        return views.reminders_renderer.RenderedRemindersCard(
+            filename="me_reminders_42.png",
+            image_bytes=BytesIO(b"png"),
+        )
+
+    monkeypatch.setattr(views.reminders_renderer, "render_reminders_card", fake_render)
+
+    embed, files = await views._build_page_response(
+        views.PAGE_REMINDERS,
+        _summary(),
+        display_name="Tester",
+        avatar_bytes=b"avatar",
+    )
+    try:
+        assert calls == [(42, b"avatar")]
+        assert embed is None
+        assert [file.filename for file in files] == ["me_reminders_42.png"]
+    finally:
+        views._close_files(files)
 
 
 @pytest.mark.asyncio
@@ -700,7 +735,8 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Accounts", 0, primary, False),
             ("Reminders", 0, primary, True),
             ("Preferences", 0, primary, False),
-            *nav_row,
+            ("Dashboard", 1, secondary, False),
+            ("Exports", 1, secondary, False),
             ("Manage", 2, success, False),
         ],
     )
@@ -756,7 +792,7 @@ async def test_accounts_view_removes_inventory_and_keeps_exports_navigation() ->
 
 
 @pytest.mark.asyncio
-async def test_reminders_view_keeps_inventory_and_exports_navigation() -> None:
+async def test_reminders_view_removes_inventory_and_keeps_exports_navigation() -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -767,7 +803,7 @@ async def test_reminders_view_keeps_inventory_and_exports_navigation() -> None:
     assert "Manage" in labels
     assert "Unsubscribe" not in labels
     assert "Register" not in labels
-    assert "Inventory" in labels
+    assert "Inventory" not in labels
     assert "Exports" in labels
 
 
@@ -2104,6 +2140,15 @@ async def test_reminder_setup_event_select_autosaves_and_sends_dm(monkeypatch) -
 
 @pytest.mark.asyncio
 async def test_reminder_autosave_refreshes_visible_reminder_card(monkeypatch) -> None:
+    rendered_avatars = []
+
+    def fake_render(payload, *, avatar_bytes):
+        rendered_avatars.append((payload.viewer_discord_id, avatar_bytes))
+        return views.reminders_renderer.RenderedRemindersCard(
+            filename="me_reminders_42.png",
+            image_bytes=BytesIO(b"png"),
+        )
+
     async def fake_save(_user_id, _username, _selected_types, _selected_times):
         return ReminderMutationResult(
             ok=True,
@@ -2118,6 +2163,7 @@ async def test_reminder_autosave_refreshes_visible_reminder_card(monkeypatch) ->
         return _summary()
 
     monkeypatch.setattr(reminder_views.reminder_service, "save_reminder_preferences", fake_save)
+    monkeypatch.setattr(views.reminders_renderer, "render_reminders_card", fake_render)
     state = ReminderCentreState(
         ok=True,
         subscribed=True,
@@ -2134,6 +2180,7 @@ async def test_reminder_autosave_refreshes_visible_reminder_card(monkeypatch) ->
         display_name="Tester",
         host_message=host_message,
         summary_loader=loader,
+        avatar_bytes=b"avatar",
     )
     interaction = _Interaction()
     select = next(
@@ -2148,6 +2195,8 @@ async def test_reminder_autosave_refreshes_visible_reminder_card(monkeypatch) ->
     assert message_id == host_message.id
     assert edit["embed"] is None
     assert [file.filename for file in edit["files"]] == ["me_reminders_42.png"]
+    assert rendered_avatars == [(42, b"avatar")]
+    assert edit["view"].avatar_bytes == b"avatar"
 
 
 @pytest.mark.asyncio
@@ -2221,6 +2270,37 @@ async def test_view_navigation_loads_summary_and_edits_message() -> None:
     assert [file.filename for file in edited["files"]] == ["me_reminders_42.png"]
     assert isinstance(edited["view"], views.PlayerSelfServiceView)
     assert edited["view"]._message_ref is interaction.message
+
+
+@pytest.mark.asyncio
+async def test_reminders_navigation_reads_and_retains_author_avatar(monkeypatch) -> None:
+    captured = []
+
+    async def loader(_user_id: int):
+        return _summary()
+
+    async def fake_read_avatar(user, *, expected_user_id):
+        assert user.id == expected_user_id == 42
+        return b"avatar"
+
+    async def fake_build(page, summary, **kwargs):
+        captured.append((page, summary.discord_user_id, kwargs["avatar_bytes"]))
+        return views.build_reminders_embed(summary, display_name="Tester"), []
+
+    monkeypatch.setattr(views, "_read_avatar_bytes", fake_read_avatar)
+    monkeypatch.setattr(views, "_build_page_response", fake_build)
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        summary_loader=loader,
+    )
+    interaction = _Interaction()
+
+    await view._show_page(interaction, views.PAGE_REMINDERS)
+
+    refreshed_view = interaction.original_edits[-1]["view"]
+    assert captured == [(views.PAGE_REMINDERS, 42, b"avatar")]
+    assert refreshed_view.avatar_bytes == b"avatar"
 
 
 @pytest.mark.asyncio
@@ -2495,6 +2575,56 @@ def test_exports_embed_is_compact_and_action_first() -> None:
     assert "Export Stats" in embed.fields[1].value
     assert "Export Inventory" in embed.fields[1].value
     assert "Legacy" not in embed.fields[1].value
+
+
+@pytest.mark.asyncio
+async def test_initial_reminders_page_reads_and_retains_author_avatar(monkeypatch) -> None:
+    captured = []
+
+    class Avatar:
+        def with_size(self, size):
+            assert size == 256
+            return self
+
+        async def read(self):
+            return b"avatar"
+
+    async def fake_safe_defer(_ctx, *, ephemeral=False):
+        assert ephemeral is True
+
+    async def loader(user_id: int):
+        assert user_id == 42
+        return _summary()
+
+    async def fake_build(page, summary, **kwargs):
+        captured.append(("build", page, summary.discord_user_id, kwargs["avatar_bytes"]))
+        return views.build_reminders_embed(summary, display_name="Tester"), []
+
+    async def fake_edit(_target, **kwargs):
+        captured.append(("edit", kwargs["view"].avatar_bytes))
+        return SimpleNamespace(id=123)
+
+    user = SimpleNamespace(
+        id=42,
+        display_name="Tester",
+        display_avatar=Avatar(),
+        avatar=None,
+    )
+    ctx = SimpleNamespace(user=user, interaction=SimpleNamespace(), followup=SimpleNamespace())
+    monkeypatch.setattr(views, "safe_defer", fake_safe_defer)
+    monkeypatch.setattr(views, "_build_page_response", fake_build)
+    monkeypatch.setattr(views, "_edit_original_with_image_fallback", fake_edit)
+
+    await views.send_player_self_service_page(
+        ctx,
+        page=views.PAGE_REMINDERS,
+        summary_loader=loader,
+    )
+
+    assert captured == [
+        ("build", views.PAGE_REMINDERS, 42, b"avatar"),
+        ("edit", b"avatar"),
+    ]
 
 
 @pytest.mark.asyncio

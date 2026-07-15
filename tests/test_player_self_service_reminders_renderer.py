@@ -81,6 +81,46 @@ def test_renderer_supports_every_approved_hero_variant() -> None:
             assert image.size == (1702, 924)
 
 
+def test_renderer_uses_avatar_duplicate_safe_identity_and_locked_alignment(monkeypatch) -> None:
+    avatar_stream = BytesIO()
+    Image.new("RGB", (96, 96), (220, 30, 40)).save(avatar_stream, format="PNG")
+    left_calls = []
+    right_calls = []
+    original_draw_fit = reminders_renderer._draw_fit
+    original_draw_fit_right = reminders_renderer._draw_fit_right
+
+    def tracked_draw_fit(draw, xy, text, **kwargs):
+        left_calls.append((xy, text))
+        return original_draw_fit(draw, xy, text, **kwargs)
+
+    def tracked_draw_fit_right(draw, **kwargs):
+        right_calls.append(kwargs.copy())
+        return original_draw_fit_right(draw, **kwargs)
+
+    monkeypatch.setattr(reminders_renderer, "_draw_fit", tracked_draw_fit)
+    monkeypatch.setattr(reminders_renderer, "_draw_fit_right", tracked_draw_fit_right)
+
+    rendered = reminders_renderer.render_reminders_card(
+        replace(_payload(), display_name="Chrislos (1198)"),
+        avatar_bytes=avatar_stream.getvalue(),
+    )
+    try:
+        with Image.open(BytesIO(rendered.image_bytes.getvalue())) as image:
+            assert image.getpixel((109, 83))[0] > 180
+        assert ((170, 125), "Chrislos (1198)") in left_calls
+        assert ((96, 872), "Scheduled times shown in UTC") in left_calls
+        assert any(
+            call["text"] == "2 of 2 systems enabled" and call["right_x"] == 1608
+            for call in right_calls
+        )
+        assert any(
+            call["text"] == "Refreshed 14 Jul 2026 15:30 UTC" and call["right_x"] == 1608
+            for call in right_calls
+        )
+    finally:
+        rendered.image_bytes.close()
+
+
 def test_renderer_rejects_wrong_sized_or_translucent_backdrop(tmp_path, monkeypatch) -> None:
     wrong_size = tmp_path / "wrong.png"
     Image.new("RGB", (100, 100), "black").save(wrong_size)

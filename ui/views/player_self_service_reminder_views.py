@@ -149,6 +149,7 @@ async def _refresh_host_page(
     author_id: int,
     display_name: str,
     summary_loader: SummaryLoader,
+    avatar_bytes: bytes | None = None,
 ) -> None:
     if host_message is None:
         return
@@ -169,11 +170,13 @@ async def _refresh_host_page(
             page=PAGE_REMINDERS,
             summary=summary,
             summary_loader=summary_loader,
+            avatar_bytes=avatar_bytes,
         )
         embed, files = await _build_page_response(
             PAGE_REMINDERS,
             summary,
             display_name=display_name,
+            avatar_bytes=avatar_bytes,
         )
 
         class _MessageTarget:
@@ -325,6 +328,7 @@ class CalendarReminderSetupView(discord.ui.View):
         known_event_types: tuple[str, ...],
         host_message: object | None = None,
         summary_loader: SummaryLoader = build_player_self_service_summary,
+        avatar_bytes: bytes | None = None,
         timeout: float = 180,
     ) -> None:
         super().__init__(timeout=timeout, disable_on_timeout=True)
@@ -333,6 +337,7 @@ class CalendarReminderSetupView(discord.ui.View):
         self.display_name = display_name
         self.host_message = host_message
         self.summary_loader = summary_loader
+        self.avatar_bytes = avatar_bytes
         self.known_event_types = tuple(sorted({t for t in known_event_types if t}))
         self.selected_types = list(state.selected_types)
         self.selected_offsets = list(state.selected_offsets or REMINDER_OFFSETS_ORDERED)
@@ -406,6 +411,7 @@ class CalendarReminderSetupView(discord.ui.View):
             author_id=self.author_id,
             display_name=self.display_name,
             summary_loader=self.summary_loader,
+            avatar_bytes=self.avatar_bytes,
         )
         self._saving = False
         content = "Calendar reminders saved automatically."
@@ -451,6 +457,7 @@ class CalendarReminderSetupView(discord.ui.View):
             display_name=self.display_name,
             host_message=self.host_message,
             summary_loader=self.summary_loader,
+            avatar_bytes=self.avatar_bytes,
         )
         try:
             await interaction.edit_original_response(
@@ -501,6 +508,7 @@ class CalendarReminderSetupView(discord.ui.View):
             author_id=self.author_id,
             display_name=self.display_name,
             summary_loader=self.summary_loader,
+            avatar_bytes=self.avatar_bytes,
         )
         try:
             await interaction.edit_original_response(
@@ -525,6 +533,7 @@ class ReminderSetupView(discord.ui.View):
         display_name: str,
         host_message: object | None = None,
         summary_loader: SummaryLoader = build_player_self_service_summary,
+        avatar_bytes: bytes | None = None,
         timeout: float = 180,
     ) -> None:
         super().__init__(timeout=timeout, disable_on_timeout=True)
@@ -534,6 +543,7 @@ class ReminderSetupView(discord.ui.View):
         self.host_message = host_message
         self._message_ref: Any | None = None
         self.summary_loader = summary_loader
+        self.avatar_bytes = avatar_bytes
         self.selected_types = list(state.event_types)
         self.selected_reminders = list(state.reminder_times or tuple(DEFAULT_REMINDER_TIMES))
         self.can_unsubscribe = state.can_unsubscribe
@@ -620,6 +630,7 @@ class ReminderSetupView(discord.ui.View):
             author_id=self.author_id,
             display_name=self.display_name,
             summary_loader=self.summary_loader,
+            avatar_bytes=self.avatar_bytes,
         )
         self.can_unsubscribe = True
         self._saving = False
@@ -675,6 +686,7 @@ class ReminderSetupView(discord.ui.View):
             ),
             host_message=self.host_message,
             summary_loader=self.summary_loader,
+            avatar_bytes=self.avatar_bytes,
         )
         try:
             await interaction.edit_original_response(
@@ -729,6 +741,7 @@ class ReminderSetupView(discord.ui.View):
                     confirmation=confirmation,
                     host_message=self.host_message,
                     summary_loader=self.summary_loader,
+                    avatar_bytes=self.avatar_bytes,
                 ),
             )
         except Exception:
@@ -741,6 +754,7 @@ class ReminderSetupView(discord.ui.View):
                     confirmation=confirmation,
                     host_message=self.host_message,
                     summary_loader=self.summary_loader,
+                    avatar_bytes=self.avatar_bytes,
                 ),
                 ephemeral=True,
             )
@@ -768,6 +782,7 @@ class ReminderUnsubscribeConfirmView(discord.ui.View):
         confirmation: ReminderUnsubscribeConfirmation,
         host_message: object | None = None,
         summary_loader: SummaryLoader = build_player_self_service_summary,
+        avatar_bytes: bytes | None = None,
         timeout: float = 120,
     ) -> None:
         super().__init__(timeout=timeout)
@@ -776,6 +791,7 @@ class ReminderUnsubscribeConfirmView(discord.ui.View):
         self.confirmation = confirmation
         self.host_message = host_message
         self.summary_loader = summary_loader
+        self.avatar_bytes = avatar_bytes
         self._confirmed = False
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -819,12 +835,14 @@ class ReminderUnsubscribeConfirmView(discord.ui.View):
             author_id=self.author_id,
             display_name=self.display_name,
             summary_loader=self.summary_loader,
+            avatar_bytes=self.avatar_bytes,
         )
         view = ReminderCompletionView(
             author_id=self.author_id,
             display_name=self.display_name,
             message=content,
             summary_loader=self.summary_loader,
+            avatar_bytes=self.avatar_bytes,
         )
         try:
             await interaction.edit_original_response(content=content, embed=None, view=view)
@@ -853,6 +871,7 @@ class ReminderUnsubscribeConfirmView(discord.ui.View):
                 author_id=self.author_id,
                 display_name=self.display_name,
                 message="Reminder unsubscribe cancelled.",
+                avatar_bytes=self.avatar_bytes,
             ),
         )
 
@@ -878,6 +897,7 @@ class ReminderCompletionView(discord.ui.View):
         display_name: str,
         message: str,
         summary_loader: SummaryLoader = build_player_self_service_summary,
+        avatar_bytes: bytes | None = None,
         timeout: float = 120,
     ) -> None:
         super().__init__(timeout=timeout)
@@ -885,6 +905,7 @@ class ReminderCompletionView(discord.ui.View):
         self.display_name = display_name
         self.message = message
         self.summary_loader = summary_loader
+        self.avatar_bytes = avatar_bytes
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user and int(interaction.user.id) == self.author_id:
@@ -903,6 +924,7 @@ class ReminderCompletionView(discord.ui.View):
             display_name=self.display_name,
             page=page,
             summary_loader=self.summary_loader,
+            avatar_bytes=self.avatar_bytes,
             timeout=self.timeout or 120,
         )
 

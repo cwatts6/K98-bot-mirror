@@ -9,6 +9,10 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from core import visual_text
+from player_self_service.accounts_renderer import (
+    format_discord_heading,
+    paste_discord_avatar,
+)
 from player_self_service.reminders_summary import RemindersSummaryPayload
 
 WIDTH = 1702
@@ -105,6 +109,31 @@ def _draw_fit(
     _draw(draw, xy, fitted, font=font, fill=fill, bold=bold)
 
 
+def _draw_fit_right(
+    draw: ImageDraw.ImageDraw,
+    *,
+    right_x: int,
+    y: int,
+    text: str,
+    width: int,
+    size: int,
+    min_size: int,
+    fill: tuple[int, int, int, int] = TEXT,
+    bold: bool = False,
+) -> None:
+    cleaned = _clean(text)
+    font = _fit(draw, cleaned, width=width, size=size, min_size=min_size, bold=bold)
+    fitted = visual_text.fit_text_to_width(
+        draw,
+        cleaned,
+        width=width,
+        base_font=font,
+        bold=bold,
+    )
+    text_width = visual_text.text_width(draw, fitted, font=font, bold=bold)
+    _draw(draw, (right_x - text_width, y), fitted, font=font, fill=fill, bold=bold)
+
+
 def _panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], *, radius: int = 22) -> None:
     draw.rounded_rectangle(box, radius=radius, fill=PANEL, outline=PANEL_EDGE, width=2)
 
@@ -176,7 +205,11 @@ def _draw_system(
     )
 
 
-def render_reminders_card(payload: RemindersSummaryPayload) -> RenderedRemindersCard:
+def render_reminders_card(
+    payload: RemindersSummaryPayload,
+    *,
+    avatar_bytes: bytes | None = None,
+) -> RenderedRemindersCard:
     with Image.open(BACKDROP_PATH) as source:
         source.load()
         if source.size != (WIDTH, HEIGHT):
@@ -186,26 +219,39 @@ def render_reminders_card(payload: RemindersSummaryPayload) -> RenderedReminders
             raise ValueError("Reminders backdrop must be fully opaque")
         canvas = source.convert("RGBA")
 
+    has_avatar = paste_discord_avatar(canvas, avatar_bytes)
     draw = ImageDraw.Draw(canvas, "RGBA")
     state_text = payload.configuration_state.value
+    heading_x = 170 if has_avatar else 94
 
-    _draw(draw, (94, 62), "REMINDER CENTRE", font=_font(42, bold=True), fill=MUTED, bold=True)
+    _draw(
+        draw,
+        (heading_x, 62),
+        "REMINDER CENTRE",
+        font=_font(42, bold=True),
+        fill=MUTED,
+        bold=True,
+    )
     _status_badge(draw, state_text)
 
-    identity = f"{_clean(payload.display_name, fallback='player')} ({payload.kingdom_id})"
+    identity = format_discord_heading(
+        _clean(payload.display_name, fallback="player"),
+        kingdom_id=payload.kingdom_id,
+    )
     _draw_fit(
         draw,
-        (94, 125),
+        (heading_x, 125),
         identity,
-        width=930,
+        width=990 - heading_x,
         size=49,
         min_size=28,
         bold=True,
     )
-    _draw_fit(
+    _draw_fit_right(
         draw,
-        (1070, 151),
-        payload.state_supporting_text,
+        right_x=1608,
+        y=151,
+        text=payload.state_supporting_text,
         width=538,
         size=28,
         min_size=19,
@@ -280,12 +326,21 @@ def render_reminders_card(payload: RemindersSummaryPayload) -> RenderedReminders
         fill=MUTED,
     )
 
-    footer = f"Refreshed {payload.generated_at_utc:%H:%M UTC} • Schedule times shown in UTC"
     _draw_fit(
         draw,
         (96, 872),
-        footer,
-        width=1510,
+        "Scheduled times shown in UTC",
+        width=650,
+        size=23,
+        min_size=18,
+        fill=MUTED,
+    )
+    _draw_fit_right(
+        draw,
+        right_x=1608,
+        y=872,
+        text=f"Refreshed {payload.generated_at_utc:%d %b %Y %H:%M UTC}",
+        width=760,
         size=23,
         min_size=18,
         fill=MUTED,

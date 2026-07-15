@@ -9,7 +9,7 @@
 - One-pass approved: `Yes - after the prerequisite gates below and within the locked product, data, visual, interaction, and compatibility contract`
 - Product/content scope approved: `Yes`
 - Runtime implementation approved: `Yes - prerequisite gates satisfied on 2026-07-14`
-- Status: `implemented and locally validated - operator Discord smoke pending`
+- Status: `operator functional smoke passed - visual refinement re-smoke pending`
 - Planned runtime backdrop: `assets/me/cards/me_reminders.png`
 - Approved production canvas: `1702 × 924 PNG`
 - Stable output filename: `me_reminders_<discord_user_id>.png`
@@ -123,8 +123,8 @@ Deliver all of the following in one Phase 5D implementation:
   host-page toggle or separate host actions.
 - The invoking Discord display name and fixed Kingdom 1198 context may be shown. Do not present one
   linked governor as though the page were scoped to that governor.
-- The approved Phase 5D layout does not require a Discord avatar. The card is alert/configuration-led
-  and the backdrop has no portrait aperture.
+- The invoking Discord user's avatar uses the established circular `/me` header treatment, with the
+  existing safe no-avatar fallback when Discord avatar bytes are unavailable.
 
 ## 7. Locked Main Reminders Card
 
@@ -133,8 +133,8 @@ Deliver all of the following in one Phase 5D implementation:
 The populated card follows this hierarchy:
 
 ```text
-REMINDER CENTRE                                      ACTIVE
-<Discord display name> (1198)             2 of 2 systems enabled
+[avatar] REMINDER CENTRE                             ACTIVE
+         <Discord display name> (1198)     2 of 2 systems enabled
 
 NEXT SCHEDULED ALERT
 <event name>
@@ -154,7 +154,7 @@ REMINDER INSIGHT
 Manage reminders
 Choose KVK and calendar events and when each alert is sent.
 
-Refreshed <HH:MM UTC> • Schedule times shown in UTC
+Scheduled times shown in UTC             Refreshed <DD Mon YYYY HH:MM UTC>
 ```
 
 Every value is dynamic. The examples above are layout examples only and must never be used as dummy
@@ -169,9 +169,12 @@ Render:
 - the invoking Discord display name with fixed Kingdom 1198 context;
 - one concise supporting line describing system enablement or the review condition.
 
+The display name must not append a second `(1198)` when Discord's current display name already ends
+with that suffix. Right-align the supporting line to the same right edge as the earned state pill.
+
 Use singular/plural grammar correctly.
 
-Do not render a governor ID, account role, selected-governor name, avatar, or Change Governor control.
+Do not render a governor ID, account role, selected-governor name, or Change Governor control.
 
 ### 7.3 Top-level state contract
 
@@ -521,7 +524,7 @@ button into the image.
 Render:
 
 ```text
-Refreshed <HH:MM UTC> • Schedule times shown in UTC
+Scheduled times shown in UTC             Refreshed <DD Mon YYYY HH:MM UTC>
 ```
 
 `Refreshed` is the card-generation time, not a reminder delivery time or event-source timestamp.
@@ -716,7 +719,7 @@ Expected rows:
 
 ```text
 Row 0: Accounts (blue) | Reminders (blue, disabled) | Preferences (blue)
-Row 1: Dashboard | Inventory | Exports
+Row 1: Dashboard | Exports
 Row 2: Manage
 ```
 
@@ -742,7 +745,8 @@ Rules:
 - Successful output: standalone private attachment, not an embed-wrapped image.
 - Fallback: concise private Reminders embed built from the same already-authorized
   `RemindersSummaryPayload`.
-- Do not use an avatar.
+- Use the invoking author's already-authorized Discord avatar bytes and the shared circular `/me`
+  treatment; unreadable or unavailable bytes fall back safely to the no-avatar header.
 
 ### 12.2 Renderer requirements
 
@@ -916,7 +920,7 @@ Cover:
 - exact `1702 × 924` dimensions;
 - exact approved backdrop path;
 - stable filename;
-- no-avatar layout;
+- avatar and safe no-avatar-fallback layouts;
 - `ACTIVE`, `REVIEW`, and `OFF` pills;
 - `NEXT SCHEDULED ALERT`, `NO UPCOMING ALERT`, `REMINDER COVERAGE`, and `SCHEDULE UNAVAILABLE` heroes;
 - long/Unicode Discord display name;
@@ -1031,10 +1035,18 @@ Implementation evidence recorded on 2026-07-14:
   `player_self_service/reminders_summary.py` for state, friendly labels, canonical alert times,
   genuine counts, deterministic overflow, saved/off treatment, coverage, hero variants, warnings,
   injected UTC time, and one priority-ordered insight.
-- Added the deterministic no-avatar `player_self_service/reminders_renderer.py`, which strictly
+- Added the deterministic `player_self_service/reminders_renderer.py`, which strictly
   requires the fully opaque `assets/me/cards/me_reminders.png` at `1702 × 924`, returns stable
   `me_reminders_<discord_user_id>.png`, and renders the approved hierarchy without changing the
   backdrop.
+- Operator smoke on 2026-07-15 accepted Manage refresh and timeout behavior and requested the final
+  visual refinement: shared Discord avatar, duplicate-safe Kingdom suffix, no deprecated Inventory
+  navigation, right-aligned state support, and a split UTC footer with full refreshed date-time.
+  These corrections are implemented and await the operator's final visual re-smoke.
+- The refinement passed `83` renderer/view tests, `146` focused Accounts/Reminders/scheduler/
+  dispatch regressions, full pytest (`2562 passed, 2 skipped`), architecture and deferred-item
+  validation, smoke imports, command registration, pytest log-noise analysis, and all pre-commit
+  hooks. The refined native-size sample passed local visual review.
 - Kept `/me reminders` private and Discord-user scoped, rendered off-loop as a standalone
   attachment, retained the real component rows and unchanged guided Manage mutations, and preserved
   same-payload fallback, deliberate attachment replacement, timeout behavior, and stream cleanup.

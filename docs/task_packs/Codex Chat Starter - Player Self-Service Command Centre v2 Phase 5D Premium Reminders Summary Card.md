@@ -10,7 +10,7 @@ Approval state:
 - Phase 5C Accounts is complete and operator accepted
 - the Phase 5D product/content workshop is complete
 - the Phase 5D information hierarchy, state rules, hero decision tree, summaries, insight priority,
-  controls, no-avatar treatment, and behavior boundaries are approved
+  controls, avatar treatment as refined by operator smoke, and behavior boundaries are approved
 - runtime implementation is approved
 - the approved production backdrop is present at assets/me/cards/me_reminders.png and must be
   exactly 1702x924

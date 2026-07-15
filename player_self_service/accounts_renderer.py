@@ -112,11 +112,17 @@ def format_tanking_score(value: Decimal | None) -> str:
     return f"{_score(value)}%"
 
 
-def _discord_heading(display_name: str) -> str:
+def format_discord_heading(display_name: str, *, kingdom_id: int = 1198) -> str:
+    """Return the shared /me identity without duplicating a saved kingdom suffix."""
     cleaned = _clean(display_name)
-    if cleaned.casefold().endswith("(1198)"):
+    suffix = f"({int(kingdom_id)})"
+    if cleaned.casefold().endswith(suffix.casefold()):
         return cleaned
-    return f"{cleaned} (1198)"
+    return f"{cleaned} {suffix}"
+
+
+def _discord_heading(display_name: str) -> str:
+    return format_discord_heading(display_name)
 
 
 def _text(
@@ -165,7 +171,8 @@ def _canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
     return canvas, ImageDraw.Draw(canvas, "RGBA")
 
 
-def _avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> bool:
+def paste_discord_avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> bool:
+    """Paste the shared circular /me avatar treatment when bytes are readable."""
     if not avatar_bytes:
         return False
     size = 82
@@ -185,6 +192,10 @@ def _avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> bool:
         return True
     except Exception:
         return False
+
+
+def _avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> bool:
+    return paste_discord_avatar(canvas, avatar_bytes)
 
 
 def _encode(canvas: Image.Image, filename: str) -> RenderedAccountsCard:

@@ -281,7 +281,10 @@ def build_reminders_embed(
     payload = _reminders_payload(summary, display_name=display_name)
     embed = discord.Embed(
         title="Reminder Centre",
-        description=f"{payload.display_name} ({payload.kingdom_id})",
+        description=accounts_renderer.format_discord_heading(
+            payload.display_name,
+            kingdom_id=payload.kingdom_id,
+        ),
         color={
             "ACTIVE": discord.Color.green(),
             "REVIEW": discord.Color.gold(),
@@ -333,7 +336,10 @@ def build_reminders_embed(
         inline=False,
     )
     embed.set_footer(
-        text=(f"Refreshed {payload.generated_at_utc:%H:%M UTC} • " "Schedule times shown in UTC")
+        text=(
+            "Scheduled times shown in UTC • "
+            f"Refreshed {payload.generated_at_utc:%d %b %Y %H:%M UTC}"
+        )
     )
     return embed
 
@@ -534,6 +540,7 @@ async def _build_page_response(
             rendered = await asyncio.to_thread(
                 reminders_renderer.render_reminders_card,
                 _reminders_payload(summary, display_name=display_name),
+                avatar_bytes=avatar_bytes,
             )
         else:
             if summary is None:
@@ -721,7 +728,7 @@ class PlayerSelfServiceView(discord.ui.View):
         if self.page == PAGE_EXPORTS:
             self._apply_export_button_state()
         self._apply_visible_action_rows()
-        if self.page == PAGE_ACCOUNTS:
+        if self.page in {PAGE_ACCOUNTS, PAGE_REMINDERS}:
             for child in list(self.children):
                 if isinstance(child, discord.ui.Button) and child.custom_id == "me:inventory":
                     self.remove_item(child)
@@ -871,7 +878,7 @@ class PlayerSelfServiceView(discord.ui.View):
             )
             return False
 
-        if page == PAGE_ACCOUNTS and avatar_bytes is None:
+        if page in {PAGE_ACCOUNTS, PAGE_REMINDERS} and avatar_bytes is None:
             avatar_bytes = await _read_avatar_bytes(
                 getattr(interaction, "user", None), expected_user_id=self.author_id
             )
@@ -1269,6 +1276,7 @@ class PlayerSelfServiceView(discord.ui.View):
             display_name=self.display_name,
             host_message=getattr(interaction, "message", None),
             summary_loader=self.summary_loader,
+            avatar_bytes=self.avatar_bytes,
         )
         sent = await interaction.followup.send(
             "Choose KVK event types and times, or switch to calendar reminder management.",
@@ -1514,9 +1522,10 @@ async def send_player_self_service_page(
     try:
         if page == PAGE_ACCOUNTS:
             accounts_payload = await accounts_service.build_accounts_portfolio(int(ctx.user.id))
-            avatar_bytes = await _read_avatar_bytes(ctx.user, expected_user_id=int(ctx.user.id))
         else:
             summary = await summary_loader(int(ctx.user.id))
+        if page in {PAGE_ACCOUNTS, PAGE_REMINDERS}:
+            avatar_bytes = await _read_avatar_bytes(ctx.user, expected_user_id=int(ctx.user.id))
     except Exception:
         logger.exception(
             "player_self_service_initial_summary_failed user_id=%s page=%s",

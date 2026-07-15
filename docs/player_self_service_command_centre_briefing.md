@@ -494,8 +494,9 @@ Current status:
   coordinates remain private. There is no Change Governor, and optional selected-governor context
   exists only for a validated Dashboard return. The completed Phase 5C task pack and starter are
   archived.
-- Phase 5D Premium Reminders Summary Card is implemented and locally validated; operator Discord
-  smoke remains pending. The no-avatar standalone 1702x924 card earns ACTIVE/REVIEW/OFF from the
+- Phase 5D Premium Reminders Summary Card is implemented and locally validated; final operator
+  visual re-smoke remains pending. The standalone 1702x924 card uses the invoking Discord avatar
+  with a safe fallback and earns ACTIVE/REVIEW/OFF from the
   existing KVK and Calendar settings, presents friendly event labels, canonical alert-time labels,
   genuine counts and deterministic overflow, saved inactive choices, compact coverage, and exactly
   one priority-ordered Reminder Insight. Repository inspection found no reusable side-effect-free
@@ -512,6 +513,9 @@ Current status:
   `8fcf96f6-44e0-4d87-8521-7de721444ef7` sealed with 85/85 review receipts and 42/42 candidate
   ledgers. It found no Phase 5D security issue; its 20 reportable findings (16 Medium, 4 Low) belong
   to pre-existing authorization/import/Ark/MGE repository surfaces.
+  Initial operator smoke on 2026-07-15 accepted Manage refresh and timeout behavior; the follow-up
+  removes deprecated Inventory navigation, deduplicates `(1198)`, right-aligns the state support,
+  and splits the UTC footer with a full refreshed date-time.
 - Phases 5D-5G independently apply the same format and transition contract to Reminders,
   Preferences, Inventory summary, and Exports summary. They preserve current page actions,
   disabled states, privacy, payloads, filenames, attachment cleanup, and service ownership; none

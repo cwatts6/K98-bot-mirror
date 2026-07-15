@@ -64,7 +64,8 @@ scan-health roster, one deterministic portfolio insight, the unchanged guided Ma
 a private avatar-enabled paginated Account Summary plus complete CSV. The accepted `1702x924`
 runtime backdrop is `assets/me/cards/me_accounts.png`.
 
-Phase 5D is implemented and locally validated; operator Discord smoke remains the final gate.
+Phase 5D has passed operator functional smoke for Manage refresh and timeout; the refined visual
+card remains subject to final operator re-smoke.
 `/me reminders` is now a private premium operational summary with earned ACTIVE/REVIEW/OFF state,
 the approved truthful coverage hero, friendly KVK and Calendar summaries, one deterministic Reminder
 Insight, and the unchanged guided Manage journey. The strict `1702x924` runtime backdrop is
@@ -785,7 +786,7 @@ Delivery record:
 
 ### Phase 5C-5G — Premium `/me` Summary Cards
 
-Status: `Phase 5C Accounts is complete and operator accepted; Phase 5D Reminders is implemented and locally validated with operator smoke pending; Phases 5E-5G remain separately scoped`.
+Status: `Phase 5C Accounts is complete and operator accepted; Phase 5D Reminders passed functional smoke with visual re-smoke pending; Phases 5E-5G remain separately scoped`.
 
 The five summary pages share a presentation and interaction baseline but remain independent PR-sized
 slices. A later page must reuse the accepted rules from earlier pages without creating a broad
@@ -803,10 +804,9 @@ Shared premium summary-card contract:
   a second data fetch, and close every file/stream on success, fallback, timeout, cancellation,
   stale suppression, and concurrent navigation.
 - The invoking-user avatar remains a page-specific design decision. Phase 5C applies the accepted
-  bounded avatar treatment to Accounts and every Account Summary section. Phase 5D explicitly omits
-  an avatar because its alert/configuration-led Herald's Watch layout has no portrait aperture; this
-  is an approved page-specific exception, not a regression. Keep long/Unicode display names fitted
-  and never derive a user-level page identity from a selected governor.
+  bounded avatar treatment to Accounts and every Account Summary section. Following operator smoke,
+  Phase 5D reuses that bounded circular avatar with a safe no-avatar fallback. Keep long/Unicode
+  display names fitted and never derive a user-level page identity from a selected governor.
 - Keep genuine current page values, states, names, action guidance, and empty/unavailable wording.
   Do not invent figures, trends, governors, status, or next actions to fill the backdrop.
 - Keep global navigation as real Discord components: blue-primary `Accounts`, `Reminders`, and
@@ -845,7 +845,7 @@ Remaining-phase consistency matrix:
 
 | Phase | Parent scope | Premium output baseline | Governor routing | Product/behavior boundary |
 |---|---|---|---|---|
-| 5D Reminders | Discord user | 1702x924 standalone, no avatar, same-payload fallback, graceful timeout | No Change Governor | Locked ACTIVE/REVIEW/OFF state, conditional next-alert/coverage hero, friendly KVK/Calendar summaries, one deterministic insight; preserve persistence, scheduling, DM, and Manage |
+| 5D Reminders | Discord user | 1702x924 standalone, invoking-user avatar with safe fallback, same-payload fallback, graceful timeout | No Change Governor | Locked ACTIVE/REVIEW/OFF state, conditional next-alert/coverage hero, friendly KVK/Calendar summaries, one deterministic insight; preserve persistence, scheduling, DM, and Manage |
 | 5E Preferences | Discord user | Same premium baseline, page-approved backdrop and controls | No parent dropdown; Update VIP resolves governor explicitly | Preserve visibility/profile/VIP services and SQL contracts unless separately approved |
 | 5F Inventory summary | All linked/user | Same premium baseline; direct 1400x980 reports remain separate | No parent dropdown; Open Report explicitly selects and report pages may switch governor | Preserve calculations, imports, ranges, visibility, export, filename, and Sheets contracts |
 | 5G Exports summary | User/all-linked | Same premium baseline and private option windows | No Change Governor under current scope | Preserve schemas, formats, windows, filenames, services, and Sheets behavior |
@@ -934,15 +934,16 @@ starter. Mirror PR #221 and production PR #528 contain the accepted implementati
 
 #### Phase 5D - Premium Reminders Summary Card
 
-Status: `implemented and locally validated - operator Discord smoke pending`.
+Status: `operator functional smoke passed - visual refinement re-smoke pending`.
 
 Implementation evidence recorded on 2026-07-14:
 
 - One typed read-only payload owns state, label/time normalisation, genuine counts, deterministic
   overflow, saved inactive treatment, coverage, warnings, hero variants, injected UTC time, and the
   priority-ordered Reminder Insight.
-- A dedicated no-avatar renderer strictly validates the fully opaque `1702x924` production asset,
-  renders the approved hierarchy, and delivers stable `me_reminders_<discord_user_id>.png` output.
+- A dedicated renderer strictly validates the fully opaque `1702x924` production asset, uses the
+  invoking user's circular Discord avatar with a safe fallback, renders the approved hierarchy, and
+  delivers stable `me_reminders_<discord_user_id>.png` output.
 - Standalone private attachment delivery, same-payload fallback, deliberate replacement, off-loop
   rendering, stream cleanup, graceful timeout, author gating, and selected-Dashboard return context
   retain the existing component architecture.
@@ -958,6 +959,13 @@ Implementation evidence recorded on 2026-07-14:
 - Codex Security standard scan `8fcf96f6-44e0-4d87-8521-7de721444ef7` sealed with `85/85` review
   receipts and `42/42` candidate ledgers. Its 20 reportable findings (`16 Medium`, `4 Low`) are in
   pre-existing repository authorization/import/Ark/MGE surfaces; Phase 5D has no security finding.
+- Operator smoke on 2026-07-15 accepted Manage refresh and timeout behavior. The requested visual
+  refinement adds the shared avatar, prevents duplicate `(1198)`, removes deprecated Inventory
+  navigation from Reminders, right-aligns state support, and splits the UTC footer with full date-time;
+  final visual re-smoke remains pending.
+  Refinement validation passed `83` renderer/view tests, `146` focused cross-system regressions, full
+  pytest (`2562 passed, 2 skipped`), pre-commit, architecture/deferred checks, smoke imports, command
+  registration, log-noise analysis, and native-size visual review.
 - The approved coverage hero is used because no existing pure cross-system projection can be reused
   without copying scheduler rules. The separately scoped extraction is recorded in the deferred
   optimisation backlog.
@@ -1346,8 +1354,9 @@ The programme is complete when:
 - [x] Phase 5D Reminders locally delivers the approved ACTIVE/REVIEW/OFF card, truthful coverage
   hero, friendly KVK/Calendar summaries, deterministic insight, unchanged Manage behavior, and
   automated/visual validation.
-- [ ] Phase 5D Reminders operator Discord smoke confirms genuine settings, Manage behavior, private
-  standalone delivery, fallback, timeout, navigation, and desktop/mobile presentation.
+- [ ] Phase 5D Reminders final operator visual re-smoke confirms the refined avatar, identity,
+  navigation, alignment, footer, and desktop/mobile presentation. Initial smoke already confirmed
+  genuine settings, Manage refresh, private standalone delivery, and timeout behavior.
 - [ ] Export Stats semantics are explicitly decided and tested before dashboard integration.
 - [ ] A private `/me history` path exists while `/kvk history` remains unchanged.
 - [ ] `/me inspect` is permission-gated, private by default, and excludes Discord-user private data.
@@ -1421,3 +1430,4 @@ Use:
 | 2026-07-14 | Phase 5D Reminders product/content/visual contract approved | Locked ACTIVE/REVIEW/OFF state, the authoritative next-alert/no-upcoming/coverage/unavailable hero decision, friendly KVK/Calendar summaries, deterministic insight, unchanged Manage and reminder behavior, no-avatar/no-Change-Governor presentation, standalone/fallback lifecycle, and approved `assets/me/cards/me_reminders.png`; implementation is the next active slice. |
 | 2026-07-14 | Phase 5D Reminders implemented and locally validated | Added the typed dual-system summary, strict no-avatar 1702x924 renderer, approved coverage hero, friendly labels/times/counts/overflow/insight, standalone same-payload delivery, and unchanged Manage behavior. Focused tests passed 147, scheduler/reminder selection passed 193, full pytest passed 2551 with 2 skipped, and the ten-state original/desktop/mobile matrix passed visual review. Exact next-alert projection is deferred; operator Discord smoke remains pending. |
 | 2026-07-14 | Phase 5D final security and cleanup validation | Closed the explicit host-refresh attachment stream lifecycle, reran focused/full/pre-commit/log-noise gates, and sealed Codex Security scan `8fcf96f6-44e0-4d87-8521-7de721444ef7` with 85/85 reviews, 42/42 candidate ledgers, 20 pre-existing wider-repository findings, and no Phase 5D security finding. Operator Discord smoke remains pending. |
+| 2026-07-15 | Phase 5D operator smoke refinement | Manage refresh and timeout passed operator smoke. Added the shared invoking-user avatar with safe fallback, duplicate-safe `(1198)` identity, removed deprecated Inventory navigation from Reminders, right-aligned state support with the state pill, and split the footer into left UTC guidance plus right full refreshed date-time. Final visual re-smoke remains pending. |
