@@ -5,20 +5,29 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
 
 from bot_config import INVENTORY_UPLOAD_CHANNEL_ID
+from constants import EVENT_CALENDAR_REMINDER_GRACE_MINUTES
+from event_cache import UpcomingEventCacheSnapshot, get_upcoming_event_cache_snapshot
+from event_calendar.reminder_candidates import build_calendar_alert_projection
 from event_calendar.reminder_config_service import (
     CalendarReminderConfigState,
-    load_user_calendar_reminder_state,
+    state_from_prefs,
 )
+from event_calendar.reminder_prefs_store import get_user_prefs
+from event_calendar.reminder_state import CalendarReminderState
+from event_calendar.runtime_cache import list_event_types, load_runtime_cache
+from event_scheduler import KvkDmTrackerSnapshot, snapshot_dm_trackers
 from inventory import profile_service, reporting_service
 from inventory.models import InventoryReportVisibility, RegisteredGovernor
 from inventory.parsing import format_resource_value
 from player_self_service import profile_preference_service, reminders_summary
 from player_self_service.reminders_summary import RemindersSummaryPayload
+from reminder_domain.kvk_candidates import build_kvk_alert_projection
+from reminder_domain.projection import ReminderSourceProjection, combine_reminder_projections
 from services.governor_account_service import (
     AccountResolutionSummary,
     get_account_summary_for_user,
@@ -165,6 +174,7 @@ class PlayerSelfServiceSummary:
 AccountLoader = Callable[[int], Awaitable[AccountResolutionSummary]]
 ReminderLoader = Callable[[int], dict[str, Any] | None]
 CalendarReminderLoader = Callable[[int], CalendarReminderConfigState]
+CalendarPrefsLoader = Callable[[int], dict[str, Any]]
 PreferenceLoader = Callable[[int], Awaitable[Any]]
 ProfilePreferenceLoader = Callable[
     [int], Awaitable[profile_preference_service.UserProfilePreferenceRead]
@@ -174,6 +184,10 @@ InventorySnapshotLoader = Callable[
     [list[RegisteredGovernor]], Awaitable[reporting_service.LatestInventorySnapshot]
 ]
 CalendarEventCatalogLoader = Callable[[], reminders_summary.CalendarEventCatalog]
+KvkEventSnapshotLoader = Callable[[], UpcomingEventCacheSnapshot]
+KvkTrackerSnapshotLoader = Callable[[], KvkDmTrackerSnapshot]
+CalendarRuntimeCacheLoader = Callable[[], dict[str, Any]]
+CalendarReminderStateLoader = Callable[[], CalendarReminderState]
 UtcClock = Callable[[], datetime]
 
 
@@ -653,7 +667,8 @@ async def build_player_self_service_summary(
     *,
     account_loader: AccountLoader = get_account_summary_for_user,
     reminder_loader: ReminderLoader = get_user_config,
-    calendar_reminder_loader: CalendarReminderLoader = load_user_calendar_reminder_state,
+    calendar_reminder_loader: CalendarReminderLoader | None = None,
+    calendar_prefs_loader: CalendarPrefsLoader = get_user_prefs,
     preference_loader: PreferenceLoader = reporting_service.read_visibility_preference,
     profile_preference_loader: ProfilePreferenceLoader = (
         profile_preference_service.read_user_profile_preference
@@ -662,11 +677,14 @@ async def build_player_self_service_summary(
     inventory_snapshot_loader: InventorySnapshotLoader = (
         reporting_service.build_latest_inventory_snapshot
     ),
-    calendar_event_catalog_loader: CalendarEventCatalogLoader = (
-        reminders_summary.load_calendar_event_catalog
-    ),
+    calendar_event_catalog_loader: CalendarEventCatalogLoader | None = None,
+    kvk_event_snapshot_loader: KvkEventSnapshotLoader = get_upcoming_event_cache_snapshot,
+    kvk_tracker_snapshot_loader: KvkTrackerSnapshotLoader = snapshot_dm_trackers,
+    calendar_runtime_cache_loader: CalendarRuntimeCacheLoader = load_runtime_cache,
+    calendar_reminder_state_loader: CalendarReminderStateLoader = CalendarReminderState.load,
     utc_clock: UtcClock = lambda: datetime.now(UTC),
 ) -> PlayerSelfServiceSummary:
+    generated_at = utc_clock()
     account_summary_task = account_loader(int(discord_user_id))
     preference_task = summarize_preference_status(
         int(discord_user_id),
@@ -707,12 +725,27 @@ async def build_player_self_service_summary(
         reminders = summarize_reminder_status(reminder_config)
 
     calendar_state: CalendarReminderConfigState | None = None
+    calendar_prefs: dict[str, Any] = {"enabled": False, "by_event_type": {}}
     calendar_source_available = True
     try:
-        calendar_state = await asyncio.to_thread(
-            calendar_reminder_loader,
-            int(discord_user_id),
-        )
+        if calendar_reminder_loader is None:
+            calendar_prefs = await asyncio.to_thread(
+                calendar_prefs_loader,
+                int(discord_user_id),
+            )
+            calendar_state = state_from_prefs(calendar_prefs)
+        else:
+            calendar_state = await asyncio.to_thread(
+                calendar_reminder_loader,
+                int(discord_user_id),
+            )
+            calendar_prefs = {
+                "enabled": calendar_state.enabled,
+                "by_event_type": {
+                    event_type: list(calendar_state.selected_offsets)
+                    for event_type in calendar_state.selected_types
+                },
+            }
     except asyncio.CancelledError:
         raise
     except Exception as exc:
@@ -732,38 +765,154 @@ async def build_player_self_service_summary(
         calendar = summarize_calendar_reminder_status(calendar_state)
     reminders = replace(reminders, calendar=calendar)
 
+    kvk_event_snapshot: UpcomingEventCacheSnapshot | None = None
+    kvk_tracker_snapshot: KvkDmTrackerSnapshot | None = None
+    calendar_runtime: dict[str, Any] = {}
+    calendar_dispatch_state: CalendarReminderState | None = None
+
     try:
-        calendar_catalog = await asyncio.to_thread(calendar_event_catalog_loader)
+        kvk_event_snapshot = await asyncio.to_thread(kvk_event_snapshot_loader)
     except asyncio.CancelledError:
         raise
     except Exception:
         logger.exception(
-            "player_self_service_calendar_event_catalog_unavailable user_id=%s",
+            "player_self_service_kvk_projection_source_unavailable user_id=%s",
             discord_user_id,
         )
-        calendar_catalog = reminders_summary.CalendarEventCatalog(
-            available=False,
-            event_types=(),
+    try:
+        kvk_tracker_snapshot = kvk_tracker_snapshot_loader()
+    except Exception:
+        logger.exception(
+            "player_self_service_kvk_projection_tracker_unavailable user_id=%s",
+            discord_user_id,
+        )
+    try:
+        calendar_runtime = await asyncio.to_thread(calendar_runtime_cache_loader)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception(
+            "player_self_service_calendar_projection_source_unavailable user_id=%s",
+            discord_user_id,
+        )
+    try:
+        calendar_dispatch_state = await asyncio.to_thread(calendar_reminder_state_loader)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception(
+            "player_self_service_calendar_projection_tracker_unavailable user_id=%s",
+            discord_user_id,
         )
 
-    calendar_prefs: dict[str, Any] = {"enabled": False, "by_event_type": {}}
-    if calendar_state is not None:
-        calendar_prefs = {
-            "enabled": calendar_state.enabled,
-            "by_event_type": {
-                event_type: list(calendar_state.selected_offsets)
-                for event_type in calendar_state.selected_types
-            },
-        }
+    if not isinstance(calendar_runtime, dict):
+        logger.warning(
+            "player_self_service_calendar_projection_source_invalid user_id=%s",
+            discord_user_id,
+        )
+        calendar_runtime = {}
+    calendar_projection_source_available = bool(calendar_runtime.get("ok"))
+    try:
+        known_calendar_types = (
+            tuple(list_event_types(calendar_runtime))
+            if calendar_projection_source_available
+            else ()
+        )
+    except Exception:
+        logger.exception(
+            "player_self_service_calendar_projection_catalog_failed user_id=%s",
+            discord_user_id,
+        )
+        calendar_projection_source_available = False
+        known_calendar_types = ()
+    if calendar_event_catalog_loader is None:
+        calendar_catalog = reminders_summary.CalendarEventCatalog(
+            available=calendar_projection_source_available,
+            event_types=known_calendar_types,
+        )
+    else:
+        try:
+            calendar_catalog = await asyncio.to_thread(calendar_event_catalog_loader)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "player_self_service_calendar_event_catalog_unavailable user_id=%s",
+                discord_user_id,
+            )
+            calendar_catalog = reminders_summary.CalendarEventCatalog(
+                available=False,
+                event_types=(),
+            )
+
+    try:
+        kvk_projection = build_kvk_alert_projection(
+            events=kvk_event_snapshot.events if kvk_event_snapshot is not None else (),
+            config=reminder_config if isinstance(reminder_config, dict) else None,
+            user_id=discord_user_id,
+            sent_tracker=(kvk_tracker_snapshot.sent if kvk_tracker_snapshot is not None else {}),
+            scheduled_tracker=(
+                kvk_tracker_snapshot.scheduled if kvk_tracker_snapshot is not None else {}
+            ),
+            now_utc=generated_at,
+            source_available=(
+                kvk_source_available
+                and kvk_event_snapshot is not None
+                and kvk_event_snapshot.ok
+                and kvk_tracker_snapshot is not None
+            ),
+        )
+    except Exception:
+        logger.exception(
+            "player_self_service_kvk_projection_failed user_id=%s",
+            discord_user_id,
+        )
+        kvk_projection = ReminderSourceProjection.unavailable("KVK projection unavailable")
+    try:
+        calendar_projection = build_calendar_alert_projection(
+            events=(
+                calendar_runtime.get("events", [])
+                if isinstance(calendar_runtime.get("events", []), list)
+                else []
+            ),
+            user_id=int(discord_user_id),
+            prefs=calendar_prefs,
+            known_event_types=set(known_calendar_types),
+            sent_keys=(calendar_dispatch_state.sent if calendar_dispatch_state is not None else {}),
+            now_utc=generated_at,
+            grace=timedelta(minutes=EVENT_CALENDAR_REMINDER_GRACE_MINUTES),
+            source_available=(
+                calendar_source_available
+                and calendar_projection_source_available
+                and calendar_dispatch_state is not None
+            ),
+        )
+    except Exception:
+        logger.exception(
+            "player_self_service_calendar_projection_failed user_id=%s",
+            discord_user_id,
+        )
+        calendar_projection = ReminderSourceProjection.unavailable(
+            "Calendar projection unavailable"
+        )
+    projection = combine_reminder_projections(
+        kvk=kvk_projection,
+        calendar=calendar_projection,
+        now_utc=generated_at,
+    )
     reminders_payload = reminders_summary.build_reminders_summary_payload(
         viewer_discord_id=int(discord_user_id),
         display_name="",
         kvk_config=reminder_config,
         calendar_prefs=calendar_prefs,
         calendar_catalog=calendar_catalog,
-        generated_at_utc=utc_clock(),
+        generated_at_utc=generated_at,
         kvk_source_available=kvk_source_available,
         calendar_source_available=calendar_source_available,
+        hero=reminders_summary.hero_from_projection(
+            projection,
+            generated_at_utc=generated_at,
+        ),
     )
 
     accounts = summarize_account_status(account_summary)

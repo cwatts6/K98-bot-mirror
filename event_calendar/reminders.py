@@ -14,11 +14,17 @@ from constants import (
     EVENT_CALENDAR_REMINDERS_DRY_RUN,
 )
 from core.interaction_safety import get_operation_lock
+from event_calendar.reminder_candidates import (
+    CalendarEligibility,
+    CalendarWindowPhase,
+    collect_calendar_offset_windows,
+    evaluate_calendar_alert_windows,
+    event_display_name,
+    filter_calendar_dispatch_events,
+)
 from event_calendar.reminder_metrics import get_reminder_status_service
-from event_calendar.reminder_prefs import is_dm_allowed, normalize_prefs
 from event_calendar.reminder_prefs_store import load_all_user_prefs
-from event_calendar.reminder_state import CalendarReminderState, make_key
-from event_calendar.reminder_types import REMINDER_OFFSET_TO_DELTA
+from event_calendar.reminder_state import CalendarReminderState
 from event_calendar.runtime_cache import filter_events, list_event_types, load_runtime_cache
 from file_utils import emit_telemetry_event
 
@@ -46,54 +52,13 @@ def _now_utc() -> datetime:
     return datetime.now(UTC)
 
 
-def _parse_event_start_utc(event: dict[str, Any]) -> datetime | None:
-    raw = str(event.get("start_utc") or "").strip()
-    if not raw:
-        return None
-    try:
-        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
-        return dt.astimezone(UTC)
-    except Exception:
-        return None
-
-
-def _iter_due_event_offsets(
-    *,
-    events: list[dict[str, Any]],
-    now: datetime,
-    grace: timedelta,
-) -> list[tuple[dict[str, Any], str, datetime]]:
-    due: list[tuple[dict[str, Any], str, datetime]] = []
-    for e in events:
-        start = _parse_event_start_utc(e)
-        if not start:
-            continue
-
-        for reminder_type, delta in REMINDER_OFFSET_TO_DELTA.items():
-            scheduled_for = start - delta
-            if now < scheduled_for:
-                continue
-            if now - scheduled_for > grace:
-                continue
-            due.append((e, reminder_type, scheduled_for))
-    return due
-
-
 def _discord_ts(dt: datetime, style: str = "F") -> str:
     return f"<t:{int(dt.timestamp())}:{style}>"
 
 
-def _event_display_name(event: dict[str, Any]) -> str:
-    title = str(event.get("title") or event.get("Title") or "(untitled)").strip()
-    variant = str(event.get("variant") or event.get("Variant") or "").strip()
-    return f"{title} ({variant})" if variant else title
-
-
 def build_reminder_dm_content(*, event: dict[str, Any], reminder_type: str) -> str:
     emoji = str(event.get("emoji") or event.get("Emoji") or "📅").strip()
-    name = _event_display_name(event)
+    name = event_display_name(event)
 
     raw_start = event.get("start_utc") or event.get("StartUTC")
     if isinstance(raw_start, datetime):
@@ -118,7 +83,7 @@ def build_reminder_dm_content(*, event: dict[str, Any], reminder_type: str) -> s
 
 def build_reminder_dm_embed(*, event: dict[str, Any], reminder_type: str) -> discord.Embed:
     emoji = str(event.get("emoji") or event.get("Emoji") or "📅").strip()
-    name = _event_display_name(event)
+    name = event_display_name(event)
 
     raw_start = event.get("start_utc") or event.get("StartUTC")
     if isinstance(raw_start, datetime):
@@ -163,16 +128,14 @@ async def dispatch_due_calendar_reminders(bot: discord.Client) -> ReminderDispat
         )
         return summary
 
-    events = filter_events(
+    events = filter_calendar_dispatch_events(
         cache_state.get("events", []),
-        now=now - timedelta(days=7),
-        days=365,
-        event_type="all",
-        importance="all",
+        now_utc=now,
+        filterer=filter_events,
     )
-
-    due = _iter_due_event_offsets(events=events, now=now, grace=grace)
-    if not due:
+    windows = collect_calendar_offset_windows(events=events, now_utc=now, grace=grace)
+    due_windows = tuple(window for window in windows if window.phase is CalendarWindowPhase.DUE)
+    if not due_windows:
         summary = ReminderDispatchSummary(ok=True, status="no_due_reminders")
         get_reminder_status_service().record_summary(
             summary=summary, dry_run=EVENT_CALENDAR_REMINDERS_DRY_RUN
@@ -190,7 +153,11 @@ async def dispatch_due_calendar_reminders(bot: discord.Client) -> ReminderDispat
     known_types = set(list_event_types(cache_state))
     state = CalendarReminderState.load(path=None)
 
-    summary = ReminderDispatchSummary(ok=True, status="completed", candidates=len(due))
+    summary = ReminderDispatchSummary(
+        ok=True,
+        status="completed",
+        candidates=len(due_windows),
+    )
 
     for user_id_raw, raw_prefs in all_prefs.items():
         try:
@@ -198,42 +165,36 @@ async def dispatch_due_calendar_reminders(bot: discord.Client) -> ReminderDispat
         except Exception:
             continue
 
-        prefs = normalize_prefs(raw_prefs)
-        for event, reminder_type, scheduled_for in due:
-            et = str(event.get("type") or "").strip().lower()
-            if et not in known_types:
+        evaluations = evaluate_calendar_alert_windows(
+            windows=due_windows,
+            user_id=user_id,
+            prefs=raw_prefs,
+            known_event_types=known_types,
+            sent_keys=state.sent,
+            now_utc=now,
+        )
+        for evaluation in evaluations:
+            if evaluation.eligibility is CalendarEligibility.UNKNOWN_TYPE:
                 summary.skipped_unknown_type += 1
                 continue
-
-            instance_id = str(event.get("instance_id") or "").strip()
-            if not instance_id:
+            if evaluation.eligibility is CalendarEligibility.MISSING_INSTANCE:
                 continue
-
-            key = make_key(instance_id, user_id, reminder_type)
-
-            if not state.should_send_with_grace(
-                key=key,
-                scheduled_for=scheduled_for,
-                now=now,
-                grace=grace,
-            ):
+            if evaluation.eligibility is CalendarEligibility.ALREADY_SENT:
                 summary.skipped_already_sent += 1
                 continue
-
-            try:
-                allowed = is_dm_allowed(
-                    reminder_type=reminder_type,
-                    event_type=et,
-                    prefs=prefs,
-                    known_event_types=known_types,
-                )
-            except ValueError:
-                summary.skipped_unknown_type += 1
-                continue
-
-            if not allowed:
+            if evaluation.eligibility is CalendarEligibility.PREFS_EXCLUDED:
                 summary.skipped_prefs += 1
                 continue
+            if evaluation.eligibility is not CalendarEligibility.ELIGIBLE:
+                continue
+
+            event = evaluation.window.event
+            reminder_type = evaluation.window.reminder_type
+            key = evaluation.key
+            if key is None:
+                continue
+            instance_id = str(event.get("instance_id") or "").strip()
+            et = str(event.get("type") or "").strip().lower()
 
             summary.attempted += 1
             if EVENT_CALENDAR_REMINDERS_DRY_RUN:

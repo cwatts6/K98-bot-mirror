@@ -1,5 +1,7 @@
 # event_cache.py
 import asyncio
+import copy
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import json
 import logging
@@ -33,6 +35,17 @@ PRESERVE_EVENT_CACHE_ON_EMPTY_SECONDS = int(
     os.getenv("PRESERVE_EVENT_CACHE_ON_EMPTY_SECONDS", "3600")
 )
 EVENT_CACHE_MIN_REFRESH_TIMEOUT = float(os.getenv("EVENT_CACHE_MIN_REFRESH_TIMEOUT", "5.0"))
+
+
+@dataclass(frozen=True, slots=True)
+class UpcomingEventCacheSnapshot:
+    """One locked, read-only KVK occurrence/cache-health snapshot."""
+
+    ok: bool
+    events: tuple[dict[str, Any], ...]
+    last_refreshed: datetime | None
+    stale: bool
+    error: str | None = None
 
 
 # ---- Helpers -----------------------------------------------------------------
@@ -413,6 +426,44 @@ def get_all_upcoming_events() -> list[dict[str, Any]]:
             except Exception:
                 continue
         return out
+
+
+def get_upcoming_event_cache_snapshot(
+    *, now_utc: datetime | None = None, max_age_hours: int = 12
+) -> UpcomingEventCacheSnapshot:
+    """Bulk-load upcoming events and existing health metadata exactly once.
+
+    A successful empty refresh has ``last_refreshed`` and is healthy. An empty
+    cache that has never loaded/refreshed has no such evidence and is reported
+    unavailable. Staleness remains diagnostic only, matching live KVK dispatch,
+    which continues to consume the current in-memory cache.
+    """
+
+    now = _aware(now_utc or utcnow())
+    with _CACHE_LOCK:
+        refreshed = last_refreshed
+        upcoming: list[dict[str, Any]] = []
+        for event in event_cache:
+            try:
+                if _aware(event["start_time"]) > now:
+                    upcoming.append(copy.deepcopy(event))
+            except Exception:
+                continue
+
+    ok = refreshed is not None or bool(upcoming)
+    stale = True
+    if refreshed is not None:
+        try:
+            stale = now - _aware(refreshed) > timedelta(hours=max_age_hours)
+        except Exception:
+            stale = True
+    return UpcomingEventCacheSnapshot(
+        ok=ok,
+        events=tuple(upcoming),
+        last_refreshed=refreshed,
+        stale=stale,
+        error=None if ok else "cache_unavailable",
+    )
 
 
 # Optional convenience: include ongoing items too (not used elsewhere, but handy)

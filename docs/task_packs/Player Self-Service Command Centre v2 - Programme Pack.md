@@ -5,7 +5,7 @@
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
 - Date: `2026-07-15`
-- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486, GovernorOS v2 Phases 1-5B completed through mirror PR #220 and production PR #527, Phase 5C Accounts completed and operator accepted in mirror PR #221 and production PR #528 on 2026-07-14, Phase 5D Reminders completed and operator accepted in mirror PR #222 and production PR #529 on 2026-07-15, and Phase 5D.1 Authoritative Next Scheduled Alert Projection prepared as the next active slice
+- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486, GovernorOS v2 Phases 1-5B completed through mirror PR #220 and production PR #527, Phase 5C Accounts completed and operator accepted in mirror PR #221 and production PR #528 on 2026-07-14, Phase 5D Reminders completed and operator accepted in mirror PR #222 and production PR #529 on 2026-07-15, and Phase 5D.1 Authoritative Next Scheduled Alert Projection implemented with final operator smoke pending
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
@@ -74,12 +74,15 @@ that logic was not copied into the summary service. Final smoke accepted Manage 
 updates, graceful timeout, invoking-user avatar, duplicate-safe identity, removal of deprecated
 Inventory navigation, right-aligned state support, and the split full UTC footer.
 
-Phase 5D.1 Authoritative Next Scheduled Alert Projection is the agreed next active slice before
-Phase 5E Preferences. It promotes the projection item out of the deferred backlog. Existing
-`/calendar_next_event`, `/next_kvk_event`, and `/next_kvk_fight` provide reusable Calendar/KVK bulk
-occurrence-reader evidence, while the implementation must extract narrow pure candidate eligibility
-shared with live dispatch to preserve KVK horizon/tracker and Calendar grace/sent-key parity. No
-command, SQL, persistence, event-source, scheduler policy, DM, or delivery behavior change is implied.
+Phase 5D.1 Authoritative Next Scheduled Alert Projection is implemented and locally validated with
+final operator Discord smoke pending before Phase 5E Preferences. It promoted the projection item
+out of the deferred backlog and extracted narrow pure KVK/Calendar candidate eligibility shared by
+live dispatch and read-only Player Self-Service. Existing `/calendar_next_event`, `/next_kvk_event`,
+and `/next_kvk_fight` remain unchanged bulk-reader evidence. The operator authorised the discovered
+KVK zero-duration truthiness correction so saved `now` is genuinely at-start eligible; its existing
+horizon, tracker, task, retry, rehydration, cleanup, and duplicate-send ownership is preserved. No
+Calendar, command, SQL, persistence, event-source/type, lead-time, cadence, or DM-content change was
+introduced.
 
 ## 3. Programme Vision
 
@@ -794,7 +797,7 @@ Delivery record:
 
 ### Phase 5C-5G — Premium `/me` Summary Cards
 
-Status: `Phase 5C Accounts and Phase 5D Reminders are complete and operator accepted; Phase 5D.1 is the next active slice; Phases 5E-5G remain separately scoped`.
+Status: `Phase 5C Accounts and Phase 5D Reminders are complete and operator accepted; Phase 5D.1 is implemented with operator smoke pending; Phases 5E-5G remain separately scoped`.
 
 The five summary pages share a presentation and interaction baseline but remain independent PR-sized
 slices. A later page must reuse the accepted rules from earlier pages without creating a broad
@@ -1076,7 +1079,7 @@ starter. The backdrop-generation task is complete; runtime uses only the product
 
 #### Phase 5D.1 - Authoritative Next Scheduled Alert Projection
 
-Status: `prepared - next active GovernorOS slice`.
+Status: `implemented and locally validated - operator Discord smoke pending`.
 
 Approved direction:
 
@@ -1101,7 +1104,21 @@ Approved direction:
   Player Self-Service delivery, full regression, K98 PR-review/promotion, and Codex Security gates.
 
 The authoritative implementation and escalation contract is in the active Phase 5D.1 task pack and
-chat starter. Runtime implementation is not started by this documentation-only programme close-out.
+chat starter. Runtime now uses one typed cross-system projection plus narrow KVK and Calendar pure
+eligibility helpers consumed by both live dispatch and Player Self-Service. KVK occurrences/config/
+sent/scheduled state and Calendar runtime occurrences/preferences/sent state are bulk-loaded once
+per request; projection performs no cache refresh, network call, job/task creation, DM,
+acknowledgement, or persistence write. The earliest future candidate uses a deterministic KVK-first
+tie-break, healthy empty inputs produce `NO UPCOMING ALERT`, and a required source/projection failure
+produces `SCHEDULE UNAVAILABLE` without changing valid ACTIVE/REVIEW/OFF configuration state.
+
+The section 16 audit exposed that KVK `now` was mapped to zero duration but skipped by the live
+scheduler's truthiness check. The operator explicitly authorised the narrow correction on
+2026-07-15: KVK `now` is now genuinely at-start eligible through the same existing task, tracker,
+retry, rehydration, cleanup, and duplicate-send machinery. No Calendar, source, persistence,
+lead-time, cadence, command, SQL, or DM-content contract changed. Local automated and native/
+desktop/mobile visual validation is complete; final operator Discord smoke remains pending before
+Phase 5D.1 completion and Phase 5E activation.
 
 #### Phase 5E - Premium Preferences Summary Card
 
@@ -1427,19 +1444,18 @@ Do not include these in early phases unless separately approved:
 ## 20. Suggested Next Action
 
 ```text
-Start Phase 5D.1 from its active task pack and chat starter. Audit the existing bulk occurrence
-readers behind /calendar_next_event, /next_kvk_event, and /next_kvk_fight, then extract narrow pure
-KVK and Calendar candidate eligibility shared with live dispatch. Prove deterministic-clock parity,
-healthy-empty versus unavailable source handling, scheduled/sent and grace semantics, no side
-effects, no N+1 reads, and unchanged commands/Manage before mapping the result into the accepted
-Reminders hero. Complete this slice before beginning Phase 5E Preferences.
+Complete the final Phase 5D.1 operator Discord smoke from its active task pack. Confirm the
+authoritative NEXT/NO UPCOMING/UNAVAILABLE hero states, the authorised KVK at-start DM, Manage
+refresh, timeout, fallback, attachment replacement, and selected-Dashboard return. Do not start
+Phase 5E until that gate is accepted.
 ```
 
 The accepted Reminders runtime backdrop remains `assets/me/cards/me_reminders.png` at exactly
 `1702x924`. Phase 5D.1 changes the authoritative hero data, not the accepted card hierarchy,
 components, renderer, fallback, Manage journey, or timeout contract.
 
-Phase 5D.1 does not inherit permission to change reminder scheduling behavior, event sources,
+Except for the explicitly authorised KVK `now` truthiness correction recorded above, Phase 5D.1
+does not inherit permission to change reminder scheduling behavior, event sources,
 event/time choices, lead times, grace, retries, DMs, Calendar behavior, persisted state, SQL,
 another `/me` page, the three existing next-event commands, or the guided Manage workflow.
 
@@ -1475,3 +1491,4 @@ Use:
 | 2026-07-14 | Phase 5D final security and cleanup validation | Closed the explicit host-refresh attachment stream lifecycle, reran focused/full/pre-commit/log-noise gates, and sealed Codex Security scan `8fcf96f6-44e0-4d87-8521-7de721444ef7` with 85/85 reviews, 42/42 candidate ledgers, 20 pre-existing wider-repository findings, and no Phase 5D security finding. Operator Discord smoke remains pending. |
 | 2026-07-15 | Phase 5D operator smoke refinement | Manage refresh and timeout passed operator smoke. Added the shared invoking-user avatar with safe fallback, duplicate-safe `(1198)` identity, removed deprecated Inventory navigation from Reminders, right-aligned state support with the state pill, and split the footer into left UTC guidance plus right full refreshed date-time. Final visual re-smoke remains pending. |
 | 2026-07-15 | Phase 5D completed and Phase 5D.1 prepared | Recorded successful final operator smoke and visual acceptance, archived the completed Phase 5D task pack/starter, promoted the authoritative next-alert projection out of the deferred backlog, and created the active Phase 5D.1 task pack/starter. Existing `/calendar_next_event`, `/next_kvk_event`, and `/next_kvk_fight` are recorded as reusable bulk reader evidence; shared live/projection parity, no side effects, no N+1 reads, and unchanged reminder/command behavior are the implementation boundary before Phase 5E Preferences. |
+| 2026-07-15 | Phase 5D.1 implemented and locally validated | Added shared pure KVK/Calendar eligibility and a typed bulk-loaded cross-system projection for NEXT/NO UPCOMING/UNAVAILABLE. Live dispatch consumes the same rules; projection performs no tasks, DMs, acknowledgements, refreshes, network calls, or writes. The operator authorised correcting KVK `now` zero-duration eligibility while preserving existing task/tracker/rehydration/retry behavior. Native/desktop/mobile visual evidence passed; final operator Discord smoke remains pending. |

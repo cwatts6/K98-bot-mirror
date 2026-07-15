@@ -8,10 +8,20 @@
 - Task type: `scheduler-domain extraction | read-only cross-system projection | Reminders hero completion`
 - One-pass approved: `No - this pack prepares the next implementation slice; runtime work begins only when the operator starts the implementation task`
 - Product direction approved: `Yes - complete the Reminders page before Phase 5E Preferences`
-- Runtime implementation approved: `Not by this documentation-only close-out`
-- Status: `prepared - next active GovernorOS slice`
+- Runtime implementation approved: `Yes - started by the operator on 2026-07-15`
+- Status: `implemented and locally validated - operator Discord smoke pending`
 - SQL impact: `None expected or approved`
 - Command-surface impact: `None`
+
+### Operator-approved section 16 resolution
+
+Repository audit found that KVK `now` maps to `timedelta(0)` but live dispatch used
+`if not delta: continue`, so the saved at-start choice was never scheduled. Calendar `start` was
+already eligible. The operator explicitly authorised the narrow KVK correction on 2026-07-15.
+Shared KVK eligibility now distinguishes a missing mapping from zero duration, making `now` a
+genuine at-start candidate for live dispatch and projection. Existing 48-hour scheduling, delayed
+task ownership, sent/scheduled trackers, rehydration, retry, duplicate prevention, unsubscribe,
+cleanup, cadence, and DM content remain unchanged.
 
 ## 2. Required Reading
 
@@ -193,6 +203,41 @@ The pure helper boundary must:
   network request, or event-source fetch;
 - preserve KVK and Calendar differences rather than forcing them into one false generic scheduler.
 
+### 10.1 Recorded Implementation Map And Evidence
+
+- Phase 5D delivery remains owned by `player_self_service/service.py` and
+  `player_self_service/reminders_summary.py`, with the accepted view/render/fallback/attachment/
+  Manage/author/timeout/selected-Dashboard paths unchanged in
+  `ui/views/player_self_service_views.py`, `player_self_service/reminders_renderer.py`, and
+  `ui/views/player_self_service_reminder_views.py`.
+- Existing command readers remain unchanged: `/calendar_next_event` uses
+  `event_calendar.runtime_cache` filtering/ordering; `/next_kvk_event` and
+  `/next_kvk_fight` use the upcoming KVK cache. Those commands expose occurrence order and labels,
+  not player reminder eligibility.
+- `event_cache.get_upcoming_event_cache_snapshot()` now supplies one locked, deep-copied KVK
+  occurrence/health snapshot; `event_scheduler.snapshot_dm_trackers()` supplies one sent/scheduled
+  tracker snapshot. Calendar preferences, runtime cache, and sent state are each loaded once by the
+  service. No occurrence-level reader is called from either pure evaluator.
+- `reminder_domain.kvk_candidates.build_kvk_alert_projection()` is the shared KVK boundary used by
+  live scheduling and read-only projection. It owns subscription/fight matching, supported types,
+  event identity, the 48-hour horizon, offsets including authorised zero-second at-start, passed-window
+  immediate time, sent exclusion, and scheduled-pending representation. Existing scheduler code still
+  owns marker writes, retries, task registry, dispatch, cleanup, and rehydration.
+- `event_calendar.reminder_candidates` owns the shared Calendar occurrence filter, offset windows,
+  enabled/all/specific preference evaluation, known-type and instance checks, grace/expiry, and sent
+  keys. `event_calendar/reminders.py` still owns DMs, retries, dry-run behavior, sent writes, the
+  operation lock, and persistence.
+- `reminder_domain.projection.combine_reminder_projections()` is the typed cross-system selector.
+  It accepts the single injected UTC clock and already-loaded source results, fails unavailable when a
+  required source fails, rejects past display timestamps, and applies the documented KVK-first
+  deterministic tie-break before mapping into the existing hero contract.
+- Focused tests are in `tests/test_kvk_reminder_candidates.py`,
+  `tests/test_calendar_reminder_candidates.py`, `tests/test_reminder_projection.py`,
+  `tests/test_player_self_service_reminder_projection.py`,
+  `tests/test_event_scheduler_at_start_projection.py`, and `tests/test_event_cache.py`, alongside
+  the existing scheduler, Calendar dispatcher, next-event command, Manage, view, renderer, fallback,
+  attachment, timeout, privacy, concurrency, and cleanup regressions selected by the repository.
+
 ## 11. Likely Files
 
 Inspect before choosing exact edits:
@@ -314,20 +359,46 @@ after the implementation tree is final.
 
 ## 15. Acceptance Criteria
 
-- [ ] The pre-edit implementation map is recorded with exact reader and eligibility owners.
-- [ ] Live KVK and Calendar dispatch consume the same pure candidate semantics as projection.
-- [ ] No parallel scheduler logic exists in Player Self-Service.
-- [ ] The earliest authoritative future candidate produces `NEXT SCHEDULED ALERT` with absolute UTC.
-- [ ] Healthy inputs with no future candidate produce `NO UPCOMING ALERT`.
-- [ ] Request-level source/projection failure produces `SCHEDULE UNAVAILABLE` without false `REVIEW`.
-- [ ] Sent, scheduled, grace, duplicate, retry, restart, and rehydration semantics remain unchanged.
-- [ ] The read-only path performs no task, DM, acknowledgement, refresh, network, or persistence side effect.
-- [ ] Sources are bulk-read once and deterministic-clock/tie behavior is covered.
-- [ ] Existing labels, commands, Manage, card, fallback, timeout, attachment, privacy, and navigation contracts remain unchanged.
-- [ ] No SQL, schema, persistence, event-source, lead-time, event-type, scheduler cadence, or DM policy change is introduced.
-- [ ] Focused/full validation, visual evidence, K98 PR review, promotion checks, and Codex Security review pass.
-- [ ] Programme, briefing, canonical reference, task status, and deferred evidence are updated.
+- [x] The pre-edit implementation map is recorded with exact reader and eligibility owners.
+- [x] Live KVK and Calendar dispatch consume the same pure candidate semantics as projection.
+- [x] No parallel scheduler logic exists in Player Self-Service.
+- [x] The earliest authoritative future candidate produces `NEXT SCHEDULED ALERT` with absolute UTC.
+- [x] Healthy inputs with no future candidate produce `NO UPCOMING ALERT`.
+- [x] Request-level source/projection failure produces `SCHEDULE UNAVAILABLE` without false `REVIEW`.
+- [x] Sent, scheduled, grace, duplicate, retry, restart, and rehydration semantics remain unchanged,
+  apart from the separately authorised correction that makes the existing zero-second KVK at-start
+  choice genuinely eligible.
+- [x] The read-only path performs no task, DM, acknowledgement, refresh, network, or persistence side effect.
+- [x] Sources are bulk-read once and deterministic-clock/tie behavior is covered.
+- [x] Existing labels, commands, Manage, card, fallback, timeout, attachment, privacy, and navigation contracts remain unchanged.
+- [x] No SQL, schema, persistence, event-source, lead-time, event-type, scheduler cadence, or DM policy change is introduced.
+- [ ] Focused/full validation, visual evidence, K98 PR review, promotion checks, and Codex Security
+  review pass. Automated gates and reviews pass; production promotion remains correctly held until
+  commit/mirror PR and operator Discord smoke.
+- [x] Programme, briefing, canonical reference, task status, and deferred evidence are updated.
 - [ ] Operator Discord smoke is recorded as the final gate.
+
+### 15.1 Delivery Evidence
+
+- Focused selected regression run: `381 passed`; final malformed-runtime projection regression:
+  `4 passed`.
+- Final full suite: `2586 passed, 2 skipped`; log-noise replay: `2586 passed, 2 skipped` with
+  production operational logs unchanged.
+- Architecture, deferred-item, test selection, smoke-import, registration
+  (`primary=42`, `grouped=101`), pre-commit, and `git diff --check` gates pass.
+- Visual evidence contains original `1702x924`, Discord desktop, and mobile samples for NEXT,
+  NO UPCOMING, SCHEDULE UNAVAILABLE, long/Unicode, and fallback states under
+  `C:\Users\cwatt\.codex\visualizations\2026\07\15\019f652b-ec5a-7b90-a3b2-5a75238a1e5c\phase5d1_next_alert`.
+- Final Codex Security report:
+  `C:\Users\cwatt\AppData\Local\Temp\codex-security-scans\discord_file_downloader\99039ac9_20260715T114222Z\report.md`.
+  Nine source rows were fully reviewed; no reportable finding survived. One production-size Calendar
+  sent-state performance question is deferred with evidence in
+  `docs/reference/deferred_optimisations.md`.
+- K98 PR review: no blocking or non-blocking code finding remains after adding and testing the
+  malformed Calendar runtime-source fail-closed guard.
+- Promotion-readiness review: do not promote yet. The branch is intentionally uncommitted/unpushed,
+  has no mirror PR, and operator Discord smoke is pending. Remotes are correct; SQL/config/dependency
+  rollout is not applicable; promotion must later use the patch-based production flow.
 
 ## 16. Escalation Gates
 

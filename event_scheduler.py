@@ -1,5 +1,7 @@
 # event_scheduler.py
 import asyncio
+import copy
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
 import logging
@@ -14,7 +16,6 @@ import time
 import discord
 
 from constants import (
-    DEFAULT_REMINDER_TIMES,
     DM_SCHEDULED_TRACKER_FILE,
     DM_SENT_TRACKER_FILE,
     FAILED_DM_LOG,
@@ -25,14 +26,31 @@ from constants import (
 )
 from embed_utils import LocalTimeToggleView, fmt_short
 from event_cache import get_all_upcoming_events
-
-# Centralized event helpers
-from event_utils import serialize_event
 from file_utils import atomic_write_json, read_json_safe, run_blocking_in_thread
 from registry.governor_registry import load_registry
+from reminder_domain.kvk_candidates import (
+    build_kvk_alert_projection,
+    is_fight_event as _is_fight_event,
+    make_event_id,
+    normalized_event_type as _normalized_event_type,
+    subscription_matches_event as _subscription_matches_event,
+)
 from reminder_task_registry import register_user_task
 from subscription_tracker import get_all_subscribers
 from utils import ensure_aware_utc, parse_isoformat_utc, utcnow
+
+
+def is_fight_event(event: dict) -> bool:
+    """Compatibility export backed by the shared pure KVK domain helper."""
+
+    return _is_fight_event(event)
+
+
+def subscription_matches_event(subscribed_types: list[str], event: dict) -> bool:
+    """Compatibility export backed by the shared pure KVK domain helper."""
+
+    return _subscription_matches_event(subscribed_types, event)
+
 
 # Per-user trackers (nested):
 # dm_sent_tracker:      { event_id: { user_id: [delta_seconds, ...] } }
@@ -171,6 +189,23 @@ dm_sent_tracker = {}  # {event_id: { user_id: [delta_seconds,...] }}
 
 # Serialize tracker file writes to avoid concurrent os.replace collisions on Windows.
 _DM_TRACKER_IO_LOCK = asyncio.Lock()
+
+
+@dataclass(frozen=True, slots=True)
+class KvkDmTrackerSnapshot:
+    """One in-memory, read-only snapshot for player projection."""
+
+    sent: dict
+    scheduled: dict
+
+
+def snapshot_dm_trackers() -> KvkDmTrackerSnapshot:
+    """Copy both KVK tracker maps once without loading or writing persistence."""
+
+    return KvkDmTrackerSnapshot(
+        sent=copy.deepcopy(dm_sent_tracker),
+        scheduled=copy.deepcopy(dm_scheduled_tracker),
+    )
 
 
 def _get_main_governor_name_for_user(user_id: int | str) -> str | None:
@@ -442,61 +477,6 @@ def get_event_thumbnail(event_type: str) -> str:
         "chronicle": "https://i.ibb.co/CK0Lr5vL/chronicle-event.png",
     }
     return thumbs.get(typ, "https://i.ibb.co/0jM8R7GW/kvk-mistakes.jpg")
-
-
-def _normalized_event_type(event: dict) -> str:
-    raw = (event.get("type") or "").lower().strip()
-    return {
-        "next ruins": "ruins",
-        "ruins": "ruins",
-        "next altar fight": "altars",
-        "altar": "altars",
-        "altars": "altars",
-        "chronicle": "chronicle",
-        "major": "major",
-    }.get(raw, raw)
-
-
-def is_fight_event(event: dict) -> bool:
-    event_type = _normalized_event_type(event)
-    event_text = " ".join(
-        str(event.get(key) or "").upper() for key in ("name", "title", "description")
-    )
-    return event_type == "altars" or (event_type == "major" and "FIGHT" in event_text)
-
-
-def subscription_matches_event(subscribed_types: list[str], event: dict) -> bool:
-    selected = {str(event_type).lower().strip() for event_type in subscribed_types}
-    event_type = _normalized_event_type(event)
-    if "all" in selected:
-        return event_type in {"ruins", "altars", "major"}
-    if event_type in selected:
-        return True
-    return "fights" in selected and is_fight_event(event)
-
-
-def make_event_id(event):
-    """
-    Canonical event id builder.
-
-    Uses the centralized serializer to ensure the start_time portion of the id
-    is always in the same canonical ISO UTC string format across the codebase.
-    """
-    typ = _normalized_event_type(event)
-
-    name_tok = (
-        str(event.get("name") or event.get("title") or "").strip().lower().replace(" ", "_")[:64]
-    )
-
-    try:
-        ts = serialize_event(event).get("start_time")
-    except Exception:
-        try:
-            ts = ensure_aware_utc(event["start_time"]).isoformat()
-        except Exception:
-            ts = str(event.get("start_time"))
-
-    return f"{typ}:{name_tok}:{ts}"
 
 
 def save_active_reminders():
@@ -1146,17 +1126,16 @@ async def schedule_event_reminders(bot, notify_channel_id, test_mode=False, test
                     logger.error("[DM_REMINDER] Could not fetch user object for ID %s", user_id)
                     continue
 
-                subscribed_types = config.get("subscriptions", [])
-                reminder_times = config.get("reminder_times", DEFAULT_REMINDER_TIMES)
-
-                if not subscription_matches_event(subscribed_types, event):
-                    continue
-
-                for rt in reminder_times:
-                    delta = REMINDER_MAP.get(rt)
-
-                    if not delta:
-                        continue
+                projection = build_kvk_alert_projection(
+                    events=(event,),
+                    config=config,
+                    user_id=user.id,
+                    sent_tracker=dm_sent_tracker,
+                    scheduled_tracker=dm_scheduled_tracker,
+                    now_utc=now,
+                )
+                for candidate in projection.candidates:
+                    delta = REMINDER_MAP[candidate.lead_time_key]
 
                     # Ensure per-user buckets exist
                     dm_sent_tracker.setdefault(event_id, {}).setdefault(str(user.id), [])
@@ -1184,7 +1163,7 @@ async def schedule_event_reminders(bot, notify_channel_id, test_mode=False, test
                         )
                         continue
 
-                    seconds_until = (start_time - delta - now).total_seconds()
+                    seconds_until = (candidate.scheduled_for_utc - now).total_seconds()
                     logger.debug(
                         "[DM_REMINDER_DEBUG] User %s | Event: %s | Delta: %s | Seconds until: %d",
                         user_id,

@@ -517,13 +517,18 @@ Current status:
   user avatar, duplicate-safe `(1198)` identity, removal of deprecated Inventory navigation,
   right-aligned state support, and the split UTC footer with a full refreshed date-time. The
   completed Phase 5D task pack and starter are archived.
-- Phase 5D.1 Authoritative Next Scheduled Alert Projection is the agreed next slice before
-  Preferences. Existing `/calendar_next_event`, `/next_kvk_event`, and `/next_kvk_fight` prove the
-  reusable Calendar/KVK bulk occurrence-reader paths, but do not apply reminder preferences,
-  offsets, KVK's 48-hour horizon, duplicate state, Calendar grace, or sent-key rules. Phase 5D.1
-  therefore requires narrow pure candidate helpers shared by live dispatch and read-only Player
-  Self-Service projection, exact UTC and deterministic parity tests, and no jobs, DMs, writes, SQL,
-  new source, or command change. The active task pack and chat starter define the implementation gate.
+- Phase 5D.1 Authoritative Next Scheduled Alert Projection is implemented and locally validated;
+  final operator Discord smoke is pending before Preferences. Existing `/calendar_next_event`,
+  `/next_kvk_event`, and `/next_kvk_fight` remain unchanged reader-path evidence rather than reminder
+  eligibility contracts. Narrow pure KVK and Calendar helpers now own the live and read-only
+  eligibility semantics, while Player Self-Service bulk-loads each source/config/tracker once and
+  chooses one deterministic earliest future alert. Healthy empty inputs show `NO UPCOMING ALERT`;
+  required source/projection failure shows `SCHEDULE UNAVAILABLE` without turning valid saved
+  configuration into REVIEW. Projection creates no tasks, DMs, acknowledgements, refreshes, network
+  calls, or writes. During the section 16 audit, the operator explicitly authorised correcting the
+  KVK zero-duration truthiness bug: saved `now` is now genuinely at-start eligible through the
+  existing task/tracker/rehydration/retry/duplicate-send machinery. No Calendar, persistence, event
+  source/type, lead-time, cadence, SQL, command-registration, or DM-content contract changed.
 - Phases 5E-5G independently apply the same format and transition contract to Preferences,
   Inventory summary, and Exports summary. They preserve current page actions,
   disabled states, privacy, payloads, filenames, attachment cleanup, and service ownership; none

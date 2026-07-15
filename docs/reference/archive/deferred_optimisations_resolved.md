@@ -3,6 +3,22 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### GovernorOS v2 Phase 5D.1 Authoritative Next-Alert Projection Completed Item
+
+- Area: `event_scheduler.py`, `event_calendar/reminders.py`, `player_self_service/service.py`, `/me reminders`
+- Type: architecture
+- Description: Phase 5D deliberately used the accepted `REMINDER COVERAGE` hero because no safe cross-system projection existed and copying scheduler rules into Player Self-Service would have drifted from live eligibility.
+- Resolution: Phase 5D.1 extracted narrow pure KVK and Calendar eligibility helpers, made live scheduling/dispatch consume them, and added one typed read-only cross-system selector. It bulk-loads occurrences, preferences/configuration, and duplicate state once per request; distinguishes healthy empty from unavailable; excludes sent alerts; retains genuine scheduled pending KVK alerts; and performs no tasks, DMs, acknowledgements, refreshes, network calls, or writes. The operator separately authorised the discovered KVK zero-duration truthiness correction so saved `now` is genuinely at-start eligible through the existing scheduler machinery.
+- Validation: Deterministic-clock parity/source-health/no-side-effect tests and native/desktop/mobile NEXT, NO UPCOMING, SCHEDULE UNAVAILABLE, long/Unicode, and fallback visual evidence were added. Final repository/security/promotion evidence is recorded in the active Phase 5D.1 task pack; operator Discord smoke remains the final external gate.
+
+### GovernorOS v2 Phase 5D.1 Authoritative Next-Alert Projection Completed Item
+
+- Area: `event_scheduler.py`, `event_calendar/reminders.py`, `player_self_service/service.py`, `/me reminders`
+- Type: architecture
+- Description: Phase 5D deliberately used the accepted `REMINDER COVERAGE` hero because no safe cross-system projection existed and copying scheduler rules into Player Self-Service would have drifted from live eligibility.
+- Resolution: Phase 5D.1 extracted narrow pure KVK and Calendar eligibility helpers, made live scheduling/dispatch consume them, and added one typed read-only cross-system selector. It bulk-loads occurrences, preferences/configuration, and duplicate state once per request; distinguishes healthy empty from unavailable; excludes sent alerts; retains genuine scheduled pending KVK alerts; and performs no tasks, DMs, acknowledgements, refreshes, network calls, or writes. The operator separately authorised the discovered KVK zero-duration truthiness correction so saved `now` is genuinely at-start eligible through the existing scheduler machinery.
+- Validation: Deterministic-clock parity/source-health/no-side-effect tests and native/desktop/mobile NEXT, NO UPCOMING, SCHEDULE UNAVAILABLE, long/Unicode, and fallback visual evidence were added. Final repository/security/promotion evidence is recorded in the active Phase 5D.1 task pack; operator Discord smoke remains the final external gate.
+
 ### GovernorOS v2 Inventory Renderer Visual Gap Promoted — 2026-07-13
 
 - Area: `inventory/report_image_renderer.py`, `assets/Inventory/cards/`, Discord desktop/mobile report presentation

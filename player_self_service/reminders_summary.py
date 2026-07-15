@@ -10,6 +10,11 @@ from enum import StrEnum
 from constants import DEFAULT_REMINDER_TIMES, REMINDER_MAP, VALID_TYPES
 from event_calendar.reminder_types import REMINDER_OFFSET_TO_DELTA, REMINDER_OFFSETS_ORDERED
 from event_calendar.runtime_cache import list_event_types, load_runtime_cache
+from reminder_domain.projection import (
+    ReminderProjectionHealth,
+    ReminderProjectionResult,
+    ReminderProjectionSystem,
+)
 
 KINGDOM_ID = 1198
 MAX_VISIBLE_EVENTS = 3
@@ -231,6 +236,34 @@ def unavailable_hero() -> ReminderHero:
         headline="SCHEDULE UNAVAILABLE",
         primary_line="Upcoming alert preview is temporarily unavailable.",
         secondary_line="Your saved choices are shown below.",
+    )
+
+
+def hero_from_projection(
+    projection: ReminderProjectionResult,
+    *,
+    generated_at_utc: datetime,
+) -> ReminderHero:
+    """Map the cross-system scheduler result into the accepted hero contract."""
+
+    if projection.health is ReminderProjectionHealth.UNAVAILABLE:
+        return unavailable_hero()
+    candidate = projection.next_alert
+    if candidate is None:
+        return no_upcoming_hero(
+            warning_windows_passed=projection.warning_windows_passed,
+        )
+    system_label = "KVK" if candidate.system is ReminderProjectionSystem.KVK else "Calendar"
+    return next_alert_hero(
+        NextScheduledReminderAlert(
+            system_label=system_label,
+            event_label=candidate.event_label,
+            lead_time_label=alert_time_label(candidate.lead_time_key),
+            alert_at_utc=candidate.alert_at_utc,
+            event_start_at_utc=candidate.event_start_at_utc,
+            occurrence_identity=candidate.event_identity,
+        ),
+        generated_at_utc=generated_at_utc,
     )
 
 

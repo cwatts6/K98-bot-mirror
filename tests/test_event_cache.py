@@ -139,3 +139,36 @@ def test_refresh_event_cache_times_out(monkeypatch, caplog):
     # Log should include timeout or timed out message
     txt = caplog.text.lower()
     assert "timed out" in txt or "timeout" in txt or "timedout" in txt
+
+
+def test_projection_snapshot_distinguishes_healthy_empty_from_never_loaded(monkeypatch):
+    now = datetime(2026, 7, 15, 12, 0, tzinfo=UTC)
+    monkeypatch.setattr(ec, "event_cache", [])
+    monkeypatch.setattr(ec, "last_refreshed", None)
+
+    unavailable = ec.get_upcoming_event_cache_snapshot(now_utc=now)
+    monkeypatch.setattr(ec, "last_refreshed", now)
+    healthy_empty = ec.get_upcoming_event_cache_snapshot(now_utc=now)
+
+    assert unavailable.ok is False
+    assert unavailable.error == "cache_unavailable"
+    assert healthy_empty.ok is True
+    assert healthy_empty.events == ()
+
+
+def test_projection_snapshot_keeps_stale_cache_usable_like_live_dispatch(monkeypatch):
+    now = datetime(2026, 7, 15, 12, 0, tzinfo=UTC)
+    event = {
+        "name": "Ancient Ruins",
+        "type": "ruins",
+        "start_time": now + timedelta(hours=2),
+    }
+    monkeypatch.setattr(ec, "event_cache", [event])
+    monkeypatch.setattr(ec, "last_refreshed", now - timedelta(hours=13))
+
+    snapshot = ec.get_upcoming_event_cache_snapshot(now_utc=now)
+
+    assert snapshot.ok is True
+    assert snapshot.stale is True
+    assert snapshot.events == (event,)
+    assert snapshot.events[0] is not event

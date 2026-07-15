@@ -3,6 +3,27 @@
 Purpose: describe the current reminder systems and where to look when changing reminder,
 subscription, or event-calendar behaviour.
 
+## Read-only next-alert projection
+
+`/me reminders` uses the same narrow pure eligibility functions as live KVK and Calendar dispatch.
+The request path bulk-loads KVK upcoming-cache health/occurrences, the saved user configuration, and
+one sent/scheduled tracker snapshot; it separately bulk-loads Calendar runtime-cache health/
+occurrences, raw per-event preferences, and sent-key state. The pure functions accept an injected
+timezone-aware UTC clock and already-loaded inputs. They create no task, timer, DM, acknowledgement,
+cache refresh, network call, or persistence write.
+
+The cross-system selector excludes sent alerts, retains genuine future KVK alerts represented by a
+scheduled or rehydrated task marker, applies the KVK 48-hour horizon and late/immediate behavior,
+applies Calendar all/specific preferences and grace/sent-key behavior, and never returns a past
+display timestamp. It chooses the earliest future candidate with a deterministic KVK-first tie-break.
+Healthy empty inputs and unavailable inputs remain distinct.
+
+On 2026-07-15 the operator authorised a narrow correction discovered during the Phase 5D.1 parity
+audit: KVK `now` maps to `timedelta(0)` and was previously skipped by a truthiness check. Live KVK
+dispatch and read-only projection now treat it as the existing saved at-start option. The correction
+uses the existing scheduling horizon, delayed task registry, sent/scheduled markers, rehydration,
+retry, cleanup, and duplicate-send rules; it does not change Calendar or add a lead time.
+
 ## Current Systems
 
 Two reminder/event systems coexist:
