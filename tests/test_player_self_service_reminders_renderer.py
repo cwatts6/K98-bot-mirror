@@ -81,6 +81,43 @@ def test_renderer_supports_every_approved_hero_variant() -> None:
             assert image.size == (1702, 924)
 
 
+def test_next_alert_emphasizes_event_start_without_changing_payload(monkeypatch) -> None:
+    payload = _payload()
+    alert = NextScheduledReminderAlert(
+        system_label="Calendar",
+        event_label="More than Gems",
+        lead_time_label="24h",
+        alert_at_utc=NOW + timedelta(hours=24),
+        event_start_at_utc=NOW + timedelta(hours=48),
+        occurrence_identity="more-than-gems-2026-07-16",
+    )
+    payload = replace(payload, hero=next_alert_hero(alert, generated_at_utc=NOW))
+    draw_calls = []
+    original_draw = reminders_renderer._draw
+
+    def tracked_draw(draw, xy, text, **kwargs):
+        draw_calls.append((xy, text, kwargs.copy()))
+        return original_draw(draw, xy, text, **kwargs)
+
+    monkeypatch.setattr(reminders_renderer, "_draw", tracked_draw)
+
+    rendered = reminders_renderer.render_reminders_card(payload)
+    try:
+        event_start_calls = [call for call in draw_calls if call[1].startswith("Event starts ")]
+        assert len(event_start_calls) == 1
+        _, event_start_text, event_start_kwargs = event_start_calls[0]
+        assert event_start_text == "Event starts 16 Jul 15:30 UTC"
+        assert event_start_kwargs["fill"] == reminders_renderer.GOLD
+        assert event_start_kwargs["bold"] is True
+        assert any(
+            text.startswith("Calendar • 24h • 15 Jul 15:30 UTC |")
+            and kwargs["fill"] == reminders_renderer.MUTED
+            for _, text, kwargs in draw_calls
+        )
+    finally:
+        rendered.image_bytes.close()
+
+
 def test_renderer_uses_avatar_duplicate_safe_identity_and_locked_alignment(monkeypatch) -> None:
     avatar_stream = BytesIO()
     Image.new("RGB", (96, 96), (220, 30, 40)).save(avatar_stream, format="PNG")

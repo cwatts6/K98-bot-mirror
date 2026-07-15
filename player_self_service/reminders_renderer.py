@@ -30,6 +30,7 @@ RED = (255, 132, 132, 255)
 SHADOW = (0, 0, 0, 190)
 PANEL = (5, 10, 24, 96)
 PANEL_EDGE = (94, 145, 210, 64)
+_EVENT_START_MARKER = " | Event starts "
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +133,76 @@ def _draw_fit_right(
     )
     text_width = visual_text.text_width(draw, fitted, font=font, bold=bold)
     _draw(draw, (right_x - text_width, y), fitted, font=font, fill=fill, bold=bold)
+
+
+def _draw_hero_secondary(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[int, int],
+    text: str,
+    *,
+    width: int,
+    size: int,
+    min_size: int,
+) -> None:
+    cleaned = _clean(text)
+    if _EVENT_START_MARKER not in cleaned:
+        _draw_fit(
+            draw,
+            xy,
+            cleaned,
+            width=width,
+            size=size,
+            min_size=min_size,
+            fill=MUTED,
+        )
+        return
+
+    prefix, event_start = cleaned.split(_EVENT_START_MARKER, 1)
+    prefix_text = f"{prefix} | "
+    event_start_text = f"Event starts {event_start}"
+
+    selected_size = min_size
+    for candidate_size in range(size, min_size - 1, -1):
+        prefix_font = _font(candidate_size)
+        event_start_font = _font(candidate_size, bold=True)
+        combined_width = visual_text.text_width(
+            draw,
+            prefix_text,
+            font=prefix_font,
+        ) + visual_text.text_width(
+            draw,
+            event_start_text,
+            font=event_start_font,
+            bold=True,
+        )
+        if combined_width <= width:
+            selected_size = candidate_size
+            break
+
+    prefix_font = _font(selected_size)
+    event_start_font = _font(selected_size, bold=True)
+    event_start_width = visual_text.text_width(
+        draw,
+        event_start_text,
+        font=event_start_font,
+        bold=True,
+    )
+    prefix_text = visual_text.fit_text_to_width(
+        draw,
+        prefix_text,
+        width=max(1, width - event_start_width),
+        base_font=prefix_font,
+    )
+    _draw(draw, xy, prefix_text, font=prefix_font, fill=MUTED)
+    prefix_width = visual_text.text_width(draw, prefix_text, font=prefix_font)
+    _draw(
+        draw,
+        (xy[0] + prefix_width, xy[1]),
+        event_start_text,
+        font=event_start_font,
+        fill=GOLD,
+        bold=True,
+    )
 
 
 def _panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], *, radius: int = 22) -> None:
@@ -271,14 +342,13 @@ def render_reminders_card(
         bold=True,
     )
     if payload.hero.secondary_line:
-        _draw_fit(
+        _draw_hero_secondary(
             draw,
             (116, 337),
             payload.hero.secondary_line,
             width=1470,
             size=27,
             min_size=19,
-            fill=MUTED,
         )
 
     _draw_system(
