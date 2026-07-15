@@ -74,15 +74,12 @@ def test_active_summary_uses_friendly_labels_order_counts_and_coverage() -> None
     assert payload.insight == "Both systems are active; coverage begins 7d before event start."
 
 
-def test_review_states_cover_missing_events_times_and_both() -> None:
+def test_review_states_cover_missing_events_and_times() -> None:
     missing_events = _payload(
         kvk={"subscriptions": [], "reminder_times": ["24h"]},
     )
     missing_times = _payload(
         kvk={"subscriptions": ["ruins"], "reminder_times": []},
-    )
-    missing_both = _payload(
-        kvk={"subscriptions": [], "reminder_times": []},
     )
 
     assert missing_events.configuration_state is ReminderConfigurationState.REVIEW
@@ -91,8 +88,34 @@ def test_review_states_cover_missing_events_times_and_both() -> None:
     assert missing_events.insight == ("KVK reminders are enabled, but no event types are selected.")
     assert missing_times.kvk.completeness is ReminderCompleteness.MISSING_TIMES
     assert missing_times.state_supporting_text == "KVK needs an alert time"
-    assert missing_both.kvk.completeness is ReminderCompleteness.MISSING_BOTH
-    assert missing_both.insight == "KVK reminders need an event and an alert time."
+
+
+def test_empty_kvk_config_is_off_for_calendar_only_player() -> None:
+    payload = _payload(
+        kvk={"subscriptions": [], "reminder_times": []},
+        calendar={
+            "enabled": True,
+            "by_event_type": {"ark": ["24h"]},
+        },
+    )
+
+    assert payload.configuration_state is ReminderConfigurationState.ACTIVE
+    assert payload.state_supporting_text == "1 of 2 systems enabled"
+    assert payload.kvk.enabled is False
+    assert payload.kvk.state_count_line.startswith("OFF")
+    assert payload.calendar.enabled is True
+    assert payload.insight == "KVK reminders are off; only Calendar alerts will be sent."
+
+
+def test_empty_kvk_config_and_disabled_calendar_are_off() -> None:
+    payload = _payload(
+        kvk={"subscriptions": [], "reminder_times": []},
+    )
+
+    assert payload.configuration_state is ReminderConfigurationState.OFF
+    assert payload.kvk.enabled is False
+    assert payload.kvk.state_count_line.startswith("OFF")
+    assert payload.state_supporting_text == "All reminder systems are off"
 
 
 def test_both_systems_off_retain_saved_calendar_choices_honestly() -> None:

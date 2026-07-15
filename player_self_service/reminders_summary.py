@@ -238,8 +238,9 @@ def _ordered_tokens(
     values: Iterable[object], order: tuple[str, ...]
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     selected = _dedupe(values)
+    known_tokens = set(order)
     known = tuple(item for item in order if item in selected)
-    unknown = tuple(item for item in selected if item not in set(order))
+    unknown = tuple(item for item in selected if item not in known_tokens)
     return known, unknown
 
 
@@ -342,13 +343,15 @@ def _state_count_line(
 
 def _kvk_summary(config: object, *, source_available: bool) -> ReminderSystemSummary:
     raw = config if isinstance(config, dict) else {}
-    enabled = source_available and isinstance(config, dict)
     raw_events = raw.get("subscriptions", [])
     raw_times = raw.get("reminder_times", [])
     event_values = raw_events if isinstance(raw_events, (list, tuple, set)) else ()
     time_values = raw_times if isinstance(raw_times, (list, tuple, set)) else ()
     valid_events, unknown_events = _ordered_tokens(event_values, tuple(VALID_TYPES))
     valid_times, unknown_times = _ordered_tokens(time_values, tuple(DEFAULT_REMINDER_TIMES))
+    enabled = source_available and bool(
+        valid_events or unknown_events or valid_times or unknown_times
+    )
     labels = tuple(kvk_event_label(key) for key in valid_events)
     if unknown_events:
         labels += tuple("Unavailable event" for _ in unknown_events)
