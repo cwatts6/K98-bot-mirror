@@ -13,7 +13,9 @@ from player_self_service.reminders_summary import RemindersSummaryPayload
 
 WIDTH = 1702
 HEIGHT = 924
-BACKDROP_PATH = Path(__file__).resolve().parent.parent / "assets" / "me" / "cards" / "me_reminders.png"
+BACKDROP_PATH = (
+    Path(__file__).resolve().parent.parent / "assets" / "me" / "cards" / "me_reminders.png"
+)
 
 TEXT = (242, 247, 255, 255)
 MUTED = (177, 197, 222, 255)
@@ -114,7 +116,9 @@ def _status_color(state: str) -> tuple[int, int, int, int]:
 def _status_badge(draw: ImageDraw.ImageDraw, text: str) -> None:
     x1, y1, x2, y2 = 1390, 62, 1608, 126
     color = _status_color(text)
-    draw.rounded_rectangle((x1, y1, x2, y2), radius=26, fill=(4, 11, 24, 205), outline=color, width=3)
+    draw.rounded_rectangle(
+        (x1, y1, x2, y2), radius=26, fill=(4, 11, 24, 205), outline=color, width=3
+    )
     font = _font(32, bold=True)
     width = visual_text.text_width(draw, text, font=font, bold=True)
     _draw(draw, (x1 + (x2 - x1 - width) // 2, y1 + 10), text, font=font, fill=color, bold=True)
@@ -176,9 +180,7 @@ def render_reminders_card(payload: RemindersSummaryPayload) -> RenderedReminders
     with Image.open(BACKDROP_PATH) as source:
         source.load()
         if source.size != (WIDTH, HEIGHT):
-            raise ValueError(
-                f"Reminders backdrop must be {WIDTH}x{HEIGHT}; got {source.size}"
-            )
+            raise ValueError(f"Reminders backdrop must be {WIDTH}x{HEIGHT}; got {source.size}")
         alpha = source.getchannel("A") if "A" in source.getbands() else None
         if alpha is not None and alpha.getextrema() != (255, 255):
             raise ValueError("Reminders backdrop must be fully opaque")
@@ -278,9 +280,7 @@ def render_reminders_card(payload: RemindersSummaryPayload) -> RenderedReminders
         fill=MUTED,
     )
 
-    footer = (
-        f"Refreshed {payload.generated_at_utc:%H:%M UTC} • Schedule times shown in UTC"
-    )
+    footer = f"Refreshed {payload.generated_at_utc:%H:%M UTC} • Schedule times shown in UTC"
     _draw_fit(
         draw,
         (96, 872),

@@ -88,9 +88,7 @@ def test_review_states_cover_missing_events_times_and_both() -> None:
     assert missing_events.configuration_state is ReminderConfigurationState.REVIEW
     assert missing_events.kvk.completeness is ReminderCompleteness.MISSING_EVENTS
     assert missing_events.state_supporting_text == "KVK needs an event"
-    assert missing_events.insight == (
-        "KVK reminders are enabled, but no event types are selected."
-    )
+    assert missing_events.insight == ("KVK reminders are enabled, but no event types are selected.")
     assert missing_times.kvk.completeness is ReminderCompleteness.MISSING_TIMES
     assert missing_times.state_supporting_text == "KVK needs an alert time"
     assert missing_both.kvk.completeness is ReminderCompleteness.MISSING_BOTH
@@ -109,7 +107,9 @@ def test_both_systems_off_retain_saved_calendar_choices_honestly() -> None:
     assert payload.state_supporting_text == "All reminder systems are off"
     assert payload.calendar.state_count_line == "OFF • 1 saved event • 2 saved alert times"
     assert payload.calendar.coverage_label == "Saved coverage: 7d → start"
-    assert payload.insight == "All reminders are off; use Manage to choose what you want to receive."
+    assert (
+        payload.insight == "All reminders are off; use Manage to choose what you want to receive."
+    )
 
 
 def test_disabled_system_does_not_make_active_configuration_review() -> None:
@@ -175,6 +175,58 @@ def test_calendar_event_overflow_is_deterministic() -> None:
     assert payload.calendar.selected_event_count == 5
     assert payload.calendar.hidden_event_count == 2
     assert payload.calendar.event_summary == "Ark of Osiris • Armament Reveal • Ceroli • + 2 more"
+
+
+def test_calendar_summary_does_not_apply_one_events_offsets_to_empty_staging_bucket() -> None:
+    payload = _payload(
+        calendar={
+            "enabled": True,
+            "by_event_type": {
+                "ark": ["24h"],
+                "20gh": [],
+            },
+        },
+    )
+
+    assert payload.configuration_state is ReminderConfigurationState.ACTIVE
+    assert payload.calendar.selected_event_keys == ("ark",)
+    assert payload.calendar.selected_event_count == 1
+    assert payload.calendar.event_summary == "Ark of Osiris"
+    assert payload.calendar.selected_time_keys == ("24h",)
+    assert payload.calendar.state_count_line.startswith("ON")
+    assert "1 event" in payload.calendar.state_count_line
+    assert "1 alert time" in payload.calendar.state_count_line
+    assert payload.calendar.coverage_label == "Coverage: 24h before start"
+
+
+def test_calendar_empty_staging_bucket_alone_cannot_produce_reminders() -> None:
+    payload = _payload(
+        calendar={
+            "enabled": True,
+            "by_event_type": {"ark": []},
+        },
+    )
+
+    assert payload.configuration_state is ReminderConfigurationState.REVIEW
+    assert payload.calendar.completeness is ReminderCompleteness.MISSING_BOTH
+    assert payload.calendar.selected_event_count == 0
+    assert payload.calendar.selected_time_count == 0
+
+
+def test_disabled_calendar_retains_empty_staging_bucket_as_saved_inactive_choice() -> None:
+    payload = _payload(
+        calendar={
+            "enabled": False,
+            "by_event_type": {"20gh": []},
+        },
+    )
+
+    assert payload.configuration_state is ReminderConfigurationState.OFF
+    assert payload.calendar.selected_event_keys == ("20gh",)
+    assert payload.calendar.selected_event_count == 1
+    assert payload.calendar.selected_time_count == 0
+    assert payload.calendar.event_summary == "20 GH"
+    assert payload.calendar.state_count_line.startswith("OFF")
 
 
 def test_now_and_start_are_presentation_synonyms_only() -> None:
@@ -271,3 +323,18 @@ def test_every_hero_variant_and_exact_utc_year_format() -> None:
     assert "No alert remains" in passed.primary_line
     assert unavailable.kind is ReminderHeroKind.UNAVAILABLE
     assert format_absolute_utc(NOW, reference=replace(alert).alert_at_utc) == "14 Jul 15:30 UTC"
+
+
+def test_naive_contract_timestamps_are_treated_as_utc() -> None:
+    naive_now = NOW.replace(tzinfo=None)
+    payload = build_reminders_summary_payload(
+        viewer_discord_id=42,
+        display_name="Tester",
+        kvk_config=None,
+        calendar_prefs={"enabled": False, "by_event_type": {}},
+        calendar_catalog=CATALOG,
+        generated_at_utc=naive_now,
+    )
+
+    assert payload.generated_at_utc == NOW
+    assert format_absolute_utc(naive_now, reference=naive_now) == "14 Jul 15:30 UTC"

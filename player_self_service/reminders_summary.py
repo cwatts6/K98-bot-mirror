@@ -144,6 +144,13 @@ def _dedupe(values: Iterable[object]) -> tuple[str, ...]:
     return tuple(ordered)
 
 
+def _as_utc(value: datetime) -> datetime:
+    """Normalize contract timestamps without treating naive UTC as host-local time."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def kvk_event_label(key: str) -> str:
     return _KVK_EVENT_LABELS.get(_clean_token(key), "Unavailable event")
 
@@ -173,14 +180,16 @@ def load_calendar_event_catalog() -> CalendarEventCatalog:
     )
 
 
-def with_display_name(payload: RemindersSummaryPayload, display_name: str) -> RemindersSummaryPayload:
+def with_display_name(
+    payload: RemindersSummaryPayload, display_name: str
+) -> RemindersSummaryPayload:
     clean = " ".join(str(display_name or "player").replace("\r", " ").replace("\n", " ").split())
     return replace(payload, display_name=clean or "player")
 
 
 def format_absolute_utc(value: datetime, *, reference: datetime) -> str:
-    utc_value = value.astimezone(UTC)
-    utc_reference = reference.astimezone(UTC)
+    utc_value = _as_utc(value)
+    utc_reference = _as_utc(reference)
     if utc_value.year == utc_reference.year:
         return utc_value.strftime("%d %b %H:%M UTC")
     return utc_value.strftime("%d %b %Y %H:%M UTC")
@@ -225,7 +234,9 @@ def unavailable_hero() -> ReminderHero:
     )
 
 
-def _ordered_tokens(values: Iterable[object], order: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+def _ordered_tokens(
+    values: Iterable[object], order: tuple[str, ...]
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
     selected = _dedupe(values)
     known = tuple(item for item in order if item in selected)
     unknown = tuple(item for item in selected if item not in set(order))
@@ -400,7 +411,36 @@ def _calendar_summary(
     by_type = raw.get("by_event_type", {})
     if not isinstance(by_type, dict):
         by_type = {}
-    selected_events = _dedupe(by_type.keys())
+
+    event_offsets: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {}
+    for raw_event, values in by_type.items():
+        event_key = _clean_token(raw_event)
+        if not event_key:
+            continue
+        if isinstance(values, (list, tuple, set)):
+            raw_values: tuple[object, ...] = tuple(values)
+        elif values is None:
+            raw_values = ()
+        else:
+            raw_values = (values,)
+        normalized = tuple(
+            "start" if _clean_token(value) == "at_start" else _clean_token(value)
+            for value in raw_values
+        )
+        previous_valid, previous_unknown = event_offsets.get(event_key, ((), ()))
+        event_offsets[event_key] = _ordered_tokens(
+            (*previous_valid, *previous_unknown, *normalized),
+            REMINDER_OFFSETS_ORDERED,
+        )
+
+    # Empty buckets are intentionally persisted while the Calendar Settings multi-select
+    # is staged. When reminders are enabled they are not dispatch-eligible event choices,
+    # so another event's offsets must not make them look covered on the summary card.
+    selected_events = tuple(
+        event_key
+        for event_key, (valid_offsets, unknown_offsets) in event_offsets.items()
+        if not enabled or valid_offsets or unknown_offsets
+    )
     known_catalog = set(catalog.event_types)
     if "all" in selected_events:
         valid_events = ("all",)
@@ -412,20 +452,15 @@ def _calendar_summary(
         valid_events = selected_events
         unknown_events = ()
 
-    raw_offsets: list[object] = []
-    for values in by_type.values():
-        if isinstance(values, (list, tuple, set)):
-            raw_offsets.extend(values)
-        elif values is not None:
-            raw_offsets.append(values)
     normalized_offsets = tuple(
-        "start" if _clean_token(value) == "at_start" else _clean_token(value)
-        for value in raw_offsets
+        offset
+        for event_key in selected_events
+        for offsets in event_offsets[event_key]
+        for offset in offsets
     )
     valid_times, unknown_times = _ordered_tokens(normalized_offsets, REMINDER_OFFSETS_ORDERED)
     labels = tuple(
-        "All calendar events" if key == "all" else calendar_event_label(key)
-        for key in valid_events
+        "All calendar events" if key == "all" else calendar_event_label(key) for key in valid_events
     )
     if unknown_events:
         labels += tuple("Unavailable event" for _ in unknown_events)
@@ -485,7 +520,9 @@ def _configuration_state(
 ) -> ReminderConfigurationState:
     systems = (kvk, calendar)
     if not any(system.enabled for system in systems):
-        if any(system.completeness is ReminderCompleteness.SOURCE_UNAVAILABLE for system in systems):
+        if any(
+            system.completeness is ReminderCompleteness.SOURCE_UNAVAILABLE for system in systems
+        ):
             return ReminderConfigurationState.REVIEW
         return ReminderConfigurationState.OFF
     if any(
@@ -582,7 +619,9 @@ def _insight(
 
 
 def _lead_seconds(label: str) -> int:
-    reverse = {alert_time_label(key): int(delta.total_seconds()) for key, delta in REMINDER_MAP.items()}
+    reverse = {
+        alert_time_label(key): int(delta.total_seconds()) for key, delta in REMINDER_MAP.items()
+    }
     reverse.update(
         {
             alert_time_label(key): int(delta.total_seconds())
@@ -609,9 +648,7 @@ def coverage_hero(
     return ReminderHero(
         kind=ReminderHeroKind.COVERAGE,
         headline="REMINDER COVERAGE",
-        primary_line=(
-            f"KVK: {_coverage_value(kvk)} • Calendar: {_coverage_value(calendar)}"
-        ),
+        primary_line=(f"KVK: {_coverage_value(kvk)} • Calendar: {_coverage_value(calendar)}"),
         secondary_line=(
             f"{_plural(event_count, 'event type')} • {_plural(time_count, 'alert time')}"
         ),
@@ -630,7 +667,7 @@ def build_reminders_summary_payload(
     calendar_source_available: bool = True,
     hero: ReminderHero | None = None,
 ) -> RemindersSummaryPayload:
-    generated = generated_at_utc.astimezone(UTC)
+    generated = _as_utc(generated_at_utc)
     kvk = _kvk_summary(kvk_config, source_available=kvk_source_available)
     calendar = _calendar_summary(
         calendar_prefs,
