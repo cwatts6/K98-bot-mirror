@@ -42,14 +42,16 @@ Player Self-Service Command Centre completed Phase 1 audit/design, Phase 2 `/me`
 foundation, Phase 3 Modern Account Centre, Phase 4 Modern Reminder Centre, Phase 5 Visual
 Dashboard Card and Preferences Hub, Phase 6 Guided Management Cards and Workflow Simplification,
 and Phase 7 Unified Reminder Centre and Dashboard Card Alignment execution records are archived
-here. The active programme pack and next-phase task pack remain in `docs/task_packs/`.
+here. The original programme is complete; its closed programme pack remains in `docs/task_packs/`.
 
-Player Self-Service Command Centre v2 / GovernorOS completed its Phase 1 Governor Dashboard Product
-Blueprint and Audit and Phase 2 Governor Context and Dashboard Data Foundation. The Phase 1 report,
-Phase 2 task pack, and Phase 2 chat starter are archived here. Phase 2 delivered in mirror PR #216
-and production PR #523, with successful operator smoke and full regression validation on
-2026-07-10. The active v2 programme pack plus the prepared Phase 3 Governor Selector and Dashboard
-Shell task pack/chat starter remain in `docs/task_packs/`.
+Player Self-Service Command Centre v2 / GovernorOS completed Phases 1 through 5D.1. The archived
+records cover the dashboard blueprint/data foundation, governor selector and premium dashboard,
+direct Inventory reports and visual alignment, Accounts, Reminders, and the authoritative shared
+KVK/Calendar next-alert projection. Phase 5D.1 delivered in mirror PR #223 and production PR #530;
+operator smoke accepted the final `/me reminders` presentation on 2026-07-15. The active v2
+programme pack remains in `docs/task_packs/`. Phase 5E Preferences is next, but its task pack and
+background will be supplied separately by the operator and runtime implementation is not yet
+approved.
 
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,

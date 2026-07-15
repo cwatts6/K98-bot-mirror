@@ -1,6 +1,14 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-07-14
+Last updated: 2026-07-15
+
+GovernorOS v2 Phase 5D.1 is complete and operator accepted in mirror PR #223 and production
+PR #530 after final Discord smoke on 2026-07-15. `/me reminders` now uses shared live/projection
+eligibility to show the deterministic earliest future KVK or Calendar alert, healthy
+`NO UPCOMING ALERT`, or request-level `SCHEDULE UNAVAILABLE` without implying delivery. The final
+card makes the authoritative event-start UTC date-time prominent in bold gold. Phase 5E Premium
+Preferences Summary Card is next, but its task pack/background will be supplied separately by the
+operator and runtime implementation is not yet approved.
 
 GovernorOS v2 status: Phase 4 Premium Governor Dashboard Renderer is complete and operator smoke
 passed on 2026-07-11. `/me dashboard` is governor-first: no linked governor shows setup
@@ -79,8 +87,12 @@ The account centre supports account review, Governor ID lookup, registration, re
 removal with confirmation through one primary Manage journey. Lookup results can continue into
 register or replace without asking the player to remember or re-enter the selected Governor ID.
 The reminder centre supports private KVK event reminder review, setup, automatic updates, and
-remove-all/unsubscribe with confirmation through one primary Manage journey. The same Manage
-journey can now open Calendar Settings for calendar reminder event types and lead times.
+remove-all/unsubscribe with confirmation through one primary Manage journey. Its premium hero
+shows the authoritative earliest future KVK or Calendar alert when one exists, otherwise clearly
+distinguishes healthy no-upcoming state from a request-level unavailable schedule. It uses friendly
+labels and absolute UTC times, highlights the event start, and never claims that Discord delivery
+has occurred. The same Manage journey can open Calendar Settings for calendar reminder event types
+and lead times.
 `/me preferences` can update inventory report visibility between private and public output, open
 the existing Governor VIP update flow, and manage profile preferences for timezone, location
 country, and preferred language through dropdowns.
@@ -517,8 +529,8 @@ Current status:
   user avatar, duplicate-safe `(1198)` identity, removal of deprecated Inventory navigation,
   right-aligned state support, and the split UTC footer with a full refreshed date-time. The
   completed Phase 5D task pack and starter are archived.
-- Phase 5D.1 Authoritative Next Scheduled Alert Projection is implemented and locally validated;
-  final operator Discord smoke is pending before Preferences. Existing `/calendar_next_event`,
+- Phase 5D.1 Authoritative Next Scheduled Alert Projection is complete and operator accepted after
+  final Discord smoke on 2026-07-15. Existing `/calendar_next_event`,
   `/next_kvk_event`, and `/next_kvk_fight` remain unchanged reader-path evidence rather than reminder
   eligibility contracts. Narrow pure KVK and Calendar helpers now own the live and read-only
   eligibility semantics, while Player Self-Service bulk-loads each source/config/tracker once and
@@ -528,9 +540,22 @@ Current status:
   calls, or writes. During the section 16 audit, the operator explicitly authorised correcting the
   KVK zero-duration truthiness bug: saved `now` is now genuinely at-start eligible through the
   existing task/tracker/rehydration/retry/duplicate-send machinery. No Calendar, persistence, event
-  source/type, lead-time, cadence, SQL, command-registration, or DM-content contract changed.
-- Phases 5E-5G independently apply the same format and transition contract to Preferences,
-  Inventory summary, and Exports summary. They preserve current page actions,
+  source/type, lead-time, cadence, SQL, command-registration, or DM-content contract changed. The
+  default KVK snapshot uses the same injected UTC clock as projection; the final card highlights
+  `Event starts` in bold gold. Mirror PR #223 and production PR #530 carry the reviewed delivery,
+  and the completed task pack/starter are archived.
+- Phase 5E Preferences is the next separately scoped slice. The operator will supply its task pack
+  and background; runtime implementation is not yet approved. It should apply the accepted premium
+  1702x924 standalone/private/same-payload-fallback lifecycle by default while preserving the
+  existing Inventory visibility, Update VIP, and Manage Profile services and saved semantics.
+  Preferences remains Discord-user scoped and never shows a parent Change Governor. Update VIP is
+  a governor-specific child journey that must explicitly select/resolve a linked governor and
+  recheck current access; retained Dashboard context is return-only and must not filter the page.
+  The Phase 5E checkpoint owns the exact hero, backdrop, avatar treatment, hierarchy, labels,
+  guidance, and component rows. No profile schema, SQL, persistence, default, preference-semantic,
+  Google Sheets, command, or legacy-redirect change is implied.
+- Phases 5F-5G independently apply the same format and transition contract to Inventory summary
+  and Exports summary. They preserve current page actions,
   disabled states, privacy, payloads, filenames, attachment cleanup, and service ownership; none
   shows Change Governor. Governor-specific child actions must perform their own explicit selection
   and access recheck rather than treating retained return context as a page filter.

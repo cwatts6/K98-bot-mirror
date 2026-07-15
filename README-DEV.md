@@ -39,13 +39,24 @@ deprecated Inventory button, aligned state support, a full UTC footer, same-payl
 graceful timeout. Manage refresh and all existing reminder behavior remain intact. The completed
 Phase 5D task pack and starter are archived.
 
-Phase 5D.1 Authoritative Next Scheduled Alert Projection is the next active GovernorOS slice before
-Phase 5E Preferences. It will reuse the bulk occurrence readers already exercised by
-`/calendar_next_event`, `/next_kvk_event`, and `/next_kvk_fight`, while extracting narrow pure
-candidate eligibility shared with live KVK and Calendar dispatch. The goal is an exact, read-only
-NEXT/NO UPCOMING/UNAVAILABLE hero with no jobs, DMs, acknowledgements, persistence writes, SQL,
-new event source, scheduler-policy change, or command-surface change. Its task pack and chat starter
-are prepared; runtime implementation remains separately started/approved.
+Phase 5D.1 Authoritative Next Scheduled Alert Projection is complete and operator accepted in
+mirror PR #223 and production PR #530 after final Discord smoke on 2026-07-15. The Reminders hero
+now selects the deterministic earliest future KVK or Calendar candidate through narrow pure
+eligibility shared with live dispatch, distinguishes healthy `NO UPCOMING ALERT` from request-level
+`SCHEDULE UNAVAILABLE`, and performs no jobs, DMs, acknowledgements, refreshes, network calls, or
+writes. The default KVK snapshot uses the same injected UTC clock as the projection, and the final
+card makes the authoritative event start date-time prominent in bold gold. Existing reminder,
+tracker, rehydration, retry, command, Calendar, persistence, and DM contracts remain unchanged apart
+from the separately authorised KVK at-start eligibility correction. The completed task pack and
+starter are archived.
+
+Phase 5E Premium Preferences Summary Card is the next separately scoped GovernorOS slice. Its task
+pack and background will be supplied separately by the operator; no runtime implementation is yet
+approved. The slice must begin from the accepted premium standalone/private/fallback lifecycle,
+keep Preferences Discord-user scoped with no parent `Change Governor`, preserve current Inventory
+visibility and profile services, and resolve `Update VIP` through its own explicit governor picker
+and current-access recheck. No SQL, schema, persistence, default, or preference-semantic change is
+implied by the visual alignment work.
 
 ## Quality Automation
 

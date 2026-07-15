@@ -412,9 +412,7 @@ Player Self-Service Command Centre status:
   `archive/`.
 - Active Player Self-Service v2 files:
   - `Player Self-Service Command Centre v2 - Programme Pack.md`
-  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md`
-  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card.md`
-- GovernorOS v2 Phases 1-5C are complete. Their reports/task packs/chat starters are archived under
+- GovernorOS v2 Phases 1-5D.1 are complete. Their reports/task packs/chat starters are archived under
   `archive/`. Phase 2 delivered in mirror PR #216 and production PR #523, Phase 3 delivered in
   mirror PR #217 and production PR #524, and Phase 4 delivered in mirror PR #218. Phase 4 operator
   smoke on 2026-07-11 accepted the materially wider standalone card and gated Change Governor
@@ -422,10 +420,13 @@ Player Self-Service Command Centre status:
   direct reports, honest no-data output, and governor switching on 2026-07-13. Phase 5B delivered
   in mirror PR #220 and production PR #527; operator smoke and final visual acceptance passed on
   2026-07-13. Phase 5C delivered in mirror PR #221 and production PR #528; final operator smoke and
-  premium visual acceptance passed on 2026-07-14. The completed Phase 5C task pack and chat starter
-  are archived under `archive/`. Phase 5D Reminders is the next approval-gated product/visual
-  workshop; implementation is not yet approved. Separate Phases 5E-5G own Preferences, Inventory
-  summary, and Exports summary page alignment.
+  premium visual acceptance passed on 2026-07-14. Phase 5D delivered in mirror PR #222 and
+  production PR #529, and Phase 5D.1 delivered in mirror PR #223 and production PR #530; final
+  operator smoke accepted the authoritative next-alert card and bold-gold event-start presentation
+  on 2026-07-15. Their completed task packs and chat starters are archived under `archive/`.
+  Phase 5E Preferences is the next separately scoped slice; the operator will supply its task pack
+  and background, and runtime implementation is not yet approved. Phases 5F-5G retain Inventory
+  summary and Exports summary page alignment.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -521,15 +522,17 @@ tuning/decomposition, residual `stats_module.py` cleanup, legacy PreKvK SQL clea
 cumulative view cleanup, and inventory view-orchestration extraction remain separate later slices
 unless explicitly approved.
 
-Player Self-Service Command Centre v2 Phase 5D Premium Reminders Summary Card is the next prepared
-player self-service slice. It starts with repository inspection and the operator's improvement
-ideas in an approval-gated product/visual workshop; implementation is not yet approved. Reminders
-remains a Discord-user-level combined KVK/calendar page and does not show Change Governor; selected
-governor context is retained only for Dashboard return. The accepted standalone 1702x924/avatar/
-same-payload-fallback/cleanup baseline carries forward, while hierarchy, genuine headline values,
-guidance, backdrop, and exact page-relevant controls remain workshop decisions. Phases 5E-5G remain
-separate page-specific slices, and later export, history, inspect, migration, SQL, or reminder-
-behavior changes stay outside Phase 5D unless separately approved.
+Player Self-Service Command Centre v2 Phase 5E Premium Preferences Summary Card is the next
+player self-service slice, but its task pack and background will be supplied separately by the
+operator. Runtime implementation is not yet approved. The slice starts from the accepted premium
+1702x924 standalone/private/same-payload-fallback/cleanup lifecycle and current service-backed
+Inventory visibility, Update VIP, and Manage Profile behavior. Preferences remains Discord-user
+scoped and never shows a parent Change Governor; Update VIP explicitly selects/resolves a linked
+governor and rechecks access. The product checkpoint must approve the page-specific backdrop,
+avatar treatment, hero, hierarchy, labels, guidance, and component rows. Profile schema,
+persistence, defaults, preference meaning, SQL, Google Sheets, command, redirect, Inventory
+summary, Exports summary, export, history, inspect, and migration changes remain outside Phase 5E
+unless separately approved.
 Final removal of temporary deprecated command paths remains captured as deferred cleanup for
 execution only after player communication, no-feedback monitoring, production usage review, and
 operator approval.

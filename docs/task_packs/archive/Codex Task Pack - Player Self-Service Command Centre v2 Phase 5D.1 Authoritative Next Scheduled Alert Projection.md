@@ -9,7 +9,7 @@
 - One-pass approved: `No - this pack prepares the next implementation slice; runtime work begins only when the operator starts the implementation task`
 - Product direction approved: `Yes - complete the Reminders page before Phase 5E Preferences`
 - Runtime implementation approved: `Yes - started by the operator on 2026-07-15`
-- Status: `implemented and locally validated - operator Discord smoke pending`
+- Status: `complete and operator accepted on 2026-07-15; archived delivery record`
 - SQL impact: `None expected or approved`
 - Command-surface impact: `None`
 
@@ -130,9 +130,9 @@ Out of scope:
 - Promoted resolution: extract shared pure eligibility/candidate helpers that accept an injected UTC
   clock and already-loaded inputs, then use those helpers from both live dispatch and projection.
 - Score: `8` (`impact 4 + frequency 4 + risk reduction 4 - effort 4`).
-- Promotion decision: `approved as Phase 5D.1 on 2026-07-15`; remove the item from the active
-  deferred backlog while this task pack is active. It is not marked resolved until implementation
-  and parity validation complete.
+- Promotion decision: `approved as Phase 5D.1 on 2026-07-15`; the item was removed from the active
+  deferred backlog and is now recorded as resolved after implementation, parity validation,
+  promotion, and operator smoke completed.
 
 ## 7. Skill Decisions
 
@@ -372,18 +372,19 @@ after the implementation tree is final.
 - [x] Sources are bulk-read once and deterministic-clock/tie behavior is covered.
 - [x] Existing labels, commands, Manage, card, fallback, timeout, attachment, privacy, and navigation contracts remain unchanged.
 - [x] No SQL, schema, persistence, event-source, lead-time, event-type, scheduler cadence, or DM policy change is introduced.
-- [ ] Focused/full validation, visual evidence, K98 PR review, promotion checks, and Codex Security
-  review pass. Automated gates and reviews pass; production promotion remains correctly held until
-  commit/mirror PR and operator Discord smoke.
+- [x] Focused/full validation, visual evidence, K98 PR review, promotion checks, and Codex Security
+  review pass; the same reviewed change is carried by mirror PR #223 and production PR #530.
 - [x] Programme, briefing, canonical reference, task status, and deferred evidence are updated.
-- [ ] Operator Discord smoke is recorded as the final gate.
+- [x] Operator Discord smoke is recorded as the final gate; the operator accepted `/me reminders`
+  and the final bold-gold event-start emphasis on 2026-07-15.
 
 ### 15.1 Delivery Evidence
 
 - Focused selected regression run: `381 passed`; final malformed-runtime projection regression:
   `4 passed`.
-- Final full suite: `2586 passed, 2 skipped`; log-noise replay: `2586 passed, 2 skipped` with
-  production operational logs unchanged.
+- Final full suite: `2588 passed, 2 skipped`; log-noise replay: `2588 passed, 2 skipped` with
+  production operational logs unchanged. Focused renderer validation passed `23` tests and the
+  deterministic scheduler/service/cache selection passed `30` tests.
 - Architecture, deferred-item, test selection, smoke-import, registration
   (`primary=42`, `grouped=101`), pre-commit, and `git diff --check` gates pass.
 - Visual evidence contains original `1702x924`, Discord desktop, and mobile samples for NEXT,
@@ -395,10 +396,15 @@ after the implementation tree is final.
   sent-state performance question is deferred with evidence in
   `docs/reference/deferred_optimisations.md`.
 - K98 PR review: no blocking or non-blocking code finding remains after adding and testing the
-  malformed Calendar runtime-source fail-closed guard.
-- Promotion-readiness review: do not promote yet. The branch is intentionally uncommitted/unpushed,
-  has no mirror PR, and operator Discord smoke is pending. Remotes are correct; SQL/config/dependency
-  rollout is not applicable; promotion must later use the patch-based production flow.
+  malformed Calendar runtime-source fail-closed guard, offloading tracker snapshots without losing
+  cancellation, and making the default KVK snapshot use the injected `generated_at` clock. Explicit
+  injected snapshot loaders retain their existing zero-argument test/integration contract.
+- Promotion-readiness review passed. The reviewed patch is pushed to mirror PR #223 and promoted by
+  the patch-based flow to production PR #530; SQL/config/dependency rollout is not applicable.
+- Operator Discord smoke passed on 2026-07-15. The accepted final card makes
+  `Event starts <absolute UTC>` bold gold without changing the projection payload or scheduler
+  semantics. When multiple eligible alerts exist, the hero still presents only the deterministic
+  earliest future candidate (KVK first on an exact tie).
 
 ## 16. Escalation Gates
 
@@ -428,7 +434,7 @@ The delivery handoff must include:
 - confirmation that the three existing next-event commands and Manage behavior are unchanged;
 - Codex Security, K98 PR-review, and promotion evidence;
 - any genuinely out-of-scope discovery captured in the deferred framework;
-- operator smoke status, without marking it complete before the operator performs it.
+- completed operator smoke status and accepted final presentation.
 
 Suggested PR headline:
 

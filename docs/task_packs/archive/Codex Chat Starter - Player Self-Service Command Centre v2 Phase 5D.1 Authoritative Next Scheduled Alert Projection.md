@@ -1,7 +1,7 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5D.1 Authoritative Next Scheduled Alert Projection
 
-Status: prepared next implementation slice. Product direction is approved; start runtime work only
-when the operator uses this starter or otherwise explicitly approves implementation.
+Status: completed and operator accepted on 2026-07-15. This is an archived execution starter and
+must not be reused as an active task.
 
 ```text
 Codex, implement Player Self-Service Command Centre v2 Phase 5D.1: Authoritative Next Scheduled Alert Projection.
