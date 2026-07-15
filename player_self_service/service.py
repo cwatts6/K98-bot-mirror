@@ -780,7 +780,9 @@ async def build_player_self_service_summary(
             discord_user_id,
         )
     try:
-        kvk_tracker_snapshot = kvk_tracker_snapshot_loader()
+        kvk_tracker_snapshot = await asyncio.to_thread(kvk_tracker_snapshot_loader)
+    except asyncio.CancelledError:
+        raise
     except Exception:
         logger.exception(
             "player_self_service_kvk_projection_tracker_unavailable user_id=%s",

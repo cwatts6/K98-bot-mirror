@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -10,7 +11,6 @@ from event_cache import UpcomingEventCacheSnapshot
 from event_calendar.reminder_state import CalendarReminderState
 from event_scheduler import KvkDmTrackerSnapshot
 from inventory.models import InventoryReportVisibility
-from reminder_domain.kvk_candidates import make_event_id
 from player_self_service import service
 from player_self_service.profile_preference_service import (
     UserProfilePreference,
@@ -20,6 +20,7 @@ from player_self_service.reminders_summary import (
     ReminderConfigurationState,
     ReminderHeroKind,
 )
+from reminder_domain.kvk_candidates import make_event_id
 from services.governor_account_service import summarize_accounts
 
 NOW = datetime(2026, 7, 15, 12, 0, tzinfo=UTC)
@@ -67,6 +68,8 @@ def _calendar_event(*, instance_id: str, start: datetime) -> dict:
 @pytest.mark.asyncio
 async def test_service_bulk_loads_each_projection_source_once_and_selects_earliest() -> None:
     calls: dict[str, int] = {}
+    event_loop_thread_id = threading.get_ident()
+    kvk_tracker_thread_ids: list[int] = []
 
     def counted(name: str):
         calls[name] = calls.get(name, 0) + 1
@@ -92,6 +95,7 @@ async def test_service_bulk_loads_each_projection_source_once_and_selects_earlie
 
     def kvk_tracker_loader():
         counted("kvk_trackers")
+        kvk_tracker_thread_ids.append(threading.get_ident())
         return KvkDmTrackerSnapshot(
             sent={},
             scheduled={event_id: {"42": {int(timedelta(hours=24).total_seconds())}}},
@@ -126,6 +130,8 @@ async def test_service_bulk_loads_each_projection_source_once_and_selects_earlie
     assert "KVK" in payload.hero.secondary_line
     assert "24h" in payload.hero.secondary_line
     assert event_id not in payload.hero.secondary_line
+    assert kvk_tracker_thread_ids
+    assert kvk_tracker_thread_ids[0] != event_loop_thread_id
     assert calls == {
         "kvk_config": 1,
         "calendar_prefs": 1,
