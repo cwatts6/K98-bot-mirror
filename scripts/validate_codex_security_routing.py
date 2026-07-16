@@ -9,11 +9,11 @@ are intentionally excluded.
 from __future__ import annotations
 
 import argparse
-import re
-import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+import re
+import sys
 
 EXCLUDED_PARTS = {
     ".git",
@@ -61,7 +61,11 @@ def candidate_files(root: Path) -> Iterable[Path]:
         if not base.is_dir():
             continue
         for path in sorted(base.rglob("*")):
-            if path.is_file() and path.suffix.lower() in TEXT_SUFFIXES and not is_excluded(path.relative_to(root)):
+            if (
+                path.is_file()
+                and path.suffix.lower() in TEXT_SUFFIXES
+                and not is_excluded(path.relative_to(root))
+            ):
                 yield path
 
 
@@ -182,34 +186,84 @@ def check_core_contract(root: Path) -> list[Finding]:
         }
         for token, purpose in required.items():
             if token not in text:
-                findings.append(Finding("ERROR", Path("AGENTS.md"), 1, f"missing `{token}`; AGENTS.md must {purpose}"))
+                findings.append(
+                    Finding(
+                        "ERROR",
+                        Path("AGENTS.md"),
+                        1,
+                        f"missing `{token}`; AGENTS.md must {purpose}",
+                    )
+                )
 
     security = root / "SECURITY.md"
     if not security.is_file():
-        findings.append(Finding("WARNING", Path("SECURITY.md"), 1, "SECURITY.md is not present; complete the supplied template before enabling policy-context checks"))
+        findings.append(
+            Finding(
+                "WARNING",
+                Path("SECURITY.md"),
+                1,
+                "SECURITY.md is not present; complete the supplied template before enabling policy-context checks",
+            )
+        )
     else:
         text = security.read_text(encoding="utf-8")
         if "<OWNER:" in text or "Template status:" in text:
-            findings.append(Finding("ERROR", Path("SECURITY.md"), 1, "SECURITY.md still contains template placeholders"))
-        if "does not select a scan type" not in text.lower() and "does not select or launch" not in text.lower():
-            findings.append(Finding("WARNING", Path("SECURITY.md"), 1, "state explicitly that SECURITY.md is policy context and does not select a scan type"))
+            findings.append(
+                Finding(
+                    "ERROR",
+                    Path("SECURITY.md"),
+                    1,
+                    "SECURITY.md still contains template placeholders",
+                )
+            )
+        if (
+            "does not select a scan type" not in text.lower()
+            and "does not select or launch" not in text.lower()
+        ):
+            findings.append(
+                Finding(
+                    "WARNING",
+                    Path("SECURITY.md"),
+                    1,
+                    "state explicitly that SECURITY.md is policy context and does not select a scan type",
+                )
+            )
 
-    for rel in (Path("README-DEV.md"), Path("docs/reference/K98 Bot - Skills & Refactor Triggers.md")):
+    for rel in (
+        Path("README-DEV.md"),
+        Path("docs/reference/K98 Bot - Skills & Refactor Triggers.md"),
+    ):
         path = root / rel
         if not path.is_file():
             continue
         text = path.read_text(encoding="utf-8")
         if "Codex Security" in text and "k98-security-review-routing" not in text:
-            findings.append(Finding("ERROR", rel, 1, "core guidance mentions Codex Security without the K98 routing skill"))
+            findings.append(
+                Finding(
+                    "ERROR",
+                    rel,
+                    1,
+                    "core guidance mentions Codex Security without the K98 routing skill",
+                )
+            )
         if "Codex Security" in text and "security-diff-scan" not in text:
-            findings.append(Finding("ERROR", rel, 1, "core guidance mentions Codex Security without naming the routine diff workflow"))
+            findings.append(
+                Finding(
+                    "ERROR",
+                    rel,
+                    1,
+                    "core guidance mentions Codex Security without naming the routine diff workflow",
+                )
+            )
 
     return findings
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", type=Path, default=Path.cwd(), help="repository root (default: current directory)")
+    parser.add_argument(
+        "--repo", type=Path, default=Path.cwd(), help="repository root (default: current directory)"
+    )
     args = parser.parse_args()
 
     root = args.repo.resolve()
@@ -226,7 +280,14 @@ def main() -> int:
         seen.add(resolved)
         findings.extend(scan_file(root, path))
 
-    findings.sort(key=lambda item: (item.level != "ERROR", item.path.as_posix().lower(), item.line, item.message))
+    findings.sort(
+        key=lambda item: (
+            item.level != "ERROR",
+            item.path.as_posix().lower(),
+            item.line,
+            item.message,
+        )
+    )
     for item in findings:
         print(f"{item.level}: {item.path}:{item.line}: {item.message}")
 
