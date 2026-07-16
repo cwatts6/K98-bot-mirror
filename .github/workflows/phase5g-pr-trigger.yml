@@ -24,16 +24,23 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import subprocess
           import textwrap
+          import traceback
 
           source = Path('.github/workflows/phase5g-finalize-docs.yml').read_text(encoding='utf-8')
           start_marker = "          python - <<'PY'\n"
           end_marker = "\n          PY\n      - name: Commit final documentation set"
           start = source.index(start_marker) + len(start_marker)
           end = source.index(end_marker, start)
-          exec(textwrap.dedent(source[start:end]), {})
+          try:
+              exec(textwrap.dedent(source[start:end]), {})
+          except Exception:
+              diagnostic = traceback.format_exc()
+              subprocess.run(['git', 'reset', '--hard', 'HEAD'], check=True)
+              Path('phase5g_finalize_error.txt').write_text(diagnostic, encoding='utf-8')
           PY
-      - name: Commit final documentation set
+      - name: Commit final documentation set or diagnostic
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
