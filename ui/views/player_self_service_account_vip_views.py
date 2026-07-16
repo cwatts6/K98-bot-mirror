@@ -53,8 +53,17 @@ async def _defer_private(interaction: discord.Interaction) -> None:
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True)
     except TypeError:
-        if not interaction.response.is_done():
-            await interaction.response.defer()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug("player_self_service_account_vip_defer_failed", exc_info=True)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.debug("player_self_service_account_vip_defer_failed", exc_info=True)
 
 
 class _AccountVipView(discord.ui.View):

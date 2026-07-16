@@ -379,6 +379,38 @@ def test_modify_governor_success_invalidates_cache(monkeypatch):
         assert rc._cache_ts == 0.0
 
 
+def test_modify_governor_success_invalidates_concurrent_transitional_reload(monkeypatch):
+    """A cache reload between delete and insert must not survive replacement success."""
+    _reset_cache(monkeypatch)
+    monkeypatch.setattr(rc, "_CACHE_TTL", 9999.0)
+    rc.store_cache(_SAMPLE_DICT)
+
+    _patch_dal(
+        monkeypatch,
+        by_discord=_EXISTING_SLOT,
+        by_governor=None,
+        soft_delete_result=(0, "OK"),
+    )
+
+    def insert_with_transitional_reload(**_kwargs):
+        rc.store_cache(_SAMPLE_DICT)
+        return 0, "OK"
+
+    monkeypatch.setattr(dal, "insert", insert_with_transitional_reload)
+
+    ok, err = svc.modify_governor(
+        discord_user_id=111,
+        discord_name="Alice",
+        account_type="Main",
+        new_governor_id="9999999",
+        new_governor_name="NewGov",
+    )
+
+    assert ok is True
+    assert err is None
+    assert rc.get_cached_or_none() is None
+
+
 def test_modify_governor_partial_failure_invalidates_after_soft_delete(monkeypatch):
     """A committed soft-delete must invalidate stale authority even if insert fails."""
     _reset_cache(monkeypatch)

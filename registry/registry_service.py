@@ -181,6 +181,10 @@ def modify_governor(
             new_governor_name,
             updated_by or "self",
         )
+        # A concurrent load may have repopulated the cache after the committed
+        # soft-delete and before this insert completed. Invalidate the final
+        # replacement state so no transitional snapshot survives.
+        registry_cache.invalidate(reason="modify_governor")
         return True, None
 
     # Partial failure: old row superseded but new row not created.
