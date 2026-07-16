@@ -5,7 +5,11 @@
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
 - Date: `2026-07-16`
-- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486; GovernorOS v2 Phases 1-5F completed and operator accepted through mirror PR #225 and production-branch commit `89f7da16`; and the Phase 5G Account Data Export Consolidation product/output/command contract, task pack, and chat starter approved on 2026-07-16 for the next implementation slice.
+- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player
+  Self-Service Command Centre programme completed in production PR #486; GovernorOS v2 Phases 1-5F
+  completed and operator accepted through mirror PR #225 and production-branch commit `89f7da16`; and
+  the Phase 5G Account Data Export Consolidation product/output/command contract, task pack, and chat
+  starter approved on 2026-07-16 for the next implementation slice.
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
