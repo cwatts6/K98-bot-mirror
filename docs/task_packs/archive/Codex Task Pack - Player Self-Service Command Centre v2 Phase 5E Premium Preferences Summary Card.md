@@ -1,5 +1,8 @@
 # Codex Task Pack - Player Self-Service Command Centre v2 Phase 5E Premium Preferences Summary Card
 
+<!-- codex-security-routing: allow-standard reason="archived historical execution record; not active security-routing guidance" -->
+<!-- codex-security-routing: allow-generic reason="archived historical execution terminology retained for delivery traceability" -->
+
 ## 1. Task Header
 
 - Task name: `Player Self-Service Command Centre v2 Phase 5E Premium Preferences Summary Card`
@@ -9,7 +12,7 @@
 - One-pass approved: `No`
 - Product/content/visual contract approved: `Yes`
 - Runtime implementation approved: `Yes, subject to the normal repository audit, architecture, and implementation-plan stop gates`
-- Status: `next active GovernorOS implementation slice`
+- Status: `complete, operator accepted, merged and deployed 2026-07-16`
 - Approved runtime backdrop: `assets/me/cards/me_preferences.png`
 - Required output: `1702 x 924` standalone private PNG
 - Stable filename: `me_preferences_<discord_user_id>.png`
@@ -18,6 +21,26 @@ The product and visual workshop is complete. Do not reopen the core information 
 new settings, or restore VIP to Preferences unless repository evidence proves the locked contract is
 unsafe or impossible. Start with repository inspection and architecture confirmation, report any
 material mismatch, and stop at the required approval gates before coding.
+
+### Completion Record
+
+- Mirror PR: `K98-bot-mirror#224`.
+- Production PR: `K98-bot#531`.
+- Production deployment: operator confirmed complete on `2026-07-16`.
+- Delivered the approved private `1702x924` Preferences card with top-left invoking-user avatar,
+  DST-aware local-time/UTC fallback, three-field regional-profile coverage, exact Inventory privacy
+  state/copy, deterministic Settings Insight, one Manage Settings journey, and same-payload fallback.
+- Removed deprecated Inventory navigation, VIP content, direct privacy toggles, and Change Governor
+  from Preferences. Update VIP now belongs to Manage Accounts and explicitly resolves/revalidates a
+  linked governor before the unchanged write contract.
+- Delivered the approved atomic field-specific profile DAL upsert. No SQL schema object, migration,
+  procedure, view, index, data migration, or preference meaning changed.
+- Final repository validation passed `2637` tests with `2` skips, plus pre-commit, architecture,
+  deferred-item, import-smoke, command-registration, log-hygiene, visual, security, PR-review, and
+  patch-based promotion gates.
+- No new Phase 5E deferred item was created. Broader legacy generic-card consolidation remains
+  intentionally deferred until after Phases 5F-5G; cross-field profile write concurrency was fixed
+  in Phase 5E and is not deferred.
 
 ## 2. Required Reading
 
@@ -952,37 +975,37 @@ Do not promote until operator smoke and visual acceptance pass.
 
 ## 24. Acceptance Criteria
 
-- [ ] Repository audit maps the exact Preferences, profile, visibility, VIP, Accounts Manage,
+- [x] Repository audit maps the exact Preferences, profile, visibility, VIP, Accounts Manage,
       renderer/fallback, attachment, and timeout flows.
-- [ ] Architecture and implementation plan are approved before coding.
-- [ ] `/me preferences` is a private Discord-user Personal Settings page with no Change Governor.
-- [ ] Successful output is a standalone `1702x924` PNG using
+- [x] Architecture and implementation plan are approved before coding.
+- [x] `/me preferences` is a private Discord-user Personal Settings page with no Change Governor.
+- [x] Successful output is a standalone `1702x924` PNG using
       `assets/me/cards/me_preferences.png` and stable filename.
-- [ ] Invoking-user avatar, long-name fitting, duplicate-safe identity, and safe fallback work.
-- [ ] Header shows `PRIVATE` or `PUBLIC` plus honest three-field profile coverage.
-- [ ] Local-time hero uses one injected UTC clock, saved timezone semantics, DST-aware offset, and
+- [x] Invoking-user avatar, long-name fitting, duplicate-safe identity, and safe fallback work.
+- [x] Header shows `PRIVATE` or `PUBLIC` plus honest three-field profile coverage.
+- [x] Local-time hero uses one injected UTC clock, saved timezone semantics, DST-aware offset, and
       honest UTC fallback without live ticking or network calls.
-- [ ] Regional Profile shows genuine friendly timezone/location/language values and honest unset or
+- [x] Regional Profile shows genuine friendly timezone/location/language values and honest unset or
       unavailable states.
-- [ ] Privacy copy matches the exact existing Inventory visibility contract and does not imply that
+- [x] Privacy copy matches the exact existing Inventory visibility contract and does not imply that
       private direct `/me` reports become public.
-- [ ] Exactly one deterministic Settings Insight follows the approved priority.
-- [ ] Main controls are the approved navigation rows plus one `Manage settings` action.
-- [ ] Manage Settings preserves existing save/clear persistence semantics, moves clear actions into
+- [x] Exactly one deterministic Settings Insight follows the approved priority.
+- [x] Main controls are the approved navigation rows plus one `Manage settings` action.
+- [x] Manage Settings preserves existing save/clear persistence semantics, moves clear actions into
       field-specific flows, and confirms visibility changes.
-- [ ] VIP values and editing are removed from Preferences.
-- [ ] Existing Update VIP behavior is re-hosted inside Manage Accounts with explicit governor
+- [x] VIP values and editing are removed from Preferences.
+- [x] Existing Update VIP behavior is re-hosted inside Manage Accounts with explicit governor
       resolution and access recheck.
-- [ ] Existing account management, profile persistence, visibility, VIP, report, export, Google
+- [x] Existing account management, profile persistence, visibility, VIP, report, export, Google
       Sheets, command, and legacy redirect contracts remain compatible.
-- [ ] Same-payload fallback, off-loop rendering, attachment replacement, timeout preservation, and
+- [x] Same-payload fallback, off-loop rendering, attachment replacement, timeout preservation, and
       complete stream cleanup are tested.
-- [ ] Focused/full validation, SQL contract validation, visual matrix, Codex Security review, PR
+- [x] Focused/full validation, SQL contract validation, visual matrix, Codex Security review, PR
       review, operator smoke, and promotion checks are recorded.
-- [ ] No new direct SQL exists in commands or views.
-- [ ] No SQL deployment or data migration is required.
-- [ ] Deferred findings are captured structurally without widening Phase 5E.
-- [ ] Programme, briefing, canonical reference, task-pack/starter indexes, and next-phase handoff are
+- [x] No new direct SQL exists in commands or views.
+- [x] No SQL deployment or data migration is required.
+- [x] Deferred findings are captured structurally without widening Phase 5E.
+- [x] Programme, briefing, canonical reference, task-pack/starter indexes, and next-phase handoff are
       updated.
 
 ## 25. Required Delivery Output
@@ -1077,10 +1100,11 @@ Rollback:
 
 ## 28. Remaining Phase 5 Handoff
 
-After Phase 5E is operator accepted and archived, prepare separately:
+Phase 5E is operator accepted and archived. Prepare separately:
 
 - Phase 5F: Premium Inventory Summary Card;
 - Phase 5G: Premium Exports Summary Card.
 
-Neither phase inherits permission to change the profile, visibility, VIP, Accounts management, or
-local-time contracts delivered here.
+Phase 5F Premium Inventory Summary Card is the next delivery slice. Its task pack and chat starter
+are intentionally not created by this closeout. Neither Phase 5F nor 5G inherits permission to
+change the profile, visibility, VIP, Accounts management, or local-time contracts delivered here.

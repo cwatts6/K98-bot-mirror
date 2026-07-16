@@ -67,14 +67,6 @@ def _reminder_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     )
 
 
-def _preference_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
-    preferences = summary.preferences
-    return (
-        f"Inventory: {preferences.inventory_visibility}",
-        "Exports: private",
-    )
-
-
 def render_dashboard_card(
     summary: PlayerSelfServiceSummary,
     *,

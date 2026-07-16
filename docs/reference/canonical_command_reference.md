@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=42 grouped_subcommands_detected=101 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=42
+primary=40 grouped_subcommands_detected=100 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=40
 ```
 
 Grouped command summary:
@@ -67,9 +67,9 @@ The approved top-level command baseline is enforced by `APPROVED_TOP_LEVEL_COMMA
 
 ```text
 activity, ark, calendar, calendar_next_event, calendar_reminder_config, crystaltech, events,
-export_inventory, honor, honor_rankings, inventory, inventory_preferences, kvk, kvk_admin, kvk_rankings,
-location, me, mge, modify_registration, modify_subscription, my_registrations, my_stats,
-my_stats_export, mygovernorid, myinventory, mykvkcrystaltech, mykvkhistory, mykvkstats,
+export_inventory, honor, honor_rankings, inventory, kvk, kvk_admin, kvk_rankings, location, me, mge,
+modify_registration, modify_subscription, my_registrations, my_stats, my_stats_export, mygovernorid,
+mykvkcrystaltech, mykvkhistory, mykvkstats,
 mykvktargets, next_kvk_event, next_kvk_fight, ops, ping, player_profile, prekvk,
 register_governor, registry, stats, subscribe, subscriptions, unsubscribe, vote_admin
 ```
@@ -130,8 +130,6 @@ Legend:
 | Honor/KVK | `/honor_rankings` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator | Public redirect | Standard | Deprecated redirect to `/kvk rankings type:honor`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Honor/KVK | `/honor purge_last` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Purges latest honor scan. |
 | Inventory | `/inventory import` | `commands/inventory_cmds.py` | Grouped | Inventory upload channel decorator with admin override | Ephemeral | Standard | Preserve | Imports resources, speedups, or materials screenshots. |
-| Inventory | `/myinventory` | `commands/inventory_cmds.py` | Flat | Public command-level access | Ephemeral prompt; report visibility follows user preference | Standard | Preserve; `/me inventory` opens summary first, then equivalent selector/report journey | Player inventory report. Phase 10 preserves this journey behind the `/me inventory` Open Report action without changing output visibility, range controls, or report export buttons. |
-| Inventory | `/inventory_preferences` | `commands/inventory_cmds.py` | Flat | Public command-level access | Ephemeral redirect | Standard | Deprecated redirect to `/me preferences`; remove only after no-feedback window | Phase 13 approved redirect slice keeps the command registered but replaces the old preference prompt entry point with private guidance to `/me preferences`. |
 | Inventory | `/export_inventory` | `commands/inventory_cmds.py` | Flat | Public command-level access | Ephemeral redirect | Standard | Deprecated redirect to `/me exports`; remove only after no-feedback window | Phase 13 explicit operator approval redirects the legacy export entry point while preserving export schemas/services behind `/me exports`. Old options remain accepted for compatibility but are ignored by the redirect handler. |
 | Inventory | `/inventory audit` | `commands/inventory_cmds.py` | Grouped | Admin-only decorator | Ephemeral | Standard | Preserve | Inventory import audit. |
 | Location | `/location import` | `commands/location_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Imports location data. |
@@ -145,8 +143,7 @@ Legend:
 | Player Self-Service | `/me dashboard` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.03`) | Preserve; GovernorOS v2 Phase 5A direct Inventory integration | Private governor-first command centre. No linked governor shows setup guidance, one opens directly, and multiple use an author-gated governor-only selector before payload fetch. The selected-governor standalone card is 1180x760 and adds latest approved RSS, Speedups, and legendary-equivalent Materials totals for that governor only. Selected dashboards expose Accounts, Reminders, Preferences, Exports, direct RSS/Materials/Speedups actions, and Change Governor where applicable. The approved private embed remains the same-payload fallback. |
 | Player Self-Service | `/me accounts` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | GovernorOS v2 Phase 5C complete; operator accepted 2026-07-14 | Private Discord-user/all-linked-governor portfolio card with author avatar, Main/role ordering, two-column governor tiles with prominent Power values and no duplicate Main header, latest Kingdom 1198 scan health, Power/T4+T5/current Inventory RSS coverage, deterministic insight, unchanged guided Manage lookup/add/replace/remove, and private avatar-enabled paginated Overview/Combat/Economy Account Summary with VIP, compact Power/Troop Power, KP Loss, percentage-labelled Tanking, Conduct in Economy, UTC date-times, complete CSV, and graceful disabled-control timeout. Successful visuals are standalone 1702x924 attachments with same-payload fallback. Coordinates and CSV remain private. It does not show Change Governor; selected governor context is retained only for validated Dashboard return. |
 | Player Self-Service | `/me reminders` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard (`v1.01`) | Phase 5D.1 complete and operator accepted 2026-07-15 | Private Discord-user-level premium reminder centre with invoking-user avatar/safe fallback, duplicate-safe Kingdom identity, earned ACTIVE/REVIEW/OFF state, and an authoritative scheduler-parity hero: earliest future KVK/Calendar alert, healthy `NO UPCOMING ALERT`, or request-level `SCHEDULE UNAVAILABLE`. Friendly labels and absolute UTC times never expose raw occurrence keys or imply delivery success; the event start date-time is visually prominent in bold gold. The existing 1702x924 card, stable filename, same-payload fallback, Manage journey, KVK autosave/remove-all/confirmation DM, Calendar Settings, privacy, navigation, timeout, attachment cleanup, and return-only Dashboard context remain unchanged. Phase 13 redirects `/subscribe`, `/modify_subscription`, `/unsubscribe`, and `/calendar_reminder_config` here; the three existing next-event commands remain registered and unchanged. Projection bulk-loads each source/config/tracker once, uses one injected UTC clock including the default KVK snapshot, and performs no tasks, DMs, acknowledgements, refreshes, network calls, or writes. The operator authorised the narrow KVK zero-duration correction so saved `now` is genuinely at-start eligible through the existing scheduling/tracker/rehydration/retry machinery. No Calendar, persistence, event-source/type, lead-time, cadence, SQL, command-registration, or DM-content contract changed. |
-| Player Self-Service | `/me preferences` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard (`v1.01`) | Preserve; GovernorOS v2 Phase 5E implementation/local validation | Private Discord-user-level Personal Settings centre for saved timezone, location country, preferred-language metadata, derived DST-aware local-time context, and Inventory visibility. The successful result is an avatar-enabled standalone 1702x924 attachment with a same-authorised-payload fallback and graceful timeout. The page has Accounts/Reminders/Preferences, Dashboard/Exports, and one in-place Manage settings action; it has no Inventory navigation, VIP content/action, direct visibility toggle, or Change Governor. Regional fields reuse existing validation/catalog/null semantics and save through an atomic field-specific DAL upsert. Inventory visibility uses the existing service/persistence path with explicit confirmation and confirmation-time state revalidation; it controls detailed `/me inventory` and `/myinventory` posting only, while private direct `/me resources`, `/me materials`, and `/me speedups` remain private. Governor-specific VIP editing is owned by Manage Accounts -> Update VIP, which explicitly resolves a linked governor and rechecks current access before the unchanged VIP write. No SQL object/schema/deployment change. |
-| Player Self-Service | `/me inventory` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 10 inventory summary card delivered and smoke tested | Private Inventory summary card using latest approved resources, speedups, and materials data for the player's registered governors, with no-data upload guidance and an Open Report handoff to the preserved `/myinventory` journey. |
+| Player Self-Service | `/me preferences` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard (`v1.02`) | Preserve; GovernorOS v2 Phase 5F profile-only consolidation | Private Discord-user-level Personal Settings centre for saved timezone, location country, preferred-language metadata, and derived DST-aware local-time context. The successful result is an avatar-enabled standalone 1702x924 attachment using `assets/me/cards/me_preferences.png`, with a same-authorised-payload fallback and graceful timeout. The header is `LOCAL` when the saved timezone is usable and `UTC` otherwise; this is derived display state, not a saved preference. Manage settings opens Regional Profile directly. Regional fields retain existing catalogs, paging, validation/null semantics, atomic field-specific save/clear, superseded/concurrent safety, Back navigation, timeout, fallback, attachment replacement, and cleanup. There is no Inventory visibility, Privacy & Sharing journey, VIP content/action, or Change Governor. Governor-specific VIP editing remains owned by Manage Accounts -> Update VIP. No SQL object/schema/deployment change. |
 | Player Self-Service | `/me resources` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.00`) | GovernorOS v2 Phase 5B complete; operator smoke passed 2026-07-13 | Private selected-governor Resources report using the report-specific premium 1400x980 Inventory backdrop, honest native no-data output, 1M/3M/6M/12M ranges, private exports, report tabs, Dashboard navigation, and paged Change Governor controls. |
 | Player Self-Service | `/me materials` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.00`) | GovernorOS v2 Phase 5B complete; operator smoke passed 2026-07-13 | Private selected-governor Materials report using the report-specific premium 1400x980 Inventory backdrop with unchanged no-data, privacy, range, export, Dashboard, and Change Governor interaction contract. |
 | Player Self-Service | `/me speedups` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.00`) | GovernorOS v2 Phase 5B complete; operator smoke passed 2026-07-13 | Private selected-governor Speedups report using the report-specific premium 1400x980 Inventory backdrop with unchanged no-data, privacy, range, export, Dashboard, and Change Governor interaction contract. |
@@ -300,18 +297,28 @@ Legend:
   saved At start choice is genuinely live-eligible. Final operator Discord smoke passed on
   2026-07-15, including authoritative NEXT presentation and the bold-gold event-start emphasis;
   the completed Phase 5D.1 task pack and starter are archived.
+- GovernorOS v2 Phase 5F supersedes the proposed Premium Inventory Summary Card and Phase 5E's
+  Inventory-privacy ownership. It retires `/me inventory`, `/myinventory`, and
+  `/inventory_preferences` as one bot release, reducing the top-level command count from 42 to 40
+  and `/me` from 9 to 8 subcommands while `/inventory` remains at 2. Public Inventory posting and
+  combined `All` viewing are removed; private `All` Inventory export remains under `/me exports`.
+  The selected-governor dashboard and `/me resources`, `/me speedups`, and `/me materials` remain
+  the definitive report UX. Personal Settings is profile-only with derived `LOCAL`/`UTC` context.
+  The bot no longer reads or writes Inventory visibility; `dbo.InventoryReportPreference` remains
+  untouched for rollback and there is no Phase 5F SQL deployment.
 - Player Self-Service Command Centre Phase 13 started legacy redirect planning with audit/scope
   only. The operator-provided SQL extract and dated JSONL files showed nonzero broad usage for
   every audited legacy and related personal path, recent direct usage for several legacy paths, and
   `/me` usage concentrated in the smoke-test/operator window. After reviewing the classifications,
   the operator approved lightweight private redirects for account, reminder, calendar reminder,
   inventory preference, and export legacy entry points. Production PR #486 delivered the redirects
-  and operator smoke on 2026-06-27 confirmed all approved redirects are correct. `/myinventory`,
-  `/my_stats`, `/mykvkcrystaltech`, `/player_profile`, and `/stats player` remain live; final
+  and operator smoke on 2026-06-27 confirmed all approved redirects were correct. Phase 5F later
+  approved retirement of `/myinventory` and `/inventory_preferences`. `/my_stats`,
+  `/mykvkcrystaltech`, `/player_profile`, and `/stats player` remain live; final
   command-registration removal requires player briefing, usage monitoring, operator approval, and
   a no-feedback monitoring window.
-- Redirected legacy player self-service paths remain registered in parallel while the `/me`
-  workflow rolls out.
+- Remaining redirected legacy player self-service paths stay registered in parallel while their
+  `/me` replacements roll out; Phase 5F's two approved Inventory removals are excluded.
 - Public calendar and KVK calendar paths remain flat pending a dedicated UX redesign.
 - `/ping` remains flat for simple health/debug discoverability.
 - Discord Voting Post Framework Phase 17 audited the expanded `/vote_admin` group after

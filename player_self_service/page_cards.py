@@ -31,7 +31,6 @@ _BACKGROUND_BY_PAGE = {
     "reminders": "me reminders.png",
     "preferences": "me preferences.png",
     "exports": "me exports.png",
-    "inventory": "me inventory.png",
 }
 
 
@@ -473,16 +472,6 @@ def _export_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     )
 
 
-def _inventory_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
-    inventory = summary.inventory
-    return (
-        f"Resources: {inventory.resources.value}",
-        f"Speedups: {inventory.speedups.value}",
-        f"Materials: {inventory.materials.value}",
-        inventory.account_summary,
-    )
-
-
 def _account_action_detail(summary: PlayerSelfServiceSummary) -> str:
     if summary.accounts.linked_count <= 0:
         return "Find ID by name, then add a governor to an available account slot."
@@ -501,7 +490,6 @@ def _dashboard_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
         f"Linked accounts: {summary.accounts.linked_label}",
         f"KVK reminders: {summary.reminders.state}",
         f"Calendar reminders: {summary.reminders.calendar.state}",
-        f"Inventory: {summary.preferences.inventory_visibility}",
         "Exports: private",
     )
 
@@ -542,20 +530,13 @@ def _dashboard_rows(summary: PlayerSelfServiceSummary) -> tuple[tuple[MetricCell
         ),
         (
             MetricCell(
-                "",
-                f"Import: {_status_label(summary.preferences.inventory_visibility).title()}",
-                "Inventory Visibility",
+                "Export Centre",
+                summary.exports.action_summary,
+                "Private personal exports",
                 value_size=50,
                 value_min_size=32,
                 detail_size=30,
-            ),
-            MetricCell(
-                "",
-                "Export: Private",
-                "Export Visibility",
-                value_size=50,
-                value_min_size=32,
-                detail_size=30,
+                width_units=2,
             ),
         ),
     )
@@ -606,42 +587,6 @@ def _reminder_rows(summary: PlayerSelfServiceSummary) -> tuple[tuple[MetricCell,
     )
 
 
-def _inventory_rows(summary: PlayerSelfServiceSummary) -> tuple[tuple[MetricCell, ...], ...]:
-    inventory = summary.inventory
-    return (
-        (
-            MetricCell(
-                "Resources",
-                inventory.resources.value,
-                inventory.resources.detail,
-                value_size=52,
-                value_min_size=30,
-                width_units=3,
-            ),
-        ),
-        (
-            MetricCell(
-                "Speedups",
-                inventory.speedups.value,
-                inventory.speedups.detail,
-                value_size=52,
-                value_min_size=30,
-                width_units=3,
-            ),
-        ),
-        (
-            MetricCell(
-                "Materials",
-                inventory.materials.value,
-                inventory.materials.detail,
-                value_size=52,
-                value_min_size=30,
-                width_units=3,
-            ),
-        ),
-    )
-
-
 def _page_copy(
     page: str, summary: PlayerSelfServiceSummary
 ) -> tuple[str, str, str, str, tuple[str, ...]]:
@@ -649,7 +594,7 @@ def _page_copy(
         return (
             "Personal Command Centre",
             summary.accounts.main_state,
-            "Actions available: Accounts, Reminders, Preferences, Inventory, Exports",
+            "Actions available: Accounts, Reminders, Preferences, Exports",
             "KVK outputs stay in their existing public channels; personal tools open here.",
             _dashboard_lines(summary),
         )
@@ -668,19 +613,6 @@ def _page_copy(
             "Actions available: Manage",
             _reminder_action_detail(summary),
             _reminder_lines(summary),
-        )
-    if page == "inventory":
-        inventory = summary.inventory
-        return (
-            "Inventory",
-            inventory.state,
-            f"Actions available: {inventory.next_action}",
-            (
-                inventory.upload_guidance
-                if inventory.state in {"empty", "none"}
-                else inventory.account_summary
-            ),
-            _inventory_lines(summary),
         )
     if page == "exports":
         action_state = summary.exports.action_state.strip().lower()
@@ -750,21 +682,11 @@ def render_page_card(
             row_height=154,
             row_gap=26,
         )
-    elif page == "inventory":
-        _draw_metric_rows(
-            draw,
-            x=108,
-            y=314,
-            width=WIDTH - 216,
-            rows=_inventory_rows(summary),
-            row_height=112,
-            row_gap=24,
-        )
     else:
         _draw_wrapped_lines(draw, x=108, y=332, width=WIDTH - 216, lines=lines, size=46, gap=66)
 
     action_font = _fit(draw, action, width=WIDTH - 216, size=44, min_size=26, bold=True)
-    action_y = 758 if page == "inventory" else 720
+    action_y = 720
     _draw_text(draw, (108, action_y), action, fill=BLUE, font=action_font, bold=True)
     detail_font = _fit(draw, action_detail, width=WIDTH - 216, size=30, min_size=22, bold=False)
     _draw_text(draw, (108, action_y + 58), action_detail, fill=MUTED, font=detail_font)

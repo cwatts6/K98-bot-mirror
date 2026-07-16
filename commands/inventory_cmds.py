@@ -9,12 +9,8 @@ from bot_config import GUILD_ID, INVENTORY_UPLOAD_CHANNEL_ID
 from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import admin_only, channel_only, track_usage
-from inventory import audit_service, reporting_service
+from inventory import audit_service
 from inventory.models import InventoryAuditRecord
-from ui.views.inventory_report_views import (
-    send_inventory_preference_prompt,
-    start_myinventory_command,
-)
 from ui.views.inventory_views import start_import_command
 from versioning import versioned
 
@@ -57,74 +53,6 @@ def register_inventory(bot: ext_commands.Bot) -> None:
                 "Inventory import setup failed. Please try again or contact an admin.",
                 ephemeral=True,
             )
-
-    @bot.slash_command(
-        name="myinventory",
-        description="View your latest inventory report",
-        guild_ids=[GUILD_ID],
-    )
-    @versioned("v1.00")
-    @safe_command
-    @track_usage()
-    async def myinventory(ctx: discord.ApplicationContext) -> None:
-        try:
-            final_visibility = await reporting_service.get_visibility_preference_or_none(
-                int(ctx.user.id)
-            )
-        except Exception:
-            logger.exception("myinventory_preference_resolution_failed actor=%s", ctx.user.id)
-            await safe_defer(ctx, ephemeral=True)
-            await ctx.followup.send(
-                "Inventory reporting preferences are not available yet. Please contact an admin.",
-                ephemeral=True,
-            )
-            return
-
-        if final_visibility is None:
-            await safe_defer(ctx, ephemeral=True)
-            await send_inventory_preference_prompt(ctx)
-            return
-
-        await safe_defer(ctx, ephemeral=True)
-        try:
-            await start_myinventory_command(
-                ctx=ctx,
-                visibility=final_visibility,
-            )
-        except PermissionError as exc:
-            await ctx.followup.send(str(exc), ephemeral=True)
-        except ValueError as exc:
-            await ctx.followup.send(str(exc), ephemeral=True)
-        except Exception:
-            logger.exception(
-                "myinventory_command_failed actor=%s",
-                ctx.user.id,
-            )
-            await ctx.followup.send(
-                "Inventory report generation failed. Please try again or contact an admin.",
-                ephemeral=True,
-            )
-
-    @bot.slash_command(
-        name="inventory_preferences",
-        description="Deprecated: use /me preferences for inventory visibility.",
-        guild_ids=[GUILD_ID],
-    )
-    @versioned("v1.00")
-    @safe_command
-    @track_usage()
-    async def inventory_preferences(ctx: discord.ApplicationContext) -> None:
-        await safe_defer(ctx, ephemeral=True)
-        await send_deprecated_command_redirect(
-            ctx,
-            CommandRedirect(
-                old_path="/inventory_preferences",
-                new_path="/me preferences",
-                detail="Profile preferences now manage private/public inventory report visibility alongside timezone, location, and language.",
-            ),
-            ephemeral=True,
-        )
-        return
 
     @bot.slash_command(
         name="export_inventory",

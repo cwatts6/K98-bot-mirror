@@ -4,14 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from inventory.models import InventoryReportVisibility
-from inventory.reporting_service import InventoryVisibilityPreferenceRead
-from player_self_service.preferences_summary import (
-    PRIVATE_CONSEQUENCE,
-    PUBLIC_CONSEQUENCE,
-    PreferencesSummaryUnavailable,
-    build_preferences_summary,
-)
+from player_self_service.preferences_summary import build_preferences_summary
 from player_self_service.profile_preference_service import (
     UserProfilePreference,
     UserProfilePreferenceRead,
@@ -25,28 +18,15 @@ def _profile_loader(profile: UserProfilePreference, *, ok: bool = True):
     return load
 
 
-def _visibility_loader(visibility: InventoryReportVisibility | None, *, ok: bool = True):
-    async def load(_user_id: int) -> InventoryVisibilityPreferenceRead:
-        return InventoryVisibilityPreferenceRead(
-            ok=ok,
-            visibility=visibility,
-            error=None if ok else "down",
-        )
-
-    return load
-
-
 async def _build(
     profile: UserProfilePreference,
     *,
-    visibility: InventoryReportVisibility | None = InventoryReportVisibility.ONLY_ME,
     now: datetime = datetime(2026, 1, 15, 12, 0, tzinfo=UTC),
 ):
     return await build_preferences_summary(
         42,
         display_name="Tester",
         profile_loader=_profile_loader(profile),
-        visibility_loader=_visibility_loader(visibility),
         utc_clock=lambda: now,
     )
 
@@ -64,7 +44,7 @@ async def _build(
                 preferred_language_tag="en-GB",
             ),
             3,
-            "regional profile is complete",
+            "All three regional profile details",
         ),
     ],
 )
@@ -122,7 +102,6 @@ async def test_local_date_can_differ_from_utc_without_a_second_clock_read() -> N
         42,
         display_name="Tester",
         profile_loader=_profile_loader(UserProfilePreference(timezone_name="Pacific/Auckland")),
-        visibility_loader=_visibility_loader(InventoryReportVisibility.ONLY_ME),
         utc_clock=clock,
     )
 
@@ -168,29 +147,6 @@ async def test_unknown_country_and_language_are_unavailable_and_not_exposed() ->
 
 
 @pytest.mark.asyncio
-async def test_settings_insight_priority_places_public_before_optional_unset() -> None:
-    payload = await _build(
-        UserProfilePreference(timezone_name="UTC"),
-        visibility=InventoryReportVisibility.PUBLIC,
-    )
-
-    assert payload.inventory_visibility.state_label == "PUBLIC"
-    assert payload.inventory_visibility.consequence_text == PUBLIC_CONSEQUENCE
-    assert "sharing is public" in payload.settings_insight
-    assert "optional" not in payload.settings_insight
-
-
-@pytest.mark.asyncio
-async def test_private_default_is_explicitly_marked_without_changing_consequence() -> None:
-    payload = await _build(UserProfilePreference(), visibility=None)
-
-    assert payload.inventory_visibility.state_label == "PRIVATE"
-    assert payload.inventory_visibility.is_explicit is False
-    assert payload.inventory_visibility.consequence_text == PRIVATE_CONSEQUENCE
-    assert payload.warnings
-
-
-@pytest.mark.asyncio
 async def test_location_does_not_infer_or_override_timezone() -> None:
     payload = await _build(
         UserProfilePreference(timezone_name="Asia/Tokyo", location_country_code="GB")
@@ -202,11 +158,15 @@ async def test_location_does_not_infer_or_override_timezone() -> None:
 
 
 @pytest.mark.asyncio
-async def test_visibility_failure_blocks_card_instead_of_guessing_private() -> None:
-    with pytest.raises(PreferencesSummaryUnavailable):
-        await build_preferences_summary(
-            42,
-            display_name="Tester",
-            profile_loader=_profile_loader(UserProfilePreference()),
-            visibility_loader=_visibility_loader(None, ok=False),
-        )
+async def test_profile_failure_returns_honest_unavailable_utc_payload() -> None:
+    payload = await build_preferences_summary(
+        42,
+        display_name="Tester",
+        profile_loader=_profile_loader(UserProfilePreference(), ok=False),
+        utc_clock=lambda: datetime(2026, 1, 15, 12, 0, tzinfo=UTC),
+    )
+
+    assert payload.time_reference.mode == "UTC_FALLBACK"
+    assert payload.profile_details_set == 0
+    assert payload.warnings == ("Regional profile details are temporarily unavailable.",)
+    assert "need review" in payload.settings_insight

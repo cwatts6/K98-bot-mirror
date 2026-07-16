@@ -32,10 +32,6 @@ from .governor_dashboard_service import (
     resolve_dashboard_context,
     resolve_default_dashboard_governor,
 )
-from .preference_service import (
-    PreferenceMutationResult,
-    save_inventory_visibility,
-)
 from .profile_preference_service import (
     UserProfilePreference,
     UserProfilePreferenceMutationResult,
@@ -52,7 +48,6 @@ from .service import (
     CalendarReminderStatus,
     ExportStatus,
     PlayerSelfServiceSummary,
-    PreferenceStatus,
     ReminderStatus,
     build_player_self_service_summary,
 )
@@ -83,8 +78,6 @@ __all__ = [
     "GovernorDashboardSelfView",
     "GovernorDashboardViewerMode",
     "PlayerSelfServiceSummary",
-    "PreferenceMutationResult",
-    "PreferenceStatus",
     "ReminderCentreState",
     "ReminderMessage",
     "ReminderMutationResult",
@@ -99,5 +92,4 @@ __all__ = [
     "get_dashboard_governor_options",
     "resolve_dashboard_context",
     "resolve_default_dashboard_governor",
-    "save_inventory_visibility",
 ]

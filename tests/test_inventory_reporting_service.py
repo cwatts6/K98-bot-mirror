@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, timedelta
-import logging
 import threading
 import time
 import types
@@ -11,7 +10,6 @@ from inventory.models import (
     InventoryGovernorProfile,
     InventoryReportRange,
     InventoryReportView,
-    InventoryReportVisibility,
     RegisteredGovernor,
 )
 
@@ -20,113 +18,6 @@ def test_parse_report_inputs_accept_expected_values():
     assert reporting_service.parse_report_view("Resources") == InventoryReportView.RESOURCES
     assert reporting_service.parse_report_view("All") == InventoryReportView.ALL
     assert reporting_service.parse_report_range("3M") == InventoryReportRange.THREE_MONTHS
-    assert reporting_service.parse_visibility("Only Me") == InventoryReportVisibility.ONLY_ME
-    assert (
-        reporting_service.parse_visibility("Public Output Channel")
-        == InventoryReportVisibility.PUBLIC
-    )
-
-
-@pytest.mark.asyncio
-async def test_resolve_visibility_persists_selected_preference(monkeypatch):
-    calls = []
-
-    def _upsert(user_id, visibility):
-        calls.append((user_id, visibility))
-
-    monkeypatch.setattr(
-        reporting_service.inventory_reporting_dal,
-        "upsert_visibility_preference",
-        _upsert,
-    )
-
-    visibility = await reporting_service.resolve_visibility(
-        discord_user_id=123,
-        selected_visibility=InventoryReportVisibility.PUBLIC,
-    )
-
-    assert visibility == InventoryReportVisibility.PUBLIC
-    assert calls == [(123, InventoryReportVisibility.PUBLIC)]
-
-
-@pytest.mark.asyncio
-async def test_resolve_visibility_defaults_private_when_preference_read_fails(monkeypatch):
-    def _fetch(_user_id):
-        raise RuntimeError("table missing")
-
-    monkeypatch.setattr(
-        reporting_service.inventory_reporting_dal,
-        "fetch_visibility_preference",
-        _fetch,
-    )
-
-    visibility = await reporting_service.resolve_visibility(
-        discord_user_id=123,
-        selected_visibility=None,
-    )
-
-    assert visibility == InventoryReportVisibility.ONLY_ME
-
-
-@pytest.mark.asyncio
-async def test_read_visibility_preference_reports_failure_without_defaulting(monkeypatch, caplog):
-    def _fetch(_user_id):
-        raise RuntimeError("table missing")
-
-    monkeypatch.setattr(
-        reporting_service.inventory_reporting_dal,
-        "fetch_visibility_preference",
-        _fetch,
-    )
-
-    caplog.set_level(logging.ERROR)
-    result = await reporting_service.read_visibility_preference(123)
-
-    assert result.ok is False
-    assert result.visibility is None
-    assert "RuntimeError" in (result.error or "")
-    assert "inventory_report_visibility_pref_read_failed user_id=123" in caplog.text
-    assert "defaulting" not in caplog.text
-
-
-@pytest.mark.asyncio
-async def test_resolve_visibility_falls_back_to_private_when_write_fails(monkeypatch):
-    def _upsert(_user_id, _visibility):
-        raise RuntimeError("db error")
-
-    monkeypatch.setattr(
-        reporting_service.inventory_reporting_dal,
-        "upsert_visibility_preference",
-        _upsert,
-    )
-
-    visibility = await reporting_service.resolve_visibility(
-        discord_user_id=123,
-        selected_visibility=InventoryReportVisibility.PUBLIC,
-    )
-
-    assert visibility == InventoryReportVisibility.ONLY_ME
-
-
-@pytest.mark.asyncio
-async def test_write_visibility_preference_reports_failure(monkeypatch):
-    def _upsert(_user_id, _visibility):
-        raise RuntimeError("db error")
-
-    monkeypatch.setattr(
-        reporting_service.inventory_reporting_dal,
-        "upsert_visibility_preference",
-        _upsert,
-    )
-
-    result = await reporting_service.write_visibility_preference(
-        123,
-        InventoryReportVisibility.ONLY_ME,
-    )
-
-    assert result.ok is False
-    assert result.visibility is None
-    assert "RuntimeError" in (result.error or "")
 
 
 @pytest.mark.asyncio

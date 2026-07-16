@@ -7,13 +7,11 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from io import BytesIO
 import logging
-from types import SimpleNamespace
 from typing import Any
 
 import discord
 
 from core.interaction_safety import safe_defer
-from inventory import reporting_service
 from player_self_service import (
     account_service,
     accounts_renderer,
@@ -38,10 +36,6 @@ from player_self_service.service import (
     build_player_self_service_summary,
 )
 from ui.views import player_self_service_export_views as export_views
-from ui.views.inventory_report_views import (
-    send_inventory_preference_prompt,
-    start_myinventory_command,
-)
 from ui.views.player_self_service_account_views import AccountManageView
 from ui.views.player_self_service_preference_views import (
     PreferencesJourneyState,
@@ -64,7 +58,6 @@ PAGE_ACCOUNTS = "accounts"
 PAGE_REMINDERS = "reminders"
 PAGE_PREFERENCES = "preferences"
 PAGE_EXPORTS = "exports"
-PAGE_INVENTORY = "inventory"
 
 
 def _display_name(user: object) -> str:
@@ -116,7 +109,7 @@ def build_dashboard_embed(
     )
     accounts = summary.accounts
     reminders = summary.reminders
-    preferences = summary.preferences
+    exports = summary.exports
 
     embed.add_field(
         name="Accounts",
@@ -143,17 +136,17 @@ def build_dashboard_embed(
         inline=False,
     )
     embed.add_field(
-        name="Preferences",
+        name="Exports",
         value=_field_value(
             [
-                f"Inventory visibility: {preferences.inventory_visibility}",
-                f"Exports: {preferences.exports_summary}",
-                f"Next action: {preferences.next_action}",
+                f"Stats: {exports.stats_export}",
+                f"Inventory: {exports.inventory_export}",
+                f"Next action: {exports.action_summary}",
             ]
         ),
         inline=False,
     )
-    embed.set_footer(text="Private player setup. Legacy commands remain available.")
+    embed.set_footer(text="Private player self-service.")
     return embed
 
 
@@ -352,15 +345,17 @@ def build_reminders_embed(
 def build_preferences_embed(
     payload: PreferencesSummaryPayload,
 ) -> discord.Embed:
-    visibility = payload.inventory_visibility
     profile = payload.regional_profile
     embed = discord.Embed(
         title="Personal Settings",
         description=f"Private settings for {payload.display_name}",
-        color=discord.Color.gold() if visibility.is_public else discord.Color.teal(),
+        color=discord.Color.teal(),
     )
     embed.add_field(
-        name=f"{visibility.state_label} • {payload.profile_supporting_text}",
+        name=(
+            f"{'LOCAL' if payload.time_reference.mode == 'LOCAL' else 'UTC'} "
+            f"• {payload.profile_supporting_text}"
+        ),
         value=_field_value(
             [
                 f"{payload.time_reference.heading}: {payload.time_reference.display_time}",
@@ -373,18 +368,13 @@ def build_preferences_embed(
         inline=False,
     )
     embed.add_field(
-        name=f"Inventory visibility: {visibility.state_label}",
-        value=visibility.consequence_text,
-        inline=False,
-    )
-    embed.add_field(
         name="Settings insight",
         value=payload.settings_insight,
         inline=False,
     )
     embed.add_field(
         name="Manage settings",
-        value="Update your regional profile and Inventory privacy.",
+        value="Update your saved timezone, location, and preferred language.",
         inline=False,
     )
     embed.set_footer(text=f"Refreshed {payload.generated_at_utc:%d %B %Y %H:%M UTC}")
@@ -425,41 +415,6 @@ def build_exports_embed(
     return embed
 
 
-def build_inventory_embed(
-    summary: PlayerSelfServiceSummary,
-    *,
-    display_name: str,
-) -> discord.Embed:
-    inventory = summary.inventory
-    embed = discord.Embed(
-        title="Inventory",
-        description=f"Private inventory summary for {display_name}",
-        color=discord.Color.blue(),
-    )
-    embed.add_field(
-        name="Latest Approved Data",
-        value=_field_value(
-            [
-                f"Resources: {inventory.resources.value} ({inventory.resources.detail})",
-                f"Speedups: {inventory.speedups.value} ({inventory.speedups.detail})",
-                f"Materials: {inventory.materials.value} ({inventory.materials.detail})",
-            ]
-        ),
-        inline=False,
-    )
-    embed.add_field(
-        name="Status",
-        value=_field_value([inventory.account_summary, inventory.upload_guidance]),
-        inline=False,
-    )
-    embed.add_field(
-        name="Actions",
-        value="Open Report shows the report picker with ranges and export buttons.",
-        inline=False,
-    )
-    return embed
-
-
 def build_page_embed(
     page: PlayerSelfServicePage,
     summary: PlayerSelfServiceSummary | None,
@@ -484,8 +439,6 @@ def build_page_embed(
         return build_reminders_embed(summary, display_name=display_name)
     if page == PAGE_EXPORTS:
         return build_exports_embed(summary, display_name=display_name)
-    if page == PAGE_INVENTORY:
-        return build_inventory_embed(summary, display_name=display_name)
     return build_dashboard_embed(summary, display_name=display_name)
 
 
@@ -784,19 +737,9 @@ class PlayerSelfServiceView(discord.ui.View):
                     "me:export:"
                 ):
                     self.remove_item(child)
-        if self.page != PAGE_INVENTORY:
-            for child in list(self.children):
-                if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
-                    "me:inventory:"
-                ):
-                    self.remove_item(child)
         if self.page == PAGE_EXPORTS:
             self._apply_export_button_state()
         self._apply_visible_action_rows()
-        if self.page in {PAGE_ACCOUNTS, PAGE_REMINDERS, PAGE_PREFERENCES}:
-            for child in list(self.children):
-                if isinstance(child, discord.ui.Button) and child.custom_id == "me:inventory":
-                    self.remove_item(child)
         for child in self.children:
             if isinstance(child, discord.ui.Button):
                 if str(child.custom_id or "").startswith("me:export:"):
@@ -818,7 +761,6 @@ class PlayerSelfServiceView(discord.ui.View):
             "me:reminder:",
             "me:preference:",
             "me:export:",
-            "me:inventory:",
         )
         for child in self.children:
             if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
@@ -1062,19 +1004,6 @@ class PlayerSelfServiceView(discord.ui.View):
         await self._show_page(interaction, PAGE_DASHBOARD)
 
     @discord.ui.button(
-        label="Inventory",
-        style=discord.ButtonStyle.secondary,
-        custom_id="me:inventory",
-        row=1,
-    )
-    async def dashboard_inventory_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        await self._show_page(interaction, PAGE_INVENTORY)
-
-    @discord.ui.button(
         label="Exports",
         style=discord.ButtonStyle.secondary,
         custom_id="me:exports",
@@ -1118,74 +1047,6 @@ class PlayerSelfServiceView(discord.ui.View):
             interaction,
             display_name=self.display_name,
         )
-
-    @discord.ui.button(
-        label="Open Report",
-        style=discord.ButtonStyle.success,
-        custom_id="me:inventory:report",
-        row=2,
-    )
-    async def inventory_report_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        await self._show_inventory_report_options(interaction)
-
-    async def _show_inventory_report_options(self, interaction: discord.Interaction) -> None:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
-        except TypeError:
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.defer()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.debug("player_self_service_inventory_defer_failed", exc_info=True)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.debug("player_self_service_inventory_defer_failed", exc_info=True)
-
-        ctx_adapter: Any = SimpleNamespace(user=interaction.user, followup=interaction.followup)
-        try:
-            visibility = await reporting_service.get_visibility_preference_or_none(self.author_id)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception(
-                "player_self_service_inventory_visibility_failed user_id=%s",
-                self.author_id,
-            )
-            await interaction.followup.send(
-                "Inventory reporting preferences are not available yet. Please contact an admin.",
-                ephemeral=True,
-            )
-            return
-
-        if visibility is None:
-            await send_inventory_preference_prompt(ctx_adapter)
-            return
-
-        try:
-            await start_myinventory_command(ctx=ctx_adapter, visibility=visibility)
-        except PermissionError as exc:
-            await interaction.followup.send(str(exc), ephemeral=True)
-        except ValueError as exc:
-            await interaction.followup.send(str(exc), ephemeral=True)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception(
-                "player_self_service_inventory_report_failed user_id=%s",
-                self.author_id,
-            )
-            await interaction.followup.send(
-                "Inventory report generation failed. Please try again or contact an admin.",
-                ephemeral=True,
-            )
 
     async def _load_account_state(
         self, interaction: discord.Interaction

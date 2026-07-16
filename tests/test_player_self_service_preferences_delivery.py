@@ -9,7 +9,6 @@ import pytest
 
 from player_self_service.preferences_renderer import RenderedPreferencesCard
 from player_self_service.preferences_summary import (
-    InventoryVisibilitySummary,
     PreferencesSummaryPayload,
     PreferenceValueSummary,
     RegionalProfileSummary,
@@ -25,12 +24,6 @@ def _payload() -> PreferencesSummaryPayload:
         display_name="Tester",
         kingdom_id=1198,
         generated_at_utc=datetime(2026, 7, 15, 12, 0, tzinfo=UTC),
-        inventory_visibility=InventoryVisibilitySummary(
-            is_public=False,
-            state_label="PRIVATE",
-            consequence_text="Detailed Inventory reports are shown only to you.",
-            is_explicit=True,
-        ),
         regional_profile=RegionalProfileSummary(value, value, value),
         time_reference=TimeReferenceSummary(
             mode="UTC_FALLBACK",

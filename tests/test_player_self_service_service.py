@@ -1,24 +1,13 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import inspect
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
 from event_calendar.reminder_config_service import CalendarReminderConfigState
-from inventory import reporting_service
-from inventory.models import (
-    InventoryMaterialPoint,
-    InventoryReportVisibility,
-    InventoryResourcePoint,
-    InventorySpeedupPoint,
-)
 from player_self_service import service
-from player_self_service.profile_preference_service import (
-    UserProfilePreference,
-    UserProfilePreferenceRead,
-)
 from services.governor_account_service import summarize_accounts
 
 
@@ -76,180 +65,6 @@ def test_export_status_is_actionable_for_registered_accounts() -> None:
     assert export_status.action_state == "actionable"
     assert export_status.stats_export == "Excel / CSV / Google Sheets"
     assert export_status.action_summary == "Ready"
-
-
-def test_inventory_snapshot_summary_handles_approved_data() -> None:
-    scan = datetime(2026, 6, 25, 12, 0, tzinfo=UTC)
-    snapshot = reporting_service.LatestInventorySnapshot(
-        governors=(
-            service.RegisteredGovernor(111, "Main Gov", "Main"),
-            service.RegisteredGovernor(222, "Alt Gov", "Alt 1"),
-        ),
-        resources=(InventoryResourcePoint(scan_utc=scan, food=100, wood=200, stone=300, gold=400),),
-        speedups=(
-            InventorySpeedupPoint(
-                scan_utc=scan,
-                building_days=1,
-                research_days=2,
-                training_days=3,
-                healing_days=4,
-                universal_days=5,
-            ),
-        ),
-        materials=(
-            InventoryMaterialPoint(
-                scan_utc=scan,
-                animal_bone_legendary=1,
-                leather_legendary=2,
-                ebony_legendary=3,
-                iron_ore_legendary=4,
-                choice_chest_legendary=5,
-            ),
-        ),
-    )
-
-    status = service.summarize_inventory_snapshot(snapshot, upload_channel_id=123)
-
-    assert status.state == "partial"
-    assert status.account_summary == "Approved inventory data for 1/2 registered governor(s)."
-    assert status.resources.value == "1K RSS"
-    assert status.resources.detail == "1/2 governors | latest 2026-06-25"
-    assert status.speedups.value == "15d total"
-    assert status.materials.value == "15 legendary"
-    assert "<#123>" in status.upload_guidance
-
-
-def test_inventory_snapshot_summary_requires_complete_category_coverage() -> None:
-    scan = datetime(2026, 6, 25, 12, 0, tzinfo=UTC)
-    snapshot = reporting_service.LatestInventorySnapshot(
-        governors=(
-            service.RegisteredGovernor(111, "Main Gov", "Main"),
-            service.RegisteredGovernor(222, "Alt Gov", "Alt 1"),
-        ),
-        resources=(
-            InventoryResourcePoint(scan_utc=scan, food=100, wood=200, stone=300, gold=400),
-            InventoryResourcePoint(scan_utc=scan, food=200, wood=300, stone=400, gold=500),
-        ),
-        speedups=(
-            InventorySpeedupPoint(
-                scan_utc=scan,
-                building_days=1,
-                research_days=2,
-                training_days=3,
-                healing_days=4,
-                universal_days=5,
-            ),
-            InventorySpeedupPoint(
-                scan_utc=scan,
-                building_days=2,
-                research_days=3,
-                training_days=4,
-                healing_days=5,
-                universal_days=6,
-            ),
-        ),
-        materials=(
-            InventoryMaterialPoint(
-                scan_utc=scan,
-                animal_bone_legendary=1,
-                leather_legendary=2,
-                ebony_legendary=3,
-                iron_ore_legendary=4,
-                choice_chest_legendary=5,
-            ),
-            InventoryMaterialPoint(
-                scan_utc=scan,
-                animal_bone_legendary=2,
-                leather_legendary=3,
-                ebony_legendary=4,
-                iron_ore_legendary=5,
-                choice_chest_legendary=6,
-            ),
-        ),
-    )
-
-    status = service.summarize_inventory_snapshot(snapshot, upload_channel_id=123)
-
-    assert status.state == "available"
-    assert (
-        status.account_summary == "2 registered governor(s) with complete approved inventory data."
-    )
-    assert status.resources.detail == "2/2 governors | latest 2026-06-25"
-
-
-def test_inventory_snapshot_summary_uses_conservative_partial_coverage() -> None:
-    scan = datetime(2026, 6, 25, 12, 0, tzinfo=UTC)
-    snapshot = reporting_service.LatestInventorySnapshot(
-        governors=(
-            service.RegisteredGovernor(111, "Main Gov", "Main"),
-            service.RegisteredGovernor(222, "Alt Gov", "Alt 1"),
-        ),
-        resources=(
-            InventoryResourcePoint(scan_utc=scan, food=100, wood=200, stone=300, gold=400),
-            InventoryResourcePoint(scan_utc=scan, food=200, wood=300, stone=400, gold=500),
-        ),
-        speedups=(
-            InventorySpeedupPoint(
-                scan_utc=scan,
-                building_days=1,
-                research_days=2,
-                training_days=3,
-                healing_days=4,
-                universal_days=5,
-            ),
-        ),
-        materials=(
-            InventoryMaterialPoint(
-                scan_utc=scan,
-                animal_bone_legendary=1,
-                leather_legendary=2,
-                ebony_legendary=3,
-                iron_ore_legendary=4,
-                choice_chest_legendary=5,
-            ),
-            InventoryMaterialPoint(
-                scan_utc=scan,
-                animal_bone_legendary=2,
-                leather_legendary=3,
-                ebony_legendary=4,
-                iron_ore_legendary=5,
-                choice_chest_legendary=6,
-            ),
-        ),
-    )
-
-    status = service.summarize_inventory_snapshot(snapshot, upload_channel_id=123)
-
-    assert status.state == "partial"
-    assert status.account_summary == "Approved inventory data for 1/2 registered governor(s)."
-    assert status.next_action == "Open Report"
-
-
-def test_inventory_snapshot_summary_handles_no_approved_data() -> None:
-    snapshot = reporting_service.LatestInventorySnapshot(
-        governors=(service.RegisteredGovernor(111, "Main Gov", "Main"),),
-    )
-
-    status = service.summarize_inventory_snapshot(snapshot, upload_channel_id=None)
-
-    assert status.state == "empty"
-    assert status.next_action == "Open Report"
-    assert status.resources.value == "No approved data"
-    assert "`/inventory import`" in status.upload_guidance
-
-
-@pytest.mark.asyncio
-async def test_inventory_status_does_not_fetch_without_accounts() -> None:
-    async def snapshot_loader(_governors):
-        raise AssertionError("should not fetch inventory without registered governors")
-
-    status = await service.summarize_inventory_status(
-        summarize_accounts({}),
-        snapshot_loader=snapshot_loader,
-    )
-
-    assert status.state == "none"
-    assert status.next_action == "Register account"
 
 
 def test_reminder_status_for_unsubscribed_player_is_off() -> None:
@@ -332,63 +147,6 @@ def test_reminder_status_combined_next_action_handles_incomplete_calendar() -> N
 
 
 @pytest.mark.asyncio
-async def test_preference_status_reads_private_public_unset_and_failure() -> None:
-    async def profile_loader(_uid):
-        return UserProfilePreferenceRead(
-            ok=True,
-            profile=UserProfilePreference(
-                timezone_name="Europe/London",
-                location_country_code="GB",
-                preferred_language_tag="en-GB",
-            ),
-        )
-
-    async def private_loader(_uid):
-        return SimpleNamespace(ok=True, visibility=InventoryReportVisibility.ONLY_ME)
-
-    async def public_loader(_uid):
-        return SimpleNamespace(ok=True, visibility=InventoryReportVisibility.PUBLIC)
-
-    async def unset_loader(_uid):
-        return SimpleNamespace(ok=True, visibility=None)
-
-    async def failed_loader(_uid):
-        return SimpleNamespace(ok=False, error="db unavailable")
-
-    assert (
-        await service.summarize_preference_status(
-            1,
-            preference_loader=private_loader,
-            profile_preference_loader=profile_loader,
-        )
-    ).inventory_visibility == "private"
-    public = await service.summarize_preference_status(
-        1,
-        preference_loader=public_loader,
-        profile_preference_loader=profile_loader,
-    )
-    assert public.inventory_visibility == "public"
-    assert public.timezone == "Europe/London"
-    assert public.location_country == "United Kingdom (GB)"
-    assert public.preferred_language == "English (en-GB)"
-    assert (
-        await service.summarize_preference_status(
-            1,
-            preference_loader=unset_loader,
-            profile_preference_loader=profile_loader,
-        )
-    ).inventory_visibility == "not set"
-
-    failed = await service.summarize_preference_status(
-        1,
-        preference_loader=failed_loader,
-        profile_preference_loader=profile_loader,
-    )
-    assert failed.inventory_visibility == "unknown"
-    assert failed.next_action == "Try again"
-
-
-@pytest.mark.asyncio
 async def test_build_summary_uses_read_only_loaders() -> None:
     calls = []
 
@@ -399,29 +157,6 @@ async def test_build_summary_uses_read_only_loaders() -> None:
     def reminder_loader(user_id):
         calls.append(("reminder", user_id))
         return {"subscriptions": ["all"], "reminder_times": ["24h"]}
-
-    async def preference_loader(user_id):
-        calls.append(("preference", user_id))
-        return SimpleNamespace(ok=True, visibility=InventoryReportVisibility.PUBLIC)
-
-    async def profile_preference_loader(user_id):
-        calls.append(("profile_preference", user_id))
-        return UserProfilePreferenceRead(
-            ok=True,
-            profile=UserProfilePreference(
-                timezone_name="Europe/London",
-                location_country_code="GB",
-                preferred_language_tag="en-GB",
-            ),
-        )
-
-    async def vip_profile_loader(governor_id):
-        calls.append(("vip", governor_id))
-        return SimpleNamespace(vip_level_label="VIP 19")
-
-    async def inventory_snapshot_loader(governors):
-        calls.append(("inventory", tuple(item.governor_id for item in governors)))
-        return reporting_service.LatestInventorySnapshot(governors=tuple(governors))
 
     def calendar_reminder_loader(user_id):
         calls.append(("calendar_reminder", user_id))
@@ -445,54 +180,24 @@ async def test_build_summary_uses_read_only_loaders() -> None:
         calendar_reminder_loader=calendar_reminder_loader,
         calendar_event_catalog_loader=calendar_event_catalog_loader,
         utc_clock=lambda: datetime(2026, 7, 14, 15, 30, tzinfo=UTC),
-        preference_loader=preference_loader,
-        profile_preference_loader=profile_preference_loader,
-        vip_profile_loader=vip_profile_loader,
-        inventory_snapshot_loader=inventory_snapshot_loader,
     )
 
     assert summary.discord_user_id == 42
     assert summary.accounts.main_state == "set"
     assert summary.reminders.state == "on"
-    assert summary.preferences.inventory_visibility == "public"
     assert ("account", 42) in calls
     assert ("reminder", 42) in calls
     assert ("calendar_reminder", 42) in calls
     assert ("calendar_catalog", None) in calls
-    assert ("preference", 42) in calls
-    assert ("profile_preference", 42) in calls
-    assert ("vip", 111) in calls
-    assert ("inventory", (111,)) in calls
-    assert summary.preferences.vip_summary == "Main Gov - 19"
-    assert summary.preferences.location_country == "United Kingdom (GB)"
+    assert not {"preference", "profile_preference", "vip", "inventory"}.intersection(
+        name for name, _value in calls
+    )
     assert summary.reminders.calendar.state == "on"
     assert summary.reminders_summary is not None
     assert summary.reminders_summary.configuration_state.value == "ACTIVE"
     assert summary.reminders_summary.calendar.event_summary == "Raid"
     assert summary.reminders_summary.generated_at_utc == datetime(2026, 7, 14, 15, 30, tzinfo=UTC)
     assert summary.exports.action_state == "actionable"
-    assert summary.inventory.state == "empty"
-
-
-@pytest.mark.asyncio
-async def test_vip_summary_lists_registered_account_levels() -> None:
-    account_summary = summarize_accounts(
-        {
-            "Main": {"GovernorID": "111", "GovernorName": "Main Gov"},
-            "Alt 1": {"GovernorID": "222", "GovernorName": "Alt Gov"},
-        }
-    )
-
-    async def vip_profile_loader(governor_id):
-        labels = {111: "VIP 19", 222: "Unknown / not set"}
-        return SimpleNamespace(vip_level_label=labels[governor_id])
-
-    summary = await service.summarize_vip_status(
-        account_summary,
-        profile_loader=vip_profile_loader,
-    )
-
-    assert summary == "Main Gov - 19, Alt Gov - not set"
 
 
 def test_player_self_service_service_has_no_ui_framework_dependency() -> None:
@@ -501,3 +206,12 @@ def test_player_self_service_service_has_no_ui_framework_dependency() -> None:
 
     assert f"import {framework_name}" not in source
     assert f"{framework_name}." not in source
+
+
+def test_generic_summary_exposes_no_obsolete_inventory_or_visibility_loaders() -> None:
+    parameters = inspect.signature(service.build_player_self_service_summary).parameters
+
+    assert "preference_loader" not in parameters
+    assert "profile_preference_loader" not in parameters
+    assert "vip_profile_loader" not in parameters
+    assert "inventory_snapshot_loader" not in parameters

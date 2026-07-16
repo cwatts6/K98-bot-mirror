@@ -15,9 +15,10 @@ Speedups, Materials, and honest no-data reports. The shared 1400x980 renderer us
 report-specific production backdrops, restored item icons, the invoking player's best-effort
 Discord avatar, fitted typography, up to six genuine upload-date labels, and density-aware markers
 for every plotted upload. The 2800x1960 masters remain source-only. Private direct `/me` reports
-and legacy `/myinventory` intentionally share the visual refresh while data, calculations,
-visibility, controls, exports, filenames, fallback, attachment lifecycle, and every interaction
-contract remain unchanged. The completed Phase 5B task pack and starter are archived.
+and the then-live legacy `/myinventory` route shared that visual refresh. Phase 5F subsequently
+retires the legacy route while preserving the accepted renderer, data, calculations, controls,
+exports, filenames, fallback, and attachment lifecycle. The completed Phase 5B task pack and
+starter are archived.
 
 Phase 5C Premium Accounts Summary Card is complete and operator accepted in mirror PR #221 and
 production PR #528. `/me accounts` resolves every linked registry entry through set-based Kingdom
@@ -50,17 +51,27 @@ tracker, rehydration, retry, command, Calendar, persistence, and DM contracts re
 from the separately authorised KVK at-start eligibility correction. The completed task pack and
 starter are archived.
 
-Phase 5E Premium Preferences Summary Card is in implementation and local validation. `/me
-preferences` is the private Discord-user-level Personal Settings centre with an avatar-enabled
+Phase 5E Premium Preferences Summary Card is complete, operator accepted, merged in mirror PR #224
+and production PR #531, and deployed on 2026-07-16. `/me preferences` is now the private Discord-
+user-level Personal Settings centre with the invoking user's top-left avatar on an approved
 1702x924 standalone card, DST-aware local-time context, regional-profile coverage, truthful
-Inventory privacy copy, deterministic insight, one in-place `Manage settings` journey, and a
-same-payload fallback. Preferences has no Inventory navigation, VIP content, direct visibility
-toggle, or parent `Change Governor`. Inventory visibility keeps its existing service/persistence
-contract with confirmation-time revalidation. `Update VIP` now belongs to the existing Manage
-Accounts task selector and explicitly resolves a currently linked governor before the unchanged VIP
-service rechecks access and writes. Profile saves use a narrow atomic field-specific DAL upsert so
-concurrent edits to different fields do not overwrite one another. No SQL repository object, schema,
-migration, procedure, view, index, data, default, or preference meaning changes in Phase 5E.
+Inventory privacy copy, deterministic insight, one in-place `Manage settings` journey, and a same-
+payload fallback. `Update VIP` now belongs to the existing
+Manage Accounts task selector and explicitly resolves a currently linked governor before the
+unchanged VIP service rechecks access and writes. Profile saves use a narrow atomic field-specific
+DAL upsert so concurrent edits to different fields do not overwrite one another. No SQL repository
+object, schema, migration, procedure, view, index, data, default, or preference meaning changed.
+The completed Phase 5E task pack and starter are archived.
+
+GovernorOS v2 Phase 5F supersedes Phase 5E's Inventory-privacy ownership and the proposed Premium
+Inventory Summary Card. The implementation retires `/me inventory`, `/myinventory`, and
+`/inventory_preferences` together; removes public Inventory reporting, combined `All` viewing, the
+visibility model/service/DAL, the orphaned legacy controller, and the old summary backdrop; and
+simplifies Personal Settings to regional profile plus derived `LOCAL`/`UTC` context. It preserves
+the selected-governor dashboard, `/me resources`, `/me speedups`, `/me materials`, private report
+tabs/ranges/exports, private `All` Inventory export under `/me exports`, `/inventory import`,
+`/inventory audit`, and `/export_inventory`. `dbo.InventoryReportPreference` and existing rows remain
+untouched for rollback; there is no SQL deployment in Phase 5F.
 
 ## Quality Automation
 

@@ -1,14 +1,20 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
-GovernorOS v2 Phase 5D.1 is complete and operator accepted in mirror PR #223 and production
-PR #530 after final Discord smoke on 2026-07-15. Phase 5E Premium Preferences Summary Card is in
-implementation and local validation. It turns `/me preferences` into the private Personal Settings
-centre for the three-field regional profile, DST-aware local-time context, and Inventory privacy;
-uses the approved Governor's Accord backdrop and invoking-user avatar; removes Inventory navigation
-and all VIP content from Preferences; and moves the unchanged governor-specific VIP editor to
-Manage Accounts -> Update VIP with explicit governor resolution and a current-access recheck.
+GovernorOS v2 Phases 1-5E are complete and operator accepted. Phase 5E shipped in mirror PR #224
+and production PR #531 and was deployed on 2026-07-16. Phase 5F supersedes the proposed Premium
+Inventory Summary Card and Phase 5E's Inventory-privacy ownership. Its coordinated bot release
+retires `/me inventory`, `/myinventory`, and `/inventory_preferences`; removes public Inventory
+posting and combined `All` viewing; and simplifies `/me preferences` to the three-field regional
+profile plus derived DST-aware `LOCAL`/`UTC` context. The selected-governor dashboard and private
+`/me resources`, `/me speedups`, and `/me materials` reports are the definitive viewing UX.
+Private `All` Inventory export remains under `/me exports`. `/inventory import`, `/inventory audit`,
+and `/export_inventory` remain registered. No SQL change or deployment is part of Phase 5F;
+`dbo.InventoryReportPreference` remains untouched for rollback.
+
+The following earlier phase notes remain as historical delivery context where they describe the
+state accepted at that time; Phase 5F's current surface above supersedes their legacy-route wording.
 
 GovernorOS v2 status: Phase 4 Premium Governor Dashboard Renderer is complete and operator smoke
 passed on 2026-07-11. `/me dashboard` is governor-first: no linked governor shows setup
@@ -94,21 +100,24 @@ labels and absolute UTC times, highlights the event start, and never claims that
 has occurred. The same Manage journey can open Calendar Settings for calendar reminder event types
 and lead times.
 `/me preferences` shows Personal Settings for saved timezone, location country, preferred-language
-metadata, a DST-aware local-time reference, and Inventory privacy. One Manage settings journey
-updates regional fields or changes Inventory visibility after explicit confirmation. Inventory
-visibility controls whether detailed `/me inventory` and `/myinventory` reports may post in the
-channel; private direct `/me resources`, `/me materials`, and `/me speedups` remain private. VIP is
-managed from Manage Accounts -> Update VIP, not from Preferences.
-`/me inventory` shows a private summary of latest approved resources, speedups, and materials for
-your registered governors. If no approved inventory data exists yet, it points you toward the
-inventory upload process. Open Report keeps the existing inventory report picker, range controls,
-visibility behavior, and export buttons.
+metadata, and a DST-aware local-time reference. Its header is `LOCAL` when the saved timezone is
+usable and `UTC` otherwise. One Manage settings action opens Regional Profile directly; the field
+catalogs, paging, atomic save/clear, Back navigation, timeout, avatar, fallback, and cleanup remain.
+There is no Inventory visibility or Privacy & Sharing setting. VIP remains managed from Manage
+Accounts -> Update VIP.
+Use the selected-governor dashboard buttons or `/me resources`, `/me speedups`, and `/me materials`
+for private detailed Inventory viewing. Reports retain tabs, 1M/3M/6M/12M ranges, private exports,
+Dashboard return, Change Governor paging, honest no-data guidance, fallback, and cleanup. There is
+no public Inventory report path and no combined `All` viewing page.
 `/me exports` can open private option windows for Stats and Inventory exports. Stats exports
 support Excel, CSV, and Google Sheets formats plus 30, 60, 90, 180, and 360 day windows,
 defaulting to Excel and 90 days. Inventory exports support format, view, registered-governor
-scope, and day-window choices using the existing inventory export defaults. Older direct commands for accounts, reminders, preferences, and exports now point privately to the matching `/me` centre. `/myinventory`, `/my_stats`, `/stats player`, `/player_profile`, and `/mykvkcrystaltech` remain live.
+scope, and day-window choices using the existing inventory export defaults, including private `All`
+scope. Older direct commands for accounts, reminders, and exports point privately to the matching
+`/me` centre. `/my_stats`, `/stats player`, `/player_profile`, and `/mykvkcrystaltech` remain live;
+`/myinventory` and `/inventory_preferences` are retired by Phase 5F.
 
-Phase 13 player message draft:
+Historical Phase 13 player message draft:
 
 ```text
 Personal setup is moving to /me dashboard.
@@ -121,8 +130,10 @@ No command has been removed from Discord yet. Please report anything you still n
 
 ## Operator Briefing
 
-Phase 10 adds `/me inventory` as the sixth private `/me` subcommand and makes dashboard Inventory
-open that generated summary card instead of jumping directly into the report selector. Phase 13 redirects approved legacy account, reminder, preference, and export commands to `/me` while preserving command registrations. It does not remove `/myinventory`, `/my_stats`, `/stats player`, `/player_profile`, or `/mykvkcrystaltech`.
+Phase 5F removes the Phase 10 `/me inventory` summary and the Phase 13
+`/inventory_preferences` redirect together with `/myinventory`. The final approved `/me` group is
+Dashboard, Accounts, Reminders, Preferences, Resources, Speedups, Materials, and Exports. Remaining
+legacy stats/profile commands are outside Phase 5F.
 
 The approved command group is:
 
@@ -131,15 +142,19 @@ The approved command group is:
 /me accounts
 /me reminders
 /me preferences
-/me inventory
+/me resources
+/me speedups
+/me materials
 /me exports
 ```
 
 Expected command-registration impact:
 
 ```text
-primary=41
-grouped_subcommands_detected=86
+primary=40
+grouped_subcommands_detected=100
+/me grouped subcommands=8
+/inventory grouped subcommands=2
 ```
 
 Rollout checks:
@@ -147,13 +162,13 @@ Rollout checks:
 - Confirm `/me dashboard` is private and shows the full-bleed generated card when rendering succeeds.
 - Confirm dashboard falls back to the private embed if image rendering or delivery fails.
 - Confirm the card is readable on desktop, mobile, and iPad.
-- Confirm account, reminder, preference, inventory, and export pages remain private.
-- Confirm account, reminder, preference, inventory, and export pages render generated cards or safe
-  fallback embeds.
-- Confirm `/me preferences` saves inventory report visibility through the existing service-backed
-  path.
-- Confirm `/me preferences` can open the existing Governor VIP update flow and that VIP writes
-  remain owned by the inventory profile service path.
+- Confirm account, reminder, preference, and export pages remain private.
+- Confirm account, reminder, preference, and export pages render generated cards or safe fallback
+  embeds.
+- Confirm `/me preferences` renders `LOCAL` or `UTC` from the existing time-reference result and
+  contains no Inventory visibility or Privacy & Sharing content.
+- Confirm Manage settings opens Regional Profile directly and Update VIP remains under Manage
+  Accounts.
 - Confirm `/me preferences` can add, update, remove, and reload timezone, location country, and
   preferred language through the SQL-backed Discord-user profile preference store.
 - Confirm Manage Profile uses dropdowns rather than free-text entry for timezone, location
@@ -174,27 +189,25 @@ Rollout checks:
 - Confirm Cancel closes each export option window without sending a file.
 - Confirm `/me exports` clearly disables or reports unavailable export actions when account data,
   linked accounts, or approved export data are unavailable.
-- Confirm `/me dashboard` has Inventory and Exports buttons, not the old KVK Quick Launch menu.
-- Confirm dashboard Inventory opens the private `/me inventory` summary card.
-- Confirm `/me inventory` uses `assets/me/cards/me inventory.png` and falls back to a private
-  embed if image rendering or delivery fails.
-- Confirm `/me inventory` shows resources, speedups, and materials values from latest approved
-  data where available.
-- Confirm `/me inventory` no-account and no-approved-data states do not leak other player data and
-  point players toward the inventory upload process.
-- Confirm `/me inventory` Open Report opens the same private `/myinventory` selector/report
-  journey and preserves the player's inventory report visibility setting.
+- Confirm `/me dashboard` shows selected-governor RSS, Speedups, and Materials buttons plus Exports,
+  with no legacy Inventory summary button.
+- Confirm each direct `/me` report remains private and retains tabs, ranges, Dashboard return,
+  Change Governor, no-data guidance, exports, fallback, and cleanup.
+- Confirm `/me exports` retains Resources, Speedups, Materials, and `All` Inventory export scopes.
+- Confirm `/me inventory`, `/myinventory`, and `/inventory_preferences` are absent after command
+  resync and no public Inventory report can be produced.
+- Confirm `/inventory import`, `/inventory audit`, and `/export_inventory` remain registered.
 - Confirm `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` remain invoked through
   their existing command paths and channel rules.
 - Confirm `/my_stats_export` and `/export_inventory` return private guidance to `/me exports`, and confirm `/me exports` still produces files with the existing option windows.
-- Confirm legacy player commands remain registered and return the approved private redirect
-  guidance.
+- Confirm remaining legacy player commands stay registered and return approved private redirect
+  guidance where applicable.
 - Monitor redirect usage and `/me` usage before approving any final command-registration removal.
 - For Phase 13, the operator-provided SQL extract and dated JSONL files were reviewed before
   rollout. They showed legacy direct-command dependency, so final command-registration removal
   still requires a fresh post-briefing production usage snapshot and no-feedback monitoring.
-- Preserve `/myinventory`, `/my_stats`, `/mykvkcrystaltech`, `/player_profile`, and
-  `/stats player` unless a separate explicit approval covers those paths.
+- Preserve `/my_stats`, `/mykvkcrystaltech`, `/player_profile`, and `/stats player`; their removal is
+  outside Phase 5F.
 
 Phase 2 smoke-test result:
 
@@ -547,21 +560,16 @@ Current status:
   default KVK snapshot uses the same injected UTC clock as projection; the final card highlights
   `Event starts` in bold gold. Mirror PR #223 and production PR #530 carry the reviewed delivery,
   and the completed task pack/starter are archived.
-- Phase 5E Preferences is in implementation/local validation using the approved 1702x924
-  Governor's Accord backdrop, invoking-user avatar, standalone private attachment, same-payload
-  fallback, and graceful timeout. Preferences is Discord-user scoped; retained Dashboard governor
-  context is return-only and never filters the page, sets local time, or preselects VIP. The main
-  page removes Inventory navigation and old direct actions in favour of one Manage settings child
-  journey. Profile values retain existing validation/null semantics and now use an atomic
-  field-specific DAL upsert; no SQL repo object or schema changes. Inventory visibility retains its
-  existing persistence meaning with explicit confirmation and stale-state revalidation. Update VIP
-  moves to Manage Accounts with an explicit linked-governor selector and unchanged access recheck,
-  labels, not-set meaning, persistence, and host refresh.
-- Phases 5F-5G independently apply the same format and transition contract to Inventory summary
-  and Exports summary. They preserve current page actions,
-  disabled states, privacy, payloads, filenames, attachment cleanup, and service ownership; none
-  shows Change Governor. Governor-specific child actions must perform their own explicit selection
-  and access recheck rather than treating retained return context as a page filter.
+- Phase 5E Preferences is complete, accepted, and deployed from mirror PR #224 and production
+  PR #531. Phase 5F supersedes only its Inventory-privacy panel/journey while preserving the
+  accepted 1702x924 backdrop, invoking-user avatar, standalone private attachment, same-payload
+  fallback, graceful timeout, profile catalogs, atomic save/clear, and Accounts-owned VIP flow.
+- Phase 5F Inventory consolidation is the active release candidate. It removes the legacy summary,
+  public/combined viewing routes, visibility application code, directly orphaned tests/controller,
+  and `me inventory.png` in one bot patch. It preserves modern selected-governor reports, dashboard
+  highlights, Accounts RSS/Inventory As Of, private exports including `All`, imports, audits, and
+  the dormant SQL table for rollback. Phase 5G remains a separate future Exports summary slice and
+  is the only approved future owner of generic-renderer consolidation after its own acceptance.
 - Phase 6 adds Export Stats only after selected-governor versus all-linked semantics are approved;
   export schema/format redesign remains outside GovernorOS.
 - Phase 7 adds private selected-governor `/me history` while preserving public/channel-gated

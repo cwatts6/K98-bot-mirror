@@ -10,7 +10,6 @@ from player_self_service.dashboard_card import (
     WIDTH,
     _account_lines,
     _linked_display,
-    _preference_lines,
     _reminder_lines,
     _status_label,
     render_dashboard_card,
@@ -19,7 +18,6 @@ from player_self_service.service import (
     AccountStatus,
     ExportStatus,
     PlayerSelfServiceSummary,
-    PreferenceStatus,
     ReminderStatus,
 )
 
@@ -41,11 +39,6 @@ def _summary() -> PlayerSelfServiceSummary:
             event_summary="all KVK events",
             time_summary="24h, 4h, 1h",
             next_action="Manage",
-        ),
-        preferences=PreferenceStatus(
-            inventory_visibility="private",
-            exports_summary="available through private export tools",
-            next_action="Review preferences",
         ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
@@ -99,8 +92,4 @@ def test_dashboard_card_lines_are_mobile_embed_friendly() -> None:
         "Calendar: not configured",
         "Times: 24h, 4h, 1h",
         "Lead times: not set",
-    )
-    assert _preference_lines(summary) == (
-        "Inventory: private",
-        "Exports: private",
     )

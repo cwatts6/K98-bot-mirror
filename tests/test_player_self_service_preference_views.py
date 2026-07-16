@@ -7,10 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from inventory.models import InventoryReportVisibility
-from player_self_service.preference_service import PreferenceMutationResult
 from player_self_service.preferences_summary import (
-    InventoryVisibilitySummary,
     PreferencesSummaryPayload,
     PreferenceValueSummary,
     RegionalProfileSummary,
@@ -78,22 +75,12 @@ class _Interaction:
         return self.message
 
 
-def _payload(*, public: bool = False) -> PreferencesSummaryPayload:
+def _payload() -> PreferencesSummaryPayload:
     return PreferencesSummaryPayload(
         discord_user_id=42,
         display_name="Tester",
         kingdom_id=1198,
         generated_at_utc=datetime(2026, 7, 15, 12, 0, tzinfo=UTC),
-        inventory_visibility=InventoryVisibilitySummary(
-            is_public=public,
-            state_label="PUBLIC" if public else "PRIVATE",
-            consequence_text=(
-                "Detailed Inventory reports may be posted in the channel."
-                if public
-                else "Detailed Inventory reports are shown only to you."
-            ),
-            is_explicit=True,
-        ),
         regional_profile=RegionalProfileSummary(
             timezone=PreferenceValueSummary(True, True, "United Kingdom", "Europe/London"),
             location=PreferenceValueSummary(True, True, "United Kingdom (GB)", "GB"),
@@ -118,6 +105,17 @@ def _payload(*, public: bool = False) -> PreferencesSummaryPayload:
 async def _loader(_user_id: int, *, display_name: str):
     assert display_name == "Tester"
     return _payload()
+
+
+async def _profile_reader(_user_id: int) -> UserProfilePreferenceRead:
+    return UserProfilePreferenceRead(
+        ok=True,
+        profile=UserProfilePreference(
+            timezone_name="Europe/London",
+            location_country_code="GB",
+            preferred_language_tag="en-GB",
+        ),
+    )
 
 
 @pytest.mark.asyncio
@@ -171,7 +169,12 @@ def _common(
 
 
 @pytest.mark.asyncio
-async def test_manage_settings_replaces_parent_and_clears_attachment() -> None:
+async def test_manage_settings_opens_regional_profile_and_clears_attachment(monkeypatch) -> None:
+    monkeypatch.setattr(
+        preference_views.profile_preference_service,
+        "read_user_profile_preference",
+        _profile_reader,
+    )
     journey = preference_views.PreferencesJourneyState()
     source_generation = journey.advance()
     interaction = _Interaction()
@@ -188,16 +191,52 @@ async def test_manage_settings_replaces_parent_and_clears_attachment() -> None:
         source_generation=source_generation,
     )
 
-    edit = interaction.response.edited[-1]
+    edit = interaction.original_edits[-1]
     assert edit["attachments"] == []
     assert edit["embed"] is None
-    assert isinstance(edit["view"], preference_views.ManageSettingsView)
+    assert isinstance(edit["view"], preference_views.RegionalProfileView)
     labels = {getattr(item, "label", None) for item in edit["view"].children}
-    assert labels == {"Regional profile", "Privacy & sharing", "Back to Preferences"}
+    assert labels == {None, "Back to Preferences"}
+    assert "Privacy" not in edit["content"]
 
 
 @pytest.mark.asyncio
-async def test_repeated_manage_click_is_rejected_as_superseded() -> None:
+async def test_manage_settings_read_failure_leaves_parent_intact(monkeypatch) -> None:
+    async def unavailable(_user_id: int) -> UserProfilePreferenceRead:
+        return UserProfilePreferenceRead(ok=False, error="down")
+
+    monkeypatch.setattr(
+        preference_views.profile_preference_service,
+        "read_user_profile_preference",
+        unavailable,
+    )
+    journey = preference_views.PreferencesJourneyState()
+    source_generation = journey.advance()
+    interaction = _Interaction()
+
+    await preference_views.show_preferences_manage_settings(
+        interaction,
+        author_id=42,
+        display_name="Tester",
+        payload=_payload(),
+        avatar_bytes=None,
+        dashboard_governor_id=None,
+        journey=journey,
+        source_generation=source_generation,
+    )
+
+    assert interaction.original_edits == []
+    assert journey.generation == source_generation
+    assert "temporarily unavailable" in interaction.followup.sent[-1][0][0]
+
+
+@pytest.mark.asyncio
+async def test_repeated_manage_click_is_rejected_as_superseded(monkeypatch) -> None:
+    monkeypatch.setattr(
+        preference_views.profile_preference_service,
+        "read_user_profile_preference",
+        _profile_reader,
+    )
     journey = preference_views.PreferencesJourneyState()
     source_generation = journey.advance()
     first = _Interaction()
@@ -224,7 +263,7 @@ async def test_repeated_manage_click_is_rejected_as_superseded() -> None:
         source_generation=source_generation,
     )
 
-    assert second.response.edited == []
+    assert second.original_edits == []
     assert "superseded" in second.response.sent[-1][0][0]
 
 
@@ -232,8 +271,8 @@ async def test_repeated_manage_click_is_rejected_as_superseded() -> None:
 async def test_child_rejects_foreign_and_superseded_interactions() -> None:
     journey = preference_views.PreferencesJourneyState()
     generation = journey.advance()
-    view = preference_views.ManageSettingsView(
-        payload=_payload(),
+    view = preference_views.RegionalProfileView(
+        profile=UserProfilePreference(),
         **_common(journey, generation),
     )
 
@@ -248,33 +287,19 @@ async def test_child_rejects_foreign_and_superseded_interactions() -> None:
 
 
 @pytest.mark.asyncio
-async def test_regional_profile_uses_field_selector_and_contextual_clear(monkeypatch) -> None:
+async def test_regional_profile_uses_field_selector_and_contextual_clear() -> None:
     profile = UserProfilePreference(
         timezone_name="Pacific/Honolulu",
         location_country_code="GB",
         preferred_language_tag="es-MX",
     )
 
-    async def read(_user_id: int):
-        return UserProfilePreferenceRead(ok=True, profile=profile)
-
-    monkeypatch.setattr(
-        preference_views.profile_preference_service,
-        "read_user_profile_preference",
-        read,
-    )
     journey = preference_views.PreferencesJourneyState()
     generation = journey.advance()
-    manage = preference_views.ManageSettingsView(
-        payload=_payload(),
+    regional = preference_views.RegionalProfileView(
+        profile=profile,
         **_common(journey, generation),
     )
-    interaction = _Interaction()
-
-    await manage.regional_button.callback(interaction)
-
-    regional = interaction.original_edits[-1]["view"]
-    assert isinstance(regional, preference_views.RegionalProfileView)
     selector = next(item for item in regional.children if hasattr(item, "options"))
     assert [option.value for option in selector.options] == ["timezone", "country", "language"]
 
@@ -372,78 +397,11 @@ async def test_field_clear_stores_not_set_and_refreshes(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_privacy_action_is_state_aware_and_cancel_does_not_mutate(monkeypatch) -> None:
-    async def forbidden(*_args, **_kwargs):
-        raise AssertionError("cancel must not mutate")
-
-    monkeypatch.setattr(
-        preference_views.preference_service,
-        "confirm_inventory_visibility_change",
-        forbidden,
-    )
-    journey = preference_views.PreferencesJourneyState()
-    private_view = preference_views.PrivacySharingView(
-        payload=_payload(public=False),
-        **_common(journey, journey.advance()),
-    )
-    assert private_view.change_button.label == "Make Public"
-    open_confirmation = _Interaction()
-    await private_view.change_button.callback(open_confirmation)
-    confirmation = open_confirmation.response.edited[-1]["view"]
-    assert isinstance(confirmation, preference_views.VisibilityConfirmationView)
-    assert "does not make /me resources" in open_confirmation.response.edited[-1]["content"]
-
-    cancel = _Interaction()
-    await confirmation.cancel_button.callback(cancel)
-    assert "cancelled" in cancel.response.edited[-1]["content"]
-    assert isinstance(cancel.response.edited[-1]["view"], preference_views.PrivacySharingView)
-
-    public_view = preference_views.PrivacySharingView(
-        payload=_payload(public=True),
-        **_common(journey, journey.advance()),
-    )
-    assert public_view.change_button.label == "Make Private"
-
-
-@pytest.mark.asyncio
-async def test_visibility_confirmation_revalidates_and_refreshes_stale_state(monkeypatch) -> None:
-    calls = []
-
-    async def confirm(user_id: int, *, expected_visibility, target_visibility):
-        calls.append((user_id, expected_visibility, target_visibility))
-        return PreferenceMutationResult(
-            ok=False,
-            stale=True,
-            message="Inventory visibility changed after this confirmation opened.",
-        )
-
-    monkeypatch.setattr(
-        preference_views.preference_service,
-        "confirm_inventory_visibility_change",
-        confirm,
-    )
-    journey = preference_views.PreferencesJourneyState()
-    view = preference_views.VisibilityConfirmationView(
-        payload=_payload(),
-        expected=InventoryReportVisibility.ONLY_ME,
-        target=InventoryReportVisibility.PUBLIC,
-        **_common(journey, journey.advance()),
-    )
-    interaction = _Interaction()
-
-    await view.confirm_button.callback(interaction)
-
-    assert calls == [(42, InventoryReportVisibility.ONLY_ME, InventoryReportVisibility.PUBLIC)]
-    assert "changed after" in interaction.original_edits[-1]["content"]
-    assert isinstance(interaction.original_edits[-1]["view"], preference_views.PrivacySharingView)
-
-
-@pytest.mark.asyncio
 async def test_child_timeout_disables_controls_and_rejects_late_interaction() -> None:
     journey = preference_views.PreferencesJourneyState()
     generation = journey.advance()
-    view = preference_views.ManageSettingsView(
-        payload=_payload(),
+    view = preference_views.RegionalProfileView(
+        profile=UserProfilePreference(),
         **_common(journey, generation),
     )
 
@@ -453,28 +411,3 @@ async def test_child_timeout_disables_controls_and_rejects_late_interaction() ->
     assert journey.expired is True
     interaction = _Interaction()
     assert await view.interaction_check(interaction) is False
-
-
-@pytest.mark.asyncio
-async def test_visibility_confirmation_cancellation_releases_completed_state(monkeypatch) -> None:
-    async def cancel(*_args, **_kwargs):
-        raise asyncio.CancelledError()
-
-    monkeypatch.setattr(
-        preference_views.preference_service,
-        "confirm_inventory_visibility_change",
-        cancel,
-    )
-    journey = preference_views.PreferencesJourneyState()
-    view = preference_views.VisibilityConfirmationView(
-        payload=_payload(),
-        expected=InventoryReportVisibility.ONLY_ME,
-        target=InventoryReportVisibility.PUBLIC,
-        **_common(journey, journey.advance()),
-    )
-
-    with pytest.raises(asyncio.CancelledError):
-        await view.confirm_button.callback(_Interaction())
-
-    assert view.completed is False
-    assert journey.mutation_lock.locked() is False

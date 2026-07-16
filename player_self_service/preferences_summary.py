@@ -2,31 +2,16 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 from zoneinfo import ZoneInfo
 
-from inventory import reporting_service
-from inventory.models import InventoryReportVisibility
 from player_self_service import profile_preference_service
 from player_self_service.profile_preference_service import UserProfilePreference
 
 TimeReferenceMode = Literal["LOCAL", "UTC_FALLBACK"]
-
-PRIVATE_CONSEQUENCE = (
-    "Detailed Inventory reports opened through /me inventory or /myinventory are shown only to you."
-)
-PUBLIC_CONSEQUENCE = (
-    "Detailed Inventory reports opened through /me inventory or /myinventory "
-    "may be posted in the channel."
-)
-
-
-class PreferencesSummaryUnavailable(RuntimeError):
-    """Raised when the card cannot prove a required privacy state."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,14 +21,6 @@ class PreferenceValueSummary:
     friendly_label: str
     stored_value: str | None = None
     player_code: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class InventoryVisibilitySummary:
-    is_public: bool
-    state_label: Literal["PRIVATE", "PUBLIC"]
-    consequence_text: str
-    is_explicit: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +47,6 @@ class PreferencesSummaryPayload:
     display_name: str
     kingdom_id: int
     generated_at_utc: datetime
-    inventory_visibility: InventoryVisibilitySummary
     regional_profile: RegionalProfileSummary
     time_reference: TimeReferenceSummary
     profile_details_set: int
@@ -81,7 +57,6 @@ class PreferencesSummaryPayload:
 
 
 ProfileLoader = Callable[[int], Awaitable[profile_preference_service.UserProfilePreferenceRead]]
-VisibilityLoader = Callable[[int], Awaitable[reporting_service.InventoryVisibilityPreferenceRead]]
 UtcClock = Callable[[], datetime]
 
 
@@ -163,20 +138,15 @@ def _time_reference(
     )
 
 
-def _settings_insight(
-    profile: RegionalProfileSummary,
-    visibility: InventoryVisibilitySummary,
-) -> str:
+def _settings_insight(profile: RegionalProfileSummary) -> str:
     values = (profile.timezone, profile.location, profile.preferred_language)
     if any(value.is_set and not value.is_available for value in values):
         return "One or more saved profile details are unavailable and need review."
     if not profile.timezone.is_set or not profile.timezone.is_available:
         return "Set a timezone to add a local-time reference to Personal Settings."
-    if visibility.is_public:
-        return "Inventory sharing is public, so open detailed reports deliberately."
     if any(not value.is_set for value in (profile.location, profile.preferred_language)):
         return "Your local-time reference is ready; optional regional details are not all set."
-    return "Your regional profile is complete and detailed Inventory reports remain private."
+    return "All three regional profile details are available."
 
 
 async def build_preferences_summary(
@@ -184,16 +154,10 @@ async def build_preferences_summary(
     *,
     display_name: str,
     profile_loader: ProfileLoader = profile_preference_service.read_user_profile_preference,
-    visibility_loader: VisibilityLoader = reporting_service.read_visibility_preference,
     utc_clock: UtcClock = lambda: datetime.now(UTC),
 ) -> PreferencesSummaryPayload:
     generated_at = _aware_utc(utc_clock())
-    profile_result, visibility_result = await asyncio.gather(
-        profile_loader(int(discord_user_id)),
-        visibility_loader(int(discord_user_id)),
-    )
-    if not visibility_result.ok:
-        raise PreferencesSummaryUnavailable("Inventory visibility is temporarily unavailable")
+    profile_result = await profile_loader(int(discord_user_id))
 
     warnings: list[str] = []
     if profile_result.ok:
@@ -207,18 +171,6 @@ async def build_preferences_summary(
         profile = RegionalProfileSummary(unavailable, unavailable, unavailable)
         warnings.append("Regional profile details are temporarily unavailable.")
 
-    stored_visibility = visibility_result.visibility
-    effective_visibility = stored_visibility or InventoryReportVisibility.ONLY_ME
-    is_public = effective_visibility == InventoryReportVisibility.PUBLIC
-    visibility = InventoryVisibilitySummary(
-        is_public=is_public,
-        state_label="PUBLIC" if is_public else "PRIVATE",
-        consequence_text=PUBLIC_CONSEQUENCE if is_public else PRIVATE_CONSEQUENCE,
-        is_explicit=stored_visibility is not None,
-    )
-    if stored_visibility is None:
-        warnings.append("Inventory visibility is using the private default until it is saved.")
-
     values = (profile.timezone, profile.location, profile.preferred_language)
     coverage = sum(value.is_set and value.is_available for value in values)
     time_reference = _time_reference(generated_at, profile)
@@ -227,12 +179,11 @@ async def build_preferences_summary(
         display_name=str(display_name or "player"),
         kingdom_id=1198,
         generated_at_utc=generated_at,
-        inventory_visibility=visibility,
         regional_profile=profile,
         time_reference=time_reference,
         profile_details_set=int(coverage),
         profile_details_total=3,
         profile_supporting_text=f"{coverage} of 3 profile details set",
-        settings_insight=_settings_insight(profile, visibility),
+        settings_insight=_settings_insight(profile),
         warnings=tuple(warnings),
     )

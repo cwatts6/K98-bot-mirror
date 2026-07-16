@@ -44,14 +44,17 @@ Dashboard Card and Preferences Hub, Phase 6 Guided Management Cards and Workflow
 and Phase 7 Unified Reminder Centre and Dashboard Card Alignment execution records are archived
 here. The original programme is complete; its closed programme pack remains in `docs/task_packs/`.
 
-Player Self-Service Command Centre v2 / GovernorOS completed Phases 1 through 5D.1. The archived
+Player Self-Service Command Centre v2 / GovernorOS completed Phases 1 through 5E. The archived
 records cover the dashboard blueprint/data foundation, governor selector and premium dashboard,
 direct Inventory reports and visual alignment, Accounts, Reminders, and the authoritative shared
 KVK/Calendar next-alert projection. Phase 5D.1 delivered in mirror PR #223 and production PR #530;
-operator smoke accepted the final `/me reminders` presentation on 2026-07-15. The active v2
-programme pack remains in `docs/task_packs/`. Phase 5E Preferences is next, but its task pack and
-background will be supplied separately by the operator and runtime implementation is not yet
-approved.
+operator smoke accepted the final `/me reminders` presentation on 2026-07-15. Phase 5E Preferences
+delivered in mirror PR #224 and production PR #531 and was deployed on 2026-07-16; its archived
+records capture the accepted top-left-avatar Personal Settings card, local-time/UTC fallback,
+regional profile, Inventory privacy flow, one Manage Settings journey, and Accounts-owned Update
+VIP migration with no SQL deployment. The active v2 programme pack remains in `docs/task_packs/`.
+Phase 5F Inventory is next; its task pack and chat starter will be supplied separately by the
+operator.
 
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,

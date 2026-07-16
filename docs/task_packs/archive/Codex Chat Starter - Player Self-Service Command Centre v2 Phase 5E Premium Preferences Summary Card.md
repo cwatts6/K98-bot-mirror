@@ -1,8 +1,26 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5E Premium Preferences Summary Card
 
-Status: next active GovernorOS implementation slice. The Phase 5E product, content, interaction, and
-backdrop contract is approved. Implementation is approved only through the normal audit,
-architecture, and implementation-plan stop gates; one-pass execution is not approved.
+<!-- codex-security-routing: allow-standard reason="archived historical execution record; not active security-routing guidance" -->
+<!-- codex-security-routing: allow-generic reason="archived historical execution terminology retained for delivery traceability" -->
+
+Status: complete, operator accepted, merged in mirror PR #224 and production PR #531, and deployed
+on 2026-07-16. This starter is retained as the archived implementation instruction record.
+
+## Completion Record
+
+- Delivered the private `1702x924` Personal Settings card with the invoking-user avatar in the
+  approved top-left identity treatment, DST-aware local-time/UTC fallback, regional-profile
+  coverage, exact Inventory privacy state/copy, deterministic insight, and same-payload fallback.
+- Removed deprecated Inventory navigation, VIP content, direct privacy toggles, and Change Governor
+  from Preferences; retained one in-place `Manage settings` action.
+- Re-hosted Update VIP under Manage Accounts with explicit linked-governor resolution and current-
+  access revalidation while preserving VIP meaning and persistence.
+- Added the approved atomic field-specific profile DAL upsert without a SQL schema or deployment
+  change.
+- Final validation recorded `2637 passed, 2 skipped`; repository gates, visual review, security/PR
+  review, patch-based promotion, operator acceptance, and deployment completed.
+- Phase 5F Premium Inventory Summary Card remains the next slice, with its task pack and starter to
+  be created separately.
 
 ## Copy/Paste Starter
 

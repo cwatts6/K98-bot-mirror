@@ -42,11 +42,6 @@ class InventoryReportRange(StrEnum):
     TWELVE_MONTHS = "12M"
 
 
-class InventoryReportVisibility(StrEnum):
-    ONLY_ME = "only_me"
-    PUBLIC = "public"
-
-
 class InventoryExportFormat(StrEnum):
     EXCEL = "excel"
     CSV = "csv"

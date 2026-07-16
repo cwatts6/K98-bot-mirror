@@ -40,6 +40,6 @@ def test_register_inventory_command_registers_grouped_admin_commands(monkeypatch
     assert fake_bot.groups["inventory"].commands.keys() == {"import", "audit"}
     assert "import_inventory" not in fake_bot.registered
     assert "inventory_import_audit" not in fake_bot.registered
-    assert "myinventory" in fake_bot.registered
-    assert "inventory_preferences" in fake_bot.registered
+    assert "myinventory" not in fake_bot.registered
+    assert "inventory_preferences" not in fake_bot.registered
     assert "export_inventory" in fake_bot.registered

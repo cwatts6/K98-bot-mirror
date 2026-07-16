@@ -3,19 +3,13 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import threading
-from types import SimpleNamespace
 
 import pytest
 
 from event_cache import UpcomingEventCacheSnapshot
 from event_calendar.reminder_state import CalendarReminderState
 from event_scheduler import KvkDmTrackerSnapshot
-from inventory.models import InventoryReportVisibility
 from player_self_service import service
-from player_self_service.profile_preference_service import (
-    UserProfilePreference,
-    UserProfilePreferenceRead,
-)
 from player_self_service.reminders_summary import (
     ReminderConfigurationState,
     ReminderHeroKind,
@@ -28,21 +22,6 @@ NOW = datetime(2026, 7, 15, 12, 0, tzinfo=UTC)
 
 async def _account_loader(_user_id: int):
     return summarize_accounts({})
-
-
-async def _preference_loader(_user_id: int):
-    return SimpleNamespace(ok=True, visibility=InventoryReportVisibility.PRIVATE)
-
-
-async def _profile_preference_loader(_user_id: int):
-    return UserProfilePreferenceRead(
-        ok=True,
-        profile=UserProfilePreference(
-            timezone_name="UTC",
-            location_country_code="GB",
-            preferred_language_tag="en-GB",
-        ),
-    )
 
 
 def _kvk_event(*, name: str = "Ancient Ruins", start: datetime) -> dict:
@@ -114,8 +93,6 @@ async def test_service_bulk_loads_each_projection_source_once_and_selects_earlie
         account_loader=_account_loader,
         reminder_loader=reminder_loader,
         calendar_prefs_loader=calendar_prefs_loader,
-        preference_loader=_preference_loader,
-        profile_preference_loader=_profile_preference_loader,
         kvk_event_snapshot_loader=kvk_event_loader,
         kvk_tracker_snapshot_loader=kvk_tracker_loader,
         calendar_runtime_cache_loader=calendar_runtime_loader,
@@ -169,8 +146,6 @@ async def test_default_kvk_snapshot_uses_projection_clock(monkeypatch) -> None:
             "enabled": False,
             "by_event_type": {},
         },
-        preference_loader=_preference_loader,
-        profile_preference_loader=_profile_preference_loader,
         kvk_tracker_snapshot_loader=lambda: KvkDmTrackerSnapshot({}, {}),
         calendar_runtime_cache_loader=lambda: {"ok": True, "events": []},
         calendar_reminder_state_loader=lambda: CalendarReminderState(
@@ -198,8 +173,6 @@ async def test_event_source_failure_makes_schedule_unavailable_without_false_rev
             "enabled": False,
             "by_event_type": {},
         },
-        preference_loader=_preference_loader,
-        profile_preference_loader=_profile_preference_loader,
         kvk_event_snapshot_loader=lambda: UpcomingEventCacheSnapshot(
             False,
             (),
@@ -236,8 +209,6 @@ async def test_malformed_calendar_runtime_source_degrades_to_schedule_unavailabl
             "enabled": False,
             "by_event_type": {},
         },
-        preference_loader=_preference_loader,
-        profile_preference_loader=_profile_preference_loader,
         kvk_event_snapshot_loader=lambda: UpcomingEventCacheSnapshot(
             True,
             (),
@@ -272,8 +243,6 @@ async def test_healthy_empty_sources_produce_no_upcoming_alert() -> None:
             "enabled": False,
             "by_event_type": {},
         },
-        preference_loader=_preference_loader,
-        profile_preference_loader=_profile_preference_loader,
         kvk_event_snapshot_loader=lambda: UpcomingEventCacheSnapshot(
             True,
             (),

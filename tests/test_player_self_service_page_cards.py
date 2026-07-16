@@ -11,7 +11,6 @@ from player_self_service.page_cards import (
     WIDTH,
     _dashboard_rows,
     _font,
-    _inventory_rows,
     _page_copy,
     _reminder_rows,
     _summarize_items_for_width,
@@ -22,10 +21,7 @@ from player_self_service.service import (
     AccountStatus,
     CalendarReminderStatus,
     ExportStatus,
-    InventoryCategoryStatus,
-    InventoryStatus,
     PlayerSelfServiceSummary,
-    PreferenceStatus,
     ReminderStatus,
 )
 
@@ -48,51 +44,16 @@ def _summary() -> PlayerSelfServiceSummary:
             time_summary="24h, 4h, 1h",
             next_action="Manage",
         ),
-        preferences=PreferenceStatus(
-            inventory_visibility="private",
-            exports_summary="available through private export tools",
-            next_action="Review preferences",
-            vip_summary="Main Gov - 19",
-            timezone="Europe/London",
-            location_country="United Kingdom (GB)",
-            preferred_language="English (en-GB)",
-        ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
             inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
-        inventory=InventoryStatus(
-            state="available",
-            account_summary="1 registered governor(s) with complete approved inventory data.",
-            resources=InventoryCategoryStatus(
-                state="available",
-                value="1.2B RSS",
-                detail="1/1 governors | latest 2026-06-25",
-                governor_count=1,
-                latest_scan_label="2026-06-25",
-            ),
-            speedups=InventoryCategoryStatus(
-                state="available",
-                value="365d total",
-                detail="1/1 governors | latest 2026-06-25",
-                governor_count=1,
-                latest_scan_label="2026-06-25",
-            ),
-            materials=InventoryCategoryStatus(
-                state="available",
-                value="42 legendary",
-                detail="1/1 governors | latest 2026-06-25",
-                governor_count=1,
-                latest_scan_label="2026-06-25",
-            ),
-            upload_guidance="Use `/inventory import` in the inventory upload channel.",
-        ),
     )
 
 
 def test_render_page_cards_output_pngs_for_remaining_me_pages() -> None:
-    for page in ("dashboard", "accounts", "reminders", "inventory", "exports"):
+    for page in ("dashboard", "accounts", "reminders", "exports"):
         rendered = render_page_card(
             page,
             _summary(),
@@ -125,11 +86,6 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
             time_summary="not set",
             next_action="Set up",
         ),
-        preferences=PreferenceStatus(
-            inventory_visibility="unknown",
-            exports_summary="available through private export tools",
-            next_action="Try again",
-        ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
             inventory_export="Excel / CSV / Google Sheets",
@@ -145,10 +101,9 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
     assert "manage calendar reminders" in _page_copy("reminders", summary)[3]
     with pytest.raises(ValueError, match="Unsupported /me page card: preferences"):
         _page_copy("preferences", summary)
-    assert _page_copy("inventory", summary)[0] == "Inventory"
     assert _page_copy("exports", summary)[1] == "private"
     assert _page_copy("dashboard", summary)[2] == (
-        "Actions available: Accounts, Reminders, Preferences, Inventory, Exports"
+        "Actions available: Accounts, Reminders, Preferences, Exports"
     )
     assert _page_copy("exports", summary)[2] == "Actions: Export Stats, Export Inventory"
     assert _page_copy("exports", summary)[3] == ""
@@ -181,11 +136,6 @@ def test_page_card_reminder_copy_treats_incomplete_as_setup() -> None:
                 next_action="Finish setup",
             ),
         ),
-        preferences=PreferenceStatus(
-            inventory_visibility="private",
-            exports_summary="available through private export tools",
-            next_action="Review preferences",
-        ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
             inventory_export="Excel / CSV / Google Sheets",
@@ -213,11 +163,6 @@ def test_page_card_export_copy_handles_unavailable_state() -> None:
             event_summary="not subscribed",
             time_summary="not set",
             next_action="Set up",
-        ),
-        preferences=PreferenceStatus(
-            inventory_visibility="private",
-            exports_summary="available through private export tools",
-            next_action="Review preferences",
         ),
         exports=ExportStatus(
             stats_export="Unavailable",
@@ -255,11 +200,6 @@ def test_page_card_export_copy_handles_guidance_state() -> None:
             time_summary="not set",
             next_action="Set up",
         ),
-        preferences=PreferenceStatus(
-            inventory_visibility="private",
-            exports_summary="available through private export tools",
-            next_action="Review preferences",
-        ),
         exports=ExportStatus(
             stats_export="Legacy",
             inventory_export="Legacy",
@@ -296,12 +236,6 @@ def test_page_card_account_and_vip_lines_show_full_summary() -> None:
             time_summary="not set",
             next_action="Set up",
         ),
-        preferences=PreferenceStatus(
-            inventory_visibility="private",
-            exports_summary="available through private export tools",
-            next_action="Review preferences",
-            vip_summary="Main - 19, Alt 1 - 15",
-        ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
             inventory_export="Excel / CSV / Google Sheets",
@@ -333,10 +267,9 @@ def test_dashboard_card_rows_group_status_by_user_workflow() -> None:
     assert rows[1][0].value == "KVK Reminders: ON"
     assert rows[1][0].detail == "All"
     assert rows[1][1].value == "Calendar Reminders: OFF"
-    assert rows[2][0].value == "Import: Private"
-    assert rows[2][0].detail == "Inventory Visibility"
-    assert rows[2][1].value == "Export: Private"
-    assert rows[2][1].detail == "Export Visibility"
+    assert rows[2][0].value == "Default private exports are available here."
+    assert rows[2][0].label == "Export Centre"
+    assert rows[2][0].detail == "Private personal exports"
 
 
 def test_reminder_card_rows_split_kvk_and_calendar() -> None:
@@ -350,15 +283,6 @@ def test_reminder_card_rows_split_kvk_and_calendar() -> None:
     ]
     assert rows[0][0].value == "ON"
     assert rows[1][0].value == "OFF"
-
-
-def test_inventory_card_rows_show_approved_data_categories() -> None:
-    rows = _inventory_rows(_summary())
-
-    assert [row[0].label for row in rows] == ["Resources", "Speedups", "Materials"]
-    assert rows[0][0].value == "1.2B RSS"
-    assert rows[1][0].value == "365d total"
-    assert rows[2][0].value == "42 legendary"
 
 
 def test_calendar_event_summary_compacts_to_two_rows_with_remaining_count() -> None:

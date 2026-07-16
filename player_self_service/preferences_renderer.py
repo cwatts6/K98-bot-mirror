@@ -1,4 +1,4 @@
-"""Deterministic Pillow renderer for the Phase 5E premium Preferences card."""
+"""Deterministic Pillow renderer for the profile-only Personal Settings card."""
 
 from __future__ import annotations
 
@@ -75,67 +75,8 @@ def _draw_fit(
     _draw(draw, xy, fitted, font=font, fill=fill, bold=bold)
 
 
-def _wrap_lines(
-    draw: ImageDraw.ImageDraw,
-    text: str,
-    *,
-    width: int,
-    font: ImageFont.ImageFont,
-    max_lines: int,
-) -> tuple[str, ...]:
-    words = _clean(text).split()
-    lines: list[str] = []
-    current = ""
-    for index, word in enumerate(words):
-        candidate = f"{current} {word}".strip()
-        if visual_text.text_width(draw, candidate, font=font) <= width:
-            current = candidate
-            continue
-        if current:
-            lines.append(current)
-        if len(lines) >= max_lines - 1:
-            remaining = " ".join(words[index:])
-            lines.append(
-                visual_text.fit_text_to_width(
-                    draw,
-                    remaining,
-                    width=width,
-                    base_font=font,
-                )
-            )
-            return tuple(lines[:max_lines])
-        current = word
-    if current and len(lines) < max_lines:
-        lines.append(
-            visual_text.fit_text_to_width(
-                draw,
-                current,
-                width=width,
-                base_font=font,
-            )
-        )
-    return tuple(lines[:max_lines])
-
-
-def _draw_wrapped(
-    draw: ImageDraw.ImageDraw,
-    xy: tuple[int, int],
-    text: str,
-    *,
-    width: int,
-    size: int,
-    max_lines: int = 2,
-    fill: tuple[int, int, int, int] = TEXT,
-) -> None:
-    font = _font(size)
-    for index, line in enumerate(
-        _wrap_lines(draw, text, width=width, font=font, max_lines=max_lines)
-    ):
-        _draw(draw, (xy[0], xy[1] + index * (size + 8)), line, font=font, fill=fill)
-
-
 def _status_badge(draw: ImageDraw.ImageDraw, state: str) -> None:
-    color = GREEN if state == "PRIVATE" else AMBER
+    color = GREEN if state == "LOCAL" else AMBER
     box = (1395, 64, 1608, 122)
     draw.rounded_rectangle(box, radius=29, fill=color[:-1] + (218,), outline=color, width=2)
     font = _font(27, bold=True)
@@ -163,7 +104,7 @@ def _preference_row(
         draw,
         (360, y - 3),
         value,
-        width=610,
+        width=1210,
         size=28,
         min_size=18,
         fill=TEXT if available else AMBER,
@@ -207,7 +148,7 @@ def render_preferences_card(
             min_size=22,
             bold=True,
         )
-        _status_badge(draw, payload.inventory_visibility.state_label)
+        _status_badge(draw, "LOCAL" if payload.time_reference.mode == "LOCAL" else "UTC")
         _draw_fit(
             draw,
             (1215, 139),
@@ -266,31 +207,6 @@ def render_preferences_card(
             available=profile.preferred_language.is_available,
         )
 
-        visibility = payload.inventory_visibility
-        state_color = GREEN if not visibility.is_public else AMBER
-        _draw(
-            draw, (1038, 438), "PRIVACY & SHARING", font=_font(26, bold=True), fill=BLUE, bold=True
-        )
-        _draw(
-            draw,
-            (1038, 493),
-            "INVENTORY VISIBILITY",
-            font=_font(20, bold=True),
-            fill=MUTED,
-            bold=True,
-        )
-        _draw(
-            draw,
-            (1038, 527),
-            visibility.state_label,
-            font=_font(36, bold=True),
-            fill=state_color,
-            bold=True,
-        )
-        _draw_wrapped(
-            draw, (1038, 578), visibility.consequence_text, width=552, size=21, max_lines=2
-        )
-
         _draw(draw, (112, 672), "SETTINGS INSIGHT", font=_font(21, bold=True), fill=BLUE, bold=True)
         _draw_fit(
             draw, (112, 708), payload.settings_insight, width=1475, size=28, min_size=19, bold=True
@@ -300,7 +216,7 @@ def render_preferences_card(
         _draw_fit(
             draw,
             (112, 815),
-            "Update your regional profile and Inventory privacy.",
+            "Update your saved timezone, location, and preferred language.",
             width=1475,
             size=24,
             min_size=18,

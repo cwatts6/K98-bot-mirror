@@ -77,13 +77,6 @@ def _unwrap(fn):
         (
             "commands.inventory_cmds",
             "register_inventory",
-            "inventory_preferences",
-            {},
-            "/me preferences",
-        ),
-        (
-            "commands.inventory_cmds",
-            "register_inventory",
             "export_inventory",
             {"format": "CSV", "view": "All", "governor": None, "days": 30},
             "/me exports",

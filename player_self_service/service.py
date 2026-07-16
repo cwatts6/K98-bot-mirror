@@ -9,7 +9,6 @@ from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
 
-from bot_config import INVENTORY_UPLOAD_CHANNEL_ID
 from constants import EVENT_CALENDAR_REMINDER_GRACE_MINUTES
 from event_cache import UpcomingEventCacheSnapshot, get_upcoming_event_cache_snapshot
 from event_calendar.reminder_candidates import build_calendar_alert_projection
@@ -21,10 +20,7 @@ from event_calendar.reminder_prefs_store import get_user_prefs
 from event_calendar.reminder_state import CalendarReminderState
 from event_calendar.runtime_cache import list_event_types, load_runtime_cache
 from event_scheduler import KvkDmTrackerSnapshot, snapshot_dm_trackers
-from inventory import profile_service, reporting_service
-from inventory.models import InventoryReportVisibility, RegisteredGovernor
-from inventory.parsing import format_resource_value
-from player_self_service import profile_preference_service, reminders_summary
+from player_self_service import reminders_summary
 from player_self_service.reminders_summary import RemindersSummaryPayload
 from reminder_domain.kvk_candidates import build_kvk_alert_projection
 from reminder_domain.projection import ReminderSourceProjection, combine_reminder_projections
@@ -102,18 +98,6 @@ class ReminderStatus:
 
 
 @dataclass(frozen=True, slots=True)
-class PreferenceStatus:
-    inventory_visibility: str
-    exports_summary: str
-    next_action: str
-    vip_summary: str = "use Update VIP to set account VIP levels"
-    timezone: str = "not set"
-    location_country: str = "not set"
-    preferred_language: str = "not set"
-    error: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class ExportStatus:
     stats_export: str
     inventory_export: str
@@ -123,51 +107,11 @@ class ExportStatus:
 
 
 @dataclass(frozen=True, slots=True)
-class InventoryCategoryStatus:
-    state: str
-    value: str
-    detail: str
-    governor_count: int = 0
-    latest_scan_label: str = "not available"
-
-
-def _default_inventory_category() -> InventoryCategoryStatus:
-    return InventoryCategoryStatus(
-        state="missing",
-        value="No approved data",
-        detail="Upload inventory screenshots to begin.",
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class InventoryStatus:
-    state: str
-    account_summary: str
-    resources: InventoryCategoryStatus = field(default_factory=_default_inventory_category)
-    speedups: InventoryCategoryStatus = field(default_factory=_default_inventory_category)
-    materials: InventoryCategoryStatus = field(default_factory=_default_inventory_category)
-    next_action: str = "Open Report"
-    upload_guidance: str = "Use the inventory upload channel to add screenshots."
-    error: str | None = None
-
-
-def _default_inventory_status() -> InventoryStatus:
-    return InventoryStatus(
-        state="unknown",
-        account_summary="Inventory data not loaded yet.",
-        next_action="Try again",
-        upload_guidance="Use the inventory upload channel to add screenshots.",
-    )
-
-
-@dataclass(frozen=True, slots=True)
 class PlayerSelfServiceSummary:
     discord_user_id: int
     accounts: AccountStatus
     reminders: ReminderStatus
-    preferences: PreferenceStatus
     exports: ExportStatus
-    inventory: InventoryStatus = field(default_factory=_default_inventory_status)
     reminders_summary: RemindersSummaryPayload | None = None
 
 
@@ -175,14 +119,6 @@ AccountLoader = Callable[[int], Awaitable[AccountResolutionSummary]]
 ReminderLoader = Callable[[int], dict[str, Any] | None]
 CalendarReminderLoader = Callable[[int], CalendarReminderConfigState]
 CalendarPrefsLoader = Callable[[int], dict[str, Any]]
-PreferenceLoader = Callable[[int], Awaitable[Any]]
-ProfilePreferenceLoader = Callable[
-    [int], Awaitable[profile_preference_service.UserProfilePreferenceRead]
-]
-VipProfileLoader = Callable[[int], Awaitable[Any]]
-InventorySnapshotLoader = Callable[
-    [list[RegisteredGovernor]], Awaitable[reporting_service.LatestInventorySnapshot]
-]
 CalendarEventCatalogLoader = Callable[[], reminders_summary.CalendarEventCatalog]
 KvkEventSnapshotLoader = Callable[[], UpcomingEventCacheSnapshot]
 KvkTrackerSnapshotLoader = Callable[[], KvkDmTrackerSnapshot]
@@ -337,119 +273,6 @@ def summarize_calendar_reminder_status(
     )
 
 
-async def summarize_preference_status(
-    discord_user_id: int,
-    *,
-    preference_loader: PreferenceLoader = reporting_service.read_visibility_preference,
-    profile_preference_loader: ProfilePreferenceLoader = (
-        profile_preference_service.read_user_profile_preference
-    ),
-) -> PreferenceStatus:
-    try:
-        result, profile_result = await asyncio.gather(
-            preference_loader(discord_user_id),
-            profile_preference_loader(discord_user_id),
-        )
-    except asyncio.CancelledError:
-        raise
-    except Exception as exc:
-        logger.exception(
-            "player_self_service_preferences_unavailable user_id=%s",
-            discord_user_id,
-        )
-        return PreferenceStatus(
-            inventory_visibility="unknown",
-            exports_summary="available through private export tools",
-            next_action="Try again",
-            error=f"{type(exc).__name__}: {exc}",
-        )
-
-    profile_error = None
-    timezone = "not set"
-    location_country = "not set"
-    preferred_language = "not set"
-    if getattr(profile_result, "ok", False):
-        profile = getattr(profile_result, "profile", None)
-        if profile is not None:
-            timezone = getattr(profile, "timezone_label", "not set")
-            location_country = getattr(profile, "country_label", "not set")
-            preferred_language = getattr(profile, "language_label", "not set")
-    else:
-        profile_error = getattr(profile_result, "error", None) or "profile source unavailable"
-
-    ok = bool(getattr(result, "ok", True))
-    if not ok:
-        return PreferenceStatus(
-            inventory_visibility="unknown",
-            exports_summary="available through private export tools",
-            next_action="Try again",
-            timezone=timezone,
-            location_country=location_country,
-            preferred_language=preferred_language,
-            error=getattr(result, "error", None) or "preference source unavailable",
-        )
-
-    visibility = getattr(result, "visibility", result)
-    if visibility == InventoryReportVisibility.ONLY_ME:
-        label = "private"
-    elif visibility == InventoryReportVisibility.PUBLIC:
-        label = "public"
-    elif visibility is None:
-        label = "not set"
-    else:
-        label = "unknown"
-
-    next_action = "Review preferences" if label != "unknown" else "Try again"
-    return PreferenceStatus(
-        inventory_visibility=label,
-        exports_summary="available through private export tools",
-        next_action=next_action,
-        timezone=timezone,
-        location_country=location_country,
-        preferred_language=preferred_language,
-        error=profile_error,
-    )
-
-
-def _compact_vip_label(value: object) -> str:
-    label = str(value or "").strip()
-    if not label or label.casefold() == "unknown / not set":
-        return "not set"
-    if label.startswith("VIP "):
-        return label.removeprefix("VIP ").replace(" or less", " or less")
-    return label
-
-
-async def summarize_vip_status(
-    account_summary: AccountResolutionSummary,
-    *,
-    profile_loader: VipProfileLoader = profile_service.fetch_inventory_profile,
-) -> str:
-    if not account_summary.ok:
-        return "unavailable"
-    if not account_summary.resolved_accounts:
-        return "register an account, then use Update VIP"
-    try:
-        profiles = await asyncio.gather(
-            *(
-                profile_loader(int(account.governor_id))
-                for account in account_summary.resolved_accounts
-            )
-        )
-    except asyncio.CancelledError:
-        raise
-    except Exception:
-        logger.exception("player_self_service_vip_profiles_unavailable")
-        return "temporarily unavailable"
-
-    labels: list[str] = []
-    for account, profile in zip(account_summary.resolved_accounts, profiles, strict=True):
-        name = account.governor_name or account.governor_id_str
-        vip = _compact_vip_label(getattr(profile, "vip_level_label", None))
-        labels.append(f"{name} - {vip}")
-    return ", ".join(labels)
-
-
 def summarize_export_status(accounts: AccountStatus) -> ExportStatus:
     if accounts.state == "unknown":
         return ExportStatus(
@@ -476,192 +299,6 @@ def summarize_export_status(accounts: AccountStatus) -> ExportStatus:
     )
 
 
-def _upload_guidance(upload_channel_id: int | None = INVENTORY_UPLOAD_CHANNEL_ID) -> str:
-    if upload_channel_id:
-        return f"Use `/inventory import` or upload inventory screenshots in <#{int(upload_channel_id)}>."
-    return "Use `/inventory import` in the inventory upload channel."
-
-
-def _governors_from_account_summary(
-    account_summary: AccountResolutionSummary,
-) -> list[RegisteredGovernor]:
-    governors: list[RegisteredGovernor] = []
-    for account in account_summary.resolved_accounts:
-        name = str(
-            account.raw.get("GovernorName")
-            or account.raw.get("Governor")
-            or account.governor_name
-            or account.governor_id_str
-        )
-        governors.append(
-            RegisteredGovernor(
-                governor_id=int(account.governor_id),
-                governor_name=name,
-                account_type=str(account.slot),
-            )
-        )
-    return governors
-
-
-def _scan_label(value: Any) -> str:
-    if value is None:
-        return "not available"
-    if hasattr(value, "strftime"):
-        return value.strftime("%Y-%m-%d")
-    return str(value)
-
-
-def _category_detail(count: int, total: int, scan: Any) -> str:
-    return f"{count}/{total} governors | latest {_scan_label(scan)}"
-
-
-def _inventory_category_status(
-    *,
-    count: int,
-    total: int,
-    value: str,
-    latest_scan: Any,
-) -> InventoryCategoryStatus:
-    return InventoryCategoryStatus(
-        state="available",
-        value=value,
-        detail=_category_detail(count, total, latest_scan),
-        governor_count=count,
-        latest_scan_label=_scan_label(latest_scan),
-    )
-
-
-def summarize_inventory_snapshot(
-    snapshot: reporting_service.LatestInventorySnapshot,
-    *,
-    upload_channel_id: int | None = INVENTORY_UPLOAD_CHANNEL_ID,
-) -> InventoryStatus:
-    total_governors = len(snapshot.governors)
-    guidance = _upload_guidance(upload_channel_id)
-    if total_governors <= 0:
-        return InventoryStatus(
-            state="none",
-            account_summary="No registered governors.",
-            next_action="Register account",
-            upload_guidance="Register a governor before uploading inventory screenshots.",
-        )
-
-    resources = _default_inventory_category()
-    if snapshot.resources:
-        total = sum(point.total for point in snapshot.resources)
-        latest_scan = max((point.scan_utc for point in snapshot.resources), default=None)
-        resources = _inventory_category_status(
-            count=len(snapshot.resources),
-            total=total_governors,
-            value=f"{format_resource_value(total)} RSS",
-            latest_scan=latest_scan,
-        )
-
-    speedups = _default_inventory_category()
-    if snapshot.speedups:
-        total_days = sum(
-            float(point.building_days)
-            + float(point.research_days)
-            + float(point.training_days)
-            + float(point.healing_days)
-            + float(point.universal_days)
-            for point in snapshot.speedups
-        )
-        latest_scan = max((point.scan_utc for point in snapshot.speedups), default=None)
-        speedups = _inventory_category_status(
-            count=len(snapshot.speedups),
-            total=total_governors,
-            value=f"{int(round(total_days)):,}d total",
-            latest_scan=latest_scan,
-        )
-
-    materials = _default_inventory_category()
-    if snapshot.materials:
-        total_legendary = sum(float(point.total_legendary) for point in snapshot.materials)
-        latest_scan = max((point.scan_utc for point in snapshot.materials), default=None)
-        materials = _inventory_category_status(
-            count=len(snapshot.materials),
-            total=total_governors,
-            value=f"{total_legendary:,.0f} legendary",
-            latest_scan=latest_scan,
-        )
-
-    categories = (resources, speedups, materials)
-    available_count = sum(category.state == "available" for category in categories)
-    approved_governor_count = min(
-        (category.governor_count for category in categories if category.state == "available"),
-        default=0,
-    )
-    has_complete_category_coverage = all(
-        category.state == "available" and category.governor_count >= total_governors
-        for category in categories
-    )
-    if has_complete_category_coverage:
-        state = "available"
-        account_summary = (
-            f"{total_governors} registered governor(s) with complete approved inventory data."
-        )
-    elif available_count > 0:
-        state = "partial"
-        account_summary = (
-            f"Approved inventory data for {approved_governor_count}/{total_governors} "
-            "registered governor(s)."
-        )
-    else:
-        state = "empty"
-        account_summary = (
-            f"No approved inventory data for {total_governors} registered governor(s)."
-        )
-
-    return InventoryStatus(
-        state=state,
-        account_summary=account_summary,
-        resources=resources,
-        speedups=speedups,
-        materials=materials,
-        next_action="Open Report",
-        upload_guidance=guidance,
-    )
-
-
-async def summarize_inventory_status(
-    account_summary: AccountResolutionSummary,
-    *,
-    snapshot_loader: InventorySnapshotLoader = reporting_service.build_latest_inventory_snapshot,
-    upload_channel_id: int | None = INVENTORY_UPLOAD_CHANNEL_ID,
-) -> InventoryStatus:
-    if not account_summary.ok:
-        return InventoryStatus(
-            state="unknown",
-            account_summary="Inventory account data is unavailable.",
-            next_action="Try again",
-            upload_guidance=_upload_guidance(upload_channel_id),
-            error=account_summary.error or "account source unavailable",
-        )
-
-    governors = _governors_from_account_summary(account_summary)
-    if not governors:
-        return summarize_inventory_snapshot(
-            reporting_service.LatestInventorySnapshot(governors=()),
-            upload_channel_id=upload_channel_id,
-        )
-
-    try:
-        snapshot = await snapshot_loader(governors)
-    except asyncio.CancelledError:
-        raise
-    except Exception as exc:
-        logger.exception("player_self_service_inventory_unavailable")
-        return InventoryStatus(
-            state="unknown",
-            account_summary="Inventory data is temporarily unavailable.",
-            next_action="Try again",
-            upload_guidance=_upload_guidance(upload_channel_id),
-            error=f"{type(exc).__name__}: {exc}",
-        )
-    return summarize_inventory_snapshot(snapshot, upload_channel_id=upload_channel_id)
-
-
 async def build_player_self_service_summary(
     discord_user_id: int,
     *,
@@ -669,14 +306,6 @@ async def build_player_self_service_summary(
     reminder_loader: ReminderLoader = get_user_config,
     calendar_reminder_loader: CalendarReminderLoader | None = None,
     calendar_prefs_loader: CalendarPrefsLoader = get_user_prefs,
-    preference_loader: PreferenceLoader = reporting_service.read_visibility_preference,
-    profile_preference_loader: ProfilePreferenceLoader = (
-        profile_preference_service.read_user_profile_preference
-    ),
-    vip_profile_loader: VipProfileLoader = profile_service.fetch_inventory_profile,
-    inventory_snapshot_loader: InventorySnapshotLoader = (
-        reporting_service.build_latest_inventory_snapshot
-    ),
     calendar_event_catalog_loader: CalendarEventCatalogLoader | None = None,
     kvk_event_snapshot_loader: KvkEventSnapshotLoader | None = None,
     kvk_tracker_snapshot_loader: KvkTrackerSnapshotLoader = snapshot_dm_trackers,
@@ -685,22 +314,7 @@ async def build_player_self_service_summary(
     utc_clock: UtcClock = lambda: datetime.now(UTC),
 ) -> PlayerSelfServiceSummary:
     generated_at = utc_clock()
-    account_summary_task = account_loader(int(discord_user_id))
-    preference_task = summarize_preference_status(
-        int(discord_user_id),
-        preference_loader=preference_loader,
-        profile_preference_loader=profile_preference_loader,
-    )
-    account_summary, preferences = await asyncio.gather(account_summary_task, preference_task)
-    vip_summary = await summarize_vip_status(
-        account_summary,
-        profile_loader=vip_profile_loader,
-    )
-    preferences = replace(preferences, vip_summary=vip_summary)
-    inventory = await summarize_inventory_status(
-        account_summary,
-        snapshot_loader=inventory_snapshot_loader,
-    )
+    account_summary = await account_loader(int(discord_user_id))
 
     reminder_config: object = None
     kvk_source_available = True
@@ -928,8 +542,6 @@ async def build_player_self_service_summary(
         discord_user_id=int(discord_user_id),
         accounts=accounts,
         reminders=reminders,
-        preferences=preferences,
         exports=summarize_export_status(accounts),
-        inventory=inventory,
         reminders_summary=reminders_payload,
     )

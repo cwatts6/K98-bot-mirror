@@ -7,7 +7,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from inventory.models import InventoryReportVisibility
 from player_self_service.account_service import (
     AccountCentreState,
     AccountConfirmation,
@@ -19,7 +18,6 @@ from player_self_service.accounts_models import (
     AccountsPortfolioPayload,
 )
 from player_self_service.preferences_summary import (
-    InventoryVisibilitySummary,
     PreferencesSummaryPayload,
     PreferenceValueSummary,
     RegionalProfileSummary,
@@ -34,10 +32,7 @@ from player_self_service.reminder_service import (
 from player_self_service.service import (
     AccountStatus,
     ExportStatus,
-    InventoryCategoryStatus,
-    InventoryStatus,
     PlayerSelfServiceSummary,
-    PreferenceStatus,
     ReminderStatus,
 )
 from ui.views import (
@@ -66,44 +61,10 @@ def _summary() -> PlayerSelfServiceSummary:
             time_summary="24h, 4h, 1h",
             next_action="Manage",
         ),
-        preferences=PreferenceStatus(
-            inventory_visibility="private",
-            exports_summary="available through private export tools",
-            next_action="Review preferences",
-            timezone="Europe/London",
-            location_country="United Kingdom (GB)",
-            preferred_language="English (en-GB)",
-        ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
             inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
-        ),
-        inventory=InventoryStatus(
-            state="available",
-            account_summary="1 registered governor(s) with complete approved inventory data.",
-            resources=InventoryCategoryStatus(
-                state="available",
-                value="1.2B RSS",
-                detail="1/1 governors | latest 2026-06-25",
-                governor_count=1,
-                latest_scan_label="2026-06-25",
-            ),
-            speedups=InventoryCategoryStatus(
-                state="available",
-                value="365d total",
-                detail="1/1 governors | latest 2026-06-25",
-                governor_count=1,
-                latest_scan_label="2026-06-25",
-            ),
-            materials=InventoryCategoryStatus(
-                state="available",
-                value="42 legendary",
-                detail="1/1 governors | latest 2026-06-25",
-                governor_count=1,
-                latest_scan_label="2026-06-25",
-            ),
-            upload_guidance="Use `/inventory import` in the inventory upload channel.",
         ),
     )
 
@@ -121,7 +82,6 @@ def _no_account_summary() -> PlayerSelfServiceSummary:
             next_action="Register",
         ),
         reminders=summary.reminders,
-        preferences=summary.preferences,
         exports=ExportStatus(
             stats_export="Unavailable",
             inventory_export="Unavailable",
@@ -174,12 +134,6 @@ def _preferences_payload() -> PreferencesSummaryPayload:
         display_name="Tester",
         kingdom_id=1198,
         generated_at_utc=datetime(2026, 7, 14, 8, 30, tzinfo=UTC),
-        inventory_visibility=InventoryVisibilitySummary(
-            is_public=False,
-            state_label="PRIVATE",
-            consequence_text="Detailed Inventory reports are shown only to you.",
-            is_explicit=True,
-        ),
         regional_profile=RegionalProfileSummary(
             timezone=PreferenceValueSummary(True, True, "United Kingdom", "Europe/London"),
             location=PreferenceValueSummary(True, True, "United Kingdom (GB)", "GB"),
@@ -197,7 +151,7 @@ def _preferences_payload() -> PreferencesSummaryPayload:
         profile_details_set=3,
         profile_details_total=3,
         profile_supporting_text="3 of 3 profile details set",
-        settings_insight="Your regional profile is complete and detailed Inventory reports remain private.",
+        settings_insight="All three regional profile details are available.",
     )
 
 
@@ -294,7 +248,7 @@ def test_dashboard_embed_is_status_first_and_compact() -> None:
 
     assert embed.title == "K98 Personal Command Centre"
     assert len(embed.fields) == 3
-    assert [field.name for field in embed.fields] == ["Accounts", "Reminders", "Preferences"]
+    assert [field.name for field in embed.fields] == ["Accounts", "Reminders", "Exports"]
     assert "Next action: Review" in embed.fields[0].value
     assert "/register_governor" not in embed.fields[0].value
 
@@ -645,20 +599,10 @@ def test_preferences_embed_uses_same_authorised_payload_without_vip() -> None:
     assert embed.title == "Personal Settings"
     assert "VIP" not in str(embed.to_dict())
     assert "Location: United Kingdom (GB)" in embed.fields[0].value
-    assert "shown only to you" in embed.fields[1].value
+    assert embed.fields[0].name.startswith("LOCAL")
     assert embed.fields[-1].name == "Manage settings"
-    assert "/inventory_preferences" not in embed.fields[1].value
-
-
-def test_inventory_embed_summarizes_latest_approved_data() -> None:
-    embed = views.build_inventory_embed(_summary(), display_name="Tester")
-
-    assert embed.title == "Inventory"
-    assert "Resources: 1.2B RSS" in embed.fields[0].value
-    assert "Speedups: 365d total" in embed.fields[0].value
-    assert "Materials: 42 legendary" in embed.fields[0].value
-    assert "`/inventory import`" in embed.fields[1].value
-    assert "Open Report" in embed.fields[2].value
+    assert "privacy" not in str(embed.to_dict()).casefold()
+    assert "inventory visibility" not in str(embed.to_dict()).casefold()
 
 
 @pytest.mark.asyncio
@@ -680,12 +624,12 @@ async def test_account_slot_select_view_preserves_twenty_sixth_slot() -> None:
 
 
 @pytest.mark.asyncio
-async def test_dashboard_view_has_primary_buttons_and_inventory_exports() -> None:
+async def test_dashboard_view_has_primary_buttons_and_exports() -> None:
     view = views.PlayerSelfServiceView(author_id=42, display_name="Tester")
 
     labels = [getattr(child, "label", None) for child in view.children]
     assert labels[:3] == ["Accounts", "Reminders", "Preferences"]
-    assert "Inventory" in labels
+    assert "Inventory" not in labels
     assert "Exports" in labels
     assert "Dashboard" in labels
     assert "Quick launch" not in [getattr(child, "placeholder", None) for child in view.children]
@@ -740,7 +684,6 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
         [
             *top_row,
             ("Dashboard", 1, secondary, True),
-            ("Inventory", 1, secondary, False),
             ("Exports", 1, secondary, False),
         ],
     )
@@ -779,21 +722,10 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
         ],
     )
     _assert_button_layout(
-        views.PAGE_INVENTORY,
-        [
-            *top_row,
-            ("Dashboard", 1, secondary, False),
-            ("Inventory", 1, secondary, True),
-            ("Exports", 1, secondary, False),
-            ("Open Report", 2, success, False),
-        ],
-    )
-    _assert_button_layout(
         views.PAGE_EXPORTS,
         [
             *top_row,
             ("Dashboard", 1, secondary, False),
-            ("Inventory", 1, secondary, False),
             ("Exports", 1, secondary, True),
             ("Export Stats", 2, success, False),
             ("Export Inventory", 2, success, False),
@@ -834,7 +766,7 @@ async def test_reminders_view_removes_inventory_and_keeps_exports_navigation() -
 
 
 @pytest.mark.asyncio
-async def test_exports_view_has_inventory_navigation_and_option_entry_actions() -> None:
+async def test_exports_view_has_private_inventory_export_action() -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -845,7 +777,7 @@ async def test_exports_view_has_inventory_navigation_and_option_entry_actions() 
     labels = [getattr(child, "label", None) for child in view.children]
     assert "Export Stats" in labels
     assert "Export Inventory" in labels
-    assert "Inventory" in labels
+    assert "Inventory" not in labels
     assert "Exports" in labels
     exports_nav = next(
         child for child in view.children if getattr(child, "custom_id", None) == "me:exports"
@@ -927,73 +859,6 @@ async def test_exports_inventory_button_opens_options(monkeypatch) -> None:
     await button.callback(interaction)
 
     assert calls == [(42, "Tester")]
-
-
-@pytest.mark.asyncio
-async def test_dashboard_inventory_button_opens_inventory_page() -> None:
-    async def loader(_user_id: int):
-        return _summary()
-
-    view = views.PlayerSelfServiceView(
-        author_id=42,
-        display_name="Tester",
-        summary_loader=loader,
-    )
-    interaction = _Interaction()
-    button = next(
-        child for child in view.children if getattr(child, "custom_id", None) == "me:inventory"
-    )
-
-    await button.callback(interaction)
-
-    edited = interaction.original_edits[-1]
-    assert interaction.response.deferred == [{}]
-    assert edited["embed"].image.url.startswith("attachment://me_inventory_")
-    assert [file.filename for file in edited["files"]] == ["me_inventory_42.png"]
-    assert isinstance(edited["view"], views.PlayerSelfServiceView)
-
-
-@pytest.mark.asyncio
-async def test_inventory_report_button_uses_existing_inventory_selector(monkeypatch) -> None:
-    calls = []
-
-    async def fake_visibility(user_id):
-        calls.append(("visibility", user_id))
-        return InventoryReportVisibility.ONLY_ME
-
-    async def fake_start_myinventory_command(*, ctx, visibility):
-        calls.append(("inventory", ctx.user.id, visibility))
-
-    monkeypatch.setattr(
-        views.reporting_service,
-        "get_visibility_preference_or_none",
-        fake_visibility,
-    )
-    monkeypatch.setattr(
-        views,
-        "start_myinventory_command",
-        fake_start_myinventory_command,
-    )
-    view = views.PlayerSelfServiceView(
-        author_id=42,
-        display_name="Tester",
-        page=views.PAGE_INVENTORY,
-        summary=_summary(),
-    )
-    interaction = _Interaction()
-    button = next(
-        child
-        for child in view.children
-        if getattr(child, "custom_id", None) == "me:inventory:report"
-    )
-
-    await button.callback(interaction)
-
-    assert interaction.response.deferred == [{"ephemeral": True}]
-    assert calls == [
-        ("visibility", 42),
-        ("inventory", 42, InventoryReportVisibility.ONLY_ME),
-    ]
 
 
 @pytest.mark.asyncio

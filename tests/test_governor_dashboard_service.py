@@ -390,9 +390,12 @@ def test_governor_dashboard_foundation_preserves_me_subcommands() -> None:
         "accounts",
         "reminders",
         "preferences",
-        "inventory",
+        "resources",
+        "speedups",
+        "materials",
         "exports",
     }.issubset(grouped["me"])
+    assert "inventory" not in grouped["me"]
 
 
 def test_governor_dashboard_service_has_no_ui_framework_dependency() -> None:

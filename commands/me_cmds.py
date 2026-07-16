@@ -12,7 +12,6 @@ from ui.views.player_self_service_inventory_report_views import send_player_inve
 from ui.views.player_self_service_views import (
     PAGE_ACCOUNTS,
     PAGE_EXPORTS,
-    PAGE_INVENTORY,
     PAGE_PREFERENCES,
     PAGE_REMINDERS,
     send_player_self_service_page,
@@ -65,22 +64,11 @@ def register_me(bot: ext_commands.Bot) -> None:
         description="Review your private Personal Settings",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.01")
+    @versioned("v1.02")
     @safe_command
     @track_usage()
     async def me_preferences(ctx: discord.ApplicationContext) -> None:
         await send_player_self_service_page(ctx, page=PAGE_PREFERENCES)
-
-    @me_group.command(
-        name="inventory",
-        description="Review your private inventory summary",
-        guild_ids=[GUILD_ID],
-    )
-    @versioned("v1.00")
-    @safe_command
-    @track_usage()
-    async def me_inventory(ctx: discord.ApplicationContext) -> None:
-        await send_player_self_service_page(ctx, page=PAGE_INVENTORY)
 
     @me_group.command(
         name="resources",

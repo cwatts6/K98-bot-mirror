@@ -9,8 +9,7 @@ from math import ceil
 
 import discord
 
-from inventory.models import InventoryReportVisibility
-from player_self_service import preference_service, profile_preference_service
+from player_self_service import profile_preference_service
 from player_self_service.preferences_summary import (
     PreferencesSummaryPayload,
     build_preferences_summary,
@@ -88,21 +87,6 @@ def _profile_content(profile: UserProfilePreference) -> str:
             f"Location: {values[1][2]}",
             f"Preferred language: {values[2][2]}",
             "\nChoose the field to update. Saved values are applied immediately.",
-        )
-    )
-
-
-def _manage_content(payload: PreferencesSummaryPayload) -> str:
-    profile = payload.regional_profile
-    return "\n".join(
-        (
-            "**Manage settings**",
-            f"Timezone: {profile.timezone.friendly_label}",
-            f"Location: {profile.location.friendly_label}",
-            f"Preferred language: {profile.preferred_language.friendly_label}",
-            "",
-            f"Inventory visibility: **{payload.inventory_visibility.state_label}**",
-            payload.inventory_visibility.consequence_text,
         )
     )
 
@@ -254,52 +238,6 @@ class _PreferencesChildView(discord.ui.View):
         await super().on_timeout()
 
 
-class ManageSettingsView(_PreferencesChildView):
-    def __init__(self, *, payload: PreferencesSummaryPayload, **kwargs) -> None:
-        self.payload = payload
-        super().__init__(**kwargs)
-
-    @discord.ui.button(
-        label="Regional profile",
-        style=discord.ButtonStyle.primary,
-        custom_id="me:preference:manage:regional",
-        row=0,
-    )
-    async def regional_button(self, _button, interaction: discord.Interaction) -> None:
-        await _defer_private(interaction)
-        result = await profile_preference_service.read_user_profile_preference(self.author_id)
-        if not result.ok:
-            await interaction.followup.send(
-                "Regional profile details are temporarily unavailable.", ephemeral=True
-            )
-            return
-        view = RegionalProfileView(profile=result.profile, **self._next_common())
-        await self._replace(interaction, content=_profile_content(result.profile), view=view)
-
-    @discord.ui.button(
-        label="Privacy & sharing",
-        style=discord.ButtonStyle.primary,
-        custom_id="me:preference:manage:privacy",
-        row=0,
-    )
-    async def privacy_button(self, _button, interaction: discord.Interaction) -> None:
-        view = PrivacySharingView(payload=self.payload, **self._next_common())
-        await self._replace(
-            interaction,
-            content=view.content,
-            view=view,
-        )
-
-    @discord.ui.button(
-        label="Back to Preferences",
-        style=discord.ButtonStyle.secondary,
-        custom_id="me:preference:manage:back",
-        row=1,
-    )
-    async def back_button(self, _button, interaction: discord.Interaction) -> None:
-        await self._back_to_preferences(interaction)
-
-
 class _ProfileFieldSelect(discord.ui.Select):
     def __init__(self) -> None:
         super().__init__(
@@ -336,17 +274,6 @@ class RegionalProfileView(_PreferencesChildView):
         field = field_value
         view = ProfileFieldView(field=field, profile=self.profile, page=0, **self._next_common())
         await self._replace(interaction, content=view.content, view=view)
-
-    @discord.ui.button(
-        label="Back to Manage settings",
-        style=discord.ButtonStyle.secondary,
-        custom_id="me:preference:regional:back_manage",
-        row=1,
-    )
-    async def back_manage_button(self, _button, interaction: discord.Interaction) -> None:
-        payload = await self._load_payload()
-        view = ManageSettingsView(payload=payload, **self._next_common())
-        await self._replace(interaction, content=_manage_content(payload), view=view)
 
     @discord.ui.button(
         label="Back to Preferences",
@@ -581,151 +508,6 @@ class ProfileFieldView(_PreferencesChildView):
         await self._back_to_preferences(interaction)
 
 
-class PrivacySharingView(_PreferencesChildView):
-    def __init__(self, *, payload: PreferencesSummaryPayload, **kwargs) -> None:
-        self.payload = payload
-        super().__init__(**kwargs)
-        self.change_button.label = (
-            "Make Private" if payload.inventory_visibility.is_public else "Make Public"
-        )
-
-    @property
-    def content(self) -> str:
-        visibility = self.payload.inventory_visibility
-        return (
-            f"**Privacy & sharing**\nInventory visibility: **{visibility.state_label}**\n"
-            f"{visibility.consequence_text}\n\nReview the consequence before changing this setting."
-        )
-
-    @discord.ui.button(
-        label="Change visibility",
-        style=discord.ButtonStyle.success,
-        custom_id="me:preference:privacy:change",
-        row=0,
-    )
-    async def change_button(self, _button, interaction: discord.Interaction) -> None:
-        expected = (
-            InventoryReportVisibility.PUBLIC
-            if self.payload.inventory_visibility.is_public
-            else InventoryReportVisibility.ONLY_ME
-        )
-        target = (
-            InventoryReportVisibility.ONLY_ME
-            if expected == InventoryReportVisibility.PUBLIC
-            else InventoryReportVisibility.PUBLIC
-        )
-        view = VisibilityConfirmationView(
-            payload=self.payload,
-            expected=expected,
-            target=target,
-            **self._next_common(),
-        )
-        target_label = "PRIVATE" if target == InventoryReportVisibility.ONLY_ME else "PUBLIC"
-        consequence = (
-            self.payload.inventory_visibility.consequence_text
-            if target == expected
-            else (
-                "Detailed Inventory reports opened through /me inventory or /myinventory are shown only to you."
-                if target == InventoryReportVisibility.ONLY_ME
-                else "Detailed Inventory reports opened through /me inventory or /myinventory may be posted in the channel."
-            )
-        )
-        await self._replace(
-            interaction,
-            content=(
-                f"**Confirm Inventory visibility: {target_label}**\n{consequence}\n\n"
-                "This does not make /me resources, /me materials, /me speedups, summaries, or exports public."
-            ),
-            view=view,
-        )
-
-    @discord.ui.button(
-        label="Back to Manage settings",
-        style=discord.ButtonStyle.secondary,
-        custom_id="me:preference:privacy:back_manage",
-        row=1,
-    )
-    async def back_manage_button(self, _button, interaction: discord.Interaction) -> None:
-        payload = await self._load_payload()
-        view = ManageSettingsView(payload=payload, **self._next_common())
-        await self._replace(interaction, content=_manage_content(payload), view=view)
-
-    @discord.ui.button(
-        label="Back to Preferences",
-        style=discord.ButtonStyle.secondary,
-        custom_id="me:preference:privacy:back_parent",
-        row=1,
-    )
-    async def back_parent_button(self, _button, interaction: discord.Interaction) -> None:
-        await self._back_to_preferences(interaction)
-
-
-class VisibilityConfirmationView(_PreferencesChildView):
-    def __init__(
-        self,
-        *,
-        payload: PreferencesSummaryPayload,
-        expected: InventoryReportVisibility,
-        target: InventoryReportVisibility,
-        **kwargs,
-    ) -> None:
-        self.payload = payload
-        self.expected = expected
-        self.target = target
-        self.completed = False
-        super().__init__(**kwargs)
-
-    @discord.ui.button(
-        label="Confirm",
-        style=discord.ButtonStyle.success,
-        custom_id="me:preference:privacy:confirm",
-        row=0,
-    )
-    async def confirm_button(self, _button, interaction: discord.Interaction) -> None:
-        await _defer_private(interaction)
-        if self.completed or self.journey.mutation_lock.locked():
-            await interaction.followup.send(
-                "This visibility confirmation is already being processed.", ephemeral=True
-            )
-            return
-        async with self.journey.mutation_lock:
-            if not self.journey.is_current(self.generation):
-                await interaction.followup.send(
-                    "This visibility confirmation was superseded.", ephemeral=True
-                )
-                return
-            self.completed = True
-            try:
-                result = await preference_service.confirm_inventory_visibility_change(
-                    self.author_id,
-                    expected_visibility=self.expected,
-                    target_visibility=self.target,
-                )
-            except asyncio.CancelledError:
-                self.completed = False
-                raise
-        if result.ok:
-            await self._back_to_preferences(interaction)
-            return
-        payload = await self._load_payload()
-        view = PrivacySharingView(payload=payload, **self._next_common())
-        await self._replace(interaction, content=f"{result.message}\n\n{view.content}", view=view)
-
-    @discord.ui.button(
-        label="Cancel",
-        style=discord.ButtonStyle.secondary,
-        custom_id="me:preference:privacy:cancel",
-        row=0,
-    )
-    async def cancel_button(self, _button, interaction: discord.Interaction) -> None:
-        view = PrivacySharingView(payload=self.payload, **self._next_common())
-        await self._replace(
-            interaction,
-            content=f"Inventory visibility change cancelled.\n\n{view.content}",
-            view=view,
-        )
-
-
 async def show_preferences_manage_settings(
     interaction: discord.Interaction,
     *,
@@ -745,9 +527,16 @@ async def show_preferences_manage_settings(
             "This Preferences window was superseded. Use the current private window.",
         )
         return
+    await _defer_private(interaction)
+    result = await profile_preference_service.read_user_profile_preference(int(author_id))
+    if not result.ok:
+        await interaction.followup.send(
+            "Regional profile details are temporarily unavailable.", ephemeral=True
+        )
+        return
     generation = journey.advance()
-    view = ManageSettingsView(
-        payload=payload,
+    view = RegionalProfileView(
+        profile=result.profile,
         author_id=author_id,
         display_name=display_name,
         preferences_loader=preferences_loader,
@@ -757,8 +546,8 @@ async def show_preferences_manage_settings(
         generation=generation,
         timeout=timeout,
     )
-    await interaction.response.edit_message(
-        content=_manage_content(payload),
+    await interaction.edit_original_response(
+        content=_profile_content(result.profile),
         embed=None,
         attachments=[],
         view=view,

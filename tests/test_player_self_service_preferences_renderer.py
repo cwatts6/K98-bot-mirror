@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime
+import inspect
 from io import BytesIO
 
 from PIL import Image
@@ -9,7 +10,6 @@ import pytest
 
 from player_self_service import preferences_renderer as renderer
 from player_self_service.preferences_summary import (
-    InventoryVisibilitySummary,
     PreferencesSummaryPayload,
     PreferenceValueSummary,
     RegionalProfileSummary,
@@ -17,7 +17,7 @@ from player_self_service.preferences_summary import (
 )
 
 
-def _payload(*, public: bool = False) -> PreferencesSummaryPayload:
+def _payload(*, mode: str = "LOCAL") -> PreferencesSummaryPayload:
     regional = RegionalProfileSummary(
         timezone=PreferenceValueSummary(
             True, True, "United Kingdom", "Europe/London", "Europe/London"
@@ -30,30 +30,24 @@ def _payload(*, public: bool = False) -> PreferencesSummaryPayload:
         display_name="Governor Tester",
         kingdom_id=1198,
         generated_at_utc=datetime(2026, 7, 15, 12, 34, tzinfo=UTC),
-        inventory_visibility=InventoryVisibilitySummary(
-            is_public=public,
-            state_label="PUBLIC" if public else "PRIVATE",
-            consequence_text=(
-                "Detailed Inventory reports opened through /me inventory or /myinventory may be posted in the channel."
-                if public
-                else "Detailed Inventory reports opened through /me inventory or /myinventory are shown only to you."
-            ),
-            is_explicit=True,
-        ),
         regional_profile=regional,
         time_reference=TimeReferenceSummary(
-            mode="LOCAL",
-            heading="LOCAL TIME REFERENCE",
-            display_time="13:34",
-            timezone_label="United Kingdom",
-            utc_offset_label="UTC+1",
-            supporting_line="United Kingdom • UTC+1",
+            mode=mode,
+            heading="LOCAL TIME REFERENCE" if mode == "LOCAL" else "UTC REFERENCE",
+            display_time="13:34" if mode == "LOCAL" else "12:34",
+            timezone_label="United Kingdom" if mode == "LOCAL" else None,
+            utc_offset_label="UTC+1" if mode == "LOCAL" else "UTC",
+            supporting_line=(
+                "United Kingdom • UTC+1"
+                if mode == "LOCAL"
+                else "Set a timezone to show your local-time reference."
+            ),
             regional_context="United Kingdom (GB) • English (en-GB)",
         ),
         profile_details_set=3,
         profile_details_total=3,
         profile_supporting_text="3 of 3 profile details set",
-        settings_insight="Your regional profile is complete and detailed Inventory reports remain private.",
+        settings_insight="All three regional profile details are available.",
     )
 
 
@@ -64,9 +58,9 @@ def _avatar_bytes() -> bytes:
     return stream.getvalue()
 
 
-@pytest.mark.parametrize("public", [False, True])
-def test_render_preferences_card_is_exact_png_with_stable_filename(public: bool) -> None:
-    rendered = renderer.render_preferences_card(_payload(public=public))
+@pytest.mark.parametrize("mode", ["LOCAL", "UTC_FALLBACK"])
+def test_render_preferences_card_is_exact_png_with_stable_filename(mode: str) -> None:
+    rendered = renderer.render_preferences_card(_payload(mode=mode))
 
     assert rendered.filename == "me_preferences_42.png"
     assert rendered.width == 1702
@@ -100,6 +94,15 @@ def test_render_preferences_card_accepts_avatar_failure_and_long_unicode_text() 
 
     with Image.open(BytesIO(rendered.image_bytes)) as image:
         assert image.size == (1702, 924)
+
+
+def test_renderer_contains_no_inventory_privacy_surface() -> None:
+    source = inspect.getsource(renderer.render_preferences_card)
+
+    assert "PRIVACY & SHARING" not in source
+    assert "INVENTORY VISIBILITY" not in source
+    assert "PRIVATE" not in source
+    assert "PUBLIC" not in source
 
 
 def test_render_preferences_card_rejects_wrong_sized_backdrop(tmp_path, monkeypatch) -> None:
