@@ -1,8 +1,12 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5F Inventory Surface Consolidation and Legacy Retirement
 
-Status: active mirror PR amendment after successful initial operator smoke. The operator has now
-approved retiring the legacy combined Inventory export and `/export_inventory`, while preserving
-the three report-page exports. Production promotion remains gated on renewed review and smoke.
+Status: completed and archived execution starter. Phase 5F delivered in mirror PR #225, was promoted
+to production branch `prod/phase-5f-inventory-consolidation` at commit `89f7da16`, and was operator
+accepted after final Discord smoke on 2026-07-16. Do not reuse this starter as an active task.
+
+The accepted result also includes the post-smoke retirement of `/export_inventory` and the combined
+Inventory export, the Stats-only `/me exports` state, and the Personal Settings visual reflow. The
+three selected-governor report-page exports remain. No SQL change or deployment occurred.
 
 ## Copy/Paste Starter
 

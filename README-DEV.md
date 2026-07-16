@@ -74,6 +74,19 @@ the legacy combined/all-governor Inventory export and `/export_inventory` are re
 import` and `/inventory audit` remain. `dbo.InventoryReportPreference` and existing rows remain
 untouched for rollback; there is no SQL deployment in Phase 5F.
 
+Phase 5F is complete and operator accepted after final Discord smoke on 2026-07-16. Mirror PR #225
+contains the accepted implementation, and production-branch commit `89f7da16` carries the promoted
+patch. The completed task pack and chat starter are archived under `docs/task_packs/archive/`.
+
+The next separately task-packed GovernorOS slice is Phase 5G Exports modernisation. It will update
+`/me exports` and `/my_stats_export` together. Before implementation, its operator-supplied task pack
+must distinguish the new page/interaction presentation from any downloaded-file format/schema
+change, decide selected-governor versus all-linked scope, define the author-gated governor dropdown
+and more-than-25 paging if selected-governor scoped, decide the `/my_stats_export` command outcome,
+and preserve one private service-backed controller with access rechecks, safe filenames, fallback,
+Google Sheets handling, and complete temporary-file/stream cleanup. The three Inventory report-page
+exports remain outside that slice unless separately approved.
+
 ## Quality Automation
 
 Run before committing:

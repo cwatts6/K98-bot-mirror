@@ -9,7 +9,7 @@
 - One-pass approved: `No`
 - Product decision approved: `Yes`
 - Runtime implementation approved: `Yes, subject to the normal audit, architecture, and implementation-plan stop gates`
-- Status: `implemented locally; validation, review, and mirror PR handoff in progress`
+- Status: `complete, operator accepted, and archived after successful Discord smoke`
 - New runtime backdrop: `none`
 - Existing Preferences backdrop retained: `assets/me/cards/me_preferences.png`
 - Asset approved for deletion after reference audit: `assets/me/cards/me inventory.png`
@@ -19,6 +19,27 @@ The operator has explicitly approved the retirement of `/me inventory`, `/myinve
 `/inventory_preferences`. Public Inventory report posting is no longer required, and the legacy
 combined `All` viewing route is not required by players. The definitive Inventory experience is the
 selected-governor dashboard plus the private premium Resources, Speedups, and Materials reports.
+
+### Completion record - 2026-07-16
+
+Phase 5F delivered in mirror PR #225. The exact accepted patch was promoted to production branch
+`prod/phase-5f-inventory-consolidation` at commit `89f7da16`. The operator completed the final
+Discord smoke and confirmed Inventory consolidation complete.
+
+The delivered result retires `/me inventory`, `/myinventory`, `/inventory_preferences`, and
+`/export_inventory`; removes public/combined Inventory viewing, the legacy combined/all-governor
+Inventory export, Inventory visibility application code, and directly orphaned controller, test,
+and asset code; and leaves `/me exports` Stats-only. It preserves `/inventory import`, `/inventory
+audit`, the selected-governor dashboard Inventory highlights, private `/me resources`, `/me
+speedups`, and `/me materials` reports, and the three report-page Excel/CSV/Google Sheets exports.
+
+Personal Settings now presents Regional Profile as the primary block, Local Time Reference as the
+secondary block, and profile coverage beside the derived LOCAL/UTC pill on the retained 1702x924
+backdrop. Final validation recorded `2590 passed, 2 skipped`; focused validation, pre-commit,
+architecture, deferred-item, command-registration, import-smoke, log-noise, visual, SQL read-only,
+K98 PR-review, and Changes-security gates passed. The final Changes scan ran with Deep off and
+reported zero findings. No SQL change or deployment occurred, and
+`dbo.InventoryReportPreference` remains untouched for rollback and later evidence-led cleanup.
 
 ### Post-smoke operator amendment - 2026-07-16
 
@@ -710,20 +731,20 @@ Deployment order:
 
 ### 12.8 Command Surface Governance
 
-- [ ] Record top-level command count `42 -> 39`.
-- [ ] Record `/me` grouped subcommand count `9 -> 8`.
-- [ ] Confirm `/inventory` remains at two subcommands.
-- [ ] Remove `myinventory`, `inventory_preferences`, and `export_inventory` from
+- [x] Record top-level command count `42 -> 39`.
+- [x] Record `/me` grouped subcommand count `9 -> 8`.
+- [x] Confirm `/inventory` remains at two subcommands.
+- [x] Remove `myinventory`, `inventory_preferences`, and `export_inventory` from
   `APPROVED_TOP_LEVEL_COMMANDS`.
-- [ ] Update canonical command tables and grouped summary.
-- [ ] Update relevant player/operator docs and smoke references.
-- [ ] Preserve decorators and versions for retained commands.
-- [ ] Run `scripts/validate_command_registration.py`.
-- [ ] Run `tests/test_validate_command_registration.py`.
-- [ ] Run `tests/test_command_inventory.py`.
-- [ ] Run `tests/test_command_registration_smoke.py`.
-- [ ] Run focused `/me` and Inventory command registration tests.
-- [ ] Perform and verify command resync after deployment.
+- [x] Update canonical command tables and grouped summary.
+- [x] Update relevant player/operator docs and smoke references.
+- [x] Preserve decorators and versions for retained commands.
+- [x] Run `scripts/validate_command_registration.py`.
+- [x] Run `tests/test_validate_command_registration.py`.
+- [x] Run `tests/test_command_inventory.py`.
+- [x] Run `tests/test_command_registration_smoke.py`.
+- [x] Run focused `/me` and Inventory command registration tests.
+- [x] Perform and verify command resync after deployment.
 
 ## 13. Refactor Decisions
 
@@ -844,35 +865,35 @@ and the final bot Changes security review.
 
 ## 15. Acceptance Criteria
 
-- [ ] The exact repository dependency map has been audited and approved before coding.
-- [ ] `/me inventory` is no longer registered or reachable through active navigation.
-- [ ] `/myinventory` is no longer registered.
-- [ ] `/inventory_preferences` is no longer registered.
-- [ ] `/export_inventory` is no longer registered.
-- [ ] Top-level command count is 39 and `/me` grouped count is 8.
-- [ ] Removed commands disappear from the Discord command cache after resync.
-- [ ] Public Inventory report posting no longer exists.
-- [ ] Combined All viewing no longer exists.
-- [ ] Combined/all-governor and private All Inventory export routes are removed.
-- [ ] Resources, Speedups, and Materials report-page exports remain private and unchanged.
-- [ ] Dashboard Inventory highlights and all three direct report journeys remain unchanged.
-- [ ] Imports, audits, report calculations, ranges, filenames, backdrops, exports, and Google Sheets
+- [x] The exact repository dependency map has been audited and approved before coding.
+- [x] `/me inventory` is no longer registered or reachable through active navigation.
+- [x] `/myinventory` is no longer registered.
+- [x] `/inventory_preferences` is no longer registered.
+- [x] `/export_inventory` is no longer registered.
+- [x] Top-level command count is 39 and `/me` grouped count is 8.
+- [x] Removed commands disappear from the Discord command cache after resync.
+- [x] Public Inventory report posting no longer exists.
+- [x] Combined All viewing no longer exists.
+- [x] Combined/all-governor and private All Inventory export routes are removed.
+- [x] Resources, Speedups, and Materials report-page exports remain private and unchanged.
+- [x] Dashboard Inventory highlights and all three direct report journeys remain unchanged.
+- [x] Imports, audits, report calculations, ranges, filenames, backdrops, exports, and Google Sheets
   behavior remain unchanged.
-- [ ] Personal Settings contains no Inventory visibility state, panel, mutation, consequence copy, or
+- [x] Personal Settings contains no Inventory visibility state, panel, mutation, consequence copy, or
   dead privacy control.
-- [ ] Personal Settings uses honest LOCAL/UTC presentation and retains all regional profile behavior.
-- [ ] The existing Preferences backdrop, avatar, fallback, attachment, cleanup, and timeout contracts
+- [x] Personal Settings uses honest LOCAL/UTC presentation and retains all regional profile behavior.
+- [x] The existing Preferences backdrop, avatar, fallback, attachment, cleanup, and timeout contracts
   remain accepted.
-- [ ] The legacy Inventory summary asset and directly orphaned code/tests are removed.
-- [ ] `dbo.InventoryReportPreference` is not read or written by the retained runtime.
-- [ ] `dbo.InventoryReportPreference` and its rows remain unchanged in SQL for rollback.
-- [ ] No required dashboard, Accounts, direct-report, or export Inventory helper is over-deleted.
-- [ ] No new direct SQL exists in commands or views.
-- [ ] Current docs, command references, task indexes, and deferred items match the delivered state.
-- [ ] Completed Phase 5E task records are archived if they were still active.
-- [ ] Focused tests, full pytest, pre-commit, validators, log-noise analysis, and visual QA pass.
-- [ ] Bot Changes security review is completed against the intended final diff with Deep off.
-- [ ] Mirror PR review, operator Discord smoke, promotion check, production promotion, deployment, and
+- [x] The legacy Inventory summary asset and directly orphaned code/tests are removed.
+- [x] `dbo.InventoryReportPreference` is not read or written by the retained runtime.
+- [x] `dbo.InventoryReportPreference` and its rows remain unchanged in SQL for rollback.
+- [x] No required dashboard, Accounts, direct-report, or export Inventory helper is over-deleted.
+- [x] No new direct SQL exists in commands or views.
+- [x] Current docs, command references, task indexes, and deferred items match the delivered state.
+- [x] Completed Phase 5E task records are archived if they were still active.
+- [x] Focused tests, full pytest, pre-commit, validators, log-noise analysis, and visual QA pass.
+- [x] Bot Changes security review is completed against the intended final diff with Deep off.
+- [x] Mirror PR review, operator Discord smoke, promotion check, production promotion, deployment, and
   command resync complete successfully.
 
 ## 16. Required Delivery Output
@@ -936,7 +957,10 @@ rollback data boundary.
 - Decision: `Changes review`
 - Repository / target: final Phase 5F mirror branch against the intended `main` base; record the exact commit range before scanning.
 - Expected setup / execution: `Changes + Deep Off`
-- Evidence: pending final Changes review; record the completed scan result and any finding disposition before PR handoff.
+- Evidence: completed Changes review with Deep off against base
+  `130840aeac84dfd17577faf1c0fee0810765f78a` and the final working-tree snapshot
+  `codex-security-snapshot/v1:sha256:16eec320b0e930c3f516ebad2f51aa3cb5e259a5a1d1cb833cebe2f5cad96f85`;
+  all 20 source rows were reviewed and the sealed report contained zero findings.
 - SQL repository: `documented skip; read-only contract/dependency validation only, no SQL diff`
 
 ## Deferred Optimisations

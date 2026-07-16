@@ -412,9 +412,9 @@ Player Self-Service Command Centre status:
   `archive/`.
 - Active Player Self-Service v2 files:
   - `Player Self-Service Command Centre v2 - Programme Pack.md`
-  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 5F Inventory Surface Consolidation and Legacy Retirement.md`
-  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5F Inventory Surface Consolidation and Legacy Retirement.md`
-- GovernorOS v2 Phases 1-5E are complete. Phase 2 delivered in mirror PR #216 and production PR
+- No Phase 5G task pack or starter is active yet; the operator will supply the next Exports slice
+  separately.
+- GovernorOS v2 Phases 1-5F are complete. Phase 2 delivered in mirror PR #216 and production PR
   #523, Phase 3 delivered in mirror PR #217 and production PR #524, and Phase 4 delivered in mirror
   PR #218. Phase 4 operator smoke on 2026-07-11 accepted the materially wider standalone card and
   gated Change Governor dropdown. Phase 5A delivered in mirror PR #219 and production PR #526;
@@ -427,18 +427,19 @@ Player Self-Service Command Centre status:
   event-start presentation on 2026-07-15. Phase 5E Preferences delivered in mirror PR #224 and
   production PR #531 and was deployed on 2026-07-16 with the accepted Personal Settings card,
   top-left avatar, one Manage Settings journey, Accounts-owned Update VIP, and no SQL deployment.
-  Completed Phase 5E records belong under `archive/`; the Phase 5F audit must move them if the active
-  checkout still exposes them under `docs/task_packs/`.
-- Phase 5F no longer builds a premium all-linked Inventory summary. Production usage evidence found
-  only two operator `/myinventory` invocations, and the operator confirmed that public Inventory
-  posting, the combined `All` viewing option, and `/inventory_preferences` are not required. The
-  active Phase 5F pack therefore coordinates removal of `/me inventory`, `/myinventory`, and
-  `/inventory_preferences`; removes the obsolete Inventory visibility setting from Personal
-  Settings; deletes directly orphaned summary/controller/asset code; preserves `/inventory import`,
-  `/inventory audit`, the private premium `/me resources|speedups|materials` reports, dashboard
-  Inventory highlights, and private Inventory exports; and leaves `dbo.InventoryReportPreference`
-  dormant for separately approved rollback-aware SQL cleanup. Phase 5G remains the Exports summary
-  alignment slice.
+  Completed Phase 5E records are under `archive/`.
+- Phase 5F completed in mirror PR #225, was promoted at production-branch commit `89f7da16`, and was
+  operator accepted after final Discord smoke on 2026-07-16. It retired `/me inventory`,
+  `/myinventory`, `/inventory_preferences`, `/export_inventory`, public/combined viewing, the
+  combined Inventory export, visibility application code, and directly orphaned controller/asset
+  code. It preserved `/inventory import`, `/inventory audit`, dashboard highlights, private premium
+  `/me resources|speedups|materials` reports and their three report-page exports, and left
+  `dbo.InventoryReportPreference` dormant. The completed Phase 5F task pack and starter are archived.
+- Phase 5G is the next Player Self-Service slice and will update `/me exports` and
+  `/my_stats_export` together. Its separate operator-supplied task pack must distinguish visual page
+  format from downloaded-file format, lock selected-governor versus all-linked semantics, define the
+  governor dropdown and more-than-25 behavior where applicable, decide the legacy command outcome,
+  and preserve one private service-backed export controller with access rechecks and cleanup.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -534,22 +535,23 @@ tuning/decomposition, residual `stats_module.py` cleanup, legacy PreKvK SQL clea
 cumulative view cleanup, and inventory view-orchestration extraction remain separate later slices
 unless explicitly approved.
 
-Player Self-Service Command Centre v2 Phase 5E Premium Preferences Summary Card is complete,
-operator accepted, and deployed through mirror PR #224 and production PR #531. Phase 5F Inventory
-Surface Consolidation and Legacy Retirement is the next active player self-service slice, with its
-approved task pack and chat starter present in this folder. It must ship as one coordinated bot
-release: remove `/me inventory`, `/myinventory`, and `/inventory_preferences`; remove the obsolete
-Inventory visibility dependency and Privacy & Sharing journey from Personal Settings; delete only
-code/assets proven orphaned by those removals; preserve modern private reports, dashboard highlights,
-imports, audits, ranges, calculations, report-page exports, filenames, and Google Sheets behavior;
-retire the combined/all-governor Inventory export and `/export_inventory`; update the 42-to-39
-top-level and 9-to-8 `/me` command baselines; and resync the Discord command cache after
-promotion. No new backdrop or SQL deployment is required. `dbo.InventoryReportPreference` remains
-untouched for rollback and later SQL cleanup review.
+Player Self-Service Command Centre v2 is complete and operator accepted through Phase 5F Inventory
+Surface Consolidation and Legacy Retirement. Phase 5F delivered in mirror PR #225, was promoted at
+production-branch commit `89f7da16`, and passed final Discord smoke on 2026-07-16. Its task pack and
+starter are archived. The accepted result has 39 top-level commands, 8 `/me` subcommands, and 2
+`/inventory` subcommands; keeps modern private reports and their three report-page exports; and leaves
+`dbo.InventoryReportPreference` untouched with no SQL deployment.
+
+Phase 5G Exports modernisation is the next player self-service slice. No active task pack or starter
+exists yet; the operator will supply them separately. That pack must cover `/me exports` and
+`/my_stats_export` together, distinguish page presentation from downloaded-file format, lock
+selected-governor versus all-linked behavior, define any governor dropdown and more-than-25 paging,
+decide the legacy command outcome, and preserve one private service-backed export controller with
+access rechecks, fallback, Sheets behavior, and cleanup.
 
 Other temporary deprecated command paths remain captured as deferred cleanup for execution only
 after their own communication, no-feedback monitoring, production usage review, and explicit
-operator approval. Phase 5F approval applies only to the four Inventory paths named above.
+operator approval. Completed Phase 5F approval applies only to its four Inventory paths.
 
 Discord Voting Post Framework is closed after Phase 22. Future voting enhancements should start in
 a new programme pack rather than continuing this programme as Phase 23.

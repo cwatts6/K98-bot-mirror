@@ -44,7 +44,7 @@ Dashboard Card and Preferences Hub, Phase 6 Guided Management Cards and Workflow
 and Phase 7 Unified Reminder Centre and Dashboard Card Alignment execution records are archived
 here. The original programme is complete; its closed programme pack remains in `docs/task_packs/`.
 
-Player Self-Service Command Centre v2 / GovernorOS completed Phases 1 through 5E. The archived
+Player Self-Service Command Centre v2 / GovernorOS completed Phases 1 through 5F. The archived
 records cover the dashboard blueprint/data foundation, governor selector and premium dashboard,
 direct Inventory reports and visual alignment, Accounts, Reminders, and the authoritative shared
 KVK/Calendar next-alert projection. Phase 5D.1 delivered in mirror PR #223 and production PR #530;
@@ -53,7 +53,14 @@ delivered in mirror PR #224 and production PR #531 and was deployed on 2026-07-1
 records capture the accepted top-left-avatar Personal Settings card, local-time/UTC fallback,
 regional profile, Inventory privacy flow, one Manage Settings journey, and Accounts-owned Update
 VIP migration with no SQL deployment. The active v2 programme pack remains in `docs/task_packs/`.
-Phase 5F Inventory is next; its task pack and chat starter are in `docs/task_packs/`.
+Phase 5F Inventory Surface Consolidation and Legacy Retirement delivered in mirror PR #225, was
+promoted at production-branch commit `89f7da16`, and was operator accepted after final Discord smoke
+on 2026-07-16. Its archived records capture retirement of `/me inventory`, `/myinventory`,
+`/inventory_preferences`, `/export_inventory`, public/combined Inventory viewing and the combined
+export; preservation of the selected-governor reports and their three exports; the profile-first
+Personal Settings reflow; final 39 top-level/8 `/me` command baselines; zero SQL change; and the
+dormant rollback table. Phase 5G Exports modernisation is next, but its task pack and starter have
+not yet been created.
 
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,

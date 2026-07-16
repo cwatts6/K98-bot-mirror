@@ -2,8 +2,10 @@
 
 Last updated: 2026-07-16
 
-GovernorOS v2 Phases 1-5E are complete and operator accepted. Phase 5E shipped in mirror PR #224
-and production PR #531 and was deployed on 2026-07-16. Phase 5F supersedes the proposed Premium
+GovernorOS v2 Phases 1-5F are complete and operator accepted. Phase 5E shipped in mirror PR #224
+and production PR #531 and was deployed on 2026-07-16. Phase 5F delivered in mirror PR #225, was
+promoted at production-branch commit `89f7da16`, and passed final operator Discord smoke on
+2026-07-16. It supersedes the proposed Premium
 Inventory Summary Card and Phase 5E's Inventory-privacy ownership. Its coordinated bot release
 retires `/me inventory`, `/myinventory`, and `/inventory_preferences`; removes public Inventory
 posting and combined `All` viewing; and simplifies `/me preferences` to the three-field regional
@@ -13,6 +15,13 @@ Inventory exports remain on the three selected-governor report pages. The legacy
 Inventory export, its `/me exports` button, and `/export_inventory` are retired; `/me exports` is now
 Stats-only. `/inventory import` and `/inventory audit` remain registered. No SQL change or deployment is part of Phase 5F;
 `dbo.InventoryReportPreference` remains untouched for rollback.
+
+Phase 5G Exports modernisation is next and will receive a separate operator-supplied task pack. It
+will update `/me exports` and `/my_stats_export` together. The task pack must distinguish page/card
+presentation from downloaded-file format/schema, lock selected-governor versus all-linked scope,
+define the author-gated governor dropdown and more-than-25 paging if selected-governor scoped, and
+decide the final `/my_stats_export` registration/redirect/alias/removal outcome. The three retained
+Inventory report-page exports are not part of that slice without separate approval.
 
 The following earlier phase notes remain as historical delivery context where they describe the
 state accepted at that time; Phase 5F's current surface above supersedes their legacy-route wording.
@@ -81,9 +90,9 @@ available. The operator-approved private embed remains the fallback when avatar 
 rendering, file creation, or image delivery fails. The successful card is delivered as a
 standalone attachment for the wider KVK-style Discord presentation. Multiple-governor cards use a
 Change Governor dropdown below the blue primary navigation row. `Last Login: TBC` is presentation
-only until its separately approved dataset/SQL contract is delivered. Accounts now uses the
-accepted premium Phase 5C portfolio/summary presentation; Reminders, Preferences, Inventory
-summary, and Exports summary retain their current cards until their own approved slices. Quick
+only until its separately approved dataset/SQL contract is delivered. Accounts, Reminders, and
+Preferences now use their accepted premium presentations; the Inventory summary is retired, and
+Exports retains its current card until the separately task-packed Phase 5G slice. Quick
 Launch links for
 `/kvk stats`, `/kvk targets`,
 `/kvk history`, and `/kvk rankings` remain absent because those commands have channel and
@@ -208,6 +217,19 @@ Rollout checks:
   still requires a fresh post-briefing production usage snapshot and no-feedback monitoring.
 - Preserve `/my_stats`, `/mykvkcrystaltech`, `/player_profile`, and `/stats player`; their removal is
   outside Phase 5F.
+
+Phase 5F final smoke-test result:
+
+- `/me dashboard`, accounts, reminders, preferences, resources, speedups, materials, and exports
+  all worked; Accounts retained its expected data.
+- `/me inventory`, `/myinventory`, `/inventory_preferences`, and `/export_inventory` were absent
+  after command resync.
+- Resources, Speedups, and Materials retained their private selected-governor report exports.
+- `/inventory import` and `/inventory audit` remained available.
+- Personal Settings retained Regional Profile and LOCAL/UTC behavior with its accepted profile-first
+  reflow and direct Manage settings journey.
+- No public or combined `All` Inventory viewing/export route remained. The operator confirmed the
+  consolidation complete on 2026-07-16.
 
 Phase 2 smoke-test result:
 
@@ -564,21 +586,24 @@ Current status:
   PR #531. Phase 5F supersedes only its Inventory-privacy panel/journey while preserving the
   accepted 1702x924 backdrop, invoking-user avatar, standalone private attachment, same-payload
   fallback, graceful timeout, profile catalogs, atomic save/clear, and Accounts-owned VIP flow.
-- Phase 5F Inventory consolidation is the active release candidate. It removes the legacy summary,
-  public/combined viewing routes, visibility application code, directly orphaned tests/controller,
-  and `me inventory.png` in one bot patch. It preserves modern selected-governor reports, dashboard
-  highlights, Accounts RSS/Inventory As Of, report-specific private exports, imports, audits, and
-  the dormant SQL table for rollback. Post-smoke operator approval also retires the combined/all-
-  governor Inventory export, its `/me exports` control, and `/export_inventory`, making the command
-  baseline 39 top-level while `/me` remains 8 and `/inventory` remains 2. Phase 5G remains a separate future Exports summary slice and
-  is the only approved future owner of generic-renderer consolidation after its own acceptance.
-- Phase 6 adds Export Stats only after selected-governor versus all-linked semantics are approved;
-  export schema/format redesign remains outside GovernorOS.
+- Phase 5F Inventory consolidation is complete and operator accepted. It removed the legacy summary,
+  public/combined viewing routes and export, visibility application code, directly orphaned
+  tests/controller, `me inventory.png`, and all four retired command routes in one bot patch. It
+  preserved modern selected-governor reports, dashboard highlights, Accounts RSS/Inventory As Of,
+  report-specific private exports, imports, audits, and the dormant SQL table for rollback. The final
+  baseline is 39 top-level while `/me` remains 8 and `/inventory` remains 2. The completed task pack
+  and starter are archived.
+- Phase 5G is the next separately task-packed Exports slice. It updates `/me exports` and
+  `/my_stats_export` together, distinguishes presentation format from downloaded-file format,
+  explicitly decides selected-governor versus all-linked semantics, and defines any governor
+  dropdown, direct entry, Change Governor, and more-than-25 paging behavior before implementation.
+- Phase 6 is now conditional dashboard integration only. If required after Phase 5G, it must reuse
+  the accepted Phase 5G controller and semantics without reopening or duplicating export decisions.
 - Phase 7 adds private selected-governor `/me history` while preserving public/channel-gated
   `/kvk history` unchanged.
 - Phase 8 delivers the required permission-gated admin/leadership inspect journey, with an explicit
   permissions, inspect-safe VIP, lookup, and telemetry approval checkpoint.
 - Phase 9 is an evidence-only usage-led migration review; no legacy redirect/removal is implied.
 - Phase 10 sticky features are a future programme candidate, not a committed implementation slice.
-- Export schema/format redesign remains a separate export-output programme unless explicitly
-  narrowed later.
+- Any broader export schema/format redesign beyond the explicitly approved Phase 5G Stats scope
+  remains a separate export-output programme.
