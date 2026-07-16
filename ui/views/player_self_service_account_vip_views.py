@@ -208,7 +208,13 @@ class _GovernorSelect(discord.ui.Select):
                 "This governor selector is unavailable.", ephemeral=True
             )
             return
-        governor_id = int(self.values[0])
+        try:
+            governor_id = int(self.values[0])
+        except (IndexError, TypeError, ValueError):
+            await interaction.response.send_message(
+                "That governor is not available on this page.", ephemeral=True
+            )
+            return
         if governor_id not in self.allowed_ids or governor_id not in view.governors_by_id:
             await interaction.response.send_message(
                 "That governor is not available on this page.", ephemeral=True

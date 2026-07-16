@@ -267,6 +267,22 @@ async def test_vip_editor_rejects_foreign_stale_and_forged_governor_selection() 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("selected_values", [["not-a-governor"], []])
+async def test_vip_editor_rejects_malformed_governor_selection(selected_values) -> None:
+    common = _common(_governors(2))
+    view = vip_views.AccountVipGovernorView(page=0, **common)
+    interaction = _Interaction()
+    selector = next(item for item in view.children if isinstance(item, vip_views._GovernorSelect))
+    selector._selected_values = selected_values
+    selector._interaction = SimpleNamespace(data={})
+
+    await selector.callback(interaction)
+
+    assert interaction.original_edits == []
+    assert "not available" in interaction.response.sent[-1][0][0]
+
+
+@pytest.mark.asyncio
 async def test_save_rechecks_access_refreshes_accounts_and_preserves_not_set(monkeypatch) -> None:
     governor = _governors(1)[0]
     calls = []

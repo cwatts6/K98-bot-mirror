@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -44,6 +45,16 @@ class _Response:
     async def defer(self, **kwargs):
         self.deferred.append(kwargs)
         self._done = True
+
+
+class _FailingDeferResponse(_Response):
+    def __init__(self, failures: tuple[BaseException, ...]) -> None:
+        super().__init__()
+        self.failures = list(failures)
+
+    async def defer(self, **kwargs):
+        self.deferred.append(kwargs)
+        raise self.failures.pop(0)
 
 
 class _Followup:
@@ -107,6 +118,40 @@ def _payload(*, public: bool = False) -> PreferencesSummaryPayload:
 async def _loader(_user_id: int, *, display_name: str):
     assert display_name == "Tester"
     return _payload()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failures",
+    [
+        (RuntimeError("primary defer failed"),),
+        (TypeError("ephemeral unsupported"), RuntimeError("fallback defer failed")),
+    ],
+)
+async def test_private_defer_logs_and_suppresses_api_failures(failures, caplog) -> None:
+    interaction = _Interaction()
+    interaction.response = _FailingDeferResponse(failures)
+
+    with caplog.at_level(logging.DEBUG, logger=preference_views.logger.name):
+        await preference_views._defer_private(interaction)
+
+    assert "player_self_service_preference_defer_failed" in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failures",
+    [
+        (asyncio.CancelledError(),),
+        (TypeError("ephemeral unsupported"), asyncio.CancelledError()),
+    ],
+)
+async def test_private_defer_propagates_cancellation(failures) -> None:
+    interaction = _Interaction()
+    interaction.response = _FailingDeferResponse(failures)
+
+    with pytest.raises(asyncio.CancelledError):
+        await preference_views._defer_private(interaction)
 
 
 def _common(
