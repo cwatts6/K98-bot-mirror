@@ -870,8 +870,8 @@ async def test_export_is_strict_private_and_cleans_temp_file(monkeypatch) -> Non
     await view.export_report(interaction, InventoryExportFormat.EXCEL)
 
     assert captured["governor_id"] == 111
-    assert captured["is_admin"] is False
-    assert captured["discord_user"] is None
+    assert "is_admin" not in captured
+    assert "discord_user" not in captured
     assert interaction.followup.sent[-1][1]["ephemeral"] is True
     assert interaction.followup.sent[-1][1]["file"].closed is True
     assert cleaned == [fake_export]

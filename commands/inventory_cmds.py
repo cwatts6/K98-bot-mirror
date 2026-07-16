@@ -6,7 +6,6 @@ import discord
 from discord.ext import commands as ext_commands
 
 from bot_config import GUILD_ID, INVENTORY_UPLOAD_CHANNEL_ID
-from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import admin_only, channel_only, track_usage
 from inventory import audit_service
@@ -53,57 +52,6 @@ def register_inventory(bot: ext_commands.Bot) -> None:
                 "Inventory import setup failed. Please try again or contact an admin.",
                 ephemeral=True,
             )
-
-    @bot.slash_command(
-        name="export_inventory",
-        description="Deprecated: use /me exports for inventory exports.",
-        guild_ids=[GUILD_ID],
-    )
-    @versioned("v1.00")
-    @safe_command
-    @track_usage()
-    async def export_inventory(
-        ctx: discord.ApplicationContext,
-        format: str = discord.Option(
-            str,
-            "Choose export format",
-            choices=["Excel", "CSV", "GoogleSheets"],
-            required=False,
-            default="Excel",
-        ),
-        view: str = discord.Option(
-            str,
-            "Inventory records to export",
-            choices=["Resources", "Speedups", "Materials", "All"],
-            required=False,
-            default="All",
-        ),
-        governor: int | None = discord.Option(
-            int,
-            "Governor ID to export (optional; defaults to all registered governors)",
-            required=False,
-            default=None,
-        ),
-        days: int = discord.Option(
-            int,
-            "Number of days to include",
-            min_value=1,
-            max_value=366,
-            required=False,
-            default=366,
-        ),
-    ) -> None:
-        await safe_defer(ctx, ephemeral=True)
-        await send_deprecated_command_redirect(
-            ctx,
-            CommandRedirect(
-                old_path="/export_inventory",
-                new_path="/me exports",
-                detail="The export centre now provides inventory exports from the same private self-service menu.",
-            ),
-            ephemeral=True,
-        )
-        return
 
     @inventory_group.command(
         name="audit",

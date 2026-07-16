@@ -1,6 +1,6 @@
 # Canonical Command Reference
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
 This is the maintained command reference for the K98 bot after the completed Command Platform
 Audit & Optimisation Programme. Use
@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=40 grouped_subcommands_detected=100 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=40
+primary=39 grouped_subcommands_detected=100 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39
 ```
 
 Grouped command summary:
@@ -67,7 +67,7 @@ The approved top-level command baseline is enforced by `APPROVED_TOP_LEVEL_COMMA
 
 ```text
 activity, ark, calendar, calendar_next_event, calendar_reminder_config, crystaltech, events,
-export_inventory, honor, honor_rankings, inventory, kvk, kvk_admin, kvk_rankings, location, me, mge,
+honor, honor_rankings, inventory, kvk, kvk_admin, kvk_rankings, location, me, mge,
 modify_registration, modify_subscription, my_registrations, my_stats, my_stats_export, mygovernorid,
 mykvkcrystaltech, mykvkhistory, mykvkstats,
 mykvktargets, next_kvk_event, next_kvk_fight, ops, ping, player_profile, prekvk,
@@ -130,7 +130,6 @@ Legend:
 | Honor/KVK | `/honor_rankings` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator | Public redirect | Standard | Deprecated redirect to `/kvk rankings type:honor`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Honor/KVK | `/honor purge_last` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Purges latest honor scan. |
 | Inventory | `/inventory import` | `commands/inventory_cmds.py` | Grouped | Inventory upload channel decorator with admin override | Ephemeral | Standard | Preserve | Imports resources, speedups, or materials screenshots. |
-| Inventory | `/export_inventory` | `commands/inventory_cmds.py` | Flat | Public command-level access | Ephemeral redirect | Standard | Deprecated redirect to `/me exports`; remove only after no-feedback window | Phase 13 explicit operator approval redirects the legacy export entry point while preserving export schemas/services behind `/me exports`. Old options remain accepted for compatibility but are ignored by the redirect handler. |
 | Inventory | `/inventory audit` | `commands/inventory_cmds.py` | Grouped | Admin-only decorator | Ephemeral | Standard | Preserve | Inventory import audit. |
 | Location | `/location import` | `commands/location_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve | Imports location data. |
 | Location | `/location player` | `commands/location_cmds.py` | Grouped | Admin or leadership in allowed channels | User-selectable | Standard | Preserve | Leadership player-location lookup. |
@@ -147,7 +146,7 @@ Legend:
 | Player Self-Service | `/me resources` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.00`) | GovernorOS v2 Phase 5B complete; operator smoke passed 2026-07-13 | Private selected-governor Resources report using the report-specific premium 1400x980 Inventory backdrop, honest native no-data output, 1M/3M/6M/12M ranges, private exports, report tabs, Dashboard navigation, and paged Change Governor controls. |
 | Player Self-Service | `/me materials` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.00`) | GovernorOS v2 Phase 5B complete; operator smoke passed 2026-07-13 | Private selected-governor Materials report using the report-specific premium 1400x980 Inventory backdrop with unchanged no-data, privacy, range, export, Dashboard, and Change Governor interaction contract. |
 | Player Self-Service | `/me speedups` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.00`) | GovernorOS v2 Phase 5B complete; operator smoke passed 2026-07-13 | Private selected-governor Speedups report using the report-specific premium 1400x980 Inventory backdrop with unchanged no-data, privacy, range, export, Dashboard, and Change Governor interaction contract. |
-| Player Self-Service | `/me exports` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Phase 9 preferred export route with option windows | Private personal export centre with `Export Stats` and `Export Inventory` child option windows. Stats supports Excel, CSV, and Google Sheets formats plus day-window selection. Inventory supports format, view, registered-governor scope, and day-window selection. Phase 13 redirects legacy `/my_stats_export` and `/export_inventory` here while preserving export schemas/services. |
+| Player Self-Service | `/me exports` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | Preserve; Stats export centre | Private personal Stats export centre with Excel, CSV, and Google Sheets formats plus day-window selection. `/my_stats_export` continues to redirect here. Inventory exports are owned by the selected-governor Resources, Speedups, and Materials report pages; the legacy combined/all-governor Inventory option window and `/export_inventory` are retired. |
 | Ops | `/ops summary` | `commands/admin_cmds.py` | Grouped | Public command-level access | Public | Standard | Preserve | Daily file-processing summary. |
 | Ops | `/ops weeksummary` | `commands/admin_cmds.py` | Grouped | Public command-level access | Public | Standard | Preserve | Seven-day file-processing summary. |
 | Ops | `/ops history` | `commands/admin_cmds.py` | Grouped | Admin-only decorator | Public | Standard | Preserve | Processed-file history. |
@@ -299,9 +298,10 @@ Legend:
   the completed Phase 5D.1 task pack and starter are archived.
 - GovernorOS v2 Phase 5F supersedes the proposed Premium Inventory Summary Card and Phase 5E's
   Inventory-privacy ownership. It retires `/me inventory`, `/myinventory`, and
-  `/inventory_preferences` as one bot release, reducing the top-level command count from 42 to 40
+  `/inventory_preferences`, and `/export_inventory` as one bot release, reducing the top-level command count from 42 to 39
   and `/me` from 9 to 8 subcommands while `/inventory` remains at 2. Public Inventory posting and
-  combined `All` viewing are removed; private `All` Inventory export remains under `/me exports`.
+  combined `All` viewing and export routes are removed. The three selected-governor report pages retain
+  their private Excel/CSV/Google Sheets exports; `/me exports` is Stats-only.
   The selected-governor dashboard and `/me resources`, `/me speedups`, and `/me materials` remain
   the definitive report UX. Personal Settings is profile-only with derived `LOCAL`/`UTC` context.
   The bot no longer reads or writes Inventory visibility; `dbo.InventoryReportPreference` remains

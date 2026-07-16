@@ -63,7 +63,6 @@ def _summary() -> PlayerSelfServiceSummary:
         ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
-            inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
     )
@@ -84,7 +83,6 @@ def _no_account_summary() -> PlayerSelfServiceSummary:
         reminders=summary.reminders,
         exports=ExportStatus(
             stats_export="Unavailable",
-            inventory_export="Unavailable",
             privacy_note="Private",
             action_state="unavailable",
             action_summary="Register an account first.",
@@ -728,7 +726,6 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Dashboard", 1, secondary, False),
             ("Exports", 1, secondary, True),
             ("Export Stats", 2, success, False),
-            ("Export Inventory", 2, success, False),
         ],
     )
 
@@ -766,7 +763,7 @@ async def test_reminders_view_removes_inventory_and_keeps_exports_navigation() -
 
 
 @pytest.mark.asyncio
-async def test_exports_view_has_private_inventory_export_action() -> None:
+async def test_exports_view_has_stats_export_action_only() -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -776,7 +773,7 @@ async def test_exports_view_has_private_inventory_export_action() -> None:
 
     labels = [getattr(child, "label", None) for child in view.children]
     assert "Export Stats" in labels
-    assert "Export Inventory" in labels
+    assert "Export Inventory" not in labels
     assert "Inventory" not in labels
     assert "Exports" in labels
     exports_nav = next(
@@ -824,36 +821,6 @@ async def test_exports_stats_button_opens_options(monkeypatch) -> None:
     interaction = _Interaction()
     button = next(
         child for child in view.children if getattr(child, "custom_id", None) == "me:export:stats"
-    )
-
-    await button.callback(interaction)
-
-    assert calls == [(42, "Tester")]
-
-
-@pytest.mark.asyncio
-async def test_exports_inventory_button_opens_options(monkeypatch) -> None:
-    calls = []
-
-    async def fake_send_inventory_export_options(interaction, *, display_name):
-        calls.append((interaction.user.id, display_name))
-
-    monkeypatch.setattr(
-        views.export_views,
-        "send_inventory_export_options",
-        fake_send_inventory_export_options,
-    )
-    view = views.PlayerSelfServiceView(
-        author_id=42,
-        display_name="Tester",
-        page=views.PAGE_EXPORTS,
-        summary=_summary(),
-    )
-    interaction = _Interaction()
-    button = next(
-        child
-        for child in view.children
-        if getattr(child, "custom_id", None) == "me:export:inventory"
     )
 
     await button.callback(interaction)
@@ -2024,7 +1991,7 @@ def test_exports_embed_is_compact_and_action_first() -> None:
     assert [field.name for field in embed.fields] == ["Status", "Actions"]
     assert "Delivery: Private" in embed.fields[0].value
     assert "Export Stats" in embed.fields[1].value
-    assert "Export Inventory" in embed.fields[1].value
+    assert "Export Inventory" not in embed.fields[1].value
     assert "Legacy" not in embed.fields[1].value
 
 

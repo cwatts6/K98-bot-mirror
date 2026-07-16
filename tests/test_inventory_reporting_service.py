@@ -14,14 +14,12 @@ from inventory.models import (
 )
 
 
-def test_parse_report_inputs_accept_expected_values():
-    assert reporting_service.parse_report_view("Resources") == InventoryReportView.RESOURCES
-    assert reporting_service.parse_report_view("All") == InventoryReportView.ALL
+def test_parse_report_range_accepts_expected_values():
     assert reporting_service.parse_report_range("3M") == InventoryReportRange.THREE_MONTHS
 
 
 @pytest.mark.asyncio
-async def test_build_inventory_report_payload_groups_resources_and_speedups(monkeypatch):
+async def test_build_inventory_report_payload_fetches_only_requested_view(monkeypatch):
     now = datetime.now(UTC)
 
     def _resource_rows(governor_id):
@@ -49,16 +47,6 @@ async def test_build_inventory_report_payload_groups_resources_and_speedups(monk
             },
         ]
 
-    def _speedup_rows(governor_id):
-        assert governor_id == 111
-        return [
-            {"ScanUtc": now, "SpeedupType": "building", "TotalDaysDecimal": 1},
-            {"ScanUtc": now, "SpeedupType": "research", "TotalDaysDecimal": 2},
-            {"ScanUtc": now, "SpeedupType": "training", "TotalDaysDecimal": 3},
-            {"ScanUtc": now, "SpeedupType": "healing", "TotalDaysDecimal": 4},
-            {"ScanUtc": now, "SpeedupType": "universal", "TotalDaysDecimal": 5},
-        ]
-
     monkeypatch.setattr(
         reporting_service.inventory_reporting_dal,
         "fetch_resource_rows",
@@ -67,7 +55,9 @@ async def test_build_inventory_report_payload_groups_resources_and_speedups(monk
     monkeypatch.setattr(
         reporting_service.inventory_reporting_dal,
         "fetch_speedup_rows",
-        _speedup_rows,
+        lambda _governor_id: (_ for _ in ()).throw(
+            AssertionError("unrequested speedups must not be fetched")
+        ),
     )
     monkeypatch.setattr(
         reporting_service.inventory_material_dal,
@@ -83,13 +73,12 @@ async def test_build_inventory_report_payload_groups_resources_and_speedups(monk
     payload = await reporting_service.build_inventory_report_payload(
         discord_user_id=42,
         governor=RegisteredGovernor(111, "Gov", "Main"),
-        view=InventoryReportView.ALL,
+        view=InventoryReportView.RESOURCES,
         range_key=InventoryReportRange.ONE_MONTH,
     )
 
     assert payload.resources[0].total == 1000
-    assert payload.speedups[0].training_days == 3
-    assert payload.speedups[0].universal_days == 5
+    assert payload.speedups == []
     assert payload.materials == []
     assert payload.governor_profile is not None
     assert payload.governor_profile.uses_default_vip is True

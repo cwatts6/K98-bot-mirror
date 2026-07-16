@@ -100,7 +100,6 @@ class ReminderStatus:
 @dataclass(frozen=True, slots=True)
 class ExportStatus:
     stats_export: str
-    inventory_export: str
     privacy_note: str
     action_state: str = "actionable"
     action_summary: str = "Default private exports are available here."
@@ -277,7 +276,6 @@ def summarize_export_status(accounts: AccountStatus) -> ExportStatus:
     if accounts.state == "unknown":
         return ExportStatus(
             stats_export="Unavailable",
-            inventory_export="Unavailable",
             privacy_note="Private",
             action_state="unavailable",
             action_summary="Try again later.",
@@ -285,14 +283,12 @@ def summarize_export_status(accounts: AccountStatus) -> ExportStatus:
     if accounts.linked_count <= 0:
         return ExportStatus(
             stats_export="Unavailable",
-            inventory_export="Unavailable",
             privacy_note="Private",
             action_state="unavailable",
             action_summary="Register an account first.",
         )
     return ExportStatus(
         stats_export="Excel / CSV / Google Sheets",
-        inventory_export="Excel / CSV / Google Sheets",
         privacy_note="Private",
         action_state="actionable",
         action_summary="Ready",

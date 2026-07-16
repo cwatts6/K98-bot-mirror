@@ -89,11 +89,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `commands/registry_cmds.py`, `commands/telemetry_cmds.py`, `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `commands/subscriptions_cmds.py`, `commands/calendar_cmds.py`, player self-service command docs/tests
 - Type: cleanup
-- Description: Player Self-Service Command Centre Phase 13 converted approved legacy self-service entry points to lightweight private redirects: account paths to `/me accounts`; reminder paths to `/me reminders`; and `/my_stats_export` plus `/export_inventory` to `/me exports`. `/inventory_preferences` was also redirected, while `/myinventory` remained live. Production usage review on 2026-07-16 found only two operator `/myinventory` invocations, and the operator explicitly approved removal of `/myinventory` plus `/inventory_preferences` in GovernorOS v2 Phase 5F. Those Inventory paths are therefore promoted out of this deferred item into the active Phase 5F task pack. The other redirected registrations and `/my_stats`, `/mykvkcrystaltech`, `/player_profile`, and `/stats player` remain outside that approval.
+- Description: Player Self-Service Command Centre Phase 13 converted approved legacy self-service entry points to lightweight private redirects. GovernorOS v2 Phase 5F separately received explicit operator approval to remove `/myinventory`, `/inventory_preferences`, and, after successful smoke plus a three-month usage review, `/export_inventory`. Those Inventory paths are promoted out of this deferred item into the active Phase 5F task pack. Account/reminder redirects, `/my_stats_export`, `/my_stats`, `/mykvkcrystaltech`, `/player_profile`, and `/stats player` remain outside that approval.
 - Suggested Fix: Execute only the approved Inventory removals through Phase 5F. For all remaining redirected paths, wait for their own player communication, no-feedback monitoring window, production usage review, and explicit operator approval; then remove only the approved registrations and redirect-only tests, update `scripts/validate_command_registration.py::APPROVED_TOP_LEVEL_COMMANDS`, canonical docs, briefing docs, and focused command tests.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 13 redirect slice delivered in production PR #486 and smoke tested on 2026-06-27; Phase 5F separately owns `/myinventory` and `/inventory_preferences`; every other registration still requires its own evidence and approval before removal.
+- Dependencies: Phase 13 redirect slice delivered in production PR #486 and smoke tested on 2026-06-27; Phase 5F owns `/myinventory`, `/inventory_preferences`, and `/export_inventory`; every other registration still requires its own evidence and approval before removal.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.InventoryReportPreference`, `inventory/dal/inventory_reporting_dal.py`, `inventory/reporting_service.py`, and retired Inventory-visibility documentation/tests
@@ -103,15 +103,6 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: low
 - Risk: medium
 - Dependencies: Phase 5F deployed and operator smoke accepted; confirmed zero runtime reads/writes; SQL repository and production dependency checks; explicit destructive SQL approval.
-
-### Deferred Optimisation
-- Area: `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `/my_stats_export`, `/export_inventory`, player self-service docs/tests
-- Type: cleanup
-- Description: Phase 13 explicitly approved lightweight redirects for `/my_stats_export` and `/export_inventory` to `/me exports`. The redirect slice intentionally preserves the existing stats and inventory export services, schemas, formats, option-window behavior, and file delivery through `/me exports`; only the old flat command entry points stop producing files directly.
-- Suggested Fix: After the export redirect no-feedback window, review production command usage and player feedback. Remove the flat export command registrations only with explicit operator approval, keep export schema/format redesign out of this cleanup, and update command registration baselines, canonical command reference, player briefing, and focused export redirect tests for the approved removal slice.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 9 `/me exports` option windows smoke tested; Phase 13 audit/scope drafted; operator approved export entry-point redirects; production PR #486 delivered and smoke tested the redirects successfully on 2026-06-27; player communication and no-feedback monitoring before final removal.
 
 ### Deferred Optimisation
 - Area: `player_self_service/governor_dashboard_dal.py`, SQL repo `dbo.KingdomScanData4` dashboard-read indexes, optional dashboard read view
@@ -161,7 +152,7 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `inventory/export_service.py`, `inventory/dal/`, SQL repo export views/tables, export docs/tests
 - Type: architecture
-- Description: Phase 8 and Phase 9 intentionally reuse existing stats and inventory export schemas and file formats so `/me exports` can safely launch current service-backed private exports. A fuller export schema and format redesign would need to decide whether exports should stay raw, add curated summary sheets, change CSV/XLSX headers, add new formats, split personal versus leadership exports, or introduce new SQL views/contracts.
+- Description: Phase 8 and Phase 9 intentionally reused existing stats and inventory export schemas and file formats. Phase 5F later retired the combined/all-governor Inventory export and kept the three selected-governor report-page exports. A fuller export schema and format redesign would need to decide whether those retained exports should stay raw, add curated summary sheets, change CSV/XLSX headers, add new formats, split personal versus leadership exports, or introduce new SQL views/contracts.
 - Suggested Fix: Treat export schema and format redesign as a separate export-output programme, not as another phase of the Player Self-Service Command Centre. Start with a dedicated audit of current stats, inventory, KVK history, rankings, and registry export consumers; validate SQL contracts in `C:\K98-bot-SQL-Server`; define backwards-compatibility and migration expectations for file consumers; then implement schema or format changes in controlled slices with export-file regression tests.
 - Impact: high
 - Risk: high

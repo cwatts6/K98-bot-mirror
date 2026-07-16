@@ -9,8 +9,9 @@ retires `/me inventory`, `/myinventory`, and `/inventory_preferences`; removes p
 posting and combined `All` viewing; and simplifies `/me preferences` to the three-field regional
 profile plus derived DST-aware `LOCAL`/`UTC` context. The selected-governor dashboard and private
 `/me resources`, `/me speedups`, and `/me materials` reports are the definitive viewing UX.
-Private `All` Inventory export remains under `/me exports`. `/inventory import`, `/inventory audit`,
-and `/export_inventory` remain registered. No SQL change or deployment is part of Phase 5F;
+Inventory exports remain on the three selected-governor report pages. The legacy combined/all-governor
+Inventory export, its `/me exports` button, and `/export_inventory` are retired; `/me exports` is now
+Stats-only. `/inventory import` and `/inventory audit` remain registered. No SQL change or deployment is part of Phase 5F;
 `dbo.InventoryReportPreference` remains untouched for rollback.
 
 The following earlier phase notes remain as historical delivery context where they describe the
@@ -109,13 +110,13 @@ Use the selected-governor dashboard buttons or `/me resources`, `/me speedups`, 
 for private detailed Inventory viewing. Reports retain tabs, 1M/3M/6M/12M ranges, private exports,
 Dashboard return, Change Governor paging, honest no-data guidance, fallback, and cleanup. There is
 no public Inventory report path and no combined `All` viewing page.
-`/me exports` can open private option windows for Stats and Inventory exports. Stats exports
+`/me exports` opens the private Stats export option window. Stats exports
 support Excel, CSV, and Google Sheets formats plus 30, 60, 90, 180, and 360 day windows,
-defaulting to Excel and 90 days. Inventory exports support format, view, registered-governor
-scope, and day-window choices using the existing inventory export defaults, including private `All`
-scope. Older direct commands for accounts, reminders, and exports point privately to the matching
+defaulting to Excel and 90 days. Resources, Speedups, and Materials reports retain their own private
+Excel/CSV/Google Sheets exports for the selected governor and active report range. There is no
+combined `All` or all-governor Inventory export. Older direct commands for accounts, reminders, and Stats exports point privately to the matching
 `/me` centre. `/my_stats`, `/stats player`, `/player_profile`, and `/mykvkcrystaltech` remain live;
-`/myinventory` and `/inventory_preferences` are retired by Phase 5F.
+`/myinventory`, `/inventory_preferences`, and `/export_inventory` are retired by Phase 5F.
 
 Historical Phase 13 player message draft:
 
@@ -151,7 +152,7 @@ The approved command group is:
 Expected command-registration impact:
 
 ```text
-primary=40
+primary=39
 grouped_subcommands_detected=100
 /me grouped subcommands=8
 /inventory grouped subcommands=2
@@ -180,26 +181,25 @@ Rollout checks:
 - Confirm `/me reminders` shows KVK-only, calendar-only, both, and neither states clearly.
 - Confirm `/me reminders` KVK event type and reminder time selections save automatically.
 - Confirm `/me reminders` Calendar Settings saves calendar reminder event types, lead times, and enabled/disabled state.
-- Confirm `/me exports` shows only `Export Stats` and `Export Inventory` controls.
+- Confirm `/me exports` shows only the `Export Stats` control.
 - Confirm `Export Stats` opens a private child window with Format and Days selectors, defaults to
   Excel and 90 days, and sends the selected export privately from Download.
-- Confirm `Export Inventory` opens a private child window with Format, View, Governor, and Days
-  selectors, defaults to the existing inventory export scope, and sends the selected export
-  privately from Download.
-- Confirm Cancel closes each export option window without sending a file.
+- Confirm Cancel closes the Stats export option window without sending a file.
 - Confirm `/me exports` clearly disables or reports unavailable export actions when account data,
   linked accounts, or approved export data are unavailable.
 - Confirm `/me dashboard` shows selected-governor RSS, Speedups, and Materials buttons plus Exports,
   with no legacy Inventory summary button.
 - Confirm each direct `/me` report remains private and retains tabs, ranges, Dashboard return,
   Change Governor, no-data guidance, exports, fallback, and cleanup.
-- Confirm `/me exports` retains Resources, Speedups, Materials, and `All` Inventory export scopes.
+- Confirm Resources, Speedups, and Materials report pages each retain private Excel/CSV/Google
+  Sheets export for the selected governor and range, with no combined `All` scope.
 - Confirm `/me inventory`, `/myinventory`, and `/inventory_preferences` are absent after command
   resync and no public Inventory report can be produced.
-- Confirm `/inventory import`, `/inventory audit`, and `/export_inventory` remain registered.
+- Confirm `/inventory import` and `/inventory audit` remain registered and `/export_inventory` is absent.
 - Confirm `/kvk stats`, `/kvk targets`, `/kvk history`, and `/kvk rankings` remain invoked through
   their existing command paths and channel rules.
-- Confirm `/my_stats_export` and `/export_inventory` return private guidance to `/me exports`, and confirm `/me exports` still produces files with the existing option windows.
+- Confirm `/my_stats_export` returns private guidance to `/me exports`, and confirm `/me exports`
+  still produces Stats files with the existing option window.
 - Confirm remaining legacy player commands stay registered and return approved private redirect
   guidance where applicable.
 - Monitor redirect usage and `/me` usage before approving any final command-registration removal.
@@ -567,8 +567,10 @@ Current status:
 - Phase 5F Inventory consolidation is the active release candidate. It removes the legacy summary,
   public/combined viewing routes, visibility application code, directly orphaned tests/controller,
   and `me inventory.png` in one bot patch. It preserves modern selected-governor reports, dashboard
-  highlights, Accounts RSS/Inventory As Of, private exports including `All`, imports, audits, and
-  the dormant SQL table for rollback. Phase 5G remains a separate future Exports summary slice and
+  highlights, Accounts RSS/Inventory As Of, report-specific private exports, imports, audits, and
+  the dormant SQL table for rollback. Post-smoke operator approval also retires the combined/all-
+  governor Inventory export, its `/me exports` control, and `/export_inventory`, making the command
+  baseline 39 top-level while `/me` remains 8 and `/inventory` remains 2. Phase 5G remains a separate future Exports summary slice and
   is the only approved future owner of generic-renderer consolidation after its own acceptance.
 - Phase 6 adds Export Stats only after selected-governor versus all-linked semantics are approved;
   export schema/format redesign remains outside GovernorOS.

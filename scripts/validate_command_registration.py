@@ -43,7 +43,6 @@ APPROVED_TOP_LEVEL_COMMANDS = frozenset(
         "calendar_reminder_config",
         "crystaltech",
         "events",
-        "export_inventory",
         "honor",
         "honor_rankings",
         "inventory",

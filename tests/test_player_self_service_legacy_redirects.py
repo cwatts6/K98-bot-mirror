@@ -75,13 +75,6 @@ def _unwrap(fn):
             "/me reminders",
         ),
         (
-            "commands.inventory_cmds",
-            "register_inventory",
-            "export_inventory",
-            {"format": "CSV", "view": "All", "governor": None, "days": 30},
-            "/me exports",
-        ),
-        (
             "commands.stats_cmds",
             "register_stats",
             "my_stats_export",

@@ -541,14 +541,15 @@ approved task pack and chat starter present in this folder. It must ship as one 
 release: remove `/me inventory`, `/myinventory`, and `/inventory_preferences`; remove the obsolete
 Inventory visibility dependency and Privacy & Sharing journey from Personal Settings; delete only
 code/assets proven orphaned by those removals; preserve modern private reports, dashboard highlights,
-imports, audits, ranges, calculations, exports, filenames, and Google Sheets behavior; update the
-42-to-40 top-level and 9-to-8 `/me` command baselines; and resync the Discord command cache after
+imports, audits, ranges, calculations, report-page exports, filenames, and Google Sheets behavior;
+retire the combined/all-governor Inventory export and `/export_inventory`; update the 42-to-39
+top-level and 9-to-8 `/me` command baselines; and resync the Discord command cache after
 promotion. No new backdrop or SQL deployment is required. `dbo.InventoryReportPreference` remains
 untouched for rollback and later SQL cleanup review.
 
 Other temporary deprecated command paths remain captured as deferred cleanup for execution only
 after their own communication, no-feedback monitoring, production usage review, and explicit
-operator approval. Phase 5F approval applies only to the three Inventory paths named above.
+operator approval. Phase 5F approval applies only to the four Inventory paths named above.
 
 Discord Voting Post Framework is closed after Phase 22. Future voting enhancements should start in
 a new programme pack rather than continuing this programme as Phase 23.

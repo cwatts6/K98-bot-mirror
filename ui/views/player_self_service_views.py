@@ -140,7 +140,6 @@ def build_dashboard_embed(
         value=_field_value(
             [
                 f"Stats: {exports.stats_export}",
-                f"Inventory: {exports.inventory_export}",
                 f"Next action: {exports.action_summary}",
             ]
         ),
@@ -397,7 +396,6 @@ def build_exports_embed(
         value=_field_value(
             [
                 f"Stats: {exports.stats_export}",
-                f"Inventory: {exports.inventory_export}",
                 f"Delivery: {exports.privacy_note}",
             ]
         ),
@@ -406,7 +404,7 @@ def build_exports_embed(
     embed.add_field(
         name="Actions",
         value=_field_value(
-            ["Export Stats", "Export Inventory"]
+            ["Export Stats"]
             if exports.action_state.strip().lower() == "actionable"
             else [exports.action_summary]
         ),
@@ -1028,22 +1026,6 @@ class PlayerSelfServiceView(discord.ui.View):
         interaction: discord.Interaction,
     ) -> None:
         await export_views.send_stats_export_options(
-            interaction,
-            display_name=self.display_name,
-        )
-
-    @discord.ui.button(
-        label="Export Inventory",
-        style=discord.ButtonStyle.success,
-        custom_id="me:export:inventory",
-        row=2,
-    )
-    async def export_inventory_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        await export_views.send_inventory_export_options(
             interaction,
             display_name=self.display_name,
         )

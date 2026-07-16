@@ -456,18 +456,11 @@ def _export_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     exports = summary.exports
     state = exports.action_state.strip().lower()
     if state == "actionable":
-        return (
-            "Stats: Excel / CSV / Google Sheets",
-            "Inventory: Excel / CSV / Google Sheets",
-        )
+        return ("Stats: Excel / CSV / Google Sheets",)
     if state == "guidance":
-        return (
-            f"Stats: {exports.stats_export}",
-            f"Inventory: {exports.inventory_export}",
-        )
+        return (f"Stats: {exports.stats_export}",)
     return (
         f"Stats: {exports.stats_export}",
-        f"Inventory: {exports.inventory_export}",
         exports.action_summary,
     )
 
@@ -622,7 +615,7 @@ def _page_copy(
             "Exports",
             "private" if actionable or guidance_only else summary.exports.action_state,
             (
-                "Actions: Export Stats, Export Inventory"
+                "Action: Export Stats"
                 if actionable
                 else "Guidance only" if guidance_only else "Actions unavailable"
             ),

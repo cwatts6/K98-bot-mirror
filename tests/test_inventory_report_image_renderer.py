@@ -392,38 +392,6 @@ def test_inventory_wrap_text_does_not_split_joined_emoji_clusters():
     assert report_image_renderer._text_width(draw, lines[0], base_font, bold=True) <= 80
 
 
-def test_render_inventory_reports_returns_png_files_for_resources_and_speedups():
-    now = datetime.now(UTC)
-    payload = InventoryReportPayload(
-        governor_id=111,
-        governor_name="Gov",
-        view=InventoryReportView.ALL,
-        range_key=InventoryReportRange.ONE_MONTH,
-        resources=[
-            InventoryResourcePoint(now - timedelta(days=7), 100, 200, 300, 400),
-            InventoryResourcePoint(now, 200, 300, 400, 500),
-        ],
-        speedups=[
-            InventorySpeedupPoint(now - timedelta(days=7), 1, 2, 3, 4, 5),
-            InventorySpeedupPoint(now, 2, 3, 4, 5, 6),
-        ],
-        generated_at_utc=now,
-    )
-
-    rendered = render_inventory_reports(payload)
-
-    assert [item.filename for item in rendered] == [
-        "inventory_resources_111_1M.png",
-        "inventory_speedups_111_1M.png",
-    ]
-    for item in rendered:
-        assert item.image_bytes.getvalue().startswith(b"\x89PNG")
-        assert item.image_bytes.tell() == 0
-        assert not item.image_bytes.closed
-        item.image_bytes.close()
-        assert item.image_bytes.closed
-
-
 def test_render_selected_empty_report_returns_standalone_png_for_each_tab():
     now = datetime.now(UTC)
     expected = {
@@ -446,18 +414,6 @@ def test_render_selected_empty_report_returns_standalone_png_for_each_tab():
         assert [item.filename for item in rendered] == [filename]
         image = Image.open(BytesIO(rendered[0].image_bytes.getvalue()))
         assert image.size == (report_image_renderer.WIDTH, report_image_renderer.HEIGHT)
-
-
-def test_render_all_empty_preserves_legacy_no_report_output():
-    payload = InventoryReportPayload(
-        governor_id=111,
-        governor_name="Empty Governor",
-        view=InventoryReportView.ALL,
-        range_key=InventoryReportRange.ONE_MONTH,
-        generated_at_utc=datetime.now(UTC),
-    )
-
-    assert render_inventory_reports(payload) == []
 
 
 def test_chart_ticks_expand_flat_values():
@@ -715,7 +671,7 @@ def test_render_inventory_reports_supports_stored_vip_profile():
     payload = InventoryReportPayload(
         governor_id=111,
         governor_name="Gov",
-        view=InventoryReportView.ALL,
+        view=InventoryReportView.RESOURCES,
         range_key=InventoryReportRange.ONE_MONTH,
         governor_profile=InventoryGovernorProfile(
             governor_id=111,
@@ -731,16 +687,12 @@ def test_render_inventory_reports_supports_stored_vip_profile():
                 800_000_000,
             )
         ],
-        speedups=[InventorySpeedupPoint(now, 1, 2, 3, 4, 5)],
         generated_at_utc=now,
     )
 
     rendered = render_inventory_reports(payload)
 
-    assert [item.filename for item in rendered] == [
-        "inventory_resources_111_1M.png",
-        "inventory_speedups_111_1M.png",
-    ]
+    assert [item.filename for item in rendered] == ["inventory_resources_111_1M.png"]
 
 
 def test_render_inventory_reports_returns_materials_png():

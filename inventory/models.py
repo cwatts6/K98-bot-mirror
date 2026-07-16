@@ -32,7 +32,6 @@ class InventoryReportView(StrEnum):
     RESOURCES = "resources"
     SPEEDUPS = "speedups"
     MATERIALS = "materials"
-    ALL = "all"
 
 
 class InventoryReportRange(StrEnum):

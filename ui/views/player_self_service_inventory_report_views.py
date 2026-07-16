@@ -72,7 +72,6 @@ def _report_label(view: InventoryReportView) -> str:
         InventoryReportView.RESOURCES: "Resources",
         InventoryReportView.MATERIALS: "Materials",
         InventoryReportView.SPEEDUPS: "Speedups",
-        InventoryReportView.ALL: "Inventory",
     }[view]
 
 
@@ -706,8 +705,6 @@ class PlayerInventoryReportView(discord.ui.View):
                 view=self.report_view,
                 governor_id=context.selected_governor_id,
                 lookback_days=reporting_service.REPORT_RANGE_DAYS[self.range_key],
-                is_admin=False,
-                discord_user=None,
             )
             if not self._is_current(interaction):
                 return

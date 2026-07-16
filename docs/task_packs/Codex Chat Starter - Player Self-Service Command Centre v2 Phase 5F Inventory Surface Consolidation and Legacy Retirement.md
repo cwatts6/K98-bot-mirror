@@ -1,8 +1,8 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5F Inventory Surface Consolidation and Legacy Retirement
 
-Status: next active GovernorOS implementation slice. The product-retirement decision is approved.
-Implementation remains subject to the required audit, architecture, and implementation-plan stop
-gates. One-pass execution is not approved.
+Status: active mirror PR amendment after successful initial operator smoke. The operator has now
+approved retiring the legacy combined Inventory export and `/export_inventory`, while preserving
+the three report-page exports. Production promotion remains gated on renewed review and smoke.
 
 ## Copy/Paste Starter
 
@@ -20,7 +20,9 @@ Approval state:
 - public Inventory report posting is not required
 - the combined All report viewing option is not required
 - the selected-governor dashboard plus /me resources, /me speedups, and /me materials are the definitive report UX
-- /me exports retains private Inventory exports, including All export scope
+- remove the Export Inventory control/option window from /me exports; keep /me exports Stats-only
+- remove /export_inventory
+- preserve private Excel/CSV/Sheets exports on /me resources, /me speedups, and /me materials
 - /inventory import and /inventory audit remain unchanged
 - Personal Settings no longer needs Inventory visibility and must be simplified to regional profile plus LOCAL/UTC context
 - no new backdrop is required; reuse assets/me/cards/me_preferences.png
@@ -101,7 +103,7 @@ Command surface:
 - exact registration/decorator/version/usage chain for /inventory_preferences
 - exact current command counts and every hard-coded baseline/test/doc that must change
 - exact command resync/cache procedure needed so removed guild commands disappear
-- confirmation that /inventory import, /inventory audit, /export_inventory, and the /inventory group remain
+- confirmation that /inventory import, /inventory audit, and the /inventory group remain and /export_inventory is removed
 
 Old summary route:
 - /me inventory command -> PAGE_INVENTORY -> summary service -> renderer/fallback -> asset -> Open Report
@@ -133,9 +135,9 @@ Modern report route to preserve:
 
 Export boundary:
 - every retained InventoryReportView.ALL consumer
-- prove All export scope remains available under /me exports
-- do not remove All merely because All viewing is retired
-- preserve Inventory export schemas, windows, filenames, formats, and Google Sheets behavior
+- remove InventoryReportView.ALL when its combined export consumer is removed
+- prove the three report-page exports remain selected-governor/private
+- preserve their export schemas, windows, filenames, formats, and Google Sheets behavior
 
 Dashboard/Accounts boundary:
 - every consumer of build_latest_inventory_snapshot and current-RSS helpers
@@ -204,9 +206,10 @@ Retired:
 /me inventory
 /myinventory
 /inventory_preferences
+/export_inventory
 
 Expected command-count result:
-- top-level commands: 42 -> 40
+- top-level commands: 42 -> 39
 - /me grouped subcommands: 9 -> 8
 - /inventory grouped subcommands: remains 2
 
@@ -217,7 +220,8 @@ Locked Inventory UX:
 - report pages retain tabs, ranges, private exports, Dashboard, and Change Governor
 - no public Inventory report path
 - no combined All viewing route
-- private All Inventory export remains available under /me exports
+- /me exports is Stats-only and combined/all-governor Inventory export is absent
+- private Resources/Speedups/Materials report-page exports remain
 - no replacement Share/Public action
 
 Locked Personal Settings outcome:
@@ -236,6 +240,8 @@ Locked Personal Settings outcome:
 - reuse assets/me/cards/me_preferences.png at 1702x924
 - keep stable filename me_preferences_<discord_user_id>.png
 - do not create a new backdrop or invent a new metric to fill the removed panel
+- make Regional Profile the larger primary block above the smaller Local Time Reference
+- align the profile coverage text beside the LOCAL/UTC pill at top-right
 
 Recommended profile-only Settings Insight priority:
 1. unavailable saved metadata needs review
@@ -252,13 +258,11 @@ Locked removal boundary:
 
 Locked preservation boundary:
 - keep /inventory import and /inventory audit
-- keep /export_inventory redirect in this phase
 - keep ui/views/player_self_service_inventory_report_views.py
 - keep inventory/report_image_renderer.py and all three premium report backdrops
 - keep report payloads, calculations, ranges, filenames, charts, dates, icons, VIP calculations, no-data behavior, and exports
-- keep InventoryReportView.ALL where exports require it
 - keep build_latest_inventory_snapshot and current-RSS helpers used by dashboard/Accounts
-- keep /me exports private option windows and All export scope
+- keep /me exports Stats option window
 - keep dbo.InventoryReportPreference and existing rows unchanged for rollback
 - keep unrelated legacy command removals and broad generic-renderer consolidation out of scope
 
@@ -316,7 +320,7 @@ Testing expectations after implementation:
 - tabs, ranges, private exports, Dashboard, Change Governor, no-data, timeout, cleanup
 - dashboard Inventory highlights
 - Accounts RSS and Inventory As Of
-- /me exports All Inventory export
+- /me exports Stats-only and each direct report private export
 - /inventory import and audit regressions
 - proof that retained pages do not read obsolete visibility/all-linked Inventory summary sources
 - architecture, deferred, selector, security-routing, command-registration, import-smoke, pre-commit,
@@ -337,7 +341,7 @@ Deployment and smoke requirements:
 - smoke /me dashboard RSS/Speedups/Materials
 - smoke each direct /me report and private export
 - smoke /me preferences LOCAL/UTC and Manage settings
-- smoke /me exports including All Inventory export
+- smoke /me exports Stats-only plus each direct report private export
 - smoke /inventory import and /inventory audit
 - verify no public Inventory report can be produced
 

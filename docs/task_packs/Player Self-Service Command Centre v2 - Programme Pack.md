@@ -235,7 +235,7 @@ is already live and accepted.
 /me resources      = private selected-governor resource report
 /me speedups       = private selected-governor speedups report
 /me materials      = private selected-governor materials report
-/me exports        = private Stats and Inventory export option windows, including All Inventory export scope
+/me exports        = private Stats export option window; Inventory exports live on the three report pages
 /inventory import  = Inventory screenshot capture
 /inventory audit   = admin Inventory import audit
 /me history        = future private selected-governor KVK history entry point
@@ -1349,7 +1349,7 @@ backdrop, avatar, fallback, attachment, and timeout contracts remain in force.
 
 #### Phase 5F - Inventory Surface Consolidation and Legacy Retirement
 
-Status: `product decision approved on 2026-07-16; task pack and chat starter prepared; next active implementation slice`.
+Status: `implemented in mirror PR #225; post-smoke export retirement and Preferences visual amendment in progress`.
 
 Phase 5F supersedes the previously proposed Premium Inventory Summary Card. No new Inventory summary
 or backdrop will be created.
@@ -1370,7 +1370,7 @@ Approved final Inventory model:
 ```text
 /me dashboard -> selected-governor RSS | Speedups | Materials highlights and buttons
 /me resources | /me speedups | /me materials -> private premium reports
-/me exports -> private Inventory exports, including All export scope
+/me exports -> private Stats exports only
 /inventory import -> screenshot import
 /inventory audit -> admin audit
 ```
@@ -1382,6 +1382,8 @@ Approved runtime scope:
 - remove `/myinventory`, its governor/output picker, All viewing option, public/private dispatch,
   first-use preference prompt, old range/export controller, and dedicated legacy tests;
 - remove `/inventory_preferences` and its redirect;
+- remove `/export_inventory`, the `/me exports` Inventory control/option window, and the combined/
+  all-governor export route after successful smoke and explicit operator approval;
 - remove Inventory visibility from Personal Settings and reflow the accepted
   `assets/me/cards/me_preferences.png` card around regional profile and LOCAL/UTC context;
 - use `LOCAL` for a usable saved timezone and `UTC` for the honest fallback; these are derived display
@@ -1391,21 +1393,19 @@ Approved runtime scope:
   only after the exact caller audit proves no supported consumer remains;
 - stop unrelated Reminders/Exports page loads from performing obsolete all-linked Inventory or
   visibility reads;
-- reduce top-level command count from 42 to 40 and `/me` grouped subcommands from 9 to 8;
+- reduce top-level command count from 42 to 39 and `/me` grouped subcommands from 9 to 8;
 - resync Discord application commands after deployment.
 
 Explicit preservation boundary:
 
 - `/inventory import` and `/inventory audit`;
-- `/export_inventory` redirect during this phase;
 - selected-governor dashboard Inventory highlights;
 - `/me resources`, `/me speedups`, and `/me materials`;
 - access rechecks, tabs, 1M/3M/6M/12M, no-data guidance, Change Governor, Dashboard return, private
   report exports, attachment lifecycle, stable filenames, and premium 1400x980 backdrops;
-- `InventoryReportView.ALL` where private export scope uses it;
 - dashboard/Accounts latest Inventory snapshot and current-RSS helpers;
-- Inventory calculations, imports, audits, exports, schemas, formats, windows, filenames, and Google
-  Sheets behavior;
+- Inventory calculations, imports, audits, and the three report-page export schemas, formats,
+  windows, filenames, and Google Sheets behavior;
 - `dbo.InventoryReportPreference` and existing rows, left dormant for rollback and a later separately
   approved SQL cleanup.
 
@@ -1422,10 +1422,10 @@ in:
 
 #### Phase 5G - Premium Exports Summary Card
 
-Preserve the current all-linked/user-level Stats and Inventory export availability, guidance,
-disabled states, private option windows, schemas, formats, date windows, filenames, and Google
-Sheets behavior. No Change Governor; any selected-governor export decision remains owned by the
-separate Phase 6 approval gate.
+Preserve the current all-linked/user-level Stats export availability, guidance, disabled state,
+private option window, schemas, formats, date windows, filenames, and Google Sheets behavior. The
+three selected-governor Inventory exports remain owned by their report pages. No Change Governor;
+any selected-governor Stats export decision remains owned by the separate Phase 6 approval gate.
 
 ### Phase 6 — Export Stats Action Decision and Integration
 
@@ -1443,7 +1443,7 @@ Deliver:
   Change Governor only if the approved export is selected-governor scoped; omit it for all-linked
   user-level exports.
 - Preserve `/me exports`, the existing `/my_stats_export` redirect, file formats, schemas, date
-  windows, Google Sheets behavior, and Inventory export behavior.
+  windows, and Google Sheets behavior.
 - Privacy, selected-context, filename/content, and compatibility tests.
 
 Approval gate: operator must approve selected-governor versus all-linked semantics. Any schema,
@@ -1558,7 +1558,7 @@ These ideas must not block or silently expand Phases 5A-9.
 - Phase 5F retirement of the redundant `/me inventory`, `/myinventory`,
   `/inventory_preferences`, public Inventory posting, combined All viewing, and obsolete visibility
   application dependency.
-- Preservation of Inventory imports, audits, calculations, private exports, All export scope,
+- Preservation of Inventory imports, audits, calculations, and report-page private exports,
   filenames, backdrops, and Google Sheets behavior.
 - Private `/me` KVK history entry point.
 - Leadership/admin `/me inspect`, later and separately permission-gated.
@@ -1570,7 +1570,6 @@ These ideas must not block or silently expand Phases 5A-9.
 
 - Redirecting or removing `/my_stats`, `/stats player`, `/player_profile`, `/mykvkcrystaltech`, or
   `/kvk history` without their own evidence and approval.
-- Removing `/export_inventory` as part of Phase 5F.
 - Dropping or migrating `dbo.InventoryReportPreference` during Phase 5F.
 - Adding a replacement public Share Report action.
 - Adding Olympia fields.
@@ -1652,7 +1651,7 @@ Likely SQL-backed objects:
 ## 16. Cross-Programme Constraints
 
 - Maintain command registration governance.
-- Preserve top-level command count unless explicitly approved. Phase 5F is an explicit approved reduction from 42 to 40 through removal of `/myinventory` and `/inventory_preferences`; `/me inventory` separately reduces the grouped `/me` count from 9 to 8.
+- Preserve top-level command count unless explicitly approved. Phase 5F is an explicit approved reduction from 42 to 39 through removal of `/myinventory`, `/inventory_preferences`, and `/export_inventory`; `/me inventory` separately reduces the grouped `/me` count from 9 to 8.
 - Prefer grouped `/me` subcommands over new flat commands.
 - Keep all player dashboard, direct Inventory report, and personal export output private unless a future separately approved sharing workflow says otherwise.
 - Keep settings ownership singular: after Phase 5F, Preferences owns regional profile/local-time context and Accounts owns governor-specific VIP editing; no retained module owns an Inventory report visibility setting.
@@ -1741,7 +1740,7 @@ The programme is complete when:
 - [ ] `/me inspect` is permission-gated, private by default, and excludes Discord-user private data.
 - [ ] Legacy commands are only redirected/removed after usage evidence and explicit operator approval; Phase 5F Inventory retirements meet that gate.
 - [x] Documentation reflects completed phases through Phase 5E and records the approved Phase 5F supersession.
-- [ ] After Phase 5F implementation, canonical command references and counts show 40 top-level commands and 8 `/me` subcommands.
+- [ ] After Phase 5F implementation, canonical command references and counts show 39 top-level commands and 8 `/me` subcommands.
 - [x] Phase 5C documentation, canonical references, automated validation, security review, visual
   samples, and successful operator Discord smoke are recorded.
 - [x] Command registration validation remains green through Phase 5E.
@@ -1773,7 +1772,7 @@ security-routing decision, and exact file manifest, then stop at the documented 
 Treat these as locked outcomes:
 - remove /me inventory, /myinventory, and /inventory_preferences
 - remove public Inventory report posting and combined All viewing
-- preserve private All Inventory export scope
+- remove combined/all-governor Inventory export and preserve the three report-page exports
 - retain dashboard highlights and /me resources, /me speedups, /me materials unchanged
 - remove Inventory visibility from Personal Settings while retaining regional profile and LOCAL/UTC
 - reuse me_preferences.png; delete me inventory.png only after zero-reference proof
@@ -1793,7 +1792,7 @@ Completed Phase 5E records belong in the archive:
 
 Phase 5F does not inherit permission to change Inventory imports, audits, calculations, ranges,
 report payloads, VIP calculations, report/export schemas, filenames, Google Sheets behavior,
-`/export_inventory`, SQL schema/data, reminder behavior, account-registry behavior, or to create a
+SQL schema/data, reminder behavior, account-registry behavior, or to create a
 broad shared renderer/view framework.
 
 ## 21. Programme Change Log
@@ -1828,3 +1827,4 @@ broad shared renderer/view framework.
 | 2026-07-15 | Phase 5E Preferences contract, backdrop, task pack, and starter approved | Narrowed Preferences to Personal Settings for regional profile/local-time context and Inventory privacy; approved PRIVATE/PUBLIC state, three-field coverage, deterministic Settings Insight, one Manage Settings action, field-specific clears, deliberate privacy confirmation, and the fully opaque `assets/me/cards/me_preferences.png` Governor's Accord backdrop. Moved the existing Update VIP editor into Manage Accounts with explicit governor resolution and unchanged persistence/account rules. Runtime implementation is the next gated slice. |
 | 2026-07-16 | Phase 5E completed, deployed, and archived | Recorded the accepted 1702x924 top-left-avatar Preferences card, DST-aware local-time/UTC fallback, regional profile, exact Inventory privacy flow, one Manage Settings journey, removal of deprecated Inventory navigation/VIP/Change Governor, Accounts-owned Update VIP migration, and atomic field-specific profile upsert. Mirror PR #224 and production PR #531 were merged and production deployment completed; final validation recorded 2637 passed and 2 skipped with no SQL deployment. The completed pack/starter moved to the archive and Phase 5F Inventory became the next separately task-packed slice. |
 | 2026-07-16 | Phase 5F Inventory summary superseded by consolidation and retirement | Production evidence showed the only `/myinventory` user was the operator with two uses. The operator confirmed public posting, All viewing, `/inventory_preferences`, `/myinventory`, and `/me inventory` are not required. Approved one coordinated Phase 5F bot slice to remove those routes, simplify Personal Settings to regional profile plus LOCAL/UTC, delete directly orphaned code/asset/tests, reduce the command surface to 40 top-level and 8 `/me` subcommands, preserve modern private reports/imports/audits/exports, and leave `dbo.InventoryReportPreference` untouched for rollback and later SQL cleanup. |
+| 2026-07-16 | Phase 5F post-smoke export and Preferences amendment | Initial Discord smoke passed. Three-month usage showed only the operator used the legacy combined Inventory export, so the operator approved removing `/export_inventory`, the `/me exports` Inventory control/window, and `InventoryReportView.ALL`, while preserving the three report-page exports. Preferences is rebalanced with Regional Profile primary, Local Time secondary, and profile coverage aligned beside LOCAL/UTC. The final command baseline is 39 top-level, 8 `/me`, and 2 `/inventory`. |

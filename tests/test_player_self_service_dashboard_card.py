@@ -42,7 +42,6 @@ def _summary() -> PlayerSelfServiceSummary:
         ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
-            inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
     )

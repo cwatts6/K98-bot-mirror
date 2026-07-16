@@ -156,7 +156,7 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
         "activity": {"activity_top": "top"},
     }
 
-    assert len(names) == 40
+    assert len(names) == 39
     assert "kvk" in names
     assert "kvk_admin" in names
     assert "me" in names

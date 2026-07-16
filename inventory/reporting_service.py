@@ -56,14 +56,6 @@ def parse_report_range(value: str | None) -> InventoryReportRange:
     raise ValueError("Inventory range must be one of: 1M, 3M, 6M, 12M.")
 
 
-def parse_report_view(value: str | None) -> InventoryReportView:
-    normalized = (value or InventoryReportView.ALL.value).strip().lower()
-    try:
-        return InventoryReportView(normalized)
-    except ValueError as exc:
-        raise ValueError("Inventory view must be Resources, Speedups, Materials, or All.") from exc
-
-
 async def resolve_governor_for_report(
     *,
     discord_user_id: int,
@@ -330,21 +322,21 @@ async def build_inventory_report_payload(
     materials: list[InventoryMaterialPoint] = []
     governor_profile = await profile_service.fetch_inventory_profile(int(governor.governor_id))
 
-    if view in {InventoryReportView.RESOURCES, InventoryReportView.ALL}:
+    if view == InventoryReportView.RESOURCES:
         resource_rows = await asyncio.to_thread(
             inventory_reporting_dal.fetch_resource_rows,
             int(governor.governor_id),
         )
         resources = _filter_points_for_range(_group_resource_points(resource_rows), range_key)
 
-    if view in {InventoryReportView.SPEEDUPS, InventoryReportView.ALL}:
+    elif view == InventoryReportView.SPEEDUPS:
         speedup_rows = await asyncio.to_thread(
             inventory_reporting_dal.fetch_speedup_rows,
             int(governor.governor_id),
         )
         speedups = _filter_points_for_range(_group_speedup_points(speedup_rows), range_key)
 
-    if view in {InventoryReportView.MATERIALS, InventoryReportView.ALL}:
+    elif view == InventoryReportView.MATERIALS:
         material_rows = await asyncio.to_thread(
             inventory_material_dal.fetch_material_rows,
             int(governor.governor_id),

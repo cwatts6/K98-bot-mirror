@@ -8,12 +8,8 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
-from decoraters import _is_admin
 from inventory.dal import inventory_export_dal, inventory_material_dal
-from inventory.inventory_service import (
-    get_registered_governors_for_user,
-    user_can_import_for_governor,
-)
+from inventory.inventory_service import user_can_import_for_governor
 from inventory.models import InventoryExportFile, InventoryExportFormat, InventoryReportView
 
 logger = logging.getLogger(__name__)
@@ -42,52 +38,18 @@ EXPORT_COLUMNS = [
 ]
 
 
-def parse_export_format(value: str | None) -> InventoryExportFormat:
-    normalized = (value or "Excel").strip().lower().replace(" ", "_")
-    aliases = {
-        "excel": InventoryExportFormat.EXCEL,
-        "xlsx": InventoryExportFormat.EXCEL,
-        "csv": InventoryExportFormat.CSV,
-        "google": InventoryExportFormat.GOOGLE_SHEETS,
-        "googlesheets": InventoryExportFormat.GOOGLE_SHEETS,
-        "google_sheets": InventoryExportFormat.GOOGLE_SHEETS,
-    }
-    if normalized not in aliases:
-        raise ValueError("Export format must be Excel, CSV, or GoogleSheets.")
-    return aliases[normalized]
-
-
-def _parse_export_view(value: str | None) -> InventoryReportView:
-    normalized = (value or InventoryReportView.ALL.value).strip().lower()
-    try:
-        return InventoryReportView(normalized)
-    except ValueError as exc:
-        raise ValueError(
-            "Inventory export view must be Resources, Speedups, Materials, or All."
-        ) from exc
-
-
 async def resolve_export_governor_ids(
     *,
     discord_user_id: int,
-    governor_id: int | None,
-    is_admin: bool = False,
-    discord_user: Any | None = None,
+    governor_id: int,
 ) -> list[int]:
-    admin = bool(is_admin or (discord_user is not None and _is_admin(discord_user)))
-    if governor_id is not None:
-        if not admin and not await user_can_import_for_governor(
-            discord_user_id=int(discord_user_id),
-            governor_id=int(governor_id),
-            is_admin=False,
-        ):
-            raise PermissionError("You can only export inventory for governors registered to you.")
-        return [int(governor_id)]
-
-    governors = await get_registered_governors_for_user(int(discord_user_id))
-    if not governors:
-        raise ValueError("You have no registered governors. Use `/register_governor` first.")
-    return [int(item.governor_id) for item in governors]
+    if not await user_can_import_for_governor(
+        discord_user_id=int(discord_user_id),
+        governor_id=int(governor_id),
+        is_admin=False,
+    ):
+        raise PermissionError("You can only export inventory for governors registered to you.")
+    return [int(governor_id)]
 
 
 def _dt(value: Any) -> str:
@@ -212,34 +174,30 @@ async def build_inventory_export_file(
     username: str,
     export_format: InventoryExportFormat,
     view: InventoryReportView,
-    governor_id: int | None = None,
+    governor_id: int,
     lookback_days: int = 366,
-    is_admin: bool = False,
-    discord_user: Any | None = None,
 ) -> InventoryExportFile:
     governor_ids = await resolve_export_governor_ids(
         discord_user_id=int(discord_user_id),
         governor_id=governor_id,
-        is_admin=is_admin,
-        discord_user=discord_user,
     )
 
     resources: list[dict[str, Any]] = []
     speedups: list[dict[str, Any]] = []
     materials: list[dict[str, Any]] = []
-    if view in {InventoryReportView.RESOURCES, InventoryReportView.ALL}:
+    if view == InventoryReportView.RESOURCES:
         resources = await asyncio.to_thread(
             inventory_export_dal.fetch_resource_export_rows,
             governor_ids,
             lookback_days=lookback_days,
         )
-    if view in {InventoryReportView.SPEEDUPS, InventoryReportView.ALL}:
+    elif view == InventoryReportView.SPEEDUPS:
         speedups = await asyncio.to_thread(
             inventory_export_dal.fetch_speedup_export_rows,
             governor_ids,
             lookback_days=lookback_days,
         )
-    if view in {InventoryReportView.MATERIALS, InventoryReportView.ALL}:
+    elif view == InventoryReportView.MATERIALS:
         materials = await asyncio.to_thread(
             inventory_material_dal.fetch_material_export_rows,
             governor_ids,
@@ -292,7 +250,3 @@ def cleanup_export_file(export_file: InventoryExportFile | None) -> None:
         export_file.path.parent.rmdir()
     except Exception:
         logger.debug("inventory_export_dir_cleanup_skipped path=%s", export_file.path.parent)
-
-
-def parse_export_view(value: str | None) -> InventoryReportView:
-    return _parse_export_view(value)

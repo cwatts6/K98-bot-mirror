@@ -42,4 +42,4 @@ def test_register_inventory_command_registers_grouped_admin_commands(monkeypatch
     assert "inventory_import_audit" not in fake_bot.registered
     assert "myinventory" not in fake_bot.registered
     assert "inventory_preferences" not in fake_bot.registered
-    assert "export_inventory" in fake_bot.registered
+    assert "export_inventory" not in fake_bot.registered

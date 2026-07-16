@@ -9,16 +9,12 @@ from typing import Any
 import discord
 
 from file_utils import emit_telemetry_event
-from inventory import export_service as inventory_export_service
-from inventory.models import InventoryExportFormat, InventoryReportView
 from services import stats_export_service
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_STATS_EXPORT_DAYS = 90
-DEFAULT_INVENTORY_EXPORT_LOOKBACK_DAYS = 366
 STATS_EXPORT_DAY_OPTIONS = (30, 60, 90, 180, 360)
-INVENTORY_EXPORT_DAY_OPTIONS = (30, 60, 90, 180, 360, DEFAULT_INVENTORY_EXPORT_LOOKBACK_DAYS)
 
 
 async def _defer_private(interaction: discord.Interaction) -> None:
@@ -199,60 +195,6 @@ async def send_stats_export(
         stats_export_service.cleanup_export_file(export_file)
 
 
-def _inventory_export_content(export_file: Any) -> str:
-    return (
-        "Inventory export ready. "
-        f"`{export_file.row_count}` raw approved row(s), "
-        f"`{len(export_file.governor_ids)}` governor(s)."
-    )
-
-
-async def send_inventory_export(
-    interaction: discord.Interaction,
-    *,
-    display_name: str,
-    export_format: InventoryExportFormat,
-    view: InventoryReportView = InventoryReportView.ALL,
-    governor_id: int | None = None,
-    lookback_days: int = DEFAULT_INVENTORY_EXPORT_LOOKBACK_DAYS,
-) -> None:
-    await _defer_private(interaction)
-    export_file = None
-    try:
-        export_file = await inventory_export_service.build_inventory_export_file(
-            discord_user_id=int(interaction.user.id),
-            username=_user_display_name(interaction.user, display_name),
-            export_format=export_format,
-            view=view,
-            governor_id=governor_id,
-            lookback_days=int(lookback_days),
-            is_admin=False,
-            discord_user=interaction.user,
-        )
-        file = discord.File(str(export_file.path), filename=export_file.filename)
-        await interaction.followup.send(
-            _inventory_export_content(export_file),
-            file=file,
-            ephemeral=True,
-        )
-    except (PermissionError, ValueError) as exc:
-        await _send_private_error(interaction, str(exc))
-    except asyncio.CancelledError:
-        raise
-    except Exception:
-        logger.exception(
-            "player_self_service_inventory_export_failed user_id=%s format=%s",
-            getattr(getattr(interaction, "user", None), "id", None),
-            export_format.value,
-        )
-        await _send_private_error(
-            interaction,
-            "Inventory export is temporarily unavailable. Please try again in a moment.",
-        )
-    finally:
-        inventory_export_service.cleanup_export_file(export_file)
-
-
 class StatsExportOptionsView(_ExportOptionsView):
     def __init__(self, *, author_id: int, display_name: str) -> None:
         super().__init__(author_id=author_id, display_name=display_name)
@@ -340,164 +282,6 @@ class StatsExportDaysSelect(discord.ui.Select):
         await interaction.response.defer(ephemeral=True)
 
 
-class InventoryExportOptionsView(_ExportOptionsView):
-    def __init__(
-        self,
-        *,
-        author_id: int,
-        display_name: str,
-        governors: list,
-    ) -> None:
-        super().__init__(author_id=author_id, display_name=display_name)
-        self.governors = governors
-        self.selected_format = InventoryExportFormat.EXCEL
-        self.selected_view = InventoryReportView.ALL
-        self.selected_governor_id: int | None = None
-        self.selected_days = DEFAULT_INVENTORY_EXPORT_LOOKBACK_DAYS
-        self.add_item(InventoryExportFormatSelect(self))
-        self.add_item(InventoryExportViewSelect(self))
-        self.add_item(InventoryExportGovernorSelect(self))
-        self.add_item(InventoryExportDaysSelect(self))
-
-    @discord.ui.button(
-        label="Download",
-        style=discord.ButtonStyle.success,
-        custom_id="me:export:inventory_options_download",
-        row=4,
-    )
-    async def download_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        await send_inventory_export(
-            interaction,
-            display_name=self.display_name,
-            export_format=self.selected_format,
-            view=self.selected_view,
-            governor_id=self.selected_governor_id,
-            lookback_days=self.selected_days,
-        )
-
-    @discord.ui.button(
-        label="Cancel",
-        style=discord.ButtonStyle.secondary,
-        custom_id="me:export:inventory_options_cancel",
-        row=4,
-    )
-    async def cancel_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        await interaction.response.edit_message(content="Inventory export cancelled.", view=None)
-
-
-class InventoryExportFormatSelect(discord.ui.Select):
-    def __init__(self, parent_view: InventoryExportOptionsView) -> None:
-        options = [
-            discord.SelectOption(
-                label="Excel", value=InventoryExportFormat.EXCEL.value, default=True
-            ),
-            discord.SelectOption(label="CSV", value=InventoryExportFormat.CSV.value),
-            discord.SelectOption(
-                label="Google Sheets",
-                value=InventoryExportFormat.GOOGLE_SHEETS.value,
-            ),
-        ]
-        super().__init__(
-            placeholder="Format",
-            min_values=1,
-            max_values=1,
-            options=options,
-            custom_id="me:export:inventory_options_format",
-            row=0,
-        )
-        self.parent_view = parent_view
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        self.parent_view.selected_format = InventoryExportFormat(self.values[0])
-        await interaction.response.defer(ephemeral=True)
-
-
-class InventoryExportViewSelect(discord.ui.Select):
-    def __init__(self, parent_view: InventoryExportOptionsView) -> None:
-        options = [
-            discord.SelectOption(label="All", value=InventoryReportView.ALL.value, default=True),
-            discord.SelectOption(label="Resources", value=InventoryReportView.RESOURCES.value),
-            discord.SelectOption(label="Speedups", value=InventoryReportView.SPEEDUPS.value),
-            discord.SelectOption(label="Materials", value=InventoryReportView.MATERIALS.value),
-        ]
-        super().__init__(
-            placeholder="View",
-            min_values=1,
-            max_values=1,
-            options=options,
-            custom_id="me:export:inventory_options_view",
-            row=1,
-        )
-        self.parent_view = parent_view
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        self.parent_view.selected_view = InventoryReportView(self.values[0])
-        await interaction.response.defer(ephemeral=True)
-
-
-class InventoryExportGovernorSelect(discord.ui.Select):
-    def __init__(self, parent_view: InventoryExportOptionsView) -> None:
-        governor_options = [
-            discord.SelectOption(
-                label=str(getattr(governor, "governor_name", "") or governor.governor_id)[:100],
-                value=str(governor.governor_id),
-                description=str(getattr(governor, "account_type", "") or "Governor")[:100],
-            )
-            for governor in parent_view.governors[:24]
-        ]
-        options = [
-            discord.SelectOption(label="All registered governors", value="all", default=True),
-            *governor_options,
-        ]
-        super().__init__(
-            placeholder="Governor",
-            min_values=1,
-            max_values=1,
-            options=options,
-            custom_id="me:export:inventory_options_governor",
-            row=2,
-        )
-        self.parent_view = parent_view
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        value = self.values[0]
-        self.parent_view.selected_governor_id = None if value == "all" else int(value)
-        await interaction.response.defer(ephemeral=True)
-
-
-class InventoryExportDaysSelect(discord.ui.Select):
-    def __init__(self, parent_view: InventoryExportOptionsView) -> None:
-        options = [
-            discord.SelectOption(
-                label=str(days),
-                value=str(days),
-                default=(days == DEFAULT_INVENTORY_EXPORT_LOOKBACK_DAYS),
-            )
-            for days in INVENTORY_EXPORT_DAY_OPTIONS
-        ]
-        super().__init__(
-            placeholder="Days",
-            min_values=1,
-            max_values=1,
-            options=options,
-            custom_id="me:export:inventory_options_days",
-            row=3,
-        )
-        self.parent_view = parent_view
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        self.parent_view.selected_days = int(self.values[0])
-        await interaction.response.defer(ephemeral=True)
-
-
 async def send_stats_export_options(
     interaction: discord.Interaction,
     *,
@@ -513,53 +297,6 @@ async def send_stats_export_options(
             "Choose your stats export options.\n"
             "Export type: Excel, CSV, or Google Sheets.\n"
             f"Timeframe: last {DEFAULT_STATS_EXPORT_DAYS} days by default."
-        ),
-        view=view,
-    )
-    view.set_message_ref(message)
-
-
-async def send_inventory_export_options(
-    interaction: discord.Interaction,
-    *,
-    display_name: str,
-) -> None:
-    await _defer_private(interaction)
-    try:
-        governors = await inventory_export_service.get_registered_governors_for_user(
-            int(interaction.user.id)
-        )
-    except asyncio.CancelledError:
-        raise
-    except Exception:
-        logger.exception(
-            "player_self_service_inventory_export_governors_failed user_id=%s",
-            getattr(getattr(interaction, "user", None), "id", None),
-        )
-        await _send_private_error(
-            interaction,
-            "Inventory export options are temporarily unavailable. Please try again in a moment.",
-        )
-        return
-    if not governors:
-        await _send_private_error(
-            interaction,
-            "You have no registered governors. Use `/me accounts` first.",
-        )
-        return
-    view = InventoryExportOptionsView(
-        author_id=int(interaction.user.id),
-        display_name=display_name,
-        governors=list(governors),
-    )
-    message = await _send_private_message(
-        interaction,
-        (
-            "Choose your inventory export options.\n"
-            "Export type: Excel, CSV, or Google Sheets.\n"
-            "Inventory type: All, Resources, Speedups, or Materials.\n"
-            "Governors: all registered governors by default.\n"
-            f"Timeframe: last {DEFAULT_INVENTORY_EXPORT_LOOKBACK_DAYS} days by default."
         ),
         view=view,
     )

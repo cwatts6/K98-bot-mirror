@@ -4,29 +4,29 @@ from datetime import UTC, datetime
 import pytest
 
 from inventory import export_service
-from inventory.models import InventoryExportFormat, InventoryReportView, RegisteredGovernor
+from inventory.models import InventoryExportFormat, InventoryReportView
 
 pytestmark = pytest.mark.asyncio
 
 
-async def test_resolve_export_governor_ids_defaults_to_registered(monkeypatch):
-    async def _governors(user_id):
-        assert user_id == 42
-        return [RegisteredGovernor(111, "Gov 1", "Main"), RegisteredGovernor(222, "Gov 2", "Alt")]
+async def test_resolve_export_governor_ids_rechecks_selected_governor(monkeypatch):
+    async def _allowed(**kwargs):
+        assert kwargs == {"discord_user_id": 42, "governor_id": 111, "is_admin": False}
+        return True
 
-    monkeypatch.setattr(export_service, "get_registered_governors_for_user", _governors)
+    monkeypatch.setattr(export_service, "user_can_import_for_governor", _allowed)
 
     governor_ids = await export_service.resolve_export_governor_ids(
         discord_user_id=42,
-        governor_id=None,
+        governor_id=111,
     )
 
-    assert governor_ids == [111, 222]
+    assert governor_ids == [111]
 
 
 async def test_build_inventory_export_file_writes_csv_and_cleans_up(monkeypatch):
-    async def _governors(_user_id):
-        return [RegisteredGovernor(111, "Gov", "Main")]
+    async def _allowed(**_kwargs):
+        return True
 
     def _resources(governor_ids, *, lookback_days):
         assert governor_ids == [111]
@@ -47,7 +47,7 @@ async def test_build_inventory_export_file_writes_csv_and_cleans_up(monkeypatch)
             }
         ]
 
-    monkeypatch.setattr(export_service, "get_registered_governors_for_user", _governors)
+    monkeypatch.setattr(export_service, "user_can_import_for_governor", _allowed)
     monkeypatch.setattr(
         export_service.inventory_export_dal,
         "fetch_resource_export_rows",
@@ -59,6 +59,7 @@ async def test_build_inventory_export_file_writes_csv_and_cleans_up(monkeypatch)
         username="Tester",
         export_format=InventoryExportFormat.CSV,
         view=InventoryReportView.RESOURCES,
+        governor_id=111,
         lookback_days=30,
     )
 
@@ -80,8 +81,8 @@ async def test_build_inventory_export_file_writes_csv_and_cleans_up(monkeypatch)
 async def test_build_inventory_export_file_writes_xlsx_smoke(monkeypatch):
     """Smoke test: xlsx branch calls _write_xlsx and produces a file."""
 
-    async def _governors(_user_id):
-        return [RegisteredGovernor(111, "Gov", "Main")]
+    async def _allowed(**_kwargs):
+        return True
 
     def _resources(governor_ids, *, lookback_days):
         return [
@@ -106,7 +107,7 @@ async def test_build_inventory_export_file_writes_xlsx_smoke(monkeypatch):
         xlsx_write_calls.append((rows, path))
         path.touch()
 
-    monkeypatch.setattr(export_service, "get_registered_governors_for_user", _governors)
+    monkeypatch.setattr(export_service, "user_can_import_for_governor", _allowed)
     monkeypatch.setattr(
         export_service.inventory_export_dal,
         "fetch_resource_export_rows",
@@ -119,6 +120,7 @@ async def test_build_inventory_export_file_writes_xlsx_smoke(monkeypatch):
         username="Tester",
         export_format=InventoryExportFormat.EXCEL,
         view=InventoryReportView.RESOURCES,
+        governor_id=111,
         lookback_days=30,
     )
 
@@ -137,30 +139,20 @@ async def test_build_inventory_export_file_writes_xlsx_smoke(monkeypatch):
 
 
 async def test_build_inventory_export_file_rejects_no_records(monkeypatch):
-    async def _governors(_user_id):
-        return [RegisteredGovernor(111, "Gov", "Main")]
+    async def _allowed(**_kwargs):
+        return True
 
-    monkeypatch.setattr(export_service, "get_registered_governors_for_user", _governors)
+    monkeypatch.setattr(export_service, "user_can_import_for_governor", _allowed)
     monkeypatch.setattr(
         export_service.inventory_export_dal,
         "fetch_resource_export_rows",
         lambda *_args, **_kwargs: [],
     )
-    monkeypatch.setattr(
-        export_service.inventory_export_dal,
-        "fetch_speedup_export_rows",
-        lambda *_args, **_kwargs: [],
-    )
-    monkeypatch.setattr(
-        export_service.inventory_material_dal,
-        "fetch_material_export_rows",
-        lambda *_args, **_kwargs: [],
-    )
-
     with pytest.raises(ValueError, match="No approved inventory records"):
         await export_service.build_inventory_export_file(
             discord_user_id=42,
             username="Tester",
             export_format=InventoryExportFormat.CSV,
-            view=InventoryReportView.ALL,
+            view=InventoryReportView.RESOURCES,
+            governor_id=111,
         )

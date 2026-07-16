@@ -20,6 +20,22 @@ The operator has explicitly approved the retirement of `/me inventory`, `/myinve
 combined `All` viewing route is not required by players. The definitive Inventory experience is the
 selected-governor dashboard plus the private premium Resources, Speedups, and Materials reports.
 
+### Post-smoke operator amendment - 2026-07-16
+
+The operator completed the initial Phase 5F Discord smoke successfully, reviewed three months of
+Inventory export usage, and confirmed that only the operator used the legacy combined export. The
+operator then explicitly approved removing `/export_inventory`, the `Export Inventory` control and
+option window from `/me exports`, the combined/all-governor export route, and
+`InventoryReportView.ALL`. This amendment supersedes every earlier preservation statement in this
+pack for `/export_inventory`, `/me exports` Inventory options, or private `All` Inventory export.
+
+The three selected-governor report pages retain their private Excel/CSV/Google Sheets exports,
+active report windows, filenames, schemas, access rechecks, and cleanup. `/me exports` becomes
+Stats-only. The approved command result is now 42 -> 39 top-level, 9 -> 8 `/me`, and 2 -> 2
+`/inventory`. Personal Settings visual hierarchy is also amended: Regional Profile is the primary
+large block, Local Time Reference is secondary, and profile coverage aligns beside the LOCAL/UTC
+pill on the existing backdrop.
+
 This task must begin with repository inspection and exact dependency confirmation. Do not reopen the
 retirement decision unless current repository evidence proves that a retained production capability
 has no replacement or that the proposed removal would affect an unrelated supported workflow.
@@ -170,14 +186,14 @@ top-level commands: 42
 Approved Phase 5F result:
 
 ```text
-top-level commands: 40
+top-level commands: 39
 /me grouped subcommands: 8
 /inventory grouped subcommands: 2
 ```
 
-The top-level reduction is `/myinventory` plus `/inventory_preferences`. Removing `/me inventory`
-changes only the grouped `/me` count. `/inventory import`, `/inventory audit`, `/export_inventory`,
-and the top-level `/inventory` group are not removed by this task.
+The top-level reduction is `/myinventory`, `/inventory_preferences`, plus the post-smoke approved
+`/export_inventory` removal. Removing `/me inventory` changes only the grouped `/me` count.
+`/inventory import`, `/inventory audit`, and the top-level `/inventory` group remain.
 
 ### 4.4 Documentation-state mismatch to resolve
 
@@ -203,7 +219,7 @@ archive copies when the local checkout has already completed the move.
   -> report tabs, ranges, private exports, Dashboard return, Change Governor
 
 /me exports
-  -> private Inventory export options, including All export scope
+  -> private Stats export options only
 
 /inventory import
   -> screenshot import
@@ -218,8 +234,10 @@ Retired:
 /me inventory
 /myinventory
 /inventory_preferences
+/export_inventory
 public Inventory report posting
 combined All report viewing route
+combined/all-governor Inventory export route
 Inventory visibility preference in Personal Settings
 ```
 
@@ -352,11 +370,10 @@ must be checked at native, Discord desktop, and mobile scales before final accep
   dimensions, stable report filenames, or premium report backdrops;
 - changing direct-report tabs, ranges, Change Governor, >25 paging, access rechecks, no-data guidance,
   Dashboard return, or private export behavior;
-- removing `InventoryReportView.ALL` where it remains required for private Inventory exports;
 - removing `build_latest_inventory_snapshot()` or current-RSS helpers used by the governor dashboard or
   Accounts portfolio;
-- changing Inventory export schemas, date windows, formats, filenames, or Google Sheets behavior;
-- removing `/export_inventory` in this phase;
+- changing the retained report-page Inventory export schemas, date windows, formats, filenames, or
+  Google Sheets behavior;
 - changing `/my_stats`, `/my_stats_export`, `/mykvkcrystaltech`, `/stats player`, `/player_profile`, or
   `/kvk history`;
 - broad consolidation of all Player Self-Service renderers/views before Phase 5G Exports is complete;
@@ -447,7 +464,8 @@ The first implementation response must report, with repository evidence:
   `/inventory_preferences`;
 - exact current top-level/grouped command counts and every hard-coded baseline/test/doc affected;
 - command-cache/resync behavior required to remove guild commands after code deployment;
-- confirmation that `/inventory import`, `/inventory audit`, and `/export_inventory` remain intact.
+- confirmation that `/inventory import` and `/inventory audit` remain intact and `/export_inventory`
+  is removed by the post-smoke amendment.
 
 ### 10.2 Legacy route ownership
 
@@ -685,17 +703,17 @@ Deployment order:
 2. merge/promote the same patch;
 3. deploy/restart the bot;
 4. run the approved command resync/cache validation;
-5. verify `/me inventory`, `/myinventory`, and `/inventory_preferences` are absent from Discord;
+5. verify `/me inventory`, `/myinventory`, `/inventory_preferences`, and `/export_inventory` are absent from Discord;
 6. smoke `/me dashboard`, all three direct reports, `/me preferences`, `/me exports`, `/inventory
    import`, and `/inventory audit`;
 7. retain SQL table/data untouched.
 
 ### 12.8 Command Surface Governance
 
-- [ ] Record top-level command count `42 -> 40`.
+- [ ] Record top-level command count `42 -> 39`.
 - [ ] Record `/me` grouped subcommand count `9 -> 8`.
 - [ ] Confirm `/inventory` remains at two subcommands.
-- [ ] Remove `myinventory` and `inventory_preferences` from
+- [ ] Remove `myinventory`, `inventory_preferences`, and `export_inventory` from
   `APPROVED_TOP_LEVEL_COMMANDS`.
 - [ ] Update canonical command tables and grouped summary.
 - [ ] Update relevant player/operator docs and smoke references.
@@ -738,7 +756,7 @@ Use `k98-test-selection` and the repository selector before finalizing exact com
 - top-level baseline excludes `myinventory` and `inventory_preferences`;
 - `/inventory import` and `/inventory audit` remain registered;
 - no active command/view/copy references retired paths;
-- command inventory reports the approved 40/8/2 result;
+- command inventory reports the approved 39/8/2 result;
 - command-cache/resync smoke confirms removed commands disappear.
 
 ### 14.2 Preferences coverage
@@ -764,8 +782,8 @@ Use `k98-test-selection` and the repository selector before finalizing exact com
   attachment lifecycle, and timeout remain unchanged;
 - report images preserve dimensions, filenames, data, icons, dates, and backdrops;
 - Accounts current RSS and Inventory As Of remain correct;
-- `/me exports` Inventory export supports Resources/Speedups/Materials/All, governor scope, windows,
-  Excel/CSV/Sheets, and private delivery;
+- the three report pages retain selected-governor Resources/Speedups/Materials Excel/CSV/Sheets
+  exports and `/me exports` contains no Inventory export control;
 - `/inventory import`, upload-first import, materials continuation, correction/review, cancellation,
   approval, audit, and admin debug regressions remain green.
 
@@ -830,11 +848,13 @@ and the final bot Changes security review.
 - [ ] `/me inventory` is no longer registered or reachable through active navigation.
 - [ ] `/myinventory` is no longer registered.
 - [ ] `/inventory_preferences` is no longer registered.
-- [ ] Top-level command count is 40 and `/me` grouped count is 8.
+- [ ] `/export_inventory` is no longer registered.
+- [ ] Top-level command count is 39 and `/me` grouped count is 8.
 - [ ] Removed commands disappear from the Discord command cache after resync.
 - [ ] Public Inventory report posting no longer exists.
 - [ ] Combined All viewing no longer exists.
-- [ ] Private All Inventory export remains available where currently supported.
+- [ ] Combined/all-governor and private All Inventory export routes are removed.
+- [ ] Resources, Speedups, and Materials report-page exports remain private and unchanged.
 - [ ] Dashboard Inventory highlights and all three direct report journeys remain unchanged.
 - [ ] Imports, audits, report calculations, ranges, filenames, backdrops, exports, and Google Sheets
   behavior remain unchanged.
@@ -885,16 +905,17 @@ rollback data boundary.
 ```md
 ## Summary
 
-- retire `/me inventory`, `/myinventory`, and `/inventory_preferences`
+- retire `/me inventory`, `/myinventory`, `/inventory_preferences`, and `/export_inventory`
 - make the selected-governor dashboard and private premium Inventory reports the definitive viewing journey
 - simplify Personal Settings to regional profile and LOCAL/UTC context
 - remove directly orphaned visibility, legacy-controller, summary, test, and asset code
 
 ## Changes
 
-- reduce top-level command count from 42 to 40 and `/me` subcommands from 9 to 8
+- reduce top-level command count from 42 to 39 and `/me` subcommands from 9 to 8
 - remove public Inventory report posting and combined All viewing
-- preserve private All Inventory exports, imports, audits, calculations, ranges, filenames, report backdrops, Dashboard highlights, and modern report controls
+- remove the combined/all-governor Inventory export while preserving the three report-page exports,
+  imports, audits, calculations, ranges, filenames, report backdrops, Dashboard highlights, and modern report controls
 - leave `dbo.InventoryReportPreference` untouched for rollback and defer SQL retirement
 
 ## Tests

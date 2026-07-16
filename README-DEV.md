@@ -68,9 +68,10 @@ Inventory Summary Card. The implementation retires `/me inventory`, `/myinventor
 `/inventory_preferences` together; removes public Inventory reporting, combined `All` viewing, the
 visibility model/service/DAL, the orphaned legacy controller, and the old summary backdrop; and
 simplifies Personal Settings to regional profile plus derived `LOCAL`/`UTC` context. It preserves
-the selected-governor dashboard, `/me resources`, `/me speedups`, `/me materials`, private report
-tabs/ranges/exports, private `All` Inventory export under `/me exports`, `/inventory import`,
-`/inventory audit`, and `/export_inventory`. `dbo.InventoryReportPreference` and existing rows remain
+the selected-governor dashboard, `/me resources`, `/me speedups`, `/me materials`, and their private
+report-page Excel/CSV/Google Sheets exports. `/me exports` now contains only the Stats export journey;
+the legacy combined/all-governor Inventory export and `/export_inventory` are retired. `/inventory
+import` and `/inventory audit` remain. `dbo.InventoryReportPreference` and existing rows remain
 untouched for rollback; there is no SQL deployment in Phase 5F.
 
 ## Quality Automation

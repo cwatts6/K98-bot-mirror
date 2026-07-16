@@ -46,7 +46,6 @@ def _summary() -> PlayerSelfServiceSummary:
         ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
-            inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
     )
@@ -88,7 +87,6 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
         ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
-            inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
     )
@@ -105,12 +103,9 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
     assert _page_copy("dashboard", summary)[2] == (
         "Actions available: Accounts, Reminders, Preferences, Exports"
     )
-    assert _page_copy("exports", summary)[2] == "Actions: Export Stats, Export Inventory"
+    assert _page_copy("exports", summary)[2] == "Action: Export Stats"
     assert _page_copy("exports", summary)[3] == ""
-    assert _page_copy("exports", summary)[4] == (
-        "Stats: Excel / CSV / Google Sheets",
-        "Inventory: Excel / CSV / Google Sheets",
-    )
+    assert _page_copy("exports", summary)[4] == ("Stats: Excel / CSV / Google Sheets",)
 
 
 def test_page_card_reminder_copy_treats_incomplete_as_setup() -> None:
@@ -138,7 +133,6 @@ def test_page_card_reminder_copy_treats_incomplete_as_setup() -> None:
         ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
-            inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
     )
@@ -166,7 +160,6 @@ def test_page_card_export_copy_handles_unavailable_state() -> None:
         ),
         exports=ExportStatus(
             stats_export="Unavailable",
-            inventory_export="Unavailable",
             privacy_note="Private",
             action_state="unavailable",
             action_summary="Register an account first.",
@@ -178,7 +171,6 @@ def test_page_card_export_copy_handles_unavailable_state() -> None:
     assert _page_copy("exports", summary)[3] == "Register an account first."
     assert _page_copy("exports", summary)[4] == (
         "Stats: Unavailable",
-        "Inventory: Unavailable",
         "Register an account first.",
     )
 
@@ -202,7 +194,6 @@ def test_page_card_export_copy_handles_guidance_state() -> None:
         ),
         exports=ExportStatus(
             stats_export="Legacy",
-            inventory_export="Legacy",
             privacy_note="Private",
             action_state="guidance",
             action_summary="Use legacy commands.",
@@ -212,10 +203,7 @@ def test_page_card_export_copy_handles_guidance_state() -> None:
     assert _page_copy("exports", summary)[1] == "private"
     assert _page_copy("exports", summary)[2] == "Guidance only"
     assert _page_copy("exports", summary)[3] == "Use legacy commands."
-    assert _page_copy("exports", summary)[4] == (
-        "Stats: Legacy",
-        "Inventory: Legacy",
-    )
+    assert _page_copy("exports", summary)[4] == ("Stats: Legacy",)
 
 
 def test_page_card_account_and_vip_lines_show_full_summary() -> None:
@@ -238,7 +226,6 @@ def test_page_card_account_and_vip_lines_show_full_summary() -> None:
         ),
         exports=ExportStatus(
             stats_export="Excel / CSV / Google Sheets",
-            inventory_export="Excel / CSV / Google Sheets",
             privacy_note="Private",
         ),
     )
