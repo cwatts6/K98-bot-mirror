@@ -412,8 +412,9 @@ Player Self-Service Command Centre status:
   `archive/`.
 - Active Player Self-Service v2 files:
   - `Player Self-Service Command Centre v2 - Programme Pack.md`
-- No Phase 5G task pack or starter is active yet; the operator will supply the next Exports slice
-  separately.
+  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
+- Phase 5G is product-approved and task-packed. Runtime implementation has not started.
 - GovernorOS v2 Phases 1-5F are complete. Phase 2 delivered in mirror PR #216 and production PR
   #523, Phase 3 delivered in mirror PR #217 and production PR #524, and Phase 4 delivered in mirror
   PR #218. Phase 4 operator smoke on 2026-07-11 accepted the materially wider standalone card and
@@ -435,11 +436,12 @@ Player Self-Service Command Centre status:
   code. It preserved `/inventory import`, `/inventory audit`, dashboard highlights, private premium
   `/me resources|speedups|materials` reports and their three report-page exports, and left
   `dbo.InventoryReportPreference` dormant. The completed Phase 5F task pack and starter are archived.
-- Phase 5G is the next Player Self-Service slice and will update `/me exports` and
-  `/my_stats_export` together. Its separate operator-supplied task pack must distinguish visual page
-  format from downloaded-file format, lock selected-governor versus all-linked semantics, define the
-  governor dropdown and more-than-25 behavior where applicable, decide the legacy command outcome,
-  and preserve one private service-backed export controller with access rechecks and cleanup.
+- Phase 5G Account Data Export Consolidation is the next implementation slice. The approved
+  canonical journey is `/me accounts -> Account Summary -> Download data`; `/me exports` and
+  `/my_stats_export` are removed rather than redirected. The outputs are Full workbook, Current
+  snapshot CSV, and Raw Stats history CSV, with Account Summary first and every identified
+  window/count/Forts/safety/freshness/Sheets-labelling defect corrected. `/my_stats` remains unchanged
+  for Phase 6. Inventory report-page exports remain outside the slice and unchanged.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -542,12 +544,11 @@ starter are archived. The accepted result has 39 top-level commands, 8 `/me` sub
 `/inventory` subcommands; keeps modern private reports and their three report-page exports; and leaves
 `dbo.InventoryReportPreference` untouched with no SQL deployment.
 
-Phase 5G Exports modernisation is the next player self-service slice. No active task pack or starter
-exists yet; the operator will supply them separately. That pack must cover `/me exports` and
-`/my_stats_export` together, distinguish page presentation from downloaded-file format, lock
-selected-governor versus all-linked behavior, define any governor dropdown and more-than-25 paging,
-decide the legacy command outcome, and preserve one private service-backed export controller with
-access rechecks, fallback, Sheets behavior, and cleanup.
+Phase 5G Account Data Export Consolidation is the next player self-service implementation slice.
+Its active task pack and starter lock Account Summary as the canonical download home, removal of
+`/me exports` and `/my_stats_export`, three all-linked private output kinds, the complete identified
+export correctness pass, no SQL deployment, unchanged Inventory report-page exports, and `/my_stats`
+as the separate Phase 6 redesign/migration.
 
 Other temporary deprecated command paths remain captured as deferred cleanup for execution only
 after their own communication, no-feedback monitoring, production usage review, and explicit

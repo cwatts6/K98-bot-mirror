@@ -78,14 +78,25 @@ Phase 5F is complete and operator accepted after final Discord smoke on 2026-07-
 contains the accepted implementation, and production-branch commit `89f7da16` carries the promoted
 patch. The completed task pack and chat starter are archived under `docs/task_packs/archive/`.
 
-The next separately task-packed GovernorOS slice is Phase 5G Exports modernisation. It will update
-`/me exports` and `/my_stats_export` together. Before implementation, its operator-supplied task pack
-must distinguish the new page/interaction presentation from any downloaded-file format/schema
-change, decide selected-governor versus all-linked scope, define the author-gated governor dropdown
-and more-than-25 paging if selected-governor scoped, decide the `/my_stats_export` command outcome,
-and preserve one private service-backed controller with access rechecks, safe filenames, fallback,
-Google Sheets handling, and complete temporary-file/stream cleanup. The three Inventory report-page
-exports remain outside that slice unless separately approved.
+GovernorOS v2 Phase 5G Account Data Export Consolidation is now product-approved and task-packed.
+Repository inspection confirms the accepted Phase 5F state: `/me exports` is Stats-only,
+`/my_stats_export` is a redirect whose format/day options are discarded, Account Summary still owns
+`Download CSV`, and `/my_stats` remains the separate live interactive stats command. Phase 5G removes
+`/me exports` and `/my_stats_export`, removes every Exports navigation surface, and makes
+`/me accounts -> Account Summary -> Download data` the canonical all-linked personal-data journey.
+
+`Download data` will offer a default Account-Summary-first formatted workbook (`.xlsx`), the exact
+current Account Summary snapshot (`.csv`), or raw Stats history (`.csv`) for 30/60/90/180/360 days.
+The phase also corrects every identified Stats export issue: exact inclusive N-day windows, filtered
+`ALL_DAILY`, actual written row counts/date bounds, selected-window Forts semantics, shared formula
+safety, separate Stats/Inventory freshness, truthful generated time, and one honest Excel/Google
+Sheets-compatible workbook option. The three selected-governor Inventory report-page exports remain
+unchanged. `/my_stats` redesign and migration are Phase 6.
+
+Active Phase 5G records:
+
+- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
+- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
 
 ## Quality Automation
 

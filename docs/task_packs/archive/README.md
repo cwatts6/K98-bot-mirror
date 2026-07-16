@@ -59,8 +59,8 @@ on 2026-07-16. Its archived records capture retirement of `/me inventory`, `/myi
 `/inventory_preferences`, `/export_inventory`, public/combined Inventory viewing and the combined
 export; preservation of the selected-governor reports and their three exports; the profile-first
 Personal Settings reflow; final 39 top-level/8 `/me` command baselines; zero SQL change; and the
-dormant rollback table. Phase 5G Exports modernisation is next, but its task pack and starter have
-not yet been created.
+dormant rollback table. Phase 5G Account Data Export Consolidation is active, product-approved, and task-packed under
+`docs/task_packs/`; its records remain outside this archive until implementation and acceptance.
 
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,

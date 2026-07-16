@@ -5,7 +5,7 @@
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
 - Date: `2026-07-16`
-- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486; GovernorOS v2 Phases 1-5E completed through mirror PR #224 and production PR #531; and Phase 5F Inventory Surface Consolidation and Legacy Retirement completed in mirror PR #225, was promoted at production-branch commit `89f7da16`, and was operator accepted after final Discord smoke on 2026-07-16. Phase 5G Exports modernisation is the next separately task-packed slice.
+- Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player Self-Service Command Centre programme completed in production PR #486; GovernorOS v2 Phases 1-5F completed and operator accepted through mirror PR #225 and production-branch commit `89f7da16`; and the Phase 5G Account Data Export Consolidation product/output/command contract, task pack, and chat starter approved on 2026-07-16 for the next implementation slice.
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
@@ -106,6 +106,16 @@ imports, audits, calculations, and filenames remain. Personal Settings keeps the
 profile and LOCAL/UTC experience with its refined profile-first layout. The dormant SQL preference
 table remains untouched for rollback and later evidence-led cleanup.
 
+Phase 5G is now product-approved as **Account Data Export Consolidation**, not a premium Exports
+summary card. Repository inspection confirms that `/me exports` is a one-action Stats page,
+`/my_stats_export` is redirect-only with discarded options, and Account Summary already owns the
+well-received all-linked portfolio context. The canonical target is therefore `/me accounts ->
+Account Summary -> Download data`; `/me exports` and `/my_stats_export` are removed rather than
+retained as duplicate or redirect-only routes. The output choices are an Account-Summary-first full
+workbook, the exact current snapshot CSV, and raw Stats history CSV. All identified export-window,
+row-count, sheet, Forts, safety, freshness, and Google Sheets labelling defects are in Phase 5G scope.
+`/my_stats` remains unchanged until the separate Phase 6 interactive-stats redesign and migration.
+
 ## 3. Programme Vision
 
 The vision is to transform `/me` from a useful collection of setup pages into the **primary personal command centre for every KD98 governor**.
@@ -179,7 +189,7 @@ For leadership, the long-term goal is a separate inspection journey that answers
 
 ## 7. Target Command Model
 
-### Canonical `/me` command group after Phase 5F
+### Canonical `/me` command group after Phase 5G
 
 ```text
 /me dashboard
@@ -189,7 +199,6 @@ For leadership, the long-term goal is a separate inspection journey that answers
 /me resources
 /me speedups
 /me materials
-/me exports
 ```
 
 ### Approved Phase 5F retirements
@@ -201,9 +210,15 @@ For leadership, the long-term goal is a separate inspection journey that answers
 /export_inventory
 ```
 
-The retired Inventory routes are removed rather than redirected because production evidence shows no
-player dependency and the operator has explicitly approved the final removal. The modern replacement
-is already live and accepted.
+### Approved Phase 5G retirements
+
+```text
+/me exports
+/my_stats_export
+```
+
+The Phase 5G routes are removed rather than redirected. Account Summary already provides the richer
+all-linked context and becomes the one central personal-data download home.
 
 ### Planned grouped additions, subject to later phase approval
 
@@ -212,11 +227,10 @@ is already live and accepted.
 /me inspect
 ```
 
-### Specialist commands retained outside Phase 5F
+### Specialist commands retained after Phase 5G
 
 ```text
 /my_stats
-/my_stats_export
 /stats player
 /player_profile
 /mykvkcrystaltech
@@ -229,15 +243,15 @@ is already live and accepted.
 
 ```text
 /me dashboard      = personal governor command centre plus selected-governor Inventory highlights
-/me accounts       = all-linked-governor portfolio, scan health, management, and private Account Summary
+/me accounts       = all-linked portfolio, management, Account Summary, and Download data
 /me reminders      = Discord-user reminder settings
 /me preferences    = Discord-user regional profile and LOCAL/UTC reference
-/me resources      = private selected-governor resource report
-/me speedups       = private selected-governor speedups report
-/me materials      = private selected-governor materials report
-/me exports        = private Stats export option window; Inventory exports live on the three report pages
+/me resources      = private selected-governor resource report and report-page export
+/me speedups       = private selected-governor speedups report and report-page export
+/me materials      = private selected-governor materials report and report-page export
 /inventory import  = Inventory screenshot capture
 /inventory audit   = admin Inventory import audit
+/my_stats          = current interactive personal Stats experience until Phase 6
 /me history        = future private selected-governor KVK history entry point
 /me inspect        = future gated leadership/admin governor dashboard inspection
 /kvk history       = existing public/channel-gated KVK history path
@@ -899,7 +913,7 @@ Delivery record:
 
 ### Phase 5C-5G — Premium Page Alignment And Surface Consolidation
 
-Status: `Phases 5C Accounts, 5D Reminders, 5D.1 Next Alert, 5E Preferences, and 5F Inventory consolidation are complete and operator accepted; Phase 5G Exports modernisation is the next separately task-packed slice`.
+Status: `Phases 5C Accounts, 5D Reminders, 5D.1 Next Alert, 5E Preferences, and 5F Inventory consolidation are complete and operator accepted; Phase 5G Account Data Export Consolidation is product-approved, task-packed, and the next implementation slice`.
 
 Accounts, Reminders, Preferences, and Exports share the accepted private standalone-card lifecycle.
 The previously planned fifth summary card for Inventory has been cancelled because the selected-
@@ -932,8 +946,8 @@ Remaining-phase consistency matrix:
 | 5D.1 Next alert | Discord user | Accepted Phase 5D card with authoritative projection | No Change Governor | Complete and operator accepted; shared scheduler parity, no side effects |
 | 5E Preferences | Discord user | Accepted 1702x924 `me_preferences.png` card | No parent dropdown; Accounts owns VIP | Complete and deployed; Phase 5F retains regional profile/local-time and intentionally retires the transitional Inventory privacy feature |
 | 5F Inventory consolidation | Commands, navigation, Preferences dependency, legacy controller | No new Inventory summary card; accepted Preferences card and existing 1400x980 reports retained | Direct report pages retain selected-governor resolver and Change Governor | Complete and operator accepted; four routes, public/All viewing and combined export retired; imports, audits, private reports, report-page exports, calculations, filenames, and dormant SQL table preserved |
-| 5G Exports modernisation | `/me exports`, `/my_stats_export`, Stats export service/view/output | New presentation and export-file format must be named separately and approved in the task pack | Explicit governor-scope decision; author-gated paged dropdown and access recheck if selected-governor scoped, otherwise no misleading dropdown | Audit current all-linked behavior and usage; lock schemas, windows, filenames, formats, Sheets behavior, legacy-command outcome, fallback, cleanup, and rollback before implementation |
-| 6 Dashboard Export Stats integration | Conditional after Phase 5G | Reuse the accepted Phase 5G controller and attachment lifecycle; no duplicate export path | Reuse Phase 5G governor semantics exactly | Only needed if dashboard integration is intentionally left out of Phase 5G; it must not reopen file-format or legacy-command decisions accepted there |
+| 5G Account Data Export Consolidation | All linked accounts under Account Summary | Full workbook, current snapshot CSV, raw history CSV | No Change Governor; active registry revalidation at Download | Remove `/me exports` and `/my_stats_export`; make Download data canonical; correct all identified output defects; no SQL deployment |
+| 6 Interactive Personal Stats Experience | `/my_stats` replacement/migration | Separately approved private interactive presentation | Decide `/me stats`, ALL/account selector, periods, channel policy, and migration | Personal downloads remain owned by Account Summary; remove `/my_stats` rather than retain a permanent redirect only after approval |
 | 7 History | Selected governor | Accepted selected-governor standalone lifecycle | Paged Change Governor with access recheck | Preserve public/channel-gated `/kvk history`; add private `/me history` only |
 | 8 Inspect | Explicit lookup target, inspect-safe | Private permission-gated premium output | Inspect lookup/ambiguity resolution | Approve permissions, safe fields/VIP, lookup, and telemetry first |
 | 9 Migration review | Evidence only | No new renderer implied | No selector change implied | Review remaining legacy commands only; Phase 5F Inventory retirements are already separately evidenced and approved |
@@ -1421,69 +1435,78 @@ record is archived in:
 - `docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5F Inventory Surface Consolidation and Legacy Retirement.md`
 - `docs/task_packs/archive/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5F Inventory Surface Consolidation and Legacy Retirement.md`
 
-#### Phase 5G - Exports Surface Modernisation And Legacy Stats Export Decision
+#### Phase 5G - Account Data Export Consolidation
 
-Status: `next slice; operator will provide a separate task pack before audit or implementation`.
+Status: `product decision and output contract approved on 2026-07-16; active task pack and chat starter prepared; implementation not started`.
 
-Phase 5G must update `/me exports` and `/my_stats_export` as one coherent Stats-export product slice.
-It must not recreate the retired combined Inventory export: the three selected-governor Inventory
-exports remain owned by their Resources, Speedups, and Materials report pages.
+Approved canonical journey:
 
-The separate task pack must distinguish two meanings of “new format” before implementation:
+```text
+/me accounts
+-> Account Summary
+-> Download data
+```
 
-1. the `/me exports` presentation and interaction format, including card/backdrop, content hierarchy,
-   selector placement, fallback, attachments, refresh, timeout, and mobile/desktop behavior; and
-2. the downloaded/exported Stats file contract, including Excel/CSV/Google Sheets availability,
-   columns, worksheets, headings, ordering, date windows, filename, formulas, and compatibility.
+Approved outputs:
 
-No file schema or downstream contract should change merely because the visual page is redesigned.
-If a new file format or schema is intended, the task pack must inventory existing consumers, validate
-the SQL/DAL contract, define backwards compatibility and migration, and provide golden-file tests.
+- **Full workbook (`.xlsx`) - default:** `ACCOUNT_SUMMARY`, `README`, `ALL_DAILY`, then one sheet per
+  linked governor. It is the single formatted file for Excel and Google Sheets compatibility.
+- **Current snapshot (`.csv`):** the exact existing 29-column Account Summary contract, one row per
+  linked governor, with no history query.
+- **Raw stats history (`.csv`):** one row per distinct authorised linked governor per source date,
+  using 30/60/90/180/360-day choices and a 90-day default.
 
-Governor routing is also an explicit design gate. Audit the current all-linked/user-level export and
-then lock one of these models:
+Locked command and navigation outcome:
 
-- selected-governor export: use the established linked-governor resolver, private author-gated
-  selector, access recheck before every download, single-governor direct entry, multiple-governor
-  selection, more-than-25 paging, and Change Governor that preserves format/window state; or
-- all-linked Discord-user export: show no governor dropdown and state honestly that every linked
-  governor is included.
+- remove `/me exports` rather than building another summary card;
+- remove `/my_stats_export` rather than retaining a redirect-only route with discarded options;
+- remove Exports navigation from Dashboard, Accounts, Account Summary, Reminders, Preferences, and
+  every child/fallback path;
+- retain `/my_stats` unchanged for Phase 6;
+- target command counts are 38 top-level, 7 `/me`, and 2 `/inventory`.
 
-Do not expose a combined `All` choice inside a selected-governor dropdown unless the operator
-explicitly approves it after reviewing the resulting file contract. The task pack must also decide
-whether `/my_stats_export` is removed, redirected, aliased to the same modern controller, or retained;
-that decision requires fresh usage evidence, exact command-count impact, player communication, cache
-resync, and rollback. Both entry points must share one service/view path rather than drift into two
-export implementations.
+Locked correctness work:
 
-Preserve private delivery, formula-injection protection, author/stale/foreign/forged/concurrent
-denial, safe filenames, temporary-file and stream cleanup, Google Sheets failure handling, honest
-unavailable/no-data guidance, and Dashboard return. Record exact current and proposed defaults for
-format and date window; do not silently inherit Excel/90-day behavior if the new design changes it.
+- use an exact inclusive N-day contract everywhere: start = latest source date - N + 1;
+- filter `ALL_DAILY`, account tables, charts, and raw CSV to that same window;
+- report rows actually written and exact earliest/latest dates;
+- make Account Summary the first sheet and remove the weaker duplicate INDEX unless dependency audit
+  requires an explicit compatibility escalation;
+- calculate Forts using the selected period rather than a hidden fixed 180 days;
+- apply formula-leading text protection consistently across CSV and workbook output;
+- report Stats freshness, Inventory freshness, and generated UTC separately;
+- replace separate Excel/Google Sheets choices with one truthful `.xlsx` compatibility option;
+- preserve complete temporary-file, stream, Discord-file, cancel, timeout, and exception cleanup.
 
-### Phase 6 — Dashboard Export Stats Integration
+Scope remains all-linked and private. There is no selected-governor export mode, no Change Governor,
+no dashboard Export Stats action, no central Inventory export, no live Google Sheets API, and no SQL
+change/deployment. Resources, Speedups, and Materials retain their selected-governor report-page
+exports unchanged.
 
-Status: `conditional after Phase 5G; skip if Phase 5G intentionally completes dashboard integration`.
+Authoritative active records:
 
-Goal: add a dashboard Export Stats action only after Phase 5G has made the governor scope, file
-contract, and `/my_stats_export` outcome unambiguous.
+- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
+- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
 
-Deliver:
+### Phase 6 — Interactive Personal Stats Experience And `/my_stats` Migration
 
-- Reuse the exact Phase 5G selected-governor or all-linked behavior without a second decision or
-  duplicate controller.
-- Dashboard action that calls the Phase 5G service-backed export path under the approved scope.
-- Clear copy when the selected dashboard governor does not narrow the resulting file.
-- Use standalone attachment delivery and the accepted navigation/fallback/cleanup contract. Show
-  Change Governor only if the approved export is selected-governor scoped; omit it for all-linked
-  user-level exports.
-- Preserve the Phase 5G-accepted `/me exports`, `/my_stats_export`, file-format, schema, date-window,
-  filename, and Google Sheets decisions.
-- Privacy, selected-context, filename/content, and compatibility tests.
+Status: `proposed after Phase 5G acceptance; separate product workshop and task pack required`.
 
-Approval gate: operator must approve whether a dashboard action is still useful after Phase 5G. Any
-schema, header, worksheet, format, governor-scope, legacy-command, or SQL contract decision belongs
-to Phase 5G and must not be reopened here without a new explicit scope change.
+Goal: transform the current interactive `/my_stats` experience without reopening personal download
+ownership.
+
+Phase 6 must separately decide:
+
+- the future `/me stats` grouped path and exact command-count effect;
+- private/channel behavior and current channel-gate migration;
+- ALL versus one-account selector semantics;
+- Yesterday, This Week, Last Week, This Month, Last Month, Last 3M, and Last 6M behavior;
+- presentation, chart, performance, fallback, timeout, and accessibility contracts;
+- player communication, observation, final `/my_stats` removal rather than a permanent redirect,
+  command resync, rollback, and smoke.
+
+Account Summary remains the owner of current snapshot and downloadable history outputs. Phase 6 does
+not create another download route unless a later explicit scope change demonstrates a distinct need.
 
 ### Phase 7 — Private `/me history` Entry Point
 
@@ -1584,7 +1607,7 @@ These ideas must not block or silently expand Phases 5A-9.
 - Dashboard data service/DAL foundation.
 - Premium governor dashboard card and fallback embed.
 - Premium all-linked-governor Accounts portfolio, scan health, insight, guided management, and
-  private paginated Account Summary/CSV.
+  private paginated Account Summary with canonical Download data outputs.
 - Premium Discord-user Reminders summary with authoritative next-alert projection and unchanged
   Manage flow.
 - Premium Discord-user Personal Settings summary with deterministic local-time/UTC reference,
@@ -1596,6 +1619,9 @@ These ideas must not block or silently expand Phases 5A-9.
   application dependency.
 - Preservation of Inventory imports, audits, calculations, and report-page private exports,
   filenames, backdrops, and Google Sheets behavior.
+- Phase 5G retirement of `/me exports` and `/my_stats_export`, removal of Exports navigation,
+  Account-Summary-owned Full workbook/Current snapshot/Raw history outputs, and correction of the
+  approved export-window, row-count, sheet, Forts, safety, freshness, and format-label defects.
 - Private `/me` KVK history entry point.
 - Leadership/admin `/me inspect`, later and separately permission-gated.
 - Usage-based migration planning for remaining legacy/specialist commands.
@@ -1687,7 +1713,7 @@ Likely SQL-backed objects:
 ## 16. Cross-Programme Constraints
 
 - Maintain command registration governance.
-- Preserve top-level command count unless explicitly approved. Phase 5F is an explicit approved reduction from 42 to 39 through removal of `/myinventory`, `/inventory_preferences`, and `/export_inventory`; `/me inventory` separately reduces the grouped `/me` count from 9 to 8.
+- Preserve top-level command count unless explicitly approved. Phase 5F reduced the surface to 39 top-level and 8 `/me`; Phase 5G explicitly approves 38 top-level and 7 `/me` by removing `/my_stats_export` and `/me exports`. `/inventory` remains 2.
 - Prefer grouped `/me` subcommands over new flat commands.
 - Keep all player dashboard, direct Inventory report, and personal export output private unless a future separately approved sharing workflow says otherwise.
 - Keep settings ownership singular: after Phase 5F, Preferences owns regional profile/local-time context and Accounts owns governor-specific VIP editing; no retained module owns an Inventory report visibility setting.
@@ -1771,7 +1797,8 @@ The programme is complete when:
   profile, transitional Inventory privacy flow, deterministic insight, VIP migration, automated/visual
   validation, security review, and successful operator Discord smoke.
 - [x] Phase 5F retains the accepted regional-profile/local-time experience while removing obsolete Inventory visibility, public posting, and legacy report controllers.
-- [ ] Phase 5G explicitly decides and tests `/me exports`, `/my_stats_export`, presentation versus file-format changes, and selected-governor versus all-linked semantics before any dashboard integration.
+- [x] Phase 5G product, command, output, correctness, privacy, no-SQL, test, security-routing, rollback, and Phase 6 handoff decisions are recorded in the active task pack and starter.
+- [ ] Phase 5G runtime removes `/me exports` and `/my_stats_export`, delivers Account Summary Download data, corrects every identified export issue, passes validation, and is operator accepted.
 - [ ] A private `/me history` path exists while `/kvk history` remains unchanged.
 - [ ] `/me inspect` is permission-gated, private by default, and excludes Discord-user private data.
 - [x] Legacy commands are only redirected/removed after usage evidence and explicit operator approval; Phase 5F Inventory retirements meet that gate.
@@ -1801,35 +1828,30 @@ Do not include these in early phases unless separately approved:
 ## 20. Suggested Next Action
 
 ```text
-Prepare the separately supplied Phase 5G task pack for `/me exports` and `/my_stats_export`. Start
-with current usage, command, view/controller, service/DAL/SQL, generated-file, Google Sheets,
-temporary-file, and test dependency audits. Stop at the normal scope, architecture, and plan gates.
+Execute Phase 5G Account Data Export Consolidation from the active task pack and chat starter.
+Begin with repository/SQL read-only audit and exact manifest, then stop at the documented scope,
+architecture, and implementation-plan approval gates.
 
-The task pack must lock:
-- whether “new format” means the page/interaction presentation, the exported file contract, or both;
-- selected-governor versus all-linked scope;
-- governor dropdown/direct-entry/Change Governor/>25 paging behavior when selected-governor scoped;
-- whether an `All` choice exists, with no implicit restoration of the retired Inventory All route;
-- the final `/my_stats_export` registration/redirect/alias/removal outcome and command-count impact;
-- exact formats, schemas, columns, sheets, windows, defaults, filenames, and Google Sheets behavior;
-- one shared controller/service path, private delivery, access rechecks, fallback, timeout, and cleanup;
-- SQL/no-SQL boundary, compatibility, migration, rollback, security routing, and smoke order.
+Locked outcomes:
+- /me accounts -> Account Summary -> Download data is canonical
+- remove /me exports and /my_stats_export; do not retain redirect-only routes
+- keep /my_stats unchanged for the separately task-packed Phase 6 redesign/migration
+- provide Full workbook, Current snapshot CSV, and Raw stats history CSV
+- make ACCOUNT_SUMMARY the first workbook sheet
+- apply exact inclusive 30/60/90/180/360-day windows everywhere
+- report actual written rows/date bounds and separate Stats/Inventory/generated freshness
+- use selected-window Forts semantics and shared spreadsheet formula safety
+- expose one truthful .xlsx option for Excel/Google Sheets compatibility
+- preserve all three selected-governor Inventory report-page exports
+- no SQL deployment, central Inventory export, selected-governor Stats export, or broad framework
 ```
 
-Completed Phase 5F records are archived:
+Active Phase 5G records:
 
-- `docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5F Inventory Surface Consolidation and Legacy Retirement.md`
-- `docs/task_packs/archive/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5F Inventory Surface Consolidation and Legacy Retirement.md`
+- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
+- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
 
-Completed Phase 5E records belong in the archive:
-
-- `docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5E Premium Preferences Summary Card.md`
-- `docs/task_packs/archive/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5E Premium Preferences Summary Card.md`
-
-No Phase 5G task pack or starter exists yet; the operator will provide it separately. Phase 5G does
-not inherit permission to change the three Inventory report-page exports, Inventory imports/audits,
-History, Inspect, unrelated legacy commands, reminders, account-registry behavior, or to create a
-broad shared renderer/view framework.
+Completed Phase 5F and earlier execution records remain archived and are not rewritten.
 
 ## 21. Programme Change Log
 
@@ -1865,3 +1887,4 @@ broad shared renderer/view framework.
 | 2026-07-16 | Phase 5F Inventory summary superseded by consolidation and retirement | Production evidence showed the only `/myinventory` user was the operator with two uses. The operator confirmed public posting, All viewing, `/inventory_preferences`, `/myinventory`, and `/me inventory` are not required. Approved one coordinated Phase 5F bot slice to remove those routes, simplify Personal Settings to regional profile plus LOCAL/UTC, delete directly orphaned code/asset/tests, reduce the command surface to 40 top-level and 8 `/me` subcommands, preserve modern private reports/imports/audits/exports, and leave `dbo.InventoryReportPreference` untouched for rollback and later SQL cleanup. |
 | 2026-07-16 | Phase 5F post-smoke export and Preferences amendment | Initial Discord smoke passed. Three-month usage showed only the operator used the legacy combined Inventory export, so the operator approved removing `/export_inventory`, the `/me exports` Inventory control/window, and `InventoryReportView.ALL`, while preserving the three report-page exports. Preferences is rebalanced with Regional Profile primary, Local Time secondary, and profile coverage aligned beside LOCAL/UTC. The final command baseline is 39 top-level, 8 `/me`, and 2 `/inventory`. |
 | 2026-07-16 | Phase 5F completed, operator accepted, and archived | Final Discord smoke confirmed all eight `/me` subcommands, retained reports/exports/import/audit paths, revised Personal Settings, and removal of all four retired Inventory routes. Mirror PR #225 delivered the accepted patch; production promotion branch commit `89f7da16` carries the exact patch. Final validation recorded 2590 passed and 2 skipped, zero Changes-security findings, no SQL change, and preserved dormant `dbo.InventoryReportPreference`. The task pack and starter moved to `archive/`; Phase 5G Exports modernisation is next and will receive a separate operator-supplied task pack. |
+| 2026-07-16 | Phase 5G Account Data Export Consolidation approved and task-packed | Confirmed the Phase 5F Inventory end state and current Stats/Accounts code. Approved Account Summary Download data as canonical, removal of `/me exports` and `/my_stats_export`, three output kinds, the full export correctness pass, no SQL deployment, and `/my_stats` redesign/migration as Phase 6. Created the active Phase 5G task pack and chat starter. |

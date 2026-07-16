@@ -89,11 +89,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `commands/registry_cmds.py`, `commands/telemetry_cmds.py`, `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `commands/subscriptions_cmds.py`, `commands/calendar_cmds.py`, player self-service command docs/tests
 - Type: cleanup
-- Description: Player Self-Service Command Centre Phase 13 converted approved legacy self-service entry points to lightweight private redirects. GovernorOS v2 Phase 5F subsequently removed `/myinventory`, `/inventory_preferences`, and `/export_inventory` after usage review and explicit approval. Account/reminder redirects, `/my_stats_export`, `/my_stats`, `/mykvkcrystaltech`, `/player_profile`, and `/stats player` remain outside that completed removal boundary. The next separately task-packed Exports slice will review `/my_stats_export`, but no outcome is implied until fresh usage and product evidence are approved.
-- Suggested Fix: In Phase 5G, audit `/my_stats_export` usage, registration, redirect behavior, player expectations, command-count impact, cache-resync order, and its relationship to `/me exports`; then explicitly approve removal, redirect, alias-to-modern-controller, or retention. For all other remaining redirects, wait for their own communication, observation window, usage review, and operator approval before changing registrations or tests.
-- Impact: medium
+- Description: Phase 13 introduced selected private redirects. Phase 5F removed the four approved Inventory routes. On 2026-07-16 the operator explicitly approved Phase 5G removal of redirect-only `/my_stats_export` together with the duplicate one-action `/me exports` page, because Account Summary becomes the canonical personal-data download home. `/my_stats` remains a separate live interactive command until Phase 6; account/reminder redirects, `/mykvkcrystaltech`, `/player_profile`, and `/stats player` remain outside Phase 5G.
+- Suggested Fix: Execute the active Phase 5G task pack: remove both registrations/navigation in one bot patch, update the approved baselines to 38 top-level and 7 `/me`, resync commands, and verify `/my_stats` unchanged. Continue to require separate evidence and approval for every other compatibility route.
+- Impact: high
 - Risk: medium
-- Dependencies: Phase 13 redirect slice delivered in production PR #486 and smoke tested on 2026-06-27; Phase 5F completed and operator accepted on 2026-07-16; Phase 5G task pack not yet supplied; every remaining registration still requires its own evidence and approval before removal.
+- Dependencies: Phase 5F accepted; Phase 5G product decision, task pack, and chat starter approved on 2026-07-16; normal audit/architecture/plan gates; command-resync and rollback plan.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.InventoryReportPreference`, `inventory/dal/inventory_reporting_dal.py`, `inventory/reporting_service.py`, and retired Inventory-visibility documentation/tests
@@ -116,11 +116,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `commands/me_cmds.py`, `ui/views/player_self_service_views.py`, `player_self_service/governor_dashboard_*`, `/me dashboard`, player self-service v2 docs/tests
 - Type: architecture
-- Description: GovernorOS v2 Phases 1-5F are complete and operator accepted. Phase 5F replaced the proposed Inventory summary with completed consolidation and retirement while preserving the selected-governor dashboard, premium private Inventory reports, imports, audits, and report-page exports. The next roadmap slice is Phase 5G Exports modernisation for `/me exports` and `/my_stats_export`; Phase 6 becomes conditional dashboard integration only; Phase 7 remains private `/me history`; Phase 8 remains permission-gated admin/leadership `/me inspect`; Phase 9 remains the usage-led review of other compatibility paths; and Phase 10 sticky features remain a future programme candidate.
-- Suggested Fix: Prepare the separately supplied Phase 5G task pack next. It must distinguish page presentation from exported-file format, decide selected-governor versus all-linked scope, define governor dropdown/direct-entry/Change Governor/>25 paging behavior where applicable, decide the `/my_stats_export` outcome, and lock schemas/windows/defaults/filenames/Sheets/compatibility before implementation. Preserve all accepted Phase 2-5F privacy, access, presentation, report, Preferences, and Inventory boundaries. Keep History, Inspect, broader export redesign, broad renderer consolidation, and unrelated legacy removals separately gated.
+- Description: GovernorOS v2 Phases 1-5F are complete and operator accepted. Phase 5G Account Data Export Consolidation is now approved and task-packed: Account Summary owns Download data, `/me exports` and `/my_stats_export` are removed, all identified export defects are corrected, and no dashboard Export Stats route is created. Phase 6 is now the separate interactive `/my_stats` redesign and migration; Phase 7 remains History and Phase 8 Inspect.
+- Suggested Fix: Execute the active Phase 5G pack without reopening governor scope, command retention, Inventory export, or output correctness decisions. After acceptance, prepare Phase 6 around `/my_stats` periods, selector, presentation, channel/private policy, performance, communication, and final removal rather than a permanent redirect.
 - Impact: high
 - Risk: medium
-- Dependencies: Phases 1-5F delivered and operator accepted through mirror PR #225 and production-branch commit `89f7da16` on 2026-07-16; Phase 5G task pack not yet supplied; explicit approval remains required for every later phase gate.
+- Dependencies: Phase 5G task pack and starter approved on 2026-07-16; explicit approval remains required at audit, architecture, plan, promotion, and later Phase 6 gates.
 
 ### Deferred Optimisation
 - Area: `player_self_service/governor_dashboard_models.py`, `player_self_service/governor_dashboard_dal.py`, `player_self_service/governor_dashboard_renderer.py`, SQL repo `dbo.KingdomScanData4`
@@ -134,29 +134,29 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `ui/views/player_self_service_views.py`, `player_self_service/page_cards.py`, `player_self_service/dashboard_card.py`, Accounts/Reminders/Preferences/Exports `/me` page delivery
 - Type: consistency
-- Description: Accounts, Reminders, Preferences, and Phase 5F Inventory consolidation are complete and operator accepted. Exports is the only remaining `/me` summary page awaiting dedicated standalone delivery and attachment-lifecycle alignment. The next slice must update `/me exports` and `/my_stats_export` together and must not inherit the previous assumption that Exports is necessarily all-linked.
-- Suggested Fix: Deliver Phase 5G as its own product-workshopped slice using the accepted standalone/private/same-payload-fallback/graceful-timeout contract. First lock selected-governor versus all-linked behavior. If selected-governor scoped, reuse the author-gated resolver, access recheck, direct-entry, paged governor dropdown, Change Governor state preservation, and more-than-25 behavior; if all-linked, show no misleading dropdown. Keep one service/view path for `/me exports` and the approved `/my_stats_export` outcome, and do not create a broad shared framework.
+- Description: The operator decided not to build a standalone Exports summary. Phase 5G removes `/me exports` and every Exports navigation/control, while Account Summary hosts one private Download data options journey. Exports-only generic page/card/fallback/timeout artifacts may become direct zero-callers; Accounts, Reminders, Preferences, and Dashboard lifecycle behavior must remain unchanged apart from removing the navigation target.
+- Suggested Fix: During Phase 5G, classify every Exports-only branch/helper/asset/test as delete or retain with caller evidence, remove only direct zero-callers, and add focused navigation/attachment/timeout regressions. Keep any broader lifecycle framework consolidation separately deferred.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phases 4-5F accepted through 2026-07-16; separate operator-supplied Phase 5G task pack; approval of presentation/file-format distinction, governor scope, and `/my_stats_export` outcome.
+- Dependencies: Active Phase 5G task pack; zero-caller proof; accepted Accounts/Reminders/Preferences/Dashboard contracts; no broad framework scope.
 
 ### Deferred Optimisation
 - Area: `player_self_service/page_cards.py`, page-specific `/me` renderers, and shared attachment/view lifecycle helpers
 - Type: architecture
-- Description: GovernorOS intentionally delivers Dashboard, Accounts, Reminders, and Preferences through dedicated payload/renderer paths. Phase 5F removed the Inventory generic-page caller without broad framework work, leaving Exports as the only supported runtime summary-page caller of the older generic card path. Historical mappings or helpers may also become mechanically dead after Phase 5G and must be proven before deletion.
-- Suggested Fix: After Phase 5G gives Exports an accepted replacement, inventory the remaining duplicated rendering, attachment, fallback, navigation, and timeout primitives. Consolidate only helpers with identical proven contracts; keep page payloads, product copy, geometry, and business ownership page-specific. Remove the generic card path only when zero supported callers remain and focused lifecycle regression coverage exists.
+- Description: Phase 5G removes the final supported Exports caller of the older generic page-card path. That may leave mechanically dead mappings/helpers, but Accounts, Reminders, Preferences, and Dashboard intentionally retain page-specific payload/renderer contracts.
+- Suggested Fix: Remove direct zero-callers inside Phase 5G with focused lifecycle proof. After Phase 5G acceptance, separately inventory any remaining duplicated rendering, attachment, fallback, navigation, and timeout primitives; consolidate only identical proven contracts and keep product copy, geometry, and business ownership page-specific.
 - Impact: low
 - Risk: medium
-- Dependencies: Phase 5F operator acceptance on 2026-07-16; future Phase 5G acceptance; measured zero-caller evidence before final generic-renderer removal.
+- Dependencies: Phase 5G acceptance; measured zero-caller evidence; focused lifecycle regression coverage; separate approval for broader consolidation.
 
 ### Deferred Optimisation
-- Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `inventory/export_service.py`, `inventory/dal/`, SQL repo export views/tables, export docs/tests
+- Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `player_self_service/accounts_export.py`, Inventory exports, SQL export views/tables, export docs/tests
 - Type: architecture
-- Description: Earlier Exports phases intentionally reused existing Stats and Inventory schemas and file formats. Phase 5F retired the combined/all-governor Inventory export and kept the three selected-governor report-page exports. Phase 5G may change the Stats export format only if its operator-supplied task pack explicitly distinguishes page presentation from file contract and approves the exact Stats-only schema/migration. Broader cross-domain redesign would still need to decide whether Inventory and other exports stay raw, add curated sheets, change headers, add formats, split personal versus leadership outputs, or introduce new SQL views/contracts.
-- Suggested Fix: Keep the Phase 5G Stats-only decision within its exact approved task pack and golden-file compatibility coverage. Treat any cross-domain export schema/format redesign as a separate export-output programme: audit Stats, Inventory, KVK history, rankings, and registry consumers; validate SQL contracts in `C:\K98-bot-SQL-Server`; define compatibility/migration expectations; and implement controlled slices with export-file regression tests.
+- Description: Phase 5G now explicitly owns the narrow all-linked Account Data output contract: Account-Summary-first full workbook, current snapshot CSV, raw Stats history CSV, exact windows/counts/Forts/safety/freshness, and truthful `.xlsx` Sheets compatibility. The three selected-governor Inventory report-page exports remain unchanged. Broader cross-domain export redesign is still not approved.
+- Suggested Fix: Execute only the exact Phase 5G Account Data contract with output-shape/golden tests and read-only validation of `dbo.vDaily_PlayerExport`. Treat future changes spanning Inventory, KVK history, rankings, registry, leadership outputs, live Sheets creation, or new SQL views as a separate evidence-led export-output programme.
 - Impact: high
 - Risk: high
-- Dependencies: Phase 8 confirms launchpad requirements without changing file contracts; operator approval for a dedicated export-output programme; SQL validation and downstream consumer review before any schema/format changes.
+- Dependencies: Active Phase 5G task pack; downstream sheet/header/filename audit; SQL read-only validation; no SQL diff; operator approval for any future cross-domain programme.
 
 ### Deferred Optimisation
 - Area: `commands/calendar_cmds.py`, `commands/events_cmds.py`, `ui/views/calendar.py`, `ui/views/events_views.py`, public calendar/KVK calendar docs/tests
