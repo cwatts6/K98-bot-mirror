@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<stdin>", line 13, in <module>
+  File "<string>", line 307, in <module>
+  File "<string>", line 30, in replace_between
+RuntimeError: briefing operator section: end marker not found: '## Data Source Notes'
