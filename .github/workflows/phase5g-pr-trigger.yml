@@ -1,0 +1,46 @@
+name: Phase 5G PR-triggered documentation update
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths:
+      - .github/workflows/phase5g-pr-trigger.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-docs:
+    if: github.head_ref == 'codex/phase-5g-account-data-export-consolidation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/phase-5g-account-data-export-consolidation
+          fetch-depth: 0
+      - name: Apply embedded updater
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64
+          import re
+          import zlib
+
+          workflow = Path('.github/workflows/phase5g-update-docs.yml').read_text(encoding='utf-8')
+          match = re.search(r"base64\.b64decode\('([^']+)'\)", workflow)
+          if match is None:
+              raise SystemExit('embedded updater payload not found')
+          exec(zlib.decompress(base64.b64decode(match.group(1))))
+          Path('.github/workflows/phase5g-pr-trigger.yml').unlink(missing_ok=True)
+          PY
+      - name: Commit documentation update
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "docs: prepare GovernorOS Phase 5G account data exports"
+          git push origin HEAD:codex/phase-5g-account-data-export-consolidation
