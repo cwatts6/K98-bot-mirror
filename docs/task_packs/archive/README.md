@@ -53,8 +53,7 @@ delivered in mirror PR #224 and production PR #531 and was deployed on 2026-07-1
 records capture the accepted top-left-avatar Personal Settings card, local-time/UTC fallback,
 regional profile, Inventory privacy flow, one Manage Settings journey, and Accounts-owned Update
 VIP migration with no SQL deployment. The active v2 programme pack remains in `docs/task_packs/`.
-Phase 5F Inventory is next; its task pack and chat starter will be supplied separately by the
-operator.
+Phase 5F Inventory is next; its task pack and chat starter are in `docs/task_packs/`.
 
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,
