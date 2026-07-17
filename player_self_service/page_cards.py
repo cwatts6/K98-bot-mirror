@@ -26,10 +26,10 @@ DARK_TEXT = (7, 16, 28)
 
 _CARD_DIR = Path(__file__).resolve().parent.parent / "assets" / "me" / "cards"
 _BACKGROUND_BY_PAGE = {
-    "dashboard": "me dashboard.png",
-    "accounts": "me accounts.png",
-    "reminders": "me reminders.png",
-    "preferences": "me preferences.png",
+    "dashboard": "me.png",
+    "accounts": "me_accounts.png",
+    "reminders": "me_reminders.png",
+    "preferences": "me_preferences.png",
 }
 
 
