@@ -38,6 +38,12 @@ a 180-second preserve-and-disable timeout. `/stats player` and its legacy render
 The additive SQL procedure `dbo.usp_GetPersonalStatsDaily` must deploy before the bot patch; a new
 covering index is deferred until representative production plans/logical reads justify it.
 
+Initial Phase 6 operator smoke accepted every period, governor switching, All Linked, Dashboard
+row-0 Stats navigation, data, and the 180-second timeout. The approved visual refinement aligns the
+card with Reminders through a bordered state pill, brighter/bolder typography, denser KPI use,
+selected Governor ID, explicit Stats/Activity/Fort coverage, a Forts Total-only Activity KPI, and a
+new T4+T5/Deads/Healed Combat trend. Final visual re-smoke remains before acceptance.
+
 The following earlier phase notes remain as historical delivery context where they describe the
 state accepted at that time; Phase 5F's current surface above supersedes their legacy-route wording.
 

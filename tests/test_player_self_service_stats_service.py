@@ -123,7 +123,7 @@ async def test_selected_default_is_main_and_signed_metrics_are_not_clamped() -> 
     )
 
     assert payload.scope_governor_ids == (111,)
-    assert payload.scope_label.endswith("(111)")
+    assert payload.scope_label == "Same Name (111)"
     assert payload.metrics.rss_gathered.total == -30
     assert payload.metrics.build_activity.total == -10
     assert payload.metrics.forts_launched.total == -10

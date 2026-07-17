@@ -414,13 +414,7 @@ def _scope_label(
     if scope_type is StatsScopeType.ALL_LINKED:
         return "All Linked"
     option = next(option for option in options if option.governor_id == governor_ids[0])
-    duplicates = sum(
-        1
-        for candidate in options
-        if candidate.governor_name.casefold() == option.governor_name.casefold()
-    )
-    suffix = f" ({str(option.governor_id)[-4:]})" if duplicates > 1 else ""
-    return f"{option.governor_name}{suffix}"
+    return f"{option.governor_name} ({option.governor_id})"
 
 
 def _emit(event: dict[str, Any]) -> None:

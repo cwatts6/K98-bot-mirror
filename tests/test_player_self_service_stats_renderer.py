@@ -10,6 +10,7 @@ import time
 from PIL import Image
 import pytest
 
+from player_self_service import stats_renderer
 from player_self_service.stats_models import (
     PersonalStatsMetrics,
     PersonalStatsPayload,
@@ -73,7 +74,7 @@ def _payload() -> PersonalStatsPayload:
         stats_anchor_date=date(2026, 7, 15),
         scope_type=StatsScopeType.SELECTED,
         scope_governor_ids=(111,),
-        scope_label="Governor 名称 with a deliberately long Unicode identity",
+        scope_label="Governor 名称 with a deliberately long Unicode identity (2441482)",
         governor_options=(StatsGovernorOption(111, "Governor 名称", "Main", True),),
         duplicate_id_warning=True,
         registry_fingerprint=(("Main", 111),),
@@ -139,6 +140,70 @@ def test_activity_one_point_and_no_point_series_render_without_fake_trend() -> N
     rendered = render_personal_stats_card(payload, mode=StatsMode.ACTIVITY, display_name="Player")
 
     assert rendered.image_bytes.startswith(b"\x89PNG")
+
+
+def test_activity_keeps_only_fort_total_box_and_all_three_fort_chart_series(monkeypatch) -> None:
+    metric_labels: list[str] = []
+    charts: list[tuple[str, tuple[str, ...]]] = []
+    monkeypatch.setattr(
+        stats_renderer,
+        "_metric_box",
+        lambda _draw, _box, label, _metric, **_kwargs: metric_labels.append(label),
+    )
+    monkeypatch.setattr(
+        stats_renderer,
+        "_draw_chart",
+        lambda _draw, _box, title, series: charts.append(
+            (title, tuple(label for label, _metric in series))
+        ),
+    )
+
+    stats_renderer._activity(object(), _payload())
+
+    assert "Forts total" in metric_labels
+    assert "Forts launched" not in metric_labels
+    assert "Forts joined" not in metric_labels
+    assert ("FORT DAILY TREND", ("Total", "Launched", "Joined")) in charts
+
+
+def test_combat_adds_requested_three_series_daily_trend(monkeypatch) -> None:
+    charts: list[tuple[str, tuple[str, ...]]] = []
+    monkeypatch.setattr(stats_renderer, "_metric_box", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        stats_renderer,
+        "_draw_chart",
+        lambda _draw, _box, title, series: charts.append(
+            (title, tuple(label for label, _metric in series))
+        ),
+    )
+
+    stats_renderer._combat(object(), _payload())
+
+    assert charts == [("COMBAT DAILY TREND", ("T4+T5", "Deads", "Healed"))]
+
+
+def test_partial_coverage_text_names_incomplete_source() -> None:
+    assert stats_renderer._coverage_text(_payload()) == "Stats 2/3 • Activity 1/3 • Forts 1/3 days"
+
+    complete_but_partial = replace(
+        _payload(),
+        coverage=StatsCoverage(3, 3, 1, 1, 3, 3, 3, 3),
+    )
+    assert stats_renderer._coverage_text(complete_but_partial).endswith("Source values incomplete")
+
+
+def test_all_linked_coverage_text_uses_account_days() -> None:
+    payload = replace(
+        _payload(),
+        scope_type=StatsScopeType.ALL_LINKED,
+        scope_governor_ids=(111, 222),
+        scope_label="All Linked",
+        coverage=StatsCoverage(3, 3, 2, 2, 6, 6, 5, 4),
+    )
+
+    assert stats_renderer._coverage_text(payload) == (
+        "Stats 6/6 • Activity 5/6 • Forts 4/6 account-days"
+    )
 
 
 def test_activity_render_stays_within_explicit_worker_budget() -> None:

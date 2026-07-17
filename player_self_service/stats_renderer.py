@@ -20,15 +20,16 @@ from player_self_service.stats_models import (
 WIDTH = 1702
 HEIGHT = 924
 _BACKGROUND = Path(__file__).resolve().parent.parent / "assets" / "me" / "cards" / "me_stats.png"
-_TEXT = (245, 248, 255, 255)
-_MUTED = (175, 190, 210, 255)
-_BLUE = (91, 178, 255, 255)
-_GOLD = (242, 195, 98, 255)
-_GREEN = (106, 225, 170, 255)
-_AMBER = (255, 190, 92, 255)
-_RED = (255, 120, 120, 255)
-_PANEL = (3, 11, 27, 210)
-_SERIES = ((88, 190, 255, 255), (250, 188, 80, 255), (126, 225, 164, 255))
+_TEXT = (248, 251, 255, 255)
+_MUTED = (190, 210, 235, 255)
+_BLUE = (91, 190, 255, 255)
+_GOLD = (255, 206, 92, 255)
+_GREEN = (76, 225, 148, 255)
+_AMBER = (255, 196, 78, 255)
+_RED = (255, 132, 132, 255)
+_SHADOW = (0, 0, 0, 190)
+_PANEL = (3, 11, 27, 220)
+_SERIES = ((91, 200, 255, 255), (255, 196, 78, 255), (102, 232, 160, 255))
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +63,14 @@ def _font_text(
     fitted = visual_text.fit_text_to_width(
         draw, cleaned, width=max(1, width), base_font=font, bold=bold
     )
+    visual_text.draw_text(
+        draw,
+        (xy[0] + 2, xy[1] + 2),
+        fitted,
+        font=font,
+        fill=_SHADOW,
+        bold=bold,
+    )
     visual_text.draw_text(draw, xy, fitted, font=font, fill=fill, bold=bold, embedded_color=True)
 
 
@@ -78,7 +87,7 @@ def _compact(value: int | None, *, signed: bool = False) -> str:
 
 
 def _panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int]) -> None:
-    draw.rounded_rectangle(box, radius=15, fill=_PANEL, outline=(80, 145, 205, 125), width=2)
+    draw.rounded_rectangle(box, radius=18, fill=_PANEL, outline=(91, 190, 255, 180), width=2)
 
 
 def _state_colour(state: str) -> tuple[int, int, int, int]:
@@ -88,6 +97,54 @@ def _state_colour(state: str) -> tuple[int, int, int, int]:
         "NO DATA": _RED,
         "UNAVAILABLE": _RED,
     }.get(state, _MUTED)
+
+
+def _state_badge(draw: ImageDraw.ImageDraw, state: str) -> None:
+    x1, y1, x2, y2 = 1370, 48, 1605, 111
+    colour = _state_colour(state)
+    draw.rounded_rectangle(
+        (x1, y1, x2, y2),
+        radius=26,
+        fill=(4, 11, 24, 220),
+        outline=colour,
+        width=3,
+    )
+    font = visual_text.font(30, bold=True)
+    text_width = visual_text.text_width(draw, state, font=font, bold=True)
+    position = (x1 + (x2 - x1 - text_width) // 2, y1 + 10)
+    visual_text.draw_text(
+        draw,
+        (position[0] + 2, position[1] + 2),
+        state,
+        font=font,
+        fill=_SHADOW,
+        bold=True,
+    )
+    visual_text.draw_text(draw, position, state, font=font, fill=colour, bold=True)
+
+
+def _coverage_text(payload: PersonalStatsPayload) -> str:
+    coverage = payload.coverage
+    if payload.scope_type.value == "all_linked":
+        label = (
+            f"Stats {coverage.stats_account_days}/{coverage.expected_account_days} • "
+            f"Activity {coverage.activity_account_days}/{coverage.expected_account_days} • "
+            f"Forts {coverage.fort_account_days}/{coverage.expected_account_days} account-days"
+        )
+    else:
+        label = (
+            f"Stats {coverage.stats_reporting_dates}/{coverage.expected_dates} • "
+            f"Activity {coverage.activity_account_days}/{coverage.expected_dates} • "
+            f"Forts {coverage.fort_account_days}/{coverage.expected_dates} days"
+        )
+    complete_coverage = (
+        coverage.stats_account_days == coverage.expected_account_days
+        and coverage.activity_account_days == coverage.expected_account_days
+        and coverage.fort_account_days == coverage.expected_account_days
+    )
+    if payload.state.value == "PARTIAL" and complete_coverage:
+        return f"{label} • Source values incomplete"
+    return label
 
 
 def _paste_avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> None:
@@ -148,16 +205,28 @@ def _metric_box(
 ) -> None:
     _panel(draw, box)
     x0, y0, x1, y1 = box
+    height = y1 - y0
+    spacious = height >= 150
+    label_size = 22 if spacious else 20
+    value_size = 50 if spacious else 43
+    helper_size = 17 if spacious else 15
     _font_text(
-        draw, (x0 + 16, y0 + 12), label.upper(), width=x1 - x0 - 32, size=17, fill=_BLUE, bold=True
+        draw,
+        (x0 + 18, y0 + 12),
+        label.upper(),
+        width=x1 - x0 - 36,
+        size=label_size,
+        min_size=16,
+        fill=_BLUE,
+        bold=True,
     )
     _font_text(
         draw,
-        (x0 + 16, y0 + 39),
+        (x0 + 18, y0 + 43),
         _compact(metric.total, signed=signed),
-        width=x1 - x0 - 32,
-        size=32,
-        min_size=22,
+        width=x1 - x0 - 36,
+        size=value_size,
+        min_size=29,
         bold=True,
     )
     average = metric.average_per_reporting_day
@@ -168,12 +237,13 @@ def _metric_box(
     )
     _font_text(
         draw,
-        (x0 + 16, y1 - 31),
+        (x0 + 18, y1 - 34),
         helper,
-        width=x1 - x0 - 32,
-        size=14,
-        min_size=11,
+        width=x1 - x0 - 36,
+        size=helper_size,
+        min_size=12,
         fill=_MUTED,
+        bold=True,
     )
 
 
@@ -212,11 +282,12 @@ def _draw_chart(
 ) -> None:
     _panel(draw, box)
     x0, y0, x1, y1 = box
-    _font_text(draw, (x0 + 16, y0 + 11), title, width=x1 - x0 - 32, size=18, fill=_BLUE, bold=True)
+    _font_text(draw, (x0 + 18, y0 + 11), title, width=x1 - x0 - 36, size=21, fill=_BLUE, bold=True)
     series_list = list(series)
     all_points = [point for _, metric in series_list for point in metric.daily]
-    chart_left, chart_top = x0 + 50, y0 + 52
-    chart_right, chart_bottom = x1 - 22, y1 - 82
+    summary_start = y1 - 14 - len(series_list) * 21
+    chart_left, chart_top = x0 + 50, y0 + 60
+    chart_right, chart_bottom = x1 - 22, summary_start - 23
     if not all_points:
         _font_text(
             draw,
@@ -247,7 +318,7 @@ def _draw_chart(
 
         zero_y = y_for(0)
         draw.line((chart_left, zero_y, chart_right, zero_y), fill=(220, 230, 245, 155), width=2)
-        _font_text(draw, (x0 + 12, zero_y - 9), "0", width=32, size=12, min_size=10, fill=_MUTED)
+        _font_text(draw, (x0 + 12, zero_y - 9), "0", width=32, size=14, min_size=11, fill=_MUTED)
         for index, (label, metric) in enumerate(series_list):
             colour = _SERIES[index % len(_SERIES)]
             coords = [(x_for(point.reporting_date), y_for(point.value)) for point in metric.daily]
@@ -258,15 +329,22 @@ def _draw_chart(
             legend_x = x0 + 17 + index * max(145, (x1 - x0 - 34) // max(1, len(series_list)))
             _marker(draw, legend_x, y0 + 39, colour, index)
             _font_text(
-                draw, (legend_x + 10, y0 + 29), label, width=155, size=13, min_size=10, fill=_TEXT
+                draw,
+                (legend_x + 12, y0 + 28),
+                label,
+                width=170,
+                size=16,
+                min_size=11,
+                fill=_TEXT,
+                bold=True,
             )
         _font_text(
             draw,
             (chart_left, chart_bottom + 7),
             f"{dates[0]:%d %b}",
             width=90,
-            size=12,
-            min_size=10,
+            size=14,
+            min_size=11,
             fill=_MUTED,
         )
         _font_text(
@@ -274,19 +352,20 @@ def _draw_chart(
             (chart_right - 90, chart_bottom + 7),
             f"{dates[-1]:%d %b}",
             width=90,
-            size=12,
-            min_size=10,
+            size=14,
+            min_size=11,
             fill=_MUTED,
         )
     for index, (label, metric) in enumerate(series_list):
         _font_text(
             draw,
-            (x0 + 16, y1 - 61 + index * 17),
+            (x0 + 18, summary_start + index * 21),
             f"{label}: {_chart_summary(metric)}",
-            width=x1 - x0 - 32,
-            size=12,
-            min_size=10,
+            width=x1 - x0 - 36,
+            size=14,
+            min_size=11,
             fill=_MUTED,
+            bold=True,
         )
 
 
@@ -299,57 +378,63 @@ def _header(
     avatar_bytes: bytes | None,
 ) -> None:
     _paste_avatar(canvas, avatar_bytes)
-    _font_text(draw, (270, 50), "PERIOD PERFORMANCE", width=730, size=38, min_size=28, bold=True)
+    _font_text(draw, (270, 48), "PERIOD PERFORMANCE", width=730, size=42, min_size=30, bold=True)
     _font_text(
-        draw, (270, 100), display_name, width=730, size=27, min_size=18, fill=_GOLD, bold=True
+        draw, (270, 103), display_name, width=730, size=31, min_size=20, fill=_GOLD, bold=True
     )
-    _font_text(draw, (270, 141), payload.scope_label, width=730, size=23, min_size=16, fill=_TEXT)
+    scope_label = payload.scope_label
+    if payload.scope_type.value == "all_linked":
+        scope_label = f"All Linked • {payload.coverage.requested_governors} governors"
     _font_text(
         draw,
-        (1040, 49),
-        payload.state.value,
-        width=555,
-        size=29,
-        min_size=21,
-        fill=_state_colour(payload.state.value),
+        (270, 149),
+        scope_label,
+        width=730,
+        size=27,
+        min_size=18,
+        fill=_TEXT,
         bold=True,
     )
+    _state_badge(draw, payload.state.value)
     _font_text(
         draw,
-        (1040, 88),
+        (1040, 117),
         f"{mode.label} • {payload.period.label}",
         width=555,
-        size=22,
-        min_size=16,
+        size=24,
+        min_size=17,
         fill=_BLUE,
         bold=True,
     )
     _font_text(
         draw,
-        (1040, 122),
+        (1040, 151),
         f"{payload.window.start_date:%d %b %Y} — {payload.window.end_date:%d %b %Y}",
         width=555,
-        size=19,
-        min_size=14,
+        size=20,
+        min_size=15,
+        bold=True,
     )
-    coverage = payload.coverage
-    if payload.scope_type.value == "all_linked":
-        coverage_text = (
-            f"Stats {coverage.stats_reporting_governors}/{coverage.requested_governors} governors • "
-            f"{coverage.stats_account_days}/{coverage.expected_account_days} account-days"
-        )
-    else:
-        coverage_text = (
-            f"Stats coverage {coverage.stats_reporting_dates}/{coverage.expected_dates} dates"
-        )
-    _font_text(draw, (1040, 158), coverage_text, width=555, size=16, min_size=12, fill=_MUTED)
+    coverage_colour = (
+        _state_colour(payload.state.value) if payload.state.value == "PARTIAL" else _MUTED
+    )
+    _font_text(
+        draw,
+        (1040, 181),
+        _coverage_text(payload),
+        width=555,
+        size=17,
+        min_size=11,
+        fill=coverage_colour,
+        bold=True,
+    )
     generated = payload.generated_at_utc.astimezone(UTC)
     _font_text(
         draw,
-        (1040, 188),
+        (1040, 207),
         f"Stats anchor {payload.stats_anchor_date:%d %b %Y} • Generated {generated:%d %b %Y %H:%M:%S UTC}",
         width=555,
-        size=13,
+        size=14,
         min_size=10,
         fill=_MUTED,
     )
@@ -405,9 +490,9 @@ def _overview(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
 def _activity(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
     metrics = payload.metrics
     boxes = tuple(
-        (95 + column * 382, 230 + row * 136, 455 + column * 382, 350 + row * 136)
+        (95 + column * 515, 230 + row * 140, 575 + column * 515, 350 + row * 140)
         for row in range(2)
-        for column in range(4)
+        for column in range(3)
     )
     activity = (
         ("RSS gathered", metrics.rss_gathered),
@@ -416,8 +501,6 @@ def _activity(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
         ("Build activity", metrics.build_activity),
         ("Tech donations", metrics.tech_donations),
         ("Forts total", metrics.forts_total),
-        ("Forts launched", metrics.forts_launched),
-        ("Forts joined", metrics.forts_joined),
     )
     for box, (label, metric) in zip(boxes, activity, strict=True):
         _metric_box(draw, box, label, metric)
@@ -442,7 +525,7 @@ def _activity(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
 def _combat(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
     metrics = payload.metrics
     boxes = tuple(
-        (95 + column * 510, 245 + row * 238, 565 + column * 510, 445 + row * 238)
+        (95 + column * 515, 230 + row * 140, 575 + column * 515, 350 + row * 140)
         for row in range(2)
         for column in range(3)
     )
@@ -456,6 +539,16 @@ def _combat(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
     )
     for box, (label, metric) in zip(boxes, combat, strict=True):
         _metric_box(draw, box, label, metric)
+    _draw_chart(
+        draw,
+        (95, 514, 1605, 792),
+        "COMBAT DAILY TREND",
+        (
+            ("T4+T5", metrics.t4_t5_kills),
+            ("Deads", metrics.deads),
+            ("Healed", metrics.healed_troops),
+        ),
+    )
 
 
 def render_personal_stats_card(
@@ -505,9 +598,10 @@ def render_personal_stats_card(
             (95, 845),
             "Private period activity • Missing source rows are not treated as zero",
             width=1050,
-            size=16,
+            size=18,
             min_size=12,
             fill=_MUTED,
+            bold=True,
         )
         refreshed = payload.generated_at_utc.astimezone(UTC)
         _font_text(
@@ -515,9 +609,10 @@ def render_personal_stats_card(
             (1325, 845),
             f"Generated {refreshed:%d %b %Y %H:%M:%S UTC}",
             width=280,
-            size=14,
+            size=16,
             min_size=10,
             fill=_MUTED,
+            bold=True,
         )
         stream = BytesIO()
         try:

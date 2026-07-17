@@ -9,7 +9,7 @@
 - One-pass approved: `no`
 - Product decision approved: `yes`
 - Runtime implementation approved: `yes, subject to the normal audit, architecture, implementation-plan, validation, security-review, operator-smoke, and promotion gates`
-- Status: `implementation in validation; final Changes reviews, operator smoke, and promotion pending`
+- Status: `initial operator smoke passed functional journeys; approved visual refinement implemented; final visual re-smoke, review, and promotion pending`
 - Approved runtime backdrop: `assets/me/cards/me_stats.png`
 - Target successful output: `private standalone 1702x924 PNG plus same-authorized-payload fallback`
 - SQL deployment approved: `yes; additive dbo.usp_GetPersonalStatsDaily only, with a separate SQL diff/review and SQL-before-bot deployment order; indexes remain measurement-gated`
@@ -56,6 +56,13 @@ Every generated card includes the invoking player's bounded circular Discord ava
 with the accepted safe local GovernorOS/KD98 fallback. The card shows selected scope, governor
 identity where applicable, friendly period, exact inclusive dates, authoritative Stats data anchor,
 reporting coverage, state, view-specific metrics, and truthful freshness/generated time.
+
+Initial operator smoke approved the interaction, periods, governor switching, All Linked, Dashboard
+row-0 Stats entry, data, and timeout behavior. The resulting presentation amendment aligns the
+state pill, typography weight, brightness, and density with the accepted Reminders card; always
+shows the selected Governor ID; exposes Stats, Activity, and Fort coverage so `PARTIAL` is
+self-explanatory; keeps only Forts Total as an Activity KPI while retaining Total/Launched/Joined
+chart series; and adds a Combat daily trend for T4+T5, Deads, and Healed Troops.
 
 ## 2. Required Reading
 
@@ -1237,6 +1244,7 @@ For every approved metric:
 - large positive/negative values;
 - signs/labels present without colour-only meaning;
 - Activity RSS/Fort two-chart layout;
+- Combat T4+T5/Deads/Healed three-series chart;
 - negative chart point and signed axis;
 - one-point Yesterday treatment;
 - no-point/no-chart treatment;
@@ -1317,6 +1325,7 @@ final Changes target with `Deep: Off`; neither review is a codebase/deep scan.
 - [ ] Ark is completely absent from the personal Period Performance experience.
 - [ ] No download/export action or Phase 5G output contract appears in `/me stats`.
 - [ ] Activity integrates truthful RSS/Fort trends and complete accessible text equivalents.
+- [ ] Combat integrates truthful T4+T5/Deads/Healed trends and complete accessible text equivalents.
 - [ ] READY/PARTIAL/NO DATA/UNAVAILABLE and access-changed behavior are distinct and honest.
 - [ ] Same-payload fallback performs no second data fetch and contains all key information.
 - [ ] Latest interaction wins; stale/foreign/forged/expired transitions cannot replace valid content.

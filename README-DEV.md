@@ -98,11 +98,15 @@ Inventory report-page exports remain unchanged. The completed Phase 5G task pack
 are archived under `docs/task_packs/archive/`.
 
 GovernorOS v2 Phase 6 Interactive Period Performance is implemented on its approval-gated bot and
-SQL branches and is awaiting final review, deployment, command resync, and operator Discord smoke.
+SQL branches. Initial operator smoke accepted all periods, governor switching, All Linked,
+Dashboard row-0 entry, data, and timeout behavior; final visual re-smoke and promotion remain.
 It adds private-anywhere `/me stats`, with Overview, Activity, and Combat on the approved 1702x924
 card; selected-governor or explicit All Linked scope; seven exact Stats-anchor periods; signed,
-coverage-aware Growth/Activity/Fort/Combat metrics; integrated RSS/Fort trends; opaque paged
+coverage-aware Growth/Activity/Fort/Combat metrics; integrated RSS/Fort and Combat trends; opaque paged
 governor selection; current-registry revalidation; and a 180-second preserve-and-disable timeout.
+The smoke refinement adopts the accepted Reminders-style state pill, brighter/bolder typography,
+full selected Governor ID, explicit Stats/Activity/Fort coverage, a Forts Total-only Activity KPI,
+and a T4+T5/Deads/Healed Combat chart.
 The selected Dashboard exposes Stats on row 0 after Preferences. The same atomic bot patch removes
 `/my_stats` without a redirect while preserving `/stats player` and its proven legacy stack. The
 validated command target is 37 top-level, 100 grouped, eight `/me`, and two `/inventory` commands.
