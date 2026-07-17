@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 import logging
 from time import monotonic
 from typing import Any
@@ -19,6 +20,8 @@ from player_self_service.account_data_export_contract import (
 from services import account_data_export_service
 
 logger = logging.getLogger(__name__)
+
+_OPTIONS_TIMEOUT_SECONDS = 300
 
 
 def _user_display_name(user: Any, fallback: str) -> str:
@@ -217,12 +220,13 @@ class AccountDataOptionsView(discord.ui.View):
     expired_message = "This private Download data window has expired. Open `/me accounts` again."
 
     def __init__(self, *, author_id: int, display_name: str) -> None:
-        super().__init__(timeout=300, disable_on_timeout=True)
+        super().__init__(timeout=_OPTIONS_TIMEOUT_SECONDS, disable_on_timeout=True)
         self.author_id = int(author_id)
         self.display_name = display_name
         self.selected_kind = AccountDataOutputKind.FULL_WORKBOOK
         self.selected_days = DEFAULT_HISTORY_DAYS
         self._message_ref: object | None = None
+        self._timeout_editor: Callable[..., Awaitable[object]] | None = None
         self._expired = False
         self._terminal = False
         self._busy = False
@@ -230,6 +234,7 @@ class AccountDataOptionsView(discord.ui.View):
         self.days_select = AccountDataDaysSelect(self)
         self.add_item(self.kind_select)
         self.add_item(self.days_select)
+        self._sync_controls()
 
     def set_message_ref(self, message: object | None) -> None:
         self._message_ref = message
@@ -238,6 +243,18 @@ class AccountDataOptionsView(discord.ui.View):
                 self.message = message
             except Exception:
                 logger.debug("account_data_export_message_ref_failed", exc_info=True)
+
+    def set_timeout_target(self, target: object) -> None:
+        editor = getattr(target, "edit_original_response", None)
+        if callable(editor):
+            self._timeout_editor = editor
+
+    def _sync_controls(self) -> None:
+        for option in self.kind_select.options:
+            option.default = option.value == self.selected_kind.value
+        for option in self.days_select.options:
+            option.default = option.value == str(self.selected_days)
+        self.days_select.disabled = self.selected_kind is AccountDataOutputKind.CURRENT_SNAPSHOT
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if int(interaction.user.id) != self.author_id:
@@ -262,7 +279,7 @@ class AccountDataOptionsView(discord.ui.View):
         return True
 
     async def _edit_window(self, interaction: discord.Interaction) -> None:
-        self.days_select.disabled = self.selected_kind is AccountDataOutputKind.CURRENT_SNAPSHOT
+        self._sync_controls()
         await interaction.response.edit_message(content=_options_copy(self), view=self)
 
     async def _finish(self, content: str) -> None:
@@ -324,12 +341,15 @@ class AccountDataOptionsView(discord.ui.View):
 
     async def on_timeout(self) -> None:
         self._expired = True
+        self._busy = False
         for child in self.children:
             child.disabled = True
         message = self._message_ref or getattr(self, "message", None)
         try:
             if message is not None and hasattr(message, "edit"):
                 await message.edit(content=self.expired_message, view=self)
+            elif self._timeout_editor is not None:
+                await self._timeout_editor(content=self.expired_message, view=self)
         except Exception:
             logger.debug("account_data_export_options_timeout_edit_failed", exc_info=True)
 
@@ -402,7 +422,8 @@ def _options_copy(view: AccountDataOptionsView) -> str:
         "Choose your private Account Data download.\n"
         f"Output: **{_output_label(view.selected_kind)}**\n"
         f"History: **{days}**\n"
-        "Scope: all governors linked to your account when you press Download."
+        "Scope: all governors linked to your account when you press Download.\n"
+        f"This window expires after {_OPTIONS_TIMEOUT_SECONDS // 60} minutes."
     )
 
 
@@ -415,6 +436,7 @@ async def send_account_data_options(
         author_id=int(interaction.user.id),
         display_name=display_name,
     )
+    view.set_timeout_target(interaction)
     message = await _send_private_message(
         interaction,
         _options_copy(view),

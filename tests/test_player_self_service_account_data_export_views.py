@@ -55,6 +55,11 @@ class _Interaction:
         self.user = SimpleNamespace(id=user_id, display_name="Tester")
         self.response = _Response()
         self.followup = _Followup()
+        self.data = {}
+        self.original_edits = []
+
+    async def edit_original_response(self, **kwargs):
+        self.original_edits.append(kwargs)
 
 
 class _FakeDiscordFile:
@@ -136,6 +141,48 @@ async def test_options_default_to_one_workbook_choice_and_ninety_days() -> None:
     ]
     assert all("Google Sheets" not in label for label in labels[1:])
     assert "Google Sheets compatible" in view.kind_select.options[0].description
+    assert view.timeout == 300
+    assert "expires after 5 minutes" in views._options_copy(view)
+
+
+@pytest.mark.asyncio
+async def test_select_callbacks_sync_rendered_defaults_and_allow_reselection() -> None:
+    view = views.AccountDataOptionsView(author_id=42, display_name="Tester")
+
+    view.kind_select._selected_values = [AccountDataOutputKind.RAW_HISTORY.value]
+    raw_interaction = _Interaction()
+    view.kind_select._interaction = raw_interaction
+    await view.kind_select.callback(raw_interaction)
+
+    assert view.selected_kind is AccountDataOutputKind.RAW_HISTORY
+    assert [option.value for option in view.kind_select.options if option.default] == [
+        AccountDataOutputKind.RAW_HISTORY.value
+    ]
+    assert "Output: **Raw stats history (.csv)**" in raw_interaction.response.edited[0]["content"]
+
+    view.kind_select._selected_values = [AccountDataOutputKind.FULL_WORKBOOK.value]
+    workbook_interaction = _Interaction()
+    view.kind_select._interaction = workbook_interaction
+    await view.kind_select.callback(workbook_interaction)
+
+    assert view.selected_kind is AccountDataOutputKind.FULL_WORKBOOK
+    assert [option.value for option in view.kind_select.options if option.default] == [
+        AccountDataOutputKind.FULL_WORKBOOK.value
+    ]
+
+    view.days_select._selected_values = ["360"]
+    days_interaction = _Interaction()
+    view.days_select._interaction = days_interaction
+    await view.days_select.callback(days_interaction)
+    assert view.selected_days == 360
+    assert [option.value for option in view.days_select.options if option.default] == ["360"]
+
+    view.days_select._selected_values = ["90"]
+    default_days_interaction = _Interaction()
+    view.days_select._interaction = default_days_interaction
+    await view.days_select.callback(default_days_interaction)
+    assert view.selected_days == 90
+    assert [option.value for option in view.days_select.options if option.default] == ["90"]
 
 
 @pytest.mark.asyncio
@@ -148,6 +195,26 @@ async def test_snapshot_selection_disables_history_days() -> None:
 
     assert view.days_select.disabled is True
     assert "History: **Not applicable**" in interaction.response.edited[0]["content"]
+
+    view.selected_kind = AccountDataOutputKind.RAW_HISTORY
+    raw_interaction = _Interaction()
+    await view._edit_window(raw_interaction)
+    assert view.days_select.disabled is False
+
+
+@pytest.mark.asyncio
+async def test_timeout_disables_window_and_edits_via_original_response_fallback() -> None:
+    view = views.AccountDataOptionsView(author_id=42, display_name="Tester")
+    interaction = _Interaction()
+    view.set_timeout_target(interaction)
+    view._busy = True
+
+    await view.on_timeout()
+
+    assert view._expired is True
+    assert view._busy is False
+    assert all(child.disabled for child in view.children)
+    assert interaction.original_edits == [{"content": view.expired_message, "view": view}]
 
 
 @pytest.mark.asyncio
