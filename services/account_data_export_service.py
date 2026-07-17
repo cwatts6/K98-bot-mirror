@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import UTC, datetime
 import logging
@@ -10,7 +11,6 @@ from pathlib import Path
 import shutil
 import tempfile
 from time import monotonic
-from typing import Callable
 
 import pandas as pd
 
@@ -224,9 +224,7 @@ async def _run_export_builder(
         executor.shutdown(wait=False, cancel_futures=False)
 
 
-def _cleanup_cancelled_builder(
-    completed: Future[None], export_file: AccountDataExportFile
-) -> None:
+def _cleanup_cancelled_builder(completed: Future[None], export_file: AccountDataExportFile) -> None:
     """Clean only after the underlying writer has released its file handles."""
     try:
         completed.result()
