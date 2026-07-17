@@ -410,10 +410,13 @@ Player Self-Service Command Centre status:
   were removed.
 - The original Player Self-Service Command Centre programme is complete and archived under
   `archive/`.
-- Active Player Self-Service v2 file:
+- Active Player Self-Service v2 files:
   - `Player Self-Service Command Centre v2 - Programme Pack.md`
-- GovernorOS v2 Phase 5 is complete and operator accepted through Phase 5G. The Phase 5G task pack
-  and chat starter are archived; the operator will create the separate Phase 6 task pack.
+  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
+- GovernorOS v2 Phase 5 is complete and operator accepted through Phase 5G. Phase 6 is implemented
+  on approval-gated bot and SQL branches and is in final validation before deployment/resync,
+  operator Discord smoke, and promotion.
 - GovernorOS v2 Phases 1-5F are complete. Phase 2 delivered in mirror PR #216 and production PR
   #523, Phase 3 delivered in mirror PR #217 and production PR #524, and Phase 4 delivered in mirror
   PR #218. Phase 4 operator smoke on 2026-07-11 accepted the materially wider standalone card and
@@ -441,14 +444,14 @@ Player Self-Service Command Centre status:
   removed rather than redirected. Full workbook, Current snapshot CSV, and Raw Stats history CSV
   passed smoke, including selector reselection, timeout, and restored governor-sheet workbook
   layout. Account Summary is first and every identified window/count/Forts/safety/freshness/Sheets-
-  labelling defect is corrected. `/my_stats` remains unchanged for Phase 6. Inventory report-page
-  exports remain unchanged.
-- Phase 6 Interactive Personal Stats Experience and `/my_stats` Migration is next but is not yet
-  task-packed. Its new interactive on-screen format must include an author-gated governor dropdown
-  with explicit ALL and each active linked governor, registry revalidation, safe >25-account paging,
-  preserved governor/period state, and evidence-based per-metric aggregation. It must separately
-  decide `/me stats`, channel/private policy, periods, presentation, performance, accessibility,
-  migration, resync, smoke, and rollback without moving downloads out of Account Summary.
+  labelling defect is corrected. Inventory report-page exports remain unchanged.
+- Phase 6 Interactive Period Performance implements private-anywhere `/me stats`, selected-governor
+  Dashboard Stats, Overview/Activity/Combat on the approved 1702x924 card, exact seven-period signed
+  aggregation, explicit All Linked, opaque 24-per-page governor selection, registry revalidation,
+  coverage/state, integrated RSS/Fort charts, fallback/lifecycle/telemetry, and atomic `/my_stats`
+  retirement while preserving `/stats player`. The command validator reports `37 / 100 / 8 / 2`.
+  Additive `dbo.usp_GetPersonalStatsDaily` deploys before the bot; an extra index remains gated on
+  representative production plans/logical reads. Final Changes reviews, smoke, and promotion remain.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -552,11 +555,10 @@ keeps modern private reports and their three report-page exports; makes Account 
 central personal-data download home; and leaves `dbo.InventoryReportPreference` untouched with no
 Phase 5G SQL deployment. Completed Phase 5G records are archived under `archive/`.
 
-Phase 6 Interactive Personal Stats Experience and `/my_stats` Migration is the next separately
-task-packed GovernorOS slice. The programme handoff records the new interactive format, governor
-dropdown with explicit ALL, active-link revalidation, period/aggregation semantics, visibility,
-performance, migration, resync, smoke, and rollback boundaries. Account Summary retains all
-personal downloads.
+Phase 6 Interactive Period Performance and `/my_stats` Retirement is the active GovernorOS slice.
+Implementation and focused validation are present; final bot/SQL Changes reviews, SQL-before-bot
+deployment, command resync, operator smoke, and exact-patch promotion remain. Account Summary
+retains all personal downloads.
 
 Other temporary deprecated command paths remain captured as deferred cleanup for execution only
 after their own communication, no-feedback monitoring, production usage review, and explicit

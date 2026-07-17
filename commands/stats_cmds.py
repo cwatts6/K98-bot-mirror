@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 
 import discord
 from discord.ext import commands as ext_commands
@@ -27,7 +26,6 @@ from embed_my_stats import SliceButtons, build_embeds
 from gsheet_module import run_kvk_export_test, run_kvk_proc_exports_with_alerts
 from kvk.services import kvk_admin_service
 from profile_cache import autocomplete_choices
-from services import governor_account_service
 from stats_alerts.embeds.kvk import send_kvk_embed
 from stats_alerts.honors import purge_latest_honor_scan
 from stats_alerts.interface import send_stats_update_embed
@@ -325,127 +323,6 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
                         "[/kvk_admin refresh_stats_cache] failed to report error to user"
                     )
             return
-
-    @bot.slash_command(
-        name="my_stats",
-        description="View your Rise of Kingdoms stats across your registered accounts",
-        guild_ids=[GUILD_ID],
-    )
-    @channel_only(KVK_PLAYER_STATS_CHANNEL_ID, admin_override=True)
-    @versioned("v1.14")
-    @safe_command
-    @track_usage()
-    async def my_stats_command(ctx):
-        # Defer so the token stays alive (ephemeral)
-        await safe_defer(ctx, ephemeral=True)
-
-        # Resolve user/guild safely
-        user_obj, guild_obj = _actor_from_ctx(ctx)
-        user_id = user_obj.id
-
-        account_summary = await governor_account_service.get_account_summary_for_user(user_id)
-        if not account_summary.ok:
-            await ctx.followup.send(
-                f"Registry is temporarily unavailable: `{account_summary.error}`",
-                ephemeral=True,
-            )
-            return
-
-        gov_ids = list(account_summary.governor_ids)
-        if not gov_ids:
-            await ctx.followup.send(
-                "I don’t see any governor accounts linked to you. Use `/link_account` first.",
-                ephemeral=True,
-            )
-            return
-
-        # Friendly account names for the dropdown
-        account_names = list(account_summary.account_names)
-        name_to_id = account_summary.name_to_id
-
-        # Initial slice & payload
-        slice_key = "wtd"
-
-        # Find the user's Main from the same registry block
-        default_choice = account_summary.default_choice
-
-        # Governor IDs to load for the initial render
-        if default_choice == "ALL":
-            initial_gov_ids = gov_ids
-        else:
-            gid = name_to_id.get(default_choice)
-            initial_gov_ids = [gid] if gid else gov_ids  # fallback if mapping missing
-
-        payload = await get_stats_payload(user_id, initial_gov_ids, slice_key)
-        rows = (payload or {}).get("rows") or []
-        if not rows:
-            await ctx.followup.send(
-                "No stats available yet for your linked accounts. Try again after the next scan.",
-                ephemeral=True,
-            )
-            return
-
-        # If registry names are missing, derive from payload (PER rows)
-        if not account_names:
-            per_names = sorted(
-                {
-                    str(r.get("GovernorName") or "").strip()
-                    for r in rows
-                    if r.get("Grouping") == "PER" and r.get("GovernorName")
-                }
-            )
-            account_names = per_names
-
-        # ---- NEW: build view + embeds, send message, and store handles ----
-        view = SliceButtons(
-            requester_id=user_id,
-            initial_slice=slice_key,
-            account_options=account_names,
-            current_choice=default_choice,
-            governor_ids=gov_ids,
-            name_to_id=name_to_id,
-            # timeout defaults to STATS_VIEW_TIMEOUT
-        )
-
-        gid_for_choice = None if default_choice == "ALL" else name_to_id.get(default_choice)
-
-        # Performance monitoring: track initial load time
-
-        start = time.time()
-
-        embeds, files = await build_embeds(
-            slice_key, default_choice, payload, governor_id_for_choice=gid_for_choice
-        )
-
-        elapsed = time.time() - start
-        try:
-            from file_utils import emit_telemetry_event
-
-            emit_telemetry_event(
-                {
-                    "event": "my_stats_initial_load",
-                    "user_id": user_id,
-                    "slice": slice_key,
-                    "num_governors": len(gov_ids),
-                    "num_accounts": len(account_names),
-                    "elapsed_seconds": round(elapsed, 3),
-                    "num_embeds": len(embeds),
-                    "num_charts": len(files),
-                }
-            )
-        except Exception:
-            pass
-
-        # Send ephemerally; store message + followup on the view so callbacks/timeout can edit/clean up
-        try:
-            msg = await ctx.followup.send(embeds=embeds, files=files, view=view, ephemeral=True)
-        except Exception:
-            # If something goes wrong sending with files, retry without attachments
-            msg = await ctx.followup.send(embeds=embeds, view=view, ephemeral=True)
-
-        view.message = msg
-        view.followup = ctx.followup
-        view.mark_live()
 
     @stats_group.command(
         name="player",

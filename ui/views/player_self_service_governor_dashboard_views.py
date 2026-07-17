@@ -598,6 +598,16 @@ class GovernorDashboardView(discord.ui.View):
                 )
             )
 
+        self.add_item(
+            _DashboardButton(
+                label="Stats",
+                custom_id="me:dashboard:navigate:stats",
+                style=discord.ButtonStyle.primary,
+                row=0,
+                action=self.open_stats,
+            )
+        )
+
         from inventory.models import InventoryReportView
 
         for label, report_view in (
@@ -706,6 +716,41 @@ class GovernorDashboardView(discord.ui.View):
             await _send_private_error(
                 interaction,
                 "That private Inventory report could not be opened. Please try again.",
+            )
+
+    async def open_stats(self, interaction: discord.Interaction) -> None:
+        from ui.views.player_self_service_stats_views import (
+            show_personal_stats_for_interaction,
+        )
+
+        if not await self._claim_transition(interaction):
+            return
+        self._lock_for_transition()
+        context = self.resolution.context
+        try:
+            await asyncio.wait_for(
+                show_personal_stats_for_interaction(
+                    interaction,
+                    author_id=self.author_id,
+                    display_name=self.display_name,
+                    governor_id=context.selected_governor_id if context is not None else None,
+                    entry_route="dashboard",
+                ),
+                timeout=self._transition_timeout_remaining(),
+            )
+            if self._transition_is_current(interaction):
+                self.stop()
+        except asyncio.CancelledError:
+            raise
+        except TimeoutError:
+            logger.info("governor_dashboard_stats_navigation_timed_out user_id=%s", self.author_id)
+        except Exception:
+            logger.exception(
+                "governor_dashboard_stats_navigation_failed user_id=%s", self.author_id
+            )
+            await _send_private_error(
+                interaction,
+                "Private Period Performance could not be opened. Please try again.",
             )
 
     async def open_page(self, interaction: discord.Interaction, page: str) -> None:

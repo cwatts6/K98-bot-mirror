@@ -329,7 +329,7 @@ async def test_get_stats_payload_includes_export_fields():
             "GovernorID": 789,
             "PowerEnd": 50000000,
             "RSSGatheredEnd": 2000000,
-            # Core fields (used by /my_stats)
+            # Core fields (used by /stats player)
             "TroopPowerEnd": 40000000,
             "KillPointsEnd": 1000000,
             "DeadsEnd": 500000,
@@ -338,7 +338,7 @@ async def test_get_stats_payload_includes_export_fields():
             "FortsTotal": 10,
             "FortsLaunched": 5,
             "FortsJoined": 5,
-            # AOO fields (used by /my_stats)
+            # AOO fields (used by /stats player)
             "AOOJoinedEnd": 3,
             "AOOWonEnd": 2,
             "AOOAvgKillEnd": 1500000,
@@ -407,7 +407,7 @@ async def test_get_stats_payload_includes_export_fields():
                 assert "T5_KillsEnd" in row, "Should have T5_KillsEnd field"
                 assert "HealedTroopsEnd" in row, "Should have HealedTroopsEnd field"
 
-                # Verify AOO fields (used by /my_stats) are present
+                # Verify AOO fields (used by /stats player) are present
                 assert "AOOJoinedEnd" in row
                 assert "AOOWonEnd" in row
 
@@ -416,9 +416,9 @@ async def test_get_stats_payload_includes_export_fields():
                 assert row["PowerEnd"] == 50000000
 
 
-def test_export_fields_do_not_break_my_stats_logic():
+def test_export_fields_do_not_break_stats_player_logic():
     """
-    Unit test: verify _num() helper in embed_my_stats handles export fields gracefully.
+    Unit test: verify the retained embed helper handles export fields gracefully.
     """
     from embed_my_stats import _num
 
@@ -439,9 +439,9 @@ def test_export_fields_do_not_break_my_stats_logic():
 
 
 @pytest.mark.asyncio
-async def test_my_stats_unchanged_after_schema_update():
+async def test_stats_player_unchanged_after_schema_update():
     """
-    End-to-end simulation: verify /my_stats command flow is unchanged.
+    End-to-end simulation: verify /stats player command flow is unchanged.
 
     This test simulates the full command flow to ensure schema changes don't break it.
     """
@@ -458,7 +458,7 @@ async def test_my_stats_unchanged_after_schema_update():
             "GovernorID": 123456,
             "GovernorName": "TestPlayer",
             "Alliance": "K98",
-            # Core fields used by /my_stats
+            # Core fields used by /stats player
             "PowerEnd": 50000000,
             "PowerDelta": 1000000,
             "TroopPowerEnd": 40000000,
@@ -509,7 +509,7 @@ async def test_my_stats_unchanged_after_schema_update():
                 )
 
                 # Verify success
-                assert len(embeds) >= 1, "/my_stats should work after schema update"
+                assert len(embeds) >= 1, "/stats player should work after schema update"
 
                 # Verify core fields displayed
                 field_names = [f.name for f in embeds[0].fields]

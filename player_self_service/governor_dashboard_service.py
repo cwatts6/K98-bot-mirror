@@ -45,10 +45,10 @@ SELF_VIEW_ACTIONS = (
     "accounts",
     "reminders",
     "preferences",
-    "exports",
+    "stats",
     "resources",
-    "materials",
     "speedups",
+    "materials",
 )
 INSPECT_VIEW_ACTIONS: tuple[str, ...] = ()
 

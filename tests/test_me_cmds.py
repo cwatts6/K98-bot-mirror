@@ -57,6 +57,7 @@ def test_register_me_declares_player_self_service_group(monkeypatch) -> None:
         "resources",
         "materials",
         "speedups",
+        "stats",
     }
     assert bot.added == [group]
 
@@ -66,13 +67,13 @@ def test_me_commands_are_decorated_and_thin() -> None:
 
     source = inspect.getsource(me_cmds.register_me)
 
-    assert source.count("@versioned(") == 7
+    assert source.count("@versioned(") == 8
     assert source.count('@versioned("v1.03")') == 1
     assert source.count('@versioned("v1.02")') == 1
     assert source.count('@versioned("v1.01")') == 2
-    assert source.count('@versioned("v1.00")') == 3
-    assert source.count("@safe_command") == 7
-    assert source.count("@track_usage()") == 7
+    assert source.count('@versioned("v1.00")') == 4
+    assert source.count("@safe_command") == 8
+    assert source.count("@track_usage()") == 8
     assert "set_user_config" not in source
     assert "remove_user" not in source
     assert "export_service" not in source
@@ -89,6 +90,23 @@ async def test_me_dashboard_hands_off_to_governor_dashboard_sender(monkeypatch) 
         calls.append(ctx)
 
     monkeypatch.setattr(me_cmds, "send_governor_dashboard", fake_sender)
+    ctx = SimpleNamespace()
+
+    await handler(ctx)
+
+    assert calls == [ctx]
+
+
+@pytest.mark.asyncio
+async def test_me_stats_hands_off_to_private_personal_stats_sender(monkeypatch) -> None:
+    me_cmds, group, _bot = _register_me(monkeypatch)
+    handler = _unwrap(group.commands["stats"])
+    calls = []
+
+    async def fake_sender(ctx):
+        calls.append(ctx)
+
+    monkeypatch.setattr(me_cmds, "send_personal_stats", fake_sender)
     ctx = SimpleNamespace()
 
     await handler(ctx)

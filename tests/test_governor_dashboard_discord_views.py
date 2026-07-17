@@ -198,10 +198,10 @@ def _payload(
             "accounts",
             "reminders",
             "preferences",
-            "exports",
+            "stats",
             "resources",
-            "materials",
             "speedups",
+            "materials",
         ),
         missing_fields=("vip_level_label",) if missing else (),
         self_view=GovernorDashboardSelfView(
@@ -615,7 +615,12 @@ async def test_change_governor_is_multi_only_dropdown_below_blue_navigation() ->
         for child in multi_view.children
         if isinstance(child, discord.ui.Button) and child.row == 0
     ]
-    assert [button.label for button in top_buttons] == ["Accounts", "Reminders", "Preferences"]
+    assert [button.label for button in top_buttons] == [
+        "Accounts",
+        "Reminders",
+        "Preferences",
+        "Stats",
+    ]
     assert all(button.style is discord.ButtonStyle.primary for button in top_buttons)
     report_buttons = [
         child

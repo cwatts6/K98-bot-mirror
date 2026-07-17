@@ -97,12 +97,21 @@ output/window choice, times out safely, and all three output kinds work. The sel
 Inventory report-page exports remain unchanged. The completed Phase 5G task pack and chat starter
 are archived under `docs/task_packs/archive/`.
 
-GovernorOS v2 Phase 5 is therefore complete. Phase 6 is the next separately task-packed slice:
-Interactive Personal Stats Experience and `/my_stats` Migration. Its audit/product workshop must
-define the new interactive on-screen format, canonical `/me stats` path, author-gated governor
-dropdown with explicit ALL behavior, period semantics, private/channel migration, performance,
-fallback/timeout/accessibility, communication, final `/my_stats` removal, command resync, smoke, and
-rollback. Personal downloads remain under Account Summary; Phase 6 must not recreate an export hub.
+GovernorOS v2 Phase 6 Interactive Period Performance is implemented on its approval-gated bot and
+SQL branches and is awaiting final review, deployment, command resync, and operator Discord smoke.
+It adds private-anywhere `/me stats`, with Overview, Activity, and Combat on the approved 1702x924
+card; selected-governor or explicit All Linked scope; seven exact Stats-anchor periods; signed,
+coverage-aware Growth/Activity/Fort/Combat metrics; integrated RSS/Fort trends; opaque paged
+governor selection; current-registry revalidation; and a 180-second preserve-and-disable timeout.
+The selected Dashboard exposes Stats on row 0 after Preferences. The same atomic bot patch removes
+`/my_stats` without a redirect while preserving `/stats player` and its proven legacy stack. The
+validated command target is 37 top-level, 100 grouped, eight `/me`, and two `/inventory` commands.
+
+The separately reviewed additive SQL migration creates `dbo.usp_GetPersonalStatsDaily`, a bounded
+set-based read contract for at most 26 deduplicated Governor IDs and 180 source-anchored days. SQL
+must deploy before the bot patch. An additional covering index remains evidence-gated on production
+plans/logical reads rather than speculative. Account Summary remains the only central personal-data
+download home and Phase 5G output contracts remain unchanged.
 
 ## Quality Automation
 

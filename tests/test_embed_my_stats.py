@@ -600,7 +600,7 @@ async def test_slice_button_emits_telemetry():
                 # Check that slice_change event was emitted
                 all_calls = [call[0][0] for call in mock_telemetry.call_args_list]
                 slice_change_events = [
-                    c for c in all_calls if c.get("event") == "my_stats_slice_change"
+                    c for c in all_calls if c.get("event") == "stats_player_slice_change"
                 ]
 
                 assert (
@@ -671,7 +671,7 @@ async def test_account_select_emits_telemetry():
                 # Check that account_change event was emitted
                 all_calls = [call[0][0] for call in mock_telemetry.call_args_list]
                 account_change_events = [
-                    c for c in all_calls if c.get("event") == "my_stats_account_change"
+                    c for c in all_calls if c.get("event") == "stats_player_account_change"
                 ]
 
                 assert (
@@ -707,17 +707,17 @@ def test_constants_imported_correctly():
 @pytest.mark.asyncio
 async def test_build_embeds_ignores_new_export_fields():
     """
-    CRITICAL: Verify /my_stats embed ignores new export-only fields added to view.
+    CRITICAL: Verify /stats player embeds ignore new export-only fields added to view.
 
     This test ensures adding T4_Kills, T5_Kills, etc. to vDaily_PlayerExport
-    does NOT break the /my_stats command.
+    does NOT break the /stats player command.
     """
     from embed_my_stats import build_embeds
 
     data = {
         "rows": [
             {
-                # Existing fields used by /my_stats
+                # Existing fields used by /stats player
                 "WindowKey": "wtd",
                 "Grouping": "PER",
                 "GovernorID": 123456,
@@ -742,7 +742,7 @@ async def test_build_embeds_ignores_new_export_fields():
                 "AOOAvgKillEnd": 1500000,
                 "AOOAvgDeadEnd": 800000,
                 "AOOAvgHealEnd": 1200000,
-                # NEW export-only fields (should be ignored by /my_stats)
+                # NEW export-only fields (should be ignored by /stats player)
                 "T4_Kills": 50000,
                 "T4_KillsDelta": 5000,
                 "T5_Kills": 30000,
@@ -783,19 +783,19 @@ async def test_build_embeds_ignores_new_export_fields():
     # These should NOT appear in the embed
     assert not any(
         "t4" in name and "kill" in name for name in field_names
-    ), "T4 kills should not appear in /my_stats embed"
+    ), "T4 kills should not appear in /stats player embed"
     assert not any(
         "t5" in name and "kill" in name for name in field_names
-    ), "T5 kills should not appear in /my_stats embed"
+    ), "T5 kills should not appear in /stats player embed"
     assert not any(
         "ranged" in name for name in field_names
-    ), "Ranged points should not appear in /my_stats embed"
+    ), "Ranged points should not appear in /stats player embed"
     assert not any(
         "acclaim" in name for name in field_names
-    ), "Acclaim should not appear in /my_stats embed"
+    ), "Acclaim should not appear in /stats player embed"
     assert not any(
         "autarch" in name for name in field_names
-    ), "Autarch should not appear in /my_stats embed"
+    ), "Autarch should not appear in /stats player embed"
 
     # These SHOULD still appear (already in use)
     assert "Power" in [f.name for f in embeds[0].fields], "Power should still be displayed"
@@ -978,7 +978,7 @@ async def test_build_embeds_partial_export_fields():
 @pytest.mark.asyncio
 async def test_backward_compatibility_no_export_fields():
     """
-    Verify /my_stats still works if export fields are missing entirely (old view schema).
+    Verify /stats player still works if export fields are missing entirely (old view schema).
 
     This ensures graceful degradation if SQL update hasn't been applied yet.
     """

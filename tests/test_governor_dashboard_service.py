@@ -393,6 +393,7 @@ def test_governor_dashboard_foundation_preserves_me_subcommands() -> None:
         "resources",
         "speedups",
         "materials",
+        "stats",
     }
     assert "inventory" not in grouped["me"]
 

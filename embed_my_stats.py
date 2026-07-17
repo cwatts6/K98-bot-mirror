@@ -326,13 +326,14 @@ class SliceButtons(ui.View):
         if self._expired:
             if not interaction.response.is_done():
                 await interaction.response.send_message(
-                    "This stats panel has expired. Run **/my_stats** again.",
+                    "This stats panel has expired. Run **/stats player** again.",
                     ephemeral=True,
                 )
             return
         if interaction.user.id != self.requester_id:
             await interaction.response.send_message(
-                "This panel isn't yours. Run `/my_stats` to get your own.", ephemeral=True
+                "This leadership panel isn't yours. Run `/stats player` for your own lookup.",
+                ephemeral=True,
             )
             return
 
@@ -375,7 +376,7 @@ class SliceButtons(ui.View):
 
             emit_telemetry_event(
                 {
-                    "event": "my_stats_refresh",
+                    "event": "stats_player_refresh",
                     "user_id": self.requester_id,
                     "slice": self.slice,
                     "choice": self.choice,
@@ -406,7 +407,7 @@ class SliceButtons(ui.View):
             # That follow-up message no longer exists
             try:
                 await interaction.followup.send(
-                    "This stats card has expired or was removed. Please run `/my_stats` again.",
+                    "This stats card has expired or was removed. Please run `/stats player` again.",
                     ephemeral=True,
                 )
             except Exception:
@@ -426,7 +427,7 @@ class SliceButtons(ui.View):
             # Webhook token likely expired – last resort informative message
             try:
                 await interaction.followup.send(
-                    "This stats card has expired or was removed. Please run `/my_stats` again.",
+                    "This stats card has expired or was removed. Please run `/stats player` again.",
                     ephemeral=True,
                 )
                 self._expired = True
@@ -439,7 +440,7 @@ class SliceButtons(ui.View):
                     )
                     if chan:
                         await chan.send(
-                            "This stats card has expired or was removed. Please run `/my_stats` again.",
+                            "This stats card has expired or was removed. Please run `/stats player` again.",
                             delete_after=30,
                         )
                 except Exception:
@@ -453,10 +454,10 @@ class SliceButtons(ui.View):
 
         expired = discord.Embed(
             title="Stats panel expired",
-            description="This stats view has timed out.\nRun **/my_stats** again to refresh.",
+            description="This stats view has timed out.\nRun **/stats player** again to refresh.",
             color=0x95A5A6,
         )
-        expired.set_footer(text="Run /my_stats again to refresh this private view.")
+        expired.set_footer(text="Run /stats player again to refresh this private view.")
 
         try:
             if not self.message:
@@ -522,7 +523,7 @@ class SliceButton(ui.Button):
 
             emit_telemetry_event(
                 {
-                    "event": "my_stats_slice_change",
+                    "event": "stats_player_slice_change",
                     "user_id": self.parent.requester_id,
                     "from_slice": self.parent.slice,  # old value
                     "to_slice": self.key,
@@ -573,7 +574,7 @@ class AccountSelect(ui.Select):
 
             emit_telemetry_event(
                 {
-                    "event": "my_stats_account_change",
+                    "event": "stats_player_account_change",
                     "user_id": self.parent.requester_id,
                     "from_account": old_choice,
                     "to_account": self.parent.choice,

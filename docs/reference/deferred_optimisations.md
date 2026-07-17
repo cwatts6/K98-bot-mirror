@@ -89,11 +89,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `commands/registry_cmds.py`, `commands/telemetry_cmds.py`, `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `commands/subscriptions_cmds.py`, `commands/calendar_cmds.py`, player self-service command docs/tests
 - Type: cleanup
-- Description: Phase 13 introduced selected private redirects. Phase 5F removed the four approved Inventory routes, and completed Phase 5G removed redirect-only `/my_stats_export` plus duplicate `/me exports`, with Account Summary as the canonical personal-data download home. `/my_stats` remains a separate live interactive command until Phase 6; account/reminder redirects, `/mykvkcrystaltech`, `/player_profile`, and `/stats player` remain outside the completed Phase 5 boundary.
-- Suggested Fix: Task-pack the `/my_stats` migration separately in Phase 6 and continue to require usage evidence, communication, observation, command resync/rollback, and explicit operator approval for every other compatibility route.
+- Description: Phase 13 introduced selected private redirects. Phase 5F removed the four approved Inventory routes, Phase 5G removed redirect-only `/my_stats_export` plus duplicate `/me exports`, and Phase 6 now replaces `/my_stats` atomically with private `/me stats`. Account/reminder redirects, `/mykvkcrystaltech`, `/player_profile`, and `/stats player` remain outside that approved retirement boundary.
+- Suggested Fix: Close the `/my_stats` item only after Phase 6 deploy/resync/smoke, then continue to require route-specific usage evidence, communication, observation, command resync/rollback, and explicit operator approval for every other compatibility route. Do not infer permission to retire `/stats player` from the personal-route migration.
 - Impact: high
 - Risk: medium
-- Dependencies: Phase 5G operator accepted and command-resynced on 2026-07-17 at the 38 top-level/7 `/me` baseline; separate Phase 6 and later route-specific task packs.
+- Dependencies: Phase 6 final Changes reviews, SQL-before-bot deployment, command resync, and operator smoke; separate later route-specific task packs.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.InventoryReportPreference`, `inventory/dal/inventory_reporting_dal.py`, `inventory/reporting_service.py`, and retired Inventory-visibility documentation/tests
@@ -114,13 +114,22 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: Phase 3 smoke correction deployed for representative measurement; production SQL execution-plan access; observed dashboard usage/concurrency; SQL owner approval before index, view, or maintained-table changes.
 
 ### Deferred Optimisation
-- Area: `commands/stats_cmds.py`, `embed_my_stats.py`, Stats services/DAL, future `/me stats`, player self-service v2 docs/tests
+- Area: `commands/stats_cmds.py`, `embed_my_stats.py`, root `stats_service.py`, `stats_helpers.py`, and future `/me inspect`
 - Type: architecture
-- Description: GovernorOS v2 Phase 5 is complete and operator accepted. `/my_stats` remains the current channel-gated interactive experience until Phase 6 replaces/migrates it. The next design needs a new on-screen Stats format and a first-class author-gated governor dropdown with explicit ALL plus every active linked governor; it must define metric-specific ALL aggregation, source-date period semantics, safe >25-account paging, registry revalidation, preserved selection state, visibility/channel migration, performance, accessibility, telemetry, timeout, and cleanup without recreating an export surface.
-- Suggested Fix: Create the separate Phase 6 task pack from the programme handoff. Audit the existing command/view/service/DAL and current ALL rows first; product-approve `/me stats`, default governor/ALL and period behavior, presentation and performance budgets, then migrate and remove `/my_stats` rather than retain a permanent redirect. Keep every personal download under Account Summary.
+- Description: Phase 6 removes the personal `/my_stats` registration but deliberately retains the proven legacy `embed_my_stats.py`/root `stats_service.py`/`stats_helpers.py` stack because `/stats player` still calls it. The leadership route retains its registration, permissions, visibility, KVK stats-channel dependencies, legacy charts, and behavior. Mixing leadership cleanup into Phase 6 would make command retirement unsafe and would pre-empt the later `/stats player` versus private `/me inspect` decision.
+- Suggested Fix: Run a separately task-packed leadership/Inspect audit after Phase 6 observation. Reconfirm callers and permission/visibility requirements, decide whether `/stats player` remains leadership-owned or becomes `/me inspect`, then migrate or delete only zero-caller legacy helpers with focused permission, registration, chart, and rendering regression coverage.
 - Impact: high
 - Risk: medium
-- Dependencies: Phase 5G operator accepted on 2026-07-17; operator-created Phase 6 task pack; explicit approval at audit, architecture, plan, implementation, review, promotion, command-resync, smoke, and rollback gates.
+- Dependencies: Phase 6 deployed and operator accepted; fresh `/stats player` usage/dependency evidence; explicit leadership/privacy product decision and separate task pack.
+
+### Deferred Optimisation
+- Area: SQL repo `dbo.usp_GetPersonalStatsDaily`, `dbo.KingdomScanData4`, Alliance Activity/Fort sources, and `stats/dal/personal_stats_dal.py`
+- Type: performance
+- Description: Phase 6 adds one bounded set-based procedure for up to 26 deduplicated governors and 180 Stats-anchor days. Existing source indexes cover the principal Governor/date access patterns, and the bot adds 9-second data timeout, bounded concurrency, TTL/LRU caching, and inflight deduplication. No representative production execution plan, logical-read, duration, memory-grant, or concurrent 26-account baseline is available locally, so an additional wide covering index would be speculative and could increase import/maintenance cost.
+- Suggested Fix: Before or immediately after controlled Phase 6 rollout, execute the procedure for single, multi, and 26-account sets at 90/180 days with actual plans plus `SET STATISTICS IO, TIME ON`, cold/warm cache, and expected concurrency. Add the narrowest covering index or procedure refinement only when the measured hotspot is identified; repeat correctness/performance tests and retain an independent rollback migration.
+- Impact: high
+- Risk: medium
+- Dependencies: additive procedure deployed to the SQL host; representative linked Governor IDs; SQL owner-approved measurement window; separate SQL Changes review for any index/procedure follow-up.
 
 ### Deferred Optimisation
 - Area: `player_self_service/governor_dashboard_models.py`, `player_self_service/governor_dashboard_dal.py`, `player_self_service/governor_dashboard_renderer.py`, SQL repo `dbo.KingdomScanData4`

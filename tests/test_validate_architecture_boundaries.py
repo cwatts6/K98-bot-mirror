@@ -91,3 +91,13 @@ def test_discord_reference_in_root_level_service_fails(tmp_path: Path) -> None:
     assert all(
         finding.message == "Discord type/reference found in service layer" for finding in findings
     )
+
+
+def test_test_filename_containing_self_service_is_not_a_service_layer(tmp_path: Path) -> None:
+    test_file = _write(
+        tmp_path,
+        "tests/test_player_self_service_stats_views.py",
+        "import discord\nbutton = discord.ui.Button()\n",
+    )
+
+    assert validate_files(tmp_path, [test_file]) == []

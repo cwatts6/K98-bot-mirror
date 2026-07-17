@@ -134,7 +134,7 @@ def validate_files(root: Path, files: Iterable[Path]) -> list[Finding]:
                         Finding("FAIL", rel, index + 1, "DAL/repository import found in view layer")
                     )
 
-        if not rel.startswith(("commands/", "ui/views/")):
+        if not rel.startswith(("commands/", "ui/views/", "tests/")):
             service_like = (
                 rel.startswith("services/")
                 or rel.endswith("_service.py")

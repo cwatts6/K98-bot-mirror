@@ -9,6 +9,7 @@ from decoraters import track_usage
 from inventory.models import InventoryReportView
 from ui.views.player_self_service_governor_dashboard_views import send_governor_dashboard
 from ui.views.player_self_service_inventory_report_views import send_player_inventory_report
+from ui.views.player_self_service_stats_views import send_personal_stats
 from ui.views.player_self_service_views import (
     PAGE_ACCOUNTS,
     PAGE_PREFERENCES,
@@ -81,6 +82,17 @@ def register_me(bot: ext_commands.Bot) -> None:
         await send_player_inventory_report(ctx, report_view=InventoryReportView.RESOURCES)
 
     @me_group.command(
+        name="speedups",
+        description="Open your private selected-governor Speedups report",
+        guild_ids=[GUILD_ID],
+    )
+    @versioned("v1.00")
+    @safe_command
+    @track_usage()
+    async def me_speedups(ctx: discord.ApplicationContext) -> None:
+        await send_player_inventory_report(ctx, report_view=InventoryReportView.SPEEDUPS)
+
+    @me_group.command(
         name="materials",
         description="Open your private selected-governor Materials report",
         guild_ids=[GUILD_ID],
@@ -92,14 +104,14 @@ def register_me(bot: ext_commands.Bot) -> None:
         await send_player_inventory_report(ctx, report_view=InventoryReportView.MATERIALS)
 
     @me_group.command(
-        name="speedups",
-        description="Open your private selected-governor Speedups report",
+        name="stats",
+        description="Open your private period performance report",
         guild_ids=[GUILD_ID],
     )
     @versioned("v1.00")
     @safe_command
     @track_usage()
-    async def me_speedups(ctx: discord.ApplicationContext) -> None:
-        await send_player_inventory_report(ctx, report_view=InventoryReportView.SPEEDUPS)
+    async def me_stats(ctx: discord.ApplicationContext) -> None:
+        await send_personal_stats(ctx)
 
     bot.add_application_command(me_group)

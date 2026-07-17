@@ -25,8 +25,18 @@ history CSV. The full export correctness pass is delivered, including exact incl
 filtered sheets, actual row/date metadata, Account Summary first, selected-window Forts, formula
 safety, separate freshness, and one truthful Excel/Google Sheets-compatible workbook option. The
 three retained Inventory report-page exports remain unchanged. Smoke accepted option reselection,
-timeout, all three private files, and the restored governor-sheet workbook layout. `/my_stats`
-remains live for the separate Phase 6 redesign and migration.
+timeout, all three private files, and the restored governor-sheet workbook layout.
+
+Phase 6 Interactive Period Performance is implemented and in final validation. It adds private-
+anywhere `/me stats`, adds Stats to selected-governor Dashboard row 0 after Preferences, and removes
+top-level `/my_stats` without a redirect in the same bot patch. The route defaults to the selected
+Dashboard governor, otherwise Main, otherwise the first valid canonical slot; All Linked is always
+explicit. Overview, Activity, and Combat share the approved 1702x924 avatar-enabled card and expose
+seven exact Stats-anchor periods, signed Growth/Activity/Fort/Combat metrics, truthful coverage and
+state, integrated RSS/Fort trends, a same-payload accessible fallback, opaque paged selection, and
+a 180-second preserve-and-disable timeout. `/stats player` and its legacy rendering stack remain.
+The additive SQL procedure `dbo.usp_GetPersonalStatsDaily` must deploy before the bot patch; a new
+covering index is deferred until representative production plans/logical reads justify it.
 
 The following earlier phase notes remain as historical delivery context where they describe the
 state accepted at that time; Phase 5F's current surface above supersedes their legacy-route wording.
@@ -129,8 +139,15 @@ Players choose a formatted Full workbook, the exact Current snapshot CSV, or Raw
 for 30, 60, 90, 180, or 360 days. The Full workbook is the one `.xlsx` file for Excel or Google
 Sheets import and starts with Account Summary. `/me exports` and `/my_stats_export` are removed rather
 than kept as redirects. Resources, Speedups, and Materials retain their own private selected-governor
-report-page exports. `/my_stats`, `/stats player`, `/player_profile`, and `/mykvkcrystaltech` remain
-live; `/my_stats` is reviewed separately in Phase 6.
+report-page exports. `/stats player`, `/player_profile`, and `/mykvkcrystaltech` remain live.
+
+Use `/me stats` for private Period Performance from any guild channel or thread. It defaults to the
+current selected Dashboard governor where available and otherwise Main/first valid account. Choose
+All Linked explicitly when portfolio activity is required. The report has Overview, Activity, and
+Combat modes and Yesterday, This Week, Last Week, This Month, Last Month, Last 90 Days, and Last 180
+Days. Exact dates and coverage appear on every result. Missing source rows are not treated as zero,
+and corrections may be negative. `/me stats` has no Ark or download/export action; Account Summary
+continues to own personal data downloads.
 
 Historical Phase 13 player message draft:
 
@@ -152,6 +169,28 @@ Phase 5G completion confirms the accepted state:
 - `/me exports` and `/my_stats_export` registrations are removed.
 - Account Summary exposes `Download data` from the authorised all-linked payload.
 - `/my_stats` remains the separate interactive command.
+
+Phase 6 implementation candidate:
+
+- add `/me stats` and selected-Dashboard Stats, private/ephemeral from any guild channel/thread;
+- remove `/my_stats` without redirect while preserving `/stats player`;
+- deploy additive `dbo.usp_GetPersonalStatsDaily` before the bot patch;
+- resync to 37 top-level, 100 grouped, eight `/me`, and two `/inventory` commands;
+- announce the retirement in the existing Stats-channel audience before deploy;
+- complete single, multi, 26-account, period, access-change, fallback, timeout, mobile/desktop, and
+  `/stats player` smoke before promotion.
+
+Phase 6 pre-deployment Stats-channel announcement:
+
+```text
+Personal Period Performance is moving to /me stats.
+
+The new report is private, works from any server channel or thread, and supports Overview,
+Activity, Combat, seven exact periods, your selected governor, and explicit All Linked activity.
+The old /my_stats command will be removed in this deployment rather than kept as a redirect.
+Personal data downloads remain under /me accounts -> Account Summary -> Download data.
+Leadership /stats player is not changing. Please report any issue with /me stats in this channel.
+```
 
 Accepted Phase 5G surface:
 

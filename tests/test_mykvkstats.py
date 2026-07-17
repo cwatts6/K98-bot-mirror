@@ -92,6 +92,7 @@ async def test_legacy_stats_commands_send_deprecation_redirect(
     monkeypatch, command_name, replacement, ephemeral
 ):
     import commands.stats_cmds as C
+    from services import governor_account_service
 
     defer_calls = []
 
@@ -100,7 +101,7 @@ async def test_legacy_stats_commands_send_deprecation_redirect(
 
     monkeypatch.setattr(C, "safe_defer", fake_safe_defer, raising=False)
     monkeypatch.setattr(
-        C.governor_account_service,
+        governor_account_service,
         "get_account_summary_for_user",
         lambda _user_id: pytest.fail("deprecated command should not load accounts"),
     )
