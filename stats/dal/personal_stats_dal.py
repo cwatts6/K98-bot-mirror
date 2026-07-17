@@ -110,7 +110,11 @@ def fetch_personal_stats_daily(
     if not 1 <= int(history_days) <= 180:
         raise ValueError("Personal stats history days must be between 1 and 180")
 
-    params: tuple[Any, ...] = (*ids, *(None for _ in range(_MAX_GOVERNORS - len(ids))), history_days)
+    params: tuple[Any, ...] = (
+        *ids,
+        *(None for _ in range(_MAX_GOVERNORS - len(ids))),
+        history_days,
+    )
     conn = get_conn_with_retries()
     cursor = None
     try:

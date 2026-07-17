@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import replace
 from datetime import UTC, date, datetime
+import threading
 from types import SimpleNamespace
 
 import discord
@@ -108,18 +109,30 @@ async def test_26_governors_use_safe_paging_opaque_tokens_and_exact_component_ro
         avatar_bytes=None,
     )
 
-    modes = [child for child in view.children if isinstance(child, discord.ui.Button) and child.row == 0]
-    period = [child for child in view.children if isinstance(child, discord.ui.Select) and child.row == 1]
-    scope = next(child for child in view.children if isinstance(child, discord.ui.Select) and child.row == 2)
-    paging = [child for child in view.children if isinstance(child, discord.ui.Button) and child.row == 3]
-    dashboard = [child for child in view.children if isinstance(child, discord.ui.Button) and child.row == 4]
+    modes = [
+        child for child in view.children if isinstance(child, discord.ui.Button) and child.row == 0
+    ]
+    period = [
+        child for child in view.children if isinstance(child, discord.ui.Select) and child.row == 1
+    ]
+    scope = next(
+        child for child in view.children if isinstance(child, discord.ui.Select) and child.row == 2
+    )
+    paging = [
+        child for child in view.children if isinstance(child, discord.ui.Button) and child.row == 3
+    ]
+    dashboard = [
+        child for child in view.children if isinstance(child, discord.ui.Button) and child.row == 4
+    ]
 
     assert [button.label for button in modes] == ["Overview", "Activity", "Combat"]
     assert len(period) == 1
     assert len(scope.options) == 25  # All Linked plus 24 governor slots.
     assert {button.label for button in paging} == {"Previous Governors", "Next Governors"}
     assert [button.label for button in dashboard] == ["Dashboard"]
-    assert all(option.value not in {str(1000 + index) for index in range(26)} for option in scope.options)
+    assert all(
+        option.value not in {str(1000 + index) for index in range(26)} for option in scope.options
+    )
     duplicate_labels = [option.label for option in scope.options if "Duplicate" in option.label]
     assert duplicate_labels and all("ID" in label for label in duplicate_labels)
 
@@ -324,3 +337,57 @@ async def test_latest_period_transition_wins_and_stale_work_cannot_replace_it() 
     assert view.period is StatsPeriod.THIS_MONTH
     assert stale_interaction.original_edits == []
     assert len(latest_interaction.original_edits) == 1
+
+
+@pytest.mark.asyncio
+async def test_cancelled_render_transitions_remain_bounded_to_two_workers() -> None:
+    lock = threading.Lock()
+    release = threading.Event()
+    active = 0
+    maximum = 0
+
+    def blocking_renderer(*_args, **_kwargs):
+        nonlocal active, maximum
+        with lock:
+            active += 1
+            maximum = max(maximum, active)
+        release.wait(5)
+        with lock:
+            active -= 1
+        return RenderedStatsCard("me_stats_42.png", b"png")
+
+    view = PersonalStatsView(
+        author_id=42,
+        display_name="Player",
+        payload=_payload(),
+        avatar_bytes=None,
+        renderer=blocking_renderer,
+    )
+    tasks: list[asyncio.Task] = []
+    try:
+        tasks = [
+            asyncio.create_task(view._render(view.payload, StatsMode.ACTIVITY)) for _ in range(2)
+        ]
+        for _ in range(100):
+            with lock:
+                if maximum == 2:
+                    break
+            await asyncio.sleep(0.01)
+        assert maximum == 2
+
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        replacement_tasks = [
+            asyncio.create_task(view._render(view.payload, StatsMode.COMBAT)) for _ in range(3)
+        ]
+        tasks.extend(replacement_tasks)
+        await asyncio.sleep(0.1)
+        assert maximum == 2
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        release.set()
+        await asyncio.sleep(0.05)

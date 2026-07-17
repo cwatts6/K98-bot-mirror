@@ -28,8 +28,7 @@ from ui.views.player_self_service_stats_views import build_personal_stats_fallba
 
 def _metric(total: int, *, daily: tuple[int, ...] = (-5, 10)) -> StatsMetricSummary:
     points = tuple(
-        StatsDailyPoint(date(2026, 7, 13 + index), value)
-        for index, value in enumerate(daily)
+        StatsDailyPoint(date(2026, 7, 13 + index), value) for index, value in enumerate(daily)
     )
     peak = max(points, key=lambda point: point.value) if points else None
     return StatsMetricSummary(

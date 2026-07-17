@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from io import BytesIO
 import logging
 from math import ceil
@@ -34,7 +36,7 @@ Renderer = Callable[..., RenderedStatsCard]
 
 _VIEW_TIMEOUT_SECONDS = 180.0
 _RENDER_TIMEOUT_SECONDS = 3.5
-_RENDER_SEMAPHORE = asyncio.Semaphore(2)
+_RENDER_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="me-stats-render")
 _AVATAR_TIMEOUT_SECONDS = 3.0
 _AVATAR_MAX_BYTES = 2 * 1024 * 1024
 _GOVERNOR_PAGE_SIZE = 24
@@ -72,6 +74,28 @@ async def _cancel_task(task: asyncio.Task[Any]) -> None:
     if not task.done():
         task.cancel()
     await asyncio.gather(task, return_exceptions=True)
+
+
+async def _run_renderer(
+    renderer: Renderer,
+    payload: PersonalStatsPayload,
+    *,
+    mode: StatsMode,
+    display_name: str,
+    avatar_bytes: bytes | None,
+) -> RenderedStatsCard:
+    loop = asyncio.get_running_loop()
+    render_future = loop.run_in_executor(
+        _RENDER_EXECUTOR,
+        partial(
+            renderer,
+            payload,
+            mode=mode,
+            display_name=display_name,
+            avatar_bytes=avatar_bytes,
+        ),
+    )
+    return await asyncio.wait_for(render_future, timeout=_RENDER_TIMEOUT_SECONDS)
 
 
 def _close_files(files: list[discord.File] | None) -> None:
@@ -166,9 +190,7 @@ def build_personal_stats_fallback_embed(
         color=(
             discord.Color.green()
             if payload.state.value == "READY"
-            else discord.Color.gold()
-            if payload.state.value == "PARTIAL"
-            else discord.Color.red()
+            else discord.Color.gold() if payload.state.value == "PARTIAL" else discord.Color.red()
         ),
     )
     metrics = payload.metrics
@@ -226,7 +248,9 @@ def build_personal_stats_fallback_embed(
             value="Duplicate linked Governor IDs were deduplicated before data access.",
             inline=False,
         )
-    embed.set_footer(text=f"Private report • Generated {payload.generated_at_utc:%d %b %Y %H:%M:%S UTC}")
+    embed.set_footer(
+        text=f"Private report • Generated {payload.generated_at_utc:%d %b %Y %H:%M:%S UTC}"
+    )
     return embed
 
 
@@ -388,8 +412,14 @@ class PersonalStatsView(discord.ui.View):
                     label=mode.label,
                     custom_id=f"me:stats:mode:{mode.value}",
                     row=0,
-                    style=(discord.ButtonStyle.primary if mode is self.mode else discord.ButtonStyle.secondary),
-                    action=lambda interaction, selected=mode: self.change_mode(interaction, selected),
+                    style=(
+                        discord.ButtonStyle.primary
+                        if mode is self.mode
+                        else discord.ButtonStyle.secondary
+                    ),
+                    action=lambda interaction, selected=mode: self.change_mode(
+                        interaction, selected
+                    ),
                     disabled=mode is self.mode,
                 )
             )
@@ -432,7 +462,9 @@ class PersonalStatsView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if self._expired:
-            await _private_message(interaction, "Report controls expired. Run /me stats to refresh.")
+            await _private_message(
+                interaction, "Report controls expired. Run /me stats to refresh."
+            )
             return False
         if interaction.user is None or int(interaction.user.id) != self.author_id:
             await _private_message(interaction, "This private Stats report is not for you.")
@@ -452,17 +484,13 @@ class PersonalStatsView(discord.ui.View):
         return not self._expired and generation == self._generation
 
     async def _render(self, payload: PersonalStatsPayload, mode: StatsMode) -> RenderedStatsCard:
-        async with _RENDER_SEMAPHORE:
-            return await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.renderer,
-                    payload,
-                    mode=mode,
-                    display_name=self.display_name,
-                    avatar_bytes=self.avatar_bytes,
-                ),
-                timeout=_RENDER_TIMEOUT_SECONDS,
-            )
+        return await _run_renderer(
+            self.renderer,
+            payload,
+            mode=mode,
+            display_name=self.display_name,
+            avatar_bytes=self.avatar_bytes,
+        )
 
     async def _edit_transition(
         self,
@@ -585,7 +613,10 @@ class PersonalStatsView(discord.ui.View):
         except Exception:
             logger.exception("personal_stats_mode_transition_failed")
             if self._is_current(generation):
-                await _private_message(interaction, "That Stats mode could not be opened. Your last report is unchanged.")
+                await _private_message(
+                    interaction,
+                    "That Stats mode could not be opened. Your last report is unchanged.",
+                )
 
     async def change_period(self, interaction: discord.Interaction, period: StatsPeriod) -> None:
         generation = self._begin_transition()
@@ -594,28 +625,43 @@ class PersonalStatsView(discord.ui.View):
             payload = await self.payload_loader(
                 self.author_id,
                 period=period,
-                governor_id=(self.payload.scope_governor_ids[0] if self.payload.scope_type is StatsScopeType.SELECTED else None),
+                governor_id=(
+                    self.payload.scope_governor_ids[0]
+                    if self.payload.scope_type is StatsScopeType.SELECTED
+                    else None
+                ),
                 all_linked=self.payload.scope_type is StatsScopeType.ALL_LINKED,
                 expected_registry_fingerprint=self.payload.registry_fingerprint,
             )
-            await self._deliver_transition(interaction, generation=generation, payload=payload, mode=self.mode)
+            await self._deliver_transition(
+                interaction, generation=generation, payload=payload, mode=self.mode
+            )
         except asyncio.CancelledError:
             _emit({"event": "me_stats_transition", "stale_suppressed": True})
         except PersonalStatsAccessChanged:
             _emit({"event": "me_stats_transition", "access_changed": True})
             if self._is_current(generation):
-                await _private_message(interaction, "Your linked-governor access changed. Run /me stats to refresh.")
+                await _private_message(
+                    interaction, "Your linked-governor access changed. Run /me stats to refresh."
+                )
         except PersonalStatsUnavailable:
             if self._is_current(generation):
-                await _private_message(interaction, "Period performance is temporarily unavailable. Your last report is unchanged.")
+                await _private_message(
+                    interaction,
+                    "Period performance is temporarily unavailable. Your last report is unchanged.",
+                )
         except Exception:
             logger.exception("personal_stats_period_transition_failed")
             if self._is_current(generation):
-                await _private_message(interaction, "That period could not be loaded. Your last report is unchanged.")
+                await _private_message(
+                    interaction, "That period could not be loaded. Your last report is unchanged."
+                )
 
     async def change_scope(self, interaction: discord.Interaction, token: str) -> None:
         if token not in self._token_map:
-            await _private_message(interaction, "That Stats selection is expired or invalid. Run /me stats to refresh.")
+            await _private_message(
+                interaction, "That Stats selection is expired or invalid. Run /me stats to refresh."
+            )
             return
         governor_id = self._token_map[token]
         generation = self._begin_transition()
@@ -628,20 +674,30 @@ class PersonalStatsView(discord.ui.View):
                 all_linked=governor_id is None,
                 expected_registry_fingerprint=self.payload.registry_fingerprint,
             )
-            await self._deliver_transition(interaction, generation=generation, payload=payload, mode=self.mode)
+            await self._deliver_transition(
+                interaction, generation=generation, payload=payload, mode=self.mode
+            )
         except asyncio.CancelledError:
             _emit({"event": "me_stats_transition", "stale_suppressed": True})
         except PersonalStatsAccessChanged:
             _emit({"event": "me_stats_transition", "access_changed": True})
             if self._is_current(generation):
-                await _private_message(interaction, "Your linked-governor access changed. Run /me stats to refresh.")
+                await _private_message(
+                    interaction, "Your linked-governor access changed. Run /me stats to refresh."
+                )
         except PersonalStatsUnavailable:
             if self._is_current(generation):
-                await _private_message(interaction, "That Stats scope is temporarily unavailable. Your last report is unchanged.")
+                await _private_message(
+                    interaction,
+                    "That Stats scope is temporarily unavailable. Your last report is unchanged.",
+                )
         except Exception:
             logger.exception("personal_stats_scope_transition_failed")
             if self._is_current(generation):
-                await _private_message(interaction, "That Stats scope could not be loaded. Your last report is unchanged.")
+                await _private_message(
+                    interaction,
+                    "That Stats scope could not be loaded. Your last report is unchanged.",
+                )
 
     async def change_scope_page(self, interaction: discord.Interaction, delta: int) -> None:
         generation = self._begin_transition()
@@ -663,7 +719,9 @@ class PersonalStatsView(discord.ui.View):
         except Exception:
             logger.debug("personal_stats_scope_page_failed", exc_info=True)
             if self._is_current(generation):
-                await _private_message(interaction, "The governor picker page could not be changed.")
+                await _private_message(
+                    interaction, "The governor picker page could not be changed."
+                )
 
     async def open_dashboard(self, interaction: discord.Interaction) -> None:
         generation = self._begin_transition()
@@ -696,7 +754,10 @@ class PersonalStatsView(discord.ui.View):
         except Exception:
             logger.exception("personal_stats_dashboard_navigation_failed")
             if self._is_current(generation):
-                await _private_message(interaction, "The private Dashboard could not be opened. Your report is unchanged.")
+                await _private_message(
+                    interaction,
+                    "The private Dashboard could not be opened. Your report is unchanged.",
+                )
 
     async def on_timeout(self) -> None:
         self._expired = True
@@ -744,17 +805,13 @@ async def _initial_delivery(
     delivery_started = 0.0
     try:
         try:
-            async with _RENDER_SEMAPHORE:
-                rendered = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        renderer,
-                        payload,
-                        mode=StatsMode.OVERVIEW,
-                        display_name=display_name,
-                        avatar_bytes=avatar_bytes,
-                    ),
-                    timeout=_RENDER_TIMEOUT_SECONDS,
-                )
+            rendered = await _run_renderer(
+                renderer,
+                payload,
+                mode=StatsMode.OVERVIEW,
+                display_name=display_name,
+                avatar_bytes=avatar_bytes,
+            )
             files = [discord.File(BytesIO(rendered.image_bytes), filename=rendered.filename)]
             render_ms = round((time.perf_counter() - render_started) * 1000, 1)
             delivery_started = time.perf_counter()

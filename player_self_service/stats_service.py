@@ -121,7 +121,9 @@ def _options(summary: AccountResolutionSummary) -> tuple[tuple[StatsGovernorOpti
 
 
 def _fingerprint(summary: AccountResolutionSummary) -> tuple[tuple[str, int], ...]:
-    return tuple((str(account.slot), int(account.governor_id)) for account in summary.resolved_accounts)
+    return tuple(
+        (str(account.slot), int(account.governor_id)) for account in summary.resolved_accounts
+    )
 
 
 async def _load_registry(
@@ -170,7 +172,9 @@ async def _authorized_dataset(
         if task is None:
             task = asyncio.create_task(_fetch_dataset(governor_ids, data_loader))
             _INFLIGHT[key] = task
-            task.add_done_callback(lambda completed, cache_key=key: _schedule_inflight_cleanup(cache_key, completed))
+            task.add_done_callback(
+                lambda completed, cache_key=key: _schedule_inflight_cleanup(cache_key, completed)
+            )
 
     try:
         dataset = await asyncio.shield(task)
@@ -245,7 +249,9 @@ def _period_end_context(
     governor_ids: tuple[int, ...],
 ) -> tuple[int | None, int | None, date | None]:
     end_rows = [row for row in rows if row.has_stats and row.as_of_date == window.end_date]
-    power_values = {row.governor_id: row.power_value for row in end_rows if row.power_value is not None}
+    power_values = {
+        row.governor_id: row.power_value for row in end_rows if row.power_value is not None
+    }
     troop_values = {
         row.governor_id: row.troop_power_value
         for row in end_rows
@@ -409,7 +415,9 @@ def _scope_label(
         return "All Linked"
     option = next(option for option in options if option.governor_id == governor_ids[0])
     duplicates = sum(
-        1 for candidate in options if candidate.governor_name.casefold() == option.governor_name.casefold()
+        1
+        for candidate in options
+        if candidate.governor_name.casefold() == option.governor_name.casefold()
     )
     suffix = f" ({str(option.governor_id)[-4:]})" if duplicates > 1 else ""
     return f"{option.governor_name}{suffix}"
@@ -448,8 +456,12 @@ async def build_personal_stats_payload(
         selected_ids = authorized_ids
     else:
         scope_type = StatsScopeType.SELECTED
-        selected_id = int(governor_id) if governor_id is not None else next(
-            (option.governor_id for option in options if option.is_main), options[0].governor_id
+        selected_id = (
+            int(governor_id)
+            if governor_id is not None
+            else next(
+                (option.governor_id for option in options if option.is_main), options[0].governor_id
+            )
         )
         if selected_id not in authorized_ids:
             raise PersonalStatsAccessChanged("The selected governor is no longer linked")

@@ -62,9 +62,7 @@ def _font_text(
     fitted = visual_text.fit_text_to_width(
         draw, cleaned, width=max(1, width), base_font=font, bold=bold
     )
-    visual_text.draw_text(
-        draw, xy, fitted, font=font, fill=fill, bold=bold, embedded_color=True
-    )
+    visual_text.draw_text(draw, xy, fitted, font=font, fill=fill, bold=bold, embedded_color=True)
 
 
 def _compact(value: int | None, *, signed: bool = False) -> str:
@@ -150,7 +148,9 @@ def _metric_box(
 ) -> None:
     _panel(draw, box)
     x0, y0, x1, y1 = box
-    _font_text(draw, (x0 + 16, y0 + 12), label.upper(), width=x1 - x0 - 32, size=17, fill=_BLUE, bold=True)
+    _font_text(
+        draw, (x0 + 16, y0 + 12), label.upper(), width=x1 - x0 - 32, size=17, fill=_BLUE, bold=True
+    )
     _font_text(
         draw,
         (x0 + 16, y0 + 39),
@@ -256,9 +256,27 @@ def _draw_chart(
                 _marker(draw, x, y, colour, index)
             legend_x = x0 + 17 + index * max(145, (x1 - x0 - 34) // max(1, len(series_list)))
             _marker(draw, legend_x, y0 + 39, colour, index)
-            _font_text(draw, (legend_x + 10, y0 + 29), label, width=155, size=13, min_size=10, fill=_TEXT)
-        _font_text(draw, (chart_left, chart_bottom + 7), f"{dates[0]:%d %b}", width=90, size=12, min_size=10, fill=_MUTED)
-        _font_text(draw, (chart_right - 90, chart_bottom + 7), f"{dates[-1]:%d %b}", width=90, size=12, min_size=10, fill=_MUTED)
+            _font_text(
+                draw, (legend_x + 10, y0 + 29), label, width=155, size=13, min_size=10, fill=_TEXT
+            )
+        _font_text(
+            draw,
+            (chart_left, chart_bottom + 7),
+            f"{dates[0]:%d %b}",
+            width=90,
+            size=12,
+            min_size=10,
+            fill=_MUTED,
+        )
+        _font_text(
+            draw,
+            (chart_right - 90, chart_bottom + 7),
+            f"{dates[-1]:%d %b}",
+            width=90,
+            size=12,
+            min_size=10,
+            fill=_MUTED,
+        )
     for index, (label, metric) in enumerate(series_list):
         _font_text(
             draw,
@@ -281,10 +299,30 @@ def _header(
 ) -> None:
     _paste_avatar(canvas, avatar_bytes)
     _font_text(draw, (270, 50), "PERIOD PERFORMANCE", width=730, size=38, min_size=28, bold=True)
-    _font_text(draw, (270, 100), display_name, width=730, size=27, min_size=18, fill=_GOLD, bold=True)
+    _font_text(
+        draw, (270, 100), display_name, width=730, size=27, min_size=18, fill=_GOLD, bold=True
+    )
     _font_text(draw, (270, 141), payload.scope_label, width=730, size=23, min_size=16, fill=_TEXT)
-    _font_text(draw, (1040, 49), payload.state.value, width=555, size=29, min_size=21, fill=_state_colour(payload.state.value), bold=True)
-    _font_text(draw, (1040, 88), f"{mode.label} • {payload.period.label}", width=555, size=22, min_size=16, fill=_BLUE, bold=True)
+    _font_text(
+        draw,
+        (1040, 49),
+        payload.state.value,
+        width=555,
+        size=29,
+        min_size=21,
+        fill=_state_colour(payload.state.value),
+        bold=True,
+    )
+    _font_text(
+        draw,
+        (1040, 88),
+        f"{mode.label} • {payload.period.label}",
+        width=555,
+        size=22,
+        min_size=16,
+        fill=_BLUE,
+        bold=True,
+    )
     _font_text(
         draw,
         (1040, 122),
@@ -300,7 +338,9 @@ def _header(
             f"{coverage.stats_account_days}/{coverage.expected_account_days} account-days"
         )
     else:
-        coverage_text = f"Stats coverage {coverage.stats_reporting_dates}/{coverage.expected_dates} dates"
+        coverage_text = (
+            f"Stats coverage {coverage.stats_reporting_dates}/{coverage.expected_dates} dates"
+        )
     _font_text(draw, (1040, 158), coverage_text, width=555, size=16, min_size=12, fill=_MUTED)
     generated = payload.generated_at_utc.astimezone(UTC)
     _font_text(
@@ -327,8 +367,16 @@ def _overview(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
         if metrics.period_end_troop_power is not None and end_date
         else "Period-end Troop Power unavailable"
     )
-    _metric_box(draw, (95, 230, 820, 392), "Power change", metrics.power_change, context=power_context)
-    _metric_box(draw, (850, 230, 1605, 392), "Troop Power change", metrics.troop_power_change, context=troop_context)
+    _metric_box(
+        draw, (95, 230, 820, 392), "Power change", metrics.power_change, context=power_context
+    )
+    _metric_box(
+        draw,
+        (850, 230, 1605, 392),
+        "Troop Power change",
+        metrics.troop_power_change,
+        context=troop_context,
+    )
     boxes = (
         (95, 420, 575, 575),
         (610, 420, 1090, 575),
@@ -441,10 +489,35 @@ def render_personal_stats_card(
         else:
             raise ValueError(f"Unsupported stats mode: {mode!r}")
         if payload.duplicate_id_warning:
-            _font_text(draw, (95, 802), "Review warning: duplicate linked Governor IDs were deduplicated.", width=1120, size=15, min_size=12, fill=_AMBER, bold=True)
-        _font_text(draw, (95, 845), "Private period activity • Missing source rows are not treated as zero", width=1050, size=16, min_size=12, fill=_MUTED)
+            _font_text(
+                draw,
+                (95, 802),
+                "Review warning: duplicate linked Governor IDs were deduplicated.",
+                width=1120,
+                size=15,
+                min_size=12,
+                fill=_AMBER,
+                bold=True,
+            )
+        _font_text(
+            draw,
+            (95, 845),
+            "Private period activity • Missing source rows are not treated as zero",
+            width=1050,
+            size=16,
+            min_size=12,
+            fill=_MUTED,
+        )
         refreshed = payload.generated_at_utc.astimezone(UTC)
-        _font_text(draw, (1325, 845), f"Generated {refreshed:%d %b %Y %H:%M:%S UTC}", width=280, size=14, min_size=10, fill=_MUTED)
+        _font_text(
+            draw,
+            (1325, 845),
+            f"Generated {refreshed:%d %b %Y %H:%M:%S UTC}",
+            width=280,
+            size=14,
+            min_size=10,
+            fill=_MUTED,
+        )
         stream = BytesIO()
         try:
             rgb = canvas.convert("RGB")
