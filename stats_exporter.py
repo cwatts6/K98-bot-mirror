@@ -50,6 +50,11 @@ def _safe_sheet_name(base: str, fallback: str, max_len: int = 31) -> str:
     return (value or fallback)[:max_len]
 
 
+def _escape_sheet_name_for_reference(sheet_name: str) -> str:
+    """Escape an Excel sheet name embedded inside a single-quoted reference."""
+    return sheet_name.replace("'", "''")
+
+
 def _calc_period(df: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timestamp) -> dict:
     """Summarise snapshots and deltas inside an inclusive period."""
     window = df[(df["AsOfDate"] >= start_date) & (df["AsOfDate"] <= end_date)]
@@ -230,10 +235,11 @@ def _write_account_summary(
         if governor_id is not None and governor_id in sheet_names:
             link_column = 3 if values[3] else 4
             display = str(spreadsheet_safe_text(values[link_column]))
+            escaped_sheet_name = _escape_sheet_name_for_reference(sheet_names[governor_id])
             worksheet.write_url(
                 row_index,
                 link_column,
-                f"internal:'{sheet_names[governor_id]}'!A1",
+                f"internal:'{escaped_sheet_name}'!A1",
                 formats["link"],
                 display,
             )
@@ -463,7 +469,7 @@ def _write_governor_sheet(
         worksheet.insert_chart(anchor, chart)
 
     sparkline_start = max(first_data_row, last_data_row - 29)
-    quoted_sheet = sheet_name.replace("'", "''")
+    quoted_sheet = _escape_sheet_name_for_reference(sheet_name)
     worksheet.write(16, 0, "Last 30 source rows", formats["section"])
     for row_index, column_name in enumerate(("Power", "KillPoints", "RSS_Gathered"), start=16):
         worksheet.write(row_index, 1, column_name, formats["body"])

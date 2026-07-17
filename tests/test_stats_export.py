@@ -327,7 +327,7 @@ def test_account_data_workbook_locked_contract(sample_daily_data, tmp_path):
             slot="Farm 1",
             role="Farm",
             registered_name="Sparse",
-            current_governor_name="Sparse / no data",
+            current_governor_name="O'Brien / sparse",
             governor_id=333,
             data_state="NO DATA",
         ),
@@ -394,6 +394,8 @@ def test_account_data_workbook_locked_contract(sample_daily_data, tmp_path):
     assert summary["C2"].value == "'=Formula"
     assert summary["D2"].hyperlink is not None
     assert account_sheets[0] in summary["D2"].hyperlink.location
+    assert summary["D4"].hyperlink is not None
+    assert summary["D4"].hyperlink.location == "'O''Brien  sparse-333'!A1"
 
     all_daily = workbook["ALL_DAILY"]
     assert all_daily.max_row == len(history.index) + 1
