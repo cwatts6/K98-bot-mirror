@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, date, datetime
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 from typing import ClassVar
@@ -66,6 +68,29 @@ class _FakeDiscordFile:
 
     def close(self):
         self.closed = True
+
+
+@pytest.mark.asyncio
+async def test_private_defer_logs_ordinary_failure_and_preserves_cancellation(caplog) -> None:
+    failed = _Interaction()
+
+    async def fail_defer(**_kwargs):
+        raise RuntimeError("transient Discord defer failure")
+
+    failed.response.defer = fail_defer
+    with caplog.at_level(logging.DEBUG, logger=views.__name__):
+        await views._defer_private(failed)
+
+    assert "account_data_export_defer_failed" in caplog.text
+
+    cancelled = _Interaction()
+
+    async def cancel_defer(**_kwargs):
+        raise asyncio.CancelledError
+
+    cancelled.response.defer = cancel_defer
+    with pytest.raises(asyncio.CancelledError):
+        await views._defer_private(cancelled)
 
 
 def _export_file(tmp_path: Path) -> AccountDataExportFile:
