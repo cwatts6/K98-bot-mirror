@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from dataclasses import replace
+from datetime import UTC, date, datetime, timedelta, timezone
 from io import BytesIO
 import os
 from pathlib import Path
@@ -165,6 +166,25 @@ def test_same_payload_fallback_contains_exact_dates_coverage_and_no_removed_feat
     assert "Ark" not in serialized
     assert "download" not in serialized.casefold()
     assert "export" not in serialized.casefold()
+
+
+def test_fallback_footer_normalizes_generated_time_to_utc() -> None:
+    payload = replace(
+        _payload(),
+        generated_at_utc=datetime(
+            2026,
+            7,
+            15,
+            18,
+            30,
+            45,
+            tzinfo=timezone(timedelta(hours=2)),
+        ),
+    )
+
+    embed = build_personal_stats_fallback_embed(payload, mode=StatsMode.OVERVIEW)
+
+    assert embed.footer.text == "Private report • Generated 15 Jul 2026 16:30:45 UTC"
 
 
 @pytest.mark.parametrize("mode", tuple(StatsMode))

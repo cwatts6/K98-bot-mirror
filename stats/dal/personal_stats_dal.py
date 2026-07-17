@@ -18,6 +18,8 @@ _MAX_GOVERNORS = 26
 _QUERY_TIMEOUT_SECONDS = 9
 _VALUE_ROWS = ", ".join("(?)" for _ in range(_MAX_GOVERNORS))
 PERSONAL_STATS_SQL = f"""
+SET NOCOUNT ON;
+
 DECLARE @GovernorIDs dbo.IntList;
 INSERT INTO @GovernorIDs (ID)
 SELECT DISTINCT GovernorID
@@ -51,6 +53,16 @@ def _rows_to_dicts(cursor: Any) -> list[dict[str, Any]]:
         return []
     columns = [str(item[0]) for item in cursor.description]
     return [dict(zip(columns, row, strict=True)) for row in rows]
+
+
+def _next_rows(cursor: Any, *, advance: bool, missing_message: str) -> list[dict[str, Any]]:
+    """Return the next row-bearing result set, skipping statement-count results."""
+    if advance and not cursor.nextset():
+        raise ValueError(missing_message)
+    while cursor.description is None:
+        if not cursor.nextset():
+            raise ValueError(missing_message)
+    return _rows_to_dicts(cursor)
 
 
 def _map_header(row: dict[str, Any], *, expected_count: int) -> PersonalStatsHeader:
@@ -122,7 +134,11 @@ def fetch_personal_stats_daily(
         if hasattr(cursor, "timeout"):
             cursor.timeout = _QUERY_TIMEOUT_SECONDS
         cursor.execute(PERSONAL_STATS_SQL, params)
-        header_rows = _rows_to_dicts(cursor)
+        header_rows = _next_rows(
+            cursor,
+            advance=False,
+            missing_message="Personal stats SQL did not return its header result set",
+        )
         if len(header_rows) != 1:
             raise ValueError("Personal stats SQL did not return exactly one header row")
         header = _map_header(header_rows[0], expected_count=len(ids))
@@ -133,10 +149,13 @@ def fetch_personal_stats_daily(
                 or header.window_end_date != header.stats_anchor_date
             ):
                 raise ValueError("Personal stats SQL returned an invalid history window")
-        if not cursor.nextset():
-            raise ValueError("Personal stats SQL did not return its daily result set")
         allowed_ids = frozenset(ids)
-        rows = tuple(_map_daily_row(row, allowed_ids=allowed_ids) for row in _rows_to_dicts(cursor))
+        daily_rows = _next_rows(
+            cursor,
+            advance=True,
+            missing_message="Personal stats SQL did not return its daily result set",
+        )
+        rows = tuple(_map_daily_row(row, allowed_ids=allowed_ids) for row in daily_rows)
         if header.window_start_date is not None and header.window_end_date is not None:
             if any(
                 not header.window_start_date <= row.as_of_date <= header.window_end_date

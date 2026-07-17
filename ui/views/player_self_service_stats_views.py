@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC
 from functools import partial
 from io import BytesIO
 import logging
@@ -248,9 +249,8 @@ def build_personal_stats_fallback_embed(
             value="Duplicate linked Governor IDs were deduplicated before data access.",
             inline=False,
         )
-    embed.set_footer(
-        text=f"Private report • Generated {payload.generated_at_utc:%d %b %Y %H:%M:%S UTC}"
-    )
+    generated_utc = payload.generated_at_utc.astimezone(UTC)
+    embed.set_footer(text=f"Private report • Generated {generated_utc:%d %b %Y %H:%M:%S UTC}")
     return embed
 
 

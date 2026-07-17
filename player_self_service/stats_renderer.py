@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC
+from datetime import UTC, date
 from io import BytesIO
 from pathlib import Path
 
@@ -228,6 +228,7 @@ def _draw_chart(
         )
     else:
         dates = sorted({point.reporting_date for point in all_points})
+        date_indexes = {reporting_date: index for index, reporting_date in enumerate(dates)}
         values = [point.value for point in all_points]
         low, high = min(0, min(values)), max(0, max(values))
         if low == high:
@@ -235,10 +236,10 @@ def _draw_chart(
             high += 1
         span = high - low
 
-        def x_for(reporting_date: object) -> int:
+        def x_for(reporting_date: date) -> int:
             if len(dates) == 1:
                 return (chart_left + chart_right) // 2
-            index = dates.index(reporting_date)
+            index = date_indexes[reporting_date]
             return int(chart_left + index * (chart_right - chart_left) / (len(dates) - 1))
 
         def y_for(value: int) -> int:

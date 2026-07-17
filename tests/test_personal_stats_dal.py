@@ -17,12 +17,15 @@ class _Cursor:
 
     @property
     def description(self):
-        return [(name,) for name in self._result_sets[self._index][0]]
+        columns = self._result_sets[self._index][0]
+        return None if columns is None else [(name,) for name in columns]
 
     def execute(self, sql, params):
         self.executed = (sql, params)
 
     def fetchall(self):
+        if self.description is None:
+            raise AssertionError("fetchall called for a non-row-bearing result set")
         return self._result_sets[self._index][1]
 
     def nextset(self):
@@ -101,6 +104,20 @@ def test_set_based_contract_deduplicates_ids_binds_fixed_shape_and_closes(monkey
     assert params[0] == 111
     assert params[1:26] == (None,) * 25
     assert params[-1] == 180
+    assert cursor.closed is True
+    assert connection.closed is True
+
+
+def test_contract_skips_non_row_bearing_result_sets(monkeypatch) -> None:
+    header, daily = _sets()
+    cursor = _Cursor(((None, []), header, (None, []), daily))
+    connection = _Connection(cursor)
+    monkeypatch.setattr(dal, "get_conn_with_retries", lambda: connection)
+
+    dataset = dal.fetch_personal_stats_daily((111,))
+
+    assert dataset.header.requested_governor_count == 1
+    assert dataset.rows[0].governor_id == 111
     assert cursor.closed is True
     assert connection.closed is True
 
