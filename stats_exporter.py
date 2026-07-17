@@ -404,8 +404,25 @@ def _write_governor_sheet(
         formats["number"],
     )
 
+    # Preserve the accepted governor-sheet layout: sparklines occupy rows 19-24,
+    # five charts are stacked in 16-row bands from row 27, and the Daily section
+    # starts after the chart reservation at row 107. Keep these positions fixed
+    # so history rows cannot overwrite the summary visualisations.
+    sparkline_section_row = 18
+    sparkline_header_row = 19
+    chart_top = 26
+    chart_band_rows = 16
+    chart_count = 5
+    daily_section_row = chart_top + (chart_band_rows * chart_count)
+    table_row = daily_section_row + 1
+
     daily_columns = list(ALL_DAILY_COLUMNS) + ["FortsTotal_Cumulative"]
-    table_row = 19
+    worksheet.write(
+        daily_section_row,
+        0,
+        f"Selected {metadata.requested_days} Days — Daily",
+        formats["section"],
+    )
     worksheet.write_row(table_row, 0, daily_columns, formats["header"])
     forts = pd.to_numeric(history.get("FortsTotal", 0), errors="coerce").fillna(0).cumsum()
     for offset, values in enumerate(history.itertuples(index=False, name=None), start=1):
@@ -433,14 +450,24 @@ def _write_governor_sheet(
     last_data_row = table_row + len(history.index)
     date_column = daily_columns.index("AsOfDate")
 
-    chart_specs = (
-        ("Power and Troop Power", ("Power", "TroopPower"), "G2"),
-        ("Kill Points", ("KillPoints",), "G18"),
-        ("Resources", ("RSS_Gathered", "RSSAssist"), "O2"),
-        ("Combat", ("T4T5_Kills", "Deads", "HealedTroops"), "O18"),
-        ("Forts cumulative", ("FortsTotal_Cumulative",), "W2"),
+    worksheet.write(
+        chart_top - 1,
+        0,
+        f"Selected {metadata.requested_days} Days — Overview",
+        formats["section"],
     )
-    for title, series_columns, anchor in chart_specs:
+    chart_specs = (
+        ("Power and Troop Power", ("Power", "TroopPower"), chart_top),
+        ("Kill Points", ("KillPoints",), chart_top + chart_band_rows),
+        ("Resources", ("RSS_Gathered", "RSSAssist"), chart_top + chart_band_rows * 2),
+        (
+            "Combat",
+            ("T4T5_Kills", "Deads", "HealedTroops"),
+            chart_top + chart_band_rows * 3,
+        ),
+        ("Forts cumulative", ("FortsTotal_Cumulative",), chart_top + chart_band_rows * 4),
+    )
+    for title, series_columns, anchor_row in chart_specs:
         chart = workbook.add_chart({"type": "line"})
         for column_name in series_columns:
             column_index = daily_columns.index(column_name)
@@ -466,17 +493,32 @@ def _write_governor_sheet(
         chart.set_title({"name": title})
         chart.set_legend({"position": "bottom"})
         chart.set_size({"width": 520, "height": 280})
-        worksheet.insert_chart(anchor, chart)
+        worksheet.insert_chart(anchor_row, 0, chart)
 
     sparkline_start = max(first_data_row, last_data_row - 29)
     quoted_sheet = _escape_sheet_name_for_reference(sheet_name)
-    worksheet.write(16, 0, "Last 30 source rows", formats["section"])
-    for row_index, column_name in enumerate(("Power", "KillPoints", "RSS_Gathered"), start=16):
-        worksheet.write(row_index, 1, column_name, formats["body"])
+    worksheet.write(
+        sparkline_section_row,
+        0,
+        "Last 30 source rows (sparklines)",
+        formats["section"],
+    )
+    worksheet.write_row(
+        sparkline_header_row,
+        0,
+        ("Metric", "Sparkline", "Min", "Max"),
+        formats["header"],
+    )
+    recent_history = history.tail(30)
+    for row_index, column_name in enumerate(
+        ("Power", "TroopPower", "KillPoints", "Deads"),
+        start=sparkline_header_row + 1,
+    ):
+        worksheet.write(row_index, 0, column_name, formats["body"])
         column_index = daily_columns.index(column_name)
         worksheet.add_sparkline(
             row_index,
-            2,
+            1,
             {
                 "range": (
                     f"'{quoted_sheet}'!"
@@ -485,6 +527,15 @@ def _write_governor_sheet(
                 "type": "line",
             },
         )
+        series = (
+            pd.to_numeric(recent_history[column_name], errors="coerce")
+            .replace([np.inf, -np.inf], np.nan)
+            .dropna()
+        )
+        minimum = series.min() if not series.empty else None
+        maximum = series.max() if not series.empty else None
+        _write_value(worksheet, row_index, 2, minimum, formats)
+        _write_value(worksheet, row_index, 3, maximum, formats)
 
 
 def build_account_data_workbook(

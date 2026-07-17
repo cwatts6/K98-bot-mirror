@@ -407,9 +407,32 @@ def test_account_data_workbook_locked_contract(sample_daily_data, tmp_path):
     assert first_sheet["B16"].value == 30
     assert first_sheet["C16"].value == 60
     assert first_sheet["D16"].value == 90
-    assert first_sheet["B19"].value == "RSS_Gathered"
-    assert first_sheet["B20"].value == "GovernorName"
+    assert first_sheet["A19"].value == "Last 30 source rows (sparklines)"
+    assert tuple(first_sheet.cell(20, column).value for column in range(1, 5)) == (
+        "Metric",
+        "Sparkline",
+        "Min",
+        "Max",
+    )
+    assert tuple(first_sheet.cell(row, 1).value for row in range(21, 25)) == (
+        "Power",
+        "TroopPower",
+        "KillPoints",
+        "Deads",
+    )
+    assert first_sheet["C21"].value == first["Power"].tail(30).min()
+    assert first_sheet["D21"].value == first["Power"].tail(30).max()
+    assert first_sheet["A26"].value == "Selected 30 Days — Overview"
+    assert first_sheet["A107"].value == "Selected 30 Days — Daily"
+    assert first_sheet["A108"].value == "GovernorID"
+    assert first_sheet["A109"].value == 111
     assert len(first_sheet._charts) == 5
+    assert [chart.anchor._from.row for chart in first_sheet._charts] == [26, 42, 58, 74, 90]
+    assert all(chart.anchor._from.col == 0 for chart in first_sheet._charts)
+    first_sheet_number = workbook.sheetnames.index(first_sheet.title) + 1
+    with zipfile.ZipFile(target) as archive:
+        sheet_xml = archive.read(f"xl/worksheets/sheet{first_sheet_number}.xml")
+    assert sheet_xml.count(b"<x14:sparkline>") == 4
     sparse_sheet = workbook[account_sheets[2]]
     assert "No Stats history" in sparse_sheet["A4"].value
     assert not sparse_sheet._charts
