@@ -45,28 +45,6 @@ def test_account_status_reports_unknown_when_registry_fails() -> None:
     assert status.error == "SQL down"
 
 
-def test_export_status_is_unavailable_until_account_is_registered() -> None:
-    account_status = service.summarize_account_status(summarize_accounts({}))
-
-    export_status = service.summarize_export_status(account_status)
-
-    assert export_status.action_state == "unavailable"
-    assert export_status.stats_export == "Unavailable"
-    assert export_status.action_summary == "Register an account first."
-
-
-def test_export_status_is_actionable_for_registered_accounts() -> None:
-    account_status = service.summarize_account_status(
-        summarize_accounts({"Main": {"GovernorID": "111", "GovernorName": "Main Gov"}})
-    )
-
-    export_status = service.summarize_export_status(account_status)
-
-    assert export_status.action_state == "actionable"
-    assert export_status.stats_export == "Excel / CSV / Google Sheets"
-    assert export_status.action_summary == "Ready"
-
-
 def test_reminder_status_for_unsubscribed_player_is_off() -> None:
     status = service.summarize_reminder_status(None)
 
@@ -197,7 +175,6 @@ async def test_build_summary_uses_read_only_loaders() -> None:
     assert summary.reminders_summary.configuration_state.value == "ACTIVE"
     assert summary.reminders_summary.calendar.event_summary == "Raid"
     assert summary.reminders_summary.generated_at_utc == datetime(2026, 7, 14, 15, 30, tzinfo=UTC)
-    assert summary.exports.action_state == "actionable"
 
 
 def test_player_self_service_service_has_no_ui_framework_dependency() -> None:

@@ -414,7 +414,8 @@ Player Self-Service Command Centre status:
   - `Player Self-Service Command Centre v2 - Programme Pack.md`
   - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
   - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
-- Phase 5G is product-approved and task-packed. Runtime implementation has not started.
+- Phase 5G is implemented on its working branch and is in validation/review before operator smoke
+  and promotion.
 - GovernorOS v2 Phases 1-5F are complete. Phase 2 delivered in mirror PR #216 and production PR
   #523, Phase 3 delivered in mirror PR #217 and production PR #524, and Phase 4 delivered in mirror
   PR #218. Phase 4 operator smoke on 2026-07-11 accepted the materially wider standalone card and
@@ -436,7 +437,7 @@ Player Self-Service Command Centre status:
   code. It preserved `/inventory import`, `/inventory audit`, dashboard highlights, private premium
   `/me resources|speedups|materials` reports and their three report-page exports, and left
   `dbo.InventoryReportPreference` dormant. The completed Phase 5F task pack and starter are archived.
-- Phase 5G Account Data Export Consolidation is the next implementation slice. The approved
+- Phase 5G Account Data Export Consolidation is the current validation/review slice. The implemented
   canonical journey is `/me accounts -> Account Summary -> Download data`; `/me exports` and
   `/my_stats_export` are removed rather than redirected. The outputs are Full workbook, Current
   snapshot CSV, and Raw Stats history CSV, with Account Summary first and every identified
@@ -537,15 +538,15 @@ tuning/decomposition, residual `stats_module.py` cleanup, legacy PreKvK SQL clea
 cumulative view cleanup, and inventory view-orchestration extraction remain separate later slices
 unless explicitly approved.
 
-Player Self-Service Command Centre v2 is complete and operator accepted through Phase 5F Inventory
+Player Self-Service Command Centre v2 is operator accepted through Phase 5F Inventory
 Surface Consolidation and Legacy Retirement. Phase 5F delivered in mirror PR #225, was promoted at
 production-branch commit `89f7da16`, and passed final Discord smoke on 2026-07-16. Its task pack and
 starter are archived. The accepted result has 39 top-level commands, 8 `/me` subcommands, and 2
 `/inventory` subcommands; keeps modern private reports and their three report-page exports; and leaves
 `dbo.InventoryReportPreference` untouched with no SQL deployment.
 
-Phase 5G Account Data Export Consolidation is the next player self-service implementation slice.
-Its active task pack and starter lock Account Summary as the canonical download home, removal of
+Phase 5G Account Data Export Consolidation is implemented and awaiting final validation/review,
+operator smoke, and promotion. Its active task pack and starter lock Account Summary as the canonical download home, removal of
 `/me exports` and `/my_stats_export`, three all-linked private output kinds, the complete identified
 export correctness pass, no SQL deployment, unchanged Inventory report-page exports, and `/my_stats`
 as the separate Phase 6 redesign/migration.

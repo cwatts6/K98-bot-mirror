@@ -98,19 +98,10 @@ class ReminderStatus:
 
 
 @dataclass(frozen=True, slots=True)
-class ExportStatus:
-    stats_export: str
-    privacy_note: str
-    action_state: str = "actionable"
-    action_summary: str = "Default private exports are available here."
-
-
-@dataclass(frozen=True, slots=True)
 class PlayerSelfServiceSummary:
     discord_user_id: int
     accounts: AccountStatus
     reminders: ReminderStatus
-    exports: ExportStatus
     reminders_summary: RemindersSummaryPayload | None = None
 
 
@@ -269,29 +260,6 @@ def summarize_calendar_reminder_status(
         event_summary=event_summary,
         time_summary=time_summary,
         next_action="Configure",
-    )
-
-
-def summarize_export_status(accounts: AccountStatus) -> ExportStatus:
-    if accounts.state == "unknown":
-        return ExportStatus(
-            stats_export="Unavailable",
-            privacy_note="Private",
-            action_state="unavailable",
-            action_summary="Try again later.",
-        )
-    if accounts.linked_count <= 0:
-        return ExportStatus(
-            stats_export="Unavailable",
-            privacy_note="Private",
-            action_state="unavailable",
-            action_summary="Register an account first.",
-        )
-    return ExportStatus(
-        stats_export="Excel / CSV / Google Sheets",
-        privacy_note="Private",
-        action_state="actionable",
-        action_summary="Ready",
     )
 
 
@@ -538,6 +506,5 @@ async def build_player_self_service_summary(
         discord_user_id=int(discord_user_id),
         accounts=accounts,
         reminders=reminders,
-        exports=summarize_export_status(accounts),
         reminders_summary=reminders_payload,
     )

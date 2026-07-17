@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from io import StringIO
 from typing import Any
 
+from player_self_service.account_data_export_contract import spreadsheet_safe_text
 from player_self_service.accounts_models import AccountPortfolioRow, AccountsPortfolioPayload
 
 CSV_COLUMNS = (
@@ -50,10 +51,7 @@ class AccountsCsvExport:
 
 
 def _safe_text(value: Any) -> str:
-    text = str(value or "").replace("\r", " ").replace("\n", " ")
-    if text.lstrip().startswith(("=", "+", "-", "@")):
-        return "'" + text
-    return text
+    return str(spreadsheet_safe_text(value))
 
 
 def _date(value: datetime | None) -> str:
@@ -63,7 +61,7 @@ def _date(value: datetime | None) -> str:
     return stamp.isoformat(timespec="seconds")
 
 
-def _row_values(row: AccountPortfolioRow) -> tuple[Any, ...]:
+def account_row_values(row: AccountPortfolioRow) -> tuple[Any, ...]:
     return (
         _safe_text(row.slot),
         _safe_text(row.role),
@@ -103,7 +101,7 @@ def build_accounts_csv(payload: AccountsPortfolioPayload) -> AccountsCsvExport:
         writer = csv.writer(stream, lineterminator="\n")
         writer.writerow(CSV_COLUMNS)
         for row in payload.rows:
-            writer.writerow(_row_values(row))
+            writer.writerow(account_row_values(row))
         data = stream.getvalue().encode("utf-8-sig")
     finally:
         stream.close()

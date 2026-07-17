@@ -56,7 +56,6 @@ APPROVED_TOP_LEVEL_COMMANDS = frozenset(
         "modify_subscription",
         "my_registrations",
         "my_stats",
-        "my_stats_export",
         "mygovernorid",
         "mykvkcrystaltech",
         "mykvkhistory",

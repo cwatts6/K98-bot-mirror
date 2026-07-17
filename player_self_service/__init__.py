@@ -46,7 +46,6 @@ from .reminder_service import (
 from .service import (
     AccountStatus,
     CalendarReminderStatus,
-    ExportStatus,
     PlayerSelfServiceSummary,
     ReminderStatus,
     build_player_self_service_summary,
@@ -60,7 +59,6 @@ __all__ = [
     "AccountSlot",
     "AccountStatus",
     "CalendarReminderStatus",
-    "ExportStatus",
     "GovernorDashboardAccessDecision",
     "GovernorDashboardAccessDenied",
     "GovernorDashboardActivityHonours",

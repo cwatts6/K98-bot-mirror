@@ -12,6 +12,9 @@ import tempfile
 import pandas as pd
 import pytest
 
+from stats.dal.stats_export_dal import EXPORT_COLUMNS
+from stats_exporter_csv import build_user_stats_csv
+
 
 @pytest.fixture
 def sample_daily_data():
@@ -77,8 +80,6 @@ def sample_daily_data():
 
 def test_build_csv_basic(sample_daily_data):
     """Test basic CSV generation."""
-    from stats_exporter_csv import build_user_stats_csv
-
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
         tmp_path = tmp.name
 
@@ -95,7 +96,8 @@ def test_build_csv_basic(sample_daily_data):
             reader = csv.DictReader(f)
             rows = list(reader)
 
-        assert len(rows) > 0
+        assert len(rows) == 90
+        assert reader.fieldnames == list(EXPORT_COLUMNS)
         assert "GovernorID" in rows[0]
         assert "Power" in rows[0]
         assert "AOOJoined" in rows[0]
@@ -110,8 +112,6 @@ def test_build_csv_basic(sample_daily_data):
 
 def test_csv_date_range_filter(sample_daily_data):
     """Test CSV filters to requested date range."""
-    from stats_exporter_csv import build_user_stats_csv
-
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
         tmp_path = tmp.name
 
@@ -123,8 +123,11 @@ def test_csv_date_range_filter(sample_daily_data):
             reader = csv.DictReader(f)
             rows = list(reader)
 
-        # Should have ~30 rows (one per day)
-        assert len(rows) <= 31  # Allow for boundary edge case
+        assert len(rows) == 30
+        assert (
+            rows[0]["AsOfDate"]
+            == pd.Timestamp(sample_daily_data["AsOfDate"].max()).date().isoformat()
+        )
 
     finally:
         try:
@@ -135,8 +138,6 @@ def test_csv_date_range_filter(sample_daily_data):
 
 def test_csv_deprecated_columns_removed(sample_daily_data):
     """Verify deprecated columns are not in CSV output."""
-    from stats_exporter_csv import build_user_stats_csv
-
     # Add deprecated columns to source
     df = sample_daily_data.copy()
     df["TechPower"] = 1000000
@@ -165,8 +166,6 @@ def test_csv_deprecated_columns_removed(sample_daily_data):
 
 def test_csv_handles_missing_columns(sample_daily_data):
     """Verify CSV export handles missing optional columns gracefully."""
-    from stats_exporter_csv import build_user_stats_csv
-
     # Remove some AOO columns
     df = sample_daily_data.copy()
     df = df.drop(columns=["AOOAvgHeal", "AOOAvgHealDelta"], errors="ignore")
@@ -191,6 +190,49 @@ def test_csv_handles_missing_columns(sample_daily_data):
             os.unlink(tmp_path)
         except Exception:
             pass
+
+
+def test_csv_formula_safety_order_and_numeric_negatives(sample_daily_data):
+    frame = sample_daily_data.iloc[:2].copy()
+    frame.loc[frame.index[0], "GovernorName"] = '=HYPERLINK("bad")'
+    frame.loc[frame.index[1], "Alliance"] = "+unsafe"
+    frame["PowerDelta"] = -5
+
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        build_user_stats_csv(frame, None, out_path=tmp_path, days_for_daily_table=30)
+        with open(tmp_path, encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+
+        assert rows[1]["GovernorName"].startswith("'")
+        assert rows[0]["Alliance"] == "'+unsafe"
+        assert all(row["PowerDelta"] == "-5" for row in rows)
+        assert [row["AsOfDate"] for row in rows] == sorted(
+            (row["AsOfDate"] for row in rows), reverse=True
+        )
+    finally:
+        os.unlink(tmp_path)
+
+
+def test_csv_writes_nan_and_infinity_as_empty(sample_daily_data):
+    frame = sample_daily_data.iloc[:1].copy()
+    frame.loc[frame.index[0], "Power"] = float("nan")
+    frame["PowerDelta"] = frame["PowerDelta"].astype(float)
+    frame.loc[frame.index[0], "PowerDelta"] = float("inf")
+
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        build_user_stats_csv(frame, None, out_path=tmp_path)
+        with open(tmp_path, encoding="utf-8") as handle:
+            row = next(csv.DictReader(handle))
+        assert row["Power"] == ""
+        assert row["PowerDelta"] == ""
+    finally:
+        os.unlink(tmp_path)
 
 
 if __name__ == "__main__":

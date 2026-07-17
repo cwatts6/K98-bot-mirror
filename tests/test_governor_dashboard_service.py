@@ -385,7 +385,7 @@ def test_governor_dashboard_foundation_preserves_me_subcommands() -> None:
     names, grouped = command_validator.collect_primary_inventory()
 
     assert "me" in names
-    assert {
+    assert grouped["me"] == {
         "dashboard",
         "accounts",
         "reminders",
@@ -393,8 +393,7 @@ def test_governor_dashboard_foundation_preserves_me_subcommands() -> None:
         "resources",
         "speedups",
         "materials",
-        "exports",
-    }.issubset(grouped["me"])
+    }
     assert "inventory" not in grouped["me"]
 
 

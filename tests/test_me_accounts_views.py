@@ -156,27 +156,26 @@ async def test_account_summary_controls_match_locked_rows_and_boundaries() -> No
         ("Reminders", 0, False),
         ("Preferences", 0, False),
         ("Dashboard", 1, False),
-        ("Exports", 1, False),
         ("Overview", 2, True),
         ("Combat", 2, False),
         ("Economy", 2, False),
         ("Previous", 3, True),
         ("Next", 3, False),
-        ("Download CSV", 3, False),
+        ("Download data", 3, False),
         ("Back to Accounts", 3, False),
     ]
 
 
 @pytest.mark.asyncio
-async def test_account_summary_disables_csv_for_empty_payload() -> None:
+async def test_account_summary_disables_download_data_for_empty_payload() -> None:
     view = summary_views.AccountSummaryView(
         author_id=42,
         display_name="Tester",
         payload=_payload(0),
     )
 
-    csv_button = next(child for child in view.children if child.label == "Download CSV")
-    assert csv_button.disabled is True
+    download_button = next(child for child in view.children if child.label == "Download data")
+    assert download_button.disabled is True
 
 
 @pytest.mark.asyncio
@@ -292,21 +291,24 @@ async def test_render_failure_uses_same_payload_without_second_fetch(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_csv_is_private_followup_and_visual_state_is_unchanged() -> None:
+async def test_download_data_opens_private_child_without_changing_visual_state(monkeypatch) -> None:
+    calls = []
+
+    async def fake_options(interaction, *, display_name):
+        calls.append((interaction.user.id, display_name))
+
+    monkeypatch.setattr(summary_views, "send_account_data_options", fake_options)
     view = summary_views.AccountSummaryView(
         author_id=42,
         display_name="Tester",
         payload=_payload(),
     )
     interaction = _Interaction()
-    button = next(child for child in view.children if child.label == "Download CSV")
+    button = next(child for child in view.children if child.label == "Download data")
 
     await button.callback(interaction)
 
-    _args, kwargs = interaction.followup.sent[-1]
-    assert kwargs["ephemeral"] is True
-    assert kwargs["file"].filename.startswith("me_account_summary_42_")
-    assert getattr(kwargs["file"].fp, "closed", True) is True
+    assert calls == [(42, "Tester")]
     assert interaction.original_edits == []
 
 

@@ -16,7 +16,6 @@ from player_self_service.dashboard_card import (
 )
 from player_self_service.service import (
     AccountStatus,
-    ExportStatus,
     PlayerSelfServiceSummary,
     ReminderStatus,
 )
@@ -39,10 +38,6 @@ def _summary() -> PlayerSelfServiceSummary:
             event_summary="all KVK events",
             time_summary="24h, 4h, 1h",
             next_action="Manage",
-        ),
-        exports=ExportStatus(
-            stats_export="Excel / CSV / Google Sheets",
-            privacy_note="Private",
         ),
     )
 

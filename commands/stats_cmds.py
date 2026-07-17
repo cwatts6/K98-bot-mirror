@@ -447,46 +447,6 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
         view.followup = ctx.followup
         view.mark_live()
 
-    @bot.slash_command(
-        name="my_stats_export",
-        description="Deprecated: use /me exports for personal stats exports.",
-        guild_ids=[GUILD_ID],
-    )
-    @versioned("v3.02")  # bump version
-    @safe_command
-    @track_usage()
-    async def my_stats_export(
-        ctx: discord.ApplicationContext,
-        format: str = discord.Option(
-            str,
-            name="format",
-            description="Choose export format",
-            choices=["Excel", "CSV", "GoogleSheets"],
-            default="Excel",
-            required=False,
-        ),
-        days: int = discord.Option(
-            int,
-            name="days",
-            description="Number of days to include (min: 30, max: 360)",
-            min_value=30,
-            max_value=360,
-            default=90,
-            required=False,
-        ),
-    ):
-        await safe_defer(ctx, ephemeral=True)
-        await send_deprecated_command_redirect(
-            ctx,
-            CommandRedirect(
-                old_path="/my_stats_export",
-                new_path="/me exports",
-                detail="The export centre now provides personal stats exports from the same private self-service menu.",
-            ),
-            ephemeral=True,
-        )
-        return
-
     @stats_group.command(
         name="player",
         description="(Leadership) View stats for a player by GovernorID or fuzzy name",

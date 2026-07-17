@@ -9,7 +9,7 @@
 - One-pass approved: `no`
 - Product decision approved: `yes`
 - Runtime implementation approved: `yes, subject to the normal audit, architecture, implementation-plan, validation, and promotion gates`
-- Status: `active task pack prepared; implementation not started`
+- Status: `implemented on working branch; final validation/review, operator smoke, and promotion pending`
 - New runtime backdrop: `none`
 - SQL deployment approved: `no`
 - Command target: `39 -> 38 top-level commands; /me 8 -> 7 grouped subcommands; /inventory remains 2`
@@ -85,7 +85,7 @@ freshness, safety, and format labels are truthful and consistent.
 
 ### 4.1 Phase 5F final Inventory state
 
-Phase 5F is complete and operator accepted. Current repository and smoke evidence confirms:
+Phase 5F is complete and operator accepted. The pre-Phase-5G repository and smoke evidence confirmed:
 
 - `/me inventory`, `/myinventory`, `/inventory_preferences`, and `/export_inventory` are removed;
 - the `Export Inventory` control and combined/all-governor Inventory export are removed;
@@ -96,9 +96,9 @@ Phase 5F is complete and operator accepted. Current repository and smoke evidenc
 
 Phase 5G must not reopen or duplicate the removed central Inventory export.
 
-### 4.2 Current command and UI surface
+### 4.2 Pre-implementation command and UI baseline
 
-Current `main` confirms:
+The accepted audit of the Phase 5F `main` baseline confirmed:
 
 ```text
 commands/me_cmds.py
@@ -114,8 +114,8 @@ scripts/validate_command_registration.py
 - my_stats_export remains in APPROVED_TOP_LEVEL_COMMANDS
 ```
 
-Current views still expose `Exports` navigation from the governor dashboard and the Player
-Self-Service pages. Account Summary currently exposes `Download CSV` and builds only the current
+Those baseline views exposed `Exports` navigation from the governor dashboard and the Player
+Self-Service pages. Account Summary exposed `Download CSV` and built only the current
 29-column snapshot.
 
 The approved Phase 5G result is removal, not another redirect:
@@ -419,8 +419,8 @@ Remove every footer or instruction saying `/my_stats_export` remains available.
 
 | Repository | Decision | Target | Expected setup / execution | Evidence |
 |---|---|---|---|---|
-| `K98 bot mirror` | `Changes review` | Final Phase 5G base..head or staged patch | `Changes + Deep Off` | Pending final diff; record exact target, snapshot, coverage, and result. |
-| `K98 SQL Server` | `documented skip` | Read-only inspection of `dbo.vDaily_PlayerExport` and dependencies | `Not applicable` | Expected because no SQL diff or runtime SQL change is approved. Re-route if scope changes. |
+| `K98 bot mirror` | `Changes review` | Working-tree patch against exact accepted base `2f6e3cc5092b18e1638001bf3a19c7772bccae62` | `Changes + Deep Off` | Final diff exists; scan pending. |
+| `K98 SQL Server` | `documented skip` | Read-only inspection of `dbo.vDaily_PlayerExport` and dependencies; SQL repository working tree clean | `Not applicable` | No SQL diff, schema change, runtime SQL change, or deployment. Re-route if scope changes. |
 
 Bot review focus:
 
@@ -748,24 +748,24 @@ sparse, 30-day, 360-day, snapshot-only, no-data, and registry-failure outputs.
 
 ## 16. Acceptance Criteria
 
-- [ ] `/me exports` and `/my_stats_export` are removed, not redirected.
-- [ ] `/my_stats` is unchanged and handed to Phase 6.
-- [ ] Counts are 38 top-level, 7 `/me`, 2 `/inventory`.
-- [ ] No Exports navigation/control remains.
-- [ ] `/me accounts -> Account Summary -> Download data` is the only central download journey.
-- [ ] Accepted Accounts/Account Summary visual output is unchanged.
-- [ ] Full workbook default; current snapshot and raw history remain separate grains.
-- [ ] Account Summary is first workbook sheet.
-- [ ] Exact N-day filter is used everywhere.
-- [ ] Actual written counts/dates and separate freshness are reported.
-- [ ] Forts uses selected period.
-- [ ] Formula safety covers CSV/XLSX text.
-- [ ] Google Sheets is compatibility wording, not a separate file.
-- [ ] Active account revalidation occurs at Download.
-- [ ] No new SQL or direct SQL in commands/views.
-- [ ] All temporary resources clean up on every path.
-- [ ] Direct orphans are removed only after caller proof.
-- [ ] Focused/full/golden/command/pre-commit/log/architecture/deferred/security-routing gates pass.
+- [x] `/me exports` and `/my_stats_export` are removed, not redirected.
+- [x] `/my_stats` is unchanged apart from required obsolete-export footer copy and handed to Phase 6.
+- [x] Counts are 38 top-level, 7 `/me`, 2 `/inventory`.
+- [x] No Exports navigation/control remains.
+- [x] `/me accounts -> Account Summary -> Download data` is the only central download journey.
+- [x] Accepted Accounts/Account Summary visual output is unchanged.
+- [x] Full workbook default; current snapshot and raw history remain separate grains.
+- [x] Account Summary is first workbook sheet.
+- [x] Exact N-day filter is used everywhere.
+- [x] Actual written counts/dates and separate freshness are reported.
+- [x] Forts uses selected period.
+- [x] Formula safety covers CSV/XLSX text.
+- [x] Google Sheets is compatibility wording, not a separate file.
+- [x] Active account revalidation occurs at Download.
+- [x] No new SQL or direct SQL in commands/views.
+- [x] All temporary resources clean up on every path.
+- [x] Direct orphans are removed only after caller proof.
+- [x] Focused/full/golden/command/pre-commit/log/architecture/deferred/security-routing gates pass.
 - [ ] SQL read-only evidence, final Changes review, K98 PR review, and operator smoke are recorded.
 - [ ] Commands are resynced after deployment.
 

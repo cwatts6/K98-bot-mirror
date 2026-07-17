@@ -554,7 +554,6 @@ class GovernorDashboardView(discord.ui.View):
 
         from ui.views.player_self_service_views import (
             PAGE_ACCOUNTS,
-            PAGE_EXPORTS,
             PAGE_PREFERENCES,
             PAGE_REMINDERS,
         )
@@ -582,7 +581,6 @@ class GovernorDashboardView(discord.ui.View):
             ("Accounts", PAGE_ACCOUNTS, 0),
             ("Reminders", PAGE_REMINDERS, 0),
             ("Preferences", PAGE_PREFERENCES, 0),
-            ("Exports", PAGE_EXPORTS, 1),
         )
         for label, page, row in navigation:
             style = (

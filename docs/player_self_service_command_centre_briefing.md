@@ -12,14 +12,14 @@ posting and combined `All` viewing; and simplifies `/me preferences` to the thre
 profile plus derived DST-aware `LOCAL`/`UTC` context. The selected-governor dashboard and private
 `/me resources`, `/me speedups`, and `/me materials` reports are the definitive viewing UX.
 Inventory exports remain on the three selected-governor report pages. The legacy combined/all-governor
-Inventory export, its `/me exports` button, and `/export_inventory` are retired; `/me exports` is now
-Stats-only. `/inventory import` and `/inventory audit` remain registered. No SQL change or deployment is part of Phase 5F;
+Inventory export, its then-current `/me exports` Inventory button, and `/export_inventory` are
+retired. `/inventory import` and `/inventory audit` remain registered. No SQL change or deployment is part of Phase 5F;
 `dbo.InventoryReportPreference` remains untouched for rollback.
 
-Phase 5G Account Data Export Consolidation is now product-approved and task-packed. Current code
-still has a Stats-only `/me exports`, redirect-only `/my_stats_export`, and Account Summary
-`Download CSV`; Phase 5G replaces that duplication with `/me accounts -> Account Summary -> Download
-data`, removes both obsolete command routes and every Exports navigation button, and keeps the output
+Phase 5G Account Data Export Consolidation is implemented on its working branch and is in
+validation/review before operator smoke and promotion. It replaces the old duplicate export homes
+with `/me accounts -> Account Summary -> Download data`, removes both obsolete command routes and
+every Exports navigation button, and keeps the output
 all-linked and private. Download data offers a Full workbook, Current snapshot CSV, or Raw Stats
 history CSV. The full export correctness pass is mandatory, including exact inclusive windows,
 filtered sheets, actual row/date metadata, Account Summary first, selected-window Forts, formula
@@ -85,7 +85,7 @@ Use it to check:
 - alliance, Civilisation, `X:Y` Location, Conduct Score, and data freshness
 - power, Kill Points, Highest Acclaim, Dead, Helps, and Healed
 - Ark joined, won, win ratio, Times Named Autarch, and Times Autarch Participated
-- where to manage Accounts, Reminders, Preferences, and Exports, or open RSS, Speedups, and
+- where to manage Accounts, Reminders, and Preferences, or open RSS, Speedups, and
   Materials directly
 
 The governor dashboard now uses a dedicated 1180x760 premium PNG governor card as the primary
@@ -96,12 +96,12 @@ standalone attachment for the wider KVK-style Discord presentation. Multiple-gov
 Change Governor dropdown below the blue primary navigation row. `Last Login: TBC` is presentation
 only until its separately approved dataset/SQL contract is delivered. Accounts, Reminders, and
 Preferences now use their accepted premium presentations; the Inventory summary is retired, and
-Exports retains its current card until the separately task-packed Phase 5G slice. Quick
+Account Data downloads now live under Account Summary. Quick
 Launch links for
 `/kvk stats`, `/kvk targets`,
 `/kvk history`, and `/kvk rankings` remain absent because those commands have channel and
 public-output rules that should stay exactly where players already use them. The dashboard keeps
-only safe private handoffs for the currently delivered direct Inventory reports and Exports page.
+only safe private handoffs for the currently delivered direct Inventory reports.
 
 The account centre supports account review, Governor ID lookup, registration, replacement, and
 removal with confirmation through one primary Manage journey. Lookup results can continue into
@@ -144,14 +144,12 @@ No command has been removed from Discord yet. Please report anything you still n
 
 ## Operator Briefing
 
-Phase 5G preparation confirms the current repository state:
+Phase 5G implementation confirms the working-branch state:
 
 - Phase 5F removed central Inventory export, `/export_inventory`, and the `/me exports` Inventory
   control; only Resources, Speedups, and Materials report-page exports remain.
-- `/me exports` is registered and Stats-only.
-- `/my_stats_export` is registered as a redirect to `/me exports`; its format/day options are
-  discarded.
-- Account Summary exposes `Download CSV` from the authorised all-linked payload.
+- `/me exports` and `/my_stats_export` registrations are removed.
+- Account Summary exposes `Download data` from the authorised all-linked payload.
 - `/my_stats` remains the separate interactive command.
 
 Approved Phase 5G target:
@@ -173,11 +171,11 @@ Retire:
 /my_stats_export
 ```
 
-Expected command-registration impact:
+Validated command-registration impact:
 
 ```text
-current: primary=39, /me=8, /inventory=2
-target:  primary=38, /me=7, /inventory=2
+accepted Phase 5F: primary=39, /me=8, /inventory=2
+Phase 5G branch:  primary=38, /me=7, /inventory=2
 ```
 
 Implementation acceptance must confirm:
@@ -578,12 +576,14 @@ Current status:
   report-specific private exports, imports, audits, and the dormant SQL table for rollback. The final
   baseline is 39 top-level while `/me` remains 8 and `/inventory` remains 2. The completed task pack
   and starter are archived.
-- Phase 5G is the next separately task-packed Exports slice. It updates `/me exports` and
-  `/my_stats_export` together, distinguishes presentation format from downloaded-file format,
-  explicitly decides selected-governor versus all-linked semantics, and defines any governor
-  dropdown, direct entry, Change Governor, and more-than-25 paging behavior before implementation.
-- Phase 6 is now conditional dashboard integration only. If required after Phase 5G, it must reuse
-  the accepted Phase 5G controller and semantics without reopening or duplicating export decisions.
+- Phase 5G Account Data Export Consolidation is implemented on its working branch and awaiting
+  final validation/review, operator smoke, and promotion. It removes both obsolete export routes,
+  keeps all personal downloads all-linked under Account Summary, and introduces no governor
+  selector, Change Governor control, dashboard Export Stats action, or live Google Sheet.
+- Phase 6 is Interactive Personal Stats Experience and `/my_stats` Migration. It separately decides
+  the canonical stats path, visibility/channel behavior, account selector and ALL mode, time slices,
+  presentation, performance, communication, final `/my_stats` removal, resync, smoke, and rollback;
+  it does not move personal downloads out of Account Summary.
 - Phase 7 adds private selected-governor `/me history` while preserving public/channel-gated
   `/kvk history` unchanged.
 - Phase 8 delivers the required permission-gated admin/leadership inspect journey, with an explicit

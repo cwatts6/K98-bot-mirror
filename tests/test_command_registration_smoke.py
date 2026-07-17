@@ -40,8 +40,8 @@ def test_register_commands_smoke(monkeypatch):
 
     Commands.register_commands(fake_bot)
 
-    assert len([name for name in registered_top_level if name]) <= 100
-    assert len([name for name in registered_top_level if name]) < 90
+    registered_names = [name for name in registered_top_level if name]
+    assert len(registered_names) == 38
     assert "ark" in registered_top_level
     assert "activity" in registered_top_level
     assert "crystaltech" in registered_top_level
@@ -57,6 +57,8 @@ def test_register_commands_smoke(monkeypatch):
     assert "prekvk" in registered_top_level
     assert "registry" in registered_top_level
     assert "stats" in registered_top_level
+    assert "my_stats" in registered_top_level
+    assert "my_stats_export" not in registered_top_level
     assert "subscriptions" in registered_top_level
     assert "ark_create_match" not in registered_top_level
     assert "ark_force_announce" not in registered_top_level

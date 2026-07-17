@@ -74,6 +74,18 @@ def test_player_stats_awaits_async_embed_builder() -> None:
     assert "build_embeds" in awaited_calls
 
 
+def test_my_stats_contract_is_preserved_and_export_command_is_removed() -> None:
+    source = Path("commands/stats_cmds.py").read_text(encoding="utf-8")
+
+    assert 'name="my_stats_export"' not in source
+    assert 'name="my_stats"' in source
+    assert '@versioned("v1.14")' in source
+    assert "@channel_only(KVK_PLAYER_STATS_CHANNEL_ID, admin_override=True)" in source
+    assert "get_account_summary_for_user" in source
+    assert "get_stats_payload" in source
+    assert "SliceButtons" in source
+
+
 def test_split_discord_content_keeps_chunks_under_limit() -> None:
     content = "header\n" + "\n".join(f"row {idx:03d} " + ("x" * 80) for idx in range(60))
 

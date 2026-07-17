@@ -17,7 +17,6 @@ from player_self_service import (
     accounts_renderer,
     accounts_service,
     dashboard_card,
-    page_cards,
     preferences_renderer,
     reminder_service,
     reminders_renderer,
@@ -35,7 +34,6 @@ from player_self_service.service import (
     PlayerSelfServiceSummary,
     build_player_self_service_summary,
 )
-from ui.views import player_self_service_export_views as export_views
 from ui.views.player_self_service_account_views import AccountManageView
 from ui.views.player_self_service_preference_views import (
     PreferencesJourneyState,
@@ -57,7 +55,6 @@ PAGE_DASHBOARD = "dashboard"
 PAGE_ACCOUNTS = "accounts"
 PAGE_REMINDERS = "reminders"
 PAGE_PREFERENCES = "preferences"
-PAGE_EXPORTS = "exports"
 
 
 def _display_name(user: object) -> str:
@@ -109,7 +106,6 @@ def build_dashboard_embed(
     )
     accounts = summary.accounts
     reminders = summary.reminders
-    exports = summary.exports
 
     embed.add_field(
         name="Accounts",
@@ -131,16 +127,6 @@ def build_dashboard_embed(
                 f"KVK times: {reminders.time_summary}",
                 f"Calendar lead times: {reminders.calendar.time_summary}",
                 f"Next action: {reminders.combined_next_action}",
-            ]
-        ),
-        inline=False,
-    )
-    embed.add_field(
-        name="Exports",
-        value=_field_value(
-            [
-                f"Stats: {exports.stats_export}",
-                f"Next action: {exports.action_summary}",
             ]
         ),
         inline=False,
@@ -380,39 +366,6 @@ def build_preferences_embed(
     return embed
 
 
-def build_exports_embed(
-    summary: PlayerSelfServiceSummary,
-    *,
-    display_name: str,
-) -> discord.Embed:
-    exports = summary.exports
-    embed = discord.Embed(
-        title="Exports",
-        description=f"Private exports for {display_name}",
-        color=discord.Color.dark_teal(),
-    )
-    embed.add_field(
-        name="Status",
-        value=_field_value(
-            [
-                f"Stats: {exports.stats_export}",
-                f"Delivery: {exports.privacy_note}",
-            ]
-        ),
-        inline=False,
-    )
-    embed.add_field(
-        name="Actions",
-        value=_field_value(
-            ["Export Stats"]
-            if exports.action_state.strip().lower() == "actionable"
-            else [exports.action_summary]
-        ),
-        inline=False,
-    )
-    return embed
-
-
 def build_page_embed(
     page: PlayerSelfServicePage,
     summary: PlayerSelfServiceSummary | None,
@@ -435,8 +388,6 @@ def build_page_embed(
         raise ValueError(f"{page} requires a player self-service summary")
     if page == PAGE_REMINDERS:
         return build_reminders_embed(summary, display_name=display_name)
-    if page == PAGE_EXPORTS:
-        return build_exports_embed(summary, display_name=display_name)
     return build_dashboard_embed(summary, display_name=display_name)
 
 
@@ -519,14 +470,7 @@ async def _build_page_response(
                 avatar_bytes=avatar_bytes,
             )
         else:
-            if summary is None:
-                raise ValueError(f"{page} render requires a summary")
-            rendered = await asyncio.to_thread(
-                page_cards.render_page_card,
-                page,
-                summary,
-                display_name=display_name,
-            )
+            raise ValueError(f"Unsupported player self-service page: {page}")
     except asyncio.CancelledError:
         raise
     except Exception:
@@ -729,19 +673,9 @@ class PlayerSelfServiceView(discord.ui.View):
                     "me:preference:"
                 ):
                     self.remove_item(child)
-        if self.page != PAGE_EXPORTS:
-            for child in list(self.children):
-                if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
-                    "me:export:"
-                ):
-                    self.remove_item(child)
-        if self.page == PAGE_EXPORTS:
-            self._apply_export_button_state()
         self._apply_visible_action_rows()
         for child in self.children:
             if isinstance(child, discord.ui.Button):
-                if str(child.custom_id or "").startswith("me:export:"):
-                    continue
                 child.disabled = child.custom_id == f"me:{self.page}"
         if self.page == PAGE_ACCOUNTS:
             self._apply_accounts_button_state()
@@ -758,24 +692,12 @@ class PlayerSelfServiceView(discord.ui.View):
             "me:account:",
             "me:reminder:",
             "me:preference:",
-            "me:export:",
         )
         for child in self.children:
             if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
                 action_prefixes
             ):
                 child.row = 2
-
-    def _apply_export_button_state(self) -> None:
-        action_state = ""
-        if self.summary is not None:
-            action_state = self.summary.exports.action_state.strip().lower()
-        disabled = action_state != "actionable"
-        for child in self.children:
-            if isinstance(child, discord.ui.Button) and str(child.custom_id or "").startswith(
-                "me:export:"
-            ):
-                child.disabled = disabled
 
     async def _show_page(
         self,
@@ -1000,35 +922,6 @@ class PlayerSelfServiceView(discord.ui.View):
         interaction: discord.Interaction,
     ) -> None:
         await self._show_page(interaction, PAGE_DASHBOARD)
-
-    @discord.ui.button(
-        label="Exports",
-        style=discord.ButtonStyle.secondary,
-        custom_id="me:exports",
-        row=1,
-    )
-    async def dashboard_exports_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        await self._show_page(interaction, PAGE_EXPORTS)
-
-    @discord.ui.button(
-        label="Export Stats",
-        style=discord.ButtonStyle.success,
-        custom_id="me:export:stats",
-        row=2,
-    )
-    async def export_stats_button(
-        self,
-        button: discord.ui.Button,
-        interaction: discord.Interaction,
-    ) -> None:
-        await export_views.send_stats_export_options(
-            interaction,
-            display_name=self.display_name,
-        )
 
     async def _load_account_state(
         self, interaction: discord.Interaction

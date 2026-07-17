@@ -69,7 +69,8 @@ Inventory Summary Card. The implementation retires `/me inventory`, `/myinventor
 visibility model/service/DAL, the orphaned legacy controller, and the old summary backdrop; and
 simplifies Personal Settings to regional profile plus derived `LOCAL`/`UTC` context. It preserves
 the selected-governor dashboard, `/me resources`, `/me speedups`, `/me materials`, and their private
-report-page Excel/CSV/Google Sheets exports. `/me exports` now contains only the Stats export journey;
+report-page Excel/CSV/Google Sheets exports. At the accepted Phase 5F checkpoint, `/me exports`
+contained only the Stats export journey;
 the legacy combined/all-governor Inventory export and `/export_inventory` are retired. `/inventory
 import` and `/inventory audit` remain. `dbo.InventoryReportPreference` and existing rows remain
 untouched for rollback; there is no SQL deployment in Phase 5F.
@@ -78,20 +79,19 @@ Phase 5F is complete and operator accepted after final Discord smoke on 2026-07-
 contains the accepted implementation, and production-branch commit `89f7da16` carries the promoted
 patch. The completed task pack and chat starter are archived under `docs/task_packs/archive/`.
 
-GovernorOS v2 Phase 5G Account Data Export Consolidation is now product-approved and task-packed.
-Repository inspection confirms the accepted Phase 5F state: `/me exports` is Stats-only,
-`/my_stats_export` is a redirect whose format/day options are discarded, Account Summary still owns
-`Download CSV`, and `/my_stats` remains the separate live interactive stats command. Phase 5G removes
-`/me exports` and `/my_stats_export`, removes every Exports navigation surface, and makes
+GovernorOS v2 Phase 5G Account Data Export Consolidation is implemented on its working branch and
+is in validation/review before operator smoke and promotion. It removes `/me exports` and
+`/my_stats_export`, removes every Exports navigation surface, and makes
 `/me accounts -> Account Summary -> Download data` the canonical all-linked personal-data journey.
 
-`Download data` will offer a default Account-Summary-first formatted workbook (`.xlsx`), the exact
+`Download data` offers a default Account-Summary-first formatted workbook (`.xlsx`), the exact
 current Account Summary snapshot (`.csv`), or raw Stats history (`.csv`) for 30/60/90/180/360 days.
 The phase also corrects every identified Stats export issue: exact inclusive N-day windows, filtered
 `ALL_DAILY`, actual written row counts/date bounds, selected-window Forts semantics, shared formula
 safety, separate Stats/Inventory freshness, truthful generated time, and one honest Excel/Google
-Sheets-compatible workbook option. The three selected-governor Inventory report-page exports remain
-unchanged. `/my_stats` redesign and migration are Phase 6.
+Sheets-compatible workbook option. The top-level command surface is 38, `/me` has seven grouped
+subcommands, and `/inventory` remains at two. The three selected-governor Inventory report-page
+exports remain unchanged. `/my_stats` remains unchanged; redesign and migration are Phase 6.
 
 Active Phase 5G records:
 

@@ -168,6 +168,17 @@ async def build_accounts_portfolio(discord_user_id: int) -> AccountsPortfolioPay
     """Build one immutable, all-linked-governor payload for rendering and CSV export."""
     user_id = int(discord_user_id)
     resolution = await governor_account_service.get_account_summary_for_user(user_id)
+    return await build_accounts_portfolio_from_resolution(user_id, resolution)
+
+
+async def build_accounts_portfolio_from_resolution(
+    discord_user_id: int,
+    resolution: governor_account_service.AccountResolutionSummary,
+    *,
+    refreshed_at_utc: datetime | None = None,
+) -> AccountsPortfolioPayload:
+    """Build the portfolio from one already-authorised registry resolution."""
+    user_id = int(discord_user_id)
     entries: list[tuple[str, dict[str, Any], int | None]] = []
     for slot, raw in resolution.ordered_accounts.items():
         info = dict(raw or {})
@@ -310,7 +321,7 @@ async def build_accounts_portfolio(discord_user_id: int) -> AccountsPortfolioPay
         t4_t5_kills=t4_t5_kills,
         rss_total=rss_total,
         insight=insight,
-        refreshed_at_utc=datetime.now(UTC),
+        refreshed_at_utc=refreshed_at_utc or datetime.now(UTC),
         latest_scan_date=latest_scan,
         warnings=tuple(warnings),
     )

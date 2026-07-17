@@ -456,7 +456,7 @@ class SliceButtons(ui.View):
             description="This stats view has timed out.\nRun **/my_stats** again to refresh.",
             color=0x95A5A6,
         )
-        expired.set_footer(text="Tip: You can export via /my_stats_export")
+        expired.set_footer(text="Run /my_stats again to refresh this private view.")
 
         try:
             if not self.message:

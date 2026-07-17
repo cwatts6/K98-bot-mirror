@@ -11,7 +11,6 @@ from ui.views.player_self_service_governor_dashboard_views import send_governor_
 from ui.views.player_self_service_inventory_report_views import send_player_inventory_report
 from ui.views.player_self_service_views import (
     PAGE_ACCOUNTS,
-    PAGE_EXPORTS,
     PAGE_PREFERENCES,
     PAGE_REMINDERS,
     send_player_self_service_page,
@@ -102,16 +101,5 @@ def register_me(bot: ext_commands.Bot) -> None:
     @track_usage()
     async def me_speedups(ctx: discord.ApplicationContext) -> None:
         await send_player_inventory_report(ctx, report_view=InventoryReportView.SPEEDUPS)
-
-    @me_group.command(
-        name="exports",
-        description="Review private personal export options",
-        guild_ids=[GUILD_ID],
-    )
-    @versioned("v1.00")
-    @safe_command
-    @track_usage()
-    async def me_exports(ctx: discord.ApplicationContext) -> None:
-        await send_player_self_service_page(ctx, page=PAGE_EXPORTS)
 
     bot.add_application_command(me_group)

@@ -10,13 +10,14 @@ import logging
 
 import discord
 
-from player_self_service import accounts_export, accounts_renderer, accounts_service
+from player_self_service import accounts_renderer, accounts_service
 from player_self_service.accounts_models import (
     AccountsPortfolioPayload,
     AccountSummaryPage,
     AccountSummarySection,
 )
 from player_self_service.service import PlayerSelfServiceSummary, build_player_self_service_summary
+from ui.views.player_self_service_account_data_export_views import send_account_data_options
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +181,7 @@ class AccountSummaryView(discord.ui.View):
                 child.disabled = self.summary_page.page <= 1
             elif custom_id == "me:account-summary:next":
                 child.disabled = self.summary_page.page >= self.summary_page.page_count
-            elif custom_id == "me:account-summary:csv":
+            elif custom_id == "me:account-summary:download-data":
                 child.disabled = not self.payload.rows
 
     async def _defer(self, interaction: discord.Interaction) -> None:
@@ -313,14 +314,6 @@ class AccountSummaryView(discord.ui.View):
 
         await self._navigate(interaction, PAGE_DASHBOARD)
 
-    @discord.ui.button(label="Exports", style=discord.ButtonStyle.secondary, row=1)
-    async def exports_button(
-        self, button: discord.ui.Button, interaction: discord.Interaction
-    ) -> None:
-        from ui.views.player_self_service_views import PAGE_EXPORTS
-
-        await self._navigate(interaction, PAGE_EXPORTS)
-
     @discord.ui.button(label="Overview", custom_id="me:account-summary:overview", row=2)
     async def overview_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
@@ -359,24 +352,15 @@ class AccountSummaryView(discord.ui.View):
             page=self.summary_page.page + 1,
         )
 
-    @discord.ui.button(label="Download CSV", custom_id="me:account-summary:csv", row=3)
-    async def csv_button(self, button: discord.ui.Button, interaction: discord.Interaction) -> None:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
-        except TypeError:
-            if not interaction.response.is_done():
-                await interaction.response.defer()
-        export = await asyncio.to_thread(accounts_export.build_accounts_csv, self.payload)
-        file: discord.File | None = discord.File(BytesIO(export.data), filename=export.filename)
-        try:
-            await interaction.followup.send(
-                "Complete Account Summary CSV.",
-                file=file,
-                ephemeral=True,
-            )
-        finally:
-            _close_file(file)
+    @discord.ui.button(
+        label="Download data",
+        custom_id="me:account-summary:download-data",
+        row=3,
+    )
+    async def download_data_button(
+        self, _button: discord.ui.Button, interaction: discord.Interaction
+    ) -> None:
+        await send_account_data_options(interaction, display_name=self.display_name)
 
     @discord.ui.button(label="Back to Accounts", custom_id="me:account-summary:back", row=3)
     async def back_button(

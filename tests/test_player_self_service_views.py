@@ -31,7 +31,6 @@ from player_self_service.reminder_service import (
 )
 from player_self_service.service import (
     AccountStatus,
-    ExportStatus,
     PlayerSelfServiceSummary,
     ReminderStatus,
 )
@@ -61,10 +60,6 @@ def _summary() -> PlayerSelfServiceSummary:
             time_summary="24h, 4h, 1h",
             next_action="Manage",
         ),
-        exports=ExportStatus(
-            stats_export="Excel / CSV / Google Sheets",
-            privacy_note="Private",
-        ),
     )
 
 
@@ -81,12 +76,6 @@ def _no_account_summary() -> PlayerSelfServiceSummary:
             next_action="Register",
         ),
         reminders=summary.reminders,
-        exports=ExportStatus(
-            stats_export="Unavailable",
-            privacy_note="Private",
-            action_state="unavailable",
-            action_summary="Register an account first.",
-        ),
     )
 
 
@@ -245,8 +234,8 @@ def test_dashboard_embed_is_status_first_and_compact() -> None:
     embed = views.build_dashboard_embed(_summary(), display_name="Tester")
 
     assert embed.title == "K98 Personal Command Centre"
-    assert len(embed.fields) == 3
-    assert [field.name for field in embed.fields] == ["Accounts", "Reminders", "Exports"]
+    assert len(embed.fields) == 2
+    assert [field.name for field in embed.fields] == ["Accounts", "Reminders"]
     assert "Next action: Review" in embed.fields[0].value
     assert "/register_governor" not in embed.fields[0].value
 
@@ -622,13 +611,13 @@ async def test_account_slot_select_view_preserves_twenty_sixth_slot() -> None:
 
 
 @pytest.mark.asyncio
-async def test_dashboard_view_has_primary_buttons_and_exports() -> None:
+async def test_dashboard_view_has_primary_buttons_without_exports() -> None:
     view = views.PlayerSelfServiceView(author_id=42, display_name="Tester")
 
     labels = [getattr(child, "label", None) for child in view.children]
     assert labels[:3] == ["Accounts", "Reminders", "Preferences"]
     assert "Inventory" not in labels
-    assert "Exports" in labels
+    assert "Exports" not in labels
     assert "Dashboard" in labels
     assert "Quick launch" not in [getattr(child, "placeholder", None) for child in view.children]
 
@@ -682,7 +671,6 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
         [
             *top_row,
             ("Dashboard", 1, secondary, True),
-            ("Exports", 1, secondary, False),
         ],
     )
     _assert_button_layout(
@@ -692,7 +680,6 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Reminders", 0, primary, False),
             ("Preferences", 0, primary, False),
             ("Dashboard", 1, secondary, False),
-            ("Exports", 1, secondary, False),
             ("Manage Accounts", 2, success, False),
             ("Account Summary", 2, secondary, False),
         ],
@@ -704,7 +691,6 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Reminders", 0, primary, True),
             ("Preferences", 0, primary, False),
             ("Dashboard", 1, secondary, False),
-            ("Exports", 1, secondary, False),
             ("Manage", 2, success, False),
         ],
     )
@@ -715,23 +701,13 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Reminders", 0, primary, False),
             ("Preferences", 0, primary, True),
             ("Dashboard", 1, secondary, False),
-            ("Exports", 1, secondary, False),
             ("Manage settings", 2, success, False),
-        ],
-    )
-    _assert_button_layout(
-        views.PAGE_EXPORTS,
-        [
-            *top_row,
-            ("Dashboard", 1, secondary, False),
-            ("Exports", 1, secondary, True),
-            ("Export Stats", 2, success, False),
         ],
     )
 
 
 @pytest.mark.asyncio
-async def test_accounts_view_removes_inventory_and_keeps_exports_navigation() -> None:
+async def test_accounts_view_has_no_inventory_or_exports_navigation() -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -743,11 +719,11 @@ async def test_accounts_view_removes_inventory_and_keeps_exports_navigation() ->
     assert "Account Summary" in labels
     assert not {"Find ID", "Register", "Replace", "Remove"}.intersection(set(labels))
     assert "Inventory" not in labels
-    assert "Exports" in labels
+    assert "Exports" not in labels
 
 
 @pytest.mark.asyncio
-async def test_reminders_view_removes_inventory_and_keeps_exports_navigation() -> None:
+async def test_reminders_view_has_no_inventory_or_exports_navigation() -> None:
     view = views.PlayerSelfServiceView(
         author_id=42,
         display_name="Tester",
@@ -759,73 +735,7 @@ async def test_reminders_view_removes_inventory_and_keeps_exports_navigation() -
     assert "Unsubscribe" not in labels
     assert "Register" not in labels
     assert "Inventory" not in labels
-    assert "Exports" in labels
-
-
-@pytest.mark.asyncio
-async def test_exports_view_has_stats_export_action_only() -> None:
-    view = views.PlayerSelfServiceView(
-        author_id=42,
-        display_name="Tester",
-        page=views.PAGE_EXPORTS,
-        summary=_summary(),
-    )
-
-    labels = [getattr(child, "label", None) for child in view.children]
-    assert "Export Stats" in labels
-    assert "Export Inventory" not in labels
-    assert "Inventory" not in labels
-    assert "Exports" in labels
-    exports_nav = next(
-        child for child in view.children if getattr(child, "custom_id", None) == "me:exports"
-    )
-    assert exports_nav.disabled is True
-
-
-@pytest.mark.asyncio
-async def test_exports_view_disables_export_actions_when_unavailable() -> None:
-    view = views.PlayerSelfServiceView(
-        author_id=42,
-        display_name="Tester",
-        page=views.PAGE_EXPORTS,
-        summary=_no_account_summary(),
-    )
-
-    export_buttons = [
-        child
-        for child in view.children
-        if str(getattr(child, "custom_id", "") or "").startswith("me:export:")
-    ]
-    assert export_buttons
-    assert all(child.disabled for child in export_buttons)
-
-
-@pytest.mark.asyncio
-async def test_exports_stats_button_opens_options(monkeypatch) -> None:
-    calls = []
-
-    async def fake_send_stats_export_options(interaction, *, display_name):
-        calls.append((interaction.user.id, display_name))
-
-    monkeypatch.setattr(
-        views.export_views,
-        "send_stats_export_options",
-        fake_send_stats_export_options,
-    )
-    view = views.PlayerSelfServiceView(
-        author_id=42,
-        display_name="Tester",
-        page=views.PAGE_EXPORTS,
-        summary=_summary(),
-    )
-    interaction = _Interaction()
-    button = next(
-        child for child in view.children if getattr(child, "custom_id", None) == "me:export:stats"
-    )
-
-    await button.callback(interaction)
-
-    assert calls == [(42, "Tester")]
+    assert "Exports" not in labels
 
 
 @pytest.mark.asyncio
@@ -1040,7 +950,7 @@ async def test_preferences_view_removes_inventory_and_old_direct_actions() -> No
     assert "Manage settings" in labels
     assert {"Set Public", "Set Private", "Update VIP", "Manage Profile"}.isdisjoint(labels)
     assert "Inventory" not in labels
-    assert "Exports" in labels
+    assert "Exports" not in labels
 
 
 @pytest.mark.asyncio
@@ -1950,29 +1860,6 @@ async def test_view_timeout_disables_controls() -> None:
 
 
 @pytest.mark.asyncio
-async def test_exports_view_timeout_disables_controls() -> None:
-    view = views.PlayerSelfServiceView(
-        author_id=42,
-        display_name="Tester",
-        page=views.PAGE_EXPORTS,
-        summary=_summary(),
-    )
-    edits = []
-
-    class Message:
-        async def edit(self, **kwargs):
-            edits.append(kwargs)
-
-    view.set_message_ref(Message())
-
-    await view.on_timeout()
-
-    assert all(child.disabled for child in view.children)
-    assert edits[-1]["view"] is view
-    assert "expired" in edits[-1]["content"]
-
-
-@pytest.mark.asyncio
 async def test_expired_view_rejects_click_with_private_message() -> None:
     view = views.PlayerSelfServiceView(author_id=42, display_name="Tester")
     await view.on_timeout()
@@ -1981,18 +1868,6 @@ async def test_expired_view_rejects_click_with_private_message() -> None:
     assert await view.interaction_check(interaction) is False
     assert "expired" in interaction.response.sent[-1][0][0]
     assert interaction.response.sent[-1][1]["ephemeral"] is True
-
-
-def test_exports_embed_is_compact_and_action_first() -> None:
-    embed = views.build_exports_embed(_summary(), display_name="Tester")
-
-    assert embed.title == "Exports"
-    assert embed.description == "Private exports for Tester"
-    assert [field.name for field in embed.fields] == ["Status", "Actions"]
-    assert "Delivery: Private" in embed.fields[0].value
-    assert "Export Stats" in embed.fields[1].value
-    assert "Export Inventory" not in embed.fields[1].value
-    assert "Legacy" not in embed.fields[1].value
 
 
 @pytest.mark.asyncio

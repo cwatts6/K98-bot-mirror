@@ -9,7 +9,7 @@
   Self-Service Command Centre programme completed in production PR #486; GovernorOS v2 Phases 1-5F
   completed and operator accepted through mirror PR #225 and production-branch commit `89f7da16`; and
   the Phase 5G Account Data Export Consolidation product/output/command contract, task pack, and chat
-  starter approved on 2026-07-16 for the next implementation slice.
+  starter approved on 2026-07-16; the Phase 5G working-branch implementation is now in validation.
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
@@ -917,24 +917,23 @@ Delivery record:
 
 ### Phase 5C-5G — Premium Page Alignment And Surface Consolidation
 
-Status: `Phases 5C Accounts, 5D Reminders, 5D.1 Next Alert, 5E Preferences, and 5F Inventory consolidation are complete and operator accepted; Phase 5G Account Data Export Consolidation is product-approved, task-packed, and the next implementation slice`.
+Status: `Phases 5C Accounts, 5D Reminders, 5D.1 Next Alert, 5E Preferences, and 5F Inventory consolidation are complete and operator accepted; Phase 5G Account Data Export Consolidation is implemented on its working branch and is in validation/review before operator smoke and promotion`.
 
-Accounts, Reminders, Preferences, and Exports share the accepted private standalone-card lifecycle.
+Accounts, Reminders, and Preferences share the accepted private standalone-card lifecycle.
 The previously planned fifth summary card for Inventory has been cancelled because the selected-
 governor dashboard and premium direct reports already provide the clearer product model. Phase 5F is
 therefore an atomic command/UX/data-dependency cleanup rather than a new renderer.
 
 Shared page contract that remains authoritative:
 
-- Accounts, Reminders, Preferences, and the future Exports summary use standalone private attachments
+- Accounts, Reminders, and Preferences use standalone private attachments
   with same-authorized-payload fallbacks, off-event-loop rendering, deliberate attachment replacement,
   and complete file/stream cleanup.
 - The invoking-user avatar, long/Unicode fitting, author gating, stale/foreign/forged/concurrent
   denial, selected-Dashboard return context, and graceful timeout rules remain unchanged.
 - Discord-user/all-linked pages do not show `Change Governor`. Selected-governor dashboard,
-  Resources, Speedups, Materials, future History, and any future selected-governor export may use the
-  author-gated paged selector with access recheck. Phase 5G must explicitly decide the Stats-export
-  ownership model before adding a governor dropdown.
+  Resources, Speedups, Materials, and future History may use the author-gated paged selector with
+  access recheck. Phase 5G locks Account Data downloads to all-linked scope with no governor dropdown.
 - Phase 5F did not add a broad renderer/view framework. It removed the obsolete Inventory-specific
   generic path and left the remaining Exports migration to Phase 5G.
 - Phase 5F landed command retirement and Preferences visibility removal together, so no dead setting
@@ -950,7 +949,7 @@ Remaining-phase consistency matrix:
 | 5D.1 Next alert | Discord user | Accepted Phase 5D card with authoritative projection | No Change Governor | Complete and operator accepted; shared scheduler parity, no side effects |
 | 5E Preferences | Discord user | Accepted 1702x924 `me_preferences.png` card | No parent dropdown; Accounts owns VIP | Complete and deployed; Phase 5F retains regional profile/local-time and intentionally retires the transitional Inventory privacy feature |
 | 5F Inventory consolidation | Commands, navigation, Preferences dependency, legacy controller | No new Inventory summary card; accepted Preferences card and existing 1400x980 reports retained | Direct report pages retain selected-governor resolver and Change Governor | Complete and operator accepted; four routes, public/All viewing and combined export retired; imports, audits, private reports, report-page exports, calculations, filenames, and dormant SQL table preserved |
-| 5G Account Data Export Consolidation | All linked accounts under Account Summary | Full workbook, current snapshot CSV, raw history CSV | No Change Governor; active registry revalidation at Download | Remove `/me exports` and `/my_stats_export`; make Download data canonical; correct all identified output defects; no SQL deployment |
+| 5G Account Data Export Consolidation | All linked accounts under Account Summary | Full workbook, current snapshot CSV, raw history CSV | No Change Governor; active registry revalidation at Download | Implemented on working branch; `/me exports` and `/my_stats_export` removed, Download data canonical, identified output defects corrected, no SQL deployment; validation/operator acceptance pending |
 | 6 Interactive Personal Stats Experience | `/my_stats` replacement/migration | Separately approved private interactive presentation | Decide `/me stats`, ALL/account selector, periods, channel policy, and migration | Personal downloads remain owned by Account Summary; remove `/my_stats` rather than retain a permanent redirect only after approval |
 | 7 History | Selected governor | Accepted selected-governor standalone lifecycle | Paged Change Governor with access recheck | Preserve public/channel-gated `/kvk history`; add private `/me history` only |
 | 8 Inspect | Explicit lookup target, inspect-safe | Private permission-gated premium output | Inspect lookup/ambiguity resolution | Approve permissions, safe fields/VIP, lookup, and telemetry first |
@@ -1441,7 +1440,7 @@ record is archived in:
 
 #### Phase 5G - Account Data Export Consolidation
 
-Status: `product decision and output contract approved on 2026-07-16; active task pack and chat starter prepared; implementation not started`.
+Status: `working-branch implementation complete; final validation/review, operator smoke, and promotion pending`.
 
 Approved canonical journey:
 
@@ -1802,12 +1801,13 @@ The programme is complete when:
   validation, security review, and successful operator Discord smoke.
 - [x] Phase 5F retains the accepted regional-profile/local-time experience while removing obsolete Inventory visibility, public posting, and legacy report controllers.
 - [x] Phase 5G product, command, output, correctness, privacy, no-SQL, test, security-routing, rollback, and Phase 6 handoff decisions are recorded in the active task pack and starter.
-- [ ] Phase 5G runtime removes `/me exports` and `/my_stats_export`, delivers Account Summary Download data, corrects every identified export issue, passes validation, and is operator accepted.
+- [x] Phase 5G working-branch runtime removes `/me exports` and `/my_stats_export`, delivers Account Summary Download data, and corrects the identified export issues.
+- [ ] Phase 5G passes final validation/review, operator Discord smoke, promotion, deployment/resync, and production verification.
 - [ ] A private `/me history` path exists while `/kvk history` remains unchanged.
 - [ ] `/me inspect` is permission-gated, private by default, and excludes Discord-user private data.
 - [x] Legacy commands are only redirected/removed after usage evidence and explicit operator approval; Phase 5F Inventory retirements meet that gate.
 - [x] Documentation reflects completed phases through Phase 5F and records the accepted Inventory consolidation outcome.
-- [x] Canonical command references and counts show 39 top-level commands and 8 `/me` subcommands after Phase 5F.
+- [x] Canonical command references and validators show the Phase 5G branch at 38 top-level commands, 7 `/me` subcommands, and 2 `/inventory` subcommands.
 - [x] Phase 5C documentation, canonical references, automated validation, security review, visual
   samples, and successful operator Discord smoke are recorded.
 - [x] Command registration validation remains green through Phase 5F.

@@ -20,7 +20,6 @@ from player_self_service.page_cards import (
 from player_self_service.service import (
     AccountStatus,
     CalendarReminderStatus,
-    ExportStatus,
     PlayerSelfServiceSummary,
     ReminderStatus,
 )
@@ -44,15 +43,11 @@ def _summary() -> PlayerSelfServiceSummary:
             time_summary="24h, 4h, 1h",
             next_action="Manage",
         ),
-        exports=ExportStatus(
-            stats_export="Excel / CSV / Google Sheets",
-            privacy_note="Private",
-        ),
     )
 
 
 def test_render_page_cards_output_pngs_for_remaining_me_pages() -> None:
-    for page in ("dashboard", "accounts", "reminders", "exports"):
+    for page in ("dashboard", "accounts", "reminders"):
         rendered = render_page_card(
             page,
             _summary(),
@@ -85,10 +80,6 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
             time_summary="not set",
             next_action="Set up",
         ),
-        exports=ExportStatus(
-            stats_export="Excel / CSV / Google Sheets",
-            privacy_note="Private",
-        ),
     )
 
     assert _page_copy("accounts", summary)[2] == "Actions available: Manage"
@@ -99,13 +90,9 @@ def test_page_card_action_copy_uses_available_action_copy() -> None:
     assert "manage calendar reminders" in _page_copy("reminders", summary)[3]
     with pytest.raises(ValueError, match="Unsupported /me page card: preferences"):
         _page_copy("preferences", summary)
-    assert _page_copy("exports", summary)[1] == "private"
     assert _page_copy("dashboard", summary)[2] == (
-        "Actions available: Accounts, Reminders, Preferences, Exports"
+        "Actions available: Accounts, Reminders, Preferences"
     )
-    assert _page_copy("exports", summary)[2] == "Action: Export Stats"
-    assert _page_copy("exports", summary)[3] == ""
-    assert _page_copy("exports", summary)[4] == ("Stats: Excel / CSV / Google Sheets",)
 
 
 def test_page_card_reminder_copy_treats_incomplete_as_setup() -> None:
@@ -131,79 +118,10 @@ def test_page_card_reminder_copy_treats_incomplete_as_setup() -> None:
                 next_action="Finish setup",
             ),
         ),
-        exports=ExportStatus(
-            stats_export="Excel / CSV / Google Sheets",
-            privacy_note="Private",
-        ),
     )
 
     assert _page_copy("reminders", summary)[1] == "incomplete"
     assert "Choose KVK reminders" in _page_copy("reminders", summary)[3]
-
-
-def test_page_card_export_copy_handles_unavailable_state() -> None:
-    summary = PlayerSelfServiceSummary(
-        discord_user_id=42,
-        accounts=AccountStatus(
-            state="none",
-            linked_count=0,
-            linked_label="0 linked",
-            main_state="not set",
-            main_label="not set",
-            next_action="Register",
-        ),
-        reminders=ReminderStatus(
-            state="off",
-            event_summary="not subscribed",
-            time_summary="not set",
-            next_action="Set up",
-        ),
-        exports=ExportStatus(
-            stats_export="Unavailable",
-            privacy_note="Private",
-            action_state="unavailable",
-            action_summary="Register an account first.",
-        ),
-    )
-
-    assert _page_copy("exports", summary)[1] == "unavailable"
-    assert _page_copy("exports", summary)[2] == "Actions unavailable"
-    assert _page_copy("exports", summary)[3] == "Register an account first."
-    assert _page_copy("exports", summary)[4] == (
-        "Stats: Unavailable",
-        "Register an account first.",
-    )
-
-
-def test_page_card_export_copy_handles_guidance_state() -> None:
-    summary = PlayerSelfServiceSummary(
-        discord_user_id=42,
-        accounts=AccountStatus(
-            state="single",
-            linked_count=1,
-            linked_label="1 linked",
-            main_state="set",
-            main_label="Main Gov (111)",
-            next_action="Manage",
-        ),
-        reminders=ReminderStatus(
-            state="off",
-            event_summary="not subscribed",
-            time_summary="not set",
-            next_action="Set up",
-        ),
-        exports=ExportStatus(
-            stats_export="Legacy",
-            privacy_note="Private",
-            action_state="guidance",
-            action_summary="Use legacy commands.",
-        ),
-    )
-
-    assert _page_copy("exports", summary)[1] == "private"
-    assert _page_copy("exports", summary)[2] == "Guidance only"
-    assert _page_copy("exports", summary)[3] == "Use legacy commands."
-    assert _page_copy("exports", summary)[4] == ("Stats: Legacy",)
 
 
 def test_page_card_account_and_vip_lines_show_full_summary() -> None:
@@ -223,10 +141,6 @@ def test_page_card_account_and_vip_lines_show_full_summary() -> None:
             event_summary="not subscribed",
             time_summary="not set",
             next_action="Set up",
-        ),
-        exports=ExportStatus(
-            stats_export="Excel / CSV / Google Sheets",
-            privacy_note="Private",
         ),
     )
 
@@ -254,9 +168,7 @@ def test_dashboard_card_rows_group_status_by_user_workflow() -> None:
     assert rows[1][0].value == "KVK Reminders: ON"
     assert rows[1][0].detail == "All"
     assert rows[1][1].value == "Calendar Reminders: OFF"
-    assert rows[2][0].value == "Default private exports are available here."
-    assert rows[2][0].label == "Export Centre"
-    assert rows[2][0].detail == "Private personal exports"
+    assert len(rows) == 2
 
 
 def test_reminder_card_rows_split_kvk_and_calendar() -> None:

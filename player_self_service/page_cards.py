@@ -30,7 +30,6 @@ _BACKGROUND_BY_PAGE = {
     "accounts": "me accounts.png",
     "reminders": "me reminders.png",
     "preferences": "me preferences.png",
-    "exports": "me exports.png",
 }
 
 
@@ -452,19 +451,6 @@ def _reminder_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
     )
 
 
-def _export_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
-    exports = summary.exports
-    state = exports.action_state.strip().lower()
-    if state == "actionable":
-        return ("Stats: Excel / CSV / Google Sheets",)
-    if state == "guidance":
-        return (f"Stats: {exports.stats_export}",)
-    return (
-        f"Stats: {exports.stats_export}",
-        exports.action_summary,
-    )
-
-
 def _account_action_detail(summary: PlayerSelfServiceSummary) -> str:
     if summary.accounts.linked_count <= 0:
         return "Find ID by name, then add a governor to an available account slot."
@@ -483,7 +469,6 @@ def _dashboard_lines(summary: PlayerSelfServiceSummary) -> tuple[str, ...]:
         f"Linked accounts: {summary.accounts.linked_label}",
         f"KVK reminders: {summary.reminders.state}",
         f"Calendar reminders: {summary.reminders.calendar.state}",
-        "Exports: private",
     )
 
 
@@ -519,17 +504,6 @@ def _dashboard_rows(summary: PlayerSelfServiceSummary) -> tuple[tuple[MetricCell
                 value_size=48,
                 value_min_size=30,
                 detail_size=30,
-            ),
-        ),
-        (
-            MetricCell(
-                "Export Centre",
-                summary.exports.action_summary,
-                "Private personal exports",
-                value_size=50,
-                value_min_size=32,
-                detail_size=30,
-                width_units=2,
             ),
         ),
     )
@@ -587,7 +561,7 @@ def _page_copy(
         return (
             "Personal Command Centre",
             summary.accounts.main_state,
-            "Actions available: Accounts, Reminders, Preferences, Exports",
+            "Actions available: Accounts, Reminders, Preferences",
             "KVK outputs stay in their existing public channels; personal tools open here.",
             _dashboard_lines(summary),
         )
@@ -606,21 +580,6 @@ def _page_copy(
             "Actions available: Manage",
             _reminder_action_detail(summary),
             _reminder_lines(summary),
-        )
-    if page == "exports":
-        action_state = summary.exports.action_state.strip().lower()
-        actionable = action_state == "actionable"
-        guidance_only = action_state == "guidance"
-        return (
-            "Exports",
-            "private" if actionable or guidance_only else summary.exports.action_state,
-            (
-                "Action: Export Stats"
-                if actionable
-                else "Guidance only" if guidance_only else "Actions unavailable"
-            ),
-            "" if actionable else summary.exports.action_summary,
-            _export_lines(summary),
         )
     raise ValueError(f"Unsupported /me page card: {page}")
 

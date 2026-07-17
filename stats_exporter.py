@@ -1,80 +1,71 @@
-# stats_exporter.py
+"""Excel / Google Sheets compatible Account Data workbook builder."""
+
 from __future__ import annotations
 
+from collections.abc import Iterable
+from datetime import UTC, datetime
+from decimal import Decimal
+from numbers import Number
 import os
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 try:
-    import xlsxwriter  # noqa: F401
+    import xlsxwriter
+    from xlsxwriter.utility import xl_range_abs
+except Exception as exc:  # pragma: no cover - dependency is pinned in production
+    raise RuntimeError("XlsxWriter is required for Account Data workbooks.") from exc
 
-    _EXCEL_ENGINE = "xlsxwriter"
-except Exception:
-    try:
-        import openpyxl  # noqa: F401
+from player_self_service.account_data_export_contract import (
+    AccountDataExportMetadata,
+    AccountDataOutputKind,
+    filter_history_window,
+    spreadsheet_safe_text,
+)
+from player_self_service.accounts_export import CSV_COLUMNS, account_row_values
+from player_self_service.accounts_models import AccountMetricTotal, AccountsPortfolioPayload
+from stats.dal.stats_export_dal import EXPORT_COLUMNS
 
-        _EXCEL_ENGINE = "openpyxl"
-    except Exception as e:
-        raise RuntimeError(
-            "No Excel writer installed. Please `pip install XlsxWriter` "
-            "(preferred) or `pip install openpyxl`."
-        ) from e
-
-
-def _coalesce_cols(df: pd.DataFrame, cols: list[str], fill=0) -> pd.Series:
-    for c in cols:
-        if c in df.columns:
-            return df[c].fillna(fill)
-    return pd.Series([fill] * len(df))
+ALL_DAILY_COLUMNS = tuple(EXPORT_COLUMNS)
+FIXED_SHEETS = ("ACCOUNT_SUMMARY", "README", "ALL_DAILY")
+_FORBIDDEN_SHEET_CHARS = set("[]:*?/\\")
 
 
-def _write_safe(ws, r: int, c: int, v, num_fmt):
-    """Write numbers safely: blanks for NaN/Inf, strings for non-numbers."""
-    if isinstance(v, (int, float, np.integer, np.floating)):
-        if isinstance(v, (np.floating, float)):
-            if np.isnan(v) or np.isinf(v):
-                ws.write_blank(r, c, None)
-                return
-        ws.write_number(r, c, float(v), num_fmt)
-    else:
-        if v is None or (isinstance(v, float) and np.isnan(v)):
-            ws.write_blank(r, c, None)
-        else:
-            ws.write(r, c, v)
-
-
-def _clean_text(s: str | None) -> str:
-    if s is None:
+def _clean_text(value: str | None) -> str:
+    if value is None:
         return ""
-    return " ".join(str(s).split())
+    return " ".join(str(value).split())
+
+
+def _safe_sheet_name(base: str, fallback: str, max_len: int = 31) -> str:
+    value = (base or "").strip().strip("'")
+    value = "".join(
+        character
+        for character in value
+        if character not in _FORBIDDEN_SHEET_CHARS and ord(character) >= 32
+    )
+    return (value or fallback)[:max_len]
 
 
 def _calc_period(df: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timestamp) -> dict:
-    """
-    Summarises a window:
-      - *_End are snapshot values at the end of the window.
-      - *_Delta are sums of the corresponding *Delta columns across the window.
-    """
-    w = df[(df["AsOfDate"] >= start_date) & (df["AsOfDate"] <= end_date)]
-    snap = df[df["AsOfDate"] <= end_date].tail(1)
+    """Summarise snapshots and deltas inside an inclusive period."""
+    window = df[(df["AsOfDate"] >= start_date) & (df["AsOfDate"] <= end_date)]
+    snapshot = df[df["AsOfDate"] <= end_date].tail(1)
 
-    def colsum(c):
-        return (
-            int(pd.to_numeric(w.get(c, pd.Series(dtype=float)), errors="coerce").fillna(0).sum())
-            if c in w
-            else 0
-        )
+    def colsum(column: str) -> int:
+        if column not in window:
+            return 0
+        return int(pd.to_numeric(window[column], errors="coerce").fillna(0).sum())
 
-    def snapv(c):
-        return (
-            int(snap[c].iloc[0])
-            if (not snap.empty and c in snap and pd.notna(snap[c].iloc[0]))
-            else 0
-        )
+    def snapv(column: str) -> int:
+        if snapshot.empty or column not in snapshot or pd.isna(snapshot[column].iloc[0]):
+            return 0
+        return int(snapshot[column].iloc[0])
 
     return {
-        # Core metrics
         "PowerEnd": snapv("Power"),
         "TroopPowerEnd": snapv("TroopPower"),
         "KillPointsEnd": snapv("KillPoints"),
@@ -90,17 +81,14 @@ def _calc_period(df: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timest
         "RSSAssistDelta": colsum("RSSAssistDelta"),
         "HelpsDelta": colsum("HelpsDelta"),
         "TechDonationsSum": colsum("TechDonations"),
-        # Forts (ADDED - was missing!)
         "FortsTotalEnd": snapv("FortsTotal"),
         "FortsLaunchedSum": colsum("FortsLaunched"),
         "FortsJoinedSum": colsum("FortsJoined"),
-        # AOO
         "AOOJoinedEnd": snapv("AOOJoined"),
         "AOOWonEnd": snapv("AOOWon"),
         "AOOAvgKillEnd": snapv("AOOAvgKill"),
         "AOOAvgDeadEnd": snapv("AOOAvgDead"),
         "AOOAvgHealEnd": snapv("AOOAvgHeal"),
-        # Detailed metrics
         "T4_KillsEnd": snapv("T4_Kills"),
         "T5_KillsEnd": snapv("T5_Kills"),
         "T4T5_KillsEnd": snapv("T4T5_Kills"),
@@ -116,622 +104,478 @@ def _calc_period(df: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timest
     }
 
 
-_FORBIDDEN_SHEET_CHARS = set(r"[]:*?/\\")
+def _normalise_history(frame: pd.DataFrame) -> pd.DataFrame:
+    prepared = frame.copy(deep=True)
+    for column in ALL_DAILY_COLUMNS:
+        if column not in prepared.columns:
+            prepared[column] = pd.NA
+    prepared = prepared.loc[:, ALL_DAILY_COLUMNS].copy()
+    prepared["AsOfDate"] = pd.to_datetime(prepared["AsOfDate"], errors="coerce")
+    prepared["GovernorID"] = pd.to_numeric(prepared["GovernorID"], errors="coerce")
+    prepared = prepared.loc[prepared["AsOfDate"].notna() & prepared["GovernorID"].notna()].copy()
+    if not prepared.empty:
+        prepared["GovernorID"] = prepared["GovernorID"].astype("int64")
+        prepared = prepared.sort_values(
+            ["GovernorID", "AsOfDate"], ascending=[True, False], kind="mergesort"
+        ).reset_index(drop=True)
+    return prepared
 
 
-def _safe_sheet_name(base: str, fallback: str, max_len: int = 31) -> str:
-    s = (base or "").strip().strip("'")
-    s = "".join(ch for ch in s if ch not in _FORBIDDEN_SHEET_CHARS)
-    s = s or fallback
-    return s[:max_len]
+def _is_missing(value: Any) -> bool:
+    if value is None:
+        return True
+    try:
+        result = pd.isna(value)
+    except (TypeError, ValueError):
+        return False
+    return bool(result) if isinstance(result, (bool, np.bool_)) else False
+
+
+def _write_value(worksheet, row: int, column: int, value: Any, formats: dict[str, Any]) -> None:
+    if _is_missing(value):
+        worksheet.write_blank(row, column, None, formats["body"])
+    elif isinstance(value, pd.Timestamp):
+        worksheet.write_datetime(row, column, value.to_pydatetime(), formats["date"])
+    elif isinstance(value, datetime):
+        worksheet.write_datetime(row, column, value, formats["datetime"])
+    elif isinstance(value, (Number, Decimal)) and not isinstance(value, bool):
+        number = float(value)
+        if np.isfinite(number):
+            worksheet.write_number(row, column, number, formats["number"])
+        else:
+            worksheet.write_blank(row, column, None, formats["body"])
+    else:
+        worksheet.write_string(row, column, spreadsheet_safe_text(value), formats["body"])
+
+
+def _date_text(value: Any) -> str:
+    if value is None:
+        return "Not applicable"
+    if isinstance(value, datetime):
+        stamp = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+        return stamp.isoformat(timespec="seconds")
+    return value.isoformat()
+
+
+def _governor_display_names(
+    portfolio: AccountsPortfolioPayload | None, history: pd.DataFrame
+) -> dict[int, str]:
+    names: dict[int, str] = {}
+    if portfolio is not None:
+        for row in portfolio.rows:
+            if row.governor_id is not None and row.governor_id not in names:
+                names[row.governor_id] = row.display_name
+    if not history.empty:
+        for governor_id, group in history.groupby("GovernorID", sort=False):
+            values = group["GovernorName"].dropna() if "GovernorName" in group else pd.Series()
+            if int(governor_id) not in names and not values.empty:
+                names[int(governor_id)] = str(values.iloc[0])
+    return names
+
+
+def _build_sheet_names(governor_ids: Iterable[int], names: dict[int, str]) -> dict[int, str]:
+    used = {item.casefold() for item in FIXED_SHEETS}
+    result: dict[int, str] = {}
+    for governor_id in governor_ids:
+        gid = int(governor_id)
+        suffix = f"-{gid}"
+        clean_name = _safe_sheet_name(names.get(gid, "Account"), "Account", max_len=31)
+        prefix = clean_name[: max(1, 31 - len(suffix))]
+        candidate = f"{prefix}{suffix}"[:31]
+        counter = 2
+        while candidate.casefold() in used:
+            collision_suffix = f"-{gid}-{counter}"
+            candidate = f"{clean_name[: max(1, 31 - len(collision_suffix))]}{collision_suffix}"[:31]
+            counter += 1
+        used.add(candidate.casefold())
+        result[gid] = candidate
+    return result
+
+
+def _workbook_formats(workbook) -> dict[str, Any]:
+    return {
+        "title": workbook.add_format(
+            {"bold": True, "font_size": 16, "font_color": "#FFFFFF", "bg_color": "#17365D"}
+        ),
+        "section": workbook.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#1F4E78"}
+        ),
+        "header": workbook.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#5B9BD5", "border": 1}
+        ),
+        "body": workbook.add_format({"border": 1, "valign": "top"}),
+        "number": workbook.add_format({"border": 1, "num_format": "#,##0"}),
+        "date": workbook.add_format({"border": 1, "num_format": "yyyy-mm-dd"}),
+        "datetime": workbook.add_format({"border": 1, "num_format": "yyyy-mm-dd hh:mm:ss"}),
+        "link": workbook.add_format({"border": 1, "font_color": "#0563C1", "underline": True}),
+        "note": workbook.add_format({"text_wrap": True, "valign": "top"}),
+    }
+
+
+def _write_account_summary(
+    workbook,
+    portfolio: AccountsPortfolioPayload | None,
+    sheet_names: dict[int, str],
+    formats: dict[str, Any],
+) -> None:
+    worksheet = workbook.add_worksheet("ACCOUNT_SUMMARY")
+    worksheet.freeze_panes(1, 0)
+    worksheet.write_row(0, 0, CSV_COLUMNS, formats["header"])
+    rows = portfolio.rows if portfolio is not None else ()
+    for row_index, portfolio_row in enumerate(rows, start=1):
+        values = account_row_values(portfolio_row)
+        for column_index, value in enumerate(values):
+            _write_value(worksheet, row_index, column_index, value, formats)
+        governor_id = portfolio_row.governor_id
+        if governor_id is not None and governor_id in sheet_names:
+            link_column = 3 if values[3] else 4
+            display = str(spreadsheet_safe_text(values[link_column]))
+            worksheet.write_url(
+                row_index,
+                link_column,
+                f"internal:'{sheet_names[governor_id]}'!A1",
+                formats["link"],
+                display,
+            )
+    worksheet.autofilter(0, 0, max(1, len(rows)), len(CSV_COLUMNS) - 1)
+    worksheet.set_column(0, 3, 20)
+    worksheet.set_column(4, 26, 16)
+    worksheet.set_column(27, 28, 22)
+
+
+def _write_readme(workbook, metadata: AccountDataExportMetadata, formats: dict[str, Any]) -> None:
+    worksheet = workbook.add_worksheet("README")
+    worksheet.set_column(0, 0, 34)
+    worksheet.set_column(1, 1, 88)
+    worksheet.write(0, 0, "Account Data workbook", formats["title"])
+    rows = (
+        ("Generated UTC", _date_text(metadata.generated_at_utc)),
+        ("Authorised distinct governors", metadata.authorised_governor_count),
+        ("Current snapshot rows", metadata.snapshot_row_count),
+        ("History rows written", metadata.history_row_count),
+        ("Requested history days", metadata.requested_days),
+        ("Selected window start", _date_text(metadata.window_start)),
+        ("Selected window end", _date_text(metadata.window_end)),
+        ("Actual written start", _date_text(metadata.written_start)),
+        ("Actual written end", _date_text(metadata.written_end)),
+        ("Stats freshness", _date_text(metadata.stats_freshness)),
+        ("Governor scan freshness", _date_text(metadata.governor_scan_freshness)),
+        ("Inventory oldest", _date_text(metadata.inventory_oldest)),
+        ("Inventory latest", _date_text(metadata.inventory_latest)),
+        (
+            "Inventory coverage",
+            (
+                f"{metadata.inventory_reporting_count}/{metadata.inventory_expected_count} linked rows"
+                if metadata.inventory_reporting_count is not None
+                and metadata.inventory_expected_count is not None
+                else "Not applicable"
+            ),
+        ),
+    )
+    for row_index, (label, value) in enumerate(rows, start=2):
+        worksheet.write(row_index, 0, label, formats["header"])
+        _write_value(worksheet, row_index, 1, value, formats)
+    notes = (
+        "ACCOUNT_SUMMARY is the current all-linked account snapshot. ALL_DAILY and each governor "
+        "worksheet contain only the selected inclusive Stats history window. Source gaps are not "
+        "filled. Current/lifetime snapshots and selected-window deltas are labelled separately.\n\n"
+        "This .xlsx file is compatible with Microsoft Excel and Google Sheets. To use Sheets, "
+        "upload the downloaded file to Google Drive and open it with Google Sheets; no live Sheet "
+        "was created or shared."
+    )
+    worksheet.merge_range(18, 0, 23, 1, notes, formats["note"])
+
+
+def _write_all_daily(workbook, history: pd.DataFrame, formats: dict[str, Any]) -> None:
+    worksheet = workbook.add_worksheet("ALL_DAILY")
+    worksheet.freeze_panes(1, 0)
+    worksheet.write_row(0, 0, ALL_DAILY_COLUMNS, formats["header"])
+    for row_index, values in enumerate(history.itertuples(index=False, name=None), start=1):
+        for column_index, value in enumerate(values):
+            _write_value(worksheet, row_index, column_index, value, formats)
+    worksheet.autofilter(0, 0, max(1, len(history.index)), len(ALL_DAILY_COLUMNS) - 1)
+    worksheet.set_column(0, 2, 18)
+    worksheet.set_column(3, 3, 13)
+    worksheet.set_column(4, len(ALL_DAILY_COLUMNS) - 1, 16)
+
+
+def _numeric_sum(frame: pd.DataFrame, column: str) -> int:
+    if column not in frame:
+        return 0
+    return int(pd.to_numeric(frame[column], errors="coerce").fillna(0).sum())
+
+
+def _write_governor_sheet(
+    workbook,
+    *,
+    sheet_name: str,
+    governor_id: int,
+    display_name: str,
+    history_desc: pd.DataFrame,
+    metadata: AccountDataExportMetadata,
+    formats: dict[str, Any],
+) -> None:
+    worksheet = workbook.add_worksheet(sheet_name)
+    worksheet.write(
+        0, 0, f"{spreadsheet_safe_text(display_name)} ({governor_id})", formats["title"]
+    )
+    worksheet.write(
+        1,
+        0,
+        f"Selected {metadata.requested_days or 0}-day window: "
+        f"{_date_text(metadata.window_start)} to {_date_text(metadata.window_end)}",
+        formats["note"],
+    )
+    if history_desc.empty:
+        worksheet.write(3, 0, "No Stats history exists for this governor in the selected window.")
+        worksheet.set_column(0, 0, 90)
+        return
+
+    history = history_desc.sort_values("AsOfDate", ascending=True, kind="mergesort").reset_index(
+        drop=True
+    )
+    latest_date = pd.Timestamp(history["AsOfDate"].max()).normalize()
+    month_start = latest_date.replace(day=1)
+    previous_end = month_start - pd.Timedelta(days=1)
+    previous_start = previous_end.replace(day=1)
+    selected_start = pd.Timestamp(history["AsOfDate"].min()).normalize()
+    selected = _calc_period(history, selected_start, latest_date)
+    month = _calc_period(history, month_start, latest_date)
+    previous = _calc_period(history, previous_start, previous_end)
+
+    worksheet.write_row(
+        3,
+        0,
+        (
+            "Metric",
+            "Current / lifetime snapshot",
+            f"Selected {metadata.requested_days}-day delta",
+            "MTD delta within window",
+            "Previous-month delta within window",
+        ),
+        formats["header"],
+    )
+    metrics = (
+        ("Power", "PowerEnd", "PowerDelta"),
+        ("Troop Power", "TroopPowerEnd", "TroopPowerDelta"),
+        ("Kill Points", "KillPointsEnd", "KillPointsDelta"),
+        ("T4+T5 Kills", "T4T5_KillsEnd", "T4T5_KillsDelta"),
+        ("Deads", "DeadsEnd", "DeadsDelta"),
+        ("Healed Troops", "HealedTroopsEnd", "HealedTroopsDelta"),
+        ("RSS Gathered", "RSSGatheredEnd", "RSS_GatheredDelta"),
+        ("RSS Assistance", "RSSAssistEnd", "RSSAssistDelta"),
+        ("Helps", "HelpsEnd", "HelpsDelta"),
+    )
+    for row_index, (label, snapshot_key, delta_key) in enumerate(metrics, start=4):
+        worksheet.write(row_index, 0, label, formats["body"])
+        for column_index, value in enumerate(
+            (
+                selected[snapshot_key],
+                selected[delta_key],
+                month[delta_key],
+                previous[delta_key],
+            ),
+            start=1,
+        ):
+            _write_value(worksheet, row_index, column_index, value, formats)
+
+    forts_row = 14
+    worksheet.write_row(
+        forts_row,
+        0,
+        ("Selected-window Forts", "Total", "Launched", "Joined"),
+        formats["header"],
+    )
+    worksheet.write_row(
+        forts_row + 1,
+        0,
+        (
+            f"Selected {metadata.requested_days} days",
+            _numeric_sum(history, "FortsTotal"),
+            _numeric_sum(history, "FortsLaunched"),
+            _numeric_sum(history, "FortsJoined"),
+        ),
+        formats["number"],
+    )
+
+    daily_columns = list(ALL_DAILY_COLUMNS) + ["FortsTotal_Cumulative"]
+    table_row = 19
+    worksheet.write_row(table_row, 0, daily_columns, formats["header"])
+    forts = pd.to_numeric(history.get("FortsTotal", 0), errors="coerce").fillna(0).cumsum()
+    for offset, values in enumerate(history.itertuples(index=False, name=None), start=1):
+        for column_index, value in enumerate(values):
+            _write_value(worksheet, table_row + offset, column_index, value, formats)
+        _write_value(
+            worksheet,
+            table_row + offset,
+            len(ALL_DAILY_COLUMNS),
+            forts.iloc[offset - 1],
+            formats,
+        )
+    worksheet.autofilter(
+        table_row,
+        0,
+        table_row + len(history.index),
+        len(daily_columns) - 1,
+    )
+    worksheet.freeze_panes(table_row + 1, 4)
+    worksheet.set_column(0, 0, 18)
+    worksheet.set_column(1, 2, 22)
+    worksheet.set_column(3, len(daily_columns) - 1, 16)
+
+    first_data_row = table_row + 1
+    last_data_row = table_row + len(history.index)
+    date_column = daily_columns.index("AsOfDate")
+
+    chart_specs = (
+        ("Power and Troop Power", ("Power", "TroopPower"), "G2"),
+        ("Kill Points", ("KillPoints",), "G18"),
+        ("Resources", ("RSS_Gathered", "RSSAssist"), "O2"),
+        ("Combat", ("T4T5_Kills", "Deads", "HealedTroops"), "O18"),
+        ("Forts cumulative", ("FortsTotal_Cumulative",), "W2"),
+    )
+    for title, series_columns, anchor in chart_specs:
+        chart = workbook.add_chart({"type": "line"})
+        for column_name in series_columns:
+            column_index = daily_columns.index(column_name)
+            chart.add_series(
+                {
+                    "name": column_name,
+                    "categories": [
+                        sheet_name,
+                        first_data_row,
+                        date_column,
+                        last_data_row,
+                        date_column,
+                    ],
+                    "values": [
+                        sheet_name,
+                        first_data_row,
+                        column_index,
+                        last_data_row,
+                        column_index,
+                    ],
+                }
+            )
+        chart.set_title({"name": title})
+        chart.set_legend({"position": "bottom"})
+        chart.set_size({"width": 520, "height": 280})
+        worksheet.insert_chart(anchor, chart)
+
+    sparkline_start = max(first_data_row, last_data_row - 29)
+    quoted_sheet = sheet_name.replace("'", "''")
+    worksheet.write(16, 0, "Last 30 source rows", formats["section"])
+    for row_index, column_name in enumerate(("Power", "KillPoints", "RSS_Gathered"), start=16):
+        worksheet.write(row_index, 1, column_name, formats["body"])
+        column_index = daily_columns.index(column_name)
+        worksheet.add_sparkline(
+            row_index,
+            2,
+            {
+                "range": (
+                    f"'{quoted_sheet}'!"
+                    f"{xl_range_abs(sparkline_start, column_index, last_data_row, column_index)}"
+                ),
+                "type": "line",
+            },
+        )
+
+
+def build_account_data_workbook(
+    history_frame: pd.DataFrame,
+    *,
+    portfolio: AccountsPortfolioPayload,
+    governor_ids: tuple[int, ...],
+    metadata: AccountDataExportMetadata,
+    out_path: str | Path,
+) -> str:
+    """Build the locked Account-Summary-first workbook from prefiltered history."""
+    target = Path(out_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    history = _normalise_history(history_frame)
+    names = _governor_display_names(portfolio, history)
+    sheet_names = _build_sheet_names(governor_ids, names)
+
+    workbook = xlsxwriter.Workbook(
+        str(target),
+        {"strings_to_formulas": False, "strings_to_urls": False, "constant_memory": False},
+    )
+    try:
+        formats = _workbook_formats(workbook)
+        _write_account_summary(workbook, portfolio, sheet_names, formats)
+        _write_readme(workbook, metadata, formats)
+        _write_all_daily(workbook, history, formats)
+        for governor_id in governor_ids:
+            group = history.loc[history["GovernorID"] == int(governor_id)].copy()
+            _write_governor_sheet(
+                workbook,
+                sheet_name=sheet_names[int(governor_id)],
+                governor_id=int(governor_id),
+                display_name=names.get(int(governor_id), f"Governor {governor_id}"),
+                history_desc=group,
+                metadata=metadata,
+                formats=formats,
+            )
+    finally:
+        workbook.close()
+    return str(target)
 
 
 def build_user_stats_excel(
     df_daily: pd.DataFrame,
-    df_targets: pd.DataFrame | None,
+    _df_targets: pd.DataFrame | None,
     *,
     out_path: str,
     days_for_daily_table: int = 90,
 ) -> None:
+    """Compatibility wrapper; the Account Data service uses build_account_data_workbook."""
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-
-    df = df_daily.copy()
-    df["AsOfDate"] = pd.to_datetime(df["AsOfDate"]).dt.normalize()
-    for col in ("GovernorName", "Alliance"):
-        if col in df:
-            df[col] = df[col].apply(_clean_text)
-
-    # Drop deprecated columns
-    drop_cols = {"TechPower", "TechPowerDelta"}
-    keep = [c for c in df.columns if c not in drop_cols]
-    df = df[keep]
-
-    # ALL_DAILY column order
-    ALL_DAILY_COLS = [
-        "GovernorID",
-        "GovernorName",
-        "Alliance",
-        "AsOfDate",
-        "Power",
-        "PowerDelta",
-        "TroopPower",
-        "TroopPowerDelta",
-        "KillPoints",
-        "KillPointsDelta",
-        "Deads",
-        "DeadsDelta",
-        "RSS_Gathered",
-        "RSS_GatheredDelta",
-        "RSSAssist",
-        "RSSAssistDelta",
-        "Helps",
-        "HelpsDelta",
-        "BuildingMinutes",
-        "TechDonations",
-        "FortsTotal",
-        "FortsLaunched",
-        "FortsJoined",
-        "AOOJoined",
-        "AOOJoinedDelta",
-        "AOOWon",
-        "AOOWonDelta",
-        "AOOAvgKill",
-        "AOOAvgKillDelta",
-        "AOOAvgDead",
-        "AOOAvgDeadDelta",
-        "AOOAvgHeal",
-        "AOOAvgHealDelta",
-        "T4_Kills",
-        "T4_KillsDelta",
-        "T5_Kills",
-        "T5_KillsDelta",
-        "T4T5_Kills",
-        "T4T5_KillsDelta",
-        "HealedTroops",
-        "HealedTroopsDelta",
-        "RangedPoints",
-        "RangedPointsDelta",
-        "HighestAcclaim",
-        "HighestAcclaimDelta",
-        "AutarchTimes",
-        "AutarchTimesDelta",
-    ]
-    for c in ALL_DAILY_COLS:
-        if c not in df:
-            df[c] = np.nan
-    df_all = df[ALL_DAILY_COLS].copy()
-
-    df_all["GovernorID"] = pd.to_numeric(df_all["GovernorID"], errors="coerce")
-    df_all = df_all[df_all["GovernorID"].notna()].copy()
-    df_all["GovernorID"] = df_all["GovernorID"].astype(int)
-
-    num_cols = df_all.select_dtypes(include=["number"]).columns
-    if len(num_cols):
-        df_all[num_cols] = df_all[num_cols].replace([np.inf, -np.inf], np.nan)
-
-    with pd.ExcelWriter(out_path, engine=_EXCEL_ENGINE) as writer:
-        if _EXCEL_ENGINE == "xlsxwriter":
-            wb = writer.book
-
-            ws_readme = wb.add_worksheet("README")
-            writer.sheets["README"] = ws_readme
-            ws_index = wb.add_worksheet("INDEX")
-            writer.sheets["INDEX"] = ws_index
-            ws_all = wb.add_worksheet("ALL_DAILY")
-            writer.sheets["ALL_DAILY"] = ws_all
-            df_all.to_excel(writer, index=False, sheet_name="ALL_DAILY")
-
-            f_h1 = wb.add_format({"bold": True, "font_size": 14})
-            f_h2 = wb.add_format({"bold": True, "font_size": 12})
-            f_hdr = wb.add_format({"bold": True, "bg_color": "#F2F2F7", "border": 1})
-            f_num = wb.add_format({"num_format": "#,##0"})
-            f_dim = wb.add_format({"font_color": "#666666"})
-            f_link = wb.add_format({"font_color": "#2980B9", "underline": 1})
-            f_date = wb.add_format({"num_format": "dd/mm/yyyy"})
-            f_white = wb.add_format({"font_color": "#FFFFFF"})
-
-            ws_readme.write(0, 0, "My Stats Export", f_h1)
-            ws_readme.write(2, 0, "This workbook shows YOUR registered accounts only.")
-            ws_readme.write(3, 0, "Tab order:")
-            ws_readme.write(4, 0, "• README – this page")
-            ws_readme.write(5, 0, "• INDEX – account summary with links")
-            ws_readme.write(6, 0, "• ALL_DAILY – raw daily data")
-            ws_readme.write(7, 0, "• <Name-ID> – KPIs, charts, and tables per account")
-
-            for c, name in enumerate(ALL_DAILY_COLS):
-                ws_all.write(0, c, name, f_hdr)
-                ws_all.set_column(
-                    c, c, 18 if name in ("GovernorName", "Alliance", "AsOfDate") else 14
-                )
-            ws_all.autofilter(0, 0, max(1, len(df_all)), max(0, len(ALL_DAILY_COLS) - 1))
-            asof_idx = ALL_DAILY_COLS.index("AsOfDate")
-            ws_all.set_column(asof_idx, asof_idx, 18, f_date)
-
-            # ---------- BUILD INDEX FROM LATEST SNAPSHOT ----------
-            # Get latest row per governor for snapshot metrics
-            latest = (
-                df_all.sort_values(["GovernorID", "AsOfDate"])
-                .groupby("GovernorID", as_index=False)
-                .tail(1)
-            )
-            latest = latest[pd.to_numeric(latest["GovernorID"], errors="coerce").notna()].copy()
-            latest["GovernorID"] = latest["GovernorID"].astype(int)
-
-            # For daily count metrics (FortsTotal, etc.), sum over a period instead of showing latest
-            # Using last 180 days same as all data for summary
-            max_date = pd.to_datetime(df_all["AsOfDate"]).max()
-            period_start = max_date - pd.Timedelta(days=180)
-
-            # Calculate period sums for daily metrics
-            period_data = df_all[pd.to_datetime(df_all["AsOfDate"]) >= period_start].copy()
-
-            period_sums = period_data.groupby("GovernorID", as_index=False).agg(
-                {
-                    "FortsTotal": lambda x: int(pd.to_numeric(x, errors="coerce").fillna(0).sum()),
-                    "FortsLaunched": lambda x: int(
-                        pd.to_numeric(x, errors="coerce").fillna(0).sum()
-                    ),
-                    "FortsJoined": lambda x: int(pd.to_numeric(x, errors="coerce").fillna(0).sum()),
-                }
-            )
-
-            # Merge period sums into latest
-            latest = latest.merge(
-                period_sums, on="GovernorID", how="left", suffixes=("", "_period")
-            )
-
-            # Replace snapshot FortsTotal with period sum
-            if "FortsTotal_period" in latest.columns:
-                latest["FortsTotal"] = latest["FortsTotal_period"].fillna(0).astype(int)
-                latest = latest.drop(
-                    columns=["FortsTotal_period", "FortsLaunched_period", "FortsJoined_period"],
-                    errors="ignore",
-                )
-            else:
-                latest["FortsTotal"] = 0
-
-            # Ensure AOO and T4/T5 fields exist (these are cumulative, so snapshot is correct)
-            for col in ["AOOJoined", "T4_Kills", "T5_Kills"]:
-                if col not in latest.columns:
-                    latest[col] = 0
-                else:
-                    latest[col] = latest[col].fillna(0).astype(int)
-
-            idx_cols = [
-                "GovernorID",
-                "GovernorName",
-                "Alliance",
-                "Power",
-                "TroopPower",
-                "KillPoints",
-                "T4T5_Kills",  # Cumulative (snapshot)
-                "Deads",
-                "HealedTroops",
-                "RSS_Gathered",
-                "RSSAssist",
-                "Helps",
-                "FortsTotal",  # Now shows last 180 days sum
-                "AOOJoined",  # Cumulative (snapshot)
-                "AOOWon",  # Cumulative (snapshot) - NEW
-            ]
-            ws_index.write(0, 0, "Your Accounts", f_h1)
-            ws_index.write_row(2, 0, idx_cols + ["Open"], f_hdr)
-
-            by_gid = {
-                int(gid): g.sort_values("AsOfDate") for gid, g in df_all.groupby("GovernorID")
-            }
-
-            def _sheet_name(name: str, gid: int) -> str:
-                base = f"{_clean_text(name)}-{gid}"
-                return _safe_sheet_name(base, fallback=f"Account-{gid}")
-
-            sheet_names = {
-                gid: _sheet_name(g.iloc[-1]["GovernorName"], gid) for gid, g in by_gid.items()
-            }
-
-            start_row = 3
-            for i, row in enumerate(latest[idx_cols].itertuples(index=False), start=start_row):
-                vals = list(row)
-                gid = int(vals[0])
-
-                for j, v in enumerate(vals):
-                    _write_safe(ws_index, i, j, v, f_num)
-
-                ws_index.write_url(
-                    i, len(idx_cols), f"internal:'{sheet_names[gid]}'!A1", f_link, "Open"
-                )
-
-            for c in range(len(idx_cols) + 1):
-                ws_index.set_column(c, c, 16)
-            name_col = idx_cols.index("GovernorName")
-            ws_index.set_column(name_col, name_col, 22)
-
-            from xlsxwriter.utility import xl_col_to_name
-
-            max_ts = pd.to_datetime(df_all["AsOfDate"]).max()
-            thirty_cut = (max_ts - pd.Timedelta(days=30)).date()
-            table_days = max(int(days_for_daily_table or 180), 1)
-            sixm_cut = (max_ts - pd.Timedelta(days=table_days)).date()
-
-            for gid, gdf in by_gid.items():
-                gdf = gdf.copy()
-                gdf["AsOfDate"] = pd.to_datetime(gdf["AsOfDate"])
-                gname = _clean_text(str(gdf.iloc[-1]["GovernorName"]))
-                sname = sheet_names[gid]
-                ws_g = wb.add_worksheet(sname)
-
-                ws_g.write(0, 0, f"{gname} ({gid})", f_h1)
-                ws_g.write(1, 0, f"Alliance: {gdf.iloc[-1]['Alliance']}", f_dim)
-
-                # KPI Grid
-                ws_g.write(3, 0, "KPIs", f_h2)
-                ws_g.write_row(4, 0, ["Metric", "Latest", "MTD Δ", "Last Month Δ"], f_hdr)
-
-                latest_snap = gdf.tail(1).to_dict("records")[0]
-                month_start = gdf["AsOfDate"].max().replace(day=1)
-                last_month_end = month_start - pd.Timedelta(days=1)
-                last_month_start = last_month_end.replace(day=1)
-
-                m_mtd = _calc_period(gdf, month_start, gdf["AsOfDate"].max())
-                m_last = _calc_period(gdf, last_month_start, last_month_end)
-
-                kpi_rows = [
-                    ("Power", latest_snap.get("Power"), m_mtd["PowerDelta"], m_last["PowerDelta"]),
-                    (
-                        "Troop Power",
-                        latest_snap.get("TroopPower"),
-                        m_mtd["TroopPowerDelta"],
-                        m_last["TroopPowerDelta"],
-                    ),
-                    (
-                        "Kill Points",
-                        latest_snap.get("KillPoints"),
-                        m_mtd["KillPointsDelta"],
-                        m_last["KillPointsDelta"],
-                    ),
-                    ("Deads", latest_snap.get("Deads"), m_mtd["DeadsDelta"], m_last["DeadsDelta"]),
-                    (
-                        "RSS Gathered",
-                        latest_snap.get("RSS_Gathered"),
-                        m_mtd["RSS_GatheredDelta"],
-                        m_last["RSS_GatheredDelta"],
-                    ),
-                    (
-                        "RSS Assist",
-                        latest_snap.get("RSSAssist"),
-                        m_mtd["RSSAssistDelta"],
-                        m_last["RSSAssistDelta"],
-                    ),
-                    ("Helps", latest_snap.get("Helps"), m_mtd["HelpsDelta"], m_last["HelpsDelta"]),
-                    (
-                        "Tech Donations",
-                        latest_snap.get("TechDonations", 0),
-                        m_mtd["TechDonationsSum"],
-                        m_last["TechDonationsSum"],
-                    ),
-                    (
-                        "Forts Total",
-                        latest_snap.get("FortsTotal", 0),
-                        m_mtd.get("FortsLaunchedSum", 0),
-                        m_last.get("FortsLaunchedSum", 0),
-                    ),
-                    ("AOO Joined", latest_snap.get("AOOJoined", 0), 0, 0),
-                    ("AOO Won", latest_snap.get("AOOWon", 0), 0, 0),
-                    (
-                        "T4 Kills",
-                        latest_snap.get("T4_Kills", 0),
-                        m_mtd["T4_KillsDelta"],
-                        m_last["T4_KillsDelta"],
-                    ),
-                    (
-                        "T5 Kills",
-                        latest_snap.get("T5_Kills", 0),
-                        m_mtd["T5_KillsDelta"],
-                        m_last["T5_KillsDelta"],
-                    ),
-                ]
-                for r, row_vals in enumerate(kpi_rows, start=5):
-                    ws_g.write(r, 0, row_vals[0])
-                    _write_safe(ws_g, r, 1, row_vals[1] or 0, f_num)
-                    _write_safe(ws_g, r, 2, row_vals[2] or 0, f_num)
-                    _write_safe(ws_g, r, 3, row_vals[3] or 0, f_num)
-                ws_g.set_column(0, 3, 18)
-
-                # 30-day Sparklines
-                ws_g.write(18, 0, "Last 30 Days (sparklines)", f_h2)
-                ws_g.write_row(19, 0, ["Metric", "Sparkline", "Min", "Max"], f_hdr)
-                g30 = gdf[gdf["AsOfDate"].dt.date >= thirty_cut]
-                metrics = ["Power", "TroopPower", "KillPoints", "Deads"]
-                base_row = 20
-                data_col = 10
-                for idx_m, m in enumerate(metrics):
-                    row_out = base_row + idx_m
-                    ws_g.write(row_out, 0, m)
-                    series = (
-                        pd.to_numeric(g30.get(m, pd.Series(dtype=float)), errors="coerce")
-                        .fillna(0)
-                        .tolist()
-                    )
-                    for j, v in enumerate(series):
-                        ws_g.write(row_out, data_col + j, v, f_white)
-                    endc = xl_col_to_name(data_col + max(0, len(series) - 1))
-                    rng = f"{xl_col_to_name(data_col)}{row_out+1}:{endc}{row_out+1}"
-                    ws_g.add_sparkline(row_out, 1, {"range": f"'{sname}'!{rng}", "type": "line"})
-                    _write_safe(ws_g, row_out, 2, min(series) if series else 0, f_num)
-                    _write_safe(ws_g, row_out, 3, max(series) if series else 0, f_num)
-                ws_g.set_column(1, 1, 22)
-                ws_g.set_column(data_col, data_col + 200, None, None, {"hidden": True})
-
-                # ===== CHARTS + DAILY TABLE SECTION =====
-                chart_top = 26
-                ws_g.write(chart_top - 1, 0, f"Last {table_days} Days — Overview", f_h2)
-
-                # ===== CHARTS + DAILY TABLE SECTION =====
-                chart_top = 26
-                ws_g.write(chart_top - 1, 0, f"Last {table_days} Days — Overview", f_h2)
-
-                daily_cols = [
-                    "AsOfDate",
-                    "Power",
-                    "PowerDelta",
-                    "TroopPower",
-                    "TroopPowerDelta",
-                    "KillPoints",
-                    "KillPointsDelta",
-                    "T4_Kills",
-                    "T5_Kills",
-                    "T4T5_Kills",
-                    "Deads",
-                    "DeadsDelta",
-                    "HealedTroops",
-                    "HealedTroopsDelta",
-                    "RSS_Gathered",
-                    "RSS_GatheredDelta",
-                    "RSSAssist",
-                    "RSSAssistDelta",
-                    "Helps",
-                    "HelpsDelta",
-                    "BuildingMinutes",
-                    "TechDonations",
-                    "FortsTotal",
-                    "FortsTotal_Cumulative",
-                    "FortsLaunched",
-                    "FortsJoined",
-                    "AOOJoined",
-                    "AOOWon",
-                ]
-
-                # Daily table positioning (after charts - 5 charts × 16 rows each = 80 rows)
-                table_top = chart_top + 80
-                ws_g.write(table_top, 0, f"Last {table_days} Days — Daily", f_h2)
-                ws_g.write_row(table_top + 1, 0, daily_cols, f_hdr)
-
-                # Build data for charts and table
-                g6 = gdf[gdf["AsOfDate"].dt.date >= sixm_cut].copy()
-                for c in daily_cols:
-                    if c not in g6:
-                        g6[c] = np.nan
-                g6 = g6[daily_cols]
-
-                for c in daily_cols:
-                    if c != "AsOfDate":
-                        g6[c] = pd.to_numeric(g6[c], errors="coerce").replace(
-                            [np.inf, -np.inf], np.nan
-                        )
-
-                # Calculate cumulative FortsTotal for Chart 5 (running sum)
-                if "FortsTotal" in g6.columns:
-                    g6["FortsTotal_Cumulative"] = g6["FortsTotal"].fillna(0).cumsum()
-                    # ADD IT TO daily_cols so _rng() can find it
-                    if "FortsTotal_Cumulative" not in daily_cols:
-                        forts_idx = daily_cols.index("FortsTotal")
-                        daily_cols.insert(forts_idx + 1, "FortsTotal_Cumulative")
-
-                # Define data range for charts (points to future table location)
-                start_data_row = table_top + 2
-
-                def _rng(col_name: str):
-                    c_idx = daily_cols.index(col_name)
-                    end_row = start_data_row + max(len(g6), 0) - 1
-                    return [sname, start_data_row, c_idx, end_row, c_idx]
-
-                if len(g6) == 0:
-                    ws_g.write(chart_top, 0, "No data available for this period.", f_dim)
-                else:
-                    # CHART 1: Power vs Troop Power
-                    ch1 = wb.add_chart({"type": "line"})
-                    ch1.add_series(
-                        {
-                            "name": "Power",
-                            "categories": _rng("AsOfDate"),
-                            "values": _rng("Power"),
-                            "line": {"color": "#3498DB", "width": 2},
-                        }
-                    )
-                    ch1.add_series(
-                        {
-                            "name": "Troop Power",
-                            "categories": _rng("AsOfDate"),
-                            "values": _rng("TroopPower"),
-                            "line": {"color": "#E74C3C", "width": 2},
-                        }
-                    )
-                    ch1.set_title({"name": "Power vs Troop Power"})
-                    ch1.set_x_axis({"name": "Date", "date_axis": True, "num_format": "dd/mm/yyyy"})
-                    ch1.set_y_axis(
-                        {"name": "Power", "num_format": '[>=1000000000]###,#,,,"b";#,##0,,"m"'}
-                    )
-                    ch1.set_legend({"position": "bottom"})
-                    ws_g.insert_chart(chart_top, 0, ch1, {"x_scale": 1.15, "y_scale": 1.0})
-
-                    # CHART 2: Kill Points - CONDITIONAL FORMAT
-                    ch2 = wb.add_chart({"type": "line"})
-                    ch2.add_series(
-                        {
-                            "name": "Kill Points",
-                            "categories": _rng("AsOfDate"),
-                            "values": _rng("KillPoints"),
-                            "line": {"color": "#8E44AD", "width": 2.5},
-                            "marker": {"type": "circle", "size": 4},
-                        }
-                    )
-                    ch2.set_title({"name": "Kill Points"})
-                    ch2.set_x_axis({"name": "Date", "date_axis": True, "num_format": "dd/mm/yyyy"})
-                    ch2.set_y_axis(
-                        {
-                            "name": "Kill Points",
-                            "num_format": '[>=1000000000]###,#,,,"b";#,##0,,"m"',
-                        }
-                    )
-                    ch2.set_legend({"position": "bottom"})
-                    ws_g.insert_chart(chart_top + 16, 0, ch2, {"x_scale": 1.15, "y_scale": 1.0})
-
-                    # CHART 3: RSS - CONDITIONAL FORMAT
-                    ch3 = wb.add_chart({"type": "line"})
-                    ch3.add_series(
-                        {
-                            "name": "RSS Gathered",
-                            "categories": _rng("AsOfDate"),
-                            "values": _rng("RSS_Gathered"),
-                            "line": {"color": "#52BE80", "width": 2.5},
-                            "marker": {"type": "circle", "size": 4},
-                        }
-                    )
-                    ch3.add_series(
-                        {
-                            "name": "RSS Assist",
-                            "categories": _rng("AsOfDate"),
-                            "values": _rng("RSSAssist"),
-                            "line": {"color": "#5DADE2", "width": 2.5},
-                            "marker": {"type": "square", "size": 4},
-                        }
-                    )
-                    ch3.set_title({"name": "RSS Gathered & RSS Assist"})
-                    ch3.set_x_axis({"name": "Date", "date_axis": True, "num_format": "dd/mm/yyyy"})
-                    ch3.set_y_axis(
-                        {"name": "RSS", "num_format": '[>=1000000000]###,#,,,"b";#,##0,,"m"'}
-                    )
-                    ch3.set_legend({"position": "bottom"})
-                    ws_g.insert_chart(chart_top + 32, 0, ch3, {"x_scale": 1.15, "y_scale": 1.0})
-
-                    # CHART 4: Combat Stats - CONDITIONAL FORMAT
-                    ch4 = wb.add_chart({"type": "line"})
-                    ch4.add_series(
-                        {
-                            "name": "T4+T5 Kills",
-                            "categories": _rng("AsOfDate"),
-                            "values": _rng("T4T5_Kills"),
-                            "line": {"color": "#E74C3C", "width": 2.5},
-                            "marker": {"type": "circle", "size": 4},
-                        }
-                    )
-                    if "HealedTroops" in g6.columns:
-                        ch4.add_series(
-                            {
-                                "name": "Healed Troops",
-                                "categories": _rng("AsOfDate"),
-                                "values": _rng("HealedTroops"),
-                                "line": {"color": "#52BE80", "width": 2.5},
-                                "marker": {"type": "diamond", "size": 5},
-                            }
-                        )
-                    ch4.add_series(
-                        {
-                            "name": "Deads",
-                            "categories": _rng("AsOfDate"),
-                            "values": _rng("Deads"),
-                            "line": {"color": "#34495E", "width": 2.5},
-                            "marker": {"type": "square", "size": 5},
-                            "y2_axis": True,
-                        }
-                    )
-                    ch4.set_title({"name": "Combat Stats (T4&T5 Kills, Healed, Deads)"})
-                    ch4.set_x_axis({"name": "Date", "date_axis": True, "num_format": "dd/mm/yyyy"})
-                    ch4.set_y_axis(
-                        {
-                            "name": "T4&T5 Kills / Healed",
-                            "num_format": '[>=1000000000]###,#,,,"b";#,##0,,"m"',
-                        }
-                    )
-                    ch4.set_y2_axis(
-                        {"name": "Deads", "num_format": '[>=1000000000]###,#,,,"b";#,##0,,"m"'}
-                    )
-                    ch4.set_legend({"position": "bottom"})
-                    ws_g.insert_chart(chart_top + 48, 0, ch4, {"x_scale": 1.15, "y_scale": 1.0})
-
-                    # CHART 5: Forts (no change - these are small numbers)
-                    ch5 = wb.add_chart({"type": "line"})
-                    ch5.add_series(
-                        {
-                            "name": "Forts Total (Running Sum)",
-                            "categories": _rng("AsOfDate"),
-                            "values": _rng("FortsTotal_Cumulative"),
-                            "line": {"color": "#95A5A6", "width": 3},
-                        }
-                    )
-                    ch5.add_series(
-                        {
-                            "name": "Forts Launched",
-                            "categories": _rng("AsOfDate"),
-                            "values": _rng("FortsLaunched"),
-                            "type": "column",
-                            "fill": {"color": "#E74C3C"},
-                            "y2_axis": True,
-                        }
-                    )
-                    ch5.add_series(
-                        {
-                            "name": "Forts Joined",
-                            "categories": _rng("AsOfDate"),
-                            "values": _rng("FortsJoined"),
-                            "type": "column",
-                            "fill": {"color": "#3498DB"},
-                            "y2_axis": True,
-                        }
-                    )
-                    ch5.set_title({"name": "Forts Timeline (Cumulative & Daily)"})
-                    ch5.set_x_axis({"name": "Date", "date_axis": True, "num_format": "dd/mm/yyyy"})
-                    ch5.set_y_axis({"name": "Total (Cumulative)", "num_format": "#,##0"})
-                    ch5.set_y2_axis({"name": "Launch / Join (Daily)", "num_format": "#,##0"})
-                    ch5.set_legend({"position": "bottom"})
-                    ws_g.insert_chart(chart_top + 64, 0, ch5, {"x_scale": 1.15, "y_scale": 1.0})
-
-                # Write the daily table data (that charts reference)
-                ws_g.set_column(0, 0, 16, f_date)
-                for j in range(1, len(daily_cols)):
-                    ws_g.set_column(j, j, 14)
-
-                for i, rec in enumerate(
-                    g6.itertuples(index=False, name=None), start=start_data_row
-                ):
-                    for j, v in enumerate(rec):
-                        if daily_cols[j] == "AsOfDate":
-                            dv = pd.to_datetime(v).to_pydatetime()
-                            ws_g.write_datetime(i, j, dv, f_date)
-                        else:
-                            _write_safe(ws_g, i, j, v, f_num)
-
-                end_row = start_data_row + len(g6) - 1
-                ws_g.autofilter(table_top + 1, 0, max(table_top + 1, end_row), len(daily_cols) - 1)
-
-        else:
-            # openpyxl fallback
-            pd.DataFrame(
-                {
-                    "Info": [
-                        "My Stats Export",
-                        "This workbook shows YOUR registered accounts only.",
-                        "Tabs: README, INDEX, ALL_DAILY, per-account sheets.",
-                    ]
-                }
-            ).to_excel(writer, index=False, sheet_name="README")
-            pd.DataFrame(columns=["GovernorID", "GovernorName", "Alliance"]).to_excel(
-                writer, index=False, sheet_name="INDEX"
-            )
-            df_all.to_excel(writer, index=False, sheet_name="ALL_DAILY")
-
-            for gid, gdf in df_all.groupby("GovernorID"):
-                name = str(gdf.sort_values("AsOfDate").iloc[-1]["GovernorName"])
-                sname = f"{_clean_text(name)}-{int(gid)}"[:31]
-                g_basic = gdf.copy()
-                g_basic.to_excel(writer, index=False, sheet_name=sname)
+    window = filter_history_window(df_daily, days_for_daily_table)
+    governor_ids = tuple(
+        int(value)
+        for value in pd.to_numeric(
+            window.frame.get("GovernorID", pd.Series(dtype=int)), errors="coerce"
+        )
+        .dropna()
+        .drop_duplicates()
+        .tolist()
+    )
+    metadata = AccountDataExportMetadata(
+        output_kind=AccountDataOutputKind.FULL_WORKBOOK,
+        generated_at_utc=datetime.now(UTC),
+        authorised_governor_count=len(governor_ids),
+        snapshot_row_count=0,
+        history_row_count=window.row_count,
+        requested_days=days_for_daily_table,
+        window_start=window.window_start,
+        window_end=window.window_end,
+        written_start=window.written_start,
+        written_end=window.written_end,
+        stats_freshness=window.window_end,
+        governor_scan_freshness=None,
+        inventory_oldest=None,
+        inventory_latest=None,
+        inventory_reporting_count=None,
+        inventory_expected_count=None,
+    )
+    empty_portfolio = AccountsPortfolioPayload(
+        discord_user_id=0,
+        state="SETUP",
+        rows=(),
+        linked_count=0,
+        main_row=None,
+        role_counts=(),
+        power=AccountMetricTotal(value=None, reporting_count=0, expected_count=0),
+        troop_power=AccountMetricTotal(value=None, reporting_count=0, expected_count=0),
+        t4_t5_kills=AccountMetricTotal(value=None, reporting_count=0, expected_count=0),
+        rss_total=AccountMetricTotal(value=None, reporting_count=0, expected_count=0),
+        insight="",
+        refreshed_at_utc=metadata.generated_at_utc,
+    )
+    build_account_data_workbook(
+        window.frame,
+        portfolio=empty_portfolio,
+        governor_ids=governor_ids,
+        metadata=metadata,
+        out_path=out_path,
+    )
