@@ -9,10 +9,26 @@
 - One-pass approved: `no`
 - Product decision approved: `yes`
 - Runtime implementation approved: `yes, subject to the normal audit, architecture, implementation-plan, validation, and promotion gates`
-- Status: `implemented on working branch; final validation/review, operator smoke, and promotion pending`
+- Status: `complete and operator accepted after final Discord smoke on 2026-07-17`
 - New runtime backdrop: `none`
 - SQL deployment approved: `no`
 - Command target: `39 -> 38 top-level commands; /me 8 -> 7 grouped subcommands; /inventory remains 2`
+
+### Completion record
+
+- Mirror PR: `#227` (`cwatts6/K98-bot-mirror`)
+- Production PR: `#534` (`cwatts6/K98-bot`)
+- Accepted runtime heads before documentation closeout: mirror `66df1df1`, production `a8aaca19`
+- Final automated validation: `2595 passed, 2 skipped`; focused export, output-shape, command,
+  architecture, deferred, security-routing, smoke-import, pre-commit, and log-noise gates passed.
+- Security: final bot Changes review completed with Deep off and zero findings; SQL repository review
+  remained a documented read-only/no-diff skip.
+- Operator smoke: all three private outputs passed; output-kind and history selectors can switch and
+  reselect defaults; the child window times out and disables safely; workbook charts, sparklines, and
+  daily tables retain the accepted governor-sheet layout; `/my_stats` remains available; the three
+  selected-governor Inventory report-page exports remain available.
+- Deployment/resync: application-command resync removed `/me exports` and `/my_stats_export` and
+  confirmed the `38 / 7 / 2` command baseline.
 
 ### Locked product decision
 
@@ -419,8 +435,8 @@ Remove every footer or instruction saying `/my_stats_export` remains available.
 
 | Repository | Decision | Target | Expected setup / execution | Evidence |
 |---|---|---|---|---|
-| `K98 bot mirror` | `Changes review` | Working-tree patch against exact accepted base `2f6e3cc5092b18e1638001bf3a19c7772bccae62` | `Changes + Deep Off` | Final diff exists; scan pending. |
-| `K98 SQL Server` | `documented skip` | Read-only inspection of `dbo.vDaily_PlayerExport` and dependencies; SQL repository working tree clean | `Not applicable` | No SQL diff, schema change, runtime SQL change, or deployment. Re-route if scope changes. |
+| `K98 bot mirror` | `Changes review complete` | Accepted runtime diff `2f6e3cc5092b18e1638001bf3a19c7772bccae62..66df1df1` | `Changes + Deep Off` | Zero findings. The later closeout diff is documentation/archive-only and uses a documented skip. |
+| `K98 SQL Server` | `documented skip` | Read-only inspection of `dbo.vDaily_PlayerExport` and dependencies; SQL repository working tree clean | `Not applicable` | No SQL diff, schema change, runtime SQL change, or deployment. |
 
 Bot review focus:
 
@@ -766,8 +782,8 @@ sparse, 30-day, 360-day, snapshot-only, no-data, and registry-failure outputs.
 - [x] All temporary resources clean up on every path.
 - [x] Direct orphans are removed only after caller proof.
 - [x] Focused/full/golden/command/pre-commit/log/architecture/deferred/security-routing gates pass.
-- [ ] SQL read-only evidence, final Changes review, K98 PR review, and operator smoke are recorded.
-- [ ] Commands are resynced after deployment.
+- [x] SQL read-only evidence, final Changes review, K98 PR review, and operator smoke are recorded.
+- [x] Commands are resynced after deployment.
 
 ## 17. Deployment And Rollback
 
@@ -852,7 +868,11 @@ After Phase 5G acceptance, Phase 6 becomes:
 Interactive Personal Stats Experience And /my_stats Migration
 ```
 
-Phase 6 separately decides the future `/me stats` path, channel/private behavior, ALL/account selector,
-Yesterday/WTD/last-week/MTD/last-month/3M/6M semantics, presentation, performance, communication, final
-`/my_stats` removal rather than a permanent redirect, resync, smoke, and rollback. Personal downloads
-remain owned by Account Summary.
+Phase 6 separately designs the new interactive on-screen Stats format and decides the future
+`/me stats` path, private/channel behavior, period semantics, presentation, performance,
+communication, final `/my_stats` removal rather than a permanent redirect, resync, smoke, and
+rollback. Governor choice must be a first-class author-gated dropdown with explicit `ALL` plus each
+currently linked governor, active-registry revalidation on every change, safe handling above 25
+accounts, selection preservation across period changes, and honest aggregation semantics rather
+than guessed sums. Personal downloads remain owned by Account Summary; Phase 6 must not recreate
+`/me exports`, add download buttons, or move Account Data files into the interactive Stats surface.

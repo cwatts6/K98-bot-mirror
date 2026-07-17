@@ -1,7 +1,8 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation
 
-Status: active prepared implementation starter. Product decisions are approved; implementation must
-begin with audit/scope and use the normal stop gates. One-pass execution is not approved.
+Status: completed execution starter, retained as the Phase 5G historical record. Runtime delivery,
+review, command resync, and operator Discord smoke were accepted on 2026-07-17 through mirror PR
+#227 and production PR #534. Do not reuse this starter for Phase 6.
 
 ## Copy/Paste Starter
 
@@ -310,8 +311,12 @@ Required focused tests:
 
 Phase 6 handoff after Phase 5G:
 - Interactive Personal Stats Experience and /my_stats Migration
-- separately decide canonical /me stats path, channel/private behavior, account selector and ALL mode,
-  current time slices, presentation, performance, communication, final /my_stats removal, command
-  resync, smoke, and rollback
+- design a new interactive on-screen Stats format rather than another export/download surface
+- separately decide canonical /me stats path, channel/private behavior, period semantics,
+  presentation, performance, communication, final /my_stats removal, command resync, smoke, and
+  rollback
+- use an author-gated governor dropdown with explicit ALL plus every currently linked governor;
+  revalidate active linkage on each change, preserve governor/period state, handle more than 25
+  accounts safely, and audit aggregation semantics instead of assuming every metric can be summed
 - do not move personal downloads out of Account Summary
 ```

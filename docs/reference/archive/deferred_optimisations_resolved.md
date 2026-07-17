@@ -3,6 +3,22 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### GovernorOS v2 Phase 5G Account Data Export Consolidation Completed Item
+
+- Area: `commands/me_cmds.py`, `commands/stats_cmds.py`, Account Summary views, `services/account_data_export_service.py`, `stats_exporter.py`, `stats_exporter_csv.py`, command/docs/tests
+- Type: architecture
+- Description: Personal data downloads were split between a one-action `/me exports` page, a redirect-only `/my_stats_export`, and Account Summary's narrower CSV action. The Stats workbook/CSV paths also had inconsistent inclusive windows, fetched-versus-written counts, unfiltered `ALL_DAILY`, partial INDEX summary, fixed 180-day Forts semantics, formula safety, freshness wording, and duplicate Excel/Google Sheets choices.
+- Resolution: Phase 5G made `/me accounts -> Account Summary -> Download data` the only central all-linked personal-data journey; removed `/me exports`, `/my_stats_export`, and every Exports navigation/control; delivered a default Account-Summary-first workbook, exact 29-column current snapshot CSV, and raw Stats history CSV; corrected all identified window/count/sheet/Forts/safety/freshness/format issues; preserved `/my_stats` and selected-governor Inventory report-page exports; and made no SQL change. The command surface is 38 top-level, seven `/me`, and two `/inventory` subcommands.
+- Validation: Mirror PR #227 and production PR #534 carry the accepted implementation. Final automated validation recorded `2595 passed, 2 skipped`, all focused/output/architecture/deferred/routing/import/registration/pre-commit/log-noise gates passed, bot Changes review reported zero findings, and the SQL repository remained read-only with no diff. Operator Discord smoke on 2026-07-17 accepted all three private outputs, selector reselection, timeout, restored governor-sheet workbook layout, unchanged `/my_stats`, retained Inventory report-page exports, and command resync.
+
+### GovernorOS v2 Phase 5G Exports Page Lifecycle Cleanup Completed Item
+
+- Area: `ui/views/player_self_service_views.py`, removed `ui/views/player_self_service_export_views.py`, `player_self_service/page_cards.py`, removed Exports asset/callbacks/tests
+- Type: consistency
+- Description: Removing `/me exports` made the Exports page, buttons, custom IDs, page-card/fallback/timeout branches, asset, and dedicated option view direct zero-callers. Leaving them active would have preserved a hidden duplicate journey and stale retry copy.
+- Resolution: Phase 5G removed every proven direct Exports-only caller and artifact while retaining the accepted Accounts, Reminders, Preferences, Dashboard, Account Summary, and selected-governor Inventory report lifecycles. Broader generic renderer/view consolidation remained out of scope and stays separately deferred only where measured duplication exists.
+- Validation: Caller searches, focused lifecycle/interaction tests, full pytest, command-registration validation, final Discord navigation/timeout smoke, and Changes review passed. No Exports button, custom ID, retry route, command registration, or asset remains.
+
 ### GovernorOS v2 Phase 5D.1 Authoritative Next-Alert Projection Completed Item
 
 - Area: `event_scheduler.py`, `event_calendar/reminders.py`, `player_self_service/service.py`, `/me reminders`

@@ -65,7 +65,12 @@ programme.
 
 This file remains the historical command-surface audit and migration record.
 
-## Current Registration Summary
+Current command-surface note (2026-07-17): GovernorOS v2 Phase 5G later removed `/me exports` and
+`/my_stats_export`. The maintained validator/canonical baseline is now
+`primary=38 grouped_subcommands_detected=99 total_unique=38`, with seven `/me` and two `/inventory`
+subcommands. See `canonical_command_reference.md`; the Phase 5A figures below remain historical.
+
+## Historical Phase 5A Registration Summary
 
 `scripts/validate_command_registration.py` reports:
 

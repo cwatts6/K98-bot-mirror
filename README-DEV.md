@@ -79,9 +79,10 @@ Phase 5F is complete and operator accepted after final Discord smoke on 2026-07-
 contains the accepted implementation, and production-branch commit `89f7da16` carries the promoted
 patch. The completed task pack and chat starter are archived under `docs/task_packs/archive/`.
 
-GovernorOS v2 Phase 5G Account Data Export Consolidation is implemented on its working branch and
-is in validation/review before operator smoke and promotion. It removes `/me exports` and
-`/my_stats_export`, removes every Exports navigation surface, and makes
+GovernorOS v2 Phase 5G Account Data Export Consolidation is complete and operator accepted after
+final Discord smoke on 2026-07-17. Mirror PR #227 and production PR #534 carry the accepted
+implementation. It removes `/me exports` and `/my_stats_export`, removes every Exports navigation
+surface, and makes
 `/me accounts -> Account Summary -> Download data` the canonical all-linked personal-data journey.
 
 `Download data` offers a default Account-Summary-first formatted workbook (`.xlsx`), the exact
@@ -90,13 +91,18 @@ The phase also corrects every identified Stats export issue: exact inclusive N-d
 `ALL_DAILY`, actual written row counts/date bounds, selected-window Forts semantics, shared formula
 safety, separate Stats/Inventory freshness, truthful generated time, and one honest Excel/Google
 Sheets-compatible workbook option. The top-level command surface is 38, `/me` has seven grouped
-subcommands, and `/inventory` remains at two. The three selected-governor Inventory report-page
-exports remain unchanged. `/my_stats` remains unchanged; redesign and migration are Phase 6.
+subcommands, and `/inventory` remains at two. Command resync and smoke confirmed both retired routes
+are absent, `/my_stats` remains live, the private option window can switch and reselect every
+output/window choice, times out safely, and all three output kinds work. The selected-governor
+Inventory report-page exports remain unchanged. The completed Phase 5G task pack and chat starter
+are archived under `docs/task_packs/archive/`.
 
-Active Phase 5G records:
-
-- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
-- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md`
+GovernorOS v2 Phase 5 is therefore complete. Phase 6 is the next separately task-packed slice:
+Interactive Personal Stats Experience and `/my_stats` Migration. Its audit/product workshop must
+define the new interactive on-screen format, canonical `/me stats` path, author-gated governor
+dropdown with explicit ALL behavior, period semantics, private/channel migration, performance,
+fallback/timeout/accessibility, communication, final `/my_stats` removal, command resync, smoke, and
+rollback. Personal downloads remain under Account Summary; Phase 6 must not recreate an export hub.
 
 ## Quality Automation
 
@@ -397,7 +403,6 @@ pytest tests/test_kvkrankingview.py -vv
 pytest -q tests/test_stats_service.py -vv
 pytest -q tests/test_embed_my_stats.py -vv
 pytest -q tests/test_stats_export.py -vv
-pytest -q tests/test_my_stats_export_command.py -vv
 pytest -q tests/test_stats_exporter_csv.py -vv
 
 pytest -q tests/test_kvk_history_offload_and_utils.py

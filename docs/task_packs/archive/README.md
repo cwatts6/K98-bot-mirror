@@ -44,7 +44,7 @@ Dashboard Card and Preferences Hub, Phase 6 Guided Management Cards and Workflow
 and Phase 7 Unified Reminder Centre and Dashboard Card Alignment execution records are archived
 here. The original programme is complete; its closed programme pack remains in `docs/task_packs/`.
 
-Player Self-Service Command Centre v2 / GovernorOS completed Phases 1 through 5F. The archived
+Player Self-Service Command Centre v2 / GovernorOS completed Phases 1 through 5G. The archived
 records cover the dashboard blueprint/data foundation, governor selector and premium dashboard,
 direct Inventory reports and visual alignment, Accounts, Reminders, and the authoritative shared
 KVK/Calendar next-alert projection. Phase 5D.1 delivered in mirror PR #223 and production PR #530;
@@ -59,9 +59,13 @@ on 2026-07-16. Its archived records capture retirement of `/me inventory`, `/myi
 `/inventory_preferences`, `/export_inventory`, public/combined Inventory viewing and the combined
 export; preservation of the selected-governor reports and their three exports; the profile-first
 Personal Settings reflow; final 39 top-level/8 `/me` command baselines; zero SQL change; and the
-dormant rollback table. Phase 5G Account Data Export Consolidation is active, product-approved, and
-task-packed under `docs/task_packs/`; its records remain outside this archive until implementation
-and acceptance.
+dormant rollback table. Phase 5G Account Data Export Consolidation completed final review,
+deployment/resync, and operator Discord smoke on 2026-07-17 through mirror PR #227 and production
+PR #534. Its archived task pack and starter record the canonical Account Summary Download data
+journey, retirement of `/me exports` and `/my_stats_export`, the `38 / 7 / 2` command surface, all
+three private output contracts, corrected workbook/history semantics, no SQL change, and the Phase 6
+interactive Stats handoff. The active v2 programme pack remains in `docs/task_packs/`; the operator
+will create the separate Phase 6 task pack.
 
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,

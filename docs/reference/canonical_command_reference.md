@@ -1,6 +1,6 @@
 # Canonical Command Reference
 
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 This is the maintained command reference for the K98 bot after the completed Command Platform
 Audit & Optimisation Programme. Use
@@ -17,7 +17,7 @@ The runtime source of truth is the active `commands/` package registered through
 Current validator baseline:
 
 ```text
-primary=39 grouped_subcommands_detected=100 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=39
+primary=38 grouped_subcommands_detected=99 disabled_legacy=0 secondary_cogs=0 secondary_subscribe=0 total_unique=38
 ```
 
 Grouped command summary:
@@ -33,7 +33,7 @@ Grouped command summary:
 | `/kvk` | 4 |
 | `/kvk_admin` | 7 |
 | `/location` | 2 |
-| `/me` | 9 |
+| `/me` | 7 |
 | `/mge` | 6 |
 | `/ops` | 25 |
 | `/prekvk` | 2 |
@@ -143,7 +143,7 @@ Legend:
 | MGE | `/mge commanders` | `commands/mge_cmds.py` | Grouped | Decorator-gated admin path | Ephemeral | Standard | Preserve | MGE commander controls. |
 | MGE | `/mge admin_completion` | `commands/mge_cmds.py` | Grouped | Decorator-gated admin path | Ephemeral | Standard | Preserve | Admin completion controls. |
 | Player Self-Service | `/me dashboard` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.03`) | Preserve; GovernorOS v2 Phase 5A direct Inventory integration | Private governor-first command centre. No linked governor shows setup guidance, one opens directly, and multiple use an author-gated governor-only selector before payload fetch. The selected-governor standalone card is 1180x760 and adds latest approved RSS, Speedups, and legendary-equivalent Materials totals for that governor only. Selected dashboards expose Accounts, Reminders, Preferences, direct RSS/Materials/Speedups actions, and Change Governor where applicable. The approved private embed remains the same-payload fallback. |
-| Player Self-Service | `/me accounts` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | GovernorOS v2 Phase 5G Account Data host; pending operator acceptance | Private Discord-user/all-linked-governor portfolio card with author avatar, Main/role ordering, accepted Account Summary visuals and guided account management. Account Summary owns the author-gated `Download data` child journey: a default Account-Summary-first Excel/Google Sheets-compatible workbook, exact 29-column current snapshot CSV, or raw Stats history CSV. Download execution re-resolves active registry authority, applies one exact inclusive 30/60/90/180/360-day window where applicable, and reports actual written rows/date bounds plus separate freshness. It does not show Change Governor; selected governor context is retained only for validated Dashboard return. |
+| Player Self-Service | `/me accounts` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard | GovernorOS v2 Phase 5G Account Data host; operator accepted 2026-07-17 | Private Discord-user/all-linked-governor portfolio card with author avatar, Main/role ordering, accepted Account Summary visuals and guided account management. Account Summary owns the author-gated `Download data` child journey: a default Account-Summary-first Excel/Google Sheets-compatible workbook, exact 29-column current snapshot CSV, or raw Stats history CSV. Download execution re-resolves active registry authority, applies one exact inclusive 30/60/90/180/360-day window where applicable, and reports actual written rows/date bounds plus separate freshness. It does not show Change Governor; selected governor context is retained only for validated Dashboard return. |
 | Player Self-Service | `/me reminders` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard (`v1.01`) | Phase 5D.1 complete and operator accepted 2026-07-15 | Private Discord-user-level premium reminder centre with invoking-user avatar/safe fallback, duplicate-safe Kingdom identity, earned ACTIVE/REVIEW/OFF state, and an authoritative scheduler-parity hero: earliest future KVK/Calendar alert, healthy `NO UPCOMING ALERT`, or request-level `SCHEDULE UNAVAILABLE`. Friendly labels and absolute UTC times never expose raw occurrence keys or imply delivery success; the event start date-time is visually prominent in bold gold. The existing 1702x924 card, stable filename, same-payload fallback, Manage journey, KVK autosave/remove-all/confirmation DM, Calendar Settings, privacy, navigation, timeout, attachment cleanup, and return-only Dashboard context remain unchanged. Phase 13 redirects `/subscribe`, `/modify_subscription`, `/unsubscribe`, and `/calendar_reminder_config` here; the three existing next-event commands remain registered and unchanged. Projection bulk-loads each source/config/tracker once, uses one injected UTC clock including the default KVK snapshot, and performs no tasks, DMs, acknowledgements, refreshes, network calls, or writes. The operator authorised the narrow KVK zero-duration correction so saved `now` is genuinely at-start eligible through the existing scheduling/tracker/rehydration/retry machinery. No Calendar, persistence, event-source/type, lead-time, cadence, SQL, command-registration, or DM-content contract changed. |
 | Player Self-Service | `/me preferences` | `commands/me_cmds.py` | Grouped | Public command-level access | Ephemeral | Standard (`v1.02`) | Preserve; GovernorOS v2 Phase 5F profile-only consolidation | Private Discord-user-level Personal Settings centre for saved timezone, location country, preferred-language metadata, and derived DST-aware local-time context. The successful result is an avatar-enabled standalone 1702x924 attachment using `assets/me/cards/me_preferences.png`, with a same-authorised-payload fallback and graceful timeout. The header is `LOCAL` when the saved timezone is usable and `UTC` otherwise; this is derived display state, not a saved preference. Manage settings opens Regional Profile directly. Regional fields retain existing catalogs, paging, validation/null semantics, atomic field-specific save/clear, superseded/concurrent safety, Back navigation, timeout, fallback, attachment replacement, and cleanup. There is no Inventory visibility, Privacy & Sharing journey, VIP content/action, or Change Governor. Governor-specific VIP editing remains owned by Manage Accounts -> Update VIP. No SQL object/schema/deployment change. |
 | Player Self-Service | `/me resources` | `commands/me_cmds.py` | Grouped | Public command-level access; selected governor must be actively linked to the invoking Discord user | Ephemeral | Standard (`v1.00`) | GovernorOS v2 Phase 5B complete; operator smoke passed 2026-07-13 | Private selected-governor Resources report using the report-specific premium 1400x980 Inventory backdrop, honest native no-data output, 1M/3M/6M/12M ranges, private exports, report tabs, Dashboard navigation, and paged Change Governor controls. |
@@ -193,7 +193,7 @@ Legend:
 | Stats/KVK | `/kvk_admin test_export` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk test_export` in Phase 2A | KVK export test. |
 | Stats/KVK | `/mykvkstats` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk stats`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_admin refresh_stats_cache` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk refresh_stats_cache` in Phase 2A | Refreshes stats cache. |
-| Stats/KVK | `/my_stats` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator | User-selectable | Standard (`v1.14`) | Preserve unchanged through Phase 5G | Personal stats report remains channel-gated. Its redesign and migration are explicitly deferred to Phase 6; personal downloads remain under Account Summary. |
+| Stats/KVK | `/my_stats` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator | User-selectable | Standard (`v1.14`) | Preserve until separately approved Phase 6 migration | Personal stats report remains channel-gated and unchanged after Phase 5G. Phase 6 must task-pack the new interactive format, canonical path, author-gated ALL/governor dropdown, period/aggregation semantics, privacy/channel migration, and final command removal. Personal downloads remain under Account Summary. |
 | Stats/KVK | `/stats player` | `commands/stats_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve; include in Player Self-Service v2 scoping review | Leadership player stats lookup remains live; alignment with the full stats/profile modernisation belongs in the v2 programme pack. |
 | Stats/KVK | `/mykvkhistory` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk history`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_rankings` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Public redirect | Standard | Deprecated redirect to `/kvk rankings type:kvk`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
@@ -307,11 +307,17 @@ Legend:
   the definitive report UX. Personal Settings is profile-only with derived `LOCAL`/`UTC` context.
   The bot no longer reads or writes Inventory visibility; `dbo.InventoryReportPreference` remains
   untouched for rollback and there is no Phase 5F SQL deployment.
-- GovernorOS v2 Phase 5G supersedes the Phase 5F Stats-only export-centre checkpoint. The working
-  branch removes `/me exports` and `/my_stats_export`, leaving 38 top-level commands, seven `/me`
+- GovernorOS v2 Phase 5G supersedes the Phase 5F Stats-only export-centre checkpoint. The accepted
+  implementation removes `/me exports` and `/my_stats_export`, leaving 38 top-level commands, seven `/me`
   subcommands, and two `/inventory` subcommands. `/me accounts -> Account Summary -> Download data`
   is the single private all-linked personal-data journey. `/my_stats` remains unchanged for Phase 6,
-  and selected-governor Resources, Speedups, and Materials retain their report-page exports.
+  and selected-governor Resources, Speedups, and Materials retain their report-page exports. Final
+  command resync and operator Discord smoke passed on 2026-07-17.
+- GovernorOS v2 Phase 6 is the next separately task-packed migration. It must design a new
+  interactive on-screen Stats experience with an author-gated dropdown for explicit ALL plus active
+  linked governors, registry revalidation, safe >25-account paging, preserved governor/period state,
+  and evidence-based metric aggregation. It must not restore `/me exports` or move Account Data
+  downloads out of Account Summary.
 - Player Self-Service Command Centre Phase 13 started legacy redirect planning with audit/scope
   only. The operator-provided SQL extract and dated JSONL files showed nonzero broad usage for
   every audited legacy and related personal path, recent direct usage for several legacy paths, and
