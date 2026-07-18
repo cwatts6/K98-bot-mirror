@@ -55,6 +55,7 @@ def _font_text(
     min_size: int = 12,
     fill: tuple[int, int, int, int] = _TEXT,
     bold: bool = False,
+    right_align: bool = False,
 ) -> None:
     cleaned = _clean(value)
     font = visual_text.fit_font(
@@ -63,18 +64,29 @@ def _font_text(
     fitted = visual_text.fit_text_to_width(
         draw, cleaned, width=max(1, width), base_font=font, bold=bold
     )
+    draw_x = xy[0]
+    if right_align:
+        draw_x += width - visual_text.text_width(draw, fitted, font=font, bold=bold)
     visual_text.draw_text(
         draw,
-        (xy[0] + 2, xy[1] + 2),
+        (draw_x + 2, xy[1] + 2),
         fitted,
         font=font,
         fill=_SHADOW,
         bold=bold,
     )
-    visual_text.draw_text(draw, xy, fitted, font=font, fill=fill, bold=bold, embedded_color=True)
+    visual_text.draw_text(
+        draw,
+        (draw_x, xy[1]),
+        fitted,
+        font=font,
+        fill=fill,
+        bold=bold,
+        embedded_color=True,
+    )
 
 
-def _compact(value: int | None, *, signed: bool = False) -> str:
+def _compact(value: int | float | None, *, signed: bool = False) -> str:
     if value is None:
         return "—"
     sign = "+" if signed and value > 0 else ""
@@ -83,7 +95,8 @@ def _compact(value: int | None, *, signed: bool = False) -> str:
         if magnitude >= divisor:
             rendered = f"{value / divisor:.2f}".rstrip("0").rstrip(".")
             return f"{sign}{rendered}{suffix}"
-    return f"{sign}{value:,}"
+    rendered = f"{value:,.1f}".rstrip("0").rstrip(".") if isinstance(value, float) else f"{value:,}"
+    return f"{sign}{rendered}"
 
 
 def _panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int]) -> None:
@@ -233,7 +246,8 @@ def _metric_box(
     helper = context or (
         "No reporting days"
         if average is None
-        else f"Avg {average:+,.1f}/reporting day • {metric.reporting_days}/{metric.expected_days} days"
+        else f"Avg {_compact(average, signed=True)}/reporting day • "
+        f"{metric.reporting_days}/{metric.expected_days} days"
     )
     _font_text(
         draw,
@@ -265,7 +279,7 @@ def _marker(
 def _chart_summary(metric: StatsMetricSummary) -> str:
     total = _compact(metric.total, signed=True)
     average = metric.average_per_reporting_day
-    average_label = "—" if average is None else f"{average:+,.1f}"
+    average_label = _compact(average, signed=True)
     peak = (
         "no exact peak"
         if metric.peak_date is None
@@ -398,45 +412,49 @@ def _header(
     _state_badge(draw, payload.state.value)
     _font_text(
         draw,
-        (1040, 117),
+        (1010, 117),
         f"{mode.label} • {payload.period.label}",
-        width=555,
+        width=595,
         size=24,
         min_size=17,
         fill=_BLUE,
         bold=True,
+        right_align=True,
     )
     _font_text(
         draw,
-        (1040, 151),
+        (1010, 151),
         f"{payload.window.start_date:%d %b %Y} — {payload.window.end_date:%d %b %Y}",
-        width=555,
+        width=595,
         size=20,
         min_size=15,
         bold=True,
+        right_align=True,
     )
     coverage_colour = (
         _state_colour(payload.state.value) if payload.state.value == "PARTIAL" else _MUTED
     )
     _font_text(
         draw,
-        (1040, 181),
+        (1010, 181),
         _coverage_text(payload),
-        width=555,
+        width=595,
         size=17,
         min_size=11,
         fill=coverage_colour,
         bold=True,
+        right_align=True,
     )
     generated = payload.generated_at_utc.astimezone(UTC)
     _font_text(
         draw,
-        (1040, 207),
+        (1010, 207),
         f"Stats anchor {payload.stats_anchor_date:%d %b %Y} • Generated {generated:%d %b %Y %H:%M:%S UTC}",
-        width=555,
+        width=595,
         size=14,
         min_size=10,
         fill=_MUTED,
+        right_align=True,
     )
 
 

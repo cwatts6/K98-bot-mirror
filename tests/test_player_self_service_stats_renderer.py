@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import time
 
-from PIL import Image
+from PIL import Image, ImageDraw
 import pytest
 
 from player_self_service import stats_renderer
@@ -190,6 +190,45 @@ def test_partial_coverage_text_names_incomplete_source() -> None:
         coverage=StatsCoverage(3, 3, 1, 1, 3, 3, 3, 3),
     )
     assert stats_renderer._coverage_text(complete_but_partial).endswith("Source values incomplete")
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    (
+        (20_569_467.2, "+20.57M"),
+        (479_819.8, "+479.82K"),
+        (4_130.3, "+4.13K"),
+        (84.5, "+84.5"),
+        (17.0, "+17"),
+        (-20_569_467.2, "-20.57M"),
+    ),
+)
+def test_compact_average_values_match_headline_scale(value: float, expected: str) -> None:
+    assert stats_renderer._compact(value, signed=True) == expected
+
+
+def test_font_text_can_align_fitted_text_to_shared_right_edge(monkeypatch) -> None:
+    image = Image.new("RGBA", (400, 100), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    drawn_at: list[tuple[int, int]] = []
+
+    def capture_draw_text(_draw, xy, *_args, **_kwargs) -> None:
+        drawn_at.append(xy)
+
+    monkeypatch.setattr(stats_renderer.visual_text, "draw_text", capture_draw_text)
+    stats_renderer._font_text(
+        draw,
+        (100, 20),
+        "Aligned",
+        width=200,
+        size=20,
+        right_align=True,
+    )
+
+    assert drawn_at[0][0] == drawn_at[1][0] + 2
+    font = stats_renderer.visual_text.fit_font(draw, "Aligned", max_width=200, size=20, min_size=12)
+    assert drawn_at[1][0] + stats_renderer.visual_text.text_width(draw, "Aligned", font=font) == 300
+    image.close()
 
 
 def test_all_linked_coverage_text_uses_account_days() -> None:
