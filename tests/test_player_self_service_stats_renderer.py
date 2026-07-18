@@ -81,6 +81,7 @@ def _payload() -> PersonalStatsPayload:
         coverage=StatsCoverage(3, 2, 1, 1, 3, 2, 1, 1),
         state=StatsResultState.PARTIAL,
         metrics=metrics,
+        data_refreshed_at_utc=datetime(2026, 7, 15, 16, 25, 30, tzinfo=UTC),
         generated_at_utc=datetime(2026, 7, 15, 16, 30, 45, tzinfo=UTC),
     )
 
@@ -144,7 +145,7 @@ def test_activity_one_point_and_no_point_series_render_without_fake_trend() -> N
 
 def test_activity_keeps_only_fort_total_box_and_all_three_fort_chart_series(monkeypatch) -> None:
     metric_labels: list[str] = []
-    charts: list[tuple[str, tuple[str, ...]]] = []
+    charts: list[tuple[str, tuple[str, ...], date, date]] = []
     monkeypatch.setattr(
         stats_renderer,
         "_metric_box",
@@ -153,8 +154,13 @@ def test_activity_keeps_only_fort_total_box_and_all_three_fort_chart_series(monk
     monkeypatch.setattr(
         stats_renderer,
         "_draw_chart",
-        lambda _draw, _box, title, series: charts.append(
-            (title, tuple(label for label, _metric in series))
+        lambda _draw, _box, title, series, **kwargs: charts.append(
+            (
+                title,
+                tuple(label for label, _metric in series),
+                kwargs["start_date"],
+                kwargs["end_date"],
+            )
         ),
     )
 
@@ -163,23 +169,97 @@ def test_activity_keeps_only_fort_total_box_and_all_three_fort_chart_series(monk
     assert "Forts total" in metric_labels
     assert "Forts launched" not in metric_labels
     assert "Forts joined" not in metric_labels
-    assert ("FORT DAILY TREND", ("Total", "Launched", "Joined")) in charts
+    assert (
+        "FORT DAILY TREND",
+        ("Total", "Launched", "Joined"),
+        date(2026, 7, 13),
+        date(2026, 7, 15),
+    ) in charts
+    assert {chart[2:] for chart in charts} == {(date(2026, 7, 13), date(2026, 7, 15))}
 
 
 def test_combat_adds_requested_three_series_daily_trend(monkeypatch) -> None:
-    charts: list[tuple[str, tuple[str, ...]]] = []
+    charts: list[tuple[str, tuple[str, ...], date, date]] = []
     monkeypatch.setattr(stats_renderer, "_metric_box", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         stats_renderer,
         "_draw_chart",
-        lambda _draw, _box, title, series: charts.append(
-            (title, tuple(label for label, _metric in series))
+        lambda _draw, _box, title, series, **kwargs: charts.append(
+            (
+                title,
+                tuple(label for label, _metric in series),
+                kwargs["start_date"],
+                kwargs["end_date"],
+            )
         ),
     )
 
     stats_renderer._combat(object(), _payload())
 
-    assert charts == [("COMBAT DAILY TREND", ("T4+T5", "Deads", "Healed"))]
+    assert charts == [
+        (
+            "COMBAT DAILY TREND",
+            ("T4+T5", "Deads", "Healed"),
+            date(2026, 7, 13),
+            date(2026, 7, 15),
+        )
+    ]
+
+
+def test_chart_uses_even_selected_window_ticks_without_repeated_metric_summaries(
+    monkeypatch,
+) -> None:
+    image = Image.new("RGBA", (800, 320), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    labels: list[str] = []
+    monkeypatch.setattr(
+        stats_renderer,
+        "_font_text",
+        lambda _draw, _xy, value, **_kwargs: labels.append(str(value)),
+    )
+    start = date(2026, 1, 19)
+    end = date(2026, 7, 17)
+
+    stats_renderer._draw_chart(
+        draw,
+        (10, 10, 790, 310),
+        "DAILY TREND",
+        (("Series A", _metric(75)), ("Series B", _metric(-25))),
+        start_date=start,
+        end_date=end,
+    )
+
+    expected_ticks = tuple(
+        f"{value:%d %b}" for value in stats_renderer._axis_tick_dates(start, end)
+    )
+    assert expected_ticks == tuple(label for label in labels if label in expected_ticks)
+    assert expected_ticks[0] == "19 Jan"
+    assert expected_ticks[-1] == "17 Jul"
+    assert len(expected_ticks) == 5
+    assert "Series A" in labels and "Series B" in labels
+    assert not any("total " in label or "avg " in label or "peak " in label for label in labels)
+    image.close()
+
+
+def test_data_refresh_text_uses_payload_refresh_in_utc_without_generated_wording() -> None:
+    payload = replace(
+        _payload(),
+        data_refreshed_at_utc=datetime(
+            2026,
+            7,
+            15,
+            18,
+            30,
+            45,
+            tzinfo=timezone(timedelta(hours=2)),
+        ),
+    )
+
+    label = stats_renderer._data_refresh_text(payload)
+
+    assert label == "Data last refreshed 15 Jul 2026 16:30:45 UTC"
+    assert "Generated" not in label
+    assert "Stats anchor" not in label
 
 
 def test_partial_coverage_text_names_incomplete_source() -> None:

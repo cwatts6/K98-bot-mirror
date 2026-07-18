@@ -303,6 +303,8 @@ async def test_identical_inflight_loads_are_deduplicated_and_cache_reuse_is_auth
     assert data_calls == 1
     assert registry_calls == 6  # Before and after every load, including cache reuse.
     assert first.metrics.power_change.total == second.metrics.power_change.total
+    assert first.data_refreshed_at_utc == second.data_refreshed_at_utc
+    assert third.data_refreshed_at_utc == first.data_refreshed_at_utc
     assert third.scope_governor_ids == (111,)
 
 

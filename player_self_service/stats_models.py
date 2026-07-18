@@ -211,9 +211,12 @@ class PersonalStatsPayload:
     coverage: StatsCoverage
     state: StatsResultState
     metrics: PersonalStatsMetrics
+    data_refreshed_at_utc: datetime
     generated_at_utc: datetime
 
     def __post_init__(self) -> None:
+        if self.data_refreshed_at_utc.tzinfo is None:
+            raise ValueError("Stats data_refreshed_at_utc must be timezone-aware")
         if self.generated_at_utc.tzinfo is None:
             raise ValueError("Stats generated_at_utc must be timezone-aware")
         if not self.scope_governor_ids:

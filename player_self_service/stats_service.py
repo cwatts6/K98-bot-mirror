@@ -51,15 +51,18 @@ _CACHE_LOCK = asyncio.Lock()
 class _CacheEntry:
     expires_at: float
     dataset: PersonalStatsDataSet
+    refreshed_at_utc: datetime
 
 
 _CACHE: OrderedDict[tuple[int, tuple[int, ...]], _CacheEntry] = OrderedDict()
-_INFLIGHT: dict[tuple[int, tuple[int, ...]], asyncio.Task[PersonalStatsDataSet]] = {}
+_INFLIGHT: dict[
+    tuple[int, tuple[int, ...]], asyncio.Task[tuple[PersonalStatsDataSet, datetime]]
+] = {}
 
 
 async def _remove_finished_inflight(
     key: tuple[int, tuple[int, ...]],
-    task: asyncio.Task[PersonalStatsDataSet],
+    task: asyncio.Task[tuple[PersonalStatsDataSet, datetime]],
 ) -> None:
     async with _CACHE_LOCK:
         if _INFLIGHT.get(key) is task:
@@ -68,7 +71,7 @@ async def _remove_finished_inflight(
 
 def _schedule_inflight_cleanup(
     key: tuple[int, tuple[int, ...]],
-    task: asyncio.Task[PersonalStatsDataSet],
+    task: asyncio.Task[tuple[PersonalStatsDataSet, datetime]],
 ) -> None:
     try:
         task.exception()
@@ -146,26 +149,27 @@ async def _load_registry(
 async def _fetch_dataset(
     governor_ids: tuple[int, ...],
     data_loader: DataLoader,
-) -> PersonalStatsDataSet:
+) -> tuple[PersonalStatsDataSet, datetime]:
     async with _DATA_SEMAPHORE:
-        return await asyncio.wait_for(
+        dataset = await asyncio.wait_for(
             asyncio.to_thread(data_loader, governor_ids, history_days=180),
             timeout=_DATA_TIMEOUT_SECONDS,
         )
+        return dataset, datetime.now(UTC)
 
 
 async def _authorized_dataset(
     discord_user_id: int,
     governor_ids: tuple[int, ...],
     data_loader: DataLoader,
-) -> tuple[PersonalStatsDataSet, bool]:
+) -> tuple[PersonalStatsDataSet, bool, datetime]:
     key = (int(discord_user_id), tuple(sorted(governor_ids)))
     now = time.monotonic()
     async with _CACHE_LOCK:
         entry = _CACHE.get(key)
         if entry is not None and entry.expires_at > now:
             _CACHE.move_to_end(key)
-            return entry.dataset, True
+            return entry.dataset, True, entry.refreshed_at_utc
         if entry is not None:
             _CACHE.pop(key, None)
         task = _INFLIGHT.get(key)
@@ -177,7 +181,7 @@ async def _authorized_dataset(
             )
 
     try:
-        dataset = await asyncio.shield(task)
+        dataset, refreshed_at_utc = await asyncio.shield(task)
     finally:
         if task.done():
             async with _CACHE_LOCK:
@@ -188,11 +192,12 @@ async def _authorized_dataset(
         _CACHE[key] = _CacheEntry(
             expires_at=time.monotonic() + _CACHE_TTL_SECONDS,
             dataset=dataset,
+            refreshed_at_utc=refreshed_at_utc,
         )
         _CACHE.move_to_end(key)
         while len(_CACHE) > _CACHE_MAX_ENTRIES:
             _CACHE.popitem(last=False)
-    return dataset, False
+    return dataset, False, refreshed_at_utc
 
 
 def _valid_interval(previous: date | None, current: date, window: StatsWindow) -> bool:
@@ -462,7 +467,7 @@ async def build_personal_stats_payload(
         selected_ids = (selected_id,)
 
     try:
-        dataset, cache_hit = await _authorized_dataset(
+        dataset, cache_hit, data_refreshed_at_utc = await _authorized_dataset(
             int(discord_user_id), selected_ids, data_loader
         )
     except asyncio.CancelledError:
@@ -548,6 +553,7 @@ async def build_personal_stats_payload(
         coverage=coverage,
         state=state,
         metrics=metrics,
+        data_refreshed_at_utc=data_refreshed_at_utc,
         generated_at_utc=datetime.now(UTC),
     )
 

@@ -13,6 +13,7 @@ from player_self_service.stats_models import (
     PersonalStatsMetrics,
     PersonalStatsPayload,
     StatsCoverage,
+    StatsDailyPoint,
     StatsGovernorOption,
     StatsMetricSummary,
     StatsMode,
@@ -24,6 +25,7 @@ from player_self_service.stats_models import (
 from player_self_service.stats_renderer import RenderedStatsCard
 from ui.views.player_self_service_stats_views import (
     PersonalStatsView,
+    _attachment_description,
     show_personal_stats_for_interaction,
 )
 
@@ -54,8 +56,40 @@ def _payload(option_count: int = 1) -> PersonalStatsPayload:
         coverage=StatsCoverage(3, 0, option_count, 0, 3 * option_count, 0, 0, 0),
         state=StatsResultState.NO_DATA,
         metrics=metrics,
+        data_refreshed_at_utc=datetime(2026, 7, 15, 11, 59, tzinfo=UTC),
         generated_at_utc=datetime(2026, 7, 15, 12, 0, tzinfo=UTC),
     )
+
+
+@pytest.mark.parametrize(
+    ("mode", "last_metric"),
+    (
+        (StatsMode.OVERVIEW, "Deads"),
+        (StatsMode.ACTIVITY, "Forts joined"),
+        (StatsMode.COMBAT, "Healed Troops gained"),
+    ),
+)
+def test_attachment_description_preserves_accessible_metric_equivalents(
+    mode: StatsMode, last_metric: str
+) -> None:
+    daily = (StatsDailyPoint(date(2026, 7, 15), 9_223_372_036_854_775_807),)
+    maximum = StatsMetricSummary(
+        9_223_372_036_854_775_807,
+        180,
+        180,
+        daily=daily,
+        peak_date=date(2026, 7, 15),
+        peak_value=9_223_372_036_854_775_807,
+    )
+    payload = replace(_payload(), metrics=PersonalStatsMetrics(*((maximum,) * 16)))
+
+    description = _attachment_description(payload, mode)
+
+    assert last_metric in description
+    assert "average" in description
+    assert "peak" in description
+    assert "coverage" in description
+    assert len(description) <= 1024
 
 
 class _Response:
@@ -202,6 +236,10 @@ async def test_command_entry_is_explicitly_ephemeral_from_any_channel() -> None:
     )
 
     assert interaction.response.deferred_args == [{"ephemeral": True}]
+    description = interaction.original_edits[-1]["files"][0].description
+    assert description.startswith("Period Performance Overview")
+    assert "Power change" in description
+    assert len(description) <= 1024
 
 
 @pytest.mark.asyncio
@@ -277,6 +315,10 @@ async def test_mode_change_reuses_payload_and_closes_attachment_stream() -> None
     assert view.mode is StatsMode.COMBAT
     assert interaction.response.deferred == 1
     attached = interaction.original_edits[-1]["files"][0]
+    assert "T4+T5 combined" in attached.description
+    assert "peak" in attached.description
+    assert "coverage" in attached.description
+    assert len(attached.description) <= 1024
     assert attached.fp.closed is True
 
 

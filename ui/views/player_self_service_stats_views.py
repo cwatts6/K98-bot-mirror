@@ -141,6 +141,26 @@ def _number(value: int | None) -> str:
     return f"{value:+,}" if value else "0"
 
 
+def _compact_alt_number(value: int | float | None) -> str:
+    if value is None:
+        return "—"
+    sign = "+" if value > 0 else ""
+    magnitude = abs(value)
+    for divisor, suffix in (
+        (1_000_000_000_000_000_000, "E"),
+        (1_000_000_000_000_000, "Q"),
+        (1_000_000_000_000, "T"),
+        (1_000_000_000, "B"),
+        (1_000_000, "M"),
+        (1_000, "K"),
+    ):
+        if magnitude >= divisor:
+            rendered = f"{value / divisor:.2f}".rstrip("0").rstrip(".")
+            return f"{sign}{rendered}{suffix}"
+    rendered = f"{value:,.1f}".rstrip("0").rstrip(".") if isinstance(value, float) else f"{value:,}"
+    return f"{sign}{rendered}"
+
+
 def _metric_text(label: str, metric: StatsMetricSummary) -> str:
     average = metric.average_per_reporting_day
     peak = (
@@ -153,6 +173,63 @@ def _metric_text(label: str, metric: StatsMetricSummary) -> str:
         f"**{label}:** {_number(metric.total)} • Avg {average_text}/reporting day • "
         f"{peak} • Coverage {metric.reporting_days}/{metric.expected_days} reporting days"
     )
+
+
+def _metric_alt_text(label: str, metric: StatsMetricSummary) -> str:
+    average = metric.average_per_reporting_day
+    average_text = _compact_alt_number(average)
+    peak = (
+        "no exact peak"
+        if metric.peak_date is None
+        else f"peak {metric.peak_date:%d %b} {_compact_alt_number(metric.peak_value)}"
+    )
+    return (
+        f"{label}: total {_compact_alt_number(metric.total)}, average {average_text}/day, "
+        f"{peak}, coverage {metric.reporting_days}/{metric.expected_days} days"
+    )
+
+
+def _attachment_description(payload: PersonalStatsPayload, mode: StatsMode) -> str:
+    metrics = payload.metrics
+    if mode is StatsMode.OVERVIEW:
+        selected = (
+            ("Power change", metrics.power_change),
+            ("Troop Power change", metrics.troop_power_change),
+            ("RSS gathered", metrics.rss_gathered),
+            ("Helps", metrics.helps),
+            ("Forts total", metrics.forts_total),
+            ("Kill Points", metrics.kill_points),
+            ("T4+T5 kills", metrics.t4_t5_kills),
+            ("Deads", metrics.deads),
+        )
+    elif mode is StatsMode.ACTIVITY:
+        selected = (
+            ("RSS gathered", metrics.rss_gathered),
+            ("RSS assisted", metrics.rss_assisted),
+            ("Helps", metrics.helps),
+            ("Build activity", metrics.build_activity),
+            ("Tech donations", metrics.tech_donations),
+            ("Forts total", metrics.forts_total),
+            ("Forts launched", metrics.forts_launched),
+            ("Forts joined", metrics.forts_joined),
+        )
+    else:
+        selected = (
+            ("Kill Points gained", metrics.kill_points),
+            ("T4 kills gained", metrics.t4_kills),
+            ("T5 kills gained", metrics.t5_kills),
+            ("T4+T5 combined", metrics.t4_t5_kills),
+            ("Deads gained", metrics.deads),
+            ("Healed Troops gained", metrics.healed_troops),
+        )
+    description = (
+        f"Period Performance {mode.label}, {payload.period.label}, "
+        f"{payload.window.start_date:%d %b %Y} to {payload.window.end_date:%d %b %Y}. "
+        + "; ".join(_metric_alt_text(label, metric) for label, metric in selected)
+    )
+    if len(description) > 1024:
+        raise ValueError("Stats attachment description exceeds Discord's limit")
+    return description
 
 
 def _add_fallback_lines(
@@ -513,7 +590,11 @@ class PersonalStatsView(discord.ui.View):
             try:
                 if rendered is not None:
                     files.append(
-                        discord.File(BytesIO(rendered.image_bytes), filename=rendered.filename)
+                        discord.File(
+                            BytesIO(rendered.image_bytes),
+                            filename=rendered.filename,
+                            description=_attachment_description(payload, mode),
+                        )
                     )
                     edited = await interaction.edit_original_response(
                         content=None,
@@ -812,7 +893,13 @@ async def _initial_delivery(
                 display_name=display_name,
                 avatar_bytes=avatar_bytes,
             )
-            files = [discord.File(BytesIO(rendered.image_bytes), filename=rendered.filename)]
+            files = [
+                discord.File(
+                    BytesIO(rendered.image_bytes),
+                    filename=rendered.filename,
+                    description=_attachment_description(payload, StatsMode.OVERVIEW),
+                )
+            ]
             render_ms = round((time.perf_counter() - render_started) * 1000, 1)
             delivery_started = time.perf_counter()
             edited = await target.edit_original_response(

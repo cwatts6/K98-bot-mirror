@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, date
+from datetime import UTC, date, timedelta
 from io import BytesIO
 from pathlib import Path
 
@@ -56,6 +56,7 @@ def _font_text(
     fill: tuple[int, int, int, int] = _TEXT,
     bold: bool = False,
     right_align: bool = False,
+    centre_align: bool = False,
 ) -> None:
     cleaned = _clean(value)
     font = visual_text.fit_font(
@@ -67,6 +68,8 @@ def _font_text(
     draw_x = xy[0]
     if right_align:
         draw_x += width - visual_text.text_width(draw, fitted, font=font, bold=bold)
+    elif centre_align:
+        draw_x += (width - visual_text.text_width(draw, fitted, font=font, bold=bold)) // 2
     visual_text.draw_text(
         draw,
         (draw_x + 2, xy[1] + 2),
@@ -276,16 +279,17 @@ def _marker(
         draw.polygon(((x, y - 5), (x - 5, y + 4), (x + 5, y + 4)), fill=colour)
 
 
-def _chart_summary(metric: StatsMetricSummary) -> str:
-    total = _compact(metric.total, signed=True)
-    average = metric.average_per_reporting_day
-    average_label = _compact(average, signed=True)
-    peak = (
-        "no exact peak"
-        if metric.peak_date is None
-        else f"peak {metric.peak_date:%d %b} {_compact(metric.peak_value, signed=True)}"
+def _axis_tick_dates(start_date: date, end_date: date, *, maximum: int = 5) -> tuple[date, ...]:
+    day_span = (end_date - start_date).days
+    if day_span < 0:
+        raise ValueError("Chart end date cannot precede its start date")
+    if day_span == 0:
+        return (start_date,)
+    tick_count = min(maximum, day_span + 1)
+    return tuple(
+        start_date + timedelta(days=round(index * day_span / (tick_count - 1)))
+        for index in range(tick_count)
     )
-    return f"total {total} | avg {average_label}/day | {peak} | {metric.reporting_days}/{metric.expected_days} days"
 
 
 def _draw_chart(
@@ -293,15 +297,55 @@ def _draw_chart(
     box: tuple[int, int, int, int],
     title: str,
     series: Iterable[tuple[str, StatsMetricSummary]],
+    *,
+    start_date: date,
+    end_date: date,
 ) -> None:
     _panel(draw, box)
     x0, y0, x1, y1 = box
     _font_text(draw, (x0 + 18, y0 + 11), title, width=x1 - x0 - 36, size=21, fill=_BLUE, bold=True)
     series_list = list(series)
     all_points = [point for _, metric in series_list for point in metric.daily]
-    summary_start = y1 - 14 - len(series_list) * 21
     chart_left, chart_top = x0 + 50, y0 + 60
-    chart_right, chart_bottom = x1 - 22, summary_start - 23
+    chart_right, chart_bottom = x1 - 22, y1 - 48
+
+    day_span = (end_date - start_date).days
+
+    def x_for(reporting_date: date) -> int:
+        if day_span == 0:
+            return (chart_left + chart_right) // 2
+        offset = (reporting_date - start_date).days
+        return int(chart_left + offset * (chart_right - chart_left) / day_span)
+
+    for tick_date in _axis_tick_dates(start_date, end_date):
+        tick_x = x_for(tick_date)
+        draw.line((tick_x, chart_top, tick_x, chart_bottom), fill=(91, 190, 255, 38), width=1)
+        _font_text(
+            draw,
+            (tick_x - 44, chart_bottom + 8),
+            f"{tick_date:%d %b}",
+            width=88,
+            size=14,
+            min_size=11,
+            fill=_MUTED,
+            centre_align=True,
+        )
+
+    for index, (label, _metric) in enumerate(series_list):
+        colour = _SERIES[index % len(_SERIES)]
+        legend_x = x0 + 17 + index * max(145, (x1 - x0 - 34) // max(1, len(series_list)))
+        _marker(draw, legend_x, y0 + 39, colour, index)
+        _font_text(
+            draw,
+            (legend_x + 12, y0 + 28),
+            label,
+            width=170,
+            size=16,
+            min_size=11,
+            fill=_TEXT,
+            bold=True,
+        )
+
     if not all_points:
         _font_text(
             draw,
@@ -312,20 +356,12 @@ def _draw_chart(
             fill=_MUTED,
         )
     else:
-        dates = sorted({point.reporting_date for point in all_points})
-        date_indexes = {reporting_date: index for index, reporting_date in enumerate(dates)}
         values = [point.value for point in all_points]
         low, high = min(0, min(values)), max(0, max(values))
         if low == high:
             low -= 1
             high += 1
         span = high - low
-
-        def x_for(reporting_date: date) -> int:
-            if len(dates) == 1:
-                return (chart_left + chart_right) // 2
-            index = date_indexes[reporting_date]
-            return int(chart_left + index * (chart_right - chart_left) / (len(dates) - 1))
 
         def y_for(value: int) -> int:
             return int(chart_bottom - (value - low) * (chart_bottom - chart_top) / span)
@@ -340,47 +376,11 @@ def _draw_chart(
                 draw.line(coords, fill=colour, width=3)
             for x, y in coords:
                 _marker(draw, x, y, colour, index)
-            legend_x = x0 + 17 + index * max(145, (x1 - x0 - 34) // max(1, len(series_list)))
-            _marker(draw, legend_x, y0 + 39, colour, index)
-            _font_text(
-                draw,
-                (legend_x + 12, y0 + 28),
-                label,
-                width=170,
-                size=16,
-                min_size=11,
-                fill=_TEXT,
-                bold=True,
-            )
-        _font_text(
-            draw,
-            (chart_left, chart_bottom + 7),
-            f"{dates[0]:%d %b}",
-            width=90,
-            size=14,
-            min_size=11,
-            fill=_MUTED,
-        )
-        _font_text(
-            draw,
-            (chart_right - 90, chart_bottom + 7),
-            f"{dates[-1]:%d %b}",
-            width=90,
-            size=14,
-            min_size=11,
-            fill=_MUTED,
-        )
-    for index, (label, metric) in enumerate(series_list):
-        _font_text(
-            draw,
-            (x0 + 18, summary_start + index * 21),
-            f"{label}: {_chart_summary(metric)}",
-            width=x1 - x0 - 36,
-            size=14,
-            min_size=11,
-            fill=_MUTED,
-            bold=True,
-        )
+
+
+def _data_refresh_text(payload: PersonalStatsPayload) -> str:
+    refreshed = payload.data_refreshed_at_utc.astimezone(UTC)
+    return f"Data last refreshed {refreshed:%d %b %Y %H:%M:%S UTC}"
 
 
 def _header(
@@ -445,11 +445,10 @@ def _header(
         bold=True,
         right_align=True,
     )
-    generated = payload.generated_at_utc.astimezone(UTC)
     _font_text(
         draw,
         (1010, 207),
-        f"Stats anchor {payload.stats_anchor_date:%d %b %Y} • Generated {generated:%d %b %Y %H:%M:%S UTC}",
+        _data_refresh_text(payload),
         width=595,
         size=14,
         min_size=10,
@@ -527,6 +526,8 @@ def _activity(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
         (95, 514, 825, 792),
         "RSS DAILY TREND",
         (("Gathered", metrics.rss_gathered), ("Assisted", metrics.rss_assisted)),
+        start_date=payload.window.start_date,
+        end_date=payload.window.end_date,
     )
     _draw_chart(
         draw,
@@ -537,6 +538,8 @@ def _activity(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
             ("Launched", metrics.forts_launched),
             ("Joined", metrics.forts_joined),
         ),
+        start_date=payload.window.start_date,
+        end_date=payload.window.end_date,
     )
 
 
@@ -566,6 +569,8 @@ def _combat(draw: ImageDraw.ImageDraw, payload: PersonalStatsPayload) -> None:
             ("Deads", metrics.deads),
             ("Healed", metrics.healed_troops),
         ),
+        start_date=payload.window.start_date,
+        end_date=payload.window.end_date,
     )
 
 
