@@ -44,7 +44,7 @@ Dashboard Card and Preferences Hub, Phase 6 Guided Management Cards and Workflow
 and Phase 7 Unified Reminder Centre and Dashboard Card Alignment execution records are archived
 here. The original programme is complete; its closed programme pack remains in `docs/task_packs/`.
 
-Player Self-Service Command Centre v2 / GovernorOS completed Phases 1 through 5G. The archived
+Player Self-Service Command Centre v2 / GovernorOS completed Phases 1 through 6. The archived
 records cover the dashboard blueprint/data foundation, governor selector and premium dashboard,
 direct Inventory reports and visual alignment, Accounts, Reminders, and the authoritative shared
 KVK/Calendar next-alert projection. Phase 5D.1 delivered in mirror PR #223 and production PR #530;
@@ -64,8 +64,14 @@ deployment/resync, and operator Discord smoke on 2026-07-17 through mirror PR #2
 PR #534. Its archived task pack and starter record the canonical Account Summary Download data
 journey, retirement of `/me exports` and `/my_stats_export`, the `38 / 7 / 2` command surface, all
 three private output contracts, corrected workbook/history semantics, no SQL change, and the Phase 6
-interactive Stats handoff. The active v2 programme pack remains in `docs/task_packs/`; the operator
-will create the separate Phase 6 task pack.
+interactive Stats handoff. Phase 6 Interactive Period Performance completed final production Discord
+smoke on 2026-07-18 through mirror PR #228 and production PR #535 after SQL PRs #43/#44 deployed.
+Its archived task pack and starter record private-anywhere `/me stats`, the accepted 1702x924
+Overview/Activity/Combat format, opaque paged governor selection plus explicit All Linked, exact
+periods and coverage, source-refresh semantics, `/my_stats` retirement, preserved `/stats player`,
+the `37 / 100 / 8 / 2` command surface, zero unresolved bot/SQL Changes findings, and final operator
+acceptance. The active v2 programme pack remains in `docs/task_packs/`; the operator will separately
+review and create the next phase task pack.
 
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,

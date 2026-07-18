@@ -452,3 +452,11 @@ This file preserves resolved deferred-optimisation notes that used to live in
 - Impact: high
 - Risk: medium
 - Dependencies: Operator approval for command path changes; command lifecycle admin tooling convergence can happen first but is not required for command-surface grouping.
+
+### GovernorOS v2 Phase 6 Completed Item
+
+- Area: `commands/stats_cmds.py`, `commands/me_cmds.py`, `scripts/validate_command_registration.py`, personal self-service command docs/tests
+- Type: cleanup
+- Description: Phase 13 and later GovernorOS work retained top-level `/my_stats` while the richer private personal Stats replacement, command ownership, communication, atomic retirement, resync, and rollback contract were unresolved.
+- Resolution: GovernorOS v2 Phase 6 added private-anywhere `/me stats` under the existing `/me` group and the selected-governor Dashboard, then removed `/my_stats` in the same deployment without a redirect, alias, or compatibility route. `/stats player` and its leadership permissions/legacy dependencies remain deliberately separate for Phase 8 Inspect review. The command surface is 37 top-level, 100 grouped, 8 `/me`, and 2 `/inventory`.
+- Validation: Mirror PR #228 and production PR #535 carry the accepted bot result. SQL PRs #43/#44 deployed first. Final validation passed with `2660 passed, 2 skipped`; separate bot and SQL Changes reviews ran with Deep off and closed with zero unresolved findings. Production Discord smoke on 2026-07-18 accepted command resync, all periods/scopes, Dashboard navigation, source-correct output, final visuals, and timeout.

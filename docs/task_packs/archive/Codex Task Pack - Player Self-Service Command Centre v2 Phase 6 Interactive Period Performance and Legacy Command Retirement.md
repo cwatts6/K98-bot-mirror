@@ -3,18 +3,39 @@
 ## 1. Task Header
 
 - Task name: `Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and /my_stats Retirement`
-- Date: `2026-07-17`
+- Date: `2026-07-18`
 - Owner/context: `KD98 / Kingdom 1198 GovernorOS v2 follow-on from completed and operator-accepted Phase 5G Account Data Export Consolidation`
 - Task type: `feature | refactor | command migration | command retirement | visual renderer | documentation`
 - One-pass approved: `no`
 - Product decision approved: `yes`
 - Runtime implementation approved: `yes, subject to the normal audit, architecture, implementation-plan, validation, security-review, operator-smoke, and promotion gates`
-- Status: `initial operator smoke passed functional journeys; approved visual refinement implemented; final visual re-smoke, review, and promotion pending`
+- Status: `complete and operator accepted after final production Discord smoke on 2026-07-18`
 - Approved runtime backdrop: `assets/me/cards/me_stats.png`
 - Target successful output: `private standalone 1702x924 PNG plus same-authorized-payload fallback`
 - SQL deployment approved: `yes; additive dbo.usp_GetPersonalStatsDaily plus the approved follow-up StatsSourceRefreshedAtUtc result column sourced from MAX(KingdomScanData4.ScanDate) on the Stats anchor date, with separate SQL diffs/reviews and SQL-before-bot deployment order; indexes remain measurement-gated`
 - Command target: `38 -> 37 top-level commands; grouped subcommands 99 -> 100; /me 7 -> 8; /inventory remains 2`
-- Command resync required: `yes, after the atomic Phase 6 deployment`
+- Command resync required: `completed; 37 top-level / 100 grouped / 8 me / 2 inventory verified`
+
+### Completion record
+
+- Mirror PR `#228` and production PR `#535` carry the accepted bot implementation and final
+  source-freshness correction.
+- SQL PRs `#43` and `#44` delivered the bounded `dbo.usp_GetPersonalStatsDaily` contract and its
+  `StatsSourceRefreshedAtUtc` header extension before the dependent bot smoke.
+- Final automated validation passed with `2660 passed, 2 skipped`, pre-commit, pyright with zero
+  errors, architecture, deferred-item, security-routing, import-smoke, log-noise, and command-
+  registration gates green.
+- Separate bot and SQL Changes reviews ran with Deep off and closed with zero unresolved findings.
+- Final operator smoke accepted every period, governor switching, explicit All Linked, Dashboard
+  return/navigation, source-correct data, the 180-second preserve-and-disable timeout, and the final
+  Overview/Activity/Combat visual presentation.
+- The final visual contract includes the Reminders-aligned right-hand state pill and header stack,
+  larger/brighter typography, compact number formatting for both totals and averages, selected
+  Governor ID, Stats/Activity/Fort coverage, Forts Total-only Activity KPI, integrated Activity and
+  Combat trends without duplicated summary text, consistent date axes, authoritative source refresh
+  time, and the unchanged generated-time footer.
+- This task pack and its matching starter are archived after acceptance. Later phases must use the
+  active programme pack and a newly approved phase-specific task pack rather than reusing this one.
 
 ### Locked product decision
 
@@ -55,7 +76,8 @@ Combat
 Every generated card includes the invoking player's bounded circular Discord avatar at the top left,
 with the accepted safe local GovernorOS/KD98 fallback. The card shows selected scope, governor
 identity where applicable, friendly period, exact inclusive dates, authoritative Stats data anchor,
-reporting coverage, state, view-specific metrics, and truthful freshness/generated time.
+reporting coverage, state, view-specific metrics, the latest anchor-date
+`KingdomScanData4.ScanDate` as `Data last refreshed`, and the separate generated-time footer.
 
 Initial operator smoke approved the interaction, periods, governor switching, All Linked, Dashboard
 row-0 Stats entry, data, and timeout behavior. The resulting presentation amendment aligns the
@@ -578,8 +600,8 @@ itself launch a scan.
 
 | Repository | Decision | Target | Expected setup / execution | Evidence |
 |---|---|---|---|---|
-| `K98-bot-mirror` | `Changes review` | Final intended Phase 6 base..head or staged working-tree patch | `Changes + Deep Off` using `$codex-security:security-diff-scan` after the final diff exists | Pending; focus on registry revalidation, private visibility, component forgery/expiry/concurrency, SQL over-read, avatar/network input, telemetry minimisation, resource exhaustion, attachment cleanup, and command retirement. |
-| `K98-bot-SQL-Server` | `Changes review required` | Final intended additive `dbo.usp_GetPersonalStatsDaily` schema/migration/rollback diff | `Changes / Deep Off` | Required because the operator approved the additive set-based contract after architecture review. Review SQL independently from the bot; any index remains outside this diff unless measurement separately approves it. |
+| `K98-bot-mirror` | `Changes review complete` | Final Phase 6 implementation plus the final source-freshness patch | `Changes + Deep Off` | Zero unresolved findings. Follow-up bot scan `348e823a-09c8-40fc-9782-90d4a5aebe75` closed with zero findings. |
+| `K98-bot-SQL-Server` | `Changes review complete` | Additive procedure plus source-freshness schema/migration/rollback diffs | `Changes + Deep Off` | Zero unresolved findings. Follow-up SQL scan `f308e17c-f358-4351-ab04-ecf7e7e17af4` reviewed all three changed SQL files and closed with zero findings. |
 
 Do not start a standard or deep codebase audit without an explicit operator request for that exact
 audit. Existing captured security findings use the triage/remediation workflow rather than new
@@ -1056,18 +1078,18 @@ interaction telemetry. Preserve standard qualified command usage identity `me st
 
 ### 12.10 Command Surface Governance
 
-- [ ] Confirm post-Phase-5G baseline: 38 top-level, 99 grouped, 7 `/me`, 2 `/inventory`.
-- [ ] Add grouped `/me stats`; grouped total becomes 100 and `/me` becomes 8.
-- [ ] Remove top-level `/my_stats`; top-level total becomes 37.
-- [ ] Remove `my_stats` from `APPROVED_TOP_LEVEL_COMMANDS`.
-- [ ] Do not add a new top-level command or command group.
-- [ ] Add/retain `@versioned()`, `@safe_command`, and `@track_usage()` on `/me stats`.
-- [ ] Do not apply the legacy KVK stats-channel decorator to `/me stats`.
-- [ ] Preserve `/stats player` registration, permission decorator, visibility, and usage identity.
-- [ ] Update the canonical command table, grouped summary, user/operator docs, smoke references, and
+- [x] Confirm post-Phase-5G baseline: 38 top-level, 99 grouped, 7 `/me`, 2 `/inventory`.
+- [x] Add grouped `/me stats`; grouped total becomes 100 and `/me` becomes 8.
+- [x] Remove top-level `/my_stats`; top-level total becomes 37.
+- [x] Remove `my_stats` from `APPROVED_TOP_LEVEL_COMMANDS`.
+- [x] Do not add a new top-level command or command group.
+- [x] Add/retain `@versioned()`, `@safe_command`, and `@track_usage()` on `/me stats`.
+- [x] Do not apply the legacy KVK stats-channel decorator to `/me stats`.
+- [x] Preserve `/stats player` registration, permission decorator, visibility, and usage identity.
+- [x] Update the canonical command table, grouped summary, user/operator docs, smoke references, and
   expected command-cache state.
-- [ ] Run command registration validation and the dedicated inventory/registration smoke tests.
-- [ ] Resync application commands after atomic deployment and verify `/me stats` present and
+- [x] Run command registration validation and the dedicated inventory/registration smoke tests.
+- [x] Resync application commands after atomic deployment and verify `/me stats` present and
   `/my_stats` absent.
 
 ### 12.11 Player communication, deployment, observation, and rollback
@@ -1302,49 +1324,50 @@ final Changes target with `Deep: Off`; neither review is a codebase/deep scan.
 
 ## 15. Acceptance Criteria
 
-- [ ] Audit, architecture, and implementation plan were separately approved before coding.
-- [ ] `/me stats` is registered under the existing `/me` group with standard decorators and private
+- [x] Audit, architecture, and implementation plan were separately approved before coding.
+- [x] `/me stats` is registered under the existing `/me` group with standard decorators and private
   use from any guild channel/thread.
-- [ ] `/my_stats` is removed, not redirected, and absent after command resync.
-- [ ] Final command counts are 37 top-level, 100 grouped, 8 `/me`, and 2 `/inventory`.
-- [ ] The selected-governor Dashboard exposes Stats and preserves validated governor context.
-- [ ] No/one/multiple/26-slot and All Linked journeys behave as approved.
-- [ ] Governor ID/opaque component identity replaces name-based authority.
-- [ ] Current registry linkage is revalidated before every data fetch.
-- [ ] Overview, Activity, and Combat use one approved `assets/me/cards/me_stats.png` backdrop.
-- [ ] Every successful card uses the invoking player's circular Discord avatar at top left with safe
+- [x] `/my_stats` is removed, not redirected, and absent after command resync.
+- [x] Final command counts are 37 top-level, 100 grouped, 8 `/me`, and 2 `/inventory`.
+- [x] The selected-governor Dashboard exposes Stats and preserves validated governor context.
+- [x] No/one/multiple/26-slot and All Linked journeys behave as approved.
+- [x] Governor ID/opaque component identity replaces name-based authority.
+- [x] Current registry linkage is revalidated before every data fetch.
+- [x] Overview, Activity, and Combat use one approved `assets/me/cards/me_stats.png` backdrop.
+- [x] Every successful card uses the invoking player's circular Discord avatar at top left with safe
   fallback and is exactly `1702x924`.
-- [ ] Header identity, exact period dates, data anchor, coverage, state, and generated UTC are truthful.
-- [ ] Yesterday, This Week, Last Week, This Month, Last Month, Last 90 Days, and Last 180 Days match
+- [x] Header identity, exact period dates, data anchor, source refresh, coverage, state, and generated
+  UTC are truthful.
+- [x] Yesterday, This Week, Last Week, This Month, Last Month, Last 90 Days, and Last 180 Days match
   the exact approved inclusive source-date contracts.
-- [ ] Last 90/180 do not reuse the current Last 3M/6M month semantics.
-- [ ] Power/Troop movement, RSS, RSS Assistance, Helps, Build, Tech, Forts, KP, T4, T5, Deads, and
+- [x] Last 90/180 do not reuse the current Last 3M/6M month semantics.
+- [x] Power/Troop movement, RSS, RSS Assistance, Helps, Build, Tech, Forts, KP, T4, T5, Deads, and
   Healed values are source-correct, signed, and coverage-aware.
-- [ ] All Linked includes only approved additive metrics, deduplicates IDs, recomputes averages, and
+- [x] All Linked includes only approved additive metrics, deduplicates IDs, recomputes averages, and
   shows reporting/account-day coverage.
-- [ ] Ark is completely absent from the personal Period Performance experience.
-- [ ] No download/export action or Phase 5G output contract appears in `/me stats`.
-- [ ] Activity integrates truthful RSS/Fort trends and complete accessible text equivalents.
-- [ ] Combat integrates truthful T4+T5/Deads/Healed trends and complete accessible text equivalents.
-- [ ] READY/PARTIAL/NO DATA/UNAVAILABLE and access-changed behavior are distinct and honest.
-- [ ] Same-payload fallback performs no second data fetch and contains all key information.
-- [ ] Latest interaction wins; stale/foreign/forged/expired transitions cannot replace valid content.
-- [ ] Timeout preserves the last report, disables controls, remains private, and references only
+- [x] Ark is completely absent from the personal Period Performance experience.
+- [x] No download/export action or Phase 5G output contract appears in `/me stats`.
+- [x] Activity integrates truthful RSS/Fort trends and complete accessible text equivalents.
+- [x] Combat integrates truthful T4+T5/Deads/Healed trends and complete accessible text equivalents.
+- [x] READY/PARTIAL/NO DATA/UNAVAILABLE and access-changed behavior are distinct and honest.
+- [x] Same-payload fallback performs no second data fetch and contains all key information.
+- [x] Latest interaction wins; stale/foreign/forged/expired transitions cannot replace valid content.
+- [x] Timeout preserves the last report, disables controls, remains private, and references only
   `/me stats`.
-- [ ] Data, chart, avatar, attachment, and stream work is bounded, off-loop where required, and
+- [x] Data, chart, avatar, attachment, and stream work is bounded, off-loop where required, and
   cleaned up on every path.
-- [ ] Representative performance meets the approved measured budgets or an explicit operator-approved
+- [x] Representative performance meets the approved measured budgets or an explicit operator-approved
   adjustment is documented.
-- [ ] `/stats player` remains registered and its proven legacy dependencies are preserved for the
+- [x] `/stats player` remains registered and its proven legacy dependencies are preserved for the
   later Inspect review.
-- [ ] Account Summary downloads and Inventory report-page exports remain unchanged.
-- [ ] Player communication, deployment/restart, command resync, observation, smoke, and rollback are
+- [x] Account Summary downloads and Inventory report-page exports remain unchanged.
+- [x] Player communication, deployment/restart, command resync, observation, smoke, and rollback are
   documented and exercised.
-- [ ] Focused, visual, full, architecture, command, deferred, security-routing, import, pre-commit,
+- [x] Focused, visual, full, architecture, command, deferred, security-routing, import, pre-commit,
   log-noise, and PR-review gates pass or have precise accepted exceptions.
-- [ ] Final bot security review is Changes with Deep off and no unresolved Phase 6 finding.
-- [ ] Additive SQL procedure/migration/rollback pass a separate SQL Changes review with Deep off.
-- [ ] Non-security out-of-scope findings are captured structurally; security findings remain in the
+- [x] Final bot security review is Changes with Deep off and no unresolved Phase 6 finding.
+- [x] Additive SQL procedure/migration/rollback pass a separate SQL Changes review with Deep off.
+- [x] Non-security out-of-scope findings are captured structurally; security findings remain in the
   security workflow.
 
 ## 16. Required Delivery Output
@@ -1425,6 +1448,7 @@ Use this delivery shape:
 - Primary risks are incorrect period/coverage math, over-aggregation, stale access, slow 180-day All
   Linked rendering, and accidental leadership-stack deletion. Rollback restores the accepted pre-
   Phase-6 bot patch and `/my_stats` registration, redeploys, resyncs commands, and re-smokes the
-  restored route. After bot rollback, the SQL rollback drops only the additive procedure; no data
-  rollback is required.
+  restored route. For the source-freshness follow-up, roll back the bot before restoring the prior
+  SQL result contract; a complete Phase 6 rollback then applies the original procedure rollback.
+  No data rollback is required.
 ```

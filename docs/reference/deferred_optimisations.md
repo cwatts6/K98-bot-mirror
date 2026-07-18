@@ -89,11 +89,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `commands/registry_cmds.py`, `commands/telemetry_cmds.py`, `commands/stats_cmds.py`, `commands/inventory_cmds.py`, `commands/subscriptions_cmds.py`, `commands/calendar_cmds.py`, player self-service command docs/tests
 - Type: cleanup
-- Description: Phase 13 introduced selected private redirects. Phase 5F removed the four approved Inventory routes, Phase 5G removed redirect-only `/my_stats_export` plus duplicate `/me exports`, and Phase 6 now replaces `/my_stats` atomically with private `/me stats`. Account/reminder redirects, `/mykvkcrystaltech`, `/player_profile`, and `/stats player` remain outside that approved retirement boundary.
-- Suggested Fix: Close the `/my_stats` item only after Phase 6 deploy/resync/smoke, then continue to require route-specific usage evidence, communication, observation, command resync/rollback, and explicit operator approval for every other compatibility route. Do not infer permission to retire `/stats player` from the personal-route migration.
+- Description: Phase 13 introduced selected private redirects. Completed Phases 5F, 5G, and 6 removed their explicitly approved Inventory, export, and `/my_stats` routes. Account/reminder redirects, `/mykvkcrystaltech`, `/player_profile`, `/stats player`, and `/kvk history` remain outside those completed retirement boundaries and still require route-specific evidence rather than programme-wide assumptions.
+- Suggested Fix: For each remaining compatibility/specialist route, collect fresh qualified usage and caller evidence, define the replacement ownership and permission/visibility contract, communicate the proposal, observe the agreed no-feedback window where appropriate, and obtain explicit operator approval before changing registration. Update command governance, canonical docs, resync, smoke, and rollback one approved route at a time. Do not infer permission to retire `/stats player` or public `/kvk history` from the completed personal-route migration.
 - Impact: high
 - Risk: medium
-- Dependencies: Phase 6 final Changes reviews, SQL-before-bot deployment, command resync, and operator smoke; separate later route-specific task packs.
+- Dependencies: Phase 6 completed and operator accepted on 2026-07-18; separate later route-specific task packs, including the Phase 8 Inspect decision and Phase 9 evidence-led migration review.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.InventoryReportPreference`, `inventory/dal/inventory_reporting_dal.py`, `inventory/reporting_service.py`, and retired Inventory-visibility documentation/tests
@@ -120,16 +120,16 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Suggested Fix: Run a separately task-packed leadership/Inspect audit after Phase 6 observation. Reconfirm callers and permission/visibility requirements, decide whether `/stats player` remains leadership-owned or becomes `/me inspect`, then migrate or delete only zero-caller legacy helpers with focused permission, registration, chart, and rendering regression coverage.
 - Impact: high
 - Risk: medium
-- Dependencies: Phase 6 deployed and operator accepted; fresh `/stats player` usage/dependency evidence; explicit leadership/privacy product decision and separate task pack.
+- Dependencies: Phase 6 completed and operator accepted on 2026-07-18; fresh `/stats player` usage/dependency evidence; explicit Phase 8 leadership/privacy product decision and separate task pack. Inspect lookup must remain separate from the accepted self-view linked-governor picker.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.usp_GetPersonalStatsDaily`, `dbo.KingdomScanData4`, Alliance Activity/Fort sources, and `stats/dal/personal_stats_dal.py`
 - Type: performance
-- Description: Phase 6 adds one bounded set-based procedure for up to 26 deduplicated governors and 180 Stats-anchor days. Existing source indexes cover the principal Governor/date access patterns, and the bot adds 9-second data timeout, bounded concurrency, TTL/LRU caching, and inflight deduplication. No representative production execution plan, logical-read, duration, memory-grant, or concurrent 26-account baseline is available locally, so an additional wide covering index would be speculative and could increase import/maintenance cost.
-- Suggested Fix: Before or immediately after controlled Phase 6 rollout, execute the procedure for single, multi, and 26-account sets at 90/180 days with actual plans plus `SET STATISTICS IO, TIME ON`, cold/warm cache, and expected concurrency. Add the narrowest covering index or procedure refinement only when the measured hotspot is identified; repeat correctness/performance tests and retain an independent rollback migration.
+- Description: Phase 6 deployed one bounded set-based procedure for up to 26 deduplicated governors and 180 Stats-anchor days plus `StatsSourceRefreshedAtUtc`, calculated as the latest `KingdomScanData4.ScanDate` on the global Stats anchor. Existing indexes cover the principal Governor/date access patterns, while the bot adds a 9-second data timeout, bounded concurrency, TTL/LRU caching, and inflight deduplication. Functional production smoke passed, but no recorded representative execution plan, logical-read, duration, memory-grant, or concurrent 26-account baseline proves that a new covering index is warranted. In particular, the existing AsOfDate-leading index does not currently include `ScanDate`, so the new global freshness aggregate should be measured rather than assumed free or prematurely indexed.
+- Suggested Fix: Execute the deployed procedure for single, multi, and 26-account sets at 90/180 days with actual plans plus `SET STATISTICS IO, TIME ON`, cold/warm cache, and expected concurrency. Isolate the header freshness aggregate from the daily payload cost. Add the narrowest covering include/index or procedure refinement only when the measured hotspot is identified; repeat correctness/performance tests and retain an independent rollback migration.
 - Impact: high
 - Risk: medium
-- Dependencies: additive procedure deployed to the SQL host; representative linked Governor IDs; SQL owner-approved measurement window; separate SQL Changes review for any index/procedure follow-up.
+- Dependencies: SQL PRs #43/#44 deployed and Phase 6 functional smoke accepted on 2026-07-18; representative linked Governor IDs; SQL owner-approved measurement window; separate SQL Changes review for any index/procedure follow-up.
 
 ### Deferred Optimisation
 - Area: `player_self_service/governor_dashboard_models.py`, `player_self_service/governor_dashboard_dal.py`, `player_self_service/governor_dashboard_renderer.py`, SQL repo `dbo.KingdomScanData4`
@@ -143,11 +143,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `player_self_service/page_cards.py`, page-specific `/me` renderers, and shared attachment/view lifecycle helpers
 - Type: architecture
-- Description: Completed Phase 5G removed the final supported Exports caller and directly orphaned generic page-card mappings/helpers. Accounts, Reminders, Preferences, and Dashboard intentionally retain page-specific payload/renderer contracts; any remaining repeated rendering, attachment, fallback, navigation, or timeout primitives have not yet been measured as one safe contract.
-- Suggested Fix: In a separate evidence-led cleanup, inventory remaining duplicated lifecycle primitives and consolidate only identical proven contracts. Keep product copy, geometry, data ownership, and renderer-specific behavior page-specific.
+- Description: Completed Phase 5G removed the final supported Exports caller and directly orphaned generic page-card mappings/helpers. Phase 6 then established a stronger accepted premium interaction pattern across Stats: right-aligned state/header hierarchy, compact supporting numbers, source/generated time separation, same-payload fallback, opaque paged governor selection, latest-transition-wins, preserve-and-disable timeout, and explicit resource cleanup. Accounts, Reminders, Preferences, Dashboard, Inventory reports, and Stats still intentionally retain page-specific payload/renderer contracts; repeated primitives have not yet been measured as one safe shared implementation.
+- Suggested Fix: After the separately approved History and Inspect slices establish whether the Phase 6 patterns genuinely repeat, inventory duplicated visual/lifecycle primitives and consolidate only identical proven contracts. Keep product copy, backdrop, geometry, data ownership, permission model, selector semantics, and renderer-specific behavior page-specific. Do not create a broad renderer/view framework merely to force consistency.
 - Impact: low
 - Risk: medium
-- Dependencies: Phase 5G accepted with direct zero-callers removed and focused lifecycle regression coverage; new measured duplication evidence and separate approval for broader consolidation.
+- Dependencies: Phase 6 accepted on 2026-07-18; completed Phase 5G zero-caller cleanup; Phase 7/8 audit evidence; separate approval for any broader consolidation.
 
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `player_self_service/accounts_export.py`, Inventory exports, SQL export views/tables, export docs/tests

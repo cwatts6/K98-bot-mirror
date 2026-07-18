@@ -1,6 +1,6 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-07-17
+Last updated: 2026-07-18
 
 GovernorOS v2 Phase 5 is complete and operator accepted through Phase 5G. Phase 5E shipped in mirror PR #224
 and production PR #531 and was deployed on 2026-07-16. Phase 5F delivered in mirror PR #225, was
@@ -27,22 +27,39 @@ safety, separate freshness, and one truthful Excel/Google Sheets-compatible work
 three retained Inventory report-page exports remain unchanged. Smoke accepted option reselection,
 timeout, all three private files, and the restored governor-sheet workbook layout.
 
-Phase 6 Interactive Period Performance is implemented and in final validation. It adds private-
-anywhere `/me stats`, adds Stats to selected-governor Dashboard row 0 after Preferences, and removes
+Phase 6 Interactive Period Performance is complete and operator accepted after final production
+Discord smoke on 2026-07-18. Mirror PR #228 and production PR #535 carry the accepted bot result;
+SQL PRs #43 and #44 deployed the bounded source contract first. Phase 6 adds private-anywhere
+`/me stats`, adds Stats to selected-governor Dashboard row 0 after Preferences, and removes
 top-level `/my_stats` without a redirect in the same bot patch. The route defaults to the selected
 Dashboard governor, otherwise Main, otherwise the first valid canonical slot; All Linked is always
 explicit. Overview, Activity, and Combat share the approved 1702x924 avatar-enabled card and expose
 seven exact Stats-anchor periods, signed Growth/Activity/Fort/Combat metrics, truthful coverage and
 state, integrated RSS/Fort trends, a same-payload accessible fallback, opaque paged selection, and
 a 180-second preserve-and-disable timeout. `/stats player` and its legacy rendering stack remain.
-The additive SQL procedure `dbo.usp_GetPersonalStatsDaily` must deploy before the bot patch; a new
-covering index is deferred until representative production plans/logical reads justify it.
+The deployed additive SQL procedure `dbo.usp_GetPersonalStatsDaily` returns the latest anchor-date
+`KingdomScanData4.ScanDate` as source refresh time; a new covering index remains deferred until
+representative production plans/logical reads justify it.
 
-Initial Phase 6 operator smoke accepted every period, governor switching, All Linked, Dashboard
-row-0 Stats navigation, data, and the 180-second timeout. The approved visual refinement aligns the
+Final Phase 6 operator smoke accepted every period, governor switching, All Linked, Dashboard
+row-0 Stats navigation, source-correct data, the 180-second timeout, and the completed visual result.
+The accepted visual refinement aligns the
 card with Reminders through a bordered state pill, brighter/bolder typography, denser KPI use,
 selected Governor ID, explicit Stats/Activity/Fort coverage, a Forts Total-only Activity KPI, and a
-new T4+T5/Deads/Healed Combat trend. Final visual re-smoke remains before acceptance.
+new T4+T5/Deads/Healed Combat trend. Totals and averages use consistent compact numbers; the right-
+aligned pill/header stack is balanced; charts retain series names and consistent date axes without
+repeating the KPI summary; `Data last refreshed` shows source time while the footer keeps generated
+time. The completed task pack and starter are archived.
+
+Locked follow-on consistency: later GovernorOS History and Inspect task packs start from the Phase 6
+premium visual hierarchy, right-aligned state/header treatment, large compact-number typography,
+same-payload fallback, source/generated time separation, accessibility, transition safety, timeout,
+and attachment/stream cleanup. Selected-governor self-view pages default from validated Dashboard
+context, then Main, then the first valid canonical slot; one governor opens directly and multiple use
+duplicate-name-safe Governor ID/opaque-token paging with linkage revalidation. All Linked is present
+only when explicitly approved and source-correct. Discord-user-level pages and Inspect lookup must
+not reuse a misleading self-view governor dropdown. Every later slice remains separately approval-
+gated and requires its own task pack.
 
 The following earlier phase notes remain as historical delivery context where they describe the
 state accepted at that time; Phase 5F's current surface above supersedes their legacy-route wording.
@@ -176,17 +193,18 @@ Phase 5G completion confirms the accepted state:
 - Account Summary exposes `Download data` from the authorised all-linked payload.
 - `/my_stats` remains the separate interactive command.
 
-Phase 6 implementation candidate:
+Completed Phase 6 deployment:
 
-- add `/me stats` and selected-Dashboard Stats, private/ephemeral from any guild channel/thread;
-- remove `/my_stats` without redirect while preserving `/stats player`;
-- deploy additive `dbo.usp_GetPersonalStatsDaily` before the bot patch;
-- resync to 37 top-level, 100 grouped, eight `/me`, and two `/inventory` commands;
-- announce the retirement in the existing Stats-channel audience before deploy;
-- complete single, multi, 26-account, period, access-change, fallback, timeout, mobile/desktop, and
-  `/stats player` smoke before promotion.
+- added `/me stats` and selected-Dashboard Stats, private/ephemeral from any guild channel/thread;
+- removed `/my_stats` without redirect while preserving `/stats player`;
+- deployed additive `dbo.usp_GetPersonalStatsDaily` and its source-refresh result extension before
+  the dependent bot patch;
+- resynced to 37 top-level, 100 grouped, eight `/me`, and two `/inventory` commands;
+- announced the retirement to the existing Stats-channel audience before deployment; and
+- passed single, multi, 26-account, period, access-change, fallback, timeout, mobile/desktop, source-
+  freshness, and `/stats player` smoke before final acceptance.
 
-Phase 6 pre-deployment Stats-channel announcement:
+Phase 6 pre-deployment Stats-channel announcement used for the accepted rollout:
 
 ```text
 Personal Period Performance is moving to /me stats.
@@ -639,18 +657,17 @@ Current status:
   smoke on 2026-07-17. It removes both obsolete export routes, keeps all personal downloads
   all-linked under Account Summary, and introduces no governor selector, Change Governor control,
   dashboard Export Stats action, or live Google Sheet. GovernorOS v2 Phase 5 is now complete.
-- Phase 6 is Interactive Personal Stats Experience and `/my_stats` Migration. Its separate task pack
-  must define the new interactive on-screen format, canonical stats path, visibility/channel
-  behavior, period semantics, presentation, performance, communication, final `/my_stats` removal,
-  resync, smoke, and rollback. The interaction owns an author-gated governor dropdown with explicit
-  ALL plus every active linked governor, revalidates registry authority on each change, preserves
-  governor/period state, handles more than 25 accounts safely, and proves metric-specific ALL
-  aggregation rather than assuming all values are additive. It does not move personal downloads out
-  of Account Summary or restore an export/download surface.
+- Phase 6 Interactive Personal Stats Experience and `/my_stats` Migration is complete and archived.
+  `/me stats` owns the accepted private Period Performance format, opaque 24-governor-per-page picker
+  plus explicit All Linked, exact periods, source/coverage semantics, final premium card, and safe
+  lifecycle. `/my_stats` is removed without a redirect; Account Summary retains all downloads.
 - Phase 7 adds private selected-governor `/me history` while preserving public/channel-gated
-  `/kvk history` unchanged.
+  `/kvk history` unchanged. Its audit must inherit the accepted premium/lifecycle contract, use the
+  validated Dashboard/Main-first governor default, open one account directly, preserve History state
+  across the opaque duplicate-safe picker, and omit All Linked unless separately approved.
 - Phase 8 delivers the required permission-gated admin/leadership inspect journey, with an explicit
-  permissions, inspect-safe VIP, lookup, and telemetry approval checkpoint.
+  permissions, inspect-safe VIP, lookup, and telemetry approval checkpoint. Inspect lookup remains
+  separate from self-view linked-governor selection and does not inherit Main-first or All Linked.
 - Phase 9 is an evidence-only usage-led migration review; no legacy redirect/removal is implied.
 - Phase 10 sticky features are a future programme candidate, not a committed implementation slice.
 - Any broader export schema/format redesign beyond the explicitly approved Phase 5G Stats scope

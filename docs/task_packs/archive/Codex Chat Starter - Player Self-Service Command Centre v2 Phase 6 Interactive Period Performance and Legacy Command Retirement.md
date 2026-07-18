@@ -1,8 +1,9 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and `/my_stats` Retirement
 
-Status: active Phase 6 implementation starter. Use with the matching active task pack. Phase 5G is
-complete and archived. The product, command, visual, metric, period, privacy, All Linked, and legacy-
-retirement decisions below are approved; one-pass execution is not approved.
+Status: archived completion starter. Phase 6 completed and passed final production Discord smoke on
+2026-07-18. The copy/paste block below is retained as the historical initiation contract and must
+not be reused to start Phase 7 or later work. Use the active programme pack plus a new separately
+approved phase-specific task pack/starter for every remaining slice.
 
 ## Copy/Paste Starter
 
@@ -215,7 +216,7 @@ Read first:
 - docs/reference/K98 Bot - Skills & Refactor Triggers.md
 - docs/reference/K98 Bot - Deferred Optimisation Framework.md
 - docs/task_packs/Player Self-Service Command Centre v2 - Programme Pack.md
-- docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md
+- docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md
 - docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5G Account Data Export Consolidation.md
 - docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 5C Premium Accounts Summary Card.md
 - docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 4 Premium Governor Dashboard Renderer.md

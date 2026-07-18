@@ -412,11 +412,8 @@ Player Self-Service Command Centre status:
   `archive/`.
 - Active Player Self-Service v2 files:
   - `Player Self-Service Command Centre v2 - Programme Pack.md`
-  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
-  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
-- GovernorOS v2 Phase 5 is complete and operator accepted through Phase 5G. Phase 6 is implemented
-  on approval-gated bot and SQL branches and is in final validation before deployment/resync,
-  operator Discord smoke, and promotion.
+- GovernorOS v2 is complete and operator accepted through Phase 6. The completed Phase 6 task pack
+  and chat starter are archived; the operator will separately review and create the next phase pack.
 - GovernorOS v2 Phases 1-5F are complete. Phase 2 delivered in mirror PR #216 and production PR
   #523, Phase 3 delivered in mirror PR #217 and production PR #524, and Phase 4 delivered in mirror
   PR #218. Phase 4 operator smoke on 2026-07-11 accepted the materially wider standalone card and
@@ -445,13 +442,20 @@ Player Self-Service Command Centre status:
   passed smoke, including selector reselection, timeout, and restored governor-sheet workbook
   layout. Account Summary is first and every identified window/count/Forts/safety/freshness/Sheets-
   labelling defect is corrected. Inventory report-page exports remain unchanged.
-- Phase 6 Interactive Period Performance implements private-anywhere `/me stats`, selected-governor
+- Phase 6 Interactive Period Performance completed final production Discord smoke on 2026-07-18
+  through mirror PR #228 and production PR #535. It implements private-anywhere `/me stats`,
+  selected-governor
   Dashboard Stats, Overview/Activity/Combat on the approved 1702x924 card, exact seven-period signed
   aggregation, explicit All Linked, opaque 24-per-page governor selection, registry revalidation,
-  coverage/state, integrated RSS/Fort charts, fallback/lifecycle/telemetry, and atomic `/my_stats`
-  retirement while preserving `/stats player`. The command validator reports `37 / 100 / 8 / 2`.
-  Additive `dbo.usp_GetPersonalStatsDaily` deploys before the bot; an extra index remains gated on
-  representative production plans/logical reads. Final Changes reviews, smoke, and promotion remain.
+  coverage/state, integrated RSS/Fort and Combat charts, same-payload fallback, lifecycle/telemetry,
+  and atomic `/my_stats` retirement while preserving `/stats player`. Final smoke accepted every
+  period, governor switching, All Linked, Dashboard navigation, source-correct data, final premium
+  formatting, and timeout. SQL PRs #43/#44 deployed first; `Data last refreshed` now uses the latest
+  anchor-date `KingdomScanData4.ScanDate`. Separate bot and SQL Changes reviews closed with zero
+  unresolved findings. The resynced command surface is `37 / 100 / 8 / 2`; any extra index remains
+  gated on representative production plans/logical reads.
+- Completed Phase 6 records are archived under `archive/`. Remaining Phases 7-10 inherit the accepted
+  premium presentation and interaction contracts but require new operator-approved task packs.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -547,18 +551,19 @@ tuning/decomposition, residual `stats_module.py` cleanup, legacy PreKvK SQL clea
 cumulative view cleanup, and inventory view-orchestration extraction remain separate later slices
 unless explicitly approved.
 
-Player Self-Service Command Centre v2 GovernorOS Phase 5 is complete and operator accepted through
-Phase 5G. Phase 5F delivered in mirror PR #225 and production-branch commit `89f7da16`; Phase 5G
+Player Self-Service Command Centre v2 GovernorOS is complete and operator accepted through Phase 6.
+Phase 5F delivered in mirror PR #225 and production-branch commit `89f7da16`; Phase 5G
 completed final Discord smoke on 2026-07-17 through mirror PR #227 and production PR #534. The
-accepted result has 38 top-level commands, 7 `/me` subcommands, and 2 `/inventory` subcommands;
+Phase 6 result in mirror PR #228 and production PR #535 passed final smoke on 2026-07-18 and has
+37 top-level commands, 100 grouped subcommands, 8 `/me` subcommands, and 2 `/inventory` subcommands;
 keeps modern private reports and their three report-page exports; makes Account Summary the only
 central personal-data download home; and leaves `dbo.InventoryReportPreference` untouched with no
 Phase 5G SQL deployment. Completed Phase 5G records are archived under `archive/`.
 
-Phase 6 Interactive Period Performance and `/my_stats` Retirement is the active GovernorOS slice.
-Implementation and focused validation are present; final bot/SQL Changes reviews, SQL-before-bot
-deployment, command resync, operator smoke, and exact-patch promotion remain. Account Summary
-retains all personal downloads.
+Phase 6 Interactive Period Performance and `/my_stats` Retirement is complete and archived. The
+active programme pack records the remaining Phase 7 History, Phase 8 Inspect, Phase 9 evidence-led
+migration review, and Phase 10 future-candidate boundaries. The operator will separately review and
+create the next phase task pack; no remaining phase is approved by this documentation closure.
 
 Other temporary deprecated command paths remain captured as deferred cleanup for execution only
 after their own communication, no-feedback monitoring, production usage review, and explicit

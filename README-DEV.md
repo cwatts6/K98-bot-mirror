@@ -97,27 +97,36 @@ output/window choice, times out safely, and all three output kinds work. The sel
 Inventory report-page exports remain unchanged. The completed Phase 5G task pack and chat starter
 are archived under `docs/task_packs/archive/`.
 
-GovernorOS v2 Phase 6 Interactive Period Performance is implemented on its approval-gated bot and
-SQL branches. Initial operator smoke accepted all periods, governor switching, All Linked,
-Dashboard row-0 entry, data, and timeout behavior; final visual re-smoke and promotion remain.
-It adds private-anywhere `/me stats`, with Overview, Activity, and Combat on the approved 1702x924
-card; selected-governor or explicit All Linked scope; seven exact Stats-anchor periods; signed,
-coverage-aware Growth/Activity/Fort/Combat metrics; integrated RSS/Fort and Combat trends; opaque paged
-governor selection; current-registry revalidation; and a 180-second preserve-and-disable timeout.
-The smoke refinement adopts the accepted Reminders-style state pill, brighter/bolder typography,
-full selected Governor ID, explicit Stats/Activity/Fort coverage, a Forts Total-only Activity KPI,
-and a T4+T5/Deads/Healed Combat chart.
+GovernorOS v2 Phase 6 Interactive Period Performance is complete and operator accepted after final
+production Discord smoke on 2026-07-18. Mirror PR #228 and production PR #535 carry the accepted
+bot implementation. It adds private-anywhere `/me stats`, with Overview, Activity, and Combat on
+the approved 1702x924 card; selected-governor or explicit All Linked scope; seven exact Stats-anchor
+periods; signed, coverage-aware Growth/Activity/Fort/Combat metrics; integrated RSS/Fort and Combat
+trends; opaque paged governor selection; current-registry revalidation; and a 180-second preserve-
+and-disable timeout. Final smoke accepted every period, governor switching, All Linked, Dashboard
+row-0 navigation, source-correct data, timeout behavior, and the final visual presentation.
+The accepted refinement uses the Reminders-style right-aligned state pill/header stack,
+brighter/bolder typography, compact totals and averages, full selected Governor ID, explicit
+Stats/Activity/Fort coverage, a Forts Total-only Activity KPI, and integrated RSS/Fort plus
+T4+T5/Deads/Healed charts with consistent date axes and no duplicated chart summary copy.
 The selected Dashboard exposes Stats on row 0 after Preferences. The same atomic bot patch removes
 `/my_stats` without a redirect while preserving `/stats player` and its proven legacy stack. The
 validated command target is 37 top-level, 100 grouped, eight `/me`, and two `/inventory` commands.
 
-The separately reviewed additive SQL migration creates `dbo.usp_GetPersonalStatsDaily`, a bounded
-set-based read contract for at most 26 deduplicated Governor IDs and 180 source-anchored days. SQL
-must deploy before the bot patch. Its follow-up result contract exposes the latest UTC
+The separately reviewed and deployed SQL migrations create `dbo.usp_GetPersonalStatsDaily`, a
+bounded set-based read contract for at most 26 deduplicated Governor IDs and 180 source-anchored
+days. SQL PRs #43 and #44 deployed before the accepted bot smoke. The follow-up result contract
+exposes the latest UTC
 `KingdomScanData4.ScanDate` on the global Stats anchor date so the card's `Data last refreshed`
 label reports source freshness rather than bot query time. An additional covering index remains
 evidence-gated on production plans/logical reads rather than speculative. Account Summary remains
 the only central personal-data download home and Phase 5G output contracts remain unchanged.
+
+The completed Phase 6 task pack and chat starter are archived under `docs/task_packs/archive/`.
+The active programme pack retains Phases 7-10 as separately approval-gated work. Any later History
+or Inspect card must start from the accepted premium layout, same-payload fallback, source/generated
+time separation, author-gated opaque governor selection, registry revalidation, lifecycle cleanup,
+and accessibility rules recorded by Phase 6; no later slice is implicitly approved by this closure.
 
 ## Quality Automation
 

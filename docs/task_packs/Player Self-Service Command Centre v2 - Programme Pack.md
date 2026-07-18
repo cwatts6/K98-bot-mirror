@@ -4,14 +4,13 @@
 
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
-- Date: `2026-07-17`
+- Date: `2026-07-18`
 - Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player
   Self-Service Command Centre programme completed in production PR #486; GovernorOS v2 Phase 5 is
-  complete and operator accepted through Phase 5G on 2026-07-17; mirror PR #227 and production PR
-  #534 carry the accepted Phase 5G Account Data Export Consolidation implementation; Phase 6
-  Interactive Period Performance and `/my_stats` Retirement is implemented on approval-gated bot
-  and SQL branches, has the accepted `assets/me/cards/me_stats.png` backdrop, and is in final
-  validation before deployment, command resync, operator smoke, and promotion.
+  complete and operator accepted through Phase 6 on 2026-07-18. Mirror PR #228 and production PR
+  #535 carry the accepted Phase 6 Interactive Period Performance and `/my_stats` Retirement bot
+  implementation; SQL PRs #43 and #44 delivered the deployed personal-stats contract first. Final
+  production Discord smoke accepted the complete data, interaction, timeout, and visual result.
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
 - One-pass approved: `No`
 - Headline: **Turn `/me` into the definitive KD98 governor operating system — bold, premium, personal, and unmistakably better than a normal Discord bot command.**
@@ -123,15 +122,17 @@ row-count, sheet, Forts, safety, freshness, and Google Sheets labelling defects 
 Final smoke accepted option reselection, timeout, all three files, and restored governor-sheet
 layout.
 
-Phase 6 **Interactive Period Performance and `/my_stats` Retirement** is now product-approved and
-task-packed. The canonical route is private `/me stats`, available from any guild channel or thread
+Phase 6 **Interactive Period Performance and `/my_stats` Retirement** is complete and operator
+accepted after final production Discord smoke on 2026-07-18. The canonical route is private
+`/me stats`, available from any guild channel or thread
 with no legacy KVK stats-channel gate. It uses the accepted `assets/me/cards/me_stats.png` backdrop
 and invoking-user avatar across Overview, Activity, and Combat; supports one linked governor or an
 explicit coverage-aware All Linked portfolio; replaces Last 3M/6M with exact Last 90/180 Days; adds
 Growth, Activity, Fort, and Combat period metrics; removes Ark and all download ownership; and
 removes `/my_stats` rather than retaining a redirect. The final target is 37 top-level commands,
 100 grouped subcommands, 8 under `/me`, and 2 under `/inventory`. `/stats player` remains outside the
-personal migration until the later Inspect review.
+personal migration until the later Inspect review. The final resynced command surface is 37 top-
+level commands, 100 grouped subcommands, 8 under `/me`, and 2 under `/inventory`.
 
 ## 3. Programme Vision
 
@@ -470,7 +471,45 @@ Delivery ownership:
   `assets/me/cards/me_accounts.png`; Phase 5D and 5D.1 completed Reminders; Phase 5E completed
   Preferences using `assets/me/cards/me_preferences.png`; Phases 5F-5G continue Inventory and
   Exports one page at a time under separately approved contracts.
-- Phases 6-8 must use the same contract for Period Performance, History, and Inspect respectively.
+- Phase 6 completed the Period Performance implementation and refined the contract below. Phases 7
+  and 8 must treat that accepted result as their starting point while retaining their own data,
+  permission, and backdrop decisions.
+
+### Locked Phase 6 inheritance contract for remaining phases
+
+Phase 6 production smoke established the following reusable GovernorOS rules. A later task pack may
+change one only through an explicit product decision backed by visual/access/security evidence:
+
+- Successful premium personal reports default to a fully opaque standalone `1702x924` PNG with the
+  invoking user's bounded circular Discord avatar at top left and the safe local GovernorOS/KD98
+  fallback. A page may use a different approved backdrop, but it must retain the accepted visual
+  hierarchy: large/bold readable metrics, bright labels, deliberate panel density, and desktop plus
+  mobile review.
+- State and header support align cleanly on the right: a bordered status pill above a right-aligned
+  mode/period or page-context stack. Exact dates, coverage, source freshness, and state remain
+  scannable. `Data last refreshed` describes the authoritative source update; the footer separately
+  owns report generation time.
+- Main values and supporting averages use the same compact signed-number language. Charts retain
+  readable series names, consistent date-axis selection, signed axes, one-point/no-point handling,
+  and text equivalents, but do not repeat the KPI totals/averages already shown above them.
+- A selected Dashboard governor is reused only as a validated Governor ID. If no Dashboard context
+  exists, selected-governor self-view pages use Main, then the first valid canonical slot. One linked
+  governor opens directly without a redundant selector.
+- Multiple-governor self-view pages use Governor ID or an opaque server-held token, never governor
+  name, and remain duplicate-name safe. The accepted picker uses 24 governor options per page plus
+  explicit `All Linked` only where the product is genuinely additive/all-linked, supports all 26
+  canonical slots, preserves current page/mode/filter state, and never silently falls back to All
+  Linked after invalid access.
+- Registry authority is re-resolved before every scope-changing data fetch. Foreign, forged,
+  expired, superseded, removed, and transferred selections return explicit private access-changed
+  handling. Author checks happen before visible state mutation and latest valid transition wins.
+- Discord-user-level pages, fixed all-linked pages, and leadership lookup journeys do not inherit a
+  misleading self-view governor dropdown. Inspect lookup/ambiguity controls remain separate from
+  the linked-governor picker and do not gain All Linked without separate approval.
+- Successful and fallback output remains private, author-gated, and built from the same authorized
+  payload without a second fetch. The accepted inactivity baseline preserves the last report,
+  disables controls, and releases attachments, images, charts, files, and streams across success,
+  failure, timeout, navigation, cancellation, and stale suppression.
 
 ## 11. Target Data / Service Contract
 
@@ -682,9 +721,10 @@ VIP journey, avatar, fallback, and attachment lifecycle remain authoritative.
 
 ### Phase 6 Period Performance data contract
 
-Phase 6 approves a new typed private personal Stats payload for interactive period analysis. It does
-not move or duplicate Account Summary downloads, change public KVK reporting, or approve SQL
-schema/object deployment.
+Phase 6 delivered a new typed private personal Stats payload for interactive period analysis. It did
+not move or duplicate Account Summary downloads or change public KVK reporting. The separately
+approved SQL PRs #43/#44 delivered only the bounded `dbo.usp_GetPersonalStatsDaily` read contract
+and source-refresh header required by this route; broader schema/index work remains evidence-gated.
 
 Recommended service-level concepts:
 
@@ -1038,10 +1078,10 @@ Remaining-phase consistency matrix:
 | 5E Preferences | Discord user | Accepted 1702x924 `me_preferences.png` card | No parent dropdown; Accounts owns VIP | Complete and deployed; Phase 5F retains regional profile/local-time and intentionally retires the transitional Inventory privacy feature |
 | 5F Inventory consolidation | Commands, navigation, Preferences dependency, legacy controller | No new Inventory summary card; accepted Preferences card and existing 1400x980 reports retained | Direct report pages retain selected-governor resolver and Change Governor | Complete and operator accepted; four routes, public/All viewing and combined export retired; imports, audits, private reports, report-page exports, calculations, filenames, and dormant SQL table preserved |
 | 5G Account Data Export Consolidation | All linked accounts under Account Summary | Full workbook, current snapshot CSV, raw history CSV | No Change Governor; active registry revalidation at Download | Complete and operator accepted; `/me exports` and `/my_stats_export` removed, Download data canonical, identified output defects corrected, no SQL deployment |
-| 6 Interactive Period Performance | Selected governor or explicit All Linked | Approved `1702x924` `me_stats.png` card with Overview, Activity, Combat; no downloads | Dashboard/Main-first selected governor, ID-based paged selector, explicit All Linked, revalidate before fetch | Product-approved and task-packed; add private-anywhere `/me stats`, exact seven periods and coverage-aware additive metrics, remove Ark, remove `/my_stats`, resync to `37 / 8 / 2`, preserve `/stats player` |
-| 7 History | Selected governor | Accepted selected-governor standalone lifecycle | Paged Change Governor with access recheck | Preserve public/channel-gated `/kvk history`; add private `/me history` only |
-| 8 Inspect | Explicit lookup target, inspect-safe | Private permission-gated premium output | Inspect lookup/ambiguity resolution | Review `/stats player` and `/me inspect` together; approve permissions, safe fields/VIP, lookup, and telemetry first |
-| 9 Migration review | Evidence only | No new renderer implied | No selector change implied | Review remaining specialist/compatibility commands only; Phase 5F, 5G, and approved Phase 6 retirements are not reopened |
+| 6 Interactive Period Performance | Selected governor or explicit All Linked | Accepted `1702x924` `me_stats.png` card with Overview, Activity, Combat; no downloads | Dashboard/Main-first selected governor, opaque ID/token picker with 24 governors per page plus explicit All Linked, revalidate before fetch | Complete and operator accepted 2026-07-18; private-anywhere `/me stats`, exact seven periods, coverage-aware signed additive metrics, integrated accessible charts, source refresh, `/my_stats` retirement, `37 / 100 / 8 / 2`, `/stats player` preserved |
+| 7 History | Selected governor | Start from the accepted Phase 6 standalone visual/lifecycle hierarchy; approve a History-specific backdrop/content geometry separately | Dashboard/Main-first; one opens directly; duplicate-safe opaque paged Change Governor with access recheck; no All Linked unless separately justified | Preserve public/channel-gated `/kvk history`; add private `/me history` only; reuse existing history payload/rendering where source-correct without importing public visibility |
+| 8 Inspect | Explicit lookup target, inspect-safe | Private permission-gated premium output using the accepted typography/header/fallback/lifecycle standard | Separate inspect lookup/ambiguity controls; never reuse linked-governor authority or infer All Linked | Review `/stats player` and `/me inspect` together; approve permissions, safe fields/VIP, lookup, telemetry, and legacy zero-callers first |
+| 9 Migration review | Evidence only | No new renderer implied | No selector change implied | Review remaining specialist/compatibility commands only; completed Phase 5F, 5G, and 6 retirements and ownership contracts are not reopened |
 
 Every phase starts with repository inspection and an approval-gated implementation plan. Historical
 phase records remain accurate for what was delivered at that time; later explicit product decisions
@@ -1581,11 +1621,11 @@ Authoritative archived records:
 
 ### Phase 6 — Interactive Period Performance And `/my_stats` Retirement
 
-Status: `product-approved and task-packed on 2026-07-17; runtime implementation is the next staged slice`.
+Status: `complete and operator accepted after final production Discord smoke on 2026-07-18`.
 
-Goal: deliver `/me stats` as the private premium Period Performance experience for one currently
-linked governor or an explicit coverage-aware All Linked portfolio, then remove `/my_stats` rather
-than retaining a redirect.
+Delivered: `/me stats` is the private premium Period Performance experience for one currently
+linked governor or an explicit coverage-aware All Linked portfolio; `/my_stats` is removed rather
+than retained as a redirect.
 
 Approved command and ownership outcome:
 
@@ -1597,15 +1637,17 @@ Approved command and ownership outcome:
 - preserve `/me accounts -> Account Summary -> Download data` as the only personal download home;
 - create no workbook, CSV, Google Sheet, export/download action, or Exports page.
 
-Approved presentation:
+Delivered presentation:
 
 - use the fully opaque `1702x924` runtime asset `assets/me/cards/me_stats.png`;
 - show the invoking user's circular Discord avatar at top left with safe fallback;
 - use one shared backdrop across Overview, Activity, and Combat;
-- display selected scope/identity, friendly period, exact inclusive dates, Stats anchor, coverage,
-  READY/PARTIAL/NO DATA/UNAVAILABLE state, and full generated UTC;
+- display selected scope/identity, friendly period, exact inclusive dates, Stats anchor, explicit
+  Stats/Activity/Fort coverage, READY/PARTIAL/NO DATA/UNAVAILABLE state, authoritative source
+  refresh, and a separate generated UTC footer;
 - deliver a standalone private attachment plus a complete same-authorized-payload fallback;
-- integrate RSS and Fort trends into Activity with accessible text equivalents;
+- integrate RSS and Fort trends into Activity and T4+T5/Deads/Healed trends into Combat with
+  accessible text equivalents, consistent date axes, and no repeated KPI summary block;
 - use a 180-second preserve-and-disable interaction timeout and no public fallback.
 
 Approved period model:
@@ -1660,10 +1702,19 @@ that procedure before the bot patch. Its approved follow-up header exposes the l
 source scan rather than bot query time. Any covering index remains gated on representative
 production execution plans, logical reads, and timings rather than being added speculatively.
 
-Authoritative active records:
+Final acceptance evidence:
 
-- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
-- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
+- Mirror PR #228 and production PR #535 carry the accepted bot result; SQL PRs #43/#44 deployed the
+  required contract first.
+- Final validation passed with `2660 passed, 2 skipped`; both bot and SQL Changes reviews ran with
+  Deep off and closed with zero unresolved findings.
+- Production smoke accepted all seven periods, every tested governor transition, explicit All
+  Linked, Dashboard return, source-correct data, final visual formatting, and timeout behavior.
+
+Authoritative archived records:
+
+- `docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
+- `docs/task_packs/archive/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
 
 ### Phase 7 — Private `/me history` Entry Point
 
@@ -1678,7 +1729,14 @@ Deliver:
 - Re-resolve selected-governor access before loading history.
 - Reuse the modern KVK history service/payload/renderer through a private delivery adapter.
 - Deliver the history card as a standalone private attachment with the accepted fallback,
-  attachment cleanup, blue navigation, and paged Change Governor contract.
+  attachment cleanup, blue navigation, and the locked Phase 6 visual/header/typography/lifecycle
+  contract. Approve a History-specific backdrop and geometry rather than reusing `me_stats.png` by
+  assumption.
+- Default from validated Dashboard governor, otherwise Main, otherwise first valid canonical slot;
+  open one linked governor directly and use the duplicate-name-safe opaque paged picker for multiple.
+- Preserve current History page/filter state when changing governor, revalidate linkage before the
+  load, reject access-changed/forged/expired selections explicitly, and do not add All Linked unless
+  a later product/data audit proves an additive portfolio History experience is wanted.
 - Preserve `/kvk history` command registration, channel gate, public behavior, filters, and output.
 - No implicit redirect between `/me history` and `/kvk history`.
 - Focused privacy, access, missing-history, rendering, and compatibility tests.
@@ -1708,6 +1766,12 @@ Deliver:
 - Preserve `/stats player` and `/player_profile` until a later usage-led migration approval.
 - Reuse the accepted standalone governor-card delivery and cleanup contract, but keep inspect lookup
   and ambiguity controls separate from the self-view linked-governor Change Governor dropdown.
+- Reuse the accepted Phase 6 right-aligned state/header hierarchy, large compact-number typography,
+  source-versus-generated time separation, same-payload fallback, transition safety, timeout, and
+  accessibility rules where applicable; do not assume the Stats backdrop or Stats metrics.
+- Do not expose the self-view linked-governor picker, Main-first default, or All Linked option in an
+  inspect journey. Inspect authority comes only from the separately approved permission and lookup
+  decision.
 
 Approval gate: define the exact admin/leadership permission policy, inspect-safe VIP decision,
 lookup behavior, audit fields/retention, and grouped-subcommand count change. Run a dedicated Codex
@@ -1832,14 +1896,14 @@ These ideas must not block or silently expand Phases 5A-9.
 commands/me_cmds.py
 ui/views/player_self_service_views.py
 ui/views/player_self_service_governor_dashboard_views.py
-ui/views/player_self_service_stats_views.py (Phase 6 candidate)
+ui/views/player_self_service_stats_views.py (delivered in Phase 6)
 player_self_service/service.py
 player_self_service/page_cards.py
 player_self_service/dashboard_card.py
-player_self_service/stats_models.py (Phase 6 candidate)
-player_self_service/stats_service.py (Phase 6 candidate)
-player_self_service/stats_renderer.py (Phase 6 candidate)
-stats/dal/personal_stats_dal.py (Phase 6 candidate)
+player_self_service/stats_models.py (delivered in Phase 6)
+player_self_service/stats_service.py (delivered in Phase 6)
+player_self_service/stats_renderer.py (delivered in Phase 6)
+stats/dal/personal_stats_dal.py (delivered in Phase 6)
 commands/inventory_cmds.py
 inventory/reporting_service.py
 inventory/dal/inventory_reporting_dal.py
@@ -1970,21 +2034,21 @@ The programme is complete when:
 - [x] Phase 5G product, command, output, correctness, privacy, no-SQL, test, security-routing, rollback, and Phase 6 handoff decisions are recorded in the archived task pack and starter.
 - [x] Phase 5G removes `/me exports` and `/my_stats_export`, delivers Account Summary Download data, and corrects the identified export issues.
 - [x] Phase 5G passed final validation/review, deployment/resync, production verification, and operator Discord smoke on 2026-07-17.
-- [x] Phase 6 product, command, period, metric, selector, All Linked, visual, privacy, accessibility, performance, security-routing, communication, resync, smoke, rollback, and `/stats player` preservation decisions are recorded in the active task pack and starter.
+- [x] Phase 6 product, command, period, metric, selector, All Linked, visual, privacy, accessibility, performance, security-routing, communication, resync, smoke, rollback, and `/stats player` preservation decisions are recorded in the archived task pack and starter.
 - [x] The approved Phase 6 runtime backdrop is present at `assets/me/cards/me_stats.png` and the programme records the invoking-user top-left avatar plus Overview/Activity/Combat contract.
-- [ ] `/me stats` delivers the approved private Period Performance experience and the selected-governor Dashboard action.
-- [ ] `/my_stats` is removed without a redirect and the resynced surface verifies 37 top-level, 100 grouped, 8 `/me`, and 2 `/inventory`.
-- [ ] Exact seven-period boundaries, signed metrics, coverage-aware All Linked aggregation, RSS/Fort charts, fallback, timeout, accessibility, and performance pass operator smoke.
-- [ ] `/stats player` remains available until the separately approved Inspect/leadership decision.
+- [x] `/me stats` delivers the approved private Period Performance experience and the selected-governor Dashboard action.
+- [x] `/my_stats` is removed without a redirect and the resynced surface verifies 37 top-level, 100 grouped, 8 `/me`, and 2 `/inventory`.
+- [x] Exact seven-period boundaries, signed metrics, coverage-aware All Linked aggregation, RSS/Fort and Combat charts, fallback, timeout, accessibility, and performance passed operator smoke on 2026-07-18.
+- [x] `/stats player` remains available until the separately approved Inspect/leadership decision.
 - [ ] A private `/me history` path exists while `/kvk history` remains unchanged.
 - [ ] `/me inspect` is permission-gated, private by default, and excludes Discord-user private data.
 - [x] Legacy commands are only redirected/removed after usage evidence and explicit operator approval; Phase 5F Inventory retirements meet that gate.
-- [x] Documentation reflects GovernorOS v2 Phase 5 completion, the approved/task-packed Phase 6 contract, and the remaining Phase 7-10 boundaries.
-- [x] Canonical command references and validators show the accepted Phase 5G baseline at 38 top-level commands, 7 `/me` subcommands, and 2 `/inventory` subcommands; the Phase 6 task records the approved 37/100/8/2 target.
+- [x] Documentation reflects GovernorOS v2 completion through Phase 6, the accepted Phase 6 inheritance contract, and the remaining Phase 7-10 boundaries.
+- [x] Canonical command references and validators show the accepted Phase 6 baseline at 37 top-level commands, 100 grouped subcommands, 8 `/me` subcommands, and 2 `/inventory` subcommands.
 - [x] Phase 5C documentation, canonical references, automated validation, security review, visual
   samples, and successful operator Discord smoke are recorded.
-- [x] Command registration validation remains green through Phase 5G.
-- [x] No new direct SQL exists in command/view layers through Phase 5G.
+- [x] Command registration validation remains green through Phase 6.
+- [x] No new direct SQL exists in command/view layers through Phase 6.
 - [x] Deferred findings from completed phases are captured structurally.
 
 ## 19. Deferred / Future Opportunities
@@ -2004,32 +2068,24 @@ Do not include these in early phases unless separately approved:
 
 ## 20. Suggested Next Action
 
-```text
-Execute the active Phase 6 task pack for Interactive Period Performance and `/my_stats` Retirement.
-Begin with audit only, then stop at the documented architecture and implementation-plan gates.
+Phase 6 is complete. The operator will separately review and create the next phase task pack.
 
-Locked Phase 6 outcome:
-- add private-anywhere /me stats under the existing /me group
-- add the selected-governor Dashboard Stats action
-- use assets/me/cards/me_stats.png with the invoking-user avatar across Overview/Activity/Combat
-- support selected governor and explicit coverage-aware All Linked scope
-- use exact Yesterday/This Week/Last Week/This Month/Last Month/Last 90/Last 180 source-date windows
-- show approved Growth, Activity/Forts, and Combat period metrics with signed corrections
-- integrate RSS and Fort charts with accessible text equivalents
-- revalidate active registry before every data fetch and support more than 25 accounts safely
-- keep all output private, use same-payload fallback, latest-request-wins, 180-second preserve-and-disable timeout, bounded cache, telemetry, and complete cleanup
-- remove /my_stats without a redirect in the same deployment and resync to 37 top-level / 100 grouped / 8 /me / 2 inventory
-- preserve /stats player and its proven legacy dependencies for the later Inspect review
-- preserve Account Summary as the only personal download home
-- deploy and verify additive `dbo.usp_GetPersonalStatsDaily` before the bot; retain the existing schema otherwise and add an index only after representative production plan/read evidence
-```
+Until that pack is approved, the only permitted next action is an audit/scope review against the
+remaining roadmap. Phase 7 History is the next proposed slice, followed by Phase 8 Inspect, Phase 9
+evidence-led migration review, and the uncommitted Phase 10 candidate programme. The audit must
+start from the locked Phase 6 inheritance contract above, including the premium visual hierarchy,
+opaque duplicate-safe governor picker, Main-first self-view default, registry revalidation,
+same-payload fallback, source/generated time separation, transition/timeout safety, accessibility,
+and resource cleanup. It must not infer a Stats backdrop, All Linked mode, permission policy, command
+retirement, or runtime approval for a later phase.
 
-Active Phase 6 records:
+Archived Phase 6 records:
 
-- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
-- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
+- `docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
+- `docs/task_packs/archive/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 6 Interactive Period Performance and Legacy Command Retirement.md`
 
-Completed Phase 5G and earlier execution records remain archived and are not rewritten.
+Completed Phase 6 and earlier execution records remain archived and are not rewritten except for
+explicit historical corrections.
 
 ## 21. Programme Change Log
 
@@ -2071,3 +2127,4 @@ Completed Phase 5G and earlier execution records remain archived and are not rew
 | 2026-07-17 | Phase 6 implementation entered final validation | Added the thin `/me stats` registration and row-0 Dashboard Stats handoff, typed service/DAL/renderer/view stack, opaque 24-per-page governor picker plus All Linked, exact signed/coverage-aware aggregation, integrated charts/fallback/lifecycle/telemetry, and atomic `/my_stats` retirement while retaining `/stats player`. Added separately reviewed additive SQL procedure `dbo.usp_GetPersonalStatsDaily`; SQL deploys before bot, while any covering index remains gated on representative production plans and logical reads. Command registration validates at `37 / 100 / 8 / 2`; final Changes reviews, deployment/resync, operator smoke, and promotion remain pending. |
 | 2026-07-17 | Phase 6 initial operator smoke refinement | Accepted every period, governor switching, All Linked, Dashboard row-0 Stats navigation, data, and timeout behavior. Approved Reminders-aligned state pill, brighter/bolder and denser typography, full selected Governor ID, explicit source coverage explaining `PARTIAL`, Forts Total as the sole Activity Fort KPI while preserving all three Fort chart series, and a T4+T5/Deads/Healed Combat chart. Final visual re-smoke and promotion remain pending. |
 | 2026-07-18 | Phase 6 source-freshness correction approved | Replaced the provisional bot-query completion meaning of `Data last refreshed` with the authoritative latest UTC `KingdomScanData4.ScanDate` on the global Stats anchor date. The change uses a new additive procedure-result migration after the original SQL contract merged, deploys SQL before the dependent bot, fails closed when the new header is absent, preserves the generation footer, and retains the measurement gate for any new index. |
+| 2026-07-18 | Phase 6 completed, operator accepted, and archived | Final production Discord smoke accepted every period, governor switching, All Linked, Dashboard navigation, source-correct data, final Overview/Activity/Combat presentation, and timeout. Mirror PR #228 and production PR #535 carry the accepted bot result; SQL PRs #43/#44 deployed first. Final validation recorded `2660 passed, 2 skipped`; bot and SQL Changes reviews ran with Deep off and closed with zero unresolved findings. Archived the Phase 6 task pack/starter and locked the premium format, source/generated time separation, opaque governor-picker, revalidation, fallback, lifecycle, and accessibility inheritance rules for separately approved Phases 7-10. |
