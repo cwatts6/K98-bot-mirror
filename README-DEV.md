@@ -113,9 +113,11 @@ validated command target is 37 top-level, 100 grouped, eight `/me`, and two `/in
 
 The separately reviewed additive SQL migration creates `dbo.usp_GetPersonalStatsDaily`, a bounded
 set-based read contract for at most 26 deduplicated Governor IDs and 180 source-anchored days. SQL
-must deploy before the bot patch. An additional covering index remains evidence-gated on production
-plans/logical reads rather than speculative. Account Summary remains the only central personal-data
-download home and Phase 5G output contracts remain unchanged.
+must deploy before the bot patch. Its follow-up result contract exposes the latest UTC
+`KingdomScanData4.ScanDate` on the global Stats anchor date so the card's `Data last refreshed`
+label reports source freshness rather than bot query time. An additional covering index remains
+evidence-gated on production plans/logical reads rather than speculative. Account Summary remains
+the only central personal-data download home and Phase 5G output contracts remain unchanged.
 
 ## Quality Automation
 

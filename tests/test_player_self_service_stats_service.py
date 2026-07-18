@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, date, datetime
 import time
 
 import pytest
@@ -14,6 +14,7 @@ from player_self_service.stats_models import (
     PersonalStatsDataSet,
     PersonalStatsHeader,
     PersonalStatsNoAccounts,
+    PersonalStatsUnavailable,
     StatsPeriod,
     StatsResultState,
     StatsScopeType,
@@ -48,7 +49,13 @@ def _summary(*accounts: tuple[str, int, str], ok: bool = True) -> AccountResolut
 
 def _dataset(anchor: date, *rows: PersonalStatsDailyRow, count: int = 1) -> PersonalStatsDataSet:
     return PersonalStatsDataSet(
-        header=PersonalStatsHeader(anchor, anchor.replace(day=1), anchor, count),
+        header=PersonalStatsHeader(
+            anchor,
+            datetime.combine(anchor, datetime.max.time(), tzinfo=UTC),
+            anchor.replace(day=1),
+            anchor,
+            count,
+        ),
         rows=tuple(rows),
     )
 
@@ -303,9 +310,35 @@ async def test_identical_inflight_loads_are_deduplicated_and_cache_reuse_is_auth
     assert data_calls == 1
     assert registry_calls == 6  # Before and after every load, including cache reuse.
     assert first.metrics.power_change.total == second.metrics.power_change.total
+    assert first.data_refreshed_at_utc == datetime(2026, 7, 15, 23, 59, 59, 999999, tzinfo=UTC)
     assert first.data_refreshed_at_utc == second.data_refreshed_at_utc
     assert third.data_refreshed_at_utc == first.data_refreshed_at_utc
     assert third.scope_governor_ids == (111,)
+
+
+@pytest.mark.asyncio
+async def test_missing_sql_source_refresh_timestamp_fails_closed() -> None:
+    await stats_service.clear_personal_stats_cache()
+    summary = _summary(("Main", 111, "Main"))
+    dataset = _dataset(date(2026, 7, 15), _complete_row(111, date(2026, 7, 14)))
+    dataset = replace(
+        dataset,
+        header=replace(dataset.header, stats_source_refreshed_at_utc=None),
+    )
+
+    async def account_loader(_user_id: int):
+        return summary
+
+    def data_loader(_governor_ids, *, history_days):
+        return dataset
+
+    with pytest.raises(PersonalStatsUnavailable, match="source refresh timestamp"):
+        await stats_service.build_personal_stats_payload(
+            109,
+            period=StatsPeriod.YESTERDAY,
+            account_loader=account_loader,
+            data_loader=data_loader,
+        )
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
 
@@ -51,6 +51,7 @@ class _Connection:
 def _sets(governor_id: int = 111):
     header_columns = (
         "StatsAnchorDate",
+        "StatsSourceRefreshedAtUtc",
         "WindowStartDate",
         "WindowEndDate",
         "RequestedGovernorCount",
@@ -66,7 +67,18 @@ def _sets(governor_id: int = 111):
         "FortsTotal",
     )
     return (
-        (header_columns, [(date(2026, 7, 15), date(2026, 1, 17), date(2026, 7, 15), 1)]),
+        (
+            header_columns,
+            [
+                (
+                    date(2026, 7, 15),
+                    datetime(2026, 7, 15, 23, 59, 42),
+                    date(2026, 1, 17),
+                    date(2026, 7, 15),
+                    1,
+                )
+            ],
+        ),
         (
             daily_columns,
             [
@@ -93,6 +105,9 @@ def test_set_based_contract_deduplicates_ids_binds_fixed_shape_and_closes(monkey
     dataset = dal.fetch_personal_stats_daily((111, 111), history_days=180)
 
     assert dataset.header.stats_anchor_date == date(2026, 7, 15)
+    assert dataset.header.stats_source_refreshed_at_utc == datetime(
+        2026, 7, 15, 23, 59, 42, tzinfo=UTC
+    )
     assert dataset.rows[0].power_delta == -50
     assert dataset.rows[0].forts_total == -2
     assert cursor.timeout == 9
@@ -138,3 +153,36 @@ def test_contract_rejects_foreign_rows_and_still_closes(monkeypatch) -> None:
 
     assert cursor.closed is True
     assert connection.closed is True
+
+
+def test_header_normalizes_aware_source_refresh_to_utc() -> None:
+    row = {
+        "StatsAnchorDate": date(2026, 7, 15),
+        "StatsSourceRefreshedAtUtc": datetime(
+            2026, 7, 16, 1, 59, 42, tzinfo=timezone(timedelta(hours=2))
+        ),
+        "WindowStartDate": date(2026, 1, 17),
+        "WindowEndDate": date(2026, 7, 15),
+        "RequestedGovernorCount": 1,
+    }
+
+    header = dal._map_header(row, expected_count=1)
+
+    assert header.stats_source_refreshed_at_utc == datetime(2026, 7, 15, 23, 59, 42, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    "source_refresh",
+    (None, "2026-07-15T23:59:42", datetime(2026, 7, 14, 23, 59, 42)),
+)
+def test_header_rejects_missing_invalid_or_out_of_anchor_source_refresh(source_refresh) -> None:
+    row = {
+        "StatsAnchorDate": date(2026, 7, 15),
+        "StatsSourceRefreshedAtUtc": source_refresh,
+        "WindowStartDate": date(2026, 1, 17),
+        "WindowEndDate": date(2026, 7, 15),
+        "RequestedGovernorCount": 1,
+    }
+
+    with pytest.raises(ValueError, match="source refresh"):
+        dal._map_header(row, expected_count=1)

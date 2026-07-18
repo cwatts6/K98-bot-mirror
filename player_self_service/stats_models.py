@@ -80,9 +80,17 @@ class StatsGovernorOption:
 @dataclass(frozen=True, slots=True)
 class PersonalStatsHeader:
     stats_anchor_date: date | None
+    stats_source_refreshed_at_utc: datetime | None
     window_start_date: date | None
     window_end_date: date | None
     requested_governor_count: int
+
+    def __post_init__(self) -> None:
+        if (
+            self.stats_source_refreshed_at_utc is not None
+            and self.stats_source_refreshed_at_utc.tzinfo is None
+        ):
+            raise ValueError("Stats source refresh timestamp must be timezone-aware")
 
 
 @dataclass(frozen=True, slots=True)

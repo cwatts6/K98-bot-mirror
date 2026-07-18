@@ -1655,8 +1655,10 @@ metrics only, recomputes daily series/averages, and shows reporting-governor/acc
 Commands and views remain thin. A new typed personal service/DAL/renderer/view stack is preferred;
 legacy `embed_my_stats.py` and root `stats_service.py` callers required by `/stats player` remain.
 The separately approved additive SQL contract is `dbo.usp_GetPersonalStatsDaily`; deploy and verify
-that procedure before the bot patch. Any covering index remains gated on representative production
-execution plans, logical reads, and timings rather than being added speculatively.
+that procedure before the bot patch. Its approved follow-up header exposes the latest UTC
+`KingdomScanData4.ScanDate` on the global Stats anchor date so `Data last refreshed` describes the
+source scan rather than bot query time. Any covering index remains gated on representative
+production execution plans, logical reads, and timings rather than being added speculatively.
 
 Authoritative active records:
 
@@ -2068,3 +2070,4 @@ Completed Phase 5G and earlier execution records remain archived and are not rew
 | 2026-07-17 | Phase 6 Interactive Period Performance approved and task-packed | Approved private-anywhere `/me stats`, the `assets/me/cards/me_stats.png` avatar-enabled Overview/Activity/Combat card, selected-governor plus explicit coverage-aware All Linked scope, exact Yesterday/Week/Month/90/180-day windows, Growth/Activity/Forts/Combat metrics, signed corrections, integrated accessible RSS/Fort charts, new typed personal stack, no downloads/Ark, atomic `/my_stats` removal, `37 / 100 / 8 / 2` command target, `/stats player` preservation, communication, resync, smoke, and rollback. Created the active Phase 6 task pack and chat starter. |
 | 2026-07-17 | Phase 6 implementation entered final validation | Added the thin `/me stats` registration and row-0 Dashboard Stats handoff, typed service/DAL/renderer/view stack, opaque 24-per-page governor picker plus All Linked, exact signed/coverage-aware aggregation, integrated charts/fallback/lifecycle/telemetry, and atomic `/my_stats` retirement while retaining `/stats player`. Added separately reviewed additive SQL procedure `dbo.usp_GetPersonalStatsDaily`; SQL deploys before bot, while any covering index remains gated on representative production plans and logical reads. Command registration validates at `37 / 100 / 8 / 2`; final Changes reviews, deployment/resync, operator smoke, and promotion remain pending. |
 | 2026-07-17 | Phase 6 initial operator smoke refinement | Accepted every period, governor switching, All Linked, Dashboard row-0 Stats navigation, data, and timeout behavior. Approved Reminders-aligned state pill, brighter/bolder and denser typography, full selected Governor ID, explicit source coverage explaining `PARTIAL`, Forts Total as the sole Activity Fort KPI while preserving all three Fort chart series, and a T4+T5/Deads/Healed Combat chart. Final visual re-smoke and promotion remain pending. |
+| 2026-07-18 | Phase 6 source-freshness correction approved | Replaced the provisional bot-query completion meaning of `Data last refreshed` with the authoritative latest UTC `KingdomScanData4.ScanDate` on the global Stats anchor date. The change uses a new additive procedure-result migration after the original SQL contract merged, deploys SQL before the dependent bot, fails closed when the new header is absent, preserves the generation footer, and retains the measurement gate for any new index. |

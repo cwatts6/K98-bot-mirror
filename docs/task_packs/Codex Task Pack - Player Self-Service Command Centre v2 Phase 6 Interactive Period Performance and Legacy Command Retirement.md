@@ -12,7 +12,7 @@
 - Status: `initial operator smoke passed functional journeys; approved visual refinement implemented; final visual re-smoke, review, and promotion pending`
 - Approved runtime backdrop: `assets/me/cards/me_stats.png`
 - Target successful output: `private standalone 1702x924 PNG plus same-authorized-payload fallback`
-- SQL deployment approved: `yes; additive dbo.usp_GetPersonalStatsDaily only, with a separate SQL diff/review and SQL-before-bot deployment order; indexes remain measurement-gated`
+- SQL deployment approved: `yes; additive dbo.usp_GetPersonalStatsDaily plus the approved follow-up StatsSourceRefreshedAtUtc result column sourced from MAX(KingdomScanData4.ScanDate) on the Stats anchor date, with separate SQL diffs/reviews and SQL-before-bot deployment order; indexes remain measurement-gated`
 - Command target: `38 -> 37 top-level commands; grouped subcommands 99 -> 100; /me 7 -> 8; /inventory remains 2`
 - Command resync required: `yes, after the atomic Phase 6 deployment`
 
@@ -812,7 +812,7 @@ Do not code in the first response.
 | Legacy leadership stack | Retain `embed_my_stats.py`/`stats_service.py` code still used by `/stats player`; no broad migration in Phase 6. |
 | Telemetry | Existing usage tracker plus narrow structured Phase 6 performance/interaction events with minimised content. |
 | Documentation | Current programme, canonical command reference, README/briefing, task indexes, deferred register, smoke and deployment records. |
-| SQL schema | Additive `dbo.usp_GetPersonalStatsDaily` procedure, migration, and rollback are approved. Deploy SQL before bot; keep any index measurement-gated. |
+| SQL schema | Additive `dbo.usp_GetPersonalStatsDaily` procedure, migration, and rollback are approved. The follow-up header column `StatsSourceRefreshedAtUtc` is the latest UTC `KingdomScanData4.ScanDate` on the global Stats anchor date; deploy this SQL contract before the dependent bot and keep any index measurement-gated. |
 | Tests | Focused command, DAL, service, renderer, view, lifecycle, performance-shape, command-governance, and visual suites. |
 
 ### Recommended typed concepts

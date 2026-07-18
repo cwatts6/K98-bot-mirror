@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -47,6 +47,14 @@ def _to_date(value: Any) -> date | None:
     return value if isinstance(value, date) else None
 
 
+def _to_utc_datetime(value: Any) -> datetime | None:
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def _rows_to_dicts(cursor: Any) -> list[dict[str, Any]]:
     rows = cursor.fetchall()
     if not rows:
@@ -69,8 +77,16 @@ def _map_header(row: dict[str, Any], *, expected_count: int) -> PersonalStatsHea
     count = _to_int(row.get("RequestedGovernorCount"))
     if count != expected_count:
         raise ValueError("Personal stats SQL returned a mismatched governor count")
+    anchor = _to_date(row.get("StatsAnchorDate"))
+    source_refreshed_at = _to_utc_datetime(row.get("StatsSourceRefreshedAtUtc"))
+    if (anchor is None) != (source_refreshed_at is None):
+        raise ValueError("Personal stats SQL returned an invalid source refresh timestamp")
+    if anchor is not None and source_refreshed_at is not None:
+        if source_refreshed_at.date() != anchor:
+            raise ValueError("Personal stats SQL returned a source refresh outside its anchor date")
     return PersonalStatsHeader(
-        stats_anchor_date=_to_date(row.get("StatsAnchorDate")),
+        stats_anchor_date=anchor,
+        stats_source_refreshed_at_utc=source_refreshed_at,
         window_start_date=_to_date(row.get("WindowStartDate")),
         window_end_date=_to_date(row.get("WindowEndDate")),
         requested_governor_count=count,
