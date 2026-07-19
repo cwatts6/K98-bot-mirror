@@ -141,16 +141,26 @@ def _dashboard_payload(scenario: str) -> GovernorDashboardPayload:
             name, 123456789, "KD98", "France", 321 if scenario != "sparse" else None, 654
         ),
         latest_metrics=GovernorDashboardLatestMetrics(
-            value(123_850_000), value(8_520_000_000), value(26_220_000), value(189_260), value(357_160_000)
+            value(123_850_000),
+            value(8_520_000_000),
+            value(26_220_000),
+            value(189_260),
+            value(357_160_000),
         ),
-        historical_highlights=GovernorDashboardHistoricalHighlights(value(10_010_000), value(3), value(11)),
+        historical_highlights=GovernorDashboardHistoricalHighlights(
+            value(10_010_000), value(3), value(11)
+        ),
         activity_honours=GovernorDashboardActivityHonours(
-            value(75), value(28), 0.3733 if scenario not in {"sparse", "no_data", "unavailable"} else None,
+            value(75),
+            value(28),
+            0.3733 if scenario not in {"sparse", "no_data", "unavailable"} else None,
             "37.33%" if scenario not in {"sparse", "no_data", "unavailable"} else "N/A",
         ),
         profile_status=GovernorDashboardProfileStatus(value(100)),
         freshness=GovernorDashboardFreshness(None if scenario == "unavailable" else NOW),
-        inventory=GovernorDashboardInventoryHighlights(value(100_700_000_000), value(4_372), value(177)),
+        inventory=GovernorDashboardInventoryHighlights(
+            value(100_700_000_000), value(4_372), value(177)
+        ),
         available_actions=("accounts",),
         missing_fields=(),
         self_view=GovernorDashboardSelfView("Main", "VIP 19"),
@@ -222,9 +232,21 @@ def _preferences_payload(scenario: str) -> PreferencesSummaryPayload:
     mode = "UTC" if scenario in {"sparse", "unavailable"} else "LOCAL"
     missing = PreferenceValueSummary(False, False, "Not recorded", None, None)
     regional = RegionalProfileSummary(
-        timezone=PreferenceValueSummary(True, True, "United Kingdom", "Europe/London", "Europe/London") if available else missing,
-        location=PreferenceValueSummary(True, True, "United Kingdom (GB)", "GB", "GB") if available else missing,
-        preferred_language=PreferenceValueSummary(True, True, "English (en-GB)", "en-GB", "en-GB") if available else missing,
+        timezone=(
+            PreferenceValueSummary(True, True, "United Kingdom", "Europe/London", "Europe/London")
+            if available
+            else missing
+        ),
+        location=(
+            PreferenceValueSummary(True, True, "United Kingdom (GB)", "GB", "GB")
+            if available
+            else missing
+        ),
+        preferred_language=(
+            PreferenceValueSummary(True, True, "English (en-GB)", "en-GB", "en-GB")
+            if available
+            else missing
+        ),
     )
     return PreferencesSummaryPayload(
         discord_user_id=42,
@@ -238,16 +260,26 @@ def _preferences_payload(scenario: str) -> PreferencesSummaryPayload:
             display_time="15:05" if mode == "LOCAL" else "14:05",
             timezone_label="United Kingdom" if mode == "LOCAL" else None,
             utc_offset_label="UTC+1" if mode == "LOCAL" else "UTC",
-            supporting_line="United Kingdom • UTC+1" if mode == "LOCAL" else "Set a timezone to show local time.",
+            supporting_line=(
+                "United Kingdom • UTC+1"
+                if mode == "LOCAL"
+                else "Set a timezone to show local time."
+            ),
             regional_context="United Kingdom (GB) • English (en-GB)",
         ),
         profile_details_set=3 if available else 0,
         profile_details_total=3,
-        profile_supporting_text="3 of 3 profile details set" if available else "0 of 3 profile details set",
+        profile_supporting_text=(
+            "3 of 3 profile details set" if available else "0 of 3 profile details set"
+        ),
         settings_insight=(
             "This deliberately long supporting sentence verifies Regional Profile text fitting at Discord desktop and mobile scales."
             if scenario == "long_support"
-            else "All three regional profile details are available." if available else "Regional profile details are not recorded."
+            else (
+                "All three regional profile details are available."
+                if available
+                else "Regional profile details are not recorded."
+            )
         ),
     )
 
@@ -263,7 +295,9 @@ def _reminders_payload(scenario: str):
             else None
         ),
         calendar_prefs={"enabled": enabled, "by_event_type": {"ark": ["24h"]} if enabled else {}},
-        calendar_catalog=CalendarEventCatalog(available=scenario != "unavailable", event_types=("ark",) if enabled else ()),
+        calendar_catalog=CalendarEventCatalog(
+            available=scenario != "unavailable", event_types=("ark",) if enabled else ()
+        ),
         generated_at_utc=NOW,
     )
 
@@ -275,9 +309,24 @@ def _stats_payload(scenario: str) -> PersonalStatsPayload:
         "unavailable": StatsResultState.UNAVAILABLE,
     }.get(scenario, StatsResultState.READY)
     total = _value(scenario, 75)
-    daily = () if total is None else (StatsDailyPoint(date(2026, 7, 17), total), StatsDailyPoint(date(2026, 7, 18), -total))
-    metric = StatsMetricSummary(total=total, reporting_days=len(daily), expected_days=2, daily=daily)
-    metrics = PersonalStatsMetrics(**{name: metric for name in PersonalStatsMetrics.__dataclass_fields__ if name not in {"period_end_power", "period_end_troop_power", "period_end_date"}}, period_end_power=_value(scenario, 123_456_789), period_end_troop_power=_value(scenario, 98_765_432), period_end_date=date(2026, 7, 18))
+    daily = (
+        ()
+        if total is None
+        else (StatsDailyPoint(date(2026, 7, 17), total), StatsDailyPoint(date(2026, 7, 18), -total))
+    )
+    metric = StatsMetricSummary(
+        total=total, reporting_days=len(daily), expected_days=2, daily=daily
+    )
+    metrics = PersonalStatsMetrics(
+        **{
+            name: metric
+            for name in PersonalStatsMetrics.__dataclass_fields__
+            if name not in {"period_end_power", "period_end_troop_power", "period_end_date"}
+        },
+        period_end_power=_value(scenario, 123_456_789),
+        period_end_troop_power=_value(scenario, 98_765_432),
+        period_end_date=date(2026, 7, 18),
+    )
     return PersonalStatsPayload(
         discord_user_id=42,
         period=StatsPeriod.THIS_WEEK,
@@ -302,10 +351,44 @@ def _inventory_payload(scenario: str, view: InventoryReportView) -> InventoryRep
     count = 1 if scenario == "sparse" else 2
     value = int(_value(scenario, 1_000_000_000) or 0)
     dates = tuple(NOW - timedelta(days=7 * (count - index - 1)) for index in range(count))
-    resources = tuple(InventoryResourcePoint(stamp, value + index * 100_000_000, value * 2, value * 3, value * 4) for index, stamp in enumerate(dates)) if view == InventoryReportView.RESOURCES and not empty else ()
-    speedups = tuple(InventorySpeedupPoint(stamp, 1, 2, 20 + index, 30 + index, 10 + index) for index, stamp in enumerate(dates)) if view == InventoryReportView.SPEEDUPS and not empty else ()
-    materials = tuple(InventoryMaterialPoint(stamp, 10 + index, 20 + index, 30 + index, 40 + index, 50 + index) for index, stamp in enumerate(dates)) if view == InventoryReportView.MATERIALS and not empty else ()
-    return InventoryReportPayload(111, NAMES[scenario], view, InventoryReportRange.ONE_MONTH, resources=resources, speedups=speedups, materials=materials, generated_at_utc=NOW)
+    resources = (
+        tuple(
+            InventoryResourcePoint(
+                stamp, value + index * 100_000_000, value * 2, value * 3, value * 4
+            )
+            for index, stamp in enumerate(dates)
+        )
+        if view == InventoryReportView.RESOURCES and not empty
+        else ()
+    )
+    speedups = (
+        tuple(
+            InventorySpeedupPoint(stamp, 1, 2, 20 + index, 30 + index, 10 + index)
+            for index, stamp in enumerate(dates)
+        )
+        if view == InventoryReportView.SPEEDUPS and not empty
+        else ()
+    )
+    materials = (
+        tuple(
+            InventoryMaterialPoint(
+                stamp, 10 + index, 20 + index, 30 + index, 40 + index, 50 + index
+            )
+            for index, stamp in enumerate(dates)
+        )
+        if view == InventoryReportView.MATERIALS and not empty
+        else ()
+    )
+    return InventoryReportPayload(
+        111,
+        NAMES[scenario],
+        view,
+        InventoryReportRange.ONE_MONTH,
+        resources=resources,
+        speedups=speedups,
+        materials=materials,
+        generated_at_utc=NOW,
+    )
 
 
 def _render_scenario(scenario: str) -> list[tuple[str, bytes]]:
@@ -314,11 +397,17 @@ def _render_scenario(scenario: str) -> list[tuple[str, bytes]]:
     dashboard = render_governor_dashboard(_dashboard_payload(scenario), avatar_bytes=avatar)
     cards.append(("dashboard", dashboard.image_bytes))
     accounts_payload = _accounts_payload(scenario)
-    accounts = accounts_renderer.render_accounts_card(accounts_payload, display_name=NAMES[scenario], avatar_bytes=avatar)
+    accounts = accounts_renderer.render_accounts_card(
+        accounts_payload, display_name=NAMES[scenario], avatar_bytes=avatar
+    )
     cards.append(("accounts", accounts.image_bytes))
     for section in ("overview", "combat", "economy"):
-        page = accounts_service.build_account_summary_page(accounts_payload, section=section, page=1)
-        card = accounts_renderer.render_account_summary_card(page, display_name=NAMES[scenario], avatar_bytes=avatar)
+        page = accounts_service.build_account_summary_page(
+            accounts_payload, section=section, page=1
+        )
+        card = accounts_renderer.render_account_summary_card(
+            page, display_name=NAMES[scenario], avatar_bytes=avatar
+        )
         cards.append((f"account-summary-{section}", card.image_bytes))
     reminders = render_reminders_card(_reminders_payload(scenario), avatar_bytes=avatar)
     try:
@@ -329,10 +418,14 @@ def _render_scenario(scenario: str) -> list[tuple[str, bytes]]:
     cards.append(("preferences", preferences.image_bytes))
     stats_payload = _stats_payload(scenario)
     for mode in StatsMode:
-        card = render_personal_stats_card(stats_payload, mode=mode, display_name=NAMES[scenario], avatar_bytes=avatar)
+        card = render_personal_stats_card(
+            stats_payload, mode=mode, display_name=NAMES[scenario], avatar_bytes=avatar
+        )
         cards.append((f"stats-{mode.value}", card.image_bytes))
     for view in InventoryReportView:
-        rendered = render_inventory_reports(_inventory_payload(scenario, view), avatar_bytes=avatar)[0]
+        rendered = render_inventory_reports(
+            _inventory_payload(scenario, view), avatar_bytes=avatar
+        )[0]
         try:
             cards.append((f"inventory-{view.value}", rendered.image_bytes.getvalue()))
         finally:
@@ -341,7 +434,11 @@ def _render_scenario(scenario: str) -> list[tuple[str, bytes]]:
 
 
 def _save_variants(output: Path, scenario: str, cards: list[tuple[str, bytes]]) -> None:
-    previews: dict[str, list[tuple[str, Image.Image]]] = {"original": [], "desktop": [], "mobile": []}
+    previews: dict[str, list[tuple[str, Image.Image]]] = {
+        "original": [],
+        "desktop": [],
+        "mobile": [],
+    }
     for label, raw in cards:
         with Image.open(BytesIO(raw)) as source:
             image = source.convert("RGB")
@@ -349,7 +446,11 @@ def _save_variants(output: Path, scenario: str, cards: list[tuple[str, bytes]]) 
         target_dir.mkdir(parents=True, exist_ok=True)
         for scale, width in (("original", image.width), ("desktop", 960), ("mobile", 430)):
             height = round(width * image.height / image.width)
-            preview = image if width == image.width else image.resize((width, height), Image.Resampling.LANCZOS)
+            preview = (
+                image
+                if width == image.width
+                else image.resize((width, height), Image.Resampling.LANCZOS)
+            )
             preview.save(target_dir / f"{scale}.png", format="PNG", optimize=True)
             sheet_preview = preview.copy()
             previews[scale].append((label, sheet_preview))

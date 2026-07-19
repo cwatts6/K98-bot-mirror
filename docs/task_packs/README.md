@@ -454,8 +454,18 @@ Player Self-Service Command Centre status:
   anchor-date `KingdomScanData4.ScanDate`. Separate bot and SQL Changes reviews closed with zero
   unresolved findings. The resynced command surface is `37 / 100 / 8 / 2`; any extra index remains
   gated on representative production plans/logical reads.
-- Completed Phase 6 records are archived under `archive/`. Remaining Phases 7-10 inherit the accepted
-  premium presentation and interaction contracts but require new operator-approved task packs.
+- Completed Phase 6 records are archived under `archive/`.
+- The former proposed `/me history` Phase 7 is closed with no build; `/kvk history` remains
+  canonical.
+- Active GovernorOS v2 task packs:
+  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 7 Visual Consistency Content Audit and Programme Closeout.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 7 Visual Consistency Content Audit and Programme Closeout.md`
+  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 8 Leadership Stats Player Modernisation Canonical Combat Metric Alignment and Player Profile Retirement.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8 Leadership Stats Player Modernisation Canonical Combat Metric Alignment and Player Profile Retirement.md`
+  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
+  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
+- Phase 7 is the next implementation candidate. Phase 8 and Phase 9 remain separately
+  approval-gated and must not be implemented through the Phase 7 PR.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -560,10 +570,23 @@ keeps modern private reports and their three report-page exports; makes Account 
 central personal-data download home; and leaves `dbo.InventoryReportPreference` untouched with no
 Phase 5G SQL deployment. Completed Phase 5G records are archived under `archive/`.
 
-Phase 6 Interactive Period Performance and `/my_stats` Retirement is complete and archived. The
-active programme pack records the remaining Phase 7 History, Phase 8 Inspect, Phase 9 evidence-led
-migration review, and Phase 10 future-candidate boundaries. The operator will separately review and
-create the next phase task pack; no remaining phase is approved by this documentation closure.
+Phase 6 Interactive Period Performance and `/my_stats` Retirement is complete and archived.
+
+The active programme pack now records:
+
+- the closed KVK history placement decision: no `/me history`, `/kvk history` remains
+  canonical;
+- Phase 7 `/me` Visual Consistency, Content Audit and Programme Closeout as the next active
+  slice, with no command or SQL change;
+- Phase 8 leadership `/stats player` modernisation, global canonical Tanking Score alignment,
+  dedicated leadership audit/source foundations, and `/player_profile` retirement;
+- Phase 9 private `/stats kingdom` with dynamic-roster twelve-month trends and the latest four
+  completed KVKs;
+- Phase 10 usage-led migration review and Phase 11 future-candidate boundaries.
+
+Phase 7-9 task packs and starters are active in this folder. One-pass execution is not
+approved. Phase 8 must wait for Phase 7 acceptance, and Phase 9 must wait for Phase 8
+acceptance.
 
 Other temporary deprecated command paths remain captured as deferred cleanup for execution only
 after their own communication, no-feedback monitoring, production usage review, and explicit

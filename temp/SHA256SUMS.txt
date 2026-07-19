@@ -1,0 +1,9 @@
+32cc22bab7ab5ad80c62fc379d2c5fdbc9b4bf36b185e7d2964f540369850ff7  ./MANIFEST.md
+0854fa4c3693942f19bb918ef28c1b11c2e4162a811c2eb991e6b44a1b17313e  ./README.md
+a53786ebe1900cc58c979abeb597d372b603eae99e178d60b4bdbf3a22031c41  ./apply_documentation_updates.py
+866bb6c74b3d74c68472d5c2eac3818c566943622c30a6f75bca09ede5ead72d  ./docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 7 Visual Consistency Content Audit and Programme Closeout.md
+e96d450fd65d467058dcb68877df3ae23ae3b74451b05086a7b12db60c3fccc7  ./docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8 Leadership Stats Player Modernisation Canonical Combat Metric Alignment and Player Profile Retirement.md
+777b743c58925cda64385af129e007880bd0de433c5facadb35cf56068235608  ./docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md
+70c15c86d30f5d6334920ffb385f4e9e8d832e4eb8ba35ef469cfaf1433a9ae0  ./docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 7 Visual Consistency Content Audit and Programme Closeout.md
+3e3894bd2408b186e3400879bc3d1b7d50ca76a1e2b789878cc15fb095e9aace  ./docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 8 Leadership Stats Player Modernisation Canonical Combat Metric Alignment and Player Profile Retirement.md
+bb3ae9256a533dc363a6e8e1f502f7b35990b0776d917cae3647cfbf00247df6  ./docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md

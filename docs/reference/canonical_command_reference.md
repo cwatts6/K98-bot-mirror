@@ -1,6 +1,6 @@
 # Canonical Command Reference
 
-Last updated: 2026-07-17
+Last updated: 2026-07-18
 
 This is the maintained command reference for the K98 bot after the completed Command Platform
 Audit & Optimisation Programme. Use
@@ -173,11 +173,11 @@ Legend:
 | Ops | `/ops usage_detail` | `commands/admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve | Usage analytics detail. |
 | Player/KVK | `/kvk stats` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator with admin override | Private selector; selected single-account stats post public | Standard | Canonical player KVK stats command | Player KVK stats journey. |
 | Player/KVK | `/kvk targets` | `commands/kvk_cmds.py` | Grouped | KVK target channel decorator with admin override | User-selectable | Standard | Canonical player KVK targets command | Player KVK targets journey. |
-| Player/KVK | `/kvk history` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator with admin override | Private picker/error handling where needed; selected/default single-account history posts public; preserves `governor_id` lookup | Standard | Canonical player KVK history command | Player KVK History, Summary, Trends, and CSV export journey. |
+| Player/KVK | `/kvk history` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator with admin override | Private picker/error handling where needed; selected/default single-account history posts public; preserves `governor_id` lookup | Standard | Canonical player KVK history command; `/me history` explicitly rejected | Player KVK History, Summary, Trends, and CSV export journey. The 2026-07-18 placement decision keeps this as the one KVK-history entry point; no `/me history`, alias, redirect, or Dashboard History action is planned. |
 | Player/KVK | `/kvk rankings` | `commands/kvk_cmds.py` | Grouped | KVK stats channel decorator with admin override for all ranking types | Public unified browser for KVK, Honor, PreKvK, and records; private My Rank follow-ups for registered users | Standard | Canonical player ranking browser | Required `type` option supports `kvk`, `honor`, `prekvk`, and `records`; current KVK, Honor, PreKvK, and Hall of Fame records Top 10 render visual cards with embed fallback, records remain Top 10 only, current Top 25/50 remain compact browser output, and current KVK/Honor/PreKvK include a private My Rank button without adding Top 100 to primary controls. |
 | Player/KVK | `/mykvktargets` | `commands/telemetry_cmds.py` | Flat | KVK target channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk targets`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Player/KVK | `/mygovernorid` | `commands/telemetry_cmds.py` | Flat | Public command-level access | Ephemeral redirect | Standard | Deprecated redirect to `/me accounts`; remove only after no-feedback window | Phase 13 approved redirect slice keeps the command registered but sends private guidance to `/me accounts`, where lookup and account linking now live. |
-| Player/KVK | `/player_profile` | `commands/telemetry_cmds.py` | Flat | Admin or leadership in allowed channels | Ephemeral | Standard | Preserve; out of Phase 13 player self-service redirect scope | Leadership profile lookup, not a player self-service path. Review only in a future leadership/profile workflow task. |
+| Player/KVK | `/player_profile` | `commands/telemetry_cmds.py` | Flat | Admin or leadership in allowed channels | Ephemeral command acknowledgement with current channel-posting behaviour | Standard | Current until coordinated Phase 8 removal; no redirect afterward | Phase 8 is approved to replace the fragmented leadership profile/stats routes with modern private `/stats player`, prove shared callers, remove command-specific profile code, remove this top-level registration, resync, and leave no redirect. Until that deployment this row remains the current runtime truth. |
 | Player/KVK | `/mykvkcrystaltech` | `commands/telemetry_cmds.py` | Flat | CrystalTech channel decorator with admin override | User-selectable; defaults private | Standard | Preserve after Phase 13 audit | Player CrystalTech progress has channel and visibility rules not replaced by `/me`; keep out of legacy self-service redirect cleanup. |
 | PreKvK | `/prekvk report` | `commands/prekvk_cmds.py` | Grouped | Public command-level access | Ephemeral redirect | Standard | Deprecated redirect to `/kvk rankings type:prekvk` in the KVK stats channel; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | PreKvK Admin | `/prekvk import_history` | `commands/prekvk_admin_cmds.py` | Grouped helper-attached | Admin notify-channel decorator | Ephemeral | Standard | Preserve | PreKvK history import. |
@@ -194,7 +194,7 @@ Legend:
 | Stats/KVK | `/kvk_admin test_export` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk test_export` in Phase 2A | KVK export test. |
 | Stats/KVK | `/mykvkstats` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk stats`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_admin refresh_stats_cache` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk refresh_stats_cache` in Phase 2A | Refreshes stats cache. |
-| Stats/KVK | `/stats player` | `commands/stats_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Preserve; include in Player Self-Service v2 scoping review | Leadership player stats lookup remains live; alignment with the full stats/profile modernisation belongs in the v2 programme pack. |
+| Stats/KVK | `/stats player` | `commands/stats_cmds.py` | Grouped | Current generic admin/leadership decorator; Phase 8 will replace it with stable role-ID/channel-specific checks | Ephemeral | Standard | Canonical leadership player route; Phase 8 modernisation approved | Remains live in its legacy form until Phase 8. The approved target is one selected-governor private review with 30/90/180/360-day kingdom contribution, ranks, Scan Presence, Activity Index v1, completed-KVK performance, linked-governor context, aliases, alliance history, location/shield, dedicated 90-day audit, and no `/me inspect`. |
 | Stats/KVK | `/mykvkhistory` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk history`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_rankings` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Public redirect | Standard | Deprecated redirect to `/kvk rankings type:kvk`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_admin export_all` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk export_all` in Phase 2A | KVK Google Sheets export. |
@@ -222,6 +222,36 @@ Legend:
 | Voting Admin | `/vote_admin survey_status` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Phase 7 first survey slice | Selects a survey by autocomplete and shows survey state, result visibility, private admin live totals, reminder delivery state, and original message link. |
 | Voting Admin | `/vote_admin survey_export` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response and private CSV file(s) | Standard | Phase 10 Survey Export v2 first runtime slice | Selects one closed survey by autocomplete and privately exports totals, response-detail, or report-bundle CSV output via the `mode` option. Response-detail and report-bundle detail output include spreadsheet-safe Discord user ID text and resolved Discord name for admin/leadership-only reporting. Aggregate report-bundle files exclude raw text/detail answers and per-user rows; the response-detail file remains the private raw/detail profile. |
 
+## Approved Future Command Roadmap (Not Yet Runtime)
+
+The current command table and validator baseline above remain authoritative until each phase is
+deployed and commands are resynced.
+
+### Phase 7
+
+- No command change.
+- `/me` remains eight subcommands.
+- `/me history` will not be implemented.
+- `/kvk history` remains canonical.
+- Target remains `37 top-level / 100 grouped / 8 me / 2 inventory`.
+
+### Phase 8
+
+- Modernise existing `/stats player`.
+- Do not create `/me inspect`.
+- Remove top-level `/player_profile` with no redirect.
+- Target after resync: `36 top-level / 100 grouped / 8 me / 1 stats / 2 inventory`.
+- Dedicated stable-role-ID/channel gate:
+  - leadership role IDs in Leadership channel/threads;
+  - admin in Leadership and Notify channel/threads;
+  - no role-name-only, Ark Setup, DM, or other-channel authorization.
+
+### Phase 9
+
+- Add grouped `/stats kingdom`.
+- No new top-level command and no `/me` change.
+- Target after resync: `36 top-level / 101 grouped / 8 me / 2 stats / 2 inventory`.
+- Private two-page Kingdom Overview and completed-KVK Summary.
 ## Migration And Disposition Notes
 
 - Phase 3 grouped low-risk ops/reporting commands under `/ops`.
@@ -314,13 +344,15 @@ Legend:
   and selected-governor Resources, Speedups, and Materials retain their report-page exports. Final
   command resync and operator Discord smoke passed on 2026-07-17.
 - GovernorOS v2 Phase 6 completed final production Discord smoke and was operator accepted on
-  2026-07-18. The maintained target
-  is 37 top-level, 100 grouped, eight `/me`, and two `/inventory` commands. Private-anywhere
-  `/me stats` owns personal Period Performance; top-level `/my_stats` is removed without a redirect.
-  `/stats player`, `/player_profile`, `/mykvkcrystaltech`, `/kvk history`, Inventory import/audit,
-  selected-governor Inventory report-page exports, and Account Summary Download data remain.
-  SQL PRs #43/#44 deployed the additive `dbo.usp_GetPersonalStatsDaily` contract before the bot;
-  its header exposes latest anchor-date source refresh independently from report generation time.
+  2026-07-18. The maintained current target is 37 top-level, 100 grouped, eight `/me`, and two
+  `/inventory` commands. Private-anywhere `/me stats` owns personal Period Performance; top-level
+  `/my_stats` is removed without a redirect. `/stats player`, `/player_profile`, `/mykvkcrystaltech`,
+  `/kvk history`, Inventory import/audit, selected-governor Inventory report-page exports, and Account
+  Summary Download data remain at the current runtime baseline. The approved follow-on roadmap closes
+  `/me history`, makes Phase 7 a no-command `/me` visual/content closeout, assigns `/stats player` and
+  `/player_profile` consolidation to Phase 8, and adds `/stats kingdom` in Phase 9. SQL PRs #43/#44
+  deployed the additive `dbo.usp_GetPersonalStatsDaily` contract before the bot; its header exposes
+  latest anchor-date source refresh independently from report generation time.
 - Player Self-Service Command Centre Phase 13 started legacy redirect planning with audit/scope
   only. The operator-provided SQL extract and dated JSONL files showed nonzero broad usage for
   every audited legacy and related personal path, recent direct usage for several legacy paths, and
