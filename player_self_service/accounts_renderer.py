@@ -208,7 +208,6 @@ def _metric_box(
         size=19 if large else 17,
         fill=_BLUE,
         bold=True,
-        right_align=True,
     )
     _text(
         draw,

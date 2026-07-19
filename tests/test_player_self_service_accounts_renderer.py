@@ -165,4 +165,30 @@ def test_summary_columns_and_values_follow_smoke_contract() -> None:
     assert "DATA" not in economy_labels
     assert "10K" in economy_values
     assert "99" in economy_values
+
+
+def test_metric_box_left_aligns_label_and_keeps_helper_right_aligned(monkeypatch) -> None:
+    calls: list[tuple[str, bool]] = []
+
+    monkeypatch.setattr(accounts_renderer, "_panel", lambda *_args, **_kwargs: None)
+
+    def capture_text(_draw, _xy, value, **kwargs):
+        calls.append((value, bool(kwargs.get("right_align", False))))
+
+    monkeypatch.setattr(accounts_renderer, "_text", capture_text)
+
+    accounts_renderer._metric_box(
+        None,
+        (95, 230, 450, 388),
+        "PORTFOLIO POWER",
+        "339.38M",
+        "5/5 reporting",
+        large=True,
+    )
+
+    assert calls == [
+        ("PORTFOLIO POWER", False),
+        ("339.38M", False),
+        ("5/5 reporting", True),
+    ]
     assert accounts_renderer._compact_detail(8_515_574_404) == "8.52B"

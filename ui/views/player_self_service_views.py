@@ -935,6 +935,52 @@ class PlayerSelfServiceView(discord.ui.View):
         await self._show_page(interaction, PAGE_PREFERENCES)
 
     @discord.ui.button(
+        label="Stats",
+        style=discord.ButtonStyle.primary,
+        custom_id="me:stats",
+        row=0,
+    )
+    async def stats_button(
+        self,
+        button: discord.ui.Button,
+        interaction: discord.Interaction,
+    ) -> None:
+        from ui.views.player_self_service_stats_views import (
+            show_personal_stats_for_interaction,
+        )
+
+        self._transition_generation += 1
+        transition_generation = self._transition_generation
+
+        def transition_is_current() -> bool:
+            return not self._expired and self._transition_generation == transition_generation
+
+        try:
+            await show_personal_stats_for_interaction(
+                interaction,
+                author_id=self.author_id,
+                display_name=self.display_name,
+                governor_id=self.dashboard_governor_id,
+                entry_route="page",
+                can_edit=transition_is_current,
+            )
+            if transition_is_current():
+                self.stop()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "player_self_service_stats_navigation_failed user_id=%s page=%s",
+                self.author_id,
+                self.page,
+            )
+            if transition_is_current():
+                await interaction.followup.send(
+                    "Private Period Performance could not be opened. Please try again.",
+                    ephemeral=True,
+                )
+
+    @discord.ui.button(
         label="Dashboard",
         style=discord.ButtonStyle.primary,
         custom_id="me:dashboard",

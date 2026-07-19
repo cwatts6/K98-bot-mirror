@@ -143,22 +143,38 @@ async def test_26_governors_use_safe_paging_opaque_tokens_and_exact_component_ro
         avatar_bytes=None,
     )
 
-    modes = [
+    navigation = [
         child for child in view.children if isinstance(child, discord.ui.Button) and child.row == 0
     ]
+    modes = [
+        child for child in view.children if isinstance(child, discord.ui.Button) and child.row == 1
+    ]
     period = [
-        child for child in view.children if isinstance(child, discord.ui.Select) and child.row == 1
+        child for child in view.children if isinstance(child, discord.ui.Select) and child.row == 2
     ]
     scope = next(
-        child for child in view.children if isinstance(child, discord.ui.Select) and child.row == 2
+        child for child in view.children if isinstance(child, discord.ui.Select) and child.row == 3
     )
     paging = [
-        child for child in view.children if isinstance(child, discord.ui.Button) and child.row == 3
+        child
+        for child in view.children
+        if isinstance(child, discord.ui.Button)
+        and child.row == 4
+        and str(child.custom_id).startswith("me:stats:scope:")
     ]
     dashboard = [
-        child for child in view.children if isinstance(child, discord.ui.Button) and child.row == 4
+        child
+        for child in view.children
+        if isinstance(child, discord.ui.Button) and child.custom_id == "me:stats:dashboard"
     ]
 
+    assert [button.label for button in navigation] == [
+        "Accounts",
+        "Reminders",
+        "Preferences",
+        "Stats",
+    ]
+    assert navigation[-1].disabled is True
     assert [button.label for button in modes] == ["Overview", "Activity", "Combat"]
     assert len(period) == 1
     assert len(scope.options) == 25  # All Linked plus 24 governor slots.
@@ -189,8 +205,60 @@ async def test_one_linked_governor_has_no_redundant_scope_selector() -> None:
     )
 
     assert not any(
-        isinstance(child, discord.ui.Select) and child.row == 2 for child in view.children
+        isinstance(child, discord.ui.Select) and child.row == 3 for child in view.children
     )
+
+
+@pytest.mark.asyncio
+async def test_stats_navigation_opens_shared_page_with_selected_governor(monkeypatch) -> None:
+    from ui.views import player_self_service_views as page_views
+
+    calls = []
+
+    async def fake_show(interaction, **kwargs):
+        calls.append((interaction, kwargs))
+        assert kwargs["can_edit"]() is True
+        return True
+
+    monkeypatch.setattr(page_views, "show_player_self_service_page_for_interaction", fake_show)
+    view = PersonalStatsView(
+        author_id=42,
+        display_name="Player",
+        payload=_payload(2),
+        avatar_bytes=b"avatar",
+    )
+    interaction = _Interaction()
+
+    await view.open_page(interaction, "preferences")
+
+    assert len(calls) == 1
+    assert calls[0][1]["page"] == "preferences"
+    assert calls[0][1]["avatar_bytes"] == b"avatar"
+    assert calls[0][1]["dashboard_governor_id"] == 1000
+
+
+@pytest.mark.asyncio
+async def test_stale_stats_initial_navigation_cannot_replace_newer_page() -> None:
+    renderer_calls = []
+
+    def renderer(*_args, **_kwargs):
+        renderer_calls.append(True)
+        return RenderedStatsCard("me_stats_42.png", b"png")
+
+    interaction = _Interaction()
+    result = await show_personal_stats_for_interaction(
+        interaction,
+        author_id=42,
+        display_name="Player",
+        entry_route="page",
+        payload_loader=lambda *_args, **_kwargs: asyncio.sleep(0, result=_payload()),
+        renderer=renderer,
+        can_edit=lambda: False,
+    )
+
+    assert result is None
+    assert renderer_calls == []
+    assert interaction.original_edits == []
 
 
 @pytest.mark.asyncio

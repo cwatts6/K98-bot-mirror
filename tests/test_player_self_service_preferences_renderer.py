@@ -96,6 +96,30 @@ def test_render_preferences_card_accepts_avatar_failure_and_long_unicode_text() 
         assert image.size == (1702, 924)
 
 
+def test_render_preferences_card_uses_balanced_shared_panel_geometry(monkeypatch) -> None:
+    boxes: list[tuple[int, int, int, int]] = []
+    original = renderer.visual_contract.draw_panel
+
+    def capture_panel(draw, box, **kwargs):
+        boxes.append(box)
+        original(draw, box, **kwargs)
+
+    monkeypatch.setattr(renderer.visual_contract, "draw_panel", capture_panel)
+
+    rendered = renderer.render_preferences_card(_payload())
+
+    assert boxes == [
+        (95, 276, 578, 455),
+        (608, 276, 1091, 455),
+        (1121, 276, 1605, 455),
+        (95, 485, 980, 705),
+        (1010, 485, 1605, 705),
+        (95, 722, 1605, 803),
+    ]
+    with Image.open(BytesIO(rendered.image_bytes)) as image:
+        assert image.getpixel((95, 350))[:3] == renderer.visual_contract.PANEL_EDGE[:3]
+
+
 def test_renderer_contains_no_inventory_privacy_surface() -> None:
     source = inspect.getsource(renderer.render_preferences_card)
 

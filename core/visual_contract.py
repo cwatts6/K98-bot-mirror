@@ -159,7 +159,10 @@ def draw_state_pill(
     text_width = visual_text.text_width(draw, fitted, font=font, bold=True)
     text_bbox = draw.textbbox((0, 0), fitted, font=font)
     text_height = text_bbox[3] - text_bbox[1]
-    position = (x1 + (x2 - x1 - text_width) // 2, y1 + max(5, (y2 - y1 - text_height) // 2))
+    position = (
+        x1 + (x2 - x1 - text_width) // 2,
+        y1 + (y2 - y1 - text_height) // 2 - text_bbox[1],
+    )
     visual_text.draw_text(
         draw,
         (position[0] + 2, position[1] + 2),

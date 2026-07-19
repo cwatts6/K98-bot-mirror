@@ -86,6 +86,28 @@ def test_panel_and_state_pill_use_bounded_geometry() -> None:
     image.close()
 
 
+@pytest.mark.parametrize("state", ["READY", "PARTIAL", "UTC", "OFF"])
+def test_state_pill_text_is_vertically_centred(state: str) -> None:
+    box = (20, 20, 255, 83)
+    image = Image.new("RGBA", (280, 110), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image, "RGBA")
+
+    contract.draw_state_pill(draw, state, box=box)
+
+    colour = contract.state_colour(state)[:3]
+    text_pixels = [
+        (x, y)
+        for y in range(box[1] + 8, box[3] - 8)
+        for x in range(box[0] + 8, box[2] - 8)
+        if image.getpixel((x, y))[:3] == colour
+    ]
+    assert text_pixels
+    visible_midpoint = (min(y for _x, y in text_pixels) + max(y for _x, y in text_pixels)) / 2
+    pill_midpoint = (box[1] + box[3]) / 2
+    assert abs(visible_midpoint - pill_midpoint) <= 1.5
+    image.close()
+
+
 def test_core_avatar_draws_real_avatar_or_deterministic_fallback() -> None:
     avatar_stream = BytesIO()
     with Image.new("RGB", (256, 256), (220, 20, 60)) as avatar:

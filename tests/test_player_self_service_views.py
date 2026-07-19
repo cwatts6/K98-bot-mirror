@@ -39,6 +39,7 @@ from ui.views import (
     player_self_service_account_views as account_views,
     player_self_service_governor_dashboard_views as governor_dashboard_views,
     player_self_service_reminder_views as reminder_views,
+    player_self_service_stats_views as stats_views,
     player_self_service_views as views,
 )
 
@@ -628,7 +629,7 @@ async def test_dashboard_view_has_primary_buttons_without_exports() -> None:
     view = views.PlayerSelfServiceView(author_id=42, display_name="Tester")
 
     labels = [getattr(child, "label", None) for child in view.children]
-    assert labels[:3] == ["Accounts", "Reminders", "Preferences"]
+    assert labels[:4] == ["Accounts", "Reminders", "Preferences", "Stats"]
     assert "Inventory" not in labels
     assert "Exports" not in labels
     assert "Dashboard" in labels
@@ -678,6 +679,7 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
         ("Accounts", 0, primary, False),
         ("Reminders", 0, primary, False),
         ("Preferences", 0, primary, False),
+        ("Stats", 0, primary, False),
     ]
     _assert_button_layout(
         views.PAGE_DASHBOARD,
@@ -692,6 +694,7 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Accounts", 0, primary, True),
             ("Reminders", 0, primary, False),
             ("Preferences", 0, primary, False),
+            ("Stats", 0, primary, False),
             ("Dashboard", 1, primary, False),
             ("Manage", 2, success, False),
             ("Account Summary", 2, secondary, False),
@@ -703,6 +706,7 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Accounts", 0, primary, False),
             ("Reminders", 0, primary, True),
             ("Preferences", 0, primary, False),
+            ("Stats", 0, primary, False),
             ("Dashboard", 1, primary, False),
             ("Manage", 2, success, False),
         ],
@@ -713,10 +717,40 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Accounts", 0, primary, False),
             ("Reminders", 0, primary, False),
             ("Preferences", 0, primary, True),
+            ("Stats", 0, primary, False),
             ("Dashboard", 1, primary, False),
             ("Manage", 2, success, False),
         ],
     )
+
+
+@pytest.mark.asyncio
+async def test_player_self_service_stats_navigation_preserves_private_context(monkeypatch) -> None:
+    calls = []
+
+    async def fake_show(interaction, **kwargs):
+        calls.append((interaction, kwargs))
+        assert kwargs["can_edit"]() is True
+        return object()
+
+    monkeypatch.setattr(stats_views, "show_personal_stats_for_interaction", fake_show)
+    view = views.PlayerSelfServiceView(
+        author_id=42,
+        display_name="Tester",
+        page=views.PAGE_ACCOUNTS,
+        accounts_payload=_accounts_payload(),
+        dashboard_governor_id=111,
+    )
+    interaction = _Interaction()
+    button = next(child for child in view.children if child.custom_id == "me:stats")
+
+    await button.callback(interaction)
+
+    assert len(calls) == 1
+    assert calls[0][1]["author_id"] == 42
+    assert calls[0][1]["display_name"] == "Tester"
+    assert calls[0][1]["governor_id"] == 111
+    assert calls[0][1]["entry_route"] == "page"
 
 
 @pytest.mark.asyncio

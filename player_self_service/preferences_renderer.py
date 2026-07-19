@@ -100,22 +100,127 @@ def _status_badge(draw: ImageDraw.ImageDraw, state: str) -> None:
     visual_contract.draw_state_pill(draw, state)
 
 
-def _preference_row(
+def _panel(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    *,
+    radius: int = 18,
+) -> None:
+    visual_contract.draw_panel(draw, box, radius=radius)
+
+
+def _wrapped_lines(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    *,
+    width: int,
+    size: int,
+    min_size: int,
+    max_lines: int,
+    bold: bool = False,
+) -> tuple[ImageFont.ImageFont, tuple[str, ...]]:
+    cleaned = _clean(text)
+    words = cleaned.split()
+    for candidate_size in range(size, min_size - 1, -1):
+        font = visual_text.font_for_text(cleaned, candidate_size, bold=bold)
+        lines: list[str] = []
+        current = ""
+        for word in words:
+            candidate = f"{current} {word}".strip()
+            if (
+                not current
+                or visual_text.text_width(draw, candidate, font=font, bold=bold) <= width
+            ):
+                current = candidate
+                continue
+            lines.append(current)
+            current = word
+        if current:
+            lines.append(current)
+        if len(lines) <= max_lines and all(
+            visual_text.text_width(draw, line, font=font, bold=bold) <= width for line in lines
+        ):
+            return font, tuple(lines)
+
+    font = visual_text.font_for_text(cleaned, min_size, bold=bold)
+    lines = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if len(lines) < max_lines - 1 and (
+            not current or visual_text.text_width(draw, candidate, font=font, bold=bold) <= width
+        ):
+            current = candidate
+            continue
+        if len(lines) < max_lines - 1:
+            lines.append(current)
+            current = word
+            continue
+        current = f"{current} {word}".strip()
+    if current:
+        lines.append(
+            visual_text.fit_text_to_width(
+                draw,
+                current,
+                width=width,
+                base_font=font,
+                bold=bold,
+            )
+        )
+    return font, tuple(lines[:max_lines])
+
+
+def _draw_wrapped_fit(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[int, int],
+    text: str,
+    *,
+    width: int,
+    size: int,
+    min_size: int,
+    max_lines: int,
+    line_gap: int,
+    fill: tuple[int, int, int, int] = TEXT,
+    bold: bool = False,
+) -> None:
+    font, lines = _wrapped_lines(
+        draw,
+        text,
+        width=width,
+        size=size,
+        min_size=min_size,
+        max_lines=max_lines,
+        bold=bold,
+    )
+    for index, line in enumerate(lines):
+        _draw(draw, (xy[0], xy[1] + index * line_gap), line, font=font, fill=fill, bold=bold)
+
+
+def _preference_card(
     draw: ImageDraw.ImageDraw,
     *,
-    y: int,
+    box: tuple[int, int, int, int],
     label: str,
     value: str,
     available: bool,
 ) -> None:
-    _draw(draw, (112, y), label.upper(), font=_font(23, bold=True), fill=MUTED, bold=True)
+    _panel(draw, box)
+    x0, y0, x1, _ = box
+    _draw(
+        draw,
+        (x0 + 20, y0 + 18),
+        label.upper(),
+        font=_font(20, bold=True),
+        fill=BLUE,
+        bold=True,
+    )
     _draw_fit(
         draw,
-        (420, y - 6),
+        (x0 + 20, y0 + 67),
         value,
-        width=1150,
+        width=x1 - x0 - 40,
         size=36,
-        min_size=22,
+        min_size=20,
         fill=TEXT if available else AMBER,
         bold=True,
     )
@@ -179,67 +284,85 @@ def render_preferences_card(
         )
 
         profile = payload.regional_profile
-        _draw(draw, (112, 230), "REGIONAL PROFILE", font=_font(29, bold=True), fill=BLUE, bold=True)
-        _preference_row(
+        _draw(draw, (95, 230), "REGIONAL PROFILE", font=_font(29, bold=True), fill=BLUE, bold=True)
+        _preference_card(
             draw,
-            y=292,
+            box=(95, 276, 578, 455),
             label="Timezone",
             value=profile.timezone.friendly_label,
             available=profile.timezone.is_available,
         )
-        _preference_row(
+        _preference_card(
             draw,
-            y=370,
+            box=(608, 276, 1091, 455),
             label="Location",
             value=profile.location.friendly_label,
             available=profile.location.is_available,
         )
-        _preference_row(
+        _preference_card(
             draw,
-            y=448,
+            box=(1121, 276, 1605, 455),
             label="Preferred language",
             value=profile.preferred_language.friendly_label,
             available=profile.preferred_language.is_available,
         )
 
         time_ref = payload.time_reference
-        _draw(draw, (112, 535), time_ref.heading, font=_font(23, bold=True), fill=BLUE, bold=True)
-        _draw(draw, (112, 574), time_ref.display_time, font=_font(56, bold=True), bold=True)
+        _panel(draw, (95, 485, 980, 705))
+        _draw(draw, (119, 503), time_ref.heading, font=_font(21, bold=True), fill=BLUE, bold=True)
+        _draw(draw, (119, 548), time_ref.display_time, font=_font(60, bold=True), bold=True)
         _draw_fit(
             draw,
-            (365, 579),
+            (340, 555),
             time_ref.supporting_line,
-            width=1213,
+            width=616,
             size=29,
-            min_size=19,
+            min_size=17,
             fill=TEXT,
             bold=True,
         )
         if time_ref.regional_context:
             _draw_fit(
                 draw,
-                (365, 626),
+                (340, 605),
                 time_ref.regional_context,
-                width=1213,
+                width=616,
                 size=21,
-                min_size=15,
+                min_size=14,
                 fill=MUTED,
             )
 
-        _draw(draw, (112, 672), "SETTINGS INSIGHT", font=_font(21, bold=True), fill=BLUE, bold=True)
-        _draw_fit(
-            draw, (112, 708), payload.settings_insight, width=1475, size=27, min_size=19, bold=True
+        _panel(draw, (1010, 485, 1605, 705))
+        _draw(
+            draw,
+            (1034, 503),
+            "SETTINGS INSIGHT",
+            font=_font(21, bold=True),
+            fill=BLUE,
+            bold=True,
+        )
+        _draw_wrapped_fit(
+            draw,
+            (1034, 552),
+            payload.settings_insight,
+            width=547,
+            size=27,
+            min_size=18,
+            max_lines=4,
+            line_gap=34,
+            bold=True,
         )
 
-        _draw(draw, (112, 760), "MANAGE", font=_font(22, bold=True), fill=GREEN, bold=True)
+        _panel(draw, (95, 722, 1605, 803))
+        _draw(draw, (119, 738), "MANAGE", font=_font(18, bold=True), fill=GREEN, bold=True)
         _draw_fit(
             draw,
-            (112, 797),
+            (285, 734),
             "Update your saved timezone, location, and preferred language.",
-            width=1475,
-            size=18,
+            width=1296,
+            size=20,
             min_size=14,
-            fill=MUTED,
+            fill=TEXT,
         )
 
         footer_context = (

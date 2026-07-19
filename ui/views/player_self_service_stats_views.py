@@ -380,7 +380,7 @@ class _PeriodSelect(discord.ui.Select):
             max_values=1,
             options=options,
             custom_id="me:stats:period",
-            row=1,
+            row=2,
         )
         self.parent_view = parent
 
@@ -424,7 +424,7 @@ class _ScopeSelect(discord.ui.Select):
             max_values=1,
             options=choices,
             custom_id="me:stats:scope",
-            row=2,
+            row=3,
         )
         self.parent_view = parent
 
@@ -492,12 +492,36 @@ class PersonalStatsView(discord.ui.View):
     def _build_controls(self) -> None:
         self.clear_items()
         self._token_map.clear()
+        for label, page in (
+            ("Accounts", "accounts"),
+            ("Reminders", "reminders"),
+            ("Preferences", "preferences"),
+        ):
+            self.add_item(
+                _ActionButton(
+                    label=label,
+                    custom_id=f"me:stats:navigate:{page}",
+                    row=0,
+                    style=discord.ButtonStyle.primary,
+                    action=lambda interaction, target=page: self.open_page(interaction, target),
+                )
+            )
+        self.add_item(
+            _ActionButton(
+                label="Stats",
+                custom_id="me:stats:navigate:stats",
+                row=0,
+                style=discord.ButtonStyle.primary,
+                action=self._ignore_disabled_action,
+                disabled=True,
+            )
+        )
         for mode in StatsMode:
             self.add_item(
                 _ActionButton(
                     label=mode.label,
                     custom_id=f"me:stats:mode:{mode.value}",
-                    row=0,
+                    row=1,
                     style=(
                         discord.ButtonStyle.primary
                         if mode is self.mode
@@ -520,7 +544,7 @@ class PersonalStatsView(discord.ui.View):
                     _ActionButton(
                         label="Previous Governors",
                         custom_id="me:stats:scope:previous",
-                        row=3,
+                        row=4,
                         style=discord.ButtonStyle.secondary,
                         action=lambda interaction: self.change_scope_page(interaction, -1),
                         disabled=self.scope_page <= 0,
@@ -530,7 +554,7 @@ class PersonalStatsView(discord.ui.View):
                     _ActionButton(
                         label="Next Governors",
                         custom_id="me:stats:scope:next",
-                        row=3,
+                        row=4,
                         style=discord.ButtonStyle.secondary,
                         action=lambda interaction: self.change_scope_page(interaction, 1),
                         disabled=self.scope_page >= pages - 1,
@@ -545,6 +569,9 @@ class PersonalStatsView(discord.ui.View):
                 action=self.open_dashboard,
             )
         )
+
+    async def _ignore_disabled_action(self, _interaction: discord.Interaction) -> None:
+        return None
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if self._expired:
@@ -849,6 +876,49 @@ class PersonalStatsView(discord.ui.View):
                     "The private Dashboard could not be opened. Your report is unchanged.",
                 )
 
+    async def open_page(self, interaction: discord.Interaction, page: str) -> None:
+        generation = self._begin_transition()
+        await _defer(interaction)
+        try:
+            from ui.views.player_self_service_views import (
+                show_player_self_service_page_for_interaction,
+            )
+
+            governor_id = (
+                self.payload.scope_governor_ids[0]
+                if self.payload.scope_type is StatsScopeType.SELECTED
+                else None
+            )
+            if not self._is_current(generation):
+                return
+            async with self._delivery_lock:
+                if not self._is_current(generation):
+                    return
+                opened = await show_player_self_service_page_for_interaction(
+                    interaction,
+                    author_id=self.author_id,
+                    display_name=self.display_name,
+                    page=page,
+                    avatar_bytes=self.avatar_bytes,
+                    dashboard_governor_id=governor_id,
+                    can_edit=lambda: self._is_current(generation),
+                )
+            if opened and self._is_current(generation):
+                self.stop()
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.exception(
+                "personal_stats_page_navigation_failed user_id=%s page=%s",
+                self.author_id,
+                page,
+            )
+            if self._is_current(generation):
+                await _private_message(
+                    interaction,
+                    f"The private {page.title()} page could not be opened. Your report is unchanged.",
+                )
+
     async def on_timeout(self) -> None:
         self._expired = True
         self._generation += 1
@@ -879,7 +949,8 @@ async def _initial_delivery(
     payload_loader: PayloadLoader,
     renderer: Renderer,
     entry_route: str,
-) -> PersonalStatsView:
+    can_edit: Callable[[], bool] | None = None,
+) -> PersonalStatsView | None:
     view = PersonalStatsView(
         author_id=author_id,
         display_name=display_name,
@@ -911,6 +982,8 @@ async def _initial_delivery(
             ]
             render_ms = round((time.perf_counter() - render_started) * 1000, 1)
             delivery_started = time.perf_counter()
+            if can_edit is not None and not can_edit():
+                return None
             edited = await target.edit_original_response(
                 content=None,
                 embed=None,
@@ -928,6 +1001,8 @@ async def _initial_delivery(
             fallback_reason = "render_or_attachment_failed"
             logger.exception("personal_stats_initial_render_failed")
             delivery_started = time.perf_counter()
+            if can_edit is not None and not can_edit():
+                return None
             edited = await target.edit_original_response(
                 content=None,
                 embed=build_personal_stats_fallback_embed(payload, mode=StatsMode.OVERVIEW),
@@ -968,6 +1043,7 @@ async def show_personal_stats_for_interaction(
     entry_route: str = "dashboard",
     payload_loader: PayloadLoader = build_personal_stats_payload,
     renderer: Renderer = render_personal_stats_card,
+    can_edit: Callable[[], bool] | None = None,
 ) -> PersonalStatsView | None:
     initial_started = time.perf_counter()
     await _defer(interaction, ephemeral=entry_route == "command")
@@ -996,12 +1072,13 @@ async def show_personal_stats_for_interaction(
                 "data_ms": round((time.perf_counter() - initial_started) * 1000, 1),
             }
         )
-        await interaction.edit_original_response(
-            content="No linked governors were found. Open /me accounts to link a governor.",
-            embed=None,
-            view=None,
-            attachments=[],
-        )
+        if can_edit is None or can_edit():
+            await interaction.edit_original_response(
+                content="No linked governors were found. Open /me accounts to link a governor.",
+                embed=None,
+                view=None,
+                attachments=[],
+            )
         return None
     except PersonalStatsAccessChanged:
         await _cancel_task(avatar_task)
@@ -1016,12 +1093,13 @@ async def show_personal_stats_for_interaction(
                 "data_ms": round((time.perf_counter() - initial_started) * 1000, 1),
             }
         )
-        await interaction.edit_original_response(
-            content="Your linked-governor access changed. Run /me stats to refresh.",
-            embed=None,
-            view=None,
-            attachments=[],
-        )
+        if can_edit is None or can_edit():
+            await interaction.edit_original_response(
+                content="Your linked-governor access changed. Run /me stats to refresh.",
+                embed=None,
+                view=None,
+                attachments=[],
+            )
         return None
     except PersonalStatsUnavailable:
         await _cancel_task(avatar_task)
@@ -1036,12 +1114,13 @@ async def show_personal_stats_for_interaction(
                 "data_ms": round((time.perf_counter() - initial_started) * 1000, 1),
             }
         )
-        await interaction.edit_original_response(
-            content="Period performance is temporarily unavailable. Please try again shortly.",
-            embed=None,
-            view=None,
-            attachments=[],
-        )
+        if can_edit is None or can_edit():
+            await interaction.edit_original_response(
+                content="Period performance is temporarily unavailable. Please try again shortly.",
+                embed=None,
+                view=None,
+                attachments=[],
+            )
         return None
     except Exception:
         await _cancel_task(avatar_task)
@@ -1057,14 +1136,17 @@ async def show_personal_stats_for_interaction(
                 "data_ms": round((time.perf_counter() - initial_started) * 1000, 1),
             }
         )
-        await interaction.edit_original_response(
-            content="Period performance is temporarily unavailable. Please try again shortly.",
-            embed=None,
-            view=None,
-            attachments=[],
-        )
+        if can_edit is None or can_edit():
+            await interaction.edit_original_response(
+                content="Period performance is temporarily unavailable. Please try again shortly.",
+                embed=None,
+                view=None,
+                attachments=[],
+            )
         return None
     avatar_bytes = await avatar_task
+    if can_edit is not None and not can_edit():
+        return None
     return await _initial_delivery(
         interaction,
         author_id=int(author_id),
@@ -1074,6 +1156,7 @@ async def show_personal_stats_for_interaction(
         payload_loader=payload_loader,
         renderer=renderer,
         entry_route=entry_route,
+        can_edit=can_edit,
     )
 
 
