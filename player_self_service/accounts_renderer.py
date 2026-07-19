@@ -161,7 +161,10 @@ def _canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
 
 
 def paste_discord_avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> bool:
-    """Paste the shared circular /me avatar treatment when bytes are readable."""
+    """Paste a real or fallback /me avatar.
+
+    Return True only when readable avatar bytes supplied the real avatar.
+    """
     return visual_contract.paste_core_avatar(canvas, avatar_bytes)
 
 
