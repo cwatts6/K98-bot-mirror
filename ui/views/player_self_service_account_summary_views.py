@@ -10,7 +10,8 @@ import logging
 
 import discord
 
-from player_self_service import accounts_renderer, accounts_service, visual_contract
+from core import visual_contract
+from player_self_service import accounts_renderer, accounts_service
 from player_self_service.accounts_models import (
     AccountsPortfolioPayload,
     AccountSummaryPage,
@@ -78,7 +79,7 @@ def build_account_summary_fallback(page: AccountSummaryPage) -> discord.Embed:
         embed.description += "\nNo linked governors to show."
     footer = (
         f"Data refreshed {_utc_date_time(page.payload.latest_scan_date)} • "
-        f"Generated {visual_contract.format_utc_datetime(page.payload.refreshed_at_utc)}"
+        f"Generated {_utc_date_time(page.payload.refreshed_at_utc)}"
     )
     if page.section == "combat":
         footer = f"Combat all linked governors (Tanking: Higher = Better) • {footer}"

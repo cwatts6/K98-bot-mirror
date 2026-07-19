@@ -11,6 +11,7 @@ from typing import Any
 
 import discord
 
+from core import visual_contract
 from core.interaction_safety import safe_defer
 from player_self_service import (
     account_service,
@@ -21,7 +22,6 @@ from player_self_service import (
     reminder_service,
     reminders_renderer,
     reminders_summary,
-    visual_contract,
 )
 from player_self_service.account_service import AccountCentreState
 from player_self_service.accounts_models import AccountsPortfolioPayload

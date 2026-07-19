@@ -8,8 +8,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from core import visual_text
-from player_self_service import visual_contract
+from core import visual_contract, visual_text
 from player_self_service.accounts_renderer import format_discord_heading
 from player_self_service.preferences_summary import PreferencesSummaryPayload
 

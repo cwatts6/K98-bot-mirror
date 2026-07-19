@@ -11,8 +11,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw
 
-from core import visual_text
-from player_self_service import visual_contract
+from core import visual_contract, visual_text
 from player_self_service.accounts_models import (
     AccountMetricTotal,
     AccountPortfolioRow,

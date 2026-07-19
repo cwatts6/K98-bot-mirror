@@ -15,8 +15,8 @@ from typing import Any
 
 import discord
 
+from core import visual_contract
 from file_utils import emit_telemetry_event
-from player_self_service import visual_contract
 from player_self_service.stats_models import (
     PersonalStatsAccessChanged,
     PersonalStatsNoAccounts,

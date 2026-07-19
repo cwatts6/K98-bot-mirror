@@ -10,7 +10,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
 
-from core import visual_text
+from core import visual_contract, visual_text
 from inventory.capacity_calculations import (
     rss_healing_capacity,
     rss_training_capacity,
@@ -21,7 +21,6 @@ from inventory.models import (
     InventoryReportPayload,
     InventoryReportView,
 )
-from player_self_service import visual_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSET_DIR = ROOT / "assets"

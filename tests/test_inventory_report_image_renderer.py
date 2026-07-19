@@ -3,7 +3,7 @@ from io import BytesIO
 
 from PIL import Image, ImageDraw
 
-from core import visual_text
+from core import visual_contract, visual_text
 from inventory import report_image_renderer
 from inventory.models import (
     InventoryGovernorProfile,
@@ -15,6 +15,11 @@ from inventory.models import (
     InventorySpeedupPoint,
 )
 from inventory.report_image_renderer import render_inventory_reports
+
+
+def test_inventory_renderer_uses_neutral_visual_contract_module():
+    assert report_image_renderer.visual_contract is visual_contract
+    assert report_image_renderer.visual_contract.__name__ == "core.visual_contract"
 
 
 def test_inventory_backdrop_assets_match_runtime_and_master_contract():

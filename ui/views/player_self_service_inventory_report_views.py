@@ -14,6 +14,7 @@ from typing import Any
 import discord
 
 from bot_config import INVENTORY_UPLOAD_CHANNEL_ID
+from core import visual_contract
 from core.interaction_safety import safe_defer
 from inventory import export_service, reporting_service
 from inventory.models import (
@@ -23,7 +24,6 @@ from inventory.models import (
     InventoryReportView,
 )
 from inventory.report_image_renderer import render_inventory_reports
-from player_self_service import visual_contract
 from player_self_service.governor_dashboard_models import (
     GovernorDashboardContext,
     GovernorDashboardOption,

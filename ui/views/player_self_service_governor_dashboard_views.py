@@ -13,7 +13,8 @@ from typing import Any
 
 import discord
 
-from player_self_service import accounts_service, visual_contract
+from core import visual_contract
+from player_self_service import accounts_service
 from player_self_service.accounts_models import AccountsPortfolioPayload
 from player_self_service.governor_dashboard_models import (
     GovernorDashboardContext,

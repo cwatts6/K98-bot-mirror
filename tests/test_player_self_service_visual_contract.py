@@ -7,7 +7,7 @@ from io import BytesIO
 from PIL import Image, ImageDraw
 import pytest
 
-from player_self_service import visual_contract as contract
+from core import visual_contract as contract
 
 
 def test_locked_colours_and_missing_labels_match_phase7_contract() -> None:

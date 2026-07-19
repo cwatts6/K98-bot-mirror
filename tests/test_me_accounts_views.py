@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from io import BytesIO
 from types import SimpleNamespace
@@ -118,6 +119,17 @@ def test_overview_fallback_includes_vip_and_last_scan_datetime() -> None:
 
     assert "VIP" in embed.fields[0].value
     assert "Last scan 14 Jul 2026, 08:30 UTC" in embed.fields[0].value
+
+
+def test_overview_fallback_normalizes_naive_generated_timestamp_to_utc() -> None:
+    payload = replace(_payload(), refreshed_at_utc=datetime(2026, 7, 14, 8, 30))
+    page = summary_views.accounts_service.build_account_summary_page(
+        payload, section="overview", page=1
+    )
+
+    embed = summary_views.build_account_summary_fallback(page)
+
+    assert "Generated 14 Jul 2026, 08:30 UTC" in embed.footer.text
 
 
 def test_combat_fallback_uses_short_title_percentage_and_helpful_footer() -> None:

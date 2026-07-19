@@ -1,4 +1,4 @@
-"""Bounded visual primitives shared by the private player self-service cards."""
+"""Bounded visual primitives shared by player-facing report renderers."""
 
 from __future__ import annotations
 

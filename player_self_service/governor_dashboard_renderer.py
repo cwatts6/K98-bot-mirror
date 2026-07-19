@@ -10,8 +10,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageOps
 
-from core import visual_text
-from player_self_service import visual_contract
+from core import visual_contract, visual_text
 from player_self_service.governor_dashboard_models import GovernorDashboardPayload
 
 WIDTH = 1180
