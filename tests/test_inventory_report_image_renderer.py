@@ -716,6 +716,26 @@ def test_render_inventory_reports_returns_materials_png():
     assert rendered[0].image_bytes.getvalue().startswith(b"\x89PNG")
 
 
+def test_same_inventory_payload_renders_deterministically() -> None:
+    generated = datetime(2026, 7, 18, 14, 5, tzinfo=UTC)
+    payload = InventoryReportPayload(
+        governor_id=111,
+        governor_name="Deterministic Governor",
+        view=InventoryReportView.MATERIALS,
+        range_key=InventoryReportRange.ONE_MONTH,
+        materials=(InventoryMaterialPoint(generated, 10, 20, 30, 40, 50),),
+        generated_at_utc=generated,
+    )
+
+    first = render_inventory_reports(payload)[0]
+    second = render_inventory_reports(payload)[0]
+    try:
+        assert first.image_bytes.getvalue() == second.image_bytes.getvalue()
+    finally:
+        first.image_bytes.close()
+        second.image_bytes.close()
+
+
 def test_render_inventory_reports_handles_special_character_governor_name():
     now = datetime.now(UTC)
     payload = InventoryReportPayload(

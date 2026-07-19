@@ -21,6 +21,7 @@ from player_self_service import (
     reminder_service,
     reminders_renderer,
     reminders_summary,
+    visual_contract,
 )
 from player_self_service.account_service import AccountCentreState
 from player_self_service.accounts_models import AccountsPortfolioPayload
@@ -47,6 +48,15 @@ logger = logging.getLogger(__name__)
 
 PlayerSelfServicePage = str
 SummaryLoader = Callable[[int], Awaitable[PlayerSelfServiceSummary]]
+
+
+def _utc_date_time(value: datetime | None) -> str:
+    if value is None:
+        return visual_contract.MISSING_VALUE
+    stamp = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return visual_contract.format_utc_datetime(stamp)
+
+
 AccountsLoader = Callable[[int], Awaitable[AccountsPortfolioPayload]]
 PreferencesLoader = Callable[..., Awaitable[PreferencesSummaryPayload]]
 _AVATAR_READ_TIMEOUT_SECONDS = 5.0
@@ -193,7 +203,7 @@ def build_accounts_portfolio_fallback(
         color={
             "READY": discord.Color.green(),
             "REVIEW": discord.Color.gold(),
-            "SETUP": discord.Color.blue(),
+            "SETUP": discord.Color.gold(),
         }[payload.state],
     )
     main = payload.main_row
@@ -202,20 +212,22 @@ def build_accounts_portfolio_fallback(
         value=_field_value(
             [
                 f"Main: {main.display_name if main else 'not set'}",
-                f"Power: {payload.power.value if payload.power.value is not None else '—'} "
+                f"Power: {visual_contract.format_compact_number(payload.power.value)} "
                 f"({payload.power.reporting_count}/{payload.power.expected_count})",
                 f"T4+T5 kills: "
-                f"{payload.t4_t5_kills.value if payload.t4_t5_kills.value is not None else '—'} "
+                f"{visual_contract.format_compact_number(payload.t4_t5_kills.value)} "
                 f"({payload.t4_t5_kills.reporting_count}/{payload.t4_t5_kills.expected_count})",
                 f"RSS total: "
-                f"{payload.rss_total.value if payload.rss_total.value is not None else '—'} "
+                f"{visual_contract.format_compact_number(payload.rss_total.value)} "
                 f"({payload.rss_total.reporting_count}/{payload.rss_total.expected_count})",
             ]
         ),
         inline=False,
     )
     embed.add_field(name="Portfolio Insight", value=payload.insight[:1024], inline=False)
-    embed.set_footer(text=f"Refreshed {payload.refreshed_at_utc:%d %b %Y %H:%M UTC}")
+    refreshed = _utc_date_time(payload.latest_scan_date)
+    generated = _utc_date_time(payload.refreshed_at_utc)
+    embed.set_footer(text=f"Data refreshed {refreshed} • Generated {generated}")
     return embed
 
 
@@ -314,14 +326,14 @@ def build_reminders_embed(
         inline=False,
     )
     embed.add_field(
-        name="Manage reminders",
+        name="Manage",
         value="Choose KVK and calendar events and when each alert is sent.",
         inline=False,
     )
     embed.set_footer(
         text=(
             "Scheduled times shown in UTC • "
-            f"Refreshed {payload.generated_at_utc:%d %b %Y %H:%M UTC}"
+            f"Generated {visual_contract.format_utc_datetime(payload.generated_at_utc)}"
         )
     )
     return embed
@@ -334,7 +346,11 @@ def build_preferences_embed(
     embed = discord.Embed(
         title="Personal Settings",
         description=f"Private settings for {payload.display_name}",
-        color=discord.Color.teal(),
+        color=(
+            discord.Color.green()
+            if payload.time_reference.mode == "LOCAL"
+            else discord.Color.blue()
+        ),
     )
     embed.add_field(
         name=(
@@ -358,11 +374,13 @@ def build_preferences_embed(
         inline=False,
     )
     embed.add_field(
-        name="Manage settings",
+        name="Manage",
         value="Update your saved timezone, location, and preferred language.",
         inline=False,
     )
-    embed.set_footer(text=f"Refreshed {payload.generated_at_utc:%d %B %Y %H:%M UTC}")
+    embed.set_footer(
+        text=f"Generated {visual_contract.format_utc_datetime(payload.generated_at_utc)}"
+    )
     return embed
 
 
@@ -634,8 +652,14 @@ class PlayerSelfServiceView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if self._expired:
+            canonical_command = {
+                PAGE_ACCOUNTS: "/me accounts",
+                PAGE_REMINDERS: "/me reminders",
+                PAGE_PREFERENCES: "/me preferences",
+                PAGE_DASHBOARD: "/me dashboard",
+            }.get(self.page, "/me dashboard")
             await interaction.response.send_message(
-                "This private menu has expired. Run `/me dashboard` again.",
+                f"Report controls expired. Run {canonical_command} to refresh.",
                 ephemeral=True,
             )
             return False
@@ -912,7 +936,7 @@ class PlayerSelfServiceView(discord.ui.View):
 
     @discord.ui.button(
         label="Dashboard",
-        style=discord.ButtonStyle.secondary,
+        style=discord.ButtonStyle.primary,
         custom_id="me:dashboard",
         row=1,
     )
@@ -961,7 +985,7 @@ class PlayerSelfServiceView(discord.ui.View):
         return state
 
     @discord.ui.button(
-        label="Manage Accounts",
+        label="Manage",
         style=discord.ButtonStyle.success,
         custom_id="me:account:manage",
         row=3,
@@ -1086,7 +1110,7 @@ class PlayerSelfServiceView(discord.ui.View):
         setup_view.set_message_ref(sent)
 
     @discord.ui.button(
-        label="Manage settings",
+        label="Manage",
         style=discord.ButtonStyle.success,
         custom_id="me:preference:manage",
         row=4,
@@ -1122,15 +1146,13 @@ class PlayerSelfServiceView(discord.ui.View):
         for child in self.children:
             child.disabled = True
         message = self._message_ref or getattr(self, "message", None)
-        timeout_content = (
-            "This private reminder report has expired. Run `/me reminders` again."
-            if self.page == PAGE_REMINDERS
-            else (
-                "This private Preferences page has expired. Run `/me preferences` again."
-                if self.page == PAGE_PREFERENCES
-                else "This private /me menu has expired. Run `/me dashboard` again."
-            )
-        )
+        canonical_command = {
+            PAGE_ACCOUNTS: "/me accounts",
+            PAGE_REMINDERS: "/me reminders",
+            PAGE_PREFERENCES: "/me preferences",
+            PAGE_DASHBOARD: "/me dashboard",
+        }.get(self.page, "/me dashboard")
+        timeout_content = f"Report controls expired. Run {canonical_command} to refresh."
         edited = False
         try:
             if self._timeout_editor is not None:

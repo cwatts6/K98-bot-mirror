@@ -257,7 +257,7 @@ def test_data_refresh_text_uses_payload_refresh_in_utc_without_generated_wording
 
     label = stats_renderer._data_refresh_text(payload)
 
-    assert label == "Data last refreshed 15 Jul 2026 16:30:45 UTC"
+    assert label == "Data refreshed 15 Jul 2026, 16:30 UTC"
     assert "Generated" not in label
     assert "Stats anchor" not in label
 
@@ -345,6 +345,7 @@ def test_same_payload_fallback_contains_exact_dates_coverage_and_no_removed_feat
     assert "13 Jul 2026" in serialized
     assert "15 Jul 2026" in serialized
     assert "Stats account-days: 2/3" in serialized
+    assert "Data refreshed 15 Jul 2026, 16:25 UTC" in serialized
     assert "RSS gathered" in serialized
     assert "Forts joined" in serialized
     assert "Ark" not in serialized
@@ -368,7 +369,7 @@ def test_fallback_footer_normalizes_generated_time_to_utc() -> None:
 
     embed = build_personal_stats_fallback_embed(payload, mode=StatsMode.OVERVIEW)
 
-    assert embed.footer.text == "Private report • Generated 15 Jul 2026 16:30:45 UTC"
+    assert embed.footer.text == "Private report • Generated 15 Jul 2026, 16:30 UTC"
 
 
 @pytest.mark.parametrize("mode", tuple(StatsMode))

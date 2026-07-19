@@ -10,7 +10,7 @@ import logging
 
 import discord
 
-from player_self_service import accounts_renderer, accounts_service
+from player_self_service import accounts_renderer, accounts_service, visual_contract
 from player_self_service.accounts_models import (
     AccountsPortfolioPayload,
     AccountSummaryPage,
@@ -29,7 +29,7 @@ def _utc_date_time(value: datetime | None) -> str:
     if value is None:
         return "—"
     stamp = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-    return stamp.strftime("%d %b %Y %H:%M UTC")
+    return visual_contract.format_utc_datetime(stamp)
 
 
 def build_account_summary_fallback(page: AccountSummaryPage) -> discord.Embed:
@@ -47,18 +47,18 @@ def build_account_summary_fallback(page: AccountSummaryPage) -> discord.Embed:
     for row in page.rows:
         if page.section == "combat":
             value = (
-                f"KP {row.kill_points if row.kill_points is not None else '—'} • "
-                f"T4+T5 {row.t4_t5_kills if row.t4_t5_kills is not None else '—'} • "
-                f"Deads {row.deads if row.deads is not None else '—'} • "
-                f"KP Loss {row.kp_loss if row.kp_loss is not None else '—'} • "
+                f"KP {visual_contract.format_compact_number(row.kill_points)} • "
+                f"T4+T5 {visual_contract.format_compact_number(row.t4_t5_kills)} • "
+                f"Deads {visual_contract.format_compact_number(row.deads)} • "
+                f"KP Loss {visual_contract.format_compact_number(row.kp_loss)} • "
                 f"Tanking {accounts_renderer.format_tanking_score(row.tanking_score)}"
             )
         elif page.section == "economy":
             value = (
-                f"Gathered {row.rss_gathered if row.rss_gathered is not None else '—'} • "
-                f"Assistance {row.rss_assistance if row.rss_assistance is not None else '—'} • "
-                f"Current {row.rss_total if row.rss_total is not None else '—'} • "
-                f"Helps {row.helps if row.helps is not None else '—'} • "
+                f"Gathered {visual_contract.format_compact_number(row.rss_gathered)} • "
+                f"Assistance {visual_contract.format_compact_number(row.rss_assistance)} • "
+                f"Current {visual_contract.format_compact_number(row.rss_total)} • "
+                f"Helps {visual_contract.format_compact_number(row.helps)} • "
                 f"Conduct {accounts_renderer.format_whole_number(row.conduct)}"
             )
         else:
@@ -70,13 +70,16 @@ def build_account_summary_fallback(page: AccountSummaryPage) -> discord.Embed:
             value = (
                 f"{row.civilisation or '—'} • VIP {row.vip_level or '—'} • "
                 f"CH {row.city_hall if row.city_hall is not None else '—'} • "
-                f"Power {row.power if row.power is not None else '—'} • "
+                f"Power {visual_contract.format_compact_number(row.power)} • "
                 f"Location {location} • Last scan {_utc_date_time(row.last_governor_scan)}"
             )
         embed.add_field(name=f"{row.slot} • {row.display_name}", value=value[:1024], inline=False)
     if not page.rows:
         embed.description += "\nNo linked governors to show."
-    footer = f"Refreshed {page.payload.refreshed_at_utc:%d %b %Y %H:%M UTC}"
+    footer = (
+        f"Data refreshed {_utc_date_time(page.payload.latest_scan_date)} • "
+        f"Generated {visual_contract.format_utc_datetime(page.payload.refreshed_at_utc)}"
+    )
     if page.section == "combat":
         footer = f"Combat all linked governors (Tanking: Higher = Better) • {footer}"
     embed.set_footer(text=footer)
@@ -161,7 +164,7 @@ class AccountSummaryView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if self._expired:
             await interaction.response.send_message(
-                "This private Account Summary has expired. Run `/me accounts` again.",
+                "Report controls expired. Run /me accounts to refresh.",
                 ephemeral=True,
             )
             return False
@@ -306,7 +309,7 @@ class AccountSummaryView(discord.ui.View):
 
         await self._navigate(interaction, PAGE_PREFERENCES)
 
-    @discord.ui.button(label="Dashboard", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="Dashboard", style=discord.ButtonStyle.primary, row=1)
     async def dashboard_button(
         self, button: discord.ui.Button, interaction: discord.Interaction
     ) -> None:
@@ -423,7 +426,7 @@ class AccountSummaryView(discord.ui.View):
         self._expired = True
         for child in self.children:
             child.disabled = True
-        content = "This private Account Summary has expired. Run `/me accounts` again."
+        content = "Report controls expired. Run /me accounts to refresh."
         edited = False
         try:
             if self._timeout_editor is not None:

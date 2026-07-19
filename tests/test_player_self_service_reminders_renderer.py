@@ -143,15 +143,15 @@ def test_renderer_uses_avatar_duplicate_safe_identity_and_locked_alignment(monke
     )
     try:
         with Image.open(BytesIO(rendered.image_bytes.getvalue())) as image:
-            assert image.getpixel((109, 83))[0] > 180
-        assert ((170, 125), "Chrislos (1198)") in left_calls
-        assert ((96, 872), "Scheduled times shown in UTC") in left_calls
+            assert image.getpixel((150, 132))[0] > 180
+        assert ((270, 103), "Chrislos (1198)") in left_calls
+        assert ((95, 845), "Scheduled times shown in UTC") in left_calls
         assert any(
-            call["text"] == "2 of 2 systems enabled" and call["right_x"] == 1608
+            call["text"] == "2 of 2 systems enabled" and call["right_x"] == 1605
             for call in right_calls
         )
         assert any(
-            call["text"] == "Refreshed 14 Jul 2026 15:30 UTC" and call["right_x"] == 1608
+            call["text"] == "Generated 14 Jul 2026, 15:30 UTC" and call["right_x"] == 1605
             for call in right_calls
         )
     finally:

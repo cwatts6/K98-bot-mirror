@@ -9,28 +9,28 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw
 
 from core import visual_text
+from player_self_service import visual_contract
 from player_self_service.accounts_models import (
     AccountMetricTotal,
     AccountPortfolioRow,
     AccountsPortfolioPayload,
     AccountSummaryPage,
 )
-from utils import fmt_short
 
 WIDTH = 1702
 HEIGHT = 924
 _BACKGROUND = Path(__file__).resolve().parent.parent / "assets" / "me" / "cards" / "me_accounts.png"
-_TEXT = (244, 247, 255, 255)
-_MUTED = (170, 185, 205, 255)
-_BLUE = (92, 174, 255, 255)
-_GOLD = (241, 194, 97, 255)
-_GREEN = (104, 221, 170, 255)
-_AMBER = (255, 190, 93, 255)
-_RED = (255, 125, 125, 255)
-_PANEL = (4, 12, 28, 202)
+_TEXT = visual_contract.TEXT
+_MUTED = visual_contract.MUTED
+_BLUE = visual_contract.BLUE
+_GOLD = visual_contract.GOLD
+_GREEN = visual_contract.GREEN
+_AMBER = visual_contract.AMBER
+_RED = visual_contract.RED
+_PANEL = visual_contract.PANEL
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,27 +49,11 @@ def _clean(value: Any, *, missing: str = "—") -> str:
 
 
 def _compact(value: int | None) -> str:
-    if value is None:
-        return "—"
-    text = fmt_short(value).replace("k", "K")
-    if len(text) >= 3 and text[-1:] in "KMB" and text[-3:-1] == ".0":
-        return text[:-3] + text[-1]
-    return text
+    return visual_contract.format_compact_number(value)
 
 
 def _compact_detail(value: int | None) -> str:
-    if value is None:
-        return "—"
-    numeric = Decimal(int(value))
-    for scale, suffix in (
-        (Decimal(1_000_000_000), "B"),
-        (Decimal(1_000_000), "M"),
-        (Decimal(1_000), "K"),
-    ):
-        if abs(numeric) >= scale:
-            rendered = f"{numeric / scale:.2f}".rstrip("0").rstrip(".")
-            return f"{rendered}{suffix}"
-    return str(int(value))
+    return visual_contract.format_compact_number(value)
 
 
 def _number(value: Any) -> str:
@@ -86,7 +70,9 @@ def _date(value: datetime | None, *, include_time: bool = False) -> str:
     if value is None:
         return "—"
     stamp = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-    return stamp.strftime("%d %b %Y %H:%M UTC") if include_time else stamp.strftime("%d %b %Y")
+    return (
+        visual_contract.format_utc_datetime(stamp) if include_time else stamp.strftime("%d %b %Y")
+    )
 
 
 def format_whole_number(value: Any) -> str:
@@ -135,6 +121,7 @@ def _text(
     min_size: int = 13,
     fill: tuple[int, int, int, int] = _TEXT,
     bold: bool = False,
+    right_align: bool = False,
 ) -> None:
     fitted = visual_text.fit_font(
         draw,
@@ -147,9 +134,12 @@ def _text(
     fitted_value = visual_text.fit_text_to_width(
         draw, _clean(value), width=max(1, width), base_font=fitted, bold=bold
     )
+    draw_x = xy[0]
+    if right_align:
+        draw_x += width - visual_text.text_width(draw, fitted_value, font=fitted, bold=bold)
     visual_text.draw_text(
         draw,
-        xy,
+        (draw_x, xy[1]),
         fitted_value,
         font=fitted,
         fill=fill,
@@ -159,7 +149,7 @@ def _text(
 
 
 def _panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], radius: int = 16) -> None:
-    draw.rounded_rectangle(box, radius=radius, fill=_PANEL, outline=(71, 130, 187, 125), width=2)
+    visual_contract.draw_panel(draw, box, radius=radius)
 
 
 def _canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
@@ -173,25 +163,7 @@ def _canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
 
 def paste_discord_avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> bool:
     """Paste the shared circular /me avatar treatment when bytes are readable."""
-    if not avatar_bytes:
-        return False
-    size = 82
-    try:
-        with Image.open(BytesIO(avatar_bytes)) as source:
-            avatar = ImageOps.fit(
-                ImageOps.exif_transpose(source).convert("RGBA"),
-                (size, size),
-                method=Image.Resampling.LANCZOS,
-            )
-        mask = Image.new("L", (size, size), 0)
-        ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
-        canvas.paste(avatar, (68, 42), mask)
-        ImageDraw.Draw(canvas, "RGBA").ellipse(
-            (67, 41, 150, 124), outline=(92, 174, 255, 190), width=2
-        )
-        return True
-    except Exception:
-        return False
+    return visual_contract.paste_core_avatar(canvas, avatar_bytes)
 
 
 def _avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> bool:
@@ -234,6 +206,7 @@ def _metric_box(
         size=19 if large else 17,
         fill=_BLUE,
         bold=True,
+        right_align=True,
     )
     _text(
         draw,
@@ -252,15 +225,18 @@ def _metric_box(
         size=17 if large else 15,
         min_size=13 if large else 12,
         fill=_MUTED,
+        right_align=True,
     )
 
 
 def _state_colour(state: str) -> tuple[int, int, int, int]:
-    return {"READY": _GREEN, "REVIEW": _AMBER, "SETUP": _BLUE}.get(state, _MUTED)
+    return visual_contract.state_colour(state)
 
 
 def _data_colour(state: str) -> tuple[int, int, int, int]:
-    return {"CURRENT": _GREEN, "STALE": _AMBER, "NO DATA": _RED}.get(state, _RED)
+    if state == "UNRESOLVED":
+        return _RED
+    return visual_contract.state_colour(state)
 
 
 def _role_helper(payload: AccountsPortfolioPayload) -> str:
@@ -306,32 +282,51 @@ def render_accounts_card(
     avatar_bytes: bytes | None = None,
 ) -> RenderedAccountsCard:
     canvas, draw = _canvas()
-    has_avatar = _avatar(canvas, avatar_bytes)
+    _avatar(canvas, avatar_bytes)
     draw = ImageDraw.Draw(canvas, "RGBA")
-    heading_x = 170 if has_avatar else 68
-    _text(draw, (heading_x, 35), "ACCOUNT CENTRE", width=900, size=40, bold=True)
+    _text(draw, (270, 48), "ACCOUNT CENTRE", width=730, size=42, min_size=30, bold=True)
     _text(
         draw,
-        (1385, 45),
-        payload.state,
-        width=245,
-        size=27,
-        min_size=21,
-        fill=_state_colour(payload.state),
+        (270, 103),
+        _discord_heading(display_name),
+        width=730,
+        size=31,
+        min_size=20,
+        fill=_GOLD,
         bold=True,
     )
-    _text(draw, (heading_x, 91), _discord_heading(display_name), width=1150, size=36, bold=True)
     _text(
         draw,
-        (1385, 96),
-        format_governor_count(payload.linked_count),
-        width=245,
-        size=21,
-        min_size=16,
-        fill=_MUTED,
+        (270, 149),
+        f"{format_governor_count(payload.linked_count)} • {_role_helper(payload)}",
+        width=730,
+        size=27,
+        min_size=18,
+        bold=True,
     )
-    _text(draw, (68, 151), "LATEST SNAPSHOTS", width=500, size=20, fill=_BLUE, bold=True)
-    boxes = [(68 + index * 397, 184, 445 + index * 397, 342) for index in range(4)]
+    visual_contract.draw_state_pill(draw, payload.state)
+    _text(
+        draw,
+        (1010, 127),
+        "LATEST SNAPSHOTS",
+        width=595,
+        size=24,
+        min_size=17,
+        fill=_BLUE,
+        bold=True,
+        right_align=True,
+    )
+    _text(
+        draw,
+        (1010, 165),
+        f"Data refreshed {_date(payload.latest_scan_date, include_time=True)}",
+        width=595,
+        size=14,
+        min_size=10,
+        fill=_MUTED,
+        right_align=True,
+    )
+    boxes = [(95 + index * 385, 230, 450 + index * 385, 388) for index in range(4)]
     _metric_box(
         draw,
         boxes[0],
@@ -365,16 +360,16 @@ def render_accounts_card(
         large=True,
     )
 
-    _panel(draw, (68, 374, 1634, 697))
-    _text(draw, (92, 392), "LINKED GOVERNORS", width=600, size=20, fill=_BLUE, bold=True)
-    tile_width = 755
+    _panel(draw, (95, 414, 1605, 705))
+    _text(draw, (119, 432), "LINKED GOVERNORS", width=600, size=20, fill=_BLUE, bold=True)
+    tile_width = 725
     for index, (slot, governor, governor_id, power, data_state) in enumerate(
         _linked_governor_entries(payload)
     ):
         column = index % 2
         row_index = index // 2
-        x = 88 + column * 771
-        y = 423 + row_index * 65
+        x = 115 + column * 750
+        y = 455 + row_index * 60
         draw.rounded_rectangle(
             (x, y, x + tile_width, y + 57),
             radius=8,
@@ -426,24 +421,23 @@ def render_accounts_card(
             bold=True,
         )
 
-    _panel(draw, (68, 714, 1634, 795), 13)
-    _text(draw, (92, 730), "PORTFOLIO INSIGHT", width=285, size=16, fill=_GOLD, bold=True)
-    _text(draw, (380, 726), payload.insight, width=1225, size=20, min_size=15)
-    _text(draw, (68, 816), "Manage accounts", width=330, size=20, fill=_BLUE, bold=True)
+    _panel(draw, (95, 722, 1605, 803), 18)
+    _text(draw, (119, 738), "PORTFOLIO INSIGHT", width=285, size=16, fill=_GOLD, bold=True)
+    _text(draw, (407, 734), payload.insight, width=1174, size=20, min_size=15)
+    _text(draw, (95, 816), "Manage", width=330, size=20, fill=_BLUE, bold=True)
     _text(
         draw,
-        (68, 849),
+        (95, 849),
         "Find an ID, add, replace or remove a linked governor.",
         width=950,
         size=18,
         fill=_MUTED,
     )
-    refreshed = payload.refreshed_at_utc.astimezone(UTC)
     _text(
         draw,
-        (1390, 850),
-        f"Refreshed {refreshed:%d %b %Y %H:%M UTC}",
-        width=244,
+        (1325, 845),
+        f"Generated {visual_contract.format_utc_datetime(payload.refreshed_at_utc)}",
+        width=280,
         size=15,
         min_size=11,
         fill=_MUTED,
@@ -552,26 +546,46 @@ def render_account_summary_card(
 ) -> RenderedAccountsCard:
     payload = page.payload
     canvas, draw = _canvas()
-    has_avatar = _avatar(canvas, avatar_bytes)
+    _avatar(canvas, avatar_bytes)
     draw = ImageDraw.Draw(canvas, "RGBA")
-    heading_x = 170 if has_avatar else 68
-    _text(draw, (heading_x, 38), "ACCOUNT SUMMARY", width=820, size=33, bold=True)
-    _text(draw, (heading_x, 86), _discord_heading(display_name), width=1000, size=27, bold=True)
+    _text(draw, (270, 48), "ACCOUNT SUMMARY", width=730, size=42, min_size=30, bold=True)
     _text(
         draw,
-        (1375, 43),
-        payload.state,
-        width=255,
-        size=25,
-        fill=_state_colour(payload.state),
+        (270, 103),
+        _discord_heading(display_name),
+        width=730,
+        size=31,
+        min_size=20,
+        fill=_GOLD,
         bold=True,
     )
     _text(
         draw,
-        (1375, 84),
-        format_governor_count(payload.linked_count),
-        width=255,
-        size=18,
+        (270, 149),
+        f"{format_governor_count(payload.linked_count)} • {_summary_section_label(page.section)}",
+        width=730,
+        size=27,
+        min_size=18,
+        bold=True,
+    )
+    visual_contract.draw_state_pill(draw, payload.state)
+    _text(
+        draw,
+        (1010, 127),
+        f"{_summary_section_label(page.section).title()} • Page {page.page} / {page.page_count}",
+        width=595,
+        size=24,
+        min_size=17,
+        fill=_BLUE,
+        bold=True,
+    )
+    _text(
+        draw,
+        (1010, 165),
+        f"Data refreshed {_date(payload.latest_scan_date, include_time=True)}",
+        width=595,
+        size=14,
+        min_size=10,
         fill=_MUTED,
     )
 
@@ -582,32 +596,32 @@ def render_account_summary_card(
         ("RSS TOTAL", payload.rss_total),
     )
     for index, (label, metric) in enumerate(labels):
-        x0 = 68 + index * 397
+        x0 = 95 + index * 385
         _metric_box(
-            draw, (x0, 135, x0 + 377, 248), label, _compact(metric.value), _coverage(metric)
+            draw, (x0, 230, x0 + 355, 343), label, _compact(metric.value), _coverage(metric)
         )
 
     section_label = _summary_section_label(page.section)
-    _text(draw, (68, 275), section_label, width=850, size=23, fill=_BLUE, bold=True)
+    _text(draw, (95, 370), section_label, width=850, size=23, fill=_BLUE, bold=True)
     _text(
-        draw, (1405, 278), f"Page {page.page} / {page.page_count}", width=225, size=18, fill=_MUTED
+        draw, (1380, 373), f"Page {page.page} / {page.page_count}", width=225, size=18, fill=_MUTED
     )
-    _panel(draw, (68, 318, 1634, 816))
+    _panel(draw, (95, 413, 1605, 803))
     columns = _summary_columns(page)
     x_positions: list[int] = []
-    x = 88
+    x = 115
     for label, width in columns:
         x_positions.append(x)
-        _text(draw, (x, 340), label, width=width - 10, size=17, min_size=11, fill=_MUTED, bold=True)
+        _text(draw, (x, 435), label, width=width - 10, size=17, min_size=11, fill=_MUTED, bold=True)
         x += width
-    draw.line((88, 372, 1614, 372), fill=(91, 140, 190, 120), width=1)
+    draw.line((115, 467, 1585, 467), fill=visual_contract.PANEL_EDGE, width=2)
     if not page.rows:
-        _text(draw, (88, 405), "No linked governors to show.", width=1450, size=22, fill=_MUTED)
+        _text(draw, (115, 500), "No linked governors to show.", width=1450, size=22, fill=_MUTED)
     for row_index, row in enumerate(page.rows):
-        y = 393 + row_index * 50
+        y = 488 + row_index * 38
         values = _summary_values(page, row)
         if row_index % 2:
-            draw.rounded_rectangle((80, y - 7, 1620, y + 34), radius=7, fill=(35, 64, 96, 58))
+            draw.rounded_rectangle((107, y - 5, 1593, y + 30), radius=7, fill=(35, 64, 96, 58))
         for value, (label, width), x in zip(values, columns, x_positions, strict=True):
             colour = _data_colour(value) if label == "DATA" else _TEXT
             _text(
@@ -624,18 +638,17 @@ def render_account_summary_card(
     footer_label = _summary_footer_label(page.section)
     _text(
         draw,
-        (68, 842),
+        (95, 845),
         footer_label,
         width=1050,
         size=17,
         fill=_MUTED,
     )
-    refreshed = payload.refreshed_at_utc.astimezone(UTC)
     _text(
         draw,
-        (1388, 842),
-        f"Refreshed {refreshed:%d %b %Y %H:%M UTC}",
-        width=245,
+        (1325, 845),
+        f"Generated {visual_contract.format_utc_datetime(payload.refreshed_at_utc)}",
+        width=280,
         size=15,
         min_size=10,
         fill=_MUTED,

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, date, timedelta
+from datetime import date, timedelta
 from io import BytesIO
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw
 
 from core import visual_text
+from player_self_service import visual_contract
 from player_self_service.stats_models import (
     PersonalStatsPayload,
     StatsMetricSummary,
@@ -20,15 +21,12 @@ from player_self_service.stats_models import (
 WIDTH = 1702
 HEIGHT = 924
 _BACKGROUND = Path(__file__).resolve().parent.parent / "assets" / "me" / "cards" / "me_stats.png"
-_TEXT = (248, 251, 255, 255)
-_MUTED = (190, 210, 235, 255)
-_BLUE = (91, 190, 255, 255)
-_GOLD = (255, 206, 92, 255)
-_GREEN = (76, 225, 148, 255)
-_AMBER = (255, 196, 78, 255)
-_RED = (255, 132, 132, 255)
-_SHADOW = (0, 0, 0, 190)
-_PANEL = (3, 11, 27, 220)
+_TEXT = visual_contract.TEXT
+_MUTED = visual_contract.MUTED
+_BLUE = visual_contract.BLUE
+_GOLD = visual_contract.GOLD
+_AMBER = visual_contract.AMBER
+_SHADOW = visual_contract.SHADOW
 _SERIES = ((91, 200, 255, 255), (255, 196, 78, 255), (102, 232, 160, 255))
 
 
@@ -90,53 +88,19 @@ def _font_text(
 
 
 def _compact(value: int | float | None, *, signed: bool = False) -> str:
-    if value is None:
-        return "—"
-    sign = "+" if signed and value > 0 else ""
-    magnitude = abs(value)
-    for divisor, suffix in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")):
-        if magnitude >= divisor:
-            rendered = f"{value / divisor:.2f}".rstrip("0").rstrip(".")
-            return f"{sign}{rendered}{suffix}"
-    rendered = f"{value:,.1f}".rstrip("0").rstrip(".") if isinstance(value, float) else f"{value:,}"
-    return f"{sign}{rendered}"
+    return visual_contract.format_compact_number(value, signed=signed)
 
 
 def _panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int]) -> None:
-    draw.rounded_rectangle(box, radius=18, fill=_PANEL, outline=(91, 190, 255, 180), width=2)
+    visual_contract.draw_panel(draw, box)
 
 
 def _state_colour(state: str) -> tuple[int, int, int, int]:
-    return {
-        "READY": _GREEN,
-        "PARTIAL": _AMBER,
-        "NO DATA": _RED,
-        "UNAVAILABLE": _RED,
-    }.get(state, _MUTED)
+    return visual_contract.state_colour(state)
 
 
 def _state_badge(draw: ImageDraw.ImageDraw, state: str) -> None:
-    x1, y1, x2, y2 = 1370, 48, 1605, 111
-    colour = _state_colour(state)
-    draw.rounded_rectangle(
-        (x1, y1, x2, y2),
-        radius=26,
-        fill=(4, 11, 24, 220),
-        outline=colour,
-        width=3,
-    )
-    font = visual_text.font(30, bold=True)
-    text_width = visual_text.text_width(draw, state, font=font, bold=True)
-    position = (x1 + (x2 - x1 - text_width) // 2, y1 + 10)
-    visual_text.draw_text(
-        draw,
-        (position[0] + 2, position[1] + 2),
-        state,
-        font=font,
-        fill=_SHADOW,
-        bold=True,
-    )
-    visual_text.draw_text(draw, position, state, font=font, fill=colour, bold=True)
+    visual_contract.draw_state_pill(draw, state)
 
 
 def _coverage_text(payload: PersonalStatsPayload) -> str:
@@ -164,50 +128,7 @@ def _coverage_text(payload: PersonalStatsPayload) -> str:
 
 
 def _paste_avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> None:
-    size = 144
-    position = (96, 60)
-    avatar: Image.Image | None = None
-    if avatar_bytes:
-        try:
-            with Image.open(BytesIO(avatar_bytes)) as source:
-                avatar = ImageOps.fit(
-                    ImageOps.exif_transpose(source).convert("RGBA"),
-                    (size, size),
-                    method=Image.Resampling.LANCZOS,
-                )
-        except Exception:
-            avatar = None
-    mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
-    if avatar is not None:
-        try:
-            canvas.paste(avatar, position, mask)
-        finally:
-            avatar.close()
-    else:
-        fallback = Image.new("RGBA", (size, size), (6, 20, 42, 255))
-        try:
-            fallback_draw = ImageDraw.Draw(fallback, "RGBA")
-            fallback_draw.ellipse((2, 2, size - 3, size - 3), outline=_BLUE, width=4)
-            _font_text(
-                fallback_draw,
-                (24, 49),
-                "KD98",
-                width=96,
-                size=30,
-                min_size=24,
-                fill=_GOLD,
-                bold=True,
-            )
-            canvas.paste(fallback, position, mask)
-        finally:
-            fallback.close()
-    ImageDraw.Draw(canvas, "RGBA").ellipse(
-        (position[0] - 2, position[1] - 2, position[0] + size + 1, position[1] + size + 1),
-        outline=(92, 174, 255, 210),
-        width=3,
-    )
-    mask.close()
+    visual_contract.paste_core_avatar(canvas, avatar_bytes)
 
 
 def _metric_box(
@@ -379,8 +300,8 @@ def _draw_chart(
 
 
 def _data_refresh_text(payload: PersonalStatsPayload) -> str:
-    refreshed = payload.data_refreshed_at_utc.astimezone(UTC)
-    return f"Data last refreshed {refreshed:%d %b %Y %H:%M:%S UTC}"
+    refreshed = visual_contract.format_utc_datetime(payload.data_refreshed_at_utc)
+    return f"Data refreshed {refreshed}"
 
 
 def _header(
@@ -626,11 +547,10 @@ def render_personal_stats_card(
             fill=_MUTED,
             bold=True,
         )
-        refreshed = payload.generated_at_utc.astimezone(UTC)
         _font_text(
             draw,
             (1325, 845),
-            f"Generated {refreshed:%d %b %Y %H:%M:%S UTC}",
+            f"Generated {visual_contract.format_utc_datetime(payload.generated_at_utc)}",
             width=280,
             size=16,
             min_size=10,

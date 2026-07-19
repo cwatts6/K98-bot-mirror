@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from io import BytesIO
 import logging
 from math import ceil
@@ -22,6 +23,7 @@ from inventory.models import (
     InventoryReportView,
 )
 from inventory.report_image_renderer import render_inventory_reports
+from player_self_service import visual_contract
 from player_self_service.governor_dashboard_models import (
     GovernorDashboardContext,
     GovernorDashboardOption,
@@ -86,6 +88,25 @@ def _report_content(payload: InventoryReportPayload) -> str:
     return content
 
 
+def _payload_points(payload: InventoryReportPayload) -> tuple[Any, ...]:
+    if payload.view == InventoryReportView.RESOURCES:
+        return tuple(payload.resources)
+    if payload.view == InventoryReportView.SPEEDUPS:
+        return tuple(payload.speedups)
+    if payload.view == InventoryReportView.MATERIALS:
+        return tuple(payload.materials)
+    return ()
+
+
+def _format_timestamp(value: Any | None) -> str:
+    if value is None:
+        return visual_contract.MISSING_VALUE
+    if isinstance(value, datetime):
+        aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value
+        return visual_contract.format_utc_datetime(aware)
+    return str(value)
+
+
 def build_report_fallback_embed(payload: InventoryReportPayload) -> discord.Embed:
     has_data = _has_requested_data(payload)
     embed = discord.Embed(
@@ -94,14 +115,17 @@ def build_report_fallback_embed(payload: InventoryReportPayload) -> discord.Embe
             f"Governor **{_safe_name(payload.governor_name, fallback=str(payload.governor_id))}** "
             f"(`{payload.governor_id}`) · `{payload.range_key.value}`"
         ),
-        color=discord.Color.blue() if has_data else discord.Color.orange(),
+        color=discord.Color.blue() if has_data else discord.Color.red(),
     )
     if has_data:
         if payload.view == InventoryReportView.RESOURCES and payload.resources:
             point = payload.resources[-1]
             value = (
-                f"Total RSS: `{point.total:,}`\nFood: `{point.food:,}` · Wood: `{point.wood:,}`\n"
-                f"Stone: `{point.stone:,}` · Gold: `{point.gold:,}`"
+                f"Total RSS: `{visual_contract.format_compact_number(point.total)}`\n"
+                f"Food: `{visual_contract.format_compact_number(point.food)}` · "
+                f"Wood: `{visual_contract.format_compact_number(point.wood)}`\n"
+                f"Stone: `{visual_contract.format_compact_number(point.stone)}` · "
+                f"Gold: `{visual_contract.format_compact_number(point.gold)}`"
             )
         elif payload.view == InventoryReportView.SPEEDUPS and payload.speedups:
             point = payload.speedups[-1]
@@ -128,9 +152,26 @@ def build_report_fallback_embed(payload: InventoryReportPayload) -> discord.Embe
         else:
             value = "Authorized report data loaded. Use the report controls to try again."
         embed.add_field(name="Latest approved values", value=value, inline=False)
-        embed.set_footer(text="Image delivery failed; this fallback uses the authorized payload.")
+        points = _payload_points(payload)
+        embed.add_field(
+            name="Report coverage",
+            value=(
+                f"Approved imports: {len(points)}\n"
+                f"Period: {_format_timestamp(getattr(points[0], 'scan_utc', None))} — "
+                f"{_format_timestamp(getattr(points[-1], 'scan_utc', None))}"
+            ),
+            inline=False,
+        )
     else:
-        embed.add_field(name="Upload Inventory", value=_upload_guidance(), inline=False)
+        embed.add_field(name=visual_contract.NO_DATA, value=_upload_guidance(), inline=False)
+    points = _payload_points(payload)
+    uploaded_at = getattr(points[-1], "scan_utc", None) if points else None
+    embed.set_footer(
+        text=(
+            f"Inventory uploaded {_format_timestamp(uploaded_at)} • "
+            f"Generated {_format_timestamp(payload.generated_at_utc)}"
+        )
+    )
     return embed
 
 
@@ -356,9 +397,10 @@ class PlayerInventoryReportView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if self._expired or self._timed_out:
+            command = f"/me {self.report_view.value}"
             await _private_error(
                 interaction,
-                "This private Inventory report has expired. Run `/me resources`, `/me materials`, or `/me speedups` again.",
+                f"Report controls expired. Run {command} to refresh.",
             )
             return False
         if not interaction.user or int(interaction.user.id) != self.author_id:
@@ -739,11 +781,10 @@ class PlayerInventoryReportView(discord.ui.View):
         self._active_transition_id = None
         for child in self.children:
             child.disabled = True
+        command = f"/me {self.report_view.value}"
         kwargs = {
-            "content": "This private Inventory report has expired. Run a `/me` report command again.",
-            "embed": None,
+            "content": f"Report controls expired. Run {command} to refresh.",
             "view": self,
-            "attachments": [],
         }
         try:
             if self._timeout_editor is not None:

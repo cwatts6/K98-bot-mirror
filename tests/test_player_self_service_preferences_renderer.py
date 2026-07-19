@@ -76,9 +76,9 @@ def test_render_preferences_card_places_circular_avatar_at_top_left() -> None:
     with_avatar = renderer.render_preferences_card(_payload(), avatar_bytes=_avatar_bytes())
 
     with Image.open(BytesIO(without_avatar.image_bytes)) as base_image:
-        base_pixel = base_image.getpixel((109, 83))
+        base_pixel = base_image.getpixel((150, 132))
     with Image.open(BytesIO(with_avatar.image_bytes)) as avatar_image:
-        avatar_pixel = avatar_image.getpixel((109, 83))
+        avatar_pixel = avatar_image.getpixel((150, 132))
     assert avatar_pixel != base_pixel
     assert avatar_pixel[0] > 150
 

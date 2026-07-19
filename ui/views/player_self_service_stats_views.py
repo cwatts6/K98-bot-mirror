@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC
 from functools import partial
 from io import BytesIO
 import logging
@@ -17,6 +16,7 @@ from typing import Any
 import discord
 
 from file_utils import emit_telemetry_event
+from player_self_service import visual_contract
 from player_self_service.stats_models import (
     PersonalStatsAccessChanged,
     PersonalStatsNoAccounts,
@@ -326,8 +326,17 @@ def build_personal_stats_fallback_embed(
             value="Duplicate linked Governor IDs were deduplicated before data access.",
             inline=False,
         )
-    generated_utc = payload.generated_at_utc.astimezone(UTC)
-    embed.set_footer(text=f"Private report • Generated {generated_utc:%d %b %Y %H:%M:%S UTC}")
+    embed.add_field(
+        name="Freshness",
+        value=f"Data refreshed {visual_contract.format_utc_datetime(payload.data_refreshed_at_utc)}",
+        inline=False,
+    )
+    embed.set_footer(
+        text=(
+            "Private report • Generated "
+            f"{visual_contract.format_utc_datetime(payload.generated_at_utc)}"
+        )
+    )
     return embed
 
 

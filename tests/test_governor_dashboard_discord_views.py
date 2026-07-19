@@ -822,6 +822,8 @@ async def test_timeout_edits_original_ephemeral_response_gracefully() -> None:
     edited = interaction.original_edits[-1]
     assert "expired" in edited["content"]
     assert edited["view"] is view
+    assert "attachments" not in edited
+    assert "embed" not in edited
     assert all(child.disabled for child in view.children)
 
 
@@ -836,10 +838,10 @@ def test_missing_values_missing_vip_and_zero_ark_are_safe_and_no_olympia_text() 
     ).casefold()
 
     assert "vip: not set" in rendered
-    assert "ark win ratio: n/a" in rendered
-    assert "power: n/a" in rendered
-    assert "location: n/a" in rendered
-    assert "times autarch participated: n/a" in rendered
+    assert "ark win ratio: —" in rendered
+    assert "power: —" in rendered
+    assert "location: —" in rendered
+    assert "times autarch participated: —" in rendered
     assert "no recent scan available" in rendered
     assert "olympia" not in rendered
 
@@ -881,7 +883,7 @@ async def test_payload_failure_renders_safe_missing_data_shell() -> None:
     embed = ctx.interaction.original_edits[-1]["embed"]
     assert embed.title == "Governor Dashboard — Main Gov"
     assert "temporarily unavailable" in embed.description
-    assert embed.fields[1].value == "Dashboard metrics: N/A"
+    assert embed.fields[1].value == "Dashboard metrics: UNAVAILABLE"
 
 
 @pytest.mark.asyncio

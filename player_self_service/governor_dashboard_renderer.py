@@ -11,19 +11,19 @@ from typing import Any
 from PIL import Image, ImageDraw, ImageOps
 
 from core import visual_text
+from player_self_service import visual_contract
 from player_self_service.governor_dashboard_models import GovernorDashboardPayload
-from utils import fmt_short
 
 WIDTH = 1180
 HEIGHT = 760
 FILENAME = "governor_dashboard.png"
 
 _BACKGROUND = Path(__file__).resolve().parent.parent / "assets" / "me" / "cards" / "me.png"
-_TEXT = (246, 247, 252, 255)
-_MUTED = (180, 184, 201, 255)
-_GOLD = (238, 190, 92, 255)
-_BLUE = (105, 171, 255, 255)
-_PANEL = (8, 10, 20, 185)
+_TEXT = visual_contract.TEXT
+_MUTED = visual_contract.MUTED
+_GOLD = visual_contract.GOLD
+_BLUE = visual_contract.BLUE
+_PANEL = (visual_contract.PANEL[0], visual_contract.PANEL[1], visual_contract.PANEL[2], 185)
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,52 +34,41 @@ class RenderedGovernorDashboard:
     height: int = HEIGHT
 
 
-def _clean(value: Any, *, missing: str = "N/A") -> str:
+def _clean(value: Any, *, missing: str = visual_contract.MISSING_VALUE) -> str:
     text = " ".join(str(value or "").replace("\r", " ").replace("\n", " ").split())
+    if text.upper() in {"N/A", "NA"}:
+        return missing
     return text or missing
 
 
 def _compact(value: int | float | None) -> str:
     if value is None or isinstance(value, bool):
-        return "N/A"
+        return visual_contract.MISSING_VALUE
     try:
         numeric = float(value)
         if abs(numeric) >= 1_000_000_000_000_000:
             return f"{numeric:.2E}".replace("E+", "E")
-        value_text = fmt_short(value)
     except (TypeError, ValueError):
-        return "N/A"
-    value_text = value_text.replace("k", "K")
-    if len(value_text) >= 3 and value_text[-1:] in "KMB" and value_text[-3:-1] == ".0":
-        value_text = value_text[:-3] + value_text[-1]
-    return value_text
-
-
-def _number(value: int | float | None) -> str:
-    if value is None or isinstance(value, bool):
-        return "N/A"
-    if isinstance(value, int):
-        return f"{value:,}"
-    try:
-        return f"{float(value):,.2f}".rstrip("0").rstrip(".")
-    except (TypeError, ValueError):
-        return "N/A"
+        return visual_contract.MISSING_VALUE
+    return visual_contract.format_compact_number(value)
 
 
 def _days(value: float | None) -> str:
     if value is None:
-        return "Not recorded"
-    return f"{int(round(value)):,}d"
+        return visual_contract.NOT_RECORDED
+    rounded = int(round(value))
+    unit = "day" if rounded == 1 else "days"
+    return f"{_compact(rounded)} {unit}"
 
 
 def _legendary(value: float | None) -> str:
     if value is None:
-        return "Not recorded"
-    return f"{value:,.0f}"
+        return visual_contract.NOT_RECORDED
+    return _compact(value)
 
 
 def _location(x: int | None, y: int | None) -> str:
-    return f"{x}:{y}" if x is not None and y is not None else "N/A"
+    return f"{x}:{y}" if x is not None and y is not None else visual_contract.MISSING_VALUE
 
 
 def _freshness(value: Any) -> str:
@@ -87,8 +76,8 @@ def _freshness(value: Any) -> str:
         return "No recent scan available"
     if isinstance(value, datetime):
         timestamp = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-        return f"Updated {timestamp:%d %b %Y, %H:%M UTC}"
-    return f"Updated {_clean(value, missing='time unavailable')}"
+        return f"Location updated {visual_contract.format_utc_datetime(timestamp)}"
+    return f"Location updated {_clean(value, missing='time unavailable')}"
 
 
 def _text(
@@ -120,7 +109,7 @@ def _text(
 
 
 def _panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], *, radius: int = 16) -> None:
-    draw.rounded_rectangle(box, radius=radius, fill=_PANEL, outline=(111, 89, 145, 150), width=1)
+    visual_contract.draw_panel(draw, box, radius=radius, fill=_PANEL)
 
 
 def _avatar(canvas: Image.Image, avatar_bytes: bytes | None) -> None:
@@ -219,7 +208,7 @@ def render_governor_dashboard(
     profile_rows = (
         ("CIVILISATION", _clean(identity.civilisation)),
         ("LOCATION", _location(identity.location_x, identity.location_y)),
-        ("CONDUCT SCORE", _number(payload.profile_status.conduct_score)),
+        ("CONDUCT SCORE", _compact(payload.profile_status.conduct_score)),
     )
     y = 94
     for label, value in profile_rows:
@@ -250,7 +239,7 @@ def render_governor_dashboard(
             (
                 _compact(inventory.total_resources)
                 if inventory.total_resources is not None
-                else "Not recorded"
+                else visual_contract.NOT_RECORDED
             ),
             inventory.total_resources is None,
         ),
@@ -270,11 +259,11 @@ def render_governor_dashboard(
         _metric(draw, (x0, 388, x0 + 180, 484), label, value, subtle=subtle)
 
     honour_values = (
-        ("ARK JOINED", _number(honours.ark_joined)),
-        ("ARK WON", _number(honours.ark_won)),
+        ("ARK JOINED", _compact(honours.ark_joined)),
+        ("ARK WON", _compact(honours.ark_won)),
         ("WIN RATIO", _clean(honours.ark_win_ratio_label)),
-        ("NAMED AUTARCH", _number(history.times_named_autarch)),
-        ("AUTARCH PARTICIPATED", _number(history.times_autarch_participated)),
+        ("NAMED AUTARCH", _compact(history.times_named_autarch)),
+        ("AUTARCH PARTICIPATED", _compact(history.times_autarch_participated)),
     )
     for index, (label, value) in enumerate(honour_values):
         x0 = 88 + index * 207

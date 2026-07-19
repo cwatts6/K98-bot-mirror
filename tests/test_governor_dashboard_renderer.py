@@ -210,6 +210,13 @@ def test_renderer_handles_sparse_zero_negative_huge_and_unicode_values() -> None
         assert image.convert("RGB").getpixel((1100, 20)) != (0, 0, 0)
 
 
+def test_dashboard_secondary_numbers_use_compact_units() -> None:
+    assert renderer._days(1) == "1 day"
+    assert renderer._days(4_372) == "4.37K days"
+    assert renderer._legendary(987_654_321_098) == "987.65B"
+    assert renderer._compact(987_654_321_098) == "987.65B"
+
+
 def test_renderer_places_optional_avatar_and_survives_invalid_avatar() -> None:
     avatar = BytesIO()
     Image.new("RGB", (64, 64), (240, 20, 30)).save(avatar, format="PNG")

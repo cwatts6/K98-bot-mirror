@@ -405,7 +405,7 @@ async def test_component_no_data_replaces_dashboard_instead_of_sending_followup(
 
     assert len(message.edits) == 1
     assert message.edits[0]["attachments"] == []
-    assert message.edits[0]["embed"].fields[0].name == "Upload Inventory"
+    assert message.edits[0]["embed"].fields[0].name == "NO DATA"
     assert interaction.followup.sent == []
 
 
@@ -768,7 +768,11 @@ async def test_foreign_timeout_and_concurrent_actions_fail_privately() -> None:
     timeout_target = _Interaction()
     view.set_timeout_target(timeout_target)
     await view.on_timeout()
-    assert timeout_target.original_edits[-1]["attachments"] == []
+    assert "attachments" not in timeout_target.original_edits[-1]
+    assert "embed" not in timeout_target.original_edits[-1]
+    assert timeout_target.original_edits[-1]["content"] == (
+        "Report controls expired. Run /me resources to refresh."
+    )
     assert all(child.disabled for child in view.children)
 
 

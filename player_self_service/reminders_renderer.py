@@ -9,10 +9,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from core import visual_text
-from player_self_service.accounts_renderer import (
-    format_discord_heading,
-    paste_discord_avatar,
-)
+from player_self_service import visual_contract
+from player_self_service.accounts_renderer import format_discord_heading
 from player_self_service.reminders_summary import RemindersSummaryPayload
 
 WIDTH = 1702
@@ -21,15 +19,15 @@ BACKDROP_PATH = (
     Path(__file__).resolve().parent.parent / "assets" / "me" / "cards" / "me_reminders.png"
 )
 
-TEXT = (242, 247, 255, 255)
-MUTED = (177, 197, 222, 255)
-BLUE = (91, 190, 255, 255)
-GREEN = (76, 214, 143, 255)
-GOLD = (255, 206, 92, 255)
-RED = (255, 132, 132, 255)
-SHADOW = (0, 0, 0, 190)
-PANEL = (5, 10, 24, 96)
-PANEL_EDGE = (94, 145, 210, 64)
+TEXT = visual_contract.TEXT
+MUTED = visual_contract.MUTED
+BLUE = visual_contract.BLUE
+GREEN = visual_contract.GREEN
+GOLD = visual_contract.GOLD
+RED = visual_contract.RED
+SHADOW = visual_contract.SHADOW
+PANEL = visual_contract.PANEL
+PANEL_EDGE = visual_contract.PANEL_EDGE
 _EVENT_START_MARKER = " | Event starts "
 
 
@@ -206,22 +204,15 @@ def _draw_hero_secondary(
 
 
 def _panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], *, radius: int = 22) -> None:
-    draw.rounded_rectangle(box, radius=radius, fill=PANEL, outline=PANEL_EDGE, width=2)
+    visual_contract.draw_panel(draw, box, radius=radius)
 
 
 def _status_color(state: str) -> tuple[int, int, int, int]:
-    return {"ACTIVE": GREEN, "REVIEW": GOLD, "OFF": MUTED}.get(state, BLUE)
+    return visual_contract.state_colour(state)
 
 
 def _status_badge(draw: ImageDraw.ImageDraw, text: str) -> None:
-    x1, y1, x2, y2 = 1390, 62, 1608, 126
-    color = _status_color(text)
-    draw.rounded_rectangle(
-        (x1, y1, x2, y2), radius=26, fill=(4, 11, 24, 205), outline=color, width=3
-    )
-    font = _font(32, bold=True)
-    width = visual_text.text_width(draw, text, font=font, bold=True)
-    _draw(draw, (x1 + (x2 - x1 - width) // 2, y1 + 10), text, font=font, fill=color, bold=True)
+    visual_contract.draw_state_pill(draw, text)
 
 
 def _draw_system(
@@ -290,17 +281,16 @@ def render_reminders_card(
             raise ValueError("Reminders backdrop must be fully opaque")
         canvas = source.convert("RGBA")
 
-    has_avatar = paste_discord_avatar(canvas, avatar_bytes)
+    visual_contract.paste_core_avatar(canvas, avatar_bytes)
     draw = ImageDraw.Draw(canvas, "RGBA")
     state_text = payload.configuration_state.value
-    heading_x = 170 if has_avatar else 94
 
     _draw(
         draw,
-        (heading_x, 62),
+        (270, 48),
         "REMINDER CENTRE",
         font=_font(42, bold=True),
-        fill=MUTED,
+        fill=TEXT,
         bold=True,
     )
     _status_badge(draw, state_text)
@@ -311,26 +301,36 @@ def render_reminders_card(
     )
     _draw_fit(
         draw,
-        (heading_x, 125),
+        (270, 103),
         identity,
-        width=990 - heading_x,
-        size=49,
-        min_size=28,
+        width=730,
+        size=31,
+        min_size=20,
+        fill=GOLD,
+        bold=True,
+    )
+    _draw_fit(
+        draw,
+        (270, 149),
+        f"Kingdom {payload.kingdom_id} • Private reminders",
+        width=730,
+        size=27,
+        min_size=18,
         bold=True,
     )
     _draw_fit_right(
         draw,
-        right_x=1608,
-        y=151,
+        right_x=1605,
+        y=127,
         text=payload.state_supporting_text,
-        width=538,
-        size=28,
-        min_size=19,
+        width=595,
+        size=24,
+        min_size=17,
         fill=_status_color(state_text),
         bold=True,
     )
 
-    _panel(draw, (92, 226, 1610, 382), radius=24)
+    _panel(draw, (95, 230, 1605, 382), radius=18)
     _draw(draw, (116, 241), payload.hero.headline, font=_font(27, bold=True), fill=BLUE, bold=True)
     _draw_fit(
         draw,
@@ -353,8 +353,8 @@ def render_reminders_card(
 
     _draw_system(
         draw,
-        x=92,
-        width=748,
+        x=95,
+        width=735,
         title="KVK REMINDERS",
         state_line=payload.kvk.state_count_line,
         events=payload.kvk.event_summary,
@@ -363,8 +363,8 @@ def render_reminders_card(
     )
     _draw_system(
         draw,
-        x=862,
-        width=748,
+        x=870,
+        width=735,
         title="CALENDAR REMINDERS",
         state_line=payload.calendar.state_count_line,
         events=payload.calendar.event_summary,
@@ -372,7 +372,7 @@ def render_reminders_card(
         coverage=payload.calendar.coverage_label,
     )
 
-    _panel(draw, (92, 664, 1610, 752), radius=20)
+    _panel(draw, (95, 664, 1605, 746), radius=18)
     _draw(draw, (116, 676), "REMINDER INSIGHT", font=_font(23, bold=True), fill=BLUE, bold=True)
     _draw_fit(
         draw,
@@ -384,35 +384,35 @@ def render_reminders_card(
         bold=True,
     )
 
-    _panel(draw, (92, 766, 1610, 848), radius=20)
-    _draw(draw, (116, 778), "Manage reminders", font=_font(28, bold=True), fill=GOLD, bold=True)
+    _panel(draw, (95, 760, 1605, 835), radius=18)
+    _draw(draw, (116, 772), "Manage", font=_font(22, bold=True), fill=GOLD, bold=True)
     _draw_fit(
         draw,
-        (116, 814),
+        (116, 806),
         "Choose KVK and calendar events and when each alert is sent.",
         width=1470,
-        size=24,
-        min_size=18,
+        size=18,
+        min_size=14,
         fill=MUTED,
     )
 
     _draw_fit(
         draw,
-        (96, 872),
+        (95, 845),
         "Scheduled times shown in UTC",
         width=650,
-        size=23,
-        min_size=18,
+        size=16,
+        min_size=12,
         fill=MUTED,
     )
     _draw_fit_right(
         draw,
-        right_x=1608,
-        y=872,
-        text=f"Refreshed {payload.generated_at_utc:%d %b %Y %H:%M UTC}",
+        right_x=1605,
+        y=845,
+        text=f"Generated {visual_contract.format_utc_datetime(payload.generated_at_utc)}",
         width=760,
-        size=23,
-        min_size=18,
+        size=16,
+        min_size=12,
         fill=MUTED,
     )
 

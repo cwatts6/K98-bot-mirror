@@ -13,7 +13,7 @@ from typing import Any
 
 import discord
 
-from player_self_service import accounts_service
+from player_self_service import accounts_service, visual_contract
 from player_self_service.accounts_models import AccountsPortfolioPayload
 from player_self_service.governor_dashboard_models import (
     GovernorDashboardContext,
@@ -31,7 +31,6 @@ from player_self_service.service import (
     PlayerSelfServiceSummary,
     build_player_self_service_summary,
 )
-from utils import fmt_short
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ AccountsLoader = Callable[[int], Awaitable[AccountsPortfolioPayload]]
 
 _SELECT_PAGE_SIZE = 25
 _VIEW_TIMEOUT_SECONDS = 180.0
-_MISSING = "N/A"
+_MISSING = visual_contract.MISSING_VALUE
 _DASHBOARD_TITLE_PREFIX = "Governor Dashboard — "
 _DISCORD_EMBED_TITLE_LIMIT = 256
 _AVATAR_READ_TIMEOUT_SECONDS = 3.0
@@ -50,6 +49,8 @@ _AVATAR_READ_TIMEOUT_SECONDS = 3.0
 
 def _safe_text(value: Any, *, missing: str = _MISSING) -> str:
     text = str(value).strip() if value is not None else ""
+    if text.upper() in {"N/A", "NA"}:
+        return missing
     return text or missing
 
 
@@ -70,15 +71,7 @@ def _format_number(value: int | float | None) -> str:
 def _format_short_number(value: int | float | None) -> str:
     if value is None or isinstance(value, bool):
         return _MISSING
-    try:
-        rendered = fmt_short(value)
-    except (TypeError, ValueError):
-        return _MISSING
-    if rendered.endswith("k"):
-        rendered = f"{rendered[:-1]}K"
-    if len(rendered) >= 3 and rendered[-1] in "KMB" and rendered[-3:-1] == ".0":
-        rendered = f"{rendered[:-3]}{rendered[-1]}"
-    return rendered
+    return visual_contract.format_compact_number(value)
 
 
 def _format_freshness(value: Any) -> str:
@@ -88,9 +81,8 @@ def _format_freshness(value: Any) -> str:
         timestamp = value
         if timestamp.tzinfo is None:
             timestamp = timestamp.replace(tzinfo=UTC)
-        epoch = int(timestamp.timestamp())
-        return f"<t:{epoch}:f> (<t:{epoch}:R>)"
-    return _safe_text(value, missing="No recent scan available")
+        return f"Location updated {visual_contract.format_utc_datetime(timestamp)}"
+    return f"Location updated {_safe_text(value, missing='time unavailable')}"
 
 
 def _format_vip(value: Any) -> str:
@@ -338,7 +330,7 @@ def build_governor_payload_error_embed(context: GovernorDashboardContext) -> dis
         value=f"Governor ID: `{governor_id}`\nAccount type: {_safe_text(context.account_type_for_self_view)}",
         inline=False,
     )
-    embed.add_field(name="Metrics", value="Dashboard metrics: N/A", inline=False)
+    embed.add_field(name="Metrics", value="Dashboard metrics: UNAVAILABLE", inline=False)
     embed.add_field(name="Freshness", value="No recent scan available", inline=False)
     return embed
 
@@ -464,7 +456,7 @@ class GovernorDashboardView(discord.ui.View):
         if self._timed_out:
             await _send_private_error(
                 interaction,
-                "This private dashboard has expired. Run `/me dashboard` again.",
+                "Report controls expired. Run /me dashboard to refresh.",
             )
             return False
         if self._active_transition_id == transition_id:
@@ -505,7 +497,7 @@ class GovernorDashboardView(discord.ui.View):
         if self._expired:
             await _send_private_error(
                 interaction,
-                "This private dashboard has expired. Run `/me dashboard` again.",
+                "Report controls expired. Run /me dashboard to refresh.",
             )
             return False
         if not interaction.user or int(interaction.user.id) != self.author_id:
@@ -973,24 +965,17 @@ class GovernorDashboardView(discord.ui.View):
         for child in self.children:
             child.disabled = True
         message = self._message_ref or getattr(self, "message", None)
-        timeout_content = "This private governor dashboard has expired. Run `/me dashboard` again."
+        timeout_content = "Report controls expired. Run /me dashboard to refresh."
         edited = False
         try:
             if self._timeout_editor is not None:
-                await self._timeout_editor(
-                    content=timeout_content, embed=None, view=self, attachments=[]
-                )
+                await self._timeout_editor(content=timeout_content, view=self)
                 edited = True
         except Exception:
             logger.debug("governor_dashboard_timeout_original_edit_failed", exc_info=True)
         try:
             if not edited and message:
-                await message.edit(
-                    content=timeout_content,
-                    embed=None,
-                    view=self,
-                    attachments=[],
-                )
+                await message.edit(content=timeout_content, view=self)
         except Exception:
             logger.debug("governor_dashboard_timeout_edit_failed", exc_info=True)
         await super().on_timeout()

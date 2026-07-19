@@ -117,7 +117,7 @@ def test_overview_fallback_includes_vip_and_last_scan_datetime() -> None:
     embed = summary_views.build_account_summary_fallback(page)
 
     assert "VIP" in embed.fields[0].value
-    assert "Last scan 14 Jul 2026 08:30 UTC" in embed.fields[0].value
+    assert "Last scan 14 Jul 2026, 08:30 UTC" in embed.fields[0].value
 
 
 def test_combat_fallback_uses_short_title_percentage_and_helpful_footer() -> None:
@@ -191,7 +191,9 @@ async def test_account_summary_timeout_disables_controls_and_preserves_report() 
     await view.on_timeout()
 
     assert all(child.disabled for child in view.children)
-    assert "expired" in interaction.original_edits[-1]["content"]
+    assert interaction.original_edits[-1]["content"] == (
+        "Report controls expired. Run /me accounts to refresh."
+    )
     assert "attachments" not in interaction.original_edits[-1]
     assert "files" not in interaction.original_edits[-1]
 

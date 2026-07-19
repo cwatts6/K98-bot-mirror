@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime
 from io import BytesIO
 from types import SimpleNamespace
@@ -151,6 +152,18 @@ def test_accounts_portfolio_fallback_uses_singular_governor_label() -> None:
     assert embed.fields[0].name == "READY • 1 governor"
 
 
+def test_accounts_portfolio_fallback_handles_missing_and_naive_freshness() -> None:
+    payload = replace(
+        _accounts_payload(),
+        latest_scan_date=None,
+        refreshed_at_utc=datetime(2026, 7, 18, 14, 5),
+    )
+
+    embed = views.build_accounts_portfolio_fallback(payload, display_name="Tester")
+
+    assert embed.footer.text == "Data refreshed — • Generated 18 Jul 2026, 14:05 UTC"
+
+
 class _Response:
     def __init__(self) -> None:
         self.sent = []
@@ -244,7 +257,7 @@ def test_reminders_fallback_identity_and_footer_match_card_contract() -> None:
     embed = views.build_reminders_embed(_summary(), display_name="Chrislos (1198)")
 
     assert embed.description == "Chrislos (1198)"
-    assert embed.footer.text.startswith("Scheduled times shown in UTC • Refreshed ")
+    assert embed.footer.text.startswith("Scheduled times shown in UTC • Generated ")
     assert embed.footer.text.endswith(" UTC")
 
 
@@ -575,7 +588,7 @@ def test_reminders_embed_invites_service_backed_controls() -> None:
     assert embed.title == "Reminder Centre"
     assert embed.fields[0].name in {"ACTIVE", "REVIEW", "OFF"}
     assert embed.fields[1].name == "REMINDER COVERAGE"
-    assert embed.fields[-1].name == "Manage reminders"
+    assert embed.fields[-1].name == "Manage"
     assert "Choose KVK and calendar events" in embed.fields[-1].value
     assert "/modify_subscription" not in embed.fields[1].value
 
@@ -587,7 +600,7 @@ def test_preferences_embed_uses_same_authorised_payload_without_vip() -> None:
     assert "VIP" not in str(embed.to_dict())
     assert "Location: United Kingdom (GB)" in embed.fields[0].value
     assert embed.fields[0].name.startswith("LOCAL")
-    assert embed.fields[-1].name == "Manage settings"
+    assert embed.fields[-1].name == "Manage"
     assert "privacy" not in str(embed.to_dict()).casefold()
     assert "inventory visibility" not in str(embed.to_dict()).casefold()
 
@@ -670,7 +683,7 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
         views.PAGE_DASHBOARD,
         [
             *top_row,
-            ("Dashboard", 1, secondary, True),
+            ("Dashboard", 1, primary, True),
         ],
     )
     _assert_button_layout(
@@ -679,8 +692,8 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Accounts", 0, primary, True),
             ("Reminders", 0, primary, False),
             ("Preferences", 0, primary, False),
-            ("Dashboard", 1, secondary, False),
-            ("Manage Accounts", 2, success, False),
+            ("Dashboard", 1, primary, False),
+            ("Manage", 2, success, False),
             ("Account Summary", 2, secondary, False),
         ],
     )
@@ -690,7 +703,7 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Accounts", 0, primary, False),
             ("Reminders", 0, primary, True),
             ("Preferences", 0, primary, False),
-            ("Dashboard", 1, secondary, False),
+            ("Dashboard", 1, primary, False),
             ("Manage", 2, success, False),
         ],
     )
@@ -700,8 +713,8 @@ async def test_player_self_service_button_layout_is_consistent() -> None:
             ("Accounts", 0, primary, False),
             ("Reminders", 0, primary, False),
             ("Preferences", 0, primary, True),
-            ("Dashboard", 1, secondary, False),
-            ("Manage settings", 2, success, False),
+            ("Dashboard", 1, primary, False),
+            ("Manage", 2, success, False),
         ],
     )
 
@@ -715,7 +728,7 @@ async def test_accounts_view_has_no_inventory_or_exports_navigation() -> None:
     )
 
     labels = [getattr(child, "label", None) for child in view.children]
-    assert "Manage Accounts" in labels
+    assert "Manage" in labels
     assert "Account Summary" in labels
     assert not {"Find ID", "Register", "Replace", "Remove"}.intersection(set(labels))
     assert "Inventory" not in labels
@@ -947,7 +960,7 @@ async def test_preferences_view_removes_inventory_and_old_direct_actions() -> No
     )
 
     labels = [getattr(child, "label", None) for child in view.children]
-    assert "Manage settings" in labels
+    assert "Manage" in labels
     assert {"Set Public", "Set Private", "Update VIP", "Manage Profile"}.isdisjoint(labels)
     assert "Inventory" not in labels
     assert "Exports" not in labels

@@ -94,7 +94,7 @@ async def test_preferences_render_failure_uses_same_payload_fallback(monkeypatch
     assert files == []
     assert embed is not None
     assert embed.title == "Personal Settings"
-    assert embed.footer.text == "Refreshed 15 July 2026 12:00 UTC"
+    assert embed.footer.text == "Generated 15 Jul 2026, 12:00 UTC"
 
 
 @pytest.mark.asyncio

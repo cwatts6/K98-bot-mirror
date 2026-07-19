@@ -21,6 +21,7 @@ from inventory.models import (
     InventoryReportPayload,
     InventoryReportView,
 )
+from player_self_service import visual_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSET_DIR = ROOT / "assets"
@@ -32,15 +33,15 @@ HEIGHT = 980
 BG = (12, 48, 96)
 PANEL = (5, 8, 20, 222)
 PANEL_2 = (8, 12, 28, 232)
-TEXT = (245, 250, 255)
-MUTED = (190, 191, 209)
-GREEN = (73, 222, 128)
-RED = (248, 113, 113)
-GOLD = (250, 204, 21)
+TEXT = visual_contract.TEXT
+MUTED = visual_contract.MUTED
+GREEN = visual_contract.GREEN
+RED = visual_contract.RED
+GOLD = visual_contract.GOLD
 GRID = (78, 89, 121, 205)
 AXIS = (173, 184, 216)
-PANEL_OUTLINE = (151, 109, 199, 225)
-SEPARATOR = (124, 91, 164, 225)
+PANEL_OUTLINE = visual_contract.PANEL_EDGE
+SEPARATOR = visual_contract.PANEL_EDGE
 CHART_FILL_ALPHA = 6
 CHART_MAX_DATE_LABELS = 6
 RESOURCE_ACCENT = (96, 204, 120)
@@ -108,26 +109,19 @@ def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFon
 
 
 def _compact(value: int | float | None, suffix: str = "") -> str:
-    if value is None:
-        return "N/A"
-    val = float(value)
-    abs_val = abs(val)
-    for limit, unit in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")):
-        if abs_val >= limit:
-            out = f"{val / limit:.1f}".rstrip("0").rstrip(".")
-            return f"{out}{unit}{suffix}"
-    return f"{int(val):,}{suffix}"
+    rendered = visual_contract.format_compact_number(value)
+    return rendered if rendered == visual_contract.MISSING_VALUE else f"{rendered}{suffix}"
 
 
 def _delta_text(
     delta: int | float | None, *, days: bool = False
-) -> tuple[str, tuple[int, int, int]]:
+) -> tuple[str, tuple[int, int, int, int]]:
     if delta is None:
-        return "N/A", MUTED
+        return visual_contract.MISSING_VALUE, MUTED
     sign = "+" if delta > 0 else ""
     if days:
         return f"{sign}{int(round(delta)):,}d", GREEN if delta >= 0 else RED
-    return f"{sign}{_compact(delta)}", GREEN if delta >= 0 else RED
+    return visual_contract.format_compact_number(delta, signed=True), GREEN if delta >= 0 else RED
 
 
 def _paste_icon(canvas: Image.Image, path: Path, box: tuple[int, int, int, int]) -> None:
@@ -216,7 +210,7 @@ def _panel(
     *,
     accent: tuple[int, int, int] | None = None,
 ) -> None:
-    draw.rounded_rectangle(xy, radius=14, fill=fill, outline=PANEL_OUTLINE, width=1)
+    draw.rounded_rectangle(xy, radius=16, fill=fill, outline=PANEL_OUTLINE, width=2)
     if accent is not None:
         x1, y1, _x2, y2 = xy
         draw.rounded_rectangle(
@@ -437,9 +431,9 @@ def _render_empty_report(
         radius=18,
         fill=(7, 10, 23, 238),
         outline=PANEL_OUTLINE,
-        width=1,
+        width=2,
     )
-    heading = f"No approved {report_label} data recorded"
+    heading = f"{visual_contract.NO_DATA} • No approved {report_label} data recorded"
     heading_font = _fit_font(
         draw,
         heading,
@@ -476,7 +470,12 @@ def _render_empty_report(
         font=_font(20, bold=True),
         bold=True,
     )
-    return _export(canvas, filename, source_label="Waiting for an approved inventory import")
+    return _export(
+        canvas,
+        filename,
+        payload=payload,
+        source_label="NO DATA • Waiting for an approved inventory import",
+    )
 
 
 def _chart_ticks(min_v: float, max_v: float, *, count: int = 5) -> list[float]:
@@ -749,7 +748,9 @@ def render_resources_report(
         else 0
     )
     velocity = (total_delta / days) if total_delta is not None and days else None
-    velocity_text = "N/A" if velocity is None else f"{velocity / 1_000_000:+.1f}m/day"
+    velocity_text = (
+        visual_contract.MISSING_VALUE if velocity is None else f"{velocity / 1_000_000:+.1f}M/day"
+    )
     velocity_color = MUTED if velocity is None else (GREEN if velocity >= 0 else RED)
 
     vip_code = payload.governor_profile.vip_level_code if payload.governor_profile else None
@@ -760,22 +761,22 @@ def render_resources_report(
         ("RSS Velocity", velocity_text, "range delta", None, velocity_color),
         (
             "RSS Troop Training Capacity",
-            f"{train_capacity.troops_millions:,.1f}m troops",
+            f"{train_capacity.troops_millions:,.1f}M troops",
             (
                 f"Limit {train_capacity.limiting_resource} | "
-                f"{train_capacity.power_millions:,.1f}m Power | "
-                f"{train_capacity.mge_points_millions:,.1f}m MGE"
+                f"{train_capacity.power_millions:,.1f}M Power | "
+                f"{train_capacity.mge_points_millions:,.1f}M MGE"
             ),
             ICON_ASSET_DIR / "Speedups" / "Training.png",
             TEXT,
         ),
         (
             "RSS Troop Healing Capacity",
-            f"{heal_capacity.troops_millions:,.1f}m troops",
+            f"{heal_capacity.troops_millions:,.1f}M troops",
             (
                 f"Limit {heal_capacity.limiting_resource} | "
-                f"{heal_capacity.kills_millions or 0:,.1f}m kills | "
-                f"{heal_capacity.kill_points_millions or 0:,.1f}m KP | "
+                f"{heal_capacity.kills_millions or 0:,.1f}M kills | "
+                f"{heal_capacity.kill_points_millions or 0:,.1f}M KP | "
                 f"{heal_capacity.vip_note}"
             ),
             ICON_ASSET_DIR / "Speedups" / "healing.png",
@@ -821,7 +822,10 @@ def render_resources_report(
         )
 
     return _export(
-        canvas, f"inventory_resources_{payload.governor_id}_{payload.range_key.value}.png"
+        canvas,
+        f"inventory_resources_{payload.governor_id}_{payload.range_key.value}.png",
+        payload=payload,
+        uploaded_at_utc=latest.scan_utc,
     )
 
 
@@ -914,8 +918,8 @@ def render_speedups_report(
             f"{int(round(train_capacity.source_days)):,}d",
             (
                 f"{train_capacity.troops or 0:,.0f} troops | "
-                f"{train_capacity.power_millions or 0:,.1f}m Power | "
-                f"{train_capacity.mge_points_millions or 0:,.1f}m MGE | "
+                f"{train_capacity.power_millions or 0:,.1f}M Power | "
+                f"{train_capacity.mge_points_millions or 0:,.1f}M MGE | "
                 f"{train_capacity.vip_note}"
             ),
             ICON_ASSET_DIR / "Speedups" / "Training.png",
@@ -925,8 +929,8 @@ def render_speedups_report(
             f"{int(round(heal_capacity.source_days)):,}d",
             (
                 f"{heal_capacity.healed_millions or 0:,.1f}m healed | "
-                f"{heal_capacity.kills_millions or 0:,.1f}m kills | "
-                f"{heal_capacity.kill_points_millions or 0:,.1f}m KP | "
+                f"{heal_capacity.kills_millions or 0:,.1f}M kills | "
+                f"{heal_capacity.kill_points_millions or 0:,.1f}M KP | "
                 f"{heal_capacity.vip_note}"
             ),
             ICON_ASSET_DIR / "Speedups" / "healing.png",
@@ -968,7 +972,10 @@ def render_speedups_report(
             font=_font(24),
         )
     return _export(
-        canvas, f"inventory_speedups_{payload.governor_id}_{payload.range_key.value}.png"
+        canvas,
+        f"inventory_speedups_{payload.governor_id}_{payload.range_key.value}.png",
+        payload=payload,
+        uploaded_at_utc=latest.scan_utc,
     )
 
 
@@ -1123,7 +1130,10 @@ def render_materials_report(
             font=_font(24),
         )
     return _export(
-        canvas, f"inventory_materials_{payload.governor_id}_{payload.range_key.value}.png"
+        canvas,
+        f"inventory_materials_{payload.governor_id}_{payload.range_key.value}.png",
+        payload=payload,
+        uploaded_at_utc=latest.scan_utc,
     )
 
 
@@ -1142,20 +1152,25 @@ def _export(
     canvas: Image.Image,
     filename: str,
     *,
-    source_label: str = "Generated from approved inventory imports",
+    payload: InventoryReportPayload,
+    uploaded_at_utc: Any | None = None,
+    source_label: str | None = None,
 ) -> RenderedInventoryImage:
     generated = ImageDraw.Draw(canvas)
+    uploaded_label = source_label
+    if uploaded_label is None:
+        uploaded_label = f"Inventory uploaded {_format_inventory_timestamp(uploaded_at_utc)}"
     _draw_text(
         generated,
         (44, 944),
-        source_label,
+        uploaded_label,
         fill=MUTED,
         font=_font(16),
     )
     _draw_text(
         generated,
-        (1110, 944),
-        f"{datetime.now(UTC):%Y-%m-%d %H:%M UTC}",
+        (1050, 944),
+        f"Generated {_format_inventory_timestamp(payload.generated_at_utc)}",
         fill=MUTED,
         font=_font(16),
     )
@@ -1163,3 +1178,12 @@ def _export(
     canvas.convert("RGB").save(buf, format="PNG", optimize=True)
     buf.seek(0)
     return RenderedInventoryImage(filename=filename, image_bytes=buf)
+
+
+def _format_inventory_timestamp(value: Any | None) -> str:
+    if value is None:
+        return visual_contract.MISSING_VALUE
+    if isinstance(value, datetime):
+        aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value
+        return visual_contract.format_utc_datetime(aware)
+    return str(value)

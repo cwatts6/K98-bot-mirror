@@ -87,7 +87,7 @@ def test_main_accounts_renderer_draws_avatar_and_deduplicates_kingdom_suffix() -
     assert accounts_renderer._discord_heading("Test Player (1198)") == "Test Player (1198)"
     assert accounts_renderer._discord_heading("Test Player") == "Test Player (1198)"
     with Image.open(BytesIO(rendered.image_bytes)) as image:
-        red, green, blue = image.getpixel((109, 83))
+        red, green, blue = image.getpixel((150, 132))
         assert red > 180
         assert green < 60
         assert blue < 90
@@ -122,7 +122,7 @@ def test_account_summary_renderer_supports_all_three_sections() -> None:
         assert rendered.filename == "me_account_summary_42.png"
         with Image.open(BytesIO(rendered.image_bytes)) as image:
             assert image.size == (1702, 924)
-            red, green, blue = image.getpixel((109, 83))
+            red, green, blue = image.getpixel((150, 132))
             assert red > 180
             assert green < 60
             assert blue < 90
@@ -141,7 +141,7 @@ def test_summary_columns_and_values_follow_smoke_contract() -> None:
     assert "VIP 18" in overview_values
     assert "1B" in overview_values
     assert "500M" in overview_values
-    assert "14 Jul 2026 08:30 UTC" in overview_values
+    assert "14 Jul 2026, 08:30 UTC" in overview_values
 
     combat = accounts_service.build_account_summary_page(payload, section="combat", page=1)
     combat_labels = [label for label, _width in accounts_renderer._summary_columns(combat)]

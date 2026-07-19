@@ -9,7 +9,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from core import visual_text
-from player_self_service.accounts_renderer import format_discord_heading, paste_discord_avatar
+from player_self_service import visual_contract
+from player_self_service.accounts_renderer import format_discord_heading
 from player_self_service.preferences_summary import PreferencesSummaryPayload
 
 WIDTH = 1702
@@ -18,12 +19,12 @@ BACKDROP_PATH = (
     Path(__file__).resolve().parent.parent / "assets" / "me" / "cards" / "me_preferences.png"
 )
 
-TEXT = (240, 247, 255, 255)
-MUTED = (170, 194, 218, 255)
-BLUE = (91, 190, 255, 255)
-GREEN = (80, 211, 164, 255)
-AMBER = (247, 190, 84, 255)
-SHADOW = (0, 0, 0, 185)
+TEXT = visual_contract.TEXT
+MUTED = visual_contract.MUTED
+BLUE = visual_contract.BLUE
+GREEN = visual_contract.GREEN
+AMBER = visual_contract.AMBER
+SHADOW = visual_contract.SHADOW
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,19 +98,7 @@ def _draw_fit_right(
 
 
 def _status_badge(draw: ImageDraw.ImageDraw, state: str) -> None:
-    color = GREEN if state == "LOCAL" else AMBER
-    box = (1395, 64, 1608, 122)
-    draw.rounded_rectangle(box, radius=29, fill=color[:-1] + (218,), outline=color, width=2)
-    font = _font(27, bold=True)
-    label_width = visual_text.text_width(draw, state, font=font, bold=True)
-    _draw(
-        draw,
-        (box[0] + (box[2] - box[0] - label_width) // 2, 77),
-        state,
-        font=font,
-        fill=(10, 25, 30, 255),
-        bold=True,
-    )
+    visual_contract.draw_state_pill(draw, state)
 
 
 def _preference_row(
@@ -148,36 +137,45 @@ def render_preferences_card(
         canvas = source.convert("RGBA")
 
     try:
-        has_avatar = paste_discord_avatar(canvas, avatar_bytes)
+        visual_contract.paste_core_avatar(canvas, avatar_bytes)
         draw = ImageDraw.Draw(canvas, "RGBA")
-        heading_x = 170 if has_avatar else 94
 
         _draw(
             draw,
-            (heading_x, 61),
+            (270, 48),
             "PERSONAL SETTINGS",
-            font=_font(40, bold=True),
-            fill=MUTED,
+            font=_font(42, bold=True),
+            fill=TEXT,
             bold=True,
         )
         _draw_fit(
             draw,
-            (heading_x, 124),
+            (270, 103),
             format_discord_heading(payload.display_name, kingdom_id=payload.kingdom_id),
-            width=1030 if has_avatar else 1110,
-            size=39,
-            min_size=22,
+            width=730,
+            size=31,
+            min_size=20,
+            fill=visual_contract.GOLD,
+            bold=True,
+        )
+        _draw_fit(
+            draw,
+            (270, 149),
+            f"Kingdom {payload.kingdom_id} • Regional profile",
+            width=730,
+            size=27,
+            min_size=18,
             bold=True,
         )
         _status_badge(draw, "LOCAL" if payload.time_reference.mode == "LOCAL" else "UTC")
         _draw_fit_right(
             draw,
-            right=1370,
-            y=82,
+            right=1605,
+            y=127,
             text=payload.profile_supporting_text,
-            width=410,
-            size=22,
-            min_size=16,
+            width=595,
+            size=24,
+            min_size=17,
             fill=MUTED,
         )
 
@@ -229,19 +227,19 @@ def render_preferences_card(
                 fill=MUTED,
             )
 
-        _draw(draw, (112, 685), "SETTINGS INSIGHT", font=_font(21, bold=True), fill=BLUE, bold=True)
+        _draw(draw, (112, 672), "SETTINGS INSIGHT", font=_font(21, bold=True), fill=BLUE, bold=True)
         _draw_fit(
-            draw, (112, 721), payload.settings_insight, width=1475, size=27, min_size=19, bold=True
+            draw, (112, 708), payload.settings_insight, width=1475, size=27, min_size=19, bold=True
         )
 
-        _draw(draw, (112, 784), "MANAGE SETTINGS", font=_font(23, bold=True), fill=GREEN, bold=True)
+        _draw(draw, (112, 760), "MANAGE", font=_font(22, bold=True), fill=GREEN, bold=True)
         _draw_fit(
             draw,
-            (112, 821),
+            (112, 797),
             "Update your saved timezone, location, and preferred language.",
             width=1475,
-            size=24,
-            min_size=18,
+            size=18,
+            min_size=14,
             fill=MUTED,
         )
 
@@ -250,13 +248,13 @@ def render_preferences_card(
             if time_ref.mode == "LOCAL"
             else "Set a timezone for local context; reminder scheduling remains in UTC."
         )
-        _draw_fit(draw, (112, 875), footer_context, width=930, size=18, min_size=14, fill=MUTED)
-        refreshed = payload.generated_at_utc.strftime("Refreshed %d %B %Y %H:%M UTC")
+        _draw_fit(draw, (95, 845), footer_context, width=930, size=16, min_size=12, fill=MUTED)
+        refreshed = f"Generated {visual_contract.format_utc_datetime(payload.generated_at_utc)}"
         font = visual_text.fit_font(
-            draw, refreshed, max_width=520, size=18, min_size=14, bold=False
+            draw, refreshed, max_width=520, size=16, min_size=12, bold=False
         )
         width = visual_text.text_width(draw, refreshed, font=font)
-        _draw(draw, (1590 - width, 875), refreshed, font=font, fill=MUTED)
+        _draw(draw, (1605 - width, 845), refreshed, font=font, fill=MUTED)
 
         stream = BytesIO()
         try:
