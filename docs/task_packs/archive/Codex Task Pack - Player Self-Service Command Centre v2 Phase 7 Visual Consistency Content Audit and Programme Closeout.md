@@ -3,14 +3,14 @@
 ## 1. Task Header
 
 - Task name: `Player Self-Service Command Centre v2 Phase 7 /me Visual Consistency, Content Audit and Programme Closeout`
-- Date: `2026-07-18`
+- Date: `2026-07-19`
 - Owner/context: `KD98 / Kingdom 1198 GovernorOS v2 follow-on from completed and operator-accepted Phase 6 Interactive Period Performance`
 - Task type: `visual consistency | content audit | narrow renderer refactor | documentation | programme closeout`
 - One-pass approved: `no`
 - Product decision approved: `yes`
 - Audit/design approved: `yes`
-- Runtime implementation approved: `not before the audit, exact visual-diff plan, and operator approval gates in this pack`
-- Status: `proposed; ready for audit and design`
+- Runtime implementation approved: `completed after the audit, visual-contract, implementation-plan, review, security, and operator gates in this pack`
+- Status: `complete; final Discord smoke and operator visual acceptance passed on 2026-07-19`
 - Reference surface: `/me stats`
 - Command target: `no command registration change`
 - SQL deployment approved: `no`
@@ -667,19 +667,72 @@ Rollback is bot-code/assets/tests/docs only.
 
 ## 23. Acceptance Criteria
 
-- [ ] The former `/me history` proposal is recorded as closed with no build.
-- [ ] All retained `/me` surfaces are inventoried.
-- [ ] Intentional visual differences are documented.
-- [ ] `/me stats` is the accepted default style reference.
-- [ ] Comparable summary cards align in typography, colour, spacing, borders, state pills, freshness,
+- [x] The former `/me history` proposal is recorded as closed with no build.
+- [x] All retained `/me` surfaces are inventoried.
+- [x] Intentional visual differences are documented.
+- [x] `/me stats` is the accepted default style reference.
+- [x] Comparable summary cards align in typography, colour, spacing, borders, state pills, freshness,
       and navigation.
-- [ ] Dashboard and Inventory retain their approved dimensions and specialist layouts.
-- [ ] Missing values, dates, units, numbers, state semantics, and timeout wording are consistent.
-- [ ] No command, SQL, metric, permission, privacy, data, export, or workflow contract changes.
-- [ ] Same-payload fallbacks remain accessible and value-parity tested.
-- [ ] All image/file/stream lifecycle contracts remain safe.
-- [ ] Contact-sheet visual review passes at original, desktop, and mobile scales.
-- [ ] Focused/full/repository/security validation passes.
-- [ ] Operator Discord smoke passes.
-- [ ] Command counts remain `37 / 100 / 8 / 2`.
-- [ ] Phase 7 is archived after acceptance and Phase 8 becomes the next active task pack.
+- [x] Dashboard and Inventory retain their approved dimensions and specialist layouts.
+- [x] Missing values, dates, units, numbers, state semantics, and timeout wording are consistent.
+- [x] No command, SQL, metric, permission, privacy, data, export, or workflow contract changes.
+- [x] Same-payload fallbacks remain accessible and value-parity tested.
+- [x] All image/file/stream lifecycle contracts remain safe.
+- [x] Contact-sheet visual review passes at original, desktop, and mobile scales.
+- [x] Focused/full/repository/security validation passes.
+- [x] Operator Discord smoke passes.
+- [x] Command counts remain `37 / 100 / 8 / 2`.
+- [x] Phase 7 is archived after acceptance and Phase 8 becomes the next active task pack.
+
+## 24. Delivery And Closeout Record
+
+Status: `complete and operator accepted on 2026-07-19`.
+
+Delivered without changing commands, SQL, DAL contracts, payload data, metrics, formulas, ranks,
+permissions, privacy, exports, account resolution, or product ownership:
+
+- aligned the retained `/me` visual family to the accepted Stats colour, type, panel, state,
+  number/date, freshness, fallback, accessibility, transition, timeout, and cleanup language;
+- introduced the bounded shared `core/visual_contract.py` primitives only where at least two
+  renderers had identical consumers; no universal renderer, grid, payload, or view framework was
+  created;
+- kept Dashboard at `1180x760`, the core summary family at `1702x924`, and Inventory reports at
+  `1400x980` with their report-specific backdrops, charts, icons, ranges, exports, and category
+  accents;
+- vertically centred state-pill text using font-bearing-aware placement across the family;
+- completed row-0 cross-navigation: Accounts, Reminders, Preferences, and Stats are available on
+  each applicable core page, while Stats page/mode controls begin on the next row;
+- retained author gating, opaque duplicate-safe governor tokens, current-registry revalidation,
+  selected-governor preservation, same-payload fallbacks, latest-transition-wins suppression,
+  preserve-and-disable timeout, and deterministic attachment/file cleanup;
+- left-aligned the Accounts hero metric headings while preserving right-aligned coverage/support
+  copy;
+- rebuilt Preferences into the accepted premium summary format: three regional-profile cards, a
+  local-time panel, a settings-insight panel, and a Manage strip, with `LOCAL`/neutral-blue `UTC`
+  semantics unchanged;
+- preserved `/kvk history` as the only KVK-history route and added neither `/me history` nor a
+  Dashboard History action.
+
+Validation evidence:
+
+- focused Phase 7 tests: `120 passed`;
+- deterministic visual sample matrix: `143 renders passed`;
+- full suite: `2701 passed, 2 skipped`;
+- architecture, deferred-item, test-selection, security-routing, command-registration,
+  pre-commit/pyright, and production-promotion validation passed;
+- Codex Security Changes scan `7d78f323-bc7c-412c-b187-642ffe716289`: five of five discovery
+  receipts complete, zero reportable findings;
+- final Discord smoke accepted all retained surfaces, row-0 navigation, governor switching,
+  fallback/lifecycle behaviour, and the revised Preferences and Accounts presentation.
+
+Command-count proof remained unchanged throughout delivery:
+
+```text
+top-level commands: 37
+grouped subcommands: 100
+/me subcommands: 8
+/inventory subcommands: 2
+```
+
+No application-command resync or SQL deployment was required. Mirror PR #229 and production PR
+#536 contain the accepted Phase 7 delivery. Phase 8 is now the next active, separately gated slice.

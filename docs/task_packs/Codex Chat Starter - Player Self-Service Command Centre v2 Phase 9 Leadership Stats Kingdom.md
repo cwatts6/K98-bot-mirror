@@ -204,7 +204,7 @@ Performance:
 - no materialized monthly table without evidence and explicit refresh/staleness/rollback design
 
 Visual:
-- Phase 8 leadership family, not /me identity
+- Phase 8 leadership family using the accepted Phase 7 1702x924 visual/token baseline, not /me identity
 - large current totals
 - one readable chart
 - four balanced KVK blocks
@@ -212,6 +212,15 @@ Visual:
 - mobile readability
 - no unnecessary metrics crowded into the card
 - same-payload fallback
+- row 0 contains Kingdom Overview and KVK Summary; chart metric and Definitions/Method begin below
+- state-pill text is centred middle in the top-right pill, with aligned source/page support below
+- blue is neutral/selection/navigation including UTC; green current/success; amber
+  stale/partial/review; red unavailable/failure/no data; muted disabled/expired
+- source freshness and Generated remain separate; retain compact formats, genuine zero, and the
+  accepted missing-value vocabulary
+- preserve latest-transition-wins, attachment replacement, preserve-and-disable timeout, cleanup,
+  and Discord component-row limits
+- no governor dropdown, player picker, All Linked, arbitrary kingdom selector, or Discord avatar
 
 Read first:
 - AGENTS.md

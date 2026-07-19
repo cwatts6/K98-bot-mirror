@@ -1,7 +1,7 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 7 `/me` Visual Consistency, Content Audit and Programme Closeout
 
-Status: active initiation starter for proposed Phase 7. Use only with the matching Phase 7 task pack
-and current programme pack. One-pass execution is not approved.
+Status: completed initiation record. Phase 7 passed final Discord smoke and was operator accepted
+on 2026-07-19. Do not restart this starter; use the active Phase 8 starter for follow-on work.
 
 ## Copy/Paste Starter
 

@@ -3,6 +3,14 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### GovernorOS v2 Phase 7 Visual Consistency And Programme Closeout Completed Item
+
+- Area: retained `/me` renderers/views/fallbacks, `core/visual_contract.py`, visual samples/tests, and GovernorOS documentation
+- Type: consistency
+- Description: The retained Dashboard, Accounts, Reminders, Preferences, Stats, and Inventory report families had accumulated avoidable drift in typography, colour/state semantics, state-pill placement, panels, navigation, freshness/generated copy, formatting, missing values, fallback presentation, and visual validation while retaining intentional product-specific dimensions and geometry.
+- Resolution: Phase 7 aligned shared visual/content/lifecycle language to the accepted Stats contract; extracted only bounded primitives with at least two identical consumers; vertically centred state-pill text; completed Accounts/Reminders/Preferences/Stats row-0 navigation; moved Stats mode controls below it; corrected Accounts hero-title alignment; rebuilt Preferences into balanced profile/local-time/insight/Manage panels; preserved Dashboard `1180x760`, core `1702x924`, Inventory `1400x980`, Inventory accents/features, all same-payload fallbacks, and every command/data/privacy/permission/export contract. The broader universal renderer/view framework remains a separate active evidence item.
+- Validation: Mirror PR #229 and production PR #536 carry the accepted result. Focused tests recorded `120 passed`, deterministic visual generation recorded `143 renders passed`, the full suite recorded `2701 passed, 2 skipped`, repository/pre-commit/pyright gates passed, the five-receipt Codex Security Changes scan found zero reportable issues, and final Discord smoke was operator accepted on 2026-07-19. Command counts remained `37 / 100 / 8 / 2`; no resync or SQL deployment occurred.
+
 ### GovernorOS v2 Phase 5G Account Data Export Consolidation Completed Item
 
 - Area: `commands/me_cmds.py`, `commands/stats_cmds.py`, Account Summary views, `services/account_data_export_service.py`, `stats_exporter.py`, `stats_exporter_csv.py`, command/docs/tests

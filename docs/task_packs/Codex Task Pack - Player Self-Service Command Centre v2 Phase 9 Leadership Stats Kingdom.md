@@ -3,7 +3,7 @@
 ## 1. Task Header
 
 - Task name: `Player Self-Service Command Centre v2 Phase 9 Leadership /stats kingdom`
-- Date: `2026-07-18`
+- Date: `2026-07-19`
 - Owner/context: `KD98 / Kingdom 1198 leadership analytics follow-on from Phase 8 /stats player`
 - Task type: `leadership feature | grouped command | SQL aggregation | visual renderer | privacy/security | documentation`
 - One-pass approved: `no`
@@ -216,6 +216,28 @@ Do not expose arbitrary kingdom input.
 Private successful output opens Kingdom Overview.
 
 ## 8. Output Contract
+
+### Accepted Phase 7/8 visual inheritance
+
+Use the operator-accepted GovernorOS core visual language as the proportional starting point while
+remaining a neutral leadership Kingdom product:
+
+- `1702x924` standalone private card baseline, shared `core/visual_contract.py` colours,
+  typography, state, panel, compact-number, UTC-date, and bounded placement primitives where
+  consumers are identical;
+- a top-right state pill with horizontally and vertically centred text, with source/page context
+  aligned beneath it;
+- row 0 owns Kingdom Overview and KVK Summary page navigation; the chart metric selector and
+  Definitions/Method start below it and stay within Discord component-row limits;
+- blue navigation/selection/neutral `UTC`, green current/success, amber stale/partial/review, red
+  unavailable/failure/no data, and muted disabled/expired;
+- truthful source freshness separate from generated UTC, compact unit-correct metrics, genuine
+  zero preservation, and the accepted missing-value vocabulary;
+- same-authorized-payload fallback, latest-transition-wins suppression, safe attachment
+  replacement, preserve-and-disable timeout, and deterministic file/stream cleanup.
+
+Do not force the Kingdom Overview chart or four-KVK summary into `/me` geometry. Do not add a
+governor dropdown, player picker, `All Linked`, or arbitrary kingdom selector.
 
 Primary pages:
 

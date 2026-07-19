@@ -4,11 +4,11 @@
 
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
-- Date: `2026-07-18`
+- Date: `2026-07-19`
 - Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player
   Self-Service Command Centre programme completed in production PR #486. GovernorOS v2 is
-  complete and operator accepted through Phase 6 on 2026-07-18. Phase 7 now closes the retained
-  `/me` product with a visual/content consistency audit; Phase 8 modernises the one leadership
+  complete and operator accepted through Phase 7 on 2026-07-19. Phase 7 closed the retained
+  `/me` product with the accepted visual/content consistency contract; Phase 8 now modernises the one leadership
   `/stats player` journey, aligns canonical combat metrics, and removes `/player_profile`; Phase 9
   adds private `/stats kingdom`. The former `/me history` proposal is closed with no build and
   `/kvk history` remains canonical.
@@ -525,6 +525,47 @@ change one only through an explicit product decision backed by visual/access/sec
   payload without a second fetch. The accepted inactivity baseline preserves the last report,
   disables controls, and releases attachments, images, charts, files, and streams across success,
   failure, timeout, navigation, cancellation, and stale suppression.
+
+### Locked Phase 7 visual and navigation inheritance contract
+
+Phase 7 final Discord smoke and operator acceptance on 2026-07-19 established the following
+additional contract for Phases 8 and 9:
+
+- Use the shared GovernorOS token language from `core/visual_contract.py`: bright readable text,
+  muted support copy, blue neutral/selection/navigation, gold identity/emphasis, green
+  ready/current/success, amber partial/stale/review, red unavailable/failed/no-data, dark
+  translucent panels, and the accepted blue panel edge. Reuse bounded primitives; do not create a
+  universal renderer/grid/payload/view framework.
+- Leadership cards should use the core `1702x924` summary family as their proportional visual
+  starting point, while keeping their own information architecture, neutral KD98/governor or
+  Kingdom identity, charts, and page-specific geometry. They must not copy `/me` ownership or a
+  Discord-user avatar.
+- The state pill remains in the same relative top-right position and its text is centred both
+  horizontally and vertically using font-bearing-aware placement. Supporting mode, period,
+  coverage, and freshness copy aligns beneath it without treating neutral `UTC` as amber.
+- Row 0 owns page-family navigation. Page-local mode, period, chart, and Definitions controls start
+  on the next available row. Current selections are blue/disabled, component rows remain within
+  Discord limits, and page changes preserve valid target/filter context.
+- Successful images and same-authorized-payload fallbacks use the same content semantics: `—` for
+  one missing value, `Not recorded` for a meaningful never-recorded state, `NO DATA` for a healthy
+  empty source/card, and `UNAVAILABLE` for request/dependency failure. Genuine zero remains zero.
+  UTC dates use `18 Jul 2026, 14:05 UTC`; K/M/B, signed deltas, percentages, days/minutes, RSS,
+  donations, KP Loss, and Tanking Score keep one compact, unit-correct language.
+- Source and generation timestamps remain separate. Use the truthful domain label (`Data
+  refreshed`, `Inventory uploaded`, `Location updated`) and keep `Generated` in the footer.
+- All private controls remain author- and permission-gated, reject forged/foreign/stale state,
+  apply latest-transition-wins suppression, preserve the last card while disabling controls on
+  timeout, and close all files/streams on every terminal path.
+- Governor/player selection uses exact Governor ID or opaque server-held tokens, never mutable
+  display names. It is duplicate-name safe, paged where needed, shows the selected identity
+  clearly, revalidates authority before every data read, and preserves the current page/filter.
+  `All Linked` exists only on the explicitly additive personal Stats product. Leadership Phase 8
+  uses Change Player/linked-governor context under its dedicated permission contract; Phase 9 has
+  no governor dropdown or arbitrary kingdom selector.
+
+The accepted Phase 7 Preferences card also establishes a useful summary-page pattern—balanced
+profile tiles, a larger context panel, an insight panel, and a Manage strip—but it is not a
+mandatory grid for leadership pages.
 
 ## 11. Target Data / Service Contract
 
@@ -1745,13 +1786,13 @@ Decision:
 
 ### Phase 7 — `/me` Visual Consistency, Content Audit and Programme Closeout
 
-Status: `proposed; task pack and chat starter prepared`.
+Status: `complete; final Discord smoke and operator visual acceptance passed on 2026-07-19`.
 
 Goal: complete the retained `/me` product by aligning typography, font scale, colours, panel
 borders, alignment, state pills, freshness wording, missing-value treatment, navigation, fallbacks,
 and mobile readability, using the accepted `/me stats` card as the reference.
 
-Deliver:
+Delivered:
 
 - Audit Dashboard, Accounts, Account Summary, Reminders, Preferences, Stats, and the three direct
   Inventory reports.
@@ -1760,19 +1801,24 @@ Deliver:
 - Preserve report-specific Inventory accents, charts, icons, ranges, exports, and backdrops.
 - Standardise semantic state colours, dates, numbers, units, missing values, footer/freshness copy,
   navigation, timeout copy, panel borders, and relative typography.
-- Permit a small `player_self_service/visual_contract.py` only for proven identical primitives.
-- Create before/after contact sheets and original/desktop/mobile visual matrices.
+- Added bounded common visual primitives in `core/visual_contract.py` only for proven identical
+  consumers; no universal renderer/view framework was introduced.
+- Completed deterministic visual samples and original/desktop/mobile review, including the final
+  Preferences rework, vertically centred state pills, Accounts heading alignment, and complete
+  core row-0 navigation.
 - Make no command, SQL, DAL, payload, metric, calculation, permission, privacy, export, selector,
   or product-ownership change.
 
 Command impact: none; remain `37 top-level / 100 grouped / 8 me / 2 inventory`.
 
-Approval gate: audit first, then exact visual contract/file manifest/contact-sheet plan, then
-implementation plan. One-pass execution is not approved.
+Acceptance evidence: mirror PR #229, production PR #536, `120` focused tests, `143` deterministic
+visual renders, `2701 passed, 2 skipped` full suite, five-of-five Codex Security discovery receipts
+with zero findings, and successful final Discord smoke. The archived Phase 7 task pack is the
+execution record. No command resync or SQL deployment was required.
 
 ### Phase 8 — Leadership `/stats player` Modernisation, Canonical Combat Metric Alignment and `/player_profile` Retirement
 
-Status: `proposed; task pack and chat starter prepared`.
+Status: `next active slice; task pack and chat starter prepared after Phase 7 acceptance`.
 
 Goal: replace fragmented leadership player tools with one private, permission-gated,
 decision-oriented review of a selected Governor ID.
@@ -1811,6 +1857,14 @@ Locked player-review output:
   episodes.
 - Maximum two deterministic evidence-based leadership prompts.
 - Private Definitions/Method panel.
+- Inherit the accepted Phase 7 `1702x924` visual language, vertically centred top-right state pill,
+  row-0 page navigation, source/generated separation, compact formats, same-payload fallback,
+  preserve-and-disable timeout, transition safety, and cleanup while retaining neutral leadership
+  identity and the dedicated permission/audit boundary.
+- The Change Player/linked-governor control is not the personal `/me` picker: it uses exact IDs or
+  opaque tokens, is duplicate-name safe and paged where needed, revalidates permission and target
+  access on every change, preserves page/period, exposes no All Linked option, and never displays
+  Discord identity/account-slot metadata.
 
 Locked source/SQL work:
 
@@ -1872,6 +1926,10 @@ Deliver:
 - Acclaim per Participant is `SUM(Acclaim) / Participants`.
 - Use one authoritative final row per Governor ID/KVK; never sum overlapping Pass and Full windows.
 - No public sharing, export, arbitrary kingdom selector, or `/me` change in the first release.
+- Inherit the accepted Phase 7/8 leadership visual family: `1702x924` proportional baseline,
+  vertically centred state pill, row-0 page navigation, chart/Definitions controls below it,
+  compact unit-correct numbers, truthful freshness/generated separation, same-payload fallback,
+  transition safety, preserve-and-disable timeout, and cleanup. Do not add a governor dropdown.
 
 Command impact after Phase 9: `36 top-level / 101 grouped / 8 me / 2 stats / 2 inventory`.
 
@@ -2184,34 +2242,30 @@ Do not include these in early phases unless separately approved:
 
 ## 20. Suggested Next Action
 
-Phase 6 is complete. Phase 7 is the next active implementation candidate.
+Phase 7 is complete, operator accepted, and archived. Phase 8 is the next active implementation
+candidate: begin with the command/caller/permission/source/history/formula audit in its task pack,
+apply the locked Phase 7 visual/navigation/governor-control inheritance contract, and stop for
+operator approval before SQL or bot implementation.
 
-Start with the Phase 7 audit only:
-
-- compare every retained `/me` renderer/card/fallback against the accepted `/me stats` contract;
-- separate intentional specialist differences from accidental drift;
-- propose the exact visual token, state, typography, panel, alignment, date/number, missing-value,
-  navigation, and contact-sheet plan;
-- make no command, SQL, metric, permission, privacy, or product change;
-- stop for operator approval before implementation.
-
-After Phase 7 acceptance, Phase 8 becomes the leadership `/stats player` and canonical combat
-metric slice. Phase 9 follows with `/stats kingdom`. Phase 10 is usage-led compatibility review,
-and Phase 11 remains an uncommitted future feature candidate.
+Phase 9 follows only after Phase 8 acceptance. Phase 10 is usage-led compatibility review, and
+Phase 11 remains an uncommitted future feature candidate.
 
 Active task packs and starters:
 
-- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 7 Visual Consistency Content Audit and Programme Closeout.md`
-- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 7 Visual Consistency Content Audit and Programme Closeout.md`
 - `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 8 Leadership Stats Player Modernisation Canonical Combat Metric Alignment and Player Profile Retirement.md`
 - `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8 Leadership Stats Player Modernisation Canonical Combat Metric Alignment and Player Profile Retirement.md`
 - `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
 - `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
 
-Completed Phase 6 and earlier execution records remain archived and are not rewritten except for
+Completed Phase 7 and earlier execution records remain archived and are not rewritten except for
 explicit historical corrections.
 
 ## 21. Programme Change Log
+
+- `2026-07-19`: Phase 7 completed final Discord smoke and operator visual acceptance. Archived its
+  task pack/starter, recorded mirror PR #229 and production PR #536, locked the accepted core
+  visual/navigation/state/content/lifecycle contract for Phases 8-9, and made Phase 8 the next
+  active slice without changing the `37 / 100 / 8 / 2` command baseline.
 
 | Date | Change | Notes |
 |---|---|---|

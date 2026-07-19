@@ -1,6 +1,6 @@
 # Command Platform Audit
 
-Last updated: 2026-06-02
+Last updated: 2026-07-19
 
 ## Programme Status
 
@@ -56,10 +56,12 @@ JSON/Markdown command inventory artifact output, local pre-commit command regist
 focused command-governance CI, and command-change checklist material. Phase 7 closed the Command
 Platform Audit & Optimisation Programme.
 
-Current command-surface note (2026-07-17): GovernorOS v2 Phase 5G later removed `/me exports` and
-`/my_stats_export`. The maintained validator/canonical baseline is now
-`primary=38 grouped_subcommands_detected=99 total_unique=38`, with seven `/me` and two `/inventory`
-subcommands. The Phase 5A baseline below remains the historical programme audit baseline.
+Current command-surface note (2026-07-19): GovernorOS v2 Phase 6 removed `/my_stats` while adding
+grouped `/me stats`; Phase 7 then completed the visual/content closeout with no command change or
+resync. The maintained validator/canonical baseline is now
+`primary=37 grouped_subcommands_detected=100 total_unique=37`, with eight `/me` and two
+`/inventory` subcommands. The Phase 5A baseline below remains the historical programme audit
+baseline.
 
 ## Audit Baseline
 

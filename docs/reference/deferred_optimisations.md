@@ -143,11 +143,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: broad cross-page renderer/view framework beyond Phase 7's narrow `/me` visual contract
 - Type: architecture
-- Description: Phase 7 is now approved to align retained `/me` typography, colours, state pills, panel borders, alignment, dates, numbers, missing values, navigation, fallbacks, and visual testing using `/me stats` as the reference. It may extract a small proven `player_self_service/visual_contract.py`. It must keep Dashboard, Inventory, summary payloads, selectors, data ownership, dimensions, and page-specific renderers independent. A universal renderer/grid/view framework is still unproven and outside Phase 7.
-- Suggested Fix: During Phase 7, measure duplicated primitives and extract only contracts with at least two identical consumers. After Phase 7 and later leadership cards are observed, reconsider a broader framework only with quantified duplication, a migration matrix, visual parity tests, lifecycle proof, and separate approval.
+- Description: Phase 7 completed the retained `/me` visual/content consistency pass and extracted only bounded, proven common primitives into `core/visual_contract.py`. Dashboard, Inventory, core summary payloads, selectors, data ownership, dimensions, and page-specific renderers remain deliberately independent. The accepted Preferences rework and cross-page row-0 navigation do not prove that one universal renderer/grid/payload/view framework would be safer or clearer. Phase 8 and Phase 9 must inherit the shared token/state/content/lifecycle contract while retaining leadership-specific payloads, permissions, selection semantics, and page geometry.
+- Suggested Fix: Observe the Phase 8 and Phase 9 leadership renderers after delivery. Reconsider any broader framework only with quantified identical duplication across at least two accepted consumers, a migration matrix, visual and fallback parity tests, Discord component-limit proof, lifecycle/timeout evidence, and a separately approved task pack. Do not use Phase 8 or 9 to consolidate self-view and leadership selectors or to introduce a universal grid.
 - Impact: low
 - Risk: medium
-- Dependencies: Phase 7 task pack and contact-sheet audit; accepted `/me stats` reference; no broad framework without a later explicit task pack.
+- Dependencies: Phase 7 operator accepted on 2026-07-19; accepted `core/visual_contract.py` boundary; Phase 8/9 observation evidence; no broad framework without a later explicit task pack.
 
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `player_self_service/accounts_export.py`, Inventory exports, SQL export views/tables, export docs/tests

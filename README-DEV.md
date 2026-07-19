@@ -122,11 +122,29 @@ label reports source freshness rather than bot query time. An additional coverin
 evidence-gated on production plans/logical reads rather than speculative. Account Summary remains
 the only central personal-data download home and Phase 5G output contracts remain unchanged.
 
-The completed Phase 6 task pack and chat starter are archived under `docs/task_packs/archive/`.
-The active programme pack retains Phases 7-10 as separately approval-gated work. Any later History
-or Inspect card must start from the accepted premium layout, same-payload fallback, source/generated
-time separation, author-gated opaque governor selection, registry revalidation, lifecycle cleanup,
-and accessibility rules recorded by Phase 6; no later slice is implicitly approved by this closure.
+GovernorOS v2 Phase 7 `/me` Visual Consistency, Content Audit and Programme Closeout is complete
+and operator accepted after final Discord smoke on 2026-07-19. Mirror PR #229 and production PR
+#536 carry the accepted result. The phase aligned the retained `/me` family to the Stats visual
+contract, added only bounded shared primitives in `core/visual_contract.py`, vertically centred the
+top-right state-pill text, completed Accounts/Reminders/Preferences/Stats row-0 navigation, moved
+Stats page-mode controls below that row, left-aligned the Accounts hero headings, and rebuilt
+Preferences into balanced regional-profile, local-time, insight, and Manage panels. Dashboard
+remains `1180x760`; core summaries remain `1702x924`; Inventory remains `1400x980` with its
+category accents, charts, icons, ranges, exports, and report-specific backdrops.
+
+No command, SQL, payload, metric, formula, rank, permission, privacy, export, or data-source
+contract changed. No resync or SQL deployment was required, and command counts remain 37 top-level,
+100 grouped, eight `/me`, and two `/inventory`. The completed Phase 6 and Phase 7 task packs and
+starters are archived under `docs/task_packs/archive/`.
+
+Phase 8 is now the next separately gated slice. Phase 8 and Phase 9 must inherit the accepted
+`1702x924` visual family, shared tokens, centred state pill, row-0 page navigation, compact and
+unit-correct content, source/generated separation, same-payload fallback, latest-transition-wins,
+preserve-and-disable timeout, and cleanup. Their governor/player controls must use exact IDs or
+opaque duplicate-safe tokens, page when needed, preserve page/filter state, and revalidate
+permission before every read. Phase 8 has no All Linked scope or Discord account metadata; Phase 9
+has no governor dropdown or arbitrary kingdom selector. These are leadership `/stats` products,
+not new `/me` surfaces.
 
 ## Quality Automation
 

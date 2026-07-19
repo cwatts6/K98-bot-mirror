@@ -458,14 +458,12 @@ Player Self-Service Command Centre status:
 - The former proposed `/me history` Phase 7 is closed with no build; `/kvk history` remains
   canonical.
 - Active GovernorOS v2 task packs:
-  - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 7 Visual Consistency Content Audit and Programme Closeout.md`
-  - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 7 Visual Consistency Content Audit and Programme Closeout.md`
   - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 8 Leadership Stats Player Modernisation Canonical Combat Metric Alignment and Player Profile Retirement.md`
   - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8 Leadership Stats Player Modernisation Canonical Combat Metric Alignment and Player Profile Retirement.md`
   - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
   - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
-- Phase 7 is the next implementation candidate. Phase 8 and Phase 9 remain separately
-  approval-gated and must not be implemented through the Phase 7 PR.
+- Phase 8 is the next implementation candidate. Phase 9 remains separately approval-gated and
+  must wait for Phase 8 acceptance.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -561,7 +559,7 @@ tuning/decomposition, residual `stats_module.py` cleanup, legacy PreKvK SQL clea
 cumulative view cleanup, and inventory view-orchestration extraction remain separate later slices
 unless explicitly approved.
 
-Player Self-Service Command Centre v2 GovernorOS is complete and operator accepted through Phase 6.
+Player Self-Service Command Centre v2 GovernorOS is complete and operator accepted through Phase 7.
 Phase 5F delivered in mirror PR #225 and production-branch commit `89f7da16`; Phase 5G
 completed final Discord smoke on 2026-07-17 through mirror PR #227 and production PR #534. The
 Phase 6 result in mirror PR #228 and production PR #535 passed final smoke on 2026-07-18 and has
@@ -571,22 +569,29 @@ central personal-data download home; and leaves `dbo.InventoryReportPreference` 
 Phase 5G SQL deployment. Completed Phase 5G records are archived under `archive/`.
 
 Phase 6 Interactive Period Performance and `/my_stats` Retirement is complete and archived.
+Phase 7 `/me` Visual Consistency, Content Audit and Programme Closeout passed final Discord smoke
+and operator visual acceptance on 2026-07-19 in mirror PR #229 and production PR #536. It made no
+command or SQL change; the baseline remains `37 / 100 / 8 / 2`. Its execution records are archived:
+
+- `archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 7 Visual Consistency Content Audit and Programme Closeout.md`
+- `archive/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 7 Visual Consistency Content Audit and Programme Closeout.md`
 
 The active programme pack now records:
 
 - the closed KVK history placement decision: no `/me history`, `/kvk history` remains
   canonical;
-- Phase 7 `/me` Visual Consistency, Content Audit and Programme Closeout as the next active
-  slice, with no command or SQL change;
+- completed Phase 7 `/me` Visual Consistency, Content Audit and Programme Closeout and its accepted
+  inheritance contract;
 - Phase 8 leadership `/stats player` modernisation, global canonical Tanking Score alignment,
   dedicated leadership audit/source foundations, and `/player_profile` retirement;
 - Phase 9 private `/stats kingdom` with dynamic-roster twelve-month trends and the latest four
   completed KVKs;
 - Phase 10 usage-led migration review and Phase 11 future-candidate boundaries.
 
-Phase 7-9 task packs and starters are active in this folder. One-pass execution is not
-approved. Phase 8 must wait for Phase 7 acceptance, and Phase 9 must wait for Phase 8
-acceptance.
+Phase 8-9 task packs and starters are active in this folder. One-pass execution is not approved.
+Phase 8 is the next active slice; Phase 9 must wait for Phase 8 acceptance. Both packs/starters
+carry forward Phase 7's accepted visual family, centred state pill, row-0 navigation,
+governor-control safety, content semantics, fallback, transition, timeout, and cleanup rules.
 
 Other temporary deprecated command paths remain captured as deferred cleanup for execution only
 after their own communication, no-feedback monitoring, production usage review, and explicit

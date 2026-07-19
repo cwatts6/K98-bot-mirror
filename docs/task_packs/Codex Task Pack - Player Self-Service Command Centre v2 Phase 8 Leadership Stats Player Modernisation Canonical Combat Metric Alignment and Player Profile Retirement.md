@@ -3,14 +3,14 @@
 ## 1. Task Header
 
 - Task name: `Player Self-Service Command Centre v2 Phase 8 Leadership /stats player Modernisation, Canonical Combat Metric Alignment and /player_profile Retirement`
-- Date: `2026-07-18`
+- Date: `2026-07-19`
 - Owner/context: `KD98 / Kingdom 1198 leadership analytics follow-on after GovernorOS v2 Phase 7 /me closeout`
 - Task type: `leadership feature | command modernisation | command retirement | SQL contract | visual renderer | privacy/security | combat-metric correction`
 - One-pass approved: `no`
 - Product decision approved: `yes`
 - Audit/design approved: `yes`
 - Runtime implementation approved: `not before the audit, SQL design, formula replay, architecture, implementation-plan, security-routing, and operator approval gates in this pack`
-- Status: `proposed; ready for audit and design after Phase 7 acceptance`
+- Status: `next active slice; Phase 7 accepted and archived, ready for audit and design`
 - Canonical command: `/stats player`
 - Removed command: `/player_profile`
 - New `/me` command: `none`
@@ -231,7 +231,7 @@ Read:
 - `docs/reference/K98 Bot - Deferred Optimisation Framework.md`
 - `docs/task_packs/Player Self-Service Command Centre v2 - Programme Pack.md`
 - this task pack
-- Phase 7 task pack and accepted closeout record
+- `docs/task_packs/archive/Codex Task Pack - Player Self-Service Command Centre v2 Phase 7 Visual Consistency Content Audit and Programme Closeout.md`
 - archived Phase 6, Phase 5C, Phase 4, and KVK history/rankings task packs
 - `docs/player_self_service_command_centre_briefing.md`
 - `docs/reference/canonical_command_reference.md`
@@ -360,6 +360,34 @@ reuse cached authorization.
 
 ## 9. Output And Navigation
 
+### Accepted Phase 7 inheritance
+
+Start from the operator-accepted Phase 7 core summary language, not from the legacy leadership
+renderer. This is visual/interaction inheritance, not `/me` product ownership:
+
+- proportional `1702x924` standalone-card baseline with neutral KD98/governor identity and no
+  Discord avatar;
+- shared `core/visual_contract.py` colours, typography hierarchy, panel edge/fill, compact-number,
+  UTC-date, state, and bounded placement primitives where the consumers are identical;
+- bright labels and values, restrained muted support copy, readable mobile scaling, and no
+  colour-only meaning;
+- one top-right state pill whose text is genuinely centred horizontally and vertically using
+  font-bearing-aware placement; source/mode/period support aligns beneath it;
+- row 0 is the four-page leadership navigation family. Period, Change Player,
+  Definitions/Method, and any approved refresh control start on later rows and remain within
+  Discord component limits;
+- blue marks navigation/selection/neutral information, including `UTC`; green means current or
+  success, amber means stale/partial/review, red means unavailable/failure/no data, and muted means
+  disabled/expired;
+- keep truthful source freshness separate from the generated UTC footer, and retain `—`, `Not
+  recorded`, `NO DATA`, `UNAVAILABLE`, genuine zero, signed deltas, percentages, K/M/B, days,
+  minutes, donations, RSS, KP Loss, and Tanking Score semantics;
+- same-authorized-payload fallback, latest-transition-wins suppression, safe attachment
+  replacement, preserve-and-disable timeout, and file/stream cleanup are mandatory.
+
+Do not force the four leadership pages into the Preferences grid or any other `/me` page geometry.
+Use the shared visual family while designing each page around its approved leadership evidence.
+
 Primary private pages:
 
 ```text
@@ -390,6 +418,13 @@ Successful output:
 - bounded timeout that preserves the last report and disables controls.
 
 Do not reuse the self-view linked-governor picker or All Linked option.
+
+The Change Player and linked-governor controls must nevertheless retain the accepted selection
+safety properties: exact Governor ID or opaque server-held token, duplicate-name-safe labels,
+paging where more than 25 choices are possible, clear selected Governor ID, current selection
+blue/disabled, page/period preservation, latest-transition-wins handling, and permission plus
+target-access revalidation before every data read. They must never expose Discord identity,
+account slot/type, or an `All Linked` choice.
 
 ## 10. Header Contract
 

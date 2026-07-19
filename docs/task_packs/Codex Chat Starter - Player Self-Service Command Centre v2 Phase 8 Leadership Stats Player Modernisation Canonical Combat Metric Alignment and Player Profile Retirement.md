@@ -1,7 +1,7 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8 Leadership `/stats player` Modernisation, Canonical Combat Metric Alignment and `/player_profile` Retirement
 
-Status: initiation starter for proposed Phase 8. Start only after Phase 7 is accepted and archived. Use
-with the matching Phase 8 task pack. One-pass execution is not approved.
+Status: active initiation starter. Phase 7 was accepted and archived on 2026-07-19. Use with the
+matching Phase 8 task pack. One-pass execution is not approved.
 
 ## Copy/Paste Starter
 
@@ -10,7 +10,7 @@ Codex, begin Player Self-Service Command Centre v2 Phase 8: Leadership /stats pl
 Canonical Combat Metric Alignment, and /player_profile Retirement.
 
 Approval state:
-- Phase 7 /me closeout must be complete first
+- Phase 7 /me closeout is complete, smoke tested, operator accepted, and archived on 2026-07-19
 - /stats player is the one approved leadership player-review command
 - do not create /me inspect
 - remove /player_profile in the same accepted release
@@ -294,6 +294,25 @@ Architecture:
 - bounded cache after authorization
 - neutral leadership identity, no Discord avatar
 
+Locked Phase 7 visual/navigation handoff:
+- start from the accepted 1702x924 core summary visual family and shared core/visual_contract.py
+  tokens/primitives; do not reuse legacy leadership visuals or create a universal renderer
+- retain neutral KD98/governor identity with no Discord avatar and do not force /me page geometry
+- row 0 contains Overview, Kingdom Activity, KVK Performance, Player Record; period, Change Player,
+  Definitions/Method, and any approved refresh control begin below it
+- state-pill text is centred middle, not baseline-bottom; keep the pill top right with aligned
+  page/period/freshness support beneath it
+- blue is neutral/selection/navigation including UTC; green current/success; amber
+  stale/partial/review; red unavailable/failure/no data; muted disabled/expired
+- keep source freshness and Generated separate; preserve genuine zero and the accepted — / Not
+  recorded / NO DATA / UNAVAILABLE, K/M/B, signed delta, percentage, day/minute, RSS, donation,
+  KP Loss, and Tanking Score language
+- Change Player/linked-governor controls use exact IDs or opaque tokens, are duplicate-name safe,
+  page where needed, disable the current choice in blue, preserve page/period, and revalidate
+  permission/target before every read; no All Linked or Discord account metadata
+- same-payload fallback, latest-transition-wins, attachment replacement, preserve-and-disable
+  timeout, and file/stream cleanup are mandatory
+
 /player_profile retirement:
 - prove every caller
 - remove top-level registration/callback/public posting flow
@@ -309,7 +328,7 @@ Read first:
 - engineering/execution/testing/skills/deferred references
 - active GovernorOS programme pack
 - matching Phase 8 task pack
-- accepted Phase 7 pack
+- archived accepted Phase 7 task pack and closeout record
 - archived Phase 6/5C/KVK history/KVK rankings packs
 - briefing, canonical reference, deferred optimisations
 - authoritative SQL repo C:\K98-bot-SQL-Server

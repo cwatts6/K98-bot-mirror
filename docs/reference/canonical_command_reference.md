@@ -222,18 +222,25 @@ Legend:
 | Voting Admin | `/vote_admin survey_status` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral | Standard | Phase 7 first survey slice | Selects a survey by autocomplete and shows survey state, result visibility, private admin live totals, reminder delivery state, and original message link. |
 | Voting Admin | `/vote_admin survey_export` | `commands/vote_admin_cmds.py` | Grouped | Admin or leadership decorator | Ephemeral command response and private CSV file(s) | Standard | Phase 10 Survey Export v2 first runtime slice | Selects one closed survey by autocomplete and privately exports totals, response-detail, or report-bundle CSV output via the `mode` option. Response-detail and report-bundle detail output include spreadsheet-safe Discord user ID text and resolved Discord name for admin/leadership-only reporting. Aggregate report-bundle files exclude raw text/detail answers and per-user rows; the response-detail file remains the private raw/detail profile. |
 
-## Approved Future Command Roadmap (Not Yet Runtime)
+## Approved Command Roadmap And Completed No-Command Closeout
 
 The current command table and validator baseline above remain authoritative until each phase is
 deployed and commands are resynced.
 
 ### Phase 7
 
-- No command change.
+- Completed and operator accepted on 2026-07-19 in mirror PR #229 and production PR #536.
+- No command change or resync occurred.
 - `/me` remains eight subcommands.
 - `/me history` will not be implemented.
 - `/kvk history` remains canonical.
-- Target remains `37 top-level / 100 grouped / 8 me / 2 inventory`.
+- Runtime remains `37 top-level / 100 grouped / 8 me / 2 inventory`.
+- The accepted `/me` visual contract includes centred top-right state pills, complete
+  Accounts/Reminders/Preferences/Stats row-0 navigation, page-local controls below row 0,
+  compact/unit-correct content, source/generated separation, same-payload fallbacks,
+  latest-transition-wins, preserve-and-disable timeout, and cleanup.
+- Dashboard remains `1180x760`, core summaries `1702x924`, and Inventory `1400x980` with its
+  report-specific visual/data/export structure.
 
 ### Phase 8
 

@@ -1,6 +1,6 @@
 # Player Self-Service Command Centre Briefing
 
-Last updated: 2026-07-18
+Last updated: 2026-07-19
 
 GovernorOS v2 Phase 5 is complete and operator accepted through Phase 5G. Phase 5E shipped in mirror PR #224
 and production PR #531 and was deployed on 2026-07-16. Phase 5F delivered in mirror PR #225, was
@@ -51,14 +51,29 @@ aligned pill/header stack is balanced; charts retain series names and consistent
 repeating the KPI summary; `Data last refreshed` shows source time while the footer keeps generated
 time. The completed task pack and starter are archived.
 
-Approved follow-on roadmap on 2026-07-18:
+Phase 7 `/me` Visual Consistency, Content Audit and Programme Closeout is complete and operator
+accepted after final Discord smoke on 2026-07-19. Mirror PR #229 and production PR #536 carry the
+accepted bot result. It introduced only bounded shared primitives in `core/visual_contract.py` and
+aligned the retained `/me` family without changing commands, SQL, payload data, metrics, formulas,
+ranks, permissions, privacy, exports, or product ownership. State-pill text is now vertically
+centred; Accounts, Reminders, Preferences, and Stats expose complete row-0 family navigation;
+Stats Overview/Activity/Combat controls begin below that row; Accounts hero headings are
+left-aligned; and Preferences now uses three regional-profile cards plus local-time,
+settings-insight, and Manage panels. Dashboard and Inventory retain their specialist dimensions,
+geometry, backdrops, charts, icons, ranges, exports, and category accents.
+
+Validation passed with 120 focused tests, 143 deterministic visual renders, the full `2701 passed,
+2 skipped` suite, repository validators, pre-commit/pyright, a five-receipt Codex Security Changes
+scan with zero findings, and final Discord smoke. No command resync or SQL deployment was needed;
+the baseline remains 37 top-level, 100 grouped, eight `/me`, and two `/inventory`. The Phase 7 task
+pack and starter are archived.
+
+Approved follow-on roadmap, updated after Phase 7 acceptance on 2026-07-19:
 
 - The proposed `/me history` route is closed with no build. `/kvk history` remains the one
   canonical KVK-history command.
-- Phase 7 is the `/me` Visual Consistency, Content Audit and Programme Closeout. It uses the
-  accepted `/me stats` card as the reference for typography, colours, panel borders, alignment,
-  state pills, dates, numbers, missing values, navigation, fallback, timeout, and mobile
-  readability. It changes no command, SQL, metric, permission, privacy, selector, or data owner.
+- Phase 7 is complete and archived. Its accepted visual/content/navigation/lifecycle contract is
+  the baseline for later leadership cards, without transferring `/me` ownership.
 - Phase 8 modernises the existing private leadership `/stats player`, adopts one canonical
   higher-is-better Tanking Score across every KVK/Account/leadership surface, adds the bounded
   leadership data/audit foundations, and removes `/player_profile` with no redirect.
@@ -68,19 +83,27 @@ Approved follow-on roadmap on 2026-07-18:
 - Phase 10 remains a usage-led review of other compatibility routes; Phase 11 remains a future
   candidate feature programme.
 
-Phase 7 is the next implementation candidate. Phase 8 must wait for Phase 7 acceptance and Phase
-9 must wait for Phase 8 acceptance.
+Phase 8 is the next implementation candidate. Phase 9 must wait for Phase 8 acceptance.
 Locked follow-on consistency:
 
-Phase 7 starts from the accepted Phase 6 visual hierarchy and checks every retained `/me`
-card/fallback against it. Core 1702x924 summary cards should align closely; Dashboard retains
-1180x760; Inventory retains 1400x980 and report-specific accents. A small shared visual-token
-module is permitted only for proven identical primitives.
+Phase 7 proved the accepted visual hierarchy across every retained `/me` card/fallback. Core
+`1702x924` summaries align closely; Dashboard retains `1180x760`; Inventory retains `1400x980` and
+report-specific accents. `core/visual_contract.py` owns only proven identical primitives; a broad
+renderer/grid/payload/view framework remains outside scope.
 
 Phase 8 and Phase 9 are leadership `/stats` products, not `/me` pages. They reuse accepted
 private attachment/fallback/lifecycle patterns but use dedicated stable-role-ID/channel
 authorization, neutral leadership identity, their own typed payloads, and no self-view
 governor picker or All Linked scope.
+
+Both leadership phases inherit the centred top-right state pill, row-0 page-family navigation,
+blue neutral/selection/UTC semantics, compact formats, accepted missing-value vocabulary,
+source/generated separation, same-payload fallback, latest-transition-wins, preserve-and-disable
+timeout, and cleanup. Phase 8 Change Player/linked-governor controls use exact Governor IDs or
+opaque duplicate-safe tokens, page when needed, preserve page/period, disable the current choice
+in blue, and revalidate permission/target access before every read; they expose no Discord account
+metadata or All Linked option. Phase 9 has no governor dropdown, player picker, All Linked, or
+arbitrary kingdom selector.
 
 Canonical combat metric for every current/future surface:
 
@@ -711,8 +734,8 @@ Current status:
   lifecycle. `/my_stats` is removed without a redirect; Account Summary retains all downloads.
 - The KVK history placement decision is closed: `/kvk history` remains canonical and `/me history`
   will not be implemented.
-- Phase 7 is the `/me` visual consistency, content audit, and programme closeout. It uses `/me stats`
-  as the reference while preserving the Dashboard and Inventory specialist dimensions and behavior.
+- Phase 7 completed the `/me` visual consistency, content audit, and programme closeout on
+  2026-07-19, preserving the Dashboard and Inventory specialist dimensions and behaviour.
 - Phase 8 modernises the existing private `/stats player`, introduces the approved leadership data,
   permission, audit, source, and canonical Tanking contracts, and removes `/player_profile` without a
   redirect. It does not create `/me inspect`.
