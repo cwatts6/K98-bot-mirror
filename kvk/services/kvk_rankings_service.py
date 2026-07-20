@@ -265,8 +265,13 @@ def _kvk_tanking_score(row: dict[str, Any]) -> float:
     return float(score) if score is not None else 0.0
 
 
-def _kvk_kp_loss(row: dict[str, Any]) -> int:
-    return _kvk_combat(row).kp_loss or 0
+def _kvk_tanking_score_supporting_value(row: dict[str, Any]) -> float | None:
+    score = _kvk_combat(row).tanking_score
+    return float(score) if score is not None else None
+
+
+def _kvk_kp_loss(row: dict[str, Any]) -> int | None:
+    return _kvk_combat(row).kp_loss
 
 
 def _kvk_has_tanking_score(row: dict[str, Any]) -> bool:
@@ -396,7 +401,7 @@ def build_kvk_rankings_payload_from_rows(
                     "Deads": _kvk_deads(raw),
                     "DKP": _kvk_dkp(raw),
                     "Acclaim": _kvk_acclaim(raw),
-                    "Tanking Score": _kvk_tanking_score(raw),
+                    "Tanking Score": _kvk_tanking_score_supporting_value(raw),
                     "Kill Points": _kvk_kill_points(raw),
                     "KP Loss": _kvk_kp_loss(raw),
                     "Healed": _kvk_healed(raw),

@@ -30,6 +30,27 @@ _PAGE_LABELS: dict[ReviewPage, str] = {
     "record": "Player Record",
 }
 
+_EMBED_FIELD_VALUE_LIMIT = 1024
+
+
+def _bounded_embed_lines(lines: list[str], *, empty: str = "NO DATA") -> str:
+    """Join complete lines without exceeding Discord's embed field limit."""
+    if not lines:
+        return empty
+    selected: list[str] = []
+    current_length = 0
+    for line in lines:
+        added_length = len(line) + (1 if selected else 0)
+        if current_length + added_length > _EMBED_FIELD_VALUE_LIMIT:
+            suffix = "\n..." if selected else "..."
+            while selected and current_length + len(suffix) > _EMBED_FIELD_VALUE_LIMIT:
+                removed = selected.pop()
+                current_length -= len(removed) + (1 if selected else 0)
+            return "\n".join(selected) + suffix
+        selected.append(line)
+        current_length += added_length
+    return "\n".join(selected)
+
 
 def _close_file(file: discord.File | None) -> None:
     if file is None:
@@ -107,7 +128,7 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
             for row in payload.kvk_rows
         ]
         embed.add_field(
-            name="Ended/finalized KVKs", value="\n".join(lines) or "NO DATA", inline=False
+            name="Ended/finalized KVKs", value=_bounded_embed_lines(lines), inline=False
         )
     else:
         linked = [f"{row.governor_name} ({row.governor_id})" for row in payload.linked_governors]

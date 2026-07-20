@@ -336,6 +336,23 @@ def test_fallback_uses_same_payload_without_discord_identity() -> None:
     assert "account slot" not in text
 
 
+def test_kvk_fallback_field_stays_within_discord_limit() -> None:
+    rows = tuple(
+        replace(
+            _kvk(index),
+            kill_points=10**80 + index,
+            tanking_score=Decimal("1234567890.12345678901234567890"),
+            dkp=10**80 + index,
+        )
+        for index in range(1, 21)
+    )
+    embed = build_fallback_embed(replace(_payload(page="kvk"), kvk_rows=rows))
+    field = next(item for item in embed.fields if item.name == "Ended/finalized KVKs")
+
+    assert len(field.value) <= 1024
+    assert field.value.endswith("...")
+
+
 @pytest.mark.asyncio
 async def test_payload_identity_history_covers_all_active_linked_governors(monkeypatch) -> None:
     sample = _payload()
