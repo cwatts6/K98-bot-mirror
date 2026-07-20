@@ -41,7 +41,7 @@ def test_register_commands_smoke(monkeypatch):
     Commands.register_commands(fake_bot)
 
     registered_names = [name for name in registered_top_level if name]
-    assert len(registered_names) == 37
+    assert len(registered_names) == 36
     assert "ark" in registered_top_level
     assert "activity" in registered_top_level
     assert "crystaltech" in registered_top_level
@@ -120,7 +120,7 @@ def test_register_commands_smoke(monkeypatch):
     assert "activity_top" not in registered_top_level
     assert "calendar" in registered_top_level
     assert "honor_rankings" in registered_top_level
-    assert "player_profile" in registered_top_level
+    assert "player_profile" not in registered_top_level
     assert "ping" in registered_top_level
 
 

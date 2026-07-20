@@ -99,6 +99,7 @@ def test_build_kvk_rankings_payload_filters_sorts_and_preserves_metadata():
                 "Acclaim": 5_000,
                 "HealedTroopsDelta": 500,
                 "KillPointsDelta": 10_000,
+                "Deads_Delta": 0,
                 "LAST_REFRESH": "2026-06-18T09:00:00+00:00",
                 "STATUS": "INCLUDED",
             },
@@ -110,6 +111,7 @@ def test_build_kvk_rankings_payload_filters_sorts_and_preserves_metadata():
                 "Acclaim": 4_000,
                 "HealedTroopsDelta": 250,
                 "KillPointsDelta": 5_000,
+                "Deads_Delta": 0,
                 "LAST_REFRESH": "2026-06-18T10:00:00+00:00",
                 "STATUS": "INCLUDED",
             },
@@ -149,6 +151,7 @@ def test_build_kvk_rankings_payload_supports_card_only_metrics():
             "Acclaim": 9_000,
             "HealedTroopsDelta": 250,
             "KillPointsDelta": 5_000,
+            "Deads_Delta": 0,
             "STATUS": "INCLUDED",
         },
         {
@@ -159,6 +162,7 @@ def test_build_kvk_rankings_payload_supports_card_only_metrics():
             "Acclaim": 4_000,
             "HealedTroopsDelta": 100,
             "KillPointsDelta": 10_000,
+            "Deads_Delta": 0,
             "STATUS": "INCLUDED",
         },
         {
@@ -169,6 +173,7 @@ def test_build_kvk_rankings_payload_supports_card_only_metrics():
             "Acclaim": 10_000,
             "HealedTroopsDelta": 0,
             "KillPointsDelta": 12_000,
+            "Deads_Delta": 0,
             "STATUS": "INCLUDED",
         },
         {
@@ -179,6 +184,7 @@ def test_build_kvk_rankings_payload_supports_card_only_metrics():
             "Acclaim": 11_000,
             "HealedTroopsDelta": 200,
             "KillPointsDelta": 0,
+            "Deads_Delta": 0,
             "STATUS": "INCLUDED",
         },
     ]
@@ -213,7 +219,7 @@ def test_build_kvk_rankings_payload_supports_card_only_metrics():
     ]
     assert tanking_payload.metric_label == "Tanking Score"
     assert [row.governor_name for row in tanking_payload.rows] == ["Bravo", "Alpha"]
-    assert tanking_payload.rows[0].value == 20
+    assert tanking_payload.rows[0].value == 500
     assert tanking_payload.total_rows == 2
     assert kill_points_payload.metric_label == "Kill Points"
     assert [row.governor_name for row in kill_points_payload.rows] == [
@@ -225,12 +231,11 @@ def test_build_kvk_rankings_payload_supports_card_only_metrics():
     assert kill_points_payload.rows[0].value == 12_000
     assert healed_payload.metric_label == "Healed"
     assert [row.governor_name for row in healed_payload.rows] == [
-        "Alpha",
-        "NoKp",
-        "Bravo",
         "NoHeals",
+        "Bravo",
+        "Alpha",
     ]
-    assert healed_payload.rows[0].value == 250
+    assert healed_payload.rows[0].value == 0
 
 
 def test_build_kvk_rankings_payload_empty_cache_is_unavailable():
@@ -241,6 +246,76 @@ def test_build_kvk_rankings_payload_empty_cache_is_unavailable():
     assert payload.source_state == "unavailable"
     assert payload.rows == []
     assert "No stats cache" in (payload.empty_message or "")
+
+
+def test_tanking_and_healed_use_competition_ranks() -> None:
+    rows = [
+        {
+            "GovernorID": str(governor_id),
+            "GovernorName": f"G{governor_id}",
+            "Starting Power": 100_000_000 - governor_id,
+            "T4&T5_Kills": 100,
+            "Deads_Delta": 100,
+            "HealedTroopsDelta": 10 if governor_id < 3 else 20,
+            "KillPointsDelta": 1_000 if governor_id < 3 else 500,
+            "STATUS": "INCLUDED",
+        }
+        for governor_id in (1, 2, 3)
+    ]
+
+    tanking = kvk_rankings_service.build_kvk_rankings_payload_from_rows(
+        rows, metric="tanking_score", include_all=True
+    )
+    healed = kvk_rankings_service.build_kvk_rankings_payload_from_rows(
+        rows, metric="healed", include_all=True
+    )
+
+    assert [row.rank for row in tanking.rows] == [1, 1, 3]
+    assert [row.rank for row in healed.rows] == [1, 1, 3]
+
+
+def test_tanking_and_healed_exclude_missing_but_keep_genuine_zero_values() -> None:
+    rows = [
+        {
+            "GovernorID": "1",
+            "GovernorName": "MissingHealed",
+            "Starting Power": 50_000_000,
+            "T4&T5_Kills": 100,
+            "Deads_Delta": 10,
+            "KillPointsDelta": 1_000,
+            "STATUS": "INCLUDED",
+        },
+        {
+            "GovernorID": "2",
+            "GovernorName": "ZeroHealed",
+            "Starting Power": 50_000_000,
+            "T4&T5_Kills": 100,
+            "Deads_Delta": 10,
+            "HealedTroopsDelta": 0,
+            "KillPointsDelta": 1_000,
+            "STATUS": "INCLUDED",
+        },
+        {
+            "GovernorID": "3",
+            "GovernorName": "MissingDeads",
+            "Starting Power": 50_000_000,
+            "T4&T5_Kills": 100,
+            "HealedTroopsDelta": 10,
+            "KillPointsDelta": 1_000,
+            "STATUS": "INCLUDED",
+        },
+    ]
+
+    tanking = kvk_rankings_service.build_kvk_rankings_payload_from_rows(
+        rows, metric="tanking_score", include_all=True
+    )
+    healed = kvk_rankings_service.build_kvk_rankings_payload_from_rows(
+        rows, metric="healed", include_all=True
+    )
+
+    assert [row.governor_name for row in tanking.rows] == ["ZeroHealed"]
+    assert [row.governor_name for row in healed.rows] == ["ZeroHealed", "MissingDeads"]
+    assert healed.rows[0].value == 0
 
 
 def test_build_kvk_rankings_payload_can_keep_full_internal_rank_set():
@@ -301,6 +376,7 @@ def test_current_rankings_csv_export_uses_player_columns_and_safe_cells():
                     "Acclaim": 500,
                     "Tanking Score": 20,
                     "Kill Points": 2000,
+                    "KP Loss": 2000,
                     "Healed": 100,
                 },
             )
@@ -325,6 +401,7 @@ def test_current_rankings_csv_export_uses_player_columns_and_safe_cells():
         "Acclaim",
         "TankingScore",
         "KillPoints",
+        "KPLoss",
         "Healed",
     ]
     assert rows[0]["GovernorID"] == "123"
@@ -333,6 +410,7 @@ def test_current_rankings_csv_export_uses_player_columns_and_safe_cells():
     assert rows[0]["PercentKillTarget"] == "125"
     assert rows[0]["TankingScore"] == "20"
     assert rows[0]["KillPoints"] == "2000"
+    assert rows[0]["KPLoss"] == "2000"
     assert rows[0]["Healed"] == "100"
 
 
@@ -382,6 +460,7 @@ def test_current_rankings_csv_headers_are_mode_specific():
         "Acclaim",
         "TankingScore",
         "KillPoints",
+        "KPLoss",
         "Healed",
     )
     assert prekvk_headers == (
@@ -811,12 +890,23 @@ def test_build_hall_of_fame_payload_from_rows_preserves_single_kvk_records():
     assert payload.total_rows == 42
 
 
+def test_hall_of_fame_healed_uses_lower_is_better_label() -> None:
+    payload = kvk_rankings_service.build_hall_of_fame_payload_from_rows(
+        HallOfFameMetric.HEALED,
+        [],
+    )
+
+    assert payload.metric_label == "Lowest Healed"
+    assert payload.source_note == "Single-KVK performances across finalized KVK outputs"
+
+
 @pytest.mark.asyncio
 async def test_build_hall_of_fame_payload_fetches_dal_rows(monkeypatch):
     calls = {}
 
-    def fake_fetch(metric, *, limit):
+    def fake_fetch(metric, finalized_kvks, *, limit):
         calls["metric"] = metric
+        calls["finalized_kvks"] = finalized_kvks
         calls["limit"] = limit
         return [
             {
@@ -832,13 +922,22 @@ async def test_build_hall_of_fame_payload_fetches_dal_rows(monkeypatch):
     monkeypatch.setattr(
         kvk_rankings_service.kvk_rankings_dal, "fetch_hall_of_fame_records", fake_fetch
     )
+    monkeypatch.setattr(
+        kvk_rankings_service.kvk_history_service,
+        "get_finalized_kvks",
+        lambda: [12, 15],
+    )
 
     payload = await kvk_rankings_service.build_hall_of_fame_payload(
         metric="honor",
         limit=25,
     )
 
-    assert calls == {"metric": HallOfFameMetric.HONOR, "limit": 10}
+    assert calls == {
+        "metric": HallOfFameMetric.HONOR,
+        "finalized_kvks": [12, 15],
+        "limit": 10,
+    }
     assert payload.rows[0].governor_name == "Bob"
     assert payload.metric_label == "Honor"
     assert payload.limit == 10

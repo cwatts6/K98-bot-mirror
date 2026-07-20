@@ -5,6 +5,7 @@ from datetime import date, datetime
 import logging
 from typing import Any
 
+from kvk.combat_metrics import calculate_combat_metrics
 from kvk.dal import kvk_stats_card_dal
 from kvk.models.kvk_stats_card import (
     KvkStatsCardContext,
@@ -103,16 +104,6 @@ def kill_progress_policy(percent: float | None, *, is_exempt: bool = False) -> t
     return "#8B0000", "FIGHT NOW!!"
 
 
-def _playstyle(tanking_score_percent: float | None) -> str | None:
-    if tanking_score_percent is None:
-        return None
-    if tanking_score_percent < 80:
-        return "Sniping Kills"
-    if tanking_score_percent <= 110:
-        return "Objective Focusing"
-    return "Going All Out Fighting"
-
-
 def _date_display(value: Any) -> str | None:
     if value in (None, ""):
         return None
@@ -180,10 +171,12 @@ async def build_kvk_stats_card_payload(
     matchmaking_power = _int_from_variants(
         row, ["Starting Power", "Starting_Power", "StartingPower", "Power"], default=0
     )
-    kp_gain = _int_from_variants(
-        row, ["KillPointsDelta", "Kill Points Delta", "KillPoints_Delta", "KillPoints"], default=0
+    combat_kp_gain = _optional_int_from_variants(
+        row, ["KillPointsDelta", "Kill Points Delta", "KillPoints_Delta", "KillPoints"]
     )
-    kills_gain = _int_from_variants(row, ["T4&T5_Kills", "T4&T5 Kills"], default=0)
+    kp_gain = combat_kp_gain or 0
+    combat_kills_gain = _optional_int_from_variants(row, ["T4&T5_Kills", "T4&T5 Kills"])
+    kills_gain = combat_kills_gain or 0
     kill_target = _int_from_variants(row, ["Kill Target", "Kill_Target", "KillTarget"], default=0)
     kill_target_percent = (
         None if is_exempt else _float_from_variants(row, ["% of Kill Target", "% of Kill target"])
@@ -192,7 +185,8 @@ async def build_kvk_stats_card_payload(
         kill_target_percent = _pct(kills_gain, kill_target)
     progress_color, progress_quote = kill_progress_policy(kill_target_percent, is_exempt=is_exempt)
 
-    deads = _int_from_variants(row, ["Deads_Delta", "Deads Delta", "Deads"], default=0)
+    combat_deads = _optional_int_from_variants(row, ["Deads_Delta", "Deads Delta", "Deads"])
+    deads = combat_deads or 0
     dead_target = _int_from_variants(row, ["Dead_Target", "Dead Target", "DeadTarget"], default=0)
     dead_target_percent = (
         None if is_exempt else _float_from_variants(row, ["% of Dead Target", "% of Dead_Target"])
@@ -211,8 +205,16 @@ async def build_kvk_stats_card_payload(
     healed = _optional_int_from_variants(
         row, ["HealedTroopsDelta", "Healed Troops Delta", "Healed_Troops_Delta"]
     )
-    kp_loss = healed * 20 if healed is not None else None
-    tanking_score_percent = _pct(kp_loss, kp_gain) if kp_loss is not None and kp_gain else None
+    combat = calculate_combat_metrics(
+        kill_points=combat_kp_gain,
+        healed=healed,
+        deads=combat_deads,
+        t4_t5_kills=combat_kills_gain,
+    )
+    kp_loss = int(combat.kp_loss) if combat.kp_loss is not None else None
+    tanking_score_percent = (
+        float(combat.tanking_score) if combat.tanking_score is not None else None
+    )
 
     pass_stats = {
         key: value
@@ -252,7 +254,6 @@ async def build_kvk_stats_card_payload(
         healed=healed,
         kp_loss=kp_loss,
         tanking_score_percent=tanking_score_percent,
-        playstyle=_playstyle(tanking_score_percent),
         acclaim=_int_from_variants(row, ["Acclaim", "AcclaimScore"], default=0),
         dkp=dkp,
         dkp_target=dkp_target,

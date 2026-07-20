@@ -7,6 +7,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
+from kvk.combat_metrics import calculate_combat_metrics
+
 AccountPortfolioState = Literal["READY", "REVIEW", "SETUP"]
 AccountDataState = Literal["CURRENT", "STALE", "NO DATA", "UNRESOLVED"]
 AccountSummarySection = Literal["overview", "combat", "economy"]
@@ -89,19 +91,21 @@ class AccountPortfolioRow:
 
     @property
     def kp_loss(self) -> int | None:
-        if self.healed_troops is None:
-            return None
-        return int(self.healed_troops) * 20
+        return calculate_combat_metrics(
+            kill_points=self.kill_points,
+            healed=self.healed_troops,
+            deads=self.deads,
+            t4_t5_kills=self.t4_t5_kills,
+        ).kp_loss
 
     @property
     def tanking_score(self) -> Decimal | None:
-        kp_loss = self.kp_loss
-        if self.kill_points is None or kp_loss is None or self.deads is None:
-            return None
-        denominator = kp_loss + int(self.deads)
-        if denominator <= 0:
-            return None
-        return Decimal(int(self.kill_points)) * Decimal(100) / Decimal(denominator)
+        return calculate_combat_metrics(
+            kill_points=self.kill_points,
+            healed=self.healed_troops,
+            deads=self.deads,
+            t4_t5_kills=self.t4_t5_kills,
+        ).tanking_score
 
 
 @dataclass(frozen=True, slots=True)

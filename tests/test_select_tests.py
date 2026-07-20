@@ -6,24 +6,25 @@ from scripts.select_tests import select_tests
 def test_select_tests_maps_stats_commands() -> None:
     commands = select_tests(["commands/stats_cmds.py"])
 
-    assert "python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py" in commands
+    assert (
+        "python -m pytest -q tests/test_stats_cmds.py "
+        "tests/test_leadership_player_review.py tests/test_mykvkstats.py" in commands
+    )
     assert "python scripts/smoke_imports.py" in commands
     assert "python scripts/validate_command_registration.py" in commands
 
 
-def test_select_tests_stats_service_triggers_stats_tests() -> None:
-    commands = select_tests(["stats_service.py"])
+def test_select_tests_leadership_player_review_triggers_focused_tests() -> None:
+    commands = select_tests(["leadership_player_review/service.py"])
 
-    assert "python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py" in commands
+    assert "python -m pytest -q tests/test_leadership_player_review.py" in commands
 
 
-def test_stats_alerts_excludes_stats_service_tests() -> None:
+def test_stats_alerts_excludes_leadership_player_review_tests() -> None:
     """stats_alerts/ is a separate subsystem and must not pull in stats service tests."""
     commands = select_tests(["stats_alerts/some_module.py"])
 
-    assert (
-        "python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py" not in commands
-    )
+    assert "python -m pytest -q tests/test_leadership_player_review.py" not in commands
 
 
 def test_select_tests_maps_subsystems_and_deduplicates() -> None:

@@ -61,7 +61,7 @@ def _payload() -> KvkHistoryPayload:
             acclaim=12_000,
             heals=36_800_000,
             kill_points=55_000_000,
-            tanking_score=0.85,
+            tanking_score=85.0,
         ),
     )
     return KvkHistoryPayload(
@@ -79,9 +79,9 @@ def _payload() -> KvkHistoryPayload:
             "Most Kills": 150_000_000,
             "Most KillPoints": 55_000_000,
             "Most Deads": 2_000_000,
-            "Most Heals": 36_800_000,
+            "Lowest Healed": 36_800_000,
             "Most DKP": 300_000_000,
-            "Lowest Tanking Score": 0.85,
+            "Highest Tanking Score": 85.0,
             "Most Pre-KVK": 900_000,
             "Most Honor": 800_000,
         },
@@ -93,9 +93,9 @@ def _payload() -> KvkHistoryPayload:
             "Most Kills": KvkHistorySummaryMetric(150_000_000, 15, 3),
             "Most KillPoints": KvkHistorySummaryMetric(55_000_000, 15, 4),
             "Most Deads": KvkHistorySummaryMetric(2_000_000, 15, 5),
-            "Most Heals": KvkHistorySummaryMetric(36_800_000, 15, 6),
+            "Lowest Healed": KvkHistorySummaryMetric(36_800_000, 15, 6),
             "Most DKP": KvkHistorySummaryMetric(300_000_000, 15, 7),
-            "Lowest Tanking Score": KvkHistorySummaryMetric(0.85, 15, 8),
+            "Highest Tanking Score": KvkHistorySummaryMetric(85.0, 15, 8),
             "Most Pre-KVK": KvkHistorySummaryMetric(900_000, 15, 10),
             "Most Honor": KvkHistorySummaryMetric(800_000, 15, 11),
         },
@@ -163,7 +163,7 @@ def test_history_trends_card_renders_png():
 
 
 def test_history_summary_tanking_score_displays_as_percent():
-    assert _summary_display_value(0.85, "score") == "85%"
+    assert _summary_display_value(85.0, "score") == "85%"
 
 
 def test_history_summary_layout_matches_requested_metric_order():
@@ -177,9 +177,9 @@ def test_history_summary_layout_matches_requested_metric_order():
         "Most Kills",
         "Most KillPoints",
         "Most Deads",
-        "Most Heals",
+        "Lowest Healed",
         "Most DKP",
-        "Lowest Tanking Score",
+        "Highest Tanking Score",
         "Most Pre-KVK",
         "Most Honor",
     ]

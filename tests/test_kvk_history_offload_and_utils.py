@@ -99,9 +99,9 @@ def test_build_history_csv_exports_rank_and_acclaim_without_zero_fill():
 
     assert "Kingdom_Rank,KVK_RANK" in csv_text
     assert "A,15,8,4" in csv_text
-    assert ",,1,1,3,4,,7,8,1750.0,5,6" in csv_text
+    assert ",,1,1,3,4,,7,8,140,5.555555555555555,5,6" in csv_text
     assert (
-        "HealedTroopsDelta,KillPointsDelta,TankingScorePct,Max_PreKvk_Points,Max_HonorPoints"
+        "HealedTroopsDelta,KillPointsDelta,KPLoss,TankingScorePct,Max_PreKvk_Points,Max_HonorPoints"
         in csv_text
     )
 
@@ -222,18 +222,20 @@ def test_fetch_history_normalizes_stringified_dict_keys(monkeypatch):
 
     captured = {}
 
-    def fake_fetch(ids):
+    def fake_fetch(ids, finalized):
         captured["ids"] = ids
+        captured["finalized"] = finalized
         return rows
 
     monkeypatch.setattr(
         kvk_history_service.kvk_history_dal, "fetch_history_rows_for_governors", fake_fetch
     )
-    monkeypatch.setattr(kvk_history_service.kvk_history_dal, "get_started_kvks", lambda: [10])
+    monkeypatch.setattr(kvk_history_service, "get_finalized_kvks", lambda: [10])
 
     df = khu.fetch_history_for_governors("dict_keys([2441482])")
 
     assert captured["ids"] == [2441482]
+    assert captured["finalized"] == [10]
     assert list(df["Gov_ID"]) == [2441482]
 
 

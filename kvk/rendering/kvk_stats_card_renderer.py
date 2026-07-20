@@ -508,7 +508,7 @@ def render_kvk_stats_card(
         w=col_w,
         title="Tanking Score",
         value=_pct(payload.tanking_score_percent),
-        sub=payload.playstyle or "Not enough data",
+        sub="Higher is better" if payload.tanking_score_percent is not None else "Not enough data",
         color=PURPLE if payload.tanking_score_percent is not None else MUTED,
     )
     _metric(

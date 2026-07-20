@@ -156,7 +156,7 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
         "activity": {"activity_top": "top"},
     }
 
-    assert len(names) == 37
+    assert len(names) == 36
     assert "kvk" in names
     assert "kvk_admin" in names
     assert "me" in names
@@ -189,7 +189,7 @@ def test_current_command_surface_reflects_phase5a_admin_grouping():
     assert sum(len(commands) for commands in grouped.values()) == 100
     assert "calendar" in names
     assert "honor_rankings" in names
-    assert "player_profile" in names
+    assert "player_profile" not in names
     assert "ping" in names
     assert "vote_admin" in names
     assert {

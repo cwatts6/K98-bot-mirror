@@ -58,6 +58,8 @@ def _payload(
                     "Acclaim": 10_000_000 - (idx * 10_000),
                     "Tanking Score": 80.0 + idx,
                     "Kill Points": 200_000_000 - (idx * 1_000_000),
+                    "KP Loss": 100_000_000 - (idx * 1_000_000),
+                    "Deads": 9_000_000 - (idx * 100_000),
                     "Healed": 10_000_000 - (idx * 100_000),
                     "Governor ID": str(1000 + idx),
                     "KVK": 3,
@@ -151,7 +153,7 @@ def test_kvk_rankings_top10_card_metric_support_texts_match_card_copy():
     )
 
     assert _support_text(acclaim_payload, row) == "Kills 148.8M  |  Healed 9.9M"
-    assert _support_text(tanking_payload, row) == "Kill Points 199M  |  Healed 9.9M"
+    assert _support_text(tanking_payload, row) == "KP Loss 99M  |  Deads 8.9M"
 
 
 def test_current_rankings_top10_card_mode_specific_context_and_support_copy():

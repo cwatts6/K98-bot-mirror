@@ -64,7 +64,6 @@ APPROVED_TOP_LEVEL_COMMANDS = frozenset(
         "next_kvk_fight",
         "ops",
         "ping",
-        "player_profile",
         "prekvk",
         "register_governor",
         "registry",

@@ -16,21 +16,17 @@ from commands.deprecation_helpers import CommandRedirect, send_deprecated_comman
 from constants import CREDENTIALS_FILE, DATABASE, KVK_SHEET_NAME, PASSWORD, SERVER, USERNAME
 from core.interaction_safety import safe_command, safe_defer
 from decoraters import (
-    _actor_from_ctx,
     channel_only,
     is_admin_and_notify_channel,
-    is_admin_or_leadership,
     track_usage,
 )
-from embed_my_stats import SliceButtons, build_embeds
 from gsheet_module import run_kvk_export_test, run_kvk_proc_exports_with_alerts
 from kvk.services import kvk_admin_service
-from profile_cache import autocomplete_choices
 from stats_alerts.embeds.kvk import send_kvk_embed
 from stats_alerts.honors import purge_latest_honor_scan
 from stats_alerts.interface import send_stats_update_embed
 from stats_alerts.kvk_meta import is_currently_kvk
-from stats_service import get_stats_payload
+from ui.views.leadership_player_review_views import send_leadership_player_review
 from versioning import versioned
 
 logger = logging.getLogger(__name__)
@@ -326,135 +322,27 @@ def register_stats(bot_instance: ext_commands.Bot) -> None:
 
     @stats_group.command(
         name="player",
-        description="(Leadership) View stats for a player by GovernorID or fuzzy name",
+        description="Privately review one governor's leadership stats",
         guild_ids=[GUILD_ID],
     )
-    @versioned("v1.02")
+    @versioned("v2.00")
     @safe_command
-    @is_admin_or_leadership()
     @track_usage()
     async def player_stats_command(
-        ctx,
-        governor_id: int = discord.Option(
+        ctx: discord.ApplicationContext,
+        governor_id: int | None = discord.Option(
             int,
-            "Governor ID (optional if using name)",
+            "Exact Governor ID (use either ID or name)",
             required=False,
-            default=0,
         ),
-        name: str = discord.Option(
+        name: str | None = discord.Option(
             str,
-            "Partial governor name (optional if using ID)",
+            "Governor name (use either name or ID)",
             required=False,
-            default="",
+            max_length=100,
         ),
     ):
-        await safe_defer(ctx, ephemeral=True)
-
-        # Resolve actor (robust across forks)
-        user_obj, _ = _actor_from_ctx(ctx)
-        requester_id = user_obj.id
-
-        # Resolve GovernorID(s)
-        gov_ids: list[int] = []
-        if governor_id:
-            gov_ids = [int(governor_id)]
-        elif name.strip():
-            # Fuzzy match from your cached helper (label, value=str(gid)) pairs expected
-            try:
-                matches = autocomplete_choices(name.strip(), limit=5)  # -> List[Tuple[str, str]]
-            except Exception:
-                matches = []
-            # Dedupe and coerce to int
-            seen = set()
-            for _, val in matches:
-                try:
-                    gid = int(val)
-                except (TypeError, ValueError):
-                    continue
-                if gid not in seen:
-                    seen.add(gid)
-                    gov_ids.append(gid)
-        else:
-            await ctx.followup.send(
-                "Provide a **GovernorID** or a **partial name**.", ephemeral=True
-            )
-            return
-
-        if not gov_ids:
-            await ctx.followup.send("No matching governors found.", ephemeral=True)
-            return
-
-        # Initial slice & payload
-        slice_key = "wtd"
-        payload = await get_stats_payload(requester_id, gov_ids, slice_key)
-        rows = (payload or {}).get("rows") or []
-        if not rows:
-            await ctx.followup.send(
-                "No stats available yet for that player/selection.", ephemeral=True
-            )
-            return
-
-        # Build account names & name->id map
-        # Prefer PER rows for names; fall back to fuzzy labels if needed
-        per_names = sorted(
-            {
-                r.get("GovernorName", "")
-                for r in rows
-                if r.get("Grouping") == "PER" and r.get("GovernorName")
-            }
-        )
-        account_options = per_names[:]  # dropdown labels
-
-        name_to_id: dict[str, int] = {}
-        # From payload (authoritative)
-        for r in rows:
-            if r.get("Grouping") == "PER":
-                gname = str(r.get("GovernorName") or "").strip()
-                try:
-                    gid = int(r.get("GovernorID"))
-                except (TypeError, ValueError):
-                    continue
-                if gname and gid:
-                    name_to_id[gname] = gid
-        # If empty (e.g., ALL rows only), seed from fuzzy match labels if available
-        if not name_to_id and name.strip():
-            try:
-                matches = autocomplete_choices(name.strip(), limit=5)
-            except Exception:
-                matches = []
-            for label, val in matches:
-                try:
-                    name_to_id[str(label).strip()] = int(val)
-                except (TypeError, ValueError):
-                    continue
-            if not account_options:
-                account_options = list(name_to_id.keys())
-
-        # Decide initial choice
-        choice = "ALL" if len(gov_ids) > 1 else (account_options[0] if account_options else "ALL")
-
-        # Build embed & view
-        embeds, files = await build_embeds(slice_key, choice, payload)
-        view = SliceButtons(
-            requester_id=requester_id,
-            initial_slice=slice_key,
-            account_options=account_options,  # names for dropdown
-            current_choice=choice,
-            governor_ids=gov_ids,
-            name_to_id=name_to_id or None,  # enables per-account switching
-            timeout=14 * 60,
-        )
-
-        if files:
-            msg = await ctx.followup.send(embeds=embeds, files=files, view=view, ephemeral=True)
-        else:
-            msg = await ctx.followup.send(embeds=embeds, view=view, ephemeral=True)
-
-        # Let the View edit this message on timeout
-        try:
-            view.message = msg
-        except Exception:
-            pass
+        await send_leadership_player_review(ctx, governor_id=governor_id, name=name)
 
     @bot.slash_command(
         name="mykvkhistory",

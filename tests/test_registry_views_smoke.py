@@ -57,14 +57,10 @@ def test_registry_views_instantiate(monkeypatch):
         async def _lookup(_name):
             return {"status": "not_found", "message": "No results found."}
 
-        async def _send_profile(*_a, **_k):
-            return None
-
         rv.configure_registry_views(
             async_load_registry=_async_load_registry,
             lookup_governor_id=_lookup,
             target_lookup_view_factory=None,
-            send_profile_to_channel=_send_profile,
             account_order_getter=lambda: ["Main", "Alt 1"],
         )
         v1 = rv.MyRegsActionView(author_id=1, has_regs=True)
@@ -97,7 +93,6 @@ def test_registry_views_instantiate(monkeypatch):
             account_summary=summary,
         )
         m2 = rv.EnterGovernorIDModal(author_id=1, mode="register", account_type="Main")
-        v4 = rv.GovernorSelectView([("A", 1)], author_id=1)
         v5 = rv.RegisterGovernorView(_User(1), "Main", "1", "A")
         v6 = rv.ModifyGovernorView(_User(1), "Main", "2", "B")
         v7 = rv.ConfirmRemoveView(_User(1), "Main")
@@ -106,7 +101,6 @@ def test_registry_views_instantiate(monkeypatch):
         assert len(v2.children) == 1
         assert len(v3.children) == 1
         assert m2.account_type == "Main"
-        assert len(v4.children) == 1
         assert v5.governor_id == "1"
         assert v6.new_gov_id == "2"
         assert v7.account_type == "Main"

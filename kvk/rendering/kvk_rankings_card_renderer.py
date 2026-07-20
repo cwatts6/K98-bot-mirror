@@ -152,7 +152,7 @@ def _support_keys(payload: RankingPayload) -> tuple[str, str]:
         "deads": ("Power", "DKP"),
         "dkp": ("Kills", "Power"),
         "acclaim": ("Kills", "Healed"),
-        "tanking_score": ("Kill Points", "Healed"),
+        "tanking_score": ("KP Loss", "Deads"),
     }
     return by_metric.get(payload.metric, ("Power", "Kills"))
 

@@ -137,7 +137,9 @@ contract changed. No resync or SQL deployment was required, and command counts r
 100 grouped, eight `/me`, and two `/inventory`. The completed Phase 6 and Phase 7 task packs and
 starters are archived under `docs/task_packs/archive/`.
 
-Phase 8 is now the next separately gated slice. Phase 8 and Phase 9 must inherit the accepted
+Phase 8 is implemented on the dedicated bot and SQL branches and is in correction validation before
+SQL-first deployment, command resync, and operator smoke; it is not yet production accepted. Phase 8
+and Phase 9 must inherit the accepted
 `1702x924` visual family, shared tokens, centred state pill, row-0 page navigation, compact and
 unit-correct content, source/generated separation, same-payload fallback, latest-transition-wins,
 preserve-and-disable timeout, and cleanup. Their governor/player controls must use exact IDs or

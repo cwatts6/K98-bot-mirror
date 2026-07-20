@@ -27,7 +27,7 @@ HALL_OF_FAME_METRIC_LABELS: dict[HallOfFameMetric, str] = {
     HallOfFameMetric.KILL_POINTS: "KillPoints",
     HallOfFameMetric.DEADS: "Deads",
     HallOfFameMetric.DKP: "DKP",
-    HallOfFameMetric.HEALED: "Healed",
+    HallOfFameMetric.HEALED: "Lowest Healed",
     HallOfFameMetric.ACCLAIM: "Acclaim",
     HallOfFameMetric.HONOR: "Honor",
     HallOfFameMetric.PREKVK: "PreKvK",

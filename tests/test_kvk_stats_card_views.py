@@ -41,7 +41,6 @@ def _payload() -> KvkStatsCardPayload:
         healed=10_000_000,
         kp_loss=200_000_000,
         tanking_score_percent=40.0,
-        playstyle="Sniping Kills",
         acclaim=10,
         dkp=25_000_000,
         dkp_target=50_000_000,

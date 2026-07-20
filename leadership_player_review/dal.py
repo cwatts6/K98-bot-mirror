@@ -1,0 +1,411 @@
+"""Stored-procedure-only data access for leadership player review."""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from datetime import UTC, date, datetime
+from decimal import Decimal, InvalidOperation
+from typing import Any
+from uuid import UUID
+
+from file_utils import get_conn_with_retries
+from leadership_player_review.models import (
+    ActivityIndex,
+    ActivityMetric,
+    AliasRecord,
+    AllianceEpisode,
+    HistoryDepth,
+    KvkCandidate,
+    KvkPerformance,
+    LookupCandidate,
+    ReviewHeader,
+    ScanPresence,
+    SourceCoverage,
+)
+
+_QUERY_TIMEOUT_SECONDS = 12
+_MAX_GOVERNORS = 26
+
+
+def _int(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(Decimal(str(value).strip()))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+
+def _decimal(value: Any) -> Decimal | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return Decimal(str(value).strip())
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+
+def _text(value: Any) -> str | None:
+    cleaned = " ".join(str(value or "").replace("\r", " ").replace("\n", " ").split())
+    return cleaned or None
+
+
+def _date(value: Any) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    return value if isinstance(value, date) else None
+
+
+def _utc(value: Any) -> datetime | None:
+    if not isinstance(value, datetime):
+        return None
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _rows(cursor: Any) -> list[dict[str, Any]]:
+    fetched = cursor.fetchall()
+    if not fetched:
+        return []
+    names = [str(column[0]) for column in cursor.description]
+    return [dict(zip(names, row, strict=True)) for row in fetched]
+
+
+def _next_rows(cursor: Any, *, advance: bool = False) -> list[dict[str, Any]]:
+    if advance and not cursor.nextset():
+        raise ValueError("leadership SQL contract omitted a result set")
+    while cursor.description is None:
+        if not cursor.nextset():
+            raise ValueError("leadership SQL contract omitted a result set")
+    return _rows(cursor)
+
+
+def _cursor(conn: Any) -> Any:
+    cursor = conn.cursor()
+    if hasattr(cursor, "timeout"):
+        cursor.timeout = _QUERY_TIMEOUT_SECONDS
+    return cursor
+
+
+def fetch_lookup_directory(*, history_days: int = 720) -> tuple[LookupCandidate, ...]:
+    if not 1 <= int(history_days) <= 720:
+        raise ValueError("lookup history must be between 1 and 720 days")
+    with get_conn_with_retries() as conn:
+        cur = _cursor(conn)
+        cur.execute(
+            "EXEC dbo.usp_GetLeadershipPlayerLookupDirectory @HistoryDays = ?;",
+            (int(history_days),),
+        )
+        output = []
+        for row in _next_rows(cur):
+            gid = _int(row.get("GovernorID"))
+            name = _text(row.get("GovernorName"))
+            key = _text(row.get("GovernorNameKey"))
+            if not gid or not name or not key:
+                continue
+            output.append(
+                LookupCandidate(
+                    governor_id=gid,
+                    governor_name=name,
+                    normalized_name=key,
+                    current_name=_text(row.get("CurrentGovernorName")),
+                    current_alliance=_text(row.get("CurrentAlliance")),
+                    last_scan_at_utc=_utc(row.get("LastGovernorScanAtUtc")),
+                    present_latest=bool(row.get("PresentInLatestCompleteScan")),
+                    is_current_name=bool(row.get("IsCurrentName")),
+                    first_seen=_utc(row.get("FirstSeen")),
+                    last_seen=_utc(row.get("LastSeen")),
+                    seen_scan_count=_int(row.get("SeenScanCount")) or 0,
+                )
+            )
+        return tuple(output)
+
+
+def fetch_review_contract(
+    governor_id: int,
+    period_days: int,
+    *,
+    now_utc: datetime | None = None,
+) -> tuple[
+    ReviewHeader,
+    tuple[ScanPresence, ...],
+    tuple[SourceCoverage, ...],
+    tuple[ActivityMetric, ...],
+    ActivityIndex,
+    tuple[HistoryDepth, ...],
+]:
+    with get_conn_with_retries() as conn:
+        cur = _cursor(conn)
+        cur.execute(
+            "EXEC dbo.usp_GetLeadershipPlayerReview @GovernorID = ?, @PeriodDays = ?, @NowUtc = ?;",
+            (int(governor_id), int(period_days), now_utc),
+        )
+        header_rows = _next_rows(cur)
+        if len(header_rows) != 1:
+            raise ValueError("leadership review header result must contain exactly one row")
+        row = header_rows[0]
+        effective = _utc(row.get("EffectiveNowUtc"))
+        if effective is None:
+            raise ValueError("leadership review header omitted EffectiveNowUtc")
+        header = ReviewHeader(
+            governor_id=_int(row.get("GovernorID")) or int(governor_id),
+            governor_name=_text(row.get("GovernorName")),
+            current_alliance=_text(row.get("CurrentAlliance")),
+            current_power=_int(row.get("CurrentPower")),
+            city_hall=_int(row.get("CityHall")),
+            effective_now_utc=effective,
+            anchor_date=_date(row.get("AnchorDate")),
+            current_start_date=_date(row.get("CurrentStartDate")),
+            current_end_date=_date(row.get("CurrentEndDate")),
+            previous_start_date=_date(row.get("PreviousStartDate")),
+            previous_end_date=_date(row.get("PreviousEndDate")),
+            period_days=_int(row.get("PeriodDays")) or int(period_days),
+            latest_complete_scan_order=_int(row.get("LatestCompleteScanOrder")),
+            latest_complete_scan_at_utc=_utc(row.get("LatestCompleteScanAtUtc")),
+            latest_governor_scan_order=_int(row.get("LatestGovernorScanOrder")),
+            latest_governor_scan_at_utc=_utc(row.get("LatestGovernorScanAtUtc")),
+            present_latest=bool(row.get("PresentInLatestCompleteScan")),
+            first_observed_date=_date(row.get("FirstObservedDate")),
+            first_observed_offset_days=_int(row.get("FirstObservedOffsetDays")),
+            location_x=_int(row.get("LocationX")),
+            location_y=_int(row.get("LocationY")),
+            location_updated_at_utc=_utc(row.get("LocationUpdatedAtUtc")),
+            shield_ends_at_utc=_utc(row.get("ShieldEndsAtUtc")),
+        )
+
+        presence = tuple(
+            ScanPresence(
+                window=_text(item.get("WindowCode")) or "UNKNOWN",
+                complete_scans=_int(item.get("CompleteScanCount")) or 0,
+                present_scans=_int(item.get("PresentScanCount")) or 0,
+                scanned_days=_int(item.get("ScannedDayCount")) or 0,
+                present_scanned_days=_int(item.get("PresentScannedDayCount")) or 0,
+            )
+            for item in _next_rows(cur, advance=True)
+        )
+        coverage = tuple(
+            SourceCoverage(
+                window=_text(item.get("WindowCode")) or "UNKNOWN",
+                source_code=_text(item.get("SourceCode")) or "UNKNOWN",
+                required=bool(item.get("RequiredSource")),
+                expected_units=_int(item.get("ExpectedUnits")) or 0,
+                valid_units=_int(item.get("ValidUnits")) or 0,
+                missing_units=_int(item.get("MissingUnits")) or 0,
+                reset_count=_int(item.get("ResetCount")) or 0,
+                state=_text(item.get("CoverageState")) or "NO_DATA",
+            )
+            for item in _next_rows(cur, advance=True)
+        )
+        metrics = tuple(
+            ActivityMetric(
+                order=_int(item.get("MetricOrder")) or 0,
+                code=_text(item.get("MetricCode")) or "UNKNOWN",
+                current_total=_decimal(item.get("CurrentTotal")),
+                current_valid_days=_int(item.get("CurrentValidReportingDays")) or 0,
+                current_average=_decimal(item.get("CurrentAveragePerValidDay")),
+                previous_total=_decimal(item.get("PreviousTotal")),
+                previous_valid_days=_int(item.get("PreviousValidReportingDays")) or 0,
+                previous_average=_decimal(item.get("PreviousAveragePerValidDay")),
+                comparison_mode=_text(item.get("ComparisonMode")) or "UNAVAILABLE",
+                comparison_percent=_decimal(item.get("ComparisonPercent")),
+                expected_units=_int(item.get("CurrentExpectedUnits")) or 0,
+                missing_units=_int(item.get("CurrentMissingUnits")) or 0,
+                reset_count=_int(item.get("CurrentResetCount")) or 0,
+                available=bool(item.get("CurrentIsAvailable")),
+                kingdom_rank=_int(item.get("KingdomRank")),
+                cohort_count=_int(item.get("RankCohortCount")),
+                percentile=_decimal(item.get("PercentileScore")),
+                top_percent=_decimal(item.get("TopPercent")),
+            )
+            for item in _next_rows(cur, advance=True)
+        )
+        index_rows = _next_rows(cur, advance=True)
+        index_row = index_rows[0] if index_rows else {}
+        activity_index = ActivityIndex(
+            value=_decimal(index_row.get("ActivityIndex")),
+            rank=_int(index_row.get("ActivityRank")),
+            cohort_count=_int(index_row.get("ActivityRankCohortCount")),
+            components=tuple(
+                (label, _decimal(index_row.get(column)))
+                for label, column in (
+                    ("Forts", "FortsScore"),
+                    ("Helps", "HelpsScore"),
+                    ("Tech", "TechScore"),
+                    ("RSS", "RSSScore"),
+                    ("Building", "BuildingScore"),
+                    ("Power", "PowerScore"),
+                )
+            ),
+            availability=_text(index_row.get("Availability")) or "MISSING_COMPONENT",
+        )
+        history = tuple(
+            HistoryDepth(
+                source_code=_text(item.get("SourceCode")) or "UNKNOWN",
+                history_kind=_text(item.get("HistoryKind")) or "UNKNOWN",
+                earliest=_date(item.get("EarliestObservedDate")),
+                latest=_date(item.get("LatestObservedDate")),
+                observation_count=_int(item.get("ObservationCount")) or 0,
+                gap_count=_int(item.get("GapCount")),
+                longest_gap_days=_int(item.get("LongestGapDays")),
+                evidence_basis=_text(item.get("EvidenceBasis")) or "UNKNOWN",
+            )
+            for item in _next_rows(cur, advance=True)
+        )
+        return header, presence, coverage, metrics, activity_index, history
+
+
+def _governor_id_values_sql(ids: tuple[int, ...]) -> tuple[str, tuple[Any, ...]]:
+    padded: tuple[Any, ...] = (*ids, *(None for _ in range(_MAX_GOVERNORS - len(ids))))
+    return ", ".join("(?)" for _ in range(_MAX_GOVERNORS)), padded
+
+
+def fetch_identity_history(
+    governor_ids: Iterable[int], *, history_days: int = 720
+) -> tuple[tuple[AliasRecord, ...], tuple[AllianceEpisode, ...]]:
+    ids = tuple(dict.fromkeys(int(value) for value in governor_ids if int(value) > 0))
+    if not 1 <= len(ids) <= _MAX_GOVERNORS:
+        raise ValueError("identity history requires between 1 and 26 Governor IDs")
+    values_sql, params = _governor_id_values_sql(ids)
+    sql = f"""
+        SET NOCOUNT ON;
+        DECLARE @GovernorIDs dbo.IntList;
+        INSERT INTO @GovernorIDs(ID)
+        SELECT DISTINCT GovernorID FROM (VALUES {values_sql}) AS v(GovernorID)
+        WHERE GovernorID IS NOT NULL;
+        EXEC dbo.usp_GetLeadershipPlayerIdentityHistory
+             @GovernorIDs = @GovernorIDs, @HistoryDays = ?;
+    """
+    with get_conn_with_retries() as conn:
+        cur = _cursor(conn)
+        cur.execute(sql, (*params, int(history_days)))
+        aliases = tuple(
+            AliasRecord(
+                governor_id=_int(row.get("GovernorID")) or 0,
+                governor_name=_text(row.get("GovernorName")) or "Unknown",
+                first_seen=_utc(row.get("FirstSeen")),
+                last_seen=_utc(row.get("LastSeen")),
+                seen_scan_count=_int(row.get("SeenScanCount")) or 0,
+            )
+            for row in _next_rows(cur)
+        )
+        episodes = tuple(
+            AllianceEpisode(
+                governor_id=_int(row.get("GovernorID")) or 0,
+                sequence=_int(row.get("EpisodeSequence")) or 0,
+                alliance=_text(row.get("Alliance")) or "Unallied",
+                first_observed=_date(row.get("FirstObservedDate")),
+                last_observed=_date(row.get("LastObservedDate")),
+                observed_scans=_int(row.get("ObservedScanCount")) or 0,
+                current=bool(row.get("IsCurrentEpisode")),
+            )
+            for row in _next_rows(cur, advance=True)
+        )
+        return aliases, episodes
+
+
+def fetch_kvk_history(
+    governor_id: int, *, candidate_limit: int = 12
+) -> tuple[tuple[KvkCandidate, ...], tuple[KvkPerformance, ...]]:
+    with get_conn_with_retries() as conn:
+        cur = _cursor(conn)
+        cur.execute(
+            "EXEC dbo.usp_GetLeadershipPlayerKvkHistory @GovernorID = ?, @CandidateLimit = ?;",
+            (int(governor_id), int(candidate_limit)),
+        )
+        candidates = tuple(
+            KvkCandidate(
+                kvk_no=_int(row.get("KVK_NO")) or 0,
+                kvk_name=_text(row.get("KVK_NAME")),
+                registration_date=_date(row.get("KVK_REGISTRATION_DATE")),
+                start_date=_date(row.get("KVK_START_DATE")),
+                end_date=_date(row.get("KVK_END_DATE")),
+                matchmaking_scan=_int(row.get("MATCHMAKING_SCAN")),
+                kvk_end_scan=_int(row.get("KVK_END_SCAN")),
+                matchmaking_start_date=_date(row.get("MATCHMAKING_START_DATE")),
+                fighting_start_date=_date(row.get("FIGHTING_START_DATE")),
+                pass4_start_scan=_int(row.get("PASS4_START_SCAN")),
+                final_data_at_utc=_utc(row.get("FinalDataAtUtc")),
+                final_scan_order=_int(row.get("FinalScanOrder")),
+                final_output_state=_text(row.get("FinalOutputState")),
+                finalization_basis=_text(row.get("FinalizationBasis")),
+            )
+            for row in _next_rows(cur)
+        )
+        rows = tuple(
+            KvkPerformance(
+                kvk_no=_int(row.get("KVK_NO")) or 0,
+                kvk_name=None,
+                governor_id=_int(row.get("GovernorID")) or int(governor_id),
+                governor_name=_text(row.get("GovernorName")),
+                kvk_rank=_int(row.get("KVKRank")),
+                t4_t5_kills=_int(row.get("T4T5Kills")),
+                kill_target=_int(row.get("KillTarget")),
+                kill_target_percent=_decimal(row.get("KillTargetPercent")),
+                kill_points=_int(row.get("KillPoints")),
+                deads=_int(row.get("Deads")),
+                dead_target=_int(row.get("DeadTarget")),
+                dead_target_percent=_decimal(row.get("DeadTargetPercent")),
+                healed=_int(row.get("Healed")),
+                kp_loss=_int(row.get("KPLoss")),
+                tanking_score=_decimal(row.get("TankingScore")),
+                acclaim=_int(row.get("Acclaim")),
+                dkp=_int(row.get("DKP")),
+                dkp_target=_int(row.get("DKPTarget")),
+                dkp_target_percent=_decimal(row.get("DKPTargetPercent")),
+                prekvk_points=_int(row.get("PreKvkPoints")),
+                prekvk_rank=_int(row.get("PreKvkRank")),
+                honor_points=_int(row.get("HonorPoints")),
+                honor_rank=_int(row.get("HonorRank")),
+                exempt=bool(row.get("IsExempt")),
+                engaged=bool(row.get("IsEngaged")),
+                healed_rank=_int(row.get("HealedRank")),
+                tanking_rank=_int(row.get("TankingRank")),
+                engaged_cohort_count=_int(row.get("EngagedCohortCount")),
+                tanking_cohort_count=_int(row.get("TankingCohortCount")),
+                final_data_at_utc=_utc(row.get("FinalDataAtUtc")),
+                final_output_state=_text(row.get("FinalOutputState")),
+                finalization_basis=_text(row.get("FinalizationBasis")),
+                personal_completed_kvk_best_acclaim=_int(
+                    row.get("PersonalCompletedKvkBestAcclaim")
+                ),
+            )
+            for row in _next_rows(cur, advance=True)
+        )
+        return candidates, rows
+
+
+def record_audit(
+    *,
+    actor_id: int,
+    target_governor_id: int | None,
+    guild_id: int,
+    channel_id: int,
+    authorization_basis: str,
+    authorization_role_id: int | None,
+    action: str,
+    outcome: str,
+    error_code: str | None,
+    correlation_id: UUID,
+) -> None:
+    with get_conn_with_retries() as conn:
+        cur = _cursor(conn)
+        cur.execute(
+            """
+            EXEC dbo.usp_RecordLeadershipPlayerReviewAudit
+                 @ActorDiscordID = ?, @TargetGovernorID = ?, @GuildID = ?, @ChannelID = ?,
+                 @AuthorizationBasis = ?, @AuthorizationRoleID = ?, @Action = ?, @Outcome = ?,
+                 @ErrorCode = ?, @RequestCorrelationID = ?;
+            """,
+            (
+                int(actor_id),
+                int(target_governor_id) if target_governor_id else None,
+                int(guild_id),
+                int(channel_id),
+                authorization_basis,
+                int(authorization_role_id) if authorization_role_id else None,
+                action,
+                outcome,
+                error_code,
+                str(correlation_id),
+            ),
+        )
+        conn.commit()

@@ -66,7 +66,6 @@ MODULES = [
     "utils",
     "bot_helpers",
     "embed_utils",
-    "embed_player_profile",
     "event_cache",
     "event_scheduler",
     "event_embed_manager",

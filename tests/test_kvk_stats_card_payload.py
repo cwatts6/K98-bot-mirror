@@ -53,7 +53,9 @@ async def test_build_payload_includes_kvk_mode_and_camp():
     assert payload.overall_kvk_top_percent == pytest.approx(0.47)
     assert payload.last_refresh == "2026-06-03 07:53 UTC"
     assert payload.kp_loss == 639_013_000
-    assert payload.playstyle == "Sniping Kills"
+    assert payload.tanking_score_percent == pytest.approx(
+        955_512_000 / (639_013_000 + 33_000_000) * 100
+    )
     assert payload.kill_progress.percent == pytest.approx(95.5512)
     assert payload.kill_progress.quote == "So close, push now!"
 
@@ -66,13 +68,41 @@ async def test_build_payload_handles_zero_kp_without_tanking_score():
             "GovernorName": "Zero KP",
             "KillPointsDelta": 0,
             "HealedTroopsDelta": 100,
+            "Deads_Delta": 1,
         },
         context=KvkStatsCardContext(kvk_name="Tides of War"),
     )
 
     assert payload.kp_loss == 2_000
+    assert payload.tanking_score_percent == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "row",
+    [
+        {
+            "GovernorID": "123",
+            "GovernorName": "Missing deads",
+            "KillPointsDelta": 100,
+            "HealedTroopsDelta": 10,
+        },
+        {
+            "GovernorID": "123",
+            "GovernorName": "Missing KP",
+            "HealedTroopsDelta": 10,
+            "Deads_Delta": 1,
+        },
+    ],
+)
+async def test_build_payload_keeps_incomplete_combat_metrics_unavailable(row):
+    payload = await build_kvk_stats_card_payload(
+        row,
+        context=KvkStatsCardContext(kvk_name="Tides of War"),
+    )
+
+    assert payload.kp_loss == 200
     assert payload.tanking_score_percent is None
-    assert payload.playstyle is None
 
 
 @pytest.mark.asyncio
@@ -89,8 +119,7 @@ async def test_build_payload_preserves_zero_healed_value():
 
     assert payload.healed == 0
     assert payload.kp_loss == 0
-    assert payload.tanking_score_percent == 0
-    assert payload.playstyle == "Sniping Kills"
+    assert payload.tanking_score_percent is None
 
 
 def test_kill_progress_policy_preserves_existing_threshold_quotes():

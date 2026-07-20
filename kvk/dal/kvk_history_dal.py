@@ -36,51 +36,51 @@ def resolve_current_kvk_no(kvk_no: int | None = None) -> int:
             return resolve_current_kvk_no_from_cursor(cur, kvk_no)
 
 
-def get_started_kvks() -> list[int]:
-    """
-    Return a contiguous range of started KVKs from the earliest tracked KVK
-    through the latest KVK whose start date has passed.
-    """
+def fetch_output_complete_kvk_candidates(limit: int = 20) -> list[dict[str, Any]]:
+    """Return bounded resolver inputs for KVKs with completed report output."""
+    bounded_limit = max(1, min(int(limit), 20))
     with get_conn_with_retries() as cn:
         with cn.cursor() as cur:
-            cur.execute("""
-                SELECT MAX(KVK_NO)
-                FROM dbo.KVK_Details
-                WHERE KVK_START_DATE IS NOT NULL
-                  AND KVK_START_DATE <= SYSUTCDATETIME();
-            """)
-            row = fetch_one_dict(cur)
-            max_started = int(next(iter(row.values())) or 0) if row else 0
-
-            if max_started == 0:
-                cur.execute("SELECT ISNULL(MAX([KVK_NO]), 0) FROM dbo.v_EXCEL_FOR_KVK_All;")
-                fallback_row = fetch_one_dict(cur)
-                max_started = int(next(iter(fallback_row.values())) or 0) if fallback_row else 0
-
-            cur.execute("""
-                SELECT MIN(TRY_CONVERT(int, REPLACE(name, 'EXCEL_FOR_KVK_', '')))
-                FROM sys.tables
-                WHERE name LIKE 'EXCEL_FOR_KVK[_]%';
-            """)
-            min_row = fetch_one_dict(cur)
-            if min_row:
-                raw_min = next(iter(min_row.values()))
-                min_kvk = int(raw_min) if raw_min is not None else 3
-            else:
-                min_kvk = 3
-            min_kvk = max(3, min_kvk)
-
-    if max_started < min_kvk:
-        return [min_kvk]
-    return list(range(min_kvk, max_started + 1))
+            cur.execute(
+                """
+                SELECT TOP (?)
+                       details.KVK_NO,
+                       details.PASS4_START_SCAN,
+                       details.KVK_END_SCAN,
+                       latest_scan.MaxScanOrder,
+                       final_header.State AS FinalOutputState
+                FROM dbo.KVK_Details AS details
+                JOIN dbo.KVKFinalReportHeader AS final_header
+                  ON final_header.KVK_NO = details.KVK_NO
+                 AND final_header.State = N'OUTPUT_COMPLETE'
+                CROSS JOIN
+                (
+                    SELECT MAX(ScanOrder) AS MaxScanOrder
+                    FROM dbo.KingdomScanData4
+                ) AS latest_scan
+                ORDER BY details.KVK_NO DESC;
+                """,
+                [bounded_limit],
+            )
+            rows = cur.fetchall()
+            cols = [column[0] for column in cur.description]
+    return [dict(zip(cols, row, strict=False)) for row in rows]
 
 
-def fetch_history_rows_for_governors(governor_ids: list[int]) -> list[dict[str, Any]]:
+def _normalized_finalized_kvk_nos(values: list[int]) -> list[int]:
+    return sorted({int(value) for value in values if int(value) > 0})[:20]
+
+
+def fetch_history_rows_for_governors(
+    governor_ids: list[int], finalized_kvk_nos: list[int]
+) -> list[dict[str, Any]]:
     """Fetch raw KVK history rows for concrete governor IDs."""
-    if not governor_ids:
+    finalized = _normalized_finalized_kvk_nos(finalized_kvk_nos)
+    if not governor_ids or not finalized:
         return []
 
     placeholders = ",".join(["?"] * len(governor_ids))
+    finalized_placeholders = ",".join(["?"] * len(finalized))
     sql = f"""
         SELECT
             CAST([Gov_ID] AS BIGINT)      AS Gov_ID,
@@ -102,23 +102,35 @@ def fetch_history_rows_for_governors(governor_ids: list[int]) -> list[dict[str, 
             CAST([Pass 6 Deads] AS BIGINT) AS P6_Deads,
             CAST([Pass 7 Deads] AS BIGINT) AS P7_Deads,
             CAST([Pass 8 Deads] AS BIGINT) AS P8_Deads
-        FROM dbo.v_EXCEL_FOR_KVK_Started
+        FROM dbo.v_EXCEL_FOR_KVK_Started AS history
         WHERE [Gov_ID] IN ({placeholders})
+          AND history.KVK_NO IN ({finalized_placeholders})
+          AND EXISTS
+          (
+              SELECT 1
+              FROM dbo.KVKFinalReportHeader AS final_header
+              WHERE final_header.KVK_NO = history.KVK_NO
+                AND final_header.State = N'OUTPUT_COMPLETE'
+          )
     """
     with get_conn_with_retries() as cn:
         cur = cn.cursor()
-        cur.execute(sql, governor_ids)
+        cur.execute(sql, [*governor_ids, *finalized])
         rows = cur.fetchall()
         cols = [c[0] for c in cur.description]
     return [dict(zip(cols, row, strict=False)) for row in rows]
 
 
-def fetch_modern_history_rows_for_governors(governor_ids: list[int]) -> list[dict[str, Any]]:
+def fetch_modern_history_rows_for_governors(
+    governor_ids: list[int], finalized_kvk_nos: list[int]
+) -> list[dict[str, Any]]:
     """Fetch null-preserving KVK history rows for the modern history payload/export."""
-    if not governor_ids:
+    finalized = _normalized_finalized_kvk_nos(finalized_kvk_nos)
+    if not governor_ids or not finalized:
         return []
 
     placeholders = ",".join(["?"] * len(governor_ids))
+    finalized_placeholders = ",".join(["?"] * len(finalized))
     sql = f"""
         SELECT
             CAST([Rank] AS INT)          AS Kingdom_Rank,
@@ -156,107 +168,48 @@ def fetch_modern_history_rows_for_governors(governor_ids: list[int]) -> list[dic
             CAST([Pass 6 Deads] AS BIGINT) AS P6_Deads,
             CAST([Pass 7 Deads] AS BIGINT) AS P7_Deads,
             CAST([Pass 8 Deads] AS BIGINT) AS P8_Deads
-        FROM dbo.v_EXCEL_FOR_KVK_Started
+        FROM dbo.v_EXCEL_FOR_KVK_Started AS history
         WHERE [Gov_ID] IN ({placeholders})
+          AND history.KVK_NO IN ({finalized_placeholders})
+          AND EXISTS
+          (
+              SELECT 1
+              FROM dbo.KVKFinalReportHeader AS final_header
+              WHERE final_header.KVK_NO = history.KVK_NO
+                AND final_header.State = N'OUTPUT_COMPLETE'
+          )
         ORDER BY [Gov_ID], [KVK_NO]
     """
     with get_conn_with_retries() as cn:
         cur = cn.cursor()
-        cur.execute(sql, governor_ids)
+        cur.execute(sql, [*governor_ids, *finalized])
         rows = cur.fetchall()
         cols = [c[0] for c in cur.description]
     return [dict(zip(cols, row, strict=False)) for row in rows]
 
 
-def fetch_history_summary_metric_ranks(governor_id: int) -> list[dict[str, Any]]:
-    """Fetch all-time, all-governor ranks for modern KVK history summary record rows."""
+def fetch_history_summary_metric_ranks(
+    governor_id: int, finalized_kvk_nos: list[int]
+) -> list[dict[str, Any]]:
+    """Fetch canonical ranks for a bounded set of finalized KVK outputs."""
+    normalized = sorted({int(value) for value in finalized_kvk_nos if int(value) > 0})[:20]
+    if not normalized:
+        return []
+    padded: list[int | None] = [*normalized, *([None] * (20 - len(normalized)))]
     sql = """
-        WITH MetricRows AS (
-            SELECT
-                'Highest Acclaim' AS Metric,
-                CAST([Gov_ID] AS BIGINT) AS Gov_ID,
-                CAST([KVK_NO] AS INT) AS KVK_NO,
-                TRY_CONVERT(float, [Acclaim]) AS MetricValue,
-                CAST(0 AS BIT) AS LowerIsBetter
-            FROM dbo.v_EXCEL_FOR_KVK_Started
-            WHERE TRY_CONVERT(float, [Acclaim]) > 0
-
-            UNION ALL
-            SELECT 'Most Kills', CAST([Gov_ID] AS BIGINT), CAST([KVK_NO] AS INT),
-                   TRY_CONVERT(float, [T4&T5_Kills]), CAST(0 AS BIT)
-            FROM dbo.v_EXCEL_FOR_KVK_Started
-            WHERE TRY_CONVERT(float, [T4&T5_Kills]) > 0
-
-            UNION ALL
-            SELECT 'Most KillPoints', CAST([Gov_ID] AS BIGINT), CAST([KVK_NO] AS INT),
-                   TRY_CONVERT(float, [KillPointsDelta]), CAST(0 AS BIT)
-            FROM dbo.v_EXCEL_FOR_KVK_Started
-            WHERE TRY_CONVERT(float, [KillPointsDelta]) > 0
-
-            UNION ALL
-            SELECT 'Most Deads', CAST([Gov_ID] AS BIGINT), CAST([KVK_NO] AS INT),
-                   TRY_CONVERT(float, [Deads_Delta]), CAST(0 AS BIT)
-            FROM dbo.v_EXCEL_FOR_KVK_Started
-            WHERE TRY_CONVERT(float, [Deads_Delta]) > 0
-
-            UNION ALL
-            SELECT 'Most Heals', CAST([Gov_ID] AS BIGINT), CAST([KVK_NO] AS INT),
-                   TRY_CONVERT(float, [HealedTroopsDelta]), CAST(0 AS BIT)
-            FROM dbo.v_EXCEL_FOR_KVK_Started
-            WHERE TRY_CONVERT(float, [HealedTroopsDelta]) > 0
-
-            UNION ALL
-            SELECT 'Most DKP', CAST([Gov_ID] AS BIGINT), CAST([KVK_NO] AS INT),
-                   TRY_CONVERT(float, [DKP_SCORE]), CAST(0 AS BIT)
-            FROM dbo.v_EXCEL_FOR_KVK_Started
-            WHERE TRY_CONVERT(float, [DKP_SCORE]) > 0
-
-            UNION ALL
-            SELECT
-                'Lowest Tanking Score',
-                CAST([Gov_ID] AS BIGINT),
-                CAST([KVK_NO] AS INT),
-                (TRY_CONVERT(float, [HealedTroopsDelta]) * 20.0)
-                    / NULLIF(TRY_CONVERT(float, [KillPointsDelta]), 0.0),
-                CAST(1 AS BIT)
-            FROM dbo.v_EXCEL_FOR_KVK_Started
-            WHERE TRY_CONVERT(float, [HealedTroopsDelta]) > 0
-              AND TRY_CONVERT(float, [KillPointsDelta]) > 0
-
-            UNION ALL
-            SELECT 'Most Pre-KVK', CAST([Gov_ID] AS BIGINT), CAST([KVK_NO] AS INT),
-                   TRY_CONVERT(float, [Max_PreKvk_Points]), CAST(0 AS BIT)
-            FROM dbo.v_EXCEL_FOR_KVK_Started
-            WHERE TRY_CONVERT(float, [Max_PreKvk_Points]) > 0
-
-            UNION ALL
-            SELECT 'Most Honor', CAST([Gov_ID] AS BIGINT), CAST([KVK_NO] AS INT),
-                   TRY_CONVERT(float, [Max_HonorPoints]), CAST(0 AS BIT)
-            FROM dbo.v_EXCEL_FOR_KVK_Started
-            WHERE TRY_CONVERT(float, [Max_HonorPoints]) > 0
-        ),
-        Ranked AS (
-            SELECT
-                Metric,
-                Gov_ID,
-                KVK_NO,
-                MetricValue,
-                RANK() OVER (
-                    PARTITION BY Metric
-                    ORDER BY
-                        CASE WHEN LowerIsBetter = 1 THEN MetricValue END ASC,
-                        CASE WHEN LowerIsBetter = 0 THEN MetricValue END DESC
-                ) AS Overall_Rank
-            FROM MetricRows
-            WHERE MetricValue IS NOT NULL
-        )
-        SELECT Metric, Gov_ID, KVK_NO, MetricValue, Overall_Rank
-        FROM Ranked
-        WHERE Gov_ID = ?
+        DECLARE @FinalizedKvkNos dbo.IntList;
+        INSERT INTO @FinalizedKvkNos (ID)
+        SELECT DISTINCT ID
+        FROM (VALUES (?), (?), (?), (?), (?), (?), (?), (?), (?), (?),
+                     (?), (?), (?), (?), (?), (?), (?), (?), (?), (?)) AS input(ID)
+        WHERE ID IS NOT NULL;
+        EXEC dbo.usp_GetKvkHistorySummaryMetricRanks
+             @GovernorID = ?,
+             @FinalizedKvkNos = @FinalizedKvkNos;
     """
     with get_conn_with_retries() as cn:
         cur = cn.cursor()
-        cur.execute(sql, [governor_id])
+        cur.execute(sql, [*padded, governor_id])
         rows = cur.fetchall()
         cols = [c[0] for c in cur.description]
     return [dict(zip(cols, row, strict=False)) for row in rows]

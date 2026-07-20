@@ -6,6 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from kvk.combat_metrics import calculate_combat_metrics
 from kvk.dal import kvk_rankings_dal
 from kvk.models.kvk_rankings import (
     CURRENT_RANKING_MODES,
@@ -20,7 +21,7 @@ from kvk.models.kvk_rankings import (
 )
 from prekvk import report_service
 from prekvk.models import PreKvkReportPayload, PreKvkReportRow, PreKvkReportSort
-from services import governor_account_service
+from services import governor_account_service, kvk_history_service
 from stats_alerts.honors import get_latest_honor_top
 from utils import load_stat_cache, parse_last_refresh_utc
 
@@ -190,6 +191,20 @@ def _to_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def _optional_int_from_row(row: dict[str, Any], keys: tuple[str, ...]) -> int | None:
+    for key in keys:
+        if key not in row:
+            continue
+        value = row.get(key)
+        if value in (None, ""):
+            continue
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def _display_name(raw: dict[str, Any], *, id_keys: tuple[str, ...] = ("GovernorID",)) -> str:
     raw_name = raw.get("GovernorName") or raw.get("Governor_Name")
     if raw_name and str(raw_name).strip():
@@ -246,15 +261,44 @@ def _kvk_healed(row: dict[str, Any]) -> int:
 
 
 def _kvk_tanking_score(row: dict[str, Any]) -> float:
-    kp_gain = _kvk_kill_points(row)
-    healed = _kvk_healed(row)
-    if not kp_gain or not healed:
-        return 0.0
-    return healed * 20 / kp_gain * 100.0
+    score = _kvk_combat(row).tanking_score
+    return float(score) if score is not None else 0.0
+
+
+def _kvk_kp_loss(row: dict[str, Any]) -> int:
+    return _kvk_combat(row).kp_loss or 0
 
 
 def _kvk_has_tanking_score(row: dict[str, Any]) -> bool:
-    return _kvk_kill_points(row) > 0 and _kvk_healed(row) > 0
+    combat = _kvk_combat(row)
+    return combat.engaged and combat.tanking_score is not None
+
+
+def _kvk_combat(row: dict[str, Any]):
+    return calculate_combat_metrics(
+        kill_points=_optional_int_from_row(
+            row,
+            ("KillPointsDelta", "Kill Points Delta", "KillPoints_Delta", "KillPoints"),
+        ),
+        healed=_optional_int_from_row(
+            row,
+            ("HealedTroopsDelta", "Healed Troops Delta", "Healed_Troops_Delta"),
+        ),
+        deads=_optional_int_from_row(row, ("Deads_Delta", "Deads")),
+        t4_t5_kills=_kvk_kills(row),
+    )
+
+
+def _kvk_is_engaged(row: dict[str, Any]) -> bool:
+    return _kvk_combat(row).engaged
+
+
+def _kvk_has_healed(row: dict[str, Any]) -> bool:
+    healed = _optional_int_from_row(
+        row,
+        ("HealedTroopsDelta", "Healed Troops Delta", "Healed_Troops_Delta"),
+    )
+    return healed is not None and _kvk_is_engaged(row)
 
 
 def _kvk_pct_kill_target(row: dict[str, Any]) -> float:
@@ -315,13 +359,14 @@ def build_kvk_rankings_payload_from_rows(
     raw_rows = list(rows or [])
     filtered = _filter_kvk_rows(raw_rows)
     getter = _kvk_metric_getter(normalized_metric)
-    rankable_rows = (
-        [row for row in filtered if _kvk_has_tanking_score(row)]
-        if normalized_metric == "tanking_score"
-        else filtered
-    )
-    sort_key: Callable[[dict[str, Any]], tuple[int | float, int | float, int]]
     if normalized_metric == "tanking_score":
+        rankable_rows = [row for row in filtered if _kvk_has_tanking_score(row)]
+    elif normalized_metric == "healed":
+        rankable_rows = [row for row in filtered if _kvk_has_healed(row)]
+    else:
+        rankable_rows = filtered
+    sort_key: Callable[[dict[str, Any]], tuple[int | float, int | float, int]]
+    if normalized_metric == "healed":
         sort_key = lambda row: (getter(row), -_kvk_power(row), _row_governor_id(row))
     else:
         sort_key = lambda row: (-getter(row), -_kvk_power(row), _row_governor_id(row))
@@ -331,13 +376,19 @@ def build_kvk_rankings_payload_from_rows(
     )
     ranking_rows: list[RankingRow] = []
     selected_rows = sorted_rows if include_all else sorted_rows[:normalized_limit]
+    previous_value: int | float | None = None
+    competition_rank = 0
     for index, raw in enumerate(selected_rows, start=1):
+        value = getter(raw)
+        if previous_value is None or value != previous_value:
+            competition_rank = index
+            previous_value = value
         ranking_rows.append(
             RankingRow(
-                rank=index,
+                rank=competition_rank,
                 governor_id=_row_governor_id(raw),
                 governor_name=_display_name(raw, id_keys=("GovernorID", "Gov_ID")),
-                value=getter(raw),
+                value=value,
                 supporting_values={
                     "Power": _kvk_power(raw),
                     "Kills": _kvk_kills(raw),
@@ -347,6 +398,7 @@ def build_kvk_rankings_payload_from_rows(
                     "Acclaim": _kvk_acclaim(raw),
                     "Tanking Score": _kvk_tanking_score(raw),
                     "Kill Points": _kvk_kill_points(raw),
+                    "KP Loss": _kvk_kp_loss(raw),
                     "Healed": _kvk_healed(raw),
                 },
                 raw=dict(raw),
@@ -662,7 +714,7 @@ def _clean_rank_message_text(value: Any) -> str:
 
 
 def _is_lower_better_rank(mode: str, metric: str) -> bool:
-    return mode == "kvk" and metric == "tanking_score"
+    return mode == "kvk" and metric == "healed"
 
 
 def _gap_to_next_rank(
@@ -876,7 +928,7 @@ def build_hall_of_fame_payload_from_rows(
         metric_label=metric_label,
         limit=normalized_limit,
         rows=ranking_rows,
-        source_note="Single-KVK performances across started KVKs",
+        source_note="Single-KVK performances across finalized KVK outputs",
         total_rows=total_rows,
     )
 
@@ -890,9 +942,11 @@ async def build_hall_of_fame_payload(
         metric if isinstance(metric, HallOfFameMetric) else parse_hall_of_fame_metric(metric)
     )
     normalized_limit = normalize_hall_of_fame_limit(limit)
+    finalized_kvks = await asyncio.to_thread(kvk_history_service.get_finalized_kvks)
     rows = await asyncio.to_thread(
         kvk_rankings_dal.fetch_hall_of_fame_records,
         parsed_metric,
+        finalized_kvks,
         limit=normalized_limit,
     )
     return build_hall_of_fame_payload_from_rows(parsed_metric, rows, limit=normalized_limit)

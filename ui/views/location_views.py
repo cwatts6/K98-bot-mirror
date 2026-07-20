@@ -22,17 +22,6 @@ class OpenFullSizeView(discord.ui.View):
         )
 
 
-class ProfileLinksView(discord.ui.View):
-    def __init__(self, card_url: str | None = None):
-        super().__init__(timeout=None)
-        if card_url:
-            self.add_item(
-                discord.ui.Button(
-                    style=discord.ButtonStyle.link, label="Open full card", url=card_url
-                )
-            )
-
-
 async def _default_run_refresh_guarded(coro: Callable[[], Awaitable[None]]) -> bool:
     await coro()
     return True
@@ -255,7 +244,6 @@ class RefreshLocationView(discord.ui.View):
 __all__ = [
     "LocationSelectView",
     "OpenFullSizeView",
-    "ProfileLinksView",
     "RefreshLocationView",
     "_LocationSelect",
     "configure_location_views",

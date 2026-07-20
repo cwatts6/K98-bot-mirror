@@ -49,7 +49,6 @@ class KvkStatsCardPayload:
     healed: int | None
     kp_loss: int | None
     tanking_score_percent: float | None
-    playstyle: str | None
     acclaim: int
     dkp: int
     dkp_target: int

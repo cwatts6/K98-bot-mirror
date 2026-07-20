@@ -1818,7 +1818,8 @@ execution record. No command resync or SQL deployment was required.
 
 ### Phase 8 — Leadership `/stats player` Modernisation, Canonical Combat Metric Alignment and `/player_profile` Retirement
 
-Status: `next active slice; task pack and chat starter prepared after Phase 7 acceptance`.
+Status: `implemented on dedicated bot and SQL branches; final correction validation in progress;
+SQL-first deployment, resync, smoke, and operator acceptance pending`.
 
 Goal: replace fragmented leadership player tools with one private, permission-gated,
 decision-oriented review of a selected Governor ID.
@@ -2214,7 +2215,7 @@ The programme is complete when:
 - [x] Exact seven-period boundaries, signed metrics, coverage-aware All Linked aggregation, RSS/Fort and Combat charts, fallback, timeout, accessibility, and performance passed operator smoke on 2026-07-18.
 - [x] The KVK history placement review is closed: `/kvk history` remains canonical and `/me history` will not be implemented.
 - [ ] Phase 7 aligns the retained `/me` visual/content system without command, data, permission, or product changes.
-- [ ] Phase 8 modernises private `/stats player`, aligns canonical Tanking Score globally, and removes `/player_profile` with no redirect.
+- [ ] Phase 8 implementation modernises private `/stats player`, aligns canonical Tanking Score globally, and removes `/player_profile` with no redirect; final validation, SQL-first deployment, resync, smoke, and operator acceptance remain.
 - [ ] Phase 9 adds private `/stats kingdom` with dynamic-roster monthly trends and the latest four completed KVKs.
 - [x] Legacy commands are only redirected/removed after usage evidence and explicit operator approval; Phase 5F, Phase 5G, Phase 6, and the approved future Phase 8 removal each have route-specific decisions.
 - [x] Documentation reflects GovernorOS v2 completion through Phase 6 and the approved Phase 7-11 roadmap.
@@ -2242,10 +2243,10 @@ Do not include these in early phases unless separately approved:
 
 ## 20. Suggested Next Action
 
-Phase 7 is complete, operator accepted, and archived. Phase 8 is the next active implementation
-candidate: begin with the command/caller/permission/source/history/formula audit in its task pack,
-apply the locked Phase 7 visual/navigation/governor-control inheritance contract, and stop for
-operator approval before SQL or bot implementation.
+Phase 7 is complete, operator accepted, and archived. Phase 8 has passed its staged approvals and is
+implemented on dedicated bot and SQL branches. Complete correction validation and fresh bot/SQL
+Changes reviews, then deploy SQL first, deploy the bot, restart, resync, smoke, observe, and promote
+only the accepted patch. Phase 9 remains blocked on Phase 8 operator acceptance.
 
 Phase 9 follows only after Phase 8 acceptance. Phase 10 is usage-led compatibility review, and
 Phase 11 remains an uncommitted future feature candidate.

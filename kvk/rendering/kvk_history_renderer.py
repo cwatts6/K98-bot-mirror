@@ -166,7 +166,7 @@ def _trend_value(value: float | None, kind: str) -> str:
     if kind == "rank":
         return f"#{int(float(value) + 0.5)}"
     if kind in {"percent", "score"}:
-        return _pct(float(value) * 100 if kind == "score" else float(value))
+        return _pct(float(value))
     return _compact(value)
 
 
@@ -308,7 +308,7 @@ def _draw_last3_rows(draw: ImageDraw.ImageDraw, payload: KvkHistoryPayload) -> N
             _draw_text(
                 draw,
                 (170, y + 18),
-                "No row found for this governor in this started KVK.",
+                "No row found for this governor in this finalized KVK.",
                 fill=MUTED,
                 font=_font(23, bold=True),
                 bold=True,
@@ -422,11 +422,11 @@ SUMMARY_METRIC_LAYOUT = (
         ("Most Kills", "Most Kills", GREEN, "number"),
         ("Most KillPoints", "Most KillPoints", GREEN, "number"),
         ("Most Deads", "Most Deads", RED, "number"),
-        ("Most Heals", "Most Heals", BLUE, "number"),
+        ("Lowest Healed", "Lowest Healed", BLUE, "number"),
     ),
     (
         ("Most DKP", "Most DKP", PURPLE, "number"),
-        ("Lowest Tanking Score", "Lowest Tanking Score", BLUE, "score"),
+        ("Highest Tanking Score", "Highest Tanking Score", BLUE, "score"),
         ("Most Pre-KVK", "Most Pre-KVK", BLUE, "number"),
         ("Most Honor", "Most Honor", GOLD, "number"),
     ),
@@ -439,7 +439,7 @@ def _summary_display_value(value: int | float | None, kind: str) -> str:
     if kind == "rank":
         return f"#{int(value)}"
     if kind == "score":
-        return f"{float(value) * 100:.0f}%"
+        return f"{float(value):.0f}%"
     return _compact(value)
 
 

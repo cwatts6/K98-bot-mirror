@@ -1491,20 +1491,31 @@ Do not use a standard/deep codebase scan unless explicitly requested.
 
 ## 39. Deployment Order
 
-1. Complete audit/design and approvals.
-2. Develop SQL migrations/contracts in SQL repo.
-3. Validate/backfill history and source calendar.
-4. Deploy additive SQL first.
-5. Verify procedures, permissions, plans, history bounds, header/backfill, audit purge.
-6. Deploy coordinated bot patch:
+1. Complete audit/design, implementation, correction validation, and separate bot/SQL Changes reviews.
+2. Deploy SQL migrations `20260719_001` through `20260719_007` in order.
+3. For every historically finalized KVK required by the latest-three experience, execute
+   `dbo.usp_BackfillKvkFinalReportCompletion` with an explicit audited KVK number, final scan order,
+   final-data UTC timestamp, and `AUDIT_BACKFILL`; use `INFERRED_BACKFILL` only when the approved
+   evidence ladder reaches the explicit-inference step. The Python `kvk_state.py` resolver remains
+   the ended/finalized authority; never infer completion from an end date alone.
+4. Execute the initial `dbo.usp_PurgeLeadershipPlayerReviewAudit`, then verify the write-bound purge
+   invoked by every `dbo.usp_RecordLeadershipPlayerReviewAudit` call preserves only 90 days of
+   identified rows and retains only de-identified daily aggregates beyond that window.
+5. Before bot rollout, verify the latest three ended/finalized KVKs have valid
+   `dbo.KVKFinalReportHeader` rows and that finalized output row/target/exemption semantics are intact.
+6. Verify deployed execute grants, procedures, static parameterization, history bounds, source
+   completion headers, representative plans/logical reads/timings, lock behavior, and concurrent
+   name-history/audit writes. Add indexes only when that production evidence justifies them.
+7. Deploy coordinated bot patch:
    - new `/stats player`;
    - canonical Tanking corrections;
    - `/player_profile` removal.
-7. Restart.
-8. Resync commands.
-9. Validate command cache and versions.
-10. Complete operator Discord smoke.
-11. Observe and promote exact accepted patch.
+8. Restart.
+9. Resync to `36 top-level / 100 grouped / 8 me / 1 stats / 2 inventory` and prove
+   `/player_profile` is absent with no redirect or alias.
+10. Validate command cache and versions.
+11. Complete operator Discord smoke.
+12. Observe and promote the exact accepted patch.
 
 ## 40. Rollback
 

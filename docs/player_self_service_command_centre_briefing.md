@@ -83,7 +83,9 @@ Approved follow-on roadmap, updated after Phase 7 acceptance on 2026-07-19:
 - Phase 10 remains a usage-led review of other compatibility routes; Phase 11 remains a future
   candidate feature programme.
 
-Phase 8 is the next implementation candidate. Phase 9 must wait for Phase 8 acceptance.
+Phase 8 is implemented on dedicated bot and SQL branches and is in final correction validation.
+SQL-first deployment, resync, and operator acceptance remain pending; Phase 9 must wait for that
+acceptance.
 Locked follow-on consistency:
 
 Phase 7 proved the accepted visual hierarchy across every retained `/me` card/fallback. Core
@@ -126,9 +128,10 @@ operator approved that registry authority based on Discord onboarding audit, mon
 reconciliation, and owner-approved transfer controls. Mirror PR #217 and production PR #524 carry
 the completed Phase 3 implementation and recorded smoke evidence. Mirror PR #218 carries the
 Phase 4 premium PNG renderer and final smoke evidence.
-Leadership review is confirmed as Phase 8 work under the existing `/stats player` command. It will
-use a dedicated stable-role-ID/channel gate, remain private, remove `/player_profile`, and will not
-create `/me inspect`.
+Leadership review is implemented under the existing `/stats player` command with a dedicated
+stable-role-ID/channel gate and private output. The coordinated branch removes `/player_profile`
+without a redirect and does not create `/me inspect`; deployment and operator acceptance remain
+pending.
 
 GovernorOS v2 Phase 5A is complete in mirror PR #219 and production PR #526. Automated validation
 and operator Discord smoke passed on 2026-07-13.
@@ -217,9 +220,10 @@ Players choose a formatted Full workbook, the exact Current snapshot CSV, or Raw
 for 30, 60, 90, 180, or 360 days. The Full workbook is the one `.xlsx` file for Excel or Google
 Sheets import and starts with Account Summary. `/me exports` and `/my_stats_export` are removed rather
 than kept as redirects. Resources, Speedups, and Materials retain their own private selected-governor report-page
-exports. `/stats player`, `/player_profile`, and `/mykvkcrystaltech` remain live at the current Phase 7
-runtime baseline. Phase 8 is approved to modernise `/stats player` and remove `/player_profile` with no
-redirect; `/mykvkcrystaltech` remains outside that phase.
+exports. At the accepted Phase 7 production baseline, `/stats player`, `/player_profile`, and
+`/mykvkcrystaltech` remain live. The Phase 8 implementation branch modernises `/stats player` and
+removes `/player_profile` with no redirect; `/mykvkcrystaltech` remains outside that phase. The
+production runtime changes only after SQL-first deployment, bot rollout, resync, and smoke.
 
 Use `/me stats` for private Period Performance from any guild channel or thread. It defaults to the
 current selected Dashboard governor where available and otherwise Main/first valid account. Choose

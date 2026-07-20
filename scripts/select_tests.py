@@ -16,9 +16,15 @@ ALWAYS_RUN = [
 RULES = [
     (
         "commands/stats",
-        ["python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py"],
+        [
+            "python -m pytest -q tests/test_stats_cmds.py "
+            "tests/test_leadership_player_review.py tests/test_mykvkstats.py"
+        ],
     ),
-    ("stats_service", ["python -m pytest -q tests/test_stats_service.py tests/test_mykvkstats.py"]),
+    (
+        "leadership_player_review/",
+        ["python -m pytest -q tests/test_leadership_player_review.py"],
+    ),
     ("ark/", ["python -m pytest -q tests/test_ark_*.py"]),
     ("mge/", ["python -m pytest -q tests/test_mge_*.py"]),
     ("event_calendar/", ["python -m pytest -q tests/test_calendar_*.py"]),

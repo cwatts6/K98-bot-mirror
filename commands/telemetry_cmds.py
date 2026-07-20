@@ -17,14 +17,10 @@ from bot_config import (
     GUILD_ID,
     KVK_CRYSTALTECH_CHANNEL_ID,
     KVK_TARGET_CHANNEL_ID,
-    LEADERSHIP_CHANNEL_ID,
-    NOTIFY_CHANNEL_ID,
 )
 from commands.crystaltech_flow import run_crystaltech_flow as run_crystaltech_flow_service
 from commands.deprecation_helpers import CommandRedirect, send_deprecated_command_redirect
-from commands.player_profile_flow import send_profile_to_channel as send_profile_to_channel_service
 from decoraters import (
-    admin_or_leadership_in_allowed_channels,
     channel_only,
     track_usage,
 )
@@ -47,7 +43,6 @@ from logging_setup import CRASH_LOG_PATH, ERROR_LOG_PATH, FULL_LOG_PATH
 from registry.account_slots import ACCOUNT_ORDER
 from registry.registry_service import load_registry_as_dict
 from services.governor_account_service import get_account_summary_for_user
-from services.profile_lookup_service import resolve_profile_lookup
 from target_utils import autocomplete_governor_names, lookup_governor_id
 from ui.views.kvk_personal_views import (
     FuzzySelectView,
@@ -55,7 +50,6 @@ from ui.views.kvk_personal_views import (
     TargetLookupView,  # noqa: F401 — kept for external importers and smoke tests
 )
 from ui.views.registry_views import (
-    GovernorSelectView,
     configure_registry_views,
 )
 from versioning import versioned
@@ -85,9 +79,6 @@ if os.getenv("DEBUG_SHADOW") == "1":
 # ---------------------------------------------------------
 
 load_dotenv()
-
-# Safer construction (avoids int(None))
-ALLOWED_CHANNEL_IDS = {int(cid) for cid in (NOTIFY_CHANNEL_ID, LEADERSHIP_CHANNEL_ID) if cid}
 
 start_bot_time = datetime.now(UTC)
 
@@ -123,12 +114,10 @@ configure_registry_views(
     target_lookup_view_factory=lambda matches, author_id: FuzzySelectView(
         matches, author_id, show_targets=True
     ),
-    send_profile_to_channel=send_profile_to_channel_service,
     account_order_getter=lambda: ACCOUNT_ORDER,
 )
 
 
-send_profile_to_channel = send_profile_to_channel_service
 run_crystaltech_flow = run_crystaltech_flow_service
 
 
@@ -217,66 +206,6 @@ def register_commands(bot_instance):
             ephemeral=True,
         )
         return
-
-    @bot.slash_command(
-        name="player_profile",
-        description="Show a player's profile (Admin/Leadership only)",
-        guild_ids=[GUILD_ID],
-    )
-    @versioned("v1.11")
-    @safe_command
-    @admin_or_leadership_in_allowed_channels(ALLOWED_CHANNEL_IDS)
-    @track_usage()
-    async def player_profile_command(
-        ctx: discord.ApplicationContext,
-        governor_id: int | None = discord.Option(int, "Governor ID", required=False),
-        governor_name: str | None = discord.Option(
-            str,
-            "Governor name",
-            autocomplete=autocomplete_governor_names,
-            required=False,
-        ),
-    ):
-
-        # --- Resolve target (accept autocomplete value as ID) ---
-        lookup = resolve_profile_lookup(governor_id=governor_id, governor_name=governor_name)
-        if lookup.status == "not_found":
-            await ctx.respond(lookup.message, ephemeral=True)
-            return
-        if lookup.status == "matches":
-            governor_matches = [(name, governor_id) for name, governor_id, *_ in lookup.matches]
-            try:
-                view = GovernorSelectView(governor_matches, author_id=ctx.user.id)
-            except TypeError:
-                view = GovernorSelectView(governor_matches)
-            await ctx.respond(lookup.message, view=view, ephemeral=True)
-            return
-        target_id: int | None = lookup.governor_id
-
-        if not target_id:
-            await ctx.respond(
-                "Provide either **governor_id** or pick a name from the list.", ephemeral=True
-            )
-            return
-
-        # --- Hand off to the helper; make sure we don't leave the interaction hanging on error
-        try:
-            # Helper is expected to handle its own defer + posting to the channel
-            await send_profile_to_channel_service(ctx.interaction, target_id, ctx.channel)
-        except Exception as e:
-            logger.exception("[/player_profile] send_profile_to_channel failed (gid=%s)", target_id)
-            # If nothing has acknowledged yet, send a clean error; otherwise use followup.
-            if not ctx.interaction.response.is_done():
-                await ctx.respond(
-                    f"❌ Failed to load profile: `{type(e).__name__}: {e}`", ephemeral=True
-                )
-            else:
-                try:
-                    await ctx.followup.send(
-                        f"❌ Failed to load profile: `{type(e).__name__}: {e}`", ephemeral=True
-                    )
-                except Exception:
-                    pass
 
     @bot.slash_command(
         name="mykvkcrystaltech",

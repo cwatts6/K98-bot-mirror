@@ -1,4 +1,46 @@
+import pytest
+
 from services import kvk_history_service
+
+
+def test_finalized_kvks_require_output_complete_and_canonical_ended_state(monkeypatch):
+    candidates = [
+        {
+            "KVK_NO": 12,
+            "PASS4_START_SCAN": 1000,
+            "KVK_END_SCAN": 1200,
+            "MaxScanOrder": 1200,
+            "FinalOutputState": "OUTPUT_COMPLETE",
+        },
+        {
+            "KVK_NO": 11,
+            "PASS4_START_SCAN": 800,
+            "KVK_END_SCAN": 999,
+            "MaxScanOrder": 1200,
+            "FinalOutputState": "OUTPUT_COMPLETE",
+        },
+        {
+            "KVK_NO": 10,
+            "PASS4_START_SCAN": 600,
+            "KVK_END_SCAN": 799,
+            "MaxScanOrder": 1200,
+            "FinalOutputState": "PENDING",
+        },
+    ]
+    calls = []
+
+    def fake_candidates(*, limit):
+        calls.append(limit)
+        return candidates
+
+    monkeypatch.setattr(
+        kvk_history_service.kvk_history_dal,
+        "fetch_output_complete_kvk_candidates",
+        fake_candidates,
+    )
+
+    assert kvk_history_service.get_finalized_kvks() == [11]
+    assert calls == [20]
 
 
 def test_normalize_governor_ids_accepts_iterables_and_legacy_strings():
@@ -108,21 +150,19 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
         },
     ]
 
-    monkeypatch.setattr(
-        kvk_history_service.kvk_history_dal, "get_started_kvks", lambda: [12, 13, 14, 15]
-    )
+    monkeypatch.setattr(kvk_history_service, "get_finalized_kvks", lambda: [12, 13, 14, 15])
     monkeypatch.setattr(
         kvk_history_service.kvk_history_dal,
         "fetch_modern_history_rows_for_governors",
-        lambda ids: rows,
+        lambda ids, finalized: rows,
     )
     monkeypatch.setattr(
         kvk_history_service.kvk_history_dal,
         "fetch_history_summary_metric_ranks",
-        lambda gid: [
+        lambda gid, finalized: [
             {"Metric": "Highest Acclaim", "KVK_NO": 13, "Overall_Rank": 5},
             {"Metric": "Most Kills", "KVK_NO": 15, "Overall_Rank": 2},
-            {"Metric": "Lowest Tanking Score", "KVK_NO": 15, "Overall_Rank": 11},
+            {"Metric": "Highest Tanking Score", "KVK_NO": 12, "Overall_Rank": 11},
         ],
     )
 
@@ -135,7 +175,7 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
     assert payload.last3_rows[0].acclaim == 10
     assert payload.last3_rows[1].row_present is False
     assert payload.last3_rows[1].kills is None
-    assert payload.last3_rows[2].acclaim is None
+    assert payload.last3_rows[2].acclaim == 0
     assert payload.last3_rows[2].kills == large_kills
     assert payload.history_summary["Highest Rank"] == 8
     assert payload.history_summary["Autarchs"] == 2
@@ -144,25 +184,25 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
     assert payload.history_summary["Most Kills"] == large_kills
     assert payload.history_summary["Most KillPoints"] == 600
     assert payload.history_summary["Most Deads"] == 7
-    assert payload.history_summary["Most Heals"] == 120
+    assert payload.history_summary["Lowest Healed"] == 0
     assert payload.history_summary["Most DKP"] == 2000
-    assert payload.history_summary["Lowest Tanking Score"] == 4.0
+    assert payload.history_summary["Highest Tanking Score"] == pytest.approx(500 / 6 * 100)
     assert payload.history_summary["Most Pre-KVK"] == 1800
     assert payload.history_summary["Most Honor"] == 1900
     assert payload.history_summary_metrics["Highest Rank"].kvk_no == 15
     assert payload.history_summary_metrics["Most Kills"].kvk_no == 15
-    assert payload.history_summary_metrics["Lowest Tanking Score"].kvk_no == 15
+    assert payload.history_summary_metrics["Highest Tanking Score"].kvk_no == 12
     assert payload.history_summary_metrics["Highest Acclaim"].overall_rank == 5
     assert payload.history_summary_metrics["Most Kills"].overall_rank == 2
-    assert payload.history_summary_metrics["Lowest Tanking Score"].overall_rank == 11
+    assert payload.history_summary_metrics["Highest Tanking Score"].overall_rank == 11
     assert payload.trends["rank"].direction == "up"
-    assert payload.trends["acclaim"].direction == "insufficient"
+    assert payload.trends["acclaim"].direction == "down"
     assert payload.trends["heals"].direction == "down"
     assert payload.trends["kill_points"].direction == "up"
-    assert payload.trends["tanking_score"].direction == "up"
-    assert payload.trends["tanking_score"].first_value == 10.0
-    assert payload.trends["tanking_score"].last_value == 4.0
-    assert payload.trends["tanking_score"].value_count == 2
+    assert payload.trends["tanking_score"].direction == "down"
+    assert payload.trends["tanking_score"].first_value == pytest.approx(500 / 6 * 100)
+    assert payload.trends["tanking_score"].last_value == pytest.approx(600 / 2407 * 100)
+    assert payload.trends["tanking_score"].value_count == 3
 
 
 def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypatch):
@@ -176,14 +216,16 @@ def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypa
             "Acclaim": None,
             "HealedTroopsDelta": 7,
             "KillPointsDelta": 8,
+            "Deads": 1,
         }
     ]
 
     monkeypatch.setattr(
         kvk_history_service.kvk_history_dal,
         "fetch_modern_history_rows_for_governors",
-        lambda ids: rows,
+        lambda ids, finalized: rows,
     )
+    monkeypatch.setattr(kvk_history_service, "get_finalized_kvks", lambda: [15])
 
     df = kvk_history_service.fetch_history_export_for_governors([1])
 
@@ -193,7 +235,8 @@ def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypa
     assert df.loc[0, "Acclaim"] is None
     assert df.loc[0, "HealedTroopsDelta"] == 7
     assert df.loc[0, "KillPointsDelta"] == 8
-    assert df.loc[0, "TankingScorePct"] == 1750.0
+    assert df.loc[0, "TankingScorePct"] == pytest.approx(8 / 141 * 100)
+    assert df.loc[0, "KPLoss"] == 140
 
 
 def test_history_export_tanking_score_pct_stays_blank_for_missing_or_zero_values():
@@ -208,6 +251,8 @@ def test_history_export_tanking_score_pct_stays_blank_for_missing_or_zero_values
     )
 
     assert df["TankingScorePct"].isna().all()
+    assert df["KPLoss"].isna().iloc[0]
+    assert df.loc[1, "KPLoss"] == 0
 
 
 def test_payload_keeps_last3_kills_trend_separate_from_all_history(monkeypatch):
@@ -238,18 +283,16 @@ def test_payload_keeps_last3_kills_trend_separate_from_all_history(monkeypatch):
         },
     ]
 
-    monkeypatch.setattr(
-        kvk_history_service.kvk_history_dal, "get_started_kvks", lambda: [10, 13, 14, 15]
-    )
+    monkeypatch.setattr(kvk_history_service, "get_finalized_kvks", lambda: [10, 13, 14, 15])
     monkeypatch.setattr(
         kvk_history_service.kvk_history_dal,
         "fetch_modern_history_rows_for_governors",
-        lambda ids: rows,
+        lambda ids, finalized: rows,
     )
     monkeypatch.setattr(
         kvk_history_service.kvk_history_dal,
         "fetch_history_summary_metric_ranks",
-        lambda gid: [],
+        lambda gid, finalized: [],
     )
 
     payload = kvk_history_service.build_kvk_history_payload(2441482)
@@ -274,16 +317,16 @@ def test_healed_trend_treats_lower_values_as_improved(monkeypatch):
         },
     ]
 
-    monkeypatch.setattr(kvk_history_service.kvk_history_dal, "get_started_kvks", lambda: [13, 14])
+    monkeypatch.setattr(kvk_history_service, "get_finalized_kvks", lambda: [13, 14])
     monkeypatch.setattr(
         kvk_history_service.kvk_history_dal,
         "fetch_modern_history_rows_for_governors",
-        lambda ids: rows,
+        lambda ids, finalized: rows,
     )
     monkeypatch.setattr(
         kvk_history_service.kvk_history_dal,
         "fetch_history_summary_metric_ranks",
-        lambda gid: [],
+        lambda gid, finalized: [],
     )
 
     payload = kvk_history_service.build_kvk_history_payload(2441482)
@@ -307,16 +350,16 @@ def test_number_trend_direction_matches_compact_display_precision(monkeypatch):
         },
     ]
 
-    monkeypatch.setattr(kvk_history_service.kvk_history_dal, "get_started_kvks", lambda: [13, 14])
+    monkeypatch.setattr(kvk_history_service, "get_finalized_kvks", lambda: [13, 14])
     monkeypatch.setattr(
         kvk_history_service.kvk_history_dal,
         "fetch_modern_history_rows_for_governors",
-        lambda ids: rows,
+        lambda ids, finalized: rows,
     )
     monkeypatch.setattr(
         kvk_history_service.kvk_history_dal,
         "fetch_history_summary_metric_ranks",
-        lambda gid: [],
+        lambda gid, finalized: [],
     )
 
     payload = kvk_history_service.build_kvk_history_payload(2441482)

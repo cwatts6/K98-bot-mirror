@@ -462,8 +462,9 @@ Player Self-Service Command Centre status:
   - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8 Leadership Stats Player Modernisation Canonical Combat Metric Alignment and Player Profile Retirement.md`
   - `Codex Task Pack - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
   - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
-- Phase 8 is the next implementation candidate. Phase 9 remains separately approval-gated and
-  must wait for Phase 8 acceptance.
+- Phase 8 is implemented on dedicated bot and SQL branches and is in final correction validation;
+  SQL-first deployment, resync, and operator acceptance remain pending. Phase 9 remains separately
+  approval-gated and must wait for Phase 8 acceptance.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -589,7 +590,8 @@ The active programme pack now records:
 - Phase 10 usage-led migration review and Phase 11 future-candidate boundaries.
 
 Phase 8-9 task packs and starters are active in this folder. One-pass execution is not approved.
-Phase 8 is the next active slice; Phase 9 must wait for Phase 8 acceptance. Both packs/starters
+Phase 8 implementation is in final validation before SQL-first deployment; Phase 9 must wait for
+Phase 8 acceptance. Both packs/starters
 carry forward Phase 7's accepted visual family, centred state pill, row-0 navigation,
 governor-control safety, content semantics, fallback, transition, timeout, and cleanup rules.
 

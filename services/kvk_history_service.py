@@ -10,6 +10,7 @@ from typing import Any
 
 import pandas as pd
 
+from kvk.combat_metrics import calculate_combat_metrics
 from kvk.dal import kvk_history_dal
 from kvk.models.kvk_history_payload import (
     KvkHistoryPayload,
@@ -17,6 +18,7 @@ from kvk.models.kvk_history_payload import (
     KvkHistorySummaryMetric,
     KvkHistoryTrend,
 )
+import kvk_state
 from registry.account_slots import ACCOUNT_ORDER
 
 logger = logging.getLogger(__name__)
@@ -71,6 +73,7 @@ HISTORY_EXPORT_COLUMNS = [
     "MostKvKHeal",
     "HealedTroopsDelta",
     "KillPointsDelta",
+    "KPLoss",
     "TankingScorePct",
     "Max_PreKvk_Points",
     "Max_HonorPoints",
@@ -182,12 +185,30 @@ def pick_default_governor_id(account_map: Mapping[str, Mapping[str, Any]]) -> st
         return None
 
 
+def get_finalized_kvks() -> list[int]:
+    """Resolve KVKs that are both output-complete and canonically ended."""
+    finalized: set[int] = set()
+    for candidate in kvk_history_dal.fetch_output_complete_kvk_candidates(limit=20):
+        kvk_no = _optional_int(candidate.get("KVK_NO"))
+        if kvk_no is None or candidate.get("FinalOutputState") != "OUTPUT_COMPLETE":
+            continue
+        state, _reason = kvk_state.resolve_kvk_scan_state(
+            pass4_start_scan=_optional_int(candidate.get("PASS4_START_SCAN")),
+            kvk_end_scan=_optional_int(candidate.get("KVK_END_SCAN")),
+            max_scan_order=_optional_int(candidate.get("MaxScanOrder")),
+        )
+        if state == "ENDED":
+            finalized.add(kvk_no)
+    return sorted(finalized)
+
+
 def get_started_kvks() -> list[int]:
-    return kvk_history_dal.get_started_kvks()
+    """Compatibility name for the canonical finalized-output KVK set."""
+    return get_finalized_kvks()
 
 
 def select_last_started_kvks(started_kvks: Iterable[Any], count: int = 3) -> tuple[int, ...]:
-    """Return the latest started KVK numbers, preserving missing-data semantics elsewhere."""
+    """Return the latest finalized KVK numbers, preserving missing-row semantics."""
     normalized: set[int] = set()
     for raw in started_kvks or []:
         try:
@@ -279,8 +300,8 @@ def _history_row_from_source(kvk_no: int, source: Mapping[str, Any] | None) -> K
         dead_target_percent=_optional_float(source.get("DeadPct")),
         dkp=_optional_int(source.get("DKP_SCORE")),
         dkp_target_percent=_optional_float(source.get("DKPPct")),
-        acclaim=_positive_optional_int(source.get("Acclaim")),
-        heals=_positive_optional_int(source.get("HealedTroopsDelta")),
+        acclaim=_optional_int(source.get("Acclaim")),
+        heals=_optional_int(source.get("HealedTroopsDelta")),
         kill_points=_optional_int(source.get("KillPointsDelta")),
         tanking_score=_tanking_score(source),
     )
@@ -348,11 +369,17 @@ def _with_summary_rank(
 
 
 def _tanking_score(row: Mapping[str, Any]) -> float | None:
-    heals = _optional_int(row.get("HealedTroopsDelta"))
-    kill_points = _optional_int(row.get("KillPointsDelta"))
-    if heals is None or heals <= 0 or kill_points is None or kill_points <= 0:
-        return None
-    return (heals * 20) / kill_points
+    score = _combat_metrics(row).tanking_score
+    return float(score) if score is not None else None
+
+
+def _combat_metrics(row: Mapping[str, Any]):
+    return calculate_combat_metrics(
+        kill_points=_optional_int(row.get("KillPointsDelta")),
+        healed=_optional_int(row.get("HealedTroopsDelta")),
+        deads=_optional_int(row.get("Deads")),
+        t4_t5_kills=_optional_int(row.get("T4T5_Kills")),
+    )
 
 
 def add_history_export_derived_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -361,13 +388,26 @@ def add_history_export_derived_columns(df: pd.DataFrame) -> pd.DataFrame:
         return empty_history_export_frame()
 
     out = df.copy()
-    if {"HealedTroopsDelta", "KillPointsDelta"}.issubset(out.columns):
-        heals = pd.to_numeric(out["HealedTroopsDelta"], errors="coerce")
-        kill_points = pd.to_numeric(out["KillPointsDelta"], errors="coerce")
-        valid = heals.notna() & kill_points.notna() & (heals > 0) & (kill_points > 0)
-        out["TankingScorePct"] = ((heals * 20) / kill_points * 100).where(valid)
-    elif "TankingScorePct" not in out.columns:
-        out["TankingScorePct"] = None
+    if {"HealedTroopsDelta", "KillPointsDelta", "Deads"}.issubset(out.columns):
+        combat_rows = [
+            calculate_combat_metrics(
+                kill_points=_optional_int(row.get("KillPointsDelta")),
+                healed=_optional_int(row.get("HealedTroopsDelta")),
+                deads=_optional_int(row.get("Deads")),
+                t4_t5_kills=_optional_int(row.get("T4T5_Kills")),
+            )
+            for row in out.to_dict(orient="records")
+        ]
+        out["KPLoss"] = [row.kp_loss for row in combat_rows]
+        out["TankingScorePct"] = [
+            float(row.tanking_score) if row.tanking_score is not None else None
+            for row in combat_rows
+        ]
+    else:
+        if "KPLoss" not in out.columns:
+            out["KPLoss"] = None
+        if "TankingScorePct" not in out.columns:
+            out["TankingScorePct"] = None
     return out
 
 
@@ -376,7 +416,23 @@ def _summary_tanking_metric(rows: Iterable[Mapping[str, Any]]) -> KvkHistorySumm
     best_kvk: int | None = None
     for row in rows:
         value = _tanking_score(row)
-        if value is None:
+        if value is None or not _combat_metrics(row).engaged:
+            continue
+        kvk_no = _optional_int(row.get("KVK_NO"))
+        if best_value is None or value > best_value:
+            best_value = value
+            best_kvk = kvk_no
+        elif value == best_value and kvk_no is not None and (best_kvk is None or kvk_no > best_kvk):
+            best_kvk = kvk_no
+    return KvkHistorySummaryMetric(value=best_value, kvk_no=best_kvk)
+
+
+def _summary_healed_metric(rows: Iterable[Mapping[str, Any]]) -> KvkHistorySummaryMetric:
+    best_value: int | None = None
+    best_kvk: int | None = None
+    for row in rows:
+        value = _optional_int(row.get("HealedTroopsDelta"))
+        if value is None or not _combat_metrics(row).engaged:
             continue
         kvk_no = _optional_int(row.get("KVK_NO"))
         if best_value is None or value < best_value:
@@ -391,7 +447,7 @@ def _trend_compare_value(metric: str, value: float) -> float:
     if metric == "rank":
         return float(int(value + 0.5))
     if metric == "tanking_score":
-        return round(value * 100, 1)
+        return round(value, 1)
     if metric.endswith("_percent"):
         return round(value, 1)
     abs_value = abs(value)
@@ -448,7 +504,8 @@ def fetch_history_export_for_governors(governor_ids: Iterable[Any] | Any) -> pd.
     if not ids:
         return empty_history_export_frame()
 
-    rows = kvk_history_dal.fetch_modern_history_rows_for_governors(ids)
+    finalized_kvks = get_finalized_kvks()
+    rows = kvk_history_dal.fetch_modern_history_rows_for_governors(ids, finalized_kvks)
     df = pd.DataFrame.from_records(rows, columns=HISTORY_EXPORT_COLUMNS)
     if df.empty:
         return empty_history_export_frame()
@@ -461,7 +518,7 @@ def build_kvk_history_payload(governor_id: Any) -> KvkHistoryPayload:
     """Build the renderer-independent modern KVK history payload for one governor."""
     ids = normalize_governor_ids([governor_id])
     gid = ids[0] if ids else 0
-    started_kvks = tuple(get_started_kvks())
+    started_kvks = tuple(get_finalized_kvks())
     last3_kvks = select_last_started_kvks(started_kvks, 3)
 
     if gid <= 0:
@@ -474,7 +531,7 @@ def build_kvk_history_payload(governor_id: Any) -> KvkHistoryPayload:
             last3_rows=tuple(_history_row_from_source(kvk, None) for kvk in last3_kvks),
         )
 
-    source_rows = kvk_history_dal.fetch_modern_history_rows_for_governors([gid])
+    source_rows = kvk_history_dal.fetch_modern_history_rows_for_governors([gid], list(started_kvks))
     rows_by_kvk: dict[int, Mapping[str, Any]] = {}
     for row in source_rows:
         kvk_no = _optional_int(row.get("KVK_NO"))
@@ -493,7 +550,7 @@ def build_kvk_history_payload(governor_id: Any) -> KvkHistoryPayload:
     last3_rows = tuple(_history_row_from_source(kvk, rows_by_kvk.get(kvk)) for kvk in last3_kvks)
 
     try:
-        rank_rows = kvk_history_dal.fetch_history_summary_metric_ranks(gid)
+        rank_rows = kvk_history_dal.fetch_history_summary_metric_ranks(gid, list(started_kvks))
     except Exception:
         logger.exception("kvk_history_summary_rank_fetch_failed governor_id=%s", gid)
         rank_rows = []
@@ -518,16 +575,16 @@ def build_kvk_history_payload(governor_id: Any) -> KvkHistoryPayload:
         "Most Deads": _with_summary_rank(
             "Most Deads", _summary_metric(source_rows, "Deads", positive_only=True), rank_lookup
         ),
-        "Most Heals": _with_summary_rank(
-            "Most Heals",
-            _summary_metric(source_rows, "HealedTroopsDelta", positive_only=True),
+        "Lowest Healed": _with_summary_rank(
+            "Lowest Healed",
+            _summary_healed_metric(source_rows),
             rank_lookup,
         ),
         "Most DKP": _with_summary_rank(
             "Most DKP", _summary_metric(source_rows, "DKP_SCORE", positive_only=True), rank_lookup
         ),
-        "Lowest Tanking Score": _with_summary_rank(
-            "Lowest Tanking Score", _summary_tanking_metric(source_rows), rank_lookup
+        "Highest Tanking Score": _with_summary_rank(
+            "Highest Tanking Score", _summary_tanking_metric(source_rows), rank_lookup
         ),
         "Most Pre-KVK": _with_summary_rank(
             "Most Pre-KVK",
@@ -555,7 +612,7 @@ def build_kvk_history_payload(governor_id: Any) -> KvkHistoryPayload:
         "dkp_target_percent": _trend("dkp_target_percent", rows, "dkp_target_percent"),
         "acclaim": _trend("acclaim", rows, "acclaim"),
         "kill_points": _trend("kill_points", rows, "kill_points"),
-        "tanking_score": _trend("tanking_score", rows, "tanking_score", lower_is_better=True),
+        "tanking_score": _trend("tanking_score", rows, "tanking_score"),
     }
     return KvkHistoryPayload(
         governor_id=str(gid),
@@ -576,13 +633,14 @@ def fetch_history_for_governors(governor_ids: Iterable[Any] | Any) -> pd.DataFra
     if not ids:
         return empty_history_frame()
 
-    rows = kvk_history_dal.fetch_history_rows_for_governors(ids)
+    finalized_kvks = get_finalized_kvks()
+    rows = kvk_history_dal.fetch_history_rows_for_governors(ids, finalized_kvks)
     df = pd.DataFrame.from_records(rows, columns=HISTORY_COLUMNS)
 
     if df.empty:
         return empty_history_frame()
 
-    started = kvk_history_dal.get_started_kvks()
+    started = finalized_kvks
     for col in NUMERIC_HISTORY_COLUMNS:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)

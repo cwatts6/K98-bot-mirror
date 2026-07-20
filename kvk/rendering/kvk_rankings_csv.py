@@ -27,6 +27,7 @@ _MODE_SUPPORT_HEADERS: dict[str, tuple[str, ...]] = {
         "Acclaim",
         "TankingScore",
         "KillPoints",
+        "KPLoss",
         "Healed",
     ),
     "honor": (
@@ -46,6 +47,7 @@ _SUPPORT_VALUE_KEYS: dict[str, str] = {
     "PercentKillTarget": "% K/T",
     "TankingScore": "Tanking Score",
     "KillPoints": "Kill Points",
+    "KPLoss": "KP Loss",
     "Stage1": "Stage 1",
     "Stage2": "Stage 2",
     "Stage3": "Stage 3",

@@ -55,7 +55,7 @@ def test_stats_cmds_imports_kvk_admin_service_boundary() -> None:
     assert "from kvk.dal.kvk_history_dal import resolve_current_kvk_no_from_cursor" not in source
 
 
-def test_player_stats_awaits_async_embed_builder() -> None:
+def test_player_stats_awaits_private_leadership_flow() -> None:
     source = Path("commands/stats_cmds.py").read_text(encoding="utf-8")
     command = next(
         node
@@ -71,7 +71,7 @@ def test_player_stats_awaits_async_embed_builder() -> None:
         and isinstance(node.value.func, ast.Name)
     ]
 
-    assert "build_embeds" in awaited_calls
+    assert awaited_calls == ["send_leadership_player_review"]
 
 
 def test_my_stats_is_retired_while_stats_player_contract_is_preserved() -> None:
@@ -81,10 +81,13 @@ def test_my_stats_is_retired_while_stats_player_contract_is_preserved() -> None:
     assert 'name="my_stats"' not in source
     assert 'name="player"' in source
     assert "async def player_stats_command" in source
-    assert "@channel_only(KVK_PLAYER_STATS_CHANNEL_ID, admin_override=True)" in source
-    assert "get_stats_payload" in source
-    assert "SliceButtons" in source
-    assert "build_embeds" in source
+    command = source[source.index("async def player_stats_command") :]
+    command = command[: command.index("\n    @bot.slash_command")]
+    assert "send_leadership_player_review" in command
+    assert "@channel_only" not in command
+    assert "get_stats_payload" not in command
+    assert "SliceButtons" not in command
+    assert "build_embeds" not in command
 
 
 def test_split_discord_content_keeps_chunks_under_limit() -> None:

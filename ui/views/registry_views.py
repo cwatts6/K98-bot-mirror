@@ -24,9 +24,6 @@ _lookup_governor_id: Callable[[str], object] = lambda _name: {
     "message": "No results found.",
 }
 _target_lookup_view_factory: Callable[[list[dict], int], object] | None = None
-_send_profile_to_channel: Callable[[discord.Interaction, int, object], object] = (
-    lambda *_a, **_k: None
-)
 _account_order_getter: Callable[[], list[str]] = lambda: ["Main"]
 
 
@@ -35,15 +32,13 @@ def configure_registry_views(
     async_load_registry: Callable[[], object],
     lookup_governor_id: Callable[[str], object],
     target_lookup_view_factory: Callable[[list[dict], int], object] | None,
-    send_profile_to_channel: Callable[[discord.Interaction, int, object], object],
     account_order_getter: Callable[[], list[str]],
 ) -> None:
     global _async_load_registry, _lookup_governor_id, _target_lookup_view_factory
-    global _send_profile_to_channel, _account_order_getter
+    global _account_order_getter
     _async_load_registry = async_load_registry
     _lookup_governor_id = lookup_governor_id
     _target_lookup_view_factory = target_lookup_view_factory
-    _send_profile_to_channel = send_profile_to_channel
     _account_order_getter = account_order_getter
 
 
@@ -651,88 +646,10 @@ class EnterGovernorIDModal(discord.ui.Modal):
             )
 
 
-class GovernorSelect(discord.ui.Select):
-    def __init__(self, matches: list[tuple[str, int]], *, author_id: int | None = None):
-        self.author_id = author_id
-        options = [
-            discord.SelectOption(label=name, description=str(gid), value=str(gid))
-            for name, gid in matches[:25]
-        ]
-        super().__init__(
-            placeholder="Multiple matches — pick one", min_values=1, max_values=1, options=options
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        if self.author_id is not None and interaction.user.id != self.author_id:
-            await interaction.response.send_message(
-                "❌ Only the requester can use this menu.", ephemeral=True
-            )
-            return
-
-        gid = int(normalize_governor_id(self.values[0]))
-
-        try:
-            await interaction.response.defer(ephemeral=True)
-        except Exception:
-            pass
-
-        try:
-            await _send_profile_to_channel(interaction, gid, interaction.channel)
-        except Exception as e:
-            logger.exception("[GovernorSelect] send_profile_to_channel failed")
-            try:
-                await interaction.followup.send(
-                    f"⚠️ Failed to send profile: `{type(e).__name__}: {e}`", ephemeral=True
-                )
-            except Exception:
-                pass
-            return
-
-        text = f"Sent profile for **{self.values[0]}**."
-        try:
-            await interaction.followup.send(text, ephemeral=True)
-        except Exception:
-            try:
-                await interaction.edit_original_response(content=text, view=None)
-            except Exception:
-                try:
-                    await interaction.message.edit(content=text, view=None)
-                except Exception:
-                    pass
-
-
-class GovernorSelectView(discord.ui.View):
-    def __init__(
-        self, matches: list[tuple[str, int]], *, author_id: int | None = None, timeout: int = 60
-    ):
-        super().__init__(timeout=timeout)
-        self.add_item(GovernorSelect(matches, author_id=author_id))
-
-    async def on_timeout(self):
-        for child in self.children:
-            child.disabled = True
-
-    async def on_error(self, interaction: discord.Interaction, error: Exception, item) -> None:
-        logger.exception("[GovernorSelectView] handler error", exc_info=error)
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "⚠️ Something went wrong. Please try again.", ephemeral=True
-                )
-            else:
-                await interaction.followup.send(
-                    "⚠️ Something went wrong. Please try again.", ephemeral=True
-                )
-        except Exception:
-            pass
-
-
 __all__ = [
     "ConfirmRemoveView",
     "EnterGovernorIDModal",
     "GovNameModal",
-    "GovernorSelect",
-    "GovernorSelectView",
     "ModifyGovernorView",
     "ModifyStartView",
     "MyRegsActionView",

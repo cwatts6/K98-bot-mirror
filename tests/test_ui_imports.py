@@ -91,10 +91,8 @@ def test_import_all_ui_view_modules_and_instantiate_core_views(monkeypatch, tmp_
         logf.write_text("INFO hello\nERROR boom\n", encoding="utf-8")
         v1 = admin.LogTailView(ctx=None, src_path=str(logf), title="Logs")
         v2 = loc.OpenFullSizeView(url="https://example.com")
-        v3 = loc.ProfileLinksView(card_url="https://example.com/card")
-        return v1, v2, v3
+        return v1, v2
 
-    v1, v2, v3 = asyncio.run(_make())
+    v1, v2 = asyncio.run(_make())
     assert v1.title == "Logs"
     assert len(v2.children) == 1
-    assert len(v3.children) == 1
