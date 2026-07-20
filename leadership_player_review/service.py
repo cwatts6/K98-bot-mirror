@@ -63,7 +63,11 @@ def _dedupe_candidates(rows: list[LookupCandidate]) -> tuple[LookupCandidate, ..
     by_governor: dict[int, LookupCandidate] = {}
     for row in rows:
         existing = by_governor.get(row.governor_id)
-        if existing is None or (row.score, row.is_current_name, row.last_seen or datetime.min.replace(tzinfo=UTC)) > (
+        if existing is None or (
+            row.score,
+            row.is_current_name,
+            row.last_seen or datetime.min.replace(tzinfo=UTC),
+        ) > (
             existing.score,
             existing.is_current_name,
             existing.last_seen or datetime.min.replace(tzinfo=UTC),
@@ -72,7 +76,12 @@ def _dedupe_candidates(rows: list[LookupCandidate]) -> tuple[LookupCandidate, ..
     return tuple(
         sorted(
             by_governor.values(),
-            key=lambda item: (-item.score, not item.is_current_name, item.governor_name.casefold(), item.governor_id),
+            key=lambda item: (
+                -item.score,
+                not item.is_current_name,
+                item.governor_name.casefold(),
+                item.governor_id,
+            ),
         )
     )
 
@@ -82,7 +91,9 @@ async def resolve_name(name: str, *, refresh: bool = False) -> LookupResult:
     if not query:
         return LookupResult(status="invalid", error="A governor name is required.")
     if len(query) > _MAX_LOOKUP_LENGTH:
-        return LookupResult(status="invalid", error="Governor name lookup is limited to 100 characters.")
+        return LookupResult(
+            status="invalid", error="Governor name lookup is limited to 100 characters."
+        )
     directory = await _lookup_directory(refresh=refresh)
     exact = _dedupe_candidates(
         [row for row in directory if normalize_name(row.governor_name) == query]
@@ -150,10 +161,17 @@ def _linked_governors(governor_id: int, governor_name: str | None) -> tuple[Link
             continue
         output[gid] = LinkedGovernor(
             governor_id=gid,
-            governor_name=str(row.get("GovernorName") or (governor_name if gid == governor_id else gid)),
+            governor_name=str(
+                row.get("GovernorName") or (governor_name if gid == governor_id else gid)
+            ),
             current=gid == governor_id,
         )
-    return tuple(sorted(output.values(), key=lambda item: (not item.current, item.governor_name.casefold(), item.governor_id)))
+    return tuple(
+        sorted(
+            output.values(),
+            key=lambda item: (not item.current, item.governor_name.casefold(), item.governor_id),
+        )
+    )
 
 
 def _finalized_kvk_numbers(candidates) -> set[int]:
@@ -185,7 +203,11 @@ def _metric_label(metric: ActivityMetric) -> str:
 
 
 def _prompts(*, freshness: FreshnessState, header, metrics, activity_index) -> tuple[str, ...]:
-    is_new = header.first_observed_date is not None and header.current_start_date is not None and header.first_observed_date >= header.current_start_date
+    is_new = (
+        header.first_observed_date is not None
+        and header.current_start_date is not None
+        and header.first_observed_date >= header.current_start_date
+    )
     comparable = all(metric.comparison_mode != "UNAVAILABLE" for metric in metrics)
     cohort = activity_index.cohort_count or 0
     if freshness != "CURRENT" or is_new or not comparable or cohort < _SMALL_COHORT:
@@ -285,7 +307,10 @@ async def load_payload(
         if len(_payload_cache) >= 128:
             oldest = min(_payload_cache, key=lambda item: _payload_cache[item][0])
             _payload_cache.pop(oldest, None)
-        _payload_cache[key] = (time.monotonic() + _PAYLOAD_TTL_SECONDS, replace(payload, page="overview"))
+        _payload_cache[key] = (
+            time.monotonic() + _PAYLOAD_TTL_SECONDS,
+            replace(payload, page="overview"),
+        )
     return payload
 
 
