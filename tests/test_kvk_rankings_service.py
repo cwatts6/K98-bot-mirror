@@ -279,6 +279,49 @@ def test_kvk_supporting_combat_values_preserve_missing_and_explicit_zero() -> No
     assert csv_rows[1]["TankingScore"] == "5000.0"
 
 
+@pytest.mark.parametrize(
+    ("raw_value", "expected"),
+    [
+        ("9,007,199,254,740,993", 9_007_199_254_740_993),
+        (Decimal("9007199254740993"), 9_007_199_254_740_993),
+        (" 1,234 ", 1_234),
+        ("1.9", None),
+        (1.9, None),
+        ("NaN", None),
+    ],
+)
+def test_optional_combat_integer_parsing_is_exact(raw_value, expected) -> None:
+    assert (
+        kvk_rankings_service._optional_int_from_row(
+            {"KillPointsDelta": raw_value},
+            ("KillPointsDelta",),
+        )
+        == expected
+    )
+
+
+def test_optional_combat_integer_parsing_uses_next_valid_alias() -> None:
+    parsed = kvk_rankings_service._optional_int_from_row(
+        {"KillPointsDelta": "1.9", "KillPoints": "2,000"},
+        ("KillPointsDelta", "KillPoints"),
+    )
+
+    assert parsed == 2_000
+
+
+def test_combat_metrics_preserve_integer_precision_above_float_limit() -> None:
+    combat = kvk_rankings_service._kvk_combat(
+        {
+            "T4&T5_Kills": 1,
+            "KillPointsDelta": "9,007,199,254,740,993",
+            "HealedTroopsDelta": "1",
+            "Deads_Delta": "0",
+        }
+    )
+
+    assert combat.tanking_score == Decimal("45035996273704965")
+
+
 def test_build_kvk_rankings_payload_empty_cache_is_unavailable():
     payload = kvk_rankings_service.build_kvk_rankings_payload_from_rows(
         [], metric="power", limit=10

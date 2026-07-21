@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from kvk.combat_metrics import calculate_combat_metrics
@@ -198,10 +198,16 @@ def _optional_int_from_row(row: dict[str, Any], keys: tuple[str, ...]) -> int | 
         value = row.get(key)
         if value in (None, ""):
             continue
-        try:
-            return int(float(value))
-        except (TypeError, ValueError):
+        cleaned = str(value).strip().replace(",", "")
+        if not cleaned:
             continue
+        try:
+            numeric = Decimal(cleaned)
+        except (InvalidOperation, ValueError):
+            continue
+        if not numeric.is_finite() or numeric != numeric.to_integral_value():
+            continue
+        return int(numeric)
     return None
 
 
