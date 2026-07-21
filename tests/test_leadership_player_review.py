@@ -272,6 +272,41 @@ def test_activity_renderer_labels_reporting_average_per_day(monkeypatch) -> None
     assert all(text.endswith("/day") for text in averages)
 
 
+@pytest.mark.parametrize("page", ["overview", "activity"])
+def test_unavailable_metric_does_not_render_sql_zero_as_genuine_zero(monkeypatch, page) -> None:
+    payload = _payload(page=page)
+    unavailable_forts = replace(
+        payload.metrics[0],
+        current_total=Decimal(0),
+        current_valid_days=0,
+        current_average=None,
+        missing_units=90,
+        available=False,
+        kingdom_rank=None,
+        cohort_count=None,
+        percentile=None,
+        top_percent=None,
+    )
+    payload = replace(payload, metrics=(unavailable_forts, *payload.metrics[1:]))
+    rendered_text: list[str] = []
+    original_text = renderer._text
+
+    def capture_text(*args, **kwargs):
+        rendered_text.append(str(args[2]))
+        return original_text(*args, **kwargs)
+
+    monkeypatch.setattr(renderer, "_text", capture_text)
+    renderer.render_leadership_player(payload)
+
+    assert "—" in rendered_text
+    assert (
+        build_fallback_embed(payload)
+        .fields[-1]
+        .value.splitlines()[0]
+        .endswith("— · rank unavailable")
+    )
+
+
 @pytest.mark.asyncio
 async def test_view_has_locked_rows_private_navigation_and_record_paging() -> None:
     payload = _payload(page="record", aliases=12, episodes=12, linked=12)
@@ -294,6 +329,8 @@ async def test_view_has_locked_rows_private_navigation_and_record_paging() -> No
     assert controls["leadership:player:record:next"].disabled is False
     assert controls["leadership:player:current"].disabled is True
     assert controls["leadership:player:current"].style.name == "primary"
+    assert callable(view.refresh)
+    assert controls["leadership:player:refresh"].callback is not None
     linked_values = {option.value for option in controls["leadership:player:linked"].options}
     assert "g:123" not in linked_values
     assert all(

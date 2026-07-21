@@ -110,7 +110,11 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
     if payload.page in {"overview", "activity"}:
         lines = []
         for metric in payload.metrics:
-            total = metric.current_total if metric.current_total is not None else "—"
+            total = (
+                metric.current_total
+                if metric.available and metric.current_total is not None
+                else "—"
+            )
             rank = (
                 f"#{metric.kingdom_rank}/{metric.cohort_count}"
                 if metric.kingdom_rank
@@ -562,7 +566,7 @@ class LeadershipPlayerView(discord.ui.View):
         )
 
     @discord.ui.button(label="Refresh", custom_id="leadership:player:refresh", row=2)
-    async def refresh(self, _button, interaction):
+    async def refresh_report(self, _button, interaction):
         transition = await self._begin(interaction)
         try:
             payload = await service.load_payload(

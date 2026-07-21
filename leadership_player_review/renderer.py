@@ -118,6 +118,11 @@ def _metric_label(code: str) -> str:
     }.get(code, code.replace("_", " "))
 
 
+def _current_metric_total(metric) -> Decimal | None:
+    """Hide SQL aggregate placeholders when source evidence is unavailable."""
+    return metric.current_total if metric.available else None
+
+
 def _draw_header(
     draw: ImageDraw.ImageDraw, canvas: Image.Image, payload: LeadershipPlayerPayload
 ) -> None:
@@ -251,7 +256,7 @@ def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
         _text(
             draw,
             (box[0] + 18, box[1] + 54),
-            _compact(metric.current_total, signed=metric.code == "POWER_CHANGE"),
+            _compact(_current_metric_total(metric), signed=metric.code == "POWER_CHANGE"),
             width=box[2] - box[0] - 36,
             size=43,
             min_size=27,
@@ -382,7 +387,7 @@ def _draw_activity(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
         _text(
             draw,
             (x0 + 18, y0 + 50),
-            _compact(metric.current_total, signed=metric.code == "POWER_CHANGE"),
+            _compact(_current_metric_total(metric), signed=metric.code == "POWER_CHANGE"),
             width=270,
             size=40,
             min_size=25,
