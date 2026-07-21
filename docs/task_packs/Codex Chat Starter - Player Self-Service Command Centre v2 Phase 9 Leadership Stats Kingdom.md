@@ -1,6 +1,7 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 9 Leadership `/stats kingdom`
 
-Status: initiation starter for proposed Phase 9. Start only after Phase 8 is accepted and archived. Use
+Status: initiation starter for proposed Phase 9. Phase 8 is accepted and archived; start only after
+separate operator scheduling and do not absorb the active Phase 8.1 refinement. Use
 with the matching Phase 9 task pack. One-pass execution is not approved.
 
 ## Copy/Paste Starter
@@ -9,7 +10,7 @@ with the matching Phase 9 task pack. One-pass execution is not approved.
 Codex, begin Player Self-Service Command Centre v2 Phase 9: Leadership /stats kingdom.
 
 Approval state:
-- Phase 8 /stats player must be complete and accepted first
+- Phase 8 /stats player is complete and accepted on 2026-07-21
 - add private grouped /stats kingdom
 - add no new top-level command
 - change no /me command

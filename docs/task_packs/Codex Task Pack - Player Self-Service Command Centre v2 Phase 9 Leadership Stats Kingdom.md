@@ -9,7 +9,7 @@
 - One-pass approved: `no`
 - Product direction approved: `yes`
 - Detailed audit/design approved: `yes`
-- Runtime implementation approved: `not before Phase 8 acceptance and the audit, SQL design, architecture, implementation-plan, visual, performance, and security approval gates in this pack`
+- Runtime implementation approved: `Phase 8 acceptance prerequisite is satisfied; runtime remains blocked on the audit, SQL design, architecture, implementation-plan, visual, performance, security, and operator scheduling gates in this pack`
 - Status: `proposed; programme scope agreed, detailed refinement may occur when Phase 9 becomes active`
 - New command: `/stats kingdom`
 - New top-level command: `none`
@@ -814,7 +814,7 @@ No standard/deep codebase scan without explicit request.
 
 ## 28. Deployment
 
-1. Complete Phase 8 and observation/acceptance.
+1. Confirm the archived Phase 8 acceptance baseline and do not absorb the active Phase 8.1 scope.
 2. Audit/approve Phase 9.
 3. Develop SQL contract.
 4. Deploy/verify SQL.

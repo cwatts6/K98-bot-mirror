@@ -68,24 +68,27 @@ scan with zero findings, and final Discord smoke. No command resync or SQL deplo
 the baseline remains 37 top-level, 100 grouped, eight `/me`, and two `/inventory`. The Phase 7 task
 pack and starter are archived.
 
-Approved follow-on roadmap, updated after Phase 7 acceptance on 2026-07-19:
+Approved follow-on roadmap, updated after Phase 8 acceptance on 2026-07-21:
 
 - The proposed `/me history` route is closed with no build. `/kvk history` remains the one
   canonical KVK-history command.
 - Phase 7 is complete and archived. Its accepted visual/content/navigation/lifecycle contract is
   the baseline for later leadership cards, without transferring `/me` ownership.
-- Phase 8 modernises the existing private leadership `/stats player`, adopts one canonical
-  higher-is-better Tanking Score across every KVK/Account/leadership surface, adds the bounded
-  leadership data/audit foundations, and removes `/player_profile` with no redirect.
+- Phase 8 completed the existing private leadership `/stats player`, adopted one canonical
+  higher-is-better Tanking Score across every KVK/Account/leadership surface, added the bounded
+  leadership data/audit foundations, and removed `/player_profile` with no redirect.
+- Phase 8.1 refines the accepted leadership page hierarchy, promotes Presence and bounded Last
+  Active, improves location/KVK/record presentation, and measures cold/warm query/load performance
+  before any optimisation is approved.
 - Phase 9 adds private `/stats kingdom` with current kingdom totals, twelve-month dynamic-roster
   trends, and the latest four completed KVKs. Participants are governors with final-event
   Acclaim greater than zero, and Acclaim per Participant is included.
 - Phase 10 remains a usage-led review of other compatibility routes; Phase 11 remains a future
   candidate feature programme.
 
-Phase 8 is implemented on dedicated bot and SQL branches and is in final correction validation.
-SQL-first deployment, resync, and operator acceptance remain pending; Phase 9 must wait for that
-acceptance.
+Phase 8 completed SQL-first deployment, resync, restart, correction smoke and operator acceptance on
+2026-07-21. Its task pack/starter are archived. Phase 8.1 is the active audit-first refinement; no
+command change or resync is expected, and SQL changes remain measurement- and approval-gated.
 Locked follow-on consistency:
 
 Phase 7 proved the accepted visual hierarchy across every retained `/me` card/fallback. Core
@@ -93,12 +96,12 @@ Phase 7 proved the accepted visual hierarchy across every retained `/me` card/fa
 report-specific accents. `core/visual_contract.py` owns only proven identical primitives; a broad
 renderer/grid/payload/view framework remains outside scope.
 
-Phase 8 and Phase 9 are leadership `/stats` products, not `/me` pages. They reuse accepted
+Phases 8, 8.1 and 9 are leadership `/stats` products, not `/me` pages. They reuse accepted
 private attachment/fallback/lifecycle patterns but use dedicated stable-role-ID/channel
 authorization, neutral leadership identity, their own typed payloads, and no self-view
 governor picker or All Linked scope.
 
-Both leadership phases inherit the centred top-right state pill, row-0 page-family navigation,
+All leadership phases inherit the centred top-right state pill, row-0 page-family navigation,
 blue neutral/selection/UTC semantics, compact formats, accepted missing-value vocabulary,
 source/generated separation, same-payload fallback, latest-transition-wins, preserve-and-disable
 timeout, and cleanup. Phase 8 Change Player/linked-governor controls use exact Governor IDs or
@@ -220,10 +223,10 @@ Players choose a formatted Full workbook, the exact Current snapshot CSV, or Raw
 for 30, 60, 90, 180, or 360 days. The Full workbook is the one `.xlsx` file for Excel or Google
 Sheets import and starts with Account Summary. `/me exports` and `/my_stats_export` are removed rather
 than kept as redirects. Resources, Speedups, and Materials retain their own private selected-governor report-page
-exports. At the accepted Phase 7 production baseline, `/stats player`, `/player_profile`, and
-`/mykvkcrystaltech` remain live. The Phase 8 implementation branch modernises `/stats player` and
-removes `/player_profile` with no redirect; `/mykvkcrystaltech` remains outside that phase. The
-production runtime changes only after SQL-first deployment, bot rollout, resync, and smoke.
+exports. At the accepted Phase 8 production baseline, `/stats player` and `/mykvkcrystaltech`
+remain live; `/player_profile` is removed with no redirect. `/mykvkcrystaltech` remains outside
+Phase 8/8.1. The accepted command surface is 36 top-level, 100 grouped, eight `/me`, one `/stats`,
+and two `/inventory`.
 
 Use `/me stats` for private Period Performance from any guild channel or thread. It defaults to the
 current selected Dashboard governor where available and otherwise Main/first valid account. Choose
@@ -265,16 +268,20 @@ Completed Phase 6 deployment:
 - passed single, multi, 26-account, period, access-change, fallback, timeout, mobile/desktop, source-
   freshness, and `/stats player` smoke before final acceptance.
 
-Approved next phases:
+Accepted and next phases:
 
-- Phase 7: no command or SQL change; visually align all retained `/me` cards/fallbacks against
+- Phase 7 complete: no command or SQL change; visually aligned all retained `/me` cards/fallbacks against
   `/me stats`, preserve Dashboard/Inventory specialist layouts, and complete contact-sheet plus
   desktop/mobile review.
-- Phase 8: dedicated Leadership-channel role-ID gate; admin additionally allowed in Notify;
+- Phase 8 complete: dedicated Leadership-channel role-ID gate; admin additionally allowed in Notify;
   private `/stats player` only; 30/90/180/360 periods; Scan Presence, source coverage, ranks,
   Activity Index v1, latest/last-three completed KVK, linked governors, aliases, alliance
   history, location/shield, dedicated 90-day audit; global Tanking correction; remove
   `/player_profile`; deploy SQL before bot; resync to 36 top-level.
+- Phase 8.1 active scope: remove duplicated Overview activity cards; make Presence, bounded Last
+  Active, location and shield primary; enlarge Activity; show latest three finalized KVKs in three
+  columns; group complete Alias/Alliance history; align footer labels; measure 30/90/180/360 cold/
+  warm performance before approving any SQL or bot optimisation. No command/resync change expected.
 - Phase 9: add private `/stats kingdom`; dynamic-roster monthly final scans, current totals,
   Total Kingdom Acclaim as `SUM(HighestAcclaim)`, last four completed KVKs, KVK Acclaim as
   `SUM(Acclaim)`, participants as distinct governors with Acclaim > 0, Acclaim per Participant,
@@ -740,9 +747,11 @@ Current status:
   will not be implemented.
 - Phase 7 completed the `/me` visual consistency, content audit, and programme closeout on
   2026-07-19, preserving the Dashboard and Inventory specialist dimensions and behaviour.
-- Phase 8 modernises the existing private `/stats player`, introduces the approved leadership data,
-  permission, audit, source, and canonical Tanking contracts, and removes `/player_profile` without a
-  redirect. It does not create `/me inspect`.
+- Phase 8 completed and operator accepted the existing private `/stats player`, approved leadership
+  data, permission, audit, source and canonical Tanking contracts, and `/player_profile` removal
+  without a redirect. It did not create `/me inspect`.
+- Phase 8.1 is separately task-packed for visual hierarchy, Presence/Last Active, record formatting
+  and evidence-led performance refinement while preserving the Phase 8 command/privacy contract.
 - Phase 9 adds private `/stats kingdom` with dynamic-roster 12-month trends and the latest four
   completed KVK summaries, including Acclaim-based participants and Acclaim per Participant.
 - Phase 10 is the later usage-led migration review; Phase 11 sticky features remain a future programme

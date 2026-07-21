@@ -1,7 +1,8 @@
 # Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8 Leadership `/stats player` Modernisation, Canonical Combat Metric Alignment and `/player_profile` Retirement
 
-Status: active initiation starter. Phase 7 was accepted and archived on 2026-07-19. Use with the
-matching Phase 8 task pack. One-pass execution is not approved.
+Status: archived closeout starter. Phase 8 was production smoke tested and operator accepted on
+2026-07-21. Do not use this starter for new work; use the active Phase 8.1 starter for the approved
+visual hierarchy, Presence/Last Active and performance refinement.
 
 ## Copy/Paste Starter
 

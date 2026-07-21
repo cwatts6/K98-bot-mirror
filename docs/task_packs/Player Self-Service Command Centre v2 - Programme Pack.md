@@ -4,13 +4,15 @@
 
 - Programme name: `Player Self-Service Command Centre v2`
 - Programme nickname: `GovernorOS`
-- Date: `2026-07-19`
+- Date: `2026-07-21`
 - Owner/context: KD98 / Kingdom 1198 player experience modernisation after the original Player
   Self-Service Command Centre programme completed in production PR #486. GovernorOS v2 is
-  complete and operator accepted through Phase 7 on 2026-07-19. Phase 7 closed the retained
-  `/me` product with the accepted visual/content consistency contract; Phase 8 now modernises the one leadership
-  `/stats player` journey, aligns canonical combat metrics, and removes `/player_profile`; Phase 9
-  adds private `/stats kingdom`. The former `/me history` proposal is closed with no build and
+  complete and operator accepted through Phase 8 on 2026-07-21. Phase 7 closed the retained
+  `/me` product with the accepted visual/content consistency contract; Phase 8 delivered the one
+  leadership `/stats player` journey, aligned canonical combat metrics, and removed
+  `/player_profile`. Phase 8.1 now refines the accepted leadership visual hierarchy, Presence/Last
+  Active signal, identity-history presentation and measured performance; Phase 9 adds private
+  `/stats kingdom`. The former `/me history` proposal is closed with no build and
   `/kvk history` remains canonical.
 
 - Programme type: `Product UX | Discord command architecture | player stats/profile/inventory integration | visual redesign | SQL-backed data service foundation`
@@ -342,6 +344,10 @@ Leadership/admin runs /stats player
 
 Phase 8 uses a dedicated stable-role-ID and channel gate. It does not reuse the self-view
 governor picker or create `/me inspect`.
+
+Phase 8 is complete and operator accepted. Phase 8.1 preserves this command, permission, privacy,
+data and lifecycle contract while refining page purpose, Presence/Last Active visibility, location
+context, KVK/record readability and measured load/query performance.
 
 ## 9. Governor Dashboard Product Model
 
@@ -1137,6 +1143,7 @@ Remaining-phase consistency matrix:
 | 6 Interactive Period Performance | Selected governor or explicit All Linked | Accepted `1702x924` `me_stats.png` card with Overview, Activity, Combat; no downloads | Dashboard/Main-first selected governor, opaque ID/token picker with 24 governors per page plus explicit All Linked, revalidate before fetch | Complete and operator accepted 2026-07-18; private-anywhere `/me stats`, exact seven periods, coverage-aware signed additive metrics, integrated accessible charts, source refresh, `/my_stats` retirement, `37 / 100 / 8 / 2`, `/stats player` preserved |
 | 7 `/me` closeout | Retained self-service cards and fallbacks | Use accepted `/me stats` typography, semantic colours, panel/pill treatment, freshness wording, and visual hierarchy as the reference | Preserve every existing page's approved self-view routing; no command or selector change | Visual/content consistency only; preserve Dashboard 1180x760 and Inventory 1400x980 specialist layouts; no SQL, metric, permission, privacy, or product change |
 | 8 `/stats player` | One explicit selected Governor ID | Private leadership Overview, Kingdom Activity, KVK Performance, and Player Record | Exact/fuzzy lookup with private ambiguity selection; linked governors are context/navigation only | Dedicated stable-role-ID/channel gate, 30/90/180/360-day contribution, Presence, Activity Index v1, KVK context, alias/alliance/location/shield, global Tanking correction, `/player_profile` removal |
+| 8.1 `/stats player` refinement | Same explicit selected Governor ID | Refined Overview, Activity, KVK and Record layouts plus measured performance | No selector/permission/command change | Presence and Last Active emphasis, location/shield hierarchy, three-column KVK, grouped identity history, evidence-led query/load optimisation |
 | 9 `/stats kingdom` | Kingdom 1198 leadership aggregate | Private Kingdom Overview and latest-four-completed-KVK summary | No player selector; no arbitrary kingdom selector in the first release | Dynamic-roster monthly trends, current totals, Total Kingdom Acclaim, KVK Acclaim, Acclaim participants/per-participant, aggregate KP Loss/Tanking Score |
 
 Every phase starts with repository inspection and an approval-gated implementation plan. Historical
@@ -1818,8 +1825,8 @@ execution record. No command resync or SQL deployment was required.
 
 ### Phase 8 — Leadership `/stats player` Modernisation, Canonical Combat Metric Alignment and `/player_profile` Retirement
 
-Status: `implemented on dedicated bot and SQL branches; final correction validation in progress;
-SQL-first deployment, resync, smoke, and operator acceptance pending`.
+Status: `complete, production smoke tested and operator accepted on 2026-07-21; task pack and
+starter archived`.
 
 Goal: replace fragmented leadership player tools with one private, permission-gated,
 decision-oriented review of a selected Governor ID.
@@ -1896,9 +1903,50 @@ least one of kills, deads, or healed.
 
 Command impact after Phase 8: `36 top-level / 100 grouped / 8 me / 1 stats / 2 inventory`.
 
-Approval gate: command/caller/permission/source/history/formula audit, SQL design, architecture,
-performance plan, visual wireframes, dedicated bot and SQL Changes reviews with Deep off, deploy
-SQL before bot, resync, and operator smoke.
+Acceptance evidence: the SQL migration series and merged SQL follow-up PR #53 deployed before the
+accepted bot runtime; mirror PR #230 and production PR #537 carry the bot result. Production smoke
+accepted lookup, permission enforcement, all four pages, all periods, activity/history backfills,
+latest-three finalized KVK data, global canonical Tanking parity, record history, controls and
+restart-safe interaction behavior. The resynced command surface is
+`36 top-level / 100 grouped / 8 me / 1 stats / 2 inventory`.
+
+### Phase 8.1 - Leadership Player Review Visual Hierarchy, Presence and Performance
+
+Status: `approved scope; task pack/chat starter prepared; audit and design first`.
+
+Goal: refine the accepted Phase 8 product without changing its command, permission, privacy or
+metric ownership, and measure then correct avoidable first-load/period-change latency.
+
+Deliver:
+
+- Overview removes duplicated Forts/Helps/Tech cards and promotes Activity Index, Presence,
+  Last Active Date, latest X:Y, location freshness and shield context.
+- Presence shows exact scan ratio and percentage.
+- Last Active is the latest authoritative complete kingdom `ScanDate` within bounded 720-day
+  history where Power, Healed, RSS Gathered, RSS Assisted, Helps, Tech Donations, Building Minutes
+  or completed Fort rallies increased from the immediately previous complete scan in which the
+  governor was present.
+- Missing observations are never zero; negative monotonic resets do not count; more than 30 UTC
+  calendar days before TODAY is INACTIVE; no qualifying evidence is `Not recorded`.
+- ACTIVE/INACTIVE is separate from CURRENT/STALE/PARTIAL/NO DATA.
+- Kingdom Activity removes repeated location context and enlarges its accepted six metric panels.
+- KVK Performance removes repeated location context and presents the latest three finalized KVKs
+  as three side-by-side cards, retaining metrics/percentages/ranks while removing visible final
+  timestamp/state and MET/NOT MET words.
+- Player Record renames Alliance Episodes to Alliances and groups complete paged Alias/Alliance
+  history beneath one Governor ID heading.
+- Footer wording becomes `Data refreshed` with Generated right aligned.
+- Performance work measures cold/warm 30/90/180/360 loads, SQL plans/reads/time/result sizes,
+  cache/inflight and rendering stages before choosing the smallest improvement.
+- New tables, indexes or pre-aggregation are not pre-approved and require evidence plus a separate
+  SQL design/review/deployment gate.
+
+Command impact: none; remain `36 / 100 / 8 / 1 / 2`. No resync is expected.
+
+Approval gate: current data/query/render audit, exact Last Active semantics and parity, visual
+wireframes, performance evidence/budget, exact bot and optional SQL manifest, focused/full/visual
+tests, bot Changes review and conditional SQL Changes review with Deep off, operator smoke and
+visual/performance acceptance.
 
 ### Phase 9 — Leadership `/stats kingdom`
 
@@ -2002,6 +2050,8 @@ validated source per feature, then create a new task pack or successor programme
   integrated RSS/Fort charts, `/my_stats` retirement, command resync, and rollback.
 - Phase 7 `/me` visual consistency, content audit, and programme closeout.
 - Phase 8 leadership `/stats player` modernisation, global Tanking Score alignment, and `/player_profile` retirement.
+- Phase 8.1 leadership page-purpose, Presence/Last Active, location/KVK/record visual hierarchy and
+  evidence-led load/query performance refinement.
 - Phase 9 private `/stats kingdom` current-strength, twelve-month, and completed-KVK reporting.
 - Phase 10 usage-based migration planning for remaining redirect/compatibility commands.
 - Documentation, tests, command reference updates, command-cache governance, and deferred
@@ -2010,8 +2060,7 @@ validated source per feature, then create a new task pack or successor programme
 ## 14. Out of Scope for the First Implementation Build
 
 - Adding `/me history`; `/kvk history` remains canonical.
-- Changing `/stats player` or removing `/player_profile` before the separately approved Phase 8
-  implementation/deployment gate.
+- Reopening the accepted `/stats player` command ownership or restoring `/player_profile`.
 - Changing `/mykvkcrystaltech` or public/channel-gated `/kvk history` without their own evidence and
   approval.
 - Dropping or migrating `dbo.InventoryReportPreference` during Phase 5F.
@@ -2214,16 +2263,17 @@ The programme is complete when:
 - [x] `/my_stats` is removed without a redirect and the resynced surface verifies 37 top-level, 100 grouped, 8 `/me`, and 2 `/inventory`.
 - [x] Exact seven-period boundaries, signed metrics, coverage-aware All Linked aggregation, RSS/Fort and Combat charts, fallback, timeout, accessibility, and performance passed operator smoke on 2026-07-18.
 - [x] The KVK history placement review is closed: `/kvk history` remains canonical and `/me history` will not be implemented.
-- [ ] Phase 7 aligns the retained `/me` visual/content system without command, data, permission, or product changes.
-- [ ] Phase 8 implementation modernises private `/stats player`, aligns canonical Tanking Score globally, and removes `/player_profile` with no redirect; final validation, SQL-first deployment, resync, smoke, and operator acceptance remain.
+- [x] Phase 7 aligns the retained `/me` visual/content system without command, data, permission, or product changes.
+- [x] Phase 8 modernises private `/stats player`, aligns canonical Tanking Score globally, removes `/player_profile` with no redirect, and passes production smoke/operator acceptance on 2026-07-21.
+- [ ] Phase 8.1 refines leadership visual hierarchy, Presence/Last Active, record readability and measured performance without changing the accepted command/permission contract.
 - [ ] Phase 9 adds private `/stats kingdom` with dynamic-roster monthly trends and the latest four completed KVKs.
 - [x] Legacy commands are only redirected/removed after usage evidence and explicit operator approval; Phase 5F, Phase 5G, Phase 6, and the approved future Phase 8 removal each have route-specific decisions.
-- [x] Documentation reflects GovernorOS v2 completion through Phase 6 and the approved Phase 7-11 roadmap.
-- [x] Canonical command references and validators show the accepted Phase 6 baseline at 37 top-level commands, 100 grouped subcommands, 8 `/me` subcommands, and 2 `/inventory` subcommands.
+- [x] Documentation reflects GovernorOS v2 completion through Phase 8 and the approved Phase 8.1-11 roadmap.
+- [x] Canonical command references and validators show the accepted Phase 8 baseline at 36 top-level commands, 100 grouped subcommands, 8 `/me`, 1 `/stats`, and 2 `/inventory` subcommands.
 - [x] Phase 5C documentation, canonical references, automated validation, security review, visual
   samples, and successful operator Discord smoke are recorded.
-- [x] Command registration validation remains green through Phase 6.
-- [x] No new direct SQL exists in command/view layers through Phase 6.
+- [x] Command registration validation remains green through Phase 8.
+- [x] No new direct SQL exists in command/view layers through Phase 8.
 - [x] Deferred findings from completed phases are captured structurally.
 
 ## 19. Deferred / Future Opportunities
@@ -2243,22 +2293,23 @@ Do not include these in early phases unless separately approved:
 
 ## 20. Suggested Next Action
 
-Phase 7 is complete, operator accepted, and archived. Phase 8 has passed its staged approvals and is
-implemented on dedicated bot and SQL branches. Complete correction validation and fresh bot/SQL
-Changes reviews, then deploy SQL first, deploy the bot, restart, resync, smoke, observe, and promote
-only the accepted patch. Phase 9 remains blocked on Phase 8 operator acceptance.
+Phase 8 is complete, production smoke tested, operator accepted and archived. Begin Phase 8.1 with
+the audit-only gate: prove Last Active source semantics, current renderer/data limits and cold/warm
+latency before proposing implementation. Any SQL change remains separately evidence- and
+approval-gated. Phase 9 remains separately task-packed and must not absorb Phase 8.1 work.
 
-Phase 9 follows only after Phase 8 acceptance. Phase 10 is usage-led compatibility review, and
-Phase 11 remains an uncommitted future feature candidate.
+Phase 9 may follow the accepted Phase 8 data/permission foundation, but scheduling relative to the
+active Phase 8.1 refinement remains an operator decision. Phase 10 is usage-led compatibility
+review, and Phase 11 remains an uncommitted future feature candidate.
 
 Active task packs and starters:
 
-- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 8 Leadership Stats Player Modernisation Canonical Combat Metric Alignment and Player Profile Retirement.md`
-- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8 Leadership Stats Player Modernisation Canonical Combat Metric Alignment and Player Profile Retirement.md`
+- `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 8.1 Leadership Player Review Visual Hierarchy Presence and Performance.md`
+- `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 8.1 Leadership Player Review Visual Hierarchy Presence and Performance.md`
 - `docs/task_packs/Codex Task Pack - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
 - `docs/task_packs/Codex Chat Starter - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
 
-Completed Phase 7 and earlier execution records remain archived and are not rewritten except for
+Completed Phase 8 and earlier execution records remain archived and are not rewritten except for
 explicit historical corrections.
 
 ## 21. Programme Change Log
@@ -2308,3 +2359,6 @@ explicit historical corrections.
 | 2026-07-18 | Phase 6 source-freshness correction approved | Replaced the provisional bot-query completion meaning of `Data last refreshed` with the authoritative latest UTC `KingdomScanData4.ScanDate` on the global Stats anchor date. The change uses a new additive procedure-result migration after the original SQL contract merged, deploys SQL before the dependent bot, fails closed when the new header is absent, preserves the generation footer, and retains the measurement gate for any new index. |
 | 2026-07-18 | Phase 6 completed, operator accepted, and archived | Final production Discord smoke accepted every period, governor switching, All Linked, Dashboard navigation, source-correct data, final Overview/Activity/Combat presentation, and timeout. Mirror PR #228 and production PR #535 carry the accepted bot result; SQL PRs #43/#44 deployed first. Final validation recorded `2660 passed, 2 skipped`; bot and SQL Changes reviews ran with Deep off and closed with zero unresolved findings. Archived the Phase 6 task pack/starter and locked the premium format, source/generated time separation, opaque governor-picker, revalidation, fallback, lifecycle, and accessibility inheritance rules for separately approved Phases 7-10. |
 | 2026-07-18 | Phase 7-9 roadmap approved and task-packed | Closed `/me history` with no build; made Phase 7 the `/me` visual/content closeout using `/me stats` as reference; approved Phase 8 `/stats player`, canonical Tanking alignment, Rally completion/alias/audit SQL foundations, and `/player_profile` removal; approved Phase 9 `/stats kingdom` dynamic-roster overview and Acclaim-based completed-KVK participation; created all three task packs and chat starters. |
+| 2026-07-19 | Phase 7 completed, operator accepted, and archived | Mirror PR #229 and production PR #536 delivered the accepted `/me` visual/content closeout without command, SQL, metric, permission or product changes. Final smoke accepted the shared visual/lifecycle language and the Phase 7 task pack/starter moved to the archive. |
+| 2026-07-21 | Phase 8 completed, operator accepted, and archived | SQL-first deployment, historic Rally/Alliance/KVK completion correction, command resync, bot restart and production smoke accepted the one private `/stats player` leadership journey, global canonical combat metrics, four pages/period controls, dedicated authorization/audit contract, complete identity/KVK history and `/player_profile` retirement. Mirror PR #230 and production PR #537 carry the bot result; merged SQL follow-up PR #53 carries the final data correction. The accepted command surface is `36 / 100 / 8 / 1 / 2`. |
+| 2026-07-21 | Phase 8.1 visual hierarchy, Presence and performance scope task-packed | Approved a separate audit-first refinement: Overview Presence/Last Active/location emphasis, larger Activity page, three-column latest-three KVK layout, grouped complete Alias/Alliance presentation, consistent footer alignment and measurement-first cold/warm 30/90/180/360 performance work. No command/resync change is expected; any SQL object remains evidence- and approval-gated. |

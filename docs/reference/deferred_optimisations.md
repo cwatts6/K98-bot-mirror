@@ -89,11 +89,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: remaining redirect-only account/reminder/KVK compatibility paths, `/mykvkcrystaltech`, command governance, and migration communications
 - Type: cleanup
-- Description: Completed Phases 5F, 5G, and 6 removed their explicitly approved Inventory, export, and `/my_stats` routes. The 2026-07-18 roadmap separately assigns `/stats player` modernisation and `/player_profile` removal to Phase 8, and closes `/me history` while preserving canonical `/kvk history`. Those decisions are no longer part of this generic deferred item. Remaining redirected account/reminder/KVK paths and `/mykvkcrystaltech` still require route-specific usage, feedback, caller, and replacement evidence.
-- Suggested Fix: Use future Phase 10 for fresh qualified usage and no-feedback review. Change one remaining route at a time only after explicit operator approval, communication, command-governance updates, resync, smoke, and rollback. Do not reopen the Phase 8 `/stats player`/`/player_profile` decision or the canonical `/kvk history` placement through this generic item.
+- Description: Completed Phases 5F, 5G, 6, and 8 removed their explicitly approved Inventory, export, `/my_stats`, and `/player_profile` routes. Phase 8 also established `/stats player` as the one canonical leadership player-review location, while `/me history` remains closed and `/kvk history` canonical. Those decisions are no longer part of this generic deferred item. Remaining redirected account/reminder/KVK paths and `/mykvkcrystaltech` still require route-specific usage, feedback, caller, and replacement evidence.
+- Suggested Fix: Use future Phase 10 for fresh qualified usage and no-feedback review. Change one remaining route at a time only after explicit operator approval, communication, command-governance updates, resync, smoke, and rollback. Do not reopen the accepted Phase 8 `/stats player`/`/player_profile` decision, the Phase 8.1 no-command-change boundary, or canonical `/kvk history` placement through this generic item.
 - Impact: medium
 - Risk: medium
-- Dependencies: Phase 7-9 roadmap approved on 2026-07-18; Phase 8 and Phase 9 have dedicated task packs; future Phase 10 evidence review.
+- Dependencies: Phase 8 operator accepted on 2026-07-21; Phase 8.1 and Phase 9 have dedicated task packs; future Phase 10 evidence review.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.InventoryReportPreference`, `inventory/dal/inventory_reporting_dal.py`, `inventory/reporting_service.py`, and retired Inventory-visibility documentation/tests
@@ -112,15 +112,6 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Impact: medium
 - Risk: medium
 - Dependencies: Phase 3 smoke correction deployed for representative measurement; production SQL execution-plan access; observed dashboard usage/concurrency; SQL owner approval before index, view, or maintained-table changes.
-
-### Deferred Optimisation
-- Area: post-Phase-8 residual `embed_my_stats.py`, root `stats_service.py`, `stats_helpers.py`, profile cache/lookup helpers, and zero-caller leadership compatibility code
-- Type: cleanup
-- Description: The product decision is no longer deferred: Phase 8 will modernise the existing `/stats player`, will not create `/me inspect`, and will remove `/player_profile` with no redirect. The exact caller audit may prove that some legacy stats/profile helpers remain shared by other commands. Any such non-zero-caller helper must be retained during Phase 8 rather than deleted speculatively.
-- Suggested Fix: Execute the Phase 8 task pack. Delete command-specific and zero-caller helpers in that phase. After acceptance, retain only a narrowly documented residual cleanup item for helpers that could not be removed because another live caller remains; do not use broad module cleanup to widen the Phase 8 command/data scope.
-- Impact: medium
-- Risk: medium
-- Dependencies: Phase 8 task pack, caller graph, focused permission/rendering/command tests, coordinated command resync and rollback.
 
 ### Deferred Optimisation
 - Area: SQL repo `dbo.usp_GetPersonalStatsDaily`, `dbo.KingdomScanData4`, Alliance Activity/Fort sources, and `stats/dal/personal_stats_dal.py`
@@ -143,11 +134,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: broad cross-page renderer/view framework beyond Phase 7's narrow `/me` visual contract
 - Type: architecture
-- Description: Phase 7 completed the retained `/me` visual/content consistency pass and extracted only bounded, proven common primitives into `core/visual_contract.py`. Dashboard, Inventory, core summary payloads, selectors, data ownership, dimensions, and page-specific renderers remain deliberately independent. The accepted Preferences rework and cross-page row-0 navigation do not prove that one universal renderer/grid/payload/view framework would be safer or clearer. Phase 8 and Phase 9 must inherit the shared token/state/content/lifecycle contract while retaining leadership-specific payloads, permissions, selection semantics, and page geometry.
-- Suggested Fix: Observe the Phase 8 and Phase 9 leadership renderers after delivery. Reconsider any broader framework only with quantified identical duplication across at least two accepted consumers, a migration matrix, visual and fallback parity tests, Discord component-limit proof, lifecycle/timeout evidence, and a separately approved task pack. Do not use Phase 8 or 9 to consolidate self-view and leadership selectors or to introduce a universal grid.
+- Description: Phase 7 completed the retained `/me` visual/content consistency pass and extracted only bounded, proven common primitives into `core/visual_contract.py`. Phase 8 then delivered a separate leadership-specific renderer/payload/view contract. Dashboard, Inventory, core summary payloads, selectors, data ownership, dimensions, and page-specific renderers remain deliberately independent. Phase 8.1 is an approved refinement inside the leadership renderer; it still does not prove that one universal renderer/grid/payload/view framework would be safer or clearer.
+- Suggested Fix: Observe the accepted Phase 8.1 and future Phase 9 leadership renderers after delivery. Reconsider any broader framework only with quantified identical duplication across at least two accepted consumers, a migration matrix, visual and fallback parity tests, Discord component-limit proof, lifecycle/timeout evidence, and a separately approved task pack. Do not use Phase 8.1 or 9 to consolidate self-view and leadership selectors or to introduce a universal grid.
 - Impact: low
 - Risk: medium
-- Dependencies: Phase 7 operator accepted on 2026-07-19; accepted `core/visual_contract.py` boundary; Phase 8/9 observation evidence; no broad framework without a later explicit task pack.
+- Dependencies: Phase 7 operator accepted on 2026-07-19; Phase 8 operator accepted on 2026-07-21; accepted `core/visual_contract.py` and leadership-renderer boundaries; Phase 8.1/9 observation evidence; no broad framework without a later explicit task pack.
 
 ### Deferred Optimisation
 - Area: `services/stats_export_service.py`, `stats/dal/stats_export_dal.py`, `stats_exporter.py`, `stats_exporter_csv.py`, `player_self_service/accounts_export.py`, Inventory exports, SQL export views/tables, export docs/tests
@@ -215,11 +206,11 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `decoraters.py`, `commands/admin_cmds.py`, `/ops usage`, `/ops usage_detail`, leadership-role configuration and permission tests
 - Type: security
-- Description: The Phase 5C Codex Security repository scan validated that the shared `is_admin_or_leadership` path treats an exact configured leadership role name as an independent authorization grant when no configured stable role ID matches. Both private SQL-backed usage commands inherit that decision. Phase 8 will not reuse this broad gate for `/stats player`; it has a dedicated stable-role-ID and Leadership/Notify channel matrix. The generic decorator and other commands remain a separate low/P3 hardening item.
+- Description: The Phase 5C Codex Security repository scan validated that the shared `is_admin_or_leadership` path treats an exact configured leadership role name as an independent authorization grant when no configured stable role ID matches. Both private SQL-backed usage commands inherit that decision. Accepted Phase 8 did not reuse this broad gate for `/stats player`; it delivered a dedicated stable-role-ID and Leadership/Notify channel matrix. The generic decorator and other commands remain a separate low/P3 hardening item.
 - Suggested Fix: In a separate permission-hardening slice, decide whether role-name compatibility must remain. Prefer configured stable role IDs as authority; if names are retained for migration, make them warning-only or require a matching approved ID. Add regression coverage for unmatched ID plus matching name, allowed/disallowed channels, Discord administrator and fixed admin paths, both usage commands, and existing leadership workflows before deployment.
 - Impact: medium
 - Risk: medium
-- Dependencies: Production leadership role IDs are confirmed for Phase 8, but generic decorator consumers still need their own compatibility audit. Preserve intended admin/leadership access outside Phase 8; run focused permission/telemetry tests, command registration, full pytest, and operator smoke before changing the shared decorator.
+- Dependencies: Phase 8 dedicated authorization is deployed and operator accepted, but generic decorator consumers still need their own compatibility audit. Preserve intended admin/leadership access outside `/stats player`; run focused permission/telemetry tests, command registration, full pytest, and operator smoke before changing the shared decorator.
 
 ### Deferred Optimisation
 - Area: `DL_bot.py` fast-path attachment handlers, `upload_routes/`, `file_utils.py`, import worker admission and operational telemetry

@@ -193,7 +193,7 @@ Legend:
 | Stats/KVK | `/kvk_admin test_export` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk test_export` in Phase 2A | KVK export test. |
 | Stats/KVK | `/mykvkstats` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk stats`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_admin refresh_stats_cache` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk refresh_stats_cache` in Phase 2A | Refreshes stats cache. |
-| Stats/KVK | `/stats player` | `commands/stats_cmds.py` | Grouped | Dedicated stable leadership-role-ID/channel check; admin additionally allowed in Leadership and Notify channel/threads; revalidated on every interaction | Private/ephemeral only | Standard | Canonical leadership player route; Phase 8 implementation pending deployment and acceptance | One selected-governor review with 30/90/180/360-day kingdom contribution, ranks, Scan Presence, Activity Index v1, finalized-KVK performance, linked-governor context/navigation, aliases, alliance history, location/shield, dedicated 90-day identified audit retention, and no `/me inspect`, public share, or export. |
+| Stats/KVK | `/stats player` | `commands/stats_cmds.py` | Grouped | Dedicated stable leadership-role-ID/channel check; admin additionally allowed in Leadership and Notify channel/threads; revalidated on every interaction | Private/ephemeral only | Standard | Canonical leadership player route; Phase 8 complete and accepted; Phase 8.1 visual/performance refinement active | One selected-governor review with 30/90/180/360-day kingdom contribution, ranks, Scan Presence, Activity Index v1, finalized-KVK performance, linked-governor context/navigation, aliases, alliance history, location/shield, dedicated 90-day identified audit retention, and no `/me inspect`, public share, or export. |
 | Stats/KVK | `/mykvkhistory` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk history`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_rankings` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Public redirect | Standard | Deprecated redirect to `/kvk rankings type:kvk`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_admin export_all` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk export_all` in Phase 2A | KVK Google Sheets export. |
@@ -243,16 +243,23 @@ deployed and commands are resynced.
 
 ### Phase 8
 
-- Implementation is complete on the Phase 8 bot and SQL branches and is undergoing final validation;
-  it is not yet deployed or operator accepted.
-- Modernise existing `/stats player`.
+- Complete, deployed, resynced, production smoke tested and operator accepted on 2026-07-21.
+- Modernised existing `/stats player` as the only leadership player-review route.
 - Do not create `/me inspect`.
 - Remove top-level `/player_profile` with no redirect.
-- Target after resync: `36 top-level / 100 grouped / 8 me / 1 stats / 2 inventory`.
+- Accepted resynced surface: `36 top-level / 100 grouped / 8 me / 1 stats / 2 inventory`.
 - Dedicated stable-role-ID/channel gate:
   - leadership role IDs in Leadership channel/threads;
   - admin in Leadership and Notify channel/threads;
   - no role-name-only, Ark Setup, DM, or other-channel authorization.
+
+### Phase 8.1
+
+- Refine the accepted `/stats player` visual hierarchy, Presence/Last Active signal, KVK/record
+  readability and measured performance.
+- No command, option or permission change; no resync expected.
+- Preserve `36 / 100 / 8 / 1 / 2`.
+- Any SQL optimisation remains plan/read/timing evidence- and approval-gated.
 
 ### Phase 9
 
@@ -361,6 +368,13 @@ deployed and commands are resynced.
   `/player_profile` consolidation to Phase 8, and adds `/stats kingdom` in Phase 9. SQL PRs #43/#44
   deployed the additive `dbo.usp_GetPersonalStatsDaily` contract before the bot; its header exposes
   latest anchor-date source refresh independently from report generation time.
+- GovernorOS v2 Phase 8 completed production smoke and was operator accepted on 2026-07-21. The
+  maintained current target is 36 top-level, 100 grouped, eight `/me`, one `/stats`, and two
+  `/inventory` commands. `/stats player` is the only private leadership player-review route;
+  `/player_profile` is removed without redirect. Mirror PR #230 and production PR #537 carry the
+  bot result after SQL-first deployment. Phase 8.1 is a no-command-change visual hierarchy,
+  Presence/Last Active, record-readability and evidence-led performance refinement; no resync is
+  expected and SQL changes are not pre-approved.
 - Player Self-Service Command Centre Phase 13 started legacy redirect planning with audit/scope
   only. The operator-provided SQL extract and dated JSONL files showed nonzero broad usage for
   every audited legacy and related personal path, recent direct usage for several legacy paths, and
@@ -368,10 +382,10 @@ deployed and commands are resynced.
   the operator approved lightweight private redirects for account, reminder, calendar reminder,
   inventory preference, and export legacy entry points. Production PR #486 delivered the redirects
   and operator smoke on 2026-06-27 confirmed all approved redirects were correct. Phase 5F later
-  approved retirement of `/myinventory` and `/inventory_preferences`. `/my_stats`,
-  `/mykvkcrystaltech`, `/player_profile`, and `/stats player` remain live; final
-  command-registration removal requires player briefing, usage monitoring, operator approval, and
-  a no-feedback monitoring window.
+  approved retirement of `/myinventory` and `/inventory_preferences`. That historical baseline was
+  later superseded: Phase 6 removed `/my_stats` and Phase 8 removed `/player_profile`, both without
+  redirects. `/mykvkcrystaltech` and `/stats player` remain live; any other final registration
+  removal still requires route-specific briefing, usage evidence and operator approval.
 - Remaining redirected legacy player self-service paths stay registered in parallel while their
   `/me` replacements roll out; Phase 5F's two approved Inventory removals are excluded.
 - Public calendar and KVK calendar paths remain flat pending a dedicated UX redesign.

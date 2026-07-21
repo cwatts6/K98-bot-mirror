@@ -3,6 +3,14 @@
 This file preserves resolved deferred-optimisation notes that used to live in
 `../deferred_optimisations.md`. It is historical context only.
 
+### GovernorOS v2 Phase 8 Leadership Compatibility Cleanup Completed Item
+
+- Area: removed `embed_my_stats.py`, root `stats_service.py`, `stats_helpers.py`, retired `/player_profile` registration/view/renderer/tests, and retained shared lookup/location/cache helpers
+- Type: cleanup
+- Description: Before Phase 8, the approved `/stats player` modernisation and `/player_profile` retirement still required a caller audit to distinguish command-specific zero-callers from shared lookup/location/cache helpers used by live paths.
+- Resolution: Phase 8 proved the command/caller graph, made `/stats player` the one private leadership player-review location, removed `/player_profile` without redirect or alias, removed the proven zero-caller legacy stats/profile modules and command-specific tests, and retained only shared helpers with live callers. No `/me inspect`, second leadership route or compatibility shim remains.
+- Validation: Command registration verifies the accepted `36 / 100 / 8 / 1 / 2` surface and explicit `/player_profile` absence. Focused caller/permission/view tests, full validation, Changes security review, restart/resync and production Discord smoke were operator accepted on 2026-07-21 through mirror PR #230 and production PR #537.
+
 ### GovernorOS v2 Phase 7 Visual Consistency And Programme Closeout Completed Item
 
 - Area: retained `/me` renderers/views/fallbacks, `core/visual_contract.py`, visual samples/tests, and GovernorOS documentation

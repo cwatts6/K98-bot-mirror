@@ -44,7 +44,7 @@ Dashboard Card and Preferences Hub, Phase 6 Guided Management Cards and Workflow
 and Phase 7 Unified Reminder Centre and Dashboard Card Alignment execution records are archived
 here. The original programme is complete; its closed programme pack remains in `docs/task_packs/`.
 
-Player Self-Service Command Centre v2 / GovernorOS completed Phases 1 through 6. The archived
+Player Self-Service Command Centre v2 / GovernorOS completed Phases 1 through 8. The archived
 records cover the dashboard blueprint/data foundation, governor selector and premium dashboard,
 direct Inventory reports and visual alignment, Accounts, Reminders, and the authoritative shared
 KVK/Calendar next-alert projection. Phase 5D.1 delivered in mirror PR #223 and production PR #530;
@@ -70,8 +70,13 @@ Its archived task pack and starter record private-anywhere `/me stats`, the acce
 Overview/Activity/Combat format, opaque paged governor selection plus explicit All Linked, exact
 periods and coverage, source-refresh semantics, `/my_stats` retirement, preserved `/stats player`,
 the `37 / 100 / 8 / 2` command surface, zero unresolved bot/SQL Changes findings, and final operator
-acceptance. The active v2 programme pack remains in `docs/task_packs/`; the operator will separately
-review and create the next phase task pack.
+acceptance. Phase 7 completed the retained `/me` visual/content closeout on 2026-07-19 through
+mirror PR #229 and production PR #536. Phase 8 completed the one private `/stats player` leadership
+journey, global canonical combat alignment, bounded source/audit/history contracts and
+`/player_profile` retirement on 2026-07-21 through mirror PR #230 and production PR #537 after the
+SQL migration series and merged follow-up SQL PR #53 deployed. Its archived records preserve the
+accepted `36 / 100 / 8 / 1 / 2` command surface and production smoke evidence. The active v2
+programme pack and Phase 8.1 refinement records remain in `docs/task_packs/`.
 
 Archived packs include completed registry/account-resolution, telemetry, stats, pytest
 log-isolation and original slow-pytest optimisation, high-priority KVK state, MGE Phase 1 polish,

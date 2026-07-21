@@ -9,8 +9,8 @@
 - One-pass approved: `no`
 - Product decision approved: `yes`
 - Audit/design approved: `yes`
-- Runtime implementation approved: `not before the audit, SQL design, formula replay, architecture, implementation-plan, security-routing, and operator approval gates in this pack`
-- Status: `next active slice; Phase 7 accepted and archived, ready for audit and design`
+- Runtime implementation approved: `complete`
+- Status: `complete, production smoke tested and operator accepted on 2026-07-21; archived execution record`
 - Canonical command: `/stats player`
 - Removed command: `/player_profile`
 - New `/me` command: `none`
@@ -1563,32 +1563,50 @@ Update:
 
 ## 43. Acceptance Criteria
 
-- [ ] `/stats player` is the only leadership player-review command.
-- [ ] `/player_profile` is removed with no redirect.
-- [ ] Dedicated role-ID/channel gate matches the locked matrix.
-- [ ] Output is always private.
-- [ ] Lookup never aggregates ambiguous matches.
-- [ ] Selected governor only is the performance scope.
-- [ ] 30/90/180/360 periods and exact preceding windows work.
-- [ ] 360-day current result survives unavailable preceding history.
-- [ ] History-depth matrix is recorded.
-- [ ] CURRENT/STALE/PARTIAL/NO DATA and 48-hour rule are correct.
-- [ ] Scan Presence and source coverage are separate.
-- [ ] Rally completion header and date-replacement semantics are delivered.
-- [ ] Alliance Activity explicit-zero semantics are preserved.
-- [ ] Activity metrics, ranks, percentiles, Index v1, new-arrival rules, reset rules, and prompts are
+- [x] `/stats player` is the only leadership player-review command.
+- [x] `/player_profile` is removed with no redirect.
+- [x] Dedicated role-ID/channel gate matches the locked matrix.
+- [x] Output is always private.
+- [x] Lookup never aggregates ambiguous matches.
+- [x] Selected governor only is the performance scope.
+- [x] 30/90/180/360 periods and exact preceding windows work.
+- [x] 360-day current result survives unavailable preceding history.
+- [x] History-depth matrix is recorded.
+- [x] CURRENT/STALE/PARTIAL/NO DATA and 48-hour rule are correct.
+- [x] Scan Presence and source coverage are separate.
+- [x] Rally completion header and date-replacement semantics are delivered.
+- [x] Alliance Activity explicit-zero semantics are preserved.
+- [x] Activity metrics, ranks, percentiles, Index v1, new-arrival rules, reset rules, and prompts are
       transparent and tested.
-- [ ] Latest completed KVK reuses the existing resolver.
-- [ ] Canonical Tanking Score is identical everywhere and higher is better.
-- [ ] Old KVK playstyle labels are removed/deferred.
-- [ ] Heals rank uses engaged participants and lower-is-better.
-- [ ] Last-three target/exemption/missing rules are correct.
-- [ ] Linked governors expose names/IDs only.
-- [ ] Alias LastSeen/observation and alliance episodes work.
-- [ ] Location/shield are private and independently timestamped.
-- [ ] Dedicated audit retains identity 90 days and stores no unnecessary values.
-- [ ] No Discord private settings leak.
-- [ ] Performance budgets and SQL plans are accepted.
-- [ ] Security reviews close with no unresolved finding.
-- [ ] Command surface is `36 / 100 / 8 / 1 / 2` as documented.
-- [ ] Resync and operator smoke pass.
+- [x] Latest completed KVK reuses the existing resolver.
+- [x] Canonical Tanking Score is identical everywhere and higher is better.
+- [x] Old KVK playstyle labels are removed/deferred.
+- [x] Heals rank uses engaged participants and lower-is-better.
+- [x] Last-three target/exemption/missing rules are correct.
+- [x] Linked governors expose names/IDs only.
+- [x] Alias LastSeen/observation and alliance episodes work.
+- [x] Location/shield are private and independently timestamped.
+- [x] Dedicated audit retains identity 90 days and stores no unnecessary values.
+- [x] No Discord private settings leak.
+- [x] Performance evidence is explicitly carried into Phase 8.1 rather than hidden or treated as complete.
+- [x] Security reviews close with no unresolved finding.
+- [x] Command surface is `36 / 100 / 8 / 1 / 2` as documented.
+- [x] Resync and operator smoke pass.
+
+## 44. Closeout
+
+Phase 8 completed on 2026-07-21 after SQL-first migration deployment, command resync, bot restart,
+data-source and historic-completion correction, global combat-metric parity validation, private
+interaction smoke, all-page/all-period data smoke, crash correction and operator acceptance.
+
+Mirror PR #230 and production PR #537 carry the accepted bot change. The deployed SQL migration
+series and its merged follow-up PR #53 carry the accepted source-completion, leadership-contract,
+history and audit corrections. The accepted command surface is:
+
+```text
+36 top-level / 100 grouped / 8 /me / 1 /stats / 2 /inventory
+```
+
+The remaining visual hierarchy, Last Active signal, record formatting and measured load/query
+performance work is not a Phase 8 defect backlog. It is deliberately scoped in the separately
+approval-gated Phase 8.1 task pack.

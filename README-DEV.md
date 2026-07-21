@@ -137,16 +137,21 @@ contract changed. No resync or SQL deployment was required, and command counts r
 100 grouped, eight `/me`, and two `/inventory`. The completed Phase 6 and Phase 7 task packs and
 starters are archived under `docs/task_packs/archive/`.
 
-Phase 8 is implemented on the dedicated bot and SQL branches and is in correction validation before
-SQL-first deployment, command resync, and operator smoke; it is not yet production accepted. Phase 8
-and Phase 9 must inherit the accepted
-`1702x924` visual family, shared tokens, centred state pill, row-0 page navigation, compact and
-unit-correct content, source/generated separation, same-payload fallback, latest-transition-wins,
-preserve-and-disable timeout, and cleanup. Their governor/player controls must use exact IDs or
-opaque duplicate-safe tokens, page when needed, preserve page/filter state, and revalidate
-permission before every read. Phase 8 has no All Linked scope or Discord account metadata; Phase 9
-has no governor dropdown or arbitrary kingdom selector. These are leadership `/stats` products,
-not new `/me` surfaces.
+Phase 8 Leadership `/stats player` Modernisation is complete and operator accepted after production
+smoke on 2026-07-21. Mirror PR #230 and production PR #537 carry the accepted bot result; the SQL
+migration series and merged follow-up SQL PR #53 were deployed first. `/stats player` is the one
+private leadership player-review journey, `/player_profile` is absent with no redirect, canonical
+Tanking Score is aligned globally, and the accepted command surface is 36 top-level, 100 grouped,
+eight `/me`, one `/stats`, and two `/inventory`.
+
+Phase 8.1 is the active audit-first refinement for `/stats player`: remove duplicated Overview
+activity cards, promote Presence and bounded Last Active, enlarge location/shield context, improve
+Activity/KVK/Record readability, align `Data refreshed`/Generated footer placement, and measure cold
+and warm 30/90/180/360 load paths before approving any bot or SQL optimisation. It preserves the
+accepted `1702x924` visual family, dedicated role-ID/channel authorization, private output,
+same-payload fallback, latest-transition-wins, preserve-and-disable timeout, cleanup and exact
+Governor-ID navigation. No command change or resync is expected; new SQL objects remain evidence-
+and approval-gated. Phase 9 remains a separate leadership `/stats kingdom` product.
 
 ## Quality Automation
 
