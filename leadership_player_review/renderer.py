@@ -10,7 +10,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 from core import visual_contract, visual_text
-from leadership_player_review.models import LeadershipPlayerPayload
+from leadership_player_review.models import ActivityMetric, LeadershipPlayerPayload
 
 WIDTH = 1702
 HEIGHT = 924
@@ -118,9 +118,11 @@ def _metric_label(code: str) -> str:
     }.get(code, code.replace("_", " "))
 
 
-def _current_metric_total(metric) -> Decimal | None:
-    """Hide SQL aggregate placeholders when source evidence is unavailable."""
-    return metric.current_total if metric.available else None
+def current_metric_total(metric: ActivityMetric) -> Decimal | None:
+    """Return an observed total, including genuine zeroes from partial coverage."""
+    if metric.current_valid_days <= 0:
+        return None
+    return metric.current_total
 
 
 def _draw_header(
@@ -243,6 +245,7 @@ def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
         _panel(draw, box)
         if metric is None:
             continue
+        display_total = current_metric_total(metric)
         _text(
             draw,
             (box[0] + 18, box[1] + 15),
@@ -256,11 +259,11 @@ def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
         _text(
             draw,
             (box[0] + 18, box[1] + 54),
-            _compact(_current_metric_total(metric), signed=metric.code == "POWER_CHANGE"),
+            _compact(display_total, signed=metric.code == "POWER_CHANGE"),
             width=box[2] - box[0] - 36,
             size=43,
             min_size=27,
-            fill=_TEXT if metric.available else _RED,
+            fill=_TEXT if display_total is not None else _RED,
             bold=True,
         )
         rank = (
@@ -368,6 +371,7 @@ def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
 
 def _draw_activity(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> None:
     for index, metric in enumerate(payload.metrics[:6]):
+        display_total = current_metric_total(metric)
         column = index % 3
         row = index // 3
         x0 = 70 + column * 520
@@ -387,11 +391,11 @@ def _draw_activity(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
         _text(
             draw,
             (x0 + 18, y0 + 50),
-            _compact(_current_metric_total(metric), signed=metric.code == "POWER_CHANGE"),
+            _compact(display_total, signed=metric.code == "POWER_CHANGE"),
             width=270,
             size=40,
             min_size=25,
-            fill=_TEXT if metric.available else _RED,
+            fill=_TEXT if display_total is not None else _RED,
             bold=True,
         )
         _text(

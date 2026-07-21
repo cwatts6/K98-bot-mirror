@@ -307,6 +307,55 @@ def test_unavailable_metric_does_not_render_sql_zero_as_genuine_zero(monkeypatch
     )
 
 
+@pytest.mark.parametrize("page", ["overview", "activity"])
+def test_partial_metric_renders_observed_total_without_rank(monkeypatch, page) -> None:
+    payload = _payload(page=page)
+    partial_tech = replace(
+        payload.metrics[2],
+        current_total=Decimal("801060"),
+        current_valid_days=79,
+        current_average=Decimal("10140"),
+        missing_units=11,
+        available=False,
+        kingdom_rank=None,
+        cohort_count=None,
+        percentile=None,
+        top_percent=None,
+    )
+    payload = replace(payload, metrics=(*payload.metrics[:2], partial_tech, *payload.metrics[3:]))
+    rendered_text: list[str] = []
+    original_text = renderer._text
+
+    def capture_text(*args, **kwargs):
+        rendered_text.append(str(args[2]))
+        return original_text(*args, **kwargs)
+
+    monkeypatch.setattr(renderer, "_text", capture_text)
+    renderer.render_leadership_player(payload)
+
+    assert renderer.current_metric_total(partial_tech) == Decimal("801060")
+    assert "801.06K" in rendered_text
+    assert (
+        build_fallback_embed(payload)
+        .fields[-1]
+        .value.splitlines()[2]
+        .endswith("801060 · rank unavailable")
+    )
+
+
+def test_partial_metric_renders_genuine_zero_when_observations_exist() -> None:
+    partial_zero = replace(
+        _payload().metrics[2],
+        current_total=Decimal(0),
+        current_valid_days=79,
+        current_average=Decimal(0),
+        missing_units=11,
+        available=False,
+    )
+
+    assert renderer.current_metric_total(partial_zero) == Decimal(0)
+
+
 @pytest.mark.asyncio
 async def test_view_has_locked_rows_private_navigation_and_record_paging() -> None:
     payload = _payload(page="record", aliases=12, episodes=12, linked=12)

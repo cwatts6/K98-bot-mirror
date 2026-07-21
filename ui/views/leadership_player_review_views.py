@@ -110,11 +110,9 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
     if payload.page in {"overview", "activity"}:
         lines = []
         for metric in payload.metrics:
-            total = (
-                metric.current_total
-                if metric.available and metric.current_total is not None
-                else "—"
-            )
+            total = renderer.current_metric_total(metric)
+            if total is None:
+                total = "—"
             rank = (
                 f"#{metric.kingdom_rank}/{metric.cohort_count}"
                 if metric.kingdom_rank
