@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, date, datetime
+from decimal import Decimal, InvalidOperation
 import logging
 import os
 import random
@@ -310,11 +311,14 @@ def _atomic_write_json_with_retries(
 
 
 def _to_int(v: Any, default: int = 0) -> int:
+    if v is None or v == "":
+        return default
+    cleaned = str(v).strip().replace(",", "")
+    if not cleaned:
+        return default
     try:
-        if v is None or v == "":
-            return default
-        return int(float(v))
-    except Exception:
+        return int(Decimal(cleaned))
+    except (InvalidOperation, TypeError, ValueError, OverflowError):
         return default
 
 

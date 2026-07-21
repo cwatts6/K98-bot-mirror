@@ -5,6 +5,20 @@ from pathlib import Path
 import pytest
 
 
+@pytest.mark.parametrize(
+    ("raw_value", "expected"),
+    [
+        ("9,007,199,254,740,993", 9_007_199_254_740_993),
+        ("456.7", 456),
+        ("NaN", 0),
+    ],
+)
+def test_cache_integer_parsing_avoids_float_precision_loss(raw_value, expected):
+    import player_stats_cache as mod
+
+    assert mod._to_int(raw_value) == expected
+
+
 def _read_json(p: Path) -> dict:
     with p.open(encoding="utf-8") as f:
         return json.load(f)
