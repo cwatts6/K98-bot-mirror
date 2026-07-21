@@ -1,4 +1,5 @@
 # weekly_activity_importer.py
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 import hashlib
 import io
@@ -11,6 +12,20 @@ from file_utils import fetch_one_dict
 from utils import ensure_aware_utc
 
 log = logging.getLogger(__name__)
+
+_SQL_INT_MAX = 2_147_483_647
+_SOURCE_VALIDATED_BASIS = "SOURCE_VALIDATED"
+
+
+@dataclass(frozen=True)
+class ActivityCompletionEvidence:
+    completion_state: str
+    expected_governor_count: int
+    observed_governor_count: int
+    missing_expected_governor_count: int
+    missing_metric_count: int
+    invalid_metric_count: int
+
 
 # ---- Helpers ---------------------------------------------------------------
 
@@ -109,7 +124,7 @@ def parse_activity_excel(content: bytes) -> pd.DataFrame:
             f"Expected columns missing in '{sheet}': {e}. Found: {', '.join(map(str, df.columns))}"
         )
 
-    # Remove thousands separators if present and trim strings
+    # Remove thousands separators while preserving genuine missing cells.
     for c in [
         "Power",
         "KillPoints",
@@ -120,20 +135,48 @@ def parse_activity_excel(content: bytes) -> pd.DataFrame:
     ]:
         if c in df.columns:
             # Explicit regex=False to avoid pandas future warnings and improve perf
-            df[c] = df[c].astype(str).str.replace(",", "", regex=False).str.strip()
+            df[c] = df[c].astype("string").str.replace(",", "", regex=False).str.strip()
 
     # Types
-    # GovernorID: coerce -> drop rows without valid ID -> convert to plain int
-    df["GovernorID"] = pd.to_numeric(df["GovernorID"], errors="coerce").astype("Int64")
-    df = df.dropna(subset=["GovernorID"]).copy()
-    # Now safe to convert to plain int for subsequent use
-    df["GovernorID"] = df["GovernorID"].astype(int)
-
-    # Building/Tech totals: coerce NaN -> 0 and ensure int
-    df["BuildingTotal"] = pd.to_numeric(df["BuildingTotal"], errors="coerce").fillna(0).astype(int)
-    df["TechDonationTotal"] = (
-        pd.to_numeric(df["TechDonationTotal"], errors="coerce").fillna(0).astype(int)
+    # GovernorID: reject missing, non-positive, fractional, out-of-range, and duplicate IDs.
+    governor_ids = pd.to_numeric(df["GovernorID"], errors="coerce")
+    invalid_governor_ids = (
+        governor_ids.isna()
+        | (governor_ids <= 0)
+        | (governor_ids > 9_223_372_036_854_775_807)
+        | ((governor_ids % 1) != 0)
     )
+    if bool(invalid_governor_ids.any()):
+        raise ValueError(
+            f"Alliance Activity contains {int(invalid_governor_ids.sum())} invalid GovernorID rows."
+        )
+    df["GovernorID"] = governor_ids.astype("int64")
+    duplicate_governor_ids = int(df["GovernorID"].duplicated(keep=False).sum())
+    if duplicate_governor_ids:
+        raise ValueError(
+            f"Alliance Activity contains {duplicate_governor_ids} duplicate GovernorID rows."
+        )
+
+    missing_metric_count = 0
+    invalid_metric_count = 0
+    for column in ("BuildingTotal", "TechDonationTotal"):
+        raw_values = df[column].astype("string").str.strip()
+        missing_values = raw_values.isna() | raw_values.eq("")
+        numeric_values = pd.to_numeric(raw_values.mask(missing_values), errors="coerce")
+        invalid_values = ~missing_values & (
+            numeric_values.isna()
+            | (numeric_values < 0)
+            | (numeric_values > _SQL_INT_MAX)
+            | ((numeric_values % 1) != 0)
+        )
+        missing_metric_count += int(missing_values.sum())
+        invalid_metric_count += int(invalid_values.sum())
+        df[column] = numeric_values.mask(missing_values | invalid_values).astype("Int64")
+
+    # The importer consumes these immediately to distinguish explicit zero,
+    # missing cells, and invalid cells without changing the public DataFrame API.
+    df.attrs["missing_metric_count"] = missing_metric_count
+    df.attrs["invalid_metric_count"] = invalid_metric_count
 
     # Optional numerics retained as nullable floats (become NaN if missing).
     # Consumers cast to int conditionally when inserting.
@@ -153,6 +196,53 @@ def parse_activity_excel(content: bytes) -> pd.DataFrame:
         df["AllianceTag"] = df["AllianceTag"].replace({"": None})
 
     return df
+
+
+def _load_expected_allied_governors(cur, snapshot_ts_utc: datetime) -> set[int]:
+    """Return allied governors from the latest complete scan at or before the snapshot."""
+    cur.execute(
+        """
+        SELECT DISTINCT TRY_CONVERT(bigint, scan.GovernorID)
+        FROM dbo.KingdomScanData4 AS scan
+        WHERE scan.SCANORDER =
+        (
+            SELECT MAX(candidate.SCANORDER)
+            FROM dbo.KingdomScanData4 AS candidate
+            WHERE candidate.AsOfDate <= CONVERT(date, ?)
+        )
+          AND NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(255), scan.Alliance))), N'') IS NOT NULL
+          AND TRY_CONVERT(bigint, scan.GovernorID) IS NOT NULL
+        """,
+        snapshot_ts_utc.replace(tzinfo=None),
+    )
+    return {int(row[0]) for row in cur.fetchall()}
+
+
+def _completion_evidence(
+    df: pd.DataFrame, expected_governors: set[int]
+) -> ActivityCompletionEvidence:
+    if not expected_governors:
+        raise RuntimeError("Alliance Activity completion cannot resolve an expected scan cohort.")
+
+    source_governors = {int(value) for value in df["GovernorID"].tolist()}
+    valid_metric_rows = df["BuildingTotal"].notna() & df["TechDonationTotal"].notna()
+    missing_metric_count = int(df.attrs.get("missing_metric_count", 0))
+    invalid_metric_count = int(df.attrs.get("invalid_metric_count", 0))
+    missing_expected_count = len(expected_governors - source_governors)
+    observed_count = int(valid_metric_rows.sum())
+    completion_state = (
+        "COMPLETE"
+        if missing_expected_count == 0 and missing_metric_count == 0 and invalid_metric_count == 0
+        else "PARTIAL"
+    )
+    return ActivityCompletionEvidence(
+        completion_state=completion_state,
+        expected_governor_count=len(expected_governors),
+        observed_governor_count=observed_count,
+        missing_expected_governor_count=missing_expected_count,
+        missing_metric_count=missing_metric_count,
+        invalid_metric_count=invalid_metric_count,
+    )
 
 
 # ---- SQL I/O ---------------------------------------------------------------
@@ -375,6 +465,10 @@ def ingest_weekly_activity_excel(
                     cxn.rollback()
                     return (0, 0)
 
+            expected_governors = _load_expected_allied_governors(cur, snapshot_ts_utc)
+            completion = _completion_evidence(df, expected_governors)
+            valid_df = df[df["BuildingTotal"].notna() & df["TechDonationTotal"].notna()].copy()
+
             # Insert header
             cur.execute(
                 """
@@ -406,7 +500,7 @@ def ingest_weekly_activity_excel(
             # Insert rows (fast_executemany for speed)
             cur.fast_executemany = True
             rows = []
-            for row in df.itertuples(index=False):
+            for row in valid_df.itertuples(index=False):
                 rows.append(
                     (
                         snapshot_id,
@@ -487,6 +581,41 @@ def ingest_weekly_activity_excel(
             rebuilt = _rebuild_daily_activity_for_week(cur, week_start)
             log.info(
                 "[ACTIVITY DAILY] Rebuilt %s daily rows for week %s", rebuilt, week_start.date()
+            )
+
+            cur.execute(
+                """
+                EXEC dbo.usp_SetAllianceActivitySnapshotCompletion
+                    @SnapshotID = ?,
+                    @CompletionState = ?,
+                    @ExpectedGovernorCount = ?,
+                    @ObservedGovernorCount = ?,
+                    @MissingExpectedGovernorCount = ?,
+                    @InvalidMetricCount = ?,
+                    @ValidatedAtUtc = NULL,
+                    @MissingMetricCount = ?,
+                    @CompletionBasis = ?
+                """,
+                snapshot_id,
+                completion.completion_state,
+                completion.expected_governor_count,
+                completion.observed_governor_count,
+                completion.missing_expected_governor_count,
+                completion.invalid_metric_count,
+                completion.missing_metric_count,
+                _SOURCE_VALIDATED_BASIS,
+            )
+            log.info(
+                "Alliance Activity completion recorded snapshot_id=%s state=%s "
+                "expected=%s observed=%s missing_expected=%s missing_metrics=%s "
+                "invalid_metrics=%s",
+                snapshot_id,
+                completion.completion_state,
+                completion.expected_governor_count,
+                completion.observed_governor_count,
+                completion.missing_expected_governor_count,
+                completion.missing_metric_count,
+                completion.invalid_metric_count,
             )
 
             cxn.commit()

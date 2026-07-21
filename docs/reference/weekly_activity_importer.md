@@ -80,9 +80,24 @@ reparses the workbook for the actual database ingest.
 - Clamps within-week cumulative decreases to avoid negative daily deltas.
 - Replaces the week's `AllianceActivityDaily` rows in a single transaction.
 
+## Completion Evidence
+
+- Historical snapshots accepted under the operator-approved zero assumption are recorded as
+  `COMPLETE` with `CompletionBasis = LEGACY_ASSUMED_ZERO`.
+- New uploads preserve explicit zero values and separately count missing and invalid Building/Tech
+  cells.
+- The latest complete kingdom scan at or before the snapshot supplies the expected allied-governor
+  cohort. Extra valid workbook rows are allowed; a missing expected governor makes the snapshot
+  `PARTIAL`.
+- Completion evidence is written through `dbo.usp_SetAllianceActivitySnapshotCompletion` in the
+  same transaction as the snapshot rows and daily rebuild, using `CompletionBasis =
+  SOURCE_VALIDATED`.
+- Leadership review metrics consume only `COMPLETE` snapshots.
+
 ## Implementation Notes
 
 - Missing/blank names are stored as SQL `NULL`.
+- Invalid Governor IDs and duplicate Governor IDs reject the upload before SQL writes.
 - Thousands separators are removed before numeric conversion.
 - Timestamp handling is UTC-oriented; SQL compatibility currently uses naive UTC values in this importer.
 - Transactions roll back on exceptions.
