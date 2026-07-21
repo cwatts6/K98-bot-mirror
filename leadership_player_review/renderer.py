@@ -11,6 +11,11 @@ from PIL import Image, ImageDraw
 
 from core import visual_contract, visual_text
 from leadership_player_review.models import ActivityMetric, LeadershipPlayerPayload
+from leadership_player_review.record_paging import (
+    RECORD_PAGE_SIZE,
+    alias_pages,
+    record_page_count,
+)
 
 WIDTH = 1702
 HEIGHT = 924
@@ -51,6 +56,7 @@ def _text(
     fill=_TEXT,
     bold: bool = False,
     centre: bool = False,
+    right_align: bool = False,
 ) -> None:
     rendered = _clean(value)
     font = visual_text.fit_font(
@@ -60,7 +66,9 @@ def _text(
         draw, rendered, width=max(1, width), base_font=font, bold=bold
     )
     x = xy[0]
-    if centre:
+    if right_align:
+        x += width - visual_text.text_width(draw, rendered, font=font, bold=bold)
+    elif centre:
         x += (width - visual_text.text_width(draw, rendered, font=font, bold=bold)) // 2
     visual_text.draw_text(
         draw, (x + 2, xy[1] + 2), rendered, font=font, fill=(0, 0, 0, 190), bold=bold
@@ -105,6 +113,10 @@ def _date(value) -> str:
 
 def _utc(value) -> str:
     return visual_contract.format_utc_datetime(value) if value is not None else "—"
+
+
+def _short_date(value) -> str:
+    return value.strftime("%d %b %y") if value is not None else "—"
 
 
 def _metric_label(code: str) -> str:
@@ -563,16 +575,14 @@ def _draw_kvk(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> No
 
 
 def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> None:
-    page_size = 10
-    offset = max(0, payload.record_page) * page_size
-    total_pages = max(
-        1,
-        (
-            max(len(payload.linked_governors), len(payload.aliases), len(payload.alliance_episodes))
-            + page_size
-            - 1
-        )
-        // page_size,
+    page_size = RECORD_PAGE_SIZE
+    page_index = max(0, payload.record_page)
+    offset = page_index * page_size
+    alias_page_rows = alias_pages(payload.aliases)
+    total_pages = record_page_count(
+        linked_count=len(payload.linked_governors),
+        aliases=payload.aliases,
+        episode_count=len(payload.alliance_episodes),
     )
     _text(
         draw,
@@ -632,15 +642,49 @@ def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) ->
         bold=True,
     )
     y = 384
-    for row in payload.aliases[offset : offset + page_size]:
-        _text(
-            draw,
-            (622, y),
-            f"{row.governor_id} · {row.governor_name} · first {_date(row.first_seen.date() if row.first_seen else None)} · last {_date(row.last_seen.date() if row.last_seen else None)} · {row.seen_scan_count} scans",
-            width=445,
-            size=15,
-            min_size=11,
-        )
+    visible_alias_rows = alias_page_rows[page_index] if page_index < len(alias_page_rows) else ()
+    for display_row in visible_alias_rows:
+        row = display_row.alias
+        if row is None:
+            _text(
+                draw,
+                (622, y),
+                f"Governor ID {display_row.governor_id}",
+                width=445,
+                size=16,
+                min_size=13,
+                fill=_BLUE,
+                bold=True,
+            )
+        else:
+            _text(draw, (630, y), row.governor_name, width=124, size=14, min_size=11)
+            _text(
+                draw,
+                (756, y),
+                f"1st {_short_date(row.first_seen.date() if row.first_seen else None)}",
+                width=105,
+                size=13,
+                min_size=10,
+                fill=_MUTED,
+            )
+            _text(
+                draw,
+                (863, y),
+                f"last {_short_date(row.last_seen.date() if row.last_seen else None)}",
+                width=111,
+                size=13,
+                min_size=10,
+                fill=_MUTED,
+            )
+            _text(
+                draw,
+                (976, y),
+                f"{row.seen_scan_count} scans",
+                width=97,
+                size=13,
+                min_size=10,
+                right_align=True,
+            )
         y += 38
     if not payload.aliases:
         _text(
@@ -706,7 +750,7 @@ def render_leadership_player(payload: LeadershipPlayerPayload) -> RenderedLeader
     _text(
         draw,
         (72, 842),
-        f"Source freshness {_utc(payload.header.latest_governor_scan_at_utc)}",
+        f"Data refreshed {_utc(payload.header.latest_governor_scan_at_utc)}",
         width=720,
         size=15,
         min_size=12,
@@ -720,6 +764,7 @@ def render_leadership_player(payload: LeadershipPlayerPayload) -> RenderedLeader
         size=15,
         min_size=12,
         fill=_BLUE,
+        right_align=True,
     )
     _text(
         draw,

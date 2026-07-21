@@ -28,6 +28,7 @@ from leadership_player_review.models import (
     ScanPresence,
     SourceCoverage,
 )
+from leadership_player_review.record_paging import alias_pages, record_page_count
 from ui.views.leadership_player_review_views import (
     LeadershipPlayerAmbiguityView,
     LeadershipPlayerView,
@@ -354,6 +355,85 @@ def test_partial_metric_renders_genuine_zero_when_observations_exist() -> None:
     )
 
     assert renderer.current_metric_total(partial_zero) == Decimal(0)
+
+
+def test_alias_pages_group_id_once_and_keep_nine_aliases_on_one_page() -> None:
+    aliases = tuple(
+        AliasRecord(
+            35_711_701,
+            name,
+            datetime(2024, 5, 16),
+            datetime(2026, 7, 21),
+            index,
+        )
+        for index, name in enumerate(
+            (
+                "TroIl",
+                "JohnPaulV",
+                "TrolI",
+                "Stylebender",
+                "TroII",
+                "NICOLAl",
+                "RaBBit",
+                "Killionaire",
+                "M4t1c0",
+            ),
+            start=1,
+        )
+    )
+
+    pages = alias_pages(aliases)
+
+    assert len(pages) == 1
+    assert sum(row.is_heading for row in pages[0]) == 1
+    assert [row.alias.governor_name for row in pages[0] if row.alias] == [
+        row.governor_name for row in aliases
+    ]
+    assert record_page_count(linked_count=0, aliases=aliases, episode_count=0) == 1
+
+
+def test_alias_pages_repeat_group_heading_only_when_group_continues() -> None:
+    aliases = tuple(AliasRecord(123, f"Alias {index}", NOW, NOW, 1) for index in range(10))
+
+    pages = alias_pages(aliases)
+
+    assert [len(page) for page in pages] == [10, 2]
+    assert all(page[0].is_heading for page in pages)
+
+
+def test_record_renderer_uses_consistent_footer_and_readable_alias_columns(monkeypatch) -> None:
+    aliases = tuple(
+        AliasRecord(
+            35_711_701,
+            name,
+            datetime(2024, 5, 16),
+            datetime(2026, 7, 21),
+            577,
+        )
+        for name in ("TroIl", "JohnPaulV", "TrolI", "Stylebender", "TroII")
+    )
+    payload = replace(_payload(page="record", aliases=0, episodes=0, linked=0), aliases=aliases)
+    calls: list[tuple[str, dict]] = []
+    original_text = renderer._text
+
+    def capture_text(*args, **kwargs):
+        calls.append((str(args[2]), kwargs))
+        return original_text(*args, **kwargs)
+
+    monkeypatch.setattr(renderer, "_text", capture_text)
+    renderer.render_leadership_player(payload)
+
+    rendered = [text for text, _kwargs in calls]
+    assert rendered.count("Governor ID 35711701") == 1
+    assert all(name in rendered for name in ("TroIl", "JohnPaulV", "TrolI", "Stylebender", "TroII"))
+    assert "1st 16 May 24" in rendered
+    assert "last 21 Jul 26" in rendered
+    assert not any(text.startswith("Source freshness") for text in rendered)
+    assert any(text.startswith("Data refreshed") for text in rendered)
+    assert any(
+        text.startswith("Generated ") and kwargs.get("right_align") is True
+        for text, kwargs in calls
+    )
 
 
 @pytest.mark.asyncio

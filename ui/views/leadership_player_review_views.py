@@ -20,6 +20,7 @@ from core.leadership_player_permissions import (
 )
 from leadership_player_review import renderer, service
 from leadership_player_review.models import LeadershipPlayerPayload, LookupCandidate, ReviewPage
+from leadership_player_review.record_paging import record_page_count
 
 logger = logging.getLogger(__name__)
 
@@ -248,17 +249,10 @@ class LeadershipPlayerView(discord.ui.View):
         self._sync_controls()
 
     def _record_page_count(self) -> int:
-        return max(
-            1,
-            (
-                max(
-                    len(self.payload.linked_governors),
-                    len(self.payload.aliases),
-                    len(self.payload.alliance_episodes),
-                )
-                + 9
-            )
-            // 10,
+        return record_page_count(
+            linked_count=len(self.payload.linked_governors),
+            aliases=self.payload.aliases,
+            episode_count=len(self.payload.alliance_episodes),
         )
 
     def _sync_controls(self) -> None:
