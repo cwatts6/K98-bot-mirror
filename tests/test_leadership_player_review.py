@@ -858,6 +858,48 @@ async def test_component_begin_reauthorizes_before_payload_access(monkeypatch) -
 
 
 @pytest.mark.asyncio
+async def test_definitions_acknowledges_before_final_reauthorization(monkeypatch) -> None:
+    import ui.views.leadership_player_review_views as views
+
+    events: list[str] = []
+    response_done = False
+
+    async def defer():
+        nonlocal response_done
+        events.append("defer")
+        response_done = True
+
+    async def authorize(*_args, **_kwargs):
+        events.append("authorize")
+        return LeadershipPlayerAuthorization(True, basis="LEADERSHIP_ROLE_ID", role_id=10)
+
+    async def followup_send(*_args, **kwargs):
+        events.append("send")
+        assert kwargs["ephemeral"] is True
+        assert kwargs["embed"].title == "Leadership player review · definitions"
+
+    async def no_audit(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(views, "_final_delivery_authorization", authorize)
+    monkeypatch.setattr(views, "_audit", no_audit)
+    interaction = SimpleNamespace(
+        response=SimpleNamespace(is_done=lambda: response_done, defer=defer),
+        followup=SimpleNamespace(send=followup_send),
+    )
+    view = LeadershipPlayerView(
+        author_id=99,
+        payload=_payload(),
+        authorization=LeadershipPlayerAuthorization(True, basis="LEADERSHIP_ROLE_ID", role_id=10),
+        correlation_id=uuid4(),
+    )
+
+    await view.definitions.callback(interaction)
+
+    assert events == ["defer", "authorize", "send"]
+
+
+@pytest.mark.asyncio
 async def test_final_reauthorization_blocks_initial_attachment(monkeypatch) -> None:
     import ui.views.leadership_player_review_views as views
 

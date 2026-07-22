@@ -634,6 +634,8 @@ class LeadershipPlayerView(discord.ui.View):
         label="Definitions / Method", custom_id="leadership:player:definitions", row=2
     )
     async def definitions(self, _button, interaction):
+        if not interaction.response.is_done():
+            await interaction.response.defer()
         current_authorization = await _final_delivery_authorization(
             interaction,
             author_id=self.author_id,
@@ -673,7 +675,7 @@ class LeadershipPlayerView(discord.ui.View):
             value=("\n".join(depth_lines) or "No history-depth evidence is available.")[:1024],
             inline=False,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
         await _audit(
             interaction,
             self.authorization,

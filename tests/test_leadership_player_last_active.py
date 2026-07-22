@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+import os
 from pathlib import Path
 
 import pytest
@@ -185,10 +186,21 @@ def test_last_active_dal_maps_and_validates_the_compact_result(monkeypatch) -> N
 
 
 def test_sql_contract_contains_all_sources_and_no_permanent_index() -> None:
-    sql_path = Path(
-        r"C:\K98-bot-SQL-Server\sql_schema\dbo.usp_GetLeadershipPlayerLastActive.StoredProcedure.sql"
-    )
-    source = sql_path.read_text(encoding="utf-8")
+    sql_repo_env = os.environ.get("K98_SQL_REPO")
+    sql_repo = Path(sql_repo_env) if sql_repo_env else Path(r"C:\K98-bot-SQL-Server")
+    sql_path = sql_repo / "sql_schema" / "dbo.usp_GetLeadershipPlayerLastActive.StoredProcedure.sql"
+    if not sql_path.exists():
+        if not sql_repo_env:
+            pytest.skip(
+                "SQL contract tests require the external SQL repository; "
+                f"set K98_SQL_REPO to enable them. Missing expected file: {sql_path}"
+            )
+        if any(
+            os.environ.get(name) for name in ("CI", "GITHUB_ACTIONS", "BUILD_BUILDID", "TF_BUILD")
+        ):
+            pytest.fail(f"SQL repo file not available in CI: {sql_path}")
+        pytest.skip(f"SQL repo file not available: {sql_path}")
+    source = sql_path.read_text(encoding="utf-8-sig")
 
     for token in (
         "source.Power",
