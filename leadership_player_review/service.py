@@ -405,7 +405,7 @@ async def load_payload(
         history_days=720,
         diagnostics=identity_diagnostics,
     )
-    payload_started = time.perf_counter()
+    kvk_started = time.perf_counter()
     header, presence, coverage, metrics, activity_index, history_depth = review
     aliases, episodes = identity
     candidates, kvk_rows = kvk
@@ -422,7 +422,8 @@ async def load_payload(
             reverse=True,
         )
     )
-    stages["kvk_resolution_ms"] = (time.perf_counter() - payload_started) * 1000.0
+    stages["kvk_resolution_ms"] = (time.perf_counter() - kvk_started) * 1000.0
+    payload_started = time.perf_counter()
     warnings: list[str] = []
     if any(metric.reset_count for metric in metrics):
         warnings.append("Negative monotonic-counter resets were excluded from activity totals.")

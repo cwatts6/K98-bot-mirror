@@ -676,6 +676,54 @@ async def test_payload_identity_history_covers_all_active_linked_governors(monke
 
 
 @pytest.mark.asyncio
+async def test_payload_diagnostics_keep_kvk_resolution_separate_from_construction(
+    monkeypatch,
+) -> None:
+    sample = _payload()
+
+    async def immediate_to_thread(function, *args, **kwargs):
+        return function(*args, **kwargs)
+
+    monkeypatch.setattr(service.asyncio, "to_thread", immediate_to_thread)
+    monkeypatch.setattr(
+        service.dal,
+        "fetch_review_contract",
+        lambda *_args, **_kwargs: (
+            sample.header,
+            sample.presence,
+            sample.coverage,
+            sample.metrics,
+            sample.activity_index,
+            sample.history_depth,
+        ),
+    )
+    monkeypatch.setattr(service.dal, "fetch_kvk_history", lambda *_args, **_kwargs: ((), ()))
+    monkeypatch.setattr(
+        service.dal,
+        "fetch_identity_history",
+        lambda *_args, **_kwargs: (sample.aliases, sample.alliance_episodes),
+    )
+    monkeypatch.setattr(
+        service.dal,
+        "fetch_last_active",
+        lambda *_args, **_kwargs: sample.last_active,
+    )
+    monkeypatch.setattr(service, "_linked_governors", lambda *_args, **_kwargs: ())
+    perf_values = iter((0.0, 1.0, 2.0, 3.0, 10.0, 12.0, 20.0, 23.0, 30.0))
+    monkeypatch.setattr(service.time, "perf_counter", lambda: next(perf_values))
+    monkeypatch.setattr(service.time, "monotonic", lambda: 0.0)
+    service._payload_cache.clear()
+    service._last_active_cache.clear()
+
+    payload = await service.load_payload(123, 90, refresh=True)
+
+    assert payload.diagnostics is not None
+    stages = dict(payload.diagnostics.stage_ms)
+    assert stages["kvk_resolution_ms"] == 2_000.0
+    assert stages["payload_construction_ms"] == 3_000.0
+
+
+@pytest.mark.asyncio
 async def test_last_active_cache_is_reused_across_period_transitions(monkeypatch) -> None:
     sample = _payload()
     last_active_calls = 0
