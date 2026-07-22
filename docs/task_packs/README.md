@@ -464,8 +464,10 @@ Player Self-Service Command Centre status:
   - `Codex Chat Starter - Player Self-Service Command Centre v2 Phase 9 Leadership Stats Kingdom.md`
 - Phase 8 completed SQL-first deployment, resync, correction smoke and operator acceptance on
   2026-07-21 through mirror PR #230 and production PR #537; merged SQL follow-up PR #53 carries the
-  final source-data correction. Its task pack/starter are archived. Phase 8.1 is the active
-  audit-first visual hierarchy, Presence/Last Active and evidence-led performance refinement.
+  final source-data correction. Its task pack/starter are archived. Phase 8.1's audited bot scope
+  and additive Last Active procedure were approved on 2026-07-21; implementation is in validation
+  with representative production performance evidence still pending. Use
+  `../stats_player_phase81_smoke_guide.md` for the bounded smoke and measurement contract.
 - Completed Phase 1 through Phase 13 execution records are archived under `archive/`.
 
 KVK Player Experience Redesign Phase 7 redirect/deprecation rollout is complete and awaiting PR
@@ -601,8 +603,9 @@ The active programme pack now records:
 - Phase 10 usage-led migration review and Phase 11 future-candidate boundaries.
 
 Phase 8.1 and Phase 9 task packs/starters are active in this folder. One-pass execution is not
-approved. Phase 8 is complete and archived; Phase 8.1 begins with audit/design and does not
-pre-approve a command, resync or SQL-object change. Both active packs/starters carry forward Phase
+approved. Phase 8 is complete and archived; Phase 8.1 has approved implementation scope and one
+additive Last Active procedure, but no command, resync, table or index change. Both active
+packs/starters carry forward Phase
 7/8's accepted visual family, centred state pill, row-0 navigation,
 governor-control safety, content semantics, fallback, transition, timeout, and cleanup rules.
 

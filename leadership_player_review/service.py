@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 import logging
 import time
 import unicodedata
@@ -17,8 +17,10 @@ from leadership_player_review import dal
 from leadership_player_review.models import (
     ActivityMetric,
     FreshnessState,
+    LastActive,
     LeadershipPlayerPayload,
     LinkedGovernor,
+    LoadDiagnostics,
     LookupCandidate,
     LookupResult,
     ReviewPage,
@@ -38,6 +40,7 @@ _MAX_GOVERNOR_ID = 9_223_372_036_854_775_807
 
 _directory_cache: tuple[float, tuple[LookupCandidate, ...]] | None = None
 _payload_cache: dict[tuple[int, int], tuple[float, LeadershipPlayerPayload]] = {}
+_last_active_cache: dict[tuple[int, date], tuple[float, LastActive]] = {}
 _cache_lock = asyncio.Lock()
 
 
@@ -52,10 +55,28 @@ async def _lookup_directory(*, refresh: bool = False) -> tuple[LookupCandidate, 
     now = time.monotonic()
     async with _cache_lock:
         if not refresh and _directory_cache and _directory_cache[0] > now:
+            logger.debug("leadership_player_lookup_performance cache=HIT total_ms=%.3f", 0.0)
             return _directory_cache[1]
-    rows = await asyncio.to_thread(dal.fetch_lookup_directory, history_days=720)
+    started = time.perf_counter()
+    diagnostics: dict[str, object] = {}
+    rows = await asyncio.to_thread(
+        dal.fetch_lookup_directory,
+        history_days=720,
+        diagnostics=diagnostics,
+    )
     async with _cache_lock:
         _directory_cache = (time.monotonic() + _DIRECTORY_TTL_SECONDS, rows)
+    logger.debug(
+        "leadership_player_lookup_performance cache=%s total_ms=%.3f "
+        "connection_ms=%s sql_fetch_ms=%s mapping_ms=%s rows=%s approximate_bytes=%s",
+        "REFRESH" if refresh else "MISS",
+        (time.perf_counter() - started) * 1000.0,
+        diagnostics.get("connection_ms"),
+        diagnostics.get("sql_fetch_ms"),
+        diagnostics.get("mapping_ms"),
+        diagnostics.get("result_rows"),
+        diagnostics.get("approximate_result_bytes"),
+    )
     return rows
 
 
@@ -174,6 +195,12 @@ def _linked_governors(governor_id: int, governor_name: str | None) -> tuple[Link
     )
 
 
+async def is_current_linked_target(source_governor_id: int, target_governor_id: int) -> bool:
+    """Re-resolve the registry relationship before linked-governor navigation."""
+    rows = await asyncio.to_thread(_linked_governors, int(source_governor_id), None)
+    return int(target_governor_id) in {row.governor_id for row in rows}
+
+
 def _finalized_kvk_numbers(candidates) -> set[int]:
     details = kvk_state.get_latest_kvk_details()
     max_scan_order = details.get("max_scan_order") if details else None
@@ -200,6 +227,87 @@ def _metric_label(metric: ActivityMetric) -> str:
         "BUILDING_MINUTES": "Building Minutes",
         "POWER_CHANGE": "Power Change",
     }.get(metric.code, metric.code.replace("_", " ").title())
+
+
+async def _load_last_active(
+    governor_id: int,
+    *,
+    effective_now_utc: datetime,
+    refresh: bool,
+    diagnostics: dict[str, object],
+) -> LastActive:
+    cache_key = (int(governor_id), effective_now_utc.date())
+    started = time.perf_counter()
+    async with _cache_lock:
+        cached = _last_active_cache.get(cache_key)
+        if not refresh and cached and cached[0] > started:
+            diagnostics.update(cache_status="HIT", total_ms=(time.perf_counter() - started) * 1000)
+            return cached[1]
+    sql_diagnostics: dict[str, object] = {}
+    result = await asyncio.to_thread(
+        dal.fetch_last_active,
+        governor_id,
+        history_days=720,
+        now_utc=effective_now_utc,
+        diagnostics=sql_diagnostics,
+    )
+    diagnostics.update(sql_diagnostics)
+    diagnostics["cache_status"] = "REFRESH" if refresh else "MISS"
+    async with _cache_lock:
+        if len(_last_active_cache) >= 128:
+            oldest = min(_last_active_cache, key=lambda item: _last_active_cache[item][0])
+            _last_active_cache.pop(oldest, None)
+        _last_active_cache[cache_key] = (
+            time.monotonic() + _PAYLOAD_TTL_SECONDS,
+            result,
+        )
+    return result
+
+
+def _load_diagnostics(
+    *,
+    cache_status: str,
+    total_ms: float,
+    stages: dict[str, float],
+    dal_diagnostics: dict[str, dict[str, object]],
+) -> LoadDiagnostics:
+    stage_rows: list[tuple[str, float]] = [
+        (name, round(value, 3)) for name, value in stages.items()
+    ]
+    result_rows: list[tuple[str, int]] = []
+    result_bytes: list[tuple[str, int]] = []
+    for name, values in dal_diagnostics.items():
+        for metric in ("connection_ms", "sql_fetch_ms", "mapping_ms", "total_ms"):
+            value = values.get(metric)
+            if isinstance(value, (int, float)):
+                stage_rows.append((f"{name}_{metric}", round(float(value), 3)))
+        rows = values.get("result_rows")
+        size = values.get("approximate_result_bytes")
+        if isinstance(rows, int):
+            result_rows.append((name, rows))
+        if isinstance(size, int):
+            result_bytes.append((name, size))
+    return LoadDiagnostics(
+        cache_status=cache_status,
+        total_ms=round(total_ms, 3),
+        stage_ms=tuple(stage_rows),
+        result_rows=tuple(result_rows),
+        approximate_result_bytes=tuple(result_bytes),
+    )
+
+
+def _log_performance(diagnostics: LoadDiagnostics, *, period: int, page: ReviewPage) -> None:
+    logger.debug(
+        "leadership_player_performance cache=%s period=%s page=%s total_ms=%.3f "
+        "stages=%s rows=%s approximate_bytes=%s",
+        diagnostics.cache_status,
+        period,
+        page,
+        diagnostics.total_ms,
+        diagnostics.stage_ms,
+        diagnostics.result_rows,
+        diagnostics.approximate_result_bytes,
+    )
 
 
 def _prompts(*, freshness: FreshnessState, header, metrics, activity_index) -> tuple[str, ...]:
@@ -235,6 +343,7 @@ async def load_payload(
     page: ReviewPage = "overview",
     refresh: bool = False,
 ) -> LeadershipPlayerPayload:
+    load_started = time.perf_counter()
     gid = int(governor_id)
     period = int(period_days)
     if gid <= 0:
@@ -246,18 +355,56 @@ async def load_payload(
     async with _cache_lock:
         cached = _payload_cache.get(key)
         if not refresh and cached and cached[0] > now:
-            return replace(cached[1], page=page)
+            diagnostics = LoadDiagnostics(
+                cache_status="HIT",
+                total_ms=round((time.perf_counter() - load_started) * 1000.0, 3),
+            )
+            _log_performance(diagnostics, period=period, page=page)
+            return replace(cached[1], page=page, diagnostics=diagnostics)
 
-    review_task = asyncio.to_thread(dal.fetch_review_contract, gid, period)
-    kvk_task = asyncio.to_thread(dal.fetch_kvk_history, gid, candidate_limit=20)
-    linked_task = asyncio.to_thread(_linked_governors, gid, None)
-    review, kvk, linked = await asyncio.gather(review_task, kvk_task, linked_task)
+    effective_now_utc = datetime.now(UTC)
+    review_diagnostics: dict[str, object] = {}
+    kvk_diagnostics: dict[str, object] = {}
+    last_active_diagnostics: dict[str, object] = {}
+    stages: dict[str, float] = {}
+
+    async def load_linked() -> tuple[LinkedGovernor, ...]:
+        started = time.perf_counter()
+        result = await asyncio.to_thread(_linked_governors, gid, None)
+        stages["linked_lookup_ms"] = (time.perf_counter() - started) * 1000.0
+        return result
+
+    review_task = asyncio.to_thread(
+        dal.fetch_review_contract,
+        gid,
+        period,
+        now_utc=effective_now_utc,
+        diagnostics=review_diagnostics,
+    )
+    kvk_task = asyncio.to_thread(
+        dal.fetch_kvk_history,
+        gid,
+        candidate_limit=20,
+        diagnostics=kvk_diagnostics,
+    )
+    last_active_task = _load_last_active(
+        gid,
+        effective_now_utc=effective_now_utc,
+        refresh=refresh,
+        diagnostics=last_active_diagnostics,
+    )
+    review, kvk, linked, last_active = await asyncio.gather(
+        review_task, kvk_task, load_linked(), last_active_task
+    )
     identity_ids = tuple(row.governor_id for row in linked) or (gid,)
+    identity_diagnostics: dict[str, object] = {}
     identity = await asyncio.to_thread(
         dal.fetch_identity_history,
         identity_ids,
         history_days=720,
+        diagnostics=identity_diagnostics,
     )
+    payload_started = time.perf_counter()
     header, presence, coverage, metrics, activity_index, history_depth = review
     aliases, episodes = identity
     candidates, kvk_rows = kvk
@@ -274,6 +421,7 @@ async def load_payload(
             reverse=True,
         )
     )
+    stages["kvk_resolution_ms"] = (time.perf_counter() - payload_started) * 1000.0
     warnings: list[str] = []
     if any(metric.reset_count for metric in metrics):
         warnings.append("Negative monotonic-counter resets were excluded from activity totals.")
@@ -302,15 +450,30 @@ async def load_payload(
         ),
         warnings=tuple(warnings),
         generated_at_utc=datetime.now(UTC),
+        last_active=last_active,
     )
+    stages["payload_construction_ms"] = (time.perf_counter() - payload_started) * 1000.0
+    diagnostics = _load_diagnostics(
+        cache_status="REFRESH" if refresh else "MISS",
+        total_ms=(time.perf_counter() - load_started) * 1000.0,
+        stages=stages,
+        dal_diagnostics={
+            "review": review_diagnostics,
+            "kvk": kvk_diagnostics,
+            "last_active": last_active_diagnostics,
+            "identity": identity_diagnostics,
+        },
+    )
+    payload = replace(payload, diagnostics=diagnostics)
     async with _cache_lock:
         if len(_payload_cache) >= 128:
             oldest = min(_payload_cache, key=lambda item: _payload_cache[item][0])
             _payload_cache.pop(oldest, None)
         _payload_cache[key] = (
             time.monotonic() + _PAYLOAD_TTL_SECONDS,
-            replace(payload, page="overview"),
+            replace(payload, page="overview", diagnostics=None),
         )
+    _log_performance(diagnostics, period=period, page=page)
     return payload
 
 

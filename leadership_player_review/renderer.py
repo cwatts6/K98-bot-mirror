@@ -14,6 +14,7 @@ from leadership_player_review.models import ActivityMetric, LeadershipPlayerPayl
 from leadership_player_review.record_paging import (
     RECORD_PAGE_SIZE,
     alias_pages,
+    alliance_pages,
     record_page_count,
 )
 
@@ -93,20 +94,6 @@ def _percent(value: Decimal | float | None, *, signed: bool = False) -> str:
     return f"{prefix}{float(value):.1f}%"
 
 
-def _target_state(value: Decimal | None, *, exempt: bool) -> str:
-    if exempt:
-        return "EXEMPT"
-    if value is None:
-        return "TARGET NOT RECORDED"
-    return "MET" if value >= 100 else "NOT MET"
-
-
-def _trend_delta(current: int | Decimal | None, previous: int | Decimal | None) -> str:
-    if current is None or previous is None:
-        return "—"
-    return _compact(Decimal(current) - Decimal(previous), signed=True)
-
-
 def _date(value) -> str:
     return value.strftime("%d %b %Y") if value is not None else "—"
 
@@ -180,10 +167,16 @@ def _draw_header(
         fill=_MUTED,
     )
     visual_contract.draw_state_pill(draw, payload.freshness)
+    page_title = {
+        "overview": "OVERVIEW",
+        "activity": "KINGDOM ACTIVITY",
+        "kvk": "KVK PERFORMANCE",
+        "record": "PLAYER RECORD",
+    }[payload.page]
     _text(
         draw,
         (1365, 119),
-        payload.page.replace("_", " ").upper(),
+        page_title,
         width=245,
         size=18,
         min_size=14,
@@ -245,231 +238,265 @@ def _draw_context(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -
     )
 
 
+def _presence_percentage(payload: LeadershipPlayerPayload) -> str:
+    current = payload.current_presence
+    if current is None or current.complete_scans <= 0:
+        return "—"
+    rounded = (current.present_scans * 100 + current.complete_scans // 2) // current.complete_scans
+    return f"{rounded}%"
+
+
 def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> None:
-    boxes = (
-        (70, 326, 445, 516),
-        (468, 326, 843, 516),
-        (866, 326, 1241, 516),
-        (1264, 326, 1632, 516),
+    index_box = (70, 226, 832, 430)
+    presence_box = (854, 226, 1632, 430)
+    _panel(draw, index_box)
+    _panel(draw, presence_box)
+
+    index = payload.activity_index
+    _text(
+        draw, (94, 244), "ACTIVITY INDEX v1", width=700, size=25, min_size=18, fill=_BLUE, bold=True
     )
-    selected = (payload.metrics[:3] + (None,))[:3]
-    for box, metric in zip(boxes[:3], selected, strict=False):
+    _text(
+        draw,
+        (94, 286),
+        _percent(index.value),
+        width=300,
+        size=58,
+        min_size=38,
+        fill=_TEXT if index.value is not None else _RED,
+        bold=True,
+    )
+    rank = f"Kingdom #{index.rank} of {index.cohort_count}" if index.rank else "Rank unavailable"
+    _text(draw, (400, 301), rank, width=390, size=21, min_size=15, fill=_GREEN)
+    component_labels = [f"{name} {_percent(value)}" for name, value in index.components]
+    _text(
+        draw,
+        (94, 366),
+        "  •  ".join(component_labels[:3]),
+        width=700,
+        size=15,
+        min_size=11,
+        fill=_MUTED,
+    )
+    _text(
+        draw,
+        (94, 394),
+        "  •  ".join(component_labels[3:]),
+        width=700,
+        size=15,
+        min_size=11,
+        fill=_MUTED,
+    )
+
+    current = payload.current_presence
+    scan_ratio = (
+        f"{current.present_scans} / {current.complete_scans} scans" if current else "NO DATA"
+    )
+    scanned_days = (
+        f"{current.present_scanned_days}/{current.scanned_days} scanned days"
+        if current
+        else "Scanned days unavailable"
+    )
+    _text(draw, (878, 244), "PRESENCE", width=325, size=25, min_size=18, fill=_BLUE, bold=True)
+    _text(draw, (878, 284), scan_ratio, width=425, size=39, min_size=25, bold=True)
+    _text(
+        draw,
+        (1320, 276),
+        _presence_percentage(payload),
+        width=270,
+        size=54,
+        min_size=34,
+        fill=_GREEN if current and current.present_scans else _RED,
+        bold=True,
+        right_align=True,
+    )
+    _text(draw, (878, 338), scanned_days, width=420, size=16, min_size=12, fill=_MUTED)
+    last_active = payload.last_active
+    last_active_text = (
+        f"Last Active {_date(last_active.last_active_date)}  •  {last_active.activity_state}"
+        if last_active and last_active.last_active_date
+        else "Last Active Not recorded"
+    )
+    state_colour = (
+        _GREEN
+        if last_active and last_active.activity_state == "ACTIVE"
+        else _AMBER if last_active and last_active.activity_state == "INACTIVE" else _MUTED
+    )
+    _text(
+        draw,
+        (878, 370),
+        last_active_text,
+        width=710,
+        size=20,
+        min_size=14,
+        fill=state_colour,
+        bold=True,
+    )
+    coverage = "  •  ".join(
+        f"{item.source_code.replace('_', ' ').title()} {item.valid_units}/{item.expected_units}"
+        for item in payload.coverage
+        if item.window == "CURRENT"
+    )
+    _text(
+        draw,
+        (878, 402),
+        coverage or "Valid source observations: NO DATA",
+        width=710,
+        size=12,
+        min_size=9,
+        fill=_MUTED,
+    )
+
+    header = payload.header
+    location = (
+        f"{header.location_x}:{header.location_y}"
+        if header.location_x is not None and header.location_y is not None
+        else "Not reported"
+    )
+    shield = "Not reported"
+    if header.shield_ends_at_utc is not None:
+        status = "ACTIVE" if header.shield_ends_at_utc > header.effective_now_utc else "EXPIRED"
+        shield = f"{status} • ends {_utc(header.shield_ends_at_utc)}"
+    location_boxes = (
+        ((70, 452, 570, 615), "LATEST X:Y", location),
+        ((592, 452, 1092, 615), "LOCATION UPDATED UTC", _utc(header.location_updated_at_utc)),
+        ((1114, 452, 1632, 615), "SHIELD STATUS", shield),
+    )
+    for box, label, value in location_boxes:
         _panel(draw, box)
-        if metric is None:
-            continue
-        display_total = current_metric_total(metric)
         _text(
             draw,
-            (box[0] + 18, box[1] + 15),
-            _metric_label(metric.code),
-            width=box[2] - box[0] - 36,
-            size=20,
-            min_size=15,
+            (box[0] + 22, box[1] + 20),
+            label,
+            width=box[2] - box[0] - 44,
+            size=19,
+            min_size=14,
             fill=_BLUE,
             bold=True,
         )
         _text(
             draw,
-            (box[0] + 18, box[1] + 54),
-            _compact(display_total, signed=metric.code == "POWER_CHANGE"),
-            width=box[2] - box[0] - 36,
-            size=43,
-            min_size=27,
-            fill=_TEXT if display_total is not None else _RED,
+            (box[0] + 22, box[1] + 65),
+            value,
+            width=box[2] - box[0] - 44,
+            size=33,
+            min_size=19,
             bold=True,
         )
-        rank = (
-            f"#{metric.kingdom_rank} of {metric.cohort_count}"
-            if metric.kingdom_rank
-            else "Rank unavailable"
-        )
-        _text(
-            draw,
-            (box[0] + 18, box[1] + 116),
-            f"Avg {_compact(metric.current_average)}/day • {rank}",
-            width=box[2] - box[0] - 36,
-            size=15,
-            min_size=12,
-            fill=_MUTED,
-        )
-        valid_units = max(0, metric.expected_units - metric.missing_units)
-        _text(
-            draw,
-            (box[0] + 18, box[1] + 148),
-            f"Previous {_percent(metric.comparison_percent, signed=True)} • coverage {valid_units}/{metric.expected_units}",
-            width=box[2] - box[0] - 36,
-            size=14,
-            min_size=11,
-            fill=_MUTED,
-        )
-    box = boxes[3]
-    _panel(draw, box)
-    index = payload.activity_index
-    _text(
-        draw,
-        (box[0] + 18, box[1] + 15),
-        "ACTIVITY INDEX v1",
-        width=box[2] - box[0] - 36,
-        size=20,
-        min_size=15,
-        fill=_BLUE,
-        bold=True,
-    )
-    _text(
-        draw,
-        (box[0] + 18, box[1] + 54),
-        _percent(index.value),
-        width=box[2] - box[0] - 36,
-        size=43,
-        min_size=27,
-        fill=_TEXT if index.value is not None else _RED,
-        bold=True,
-    )
-    rank = f"#{index.rank} of {index.cohort_count}" if index.rank else "Unavailable"
-    _text(
-        draw,
-        (box[0] + 18, box[1] + 116),
-        rank,
-        width=box[2] - box[0] - 36,
-        size=16,
-        min_size=12,
-        fill=_MUTED,
-    )
-    component_labels = [f"{name} {_percent(value)}" for name, value in index.components]
-    _text(
-        draw,
-        (box[0] + 18, box[1] + 145),
-        " • ".join(component_labels[:3]),
-        width=box[2] - box[0] - 36,
-        size=12,
-        min_size=10,
-        fill=_MUTED,
-    )
-    _text(
-        draw,
-        (box[0] + 18, box[1] + 166),
-        " • ".join(component_labels[3:]),
-        width=box[2] - box[0] - 36,
-        size=12,
-        min_size=10,
-        fill=_MUTED,
-    )
 
-    _panel(draw, (70, 538, 1632, 810))
+    _panel(draw, (70, 637, 1632, 810))
     _text(
-        draw, (92, 554), "LEADERSHIP REVIEW", width=400, size=22, min_size=17, fill=_BLUE, bold=True
+        draw, (92, 653), "LEADERSHIP REVIEW", width=400, size=22, min_size=17, fill=_BLUE, bold=True
     )
-    y = 598
+    y = 697
     if payload.prompts:
         for prompt in payload.prompts[:2]:
             colour = _GREEN if prompt.startswith("Strength") else _AMBER
-            _text(draw, (102, y), prompt, width=1480, size=21, min_size=15, fill=colour)
-            y += 66
+            _text(draw, (102, y), prompt, width=1480, size=19, min_size=14, fill=colour)
+            y += 45
     else:
         _text(
             draw,
             (102, y),
             "Prompts suppressed for freshness, coverage, tenure, comparison, or cohort safeguards.",
             width=1480,
-            size=20,
-            min_size=15,
+            size=18,
+            min_size=14,
             fill=_MUTED,
         )
-        y += 60
-    for warning in payload.warnings[:3]:
-        _text(draw, (102, y), warning, width=1480, size=17, min_size=13, fill=_AMBER)
         y += 42
+    for warning in payload.warnings[:2]:
+        _text(draw, (102, y), warning, width=1480, size=16, min_size=12, fill=_AMBER)
+        y += 34
 
 
 def _draw_activity(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> None:
-    for index, metric in enumerate(payload.metrics[:6]):
+    boxes = (
+        (70, 226, 570, 507),
+        (592, 226, 1092, 507),
+        (1114, 226, 1632, 507),
+        (70, 529, 570, 810),
+        (592, 529, 1092, 810),
+        (1114, 529, 1632, 810),
+    )
+    for box, metric in zip(boxes, payload.metrics[:6], strict=False):
         display_total = current_metric_total(metric)
-        column = index % 3
-        row = index // 3
-        x0 = 70 + column * 520
-        y0 = 326 + row * 235
-        box = (x0, y0, x0 + 492, y0 + 210)
+        x0, y0, x1, _y1 = box
+        width = x1 - x0
         _panel(draw, box)
         _text(
             draw,
-            (x0 + 18, y0 + 14),
+            (x0 + 22, y0 + 18),
             _metric_label(metric.code),
-            width=456,
-            size=20,
-            min_size=15,
+            width=width - 44,
+            size=23,
+            min_size=16,
             fill=_BLUE,
             bold=True,
         )
         _text(
             draw,
-            (x0 + 18, y0 + 50),
+            (x0 + 22, y0 + 62),
             _compact(display_total, signed=metric.code == "POWER_CHANGE"),
-            width=270,
-            size=40,
-            min_size=25,
+            width=width - 44,
+            size=50,
+            min_size=30,
             fill=_TEXT if display_total is not None else _RED,
             bold=True,
         )
         _text(
             draw,
-            (x0 + 298, y0 + 55),
-            f"AVG {_compact(metric.current_average)}/day",
-            width=170,
-            size=18,
+            (x0 + 22, y0 + 127),
+            f"Average {_compact(metric.current_average)}/valid day",
+            width=width - 44,
+            size=19,
             min_size=14,
             fill=_MUTED,
         )
         rank = (
-            f"Current kingdom #{metric.kingdom_rank} of {metric.cohort_count}"
+            f"Kingdom #{metric.kingdom_rank} of {metric.cohort_count}"
             if metric.kingdom_rank
-            else "Current kingdom rank unavailable"
+            else "Kingdom rank unavailable"
         )
         _text(
             draw,
-            (x0 + 18, y0 + 108),
+            (x0 + 22, y0 + 164),
             rank,
-            width=450,
-            size=17,
-            min_size=13,
+            width=width - 44,
+            size=20,
+            min_size=14,
             fill=_GREEN if metric.kingdom_rank else _MUTED,
+            bold=bool(metric.kingdom_rank),
         )
         _text(
             draw,
-            (x0 + 18, y0 + 140),
-            f"Top {_percent(metric.top_percent)} • previous {_percent(metric.comparison_percent, signed=True)}",
-            width=450,
-            size=16,
+            (x0 + 22, y0 + 202),
+            f"Top {_percent(metric.top_percent)}  •  previous {_percent(metric.comparison_percent, signed=True)}",
+            width=width - 44,
+            size=17,
             min_size=12,
             fill=_MUTED,
         )
-        reset = f" • {metric.reset_count} reset(s) excluded" if metric.reset_count else ""
+        reset = f"  •  {metric.reset_count} reset(s) excluded" if metric.reset_count else ""
         valid_units = max(0, metric.expected_units - metric.missing_units)
         _text(
             draw,
-            (x0 + 18, y0 + 172),
+            (x0 + 22, y0 + 239),
             f"Coverage {valid_units}/{metric.expected_units}{reset}",
-            width=450,
-            size=14,
+            width=width - 44,
+            size=15,
             min_size=11,
             fill=_AMBER if metric.missing_units or metric.reset_count else _MUTED,
         )
 
 
+def _kvk_target_context(value: Decimal | None, *, exempt: bool) -> str:
+    target = f"{_percent(value)} target" if value is not None else "Target % not recorded"
+    return f"{target}  •  EXEMPT" if exempt else target
+
+
 def _draw_kvk(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> None:
     rows = payload.kvk_rows[:3]
-    if not rows:
-        _panel(draw, (70, 326, 1632, 810))
-        _text(
-            draw,
-            (100, 500),
-            "NO DATA · No ended, finalized KVK row is available.",
-            width=1500,
-            size=30,
-            min_size=22,
-            fill=_RED,
-            centre=True,
-        )
-        return
     _text(
         draw,
         (1365, 203),
@@ -480,50 +507,119 @@ def _draw_kvk(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> No
         fill=_MUTED,
         centre=True,
     )
-    for index, row in enumerate(rows):
-        y0 = 326 + index * 160
-        _panel(draw, (70, y0, 1632, y0 + 138))
+    boxes = ((70, 226, 570, 810), (592, 226, 1092, 810), (1114, 226, 1632, 810))
+    for index, box in enumerate(boxes):
+        _panel(draw, box)
+        x0, y0, x1, _y1 = box
+        width = x1 - x0 - 44
+        if index >= len(rows):
+            _text(
+                draw,
+                (x0 + 22, y0 + 258),
+                "NO ADDITIONAL ELIGIBLE FINALIZED KVK",
+                width=width,
+                size=22,
+                min_size=15,
+                fill=_MUTED,
+                centre=True,
+                bold=True,
+            )
+            continue
+        row = rows[index]
         _text(
             draw,
-            (92, y0 + 13),
-            f"KVK {row.kvk_no} · {row.kvk_name or 'Name not recorded'}",
-            width=420,
-            size=22,
-            min_size=15,
+            (x0 + 22, y0 + 18),
+            f"KVK {row.kvk_no}",
+            width=width,
+            size=29,
+            min_size=20,
             fill=_BLUE,
             bold=True,
         )
         _text(
             draw,
-            (520, y0 + 17),
-            f"Rank {_clean(row.kvk_rank)}  •  T4+T5 {_compact(row.t4_t5_kills)} ({_percent(row.kill_target_percent)} · {_target_state(row.kill_target_percent, exempt=row.exempt)})  •  KP {_compact(row.kill_points)}",
-            width=520,
+            (x0 + 22, y0 + 57),
+            row.kvk_name or "Name not recorded",
+            width=width,
             size=18,
-            min_size=10,
-        )
-        _text(
-            draw,
-            (1060, y0 + 17),
-            f"Final {_utc(row.final_data_at_utc)} · {row.final_output_state or 'STATE NOT RECORDED'}",
-            width=530,
-            size=15,
-            min_size=10,
+            min_size=13,
             fill=_MUTED,
         )
         _text(
             draw,
-            (92, y0 + 55),
-            f"Deads {_compact(row.deads)} ({_percent(row.dead_target_percent)} · {_target_state(row.dead_target_percent, exempt=row.exempt)})  •  Healed {_compact(row.healed)} rank {_clean(row.healed_rank)}  •  KP Loss {_compact(row.kp_loss)}",
-            width=900,
-            size=18,
-            min_size=11,
+            (x0 + 22, y0 + 91),
+            f"KVK rank {_clean(row.kvk_rank)}",
+            width=width,
+            size=22,
+            min_size=15,
+            bold=True,
         )
         _text(
             draw,
-            (1030, y0 + 55),
-            f"Tanking {_percent(row.tanking_score)} · rank {_clean(row.tanking_rank)} (higher is better)",
-            width=560,
-            size=17,
+            (x0 + 22, y0 + 130),
+            f"T4+T5  {_compact(row.t4_t5_kills)}",
+            width=width,
+            size=20,
+            min_size=14,
+            bold=True,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 160),
+            _kvk_target_context(row.kill_target_percent, exempt=row.exempt),
+            width=width,
+            size=15,
+            min_size=11,
+            fill=_MUTED,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 192),
+            f"KP  {_compact(row.kill_points)}",
+            width=width,
+            size=20,
+            min_size=14,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 230),
+            f"Deads  {_compact(row.deads)}",
+            width=width,
+            size=20,
+            min_size=14,
+            bold=True,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 260),
+            _kvk_target_context(row.dead_target_percent, exempt=row.exempt),
+            width=width,
+            size=15,
+            min_size=11,
+            fill=_MUTED,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 294),
+            f"Healed  {_compact(row.healed)}  •  rank {_clean(row.healed_rank)}",
+            width=width,
+            size=18,
+            min_size=12,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 328),
+            f"KP Loss  {_compact(row.kp_loss)}",
+            width=width,
+            size=18,
+            min_size=12,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 362),
+            f"Tanking  {_percent(row.tanking_score)}  •  rank {_clean(row.tanking_rank)}",
+            width=width,
+            size=18,
             min_size=12,
             fill=_GREEN if row.tanking_score is not None else _RED,
         )
@@ -535,42 +631,45 @@ def _draw_kvk(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> No
         )
         _text(
             draw,
-            (92, y0 + 94),
-            f"Acclaim {_compact(row.acclaim)} · best {_compact(best_acclaim)} · {_percent(acclaim_pct)} of personal completed-KVK best  •  DKP {_compact(row.dkp)} ({_percent(row.dkp_target_percent)} · {_target_state(row.dkp_target_percent, exempt=row.exempt)})  •  Pre-KVK {_compact(row.prekvk_points)} rank {_clean(row.prekvk_rank)}  •  Honor {_compact(row.honor_points)} rank {_clean(row.honor_rank)}",
-            width=1490,
-            size=16,
-            min_size=9,
-            fill=_MUTED,
-        )
-    if len(rows) >= 2:
-        latest, previous = rows[0], rows[1]
-        comparison_rows = rows[1:3]
-
-        def average(attribute: str) -> Decimal | None:
-            values = [
-                Decimal(value)
-                for row in comparison_rows
-                if (value := getattr(row, attribute)) is not None
-            ]
-            return sum(values) / len(values) if values else None
-
-        _text(
-            draw,
-            (92, 788),
-            f"Latest vs previous · Rank {_trend_delta(latest.kvk_rank, previous.kvk_rank)} · KP {_trend_delta(latest.kill_points, previous.kill_points)} · Tanking {_trend_delta(latest.tanking_score, previous.tanking_score)} · Acclaim {_trend_delta(latest.acclaim, previous.acclaim)}",
-            width=1495,
-            size=13,
-            min_size=9,
-            fill=_BLUE,
+            (x0 + 22, y0 + 404),
+            f"Acclaim  {_compact(row.acclaim)}",
+            width=width,
+            size=18,
+            min_size=12,
+            bold=True,
         )
         _text(
             draw,
-            (92, 811),
-            f"Previous-two averages · Rank {_compact(average('kvk_rank'))} · KP {_compact(average('kill_points'))} · Tanking {_percent(average('tanking_score'))} · Acclaim {_compact(average('acclaim'))}",
-            width=1495,
-            size=13,
-            min_size=9,
+            (x0 + 22, y0 + 434),
+            f"Best {_compact(best_acclaim)}  •  {_percent(acclaim_pct)} of best",
+            width=width,
+            size=15,
+            min_size=11,
             fill=_MUTED,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 470),
+            f"DKP  {_compact(row.dkp)}  •  {_percent(row.dkp_target_percent)}",
+            width=width,
+            size=18,
+            min_size=12,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 506),
+            f"Pre-KVK  {_compact(row.prekvk_points)}  •  rank {_clean(row.prekvk_rank)}",
+            width=width,
+            size=17,
+            min_size=11,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 540),
+            f"Honor  {_compact(row.honor_points)}  •  rank {_clean(row.honor_rank)}",
+            width=width,
+            size=17,
+            min_size=11,
         )
 
 
@@ -579,10 +678,11 @@ def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) ->
     page_index = max(0, payload.record_page)
     offset = page_index * page_size
     alias_page_rows = alias_pages(payload.aliases)
+    alliance_page_rows = alliance_pages(payload.alliance_episodes)
     total_pages = record_page_count(
         linked_count=len(payload.linked_governors),
         aliases=payload.aliases,
-        episode_count=len(payload.alliance_episodes),
+        episodes=payload.alliance_episodes,
     )
     _text(
         draw,
@@ -701,7 +801,7 @@ def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) ->
     _text(
         draw,
         (1139, 342),
-        "ALLIANCE EPISODES",
+        "ALLIANCES",
         width=465,
         size=21,
         min_size=16,
@@ -709,22 +809,57 @@ def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) ->
         bold=True,
     )
     y = 384
-    for row in payload.alliance_episodes[offset : offset + page_size]:
-        _text(
-            draw,
-            (1147, y),
-            f"{row.governor_id} · {row.alliance} · {_date(row.first_observed)}–{_date(row.last_observed)} · {row.observed_scans} scans",
-            width=455,
-            size=15,
-            min_size=11,
-            fill=_BLUE if row.current else _TEXT,
-        )
+    visible_alliance_rows = (
+        alliance_page_rows[page_index] if page_index < len(alliance_page_rows) else ()
+    )
+    for display_row in visible_alliance_rows:
+        row = display_row.episode
+        if row is None:
+            _text(
+                draw,
+                (1147, y),
+                f"Governor ID {display_row.governor_id}",
+                width=455,
+                size=16,
+                min_size=13,
+                fill=_BLUE,
+                bold=True,
+            )
+        else:
+            current = " • CURRENT" if row.current else ""
+            _text(
+                draw,
+                (1155, y),
+                f"{row.alliance}{current}",
+                width=165,
+                size=14,
+                min_size=11,
+                fill=_BLUE if row.current else _TEXT,
+            )
+            _text(
+                draw,
+                (1322, y),
+                f"{_short_date(row.first_observed)}–{_short_date(row.last_observed)}",
+                width=164,
+                size=13,
+                min_size=10,
+                fill=_MUTED,
+            )
+            _text(
+                draw,
+                (1488, y),
+                f"{row.observed_scans} scans",
+                width=112,
+                size=13,
+                min_size=10,
+                right_align=True,
+            )
         y += 38
     if not payload.alliance_episodes:
         _text(
             draw,
             (1147, y),
-            "No alliance episodes in the selected history depth.",
+            "No observed alliance history.",
             width=455,
             size=17,
             min_size=13,
@@ -738,12 +873,12 @@ def render_leadership_player(payload: LeadershipPlayerPayload) -> RenderedLeader
     canvas = Image.alpha_composite(canvas, Image.new("RGBA", canvas.size, (1, 4, 13, 60)))
     draw = ImageDraw.Draw(canvas, "RGBA")
     _draw_header(draw, canvas, payload)
-    _draw_context(draw, payload)
     if payload.page == "activity":
         _draw_activity(draw, payload)
     elif payload.page == "kvk":
         _draw_kvk(draw, payload)
     elif payload.page == "record":
+        _draw_context(draw, payload)
         _draw_record(draw, payload)
     else:
         _draw_overview(draw, payload)

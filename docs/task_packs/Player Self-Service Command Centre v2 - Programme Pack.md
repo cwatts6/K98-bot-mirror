@@ -1912,7 +1912,8 @@ restart-safe interaction behavior. The resynced command surface is
 
 ### Phase 8.1 - Leadership Player Review Visual Hierarchy, Presence and Performance
 
-Status: `approved scope; task pack/chat starter prepared; audit and design first`.
+Status: `audited scope and additive Last Active procedure approved on 2026-07-21; implementation
+complete, validation and representative production performance evidence pending`.
 
 Goal: refine the accepted Phase 8 product without changing its command, permission, privacy or
 metric ownership, and measure then correct avoidable first-load/period-change latency.
@@ -1938,8 +1939,9 @@ Deliver:
 - Footer wording becomes `Data refreshed` with Generated right aligned.
 - Performance work measures cold/warm 30/90/180/360 loads, SQL plans/reads/time/result sizes,
   cache/inflight and rendering stages before choosing the smallest improvement.
-- New tables, indexes or pre-aggregation are not pre-approved and require evidence plus a separate
-  SQL design/review/deployment gate.
+- The approved SQL scope is one additive bounded Last Active procedure. No table, index or
+  pre-aggregation is included; any supporting-object proposal still requires actual-plan/read/
+  timing evidence plus a separate SQL design/review/deployment gate.
 
 Command impact: none; remain `36 / 100 / 8 / 1 / 2`. No resync is expected.
 

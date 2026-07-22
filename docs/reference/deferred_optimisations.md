@@ -123,6 +123,15 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 - Dependencies: SQL PRs #43/#44 deployed and Phase 6 functional smoke accepted on 2026-07-18; representative linked Governor IDs; SQL owner-approved measurement window; separate SQL Changes review for any index/procedure follow-up.
 
 ### Deferred Optimisation
+- Area: `leadership_player_review` DAL/service/cache/render path and SQL leadership procedures
+- Type: performance
+- Description: Phase 8.1 adds stage-level bot diagnostics, a sequential cold/warm application harness and a read-only SQL evidence harness. No representative production actual plan, logical-read, CPU/elapsed, memory-grant, row/result-size, statistics-quality or operational wait evidence has yet shown that a new table/index is safer than query refinement, cache granularity or page-specific loading. Existing source tables also contain overlapping indexes, so adding from a missing-index DMV hint alone could increase import/write cost and fragmentation.
+- Suggested Fix: Run the approved harness for recent/long-tenure, sparse/dense, one/three-KVK and high-history governors in a production-safe measurement window. Save actual plans and per-statement IO/time; compare estimated versus actual rows, spills, scans/lookups, residual predicates, memory grants, statistics sampling/age and index usage/operational counters. First correct cardinality/query-shape defects, then assess consolidation or the narrowest supporting index against the full existing-index set and source write workload. Require an isolated before/after replay, no more than 10% unexplained logical-read regression, stable result contracts, concurrency evidence and an independent migration/rollback before a new SQL proposal.
+- Impact: high
+- Risk: medium
+- Dependencies: approved additive `dbo.usp_GetLeadershipPlayerLastActive`; representative Governor IDs; SQL owner-approved plan collection window; no live load test without explicit approval; separate design approval, SQL PR, Changes review and SQL-first deployment for any follow-up object.
+
+### Deferred Optimisation
 - Area: `player_self_service/governor_dashboard_models.py`, `player_self_service/governor_dashboard_dal.py`, `player_self_service/governor_dashboard_renderer.py`, SQL repo `dbo.KingdomScanData4`
 - Type: consistency
 - Description: Phase 4 operator smoke approved a visible `Last Login: TBC` placeholder on the governor card, but the current renderer-independent payload and authoritative SQL contract do not yet expose a last-login value. Guessing or deriving it in the renderer would violate the payload/DAL boundary.

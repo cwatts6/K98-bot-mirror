@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import replace
 from io import BytesIO
 import logging
+import time
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -72,6 +73,29 @@ def _card_file(payload: LeadershipPlayerPayload) -> discord.File:
     return discord.File(BytesIO(rendered.image_bytes), filename=rendered.filename)
 
 
+def _log_delivery_performance(
+    payload: LeadershipPlayerPayload,
+    *,
+    action: str,
+    render_ms: float | None,
+    attachment_ms: float,
+    fallback: bool,
+) -> None:
+    diagnostics = payload.diagnostics
+    logger.debug(
+        "leadership_player_delivery_performance action=%s page=%s period=%s "
+        "cache=%s load_ms=%s render_ms=%s attachment_ms=%.3f fallback=%s",
+        action,
+        payload.page,
+        payload.period_days,
+        diagnostics.cache_status if diagnostics else "PAGE_PAYLOAD",
+        diagnostics.total_ms if diagnostics else None,
+        round(render_ms, 3) if render_ms is not None else None,
+        attachment_ms,
+        fallback,
+    )
+
+
 def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
     header = payload.header
     colour = {
@@ -98,16 +122,48 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
         inline=True,
     )
     current = payload.current_presence
+    presence_percent = (
+        f"{(current.present_scans * 100 + current.complete_scans // 2) // current.complete_scans}%"
+        if current and current.complete_scans > 0
+        else "—"
+    )
+    last_active = payload.last_active
+    last_active_text = (
+        f"{last_active.last_active_date.isoformat()} • {last_active.activity_state.replace('_', ' ')}"
+        if last_active and last_active.last_active_date
+        else "Not recorded"
+    )
     embed.add_field(
         name="Presence",
         value=(
-            f"Scans: {current.present_scans}/{current.complete_scans}\n"
-            f"Scanned days: {current.present_scanned_days}/{current.scanned_days}"
+            f"Scans: {current.present_scans}/{current.complete_scans} • {presence_percent}\n"
+            f"Scanned days: {current.present_scanned_days}/{current.scanned_days}\n"
+            f"Last Active: {last_active_text}"
             if current
-            else "NO DATA"
+            else f"NO DATA\nLast Active: {last_active_text}"
         ),
         inline=True,
     )
+    if payload.page == "overview":
+        location = (
+            f"{header.location_x}:{header.location_y}"
+            if header.location_x is not None and header.location_y is not None
+            else "Not reported"
+        )
+        shield = (
+            renderer._utc(header.shield_ends_at_utc)
+            if header.shield_ends_at_utc is not None
+            else "Not reported"
+        )
+        embed.add_field(
+            name="Location and shield",
+            value=(
+                f"Latest X:Y: {location}\n"
+                f"Location updated: {renderer._utc(header.location_updated_at_utc)}\n"
+                f"Shield ends: {shield}"
+            ),
+            inline=False,
+        )
     if payload.page in {"overview", "activity"}:
         lines = []
         for metric in payload.metrics:
@@ -128,7 +184,7 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
 
         lines = [
             f"KVK {row.kvk_no}: KP {number(row.kill_points)} · Tanking {row.tanking_score if row.tanking_score is not None else '—'} · DKP {number(row.dkp)}"
-            for row in payload.kvk_rows
+            for row in payload.kvk_rows[:3]
         ]
         embed.add_field(
             name="Ended/finalized KVKs", value=_bounded_embed_lines(lines), inline=False
@@ -189,8 +245,17 @@ async def _final_delivery_authorization(
     target_id: int | None,
     action: str,
     correlation_id: UUID,
+    boundary: str = "delivery",
 ) -> LeadershipPlayerAuthorization | None:
+    started = time.perf_counter()
     authorization = await reauthorize_leadership_player_interaction(interaction)
+    logger.debug(
+        "leadership_player_authorization_performance action=%s boundary=%s elapsed_ms=%.3f allowed=%s",
+        action,
+        boundary,
+        (time.perf_counter() - started) * 1000.0,
+        authorization.allowed,
+    )
     if int(getattr(interaction.user, "id", 0) or 0) != int(author_id):
         error_code = "AUTHOR_MISMATCH"
     elif not authorization.allowed:
@@ -252,7 +317,7 @@ class LeadershipPlayerView(discord.ui.View):
         return record_page_count(
             linked_count=len(self.payload.linked_governors),
             aliases=self.payload.aliases,
-            episode_count=len(self.payload.alliance_episodes),
+            episodes=self.payload.alliance_episodes,
         )
 
     def _sync_controls(self) -> None:
@@ -340,11 +405,28 @@ class LeadershipPlayerView(discord.ui.View):
         self.authorization = authorization
         return True
 
-    async def _begin(self, interaction: discord.Interaction) -> int:
+    async def _begin(
+        self,
+        interaction: discord.Interaction,
+        *,
+        action: str,
+        target_id: int | None,
+    ) -> int | None:
         self._transition_id += 1
         transition_id = self._transition_id
         if not interaction.response.is_done():
             await interaction.response.defer()
+        authorization = await _final_delivery_authorization(
+            interaction,
+            author_id=self.author_id,
+            target_id=target_id,
+            action=action,
+            correlation_id=self.correlation_id,
+            boundary="before_access",
+        )
+        if authorization is None:
+            return None
+        self.authorization = authorization
         return transition_id
 
     async def _replace(
@@ -374,9 +456,14 @@ class LeadershipPlayerView(discord.ui.View):
             timeout=self.timeout or 14 * 60,
         )
         file: discord.File | None = None
+        render_ms: float | None = None
+        attachment_ms = 0.0
+        fallback = False
         try:
             try:
+                render_started = time.perf_counter()
                 file = await asyncio.to_thread(_card_file, payload)
+                render_ms = (time.perf_counter() - render_started) * 1000.0
                 if transition_id != self._transition_id:
                     await _audit(
                         interaction,
@@ -399,6 +486,7 @@ class LeadershipPlayerView(discord.ui.View):
                     return
                 self.authorization = authorization
                 next_view.authorization = authorization
+                attachment_started = time.perf_counter()
                 edited = await interaction.edit_original_response(
                     content=None,
                     embed=None,
@@ -406,9 +494,11 @@ class LeadershipPlayerView(discord.ui.View):
                     files=[file],
                     view=next_view,
                 )
+                attachment_ms = (time.perf_counter() - attachment_started) * 1000.0
             except asyncio.CancelledError:
                 raise
             except Exception:
+                fallback = True
                 logger.exception(
                     "leadership_player_render_or_delivery_failed target_id=%s page=%s",
                     payload.header.governor_id,
@@ -436,13 +526,22 @@ class LeadershipPlayerView(discord.ui.View):
                     return
                 self.authorization = authorization
                 next_view.authorization = authorization
+                attachment_started = time.perf_counter()
                 edited = await interaction.edit_original_response(
                     content=None,
                     embed=build_fallback_embed(payload),
                     attachments=[],
                     view=next_view,
                 )
+                attachment_ms = (time.perf_counter() - attachment_started) * 1000.0
             next_view.message = edited
+            _log_delivery_performance(
+                payload,
+                action=action,
+                render_ms=render_ms,
+                attachment_ms=attachment_ms,
+                fallback=fallback,
+            )
             await _audit(
                 interaction,
                 self.authorization,
@@ -455,7 +554,13 @@ class LeadershipPlayerView(discord.ui.View):
             _close_file(file)
 
     async def _page(self, interaction: discord.Interaction, page: ReviewPage) -> None:
-        transition = await self._begin(interaction)
+        transition = await self._begin(
+            interaction,
+            action="page_change",
+            target_id=self.payload.header.governor_id,
+        )
+        if transition is None:
+            return
         await self._replace(
             interaction,
             replace(self.payload, page=page),
@@ -486,7 +591,13 @@ class LeadershipPlayerView(discord.ui.View):
         row=1,
     )
     async def period(self, select, interaction):
-        transition = await self._begin(interaction)
+        transition = await self._begin(
+            interaction,
+            action="period_change",
+            target_id=self.payload.header.governor_id,
+        )
+        if transition is None:
+            return
         try:
             period_days = int(select.values[0])
             payload = await service.load_payload(
@@ -523,6 +634,17 @@ class LeadershipPlayerView(discord.ui.View):
         label="Definitions / Method", custom_id="leadership:player:definitions", row=2
     )
     async def definitions(self, _button, interaction):
+        current_authorization = await _final_delivery_authorization(
+            interaction,
+            author_id=self.author_id,
+            target_id=self.payload.header.governor_id,
+            action="definitions",
+            correlation_id=self.correlation_id,
+            boundary="before_access",
+        )
+        if current_authorization is None:
+            return
+        self.authorization = current_authorization
         embed = discord.Embed(
             title="Leadership player review · definitions",
             description=(
@@ -530,6 +652,10 @@ class LeadershipPlayerView(discord.ui.View):
                 "Coverage keeps Stats scans, Alliance Activity snapshots, and completed Rally report dates separate.\n\n"
                 "Activity Index v1 weights: Forts 30%, Helps 22%, Tech 18%, RSS 14%, Building 10%, Power 6%. "
                 "Components use average-rank percentile; missing one component makes the index unavailable.\n\n"
+                "Last Active searches at most 720 UTC calendar days and compares each complete kingdom scan "
+                "with the previous complete scan where that Governor ID was present. Power, Healed, RSS Gathered, "
+                "RSS Assisted, Helps, Tech Donations, Building Minutes and completed Fort rallies can qualify. "
+                "Missing observations are not zero; exactly 30 days remains ACTIVE.\n\n"
                 "KP Loss = Healed × 20. Tanking Score = Kill Points ÷ (KP Loss + Deads) × 100; higher is better."
             ),
             color=discord.Color.blue(),
@@ -559,7 +685,13 @@ class LeadershipPlayerView(discord.ui.View):
 
     @discord.ui.button(label="Refresh", custom_id="leadership:player:refresh", row=2)
     async def refresh_report(self, _button, interaction):
-        transition = await self._begin(interaction)
+        transition = await self._begin(
+            interaction,
+            action="refresh",
+            target_id=self.payload.header.governor_id,
+        )
+        if transition is None:
+            return
         try:
             payload = await service.load_payload(
                 self.payload.header.governor_id,
@@ -597,9 +729,22 @@ class LeadershipPlayerView(discord.ui.View):
                 "No linked governor is available.", ephemeral=True
             )
             return
-        transition = await self._begin(interaction)
+        transition = await self._begin(
+            interaction,
+            action="linked_governor_change",
+            target_id=None,
+        )
+        if transition is None:
+            return
         target_id = int(value.split(":", 1)[1])
-        if target_id not in {row.governor_id for row in self.payload.linked_governors}:
+        try:
+            target_is_linked = await service.is_current_linked_target(
+                self.payload.header.governor_id, target_id
+            )
+        except Exception:
+            logger.exception("leadership_player_linked_revalidation_failed")
+            target_is_linked = False
+        if not target_is_linked:
             await _audit(
                 interaction,
                 self.authorization,
@@ -633,7 +778,13 @@ class LeadershipPlayerView(discord.ui.View):
         )
 
     async def _record_page(self, interaction: discord.Interaction, delta: int) -> None:
-        transition = await self._begin(interaction)
+        transition = await self._begin(
+            interaction,
+            action="page_change",
+            target_id=self.payload.header.governor_id,
+        )
+        if transition is None:
+            return
         page = min(
             max(0, self.payload.record_page + delta),
             self._record_page_count() - 1,
@@ -704,6 +855,17 @@ class LeadershipChangePlayerModal(discord.ui.Modal):
                 interaction, "Your current identity, role, or channel cannot change this review."
             )
             return
+        current_authorization = await _final_delivery_authorization(
+            interaction,
+            author_id=self.parent.author_id,
+            target_id=self.parent.payload.header.governor_id,
+            action="change_player",
+            correlation_id=self.parent.correlation_id,
+            boundary="before_access",
+        )
+        if current_authorization is None:
+            return
+        authorization = current_authorization
         raw = str(self.query.value or "").strip()
         target_id: int | None = None
         matches: tuple[LookupCandidate, ...] = ()
@@ -874,13 +1036,24 @@ class LeadershipPlayerAmbiguityView(discord.ui.View):
         options=[discord.SelectOption(label="Loading", value="loading")],
     )
     async def selector(self, select, interaction):
+        await interaction.response.defer()
+        current_authorization = await _final_delivery_authorization(
+            interaction,
+            author_id=self.author_id,
+            target_id=None,
+            action="ambiguity_select",
+            correlation_id=self.correlation_id,
+            boundary="before_access",
+        )
+        if current_authorization is None:
+            return
+        self.authorization = current_authorization
         try:
             candidate_index = int(select.values[0].split(":", 1)[1])
             candidate = self.candidates[candidate_index]
         except (IndexError, TypeError, ValueError):
-            await interaction.response.send_message("That selection expired.", ephemeral=True)
+            await interaction.followup.send("That selection expired.", ephemeral=True)
             return
-        await interaction.response.defer()
         try:
             payload = await service.load_payload(
                 candidate.governor_id,
@@ -955,18 +1128,19 @@ class LeadershipPlayerAmbiguityView(discord.ui.View):
         interaction: discord.Interaction,
         delta: int,
     ) -> None:
-        self.selector_page += delta
-        self._sync_selector_page()
         current_authorization = await _final_delivery_authorization(
             interaction,
             author_id=self.author_id,
             target_id=None,
             action="page_change",
             correlation_id=self.correlation_id,
+            boundary="before_access",
         )
         if current_authorization is None:
             return
         self.authorization = current_authorization
+        self.selector_page += delta
+        self._sync_selector_page()
         await interaction.response.edit_message(view=self)
         await _audit(
             interaction,
@@ -1050,6 +1224,17 @@ async def send_leadership_player_review(
     )
     await safe_defer(ctx, ephemeral=True)
     target_id = int(governor_id or 0) or None
+    current_authorization = await _final_delivery_authorization(
+        interaction,
+        author_id=ctx.user.id,
+        target_id=target_id,
+        action="open",
+        correlation_id=correlation_id,
+        boundary="before_access",
+    )
+    if current_authorization is None:
+        return
+    authorization = current_authorization
     if target_id is None:
         try:
             result = await service.resolve_name(name or "")
@@ -1127,9 +1312,14 @@ async def send_leadership_player_review(
         correlation_id=correlation_id,
     )
     file: discord.File | None = None
+    render_ms: float | None = None
+    attachment_ms = 0.0
+    fallback = False
     try:
         try:
+            render_started = time.perf_counter()
             file = await asyncio.to_thread(_card_file, payload)
+            render_ms = (time.perf_counter() - render_started) * 1000.0
             current_authorization = await _final_delivery_authorization(
                 interaction,
                 author_id=ctx.user.id,
@@ -1141,8 +1331,11 @@ async def send_leadership_player_review(
                 return
             authorization = current_authorization
             view.authorization = current_authorization
+            attachment_started = time.perf_counter()
             message = await ctx.followup.send(file=file, view=view, ephemeral=True)
+            attachment_ms = (time.perf_counter() - attachment_started) * 1000.0
         except Exception:
+            fallback = True
             logger.exception("leadership_player_initial_render_failed target_id=%s", target_id)
             current_authorization = await _final_delivery_authorization(
                 interaction,
@@ -1155,10 +1348,19 @@ async def send_leadership_player_review(
                 return
             authorization = current_authorization
             view.authorization = current_authorization
+            attachment_started = time.perf_counter()
             message = await ctx.followup.send(
                 embed=build_fallback_embed(payload), view=view, ephemeral=True
             )
+            attachment_ms = (time.perf_counter() - attachment_started) * 1000.0
         view.message = message
+        _log_delivery_performance(
+            payload,
+            action="open",
+            render_ms=render_ms,
+            attachment_ms=attachment_ms,
+            fallback=fallback,
+        )
         await _audit(
             interaction,
             authorization,

@@ -5,10 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+import time
+from typing import Any, cast
 from uuid import UUID
 
 from file_utils import get_conn_with_retries
+from leadership_player_review.last_active import validate_last_active
 from leadership_player_review.models import (
     ActivityIndex,
     ActivityMetric,
@@ -17,6 +19,8 @@ from leadership_player_review.models import (
     HistoryDepth,
     KvkCandidate,
     KvkPerformance,
+    LastActive,
+    LastActiveState,
     LookupCandidate,
     ReviewHeader,
     ScanPresence,
@@ -86,17 +90,58 @@ def _cursor(conn: Any) -> Any:
     return cursor
 
 
-def fetch_lookup_directory(*, history_days: int = 720) -> tuple[LookupCandidate, ...]:
+def _result_sets(cursor: Any, count: int) -> tuple[list[dict[str, Any]], ...]:
+    return tuple(_next_rows(cursor, advance=index > 0) for index in range(count))
+
+
+def _approximate_result_bytes(result_sets: Iterable[Iterable[dict[str, Any]]]) -> int:
+    return sum(
+        len(str(key).encode("utf-8")) + len(str(value).encode("utf-8"))
+        for rows in result_sets
+        for row in rows
+        for key, value in row.items()
+    )
+
+
+def _record_diagnostics(
+    diagnostics: dict[str, Any] | None,
+    *,
+    started: float,
+    connected: float,
+    fetched: float,
+    mapped: float,
+    result_sets: tuple[list[dict[str, Any]], ...],
+) -> None:
+    if diagnostics is None:
+        return
+    diagnostics.update(
+        connection_ms=(connected - started) * 1000.0,
+        sql_fetch_ms=(fetched - connected) * 1000.0,
+        mapping_ms=(mapped - fetched) * 1000.0,
+        total_ms=(mapped - started) * 1000.0,
+        result_rows=sum(len(rows) for rows in result_sets),
+        approximate_result_bytes=_approximate_result_bytes(result_sets),
+        result_set_rows=tuple(len(rows) for rows in result_sets),
+    )
+
+
+def fetch_lookup_directory(
+    *, history_days: int = 720, diagnostics: dict[str, Any] | None = None
+) -> tuple[LookupCandidate, ...]:
     if not 1 <= int(history_days) <= 720:
         raise ValueError("lookup history must be between 1 and 720 days")
+    started = time.perf_counter()
     with get_conn_with_retries() as conn:
+        connected = time.perf_counter()
         cur = _cursor(conn)
         cur.execute(
             "EXEC dbo.usp_GetLeadershipPlayerLookupDirectory @HistoryDays = ?;",
             (int(history_days),),
         )
+        result_sets = _result_sets(cur, 1)
+        fetched = time.perf_counter()
         output = []
-        for row in _next_rows(cur):
+        for row in result_sets[0]:
             gid = _int(row.get("GovernorID"))
             name = _text(row.get("GovernorName"))
             key = _text(row.get("GovernorNameKey"))
@@ -117,7 +162,17 @@ def fetch_lookup_directory(*, history_days: int = 720) -> tuple[LookupCandidate,
                     seen_scan_count=_int(row.get("SeenScanCount")) or 0,
                 )
             )
-        return tuple(output)
+        result = tuple(output)
+        mapped = time.perf_counter()
+        _record_diagnostics(
+            diagnostics,
+            started=started,
+            connected=connected,
+            fetched=fetched,
+            mapped=mapped,
+            result_sets=result_sets,
+        )
+        return result
 
 
 def fetch_review_contract(
@@ -125,6 +180,7 @@ def fetch_review_contract(
     period_days: int,
     *,
     now_utc: datetime | None = None,
+    diagnostics: dict[str, Any] | None = None,
 ) -> tuple[
     ReviewHeader,
     tuple[ScanPresence, ...],
@@ -133,13 +189,19 @@ def fetch_review_contract(
     ActivityIndex,
     tuple[HistoryDepth, ...],
 ]:
+    started = time.perf_counter()
     with get_conn_with_retries() as conn:
+        connected = time.perf_counter()
         cur = _cursor(conn)
         cur.execute(
             "EXEC dbo.usp_GetLeadershipPlayerReview @GovernorID = ?, @PeriodDays = ?, @NowUtc = ?;",
             (int(governor_id), int(period_days), now_utc),
         )
-        header_rows = _next_rows(cur)
+        result_sets = _result_sets(cur, 6)
+        fetched = time.perf_counter()
+        header_rows, presence_rows, coverage_rows, metric_rows, index_rows, history_rows = (
+            result_sets
+        )
         if len(header_rows) != 1:
             raise ValueError("leadership review header result must contain exactly one row")
         row = header_rows[0]
@@ -180,7 +242,7 @@ def fetch_review_contract(
                 scanned_days=_int(item.get("ScannedDayCount")) or 0,
                 present_scanned_days=_int(item.get("PresentScannedDayCount")) or 0,
             )
-            for item in _next_rows(cur, advance=True)
+            for item in presence_rows
         )
         coverage = tuple(
             SourceCoverage(
@@ -193,7 +255,7 @@ def fetch_review_contract(
                 reset_count=_int(item.get("ResetCount")) or 0,
                 state=_text(item.get("CoverageState")) or "NO_DATA",
             )
-            for item in _next_rows(cur, advance=True)
+            for item in coverage_rows
         )
         metrics = tuple(
             ActivityMetric(
@@ -216,9 +278,8 @@ def fetch_review_contract(
                 percentile=_decimal(item.get("PercentileScore")),
                 top_percent=_decimal(item.get("TopPercent")),
             )
-            for item in _next_rows(cur, advance=True)
+            for item in metric_rows
         )
-        index_rows = _next_rows(cur, advance=True)
         index_row = index_rows[0] if index_rows else {}
         activity_index = ActivityIndex(
             value=_decimal(index_row.get("ActivityIndex")),
@@ -248,9 +309,19 @@ def fetch_review_contract(
                 longest_gap_days=_int(item.get("LongestGapDays")),
                 evidence_basis=_text(item.get("EvidenceBasis")) or "UNKNOWN",
             )
-            for item in _next_rows(cur, advance=True)
+            for item in history_rows
         )
-        return header, presence, coverage, metrics, activity_index, history
+        result = header, presence, coverage, metrics, activity_index, history
+        mapped = time.perf_counter()
+        _record_diagnostics(
+            diagnostics,
+            started=started,
+            connected=connected,
+            fetched=fetched,
+            mapped=mapped,
+            result_sets=result_sets,
+        )
+        return result
 
 
 def _governor_id_values_sql(ids: tuple[int, ...]) -> tuple[str, tuple[Any, ...]]:
@@ -259,11 +330,16 @@ def _governor_id_values_sql(ids: tuple[int, ...]) -> tuple[str, tuple[Any, ...]]
 
 
 def fetch_identity_history(
-    governor_ids: Iterable[int], *, history_days: int = 720
+    governor_ids: Iterable[int],
+    *,
+    history_days: int = 720,
+    diagnostics: dict[str, Any] | None = None,
 ) -> tuple[tuple[AliasRecord, ...], tuple[AllianceEpisode, ...]]:
     ids = tuple(dict.fromkeys(int(value) for value in governor_ids if int(value) > 0))
     if not 1 <= len(ids) <= _MAX_GOVERNORS:
         raise ValueError("identity history requires between 1 and 26 Governor IDs")
+    if not 1 <= int(history_days) <= 720:
+        raise ValueError("identity history must be between 1 and 720 days")
     values_sql, params = _governor_id_values_sql(ids)
     sql = f"""
         SET NOCOUNT ON;
@@ -274,9 +350,13 @@ def fetch_identity_history(
         EXEC dbo.usp_GetLeadershipPlayerIdentityHistory
              @GovernorIDs = @GovernorIDs, @HistoryDays = ?;
     """
+    started = time.perf_counter()
     with get_conn_with_retries() as conn:
+        connected = time.perf_counter()
         cur = _cursor(conn)
         cur.execute(sql, (*params, int(history_days)))
+        result_sets = _result_sets(cur, 2)
+        fetched = time.perf_counter()
         aliases = tuple(
             AliasRecord(
                 governor_id=_int(row.get("GovernorID")) or 0,
@@ -285,7 +365,7 @@ def fetch_identity_history(
                 last_seen=_utc(row.get("LastSeen")),
                 seen_scan_count=_int(row.get("SeenScanCount")) or 0,
             )
-            for row in _next_rows(cur)
+            for row in result_sets[0]
         )
         episodes = tuple(
             AllianceEpisode(
@@ -297,20 +377,39 @@ def fetch_identity_history(
                 observed_scans=_int(row.get("ObservedScanCount")) or 0,
                 current=bool(row.get("IsCurrentEpisode")),
             )
-            for row in _next_rows(cur, advance=True)
+            for row in result_sets[1]
         )
-        return aliases, episodes
+        result = aliases, episodes
+        mapped = time.perf_counter()
+        _record_diagnostics(
+            diagnostics,
+            started=started,
+            connected=connected,
+            fetched=fetched,
+            mapped=mapped,
+            result_sets=result_sets,
+        )
+        return result
 
 
 def fetch_kvk_history(
-    governor_id: int, *, candidate_limit: int = 12
+    governor_id: int,
+    *,
+    candidate_limit: int = 12,
+    diagnostics: dict[str, Any] | None = None,
 ) -> tuple[tuple[KvkCandidate, ...], tuple[KvkPerformance, ...]]:
+    if not 3 <= int(candidate_limit) <= 20:
+        raise ValueError("KVK candidate limit must be between 3 and 20")
+    started = time.perf_counter()
     with get_conn_with_retries() as conn:
+        connected = time.perf_counter()
         cur = _cursor(conn)
         cur.execute(
             "EXEC dbo.usp_GetLeadershipPlayerKvkHistory @GovernorID = ?, @CandidateLimit = ?;",
             (int(governor_id), int(candidate_limit)),
         )
+        result_sets = _result_sets(cur, 2)
+        fetched = time.perf_counter()
         candidates = tuple(
             KvkCandidate(
                 kvk_no=_int(row.get("KVK_NO")) or 0,
@@ -328,7 +427,7 @@ def fetch_kvk_history(
                 final_output_state=_text(row.get("FinalOutputState")),
                 finalization_basis=_text(row.get("FinalizationBasis")),
             )
-            for row in _next_rows(cur)
+            for row in result_sets[0]
         )
         rows = tuple(
             KvkPerformance(
@@ -368,9 +467,84 @@ def fetch_kvk_history(
                     row.get("PersonalCompletedKvkBestAcclaim")
                 ),
             )
-            for row in _next_rows(cur, advance=True)
+            for row in result_sets[1]
         )
-        return candidates, rows
+        result = candidates, rows
+        mapped = time.perf_counter()
+        _record_diagnostics(
+            diagnostics,
+            started=started,
+            connected=connected,
+            fetched=fetched,
+            mapped=mapped,
+            result_sets=result_sets,
+        )
+        return result
+
+
+def fetch_last_active(
+    governor_id: int,
+    *,
+    history_days: int = 720,
+    now_utc: datetime | None = None,
+    diagnostics: dict[str, Any] | None = None,
+) -> LastActive:
+    if int(governor_id) <= 0:
+        raise ValueError("Governor ID must be positive")
+    if not 1 <= int(history_days) <= 720:
+        raise ValueError("Last Active history must be between 1 and 720 days")
+    started = time.perf_counter()
+    with get_conn_with_retries() as conn:
+        connected = time.perf_counter()
+        cur = _cursor(conn)
+        cur.execute(
+            """
+            EXEC dbo.usp_GetLeadershipPlayerLastActive
+                 @GovernorID = ?, @HistoryDays = ?, @NowUtc = ?;
+            """,
+            (int(governor_id), int(history_days), now_utc),
+        )
+        result_sets = _result_sets(cur, 1)
+        fetched = time.perf_counter()
+        rows = result_sets[0]
+        if len(rows) != 1:
+            raise ValueError("leadership Last Active result must contain exactly one row")
+        row = rows[0]
+        returned_governor_id = _int(row.get("GovernorID"))
+        if returned_governor_id != int(governor_id):
+            raise ValueError("leadership Last Active returned a mismatched Governor ID")
+        effective = _date(row.get("EffectiveUtcDate"))
+        history_start = _date(row.get("HistoryStartDate"))
+        history_end = _date(row.get("HistoryEndDate"))
+        state = _text(row.get("ActivityState"))
+        if effective is None or history_start is None or history_end is None:
+            raise ValueError("leadership Last Active omitted its bounded UTC dates")
+        if state not in {"ACTIVE", "INACTIVE", "NOT_RECORDED"}:
+            raise ValueError("leadership Last Active returned an invalid activity state")
+        result = validate_last_active(
+            LastActive(
+                governor_id=returned_governor_id,
+                effective_utc_date=effective,
+                history_start_date=history_start,
+                history_end_date=history_end,
+                last_active_date=_date(row.get("LastActiveDate")),
+                activity_state=cast(LastActiveState, state),
+                qualifying_source_code=_text(row.get("QualifyingSourceCode")),
+                qualifying_scan_order=_int(row.get("QualifyingScanOrder")),
+                compared_complete_scans=_int(row.get("ComparedCompleteScanCount")) or 0,
+                history_days=_int(row.get("HistoryDays")) or int(history_days),
+            )
+        )
+        mapped = time.perf_counter()
+        _record_diagnostics(
+            diagnostics,
+            started=started,
+            connected=connected,
+            fetched=fetched,
+            mapped=mapped,
+            result_sets=result_sets,
+        )
+        return result
 
 
 def record_audit(

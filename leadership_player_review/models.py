@@ -10,6 +10,7 @@ from typing import Literal
 ReviewPage = Literal["overview", "activity", "kvk", "record"]
 FreshnessState = Literal["CURRENT", "STALE", "PARTIAL", "NO DATA"]
 LookupStatus = Literal["found", "matches", "not_found", "invalid"]
+LastActiveState = Literal["ACTIVE", "INACTIVE", "NOT_RECORDED"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +132,29 @@ class HistoryDepth:
 
 
 @dataclass(frozen=True, slots=True)
+class LastActive:
+    governor_id: int
+    effective_utc_date: date
+    history_start_date: date
+    history_end_date: date
+    last_active_date: date | None
+    activity_state: LastActiveState
+    qualifying_source_code: str | None
+    qualifying_scan_order: int | None
+    compared_complete_scans: int
+    history_days: int
+
+
+@dataclass(frozen=True, slots=True)
+class LoadDiagnostics:
+    cache_status: str
+    total_ms: float
+    stage_ms: tuple[tuple[str, float], ...] = ()
+    result_rows: tuple[tuple[str, int], ...] = ()
+    approximate_result_bytes: tuple[tuple[str, int], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class AliasRecord:
     governor_id: int
     governor_name: str
@@ -231,6 +255,8 @@ class LeadershipPlayerPayload:
     warnings: tuple[str, ...]
     generated_at_utc: datetime
     record_page: int = 0
+    last_active: LastActive | None = None
+    diagnostics: LoadDiagnostics | None = None
 
     @property
     def current_presence(self) -> ScanPresence | None:

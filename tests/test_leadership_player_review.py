@@ -21,6 +21,7 @@ from leadership_player_review.models import (
     AllianceEpisode,
     HistoryDepth,
     KvkPerformance,
+    LastActive,
     LeadershipPlayerPayload,
     LinkedGovernor,
     LookupCandidate,
@@ -28,7 +29,11 @@ from leadership_player_review.models import (
     ScanPresence,
     SourceCoverage,
 )
-from leadership_player_review.record_paging import alias_pages, record_page_count
+from leadership_player_review.record_paging import (
+    alias_pages,
+    alliance_pages,
+    record_page_count,
+)
 from ui.views.leadership_player_review_views import (
     LeadershipPlayerAmbiguityView,
     LeadershipPlayerView,
@@ -198,6 +203,18 @@ def _payload(*, page="overview", aliases=1, episodes=1, linked=2) -> LeadershipP
         prompts=("Strength: visible rank evidence.", "Review: visible trend evidence?"),
         warnings=(),
         generated_at_utc=NOW,
+        last_active=LastActive(
+            governor_id=123,
+            effective_utc_date=NOW.date(),
+            history_start_date=date(2024, 7, 31),
+            history_end_date=NOW.date(),
+            last_active_date=NOW.date() - timedelta(days=1),
+            activity_state="ACTIVE",
+            qualifying_source_code="HELPS",
+            qualifying_scan_order=99,
+            compared_complete_scans=88,
+            history_days=720,
+        ),
     )
 
 
@@ -268,12 +285,12 @@ def test_activity_renderer_labels_reporting_average_per_day(monkeypatch) -> None
     monkeypatch.setattr(renderer, "_text", capture_text)
     renderer.render_leadership_player(_payload(page="activity"))
 
-    averages = [text for text in rendered_text if text.startswith("AVG ")]
+    averages = [text for text in rendered_text if text.startswith("Average ")]
     assert len(averages) == 6
-    assert all(text.endswith("/day") for text in averages)
+    assert all(text.endswith("/valid day") for text in averages)
 
 
-@pytest.mark.parametrize("page", ["overview", "activity"])
+@pytest.mark.parametrize("page", ["activity"])
 def test_unavailable_metric_does_not_render_sql_zero_as_genuine_zero(monkeypatch, page) -> None:
     payload = _payload(page=page)
     unavailable_forts = replace(
@@ -308,7 +325,7 @@ def test_unavailable_metric_does_not_render_sql_zero_as_genuine_zero(monkeypatch
     )
 
 
-@pytest.mark.parametrize("page", ["overview", "activity"])
+@pytest.mark.parametrize("page", ["activity"])
 def test_partial_metric_renders_observed_total_without_rank(monkeypatch, page) -> None:
     payload = _payload(page=page)
     partial_tech = replace(
@@ -389,7 +406,7 @@ def test_alias_pages_group_id_once_and_keep_nine_aliases_on_one_page() -> None:
     assert [row.alias.governor_name for row in pages[0] if row.alias] == [
         row.governor_name for row in aliases
     ]
-    assert record_page_count(linked_count=0, aliases=aliases, episode_count=0) == 1
+    assert record_page_count(linked_count=0, aliases=aliases, episodes=()) == 1
 
 
 def test_alias_pages_repeat_group_heading_only_when_group_continues() -> None:
@@ -399,6 +416,70 @@ def test_alias_pages_repeat_group_heading_only_when_group_continues() -> None:
 
     assert [len(page) for page in pages] == [10, 2]
     assert all(page[0].is_heading for page in pages)
+
+
+def test_alliance_pages_group_governor_ids_and_preserve_every_episode() -> None:
+    episodes = tuple(
+        AllianceEpisode(
+            123 if index < 10 else 456,
+            index,
+            f"A{index}",
+            date(2026, 1, 1),
+            date(2026, 2, 1),
+            index,
+            False,
+        )
+        for index in range(1, 15)
+    )
+
+    pages = alliance_pages(episodes)
+
+    assert len(pages) == 2
+    assert all(page[0].is_heading for page in pages)
+    assert [row.episode for page in pages for row in page if row.episode] == list(episodes)
+    assert record_page_count(linked_count=0, aliases=(), episodes=episodes) == 2
+
+
+def test_overview_promotes_presence_last_active_and_removes_duplicate_metrics(
+    monkeypatch,
+) -> None:
+    rendered_text: list[str] = []
+    original_text = renderer._text
+
+    def capture_text(*args, **kwargs):
+        rendered_text.append(str(args[2]))
+        return original_text(*args, **kwargs)
+
+    monkeypatch.setattr(renderer, "_text", capture_text)
+    renderer.render_leadership_player(_payload(page="overview"))
+
+    assert "PRESENCE" in rendered_text
+    assert "89 / 90 scans" in rendered_text
+    assert "99%" in rendered_text
+    assert any(text.startswith("Last Active ") for text in rendered_text)
+    assert "LATEST X:Y" in rendered_text
+    assert not {"FORTS TOTAL", "HELPS", "TECH DONATIONS"} & set(rendered_text)
+
+
+def test_kvk_cards_keep_numeric_context_without_state_or_met_words(monkeypatch) -> None:
+    rendered_text: list[str] = []
+    original_text = renderer._text
+
+    def capture_text(*args, **kwargs):
+        rendered_text.append(str(args[2]))
+        return original_text(*args, **kwargs)
+
+    monkeypatch.setattr(renderer, "_text", capture_text)
+    renderer.render_leadership_player(_payload(page="kvk"))
+    combined = "\n".join(rendered_text)
+
+    assert all(f"KVK {value}" in rendered_text for value in (15, 14, 13))
+    assert "111.1% target" in combined
+    assert "100.0% target" in combined
+    assert "OUTPUT_COMPLETE" not in combined
+    assert "Final " not in combined
+    assert "NOT MET" not in combined
+    assert "\nMET\n" not in f"\n{combined}\n"
 
 
 def test_record_renderer_uses_consistent_footer_and_readable_alias_columns(monkeypatch) -> None:
@@ -516,7 +597,7 @@ def test_kvk_fallback_field_stays_within_discord_limit() -> None:
     field = next(item for item in embed.fields if item.name == "Ended/finalized KVKs")
 
     assert len(field.value) <= 1024
-    assert field.value.endswith("...")
+    assert len(field.value.splitlines()) == 3
 
 
 @pytest.mark.asyncio
@@ -542,6 +623,11 @@ async def test_payload_identity_history_covers_all_active_linked_governors(monke
         lambda *_args, **_kwargs: ((), ()),
     )
     monkeypatch.setattr(
+        service.dal,
+        "fetch_last_active",
+        lambda *_args, **_kwargs: sample.last_active,
+    )
+    monkeypatch.setattr(
         service,
         "_linked_governors",
         lambda *_args, **_kwargs: (
@@ -556,6 +642,7 @@ async def test_payload_identity_history_covers_all_active_linked_governors(monke
 
     monkeypatch.setattr(service.dal, "fetch_identity_history", identity)
     service._payload_cache.clear()
+    service._last_active_cache.clear()
 
     payload = await service.load_payload(123, 90, refresh=True)
 
@@ -563,9 +650,57 @@ async def test_payload_identity_history_covers_all_active_linked_governors(monke
     assert {row.governor_id for row in payload.linked_governors} == {123, 456}
 
 
+@pytest.mark.asyncio
+async def test_last_active_cache_is_reused_across_period_transitions(monkeypatch) -> None:
+    sample = _payload()
+    last_active_calls = 0
+
+    monkeypatch.setattr(
+        service.dal,
+        "fetch_review_contract",
+        lambda *_args, **_kwargs: (
+            sample.header,
+            sample.presence,
+            sample.coverage,
+            sample.metrics,
+            sample.activity_index,
+            sample.history_depth,
+        ),
+    )
+    monkeypatch.setattr(
+        service.dal,
+        "fetch_kvk_history",
+        lambda *_args, **_kwargs: ((), ()),
+    )
+    monkeypatch.setattr(
+        service.dal,
+        "fetch_identity_history",
+        lambda *_args, **_kwargs: (sample.aliases, sample.alliance_episodes),
+    )
+    monkeypatch.setattr(service, "_linked_governors", lambda *_args, **_kwargs: ())
+
+    def fetch_last_active(*_args, **_kwargs):
+        nonlocal last_active_calls
+        last_active_calls += 1
+        return sample.last_active
+
+    monkeypatch.setattr(service.dal, "fetch_last_active", fetch_last_active)
+    service._payload_cache.clear()
+    service._last_active_cache.clear()
+
+    first = await service.load_payload(123, 90)
+    second = await service.load_payload(123, 30)
+
+    assert last_active_calls == 1
+    assert first.last_active == second.last_active
+    assert first.diagnostics and first.diagnostics.cache_status == "MISS"
+    assert second.diagnostics and second.diagnostics.cache_status == "MISS"
+
+
 def test_dal_contract_is_bounded_static_and_audit_does_not_accept_sensitive_fields() -> None:
     source = Path(dal.__file__).read_text(encoding="utf-8")
     assert "usp_GetLeadershipPlayerReview" in source
+    assert "usp_GetLeadershipPlayerLastActive" in source
     assert "usp_GetLeadershipPlayerLookupDirectory" in source
     assert "usp_GetLeadershipPlayerKvkHistory" in source
     assert "_QUERY_TIMEOUT_SECONDS = 12" in source
@@ -630,6 +765,48 @@ async def test_final_reauthorization_blocks_component_delivery(monkeypatch) -> N
 
 
 @pytest.mark.asyncio
+async def test_component_begin_reauthorizes_before_payload_access(monkeypatch) -> None:
+    import ui.views.leadership_player_review_views as views
+
+    async def deny(_interaction):
+        return LeadershipPlayerAuthorization(False, error_code="LEADERSHIP_ROLE_REQUIRED")
+
+    async def no_audit(*_args, **_kwargs):
+        return None
+
+    denials: list[str] = []
+
+    async def defer():
+        return None
+
+    async def send_denial(message, **_kwargs):
+        denials.append(message)
+
+    monkeypatch.setattr(views, "reauthorize_leadership_player_interaction", deny)
+    monkeypatch.setattr(views, "_audit", no_audit)
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=99),
+        response=SimpleNamespace(is_done=lambda: True, defer=defer),
+        followup=SimpleNamespace(send=send_denial),
+    )
+    view = LeadershipPlayerView(
+        author_id=99,
+        payload=_payload(),
+        authorization=LeadershipPlayerAuthorization(True, basis="LEADERSHIP_ROLE_ID", role_id=10),
+        correlation_id=uuid4(),
+    )
+
+    transition = await view._begin(
+        interaction,
+        action="period_change",
+        target_id=123,
+    )
+
+    assert transition is None
+    assert len(denials) == 1
+
+
+@pytest.mark.asyncio
 async def test_final_reauthorization_blocks_initial_attachment(monkeypatch) -> None:
     import ui.views.leadership_player_review_views as views
 
@@ -644,7 +821,11 @@ async def test_final_reauthorization_blocks_initial_attachment(monkeypatch) -> N
     async def no_defer(*_args, **_kwargs):
         return None
 
+    load_calls = 0
+
     async def load_payload(*_args, **_kwargs):
+        nonlocal load_calls
+        load_calls += 1
         return _payload()
 
     sends: list[tuple[tuple, dict]] = []
@@ -677,6 +858,7 @@ async def test_final_reauthorization_blocks_initial_attachment(monkeypatch) -> N
     args, kwargs = sends[0]
     assert "no longer permits" in args[0]
     assert kwargs == {"ephemeral": True}
+    assert load_calls == 0
 
 
 def test_kvk_dal_maps_personal_best_from_second_result_set(monkeypatch) -> None:

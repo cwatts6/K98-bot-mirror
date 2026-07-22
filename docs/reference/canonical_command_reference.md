@@ -193,7 +193,7 @@ Legend:
 | Stats/KVK | `/kvk_admin test_export` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk test_export` in Phase 2A | KVK export test. |
 | Stats/KVK | `/mykvkstats` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk stats`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_admin refresh_stats_cache` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk refresh_stats_cache` in Phase 2A | Refreshes stats cache. |
-| Stats/KVK | `/stats player` | `commands/stats_cmds.py` | Grouped | Dedicated stable leadership-role-ID/channel check; admin additionally allowed in Leadership and Notify channel/threads; revalidated on every interaction | Private/ephemeral only | Standard | Canonical leadership player route; Phase 8 complete and accepted; Phase 8.1 visual/performance refinement active | One selected-governor review with 30/90/180/360-day kingdom contribution, ranks, Scan Presence, Activity Index v1, finalized-KVK performance, linked-governor context/navigation, aliases, alliance history, location/shield, dedicated 90-day identified audit retention, and no `/me inspect`, public share, or export. |
+| Stats/KVK | `/stats player` | `commands/stats_cmds.py` | Grouped | Dedicated stable leadership-role-ID/channel check; admin additionally allowed in Leadership and Notify channel/threads; revalidated before every cache, state or data access | Private/ephemeral only | Standard | Canonical leadership player route; Phase 8 complete and accepted; Phase 8.1 implementation in validation | One selected-governor review with 30/90/180/360-day kingdom contribution, ranks, primary Scan Presence ratio/percentage, bounded Last Active evidence, Activity Index v1, latest-three finalized-KVK performance, linked-governor context/navigation, complete grouped/paged aliases and alliances, Overview-only location/shield, dedicated 90-day identified audit retention, and no `/me inspect`, public share, or export. |
 | Stats/KVK | `/mykvkhistory` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Ephemeral redirect | Standard | Deprecated redirect to `/kvk history`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_rankings` | `commands/stats_cmds.py` | Flat | KVK stats channel decorator with admin override | Public redirect | Standard | Deprecated redirect to `/kvk rankings type:kvk`; remove after no-feedback window | Retained temporarily so old invocations receive migration guidance. |
 | Stats/KVK | `/kvk_admin export_all` | `commands/stats_cmds.py` | Grouped | Admin notify-channel decorator | Ephemeral | Standard | Preserve; moved from `/kvk export_all` in Phase 2A | KVK Google Sheets export. |
@@ -259,7 +259,8 @@ deployed and commands are resynced.
   readability and measured performance.
 - No command, option or permission change; no resync expected.
 - Preserve `36 / 100 / 8 / 1 / 2`.
-- Any SQL optimisation remains plan/read/timing evidence- and approval-gated.
+- The approved SQL addition is the bounded Last Active procedure. Any table/index or further SQL
+  optimisation remains actual-plan/read/timing evidence- and separately approval-gated.
 
 ### Phase 9
 

@@ -8,13 +8,13 @@
 - Task type: `leadership UX refinement | derived activity signal | renderer/layout | SQL and bot performance audit | optional evidence-led optimisation`
 - One-pass approved: `no`
 - Product scope approved: `yes`
-- Runtime implementation approved: `not before the audit, data-contract, wireframe, performance-evidence, SQL-impact, test, security-routing, and operator approval gates in this pack`
-- Status: `next active slice; audit and design first`
+- Runtime implementation approved: `yes; operator approved the audited bot scope and additive Last Active procedure on 2026-07-21`
+- Status: `implementation complete; validation, representative production measurement, review and deployment pending`
 - Canonical command: `/stats player`
 - Command change: `none`
 - Command baseline and target: `36 top-level / 100 grouped / 8 /me / 1 /stats / 2 /inventory`
 - Command resync expected: `no; revalidate and resync only if the audit proves a registration change`
-- SQL deployment: `not pre-approved; measurement and source-contract audit first, then a separately reviewed SQL change only if evidence requires it`
+- SQL deployment: `approved additive dbo.usp_GetLeadershipPlayerLastActive only; no table or index change`
 - Background asset: `assets/stats/cards/stats_player.png`
 
 ## 2. Required Reading
@@ -529,6 +529,30 @@ The implementation handoff must include:
 - deployment order, smoke results, observation and rollback state;
 - residual deferred items only where they remain genuinely outside scope;
 - explicit operator acceptance before Phase 8.1 archive.
+
+### Implementation evidence, 2026-07-21
+
+- Bot instrumentation records authorization/lookup, connection, SQL fetch, mapping, KVK, payload,
+  render, attachment and cache/inflight stages without logging governor identity, location or
+  shield values.
+- `scripts/measure_leadership_player_review.py` provides an explicit read-only, sequential
+  30/90/180/360 cold/warm application harness. It labels representative cases without writing
+  Governor IDs to the result artifact.
+- SQL adds only `dbo.usp_GetLeadershipPlayerLastActive`, its migration/rollback and a read-only
+  measurement harness. The procedure returns one compact row and preserves the eight approved
+  source, complete-scan, missing, reset and UTC-threshold rules.
+- `deploy/Measure-Phase81LeadershipPerformance.sql` captures actual-plan-compatible IO/time,
+  result rows, existing index definitions and usage, statistics age/sampling, operational
+  lock/latch counters and missing-index hints. Hints are advisory and cannot approve an index.
+- No table, index, materialized snapshot or pre-aggregation object is introduced. Representative
+  production actual plans and cold/warm read evidence remain a deployment-window evidence gate,
+  not a reason to speculate locally.
+- Proposed acceptance budget: warm application-cache period/page transition p95 <= 1.0 s;
+  warm SQL-backed period transition p95 <= 2.5 s; cold first load p95 <= 5.0 s; render plus PNG
+  encode p95 <= 750 ms; attachment replacement p95 <= 1.5 s. No representative case may exceed
+  the existing interaction timeout, regress logical reads by more than 10% without an explained
+  correctness trade-off, or expose private values in performance artifacts. The operator must
+  accept or revise this budget after the baseline is collected.
 
 ## 17. PR Summary Template
 
