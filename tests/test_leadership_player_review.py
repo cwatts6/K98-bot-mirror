@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
-from PIL import Image
+from PIL import Image, ImageDraw
 import pytest
 
 from core.leadership_player_permissions import LeadershipPlayerAuthorization
@@ -600,6 +600,31 @@ def test_kvk_fallback_field_stays_within_discord_limit() -> None:
     assert len(field.value.splitlines()) == 3
 
 
+@pytest.mark.parametrize(
+    ("row_count", "expected", "unexpected"),
+    (
+        (0, "NO ELIGIBLE FINALIZED KVK", "NO ADDITIONAL ELIGIBLE FINALIZED KVK"),
+        (1, "NO ADDITIONAL ELIGIBLE FINALIZED KVK", "NO ELIGIBLE FINALIZED KVK"),
+    ),
+)
+def test_kvk_empty_cards_distinguish_zero_from_fewer_than_three_rows(
+    monkeypatch, row_count: int, expected: str, unexpected: str
+) -> None:
+    labels: list[str] = []
+
+    def capture_text(_draw, _xy, value, **_kwargs):
+        labels.append(value)
+
+    monkeypatch.setattr(renderer, "_text", capture_text)
+    image = Image.new("RGB", (renderer.WIDTH, renderer.HEIGHT))
+    payload = replace(_payload(page="kvk"), kvk_rows=_payload().kvk_rows[:row_count])
+
+    renderer._draw_kvk(ImageDraw.Draw(image), payload)
+
+    assert expected in labels
+    assert unexpected not in labels
+
+
 @pytest.mark.asyncio
 async def test_payload_identity_history_covers_all_active_linked_governors(monkeypatch) -> None:
     sample = _payload()
@@ -695,6 +720,32 @@ async def test_last_active_cache_is_reused_across_period_transitions(monkeypatch
     assert first.last_active == second.last_active
     assert first.diagnostics and first.diagnostics.cache_status == "MISS"
     assert second.diagnostics and second.diagnostics.cache_status == "MISS"
+
+
+@pytest.mark.asyncio
+async def test_last_active_cache_expiry_uses_monotonic_clock(monkeypatch) -> None:
+    sample = _payload()
+    cache_key = (sample.header.governor_id, NOW.date())
+    service._last_active_cache.clear()
+    service._last_active_cache[cache_key] = (50.0, sample.last_active)
+    monkeypatch.setattr(service.time, "monotonic", lambda: 20.0)
+    monkeypatch.setattr(service.time, "perf_counter", lambda: 1_000.0)
+
+    def unexpected_fetch(*_args, **_kwargs):
+        raise AssertionError("unexpired Last Active cache entry was not reused")
+
+    monkeypatch.setattr(service.dal, "fetch_last_active", unexpected_fetch)
+    diagnostics: dict[str, object] = {}
+
+    result = await service._load_last_active(
+        sample.header.governor_id,
+        effective_now_utc=NOW,
+        refresh=False,
+        diagnostics=diagnostics,
+    )
+
+    assert result == sample.last_active
+    assert diagnostics["cache_status"] == "HIT"
 
 
 def test_dal_contract_is_bounded_static_and_audit_does_not_accept_sensitive_fields() -> None:

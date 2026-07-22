@@ -68,11 +68,7 @@ def classify_last_active(
     """Classify using UTC calendar dates; exactly 30 days remains active."""
     if last_active_date is None:
         return "NOT_RECORDED"
-    return (
-        "INACTIVE"
-        if last_active_date < effective_utc_date - timedelta(days=30)
-        else "ACTIVE"
-    )
+    return "INACTIVE" if last_active_date < effective_utc_date - timedelta(days=30) else "ACTIVE"
 
 
 def validate_last_active(record: LastActive) -> LastActive:
@@ -89,9 +85,7 @@ def validate_last_active(record: LastActive) -> LastActive:
         raise ValueError("Last Active date falls outside the bounded history")
     if record.compared_complete_scans < 0:
         raise ValueError("Last Active comparison count cannot be negative")
-    expected_state = classify_last_active(
-        record.last_active_date, record.effective_utc_date
-    )
+    expected_state = classify_last_active(record.last_active_date, record.effective_utc_date)
     if record.activity_state != expected_state:
         raise ValueError("Last Active SQL/Python activity classification mismatch")
     if record.last_active_date is None:

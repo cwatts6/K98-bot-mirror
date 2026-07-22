@@ -513,10 +513,13 @@ def _draw_kvk(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> No
         x0, y0, x1, _y1 = box
         width = x1 - x0 - 44
         if index >= len(rows):
+            empty_label = (
+                "NO ELIGIBLE FINALIZED KVK" if not rows else "NO ADDITIONAL ELIGIBLE FINALIZED KVK"
+            )
             _text(
                 draw,
                 (x0 + 22, y0 + 258),
-                "NO ADDITIONAL ELIGIBLE FINALIZED KVK",
+                empty_label,
                 width=width,
                 size=22,
                 min_size=15,

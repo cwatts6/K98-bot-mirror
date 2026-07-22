@@ -238,9 +238,10 @@ async def _load_last_active(
 ) -> LastActive:
     cache_key = (int(governor_id), effective_now_utc.date())
     started = time.perf_counter()
+    cache_now = time.monotonic()
     async with _cache_lock:
         cached = _last_active_cache.get(cache_key)
-        if not refresh and cached and cached[0] > started:
+        if not refresh and cached and cached[0] > cache_now:
             diagnostics.update(cache_status="HIT", total_ms=(time.perf_counter() - started) * 1000)
             return cached[1]
     sql_diagnostics: dict[str, object] = {}

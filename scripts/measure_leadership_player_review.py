@@ -79,9 +79,7 @@ def _resolve_output_path(path: Path) -> Path:
     try:
         resolved.relative_to(_PRIVATE_OUTPUT_ROOT)
     except ValueError as exc:
-        raise SystemExit(
-            "--output must stay beneath .codex_artifacts/phase81_private"
-        ) from exc
+        raise SystemExit("--output must stay beneath .codex_artifacts/phase81_private") from exc
     return resolved
 
 
