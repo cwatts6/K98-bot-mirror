@@ -8,9 +8,9 @@ must remain private and no command resync is expected.
 1. Use an approved leadership role in Leadership and an administrator in Leadership/Notify; prove
    an unapproved role/channel is denied. Repeat after opening the view to prove per-interaction
    revalidation.
-2. Open a representative recent/dense governor at 90 days. Confirm Overview has distinct Activity
-   Index, KVK Index, Presence and Last Active boxes, exact scan ratio and whole percentage, and one
-   combined location/shield box with large X:Y and shield status plus smaller location-updated UTC;
+2. Open a representative recent/dense governor at 90 days. Confirm Overview has four equal Activity
+   Index, KVK Index, Presence and Last Active scorecards, exact scan ratio and whole percentage, and
+   balanced location/shield and Leadership Review panels. KVK Index includes its kingdom rank;
    CURRENT/STALE/PARTIAL/NO DATA remains separate.
 3. Check Last Active fixtures or known source evidence for each of Power, Healed, RSS Gathered,
    RSS Assisted, Helps, Tech Donations, Building Minutes and completed Fort rallies. Exactly 30
@@ -31,6 +31,9 @@ must remain private and no command resync is expected.
    episodes, and does not infer Unallied from a missing governor scan.
 9. Check one/two/no-KVK, no-data, long Unicode/history, fallback, timeout-disable and cleanup paths.
    Footer must show Data refreshed left and Generated right.
+10. Confirm the controls use four page buttons, Timeslice, Active linked governors, then Change
+    Player / Previous Page / Next Page / Definitions / Current. Refresh is absent; record paging is
+    visible but disabled outside Player Record.
 
 ## Bounded performance evidence
 

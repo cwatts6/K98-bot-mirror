@@ -79,9 +79,9 @@ Approved follow-on roadmap, updated after Phase 8 acceptance on 2026-07-21:
   leadership data/audit foundations, and removed `/player_profile` with no redirect.
 - Phase 8.1's audited bot scope and SQL contract are approved. The implementation refines the
   accepted leadership hierarchy, adds privacy-safe stage timing and a latest-three completed-KVK
-  Index, limits identity history to the selected Governor ID, and extends finalized-KVK output
-  with KP/Deads ranks plus explicit legacy Healed availability. Tables and further indexes remain
-  separately evidence- and approval-gated.
+  Index with kingdom rank, limits identity history to the selected Governor ID, and extends
+  finalized-KVK output with KP/Deads ranks plus explicit legacy Healed availability. Tables and
+  further indexes remain separately evidence- and approval-gated.
 - Phase 9 adds private `/stats kingdom` with current kingdom totals, twelve-month dynamic-roster
   trends, and the latest four completed KVKs. Participants are governors with final-event
   Acclaim greater than zero, and Acclaim per Participant is included.

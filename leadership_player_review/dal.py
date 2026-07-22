@@ -18,6 +18,7 @@ from leadership_player_review.models import (
     AllianceEpisode,
     HistoryDepth,
     KvkCandidate,
+    KvkIndex,
     KvkPerformance,
     LastActive,
     LastActiveState,
@@ -397,7 +398,7 @@ def fetch_kvk_history(
     *,
     candidate_limit: int = 12,
     diagnostics: dict[str, Any] | None = None,
-) -> tuple[tuple[KvkCandidate, ...], tuple[KvkPerformance, ...]]:
+) -> tuple[tuple[KvkCandidate, ...], tuple[KvkPerformance, ...], KvkIndex]:
     if not 3 <= int(candidate_limit) <= 20:
         raise ValueError("KVK candidate limit must be between 3 and 20")
     started = time.perf_counter()
@@ -408,7 +409,7 @@ def fetch_kvk_history(
             "EXEC dbo.usp_GetLeadershipPlayerKvkHistory @GovernorID = ?, @CandidateLimit = ?;",
             (int(governor_id), int(candidate_limit)),
         )
-        result_sets = _result_sets(cur, 2)
+        result_sets = _result_sets(cur, 3)
         fetched = time.perf_counter()
         candidates = tuple(
             KvkCandidate(
@@ -476,7 +477,39 @@ def fetch_kvk_history(
             )
             for row in result_sets[1]
         )
-        result = candidates, rows
+        index_rows = result_sets[2]
+        if len(index_rows) != 1:
+            raise ValueError("leadership KVK Index result must contain exactly one row")
+        index_row = index_rows[0]
+        returned_governor_id = _int(index_row.get("GovernorID"))
+        if returned_governor_id != int(governor_id):
+            raise ValueError("leadership KVK Index returned a mismatched Governor ID")
+        availability = _text(index_row.get("Availability"))
+        if availability not in {"AVAILABLE", "PARTIAL", "NOT_RECORDED"}:
+            raise ValueError("leadership KVK Index returned an invalid availability state")
+        scored_kvks = _int(index_row.get("ScoredKvkCount")) or 0
+        candidate_kvks = _int(index_row.get("CandidateKvkCount")) or 0
+        cohort_count = _int(index_row.get("KvkIndexCohortCount")) or 0
+        rank = _int(index_row.get("KvkIndexRank"))
+        value = _decimal(index_row.get("KvkIndexValue"))
+        if not 0 <= scored_kvks <= candidate_kvks <= 3:
+            raise ValueError("leadership KVK Index returned invalid score counts")
+        if cohort_count < 0 or (rank is not None and not 1 <= rank <= cohort_count):
+            raise ValueError("leadership KVK Index returned invalid kingdom rank values")
+        if availability == "NOT_RECORDED" and (value is not None or rank is not None):
+            raise ValueError("leadership KVK Index returned a value for NOT_RECORDED")
+        if availability != "NOT_RECORDED" and (value is None or rank is None):
+            raise ValueError("leadership KVK Index omitted an available value or rank")
+        kvk_index = KvkIndex(
+            value=value,
+            scored_kvks=scored_kvks,
+            candidate_kvks=candidate_kvks,
+            per_kvk_scores=(),
+            availability=availability,
+            rank=rank,
+            cohort_count=cohort_count,
+        )
+        result = candidates, rows, kvk_index
         mapped = time.perf_counter()
         _record_diagnostics(
             diagnostics,

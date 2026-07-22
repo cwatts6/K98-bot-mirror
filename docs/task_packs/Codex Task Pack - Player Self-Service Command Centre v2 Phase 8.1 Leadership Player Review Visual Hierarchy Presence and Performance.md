@@ -411,8 +411,10 @@ Rules:
   red unavailable/failure/no data; muted disabled/expired.
 - Footer label is `Data refreshed`, consistent with accepted `/me` pages; Generated is right aligned.
 - Keep source/data refreshed and Generated separate.
-- Keep Overview Activity Index, KVK Index and Presence adjacent; render Last Active separately and
-  combine location/shield in one action-oriented box.
+- Use four equal Overview scorecards for Activity Index, KVK Index, Presence and Last Active, then
+  balance the combined location/shield context against Leadership Review below them.
+- Show KVK Index kingdom competition rank across governors with at least one scoreable result in
+  the latest three globally finalized KVKs.
 - Meet established contrast and font-size requirements and validate at desktop and Discord-scaled
   presentation.
 
@@ -519,8 +521,11 @@ Rules:
 - [ ] Player Record uses `Alliances` and complete selected-governor paginated history while linked
       governor navigation remains unchanged.
 - [ ] KVK Index follows the approved uncapped 60/20/20 latest-three scoring contract.
+- [ ] KVK Index shows its SQL-backed kingdom rank and eligible cohort count.
 - [ ] Tanking is unavailable unless Healed is positive; KP and Deads ranks are correct.
 - [ ] Data refreshed is left aligned and Generated is right aligned on every page.
+- [ ] Controls use four page buttons, Timeslice, Active linked governors, and one final action row
+      with Change Player, record Previous/Next, Definitions and the disabled current governor.
 - [ ] Cold/warm and period-change performance evidence identifies dominant costs.
 - [ ] Any optimisation is the smallest evidenced change and meets the approved budget.
 - [ ] No speculative SQL table/index is introduced.

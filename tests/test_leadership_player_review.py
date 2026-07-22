@@ -20,6 +20,7 @@ from leadership_player_review.models import (
     AliasRecord,
     AllianceEpisode,
     HistoryDepth,
+    KvkIndex,
     KvkPerformance,
     LastActive,
     LeadershipPlayerPayload,
@@ -218,7 +219,11 @@ def _payload(*, page="overview", aliases=1, episodes=1, linked=2) -> LeadershipP
             compared_complete_scans=88,
             history_days=720,
         ),
-        kvk_index=service._kvk_index((_kvk(15), _kvk(14), _kvk(13))),
+        kvk_index=replace(
+            service._kvk_index((_kvk(15), _kvk(14), _kvk(13))),
+            rank=5,
+            cohort_count=308,
+        ),
     )
 
 
@@ -310,7 +315,28 @@ def test_activity_renderer_explains_counter_reset_exclusion(monkeypatch) -> None
 
     renderer.render_leadership_player(payload)
 
-    assert "Coverage 90/90  •  2 counter reset(s); decreases not counted" in rendered_text
+    assert "Coverage 90/90" in rendered_text
+    assert "2 counter reset(s); decreases not counted" in rendered_text
+
+
+def test_overview_renderer_uses_equal_scorecards_and_balanced_lower_panels(monkeypatch) -> None:
+    panels: list[tuple[int, int, int, int]] = []
+    original_panel = renderer._panel
+
+    def capture_panel(draw, box):
+        panels.append(box)
+        return original_panel(draw, box)
+
+    monkeypatch.setattr(renderer, "_panel", capture_panel)
+    renderer.render_leadership_player(_payload(page="overview"))
+
+    assert panels[-6:-2] == [
+        (70, 226, 444, 486),
+        (466, 226, 840, 486),
+        (862, 226, 1236, 486),
+        (1258, 226, 1632, 486),
+    ]
+    assert panels[-2:] == [(70, 508, 840, 810), (862, 508, 1632, 810)]
 
 
 @pytest.mark.parametrize("page", ["activity"])
@@ -637,20 +663,42 @@ async def test_view_has_locked_rows_private_navigation_and_record_paging() -> No
         for page in ("overview", "activity", "kvk", "record")
     ] == [0, 0, 0, 0]
     assert controls["leadership:player:period"].row == 1
-    assert controls["leadership:player:change"].row == 2
-    assert controls["leadership:player:linked"].row == 3
+    assert controls["leadership:player:period"].placeholder == "Timeslice"
+    assert controls["leadership:player:linked"].row == 2
+    assert controls["leadership:player:linked"].placeholder == "Active linked governors"
+    assert controls["leadership:player:change"].row == 3
+    assert controls["leadership:player:definitions"].row == 3
+    assert controls["leadership:player:record:previous"].row == 3
+    assert controls["leadership:player:record:next"].row == 3
     assert controls["leadership:player:record:previous"].disabled is True
     assert controls["leadership:player:record:next"].disabled is False
     assert controls["leadership:player:current"].disabled is True
+    assert controls["leadership:player:current"].row == 3
+    assert controls["leadership:player:current"].label == "Current: Governor Alpha (123)"
     assert controls["leadership:player:current"].style.name == "primary"
     assert callable(view.refresh)
-    assert controls["leadership:player:refresh"].callback is not None
+    assert "leadership:player:refresh" not in controls
     linked_values = {option.value for option in controls["leadership:player:linked"].options}
     assert "g:123" not in linked_values
     assert all(
         "discord" not in option.description.lower()
         for option in controls["leadership:player:linked"].options
     )
+
+
+@pytest.mark.asyncio
+async def test_record_paging_controls_remain_visible_and_disabled_off_record_page() -> None:
+    view = LeadershipPlayerView(
+        author_id=42,
+        payload=_payload(page="overview", aliases=12, episodes=12, linked=12),
+        authorization=LeadershipPlayerAuthorization(True, basis="ADMIN_USER_ID"),
+        correlation_id=uuid4(),
+    )
+    controls = {child.custom_id: child for child in view.children}
+
+    assert controls["leadership:player:record:previous"].disabled is True
+    assert controls["leadership:player:record:next"].disabled is True
+    assert len([child for child in view.children if child.row == 3]) == 5
 
 
 @pytest.mark.asyncio
@@ -749,7 +797,7 @@ async def test_payload_identity_history_is_limited_to_selected_governor(monkeypa
     monkeypatch.setattr(
         service.dal,
         "fetch_kvk_history",
-        lambda *_args, **_kwargs: ((), ()),
+        lambda *_args, **_kwargs: ((), (), service._kvk_index(())),
     )
     monkeypatch.setattr(
         service.dal,
@@ -780,6 +828,56 @@ async def test_payload_identity_history_is_limited_to_selected_governor(monkeypa
 
 
 @pytest.mark.asyncio
+async def test_payload_uses_sql_backed_kvk_index_rank(monkeypatch) -> None:
+    sample = _payload()
+    sql_index = KvkIndex(
+        value=Decimal("181.20000000"),
+        scored_kvks=2,
+        candidate_kvks=3,
+        per_kvk_scores=(),
+        availability="PARTIAL",
+        rank=5,
+        cohort_count=308,
+    )
+    monkeypatch.setattr(
+        service.dal,
+        "fetch_review_contract",
+        lambda *_args, **_kwargs: (
+            sample.header,
+            sample.presence,
+            sample.coverage,
+            sample.metrics,
+            sample.activity_index,
+            sample.history_depth,
+        ),
+    )
+    monkeypatch.setattr(
+        service.dal,
+        "fetch_kvk_history",
+        lambda *_args, **_kwargs: ((), (), sql_index),
+    )
+    monkeypatch.setattr(
+        service.dal,
+        "fetch_identity_history",
+        lambda *_args, **_kwargs: (sample.aliases, sample.alliance_episodes),
+    )
+    monkeypatch.setattr(
+        service.dal,
+        "fetch_last_active",
+        lambda *_args, **_kwargs: sample.last_active,
+    )
+    monkeypatch.setattr(service, "_linked_governors", lambda *_args, **_kwargs: ())
+    service._payload_cache.clear()
+    service._last_active_cache.clear()
+
+    payload = await service.load_payload(123, 90, refresh=True)
+
+    assert payload.kvk_index.value == Decimal("181.20000000")
+    assert payload.kvk_index.rank == 5
+    assert payload.kvk_index.cohort_count == 308
+
+
+@pytest.mark.asyncio
 async def test_payload_diagnostics_keep_kvk_resolution_separate_from_construction(
     monkeypatch,
 ) -> None:
@@ -801,7 +899,11 @@ async def test_payload_diagnostics_keep_kvk_resolution_separate_from_constructio
             sample.history_depth,
         ),
     )
-    monkeypatch.setattr(service.dal, "fetch_kvk_history", lambda *_args, **_kwargs: ((), ()))
+    monkeypatch.setattr(
+        service.dal,
+        "fetch_kvk_history",
+        lambda *_args, **_kwargs: ((), (), service._kvk_index(())),
+    )
     monkeypatch.setattr(
         service.dal,
         "fetch_identity_history",
@@ -847,7 +949,7 @@ async def test_last_active_cache_is_reused_across_period_transitions(monkeypatch
     monkeypatch.setattr(
         service.dal,
         "fetch_kvk_history",
-        lambda *_args, **_kwargs: ((), ()),
+        lambda *_args, **_kwargs: ((), (), service._kvk_index(())),
     )
     monkeypatch.setattr(
         service.dal,
@@ -1122,10 +1224,19 @@ def test_kvk_dal_maps_personal_best_from_second_result_set(monkeypatch) -> None:
         "HealedDataAvailable": 1,
         "FinalOutputState": "OUTPUT_COMPLETE",
     }
+    index_summary = {
+        "GovernorID": 123,
+        "KvkIndexValue": Decimal("181.20000000"),
+        "KvkIndexRank": 5,
+        "KvkIndexCohortCount": 308,
+        "ScoredKvkCount": 2,
+        "CandidateKvkCount": 3,
+        "Availability": "PARTIAL",
+    }
 
     class _Cursor:
         def __init__(self) -> None:
-            self._sets = [candidate, performance]
+            self._sets = [candidate, performance, index_summary]
             self._index = 0
             self.timeout = None
 
@@ -1159,10 +1270,19 @@ def test_kvk_dal_maps_personal_best_from_second_result_set(monkeypatch) -> None:
 
     monkeypatch.setattr(dal, "get_conn_with_retries", _Connection)
 
-    candidates, rows = dal.fetch_kvk_history(123)
+    candidates, rows, kvk_index = dal.fetch_kvk_history(123)
 
     assert candidates[0].kvk_no == 15
     assert rows[0].personal_completed_kvk_best_acclaim == 25_000
     assert rows[0].kill_points_rank == 4
     assert rows[0].deads_rank == 12
     assert rows[0].healed_data_available is True
+    assert kvk_index == KvkIndex(
+        value=Decimal("181.20000000"),
+        scored_kvks=2,
+        candidate_kvks=3,
+        per_kvk_scores=(),
+        availability="PARTIAL",
+        rank=5,
+        cohort_count=308,
+    )

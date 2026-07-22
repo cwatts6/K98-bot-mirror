@@ -177,6 +177,8 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
             name="KVK Index",
             value=(
                 f"{renderer._percent(kvk_index.value, decimals=2) if kvk_index.value is not None else 'Not recorded'}\n"
+                f"Kingdom rank: {kvk_index.rank or 'unavailable'}"
+                f"/{kvk_index.cohort_count or '—'}\n"
                 f"{kvk_index.scored_kvks}/{kvk_index.candidate_kvks} completed KVKs scored"
             ),
             inline=True,
@@ -332,19 +334,18 @@ class LeadershipPlayerView(discord.ui.View):
         self.message: Any | None = None
         self._transition_id = 0
         self._expired = False
-        if self._record_page_count() <= 1:
-            self.remove_item(self.record_previous)
-            self.remove_item(self.record_next)
+        current_name = payload.header.governor_name or "Governor"
+        current_suffix = f" ({payload.header.governor_id})"
+        max_name_length = 80 - len("Current: ") - len(current_suffix)
+        if len(current_name) > max_name_length:
+            current_name = f"{current_name[: max(1, max_name_length - 1)]}…"
         self.add_item(
             discord.ui.Button(
-                label=(
-                    f"Current: {payload.header.governor_name or 'Governor'} "
-                    f"({payload.header.governor_id})"
-                )[:80],
+                label=f"Current: {current_name}{current_suffix}",
                 custom_id="leadership:player:current",
                 style=discord.ButtonStyle.primary,
                 disabled=True,
-                row=4,
+                row=3,
             )
         )
         self._sync_controls()
@@ -378,9 +379,7 @@ class LeadershipPlayerView(discord.ui.View):
                 other = [row for row in self.payload.linked_governors if not row.current]
                 child.disabled = not other
                 child.placeholder = (
-                    f"Current: {self.payload.header.governor_name or self.payload.header.governor_id}"
-                    if other
-                    else "No other linked governors"
+                    "Active linked governors" if other else "No other active linked governors"
                 )
                 child.options = [
                     discord.SelectOption(
@@ -391,9 +390,12 @@ class LeadershipPlayerView(discord.ui.View):
                     for row in other[:25]
                 ] or [discord.SelectOption(label="No linked governors", value="none")]
             if custom_id == "leadership:player:record:previous":
-                child.disabled = self.payload.record_page <= 0
+                child.disabled = self.payload.page != "record" or self.payload.record_page <= 0
             if custom_id == "leadership:player:record:next":
-                child.disabled = self.payload.record_page + 1 >= self._record_page_count()
+                child.disabled = (
+                    self.payload.page != "record"
+                    or self.payload.record_page + 1 >= self._record_page_count()
+                )
 
     @staticmethod
     def _interaction_action(interaction: discord.Interaction) -> str:
@@ -407,8 +409,6 @@ class LeadershipPlayerView(discord.ui.View):
             return "change_player"
         if custom_id.endswith(":definitions"):
             return "definitions"
-        if custom_id.endswith(":refresh"):
-            return "refresh"
         return "page_change"
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -621,7 +621,7 @@ class LeadershipPlayerView(discord.ui.View):
         await self._page(interaction, "record")
 
     @discord.ui.select(
-        placeholder="Period",
+        placeholder="Timeslice",
         custom_id="leadership:player:period",
         options=[discord.SelectOption(label="90 days", value="90")],
         row=1,
@@ -658,7 +658,7 @@ class LeadershipPlayerView(discord.ui.View):
             return
         await self._replace(interaction, payload, action="period_change", transition_id=transition)
 
-    @discord.ui.button(label="Change Player", custom_id="leadership:player:change", row=2)
+    @discord.ui.button(label="Change Player", custom_id="leadership:player:change", row=3)
     async def change_player(self, _button, interaction):
         await interaction.response.send_modal(
             LeadershipChangePlayerModal(
@@ -666,9 +666,7 @@ class LeadershipPlayerView(discord.ui.View):
             )
         )
 
-    @discord.ui.button(
-        label="Definitions / Method", custom_id="leadership:player:definitions", row=2
-    )
+    @discord.ui.button(label="Definitions", custom_id="leadership:player:definitions", row=3)
     async def definitions(self, _button, interaction):
         if not interaction.response.is_done():
             await interaction.response.defer()
@@ -698,7 +696,8 @@ class LeadershipPlayerView(discord.ui.View):
                 "Kill Points ÷ (KP Loss + Deads) × 100; higher is better.\n\n"
                 "KVK Index uses the latest three scoreable completed KVKs: Kill target 60%, Deads target 20%, "
                 "and Tanking 20%. It is uncapped; missing or exempt KVKs are excluded and an observed zero "
-                "Kills, Deads or Healed value scores zero."
+                "Kills, Deads or Healed value scores zero. Its kingdom rank compares governors with at least "
+                "one scoreable result among the latest three globally finalized KVKs."
             ),
             color=discord.Color.blue(),
         )
@@ -725,44 +724,11 @@ class LeadershipPlayerView(discord.ui.View):
             correlation_id=self.correlation_id,
         )
 
-    @discord.ui.button(label="Refresh", custom_id="leadership:player:refresh", row=2)
-    async def refresh_report(self, _button, interaction):
-        transition = await self._begin(
-            interaction,
-            action="refresh",
-            target_id=self.payload.header.governor_id,
-        )
-        if transition is None:
-            return
-        try:
-            payload = await service.load_payload(
-                self.payload.header.governor_id,
-                self.payload.period_days,
-                page=self.payload.page,
-                refresh=True,
-            )
-        except Exception:
-            logger.exception("leadership_player_refresh_failed")
-            await _audit(
-                interaction,
-                self.authorization,
-                target_id=self.payload.header.governor_id,
-                action="refresh",
-                outcome="FAILED",
-                correlation_id=self.correlation_id,
-                error_code="LOAD_FAILED",
-            )
-            await interaction.followup.send(
-                "Refresh failed. The existing report has been preserved.", ephemeral=True
-            )
-            return
-        await self._replace(interaction, payload, action="refresh", transition_id=transition)
-
     @discord.ui.select(
-        placeholder="Linked governors",
+        placeholder="Active linked governors",
         custom_id="leadership:player:linked",
         options=[discord.SelectOption(label="No linked governors", value="none")],
-        row=3,
+        row=2,
     )
     async def linked(self, select, interaction):
         value = select.values[0]
@@ -839,17 +805,17 @@ class LeadershipPlayerView(discord.ui.View):
         )
 
     @discord.ui.button(
-        label="Previous Record Page",
+        label="Previous Page",
         custom_id="leadership:player:record:previous",
-        row=4,
+        row=3,
     )
     async def record_previous(self, _button, interaction):
         await self._record_page(interaction, -1)
 
     @discord.ui.button(
-        label="Next Record Page",
+        label="Next Page",
         custom_id="leadership:player:record:next",
-        row=4,
+        row=3,
     )
     async def record_next(self, _button, interaction):
         await self._record_page(interaction, 1)

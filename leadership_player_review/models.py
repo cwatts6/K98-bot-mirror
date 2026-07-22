@@ -246,6 +246,8 @@ class KvkIndex:
     candidate_kvks: int
     per_kvk_scores: tuple[tuple[int, Decimal | None], ...]
     availability: str
+    rank: int | None = None
+    cohort_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)

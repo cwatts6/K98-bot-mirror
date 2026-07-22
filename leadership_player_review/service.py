@@ -462,7 +462,7 @@ async def load_payload(
     kvk_started = time.perf_counter()
     header, presence, coverage, metrics, activity_index, history_depth = review
     aliases, episodes = identity
-    candidates, kvk_rows = kvk
+    candidates, kvk_rows, kvk_index = kvk
     finalized = _finalized_kvk_numbers(candidates)
     candidate_by_kvk = {candidate.kvk_no: candidate for candidate in candidates}
     completed_rows = tuple(
@@ -478,6 +478,13 @@ async def load_payload(
             reverse=True,
         )
     )
+    latest_index_kvks = tuple(
+        candidate.kvk_no for candidate in candidates if candidate.kvk_no in finalized
+    )[:3]
+    local_kvk_index = _kvk_index(
+        tuple(row for row in completed_rows if row.kvk_no in latest_index_kvks)
+    )
+    kvk_index = replace(kvk_index, per_kvk_scores=local_kvk_index.per_kvk_scores)
     stages["kvk_resolution_ms"] = (time.perf_counter() - kvk_started) * 1000.0
     payload_started = time.perf_counter()
     warnings: list[str] = []
@@ -509,7 +516,7 @@ async def load_payload(
         warnings=tuple(warnings),
         generated_at_utc=datetime.now(UTC),
         last_active=last_active,
-        kvk_index=_kvk_index(completed_rows),
+        kvk_index=kvk_index,
     )
     stages["payload_construction_ms"] = (time.perf_counter() - payload_started) * 1000.0
     diagnostics = _load_diagnostics(
