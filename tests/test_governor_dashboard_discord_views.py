@@ -1035,6 +1035,9 @@ async def test_real_timeout_cancels_slow_page_navigation_before_edit() -> None:
     await asyncio.sleep(0.05)
     release_accounts.set()
     await navigation_task
+    # The navigation deadline and the Discord view deadline share the same expiry.
+    # Wait for the view's timeout task as well; either task may resume first.
+    await view.wait()
 
     assert view._timed_out is True
     assert interaction.original_edits == []
