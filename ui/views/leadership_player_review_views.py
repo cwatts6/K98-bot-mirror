@@ -137,13 +137,13 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
         name="Presence",
         value=(
             f"Scans: {current.present_scans}/{current.complete_scans} • {presence_percent}\n"
-            f"Scanned days: {current.present_scanned_days}/{current.scanned_days}\n"
-            f"Last Active: {last_active_text}"
+            f"Scanned days: {current.present_scanned_days}/{current.scanned_days}"
             if current
-            else f"NO DATA\nLast Active: {last_active_text}"
+            else "NO DATA"
         ),
         inline=True,
     )
+    embed.add_field(name="Last Active", value=last_active_text, inline=True)
     if payload.page == "overview":
         location = (
             f"{header.location_x}:{header.location_y}"
@@ -164,7 +164,24 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
             ),
             inline=False,
         )
-    if payload.page in {"overview", "activity"}:
+        embed.add_field(
+            name="Activity Index v1",
+            value=(
+                f"{renderer._percent(payload.activity_index.value)}\n"
+                f"Kingdom rank: {payload.activity_index.rank or 'unavailable'}"
+            ),
+            inline=True,
+        )
+        kvk_index = payload.kvk_index
+        embed.add_field(
+            name="KVK Index",
+            value=(
+                f"{renderer._percent(kvk_index.value, decimals=2) if kvk_index.value is not None else 'Not recorded'}\n"
+                f"{kvk_index.scored_kvks}/{kvk_index.candidate_kvks} completed KVKs scored"
+            ),
+            inline=True,
+        )
+    if payload.page == "activity":
         lines = []
         for metric in payload.metrics:
             total = renderer.current_metric_total(metric)
@@ -182,18 +199,37 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
         def number(value: int | None) -> str:
             return f"{value:,}" if value is not None else "—"
 
-        lines = [
-            f"KVK {row.kvk_no}: KP {number(row.kill_points)} · Tanking {row.tanking_score if row.tanking_score is not None else '—'} · DKP {number(row.dkp)}"
-            for row in payload.kvk_rows[:3]
-        ]
+        lines = []
+        for row in payload.kvk_rows[:3]:
+            tanking = (
+                renderer._percent(row.tanking_score)
+                if row.tanking_score is not None
+                else "Not available"
+            )
+            lines.append(
+                f"KVK {row.kvk_no}: KP {number(row.kill_points)} (rank {row.kill_points_rank or '—'}) · "
+                f"Deads {number(row.deads)} (rank {row.deads_rank or '—'}) · Tanking {tanking}"
+            )
         embed.add_field(
             name="Ended/finalized KVKs", value=_bounded_embed_lines(lines), inline=False
         )
-    else:
+    elif payload.page == "record":
         linked = [f"{row.governor_name} ({row.governor_id})" for row in payload.linked_governors]
         embed.add_field(
             name="Active linked governors", value="\n".join(linked) or "None found", inline=False
         )
+        aliases = [
+            f"{row.governor_name} • {row.first_seen.date() if row.first_seen else '—'}–"
+            f"{row.last_seen.date() if row.last_seen else '—'} • {row.seen_scan_count} scans"
+            for row in payload.aliases
+        ]
+        alliances = [
+            f"{row.alliance} • {row.first_observed or '—'}–{row.last_observed or '—'} • "
+            f"{row.observed_scans} scans"
+            for row in payload.alliance_episodes
+        ]
+        embed.add_field(name="Aliases", value=_bounded_embed_lines(aliases), inline=False)
+        embed.add_field(name="Alliances", value=_bounded_embed_lines(alliances), inline=False)
     embed.set_footer(
         text="Source freshness and Generated time remain separate on the primary card."
     )
@@ -658,7 +694,11 @@ class LeadershipPlayerView(discord.ui.View):
                 "with the previous complete scan where that Governor ID was present. Power, Healed, RSS Gathered, "
                 "RSS Assisted, Helps, Tech Donations, Building Minutes and completed Fort rallies can qualify. "
                 "Missing observations are not zero; exactly 30 days remains ACTIVE.\n\n"
-                "KP Loss = Healed × 20. Tanking Score = Kill Points ÷ (KP Loss + Deads) × 100; higher is better."
+                "KP Loss = Healed × 20. Tanking Score is calculated only when Healed is positive: "
+                "Kill Points ÷ (KP Loss + Deads) × 100; higher is better.\n\n"
+                "KVK Index uses the latest three scoreable completed KVKs: Kill target 60%, Deads target 20%, "
+                "and Tanking 20%. It is uncapped; missing or exempt KVKs are excluded and an observed zero "
+                "Kills, Deads or Healed value scores zero."
             ),
             color=discord.Color.blue(),
         )

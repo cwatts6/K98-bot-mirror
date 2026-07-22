@@ -269,14 +269,14 @@ def test_kvk_supporting_combat_values_preserve_missing_and_explicit_zero() -> No
     assert missing["KP Loss"] is None
     assert missing["Tanking Score"] is None
     assert explicit_zero["KP Loss"] == 0
-    assert explicit_zero["Tanking Score"] == 5_000
+    assert explicit_zero["Tanking Score"] is None
 
     exported = kvk_rankings_csv.build_current_rankings_csv_bytes(payload)
     csv_rows = list(csv.DictReader(io.StringIO(exported.getvalue().decode("utf-8-sig"))))
     assert csv_rows[0]["KPLoss"] == ""
     assert csv_rows[0]["TankingScore"] == ""
     assert csv_rows[1]["KPLoss"] == "0"
-    assert csv_rows[1]["TankingScore"] == "5000.0"
+    assert csv_rows[1]["TankingScore"] == ""
 
 
 @pytest.mark.parametrize(
@@ -397,7 +397,7 @@ def test_tanking_and_healed_exclude_missing_but_keep_genuine_zero_values() -> No
         rows, metric="healed", include_all=True
     )
 
-    assert [row.governor_name for row in tanking.rows] == ["ZeroHealed"]
+    assert tanking.rows == []
     assert [row.governor_name for row in healed.rows] == ["ZeroHealed", "MissingDeads"]
     assert healed.rows[0].value == 0
 

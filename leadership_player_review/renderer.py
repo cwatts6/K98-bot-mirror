@@ -87,11 +87,11 @@ def _compact(value: int | float | Decimal | None, *, signed: bool = False) -> st
     return visual_contract.format_compact_number(value, signed=signed)
 
 
-def _percent(value: Decimal | float | None, *, signed: bool = False) -> str:
+def _percent(value: Decimal | float | None, *, signed: bool = False, decimals: int = 1) -> str:
     if value is None:
         return "—"
     prefix = "+" if signed and value > 0 else ""
-    return f"{prefix}{float(value):.1f}%"
+    return f"{prefix}{float(value):.{decimals}f}%"
 
 
 def _date(value) -> str:
@@ -248,8 +248,10 @@ def _presence_percentage(payload: LeadershipPlayerPayload) -> str:
 
 def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> None:
     index_box = (70, 226, 832, 430)
-    presence_box = (854, 226, 1632, 430)
+    kvk_index_box = (854, 226, 1228, 430)
+    presence_box = (1250, 226, 1632, 430)
     _panel(draw, index_box)
+    _panel(draw, kvk_index_box)
     _panel(draw, presence_box)
 
     index = payload.activity_index
@@ -288,6 +290,43 @@ def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
         fill=_MUTED,
     )
 
+    kvk_index = payload.kvk_index
+    _text(
+        draw,
+        (878, 244),
+        "KVK INDEX",
+        width=326,
+        size=25,
+        min_size=18,
+        fill=_BLUE,
+        bold=True,
+    )
+    _text(
+        draw,
+        (878, 287),
+        _percent(kvk_index.value, decimals=2) if kvk_index.value is not None else "Not recorded",
+        width=326,
+        size=47,
+        min_size=27,
+        fill=_TEXT if kvk_index.value is not None else _MUTED,
+        bold=True,
+    )
+    kvk_basis = (
+        f"{kvk_index.scored_kvks} of {kvk_index.candidate_kvks} completed KVKs scored"
+        if kvk_index.candidate_kvks
+        else "No completed KVK score available"
+    )
+    _text(draw, (878, 358), kvk_basis, width=326, size=16, min_size=11, fill=_MUTED)
+    _text(
+        draw,
+        (878, 391),
+        "Kills 60%  •  Deads 20%  •  Tanking 20%",
+        width=326,
+        size=13,
+        min_size=9,
+        fill=_MUTED,
+    )
+
     current = payload.current_presence
     scan_ratio = (
         f"{current.present_scans} / {current.complete_scans} scans" if current else "NO DATA"
@@ -297,40 +336,102 @@ def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
         if current
         else "Scanned days unavailable"
     )
-    _text(draw, (878, 244), "PRESENCE", width=325, size=25, min_size=18, fill=_BLUE, bold=True)
-    _text(draw, (878, 284), scan_ratio, width=425, size=39, min_size=25, bold=True)
+    _text(draw, (1274, 244), "PRESENCE", width=334, size=25, min_size=18, fill=_BLUE, bold=True)
+    _text(draw, (1274, 286), scan_ratio, width=334, size=35, min_size=22, bold=True)
     _text(
         draw,
-        (1320, 276),
+        (1274, 336),
         _presence_percentage(payload),
-        width=270,
-        size=54,
-        min_size=34,
+        width=334,
+        size=45,
+        min_size=30,
         fill=_GREEN if current and current.present_scans else _RED,
         bold=True,
-        right_align=True,
     )
-    _text(draw, (878, 338), scanned_days, width=420, size=16, min_size=12, fill=_MUTED)
+    _text(draw, (1274, 393), scanned_days, width=334, size=15, min_size=11, fill=_MUTED)
+
+    last_active_box = (70, 452, 570, 615)
+    location_box = (592, 452, 1632, 615)
+    _panel(draw, last_active_box)
+    _panel(draw, location_box)
     last_active = payload.last_active
-    last_active_text = (
-        f"Last Active {_date(last_active.last_active_date)}  •  {last_active.activity_state}"
+    last_active_date = (
+        _date(last_active.last_active_date)
         if last_active and last_active.last_active_date
-        else "Last Active Not recorded"
+        else "Not recorded"
+    )
+    last_active_state = (
+        last_active.activity_state if last_active and last_active.last_active_date else ""
     )
     state_colour = (
         _GREEN
         if last_active and last_active.activity_state == "ACTIVE"
         else _AMBER if last_active and last_active.activity_state == "INACTIVE" else _MUTED
     )
+    _text(draw, (94, 470), "LAST ACTIVE", width=452, size=20, min_size=15, fill=_BLUE, bold=True)
+    _text(draw, (94, 507), last_active_date, width=452, size=31, min_size=21, bold=True)
+    if last_active_state:
+        _text(
+            draw,
+            (94, 558),
+            last_active_state,
+            width=452,
+            size=22,
+            min_size=16,
+            fill=state_colour,
+            bold=True,
+        )
+
+    header = payload.header
+    location = (
+        f"{header.location_x}:{header.location_y}"
+        if header.location_x is not None and header.location_y is not None
+        else "Not reported"
+    )
+    shield_status = "NOT REPORTED"
+    shield_detail = ""
+    if header.shield_ends_at_utc is not None:
+        shield_status = (
+            "ACTIVE" if header.shield_ends_at_utc > header.effective_now_utc else "EXPIRED"
+        )
+        shield_detail = f"Ends {_utc(header.shield_ends_at_utc)}"
     _text(
         draw,
-        (878, 370),
-        last_active_text,
-        width=710,
+        (614, 470),
+        "LATEST LOCATION",
+        width=470,
         size=20,
-        min_size=14,
-        fill=state_colour,
+        min_size=15,
+        fill=_BLUE,
         bold=True,
+    )
+    _text(draw, (614, 506), location, width=470, size=37, min_size=24, bold=True)
+    _text(
+        draw,
+        (614, 560),
+        _utc(header.location_updated_at_utc),
+        width=470,
+        size=16,
+        min_size=12,
+        fill=_MUTED,
+    )
+    _text(
+        draw,
+        (1110, 470),
+        "SHIELD STATUS",
+        width=498,
+        size=20,
+        min_size=15,
+        fill=_BLUE,
+        bold=True,
+    )
+    _text(draw, (1110, 510), shield_status, width=498, size=31, min_size=20, bold=True)
+    if shield_detail:
+        _text(draw, (1110, 560), shield_detail, width=498, size=16, min_size=12, fill=_MUTED)
+
+    _panel(draw, (70, 637, 1632, 810))
+    _text(
+        draw, (92, 653), "LEADERSHIP REVIEW", width=400, size=22, min_size=17, fill=_BLUE, bold=True
     )
     coverage = "  •  ".join(
         f"{item.source_code.replace('_', ' ').title()} {item.valid_units}/{item.expected_units}"
@@ -339,54 +440,13 @@ def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
     )
     _text(
         draw,
-        (878, 402),
+        (472, 658),
         coverage or "Valid source observations: NO DATA",
-        width=710,
-        size=12,
-        min_size=9,
+        width=1138,
+        size=13,
+        min_size=10,
         fill=_MUTED,
-    )
-
-    header = payload.header
-    location = (
-        f"{header.location_x}:{header.location_y}"
-        if header.location_x is not None and header.location_y is not None
-        else "Not reported"
-    )
-    shield = "Not reported"
-    if header.shield_ends_at_utc is not None:
-        status = "ACTIVE" if header.shield_ends_at_utc > header.effective_now_utc else "EXPIRED"
-        shield = f"{status} • ends {_utc(header.shield_ends_at_utc)}"
-    location_boxes = (
-        ((70, 452, 570, 615), "LATEST X:Y", location),
-        ((592, 452, 1092, 615), "LOCATION UPDATED UTC", _utc(header.location_updated_at_utc)),
-        ((1114, 452, 1632, 615), "SHIELD STATUS", shield),
-    )
-    for box, label, value in location_boxes:
-        _panel(draw, box)
-        _text(
-            draw,
-            (box[0] + 22, box[1] + 20),
-            label,
-            width=box[2] - box[0] - 44,
-            size=19,
-            min_size=14,
-            fill=_BLUE,
-            bold=True,
-        )
-        _text(
-            draw,
-            (box[0] + 22, box[1] + 65),
-            value,
-            width=box[2] - box[0] - 44,
-            size=33,
-            min_size=19,
-            bold=True,
-        )
-
-    _panel(draw, (70, 637, 1632, 810))
-    _text(
-        draw, (92, 653), "LEADERSHIP REVIEW", width=400, size=22, min_size=17, fill=_BLUE, bold=True
+        right_align=True,
     )
     y = 697
     if payload.prompts:
@@ -477,7 +537,11 @@ def _draw_activity(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
             min_size=12,
             fill=_MUTED,
         )
-        reset = f"  •  {metric.reset_count} reset(s) excluded" if metric.reset_count else ""
+        reset = (
+            f"  •  {metric.reset_count} counter reset(s); decreases not counted"
+            if metric.reset_count
+            else ""
+        )
         valid_units = max(0, metric.expected_units - metric.missing_units)
         _text(
             draw,
@@ -491,7 +555,7 @@ def _draw_activity(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
 
 
 def _kvk_target_context(value: Decimal | None, *, exempt: bool) -> str:
-    target = f"{_percent(value)} target" if value is not None else "Target % not recorded"
+    target = f"{_percent(value)} Target" if value is not None else "Target % not recorded"
     return f"{target}  •  EXEMPT" if exempt else target
 
 
@@ -529,102 +593,82 @@ def _draw_kvk(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> No
             )
             continue
         row = rows[index]
+        title = f"KVK {row.kvk_no} - {row.kvk_name or 'Name not recorded'}"
         _text(
             draw,
             (x0 + 22, y0 + 18),
-            f"KVK {row.kvk_no}",
+            title,
             width=width,
-            size=29,
-            min_size=20,
+            size=27,
+            min_size=17,
             fill=_BLUE,
             bold=True,
         )
         _text(
             draw,
-            (x0 + 22, y0 + 57),
-            row.kvk_name or "Name not recorded",
+            (x0 + 22, y0 + 65),
+            f"KVK Rank {_clean(row.kvk_rank)}",
+            width=width,
+            size=23,
+            min_size=16,
+            bold=True,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 111),
+            f"T4 & T5 Kills: {_compact(row.t4_t5_kills)}  •  {_kvk_target_context(row.kill_target_percent, exempt=row.exempt)}",
+            width=width,
+            size=19,
+            min_size=12,
+            bold=True,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 157),
+            f"KP: {_compact(row.kill_points)}  •  rank {_clean(row.kill_points_rank)}",
+            width=width,
+            size=19,
+            min_size=13,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 203),
+            f"Deads: {_compact(row.deads)}  •  {_kvk_target_context(row.dead_target_percent, exempt=row.exempt)}  •  rank {_clean(row.deads_rank)}",
+            width=width,
+            size=19,
+            min_size=11,
+            bold=True,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 249),
+            f"Healed: {_compact(row.healed) if row.healed is not None else 'Not recorded'}  •  rank {_clean(row.healed_rank)}",
+            width=width,
+            size=19,
+            min_size=13,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 287),
+            f"KP Loss: {_compact(row.kp_loss) if row.kp_loss is not None else 'Not recorded'}",
             width=width,
             size=18,
             min_size=13,
-            fill=_MUTED,
+        )
+        tanking = (
+            f"{_percent(row.tanking_score)}  •  rank {_clean(row.tanking_rank)}"
+            if row.tanking_score is not None
+            else "Not available"
         )
         _text(
             draw,
-            (x0 + 22, y0 + 91),
-            f"KVK rank {_clean(row.kvk_rank)}",
+            (x0 + 22, y0 + 329),
+            f"Tanking: {tanking}",
             width=width,
-            size=22,
-            min_size=15,
-            bold=True,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 130),
-            f"T4+T5  {_compact(row.t4_t5_kills)}",
-            width=width,
-            size=20,
-            min_size=14,
-            bold=True,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 160),
-            _kvk_target_context(row.kill_target_percent, exempt=row.exempt),
-            width=width,
-            size=15,
-            min_size=11,
-            fill=_MUTED,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 192),
-            f"KP  {_compact(row.kill_points)}",
-            width=width,
-            size=20,
-            min_size=14,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 230),
-            f"Deads  {_compact(row.deads)}",
-            width=width,
-            size=20,
-            min_size=14,
-            bold=True,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 260),
-            _kvk_target_context(row.dead_target_percent, exempt=row.exempt),
-            width=width,
-            size=15,
-            min_size=11,
-            fill=_MUTED,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 294),
-            f"Healed  {_compact(row.healed)}  •  rank {_clean(row.healed_rank)}",
-            width=width,
-            size=18,
-            min_size=12,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 328),
-            f"KP Loss  {_compact(row.kp_loss)}",
-            width=width,
-            size=18,
-            min_size=12,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 362),
-            f"Tanking  {_percent(row.tanking_score)}  •  rank {_clean(row.tanking_rank)}",
-            width=width,
-            size=18,
-            min_size=12,
-            fill=_GREEN if row.tanking_score is not None else _RED,
+            size=19,
+            min_size=13,
+            fill=_GREEN if row.tanking_score is not None else _MUTED,
+            bold=row.tanking_score is not None,
         )
         best_acclaim = row.personal_completed_kvk_best_acclaim
         acclaim_pct = (
@@ -634,45 +678,45 @@ def _draw_kvk(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> No
         )
         _text(
             draw,
-            (x0 + 22, y0 + 404),
-            f"Acclaim  {_compact(row.acclaim)}",
+            (x0 + 22, y0 + 375),
+            f"Acclaim: {_compact(row.acclaim)}",
             width=width,
-            size=18,
-            min_size=12,
+            size=19,
+            min_size=13,
             bold=True,
         )
         _text(
             draw,
-            (x0 + 22, y0 + 434),
-            f"Best {_compact(best_acclaim)}  •  {_percent(acclaim_pct)} of best",
+            (x0 + 22, y0 + 413),
+            f"Best: {_compact(best_acclaim)}  •  {_percent(acclaim_pct)} of Best",
             width=width,
-            size=15,
-            min_size=11,
+            size=17,
+            min_size=12,
             fill=_MUTED,
         )
         _text(
             draw,
-            (x0 + 22, y0 + 470),
-            f"DKP  {_compact(row.dkp)}  •  {_percent(row.dkp_target_percent)}",
+            (x0 + 22, y0 + 457),
+            f"DKP: {_compact(row.dkp)}  •  {_percent(row.dkp_target_percent)}",
+            width=width,
+            size=19,
+            min_size=13,
+        )
+        _text(
+            draw,
+            (x0 + 22, y0 + 501),
+            f"Pre-KVK: {_compact(row.prekvk_points)}  •  rank {_clean(row.prekvk_rank)}",
             width=width,
             size=18,
             min_size=12,
         )
         _text(
             draw,
-            (x0 + 22, y0 + 506),
-            f"Pre-KVK  {_compact(row.prekvk_points)}  •  rank {_clean(row.prekvk_rank)}",
+            (x0 + 22, y0 + 545),
+            f"Honor: {_compact(row.honor_points)}  •  rank {_clean(row.honor_rank)}",
             width=width,
-            size=17,
-            min_size=11,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 540),
-            f"Honor  {_compact(row.honor_points)}  •  rank {_clean(row.honor_rank)}",
-            width=width,
-            size=17,
-            min_size=11,
+            size=18,
+            min_size=12,
         )
 
 
@@ -737,7 +781,7 @@ def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) ->
     _text(
         draw,
         (614, 342),
-        "ALIASES BY GOVERNOR ID",
+        "ALIASES",
         width=455,
         size=21,
         min_size=16,

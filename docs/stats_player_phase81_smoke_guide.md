@@ -8,9 +8,10 @@ must remain private and no command resync is expected.
 1. Use an approved leadership role in Leadership and an administrator in Leadership/Notify; prove
    an unapproved role/channel is denied. Repeat after opening the view to prove per-interaction
    revalidation.
-2. Open a representative recent/dense governor at 90 days. Confirm Overview has adjacent Activity
-   Index and Presence, exact scan ratio and whole percentage, Last Active, large latest X:Y,
-   location-updated UTC and shield; CURRENT/STALE/PARTIAL/NO DATA remains separate.
+2. Open a representative recent/dense governor at 90 days. Confirm Overview has distinct Activity
+   Index, KVK Index, Presence and Last Active boxes, exact scan ratio and whole percentage, and one
+   combined location/shield box with large X:Y and shield status plus smaller location-updated UTC;
+   CURRENT/STALE/PARTIAL/NO DATA remains separate.
 3. Check Last Active fixtures or known source evidence for each of Power, Healed, RSS Gathered,
    RSS Assisted, Helps, Tech Donations, Building Minutes and completed Fort rallies. Exactly 30
    UTC dates old is ACTIVE; 31 is INACTIVE; no qualifying change is Not recorded.
@@ -19,10 +20,16 @@ must remain private and no command resync is expected.
 5. Confirm KVK shows no more than three distinct latest eligible finalized KVKs side by side. It
    retains all numeric percentages, exemptions, ranks and missing states, and shows no final
    timestamp/state or MET/NOT MET words.
-6. Confirm Player Record groups every returned Alias and Alliance row beneath one Governor ID,
-   pages deterministically, preserves leave/return episodes, and does not infer Unallied from a
-   missing governor scan.
-7. Check one/two/no-KVK, no-data, long Unicode/history, fallback, timeout-disable and cleanup paths.
+6. Confirm KVK Index is the arithmetic mean of the scoreable latest-three completed KVK scores,
+   where each score is `kills target % * 60% + deads target % * 20% + Tanking % * 20%`. Confirm
+   the score is uncapped, missing/exempt KVKs are excluded, genuine zero kills/deads/healed makes
+   that KVK score zero, and no scoreable KVK remains neutral.
+7. Confirm Tanking and its rank are unavailable whenever Healed is zero/missing or legacy Healed
+   capture is unavailable. Confirm KP and Deads ranks use descending competition ranking.
+8. Confirm Player Record keeps Active Linked Governors unchanged but returns Alias and Alliance
+   history only for the selected Governor ID, pages deterministically, preserves leave/return
+   episodes, and does not infer Unallied from a missing governor scan.
+9. Check one/two/no-KVK, no-data, long Unicode/history, fallback, timeout-disable and cleanup paths.
    Footer must show Data refreshed left and Generated right.
 
 ## Bounded performance evidence

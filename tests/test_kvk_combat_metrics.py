@@ -12,7 +12,7 @@ from kvk.combat_metrics import calculate_combat_metrics
     [
         (None, None, None, None, None, None, False),
         (100, 0, 0, 1, 0, None, True),
-        (1_000, 0, 100, 1, 0, Decimal("1000.00000000"), True),
+        (1_000, 0, 100, 1, 0, None, True),
         (1_000, 10, 0, 1, 200, Decimal("500.00000000"), True),
         (5_000, 10, 100, 1, 200, Decimal("1666.66666667"), True),
         (0, 10, 100, 0, 200, Decimal("0.00000000"), False),
@@ -54,4 +54,4 @@ def test_engaged_requires_positive_kp_and_combat_evidence() -> None:
     assert no_evidence.engaged is False
     assert no_evidence.tanking_score is None
     assert deads_evidence.engaged is True
-    assert deads_evidence.tanking_score == Decimal("1000")
+    assert deads_evidence.tanking_score is None

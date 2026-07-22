@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 import logging
 import time
 import unicodedata
@@ -17,6 +18,8 @@ from leadership_player_review import dal
 from leadership_player_review.models import (
     ActivityMetric,
     FreshnessState,
+    KvkIndex,
+    KvkPerformance,
     LastActive,
     LeadershipPlayerPayload,
     LinkedGovernor,
@@ -218,6 +221,57 @@ def _finalized_kvk_numbers(candidates) -> set[int]:
     return finalized
 
 
+def _normalise_kvk_performance(row: KvkPerformance) -> KvkPerformance:
+    """Apply leadership availability guards without inventing historical combat evidence."""
+    if row.healed_data_available is False:
+        return replace(
+            row,
+            healed=None,
+            kp_loss=None,
+            healed_rank=None,
+            tanking_score=None,
+            tanking_rank=None,
+            tanking_cohort_count=None,
+        )
+    if row.healed is None or row.healed <= 0:
+        return replace(row, tanking_score=None, tanking_rank=None)
+    return row
+
+
+def _kvk_index(rows: tuple[KvkPerformance, ...]) -> KvkIndex:
+    """Return the uncapped mean KVK score for the latest three finalized rows."""
+    candidates = rows[:3]
+    per_kvk: list[tuple[int, Decimal | None]] = []
+    scores: list[Decimal] = []
+    for row in candidates:
+        score: Decimal | None = None
+        raw_values = (row.t4_t5_kills, row.deads, row.healed)
+        percentages = (row.kill_target_percent, row.dead_target_percent)
+        source_available = row.healed_data_available is True
+        complete = all(value is not None and value >= 0 for value in raw_values)
+        targets_available = all(value is not None for value in percentages)
+        if source_available and not row.exempt and complete and targets_available:
+            if any(value == 0 for value in raw_values):
+                score = Decimal(0)
+            elif row.tanking_score is not None:
+                score = (
+                    row.kill_target_percent * Decimal("0.60")
+                    + row.dead_target_percent * Decimal("0.20")
+                    + row.tanking_score * Decimal("0.20")
+                )
+        per_kvk.append((row.kvk_no, score))
+        if score is not None:
+            scores.append(score)
+
+    value = sum(scores, Decimal(0)) / Decimal(len(scores)) if scores else None
+    availability = (
+        "AVAILABLE"
+        if scores and len(scores) == len(candidates)
+        else "PARTIAL" if scores else "NOT_RECORDED"
+    )
+    return KvkIndex(value, len(scores), len(candidates), tuple(per_kvk), availability)
+
+
 def _metric_label(metric: ActivityMetric) -> str:
     return {
         "FORTS_TOTAL": "Forts",
@@ -397,7 +451,7 @@ async def load_payload(
     review, kvk, linked, last_active = await asyncio.gather(
         review_task, kvk_task, load_linked(), last_active_task
     )
-    identity_ids = tuple(row.governor_id for row in linked) or (gid,)
+    identity_ids = (gid,)
     identity_diagnostics: dict[str, object] = {}
     identity = await asyncio.to_thread(
         dal.fetch_identity_history,
@@ -414,7 +468,9 @@ async def load_payload(
     completed_rows = tuple(
         sorted(
             (
-                replace(row, kvk_name=candidate_by_kvk[row.kvk_no].kvk_name)
+                _normalise_kvk_performance(
+                    replace(row, kvk_name=candidate_by_kvk[row.kvk_no].kvk_name)
+                )
                 for row in kvk_rows
                 if row.kvk_no in finalized
             ),
@@ -453,6 +509,7 @@ async def load_payload(
         warnings=tuple(warnings),
         generated_at_utc=datetime.now(UTC),
         last_active=last_active,
+        kvk_index=_kvk_index(completed_rows),
     )
     stages["payload_construction_ms"] = (time.perf_counter() - payload_started) * 1000.0
     diagnostics = _load_diagnostics(

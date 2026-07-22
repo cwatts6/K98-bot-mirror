@@ -162,7 +162,7 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
         lambda gid, finalized: [
             {"Metric": "Highest Acclaim", "KVK_NO": 13, "Overall_Rank": 5},
             {"Metric": "Most Kills", "KVK_NO": 15, "Overall_Rank": 2},
-            {"Metric": "Highest Tanking Score", "KVK_NO": 12, "Overall_Rank": 11},
+            {"Metric": "Highest Tanking Score", "KVK_NO": 15, "Overall_Rank": 11},
         ],
     )
 
@@ -186,12 +186,12 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
     assert payload.history_summary["Most Deads"] == 7
     assert payload.history_summary["Lowest Healed"] == 0
     assert payload.history_summary["Most DKP"] == 2000
-    assert payload.history_summary["Highest Tanking Score"] == pytest.approx(500 / 6 * 100)
+    assert payload.history_summary["Highest Tanking Score"] == pytest.approx(600 / 2407 * 100)
     assert payload.history_summary["Most Pre-KVK"] == 1800
     assert payload.history_summary["Most Honor"] == 1900
     assert payload.history_summary_metrics["Highest Rank"].kvk_no == 15
     assert payload.history_summary_metrics["Most Kills"].kvk_no == 15
-    assert payload.history_summary_metrics["Highest Tanking Score"].kvk_no == 12
+    assert payload.history_summary_metrics["Highest Tanking Score"].kvk_no == 15
     assert payload.history_summary_metrics["Highest Acclaim"].overall_rank == 5
     assert payload.history_summary_metrics["Most Kills"].overall_rank == 2
     assert payload.history_summary_metrics["Highest Tanking Score"].overall_rank == 11
@@ -199,10 +199,10 @@ def test_modern_payload_preserves_missing_rows_and_null_metrics(monkeypatch):
     assert payload.trends["acclaim"].direction == "down"
     assert payload.trends["heals"].direction == "down"
     assert payload.trends["kill_points"].direction == "up"
-    assert payload.trends["tanking_score"].direction == "down"
-    assert payload.trends["tanking_score"].first_value == pytest.approx(500 / 6 * 100)
+    assert payload.trends["tanking_score"].direction == "up"
+    assert payload.trends["tanking_score"].first_value == pytest.approx(200 / 2005 * 100)
     assert payload.trends["tanking_score"].last_value == pytest.approx(600 / 2407 * 100)
-    assert payload.trends["tanking_score"].value_count == 3
+    assert payload.trends["tanking_score"].value_count == 2
 
 
 def test_history_export_dataframe_uses_expanded_null_preserving_columns(monkeypatch):

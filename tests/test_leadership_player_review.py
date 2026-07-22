@@ -115,6 +115,9 @@ def _kvk(kvk_no: int) -> KvkPerformance:
         final_output_state="OUTPUT_COMPLETE",
         finalization_basis="AUDIT_PROOF",
         personal_completed_kvk_best_acclaim=25_000,
+        kill_points_rank=4,
+        deads_rank=12,
+        healed_data_available=True,
     )
 
 
@@ -215,6 +218,7 @@ def _payload(*, page="overview", aliases=1, episodes=1, linked=2) -> LeadershipP
             compared_complete_scans=88,
             history_days=720,
         ),
+        kvk_index=service._kvk_index((_kvk(15), _kvk(14), _kvk(13))),
     )
 
 
@@ -288,6 +292,25 @@ def test_activity_renderer_labels_reporting_average_per_day(monkeypatch) -> None
     averages = [text for text in rendered_text if text.startswith("Average ")]
     assert len(averages) == 6
     assert all(text.endswith("/valid day") for text in averages)
+
+
+def test_activity_renderer_explains_counter_reset_exclusion(monkeypatch) -> None:
+    rendered_text: list[str] = []
+    original_text = renderer._text
+
+    def capture_text(*args, **kwargs):
+        rendered_text.append(args[2])
+        return original_text(*args, **kwargs)
+
+    payload = _payload(page="activity")
+    payload = replace(
+        payload, metrics=(replace(payload.metrics[0], reset_count=2), *payload.metrics[1:])
+    )
+    monkeypatch.setattr(renderer, "_text", capture_text)
+
+    renderer.render_leadership_player(payload)
+
+    assert "Coverage 90/90  •  2 counter reset(s); decreases not counted" in rendered_text
 
 
 @pytest.mark.parametrize("page", ["activity"])
@@ -456,8 +479,10 @@ def test_overview_promotes_presence_last_active_and_removes_duplicate_metrics(
     assert "PRESENCE" in rendered_text
     assert "89 / 90 scans" in rendered_text
     assert "99%" in rendered_text
-    assert any(text.startswith("Last Active ") for text in rendered_text)
-    assert "LATEST X:Y" in rendered_text
+    assert "LAST ACTIVE" in rendered_text
+    assert "18 Jul 2026" in rendered_text
+    assert "KVK INDEX" in rendered_text
+    assert "LATEST LOCATION" in rendered_text
     assert not {"FORTS TOTAL", "HELPS", "TECH DONATIONS"} & set(rendered_text)
 
 
@@ -473,13 +498,92 @@ def test_kvk_cards_keep_numeric_context_without_state_or_met_words(monkeypatch) 
     renderer.render_leadership_player(_payload(page="kvk"))
     combined = "\n".join(rendered_text)
 
-    assert all(f"KVK {value}" in rendered_text for value in (15, 14, 13))
-    assert "111.1% target" in combined
-    assert "100.0% target" in combined
+    assert all(
+        any(text.startswith(f"KVK {value} -") for text in rendered_text) for value in (15, 14, 13)
+    )
+    assert "111.1% Target" in combined
+    assert "100.0% Target" in combined
+    assert any(text.startswith("KP:") and "rank 4" in text for text in rendered_text)
+    assert "rank 12" in combined
     assert "OUTPUT_COMPLETE" not in combined
     assert "Final " not in combined
     assert "NOT MET" not in combined
     assert "\nMET\n" not in f"\n{combined}\n"
+
+
+def test_kvk_index_uses_approved_weights_without_capping() -> None:
+    row = replace(
+        _kvk(15),
+        kill_target_percent=Decimal("205.5"),
+        dead_target_percent=Decimal("88.4"),
+        tanking_score=Decimal("117"),
+    )
+
+    result = service._kvk_index((row,))
+
+    assert result.value == Decimal("164.380")
+    assert result.scored_kvks == 1
+    assert result.candidate_kvks == 1
+    assert result.availability == "AVAILABLE"
+
+
+@pytest.mark.parametrize("field", ("t4_t5_kills", "deads", "healed"))
+def test_kvk_index_scores_an_observed_zero_as_zero(field: str) -> None:
+    row = replace(_kvk(15), **{field: 0})
+
+    result = service._kvk_index((row,))
+
+    assert result.value == Decimal(0)
+    assert result.per_kvk_scores == ((15, Decimal(0)),)
+
+
+def test_kvk_index_averages_only_scoreable_non_exempt_completed_kvks() -> None:
+    scored = replace(
+        _kvk(15),
+        kill_target_percent=Decimal("100"),
+        dead_target_percent=Decimal("100"),
+        tanking_score=Decimal("100"),
+    )
+    exempt = replace(_kvk(14), exempt=True)
+    missing_healed_source = replace(_kvk(13), healed_data_available=False)
+
+    result = service._kvk_index((scored, exempt, missing_healed_source))
+
+    assert result.value == Decimal("100.00")
+    assert result.scored_kvks == 1
+    assert result.candidate_kvks == 3
+    assert result.availability == "PARTIAL"
+    assert result.per_kvk_scores == ((15, Decimal("100.00")), (14, None), (13, None))
+
+
+def test_kvk_index_is_not_recorded_without_scoreable_rows() -> None:
+    result = service._kvk_index(
+        (
+            replace(_kvk(13), healed_data_available=False),
+            replace(_kvk(12), healed_data_available=None),
+            replace(_kvk(11), exempt=True),
+        )
+    )
+
+    assert result.value is None
+    assert result.scored_kvks == 0
+    assert result.availability == "NOT_RECORDED"
+
+
+def test_kvk_normalisation_suppresses_uncaptured_or_zero_healed_tanking() -> None:
+    uncaptured = service._normalise_kvk_performance(
+        replace(_kvk(13), healed=0, kp_loss=0, healed_data_available=False)
+    )
+    observed_zero = service._normalise_kvk_performance(
+        replace(_kvk(14), healed=0, kp_loss=0, healed_data_available=True)
+    )
+
+    assert uncaptured.healed is None
+    assert uncaptured.kp_loss is None
+    assert uncaptured.healed_rank is None
+    assert uncaptured.tanking_score is None
+    assert observed_zero.healed == 0
+    assert observed_zero.tanking_score is None
 
 
 def test_record_renderer_uses_consistent_footer_and_readable_alias_columns(monkeypatch) -> None:
@@ -626,7 +730,7 @@ def test_kvk_empty_cards_distinguish_zero_from_fewer_than_three_rows(
 
 
 @pytest.mark.asyncio
-async def test_payload_identity_history_covers_all_active_linked_governors(monkeypatch) -> None:
+async def test_payload_identity_history_is_limited_to_selected_governor(monkeypatch) -> None:
     sample = _payload()
     captured: list[tuple[int, ...]] = []
 
@@ -671,7 +775,7 @@ async def test_payload_identity_history_covers_all_active_linked_governors(monke
 
     payload = await service.load_payload(123, 90, refresh=True)
 
-    assert captured == [(123, 456)]
+    assert captured == [(123,)]
     assert {row.governor_id for row in payload.linked_governors} == {123, 456}
 
 
@@ -1013,6 +1117,9 @@ def test_kvk_dal_maps_personal_best_from_second_result_set(monkeypatch) -> None:
         "GovernorID": 123,
         "GovernorName": "Governor Alpha",
         "PersonalCompletedKvkBestAcclaim": 25_000,
+        "KillPointsRank": 4,
+        "DeadsRank": 12,
+        "HealedDataAvailable": 1,
         "FinalOutputState": "OUTPUT_COMPLETE",
     }
 
@@ -1056,3 +1163,6 @@ def test_kvk_dal_maps_personal_best_from_second_result_set(monkeypatch) -> None:
 
     assert candidates[0].kvk_no == 15
     assert rows[0].personal_completed_kvk_best_acclaim == 25_000
+    assert rows[0].kill_points_rank == 4
+    assert rows[0].deads_rank == 12
+    assert rows[0].healed_data_available is True

@@ -77,10 +77,11 @@ Approved follow-on roadmap, updated after Phase 8 acceptance on 2026-07-21:
 - Phase 8 completed the existing private leadership `/stats player`, adopted one canonical
   higher-is-better Tanking Score across every KVK/Account/leadership surface, added the bounded
   leadership data/audit foundations, and removed `/player_profile` with no redirect.
-- Phase 8.1's audited bot scope and additive bounded Last Active procedure are approved. The
-  implementation refines the accepted leadership hierarchy and adds privacy-safe stage timing;
-  representative cold/warm plans, reads and result-size evidence remains required before any
-  table or index proposal.
+- Phase 8.1's audited bot scope and SQL contract are approved. The implementation refines the
+  accepted leadership hierarchy, adds privacy-safe stage timing and a latest-three completed-KVK
+  Index, limits identity history to the selected Governor ID, and extends finalized-KVK output
+  with KP/Deads ranks plus explicit legacy Healed availability. Tables and further indexes remain
+  separately evidence- and approval-gated.
 - Phase 9 adds private `/stats kingdom` with current kingdom totals, twelve-month dynamic-roster
   trends, and the latest four completed KVKs. Participants are governors with final-event
   Acclaim greater than zero, and Acclaim per Participant is included.
@@ -90,7 +91,8 @@ Approved follow-on roadmap, updated after Phase 8 acceptance on 2026-07-21:
 Phase 8 completed SQL-first deployment, resync, restart, correction smoke and operator acceptance on
 2026-07-21. Its task pack/starter are archived. Phase 8.1 implementation is in validation; no
 command change or resync is expected. Its approved SQL change is one additive Last Active
-procedure, while tables and indexes remain measurement- and separately approval-gated.
+procedure plus the approved finalized-KVK ranking/availability contract; tables and further
+indexes remain measurement- and separately approval-gated.
 Locked follow-on consistency:
 
 Phase 7 proved the accepted visual hierarchy across every retained `/me` card/fallback. Core
@@ -119,7 +121,9 @@ KP Loss = Healed Troops * 20
 Tanking Score = Kill Points / (KP Loss + Deads) * 100
 ```
 
-Higher is better. Phase 8 owns the coordinated correction of old KVK formulas, labels, ranking
+Tanking Score is available only when Healed Troops is greater than zero, preventing legacy KVKs
+where Healed was not captured from presenting a misleading score. Higher is better. Phase 8 owns
+the coordinated correction of old KVK formulas, labels, ranking
 direction, trends, exports, and playstyle copy.
 
 The following earlier phase notes remain as historical delivery context where they describe the
@@ -280,11 +284,12 @@ Accepted and next phases:
   Activity Index v1, latest/last-three completed KVK, linked governors, aliases, alliance
   history, location/shield, dedicated 90-day audit; global Tanking correction; remove
   `/player_profile`; deploy SQL before bot; resync to 36 top-level.
-- Phase 8.1 implementation/validation: remove duplicated Overview activity cards; make Presence, bounded Last
-  Active, location and shield primary; enlarge Activity; show latest three finalized KVKs in three
-  columns; group complete Alias/Alliance history; align footer labels; measure 30/90/180/360 cold/
-  warm performance before proposing any supporting table/index optimisation. One additive bounded
-  Last Active procedure is approved; no command/resync change is expected.
+- Phase 8.1 implementation/validation: remove duplicated Overview activity cards; split Presence
+  and bounded Last Active, combine location/shield context, add the uncapped weighted latest-three
+  completed-KVK Index, enlarge Activity, and show latest three finalized KVKs in three columns.
+  Player Record retains linked navigation but limits Aliases/Alliances to the selected Governor ID.
+  The SQL contract adds finalized-KVK KP/Deads ranks and explicit legacy Healed availability; no
+  table or further index and no command/resync change is expected.
 - Phase 9: add private `/stats kingdom`; dynamic-roster monthly final scans, current totals,
   Total Kingdom Acclaim as `SUM(HighestAcclaim)`, last four completed KVKs, KVK Acclaim as
   `SUM(Acclaim)`, participants as distinct governors with Acclaim > 0, Acclaim per Participant,

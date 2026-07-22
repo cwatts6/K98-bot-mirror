@@ -466,6 +466,13 @@ def fetch_kvk_history(
                 personal_completed_kvk_best_acclaim=_int(
                     row.get("PersonalCompletedKvkBestAcclaim")
                 ),
+                kill_points_rank=_int(row.get("KillPointsRank")),
+                deads_rank=_int(row.get("DeadsRank")),
+                healed_data_available=(
+                    bool(row.get("HealedDataAvailable"))
+                    if row.get("HealedDataAvailable") is not None
+                    else None
+                ),
             )
             for row in result_sets[1]
         )

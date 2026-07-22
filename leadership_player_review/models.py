@@ -234,6 +234,18 @@ class KvkPerformance:
     final_output_state: str | None
     finalization_basis: str | None
     personal_completed_kvk_best_acclaim: int | None = None
+    kill_points_rank: int | None = None
+    deads_rank: int | None = None
+    healed_data_available: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class KvkIndex:
+    value: Decimal | None
+    scored_kvks: int
+    candidate_kvks: int
+    per_kvk_scores: tuple[tuple[int, Decimal | None], ...]
+    availability: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +266,7 @@ class LeadershipPlayerPayload:
     prompts: tuple[str, ...]
     warnings: tuple[str, ...]
     generated_at_utc: datetime
+    kvk_index: KvkIndex = KvkIndex(None, 0, 0, (), "NOT_RECORDED")
     record_page: int = 0
     last_active: LastActive | None = None
     diagnostics: LoadDiagnostics | None = None

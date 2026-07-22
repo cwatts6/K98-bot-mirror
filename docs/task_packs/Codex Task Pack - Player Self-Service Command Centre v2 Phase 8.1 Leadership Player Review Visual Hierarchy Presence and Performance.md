@@ -9,12 +9,12 @@
 - One-pass approved: `no`
 - Product scope approved: `yes`
 - Runtime implementation approved: `yes; operator approved the audited bot scope and additive Last Active procedure on 2026-07-21`
-- Status: `implementation complete; validation, representative production measurement, review and deployment pending`
+- Status: `operator follow-up approved on 2026-07-22; implementation and validation in progress`
 - Canonical command: `/stats player`
 - Command change: `none`
 - Command baseline and target: `36 top-level / 100 grouped / 8 /me / 1 /stats / 2 /inventory`
 - Command resync expected: `no; revalidate and resync only if the audit proves a registration change`
-- SQL deployment: `approved additive dbo.usp_GetLeadershipPlayerLastActive only; no table or index change`
+- SQL deployment: `approved additive Last Active plus finalized-KVK rank/Healed-availability contract; no table or further index change`
 - Background asset: `assets/stats/cards/stats_player.png`
 
 ## 2. Required Reading
@@ -82,7 +82,10 @@ Production smoke proved the data is now available and materially correct, but al
   fully available on Kingdom Activity.
 - Keep Activity Index v1 on Overview with its existing six-component formula, coverage, ranking,
   missing-value and reset semantics.
-- Promote Presence to a primary Overview element adjacent to Activity Index.
+- Add an uncapped KVK Index: score each scoreable latest-three completed KVK as `T4+T5 target % *
+  60% + Deads target % * 20% + Tanking Score * 20%`, then take the arithmetic mean. Missing or
+  exempt KVKs are excluded; genuine zero kills, deads or healed makes that KVK score zero.
+- Promote Presence and Last Active as separate primary Overview elements.
 - Present Presence as both an exact scan ratio and a percentage, for example:
 
 ```text
@@ -93,7 +96,7 @@ Presence
 
 - Add `Last Active Date` and a separate active/inactive classification using the exact contract in
   section 12.
-- Make latest X:Y, location-updated UTC and shield status materially larger and easier to scan.
+- Combine latest X:Y, smaller location-updated UTC and prominent shield status in one action box.
 - Keep location freshness separate from governor/source freshness.
 - Keep the common governor header, period, dates, valid source observations and primary
   CURRENT/STALE/PARTIAL/NO DATA badge.
@@ -131,6 +134,8 @@ Presence
 - Remove visible `MET` / `NOT MET` words. Preserve the numeric target percentages and the
   underlying target, exemption, missing and eligibility semantics.
 - Preserve higher-is-better canonical Tanking Score and lower-is-better Healed ranking semantics.
+- Calculate Tanking only when Healed is greater than zero; explicit legacy Healed-unavailable KVKs
+  must not display Tanking or a Tanking rank. Add descending competition ranks for KP and Deads.
 - Keep latest-versus-previous and previous-two-average context only when it remains readable and
   is not contradicted by missing/exempt data.
 - Render honest NO DATA/UNAVAILABLE states for fewer than three valid KVKs; never repeat or invent
@@ -139,8 +144,8 @@ Presence
 #### Player Record readability
 
 - Rename `Alliance Episodes` to `Alliances`.
-- Group Aliases by Governor ID with one visible Governor ID heading rather than repeating it on
-  every alias row.
+- Keep Active Linked Governors unchanged, but query and render Alias and Alliance history only for
+  the selected Governor ID with one visible Governor ID heading.
 - Show each alias on a readable row using the accepted content pattern:
 
 ```text
@@ -328,7 +333,8 @@ R. explicit stop for operator approval.
 - Only files proven by the audit and approved manifest.
 - Expected bot changes are leadership models/service/DAL only where required for Last Active or
   pagination, leadership renderer/view, tests and documentation.
-- SQL files are modified only after an approved evidence-led SQL design.
+- SQL files are modified only after an approved evidence-led SQL design; the 2026-07-22 approval
+  covers finalized-KVK KP/Deads ranks and explicit legacy Healed availability.
 
 ### Create
 
@@ -405,6 +411,8 @@ Rules:
   red unavailable/failure/no data; muted disabled/expired.
 - Footer label is `Data refreshed`, consistent with accepted `/me` pages; Generated is right aligned.
 - Keep source/data refreshed and Generated separate.
+- Keep Overview Activity Index, KVK Index and Presence adjacent; render Last Active separately and
+  combine location/shield in one action-oriented box.
 - Meet established contrast and font-size requirements and validate at desktop and Discord-scaled
   presentation.
 
@@ -452,8 +460,12 @@ Rules:
 ### Data/service tests
 
 - Presence numerator/denominator/percentage and scanned-day distinction;
-- all Alias and Alliance rows preserved and deterministically paged;
+- selected-governor Alias and Alliance rows preserved and deterministically paged while linked
+  governor navigation remains unchanged;
 - latest three finalized KVKs, one/two/three/no valid KVKs;
+- uncapped KVK Index weighting, arithmetic averaging, excluded unavailable/exempt KVKs and genuine
+  zero kills/deads/healed behavior;
+- KP/Deads descending competition ranks and the positive-Healed Tanking guard;
 - retained target/exemption/missing semantics after removal of MET text;
 - unchanged Activity Index and canonical combat outputs;
 - authorization-before-cache/read and period/page preservation.
@@ -504,7 +516,10 @@ Rules:
 - [ ] KVK shows the latest three eligible finalized KVKs in readable side-by-side cards.
 - [ ] KVK cards remove final timestamp/state and MET/NOT MET copy without losing percentages,
       exemptions or honest missing semantics.
-- [ ] Player Record uses `Alliances`, grouped Governor ID structure and complete paginated history.
+- [ ] Player Record uses `Alliances` and complete selected-governor paginated history while linked
+      governor navigation remains unchanged.
+- [ ] KVK Index follows the approved uncapped 60/20/20 latest-three scoring contract.
+- [ ] Tanking is unavailable unless Healed is positive; KP and Deads ranks are correct.
 - [ ] Data refreshed is left aligned and Generated is right aligned on every page.
 - [ ] Cold/warm and period-change performance evidence identifies dominant costs.
 - [ ] Any optimisation is the smallest evidenced change and meets the approved budget.
@@ -553,6 +568,17 @@ The implementation handoff must include:
   the existing interaction timeout, regress logical reads by more than 10% without an explained
   correctness trade-off, or expose private values in performance artifacts. The operator must
   accept or revise this budget after the baseline is collected.
+
+### Operator follow-up approval, 2026-07-22
+
+- Split Presence and Last Active, combine location/shield, and add the uncapped KVK Index scorecard
+  metric using the approved 60/20/20 completed-KVK formula.
+- Treat a scoreable KVK with observed zero kills, deads or healed as score zero; exclude KVKs whose
+  required target/metric data is unavailable or exempt, and average however many of the latest
+  three completed KVKs remain scoreable.
+- Require positive Healed for Tanking. SQL exposes explicit cohort-level legacy Healed availability
+  plus KP and Deads competition ranks; no table or additional index is approved.
+- Keep Active Linked Governors but limit Alias and Alliance history to the selected Governor ID.
 
 ## 17. PR Summary Template
 

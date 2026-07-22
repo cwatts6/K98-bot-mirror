@@ -1893,7 +1893,7 @@ KP Loss = Healed Troops * 20
 Tanking Score = Kill Points / (KP Loss + Deads) * 100
 ```
 
-Higher is better. Apply it globally to Account Summary parity, KVK stats, KVK history
+Tanking Score is available only when Healed Troops is greater than zero. Higher is better. Apply it globally to Account Summary parity, KVK stats, KVK history
 cards/summary/trends/CSV/ranks, KVK rankings, `/stats player`, and future `/stats kingdom`.
 Rename `Lowest Tanking Score` to `Highest Tanking Score`, reverse ranking/trend direction, and
 remove old-formula playstyle bands until replay supports replacements.
@@ -1912,16 +1912,17 @@ restart-safe interaction behavior. The resynced command surface is
 
 ### Phase 8.1 - Leadership Player Review Visual Hierarchy, Presence and Performance
 
-Status: `audited scope and additive Last Active procedure approved on 2026-07-21; implementation
-complete, validation and representative production performance evidence pending`.
+Status: `audited scope approved on 2026-07-21; operator scorecard/SQL follow-up approved on
+2026-07-22; implementation and validation in progress`.
 
 Goal: refine the accepted Phase 8 product without changing its command, permission, privacy or
 metric ownership, and measure then correct avoidable first-load/period-change latency.
 
 Deliver:
 
-- Overview removes duplicated Forts/Helps/Tech cards and promotes Activity Index, Presence,
-  Last Active Date, latest X:Y, location freshness and shield context.
+- Overview removes duplicated Forts/Helps/Tech cards; keeps Activity Index; adds an uncapped
+  latest-three KVK Index; separates Presence and Last Active; and combines latest X:Y, location
+  freshness and shield context in one action box.
 - Presence shows exact scan ratio and percentage.
 - Last Active is the latest authoritative complete kingdom `ScanDate` within bounded 720-day
   history where Power, Healed, RSS Gathered, RSS Assisted, Helps, Tech Donations, Building Minutes
@@ -1934,13 +1935,19 @@ Deliver:
 - KVK Performance removes repeated location context and presents the latest three finalized KVKs
   as three side-by-side cards, retaining metrics/percentages/ranks while removing visible final
   timestamp/state and MET/NOT MET words.
-- Player Record renames Alliance Episodes to Alliances and groups complete paged Alias/Alliance
-  history beneath one Governor ID heading.
+- KVK Index uses `kills target % * 60% + deads target % * 20% + Tanking * 20%` per scoreable
+  completed KVK and the arithmetic mean across as many of the latest three as have complete,
+  non-exempt score inputs. Genuine zero kills/deads/healed makes that KVK score zero.
+- Tanking requires positive Healed; SQL supplies KP/Deads competition ranks and explicit legacy
+  Healed availability without adding a table or further index.
+- Player Record renames Alliance Episodes to Alliances and limits complete paged Alias/Alliance
+  history to the selected Governor ID while retaining linked-governor navigation.
 - Footer wording becomes `Data refreshed` with Generated right aligned.
 - Performance work measures cold/warm 30/90/180/360 loads, SQL plans/reads/time/result sizes,
   cache/inflight and rendering stages before choosing the smallest improvement.
-- The approved SQL scope is one additive bounded Last Active procedure. No table, index or
-  pre-aggregation is included; any supporting-object proposal still requires actual-plan/read/
+- The approved SQL scope is the additive bounded Last Active procedure plus finalized-KVK KP/Deads
+  ranks and explicit legacy Healed availability. No table, further index or pre-aggregation is
+  included; any supporting-object proposal still requires actual-plan/read/
   timing evidence plus a separate SQL design/review/deployment gate.
 
 Command impact: none; remain `36 / 100 / 8 / 1 / 2`. No resync is expected.
@@ -2295,10 +2302,10 @@ Do not include these in early phases unless separately approved:
 
 ## 20. Suggested Next Action
 
-Phase 8 is complete, production smoke tested, operator accepted and archived. Begin Phase 8.1 with
-the audit-only gate: prove Last Active source semantics, current renderer/data limits and cold/warm
-latency before proposing implementation. Any SQL change remains separately evidence- and
-approval-gated. Phase 9 remains separately task-packed and must not absorb Phase 8.1 work.
+Phase 8 is complete, production smoke tested, operator accepted and archived. Complete the approved
+Phase 8.1 scorecard/SQL follow-up, focused/full/visual/performance validation, separate bot and SQL
+Changes reviews, SQL-first deployment and final operator smoke. Any further SQL object remains
+separately evidence- and approval-gated. Phase 9 must not absorb Phase 8.1 work.
 
 Phase 9 may follow the accepted Phase 8 data/permission foundation, but scheduling relative to the
 active Phase 8.1 refinement remains an operator decision. Phase 10 is usage-led compatibility
@@ -2364,3 +2371,4 @@ explicit historical corrections.
 | 2026-07-19 | Phase 7 completed, operator accepted, and archived | Mirror PR #229 and production PR #536 delivered the accepted `/me` visual/content closeout without command, SQL, metric, permission or product changes. Final smoke accepted the shared visual/lifecycle language and the Phase 7 task pack/starter moved to the archive. |
 | 2026-07-21 | Phase 8 completed, operator accepted, and archived | SQL-first deployment, historic Rally/Alliance/KVK completion correction, command resync, bot restart and production smoke accepted the one private `/stats player` leadership journey, global canonical combat metrics, four pages/period controls, dedicated authorization/audit contract, complete identity/KVK history and `/player_profile` retirement. Mirror PR #230 and production PR #537 carry the bot result; merged SQL follow-up PR #53 carries the final data correction. The accepted command surface is `36 / 100 / 8 / 1 / 2`. |
 | 2026-07-21 | Phase 8.1 visual hierarchy, Presence and performance scope task-packed | Approved a separate audit-first refinement: Overview Presence/Last Active/location emphasis, larger Activity page, three-column latest-three KVK layout, grouped complete Alias/Alliance presentation, consistent footer alignment and measurement-first cold/warm 30/90/180/360 performance work. No command/resync change is expected; any SQL object remains evidence- and approval-gated. |
+| 2026-07-22 | Phase 8.1 operator scorecard and SQL follow-up approved | Split Presence/Last Active, combined action-focused location/shield context, added an uncapped 60/20/20 latest-three completed-KVK Index, limited Alias/Alliance history to the selected Governor ID, required positive Healed for Tanking, and approved SQL KP/Deads competition ranks plus explicit legacy Healed availability. No table, further index, command, permission or resync change is included. |

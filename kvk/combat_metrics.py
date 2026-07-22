@@ -31,7 +31,7 @@ def calculate_combat_metrics(
             or (healed is not None and int(healed) > 0)
         )
     )
-    if kill_points is None or kp_loss is None or deads is None:
+    if kill_points is None or healed is None or int(healed) <= 0 or deads is None:
         return CombatMetrics(kp_loss=kp_loss, tanking_score=None, engaged=engaged)
     denominator = kp_loss + int(deads)
     score = None
