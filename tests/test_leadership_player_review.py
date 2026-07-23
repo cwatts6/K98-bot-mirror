@@ -99,6 +99,7 @@ def _kvk(kvk_no: int) -> KvkPerformance:
         kp_loss=1_000_000,
         tanking_score=Decimal("198.0198"),
         acclaim=20_000,
+        acclaim_rank=6,
         dkp=100_000,
         dkp_target=100_000,
         dkp_target_percent=Decimal("100"),
@@ -128,6 +129,7 @@ def _payload(*, page="overview", aliases=1, episodes=1, linked=2) -> LeadershipP
         governor_name="Governor Alpha",
         current_alliance="K98",
         current_power=123_456_789,
+        current_power_rank=3,
         city_hall=25,
         effective_now_utc=NOW,
         anchor_date=date(2026, 7, 19),
@@ -550,6 +552,8 @@ def test_overview_promotes_presence_last_active_and_removes_duplicate_metrics(
     assert "ACTION" in rendered_text
     assert "90 days • 21 Apr 2026–19 Jul 2026" in rendered_text
     assert "Previous 21 Jan 2026–20 Apr 2026" in rendered_text
+    assert "RANK" in rendered_text
+    assert "3" in rendered_text
     assert not any(text.startswith("Presence 89/90 scans") for text in rendered_text)
     assert "Stats Scans 89/90" not in rendered_text
     assert not any(text.startswith("Prompts suppressed") for text in rendered_text)
@@ -573,8 +577,15 @@ def test_kvk_cards_keep_numeric_context_without_state_or_met_words(monkeypatch) 
     )
     assert "111.1% Target" in combined
     assert "100.0% Target" in combined
-    assert any(text.startswith("KP:") and "rank 4" in text for text in rendered_text)
+    assert any(text == "KP: 2M" for text in rendered_text)
     assert "rank 12" in combined
+    assert "Acclaim: 20K  •  rank 6" in combined
+    assert "Healed: 50K  •  KP Loss: 1M" in combined
+    assert "DKP:" not in combined
+    assert "Pre-KVK:" not in combined
+    assert "Honor:" not in combined
+    assert "rank 4" not in combined
+    assert "rank 2" not in combined
     assert "OUTPUT_COMPLETE" not in combined
     assert "Final " not in combined
     assert "NOT MET" not in combined
@@ -777,6 +788,8 @@ def test_fallback_uses_same_payload_without_discord_identity() -> None:
     rendered = embed.to_dict()
     text = str(rendered).lower()
     assert "governor alpha" in text
+    assert "power rank: 3" in text
+    assert "acclaim 20,000 (rank 6)" in text
     assert "discord" not in text
     assert "account slot" not in text
 
@@ -1234,6 +1247,7 @@ def test_kvk_dal_maps_personal_best_from_second_result_set(monkeypatch) -> None:
         "GovernorID": 123,
         "GovernorName": "Governor Alpha",
         "PersonalCompletedKvkBestAcclaim": 25_000,
+        "AcclaimRank": 6,
         "KillPointsRank": 4,
         "DeadsRank": 12,
         "HealedDataAvailable": 1,
@@ -1289,6 +1303,7 @@ def test_kvk_dal_maps_personal_best_from_second_result_set(monkeypatch) -> None:
 
     assert candidates[0].kvk_no == 15
     assert rows[0].personal_completed_kvk_best_acclaim == 25_000
+    assert rows[0].acclaim_rank == 6
     assert rows[0].kill_points_rank == 4
     assert rows[0].deads_rank == 12
     assert rows[0].healed_data_available is True
@@ -1301,3 +1316,41 @@ def test_kvk_dal_maps_personal_best_from_second_result_set(monkeypatch) -> None:
         rank=5,
         cohort_count=308,
     )
+
+
+def test_review_dal_maps_latest_scan_power_rank(monkeypatch) -> None:
+    header_row = {
+        "GovernorID": 123,
+        "GovernorName": "Governor Alpha",
+        "CurrentPower": 123_456_789,
+        "PowerRank": 3,
+        "EffectiveNowUtc": NOW.replace(tzinfo=None),
+        "PeriodDays": 90,
+    }
+
+    class _Cursor:
+        timeout = None
+
+        def execute(self, *_args, **_kwargs) -> None:
+            return None
+
+    class _Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+        def cursor(self):
+            return _Cursor()
+
+    monkeypatch.setattr(dal, "get_conn_with_retries", _Connection)
+    monkeypatch.setattr(
+        dal,
+        "_result_sets",
+        lambda _cursor, _count: ([header_row], [], [], [], [], []),
+    )
+
+    header, *_rest = dal.fetch_review_contract(123, 90, now_utc=NOW)
+
+    assert header.current_power_rank == 3

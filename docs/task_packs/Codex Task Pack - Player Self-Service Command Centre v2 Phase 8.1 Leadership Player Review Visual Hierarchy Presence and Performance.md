@@ -14,7 +14,7 @@
 - Command change: `none`
 - Command baseline and target: `36 top-level / 100 grouped / 8 /me / 1 /stats / 2 /inventory`
 - Command resync expected: `no; revalidate and resync only if the audit proves a registration change`
-- SQL deployment: `approved additive Last Active plus finalized-KVK rank/Healed-availability contract; no table or further index change`
+- SQL deployment: `approved additive Last Active, finalized-KVK rank/Healed-availability/KVK Index contract, latest-scan Power rank and positive-Acclaim rank; no table or further index change`
 - Background asset: `assets/stats/cards/stats_player.png`
 
 ## 2. Required Reading
@@ -117,25 +117,25 @@ Presence
 - Continue to show exactly the latest three eligible completed/finalized KVKs and `valid x/3`.
 - Replace the vertical full-width stack with three side-by-side KVK cards on the `1702x924`
   proportional baseline.
-- Each populated card must retain, with readable hierarchy:
+- Each populated card must show, with readable hierarchy:
   - KVK number, `KVK_NAME`, and KVK rank;
   - T4+T5 kills and target percentage;
   - Kill Points;
-  - Deads and target percentage;
-  - Healed and engaged-cohort Healed rank;
-  - KP Loss;
+  - Deads, target percentage and rank;
+  - Healed and KP Loss on one line;
   - Tanking Score and engaged-cohort Tanking rank;
-  - Acclaim, personal completed-KVK best context and percentage of best;
-  - DKP and target percentage;
-  - Pre-KVK points/rank;
-  - Honor points/rank;
+  - Acclaim, positive-Acclaim kingdom rank, personal completed-KVK best context and percentage of
+    best;
   - exemptions and honest missing-value treatment where applicable.
+- Keep DKP, Pre-KVK, Honor, KP rank and Healed rank in the typed payload but omit them from the
+  visual cards to preserve comparison hierarchy.
 - Remove final data date/time/state from the visible KVK cards.
 - Remove visible `MET` / `NOT MET` words. Preserve the numeric target percentages and the
   underlying target, exemption, missing and eligibility semantics.
 - Preserve higher-is-better canonical Tanking Score and lower-is-better Healed ranking semantics.
 - Calculate Tanking only when Healed is greater than zero; explicit legacy Healed-unavailable KVKs
-  must not display Tanking or a Tanking rank. Add descending competition ranks for KP and Deads.
+  must not display Tanking or a Tanking rank. Preserve the existing KP/Deads ranks in the data
+  contract and add descending competition rank for positive Acclaim values.
 - Keep latest-versus-previous and previous-two-average context only when it remains readable and
   is not contradicted by missing/exempt data.
 - Render honest NO DATA/UNAVAILABLE states for fewer than three valid KVKs; never repeat or invent
@@ -404,7 +404,8 @@ Rules:
 
 ### Visual hierarchy
 
-- Retain `assets/stats/cards/stats_player.png`, neutral KD98/governor identity and no Discord avatar.
+- Retain `assets/stats/cards/stats_player.png`, no Discord avatar, and use the neutral top-left
+  circle for the selected governor's stored latest-scan Power rank.
 - Keep row 0 page navigation and controls below it.
 - Keep the state-pill text vertically centered at top right.
 - Blue remains neutral/selection/navigation/UTC; green current/success; amber stale/partial/review;
@@ -467,7 +468,7 @@ Rules:
 - latest three finalized KVKs, one/two/three/no valid KVKs;
 - uncapped KVK Index weighting, arithmetic averaging, excluded unavailable/exempt KVKs and genuine
   zero kills/deads/healed behavior;
-- KP/Deads descending competition ranks and the positive-Healed Tanking guard;
+- KP/Deads/positive-Acclaim descending competition ranks and the positive-Healed Tanking guard;
 - retained target/exemption/missing semantics after removal of MET text;
 - unchanged Activity Index and canonical combat outputs;
 - authorization-before-cache/read and period/page preservation.
@@ -515,7 +516,8 @@ Rules:
 - [ ] More-than-30-day UTC inactivity classification is correct and separate from freshness state.
 - [ ] Location, location freshness and shield are larger on Overview and absent from Activity/KVK.
 - [ ] Kingdom Activity retains all six metrics and materially improves readability.
-- [ ] KVK shows the latest three eligible finalized KVKs in readable side-by-side cards.
+- [ ] KVK shows the latest three eligible finalized KVKs in readable side-by-side cards focused
+      on the approved leadership comparison essentials.
 - [ ] KVK cards remove final timestamp/state and MET/NOT MET copy without losing percentages,
       exemptions or honest missing semantics.
 - [ ] Player Record uses `Alliances` and complete selected-governor paginated history while linked
@@ -525,7 +527,7 @@ Rules:
 - [ ] Tanking is unavailable unless Healed is positive; KP and Deads ranks are correct.
 - [ ] Data refreshed is left aligned and Generated is right aligned on every page.
 - [ ] Controls use four page buttons, Timeslice, Active linked governors, and one final action row
-      with Change Player, record Previous/Next, Definitions and the disabled current governor.
+      with Change Player, record Previous/Next and the disabled current governor.
 - [ ] Cold/warm and period-change performance evidence identifies dominant costs.
 - [ ] Any optimisation is the smallest evidenced change and meets the approved budget.
 - [ ] No speculative SQL table/index is introduced.
@@ -584,6 +586,15 @@ The implementation handoff must include:
 - Require positive Healed for Tanking. SQL exposes explicit cohort-level legacy Healed availability
   plus KP and Deads competition ranks; no table or additional index is approved.
 - Keep Active Linked Governors but limit Alias and Alliance history to the selected Governor ID.
+
+### Operator final visual follow-up approval, 2026-07-23
+
+- Replace the static KD98 top-left label with the selected governor's stored Power rank from their
+  latest scan.
+- Reduce KVK cards to KVK rank, T4+T5 target performance, KP, Deads target/rank, Healed/KP Loss,
+  Tanking/rank, and Acclaim rank/personal-best context.
+- Add positive-Acclaim descending competition rank through the existing bounded KVK calculation
+  set. Add no table, index, refresh, or pre-aggregation object.
 
 ## 17. PR Summary Template
 

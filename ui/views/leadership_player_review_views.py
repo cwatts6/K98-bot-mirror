@@ -117,6 +117,7 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
         value=(
             f"Alliance: {header.current_alliance or 'Unallied'}\n"
             f"Power: {header.current_power if header.current_power is not None else '—'}\n"
+            f"Power rank: {header.current_power_rank if header.current_power_rank is not None else '—'}\n"
             f"City Hall: {header.city_hall if header.city_hall is not None else '—'}"
         ),
         inline=True,
@@ -211,8 +212,12 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
                 else "Not available"
             )
             lines.append(
-                f"KVK {row.kvk_no}: KP {number(row.kill_points)} (rank {row.kill_points_rank or '—'}) · "
-                f"Deads {number(row.deads)} (rank {row.deads_rank or '—'}) · Tanking {tanking}"
+                f"KVK {row.kvk_no} rank {row.kvk_rank or '—'} · "
+                f"T4+T5 {number(row.t4_t5_kills)} ({renderer._percent(row.kill_target_percent)} target) · "
+                f"KP {number(row.kill_points)} · Deads {number(row.deads)} "
+                f"({renderer._percent(row.dead_target_percent)} target, rank {row.deads_rank or '—'}) · "
+                f"Tanking {tanking} · Acclaim {number(row.acclaim)} "
+                f"(rank {row.acclaim_rank or '—'})"
             )
         embed.add_field(
             name="Ended/finalized KVKs", value=_bounded_embed_lines(lines), inline=False

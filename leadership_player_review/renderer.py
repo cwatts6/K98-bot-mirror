@@ -128,7 +128,29 @@ def _draw_header(
     draw: ImageDraw.ImageDraw, canvas: Image.Image, payload: LeadershipPlayerPayload
 ) -> None:
     header = payload.header
-    visual_contract.paste_core_avatar(canvas, None, fallback_text="KD98")
+    visual_contract.paste_core_avatar(canvas, None, fallback_text="")
+    _text(
+        draw,
+        (96, 88),
+        "RANK",
+        width=144,
+        size=22,
+        min_size=18,
+        fill=_BLUE,
+        bold=True,
+        centre=True,
+    )
+    _text(
+        draw,
+        (96, 119),
+        _clean(header.current_power_rank),
+        width=144,
+        size=49,
+        min_size=30,
+        fill=visual_contract.GOLD,
+        bold=True,
+        centre=True,
+    )
     _panel(draw, (260, 38, 1328, 210))
     _text(
         draw,
@@ -612,8 +634,9 @@ def _draw_kvk(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> No
             (x0 + 22, y0 + 65),
             f"KVK Rank {_clean(row.kvk_rank)}",
             width=width,
-            size=25,
-            min_size=17,
+            size=27,
+            min_size=19,
+            fill=_GREEN if row.kvk_rank is not None else _MUTED,
             bold=True,
         )
         _text(
@@ -621,42 +644,34 @@ def _draw_kvk(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> No
             (x0 + 22, y0 + 111),
             f"T4 & T5 Kills: {_compact(row.t4_t5_kills)}  •  {_kvk_target_context(row.kill_target_percent, exempt=row.exempt)}",
             width=width,
-            size=21,
-            min_size=13,
+            size=23,
+            min_size=15,
             bold=True,
         )
         _text(
             draw,
-            (x0 + 22, y0 + 157),
-            f"KP: {_compact(row.kill_points)}  •  rank {_clean(row.kill_points_rank)}",
+            (x0 + 22, y0 + 161),
+            f"KP: {_compact(row.kill_points)}",
             width=width,
-            size=21,
-            min_size=14,
+            size=23,
+            min_size=16,
         )
         _text(
             draw,
-            (x0 + 22, y0 + 203),
+            (x0 + 22, y0 + 229),
             f"Deads: {_compact(row.deads)}  •  {_kvk_target_context(row.dead_target_percent, exempt=row.exempt)}  •  rank {_clean(row.deads_rank)}",
             width=width,
-            size=21,
-            min_size=12,
+            size=23,
+            min_size=14,
             bold=True,
         )
         _text(
             draw,
-            (x0 + 22, y0 + 249),
-            f"Healed: {_compact(row.healed) if row.healed is not None else 'Not recorded'}  •  rank {_clean(row.healed_rank)}",
+            (x0 + 22, y0 + 299),
+            f"Healed: {_compact(row.healed) if row.healed is not None else 'Not recorded'}  •  KP Loss: {_compact(row.kp_loss) if row.kp_loss is not None else 'Not recorded'}",
             width=width,
-            size=21,
-            min_size=14,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 287),
-            f"KP Loss: {_compact(row.kp_loss) if row.kp_loss is not None else 'Not recorded'}",
-            width=width,
-            size=20,
-            min_size=14,
+            size=22,
+            min_size=13,
         )
         tanking = (
             f"{_percent(row.tanking_score)}  •  rank {_clean(row.tanking_rank)}"
@@ -665,11 +680,11 @@ def _draw_kvk(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> No
         )
         _text(
             draw,
-            (x0 + 22, y0 + 329),
+            (x0 + 22, y0 + 345),
             f"Tanking: {tanking}",
             width=width,
-            size=21,
-            min_size=14,
+            size=23,
+            min_size=16,
             fill=_GREEN if row.tanking_score is not None else _MUTED,
             bold=row.tanking_score is not None,
         )
@@ -681,45 +696,21 @@ def _draw_kvk(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> No
         )
         _text(
             draw,
-            (x0 + 22, y0 + 375),
-            f"Acclaim: {_compact(row.acclaim)}",
+            (x0 + 22, y0 + 419),
+            f"Acclaim: {_compact(row.acclaim)}  •  rank {_clean(row.acclaim_rank)}",
             width=width,
-            size=21,
-            min_size=14,
+            size=23,
+            min_size=16,
             bold=True,
         )
         _text(
             draw,
-            (x0 + 22, y0 + 413),
+            (x0 + 22, y0 + 465),
             f"Best: {_compact(best_acclaim)}  •  {_percent(acclaim_pct)} of Best",
             width=width,
-            size=19,
-            min_size=13,
+            size=22,
+            min_size=15,
             fill=_MUTED,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 457),
-            f"DKP: {_compact(row.dkp)}  •  {_percent(row.dkp_target_percent)}",
-            width=width,
-            size=21,
-            min_size=14,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 501),
-            f"Pre-KVK: {_compact(row.prekvk_points)}  •  rank {_clean(row.prekvk_rank)}",
-            width=width,
-            size=20,
-            min_size=13,
-        )
-        _text(
-            draw,
-            (x0 + 22, y0 + 545),
-            f"Honor: {_compact(row.honor_points)}  •  rank {_clean(row.honor_rank)}",
-            width=width,
-            size=20,
-            min_size=13,
         )
 
 

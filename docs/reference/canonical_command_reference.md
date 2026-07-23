@@ -259,9 +259,14 @@ deployed and commands are resynced.
   readability and measured performance.
 - No command, option or permission change; no resync expected.
 - Preserve `36 / 100 / 8 / 1 / 2`.
-- The approved SQL additions are the bounded Last Active procedure and finalized-KVK KP/Deads
-  ranks plus explicit legacy Healed availability. Any table/index or further SQL optimisation
-  remains actual-plan/read/timing evidence- and separately approval-gated.
+- The approved SQL additions are the bounded Last Active procedure, finalized-KVK KP/Deads and
+  positive-Acclaim ranks, explicit legacy Healed availability, KVK Index kingdom rank, and the
+  selected governor's stored latest-scan Power rank. These extensions reuse existing bounded
+  result paths and add no table, index, refresh, or pre-aggregation object.
+- The neutral top-left identity circle shows latest-scan Power rank. KVK Performance prioritises
+  KVK rank, T4+T5 target performance, KP, Deads target/rank, Healed/KP Loss, Tanking/rank, and
+  Acclaim rank/personal-best context; DKP, Pre-KVK, Honor, KP rank, and Healed rank remain in the
+  payload but are no longer repeated on the visual card.
 
 ### Phase 9
 

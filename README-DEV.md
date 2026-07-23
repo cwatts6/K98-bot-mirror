@@ -153,6 +153,11 @@ same-payload fallback, latest-transition-wins, preserve-and-disable timeout, cle
 Governor-ID navigation. No command change or resync is expected; new SQL objects remain evidence-
 and approval-gated. Phase 9 remains a separate leadership `/stats kingdom` product.
 
+The 2026-07-23 final visual follow-up replaces the static KD98 circle with stored latest-scan Power
+rank and reduces KVK cards to the essential leadership comparison lines. Positive-Acclaim rank is
+added through the existing bounded KVK calculation set; no table, index, refresh or
+pre-aggregation object is introduced.
+
 ## Quality Automation
 
 Run before committing:

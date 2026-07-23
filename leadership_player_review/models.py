@@ -46,6 +46,7 @@ class ReviewHeader:
     governor_name: str | None
     current_alliance: str | None
     current_power: int | None
+    current_power_rank: int | None
     city_hall: int | None
     effective_now_utc: datetime
     anchor_date: date | None
@@ -217,6 +218,7 @@ class KvkPerformance:
     kp_loss: int | None
     tanking_score: Decimal | None
     acclaim: int | None
+    acclaim_rank: int | None
     dkp: int | None
     dkp_target: int | None
     dkp_target_percent: Decimal | None

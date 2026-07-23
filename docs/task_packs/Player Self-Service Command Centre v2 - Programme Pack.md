@@ -1923,6 +1923,8 @@ Deliver:
 - Overview removes duplicated Forts/Helps/Tech cards; keeps Activity Index; adds an uncapped
   latest-three KVK Index; separates Presence and Last Active; and combines latest X:Y, location
   freshness and shield context in one action box.
+- The neutral top-left circle shows the selected governor's stored Power rank from their latest
+  scan instead of the static KD98 label.
 - Presence shows exact scan ratio and percentage.
 - Last Active is the latest authoritative complete kingdom `ScanDate` within bounded 720-day
   history where Power, Healed, RSS Gathered, RSS Assisted, Helps, Tech Donations, Building Minutes
@@ -1933,8 +1935,9 @@ Deliver:
 - ACTIVE/INACTIVE is separate from CURRENT/STALE/PARTIAL/NO DATA.
 - Kingdom Activity removes repeated location context and enlarges its accepted six metric panels.
 - KVK Performance removes repeated location context and presents the latest three finalized KVKs
-  as three side-by-side cards, retaining metrics/percentages/ranks while removing visible final
-  timestamp/state and MET/NOT MET words.
+  as three side-by-side cards focused on KVK rank, T4+T5 target performance, KP, Deads
+  target/rank, Healed/KP Loss, Tanking/rank, and Acclaim rank/personal-best context. DKP, Pre-KVK,
+  Honor, KP rank, and Healed rank are omitted from the visual card.
 - KVK Index uses `kills target % * 60% + deads target % * 20% + Tanking * 20%` per scoreable
   completed KVK and the arithmetic mean across as many of the latest three as have complete,
   non-exempt score inputs. Genuine zero kills/deads/healed makes that KVK score zero.
@@ -1945,9 +1948,10 @@ Deliver:
 - Footer wording becomes `Data refreshed` with Generated right aligned.
 - Performance work measures cold/warm 30/90/180/360 loads, SQL plans/reads/time/result sizes,
   cache/inflight and rendering stages before choosing the smallest improvement.
-- The approved SQL scope is the additive bounded Last Active procedure plus finalized-KVK KP/Deads
-  ranks and explicit legacy Healed availability. No table, further index or pre-aggregation is
-  included; any supporting-object proposal still requires actual-plan/read/
+- The approved SQL scope is the additive bounded Last Active procedure plus finalized-KVK
+  KP/Deads/positive-Acclaim ranks, explicit legacy Healed availability, KVK Index kingdom rank,
+  and the selected governor's stored latest-scan Power rank. No table, further index or
+  pre-aggregation is included; any supporting-object proposal still requires actual-plan/read/
   timing evidence plus a separate SQL design/review/deployment gate.
 
 Command impact: none; remain `36 / 100 / 8 / 1 / 2`. No resync is expected.
@@ -2373,3 +2377,4 @@ explicit historical corrections.
 | 2026-07-21 | Phase 8.1 visual hierarchy, Presence and performance scope task-packed | Approved a separate audit-first refinement: Overview Presence/Last Active/location emphasis, larger Activity page, three-column latest-three KVK layout, grouped complete Alias/Alliance presentation, consistent footer alignment and measurement-first cold/warm 30/90/180/360 performance work. No command/resync change is expected; any SQL object remains evidence- and approval-gated. |
 | 2026-07-22 | Phase 8.1 operator scorecard and SQL follow-up approved | Split Presence/Last Active, combined action-focused location/shield context, added an uncapped 60/20/20 latest-three completed-KVK Index, limited Alias/Alliance history to the selected Governor ID, required positive Healed for Tanking, and approved SQL KP/Deads competition ranks plus explicit legacy Healed availability. No table, further index, command, permission or resync change is included. |
 | 2026-07-22 | Phase 8.1 visual consistency and KVK Index rank follow-up approved | Standardise Overview scorecards and three-column page grids, enlarge bounded typography, simplify controls without Refresh, and add a SQL-backed kingdom competition rank for the uncapped KVK Index. The SQL extension reuses the bounded finalized-KVK temp cohort and adds no table, index or refresh object. |
+| 2026-07-23 | Phase 8.1 final KVK and Power-rank visual follow-up approved | Replace the static KD98 circle with stored latest-scan Power rank; reduce each KVK card to the leadership comparison essentials; and add positive-Acclaim competition rank through the existing bounded KVK calculation set. The additive procedure-result changes add no table, index, refresh, or pre-aggregation object. |
