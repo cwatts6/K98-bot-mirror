@@ -132,38 +132,29 @@ def _draw_header(
     _panel(draw, (260, 38, 1328, 210))
     _text(
         draw,
-        (286, 50),
+        (286, 47),
         header.governor_name or f"Governor {header.governor_id}",
-        width=730,
-        size=44,
-        min_size=25,
+        width=780,
+        size=50,
+        min_size=29,
         bold=True,
     )
     _text(
         draw,
-        (286, 103),
+        (286, 106),
         f"Governor ID {header.governor_id}  •  Alliance {_clean(header.current_alliance, missing='Unallied')}",
         width=900,
-        size=22,
-        min_size=16,
+        size=25,
+        min_size=17,
         fill=_BLUE,
     )
     _text(
         draw,
-        (286, 139),
+        (286, 151),
         f"Power {_compact(header.current_power)}  •  City Hall {_clean(header.city_hall)}  •  Governor scan {_utc(header.latest_governor_scan_at_utc)}",
         width=970,
-        size=18,
-        min_size=14,
-        fill=_MUTED,
-    )
-    _text(
-        draw,
-        (286, 171),
-        f"{payload.period_days} days  •  {_date(header.current_start_date)}–{_date(header.current_end_date)}  •  Previous {_date(header.previous_start_date)}–{_date(header.previous_end_date)}",
-        width=980,
-        size=17,
-        min_size=13,
+        size=21,
+        min_size=15,
         fill=_MUTED,
     )
     visual_contract.draw_state_pill(draw, payload.freshness)
@@ -187,54 +178,22 @@ def _draw_header(
     _text(
         draw,
         (1365, 149),
-        f"Period {payload.period_days}d",
+        f"{payload.period_days} days • {_date(header.current_start_date)}–{_date(header.current_end_date)}",
         width=245,
-        size=16,
-        min_size=13,
+        size=13,
+        min_size=10,
         fill=_MUTED,
         centre=True,
     )
-    current = payload.current_presence
-    presence = "No scan presence"
-    if current:
-        presence = f"Presence {current.present_scans}/{current.complete_scans} scans • {current.present_scanned_days}/{current.scanned_days} days"
-    _text(draw, (1365, 176), presence, width=245, size=13, min_size=11, fill=_MUTED, centre=True)
-
-
-def _draw_context(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> None:
-    header = payload.header
-    _panel(draw, (70, 226, 1632, 304))
-    location = (
-        f"{header.location_x}:{header.location_y}"
-        if header.location_x is not None and header.location_y is not None
-        else "—"
-    )
-    shield = "Not reported"
-    if header.shield_ends_at_utc is not None:
-        status = "active" if header.shield_ends_at_utc > header.effective_now_utc else "expired"
-        shield = f"Reported {status} · ends {_utc(header.shield_ends_at_utc)}"
-    coverage = " • ".join(
-        f"{item.source_code.replace('_', ' ').title()} {item.valid_units}/{item.expected_units}"
-        for item in payload.coverage
-        if item.window == "CURRENT"
-    )
     _text(
         draw,
-        (92, 239),
-        f"Latest X:Y {location}  •  Location updated {_utc(header.location_updated_at_utc)}  •  Shield {shield}",
-        width=1500,
-        size=17,
-        min_size=13,
-        fill=_BLUE,
-    )
-    _text(
-        draw,
-        (92, 271),
-        coverage or "Valid source observations: NO DATA",
-        width=1500,
-        size=15,
-        min_size=12,
+        (1365, 176),
+        f"Previous {_date(header.previous_start_date)}–{_date(header.previous_end_date)}",
+        width=245,
+        size=13,
+        min_size=10,
         fill=_MUTED,
+        centre=True,
     )
 
 
@@ -422,13 +381,14 @@ def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
         if header.location_x is not None and header.location_y is not None
         else "Not reported"
     )
-    shield_status = "NOT REPORTED"
-    shield_detail = ""
+    shield_status = "INACTIVE"
+    shield_detail = "No active shield reported"
     if header.shield_ends_at_utc is not None:
-        shield_status = (
-            "ACTIVE" if header.shield_ends_at_utc > header.effective_now_utc else "EXPIRED"
-        )
-        shield_detail = f"Ends {_utc(header.shield_ends_at_utc)}"
+        if header.shield_ends_at_utc > header.effective_now_utc:
+            shield_status = "ACTIVE"
+            shield_detail = f"Ends {_utc(header.shield_ends_at_utc)}"
+        else:
+            shield_detail = f"Last ended {_utc(header.shield_ends_at_utc)}"
     _text(
         draw,
         (94, 530),
@@ -460,8 +420,7 @@ def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
         bold=True,
     )
     _text(draw, (466, 579), shield_status, width=350, size=34, min_size=22, bold=True)
-    if shield_detail:
-        _text(draw, (466, 643), shield_detail, width=350, size=18, min_size=13, fill=_MUTED)
+    _text(draw, (466, 643), shield_detail, width=350, size=18, min_size=13, fill=_MUTED)
 
     _panel(draw, (862, 508, 1632, 810))
     _text(
@@ -474,40 +433,39 @@ def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
         fill=_BLUE,
         bold=True,
     )
-    coverage = "  •  ".join(
-        f"{item.source_code.replace('_', ' ').title()} {item.valid_units}/{item.expected_units}"
-        for item in payload.coverage
-        if item.window == "CURRENT"
+    insight = (
+        payload.prompts[0]
+        if payload.prompts
+        else "The data is not complete enough for a fair player comparison."
+    )
+    action = (
+        payload.prompts[1]
+        if len(payload.prompts) > 1
+        else "No player action is recommended from this review."
     )
     _text(
         draw,
-        (884, 571),
-        coverage or "Valid source observations: NO DATA",
+        (894, 580),
+        "INSIGHT",
         width=726,
-        size=15,
-        min_size=11,
-        fill=_MUTED,
+        size=19,
+        min_size=15,
+        fill=_BLUE,
+        bold=True,
     )
-    y = 612
-    if payload.prompts:
-        for prompt in payload.prompts[:2]:
-            colour = _GREEN if prompt.startswith("Strength") else _AMBER
-            _text(draw, (894, y), prompt, width=706, size=18, min_size=13, fill=colour)
-            y += 43
-    else:
-        _text(
-            draw,
-            (894, y),
-            "Prompts suppressed for freshness, coverage, tenure, comparison, or cohort safeguards.",
-            width=706,
-            size=17,
-            min_size=12,
-            fill=_MUTED,
-        )
-        y += 42
-    for warning in payload.warnings[:2]:
-        _text(draw, (894, y), warning, width=706, size=16, min_size=11, fill=_AMBER)
-        y += 34
+    _text(draw, (894, 614), insight, width=706, size=20, min_size=14, fill=_TEXT)
+    _text(
+        draw,
+        (894, 686),
+        "ACTION",
+        width=726,
+        size=19,
+        min_size=15,
+        fill=_BLUE,
+        bold=True,
+    )
+    action_colour = _GREEN if action.startswith("No player action is recommended") else _AMBER
+    _text(draw, (894, 720), action, width=706, size=20, min_size=14, fill=action_colour)
 
 
 def _draw_activity(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) -> None:
@@ -786,10 +744,10 @@ def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) ->
         fill=_MUTED,
         centre=True,
     )
-    _panel(draw, (70, 326, 576, 810))
+    _panel(draw, (70, 226, 576, 810))
     _text(
         draw,
-        (92, 342),
+        (92, 242),
         "ACTIVE LINKED GOVERNORS",
         width=462,
         size=23,
@@ -797,7 +755,7 @@ def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) ->
         fill=_BLUE,
         bold=True,
     )
-    y = 384
+    y = 284
     if payload.linked_governors:
         for row in payload.linked_governors[offset : offset + page_size]:
             suffix = " · CURRENT" if row.current else ""
@@ -822,10 +780,10 @@ def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) ->
             fill=_MUTED,
         )
 
-    _panel(draw, (598, 326, 1104, 810))
+    _panel(draw, (598, 226, 1104, 810))
     _text(
         draw,
-        (620, 342),
+        (620, 242),
         "ALIASES",
         width=462,
         size=23,
@@ -833,7 +791,7 @@ def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) ->
         fill=_BLUE,
         bold=True,
     )
-    y = 384
+    y = 284
     visible_alias_rows = alias_page_rows[page_index] if page_index < len(alias_page_rows) else ()
     for display_row in visible_alias_rows:
         row = display_row.alias
@@ -889,10 +847,10 @@ def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) ->
             fill=_MUTED,
         )
 
-    _panel(draw, (1126, 326, 1632, 810))
+    _panel(draw, (1126, 226, 1632, 810))
     _text(
         draw,
-        (1148, 342),
+        (1148, 242),
         "ALLIANCES",
         width=462,
         size=23,
@@ -900,7 +858,7 @@ def _draw_record(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) ->
         fill=_BLUE,
         bold=True,
     )
-    y = 384
+    y = 284
     visible_alliance_rows = (
         alliance_page_rows[page_index] if page_index < len(alliance_page_rows) else ()
     )
@@ -970,7 +928,6 @@ def render_leadership_player(payload: LeadershipPlayerPayload) -> RenderedLeader
     elif payload.page == "kvk":
         _draw_kvk(draw, payload)
     elif payload.page == "record":
-        _draw_context(draw, payload)
         _draw_record(draw, payload)
     else:
         _draw_overview(draw, payload)

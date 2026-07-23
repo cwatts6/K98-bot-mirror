@@ -366,6 +366,10 @@ def _log_performance(diagnostics: LoadDiagnostics, *, period: int, page: ReviewP
 
 
 def _prompts(*, freshness: FreshnessState, header, metrics, activity_index) -> tuple[str, ...]:
+    no_recommendation = (
+        "The data is not complete enough for a fair player comparison.",
+        "No player action is recommended from this review.",
+    )
     is_new = (
         header.first_observed_date is not None
         and header.current_start_date is not None
@@ -374,21 +378,23 @@ def _prompts(*, freshness: FreshnessState, header, metrics, activity_index) -> t
     comparable = all(metric.comparison_mode != "UNAVAILABLE" for metric in metrics)
     cohort = activity_index.cohort_count or 0
     if freshness != "CURRENT" or is_new or not comparable or cohort < _SMALL_COHORT:
-        return ()
+        return no_recommendation
     ranked = [metric for metric in metrics if metric.percentile is not None and metric.kingdom_rank]
     if not ranked:
-        return ()
+        return no_recommendation
     best = max(ranked, key=lambda item: item.percentile or 0)
     worst = min(ranked, key=lambda item: item.percentile or 0)
-    strength = (
-        f"Strength: {_metric_label(best)} ranks #{best.kingdom_rank} of {best.cohort_count}; "
-        f"top {best.top_percent:.0f}% with {best.current_valid_days} valid reporting days."
+    insight = (
+        f"{_metric_label(best)} is the strongest result, ranked "
+        f"#{best.kingdom_rank} of {best.cohort_count} in the kingdom."
     )
-    attention = (
-        f"Review: what changed in {_metric_label(worst)}? It ranks #{worst.kingdom_rank} of "
-        f"{worst.cohort_count} with {worst.missing_units} missing source units."
+    action = (
+        f"Review {_metric_label(worst)} with the player; it is the weakest result, "
+        f"ranked #{worst.kingdom_rank} of {worst.cohort_count} in the kingdom."
     )
-    return (strength, attention) if best.order != worst.order else (strength,)
+    if best.order == worst.order:
+        action = "No player action is recommended from this review."
+    return insight, action
 
 
 async def load_payload(

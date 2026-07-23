@@ -150,17 +150,19 @@ def build_fallback_embed(payload: LeadershipPlayerPayload) -> discord.Embed:
             if header.location_x is not None and header.location_y is not None
             else "Not reported"
         )
-        shield = (
-            renderer._utc(header.shield_ends_at_utc)
-            if header.shield_ends_at_utc is not None
-            else "Not reported"
+        shield_active = bool(
+            header.shield_ends_at_utc and header.shield_ends_at_utc > header.effective_now_utc
+        )
+        shield = "Active" if shield_active else "Inactive"
+        shield_detail = (
+            f"\nShield ends: {renderer._utc(header.shield_ends_at_utc)}" if shield_active else ""
         )
         embed.add_field(
             name="Location and shield",
             value=(
                 f"Latest X:Y: {location}\n"
                 f"Location updated: {renderer._utc(header.location_updated_at_utc)}\n"
-                f"Shield ends: {shield}"
+                f"Shield status: {shield}{shield_detail}"
             ),
             inline=False,
         )
@@ -407,8 +409,6 @@ class LeadershipPlayerView(discord.ui.View):
             return "linked_governor_change"
         if custom_id.endswith(":change"):
             return "change_player"
-        if custom_id.endswith(":definitions"):
-            return "definitions"
         return "page_change"
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -664,64 +664,6 @@ class LeadershipPlayerView(discord.ui.View):
             LeadershipChangePlayerModal(
                 parent=self,
             )
-        )
-
-    @discord.ui.button(label="Definitions", custom_id="leadership:player:definitions", row=3)
-    async def definitions(self, _button, interaction):
-        if not interaction.response.is_done():
-            await interaction.response.defer()
-        current_authorization = await _final_delivery_authorization(
-            interaction,
-            author_id=self.author_id,
-            target_id=self.payload.header.governor_id,
-            action="definitions",
-            correlation_id=self.correlation_id,
-            boundary="before_access",
-        )
-        if current_authorization is None:
-            return
-        self.authorization = current_authorization
-        embed = discord.Embed(
-            title="Leadership player review · definitions",
-            description=(
-                "Exact periods use anchor − days + 1. Presence is distinct complete scans containing the Governor ID. "
-                "Coverage keeps Stats scans, Alliance Activity snapshots, and completed Rally report dates separate.\n\n"
-                "Activity Index v1 weights: Forts 30%, Helps 22%, Tech 18%, RSS 14%, Building 10%, Power 6%. "
-                "Components use average-rank percentile; missing one component makes the index unavailable.\n\n"
-                "Last Active searches at most 720 UTC calendar days and compares each complete kingdom scan "
-                "with the previous complete scan where that Governor ID was present. Power, Healed, RSS Gathered, "
-                "RSS Assisted, Helps, Tech Donations, Building Minutes and completed Fort rallies can qualify. "
-                "Missing observations are not zero; exactly 30 days remains ACTIVE.\n\n"
-                "KP Loss = Healed × 20. Tanking Score is calculated only when Healed is positive: "
-                "Kill Points ÷ (KP Loss + Deads) × 100; higher is better.\n\n"
-                "KVK Index uses the latest three scoreable completed KVKs: Kill target 60%, Deads target 20%, "
-                "and Tanking 20%. It is uncapped; missing or exempt KVKs are excluded and an observed zero "
-                "Kills, Deads or Healed value scores zero. Its kingdom rank compares governors with at least "
-                "one scoreable result among the latest three globally finalized KVKs."
-            ),
-            color=discord.Color.blue(),
-        )
-        depth_lines = [
-            (
-                f"{row.source_code}: {row.earliest or '—'} to {row.latest or '—'} · "
-                f"{row.observation_count} {row.history_kind.lower()} · "
-                f"gaps {row.gap_count if row.gap_count is not None else '—'} · {row.evidence_basis}"
-            )
-            for row in self.payload.history_depth
-        ]
-        embed.add_field(
-            name="History depth",
-            value=("\n".join(depth_lines) or "No history-depth evidence is available.")[:1024],
-            inline=False,
-        )
-        await interaction.followup.send(embed=embed, ephemeral=True)
-        await _audit(
-            interaction,
-            self.authorization,
-            target_id=self.payload.header.governor_id,
-            action="definitions",
-            outcome="SUCCEEDED",
-            correlation_id=self.correlation_id,
         )
 
     @discord.ui.select(

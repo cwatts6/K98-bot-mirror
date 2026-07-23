@@ -204,7 +204,10 @@ def _payload(*, page="overview", aliases=1, episodes=1, linked=2) -> LeadershipP
             for index in range(linked)
         ),
         kvk_rows=(_kvk(15), _kvk(14), _kvk(13)),
-        prompts=("Strength: visible rank evidence.", "Review: visible trend evidence?"),
+        prompts=(
+            "Forts is the strongest result, ranked #1 of 100 in the kingdom.",
+            "Review Power Change with the player; it is the weakest result, ranked #6 of 100 in the kingdom.",
+        ),
         warnings=(),
         generated_at_utc=NOW,
         last_active=LastActive(
@@ -272,6 +275,37 @@ def test_stale_wins_over_partial_and_no_data_wins_without_presence() -> None:
             (ScanPresence("CURRENT", 90, 0, 90, 0),),
         )
         == "NO DATA"
+    )
+
+
+def test_leadership_review_returns_one_plain_english_insight_and_action() -> None:
+    payload = _payload()
+
+    insight, action = service._prompts(
+        freshness=payload.freshness,
+        header=payload.header,
+        metrics=payload.metrics,
+        activity_index=payload.activity_index,
+    )
+
+    assert insight == "Forts is the strongest result, ranked #1 of 100 in the kingdom."
+    assert action == (
+        "Review Power Change with the player; it is the weakest result, "
+        "ranked #6 of 100 in the kingdom."
+    )
+
+
+def test_leadership_review_recommends_no_player_action_when_safeguarded() -> None:
+    payload = _payload()
+
+    assert service._prompts(
+        freshness="PARTIAL",
+        header=payload.header,
+        metrics=payload.metrics,
+        activity_index=payload.activity_index,
+    ) == (
+        "The data is not complete enough for a fair player comparison.",
+        "No player action is recommended from this review.",
     )
 
 
@@ -500,7 +534,9 @@ def test_overview_promotes_presence_last_active_and_removes_duplicate_metrics(
         return original_text(*args, **kwargs)
 
     monkeypatch.setattr(renderer, "_text", capture_text)
-    renderer.render_leadership_player(_payload(page="overview"))
+    payload = _payload(page="overview")
+    payload = replace(payload, header=replace(payload.header, shield_ends_at_utc=None))
+    renderer.render_leadership_player(payload)
 
     assert "PRESENCE" in rendered_text
     assert "89 / 90 scans" in rendered_text
@@ -509,6 +545,14 @@ def test_overview_promotes_presence_last_active_and_removes_duplicate_metrics(
     assert "18 Jul 2026" in rendered_text
     assert "KVK INDEX" in rendered_text
     assert "LATEST LOCATION" in rendered_text
+    assert "INACTIVE" in rendered_text
+    assert "INSIGHT" in rendered_text
+    assert "ACTION" in rendered_text
+    assert "90 days • 21 Apr 2026–19 Jul 2026" in rendered_text
+    assert "Previous 21 Jan 2026–20 Apr 2026" in rendered_text
+    assert not any(text.startswith("Presence 89/90 scans") for text in rendered_text)
+    assert "Stats Scans 89/90" not in rendered_text
+    assert not any(text.startswith("Prompts suppressed") for text in rendered_text)
     assert not {"FORTS TOTAL", "HELPS", "TECH DONATIONS"} & set(rendered_text)
 
 
@@ -639,6 +683,8 @@ def test_record_renderer_uses_consistent_footer_and_readable_alias_columns(monke
     assert all(name in rendered for name in ("TroIl", "JohnPaulV", "TrolI", "Stylebender", "TroII"))
     assert "1st 16 May 24" in rendered
     assert "last 21 Jul 26" in rendered
+    assert not any(text.startswith("Latest X:Y") for text in rendered)
+    assert not any(text.startswith("Stats Scans") for text in rendered)
     assert not any(text.startswith("Source freshness") for text in rendered)
     assert any(text.startswith("Data refreshed") for text in rendered)
     assert any(
@@ -667,7 +713,7 @@ async def test_view_has_locked_rows_private_navigation_and_record_paging() -> No
     assert controls["leadership:player:linked"].row == 2
     assert controls["leadership:player:linked"].placeholder == "Active linked governors"
     assert controls["leadership:player:change"].row == 3
-    assert controls["leadership:player:definitions"].row == 3
+    assert "leadership:player:definitions" not in controls
     assert controls["leadership:player:record:previous"].row == 3
     assert controls["leadership:player:record:next"].row == 3
     assert controls["leadership:player:record:previous"].disabled is True
@@ -698,7 +744,7 @@ async def test_record_paging_controls_remain_visible_and_disabled_off_record_pag
 
     assert controls["leadership:player:record:previous"].disabled is True
     assert controls["leadership:player:record:next"].disabled is True
-    assert len([child for child in view.children if child.row == 3]) == 5
+    assert len([child for child in view.children if child.row == 3]) == 4
 
 
 @pytest.mark.asyncio
@@ -733,6 +779,17 @@ def test_fallback_uses_same_payload_without_discord_identity() -> None:
     assert "governor alpha" in text
     assert "discord" not in text
     assert "account slot" not in text
+
+
+def test_overview_fallback_uses_leadership_facing_inactive_shield_status() -> None:
+    payload = _payload(page="overview")
+    payload = replace(payload, header=replace(payload.header, shield_ends_at_utc=None))
+
+    embed = build_fallback_embed(payload)
+    location_field = next(field for field in embed.fields if field.name == "Location and shield")
+
+    assert "Shield status: Inactive" in location_field.value
+    assert "Shield ends:" not in location_field.value
 
 
 def test_kvk_fallback_field_stays_within_discord_limit() -> None:
@@ -1109,48 +1166,6 @@ async def test_component_begin_reauthorizes_before_payload_access(monkeypatch) -
 
     assert transition is None
     assert len(denials) == 1
-
-
-@pytest.mark.asyncio
-async def test_definitions_acknowledges_before_final_reauthorization(monkeypatch) -> None:
-    import ui.views.leadership_player_review_views as views
-
-    events: list[str] = []
-    response_done = False
-
-    async def defer():
-        nonlocal response_done
-        events.append("defer")
-        response_done = True
-
-    async def authorize(*_args, **_kwargs):
-        events.append("authorize")
-        return LeadershipPlayerAuthorization(True, basis="LEADERSHIP_ROLE_ID", role_id=10)
-
-    async def followup_send(*_args, **kwargs):
-        events.append("send")
-        assert kwargs["ephemeral"] is True
-        assert kwargs["embed"].title == "Leadership player review · definitions"
-
-    async def no_audit(*_args, **_kwargs):
-        return None
-
-    monkeypatch.setattr(views, "_final_delivery_authorization", authorize)
-    monkeypatch.setattr(views, "_audit", no_audit)
-    interaction = SimpleNamespace(
-        response=SimpleNamespace(is_done=lambda: response_done, defer=defer),
-        followup=SimpleNamespace(send=followup_send),
-    )
-    view = LeadershipPlayerView(
-        author_id=99,
-        payload=_payload(),
-        authorization=LeadershipPlayerAuthorization(True, basis="LEADERSHIP_ROLE_ID", role_id=10),
-        correlation_id=uuid4(),
-    )
-
-    await view.definitions.callback(interaction)
-
-    assert events == ["defer", "authorize", "send"]
 
 
 @pytest.mark.asyncio
