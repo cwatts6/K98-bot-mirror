@@ -156,7 +156,9 @@ and approval-gated. Phase 9 remains a separate leadership `/stats kingdom` produ
 The 2026-07-23 final visual follow-up replaces the static KD98 circle with stored latest-scan Power
 rank and reduces KVK cards to the essential leadership comparison lines. Positive-Acclaim rank is
 added through the existing bounded KVK calculation set; no table, index, refresh or
-pre-aggregation object is introduced.
+pre-aggregation object is introduced. Direct numeric Governor IDs now receive a bounded
+authoritative existence check before the full review payload starts; an unknown ID returns a
+private retry message, while governor-name matching and its ambiguity selector remain unchanged.
 
 ## Quality Automation
 

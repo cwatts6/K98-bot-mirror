@@ -387,16 +387,6 @@ def _draw_overview(draw: ImageDraw.ImageDraw, payload: LeadershipPlayerPayload) 
             fill=state_colour,
             bold=True,
         )
-    _text(
-        draw,
-        (1280, 419),
-        "UTC calendar date",
-        width=330,
-        size=16,
-        min_size=12,
-        fill=_MUTED,
-    )
-
     header = payload.header
     location = (
         f"{header.location_x}:{header.location_y}"

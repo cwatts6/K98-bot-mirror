@@ -176,6 +176,28 @@ def fetch_lookup_directory(
         return result
 
 
+def fetch_governor_exists(governor_id: int) -> bool:
+    """Return authoritative KingdomScanData4 existence for one exact Governor ID."""
+    gid = int(governor_id)
+    if gid <= 0:
+        raise ValueError("Governor ID must be positive")
+    with get_conn_with_retries() as conn:
+        cur = _cursor(conn)
+        cur.execute(
+            "EXEC dbo.usp_LeadershipPlayerGovernorExists @GovernorID = ?;",
+            (gid,),
+        )
+        rows = _result_sets(cur, 1)[0]
+        if len(rows) != 1:
+            raise ValueError("leadership Governor existence result must contain exactly one row")
+        returned_governor_id = _int(rows[0].get("GovernorID"))
+        if returned_governor_id != gid:
+            raise ValueError(
+                "leadership Governor existence result returned a mismatched Governor ID"
+            )
+        return bool(rows[0].get("ExistsInDatabase"))
+
+
 def fetch_review_contract(
     governor_id: int,
     period_days: int,

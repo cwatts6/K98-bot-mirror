@@ -152,6 +152,25 @@ def validate_command_inputs(governor_id: int | None, name: str | None) -> str | 
     return None
 
 
+def governor_not_found_message(governor_id: int) -> str:
+    return (
+        f"No governor with ID `{int(governor_id)}` was found in the database. "
+        "Please check the ID and try again."
+    )
+
+
+async def governor_exists(governor_id: int) -> bool:
+    """Check one exact numeric ID before starting the full leadership payload."""
+    started = time.perf_counter()
+    exists = await asyncio.to_thread(dal.fetch_governor_exists, int(governor_id))
+    logger.debug(
+        "leadership_player_exact_id_lookup_performance elapsed_ms=%.3f exists=%s",
+        (time.perf_counter() - started) * 1000.0,
+        exists,
+    )
+    return exists
+
+
 def _freshness(payload_header, coverage, presence) -> FreshnessState:
     current_presence = next((item for item in presence if item.window == "CURRENT"), None)
     if current_presence is None or current_presence.present_scans == 0:

@@ -527,7 +527,9 @@ Rules:
 - [ ] Tanking is unavailable unless Healed is positive; KP and Deads ranks are correct.
 - [ ] Data refreshed is left aligned and Generated is right aligned on every page.
 - [ ] Controls use four page buttons, Timeslice, Active linked governors, and one final action row
-      with Change Player, record Previous/Next and the disabled current governor.
+      with Change Player and record Previous/Next.
+- [ ] An unknown directly entered Governor ID returns one private check-and-retry message before
+      full review/KVK/Last Active/history loading; governor-name matching remains unchanged.
 - [ ] Cold/warm and period-change performance evidence identifies dominant costs.
 - [ ] Any optimisation is the smallest evidenced change and meets the approved budget.
 - [ ] No speculative SQL table/index is introduced.
@@ -595,6 +597,10 @@ The implementation handoff must include:
   Tanking/rank, and Acclaim rank/personal-best context.
 - Add positive-Acclaim descending competition rank through the existing bounded KVK calculation
   set. Add no table, index, refresh, or pre-aggregation object.
+- Reject a directly entered numeric Governor ID that has no authoritative `KingdomScanData4`
+  observation before starting the full payload; retain existing exact/fuzzy governor-name
+  selection.
+- Remove `UTC calendar date` from Last Active and remove the redundant disabled Current button.
 
 ## 17. PR Summary Template
 

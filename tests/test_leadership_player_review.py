@@ -36,6 +36,7 @@ from leadership_player_review.record_paging import (
     record_page_count,
 )
 from ui.views.leadership_player_review_views import (
+    LeadershipChangePlayerModal,
     LeadershipPlayerAmbiguityView,
     LeadershipPlayerView,
     build_fallback_embed,
@@ -258,6 +259,46 @@ def test_lookup_input_shape_rejects_neither_both_and_non_positive() -> None:
     assert service.validate_command_inputs(10**30, None)
     assert service.validate_command_inputs(None, "x" * 101)
     assert service.validate_command_inputs(123, None) is None
+
+
+def test_governor_not_found_message_is_clear_and_specific() -> None:
+    assert service.governor_not_found_message(123) == (
+        "No governor with ID `123` was found in the database. " "Please check the ID and try again."
+    )
+
+
+def test_dal_exact_governor_existence_contract_is_parameterized(monkeypatch) -> None:
+    executed: list[tuple[str, tuple[int]]] = []
+
+    class _Cursor:
+        timeout = None
+        description = (("GovernorID",), ("ExistsInDatabase",))
+
+        def execute(self, statement, parameters) -> None:
+            executed.append((statement, parameters))
+
+        def fetchall(self):
+            return [(123, True)]
+
+    class _Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+        def cursor(self):
+            return _Cursor()
+
+    monkeypatch.setattr(dal, "get_conn_with_retries", _Connection)
+
+    assert dal.fetch_governor_exists(123) is True
+    assert executed == [
+        (
+            "EXEC dbo.usp_LeadershipPlayerGovernorExists @GovernorID = ?;",
+            (123,),
+        )
+    ]
 
 
 def test_stale_wins_over_partial_and_no_data_wins_without_presence() -> None:
@@ -545,6 +586,7 @@ def test_overview_promotes_presence_last_active_and_removes_duplicate_metrics(
     assert "99%" in rendered_text
     assert "LAST ACTIVE" in rendered_text
     assert "18 Jul 2026" in rendered_text
+    assert "UTC calendar date" not in rendered_text
     assert "KVK INDEX" in rendered_text
     assert "LATEST LOCATION" in rendered_text
     assert "INACTIVE" in rendered_text
@@ -729,10 +771,7 @@ async def test_view_has_locked_rows_private_navigation_and_record_paging() -> No
     assert controls["leadership:player:record:next"].row == 3
     assert controls["leadership:player:record:previous"].disabled is True
     assert controls["leadership:player:record:next"].disabled is False
-    assert controls["leadership:player:current"].disabled is True
-    assert controls["leadership:player:current"].row == 3
-    assert controls["leadership:player:current"].label == "Current: Governor Alpha (123)"
-    assert controls["leadership:player:current"].style.name == "primary"
+    assert "leadership:player:current" not in controls
     assert callable(view.refresh)
     assert "leadership:player:refresh" not in controls
     linked_values = {option.value for option in controls["leadership:player:linked"].options}
@@ -755,7 +794,7 @@ async def test_record_paging_controls_remain_visible_and_disabled_off_record_pag
 
     assert controls["leadership:player:record:previous"].disabled is True
     assert controls["leadership:player:record:next"].disabled is True
-    assert len([child for child in view.children if child.row == 3]) == 4
+    assert len([child for child in view.children if child.row == 3]) == 3
 
 
 @pytest.mark.asyncio
@@ -1213,6 +1252,9 @@ async def test_final_reauthorization_blocks_initial_attachment(monkeypatch) -> N
     monkeypatch.setattr(views, "reauthorize_leadership_player_interaction", deny)
     monkeypatch.setattr(views, "_audit", no_audit)
     monkeypatch.setattr(views, "safe_defer", no_defer)
+    monkeypatch.setattr(
+        views.service, "governor_exists", lambda _governor_id: asyncio.sleep(0, True)
+    )
     monkeypatch.setattr(views.service, "load_payload", load_payload)
     monkeypatch.setattr(views, "_card_file", lambda _payload: None)
     followup = SimpleNamespace(send=followup_send)
@@ -1234,6 +1276,117 @@ async def test_final_reauthorization_blocks_initial_attachment(monkeypatch) -> N
     assert "no longer permits" in args[0]
     assert kwargs == {"ephemeral": True}
     assert load_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_unknown_exact_governor_id_fails_before_payload_load(monkeypatch) -> None:
+    import ui.views.leadership_player_review_views as views
+
+    allowed = LeadershipPlayerAuthorization(True, basis="LEADERSHIP_ROLE_ID", role_id=10)
+
+    async def authorize(_interaction):
+        return allowed
+
+    async def no_audit(*_args, **_kwargs):
+        return None
+
+    async def no_defer(*_args, **_kwargs):
+        return None
+
+    async def does_not_exist(_governor_id):
+        return False
+
+    async def unexpected_load(*_args, **_kwargs):
+        raise AssertionError("unknown exact ID must not start the full leadership payload")
+
+    sends: list[tuple[tuple, dict]] = []
+
+    async def followup_send(*args, **kwargs):
+        sends.append((args, kwargs))
+        return SimpleNamespace()
+
+    monkeypatch.setattr(views, "authorize_leadership_player_interaction", lambda _i: allowed)
+    monkeypatch.setattr(views, "reauthorize_leadership_player_interaction", authorize)
+    monkeypatch.setattr(views, "_audit", no_audit)
+    monkeypatch.setattr(views, "safe_defer", no_defer)
+    monkeypatch.setattr(views.service, "governor_exists", does_not_exist)
+    monkeypatch.setattr(views.service, "load_payload", unexpected_load)
+    followup = SimpleNamespace(send=followup_send)
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=99),
+        response=SimpleNamespace(is_done=lambda: True),
+        followup=followup,
+    )
+    ctx = SimpleNamespace(
+        interaction=interaction,
+        user=interaction.user,
+        followup=followup,
+    )
+
+    await views.send_leadership_player_review(ctx, governor_id=999_999, name=None)
+
+    assert sends == [
+        (
+            (
+                "No governor with ID `999999` was found in the database. "
+                "Please check the ID and try again.",
+            ),
+            {"ephemeral": True},
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_change_player_unknown_exact_id_keeps_current_dashboard(monkeypatch) -> None:
+    import ui.views.leadership_player_review_views as views
+
+    allowed = LeadershipPlayerAuthorization(True, basis="LEADERSHIP_ROLE_ID", role_id=10)
+
+    async def reauthorize(_interaction):
+        return allowed
+
+    async def no_audit(*_args, **_kwargs):
+        return None
+
+    async def does_not_exist(_governor_id):
+        return False
+
+    async def unexpected_load(*_args, **_kwargs):
+        raise AssertionError("unknown Change Player ID must not replace the current dashboard")
+
+    sends: list[tuple[str, bool]] = []
+
+    async def send_message(message, *, ephemeral=False, **_kwargs):
+        sends.append((message, ephemeral))
+
+    monkeypatch.setattr(views, "authorize_leadership_player_interaction", lambda _i: allowed)
+    monkeypatch.setattr(views, "reauthorize_leadership_player_interaction", reauthorize)
+    monkeypatch.setattr(views, "_audit", no_audit)
+    monkeypatch.setattr(views.service, "governor_exists", does_not_exist)
+    monkeypatch.setattr(views.service, "load_payload", unexpected_load)
+
+    parent = LeadershipPlayerView(
+        author_id=42,
+        payload=_payload(),
+        authorization=allowed,
+        correlation_id=uuid4(),
+    )
+    modal = LeadershipChangePlayerModal(parent=parent)
+    modal.query._input_value = "999999"
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=42),
+        response=SimpleNamespace(send_message=send_message),
+    )
+
+    await modal.callback(interaction)
+
+    assert sends == [
+        (
+            "No governor with ID `999999` was found in the database. "
+            "Please check the ID and try again.",
+            True,
+        )
+    ]
 
 
 def test_kvk_dal_maps_personal_best_from_second_result_set(monkeypatch) -> None:

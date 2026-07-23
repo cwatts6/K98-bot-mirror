@@ -341,20 +341,6 @@ class LeadershipPlayerView(discord.ui.View):
         self.message: Any | None = None
         self._transition_id = 0
         self._expired = False
-        current_name = payload.header.governor_name or "Governor"
-        current_suffix = f" ({payload.header.governor_id})"
-        max_name_length = 80 - len("Current: ") - len(current_suffix)
-        if len(current_name) > max_name_length:
-            current_name = f"{current_name[: max(1, max_name_length - 1)]}…"
-        self.add_item(
-            discord.ui.Button(
-                label=f"Current: {current_name}{current_suffix}",
-                custom_id="leadership:player:current",
-                style=discord.ButtonStyle.primary,
-                disabled=True,
-                row=3,
-            )
-        )
         self._sync_controls()
 
     def _record_page_count(self) -> int:
@@ -823,9 +809,10 @@ class LeadershipChangePlayerModal(discord.ui.Modal):
         authorization = current_authorization
         raw = str(self.query.value or "").strip()
         target_id: int | None = None
+        numeric_lookup = raw.isdecimal()
         matches: tuple[LookupCandidate, ...] = ()
         lookup_error: str | None = None
-        if raw.isdecimal():
+        if numeric_lookup:
             target_id = int(raw)
             lookup_error = service.validate_command_inputs(target_id, None)
             if lookup_error:
@@ -898,6 +885,40 @@ class LeadershipChangePlayerModal(discord.ui.Modal):
                 ephemeral=True,
             )
             return
+        if numeric_lookup:
+            assert target_id is not None
+            try:
+                exists = await service.governor_exists(target_id)
+            except Exception:
+                logger.exception("leadership_player_change_exact_id_lookup_failed")
+                await _audit(
+                    interaction,
+                    authorization,
+                    target_id=target_id,
+                    action="change_player",
+                    outcome="FAILED",
+                    correlation_id=self.parent.correlation_id,
+                    error_code="LOOKUP_FAILED",
+                )
+                await interaction.response.send_message(
+                    "Player lookup is temporarily unavailable.", ephemeral=True
+                )
+                return
+            if not exists:
+                await _audit(
+                    interaction,
+                    authorization,
+                    target_id=target_id,
+                    action="change_player",
+                    outcome="FAILED",
+                    correlation_id=self.parent.correlation_id,
+                    error_code="NOT_FOUND",
+                )
+                await interaction.response.send_message(
+                    service.governor_not_found_message(target_id),
+                    ephemeral=True,
+                )
+                return
         await interaction.response.defer()
         try:
             payload = await service.load_payload(
@@ -1179,6 +1200,7 @@ async def send_leadership_player_review(
     )
     await safe_defer(ctx, ephemeral=True)
     target_id = int(governor_id or 0) or None
+    numeric_lookup = target_id is not None
     current_authorization = await _final_delivery_authorization(
         interaction,
         author_id=ctx.user.id,
@@ -1245,6 +1267,38 @@ async def send_leadership_player_review(
             )
             return
         target_id = result.candidate.governor_id
+    if numeric_lookup:
+        assert target_id is not None
+        try:
+            exists = await service.governor_exists(target_id)
+        except Exception:
+            logger.exception("leadership_player_exact_id_lookup_failed")
+            await _audit(
+                interaction,
+                authorization,
+                target_id=target_id,
+                action="open",
+                outcome="FAILED",
+                correlation_id=correlation_id,
+                error_code="LOOKUP_FAILED",
+            )
+            await ctx.followup.send("Player lookup is temporarily unavailable.", ephemeral=True)
+            return
+        if not exists:
+            await _audit(
+                interaction,
+                authorization,
+                target_id=target_id,
+                action="open",
+                outcome="FAILED",
+                correlation_id=correlation_id,
+                error_code="NOT_FOUND",
+            )
+            await ctx.followup.send(
+                service.governor_not_found_message(target_id),
+                ephemeral=True,
+            )
+            return
     try:
         payload = await service.load_payload(target_id, service.DEFAULT_PERIOD)
     except Exception:
