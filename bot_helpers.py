@@ -18,6 +18,9 @@ from embed_utils import send_embed
 from file_utils import append_csv_line
 from logging_setup import flush_logs
 from processing_pipeline import handle_file_processing
+from services.fallback_upload_staging_service import (
+    stage_and_process_fallback_attachment,
+)
 from utils import (
     download_attachment,
     ensure_aware_utc,
@@ -292,20 +295,9 @@ async def queue_worker(channel_id):
             message = await queue.get()
             try:
                 for attachment in message.attachments:
-                    # Sanitize filename to avoid path traversal or directory components
-                    raw_filename = getattr(attachment, "filename", "unknown")
-                    filename = os.path.basename(raw_filename)
-                    save_path = os.path.join(DOWNLOAD_FOLDER, filename)
-                    success = await download_attachment(
-                        attachment,
-                        save_path,
-                        channel_name=message.channel.name,
-                        user=message.author,
-                    )
 
-                    user = await bot.fetch_user(ADMIN_USER_ID)
-
-                    if success:
+                    async def _process_staged_attachment(filename: str, staged_path: str) -> None:
+                        user = await bot.fetch_user(ADMIN_USER_ID)
                         await append_csv_line(
                             CSV_LOG,
                             [
@@ -313,26 +305,40 @@ async def queue_worker(channel_id):
                                 message.channel.name,
                                 filename,
                                 str(message.author),
-                                save_path,
+                                staged_path,
                             ],
                         )
 
                         job_id = (channel_id, filename)
-                        # Use lock to make check-and-add atomic
                         async with active_jobs_lock:
                             if job_id in active_jobs:
                                 logger.warning(f"Duplicate job skipped: {job_id}")
-                                continue
+                                return
                             active_jobs.add(job_id)
 
                         try:
-                            async with processing_lock:
-                                await handle_file_processing(user, message, filename, save_path)
+                            await handle_file_processing(
+                                user,
+                                message,
+                                filename,
+                                staged_path,
+                            )
                         finally:
-                            # Remove under lock to avoid races
                             async with active_jobs_lock:
                                 active_jobs.discard(job_id)
-                    else:
+
+                    success = await stage_and_process_fallback_attachment(
+                        attachment,
+                        download_folder=DOWNLOAD_FOLDER,
+                        processing_lock=processing_lock,
+                        download_attachment=download_attachment,
+                        process_attachment=_process_staged_attachment,
+                        channel_name=message.channel.name,
+                        user=message.author,
+                    )
+
+                    if not success:
+                        filename = os.path.basename(getattr(attachment, "filename", "unknown"))
                         notify_channel = bot.get_channel(NOTIFY_CHANNEL_ID)
                         await send_embed(
                             notify_channel,
