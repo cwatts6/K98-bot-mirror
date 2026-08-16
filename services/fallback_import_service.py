@@ -8,10 +8,14 @@ from datetime import datetime
 import json
 import logging
 import os
+from pathlib import Path
+import re
+import secrets
 import shutil
 
 import pandas as pd
 
+from file_utils import atomic_write_json
 from services.fallback_import_schema import (
     INTERIM_AUTO_PARTIAL_SNAPSHOT,
     detect_fallback_source_type,
@@ -22,6 +26,10 @@ from utils import utcnow
 
 logger = logging.getLogger(__name__)
 
+COMPLETED_FILE_PATTERN = re.compile(r"^stats_[0-9a-f]{32}\.ready\.csv$")
+PUBLICATION_MANIFEST_VERSION = 1
+_RECOVERABLE_PUBLICATION_STATES = frozenset({"prepared", "published", "sql_owned"})
+
 
 @dataclass(frozen=True, slots=True)
 class FallbackImportPaths:
@@ -29,7 +37,7 @@ class FallbackImportPaths:
     source_file_2: str
     archive_dir_1: str
     archive_dir_2: str
-    csv_file_path: str
+    ready_dir: str
     import_metadata_file_path: str
 
 
@@ -55,9 +63,7 @@ def read_source_dataframe(source_filepath: str) -> pd.DataFrame:
 
 
 def write_import_metadata(metadata: dict, metadata_path: str) -> None:
-    os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
-    with open(metadata_path, "w", encoding="utf-8") as handle:
-        json.dump(metadata, handle, ensure_ascii=False, indent=2)
+    atomic_write_json(metadata_path, metadata, ensure_parent_dir=True)
 
 
 def load_import_metadata(metadata_path: str) -> dict:
@@ -79,6 +85,119 @@ def delete_import_metadata(metadata_path: str) -> None:
         return
     except Exception:
         logger.debug("[EXCEL] Failed to remove consumed import metadata sidecar", exc_info=True)
+
+
+def is_completed_filename(value: object) -> bool:
+    return isinstance(value, str) and COMPLETED_FILE_PATTERN.fullmatch(value) is not None
+
+
+def set_import_metadata_state(metadata_path: str, metadata: dict, state: str) -> None:
+    metadata["publication_state"] = state
+    metadata["publication_state_updated_at_utc"] = utcnow().isoformat()
+    write_import_metadata(metadata, metadata_path)
+
+
+def resolve_published_completed_filename(
+    *,
+    metadata_path: str,
+    ready_dir: str,
+    metadata: dict | None = None,
+) -> str:
+    """Resolve one durable immutable identity, failing closed on ambiguous state."""
+    manifest = metadata if isinstance(metadata, dict) else load_import_metadata(metadata_path)
+    if manifest.get("publication_manifest_version") != PUBLICATION_MANIFEST_VERSION:
+        raise ValueError("Fallback import publication manifest is missing or unsupported")
+
+    completed_filename = manifest.get("completed_filename")
+    if not is_completed_filename(completed_filename):
+        raise ValueError("Fallback import manifest contains an invalid completed filename")
+
+    state = manifest.get("publication_state")
+    if state in {"private_writing", "failed"}:
+        token = completed_filename[len("stats_") : -len(".ready.csv")]
+        temporary_path = Path(ready_dir) / f".stats_{token}.tmp"
+        try:
+            temporary_path.unlink(missing_ok=True)
+        except OSError:
+            logger.warning(
+                "[EXCEL] Failed to clean private interrupted publication %s",
+                temporary_path,
+                exc_info=True,
+            )
+    if state not in _RECOVERABLE_PUBLICATION_STATES:
+        raise ValueError("Fallback import manifest does not identify a published CSV")
+
+    if state == "prepared":
+        token = completed_filename[len("stats_") : -len(".ready.csv")]
+        temporary_path = Path(ready_dir) / f".stats_{token}.tmp"
+        ready_path = Path(ready_dir) / completed_filename
+        if not ready_path.is_file() or temporary_path.exists():
+            raise ValueError("Fallback import publication was interrupted before atomic rename")
+        set_import_metadata_state(metadata_path, manifest, "published")
+
+    return completed_filename
+
+
+def publish_fallback_csv(
+    csv_df: pd.DataFrame,
+    *,
+    paths: FallbackImportPaths,
+    metadata: dict,
+    token_factory: Callable[[], str] = lambda: secrets.token_hex(16),
+    rename_file: Callable[[str, str], None] = os.rename,
+    sync_file: Callable[[int], None] = os.fsync,
+) -> str:
+    """Publish a closed CSV under one unique, immutable Ready identity."""
+    token = token_factory()
+    if not isinstance(token, str) or re.fullmatch(r"[0-9a-f]{32}", token) is None:
+        raise ValueError("Fallback import token must be 32 lowercase hexadecimal characters")
+
+    ready_dir = Path(paths.ready_dir)
+    ready_dir.mkdir(parents=True, exist_ok=True)
+    completed_filename = f"stats_{token}.ready.csv"
+    temporary_path = ready_dir / f".stats_{token}.tmp"
+    ready_path = ready_dir / completed_filename
+    if temporary_path.exists() or ready_path.exists():
+        raise FileExistsError(f"Fallback import identity already exists: {completed_filename}")
+
+    metadata.update(
+        {
+            "publication_manifest_version": PUBLICATION_MANIFEST_VERSION,
+            "completed_filename": completed_filename,
+            "publication_state": "private_writing",
+            "publication_state_updated_at_utc": utcnow().isoformat(),
+        }
+    )
+    write_import_metadata(metadata, paths.import_metadata_file_path)
+
+    try:
+        with open(temporary_path, "x", encoding="utf-8-sig", newline="") as handle:
+            csv_df.to_csv(handle, index=False)
+            handle.flush()
+            sync_file(handle.fileno())
+
+        set_import_metadata_state(paths.import_metadata_file_path, metadata, "prepared")
+        rename_file(str(temporary_path), str(ready_path))
+        if not ready_path.is_file() or temporary_path.exists():
+            raise OSError("Atomic Ready publication could not be verified")
+        set_import_metadata_state(paths.import_metadata_file_path, metadata, "published")
+        logger.info("[EXCEL] Published immutable CSV identity=%s", completed_filename)
+        return completed_filename
+    except Exception:
+        try:
+            temporary_path.unlink(missing_ok=True)
+        except OSError:
+            logger.warning(
+                "[EXCEL] Failed to remove private publication file %s",
+                temporary_path,
+                exc_info=True,
+            )
+        if not ready_path.exists():
+            try:
+                set_import_metadata_state(paths.import_metadata_file_path, metadata, "failed")
+            except Exception:
+                logger.warning("[EXCEL] Failed to persist publication failure state", exc_info=True)
+        raise
 
 
 def process_fallback_source_file(
@@ -136,11 +255,7 @@ def process_fallback_source_file(
         logger.info("[EXCEL] Archived original -> %s", archive_path)
 
         csv_df = prepare_fallback_csv_dataframe(df)
-        csv_df.to_csv(paths.csv_file_path, index=False, encoding="utf-8-sig")
-        if not os.path.isfile(paths.csv_file_path):
-            logger.error("[EXCEL] Failed to write CSV to %s", paths.csv_file_path)
-            return False, f"[ERROR] Failed to write CSV to {paths.csv_file_path}", None
-        logger.info("[EXCEL] Wrote CSV -> %s", paths.csv_file_path)
+        publish_fallback_csv(csv_df, paths=paths, metadata=metadata)
 
         return True, "[INFO] Excel processed successfully.", None
 

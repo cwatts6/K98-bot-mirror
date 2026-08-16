@@ -1,12 +1,25 @@
 # tests/test_stats_module.py
 import asyncio
 import csv
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
 import file_utils
+from stats.dal.immutable_import_dal import ImmutableImportOutcome
 import stats_module
+
+COMPLETED_FILENAME = "stats_0123456789abcdef0123456789abcdef.ready.csv"
+
+
+def _published_metadata(**values):
+    return {
+        "publication_manifest_version": 1,
+        "completed_filename": COMPLETED_FILENAME,
+        "publication_state": "published",
+        **values,
+    }
 
 
 @pytest.fixture(autouse=True)
@@ -83,7 +96,7 @@ async def test_run_stats_copy_archive_contract_monkeypatched(monkeypatch):
 
     # Monkeypatch internal functions to avoid heavy IO / DB calls
     async def fake_run_sql_procedure(
-        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None, **kwargs
     ):
         import_metadata["_fallback_import_control_id"] = 456
         await asyncio.sleep(0)
@@ -104,6 +117,7 @@ async def test_run_stats_copy_archive_contract_monkeypatched(monkeypatch):
     monkeypatch.setattr(stats_module, "process_excel_file", fake_process_excel_file)
     monkeypatch.setattr(stats_module, "archive_second_file", fake_archive_second_file)
     monkeypatch.setattr(file_utils, "run_blocking_in_thread", fake_run_blocking_in_thread)
+    monkeypatch.setattr(stats_module, "_load_import_metadata", _published_metadata)
 
     # Call with a fake source filename so the excel branch executes
     success, combined_log, steps = await stats_module.run_stats_copy_archive(
@@ -127,7 +141,7 @@ async def test_run_stats_copy_archive_passes_only_current_import_metadata(monkey
         return True, "[INFO] fake excel", None
 
     async def fake_run_sql_procedure(
-        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None, **kwargs
     ):
         metadata_seen.append(import_metadata)
         await asyncio.sleep(0)
@@ -139,7 +153,9 @@ async def test_run_stats_copy_archive_passes_only_current_import_metadata(monkey
     monkeypatch.setattr(
         stats_module,
         "_load_import_metadata",
-        lambda: {"source_type": "full_fallback_snapshot", "source_filename": metadata_path},
+        lambda: _published_metadata(
+            source_type="full_fallback_snapshot", source_filename=metadata_path
+        ),
     )
 
     success, _combined_log, _steps = await stats_module.run_stats_copy_archive(
@@ -148,16 +164,16 @@ async def test_run_stats_copy_archive_passes_only_current_import_metadata(monkey
 
     assert success is True
     assert metadata_seen == [
-        {"source_type": "full_fallback_snapshot", "source_filename": metadata_path}
+        _published_metadata(source_type="full_fallback_snapshot", source_filename=metadata_path)
     ]
 
 
 @pytest.mark.asyncio
-async def test_run_stats_copy_archive_sql_only_does_not_reuse_stale_metadata(monkeypatch):
+async def test_run_stats_copy_archive_sql_only_fails_closed_for_stale_metadata(monkeypatch):
     metadata_seen = []
 
     async def fake_run_sql_procedure(
-        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None, **kwargs
     ):
         metadata_seen.append(import_metadata)
         await asyncio.sleep(0)
@@ -172,8 +188,8 @@ async def test_run_stats_copy_archive_sql_only_does_not_reuse_stale_metadata(mon
 
     success, _combined_log, _steps = await stats_module.run_stats_copy_archive()
 
-    assert success is True
-    assert metadata_seen == [{}]
+    assert success is False
+    assert metadata_seen == []
 
 
 @pytest.mark.asyncio
@@ -200,7 +216,7 @@ async def test_run_stats_copy_archive_records_best_effort_audit(monkeypatch):
         return True, "[INFO] fake excel", None
 
     async def fake_run_sql_procedure(
-        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None, **kwargs
     ):
         import_metadata["_fallback_import_control_id"] = 456
         await asyncio.sleep(0)
@@ -218,7 +234,9 @@ async def test_run_stats_copy_archive_records_best_effort_audit(monkeypatch):
     monkeypatch.setattr(
         stats_module,
         "_load_import_metadata",
-        lambda: {"source_type": "full_fallback_snapshot", "rows_in_source": 3, "rows_written": 3},
+        lambda: _published_metadata(
+            source_type="full_fallback_snapshot", rows_in_source=3, rows_written=3
+        ),
     )
 
     success, _combined_log, steps = await stats_module.run_stats_copy_archive(
@@ -244,6 +262,7 @@ async def test_run_stats_copy_archive_records_best_effort_audit(monkeypatch):
 @pytest.mark.asyncio
 async def test_run_stats_copy_archive_uses_stdout_failure_message(monkeypatch):
     audit_calls = []
+    monkeypatch.setattr(stats_module, "_load_import_metadata", _published_metadata)
 
     monkeypatch.setattr(
         stats_module.import_audit_service,
@@ -262,7 +281,7 @@ async def test_run_stats_copy_archive_uses_stdout_failure_message(monkeypatch):
     )
 
     async def fake_run_sql_procedure(
-        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None, **kwargs
     ):
         await asyncio.sleep(0)
         return False, "[TIMEOUT] fake timeout", None
@@ -287,6 +306,7 @@ async def test_run_stats_copy_archive_uses_stdout_failure_message(monkeypatch):
 async def test_run_stats_copy_archive_records_update_all2_subphase_audit(monkeypatch):
     audit_calls = []
     offload_metas = []
+    monkeypatch.setattr(stats_module, "_load_import_metadata", _published_metadata)
 
     monkeypatch.setattr(
         stats_module.import_audit_service,
@@ -311,7 +331,7 @@ async def test_run_stats_copy_archive_records_update_all2_subphase_audit(monkeyp
     monkeypatch.setattr(stats_module, "_offload_callable_py", direct_offload)
 
     async def fake_run_sql_procedure(
-        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None, **kwargs
     ):
         import_metadata["_update_all2_phase_results"] = [
             {
@@ -351,6 +371,7 @@ async def test_run_stats_copy_archive_records_update_all2_subphase_audit(monkeyp
 @pytest.mark.asyncio
 async def test_run_stats_copy_archive_marks_audit_cancelled(monkeypatch):
     audit_calls = []
+    monkeypatch.setattr(stats_module, "_load_import_metadata", _published_metadata)
 
     monkeypatch.setattr(
         stats_module.import_audit_service,
@@ -369,7 +390,7 @@ async def test_run_stats_copy_archive_marks_audit_cancelled(monkeypatch):
     )
 
     async def fake_run_sql_procedure(
-        rank=None, seed=None, timeout_seconds=600, import_metadata=None
+        rank=None, seed=None, timeout_seconds=600, import_metadata=None, **kwargs
     ):
         await asyncio.sleep(0)
         raise asyncio.CancelledError
@@ -404,7 +425,7 @@ async def test_run_sql_procedure_does_not_publish_uncommitted_control_id(monkeyp
     async def direct_offload(fn, *args, **kwargs):
         return fn(*args)
 
-    def failing_update_all2(cur, param1=None, param2=None):
+    def failing_update_all2(cur, param1=None, param2=None, **kwargs):
         raise RuntimeError("update failed")
 
     metadata = {"source_type": "full_fallback_snapshot"}
@@ -413,17 +434,165 @@ async def test_run_sql_procedure_does_not_publish_uncommitted_control_id(monkeyp
     monkeypatch.setattr(stats_module, "_conn_trusted", lambda: FakeConnection())
     monkeypatch.setattr(stats_module, "fetch_update_all2_last_counter", lambda cur, task: 0)
     monkeypatch.setattr(stats_module, "_record_fallback_import_control", lambda cur, meta: 456)
+    monkeypatch.setattr(stats_module, "_set_import_metadata_state", lambda meta, state: None)
+    monkeypatch.setattr(stats_module, "_fetch_immutable_import_outcome", lambda name: None)
     monkeypatch.setattr(
         stats_module,
         "execute_update_all2_with_log_management",
         failing_update_all2,
     )
 
-    success, message, _extra = await stats_module.run_sql_procedure(import_metadata=metadata)
+    success, message, _extra = await stats_module.run_sql_procedure(
+        completed_filename=COMPLETED_FILENAME,
+        import_metadata=metadata,
+    )
 
     assert success is False
     assert "update failed" in message
     assert "_fallback_import_control_id" not in metadata
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("outcome", "message_fragment"),
+    [
+        (
+            ImmutableImportOutcome(
+                completed_filename=COMPLETED_FILENAME,
+                claim_status="duplicate_archived",
+                file_digest_hex="AA" * 32,
+                scan_order=None,
+                archive_status=None,
+            ),
+            "duplicate content",
+        ),
+        (
+            ImmutableImportOutcome(
+                completed_filename=COMPLETED_FILENAME,
+                claim_status="archived",
+                file_digest_hex="BB" * 32,
+                scan_order=42,
+                archive_status="archived",
+            ),
+            "archived terminal state",
+        ),
+    ],
+)
+async def test_run_sql_procedure_reconciles_terminal_identity_without_retry(
+    monkeypatch, outcome, message_fragment
+):
+    deleted = []
+
+    class FakeCursor:
+        timeout = 0
+
+    class FakeConnection:
+        autocommit = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+    async def direct_offload(fn, *args, **kwargs):
+        return fn(*args)
+
+    monkeypatch.setattr(stats_module, "_offload_callable_py", direct_offload)
+    monkeypatch.setattr(stats_module, "_conn_trusted", lambda: FakeConnection())
+    monkeypatch.setattr(stats_module, "fetch_update_all2_last_counter", lambda cur, task: 0)
+    monkeypatch.setattr(stats_module, "_record_fallback_import_control", lambda cur, meta: 456)
+    monkeypatch.setattr(
+        stats_module,
+        "execute_update_all2_with_log_management",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("connection lost")),
+    )
+    monkeypatch.setattr(stats_module, "_fetch_immutable_import_outcome", lambda name: outcome)
+    monkeypatch.setattr(stats_module, "_delete_import_metadata", lambda: deleted.append(True))
+
+    success, message, _extra = await stats_module.run_sql_procedure(
+        completed_filename=COMPLETED_FILENAME,
+        import_metadata=_published_metadata(),
+    )
+
+    assert success is False
+    assert message_fragment in message
+    assert deleted == [True]
+
+
+@pytest.mark.asyncio
+async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_manifest(monkeypatch):
+    wrapper_calls = []
+    deleted = []
+
+    class FakeCursor:
+        timeout = 0
+
+        def fetchall(self):
+            return []
+
+        def nextset(self):
+            return False
+
+    class FakeConnection:
+        autocommit = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            return None
+
+    async def direct_offload(fn, *args, **kwargs):
+        return fn(*args)
+
+    def execute_wrapper(cur, *, param1, param2, completed_filename):
+        wrapper_calls.append((param1, param2, completed_filename))
+        return {
+            "success": True,
+            "phase_results": [],
+            "trigger_results": {},
+            "log_before": 1.0,
+            "log_after": 1.0,
+        }
+
+    metadata = _published_metadata(source_type="full_fallback_snapshot")
+    monkeypatch.setattr(stats_module, "_offload_callable_py", direct_offload)
+    monkeypatch.setattr(stats_module, "_conn_trusted", lambda: FakeConnection())
+    monkeypatch.setattr(stats_module, "fetch_update_all2_last_counter", lambda cur, task: 7)
+    monkeypatch.setattr(stats_module, "_record_fallback_import_control", lambda cur, meta: 456)
+    monkeypatch.setattr(stats_module, "execute_update_all2_with_log_management", execute_wrapper)
+    monkeypatch.setattr(stats_module, "_set_import_metadata_state", lambda meta, state: None)
+    monkeypatch.setattr(stats_module, "_delete_import_metadata", lambda: deleted.append(True))
+    monkeypatch.setattr(
+        stats_module,
+        "fetch_update_all2_status",
+        lambda conn_factory, task: {"LastRunCounter": 8, "DurationSeconds": 1},
+    )
+    monkeypatch.setattr(stats_module, "WAIT_SECONDS", 0)
+    monkeypatch.setattr(stats_module, "MAX_RETRIES", 1)
+
+    success, message, _extra = await stats_module.run_sql_procedure(
+        rank=1,
+        seed="A",
+        completed_filename=COMPLETED_FILENAME,
+        import_metadata=metadata,
+    )
+
+    assert success is True
+    assert "Counter reached 8" in message
+    assert wrapper_calls == [(1, "A", COMPLETED_FILENAME)]
+    assert deleted == [True]
+    assert metadata["_fallback_import_control_id"] == 456
 
 
 def test_process_excel_file_preserves_credit_before_updated_on(tmp_path, monkeypatch):
@@ -441,7 +610,7 @@ def test_process_excel_file_preserves_credit_before_updated_on(tmp_path, monkeyp
 
     monkeypatch.setattr(stats_module, "DOWNLOAD_FOLDER", str(download_dir))
     monkeypatch.setattr(stats_module, "ARCHIVE_DIR_1", str(archive_dir))
-    monkeypatch.setattr(stats_module, "CSV_FILE_PATH", str(download_dir / "stats.csv"))
+    monkeypatch.setattr(stats_module, "READY_DIR", str(download_dir / "Import_Ready"))
     monkeypatch.setattr(
         stats_module, "IMPORT_METADATA_FILE_PATH", str(download_dir / "stats_import_metadata.json")
     )
@@ -449,7 +618,12 @@ def test_process_excel_file_preserves_credit_before_updated_on(tmp_path, monkeyp
     success, message, _ = stats_module.process_excel_file(str(source_path))
 
     assert success, message
-    with open(stats_module.CSV_FILE_PATH, newline="", encoding="utf-8-sig") as handle:
+    manifest = stats_module._load_import_metadata()
+    with open(
+        Path(stats_module.READY_DIR) / manifest["completed_filename"],
+        newline="",
+        encoding="utf-8-sig",
+    ) as handle:
         rows = list(csv.DictReader(handle))
 
     assert float(rows[0]["Credit"]) == pytest.approx(100.0)
@@ -467,7 +641,7 @@ def test_process_excel_file_adds_blank_credit_when_score_column_missing(tmp_path
 
     monkeypatch.setattr(stats_module, "DOWNLOAD_FOLDER", str(download_dir))
     monkeypatch.setattr(stats_module, "ARCHIVE_DIR_1", str(archive_dir))
-    monkeypatch.setattr(stats_module, "CSV_FILE_PATH", str(download_dir / "stats.csv"))
+    monkeypatch.setattr(stats_module, "READY_DIR", str(download_dir / "Import_Ready"))
     monkeypatch.setattr(
         stats_module, "IMPORT_METADATA_FILE_PATH", str(download_dir / "stats_import_metadata.json")
     )
@@ -475,7 +649,12 @@ def test_process_excel_file_adds_blank_credit_when_score_column_missing(tmp_path
     success, message, _ = stats_module.process_excel_file(str(source_path))
 
     assert success, message
-    with open(stats_module.CSV_FILE_PATH, newline="", encoding="utf-8-sig") as handle:
+    manifest = stats_module._load_import_metadata()
+    with open(
+        Path(stats_module.READY_DIR) / manifest["completed_filename"],
+        newline="",
+        encoding="utf-8-sig",
+    ) as handle:
         rows = list(csv.DictReader(handle))
 
     assert "Credit" in rows[0]
@@ -493,7 +672,7 @@ def test_process_excel_file_maps_conduct_score_to_credit(tmp_path, monkeypatch):
 
     monkeypatch.setattr(stats_module, "DOWNLOAD_FOLDER", str(download_dir))
     monkeypatch.setattr(stats_module, "ARCHIVE_DIR_1", str(archive_dir))
-    monkeypatch.setattr(stats_module, "CSV_FILE_PATH", str(download_dir / "stats.csv"))
+    monkeypatch.setattr(stats_module, "READY_DIR", str(download_dir / "Import_Ready"))
     monkeypatch.setattr(
         stats_module, "IMPORT_METADATA_FILE_PATH", str(download_dir / "stats_import_metadata.json")
     )
@@ -501,7 +680,12 @@ def test_process_excel_file_maps_conduct_score_to_credit(tmp_path, monkeypatch):
     success, message, _ = stats_module.process_excel_file(str(source_path))
 
     assert success, message
-    with open(stats_module.CSV_FILE_PATH, newline="", encoding="utf-8-sig") as handle:
+    manifest = stats_module._load_import_metadata()
+    with open(
+        Path(stats_module.READY_DIR) / manifest["completed_filename"],
+        newline="",
+        encoding="utf-8-sig",
+    ) as handle:
         rows = list(csv.DictReader(handle))
 
     assert "Conduct Score" not in rows[0]
@@ -530,7 +714,7 @@ def test_process_excel_file_preserves_unicode_names_in_csv(tmp_path, monkeypatch
 
     monkeypatch.setattr(stats_module, "DOWNLOAD_FOLDER", str(download_dir))
     monkeypatch.setattr(stats_module, "ARCHIVE_DIR_1", str(archive_dir))
-    monkeypatch.setattr(stats_module, "CSV_FILE_PATH", str(download_dir / "stats.csv"))
+    monkeypatch.setattr(stats_module, "READY_DIR", str(download_dir / "Import_Ready"))
     monkeypatch.setattr(
         stats_module, "IMPORT_METADATA_FILE_PATH", str(download_dir / "stats_import_metadata.json")
     )
@@ -538,7 +722,12 @@ def test_process_excel_file_preserves_unicode_names_in_csv(tmp_path, monkeypatch
     success, message, _ = stats_module.process_excel_file(str(source_path))
 
     assert success, message
-    with open(stats_module.CSV_FILE_PATH, newline="", encoding="utf-8-sig") as handle:
+    manifest = stats_module._load_import_metadata()
+    with open(
+        Path(stats_module.READY_DIR) / manifest["completed_filename"],
+        newline="",
+        encoding="utf-8-sig",
+    ) as handle:
         rows = list(csv.DictReader(handle))
 
     assert rows[0]["Name"] == "義Vìper義"

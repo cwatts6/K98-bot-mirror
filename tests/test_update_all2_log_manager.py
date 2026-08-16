@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pytest
+
 import update_all2_log_manager as mgr
 
 
@@ -89,9 +91,17 @@ def test_execute_update_all2_parses_internal_phase_result_set(monkeypatch):
         },
     )
 
-    result = mgr.execute_update_all2_with_log_management(cursor)
+    completed_filename = "stats_0123456789abcdef0123456789abcdef.ready.csv"
+    result = mgr.execute_update_all2_with_log_management(
+        cursor,
+        completed_filename=completed_filename,
+    )
 
     assert result["success"] is True
+    assert cursor.executed[0] == (
+        "EXEC dbo.UPDATE_ALL2 @param1 = ?, @param2 = ?, @CompletedFileName = ?",
+        (None, None, completed_filename),
+    )
     assert result["sp_result"]["status"] == "SUCCESS"
     assert result["phase_results"] == [
         {
@@ -119,3 +129,15 @@ def test_execute_update_all2_parses_internal_phase_result_set(monkeypatch):
             "error_text": None,
         },
     ]
+
+
+def test_execute_update_all2_rejects_noncanonical_completed_filename(monkeypatch):
+    cursor = _FakeCursor([])
+    monkeypatch.setattr(mgr, "get_log_space_usage", lambda _cursor: None)
+
+    with pytest.raises(ValueError, match="canonical immutable completed filename"):
+        mgr.execute_update_all2_with_log_management(
+            cursor,
+            completed_filename="stats.csv",
+        )
+    assert cursor.executed == []

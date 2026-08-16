@@ -38,10 +38,13 @@ from services.fallback_import_service import (
     FallbackImportPaths,
     archive_secondary_file,
     delete_import_metadata,
+    is_completed_filename,
     load_import_metadata,
     process_fallback_source_file,
     read_source_dataframe,
+    resolve_published_completed_filename,
     robust_move,
+    set_import_metadata_state,
 )
 import services.import_audit_service as import_audit_service
 from stats.dal.fallback_import_dal import (
@@ -50,13 +53,14 @@ from stats.dal.fallback_import_dal import (
     fetch_update_all2_status,
     record_fallback_import_control,
 )
+from stats.dal.immutable_import_dal import fetch_immutable_import_outcome
 from update_all2_log_manager import execute_update_all2_with_log_management
 from utils import utcnow
 
 SOURCE_FILE_2 = os.path.join(DOWNLOAD_FOLDER, "stats.xlsx")
 ARCHIVE_DIR_1 = os.path.join(DOWNLOAD_FOLDER, "Databook_Archive")
-ARCHIVE_DIR_2 = os.path.join(DOWNLOAD_FOLDER, "Import_Archive")
-CSV_FILE_PATH = os.path.join(DOWNLOAD_FOLDER, "stats.csv")
+ARCHIVE_DIR_2 = ARCHIVE_DIR_1
+READY_DIR = os.path.join(DOWNLOAD_FOLDER, "Import_Ready")
 IMPORT_METADATA_FILE_PATH = os.path.join(DOWNLOAD_FOLDER, "stats_import_metadata.json")
 
 TASK_NAME = "UPDATE_ALL2"
@@ -69,6 +73,7 @@ FALLBACK_AUDIT_PHASES = {
     "archive": "fallback_secondary_archive",
     "sql": "fallback_update_all2",
 }
+_fallback_import_lock = asyncio.Lock()
 
 
 def _fallback_import_paths() -> FallbackImportPaths:
@@ -77,7 +82,7 @@ def _fallback_import_paths() -> FallbackImportPaths:
         source_file_2=SOURCE_FILE_2,
         archive_dir_1=ARCHIVE_DIR_1,
         archive_dir_2=ARCHIVE_DIR_2,
-        csv_file_path=CSV_FILE_PATH,
+        ready_dir=READY_DIR,
         import_metadata_file_path=IMPORT_METADATA_FILE_PATH,
     )
 
@@ -106,6 +111,23 @@ def _load_import_metadata() -> dict:
 
 def _delete_import_metadata() -> None:
     delete_import_metadata(IMPORT_METADATA_FILE_PATH)
+
+
+def _resolve_completed_filename(metadata: dict) -> str:
+    return resolve_published_completed_filename(
+        metadata_path=IMPORT_METADATA_FILE_PATH,
+        ready_dir=READY_DIR,
+        metadata=metadata,
+    )
+
+
+def _set_import_metadata_state(metadata: dict, state: str) -> None:
+    set_import_metadata_state(IMPORT_METADATA_FILE_PATH, metadata, state)
+
+
+def _fetch_immutable_import_outcome(completed_filename: str):
+    with _conn_trusted() as conn:
+        return fetch_immutable_import_outcome(conn.cursor(), completed_filename)
 
 
 def _record_fallback_import_control(cur, metadata: dict) -> int | None:
@@ -259,9 +281,23 @@ async def _offload_callable_py(fn, *args, name: str | None = None, meta: dict | 
 
 # === Execute SQL Stored Procedure and Wait (NON-BLOCKING) ===
 async def run_sql_procedure(
-    rank=None, seed=None, timeout_seconds: int = 600, import_metadata: dict | None = None
+    rank=None,
+    seed=None,
+    *,
+    completed_filename: str,
+    timeout_seconds: int = 600,
+    import_metadata: dict | None = None,
 ):
-    logger.info(f"[SQL_PROC] Received Rank: {rank}, Seed: {seed}")
+    if not is_completed_filename(completed_filename):
+        return False, "[ERROR] SQL execution refused an invalid completed filename.", None
+    logger.info(
+        "[SQL_PROC] Received Rank: %s, Seed: %s, completed_filename=%s",
+        rank,
+        seed,
+        completed_filename,
+    )
+    if isinstance(import_metadata, dict):
+        _set_import_metadata_state(import_metadata, "sql_owned")
 
     def _proc_and_get_expected_counter() -> int:
         with _conn_trusted() as conn:
@@ -281,7 +317,12 @@ async def run_sql_procedure(
                 logger.info("[SQL_PROC] Executing UPDATE_ALL2 with log management wrapper...")
                 fallback_control_id = _record_fallback_import_control(cur, import_metadata or {})
 
-                result = execute_update_all2_with_log_management(cur, param1=rank, param2=seed)
+                result = execute_update_all2_with_log_management(
+                    cur,
+                    param1=rank,
+                    param2=seed,
+                    completed_filename=completed_filename,
+                )
 
                 if not result["success"]:
                     raise RuntimeError(f"UPDATE_ALL2 failed: {result.get('error', 'unknown')}")
@@ -311,6 +352,7 @@ async def run_sql_procedure(
                         "backups_triggered": trigger_results.get("backups_triggered", 0),
                         "triggers_processed": trigger_results.get("triggers_processed", 0),
                         "internal_phase_count": len(result.get("phase_results") or []),
+                        "completed_filename": completed_filename,
                     }
                 )
 
@@ -330,6 +372,7 @@ async def run_sql_procedure(
                         "status": "failed",
                         "error_type": type(e).__name__,
                         "error": str(e)[:500],
+                        "completed_filename": completed_filename,
                     }
                 )
                 raise
@@ -369,8 +412,36 @@ async def run_sql_procedure(
                 "status": "failed",
                 "task_name": TASK_NAME,
                 "orphaned_offload_possible": False,
+                "completed_filename": completed_filename,
             }
         )
+        try:
+            outcome = await _offload_callable_py(
+                _fetch_immutable_import_outcome,
+                completed_filename,
+                name="sql_proc_reconcile",
+                meta={"task": TASK_NAME, "completed_filename": completed_filename},
+            )
+        except Exception:
+            outcome = None
+            logger.exception(
+                "[SQL_PROC] Failed to reconcile completed identity=%s",
+                completed_filename,
+            )
+        if outcome is not None and outcome.is_terminal:
+            _delete_import_metadata()
+            if outcome.is_duplicate:
+                return (
+                    False,
+                    "[ERROR] SQL rejected duplicate content and archived the completed identity.",
+                    None,
+                )
+            return (
+                False,
+                "[ERROR] SQL execution failed after the immutable import reached its "
+                f"archived terminal state: {e}",
+                None,
+            )
         return False, f"[ERROR] SQL execution failed: {e}", None
 
     # expected_counter may be wrapped by some helpers; ensure int
@@ -422,12 +493,24 @@ async def run_sql_procedure(
 async def run_stats_copy_archive(
     rank=None, seed=None, source_filename=None, send_step_embed=None
 ) -> tuple[bool, str, dict]:
+    async with _fallback_import_lock:
+        return await _run_stats_copy_archive_unlocked(
+            rank=rank,
+            seed=seed,
+            source_filename=source_filename,
+            send_step_embed=send_step_embed,
+        )
+
+
+async def _run_stats_copy_archive_unlocked(
+    rank=None, seed=None, source_filename=None, send_step_embed=None
+) -> tuple[bool, str, dict]:
     steps = []
 
     excel_title = "Processing Excel File"
     archive2_title = "Archiving Secondary File"
     sql_title = "Running SQL Procedure"
-    current_import_metadata: dict = {}
+    current_import_metadata: dict = {} if source_filename else _load_import_metadata()
 
     excel_included = bool(source_filename)
     audit_ref = _unwrap_offload_result(
@@ -572,7 +655,11 @@ async def run_stats_copy_archive(
         (
             sql_title,
             lambda: run_sql_procedure(
-                rank, seed, timeout_seconds=600, import_metadata=current_import_metadata
+                rank,
+                seed,
+                completed_filename=_resolve_completed_filename(current_import_metadata),
+                timeout_seconds=600,
+                import_metadata=current_import_metadata,
             ),
         ),
     ]
@@ -668,6 +755,7 @@ async def run_stats_copy_archive(
 
             if not success:
                 all_success = False
+                break
 
             await asyncio.sleep(0.01)
 

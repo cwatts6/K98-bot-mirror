@@ -84,7 +84,8 @@ def test_dashboard_dal_uses_latest_scan_fields_and_civilisation_mapping(monkeypa
     assert "s.AOOWon" in sql
     assert "s.AutarchTimes" in sql
     assert "s.KvKPlayed" in sql
-    assert "s.GovernorID = CONVERT(FLOAT, ?)" in sql
+    assert "s.GovernorID = ?" in sql
+    assert "CONVERT(FLOAT, ?)" not in sql
     assert "ORDER BY s.SCANORDER DESC, s.AsOfDate DESC, s.ScanDate DESC" in sql
     assert "TRY_CONVERT(BIGINT, s.GovernorID)" not in sql
     assert "dbo.Civilization_Mapping" in sql

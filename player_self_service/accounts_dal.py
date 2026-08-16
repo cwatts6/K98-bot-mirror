@@ -94,30 +94,30 @@ def fetch_latest_accounts_scan_rows(governor_ids: Iterable[int]) -> tuple[Accoun
                 ),
                 Ranked AS (
                     SELECT
-                        TRY_CONVERT(BIGINT, s.GovernorID) AS GovernorID,
+                        s.GovernorID AS GovernorID,
                         NULLIF(LTRIM(RTRIM(s.GovernorName)), '') AS GovernorName,
                         NULLIF(LTRIM(RTRIM(s.Civilization)), '') AS RawCivilisation,
                         TRY_CONVERT(INT, s.[City Hall]) AS CityHall,
-                        TRY_CONVERT(BIGINT, s.Power) AS Power,
+                        s.Power AS Power,
                         TRY_CONVERT(BIGINT, s.[Troops Power]) AS TroopPower,
-                        TRY_CONVERT(BIGINT, s.KillPoints) AS KillPoints,
-                        TRY_CONVERT(BIGINT, s.T4_Kills) AS T4Kills,
-                        TRY_CONVERT(BIGINT, s.T5_Kills) AS T5Kills,
-                        TRY_CONVERT(BIGINT, s.Deads) AS Deads,
-                        TRY_CONVERT(BIGINT, s.HealedTroops) AS HealedTroops,
-                        TRY_CONVERT(BIGINT, s.HighestAcclaim) AS HighestAcclaim,
-                        TRY_CONVERT(BIGINT, s.Helps) AS Helps,
-                        TRY_CONVERT(BIGINT, s.RSS_Gathered) AS RSSGathered,
-                        TRY_CONVERT(BIGINT, s.RSSAssistance) AS RSSAssistance,
+                        s.KillPoints AS KillPoints,
+                        s.T4_Kills AS T4Kills,
+                        s.T5_Kills AS T5Kills,
+                        s.Deads AS Deads,
+                        s.HealedTroops AS HealedTroops,
+                        s.HighestAcclaim AS HighestAcclaim,
+                        s.Helps AS Helps,
+                        s.RSS_Gathered AS RSSGathered,
+                        s.RSSAssistance AS RSSAssistance,
                         s.Conduct,
                         s.ScanDate,
                         ROW_NUMBER() OVER (
-                            PARTITION BY TRY_CONVERT(BIGINT, s.GovernorID)
+                            PARTITION BY s.GovernorID
                             ORDER BY s.ScanDate DESC, s.SCANORDER DESC, s.AsOfDate DESC
                         ) AS rn
                     FROM dbo.KingdomScanData4 AS s WITH (NOLOCK)
                     INNER JOIN Requested AS r
-                        ON r.GovernorID = TRY_CONVERT(BIGINT, s.GovernorID)
+                        ON r.GovernorID = s.GovernorID
                 )
                 SELECT
                     r.GovernorID AS RequestedGovernorID,

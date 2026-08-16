@@ -8,6 +8,8 @@ import pytest
 # Import the module under test
 import stats_module as sm
 
+COMPLETED_FILENAME = "stats_0123456789abcdef0123456789abcdef.ready.csv"
+
 
 @pytest.mark.asyncio
 async def test_run_sql_procedure_cancelled_propagates(caplog):
@@ -32,7 +34,12 @@ async def test_run_sql_procedure_cancelled_propagates(caplog):
 
     try:
         with pytest.raises(asyncio.CancelledError):
-            await sm.run_sql_procedure(rank=1, seed=2, timeout_seconds=0.5)
+            await sm.run_sql_procedure(
+                rank=1,
+                seed=2,
+                completed_filename=COMPLETED_FILENAME,
+                timeout_seconds=0.5,
+            )
 
         # Ensure no telemetry sql_proc timeout/failed payload was emitted
         telemetry_records = [r for r in caplog.records if r.name == "telemetry"]

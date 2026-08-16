@@ -1,33 +1,25 @@
 # embed_offseason_stats.py
-"""
-Offseason combo embed sender.
-
-Changes:
-- Removed hero dashboard image per latest requirement.
-- Accepts include_kingdom_summary flag: if False, the combo will NOT include the KS embed (only supporting embeds).
-- When including KS embed, uses centralized loader/builder from stats_alerts.embeds.kingdom_summary if available;
-  otherwise falls back to legacy summary line.
-- Attempts to claim kingdom_summary_daily / kingdom_summary_weekly before pinging.
-"""
+"""Offseason combo embed sender with SQL owned by the stats-alert DAL."""
 
 from __future__ import annotations
 
 import logging
-
-logger = logging.getLogger(__name__)
-
-from datetime import UTC, date, datetime
 from typing import Any
 
 import discord
 
 from constants import CUSTOM_AVATAR_URL
+from file_utils import get_conn_with_retries
+from stats_alerts.offseason_dal import (
+    get_kingdom_summary,
+    get_kingdom_summary_weekly,
+    load_all_daily,
+    load_all_weekly,
+    pick_daily_snapshot_date as _pick_daily_snapshot_date,
+)
 
-UTC = UTC
+logger = logging.getLogger(__name__)
 
-from file_utils import fetch_one_dict, get_conn_with_retries
-
-# Try to import the centralized KS helpers (optional)
 try:
     from stats_alerts.embeds.kingdom_summary import (
         build_kingdom_summary_embed,
@@ -36,31 +28,6 @@ try:
 except Exception:
     load_latest_and_prev_rows = None
     build_kingdom_summary_embed = None
-
-# ----------------------------- SQL helpers -----------------------------
-
-
-def _fetchone(cur, sql: str, *params) -> tuple | None:
-    """
-    Execute SQL and return a single row as a positional tuple (or None).
-
-    Internally uses file_utils.fetch_one_dict to obtain a robust column-name->value
-    mapping based on cursor.description, then returns the values as a tuple
-    in the same column order. Returning a tuple preserves existing callers'
-    expectations while centralizing row->dict logic in file_utils.
-    """
-    cur.execute(sql, *params)
-    rd = fetch_one_dict(cur)
-    if rd is None:
-        return None
-    # cursor_row_to_dict in file_utils uses cursor.description to preserve column order,
-    # so the dict.values() iteration order matches the original positional order.
-    return tuple(rd.values())
-
-
-def _fetchall(cur, sql: str, *params) -> list[tuple]:
-    cur.execute(sql, *params)
-    return cur.fetchall()
 
 
 def _fmt_short(n: Any) -> str:
@@ -83,304 +50,6 @@ def _fmt(n: Any) -> str:
         return f"{int(n):,}"
     except Exception:
         return str(n)
-
-
-# ----------------------- Canonical snapshot pickers --------------------
-
-
-def _pick_daily_snapshot_date(cur) -> date:
-    """
-    Canonical daily snapshot date (UTC): pick today if present in AllianceActivityDaily,
-    else yesterday, else the latest available date in that table.
-    """
-    row = _fetchone(
-        cur,
-        """
-        DECLARE @today date     = CONVERT(date, SYSUTCDATETIME());
-        DECLARE @yesterday date = DATEADD(day, -1, @today);
-
-        SELECT TOP (1) AsOfDate
-        FROM dbo.AllianceActivityDaily
-        WHERE AsOfDate IN (@today, @yesterday)
-        GROUP BY AsOfDate
-        ORDER BY AsOfDate DESC;
-    """,
-    )
-    if row and row[0]:
-        return row[0]
-    row = _fetchone(cur, "SELECT MAX(AsOfDate) FROM dbo.AllianceActivityDaily;")
-    return row[0] if row and row[0] else datetime.now(UTC).date()
-
-
-# ----------------------------- Kingdom summary ------------------------
-
-
-def get_kingdom_summary(cur) -> dict:
-    """
-    Headline is based on latest SCANORDER + prior SCANORDER (top-300 power).
-    """
-    row = _fetchone(
-        cur,
-        """
-        ;WITH last AS (SELECT MAX(SCANORDER) AS cur_order FROM dbo.KingdomScanData4)
-        SELECT
-            (SELECT cur_order FROM last) AS cur_order,
-            (SELECT MAX(SCANORDER) FROM dbo.KingdomScanData4 WHERE SCANORDER < (SELECT cur_order FROM last)) AS prev_order;
-    """,
-    )
-    cur_order, prev_order = row or (None, None)
-    if cur_order is None:
-        return {"total_power_top300": 0, "total_players": 0, "power_delta_top300": 0}
-
-    total_players = (
-        _fetchone(cur, "SELECT COUNT(*) FROM dbo.KingdomScanData4 WHERE SCANORDER = ?", cur_order)[
-            0
-        ]
-        or 0
-    )
-
-    def _top300_at(scanorder: int) -> int:
-        if scanorder is None:
-            return 0
-        row2 = _fetchone(
-            cur,
-            """
-            SELECT SUM(CAST(Power AS BIGINT))
-            FROM (
-                SELECT TOP (300) Power
-                FROM dbo.KingdomScanData4
-                WHERE SCANORDER = ?
-                ORDER BY Power DESC
-            ) s
-        """,
-            scanorder,
-        )
-        return int(row2[0] or 0)
-
-    cur_p = _top300_at(cur_order)
-    prev_p = _top300_at(prev_order)
-    return {
-        "total_power_top300": cur_p,
-        "total_players": int(total_players),
-        "power_delta_top300": cur_p - prev_p,
-    }
-
-
-def get_kingdom_summary_weekly(cur) -> dict:
-    """
-    Last completed week (Mon→Mon), using scanorders just before each boundary.
-    """
-    latest_date = _fetchone(cur, "SELECT CAST(MAX(ScanDate) AS date) FROM dbo.KingdomScanData4;")[0]
-
-    row = _fetchone(
-        cur,
-        """
-        DECLARE @latest date = ?;
-        DECLARE @dow int = (DATEPART(WEEKDAY, @latest) + 5) % 7; -- 0=Mon..6=Sun independent of DATEFIRST
-        DECLARE @start_this_week date = DATEADD(day, -@dow, @latest);
-        DECLARE @start_prev_week date = DATEADD(day, -7, @start_this_week);
-
-        SELECT
-            (SELECT MAX(SCANORDER) FROM dbo.KingdomScanData4 WHERE ScanDate < @start_prev_week) AS so_start,
-            (SELECT MAX(SCANORDER) FROM dbo.KingdomScanData4 WHERE ScanDate < @start_this_week) AS so_end;
-    """,
-        latest_date,
-    )
-    so_start, so_end = row or (None, None)
-
-    if so_start is None:
-        so_start = _fetchone(cur, "SELECT MIN(SCANORDER) FROM dbo.KingdomScanData4;")[0]
-    if so_end is None:
-        so_end = _fetchone(
-            cur, "SELECT MAX(SCANORDER) FROM dbo.KingdomScanData4 WHERE ScanDate < ?", latest_date
-        )[0]
-
-    def _top300_at(so: int) -> int:
-        if so is None:
-            return 0
-        row2 = _fetchone(
-            cur,
-            """
-            SELECT SUM(CAST(Power AS BIGINT))
-            FROM (SELECT TOP (300) Power
-                  FROM dbo.KingdomScanData4
-                  WHERE SCANORDER = ?
-                  ORDER BY Power DESC) s
-        """,
-            so,
-        )
-        return int(row2[0] or 0)
-
-    start_v = _top300_at(so_start)
-    end_v = _top300_at(so_end)
-    return {"top300_start": start_v, "top300_end": end_v, "weekly_delta": end_v - start_v}
-
-
-# ----------------------------- Top pickers -----------------------------
-
-
-def _top_names_for_day(cur, metric_sql_col: str, limit: int, snap_date: date):
-    # Pull daily totals and attach a display name (latest seen in snapshots)
-    rows = _fetchall(
-        cur,
-        f"""
-        WITH d AS (
-            SELECT GovernorID, SUM({metric_sql_col}) AS v
-            FROM dbo.AllianceActivityDaily
-            WHERE AsOfDate = ?
-            GROUP BY GovernorID
-        )
-        SELECT TOP ({limit})
-               COALESCE(n.GovernorName, CONCAT('#', CAST(d.GovernorID AS varchar(20)))) AS GovernorName,
-               d.v
-        FROM d
-        OUTER APPLY (
-            SELECT TOP (1) r.GovernorName
-            FROM dbo.AllianceActivitySnapshotRow r
-            JOIN dbo.AllianceActivitySnapshotHeader h ON h.SnapshotId = r.SnapshotId
-            WHERE r.GovernorID = d.GovernorID
-            ORDER BY h.SnapshotTsUtc DESC
-        ) n
-        ORDER BY d.v DESC, GovernorName ASC;
-    """,
-        snap_date,
-    )
-    return [(r[0], int(r[1] or 0)) for r in rows]
-
-
-def get_activity_top_daily(cur, metric_col: str, limit: int, snap_date: date):
-    # metric_col was "BuildingDelta"/"TechDonationDelta" before.
-    # Map to the real AllianceActivityDaily column names.
-    col_map = {
-        "BuildingDelta": "BuildDonations",
-        "TechDonationDelta": "TechDonations",
-    }
-    real_col = col_map.get(metric_col, metric_col)  # default to passed value
-    return _top_names_for_day(cur, real_col, limit, snap_date)
-
-
-def get_daily_top(
-    cur,
-    view_name: str,
-    value_col: str,
-    snap_date: date,
-    label_col: str = "GovernorName",
-    limit: int = 5,
-    date_col: str | None = None,
-):
-    """
-    Return list[(label, int(value))] for the top `limit` rows in view_name.
-    Default limit changed to 5 for daily usage.
-    """
-    if date_col:
-        rows = _fetchall(
-            cur,
-            f"""
-            SELECT TOP ({limit}) {label_col}, {value_col}
-            FROM {view_name}
-            WHERE CAST({date_col} AS date) = ?
-            ORDER BY {value_col} DESC, {label_col} ASC;
-        """,
-            snap_date,
-        )
-    else:
-        rows = _fetchall(
-            cur,
-            f"""
-            SELECT TOP ({limit}) {label_col}, {value_col}
-            FROM {view_name}
-            ORDER BY {value_col} DESC, {label_col} ASC;
-        """,
-        )
-    return [(r[0], int(r[1] or 0)) for r in rows]
-
-
-def get_activity_top_week(cur, metric_col: str, limit: int = 10):
-    # no Python change here, but replace the SQL body entirely:
-    col_map = {"BuildingDelta": "BuildDonations", "TechDonationDelta": "TechDonations"}
-    mcol = col_map.get(metric_col, "BuildDonations")
-    rows = _fetchall(
-        cur,
-        f"""
-        DECLARE @latest date = (SELECT MAX(AsOfDate) FROM dbo.AllianceActivityDaily);
-        IF @latest IS NULL
-        BEGIN
-            SELECT TOP (0) CAST(NULL AS nvarchar(1)) AS GovernorName, CAST(0 AS int) AS v;
-            RETURN;
-        END;
-
-        -- Monday (UTC) for the @latest week
-        DECLARE @dow int = (DATEPART(WEEKDAY, @latest) + 5) % 7; -- 0=Mon..6=Sun
-        DECLARE @start_this_week date = DATEADD(day, -@dow, @latest);
-        DECLARE @start_prev_week date = DATEADD(day, -7, @start_this_week);
-
-        WITH w AS (
-            SELECT GovernorID, SUM({mcol}) AS v
-            FROM dbo.AllianceActivityDaily
-            WHERE AsOfDate >= @start_prev_week AND AsOfDate < @start_this_week
-            GROUP BY GovernorID
-        )
-        SELECT TOP ({limit})
-               COALESCE(n.GovernorName, CONCAT('#', CAST(w.GovernorID AS varchar(20)))) AS GovernorName,
-               w.v
-        FROM w
-        OUTER APPLY (
-            SELECT TOP (1) r.GovernorName
-            FROM dbo.AllianceActivitySnapshotRow r
-            JOIN dbo.AllianceActivitySnapshotHeader h ON h.SnapshotId = r.SnapshotId
-            WHERE r.GovernorID = w.GovernorID
-            ORDER BY h.SnapshotTsUtc DESC
-        ) n
-        ORDER BY w.v DESC, GovernorName ASC;
-    """,
-    )
-    return [(r[0], int(r[1] or 0)) for r in rows]
-
-
-# ----------------------------- Loaders -----------------------------
-
-
-def load_all_daily(cur) -> dict:
-    snap_date = _pick_daily_snapshot_date(cur)
-    return {
-        "building": get_activity_top_daily(cur, "BuildingDelta", 5, snap_date),
-        "tech": get_activity_top_daily(cur, "TechDonationDelta", 5, snap_date),
-        "helps": get_daily_top(
-            cur, "dbo.vDaily_Helps", "HelpsDelta", snap_date, date_col="AsOfDate"
-        ),
-        "rss_gathered": get_daily_top(
-            cur, "dbo.vDaily_RSSGathered", "RSSGatheredDelta", snap_date, date_col="AsOfDate"
-        ),
-        "rss_assisted": get_daily_top(
-            cur, "dbo.vDaily_RSSAssisted", "RSSAssistedDelta", snap_date, date_col="AsOfDate"
-        ),
-        "forts": get_daily_top(
-            cur, "dbo.v_RallyDaily_Latest", "TotalRallies", snap_date, date_col=None
-        ),
-    }
-
-
-def load_all_weekly(cur) -> dict:
-    def _top10(view: str, value_col: str, label_col: str = "GovernorName"):
-        rows = _fetchall(
-            cur,
-            f"""
-            SELECT TOP (10) {label_col}, {value_col} AS MetricValue
-            FROM {view}
-            ORDER BY {value_col} DESC, {label_col} ASC
-        """,
-        )
-        return [(r[0], int(r[1] or 0)) for r in rows]
-
-    return {
-        "building": _top10("dbo.vAllianceActivity_WeeklyDelta", "BuildingDeltaWeek"),
-        "tech": _top10("dbo.vAllianceActivity_WeeklyDelta", "TechDonationDeltaWeek"),
-        "helps": _top10("dbo.vWTD_Helps", "WTD_HELPS"),
-        "rss_gathered": _top10("dbo.vWTD_RSSGathered", "WTD_RssGathered"),
-        # Add when available:
-        "rss_assisted": _top10("dbo.vWTD_RSSAssisted", "[WTD_RSSAssisted]"),
-        "forts": _top10("dbo.vFortsCompleted_WeekToDate", "TotalRallies"),
-    }
 
 
 # ----------------------------- Embeds -----------------------------

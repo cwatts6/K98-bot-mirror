@@ -17,11 +17,13 @@ Usage in bot:
     result = execute_update_all2_with_log_management(
         cursor=db_cursor,
         param1=kingdom_rank,
-        param2=kingdom_seed
+        param2=kingdom_seed,
+        completed_filename=completed_filename,
     )
 """
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -452,6 +454,7 @@ def execute_update_all2_with_log_management(
     param1: float | None = None,
     param2: str | None = None,
     *,
+    completed_filename: str,
     post_trigger_wait: float = 2.0,
     max_post_trigger_wait: float = 30.0,
 ) -> dict[str, Any]:
@@ -470,6 +473,7 @@ def execute_update_all2_with_log_management(
         cursor: Active database cursor (must support execute)
         param1: KINGDOM_RANK parameter (optional)
         param2: KINGDOM_SEED parameter (optional)
+        completed_filename: Exact canonical immutable Ready basename (required)
         post_trigger_wait: Initial wait after triggering backup (seconds)
         max_post_trigger_wait: Maximum total wait for log backup (seconds)
 
@@ -499,30 +503,37 @@ def execute_update_all2_with_log_management(
     start_time = time.time()
 
     try:
+        if re.fullmatch(r"stats_[0-9a-f]{32}\.ready\.csv", completed_filename) is None:
+            raise ValueError("UPDATE_ALL2 requires a canonical immutable completed filename")
+
         # Capture log usage before
         result["log_before"] = get_log_space_usage(cursor)
         if result["log_before"] is not None:
             logger.info("Log usage before UPDATE_ALL2: %.2f%%", result["log_before"])
 
         # Execute UPDATE_ALL2
-        logger.info("Executing UPDATE_ALL2 (param1=%s, param2=%s)", param1, param2)
+        logger.info(
+            "Executing UPDATE_ALL2 (param1=%s, param2=%s, completed_filename=%s)",
+            param1,
+            param2,
+            completed_filename,
+        )
         _safe_emit_telemetry(
             {
                 "event": "update_all2_execute_start",
                 "param1": param1,
                 "param2": param2,
+                "completed_filename": completed_filename,
                 "log_before": result["log_before"],
             }
         )
 
-        if param1 is not None and param2 is not None:
-            cursor.execute("EXEC dbo.UPDATE_ALL2 @param1 = ?, @param2 = ?", param1, param2)
-        elif param1 is not None:
-            cursor.execute("EXEC dbo.UPDATE_ALL2 @param1 = ?", param1)
-        elif param2 is not None:
-            cursor.execute("EXEC dbo.UPDATE_ALL2 @param2 = ?", param2)
-        else:
-            cursor.execute("EXEC dbo.UPDATE_ALL2")
+        cursor.execute(
+            "EXEC dbo.UPDATE_ALL2 @param1 = ?, @param2 = ?, @CompletedFileName = ?",
+            param1,
+            param2,
+            completed_filename,
+        )
 
         # Consume all result sets. The final 8-column summary must stay last.
         try:

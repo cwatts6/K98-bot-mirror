@@ -80,25 +80,25 @@ def fetch_governor_dashboard_data(governor_id: int) -> GovernorDashboardDataRow:
         ),
         LatestScan AS (
             SELECT TOP (1)
-                CAST(s.GovernorID AS BIGINT) AS GovernorID,
+                s.GovernorID AS GovernorID,
                 LTRIM(RTRIM(s.GovernorName)) AS GovernorName,
                 LTRIM(RTRIM(s.Alliance)) AS Alliance,
-                CAST(s.Power AS BIGINT) AS Power,
-                CAST(s.KillPoints AS BIGINT) AS KillPoints,
-                CAST(s.Deads AS BIGINT) AS Dead,
-                CAST(s.Helps AS BIGINT) AS Helps,
-                CAST(s.HealedTroops AS BIGINT) AS Healed,
-                TRY_CONVERT(BIGINT, s.HighestAcclaim) AS HighestAcclaim,
-                TRY_CONVERT(BIGINT, s.AOOJoined) AS AOOJoined,
-                TRY_CONVERT(INT, s.AOOWon) AS AOOWon,
-                TRY_CONVERT(BIGINT, s.AutarchTimes) AS AutarchTimes,
-                TRY_CONVERT(INT, s.KvKPlayed) AS KvKPlayed,
+                s.Power AS Power,
+                s.KillPoints AS KillPoints,
+                s.Deads AS Dead,
+                s.Helps AS Helps,
+                s.HealedTroops AS Healed,
+                s.HighestAcclaim AS HighestAcclaim,
+                s.AOOJoined AS AOOJoined,
+                s.AOOWon AS AOOWon,
+                s.AutarchTimes AS AutarchTimes,
+                s.KvKPlayed AS KvKPlayed,
                 s.Conduct,
                 LTRIM(RTRIM(s.Civilization)) AS Civilization,
                 s.ScanDate AS UpdatedAtUtc,
                 CAST(s.SCANORDER AS BIGINT) AS ScanOrder
             FROM dbo.KingdomScanData4 AS s WITH (NOLOCK)
-            WHERE s.GovernorID = CONVERT(FLOAT, ?)
+            WHERE s.GovernorID = ?
             ORDER BY s.SCANORDER DESC, s.AsOfDate DESC, s.ScanDate DESC
         )
         SELECT

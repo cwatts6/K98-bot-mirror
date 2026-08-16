@@ -8,6 +8,8 @@ import pytest
 # Import the module under test
 import stats_module as sm
 
+COMPLETED_FILENAME = "stats_0123456789abcdef0123456789abcdef.ready.csv"
+
 
 @pytest.mark.skip(reason="Integration test requiring live DB — not suitable for unit test suite")
 @pytest.mark.asyncio
@@ -38,7 +40,12 @@ async def test_run_sql_procedure_timeout_emits_telemetry(caplog):
 
     try:
         # Use a very small timeout so the fake_to_thread will cause asyncio.TimeoutError
-        ok, msg, extra = await sm.run_sql_procedure(rank=1, seed=2, timeout_seconds=0.05)
+        ok, msg, extra = await sm.run_sql_procedure(
+            rank=1,
+            seed=2,
+            completed_filename=COMPLETED_FILENAME,
+            timeout_seconds=0.05,
+        )
 
         # Ensure the call returned a timeout-style failure
         assert ok is False, "Expected run_sql_procedure to report failure on timeout"

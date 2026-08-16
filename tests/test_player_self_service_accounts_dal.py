@@ -101,7 +101,10 @@ def test_accounts_dal_uses_one_set_based_latest_scan_query(monkeypatch) -> None:
     sql, params = connection.cursor_instance.executions[0]
     assert params == (222, 111)
     assert "MAX(s.ScanDate)" in sql
-    assert "PARTITION BY TRY_CONVERT(BIGINT, s.GovernorID)" in sql
+    assert "PARTITION BY s.GovernorID" in sql
+    assert "ON r.GovernorID = s.GovernorID" in sql
+    assert "TRY_CONVERT(BIGINT, s.GovernorID)" not in sql
+    assert "TRY_CONVERT(BIGINT, s.[Troops Power])" in sql
     assert "dbo.KingdomScanData4" in sql
     assert "dbo.Civilization_Mapping" in sql
     assert "dbo.PlayerLocation" in sql

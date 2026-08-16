@@ -1,11 +1,39 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from io import BytesIO
 
 import pandas as pd
 import pytest
 
-from weekly_activity_importer import _completion_evidence, parse_activity_excel
+from weekly_activity_importer import (
+    _completion_evidence,
+    _load_expected_allied_governors,
+    parse_activity_excel,
+)
+
+
+def test_expected_allied_governors_uses_schema_native_columns() -> None:
+    class Cursor:
+        def __init__(self):
+            self.executed = None
+
+        def execute(self, sql, *params):
+            self.executed = (sql, params)
+
+        def fetchall(self):
+            return [(123,), (456,)]
+
+    cursor = Cursor()
+    snapshot = datetime(2026, 7, 28, tzinfo=UTC)
+
+    assert _load_expected_allied_governors(cursor, snapshot) == {123, 456}
+    sql, params = cursor.executed
+    assert "SELECT DISTINCT scan.GovernorID" in sql
+    assert "LTRIM(RTRIM(scan.Alliance))" in sql
+    assert "TRY_CONVERT(bigint, scan.GovernorID)" not in sql
+    assert "CONVERT(nvarchar(255), scan.Alliance)" not in sql
+    assert params == (snapshot.replace(tzinfo=None),)
 
 
 def _workbook(rows: list[dict[str, object]]) -> bytes:

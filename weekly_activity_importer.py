@@ -202,7 +202,7 @@ def _load_expected_allied_governors(cur, snapshot_ts_utc: datetime) -> set[int]:
     """Return allied governors from the latest complete scan at or before the snapshot."""
     cur.execute(
         """
-        SELECT DISTINCT TRY_CONVERT(bigint, scan.GovernorID)
+        SELECT DISTINCT scan.GovernorID
         FROM dbo.KingdomScanData4 AS scan
         WHERE scan.SCANORDER =
         (
@@ -210,8 +210,7 @@ def _load_expected_allied_governors(cur, snapshot_ts_utc: datetime) -> set[int]:
             FROM dbo.KingdomScanData4 AS candidate
             WHERE candidate.AsOfDate <= CONVERT(date, ?)
         )
-          AND NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(255), scan.Alliance))), N'') IS NOT NULL
-          AND TRY_CONVERT(bigint, scan.GovernorID) IS NOT NULL
+          AND NULLIF(LTRIM(RTRIM(scan.Alliance)), N'') IS NOT NULL
         """,
         snapshot_ts_utc.replace(tzinfo=None),
     )
