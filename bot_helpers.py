@@ -295,9 +295,15 @@ async def queue_worker(channel_id):
             message = await queue.get()
             try:
                 for attachment in message.attachments:
+                    admin_user = bot.get_user(ADMIN_USER_ID)
+                    if admin_user is None:
+                        admin_user = await bot.fetch_user(ADMIN_USER_ID)
 
-                    async def _process_staged_attachment(filename: str, staged_path: str) -> None:
-                        user = await bot.fetch_user(ADMIN_USER_ID)
+                    async def _process_staged_attachment(
+                        filename: str,
+                        staged_path: str,
+                        user=admin_user,
+                    ) -> None:
                         await append_csv_line(
                             CSV_LOG,
                             [
