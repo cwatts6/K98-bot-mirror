@@ -87,6 +87,11 @@ def _full_upload_row(**overrides):
     return row
 
 
+def test_fallback_archive_configuration_separates_original_and_normalized_workbooks():
+    assert Path(stats_module.ARCHIVE_DIR_2) == Path(stats_module.ARCHIVE_DIR_1) / "Normalized"
+    assert "Import_Archive" not in Path(stats_module.ARCHIVE_DIR_2).parts
+
+
 @pytest.mark.asyncio
 async def test_run_stats_copy_archive_contract_monkeypatched(monkeypatch):
     """

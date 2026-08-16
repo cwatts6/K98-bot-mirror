@@ -59,7 +59,7 @@ from utils import utcnow
 
 SOURCE_FILE_2 = os.path.join(DOWNLOAD_FOLDER, "stats.xlsx")
 ARCHIVE_DIR_1 = os.path.join(DOWNLOAD_FOLDER, "Databook_Archive")
-ARCHIVE_DIR_2 = ARCHIVE_DIR_1
+ARCHIVE_DIR_2 = os.path.join(ARCHIVE_DIR_1, "Normalized")
 READY_DIR = os.path.join(DOWNLOAD_FOLDER, "Import_Ready")
 IMPORT_METADATA_FILE_PATH = os.path.join(DOWNLOAD_FOLDER, "stats_import_metadata.json")
 

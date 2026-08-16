@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import json
 from pathlib import Path
 
@@ -18,10 +19,32 @@ def _paths(tmp_path: Path) -> service.FallbackImportPaths:
         download_folder=str(downloads),
         source_file_2=str(downloads / "stats.xlsx"),
         archive_dir_1=str(downloads / "Databook_Archive"),
-        archive_dir_2=str(downloads / "Import_Archive"),
+        archive_dir_2=str(downloads / "Databook_Archive" / "Normalized"),
         ready_dir=str(downloads / "Import_Ready"),
         import_metadata_file_path=str(downloads / "stats_import_metadata.json"),
     )
+
+
+def test_secondary_archive_cannot_replace_same_minute_original_archive(tmp_path: Path) -> None:
+    paths = _paths(tmp_path)
+    archive_time = datetime(2026, 8, 16, 8, 30, tzinfo=UTC)
+    original_archive = Path(paths.archive_dir_1) / "stats_2026-08-16_0830.xlsx"
+    normalized_archive = Path(paths.archive_dir_2) / "stats_2026-08-16_0830.xlsx"
+    original_archive.parent.mkdir(parents=True)
+    original_archive.write_bytes(b"original upload")
+    source_file_2 = Path(paths.source_file_2)
+    source_file_2.parent.mkdir(parents=True, exist_ok=True)
+    source_file_2.write_bytes(b"normalized workbook")
+
+    success, message, _ = service.archive_secondary_file(
+        paths=paths,
+        now_fn=lambda: archive_time,
+    )
+
+    assert success is True, message
+    assert original_archive.read_bytes() == b"original upload"
+    assert normalized_archive.read_bytes() == b"normalized workbook"
+    assert not source_file_2.exists()
 
 
 def test_publish_fallback_csv_uses_unique_closed_ready_identity(tmp_path: Path) -> None:
@@ -98,9 +121,7 @@ def test_failed_identity_can_be_corrected_under_a_new_identity(tmp_path: Path) -
             paths=paths,
             metadata={},
             token_factory=lambda: TOKEN,
-            rename_file=lambda _source, _target: (_ for _ in ()).throw(
-                OSError("rename denied")
-            ),
+            rename_file=lambda _source, _target: (_ for _ in ()).throw(OSError("rename denied")),
         )
 
     corrected_name = service.publish_fallback_csv(
