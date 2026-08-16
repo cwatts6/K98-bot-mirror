@@ -16,7 +16,15 @@ param(
         'C:\discord_file_downloader',
         'C:\K98-bot-SQL-Server\reports\phase51-bot-worktree'
     )]
-    [string]$BotRepoRoot = 'C:\K98-bot-SQL-Server\reports\phase51-bot-worktree',
+    [string]$BotRepoRoot = 'C:\discord_file_downloader',
+
+    [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[0-9a-f]{40}$')]
+    [string]$ExpectedSqlCommit,
+
+    [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[0-9a-f]{40}$')]
+    [string]$ExpectedBotCommit,
 
     [Parameter(Mandatory = $true)]
     [int]$BotProcessId,
@@ -32,7 +40,6 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $expectedMachine = 'MINI_AMD'
-$expectedSqlCommit = '2e0f228f399bcc7b8bd3d6a758b059466c0474ac'
 $resolvedRoot = [IO.Path]::GetFullPath($TestRoot).TrimEnd('\')
 $readyRoot = Join-Path $resolvedRoot 'Import_Ready'
 $claimedRoot = Join-Path $resolvedRoot 'Import_Claimed'
@@ -41,7 +48,18 @@ $evidenceRoot = Join-Path $resolvedRoot 'evidence'
 $runId = 'phase5_1_' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ')
 $runRoot = Join-Path $evidenceRoot $runId
 $receiptPath = Join-Path $runRoot 'receipt.json'
+$failureReceiptPath = Join-Path $runRoot 'receipt.failed.json'
 $transcriptPath = Join-Path $runRoot 'transcript.log'
+$mutationAttempts = [System.Collections.Generic.List[object]]::new()
+$currentIdentity = $null
+$processOwner = $null
+$process = $null
+$sqlCommit = $null
+$botCommit = $null
+$completedFileName = $null
+$claimResult = $null
+$claimedFileAcl = $null
+$ledger = $null
 
 if (-not $ConfirmIsolatedTarget.IsPresent) {
     throw 'Pass -ConfirmIsolatedTarget only after confirming the pinned isolated database.'
@@ -98,12 +116,46 @@ function Invoke-DeniedMutation {
         }
     }
     catch {
+        $exception = $_.Exception
+        $accessDenied = $false
+        while ($null -ne $exception) {
+            if (
+                $exception -is [UnauthorizedAccessException] -or
+                $exception.HResult -eq -2147024891 -or
+                (
+                    $exception.PSObject.Properties.Name -contains 'NativeErrorCode' -and
+                    [int]$exception.NativeErrorCode -eq 5
+                )
+            ) {
+                $accessDenied = $true
+                break
+            }
+            $exception = $exception.InnerException
+        }
+
         return [pscustomobject]@{
             Name = $Name
-            Denied = $true
+            Denied = $accessDenied
             ErrorType = $_.Exception.GetType().FullName
             ErrorText = $_.Exception.Message
         }
+    }
+}
+
+function Assert-TrackedWorktreeClean {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)][string]$RepositoryLabel
+    )
+
+    & git -C $RepositoryRoot diff --quiet --exit-code --
+    if ($LASTEXITCODE -ne 0) {
+        throw "$RepositoryLabel repository has unstaged tracked changes."
+    }
+
+    & git -C $RepositoryRoot diff --cached --quiet --exit-code --
+    if ($LASTEXITCODE -ne 0) {
+        throw "$RepositoryLabel repository has staged but uncommitted changes."
     }
 }
 
@@ -122,6 +174,9 @@ SELECT DB_NAME() AS DatabaseName,
     $process = Get-CimInstance Win32_Process -Filter "ProcessId = $BotProcessId"
     if ($null -eq $process) {
         throw "Bot process $BotProcessId was not found."
+    }
+    if ([string]$process.CommandLine -notmatch '(?i)\\DL_bot\.py(?:\s|$|\")') {
+        throw "Process $BotProcessId is not a live DL_bot.py process."
     }
     $ownerResult = Invoke-CimMethod -InputObject $process -MethodName GetOwner
     $processOwner = "$($ownerResult.Domain)\$($ownerResult.User)"
@@ -154,10 +209,15 @@ WHERE servicename LIKE N'SQL Server (%';
     }
 
     $sqlCommit = (& git -C $SqlRepoRoot rev-parse HEAD).Trim()
-    if ($sqlCommit -cne $expectedSqlCommit) {
-        throw "SQL repository is not frozen at $expectedSqlCommit; found $sqlCommit."
+    if ($sqlCommit -cne $ExpectedSqlCommit) {
+        throw "SQL repository is not frozen at $ExpectedSqlCommit; found $sqlCommit."
     }
+    Assert-TrackedWorktreeClean -RepositoryRoot $SqlRepoRoot -RepositoryLabel 'SQL'
     $botCommit = (& git -C $BotRepoRoot rev-parse HEAD).Trim()
+    if ($botCommit -cne $ExpectedBotCommit) {
+        throw "Bot repository is not frozen at $ExpectedBotCommit; found $botCommit."
+    }
+    Assert-TrackedWorktreeClean -RepositoryRoot $BotRepoRoot -RepositoryLabel 'Bot'
 
     $token = [Guid]::NewGuid().ToString('N')
     $completedFileName = "stats_$token.ready.csv"
@@ -206,35 +266,66 @@ EXEC dbo.CLAIM_KS4_IMPORT_FILE
     @ArchivePath = @Archive OUTPUT;
 SELECT CONVERT(varchar(64), @Digest, 2) AS ClaimDigest,
        @Claimed AS ClaimedPath,
-       @Archive AS ArchivePath;
+       @Archive AS ArchivePath,
+       claim.AclHardenedAtUtc,
+       claim.AclOwnerIdentity
+FROM dbo.KS4_ImportFileClaim AS claim
+WHERE claim.CompletedFileName = N'$completedFileName';
 "@
     if (-not (Test-Path -LiteralPath $claimedPath -PathType Leaf)) {
         throw 'SQL-positive claim did not produce the exact Claimed identity.'
     }
 
+    $claimedAcl = Get-Acl -LiteralPath $claimedPath
+    $claimedFileAcl = [ordered]@{
+        Owner = $claimedAcl.Owner
+        Sddl = $claimedAcl.GetSecurityDescriptorSddlForm(
+            [Security.AccessControl.AccessControlSections]::All
+        )
+        Icacls = @(& icacls $claimedPath)
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$claimResult.AclOwnerIdentity)) {
+        throw 'SQL claim did not persist the ACL owner identity.'
+    }
+    if ($claimedAcl.Owner -ine [string]$claimResult.AclOwnerIdentity) {
+        throw "Claimed file owner $($claimedAcl.Owner) does not match SQL evidence $($claimResult.AclOwnerIdentity)."
+    }
+
     $replacementPath = Join-Path $readyRoot ".replacement_$token.tmp"
-    $mutationAttempts = @(
-        Invoke-DeniedMutation -Name 'overwrite' -Operation {
+    $mutationOperations = @(
+        [pscustomobject]@{ Name = 'overwrite'; Operation = {
             [IO.File]::WriteAllText($claimedPath, 'overwrite')
-        }
-        Invoke-DeniedMutation -Name 'replacement' -Operation {
+        } }
+        [pscustomobject]@{ Name = 'replacement'; Operation = {
             [IO.File]::WriteAllText($replacementPath, 'replacement')
             Move-Item -LiteralPath $replacementPath -Destination $claimedPath -Force -ErrorAction Stop
-        }
-        Invoke-DeniedMutation -Name 'rename' -Operation {
+        } }
+        [pscustomobject]@{ Name = 'rename'; Operation = {
             [IO.File]::Move($claimedPath, "$claimedPath.renamed")
-        }
-        Invoke-DeniedMutation -Name 'delete' -Operation {
+        } }
+        [pscustomobject]@{ Name = 'delete'; Operation = {
             [IO.File]::Delete($claimedPath)
             if (Test-Path -LiteralPath $claimedPath) {
-                throw [UnauthorizedAccessException]::new('Delete did not remove the claimed file.')
+                throw [InvalidOperationException]::new(
+                    'Delete returned without access denial but the claimed file remains.'
+                )
             }
-        }
-        Invoke-DeniedMutation -Name 'in_place_modify' -Operation {
+        } }
+        [pscustomobject]@{ Name = 'in_place_modify'; Operation = {
             $handle = [IO.File]::Open($claimedPath, [IO.FileMode]::Open, [IO.FileAccess]::Write)
             $handle.Dispose()
-        }
+        } }
     )
+
+    foreach ($mutationOperation in $mutationOperations) {
+        $attempt = Invoke-DeniedMutation `
+            -Name $mutationOperation.Name `
+            -Operation $mutationOperation.Operation
+        $mutationAttempts.Add($attempt)
+        if (-not $attempt.Denied) {
+            break
+        }
+    }
     Remove-Item -LiteralPath $replacementPath -ErrorAction SilentlyContinue
     if (@($mutationAttempts | Where-Object { -not $_.Denied }).Count -ne 0) {
         throw 'The real bot token retained a mutation path after SQL claim.'
@@ -256,6 +347,8 @@ SELECT claim.CompletedFileName,
        claim.ArchivePath,
        claim.ClaimRequestedAtUtc,
        claim.ClaimedAtUtc,
+       claim.AclHardenedAtUtc,
+       claim.AclOwnerIdentity,
        claim.ImportCommittedAtUtc,
        claim.ArchivedAtUtc,
        receipt.ScanOrder,
@@ -283,7 +376,7 @@ SELECT CONVERT(varchar(64), @Digest, 2) AS ArchiveDigest;
     }
 
     $receipt = [ordered]@{
-        EvidenceVersion = 1
+        EvidenceVersion = 2
         RunId = $runId
         CapturedAtUtc = [DateTime]::UtcNow.ToString('o')
         Machine = $env:COMPUTERNAME
@@ -291,6 +384,8 @@ SELECT CONVERT(varchar(64), @Digest, 2) AS ArchiveDigest;
         DatabaseName = [string]$databaseGuard.DatabaseName
         BotCommit = $botCommit
         SqlCommit = $sqlCommit
+        ExpectedBotCommit = $ExpectedBotCommit
+        ExpectedSqlCommit = $ExpectedSqlCommit
         CurrentBotIdentity = $currentIdentity
         BotProcessId = $BotProcessId
         BotProcessOwner = $processOwner
@@ -307,7 +402,8 @@ SELECT CONVERT(varchar(64), @Digest, 2) AS ArchiveDigest;
         CompletedFileName = $completedFileName
         ReadyDigest = $readyDigest
         ClaimResult = $claimResult
-        MutationAttempts = $mutationAttempts
+        ClaimedFileAcl = $claimedFileAcl
+        MutationAttempts = @($mutationAttempts)
         Ledger = $ledger
         ArchiveDigest = [string]$archiveDigestRow.ArchiveDigest
         StableFindingIds = @(
@@ -318,6 +414,32 @@ SELECT CONVERT(varchar(64), @Digest, 2) AS ArchiveDigest;
     }
     $receipt | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $receiptPath -Encoding UTF8
     Write-Host "Phase 5.1 immutable handoff evidence passed: $receiptPath"
+}
+catch {
+    $failureReceipt = [ordered]@{
+        EvidenceVersion = 2
+        RunId = $runId
+        CapturedAtUtc = [DateTime]::UtcNow.ToString('o')
+        Machine = $env:COMPUTERNAME
+        DatabaseName = $DatabaseName
+        BotCommit = $botCommit
+        SqlCommit = $sqlCommit
+        ExpectedBotCommit = $ExpectedBotCommit
+        ExpectedSqlCommit = $ExpectedSqlCommit
+        CurrentBotIdentity = $currentIdentity
+        BotProcessOwner = $processOwner
+        CompletedFileName = $completedFileName
+        ClaimResult = $claimResult
+        ClaimedFileAcl = $claimedFileAcl
+        MutationAttempts = @($mutationAttempts)
+        ErrorType = $_.Exception.GetType().FullName
+        ErrorText = $_.Exception.Message
+        Status = 'FAIL'
+    }
+    $failureReceipt |
+        ConvertTo-Json -Depth 12 |
+        Set-Content -LiteralPath $failureReceiptPath -Encoding UTF8
+    throw
 }
 finally {
     Stop-Transcript | Out-Null
