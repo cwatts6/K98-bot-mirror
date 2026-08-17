@@ -21,7 +21,26 @@ def test_acl_configuration_uses_protected_allow_list_and_owner_transfer() -> Non
     assert "'S-1-5-32-545'" in script
     assert "ConfirmProductionRoot" in script
     assert "ConfirmWritersStopped" in script
-    assert "phase5-1-acl-configuration/v1" in script
+    assert "phase5-1-acl-configuration/v2" in script
+
+
+def test_acl_configuration_normalizes_and_verifies_existing_archive_descendants() -> None:
+    script = _script("Configure-Phase51ImmutableHandoffAcl.ps1")
+
+    assert "function Get-ArchiveDescendantPaths" in script
+    assert "function Assert-NotReparsePoint" in script
+    assert "function Set-DescendantAclToParent" in script
+    assert "function Assert-DescendantAcl" in script
+    assert "& icacls $Path /reset /Q" in script
+    assert '& icacls $Path /setowner "*$($SqlSid.Value)" /Q' in script
+    assert "Could not reset the archive descendant ACL to inherited defaults" in script
+    assert "Could not transfer archive descendant ownership to SQL" in script
+    assert "Archive descendant still protects an independent ACL" in script
+    assert "Archive descendant retained an explicit access rule" in script
+    assert "Archive descendants changed while ACL hardening was in progress" in script
+    assert "Archive descendants must not contain a reparse point" in script
+    assert "ArchiveDescendantPathDigestSha256" in script
+    assert "ArchiveDescendantAclStatus = 'PASS'" in script
 
 
 def test_evidence_runner_requires_frozen_commits_and_persists_failures() -> None:

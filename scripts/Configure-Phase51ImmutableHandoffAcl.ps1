@@ -162,6 +162,118 @@ function Set-ImmutableDirectoryAcl {
     Set-Acl -LiteralPath $Path -AclObject $acl
 }
 
+function Assert-NotReparsePoint {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $item = Get-Item -LiteralPath $Path -Force
+    if (
+        ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+    ) {
+        throw "Archive descendants must not contain a reparse point: $Path"
+    }
+}
+
+function Get-ArchiveDescendantPaths {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $descendants = @(
+        Get-ChildItem -LiteralPath $Path -Force -Recurse |
+            Sort-Object @{ Expression = { $_.FullName.Length } }, FullName |
+            Select-Object -ExpandProperty FullName
+    )
+    foreach ($descendant in $descendants) {
+        Assert-NotReparsePoint -Path $descendant
+    }
+    return $descendants
+}
+
+function Get-RelativePathSetDigest {
+    param(
+        [Parameter(Mandatory = $true)][string]$RootPath,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Paths
+    )
+
+    $rootPrefix = $RootPath.TrimEnd('\') + '\'
+    $relativePaths = @(
+        $Paths | ForEach-Object {
+            if (-not $_.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Archive descendant escaped the approved root: $_"
+            }
+            $_.Substring($rootPrefix.Length)
+        } | Sort-Object
+    )
+    $payload = [string]::Join("`n", $relativePaths)
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        $digest = $sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($payload))
+        return ([BitConverter]::ToString($digest)).Replace('-', '')
+    }
+    finally {
+        $sha256.Dispose()
+    }
+}
+
+function Set-DescendantAclToParent {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)]
+        [Security.Principal.SecurityIdentifier]$SqlSid
+    )
+
+    Assert-NotReparsePoint -Path $Path
+    $currentAcl = Get-Acl -LiteralPath $Path
+    $currentOwnerSid = Resolve-IdentitySid -Identity $currentAcl.Owner
+    & icacls $Path /reset /Q | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not reset the archive descendant ACL to inherited defaults: $Path"
+    }
+    if ($currentOwnerSid.Value -cne $SqlSid.Value) {
+        & icacls $Path /setowner "*$($SqlSid.Value)" /Q | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not transfer archive descendant ownership to SQL: $Path"
+        }
+    }
+}
+
+function Assert-DescendantAcl {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)]
+        [Security.Principal.SecurityIdentifier]$SqlSid
+    )
+
+    Assert-NotReparsePoint -Path $Path
+    $acl = Get-Acl -LiteralPath $Path
+    if ([bool]$acl.AreAccessRulesProtected) {
+        throw "Archive descendant still protects an independent ACL: $Path"
+    }
+    if ((Resolve-IdentitySid -Identity $acl.Owner).Value -cne $SqlSid.Value) {
+        throw "Archive descendant owner is not the SQL identity: $Path"
+    }
+
+    $rules = @(
+        $acl.GetAccessRules(
+            $true,
+            $true,
+            [Security.Principal.SecurityIdentifier]
+        )
+    )
+    if (@($rules | Where-Object { -not $_.IsInherited }).Count -ne 0) {
+        throw "Archive descendant retained an explicit access rule: $Path"
+    }
+    if (@(
+        $rules | Where-Object {
+            $_.IdentityReference.Value -in @(
+                'S-1-1-0',
+                'S-1-5-11',
+                'S-1-5-32-545'
+            )
+        }
+    ).Count -ne 0) {
+        throw "Archive descendant retained a broad mutable principal: $Path"
+    }
+}
+
 $botSid = Resolve-IdentitySid -Identity $BotIdentity
 $sqlSid = Resolve-IdentitySid -Identity $SqlIdentity
 if ($botSid.Value -ceq $sqlSid.Value) {
@@ -208,10 +320,31 @@ if (Test-Path -LiteralPath $receiptPath) {
 }
 
 $before = @($paths | ForEach-Object { Get-AclSnapshot -Path $_ })
+$archiveDescendantPathsBefore = @(Get-ArchiveDescendantPaths -Path $archiveRoot)
+$archiveDescendantDigestBefore = Get-RelativePathSetDigest `
+    -RootPath $archiveRoot `
+    -Paths $archiveDescendantPathsBefore
 
 Set-ImmutableDirectoryAcl -Path $readyRoot -BotRights ([Security.AccessControl.FileSystemRights]::Modify) -BotSid $botSid -SqlSid $sqlSid
 Set-ImmutableDirectoryAcl -Path $claimedRoot -BotRights ([Security.AccessControl.FileSystemRights]::ReadAndExecute) -BotSid $botSid -SqlSid $sqlSid
 Set-ImmutableDirectoryAcl -Path $archiveRoot -BotRights ([Security.AccessControl.FileSystemRights]::ReadAndExecute) -BotSid $botSid -SqlSid $sqlSid
+foreach ($path in $archiveDescendantPathsBefore) {
+    Set-DescendantAclToParent -Path $path -SqlSid $sqlSid
+}
+
+$archiveDescendantPathsAfter = @(Get-ArchiveDescendantPaths -Path $archiveRoot)
+$archiveDescendantDigestAfter = Get-RelativePathSetDigest `
+    -RootPath $archiveRoot `
+    -Paths $archiveDescendantPathsAfter
+if (
+    $archiveDescendantPathsAfter.Count -ne $archiveDescendantPathsBefore.Count -or
+    $archiveDescendantDigestAfter -cne $archiveDescendantDigestBefore
+) {
+    throw 'Archive descendants changed while ACL hardening was in progress.'
+}
+foreach ($path in $archiveDescendantPathsAfter) {
+    Assert-DescendantAcl -Path $path -SqlSid $sqlSid
+}
 
 $after = @($paths | ForEach-Object { Get-AclSnapshot -Path $_ })
 foreach ($snapshot in $after) {
@@ -237,7 +370,7 @@ foreach ($snapshot in $after) {
 }
 
 $receipt = [ordered]@{
-    SchemaVersion = 'phase5-1-acl-configuration/v1'
+    SchemaVersion = 'phase5-1-acl-configuration/v2'
     CapturedAtUtc = [DateTime]::UtcNow.ToString('o')
     Machine = $env:COMPUTERNAME
     RootPath = $resolvedRoot
@@ -248,6 +381,9 @@ $receipt = [ordered]@{
     SqlSid = $sqlSid.Value
     FileSystem = $volume.FileSystemType
     VolumeUniqueId = $volume.UniqueId
+    ArchiveDescendantCount = $archiveDescendantPathsAfter.Count
+    ArchiveDescendantPathDigestSha256 = $archiveDescendantDigestAfter
+    ArchiveDescendantAclStatus = 'PASS'
     Before = $before
     After = $after
     Status = 'PASS'
