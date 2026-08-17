@@ -58,9 +58,12 @@ $sqlCommit = $null
 $botCommit = $null
 $completedFileName = $null
 $claimResult = $null
+$claimEvidenceRows = @()
 $claimedFileAcl = $null
 $ledger = $null
+$ledgerEvidenceRows = @()
 $updateAll2DurationMs = $null
+$archiveDigestDurationMs = $null
 
 if (-not $ConfirmIsolatedTarget.IsPresent) {
     throw 'Pass -ConfirmIsolatedTarget only after confirming the pinned isolated database.'
@@ -99,6 +102,43 @@ function Invoke-EvidenceSql {
         -AbortOnError `
         -TrustServerCertificate `
         -ErrorAction Stop
+}
+
+function Convert-EvidenceSqlRows {
+    param([AllowNull()][object[]]$Rows)
+
+    foreach ($row in @($Rows)) {
+        if ($null -eq $row) {
+            continue
+        }
+
+        $dataRow = if ($row -is [System.Data.DataRow]) {
+            $row
+        }
+        elseif ($row.PSObject.BaseObject -is [System.Data.DataRow]) {
+            $row.PSObject.BaseObject
+        }
+        else {
+            throw "Evidence SQL returned an unexpected row type: $($row.GetType().FullName)"
+        }
+
+        $evidenceRow = [ordered]@{}
+        foreach ($column in $dataRow.Table.Columns) {
+            $value = $dataRow[$column]
+            if ($value -is [DBNull]) {
+                $value = $null
+            }
+            elseif (
+                $null -ne $value -and
+                $value -isnot [string] -and
+                $value -isnot [ValueType]
+            ) {
+                $value = [string]$value
+            }
+            $evidenceRow[[string]$column.ColumnName] = $value
+        }
+        [pscustomobject]$evidenceRow
+    }
 }
 
 function Invoke-DeniedMutation {
@@ -186,6 +226,54 @@ EXEC dbo.UPDATE_ALL2
     }
 }
 
+function Get-ArchiveDigestEvidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidatePattern('\\Import_Archive\\stats_[0-9a-f]{32}\.ready\.csv$')]
+        [string]$ApprovedPath
+    )
+
+    $connectionBuilder = [System.Data.SqlClient.SqlConnectionStringBuilder]::new()
+    $connectionBuilder['Data Source'] = $ServerName
+    $connectionBuilder['Initial Catalog'] = $DatabaseName
+    $connectionBuilder['Integrated Security'] = $true
+    $connectionBuilder['TrustServerCertificate'] = $true
+    $connectionBuilder['Connect Timeout'] = 15
+    $connectionBuilder['Application Name'] = 'K98 Phase 5.1 Archive Digest Evidence'
+
+    $connection = [System.Data.SqlClient.SqlConnection]::new(
+        $connectionBuilder.ToString()
+    )
+    $command = $connection.CreateCommand()
+    $command.CommandText = @'
+DECLARE @Digest binary(32);
+EXEC dbo.HASH_KS4_IMPORT_ARCHIVE_FILE
+    @ApprovedPath = @ApprovedPath,
+    @FileDigest = @Digest OUTPUT;
+SELECT CONVERT(varchar(64), @Digest, 2);
+'@
+    $command.CommandTimeout = 120
+    $approvedPathParameter = $command.Parameters.Add(
+        '@ApprovedPath',
+        [System.Data.SqlDbType]::NVarChar,
+        4000
+    )
+    $approvedPathParameter.Value = $ApprovedPath
+
+    try {
+        $connection.Open()
+        $digest = $command.ExecuteScalar()
+        if ($null -eq $digest -or $digest -is [DBNull]) {
+            throw 'Archive digest query did not return a digest.'
+        }
+        return [string]$digest
+    }
+    finally {
+        $command.Dispose()
+        $connection.Dispose()
+    }
+}
+
 function Assert-TrackedWorktreeClean {
     param(
         [Parameter(Mandatory = $true)][string]$RepositoryRoot,
@@ -233,7 +321,9 @@ SELECT servicename, service_account, status_desc
 FROM sys.dm_server_services
 WHERE servicename LIKE N'SQL Server (%';
 "@
+    $serviceEvidenceRows = @(Convert-EvidenceSqlRows -Rows @($serviceRows))
     $xpIdentityRows = Invoke-EvidenceSql -Query "EXEC master.dbo.xp_cmdshell 'whoami';"
+    $xpIdentityEvidenceRows = @(Convert-EvidenceSqlRows -Rows @($xpIdentityRows))
 
     $roots = @($readyRoot, $claimedRoot, $archiveRoot)
     $rootDrives = @($roots | ForEach-Object { [IO.Path]::GetPathRoot($_) } | Select-Object -Unique)
@@ -316,6 +406,7 @@ SELECT CONVERT(varchar(64), @Digest, 2) AS ClaimDigest,
 FROM dbo.KS4_ImportFileClaim AS claim
 WHERE claim.CompletedFileName = N'$completedFileName';
 "@
+    $claimEvidenceRows = @(Convert-EvidenceSqlRows -Rows @($claimResult))
     if (-not (Test-Path -LiteralPath $claimedPath -PathType Leaf)) {
         throw 'SQL-positive claim did not produce the exact Claimed identity.'
     }
@@ -410,22 +501,26 @@ LEFT JOIN dbo.KS4_ImportFileReceipt AS receipt
   ON receipt.FileDigest = claim.FileDigest
 WHERE claim.CompletedFileName = N'$completedFileName';
 "@
+    $ledgerEvidenceRows = @(Convert-EvidenceSqlRows -Rows @($ledger))
     if ($ledger.ClaimStatus -cne 'archived' -or $ledger.ArchiveStatus -cne 'archived') {
         throw 'SQL did not reach the receipt-backed archived terminal state.'
     }
 
-    Write-Host 'Phase 5.1 evidence: validating the archived file digest.'
-    $archiveDigestRow = Invoke-EvidenceSql -Query @"
-DECLARE @Digest binary(32);
-EXEC dbo.HASH_KS4_IMPORT_ARCHIVE_FILE
-    @ApprovedPath = N'$archivePath',
-    @FileDigest = @Digest OUTPUT;
-SELECT CONVERT(varchar(64), @Digest, 2) AS ArchiveDigest;
-"@
-    if ($readyDigest -ine $ledger.ClaimDigest -or $ledger.ClaimDigest -ine $archiveDigestRow.ArchiveDigest) {
+    Write-Host 'Phase 5.1 evidence: validating the archived file digest with a bounded command.'
+    $archiveDigestStopwatch = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $archiveDigest = Get-ArchiveDigestEvidence -ApprovedPath $archivePath
+    }
+    finally {
+        $archiveDigestStopwatch.Stop()
+        $archiveDigestDurationMs = $archiveDigestStopwatch.ElapsedMilliseconds
+    }
+    Write-Host "Phase 5.1 evidence: archive digest completed in $archiveDigestDurationMs ms."
+    if ($readyDigest -ine $ledger.ClaimDigest -or $ledger.ClaimDigest -ine $archiveDigest) {
         throw 'Ready, claim and archive SHA-256 digests do not match.'
     }
 
+    Write-Host 'Phase 5.1 evidence: writing the normalized JSON receipt.'
     $receipt = [ordered]@{
         EvidenceVersion = 2
         RunId = $runId
@@ -440,24 +535,25 @@ SELECT CONVERT(varchar(64), @Digest, 2) AS ArchiveDigest;
         CurrentBotIdentity = $currentIdentity
         BotProcessId = $BotProcessId
         BotProcessOwner = $processOwner
-        BotCommandLine = $process.CommandLine
-        CurrentToken = $currentToken
-        SqlServices = @($serviceRows)
-        XpCmdShellIdentity = @($xpIdentityRows)
-        Paths = $roots
+        BotCommandLine = [string]$process.CommandLine
+        CurrentToken = @($currentToken | ForEach-Object { [string]$_ })
+        SqlServices = $serviceEvidenceRows
+        XpCmdShellIdentity = $xpIdentityEvidenceRows
+        Paths = @($roots | ForEach-Object { [string]$_ })
         DriveLetter = $driveLetter
-        FileSystem = $volume.FileSystemType
-        VolumeUniqueId = $volume.UniqueId
-        VolumeSerialNumber = $logicalDisk.VolumeSerialNumber
+        FileSystem = [string]$volume.FileSystemType
+        VolumeUniqueId = [string]$volume.UniqueId
+        VolumeSerialNumber = [string]$logicalDisk.VolumeSerialNumber
         AclEvidence = $aclEvidence
         CompletedFileName = $completedFileName
         ReadyDigest = $readyDigest
-        ClaimResult = $claimResult
+        ClaimResult = $claimEvidenceRows
         ClaimedFileAcl = $claimedFileAcl
         MutationAttempts = @($mutationAttempts)
         UpdateAll2DurationMs = $updateAll2DurationMs
-        Ledger = $ledger
-        ArchiveDigest = [string]$archiveDigestRow.ArchiveDigest
+        ArchiveDigestDurationMs = $archiveDigestDurationMs
+        Ledger = $ledgerEvidenceRows
+        ArchiveDigest = $archiveDigest
         StableFindingIds = @(
             'csf_1a1c440452b02cdb787fa7c3',
             'csf_3cb54318733d3a216dd91e9b'
@@ -481,10 +577,11 @@ catch {
         CurrentBotIdentity = $currentIdentity
         BotProcessOwner = $processOwner
         CompletedFileName = $completedFileName
-        ClaimResult = $claimResult
+        ClaimResult = $claimEvidenceRows
         ClaimedFileAcl = $claimedFileAcl
         MutationAttempts = @($mutationAttempts)
         UpdateAll2DurationMs = $updateAll2DurationMs
+        ArchiveDigestDurationMs = $archiveDigestDurationMs
         ErrorType = $_.Exception.GetType().FullName
         ErrorText = $_.Exception.Message
         Status = 'FAIL'

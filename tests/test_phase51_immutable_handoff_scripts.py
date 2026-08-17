@@ -69,6 +69,27 @@ def test_evidence_runner_does_not_materialize_update_all2_result_rows() -> None:
     assert 'Invoke-EvidenceSql -Query @"\nEXEC dbo.UPDATE_ALL2' not in script
 
 
+def test_evidence_runner_bounds_archive_hash_and_normalizes_sql_receipt_rows() -> None:
+    script = _script("Invoke-Phase51ImmutableHandoffEvidence.ps1")
+
+    assert "function Get-ArchiveDigestEvidence" in script
+    assert "$command.CommandTimeout = 120" in script
+    assert "[System.Data.SqlDbType]::NVarChar" in script
+    assert "$digest = $command.ExecuteScalar()" in script
+    assert "Get-ArchiveDigestEvidence -ApprovedPath $archivePath" in script
+    assert "archive digest completed in $archiveDigestDurationMs ms" in script
+    assert "function Convert-EvidenceSqlRows" in script
+    assert "$dataRow.Table.Columns" in script
+    assert "SqlServices = $serviceEvidenceRows" in script
+    assert "XpCmdShellIdentity = $xpIdentityEvidenceRows" in script
+    assert "ClaimResult = $claimEvidenceRows" in script
+    assert "Ledger = $ledgerEvidenceRows" in script
+    assert "SqlServices = @($serviceRows)" not in script
+    assert "ClaimResult = $claimResult" not in script
+    assert "\n        Ledger = $ledger\n" not in script
+    assert script.count("ClaimResult = $claimEvidenceRows") == 2
+
+
 def test_failed_evidence_reset_is_pinned_and_shape_specific() -> None:
     script = _script("Reset-Phase51FailedEvidence.ps1")
 
