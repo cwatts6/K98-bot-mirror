@@ -28,7 +28,7 @@ def test_acl_configuration_normalizes_and_verifies_existing_archive_descendants(
     script = _script("Configure-Phase51ImmutableHandoffAcl.ps1")
 
     assert "function Get-ArchiveDescendantPaths" in script
-    assert "function Assert-NotReparsePoint" in script
+    assert "function Assert-SafeArchiveDescendant" in script
     assert "function Set-DescendantAclToParent" in script
     assert "function Assert-DescendantAcl" in script
     assert "& icacls $Path /reset /Q" in script
@@ -39,6 +39,8 @@ def test_acl_configuration_normalizes_and_verifies_existing_archive_descendants(
     assert "Archive descendant retained an explicit access rule" in script
     assert "Archive descendants changed while ACL hardening was in progress" in script
     assert "Archive descendants must not contain a reparse point" in script
+    assert "Archive descendants must not contain a hard link" in script
+    assert "$item.PSObject.Properties['LinkType']" in script
     assert "ArchiveDescendantPathDigestSha256" in script
     assert "ArchiveDescendantAclStatus = 'PASS'" in script
 

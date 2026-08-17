@@ -162,7 +162,7 @@ function Set-ImmutableDirectoryAcl {
     Set-Acl -LiteralPath $Path -AclObject $acl
 }
 
-function Assert-NotReparsePoint {
+function Assert-SafeArchiveDescendant {
     param([Parameter(Mandatory = $true)][string]$Path)
 
     $item = Get-Item -LiteralPath $Path -Force
@@ -170,6 +170,13 @@ function Assert-NotReparsePoint {
         ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
     ) {
         throw "Archive descendants must not contain a reparse point: $Path"
+    }
+    $linkTypeProperty = $item.PSObject.Properties['LinkType']
+    if (
+        $null -ne $linkTypeProperty -and
+        [string]$linkTypeProperty.Value -ceq 'HardLink'
+    ) {
+        throw "Archive descendants must not contain a hard link: $Path"
     }
 }
 
@@ -182,7 +189,7 @@ function Get-ArchiveDescendantPaths {
             Select-Object -ExpandProperty FullName
     )
     foreach ($descendant in $descendants) {
-        Assert-NotReparsePoint -Path $descendant
+        Assert-SafeArchiveDescendant -Path $descendant
     }
     return $descendants
 }
@@ -220,7 +227,7 @@ function Set-DescendantAclToParent {
         [Security.Principal.SecurityIdentifier]$SqlSid
     )
 
-    Assert-NotReparsePoint -Path $Path
+    Assert-SafeArchiveDescendant -Path $Path
     $currentAcl = Get-Acl -LiteralPath $Path
     $currentOwnerSid = Resolve-IdentitySid -Identity $currentAcl.Owner
     & icacls $Path /reset /Q | Out-Null
@@ -228,6 +235,7 @@ function Set-DescendantAclToParent {
         throw "Could not reset the archive descendant ACL to inherited defaults: $Path"
     }
     if ($currentOwnerSid.Value -cne $SqlSid.Value) {
+        Assert-SafeArchiveDescendant -Path $Path
         & icacls $Path /setowner "*$($SqlSid.Value)" /Q | Out-Null
         if ($LASTEXITCODE -ne 0) {
             throw "Could not transfer archive descendant ownership to SQL: $Path"
@@ -242,7 +250,7 @@ function Assert-DescendantAcl {
         [Security.Principal.SecurityIdentifier]$SqlSid
     )
 
-    Assert-NotReparsePoint -Path $Path
+    Assert-SafeArchiveDescendant -Path $Path
     $acl = Get-Acl -LiteralPath $Path
     if ([bool]$acl.AreAccessRulesProtected) {
         throw "Archive descendant still protects an independent ACL: $Path"
