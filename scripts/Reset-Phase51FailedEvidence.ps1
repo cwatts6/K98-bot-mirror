@@ -21,14 +21,21 @@ param(
     [switch]$ConfirmDiscardFailedAttempt,
 
     [Parameter(Mandatory = $true)]
-    [switch]$ConfirmWritersStopped
+    [switch]$ConfirmWritersStopped,
+
+    [switch]$ConfirmRecoverLegacyPostCommit
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $expectedMachine = 'MINI_AMD'
+$expectedRoot = 'C:\discord_file_downloader\downloads_test_phase5_rehearsal'
+$expectedReplacementHash = '95713E9CBDD1DFCB2D4080C2537F418D43CA0DA25F0D7D6631F4F7C97B89DC47'
+$legacyPostCommitRunId = 'phase5_1_20260816T173604288Z'
+$legacyPostCommitFileName = 'stats_4f3816925f51437fbaba8f5d49c40064.ready.csv'
 $resolvedRoot = [IO.Path]::GetFullPath($TestRoot).TrimEnd('\')
+
 if ($env:COMPUTERNAME -ine $expectedMachine) {
     throw "Run locally on $expectedMachine. Current host: $env:COMPUTERNAME"
 }
@@ -38,7 +45,7 @@ if (-not $ConfirmDiscardFailedAttempt.IsPresent -or -not $ConfirmWritersStopped.
 if ($DatabaseName -ceq 'ROK_TRACKER') {
     throw 'Phase 5.1 failed-evidence reset refuses the production database.'
 }
-if ($resolvedRoot -cne 'C:\discord_file_downloader\downloads_test_phase5_rehearsal') {
+if ($resolvedRoot -cne $expectedRoot) {
     throw 'Phase 5.1 failed-evidence reset refuses an unreviewed filesystem root.'
 }
 
@@ -50,6 +57,7 @@ $transcriptPath = Join-Path $failedRunRoot 'transcript.log'
 $successReceiptPath = Join-Path $failedRunRoot 'receipt.json'
 $failedReceiptPath = Join-Path $failedRunRoot 'receipt.failed.json'
 $quarantineRoot = Join-Path $failedRunRoot 'failed_work_files'
+$resetIntentPath = Join-Path $quarantineRoot 'reset_intent.json'
 $resetReceiptPath = Join-Path $quarantineRoot 'reset_receipt.json'
 
 if (-not (Test-Path -LiteralPath $transcriptPath -PathType Leaf)) {
@@ -85,15 +93,83 @@ if ($renamedExists -eq $quarantineExists) {
 $retainedPath = if ($renamedExists) { $renamedPath } else { $quarantinePath }
 $retainedItem = Get-Item -LiteralPath $retainedPath
 $retainedHash = (Get-FileHash -LiteralPath $retainedPath -Algorithm SHA256).Hash
-$expectedReplacementHash = '95713E9CBDD1DFCB2D4080C2537F418D43CA0DA25F0D7D6631F4F7C97B89DC47'
 if ($retainedItem.Length -ne 11 -or $retainedHash -cne $expectedReplacementHash) {
     throw 'Retained renamed file does not match the exact 11-byte replacement failure shape.'
+}
+
+function Write-JsonAtomically {
+    param(
+        [Parameter(Mandatory = $true)]$Value,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+
+    if (Test-Path -LiteralPath $Destination) {
+        throw "Refusing to replace existing evidence: $Destination"
+    }
+    $temporaryPath = "$Destination.$([guid]::NewGuid().ToString('N')).tmp"
+    try {
+        $Value |
+            ConvertTo-Json -Depth 12 |
+            Set-Content -LiteralPath $temporaryPath -Encoding UTF8
+        [IO.File]::Move($temporaryPath, $Destination)
+    }
+    finally {
+        Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Invoke-ResetSql {
     param([Parameter(Mandatory = $true)][string]$Query)
 
-    Invoke-Sqlcmd -ServerInstance $ServerName -Database $DatabaseName -Query $Query -AbortOnError -TrustServerCertificate -ErrorAction Stop
+    $boundedQuery = "SET LOCK_TIMEOUT 30000;`r`n$Query"
+    Invoke-Sqlcmd `
+        -ServerInstance $ServerName `
+        -Database $DatabaseName `
+        -Query $boundedQuery `
+        -QueryTimeout 60 `
+        -AbortOnError `
+        -TrustServerCertificate `
+        -ErrorAction Stop
+}
+
+function Get-ReceiptPathCount {
+    $result = Invoke-ResetSql -Query @"
+SELECT COUNT_BIG(*) AS ReceiptPathCount
+FROM dbo.KS4_ImportFileReceipt
+WHERE SourcePath IN (N'$readyPath', N'$claimedPath')
+   OR ArchivePath = N'$archivePath';
+"@
+    return [long]$result.ReceiptPathCount
+}
+
+function New-ResetReceipt {
+    param(
+        [Parameter(Mandatory = $true)]$DatabaseGuard,
+        [Parameter(Mandatory = $true)]$OriginalClaim,
+        [Parameter(Mandatory = $true)][string]$RecoveryMode,
+        [Parameter(Mandatory = $true)][string]$EvidenceSource
+    )
+
+    return [ordered]@{
+        SchemaVersion = 'phase5-1-failed-evidence-reset/v2'
+        CapturedAtUtc = [DateTime]::UtcNow.ToString('o')
+        Machine = $env:COMPUTERNAME
+        ServerName = [string]$DatabaseGuard.ServerName
+        DatabaseName = [string]$DatabaseGuard.DatabaseName
+        FailedRunId = $FailedRunId
+        CompletedFileName = $CompletedFileName
+        RecoveryMode = $RecoveryMode
+        EvidenceSource = $EvidenceSource
+        OriginalClaim = $OriginalClaim
+        TranscriptPath = $transcriptPath
+        TranscriptSha256 = (Get-FileHash -LiteralPath $transcriptPath -Algorithm SHA256).Hash
+        QuarantinedPath = $quarantinePath
+        QuarantinedLength = (Get-Item -LiteralPath $quarantinePath).Length
+        QuarantinedSha256 = $retainedHash
+        DeletedClaimRows = 1
+        MatchingReceiptRows = 0
+        Status = 'PASS'
+    }
 }
 
 $databaseGuard = Invoke-ResetSql -Query @"
@@ -105,7 +181,8 @@ if ([int]$databaseGuard.IsIsolated -ne 1) {
     throw 'Database guard did not prove an isolated target.'
 }
 
-$claim = Invoke-ResetSql -Query @"
+$claimRows = @(
+    Invoke-ResetSql -Query @"
 SELECT claim.CompletedFileName,
        claim.ClaimStatus,
        CONVERT(varchar(64), claim.FileDigest, 2) AS FileDigest,
@@ -121,10 +198,82 @@ LEFT JOIN dbo.KS4_ImportFileReceipt AS receipt
   ON receipt.FileDigest = claim.FileDigest
 WHERE claim.CompletedFileName = N'$CompletedFileName';
 "@
-if ($null -eq $claim -or $claim.CompletedFileName -cne $CompletedFileName) {
-    throw 'Reset did not find exactly the requested failed claim.'
+)
+
+if ($claimRows.Count -eq 0) {
+    if (-not $quarantineExists -or $renamedExists) {
+        throw 'Post-commit recovery requires only the exact quarantined failure artifact.'
+    }
+    if ((Get-ReceiptPathCount) -ne 0) {
+        throw 'Post-commit recovery found a matching committed receipt.'
+    }
+
+    if (Test-Path -LiteralPath $resetIntentPath -PathType Leaf) {
+        $intent = Get-Content -LiteralPath $resetIntentPath -Raw | ConvertFrom-Json
+        if (
+            $intent.SchemaVersion -cne 'phase5-1-failed-evidence-reset-intent/v1' -or
+            $intent.DatabaseName -cne $DatabaseName -or
+            $intent.FailedRunId -cne $FailedRunId -or
+            $intent.CompletedFileName -cne $CompletedFileName -or
+            $intent.QuarantinedSha256 -cne $retainedHash
+        ) {
+            throw 'Reset intent does not match the requested post-commit recovery.'
+        }
+        $receipt = New-ResetReceipt `
+            -DatabaseGuard $databaseGuard `
+            -OriginalClaim $intent.OriginalClaim `
+            -RecoveryMode 'PostCommitIntentRecovery' `
+            -EvidenceSource $resetIntentPath
+        Write-JsonAtomically -Value $receipt -Destination $resetReceiptPath
+        Write-Host "Phase 5.1 post-commit intent recovery passed: $resetReceiptPath"
+        return
+    }
+
+    if (-not $ConfirmRecoverLegacyPostCommit.IsPresent) {
+        throw 'Claim deletion committed without a reset intent. Pass -ConfirmRecoverLegacyPostCommit only for the pinned legacy incident.'
+    }
+    if (
+        $FailedRunId -cne $legacyPostCommitRunId -or
+        $CompletedFileName -cne $legacyPostCommitFileName
+    ) {
+        throw 'Legacy post-commit recovery refuses every run except the pinned 2026-08-16 incident.'
+    }
+
+    $transcript = Get-Content -LiteralPath $transcriptPath -Raw
+    if (
+        $transcript -notmatch [regex]::Escape($CompletedFileName) -or
+        $transcript -notmatch [regex]::Escape($expectedReplacementHash) -or
+        $transcript -notmatch 'ClaimStatus\s+ReadyPath' -or
+        $transcript -notmatch 'claimed\s+C:\\discord_file_downloader\\downloads_test_phase5_rehearsal\\Import_Ready'
+    ) {
+        throw 'Legacy post-commit recovery transcript markers do not match the pinned failed incident.'
+    }
+
+    $legacyClaimEvidence = [ordered]@{
+        CompletedFileName = $CompletedFileName
+        ClaimStatus = 'claimed'
+        ReadyPath = $readyPath
+        ClaimedPath = $claimedPath
+        ArchivePath = $archivePath
+        HasReceipt = 0
+        RecoveryNote = 'Original row was deleted before the interrupted v1 reset could persist its receipt; exact state is reconstructed from the pinned transcript, paths, and quarantine digest.'
+    }
+    $receipt = New-ResetReceipt `
+        -DatabaseGuard $databaseGuard `
+        -OriginalClaim $legacyClaimEvidence `
+        -RecoveryMode 'LegacyPostCommitRecovery' `
+        -EvidenceSource $transcriptPath
+    Write-JsonAtomically -Value $receipt -Destination $resetReceiptPath
+    Write-Host "Phase 5.1 pinned legacy post-commit recovery passed: $resetReceiptPath"
+    return
 }
+
+if ($claimRows.Count -ne 1) {
+    throw 'Reset did not find exactly one requested failed claim.'
+}
+$claim = $claimRows[0]
 if (
+    $claim.CompletedFileName -cne $CompletedFileName -or
     $claim.ClaimStatus -cne 'claimed' -or
     [int]$claim.HasReceipt -ne 0 -or
     $claim.ReadyPath -cne $readyPath -or
@@ -135,6 +284,25 @@ if (
 }
 
 New-Item -ItemType Directory -Path $quarantineRoot -Force | Out-Null
+if (-not (Test-Path -LiteralPath $resetIntentPath -PathType Leaf)) {
+    $intent = [ordered]@{
+        SchemaVersion = 'phase5-1-failed-evidence-reset-intent/v1'
+        CapturedAtUtc = [DateTime]::UtcNow.ToString('o')
+        Machine = $env:COMPUTERNAME
+        ServerName = [string]$databaseGuard.ServerName
+        DatabaseName = [string]$databaseGuard.DatabaseName
+        FailedRunId = $FailedRunId
+        CompletedFileName = $CompletedFileName
+        OriginalClaim = $claim
+        TranscriptPath = $transcriptPath
+        TranscriptSha256 = (Get-FileHash -LiteralPath $transcriptPath -Algorithm SHA256).Hash
+        QuarantinedPath = $quarantinePath
+        QuarantinedSha256 = $retainedHash
+        Status = 'PENDING'
+    }
+    Write-JsonAtomically -Value $intent -Destination $resetIntentPath
+}
+
 if ($renamedExists) {
     Move-Item -LiteralPath $renamedPath -Destination $quarantinePath -ErrorAction Stop
 }
@@ -176,20 +344,10 @@ if ([int]$deleteResult.DeletedClaimRows -ne 1) {
     throw 'Reset did not confirm deletion of exactly one isolated failed claim.'
 }
 
-$receipt = [ordered]@{
-    SchemaVersion = 'phase5-1-failed-evidence-reset/v1'
-    CapturedAtUtc = [DateTime]::UtcNow.ToString('o')
-    Machine = $env:COMPUTERNAME
-    ServerName = [string]$databaseGuard.ServerName
-    DatabaseName = [string]$databaseGuard.DatabaseName
-    FailedRunId = $FailedRunId
-    CompletedFileName = $CompletedFileName
-    OriginalClaim = $claim
-    QuarantinedPath = $quarantinePath
-    QuarantinedLength = (Get-Item -LiteralPath $quarantinePath).Length
-    QuarantinedSha256 = $retainedHash
-    DeletedClaimRows = [int]$deleteResult.DeletedClaimRows
-    Status = 'PASS'
-}
-$receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $resetReceiptPath -Encoding UTF8
+$receipt = New-ResetReceipt `
+    -DatabaseGuard $databaseGuard `
+    -OriginalClaim $claim `
+    -RecoveryMode 'Normal' `
+    -EvidenceSource $resetIntentPath
+Write-JsonAtomically -Value $receipt -Destination $resetReceiptPath
 Write-Host "Phase 5.1 failed evidence reset passed: $resetReceiptPath"

@@ -64,4 +64,28 @@ def test_failed_evidence_reset_is_pinned_and_shape_specific() -> None:
         "DELETE dbo.KS4_ImportFileClaim"
     )
     assert "IF @@ROWCOUNT <> 1" in script
-    assert "phase5-1-failed-evidence-reset/v1" in script
+    assert "phase5-1-failed-evidence-reset/v2" in script
+
+
+def test_failed_evidence_reset_journals_before_delete_and_bounds_sql_waits() -> None:
+    script = _script("Reset-Phase51FailedEvidence.ps1")
+
+    assert "phase5-1-failed-evidence-reset-intent/v1" in script
+    assert "Write-JsonAtomically -Value $intent" in script
+    assert script.index("Write-JsonAtomically -Value $intent") < script.index(
+        "DELETE dbo.KS4_ImportFileClaim"
+    )
+    assert "SET LOCK_TIMEOUT 30000" in script
+    assert "-QueryTimeout 60" in script
+    assert "PostCommitIntentRecovery" in script
+
+
+def test_failed_evidence_reset_legacy_recovery_is_exact_and_explicit() -> None:
+    script = _script("Reset-Phase51FailedEvidence.ps1")
+
+    assert "ConfirmRecoverLegacyPostCommit" in script
+    assert "phase5_1_20260816T173604288Z" in script
+    assert "stats_4f3816925f51437fbaba8f5d49c40064.ready.csv" in script
+    assert "LegacyPostCommitRecovery" in script
+    assert "Legacy post-commit recovery refuses every run except" in script
+    assert "Get-ReceiptPathCount" in script

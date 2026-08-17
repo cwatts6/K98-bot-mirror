@@ -37,6 +37,13 @@ Set-Location C:\discord_file_downloader
 Require `failed_work_files\reset_receipt.json`. The script quarantines the 11-byte renamed
 artifact before deleting exactly one receipt-free isolated claim.
 
+The reset writes `failed_work_files\reset_intent.json` atomically before the SQL delete and bounds
+both SQL lock and query waits. If interruption occurs after commit, rerun the same command to
+complete the receipt from that intent. The single pre-intent incident from
+`phase5_1_20260816T173604288Z` requires the additional explicit
+`-ConfirmRecoverLegacyPostCommit` switch; that path accepts only the pinned run, filename,
+transcript markers, quarantine digest, absent claim and absent matching receipt.
+
 ## 3. Configure isolated directory ACLs
 
 Resolve the real identities first:
