@@ -51,6 +51,24 @@ def test_evidence_runner_counts_only_access_denied_as_denial() -> None:
     assert "throw [UnauthorizedAccessException]::new(" not in script
 
 
+def test_evidence_runner_does_not_materialize_update_all2_result_rows() -> None:
+    script = _script("Invoke-Phase51ImmutableHandoffEvidence.ps1")
+
+    assert "function Invoke-UpdateAll2Evidence" in script
+    assert "[System.Data.SqlClient.SqlConnectionStringBuilder]::new()" in script
+    assert "$connectionBuilder['Data Source'] = $ServerName" in script
+    assert "$connectionBuilder['Initial Catalog'] = $DatabaseName" in script
+    assert "$connectionBuilder['Integrated Security'] = $true" in script
+    assert "$connectionBuilder['TrustServerCertificate'] = $true" in script
+    assert "$command.CommandTimeout = 900" in script
+    assert "[System.Data.SqlDbType]::NVarChar" in script
+    assert "[void]$command.ExecuteNonQuery()" in script
+    assert "Invoke-UpdateAll2Evidence -CompletedFileName $completedFileName" in script
+    assert "starting UPDATE_ALL2 without materializing result rows" in script
+    assert "UpdateAll2DurationMs = $updateAll2DurationMs" in script
+    assert 'Invoke-EvidenceSql -Query @"\nEXEC dbo.UPDATE_ALL2' not in script
+
+
 def test_failed_evidence_reset_is_pinned_and_shape_specific() -> None:
     script = _script("Reset-Phase51FailedEvidence.ps1")
 

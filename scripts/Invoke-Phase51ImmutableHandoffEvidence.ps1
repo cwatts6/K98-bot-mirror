@@ -60,6 +60,7 @@ $completedFileName = $null
 $claimResult = $null
 $claimedFileAcl = $null
 $ledger = $null
+$updateAll2DurationMs = $null
 
 if (-not $ConfirmIsolatedTarget.IsPresent) {
     throw 'Pass -ConfirmIsolatedTarget only after confirming the pinned isolated database.'
@@ -139,6 +140,49 @@ function Invoke-DeniedMutation {
             ErrorType = $_.Exception.GetType().FullName
             ErrorText = $_.Exception.Message
         }
+    }
+}
+
+function Invoke-UpdateAll2Evidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidatePattern('^stats_[0-9a-f]{32}\.ready\.csv$')]
+        [string]$CompletedFileName
+    )
+
+    $connectionBuilder = [System.Data.SqlClient.SqlConnectionStringBuilder]::new()
+    $connectionBuilder['Data Source'] = $ServerName
+    $connectionBuilder['Initial Catalog'] = $DatabaseName
+    $connectionBuilder['Integrated Security'] = $true
+    $connectionBuilder['TrustServerCertificate'] = $true
+    $connectionBuilder['Connect Timeout'] = 15
+    $connectionBuilder['Application Name'] = 'K98 Phase 5.1 Immutable Handoff Evidence'
+
+    $connection = [System.Data.SqlClient.SqlConnection]::new(
+        $connectionBuilder.ToString()
+    )
+    $command = $connection.CreateCommand()
+    $command.CommandText = @'
+EXEC dbo.UPDATE_ALL2
+    @param1 = NULL,
+    @param2 = NULL,
+    @CompletedFileName = @CompletedFileName;
+'@
+    $command.CommandTimeout = 900
+    $completedFileParameter = $command.Parameters.Add(
+        '@CompletedFileName',
+        [System.Data.SqlDbType]::NVarChar,
+        260
+    )
+    $completedFileParameter.Value = $CompletedFileName
+
+    try {
+        $connection.Open()
+        [void]$command.ExecuteNonQuery()
+    }
+    finally {
+        $command.Dispose()
+        $connection.Dispose()
     }
 }
 
@@ -331,13 +375,19 @@ WHERE claim.CompletedFileName = N'$completedFileName';
         throw 'The real bot token retained a mutation path after SQL claim.'
     }
 
-    Invoke-EvidenceSql -Query @"
-EXEC dbo.UPDATE_ALL2
-    @param1 = NULL,
-    @param2 = NULL,
-    @CompletedFileName = N'$completedFileName';
-"@ | Out-Null
+    Write-Host 'Phase 5.1 evidence: all five bot-token mutation attempts were denied.'
+    Write-Host 'Phase 5.1 evidence: starting UPDATE_ALL2 without materializing result rows.'
+    $updateAll2Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        Invoke-UpdateAll2Evidence -CompletedFileName $completedFileName
+    }
+    finally {
+        $updateAll2Stopwatch.Stop()
+        $updateAll2DurationMs = $updateAll2Stopwatch.ElapsedMilliseconds
+    }
+    Write-Host "Phase 5.1 evidence: UPDATE_ALL2 completed in $updateAll2DurationMs ms."
 
+    Write-Host 'Phase 5.1 evidence: validating the terminal SQL ledger.'
     $ledger = Invoke-EvidenceSql -Query @"
 SELECT claim.CompletedFileName,
        claim.ClaimStatus,
@@ -364,6 +414,7 @@ WHERE claim.CompletedFileName = N'$completedFileName';
         throw 'SQL did not reach the receipt-backed archived terminal state.'
     }
 
+    Write-Host 'Phase 5.1 evidence: validating the archived file digest.'
     $archiveDigestRow = Invoke-EvidenceSql -Query @"
 DECLARE @Digest binary(32);
 EXEC dbo.HASH_KS4_IMPORT_ARCHIVE_FILE
@@ -404,6 +455,7 @@ SELECT CONVERT(varchar(64), @Digest, 2) AS ArchiveDigest;
         ClaimResult = $claimResult
         ClaimedFileAcl = $claimedFileAcl
         MutationAttempts = @($mutationAttempts)
+        UpdateAll2DurationMs = $updateAll2DurationMs
         Ledger = $ledger
         ArchiveDigest = [string]$archiveDigestRow.ArchiveDigest
         StableFindingIds = @(
@@ -432,6 +484,7 @@ catch {
         ClaimResult = $claimResult
         ClaimedFileAcl = $claimedFileAcl
         MutationAttempts = @($mutationAttempts)
+        UpdateAll2DurationMs = $updateAll2DurationMs
         ErrorType = $_.Exception.GetType().FullName
         ErrorText = $_.Exception.Message
         Status = 'FAIL'
