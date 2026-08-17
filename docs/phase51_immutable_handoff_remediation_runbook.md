@@ -42,7 +42,7 @@ both SQL lock and query waits. If interruption occurs after commit, rerun the sa
 complete the receipt from that intent. The single pre-intent incident from
 `phase5_1_20260816T173604288Z` requires the additional explicit
 `-ConfirmRecoverLegacyPostCommit` switch; that path accepts only the pinned run, filename,
-transcript markers, quarantine digest, absent claim and absent matching receipt.
+exact transcript SHA-256, quarantine digest, absent claim and absent matching receipt.
 
 ## 3. Configure isolated directory ACLs
 

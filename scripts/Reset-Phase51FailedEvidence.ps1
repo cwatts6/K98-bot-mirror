@@ -34,6 +34,7 @@ $expectedRoot = 'C:\discord_file_downloader\downloads_test_phase5_rehearsal'
 $expectedReplacementHash = '95713E9CBDD1DFCB2D4080C2537F418D43CA0DA25F0D7D6631F4F7C97B89DC47'
 $legacyPostCommitRunId = 'phase5_1_20260816T173604288Z'
 $legacyPostCommitFileName = 'stats_4f3816925f51437fbaba8f5d49c40064.ready.csv'
+$legacyPostCommitTranscriptHash = 'DCFA021B9C713C638B9455DD0B057D05C8897E980B9A6E2B581036693B7D5506'
 $resolvedRoot = [IO.Path]::GetFullPath($TestRoot).TrimEnd('\')
 
 if ($env:COMPUTERNAME -ine $expectedMachine) {
@@ -239,14 +240,9 @@ if ($claimRows.Count -eq 0) {
         throw 'Legacy post-commit recovery refuses every run except the pinned 2026-08-16 incident.'
     }
 
-    $transcript = Get-Content -LiteralPath $transcriptPath -Raw
-    if (
-        $transcript -notmatch [regex]::Escape($CompletedFileName) -or
-        $transcript -notmatch [regex]::Escape($expectedReplacementHash) -or
-        $transcript -notmatch 'ClaimStatus\s+ReadyPath' -or
-        $transcript -notmatch 'claimed\s+C:\\discord_file_downloader\\downloads_test_phase5_rehearsal\\Import_Ready'
-    ) {
-        throw 'Legacy post-commit recovery transcript markers do not match the pinned failed incident.'
+    $transcriptHash = (Get-FileHash -LiteralPath $transcriptPath -Algorithm SHA256).Hash
+    if ($transcriptHash -cne $legacyPostCommitTranscriptHash) {
+        throw 'Legacy post-commit recovery transcript digest does not match the pinned failed incident.'
     }
 
     $legacyClaimEvidence = [ordered]@{

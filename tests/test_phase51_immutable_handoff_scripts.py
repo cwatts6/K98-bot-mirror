@@ -86,6 +86,9 @@ def test_failed_evidence_reset_legacy_recovery_is_exact_and_explicit() -> None:
     assert "ConfirmRecoverLegacyPostCommit" in script
     assert "phase5_1_20260816T173604288Z" in script
     assert "stats_4f3816925f51437fbaba8f5d49c40064.ready.csv" in script
+    assert "DCFA021B9C713C638B9455DD0B057D05C8897E980B9A6E2B581036693B7D5506" in script
     assert "LegacyPostCommitRecovery" in script
     assert "Legacy post-commit recovery refuses every run except" in script
+    assert "transcript digest does not match the pinned failed incident" in script
+    assert "ClaimStatus\\s+ReadyPath" not in script
     assert "Get-ReceiptPathCount" in script
