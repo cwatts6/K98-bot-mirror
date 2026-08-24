@@ -182,7 +182,7 @@ KVK_BANNER_MAP = {
     "desert conquest": "https://your-link-for-desert.png",
     "strife of the eight": "https://your-link-for-strife.png",
     "tides of war": "https://i.ibb.co/Pv6bxrsd/tides-of-war.jpg",
-    "koab": "https://i.ibb.co/gMPWkkZX/KOAB.png",
+    "king of all britain": "https://i.ibb.co/gMPWkkZX/KOAB.png",
     "storm of stratagems": "https://i.ibb.co/sJdSFQN9/stratagems.jpg",
     "invictus": "https://i.ibb.co/Fqh6bhRK/alliance-invictus.png",
 }
