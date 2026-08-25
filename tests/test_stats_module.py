@@ -46,6 +46,19 @@ def _disable_import_audit(monkeypatch):
     )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_import_metadata_file(monkeypatch, tmp_path):
+    """Never let unit tests read, write, or delete the repository runtime manifest."""
+    isolated_path = tmp_path / "stats_import_metadata.json"
+    monkeypatch.setattr(stats_module, "IMPORT_METADATA_FILE_PATH", str(isolated_path))
+    return isolated_path
+
+
+def test_import_metadata_file_is_test_isolated(_isolate_import_metadata_file):
+    assert Path(stats_module.IMPORT_METADATA_FILE_PATH) == _isolate_import_metadata_file
+    assert Path(stats_module.IMPORT_METADATA_FILE_PATH).parent != Path(stats_module.__file__).parent
+
+
 def _full_upload_row(**overrides):
     row = {
         "Governor ID": 123,
