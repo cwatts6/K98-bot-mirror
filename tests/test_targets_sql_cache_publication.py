@@ -304,6 +304,27 @@ def test_legacy_cache_is_unverified_and_not_served(monkeypatch, tmp_path):
     assert meta["publication_state"] == "UNKNOWN"
 
 
+def test_invalid_cache_reports_refresh_failure_reason(monkeypatch, tmp_path):
+    cache_path = tmp_path / "targets.json"
+    cache_path.write_text(
+        '{"_meta":{"kvk_no":16,"state":"ACTIVE"},"by_gov":{}}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cache, "PLAYER_TARGETS_CACHE", str(cache_path))
+    monkeypatch.setattr(cache, "get_kvk_context_today", lambda: _context())
+    monkeypatch.setattr(
+        cache,
+        "fetch_current_publication_metadata",
+        lambda _kvk_no: (_ for _ in ()).throw(RuntimeError("temporary SQL outage")),
+    )
+
+    row, meta = cache.get_target_cache_entry("123")
+
+    assert row is None
+    assert meta["publication_state"] == "UNKNOWN"
+    assert meta["publication_reason"] == cache.PUBLICATION_READ_FAILED
+
+
 def test_maintenance_subprocess_returns_provenance_summary(monkeypatch, tmp_path):
     monkeypatch.setenv("MAINT_SUBPROC", "1")
     monkeypatch.setattr(cache, "PLAYER_TARGETS_CACHE", str(tmp_path / "targets.json"))
@@ -316,3 +337,15 @@ def test_maintenance_subprocess_returns_provenance_summary(monkeypatch, tmp_path
     assert result["summary"]["by_gov_count"] == 2
     assert result["summary"]["publication_state"] == "OFFICIAL"
     assert result["summary"]["publication_signature"]
+
+
+def test_disabled_maintenance_subprocess_marker_returns_full_cache(monkeypatch, tmp_path):
+    monkeypatch.setenv("MAINT_SUBPROC", "0")
+    monkeypatch.setattr(cache, "PLAYER_TARGETS_CACHE", str(tmp_path / "targets.json"))
+    monkeypatch.setattr(cache, "get_kvk_context_today", lambda: _context())
+    _install_sql_snapshot(monkeypatch, _snapshot())
+
+    result = cache.refresh_targets_cache()
+
+    assert "summary" not in result
+    assert len(result["by_gov"]) == 2

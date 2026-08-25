@@ -202,7 +202,7 @@ def _summary(cache: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _result(cache: dict[str, Any]) -> dict[str, Any]:
-    return _summary(cache) if os.environ.get("MAINT_SUBPROC") else cache
+    return _summary(cache) if os.environ.get("MAINT_SUBPROC") == "1" else cache
 
 
 def _last_known_good(
@@ -441,11 +441,16 @@ def _load_current_cache(
     if validated is None:
         cache_reason = _cache_failure_reason(existing, ctx)
         refreshed = refresh_targets_cache(ctx)
+        refreshed_meta, _ = _cache_parts(refreshed)
         if "summary" in refreshed:
             refreshed = _read_json(PLAYER_TARGETS_CACHE)
         resolved = _resolved_cache_copy(refreshed, ctx)
         if not resolved:
-            return {}, _unknown_meta(ctx, cache_reason)
+            refresh_reason = refreshed_meta.get("publication_reason")
+            return {}, _unknown_meta(
+                ctx,
+                str(refresh_reason) if refresh_reason else cache_reason,
+            )
         return _cache_parts(resolved)[1], _cache_parts(resolved)[0]
 
     metadata, state, _ = validated
