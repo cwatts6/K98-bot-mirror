@@ -21,6 +21,9 @@ import stats_module
 POST_MAINT_TIMEOUT = int(os.getenv("POST_MAINT_TIMEOUT", "300"))
 BUILD_CACHE_TIMEOUT = float(os.getenv("BUILD_CACHE_TIMEOUT", "60.0"))
 MAINT_WORKER_MODE = os.getenv("MAINT_WORKER_MODE", "thread").lower()
+POST_STATS_WORKER_SPEC = (
+    "scripts.retry_phase52_stats_import:_run_post_stats_without_argv_credentials"
+)
 
 
 def _run_post_stats_without_argv_credentials() -> None:
@@ -65,7 +68,7 @@ async def _run_required_post_sql_stages(completed_filename: str) -> tuple[bool, 
         return False, f"required cache rebuild failed: {exc}"
 
     ok, output = await run_maintenance_with_isolation(
-        _run_post_stats_without_argv_credentials,
+        POST_STATS_WORKER_SPEC,
         timeout=POST_MAINT_TIMEOUT,
         name="run_post_import_stats_update",
         meta={"completed_filename": completed_filename, "recovery": True},
