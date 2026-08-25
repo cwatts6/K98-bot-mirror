@@ -154,6 +154,35 @@ async def test_targets_payload_complete(monkeypatch):
     assert payload.metrics[3].note == "Target coming next KVK"
 
 
+async def test_targets_payload_reports_no_target_values_for_unset_amounts(monkeypatch):
+    monkeypatch.setattr(service, "get_kvk_context_today", lambda: {"kvk_no": 15})
+    monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
+    monkeypatch.setattr(
+        service.kvk_targets_dal,
+        "fetch_target_entry",
+        lambda gid, _kvk_context=None: (
+            {
+                "GovernorID": gid,
+                "GovernorName": "Awaiting Targets",
+                "Kill_Target": None,
+                "Min_Kill_Target": None,
+                "Deads_Target": None,
+                "DKP_Target": None,
+            },
+            _publication_meta(),
+        ),
+    )
+    monkeypatch.setattr(service.kvk_targets_dal, "fetch_exemption_row", lambda *_args: None)
+    monkeypatch.setattr(service.stats_cache_helpers, "load_last_kvk_map", _empty_last_kvk_map)
+    monkeypatch.setattr(service, "load_stat_row", lambda _gid: None)
+
+    payload = await service.build_kvk_targets_card_payload("1")
+
+    assert payload.target_state == "no_target_values"
+    assert payload.status_label == "No target values"
+    assert not any(metric.has_target for metric in payload.metrics)
+
+
 async def test_targets_payload_exempt_uses_sql_contract(monkeypatch):
     monkeypatch.setattr(service, "get_kvk_context_today", lambda: {"kvk_no": 15})
     monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)

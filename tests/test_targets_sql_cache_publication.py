@@ -101,6 +101,36 @@ def test_refresh_persists_verified_official_publication(monkeypatch, tmp_path):
     assert cache_path.exists()
 
 
+def test_refresh_persists_verified_publication_with_unset_target_amounts(monkeypatch, tmp_path):
+    cache_path = tmp_path / "targets.json"
+    monkeypatch.setattr(cache, "PLAYER_TARGETS_CACHE", str(cache_path))
+    monkeypatch.setattr(cache, "get_kvk_context_today", lambda: _context())
+    snapshot = _snapshot()
+    rows = tuple(
+        {
+            **row,
+            "DKP_Target": None,
+            "Kill_Target": None,
+            "Deads_Target": None,
+            "Min_Kill_Target": None,
+        }
+        for row in snapshot.rows
+    )
+    _install_sql_snapshot(
+        monkeypatch,
+        TargetPublicationSnapshot(snapshot.metadata, rows),
+    )
+
+    result = cache.refresh_targets_cache()
+
+    assert result["_meta"]["publication_state"] == "OFFICIAL"
+    assert result["by_gov"]["123"]["Kill_Target"] is None
+    row, meta = cache.get_target_cache_entry("123")
+    assert row is not None
+    assert row["DKP_Target"] is None
+    assert meta["publication_state"] == "OFFICIAL"
+
+
 def test_matching_official_identity_is_not_rewritten_and_becomes_historic_live(
     monkeypatch, tmp_path
 ):

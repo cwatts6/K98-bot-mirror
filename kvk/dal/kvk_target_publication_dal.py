@@ -61,8 +61,10 @@ def _normalise_target_row(row: Mapping[str, Any], kvk_no: int) -> dict[str, Any]
     if not governor_id or not governor_id.isdigit() or int(governor_id) <= 0:
         raise TargetPublicationContractError("Target publication contained an invalid GovernorID.")
 
-    def required_nonnegative(name: str) -> int:
+    def optional_nonnegative(name: str) -> int | None:
         value = row.get(name)
+        if value in (None, ""):
+            return None
         if isinstance(value, bool):
             raise TargetPublicationContractError(f"Target publication contained an invalid {name}.")
         try:
@@ -93,10 +95,10 @@ def _normalise_target_row(row: Mapping[str, Any], kvk_no: int) -> dict[str, Any]
         "GovernorID": governor_id,
         "GovernorName": str(row.get("GovernorName") or "").strip(),
         "Power": power,
-        "DKP_Target": required_nonnegative("DKP_Target"),
-        "Kill_Target": required_nonnegative("Kill_Target"),
-        "Deads_Target": required_nonnegative("Deads_Target"),
-        "Min_Kill_Target": required_nonnegative("Min_Kill_Target"),
+        "DKP_Target": optional_nonnegative("DKP_Target"),
+        "Kill_Target": optional_nonnegative("Kill_Target"),
+        "Deads_Target": optional_nonnegative("Deads_Target"),
+        "Min_Kill_Target": optional_nonnegative("Min_Kill_Target"),
         "TargetRank": target_rank,
         "KVK_NO": kvk_no,
     }

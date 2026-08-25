@@ -116,6 +116,8 @@ def _validate_cache(
             return None
         for field in ("DKP_Target", "Kill_Target", "Deads_Target", "Min_Kill_Target"):
             value = row.get(field)
+            if value in (None, ""):
+                continue
             if isinstance(value, bool):
                 return None
             try:

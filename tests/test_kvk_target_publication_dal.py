@@ -89,3 +89,20 @@ def test_full_publication_read_rejects_mixed_publication_identity(monkeypatch):
 
     with pytest.raises(dal.TargetPublicationContractError, match="inconsistent"):
         dal.fetch_current_target_publication(16)
+
+
+def test_full_publication_read_preserves_unset_target_amounts(monkeypatch):
+    connection = _Connection()
+    row = _row(123, row_count=1)
+    for field in ("Kill_Target", "Min_Kill_Target", "Deads_Target", "DKP_Target"):
+        row[field] = None
+    monkeypatch.setattr(dal, "_open_connection", lambda: connection)
+    monkeypatch.setattr(dal, "fetch_all_dicts", lambda _cursor: [row])
+
+    snapshot = dal.fetch_current_target_publication(16)
+
+    assert snapshot is not None
+    assert snapshot.rows[0]["Kill_Target"] is None
+    assert snapshot.rows[0]["Min_Kill_Target"] is None
+    assert snapshot.rows[0]["Deads_Target"] is None
+    assert snapshot.rows[0]["DKP_Target"] is None
