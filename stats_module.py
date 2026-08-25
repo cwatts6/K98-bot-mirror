@@ -301,7 +301,11 @@ async def run_sql_procedure(
 
     def _proc_and_get_expected_counter() -> int:
         with _conn_trusted() as conn:
-            conn.autocommit = False
+            # UPDATE_ALL2 owns its Phase A/Phase B transactions and rejects any
+            # caller-owned transaction at entry. Keep this connection in
+            # autocommit mode so the counter/control queries do not create an
+            # ambient transaction before the public procedure is invoked.
+            conn.autocommit = True
             cur = conn.cursor()
             try:
                 cur.timeout = max(1, int(timeout_seconds) - 5)
@@ -390,7 +394,6 @@ async def run_sql_procedure(
                 if not more:
                     break
 
-            conn.commit()
             if fallback_control_id is not None and isinstance(import_metadata, dict):
                 import_metadata["_fallback_import_control_id"] = fallback_control_id
             if import_metadata:

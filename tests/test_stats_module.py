@@ -411,7 +411,7 @@ async def test_run_stats_copy_archive_marks_audit_cancelled(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_run_sql_procedure_does_not_publish_uncommitted_control_id(monkeypatch):
+async def test_run_sql_procedure_does_not_publish_control_id_when_update_fails(monkeypatch):
     class FakeCursor:
         timeout = 0
 
@@ -544,6 +544,7 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
 
     class FakeConnection:
         autocommit = False
+        commit_called = False
 
         def __enter__(self):
             return self
@@ -555,12 +556,14 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
             return FakeCursor()
 
         def commit(self):
-            return None
+            self.commit_called = True
+            raise AssertionError("UPDATE_ALL2 caller must not commit its transaction")
 
     async def direct_offload(fn, *args, **kwargs):
         return fn(*args)
 
     def execute_wrapper(cur, *, param1, param2, completed_filename):
+        assert connection.autocommit is True
         wrapper_calls.append((param1, param2, completed_filename))
         return {
             "success": True,
@@ -571,8 +574,9 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
         }
 
     metadata = _published_metadata(source_type="full_fallback_snapshot")
+    connection = FakeConnection()
     monkeypatch.setattr(stats_module, "_offload_callable_py", direct_offload)
-    monkeypatch.setattr(stats_module, "_conn_trusted", lambda: FakeConnection())
+    monkeypatch.setattr(stats_module, "_conn_trusted", lambda: connection)
     monkeypatch.setattr(stats_module, "fetch_update_all2_last_counter", lambda cur, task: 7)
     monkeypatch.setattr(stats_module, "_record_fallback_import_control", lambda cur, meta: 456)
     monkeypatch.setattr(stats_module, "execute_update_all2_with_log_management", execute_wrapper)
@@ -596,6 +600,8 @@ async def test_run_sql_procedure_binds_exact_completed_filename_and_consumes_man
     assert success is True
     assert "Counter reached 8" in message
     assert wrapper_calls == [(1, "A", COMPLETED_FILENAME)]
+    assert connection.autocommit is True
+    assert connection.commit_called is False
     assert deleted == [True]
     assert metadata["_fallback_import_control_id"] == 456
 
