@@ -140,6 +140,7 @@ async def test_run_stats_copy_archive_contract_monkeypatched(monkeypatch):
 @pytest.mark.asyncio
 async def test_run_stats_copy_archive_passes_only_current_import_metadata(monkeypatch):
     metadata_seen = []
+    metadata_written = []
     metadata_path = "stats_import_metadata.json"
 
     def fake_process_excel_file(path):
@@ -157,6 +158,11 @@ async def test_run_stats_copy_archive_passes_only_current_import_metadata(monkey
     monkeypatch.setattr(stats_module, "run_sql_procedure", fake_run_sql_procedure)
     monkeypatch.setattr(
         stats_module,
+        "_write_import_metadata",
+        lambda metadata: metadata_written.append(dict(metadata)),
+    )
+    monkeypatch.setattr(
+        stats_module,
         "_load_import_metadata",
         lambda: _published_metadata(
             source_type="full_fallback_snapshot", source_filename=metadata_path
@@ -164,13 +170,19 @@ async def test_run_stats_copy_archive_passes_only_current_import_metadata(monkey
     )
 
     success, _combined_log, _steps = await stats_module.run_stats_copy_archive(
-        source_filename="upload.xlsx"
+        1184, seed="B", source_filename="upload.xlsx"
     )
 
     assert success is True
     assert metadata_seen == [
-        _published_metadata(source_type="full_fallback_snapshot", source_filename=metadata_path)
+        _published_metadata(
+            source_type="full_fallback_snapshot",
+            source_filename=metadata_path,
+            rank=1184,
+            seed="B",
+        )
     ]
+    assert metadata_written == metadata_seen
 
 
 @pytest.mark.asyncio
@@ -412,6 +424,8 @@ async def test_run_stats_copy_archive_marks_audit_cancelled(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_sql_procedure_does_not_publish_control_id_when_update_fails(monkeypatch):
+    control_calls = []
+
     class FakeCursor:
         timeout = 0
 
@@ -438,7 +452,11 @@ async def test_run_sql_procedure_does_not_publish_control_id_when_update_fails(m
     monkeypatch.setattr(stats_module, "_offload_callable_py", direct_offload)
     monkeypatch.setattr(stats_module, "_conn_trusted", lambda: FakeConnection())
     monkeypatch.setattr(stats_module, "fetch_update_all2_last_counter", lambda cur, task: 0)
-    monkeypatch.setattr(stats_module, "_record_fallback_import_control", lambda cur, meta: 456)
+    monkeypatch.setattr(
+        stats_module,
+        "_record_fallback_import_control",
+        lambda cur, meta: control_calls.append((cur, meta)),
+    )
     monkeypatch.setattr(stats_module, "_set_import_metadata_state", lambda meta, state: None)
     monkeypatch.setattr(stats_module, "_fetch_immutable_import_outcome", lambda name: None)
     monkeypatch.setattr(
@@ -454,6 +472,7 @@ async def test_run_sql_procedure_does_not_publish_control_id_when_update_fails(m
 
     assert success is False
     assert "update failed" in message
+    assert control_calls == []
     assert "_fallback_import_control_id" not in metadata
 
 

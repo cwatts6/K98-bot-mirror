@@ -319,8 +319,6 @@ async def run_sql_procedure(
             try:
                 # ⭐ DEFENSE LAYER 1: Wrap UPDATE_ALL2 with log management ⭐
                 logger.info("[SQL_PROC] Executing UPDATE_ALL2 with log management wrapper...")
-                fallback_control_id = _record_fallback_import_control(cur, import_metadata or {})
-
                 result = execute_update_all2_with_log_management(
                     cur,
                     param1=rank,
@@ -330,6 +328,11 @@ async def run_sql_procedure(
 
                 if not result["success"]:
                     raise RuntimeError(f"UPDATE_ALL2 failed: {result.get('error', 'unknown')}")
+
+                # This metadata row describes a completed SQL import. Write it
+                # only after UPDATE_ALL2 succeeds so a failed procedure cannot
+                # leave an orphaned ControlId behind on the autocommit connection.
+                fallback_control_id = _record_fallback_import_control(cur, import_metadata or {})
 
                 if isinstance(import_metadata, dict):
                     import_metadata["_update_all2_phase_results"] = (
@@ -692,6 +695,8 @@ async def _run_stats_copy_archive_unlocked(
                 details={
                     "steps": dict(step_results),
                     "metadata": current_import_metadata if current_import_metadata else None,
+                    "rank": rank,
+                    "seed": seed,
                 },
             ),
             name="import_audit_exit",
@@ -732,6 +737,13 @@ async def _run_stats_copy_archive_unlocked(
                 step_results[key] = bool(success)
                 if key == "excel" and success:
                     current_import_metadata = _load_import_metadata()
+                    # Bind the SQL-affecting inputs to the immutable Ready-file
+                    # identity before SQL starts. Recovery must reuse these
+                    # persisted values instead of accepting new operator input.
+                    if rank is not None and seed is not None and str(seed).strip():
+                        current_import_metadata["rank"] = rank
+                        current_import_metadata["seed"] = seed
+                        _write_import_metadata(current_import_metadata)
 
             await _record_audit_phase(
                 key=key,
@@ -769,6 +781,8 @@ async def _run_stats_copy_archive_unlocked(
         completion_details = {
             "steps": dict(step_results),
             "metadata": current_import_metadata if current_import_metadata else None,
+            "rank": rank,
+            "seed": seed,
         }
         if all_success:
             await _offload_callable_py(

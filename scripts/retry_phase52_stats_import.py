@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 from pathlib import Path
 import sys
 
@@ -12,16 +13,68 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from constants import DATABASE, PASSWORD, SERVER, USERNAME
+from file_utils import run_maintenance_with_isolation
+from player_stats_cache import build_lastkvk_player_stats_cache, build_player_stats_cache
 import stats_module
+
+POST_MAINT_TIMEOUT = int(os.getenv("POST_MAINT_TIMEOUT", "300"))
+BUILD_CACHE_TIMEOUT = float(os.getenv("BUILD_CACHE_TIMEOUT", "60.0"))
+MAINT_WORKER_MODE = os.getenv("MAINT_WORKER_MODE", "thread").lower()
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--completed-filename", required=True)
-    parser.add_argument("--rank", required=True, type=float)
-    parser.add_argument("--seed", required=True)
     parser.add_argument("--timeout-seconds", type=int, default=600)
     return parser
+
+
+def _load_bound_parameters(metadata: dict) -> tuple[float, str]:
+    raw_rank = metadata.get("rank")
+    raw_seed = metadata.get("seed")
+    if isinstance(raw_rank, bool) or raw_rank is None:
+        raise ValueError("the durable manifest has no original rank")
+    try:
+        rank = float(raw_rank)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("the durable manifest rank is invalid") from exc
+    seed = str(raw_seed).strip() if raw_seed is not None else ""
+    if not seed:
+        raise ValueError("the durable manifest has no original seed")
+    return rank, seed
+
+
+async def _run_required_post_sql_stages(completed_filename: str) -> tuple[bool, str]:
+    async def _build_cache(builder) -> None:
+        cache_build = builder()
+        if BUILD_CACHE_TIMEOUT > 0:
+            await asyncio.wait_for(cache_build, timeout=BUILD_CACHE_TIMEOUT)
+        else:
+            await cache_build
+
+    try:
+        await _build_cache(build_player_stats_cache)
+        await _build_cache(build_lastkvk_player_stats_cache)
+    except Exception as exc:
+        return False, f"required cache rebuild failed: {exc}"
+
+    ok, output = await run_maintenance_with_isolation(
+        "post_stats",
+        kwargs={
+            "server": SERVER,
+            "database": DATABASE,
+            "username": USERNAME,
+            "password": PASSWORD,
+        },
+        timeout=POST_MAINT_TIMEOUT,
+        name="run_post_import_stats_update",
+        meta={"completed_filename": completed_filename, "recovery": True},
+        prefer_process=(MAINT_WORKER_MODE == "process"),
+    )
+    if not ok:
+        return False, f"required post_stats maintenance failed: {output}"
+    return True, str(output or "post_stats completed")
 
 
 async def _run(args: argparse.Namespace) -> int:
@@ -40,6 +93,12 @@ async def _run(args: argparse.Namespace) -> int:
         )
         return 2
 
+    try:
+        rank, seed = _load_bound_parameters(metadata)
+    except ValueError as exc:
+        print(f"RECOVERY REFUSED: {exc}", file=sys.stderr)
+        return 2
+
     ready_path = Path(stats_module.READY_DIR) / completed_filename
     if not ready_path.is_file():
         print(f"RECOVERY REFUSED: Ready file is missing: {ready_path}", file=sys.stderr)
@@ -47,8 +106,8 @@ async def _run(args: argparse.Namespace) -> int:
 
     print(f"Retrying immutable Ready file: {completed_filename}")
     success, message, _extra = await stats_module.run_sql_procedure(
-        rank=args.rank,
-        seed=args.seed,
+        rank=rank,
+        seed=seed,
         completed_filename=completed_filename,
         timeout_seconds=args.timeout_seconds,
         import_metadata=metadata,
@@ -57,6 +116,15 @@ async def _run(args: argparse.Namespace) -> int:
     if not success:
         print(
             "RECOVERY FAILED - preserve the file and return the output to Codex.", file=sys.stderr
+        )
+        return 1
+
+    post_success, post_message = await _run_required_post_sql_stages(completed_filename)
+    print(post_message)
+    if not post_success:
+        print(
+            "RECOVERY INCOMPLETE - SQL succeeded but required post-SQL stages failed.",
+            file=sys.stderr,
         )
         return 1
 

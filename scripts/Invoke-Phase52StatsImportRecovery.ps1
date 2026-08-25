@@ -2,14 +2,7 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^stats_[0-9a-f]{32}\.ready\.csv$')]
-    [string]$CompletedFilename,
-
-    [Parameter(Mandatory = $true)]
-    [double]$Rank,
-
-    [Parameter(Mandatory = $true)]
-    [ValidateNotNullOrEmpty()]
-    [string]$Seed
+    [string]$CompletedFilename
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,9 +17,7 @@ if (-not (Test-Path -LiteralPath $pythonExe -PathType Leaf)) {
 Push-Location $repoRoot
 try {
     & $pythonExe $recoveryScript `
-        --completed-filename $CompletedFilename `
-        --rank $Rank `
-        --seed $Seed
+        --completed-filename $CompletedFilename
     if ($LASTEXITCODE -ne 0) {
         throw "Phase 5.2 stats import recovery failed with exit code $LASTEXITCODE."
     }
