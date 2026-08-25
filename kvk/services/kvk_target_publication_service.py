@@ -36,7 +36,14 @@ def target_publication_display(
 ) -> TargetPublicationDisplay:
     normalized = str(state or "").strip().upper()
     scan = _optional_int(source_scan_order)
-    scan_text = f"scan {scan}" if scan is not None and scan > 0 else "the recorded source scan"
+    if scan is None or scan <= 0:
+        return TargetPublicationDisplay(
+            state="UNKNOWN",
+            label="Unverified",
+            source_text="Target source scan could not be verified.",
+            warning_text="Do not treat this target set as Official.",
+        )
+    scan_text = f"scan {scan}"
     if normalized == "DRAFT":
         return TargetPublicationDisplay(
             state="DRAFT",

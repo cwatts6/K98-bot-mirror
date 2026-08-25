@@ -121,3 +121,14 @@ def test_publication_display_copy_is_canonical_and_fails_closed(state, label, so
 
     assert display.label == label
     assert source_fragment in display.source_text
+
+
+@pytest.mark.parametrize("state", ["DRAFT", "OFFICIAL", "HISTORIC"])
+@pytest.mark.parametrize("source_scan", [None, 0, -1, "invalid", True])
+def test_publication_display_requires_positive_source_scan(state, source_scan):
+    display = service.target_publication_display(state, source_scan_order=source_scan)
+
+    assert display.state == "UNKNOWN"
+    assert display.label == "Unverified"
+    assert "could not be verified" in display.source_text
+    assert "Do not treat this target set as Official" in display.warning_text

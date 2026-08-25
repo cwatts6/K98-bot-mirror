@@ -41,6 +41,17 @@ def test_legacy_embed_missing_state_defaults_unverified():
     assert "Do not treat this target set as Official" in embed.description
 
 
+def test_legacy_embed_known_state_without_source_scan_is_unverified():
+    targets = _targets()
+    targets.pop("TargetSourceScan")
+
+    embed = build_kvk_targets_embed("Governor", 123, targets, "Tides of War")
+
+    assert "UNVERIFIED" in embed.description
+    assert "could not be verified" in embed.description
+    assert "Do not treat this target set as Official" in embed.description
+
+
 def test_legacy_active_state_is_not_treated_as_official():
     embed = build_kvk_targets_embed(
         "Governor",
