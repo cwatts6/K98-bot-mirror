@@ -13,14 +13,19 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from constants import DATABASE, PASSWORD, SERVER, USERNAME
-from file_utils import run_maintenance_with_isolation
+from constants import DATABASE, SERVER
+from file_utils import run_maintenance_with_isolation, run_post_import_stats_update
 from player_stats_cache import build_lastkvk_player_stats_cache, build_player_stats_cache
 import stats_module
 
 POST_MAINT_TIMEOUT = int(os.getenv("POST_MAINT_TIMEOUT", "300"))
 BUILD_CACHE_TIMEOUT = float(os.getenv("BUILD_CACHE_TIMEOUT", "60.0"))
 MAINT_WORKER_MODE = os.getenv("MAINT_WORKER_MODE", "thread").lower()
+
+
+def _run_post_stats_without_argv_credentials() -> None:
+    """Run post-stats using the existing protected connection configuration."""
+    run_post_import_stats_update(SERVER, DATABASE, "", "")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -60,13 +65,7 @@ async def _run_required_post_sql_stages(completed_filename: str) -> tuple[bool, 
         return False, f"required cache rebuild failed: {exc}"
 
     ok, output = await run_maintenance_with_isolation(
-        "post_stats",
-        kwargs={
-            "server": SERVER,
-            "database": DATABASE,
-            "username": USERNAME,
-            "password": PASSWORD,
-        },
+        _run_post_stats_without_argv_credentials,
         timeout=POST_MAINT_TIMEOUT,
         name="run_post_import_stats_update",
         meta={"completed_filename": completed_filename, "recovery": True},

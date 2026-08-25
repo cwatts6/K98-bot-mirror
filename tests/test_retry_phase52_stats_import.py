@@ -155,8 +155,22 @@ async def test_required_post_sql_stages_rebuild_caches_and_run_maintenance(monke
     assert success is True
     assert message == "maintenance complete"
     assert calls[:2] == ["player_cache", "lastkvk_cache"]
-    assert calls[2][0] == "post_stats"
+    assert calls[2][0] is recovery._run_post_stats_without_argv_credentials
+    assert "kwargs" not in calls[2][1]
     assert calls[2][1]["meta"] == {
         "completed_filename": COMPLETED_FILENAME,
         "recovery": True,
     }
+
+
+def test_post_stats_wrapper_does_not_forward_configured_credentials(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        recovery,
+        "run_post_import_stats_update",
+        lambda *args: calls.append(args),
+    )
+
+    recovery._run_post_stats_without_argv_credentials()
+
+    assert calls == [(recovery.SERVER, recovery.DATABASE, "", "")]
