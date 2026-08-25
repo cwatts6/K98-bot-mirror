@@ -160,17 +160,54 @@ def test_draft_cache_refreshes_to_new_official_identity(monkeypatch, tmp_path):
     cache_path = tmp_path / "targets.json"
     monkeypatch.setattr(cache, "PLAYER_TARGETS_CACHE", str(cache_path))
     monkeypatch.setattr(cache, "get_kvk_context_today", lambda: _context())
+    clock = [0.0]
+    monkeypatch.setattr(cache.time, "monotonic", lambda: clock[0])
     _install_sql_snapshot(monkeypatch, _snapshot(state="DRAFT"))
     cache.refresh_targets_cache()
 
     official = _snapshot(version=2)
     _install_sql_snapshot(monkeypatch, official)
+    clock[0] += cache.DRAFT_PUBLICATION_POLL_INTERVAL_SECONDS + 1
     row, meta = cache.get_target_cache_entry("123")
 
     assert row is not None
     assert row["TargetState"] == "OFFICIAL"
     assert meta["publication_state"] == "OFFICIAL"
     assert meta["publication_version"] == 2
+
+
+def test_draft_cache_hot_reads_poll_metadata_once_per_interval(monkeypatch, tmp_path):
+    cache_path = tmp_path / "targets.json"
+    monkeypatch.setattr(cache, "PLAYER_TARGETS_CACHE", str(cache_path))
+    monkeypatch.setattr(cache, "get_kvk_context_today", lambda: _context())
+    clock = [100.0]
+    monkeypatch.setattr(cache.time, "monotonic", lambda: clock[0])
+    draft = _snapshot(state="DRAFT")
+    _install_sql_snapshot(monkeypatch, draft)
+    cache.refresh_targets_cache()
+
+    metadata_reads: list[int] = []
+
+    def fetch_metadata(kvk_no: int) -> TargetPublicationMetadata:
+        metadata_reads.append(kvk_no)
+        return draft.metadata
+
+    monkeypatch.setattr(cache, "fetch_current_publication_metadata", fetch_metadata)
+
+    first_row, first_meta = cache.get_target_cache_entry("123")
+    second_row, second_meta = cache.get_target_cache_entry("456")
+
+    assert first_row is not None
+    assert second_row is not None
+    assert first_meta["publication_state"] == "DRAFT"
+    assert second_meta["publication_state"] == "DRAFT"
+    assert metadata_reads == []
+
+    clock[0] += cache.DRAFT_PUBLICATION_POLL_INTERVAL_SECONDS + 1
+    cache.get_target_cache_entry("123")
+    cache.get_target_cache_entry("456")
+
+    assert metadata_reads == [16]
 
 
 def test_matching_last_known_good_official_survives_transient_sql_failure(monkeypatch, tmp_path):

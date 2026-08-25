@@ -251,8 +251,8 @@ Resolved historical notes moved to `archive/deferred_optimisations_resolved.md`.
 ### Deferred Optimisation
 - Area: `targets_sql_cache.py`, target maintenance subprocesses, cache refresh orchestration
 - Type: architecture
-- Description: The target publication cache is atomic, version guarded, cross-KVK safe, and last-known-good aware. A narrow cross-process critical section now makes the final disk-version comparison and replacement monotonic, but SQL metadata/rowset fetches can still duplicate across concurrent callers and the implementation remains a target-specific root module rather than a reusable single-flight cache repository contract.
-- Suggested Fix: Extract a target-domain cache repository with one validated snapshot read API, explicit refresh outcomes, bounded metadata polling, and tested same-process and cross-process single-flight coordination. Preserve publication identity, last-known-good, fail-closed, subprocess-summary, and no-downgrade behavior before considering any reusable cache abstraction.
+- Description: The target publication cache is atomic, version guarded, cross-KVK safe, and last-known-good aware. Draft hot-read metadata polling is bounded within one process, and a narrow cross-process critical section makes the final disk-version comparison and replacement monotonic, but SQL metadata/rowset fetches can still duplicate across processes and the implementation remains a target-specific root module rather than a reusable single-flight cache repository contract.
+- Suggested Fix: Extract a target-domain cache repository with one validated snapshot read API, explicit refresh outcomes, durable poll coordination, and tested cross-process single-flight behavior. Preserve publication identity, last-known-good, fail-closed, subprocess-summary, and no-downgrade behavior before considering any reusable cache abstraction.
 - Impact: medium
 - Risk: high
 - Dependencies: Observe the Phase 1 cache in production for at least one Draft-to-Official transition; retain SQL publication version/signature monotonicity and atomic JSON replacement.

@@ -42,7 +42,10 @@ publication_signature)`. It stores SQL publication time separately from cache-wr
 state.
 
 - A missing or legacy cache is rebuilt only from a verified SQL publication.
-- A Draft cache is polled and promoted when a new Official identity appears.
+- A Draft cache is polled and promoted when a new Official identity appears. Command-path metadata
+  polling is single-process bounded to once per verified publication identity per 60 seconds;
+  explicit maintenance refreshes bypass that hot-read cadence. A restart may perform one immediate
+  metadata check, then restores the same bound.
 - An Official cache is not rewritten because later scans arrive or Pass 4 begins.
 - KVK end projects a verified Official cache as Historical without changing the fixed rows.
 - A previous-KVK cache is never served as the current KVK.

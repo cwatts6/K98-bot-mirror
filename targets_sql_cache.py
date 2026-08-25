@@ -4,6 +4,8 @@ from collections.abc import Mapping
 import json
 import logging
 import os
+import threading
+import time
 from typing import Any
 
 from filelock import FileLock
@@ -32,6 +34,10 @@ logger = logging.getLogger(__name__)
 
 CACHE_SCHEMA_VERSION = 2
 CACHE_WRITE_LOCK_TIMEOUT_SECONDS = 5.0
+DRAFT_PUBLICATION_POLL_INTERVAL_SECONDS = 60.0
+
+_draft_poll_lock = threading.Lock()
+_draft_poll_deadlines: dict[tuple[str, int, int, str], float] = {}
 
 
 def _read_json(path: str) -> dict[str, Any]:
@@ -229,6 +235,44 @@ def _same_publication(
     )
 
 
+def _draft_poll_key(
+    metadata: TargetPublicationMetadata,
+) -> tuple[str, int, int, str] | None:
+    identity = metadata.cache_identity
+    if identity is None:
+        return None
+    kvk_no, publication_version, publication_signature = identity
+    return (
+        os.path.abspath(PLAYER_TARGETS_CACHE),
+        kvk_no,
+        publication_version,
+        publication_signature,
+    )
+
+
+def _claim_draft_publication_poll(metadata: TargetPublicationMetadata) -> bool:
+    """Bound hot-path Draft metadata polling to once per publication interval."""
+    key = _draft_poll_key(metadata)
+    if key is None:
+        return True
+    now = time.monotonic()
+    with _draft_poll_lock:
+        if now < _draft_poll_deadlines.get(key, 0.0):
+            return False
+        _draft_poll_deadlines.clear()
+        _draft_poll_deadlines[key] = now + DRAFT_PUBLICATION_POLL_INTERVAL_SECONDS
+    return True
+
+
+def _mark_draft_publication_polled(metadata: TargetPublicationMetadata) -> None:
+    key = _draft_poll_key(metadata)
+    if key is None:
+        return
+    with _draft_poll_lock:
+        _draft_poll_deadlines.clear()
+        _draft_poll_deadlines[key] = time.monotonic() + DRAFT_PUBLICATION_POLL_INTERVAL_SECONDS
+
+
 def _disk_has_newer_publication(
     snapshot: TargetPublicationMetadata,
     ctx: Mapping[str, Any],
@@ -331,6 +375,9 @@ def refresh_targets_cache(
         )
         return _result(_last_known_good(existing, ctx, current_resolution.reason))
 
+    if current_resolution.state == "DRAFT":
+        _mark_draft_publication_polled(current_metadata)
+
     if valid_existing and _same_publication(valid_existing[0], current_metadata):
         return _result(_resolved_cache_copy(existing, ctx))
 
@@ -402,7 +449,7 @@ def _load_current_cache(
         return _cache_parts(resolved)[1], _cache_parts(resolved)[0]
 
     metadata, state, _ = validated
-    if state == "DRAFT":
+    if state == "DRAFT" and _claim_draft_publication_poll(metadata):
         refreshed = refresh_targets_cache(ctx)
         if "summary" in refreshed:
             refreshed = _read_json(PLAYER_TARGETS_CACHE)
