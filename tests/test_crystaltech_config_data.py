@@ -6,7 +6,6 @@ import pytest
 
 from crystaltech_config import load_and_validate_config
 
-
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "config" / "crystaltech_paths.v1.json"
 ASSETS_PATH = ROOT / "assets" / "crystaltech"
@@ -37,6 +36,26 @@ ADDED_STEP_UIDS = {
     "f2p_low_siege__reinforced_axles_iii_lv10",
     "f2p_low_siege__special_concoction_ii_lv3",
     "f2p_low_siege__siege_expert_lv4",
+}
+
+EXPECTED_WARNING_CORRECTIONS = {
+    "f2p_low_infantry__swift_steeds_i_lv5": ("image", "swift_steeds.png"),
+    "f2p_low_archer__swift_marching_iii_lv4": ("image", "swift_marching.png"),
+    "f2p_low_cavalry__swift_marching_iii_lv4": ("image", "swift_marching.png"),
+    "f2p_low_siege__improved_projectiles_i_lv3": (
+        "image",
+        "improved_projectiles.png",
+    ),
+    "f2p_low_siege__improved_projectiles_i_lv5": (
+        "image",
+        "improved_projectiles.png",
+    ),
+    "f2p_low_siege__swift_steeds_i_lv5": ("image", "swift_steeds.png"),
+    "f2p_low_siege__swift_marching_iii_lv4": ("image", "swift_marching.png"),
+    "mid_high_infantry__archers_focus_lv7": ("name", "Archer's Focus"),
+    "mid_high_archer__archers_focus_lv10": ("name", "Archer's Focus"),
+    "mid_high_cavalry__archers_focus_lv7": ("name", "Archer's Focus"),
+    "mid_high_siege__archers_focus_lv7": ("name", "Archer's Focus"),
 }
 
 EXPECTED_IMAGES = {
@@ -129,11 +148,7 @@ def _steps_by_path(config):
 
 
 def _step_index(config):
-    return {
-        step["step_uid"]: step
-        for path in config["paths"]
-        for step in path["steps"]
-    }
+    return {step["step_uid"]: step for path in config["paths"] for step in path["steps"]}
 
 
 def test_production_config_root_and_path_contract(production_config):
@@ -199,11 +214,16 @@ def test_production_config_semantic_corrections(production_config):
         assert step_index[uid]["name"]["en-GB"] == "Reinforced Axles I"
 
     assert (
-        step_index["mid_high_cavalry__fleet_of_foot_ii_lv10"]["name"]["en-GB"]
-        == "Fleet of Foot II"
+        step_index["mid_high_cavalry__fleet_of_foot_ii_lv10"]["name"]["en-GB"] == "Fleet of Foot II"
     )
     assert step_index["mid_high_siege__siege_provisions_lv10"]["target_level"] == 10
     assert step_index["mid_high_siege__reinforced_axles_iii_lv10"]["target_level"] == 10
+
+    for uid, (field, expected_value) in EXPECTED_WARNING_CORRECTIONS.items():
+        actual_value = (
+            step_index[uid]["name"]["en-GB"] if field == "name" else step_index[uid][field]
+        )
+        assert actual_value == expected_value, uid
 
 
 def test_production_config_regression_sensitive_ordering(production_config):
