@@ -97,10 +97,6 @@ def _state_color(state: str | None) -> int:
     }.get(s, 0xD97706)
 
 
-def _state_label(state: str | None) -> str:
-    return target_publication_display(state).label
-
-
 def _maybe_banner(kvk_name: str | None) -> str | None:
     if not SHOW_KVK_BANNER or not kvk_name:
         return None

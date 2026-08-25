@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from kvk.models.kvk_targets_card import KvkTargetMetricProgress, KvkTargetsCardPayload
-from kvk.rendering.kvk_targets_card_renderer import render_kvk_targets_card
+from kvk.rendering import kvk_targets_card_renderer as renderer
 
 
 def _payload(*, state: str = "active") -> KvkTargetsCardPayload:
@@ -32,7 +34,7 @@ def _payload(*, state: str = "active") -> KvkTargetsCardPayload:
 
 
 def test_targets_renderer_returns_png_bytes_for_active_payload():
-    rendered = render_kvk_targets_card(_payload())
+    rendered = renderer.render_kvk_targets_card(_payload())
 
     assert rendered is not None
     assert rendered.filename == "kvk_targets_2441482.png"
@@ -42,7 +44,30 @@ def test_targets_renderer_returns_png_bytes_for_active_payload():
 
 
 def test_targets_renderer_returns_png_bytes_for_empty_state():
-    rendered = render_kvk_targets_card(_payload(state="exempt"))
+    rendered = renderer.render_kvk_targets_card(_payload(state="exempt"))
 
     assert rendered is not None
     assert rendered.image_bytes.getvalue().startswith(b"\x89PNG")
+
+
+def test_targets_renderer_prefers_canonical_unknown_publication_warning(monkeypatch):
+    payload = replace(
+        _payload(),
+        publication_state="UNKNOWN",
+        target_source_scan=None,
+        warnings=("Target publication provenance could not be verified.",),
+    )
+    drawn_text: list[str] = []
+    original_draw_text = renderer._draw_text
+
+    def capture_draw_text(draw, xy, text, **kwargs):
+        drawn_text.append(text)
+        return original_draw_text(draw, xy, text, **kwargs)
+
+    monkeypatch.setattr(renderer, "_draw_text", capture_draw_text)
+
+    rendered = renderer.render_kvk_targets_card(payload)
+
+    assert rendered is not None
+    assert "Do not treat this target set as Official." in drawn_text
+    assert "Target publication provenance could not be verified." not in drawn_text

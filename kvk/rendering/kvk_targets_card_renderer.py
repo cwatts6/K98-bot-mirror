@@ -347,7 +347,7 @@ def render_kvk_targets_card(
         bold=True,
     )
     _draw_text(draw, (760, 82), publication.source_text, fill=TEXT, font=source_font, bold=True)
-    warning_text = payload.warnings[0] if payload.warnings else publication.warning_text
+    warning_text = publication.warning_text or (payload.warnings[0] if payload.warnings else None)
     if warning_text:
         warning_font = _fit_font(
             draw,

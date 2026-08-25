@@ -61,7 +61,7 @@ def build_targets_fallback_embed(payload: KvkTargetsCardPayload) -> discord.Embe
         color=discord.Color(publication_colors[publication.state]),
     )
     embed.add_field(name="Target Publication", value=publication.source_text, inline=False)
-    warning_text = payload.warnings[0] if payload.warnings else publication.warning_text
+    warning_text = publication.warning_text or (payload.warnings[0] if payload.warnings else None)
     if warning_text:
         embed.add_field(name="Publication Warning", value=warning_text, inline=False)
     embed.add_field(name="Status", value=payload.status_detail, inline=False)

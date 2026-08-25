@@ -178,6 +178,7 @@ async def test_fallback_embed_missing_publication_is_unverified():
         publication_state="UNKNOWN",
         target_source_scan=None,
         target_published_at=None,
+        warnings=("Target publication provenance could not be verified.",),
     )
 
     embed = posting.build_targets_fallback_embed(payload)
@@ -185,3 +186,4 @@ async def test_fallback_embed_missing_publication_is_unverified():
     assert "Unverified targets" in embed.description
     warning = next(field for field in embed.fields if field.name == "Publication Warning")
     assert "Do not treat" in warning.value
+    assert "provenance could not be verified" not in warning.value
