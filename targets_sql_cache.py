@@ -1,233 +1,441 @@
-# targets_sql_cache.py
 from __future__ import annotations
 
+from collections.abc import Mapping
 import json
 import logging
 import os
 from typing import Any
 
-from constants import PLAYER_TARGETS_CACHE, _conn
+from filelock import FileLock
+
+from constants import PLAYER_TARGETS_CACHE
+from file_utils import atomic_json_write
+from kvk.dal.kvk_target_publication_dal import (
+    TargetPublicationContractError,
+    fetch_current_publication_metadata,
+    fetch_current_target_publication,
+)
+from kvk.models.kvk_target_publication import TargetPublicationMetadata
+from kvk.services.kvk_target_publication_service import (
+    CACHE_ROW_INVALID,
+    LEGACY_CACHE_UNVERIFIED,
+    MISSING_PUBLICATION_METADATA,
+    PUBLICATION_READ_FAILED,
+    metadata_to_cache_fields,
+    parse_target_publication_metadata,
+    resolve_target_publication_state,
+)
 from kvk_state import get_kvk_context_today
 from utils import normalize_governor_id, utcnow
 
 logger = logging.getLogger(__name__)
 
-VIEW_NAME = "dbo.v_TARGETS_FOR_UPLOAD"  # single source of truth
+CACHE_SCHEMA_VERSION = 2
+CACHE_WRITE_LOCK_TIMEOUT_SECONDS = 5.0
 
 
 def _read_json(path: str) -> dict[str, Any]:
     if not os.path.exists(path):
         return {}
     try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as exc:
-        logger.debug("[targets_sql_cache] Failed to read JSON %s: %s", path, exc)
+        with open(path, encoding="utf-8") as handle:
+            value = json.load(handle)
+    except Exception:
+        logger.debug("target_publication_cache_read_failed path=%s", path, exc_info=True)
         return {}
+    return value if isinstance(value, dict) else {}
 
 
 def _write_json(path: str, data: dict[str, Any]) -> None:
-    tmp = path + ".tmp"
+    atomic_json_write(path, data)
+
+
+def _positive_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
     try:
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, path)
+        converted = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return converted if converted > 0 else None
+
+
+def _context() -> dict[str, Any] | None:
+    try:
+        raw = get_kvk_context_today()
     except Exception:
-        # If write fails, remove temp file if present and raise/log
-        try:
-            if os.path.exists(tmp):
-                os.remove(tmp)
-        except Exception:
-            pass
-        logger.exception("[targets_sql_cache] Failed to write JSON cache to %s", path)
-        raise
+        logger.exception("target_publication_kvk_context_failed")
+        return None
+    if not isinstance(raw, Mapping):
+        return None
+    kvk_no = _positive_int(raw.get("kvk_no"))
+    if kvk_no is None:
+        return None
+    return dict(raw)
 
 
-def _cache_matches_context(cache: dict[str, Any], ctx: dict[str, Any] | None) -> bool:
-    if not cache or not ctx:
-        return False
-    meta = cache.get("_meta") if isinstance(cache, dict) else None
-    if not isinstance(meta, dict):
-        return False
-    return meta.get("kvk_no") == ctx.get("kvk_no") and meta.get("state") == ctx.get("state")
+def _bound_context(kvk_context: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if kvk_context is None:
+        return _context()
+    if _positive_int(kvk_context.get("kvk_no")) is None:
+        return None
+    return dict(kvk_context)
 
 
-def _cache_might_be_stale(cache: dict[str, Any]) -> bool:
+def _cache_parts(cache: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    meta = cache.get("_meta")
+    by_gov = cache.get("by_gov")
+    return (
+        dict(meta) if isinstance(meta, Mapping) else {},
+        dict(by_gov) if isinstance(by_gov, Mapping) else {},
+    )
+
+
+def _validate_cache(
+    cache: Mapping[str, Any],
+    ctx: Mapping[str, Any],
+) -> tuple[TargetPublicationMetadata, str, str] | None:
+    meta, by_gov = _cache_parts(cache)
+    if meta.get("schema_version") != CACHE_SCHEMA_VERSION:
+        return None
+    metadata = parse_target_publication_metadata(meta)
+    resolution = resolve_target_publication_state(
+        metadata,
+        requested_kvk_no=_positive_int(ctx.get("kvk_no")),
+        fighting_state=str(ctx.get("state") or ""),
+        observed_row_count=len(by_gov),
+    )
+    if metadata is None or not resolution.is_verified:
+        return None
+    for governor_id, row in by_gov.items():
+        if not isinstance(row, Mapping):
+            return None
+        if normalize_governor_id(row.get("GovernorID")) != str(governor_id):
+            return None
+        if _positive_int(row.get("KVK_NO")) != metadata.kvk_no:
+            return None
+        for field in ("DKP_Target", "Kill_Target", "Deads_Target", "Min_Kill_Target"):
+            value = row.get(field)
+            if isinstance(value, bool):
+                return None
+            try:
+                if int(value) < 0:
+                    return None
+            except (TypeError, ValueError, OverflowError):
+                return None
+    return metadata, resolution.state, resolution.reason
+
+
+def _cache_failure_reason(cache: Mapping[str, Any], ctx: Mapping[str, Any]) -> str:
+    meta, by_gov = _cache_parts(cache)
     if not cache:
-        return True
-    meta = cache.get("_meta") if isinstance(cache, dict) else None
-    if not isinstance(meta, dict):
-        return True
-    return meta.get("state") == "DRAFT"
+        return MISSING_PUBLICATION_METADATA
+    if meta.get("schema_version") != CACHE_SCHEMA_VERSION:
+        return LEGACY_CACHE_UNVERIFIED
+    metadata = parse_target_publication_metadata(meta)
+    resolution = resolve_target_publication_state(
+        metadata,
+        requested_kvk_no=_positive_int(ctx.get("kvk_no")),
+        fighting_state=str(ctx.get("state") or ""),
+        observed_row_count=len(by_gov),
+    )
+    if not resolution.is_verified:
+        return resolution.reason
+    return CACHE_ROW_INVALID
 
 
-def _fetch_targets_from_view(cur) -> list[dict[str, Any]]:
-    """
-    Reads from dbo.v_TARGETS_FOR_UPLOAD and normalizes columns to:
-      GovernorID, GovernorName, Power (bigint), DKP_Target, Kill_Target, Deads_Target, Min_Kill_Target
-
-    Notes:
-      - Uses COALESCE to support both [Dead Target] and [Deads Target].
-      - Power may be NVARCHAR with thousands separators; coerced to bigint via replace.
-    """
-    # shared expression to coerce NVARCHAR '129,882,341' -> bigint 129882341
-    POWER_EXPR = "TRY_CONVERT(bigint, REPLACE(REPLACE([Power], ',', ''), ' ', ''))"
-
-    # Use COALESCE to handle either column name variant in a single query
-    sql = f"""
-        SELECT
-            CAST([Gov_ID] AS bigint)                 AS GovernorID,
-            CAST([Governor_Name] AS nvarchar(255))   AS GovernorName,
-            {POWER_EXPR}                             AS Power,
-            TRY_CONVERT(float, [DKP Target])         AS DKP_Target,
-            TRY_CONVERT(float, [Kill Target])        AS Kill_Target,
-            TRY_CONVERT(float, [Dead Target])        AS Deads_Target,
-            TRY_CONVERT(float, [Minimum Kill Target]) AS Min_Kill_Target
-        FROM {VIEW_NAME}
-    """
-
-    cur.execute(sql)
-    rows = cur.fetchall()
-
-    out: list[dict[str, Any]] = []
-    for r in rows:
-        # r is row-like; using positional indices keeps parity with previous code
-        gov_raw = r[0]
-        if gov_raw is None:
-            # Skip rows without a valid GovernorID (log at debug to allow post-mortem)
-            logger.debug("[targets_sql_cache] Skipping row with missing GovernorID: %s", r)
-            continue
-
-        try:
-            # Normalize GovernorID to canonical string form
-            normalized_id = normalize_governor_id(gov_raw)
-        except Exception:
-            # Fallback to simple str cast if normalization fails
-            normalized_id = str(int(gov_raw)) if isinstance(gov_raw, (int, float)) else str(gov_raw)
-
-        out.append(
-            {
-                "GovernorID": normalized_id,
-                "GovernorName": (r[1] or "").strip(),
-                "Power": int(r[2]) if r[2] is not None else None,
-                "DKP_Target": r[3],
-                "Kill_Target": r[4],
-                "Deads_Target": r[5],
-                "Min_Kill_Target": r[6],
-            }
-        )
-    return out
-
-
-def refresh_targets_cache() -> dict[str, Any]:
-    """
-    Builds the cache from dbo.v_TARGETS_FOR_UPLOAD.
-    Persists full cache to PLAYER_TARGETS_CACHE on disk.
-    If running inside a maintenance subprocess (MAINT_SUBPROC=1) the function
-    will return a small summary dict instead of the full cache to avoid leaking
-    large payloads via stdout/telemetry. The full cache is still written to disk.
-    """
-    existing = _read_json(PLAYER_TARGETS_CACHE)
-    ctx = get_kvk_context_today()
-    if not ctx:
-        logger.debug("[targets_sql_cache] No KVK context available; returning existing cache.")
-        return existing
-
-    data: dict[str, Any] = {
-        "_meta": {
-            "generated_at": utcnow().isoformat(),
-            "kvk_no": ctx.get("kvk_no"),
-            "state": ctx.get("state"),
-            "state_reason": ctx.get("state_reason"),
-            "matchmaking_scan": ctx.get("matchmaking_scan"),
-            "pass4_start_scan": ctx.get("pass4_start_scan"),
-            "kvk_end_scan": ctx.get("kvk_end_scan"),
-            "max_scan_order": ctx.get("max_scan_order"),
-        },
-        "by_gov": {},
+def _unknown_meta(ctx: Mapping[str, Any] | None, reason: str) -> dict[str, Any]:
+    return {
+        "schema_version": CACHE_SCHEMA_VERSION,
+        "kvk_no": _positive_int((ctx or {}).get("kvk_no")),
+        "publication_state": "UNKNOWN",
+        "publication_reason": reason,
     }
 
-    try:
-        conn = _conn()
-    except Exception:
-        logger.exception(
-            "[targets_sql_cache] Failed to create DB connection; returning existing cache."
-        )
-        return existing
 
-    try:
-        cur = conn.cursor()
-        try:
-            try:
-                rows = _fetch_targets_from_view(cur)
-            except Exception:
-                logger.exception("[targets_sql_cache] Failed to read from %s", VIEW_NAME)
-                return existing
-
-            for t in rows:
-                gid = t.get("GovernorID")
-                if not gid:
-                    continue
-                t["TargetState"] = ctx.get("state")
-                t["KVK_NO"] = ctx.get("kvk_no")
-                key = str(gid)
-                data["by_gov"][key] = t
-        finally:
-            try:
-                cur.close()
-            except Exception:
-                pass
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-    # Persist the cache atomically (full data)
-    try:
-        _write_json(PLAYER_TARGETS_CACHE, data)
-    except Exception:
-        logger.exception("[targets_sql_cache] Failed to persist cache to %s", PLAYER_TARGETS_CACHE)
-
-    # If running in maintenance subprocess, return summary only (avoid large stdout)
-    if os.environ.get("MAINT_SUBPROC"):
-        summary = {
-            "_meta": data["_meta"],
-            "summary": {
-                "by_gov_count": len(data.get("by_gov", {})),
-                "kvk_no": data["_meta"].get("kvk_no"),
-                "state": data["_meta"].get("state"),
-            },
-        }
-        return summary
-
-    return data
+def _resolved_cache_copy(
+    cache: Mapping[str, Any],
+    ctx: Mapping[str, Any],
+) -> dict[str, Any]:
+    validated = _validate_cache(cache, ctx)
+    if validated is None:
+        return {}
+    _, state, reason = validated
+    meta, by_gov = _cache_parts(cache)
+    meta["publication_state"] = state
+    meta["publication_reason"] = reason
+    meta["kvk_fighting_state"] = str(ctx.get("state") or "") or None
+    meta["kvk_fighting_state_reason"] = ctx.get("state_reason")
+    rows: dict[str, Any] = {}
+    for governor_id, raw_row in by_gov.items():
+        row = dict(raw_row)
+        row["TargetState"] = state
+        row["PublicationReason"] = reason
+        row["TargetSourceScan"] = meta.get("target_source_scan")
+        row["TargetSourceType"] = meta.get("target_source_type")
+        row["TargetPublishedAt"] = meta.get("target_published_at")
+        row["PublicationVersion"] = meta.get("publication_version")
+        row["PublicationSignature"] = meta.get("publication_signature")
+        rows[str(governor_id)] = row
+    return {"_meta": meta, "by_gov": rows}
 
 
-def get_targets_for_governor(governor_id: int) -> dict[str, Any] | None:
-    try:
-        key = normalize_governor_id(governor_id)
-    except Exception:
-        key = str(governor_id)
+def _summary(cache: Mapping[str, Any]) -> dict[str, Any]:
+    meta, by_gov = _cache_parts(cache)
+    return {
+        "_meta": meta,
+        "summary": {
+            "by_gov_count": len(by_gov),
+            "kvk_no": meta.get("kvk_no"),
+            "publication_state": meta.get("publication_state", "UNKNOWN"),
+            "publication_signature": meta.get("publication_signature"),
+        },
+    }
 
-    cache = _read_json(PLAYER_TARGETS_CACHE)
-    if _cache_might_be_stale(cache):
-        ctx = get_kvk_context_today()
-        if ctx and not _cache_matches_context(cache, ctx):
-            if cache:
-                logger.info(
-                    "[targets_sql_cache] Refreshing stale targets cache. cached_kvk=%r cached_state=%r "
-                    "resolved_kvk=%r resolved_state=%r reason=%r",
-                    (cache.get("_meta") or {}).get("kvk_no"),
-                    (cache.get("_meta") or {}).get("state"),
-                    ctx.get("kvk_no"),
-                    ctx.get("state"),
-                    ctx.get("state_reason"),
-                )
-            cache = refresh_targets_cache()
-        elif not ctx and cache:
-            logger.info(
-                "[targets_sql_cache] Keeping existing targets cache because KVK context could not be resolved."
+
+def _result(cache: dict[str, Any]) -> dict[str, Any]:
+    return _summary(cache) if os.environ.get("MAINT_SUBPROC") else cache
+
+
+def _last_known_good(
+    existing: Mapping[str, Any],
+    ctx: Mapping[str, Any] | None,
+    reason: str,
+) -> dict[str, Any]:
+    if ctx is not None:
+        resolved = _resolved_cache_copy(existing, ctx)
+        if resolved:
+            logger.warning(
+                "target_publication_using_last_known_good kvk_no=%s reason=%s state=%s",
+                (resolved.get("_meta") or {}).get("kvk_no"),
+                reason,
+                (resolved.get("_meta") or {}).get("publication_state"),
             )
+            return resolved
+    return {"_meta": _unknown_meta(ctx, reason), "by_gov": {}}
 
-    return (cache.get("by_gov") or {}).get(str(key))
+
+def _same_publication(
+    cached: TargetPublicationMetadata | None,
+    current: TargetPublicationMetadata | None,
+) -> bool:
+    return (
+        cached is not None
+        and current is not None
+        and cached.cache_identity is not None
+        and cached.cache_identity == current.cache_identity
+    )
+
+
+def _disk_has_newer_publication(
+    snapshot: TargetPublicationMetadata,
+    ctx: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    disk_cache = _read_json(PLAYER_TARGETS_CACHE)
+    validated = _validate_cache(disk_cache, ctx)
+    if validated is None:
+        return None
+    disk_metadata = validated[0]
+    if disk_metadata.kvk_no != snapshot.kvk_no:
+        return None
+    disk_version = disk_metadata.publication_version or 0
+    snapshot_version = snapshot.publication_version or 0
+    if disk_version > snapshot_version:
+        return _resolved_cache_copy(disk_cache, ctx)
+    if disk_version == snapshot_version and disk_metadata.cache_identity != snapshot.cache_identity:
+        logger.error(
+            "target_publication_conflicting_identity kvk_no=%s version=%s",
+            snapshot.kvk_no,
+            snapshot_version,
+        )
+        return _resolved_cache_copy(disk_cache, ctx)
+    return None
+
+
+def _build_cache(
+    metadata: TargetPublicationMetadata,
+    rows: tuple[Mapping[str, Any], ...],
+    ctx: Mapping[str, Any],
+) -> dict[str, Any]:
+    resolution = resolve_target_publication_state(
+        metadata,
+        requested_kvk_no=_positive_int(ctx.get("kvk_no")),
+        fighting_state=str(ctx.get("state") or ""),
+        observed_row_count=len(rows),
+    )
+    if not resolution.is_verified:
+        raise TargetPublicationContractError(
+            f"Target publication failed cache validation: {resolution.reason}."
+        )
+    written_at = utcnow().isoformat()
+    meta = {
+        "schema_version": CACHE_SCHEMA_VERSION,
+        "generated_at": written_at,
+        "cache_written_at_utc": written_at,
+        **metadata_to_cache_fields(metadata),
+        "publication_state": resolution.state,
+        "publication_reason": resolution.reason,
+        "kvk_fighting_state": str(ctx.get("state") or "") or None,
+        "kvk_fighting_state_reason": ctx.get("state_reason"),
+    }
+    by_gov: dict[str, dict[str, Any]] = {}
+    for raw_row in rows:
+        row = dict(raw_row)
+        governor_id = normalize_governor_id(row.get("GovernorID"))
+        row["GovernorID"] = governor_id
+        row["KVK_NO"] = metadata.kvk_no
+        row["TargetState"] = resolution.state
+        row["PublicationReason"] = resolution.reason
+        row["TargetSourceScan"] = metadata.source_scan_order
+        row["TargetSourceType"] = metadata.source_scan_type
+        row["TargetPublishedAt"] = meta["target_published_at"]
+        row["PublicationVersion"] = metadata.publication_version
+        row["PublicationSignature"] = metadata.publication_signature
+        by_gov[governor_id] = row
+    return {"_meta": meta, "by_gov": by_gov}
+
+
+def refresh_targets_cache(
+    kvk_context: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Refresh the target cache only when verified publication identity changes."""
+    existing = _read_json(PLAYER_TARGETS_CACHE)
+    ctx = _bound_context(kvk_context)
+    if ctx is None:
+        return _result(_last_known_good(existing, None, PUBLICATION_READ_FAILED))
+    kvk_no = _positive_int(ctx.get("kvk_no"))
+    if kvk_no is None:
+        return _result(_last_known_good(existing, ctx, PUBLICATION_READ_FAILED))
+
+    valid_existing = _validate_cache(existing, ctx)
+    try:
+        current_metadata = fetch_current_publication_metadata(kvk_no)
+    except Exception:
+        logger.exception("target_publication_metadata_read_failed kvk_no=%s", kvk_no)
+        return _result(_last_known_good(existing, ctx, PUBLICATION_READ_FAILED))
+    if current_metadata is None:
+        return _result(_last_known_good(existing, ctx, MISSING_PUBLICATION_METADATA))
+
+    current_resolution = resolve_target_publication_state(
+        current_metadata,
+        requested_kvk_no=kvk_no,
+        fighting_state=str(ctx.get("state") or ""),
+    )
+    if not current_resolution.is_verified:
+        logger.error(
+            "target_publication_metadata_invalid kvk_no=%s reason=%s",
+            kvk_no,
+            current_resolution.reason,
+        )
+        return _result(_last_known_good(existing, ctx, current_resolution.reason))
+
+    if valid_existing and _same_publication(valid_existing[0], current_metadata):
+        return _result(_resolved_cache_copy(existing, ctx))
+
+    try:
+        snapshot = fetch_current_target_publication(kvk_no)
+    except Exception:
+        logger.exception("target_publication_rowset_read_failed kvk_no=%s", kvk_no)
+        return _result(_last_known_good(existing, ctx, PUBLICATION_READ_FAILED))
+    if snapshot is None:
+        return _result(_last_known_good(existing, ctx, MISSING_PUBLICATION_METADATA))
+
+    if not _same_publication(current_metadata, snapshot.metadata):
+        logger.info("target_publication_changed_during_refresh kvk_no=%s", kvk_no)
+        try:
+            snapshot = fetch_current_target_publication(kvk_no)
+        except Exception:
+            logger.exception("target_publication_retry_failed kvk_no=%s", kvk_no)
+            return _result(_last_known_good(existing, ctx, PUBLICATION_READ_FAILED))
+        if snapshot is None:
+            return _result(_last_known_good(existing, ctx, MISSING_PUBLICATION_METADATA))
+
+    try:
+        data = _build_cache(snapshot.metadata, snapshot.rows, ctx)
+    except TargetPublicationContractError:
+        logger.exception("target_publication_cache_build_failed kvk_no=%s", kvk_no)
+        return _result(_last_known_good(existing, ctx, PUBLICATION_READ_FAILED))
+
+    try:
+        lock_directory = os.path.dirname(PLAYER_TARGETS_CACHE)
+        if lock_directory:
+            os.makedirs(lock_directory, exist_ok=True)
+        with FileLock(
+            f"{PLAYER_TARGETS_CACHE}.lock",
+            timeout=CACHE_WRITE_LOCK_TIMEOUT_SECONDS,
+        ):
+            newer = _disk_has_newer_publication(snapshot.metadata, ctx)
+            if newer is not None:
+                return _result(newer)
+            _write_json(PLAYER_TARGETS_CACHE, data)
+    except Exception:
+        logger.exception("target_publication_cache_write_failed path=%s", PLAYER_TARGETS_CACHE)
+        disk_fallback = _last_known_good(
+            _read_json(PLAYER_TARGETS_CACHE), ctx, PUBLICATION_READ_FAILED
+        )
+        if disk_fallback.get("by_gov") or {}:
+            return _result(disk_fallback)
+        fallback = _last_known_good(existing, ctx, PUBLICATION_READ_FAILED)
+        if fallback.get("by_gov") or {}:
+            return _result(fallback)
+    return _result(data)
+
+
+def _load_current_cache(
+    kvk_context: Mapping[str, Any] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    ctx = _bound_context(kvk_context)
+    if ctx is None:
+        return {}, _unknown_meta(None, PUBLICATION_READ_FAILED)
+    existing = _read_json(PLAYER_TARGETS_CACHE)
+    validated = _validate_cache(existing, ctx)
+    if validated is None:
+        cache_reason = _cache_failure_reason(existing, ctx)
+        refreshed = refresh_targets_cache(ctx)
+        if "summary" in refreshed:
+            refreshed = _read_json(PLAYER_TARGETS_CACHE)
+        resolved = _resolved_cache_copy(refreshed, ctx)
+        if not resolved:
+            return {}, _unknown_meta(ctx, cache_reason)
+        return _cache_parts(resolved)[1], _cache_parts(resolved)[0]
+
+    metadata, state, _ = validated
+    if state == "DRAFT":
+        refreshed = refresh_targets_cache(ctx)
+        if "summary" in refreshed:
+            refreshed = _read_json(PLAYER_TARGETS_CACHE)
+        resolved = _resolved_cache_copy(refreshed, ctx)
+    else:
+        resolved = _resolved_cache_copy(existing, ctx)
+    if not resolved:
+        return {}, _unknown_meta(ctx, PUBLICATION_READ_FAILED)
+    meta, by_gov = _cache_parts(resolved)
+    if _positive_int(meta.get("kvk_no")) != metadata.kvk_no:
+        return {}, _unknown_meta(ctx, PUBLICATION_READ_FAILED)
+    return by_gov, meta
+
+
+def get_target_cache_entry(
+    governor_id: int | str,
+    kvk_context: Mapping[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Return a row and its metadata from the same validated cache snapshot."""
+    governor_key = normalize_governor_id(governor_id)
+    if not governor_key or not governor_key.isdigit():
+        return None, _unknown_meta(None, PUBLICATION_READ_FAILED)
+    by_gov, meta = _load_current_cache(kvk_context)
+    row = by_gov.get(governor_key)
+    return (dict(row) if isinstance(row, Mapping) else None), dict(meta)
+
+
+def get_current_target_cache_meta(
+    kvk_context: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return current-KVK verified cache metadata, or explicit Unknown metadata."""
+    _, meta = _load_current_cache(kvk_context)
+    return meta
+
+
+def get_targets_for_governor(governor_id: int | str) -> dict[str, Any] | None:
+    row, _ = get_target_cache_entry(governor_id)
+    return row

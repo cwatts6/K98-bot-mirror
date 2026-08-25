@@ -32,16 +32,32 @@ class KvkTargetsCardPayload:
     kvk_no: int | None
     kvk_name: str | None
     camp_name: str | None
-    target_state: str
+    progress_state: str
     status_label: str
     status_detail: str
     next_action: str
     power: int | None
     metrics: tuple[KvkTargetMetricProgress, ...]
     last_refreshed: str | None = None
-    source_state: str | None = None
+    publication_state: str = "UNKNOWN"
+    publication_reason: str | None = None
+    target_source_scan: int | None = None
+    target_source_type: str | None = None
+    target_published_at: str | None = None
+    publication_version: int | None = None
+    publication_signature: str | None = None
     warnings: tuple[str, ...] = field(default_factory=tuple)
     generated_at_utc: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    @property
+    def target_state(self) -> str:
+        """Compatibility alias for the card's progress/status state."""
+        return self.progress_state
+
+    @property
+    def source_state(self) -> str:
+        """Compatibility alias for the target publication state."""
+        return self.publication_state
 
     @property
     def display_kvk_label(self) -> str:

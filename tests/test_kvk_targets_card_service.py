@@ -31,30 +31,55 @@ async def _acclaim_last_kvk_map():
     }
 
 
+def _publication_meta(*, state: str = "OFFICIAL") -> dict[str, object]:
+    source_type = "MATCHMAKING_SCAN" if state == "OFFICIAL" else "DRAFTSCAN"
+    source_scan = 1059 if state == "OFFICIAL" else 1040
+    return {
+        "PublicationId": 1,
+        "KVK_NO": 15,
+        "PublicationState": state,
+        "SourceScanOrder": source_scan,
+        "SourceScanType": source_type,
+        "ConfiguredDraftScan": 1040,
+        "ConfiguredMatchmakingScan": 1059,
+        "PublishedAtUtc": "2026-06-05T10:30:00+00:00",
+        "TargetRowCount": 2,
+        "OutputObjectName": "dbo.EXCEL_EXPORT_KVK_TARGETS_15",
+        "PublicationVersion": 1,
+        "PublicationSignature": "2ad2a141-c5bf-4075-927b-832e44477e55",
+        "cache_written_at_utc": "2026-06-05T10:31:00+00:00",
+    }
+
+
 async def test_targets_payload_active_progress(monkeypatch):
+    kvk_context = {"kvk_no": 15, "kvk_name": "Tides of War"}
+    received_contexts = []
     monkeypatch.setattr(
         service,
         "get_kvk_context_today",
-        lambda: {"kvk_no": 15, "kvk_name": "Tides of War"},
+        lambda: kvk_context,
     )
     monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
+
+    def fetch_target_entry(gid, received_context):
+        received_contexts.append(received_context)
+        return (
+            {
+                "GovernorID": gid,
+                "GovernorName": "Target Gov",
+                "Power": 123_000_000,
+                "Kill_Target": 20_000_000,
+                "Deads_Target": 1_000_000,
+                "DKP_Target": 50_000_000,
+                "KVK_NO": 15,
+            },
+            _publication_meta(),
+        )
+
     monkeypatch.setattr(
         service.kvk_targets_dal,
-        "fetch_target_row",
-        lambda gid: {
-            "GovernorID": gid,
-            "GovernorName": "Target Gov",
-            "Power": 123_000_000,
-            "Kill_Target": 20_000_000,
-            "Deads_Target": 1_000_000,
-            "DKP_Target": 50_000_000,
-            "KVK_NO": 15,
-        },
-    )
-    monkeypatch.setattr(
-        service.kvk_targets_dal,
-        "fetch_target_cache_meta",
-        lambda: {"generated_at": "2026-06-05T10:30:00+00:00", "state": "ACTIVE"},
+        "fetch_target_entry",
+        fetch_target_entry,
     )
     monkeypatch.setattr(service.kvk_targets_dal, "fetch_exemption_row", lambda *_args: None)
     monkeypatch.setattr(
@@ -86,6 +111,9 @@ async def test_targets_payload_active_progress(monkeypatch):
     assert payload.metrics[3].label == "Acclaim Target"
     assert payload.metrics[3].current == 4_700_000
     assert "work on the table" in payload.next_action.lower()
+    assert payload.publication_state == "OFFICIAL"
+    assert payload.target_source_scan == 1059
+    assert received_contexts == [kvk_context]
 
 
 async def test_targets_payload_complete(monkeypatch):
@@ -93,16 +121,18 @@ async def test_targets_payload_complete(monkeypatch):
     monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
     monkeypatch.setattr(
         service.kvk_targets_dal,
-        "fetch_target_row",
-        lambda gid: {
-            "GovernorID": gid,
-            "GovernorName": "Target Gov",
-            "Kill_Target": 10,
-            "Deads_Target": 5,
-            "DKP_Target": 20,
-        },
+        "fetch_target_entry",
+        lambda gid, _kvk_context=None: (
+            {
+                "GovernorID": gid,
+                "GovernorName": "Target Gov",
+                "Kill_Target": 10,
+                "Deads_Target": 5,
+                "DKP_Target": 20,
+            },
+            _publication_meta(),
+        ),
     )
-    monkeypatch.setattr(service.kvk_targets_dal, "fetch_target_cache_meta", lambda: {})
     monkeypatch.setattr(service.kvk_targets_dal, "fetch_exemption_row", lambda *_args: None)
     monkeypatch.setattr(service.stats_cache_helpers, "load_last_kvk_map", _empty_last_kvk_map)
     monkeypatch.setattr(
@@ -127,8 +157,11 @@ async def test_targets_payload_complete(monkeypatch):
 async def test_targets_payload_exempt_uses_sql_contract(monkeypatch):
     monkeypatch.setattr(service, "get_kvk_context_today", lambda: {"kvk_no": 15})
     monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
-    monkeypatch.setattr(service.kvk_targets_dal, "fetch_target_row", lambda _gid: None)
-    monkeypatch.setattr(service.kvk_targets_dal, "fetch_target_cache_meta", lambda: {})
+    monkeypatch.setattr(
+        service.kvk_targets_dal,
+        "fetch_target_entry",
+        lambda _gid, _kvk_context=None: (None, _publication_meta()),
+    )
     monkeypatch.setattr(
         service.kvk_targets_dal,
         "fetch_exemption_row",
@@ -153,10 +186,12 @@ async def test_targets_payload_source_unavailable_when_stats_missing(monkeypatch
     monkeypatch.setattr(service, "load_kvk_stats_card_context", _context)
     monkeypatch.setattr(
         service.kvk_targets_dal,
-        "fetch_target_row",
-        lambda _gid: {"GovernorName": "Target Gov", "Kill_Target": 100, "Kills KVK -1": 50},
+        "fetch_target_entry",
+        lambda _gid, _kvk_context=None: (
+            {"GovernorName": "Target Gov", "Kill_Target": 100, "Kills KVK -1": 50},
+            _publication_meta(),
+        ),
     )
-    monkeypatch.setattr(service.kvk_targets_dal, "fetch_target_cache_meta", lambda: {})
     monkeypatch.setattr(service.kvk_targets_dal, "fetch_exemption_row", lambda *_args: None)
     monkeypatch.setattr(service.stats_cache_helpers, "load_last_kvk_map", _empty_last_kvk_map)
     monkeypatch.setattr(service, "load_stat_row", lambda _gid: None)

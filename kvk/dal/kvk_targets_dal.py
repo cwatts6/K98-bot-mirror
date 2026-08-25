@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-import json
+from collections.abc import Mapping
 import logging
-import os
 from typing import Any
 
-from constants import PLAYER_TARGETS_CACHE
 from file_utils import fetch_one_dict, get_conn_with_retries
-from targets_sql_cache import get_targets_for_governor
+from targets_sql_cache import (
+    get_current_target_cache_meta,
+    get_target_cache_entry,
+    get_targets_for_governor,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def fetch_target_row(governor_id: str | int) -> dict[str, Any] | None:
-    """Return the cached target row for a governor, refreshing through the cache module if needed."""
+    """Compatibility wrapper returning the verified current-KVK target row."""
     try:
         gid = int(str(governor_id).strip())
     except (TypeError, ValueError):
@@ -23,17 +25,16 @@ def fetch_target_row(governor_id: str | int) -> dict[str, Any] | None:
 
 
 def fetch_target_cache_meta() -> dict[str, Any]:
-    """Return target cache metadata without exposing the cache file format to services."""
-    if not os.path.exists(PLAYER_TARGETS_CACHE):
-        return {}
-    try:
-        with open(PLAYER_TARGETS_CACHE, encoding="utf-8") as handle:
-            raw = json.load(handle)
-    except Exception:
-        logger.debug("kvk_targets_cache_meta_read_failed", exc_info=True)
-        return {}
-    meta = raw.get("_meta") if isinstance(raw, dict) else None
-    return dict(meta) if isinstance(meta, dict) else {}
+    """Compatibility wrapper returning verified current-KVK publication metadata."""
+    return get_current_target_cache_meta()
+
+
+def fetch_target_entry(
+    governor_id: str | int,
+    kvk_context: Mapping[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Return a target row and publication metadata from one cache snapshot."""
+    return get_target_cache_entry(governor_id, kvk_context)
 
 
 def fetch_exemption_row(governor_id: str | int, kvk_no: int | None = None) -> dict[str, Any] | None:

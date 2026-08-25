@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from core import visual_text
 from kvk.models.kvk_targets_card import KvkTargetsCardPayload, RenderedKvkTargetsCard
+from kvk.services.kvk_target_publication_service import target_publication_display
 from kvk.theme import normalize_kvk_mode
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,6 +32,12 @@ RED = (255, 87, 118)
 BLUE = (164, 220, 255)
 GRAY = (148, 163, 184)
 PURPLE = (168, 85, 247)
+PUBLICATION_COLORS = {
+    "DRAFT": BLUE,
+    "OFFICIAL": GREEN,
+    "HISTORIC": GRAY,
+    "UNKNOWN": AMBER,
+}
 
 
 def _font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
@@ -298,6 +305,11 @@ def render_kvk_targets_card(
     canvas = Image.alpha_composite(background, overlay)
     draw = ImageDraw.Draw(canvas, "RGBA")
 
+    publication = target_publication_display(
+        payload.publication_state,
+        source_scan_order=payload.target_source_scan,
+    )
+
     _draw_text(draw, (46, 38), "KVK TARGETS", fill=GOLD, font=_font(36, bold=True), bold=True)
     context_bits = [payload.display_kvk_label, payload.display_mode]
     if payload.display_camp:
@@ -305,8 +317,47 @@ def render_kvk_targets_card(
     if payload.power:
         context_bits.append(f"MM Power {_compact(payload.power)}")
     context = "  |  ".join(context_bits)
-    context_font = _fit_font(draw, context, max_width=850, size=21, min_size=15, bold=True)
+    context_font = _fit_font(draw, context, max_width=680, size=21, min_size=15, bold=True)
     _draw_text(draw, (46, 86), context, fill=MUTED, font=context_font, bold=True)
+
+    badge_text = publication.label.upper()
+    badge_font = _font(19, bold=True)
+    badge_width = _text_width(draw, badge_text, badge_font, bold=True) + 30
+    badge_left = WIDTH - 48 - badge_width
+    badge_color = PUBLICATION_COLORS[publication.state]
+    draw.rounded_rectangle(
+        (badge_left, 34, WIDTH - 48, 70),
+        radius=16,
+        fill=(*badge_color, 225),
+    )
+    _draw_text(
+        draw,
+        (badge_left + 15, 41),
+        badge_text,
+        fill=(15, 23, 42),
+        font=badge_font,
+        bold=True,
+    )
+    source_font = _fit_font(
+        draw,
+        publication.source_text,
+        max_width=370,
+        size=17,
+        min_size=12,
+        bold=True,
+    )
+    _draw_text(draw, (760, 82), publication.source_text, fill=TEXT, font=source_font, bold=True)
+    warning_text = payload.warnings[0] if payload.warnings else publication.warning_text
+    if warning_text:
+        warning_font = _fit_font(
+            draw,
+            warning_text,
+            max_width=370,
+            size=16,
+            min_size=12,
+            bold=True,
+        )
+        _draw_text(draw, (760, 107), warning_text, fill=AMBER, font=warning_font, bold=True)
 
     _draw_avatar(
         canvas,
@@ -316,7 +367,7 @@ def render_kvk_targets_card(
         avatar_bytes=avatar_bytes,
     )
     name_font = _fit_font(
-        draw, payload.governor_name, max_width=640, size=36, min_size=23, bold=True
+        draw, payload.governor_name, max_width=580, size=36, min_size=23, bold=True
     )
     _draw_text(draw, (155, 123), payload.governor_name, fill=TEXT, font=name_font, bold=True)
     _draw_text(draw, (155, 167), str(payload.governor_id), fill=TEXT, font=_font(23, bold=True))
@@ -336,10 +387,10 @@ def render_kvk_targets_card(
     )
 
     footer_parts = []
+    if payload.target_published_at:
+        footer_parts.append(f"Published {payload.target_published_at}")
     if payload.last_refreshed:
-        footer_parts.append(f"Targets refreshed {payload.last_refreshed}")
-    if payload.source_state:
-        footer_parts.append(f"State {payload.source_state}")
+        footer_parts.append(f"Cache {payload.last_refreshed}")
     footer = "  |  ".join(footer_parts)
     footer_font = _fit_font(draw, footer, max_width=1040, size=17, min_size=13, bold=True)
     footer_x = WIDTH - 52 - _text_width(draw, footer, footer_font, bold=True)

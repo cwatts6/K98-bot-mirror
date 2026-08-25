@@ -7,16 +7,14 @@ from typing import Any
 
 import discord
 
+from kvk.services.kvk_target_publication_service import target_publication_display
 from kvk.theme import normalize_kvk_mode
 
 # Helpers (with safe fallbacks)
 try:
     # embed_utils.py provides fmt_short which is the canonical short-number formatter in repo
-    from embed_utils import brand_color, fmt_short as format_number_short
+    from embed_utils import fmt_short as format_number_short
 except Exception:
-
-    def brand_color() -> int:
-        return 0x2B6CB0
 
     def format_number_short(v) -> str:
         try:
@@ -25,11 +23,11 @@ except Exception:
             return str(v) if v is not None else "—"
         ax = abs(x)
         if ax >= 1_000_000_000:
-            return f"{x/1_000_000_000:.2f}B"
+            return f"{x / 1_000_000_000:.2f}B"
         if ax >= 1_000_000:
-            return f"{x/1_000_000:.2f}M"
+            return f"{x / 1_000_000:.2f}M"
         if ax >= 1_000:
-            return f"{x/1_000:.2f}K"
+            return f"{x / 1_000:.2f}K"
         try:
             return f"{int(x):,}"
         except Exception:
@@ -69,8 +67,8 @@ def _state_assets_for_header(state: str | None) -> tuple[str, str | None]:
     s = (state or "").upper()
     raw = {
         "DRAFT": DRAFT_TARGET_EMOJI,
-        "ACTIVE": ACTIVE_TARGET_EMOJI,
-        "ENDED": HISTORIC_TARGET_EMOJI,
+        "OFFICIAL": ACTIVE_TARGET_EMOJI,
+        "HISTORIC": HISTORIC_TARGET_EMOJI,
     }.get(s)
 
     if isinstance(raw, str):
@@ -83,20 +81,24 @@ def _state_assets_for_header(state: str | None) -> tuple[str, str | None]:
     # Unicode fallbacks (inline)
     return {
         "DRAFT": ("🧪 ", None),
-        "ACTIVE": ("✅ ", None),
-        "ENDED": ("📜 ", None),
-    }.get(s, ("✅ ", None))
+        "OFFICIAL": ("✅ ", None),
+        "HISTORIC": ("📜 ", None),
+        "UNKNOWN": ("⚠️ ", None),
+    }.get(s, ("⚠️ ", None))
 
 
 def _state_color(state: str | None) -> int:
     s = (state or "").upper()
-    return {"DRAFT": 0x2563EB, "ACTIVE": 0x16A34A, "ENDED": 0x334155}.get(s, brand_color())
+    return {
+        "DRAFT": 0x2563EB,
+        "OFFICIAL": 0x16A34A,
+        "HISTORIC": 0x334155,
+        "UNKNOWN": 0xD97706,
+    }.get(s, 0xD97706)
 
 
 def _state_label(state: str | None) -> str:
-    return {"DRAFT": "Draft", "ACTIVE": "Active", "ENDED": "Ended"}.get(
-        (state or "").upper(), "Active"
-    )
+    return target_publication_display(state).label
 
 
 def _maybe_banner(kvk_name: str | None) -> str | None:
@@ -127,10 +129,20 @@ def build_kvk_targets_embed(
     # Defensive normalisation of incoming target keys (case-insensitive; spaces -> underscores)
     norm = {str(k).strip().lower().replace(" ", "_"): v for k, v in (targets or {}).items()}
 
-    state = str(
-        norm.get("targetstate") or norm.get("target_state") or norm.get("target") or "ACTIVE"
-    ).upper()
+    state = str(norm.get("targetstate") or norm.get("target_state") or "UNKNOWN").upper()
     kvk_no = norm.get("kvk_no") or norm.get("kvk")
+    source_scan = (
+        norm.get("targetsourcescan")
+        or norm.get("target_source_scan")
+        or norm.get("sourcescanorder")
+        or norm.get("source_scan_order")
+    )
+    try:
+        source_scan_int = int(source_scan) if source_scan not in (None, "") else None
+    except (TypeError, ValueError, OverflowError):
+        source_scan_int = None
+    publication = target_publication_display(state, source_scan_order=source_scan_int)
+    state = publication.state
 
     # support multiple key naming variants
     dkp = norm.get("dkp_target") or norm.get("dkp_target_value") or norm.get("dkp")
@@ -146,13 +158,17 @@ def build_kvk_targets_embed(
     title = f"{gov_name} • {governor_id_str}"
     kvk_label = kvk_name or (f"KVK {kvk_no}" if kvk_no else "KVK")
     color = _state_color(state)
-    label = _state_label(state)
+    label = publication.label
 
     em = discord.Embed(title=title, color=color)
 
     # High-contrast header in DESCRIPTION
     emoji_text, author_icon = _state_assets_for_header(state)
-    header = f"{emoji_text}**{label.upper()}** • **{str(kvk_label).upper()}**"
+    header = (
+        f"{emoji_text}**{label.upper()}** • **{str(kvk_label).upper()}**\n{publication.source_text}"
+    )
+    if publication.warning_text:
+        header += f"\n⚠️ {publication.warning_text}"
     em.description = header
 
     # Optional small author icon if provided as URL
@@ -296,13 +312,15 @@ def build_kvk_targets_embed(
     if banner_url:
         em.set_image(url=banner_url)
 
-    # Footer per state
-    foot = {
-        "DRAFT": "Draft targets (may change before KVK starts)",
-        "ACTIVE": "Official KVK targets",
-        "ENDED": "Historical targets",
-    }.get(state, "Targets")
-    em.set_footer(text=f"GovernorID: {governor_id_str} • {foot}")
+    published_at = (
+        norm.get("targetpublishedat")
+        or norm.get("target_published_at")
+        or norm.get("publishedatutc")
+    )
+    footer = f"GovernorID: {governor_id_str} • {publication.label} targets"
+    if published_at:
+        footer += f" • Published {published_at}"
+    em.set_footer(text=footer)
 
     # Set a consistent timezone-aware timestamp (use discord.utils.utcnow or repo utc helper)
     try:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -17,12 +18,15 @@ def _payload() -> KvkTargetsCardPayload:
         kvk_no=15,
         kvk_name="Tides of War",
         camp_name="Wind",
-        target_state="active",
+        progress_state="active",
         status_label="Push now",
         status_detail="Targets are active.",
         next_action="Fight now.",
         power=None,
         metrics=(KvkTargetMetricProgress("Kills", 5, 10, 50.0, 5),),
+        publication_state="OFFICIAL",
+        target_source_scan=1059,
+        target_published_at="2026-06-05 10:30 UTC",
     )
 
 
@@ -33,7 +37,7 @@ def _payload_with_placeholder_metric() -> KvkTargetsCardPayload:
         kvk_no=15,
         kvk_name="Tides of War",
         camp_name="Wind",
-        target_state="active",
+        progress_state="active",
         status_label="Push now",
         status_detail="Targets are active.",
         next_action="Fight now.",
@@ -49,6 +53,8 @@ def _payload_with_placeholder_metric() -> KvkTargetsCardPayload:
                 "Target coming next KVK",
             ),
         ),
+        publication_state="OFFICIAL",
+        target_source_scan=1059,
     )
 
 
@@ -154,3 +160,28 @@ async def test_fallback_embed_formats_placeholder_metric_note():
 
     assert acclaim.value == "4.7M\nTarget coming next KVK"
     assert "/ N/A" not in acclaim.value
+
+
+async def test_fallback_embed_shows_official_publication_source():
+    embed = posting.build_targets_fallback_embed(_payload())
+
+    assert "Official targets" in embed.description
+    publication = next(field for field in embed.fields if field.name == "Target Publication")
+    assert "exact matchmaking scan 1059" in publication.value
+    assert "Published 2026-06-05 10:30 UTC" in embed.footer.text
+
+
+async def test_fallback_embed_missing_publication_is_unverified():
+    payload = _payload()
+    payload = replace(
+        payload,
+        publication_state="UNKNOWN",
+        target_source_scan=None,
+        target_published_at=None,
+    )
+
+    embed = posting.build_targets_fallback_embed(payload)
+
+    assert "Unverified targets" in embed.description
+    warning = next(field for field in embed.fields if field.name == "Publication Warning")
+    assert "Do not treat" in warning.value

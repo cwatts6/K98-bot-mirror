@@ -8,6 +8,11 @@ from typing import Any
 from kvk.dal import kvk_targets_dal
 from kvk.models.kvk_targets_card import KvkTargetMetricProgress, KvkTargetsCardPayload
 from kvk.services.kvk_stats_card_service import load_kvk_stats_card_context
+from kvk.services.kvk_target_publication_service import (
+    MISSING_PUBLICATION_METADATA,
+    parse_target_publication_metadata,
+    resolve_target_publication_state,
+)
 from kvk_state import get_kvk_context_today
 import stats_cache_helpers
 from utils import load_stat_row
@@ -208,6 +213,28 @@ def _status_for_metrics(metrics: tuple[KvkTargetMetricProgress, ...]) -> tuple[s
     )
 
 
+def _publication_details(
+    cache_meta: dict[str, Any],
+    kvk_context: dict[str, Any],
+) -> tuple[str, str, int | None, str | None, str | None, int | None, str | None]:
+    metadata = parse_target_publication_metadata(cache_meta)
+    resolution = resolve_target_publication_state(
+        metadata,
+        requested_kvk_no=_optional_int_from_variants(kvk_context, ["kvk_no"]),
+        fighting_state=_str_from_variants(kvk_context, ["state"], default=""),
+    )
+    reason = resolution.reason or MISSING_PUBLICATION_METADATA
+    return (
+        resolution.state,
+        reason,
+        metadata.source_scan_order if metadata else None,
+        metadata.source_scan_type if metadata else None,
+        _display_datetime(metadata.published_at_utc) if metadata else None,
+        metadata.publication_version if metadata else None,
+        metadata.publication_signature if metadata else None,
+    )
+
+
 async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCardPayload:
     gid = str(governor_id or "").strip()
     if not gid.isdigit():
@@ -217,7 +244,7 @@ async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCa
             kvk_no=None,
             kvk_name=None,
             camp_name=None,
-            target_state="missing_governor",
+            progress_state="missing_governor",
             status_label="Invalid ID",
             status_detail="That Governor ID is not valid.",
             next_action="Use a numeric Governor ID or register an account.",
@@ -237,10 +264,23 @@ async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCa
     if context.kvk_name:
         kvk_name = context.kvk_name
 
-    target_row = await asyncio.to_thread(kvk_targets_dal.fetch_target_row, gid)
-    cache_meta = await asyncio.to_thread(kvk_targets_dal.fetch_target_cache_meta)
-    last_refreshed = _display_datetime(cache_meta.get("generated_at"))
-    source_state = _str_from_variants(cache_meta, ["state"], default="") or None
+    target_row, cache_meta = await asyncio.to_thread(
+        kvk_targets_dal.fetch_target_entry,
+        gid,
+        kvk_context,
+    )
+    last_refreshed = _display_datetime(
+        cache_meta.get("cache_written_at_utc") or cache_meta.get("generated_at")
+    )
+    (
+        publication_state,
+        publication_reason,
+        target_source_scan,
+        target_source_type,
+        target_published_at,
+        publication_version,
+        publication_signature,
+    ) = _publication_details(cache_meta, kvk_context)
 
     if not target_row:
         exemption = await asyncio.to_thread(kvk_targets_dal.fetch_exemption_row, gid, kvk_no)
@@ -253,14 +293,20 @@ async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCa
                 kvk_no=kvk_no or _int_from_variants(exemption, ["KVK_NO"], default=0) or None,
                 kvk_name=kvk_name,
                 camp_name=context.camp_name,
-                target_state="exempt",
+                progress_state="exempt",
                 status_label="Exempt",
                 status_detail="This governor is exempt from KVK targets.",
                 next_action="No action needed unless leadership asks for an update.",
                 power=None,
                 metrics=(),
                 last_refreshed=last_refreshed,
-                source_state=source_state,
+                publication_state=publication_state,
+                publication_reason=publication_reason,
+                target_source_scan=target_source_scan,
+                target_source_type=target_source_type,
+                target_published_at=target_published_at,
+                publication_version=publication_version,
+                publication_signature=publication_signature,
             )
         return KvkTargetsCardPayload(
             governor_id=gid,
@@ -268,14 +314,20 @@ async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCa
             kvk_no=kvk_no,
             kvk_name=kvk_name,
             camp_name=context.camp_name,
-            target_state="no_target",
+            progress_state="no_target",
             status_label="No target",
             status_detail="No target row was found for this governor.",
             next_action="Check the Governor ID or ask leadership if targets are still being prepared.",
             power=None,
             metrics=(),
             last_refreshed=last_refreshed,
-            source_state=source_state,
+            publication_state=publication_state,
+            publication_reason=publication_reason,
+            target_source_scan=target_source_scan,
+            target_source_type=target_source_type,
+            target_published_at=target_published_at,
+            publication_version=publication_version,
+            publication_signature=publication_signature,
         )
 
     try:
@@ -300,8 +352,10 @@ async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCa
     )
 
     warnings: list[str] = []
-    if source_state and source_state.upper() == "DRAFT":
+    if publication_state == "DRAFT":
         warnings.append("Targets are marked as draft and may still change.")
+    elif publication_state == "UNKNOWN":
+        warnings.append("Target publication provenance could not be verified.")
 
     return KvkTargetsCardPayload(
         governor_id=gid,
@@ -309,13 +363,19 @@ async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCa
         kvk_no=kvk_no or _int_from_variants(target_row, ["KVK_NO"], default=0) or None,
         kvk_name=kvk_name,
         camp_name=context.camp_name,
-        target_state=target_state,
+        progress_state=target_state,
         status_label=label,
         status_detail=detail,
         next_action=next_action,
         power=_optional_int_from_variants(target_row, ["Power", "Starting Power"]),
         metrics=metrics,
         last_refreshed=last_refreshed,
-        source_state=source_state,
+        publication_state=publication_state,
+        publication_reason=publication_reason,
+        target_source_scan=target_source_scan,
+        target_source_type=target_source_type,
+        target_published_at=target_published_at,
+        publication_version=publication_version,
+        publication_signature=publication_signature,
         warnings=tuple(warnings),
     )

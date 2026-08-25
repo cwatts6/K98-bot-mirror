@@ -18,14 +18,16 @@ def _payload(*, state: str = "active") -> KvkTargetsCardPayload:
         kvk_no=15,
         kvk_name="Tides of War",
         camp_name="Wind",
-        target_state=state,
+        progress_state=state,
         status_label="Push now" if state == "active" else "Exempt",
         status_detail="Targets are active for this KVK.",
         next_action="Focus kills first: 8M remaining.",
         power=123_000_000,
         metrics=metrics,
         last_refreshed="2026-06-05 10:30 UTC",
-        source_state="ACTIVE",
+        publication_state="OFFICIAL",
+        target_source_scan=1059,
+        target_published_at="2026-06-05 10:00 UTC",
     )
 
 

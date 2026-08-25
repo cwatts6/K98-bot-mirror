@@ -9,6 +9,7 @@ import discord
 
 from kvk.models.kvk_targets_card import KvkTargetsCardPayload
 from kvk.rendering.kvk_targets_card_renderer import render_kvk_targets_card
+from kvk.services.kvk_target_publication_service import target_publication_display
 from kvk.services.kvk_targets_card_service import build_kvk_targets_card_payload
 
 logger = logging.getLogger(__name__)
@@ -41,11 +42,28 @@ def _pct(value: float | None) -> str:
 
 
 def build_targets_fallback_embed(payload: KvkTargetsCardPayload) -> discord.Embed:
+    publication = target_publication_display(
+        payload.publication_state,
+        source_scan_order=payload.target_source_scan,
+    )
+    publication_colors = {
+        "DRAFT": 0x2563EB,
+        "OFFICIAL": 0x16A34A,
+        "HISTORIC": 0x334155,
+        "UNKNOWN": 0xD97706,
+    }
     embed = discord.Embed(
         title=f"KVK Targets - {payload.governor_name}",
-        description=f"{payload.display_kvk_label} | {payload.display_mode}",
-        color=discord.Color.gold() if payload.target_state == "complete" else discord.Color.blue(),
+        description=(
+            f"**{publication.label} targets** | "
+            f"{payload.display_kvk_label} | {payload.display_mode}"
+        ),
+        color=discord.Color(publication_colors[publication.state]),
     )
+    embed.add_field(name="Target Publication", value=publication.source_text, inline=False)
+    warning_text = payload.warnings[0] if payload.warnings else publication.warning_text
+    if warning_text:
+        embed.add_field(name="Publication Warning", value=warning_text, inline=False)
     embed.add_field(name="Status", value=payload.status_detail, inline=False)
     if payload.metrics:
         for metric in payload.metrics:
@@ -75,8 +93,10 @@ def build_targets_fallback_embed(payload: KvkTargetsCardPayload) -> discord.Embe
             )
     embed.add_field(name="Next Action", value=payload.next_action, inline=False)
     footer = f"GovernorID: {payload.governor_id}"
+    if payload.target_published_at:
+        footer += f" | Published {payload.target_published_at}"
     if payload.last_refreshed:
-        footer += f" | Targets refreshed {payload.last_refreshed}"
+        footer += f" | Cache {payload.last_refreshed}"
     embed.set_footer(text=footer)
     return embed
 
