@@ -2,6 +2,12 @@
 
 This folder keeps completed task packs and chat starters for historical reference.
 
+CrystalTech Path Refresh and Config Corrections completed operator smoke and acceptance on
+2026-08-25 in mirror PR #234 and production PR #541, pending manual merge. The archived bundle
+records the 404-step source contract, the 11 approved follow-up image/spelling corrections,
+focused regression coverage, final security Changes review, clean-rollover/no-extant-progress
+precondition, successful validate/reload checks, and two-user progression/reset smoke evidence.
+
 Discord Voting Post Framework Phase 1 through Phase 22 execution records are archived here. The
 programme delivered SQL-backed vote posts, button voting, one-vote-per-Discord-user enforcement,
 vote changes, live Pillow result cards, scheduler reminders, automatic close, manual close,

@@ -7,6 +7,21 @@ Before repo work, read `AGENTS.md` and the indexed core docs in
 domain, promotion, and operations references so routine work does not require reading the
 entire `docs/reference` folder.
 
+## CrystalTech Path Refresh Delivery
+
+The 2026-08-25 CrystalTech path refresh is complete and operator accepted in mirror PR #234 and
+production PR #541, pending the operator's manual merges. The final config contains eight paths
+and 404 path steps, includes the corrected image mappings and in-game `Archer's Focus` spelling,
+and is protected by focused production-config regression tests. `/crystaltech validate` and
+`/crystaltech reload` passed; two users progressed through multiple steps, and account reset
+behaviour correctly returned the affected path to its start. The clean-rollover deployment
+precondition was satisfied with no extant CrystalTech progress.
+
+This delivery made no SQL, command, service, UI, asset, command-registration, automatic progress
+migration/reset, or archive/copy config change. The completed task pack, chat starter, review,
+approved candidate, proposed diff, and corrected workbook are archived under
+`docs/task_packs/archive/`.
+
 ## Current GovernorOS Programme
 
 GovernorOS v2 Phase 5B Premium Inventory Report Backdrops and Visual Alignment is complete.

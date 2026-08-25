@@ -4,6 +4,12 @@ Active task packs live in this folder. Completed DL_bot upload-routing, startup/
 completed command-platform programme packs were moved to `archive/` to keep the active task-pack
 list focused.
 
+CrystalTech Path Refresh and Config Corrections is complete and operator accepted on 2026-08-25
+in mirror PR #234 and production PR #541, pending manual merge. Config validation, reload, two-user
+multi-step progression, and account reset/restart-path smoke all passed after the clean-rollover
+no-extant-progress precondition was satisfied. Its task pack, chat starter, source review,
+approved candidate, proposed diff, and corrected workbook are archived under `archive/`.
+
 Do not continue the completed DL_bot programme as Phase 6M. Open a fresh task pack for the
 queue-domain redesign, optional SQL-backed queue persistence, SQL deployment workflow, or pinned
 calendar tracker atomic-write hardening when one of those programmes is approved.

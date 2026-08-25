@@ -1,5 +1,27 @@
 # CrystalTech Path Review — 2026-08-25
 
+## Final delivery update
+
+**Delivered and operator accepted on 2026-08-25.** Mirror PR #234 and production PR #541 are ready
+for manual merge. The approved 404-step candidate was implemented, then reconciled with the
+operator's updated corrected workbook through 11 authorised value-only corrections: seven image
+mappings across the Swift Steeds I, Swift Marching III, and Improved Projectiles I groups, plus
+four Mid/High labels standardised to the in-game spelling `Archer's Focus`.
+
+The original proposed JSON is retained unchanged as provenance with SHA-256
+`59daed30ae758a0b86f7d83168dd1b30519d27b3bfcabe6341d975dc76bb0bca`. The final runtime JSON,
+including its implementation timestamp and the 11 follow-up corrections, has SHA-256
+`a3da2af3e6330d009df2258767e9ba6d073bbc43b9f279da84f60b5ebc5f4e2b` and Git blob SHA-1
+`7e836e744a29b3ca45ae6bcae8e83b5d72c8ba33`. Counts, crystal-cost totals, UIDs, ordering, schema,
+and non-timestamp metadata remain exactly as reviewed. The updated corrected workbook SHA-256 is
+`b21a9bb491443acdfab141b3038f9b8d566cba18bdb4bee2af7abfa4f0cb9c5b`.
+
+Operator smoke passed `/crystaltech validate`, `/crystaltech reload`, two-user multi-step
+progression, and account reset/restart-path behaviour. The clean-rollover deployment precondition
+was satisfied with no extant CrystalTech progress. The historical review below records the initial
+source assessment; its pre-existing-warning disposition is superseded by the final follow-up
+section near the end of this document.
+
 ## Executive verdict
 
 The supplied workbook **cannot be deployed unchanged**.
@@ -130,18 +152,20 @@ The repository validator checks JSON loading, required fields, path/step UID uni
 
 The PR task therefore requires both the existing validator and focused data-contract regression assertions.
 
-## Pre-existing consistency warnings outside the workbook audit
+## Follow-up consistency warning resolution
 
-These values are unchanged from the original and were not corrected in the supplied workbook. They are not new regressions, but the supplied sources do not establish whether they are intentional:
+The operator supplied an updated corrected workbook and explicitly approved resolving all four
+warning groups in the same PR. The final runtime config and focused tests now lock these values:
 
-| Pre-existing pattern | Affected rows | Status |
-|---|---|---|
-| `Swift Steeds I` uses `mounted_combat_techniques.png` | `f2p_low_infantry__swift_steeds_i_lv5`; `f2p_low_siege__swift_steeds_i_lv5` | Unchanged; not authorised by the workbook |
-| `Swift Marching III` uses `fleet_of_foot.png` | F2P archer/cavalry/siege level-4 rows | Unchanged; not authorised by the workbook |
-| `Improved Projectiles I` uses `improved_bows.png` | F2P siege levels 3 and 5 | Unchanged; not authorised by the workbook |
-| `Archers Focus` differs from `Archer's Focus` | Four Mid/High rows | Unchanged spelling inconsistency; in-game label not established by supplied sources |
+| Warning group | Final resolution | Affected values |
+|---|---|---:|
+| F2P `Swift Steeds I` image mismatch | `swift_steeds.png` | 2 |
+| F2P `Swift Marching III` image mismatch | `swift_marching.png` | 3 |
+| F2P siege `Improved Projectiles I` image mismatch | `improved_projectiles.png` | 2 |
+| Mid/High `Archers Focus` spelling variant | `Archer's Focus` | 4 |
 
-They are explicitly excluded from the deployment candidate rather than silently altered.
+These 11 changes do not alter counts, costs, UIDs, order, or the image-filename set. No known
+source consistency warning from this review remains unresolved.
 
 ## Corrected artifacts
 

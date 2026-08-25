@@ -1,8 +1,12 @@
 # Codex Chat Starter — CrystalTech Path Refresh and Config Corrections
 
+> **Status: delivered and operator accepted on 2026-08-25.** Mirror PR #234 and production PR
+> #541 are ready for manual merge. This starter is retained as an archived execution record; its
+> pre-implementation instructions are historical and are not an active task.
+
 Work in the current `K98-bot-mirror` repository and complete the attached task pack:
 
-`docs/task_packs/Codex Task Pack - CrystalTech Path Refresh and Config Corrections.md`
+`docs/task_packs/archive/Codex Task Pack - CrystalTech Path Refresh and Config Corrections.md`
 
 Supporting source files:
 
@@ -47,7 +51,9 @@ Hard stops:
 - Do not continue if the proposed JSON hash differs before the permitted timestamp refresh.
 - Do not expand into runtime code, SQL, assets, schema, or player-progress migration without reporting the blocker.
 - Never run `/crystaltech admin_reset`.
-- Do not silently alter the pre-existing image/spelling consistency warnings excluded by the task pack.
+- At initial execution, do not silently alter the pre-existing image/spelling consistency warnings
+  excluded by the task pack. The operator later supplied an updated workbook and explicitly
+  approved all four warning groups in the same PR.
 
 Return the task pack's required delivery output, including:
 

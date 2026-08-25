@@ -8,6 +8,23 @@
 - Task type: `bug fix / configuration data update`
 - One-pass approved: `yes`
 - One-pass basis: The operator requested a PR-ready, super-simple deployment task after the source JSON and workbook had been reviewed and the implementation contract below was locked.
+- Final status: `delivered and operator accepted on 2026-08-25; mirror PR #234 and production PR #541 ready for manual merge`
+
+### Delivery Closeout
+
+This task pack is a completed execution record. The final runtime config was built from the
+approved candidate, refreshed with the implementation timestamp, and then reconciled with the
+operator's updated corrected workbook through 11 approved image/spelling corrections. The final
+config SHA-256 is `a3da2af3e6330d009df2258767e9ba6d073bbc43b9f279da84f60b5ebc5f4e2b`
+and its Git blob SHA-1 is `7e836e744a29b3ca45ae6bcae8e83b5d72c8ba33`. The updated corrected
+workbook SHA-256 is `b21a9bb491443acdfab141b3038f9b8d566cba18bdb4bee2af7abfa4f0cb9c5b`.
+
+Operator smoke completed successfully on 2026-08-25: `/crystaltech validate` passed,
+`/crystaltech reload` passed, two users advanced through multiple path steps, and account reset
+behaviour returned the affected path to its beginning. The deployment precondition was satisfied:
+the rollout occurred with no extant CrystalTech progress after an authorised clean KVK rollover.
+No automatic migration or reset was introduced, and `/crystaltech admin_reset` was not run by
+Codex.
 
 ## 2. Required Reading
 
@@ -70,6 +87,12 @@ A corrected workbook and reviewed JSON candidate are supplied with this task:
 
 Use the proposed JSON as the implementation source. The workbook and review report are evidence/supporting material; they are not runtime files.
 
+The original candidate hash remains the immutable pre-follow-up provenance record. The operator's
+updated corrected workbook subsequently authorised 11 value-only corrections: seven image
+mappings across the Swift Steeds I, Swift Marching III, and Improved Projectiles I warning groups,
+plus four Mid/High `Archer's Focus` labels. Those corrections do not change path counts, costs,
+UIDs, ordering, schema, or metadata other than the separately refreshed implementation timestamp.
+
 ## 5. Scope
 
 ### In Scope
@@ -94,7 +117,9 @@ Use the proposed JSON as the implementation source. The workbook and review repo
 - Do not update any archive, copy, broken, old, output, or experimental CrystalTech JSON files under `config/`.
 - Do not reset, migrate, rewrite, or delete runtime CrystalTech player progress.
 - Do not invoke `/crystaltech admin_reset`.
-- Do not alter the four pre-existing consistency groups listed under Refactor Decisions without separate operator approval.
+- At initial execution, do not alter the four pre-existing consistency groups listed under
+  Refactor Decisions without separate operator approval. That approval and an updated workbook
+  were subsequently supplied; the final delivery resolves all four groups.
 - Do not merge, promote, or deploy the PR; hand it back ready for operator review and deployment.
 
 ## 6. Source Data Contract
@@ -314,13 +339,14 @@ Confirm and record:
 | Duplicate/missing Excel step orders and cavalry path-order typo | `fix now` | Required for deterministic round-trip evidence; runtime JSON order is supplied in the corrected candidate. |
 | Stale workbook audit counts and metadata | `fix now` | Corrected evidence and runtime freshness metadata are required. |
 | Existing validator does not check semantic UID/name correspondence | `fix now through focused regression test` | Avoid changing runtime validator architecture for a data-only PR. |
-| F2P Swift Steeds I image mismatch pattern | `defer / preserve` | Pre-existing and not authorised by supplied workbook data. |
-| F2P Swift Marching III image mismatch pattern | `defer / preserve` | Pre-existing and not authorised by supplied workbook data. |
-| F2P siege Improved Projectiles I image mismatch pattern | `defer / preserve` | Pre-existing and not authorised by supplied workbook data. |
-| Mid/High `Archers Focus` spelling variant | `defer / preserve` | In-game authoritative spelling is not established by supplied sources. |
+| F2P Swift Steeds I image mismatch pattern | `fixed in approved follow-up` | Updated workbook authorises `swift_steeds.png` for both affected rows. |
+| F2P Swift Marching III image mismatch pattern | `fixed in approved follow-up` | Updated workbook authorises `swift_marching.png` for all three affected rows. |
+| F2P siege Improved Projectiles I image mismatch pattern | `fixed in approved follow-up` | Updated workbook authorises `improved_projectiles.png` for both affected rows. |
+| Mid/High `Archers Focus` spelling variant | `fixed in approved follow-up` | Operator confirmed the in-game spelling is `Archer's Focus`; all four Mid/High rows now match. |
 | Archive/copy JSON proliferation | `out of scope` | Do not mix cleanup into the production-data PR. |
 
-Any deferred item added to repository documentation must use the required structured format. Do not create deferred entries merely to restate the four preserved source-data warnings unless repository guidance requires it.
+No deferred item remains for these four warning groups; focused regression assertions lock all 11
+corrected values.
 
 ## 14. Testing Requirements
 
@@ -375,26 +401,38 @@ After the operator promotes and deploys from `K98-bot/main`:
 7. Do not run `/crystaltech admin_reset`.
 8. If validation fails, revert the single production config commit, restart/reload, and validate again.
 
+### Completed Operator Verification — 2026-08-25
+
+- `/crystaltech validate`: passed.
+- `/crystaltech reload`: passed.
+- Telemetry recorded and safely flushed one `crystaltech validate` event and one
+  `crystaltech reload` event to SQL.
+- Two users progressed through multiple path steps successfully.
+- Account reset behaviour was tested and the path started again correctly.
+- The rollout precondition of no extant CrystalTech progress after an authorised clean KVK
+  rollover was confirmed.
+
 ## 15. Acceptance Criteria
 
-- [ ] The production JSON is based on the reviewed candidate with matching source hash before timestamp refresh.
-- [ ] `schema_version`, locales, common blocks, path metadata, path IDs, and path order are preserved.
-- [ ] `updated_at_utc` is refreshed; other metadata is unchanged.
-- [ ] Exactly eight paths and 404 path steps are present.
-- [ ] Exact path counts and crystal-cost totals match the locked contract.
-- [ ] All 14 added UIDs are present and the one removed UID is absent.
-- [ ] All 16 original audit findings are resolved.
-- [ ] All five newly detected workbook defects are resolved.
-- [ ] No helper/review columns leak into JSON.
-- [ ] No new image filename is introduced and all referenced assets pass the existing validator.
-- [ ] Production-config regression tests pass.
-- [ ] Existing CrystalTech service tests pass.
-- [ ] Required repository validation gates pass or unrelated failures are documented.
-- [ ] No commands, SQL, assets, progress, or archive/copy configs changed.
-- [ ] Diff-focused Codex Security Changes review ran against the final base/head with Deep Off.
-- [ ] `k98-pr-review` and promotion handoff are complete.
-- [ ] PR includes clear risk and rollback instructions.
-- [ ] Operator deployment verification lists `/crystaltech validate` and explicitly prohibits automatic reset.
+- [x] The production JSON is based on the reviewed candidate with matching source hash before timestamp refresh and the 11 approved follow-up corrections.
+- [x] `schema_version`, locales, common blocks, path metadata, path IDs, and path order are preserved.
+- [x] `updated_at_utc` is refreshed; other metadata is unchanged.
+- [x] Exactly eight paths and 404 path steps are present.
+- [x] Exact path counts and crystal-cost totals match the locked contract.
+- [x] All 14 added UIDs are present and the one removed UID is absent.
+- [x] All 16 original audit findings are resolved.
+- [x] All five newly detected workbook defects are resolved.
+- [x] All four follow-up warning groups (11 values) are resolved.
+- [x] No helper/review columns leak into JSON.
+- [x] All referenced assets pass the existing validator.
+- [x] Production-config regression tests pass.
+- [x] Existing CrystalTech service tests pass.
+- [x] Required repository validation gates pass.
+- [x] No commands, SQL, assets, progress, or archive/copy configs changed.
+- [x] Diff-focused Codex Security Changes review ran against the final runtime/config base/head with Deep Off.
+- [x] `k98-pr-review` and promotion handoff are complete.
+- [x] PR includes clear risk and rollback instructions.
+- [x] Operator verification passed without an automatic reset or migration.
 
 ## 16. Required Delivery Output
 
@@ -457,7 +495,8 @@ State explicitly:
 
 ## Deferred Optimisations
 
-- Preserved the documented pre-existing image/spelling consistency warnings because the supplied source did not authorise those changes.
+- Resolved the four documented image/spelling consistency warning groups after the operator
+  supplied the updated workbook and explicit approval; no warning-group deferral remains.
 
 ## Risk / Rollback
 
