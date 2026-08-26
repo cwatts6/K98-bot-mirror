@@ -1055,6 +1055,7 @@ def run_proc_config_import(dry_run: bool = False) -> tuple[bool, dict]:
                 logger.exception("[IMPORT] DataFrame fallback also failed")
 
         # Post-transaction stored proc
+        previous_autocommit = conn.autocommit
         try:
             # sp_TARGETS_MASTER owns its internal publication transactions and
             # deliberately rejects ambient caller transactions. With pyodbc,
@@ -1081,6 +1082,8 @@ def run_proc_config_import(dry_run: bool = False) -> tuple[bool, dict]:
         except Exception:
             logger.exception("sp_TARGETS_MASTER execution failed")
             report["errors"].append("sp_TARGETS_MASTER execution failed")
+        finally:
+            conn.autocommit = previous_autocommit
 
         report["duration_sec"] = time.time() - report["start_time"]
         success = len(report.get("errors", [])) == 0

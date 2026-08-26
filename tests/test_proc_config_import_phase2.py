@@ -95,10 +95,13 @@ def test_transactional_success(monkeypatch, tmp_path):
     assert report["tables"]["dbo.ProcConfig_Staging"]["status"] == "ok"
     assert report["tables"]["dbo.ProcConfig_Staging_upsert"]["status"] == "ok"
     assert fake_conn.committed is True
-    target_exec_index = next(
+    target_exec_indices = [
         index for index, sql in enumerate(fake_conn._cursor.executed) if "sp_TARGETS_MASTER" in sql
-    )
+    ]
+    assert target_exec_indices, "sp_TARGETS_MASTER was not executed"
+    target_exec_index = target_exec_indices[0]
     assert fake_conn._cursor.executed_autocommit[target_exec_index] is True
+    assert fake_conn.autocommit is False
     # persisted report file exists
     assert os.path.exists(os.path.join(str(tmp_path), "last_proc_import_report.json"))
 
