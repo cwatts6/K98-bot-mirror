@@ -7,12 +7,15 @@ import proc_config_import as pci
 
 
 class FakeCursor:
-    def __init__(self):
+    def __init__(self, connection):
+        self.connection = connection
         self.executed = []
+        self.executed_autocommit = []
         self.closed = False
 
     def execute(self, sql, *args, **kwargs):
         self.executed.append(sql)
+        self.executed_autocommit.append(self.connection.autocommit)
 
     def fetchall(self):
         return []
@@ -23,10 +26,11 @@ class FakeCursor:
 
 class FakeConn:
     def __init__(self):
+        self.autocommit = False
         self.committed = False
         self.rolled_back = False
         self.closed = False
-        self._cursor = FakeCursor()
+        self._cursor = FakeCursor(self)
 
     def cursor(self):
         return self._cursor
@@ -91,6 +95,10 @@ def test_transactional_success(monkeypatch, tmp_path):
     assert report["tables"]["dbo.ProcConfig_Staging"]["status"] == "ok"
     assert report["tables"]["dbo.ProcConfig_Staging_upsert"]["status"] == "ok"
     assert fake_conn.committed is True
+    target_exec_index = next(
+        index for index, sql in enumerate(fake_conn._cursor.executed) if "sp_TARGETS_MASTER" in sql
+    )
+    assert fake_conn._cursor.executed_autocommit[target_exec_index] is True
     # persisted report file exists
     assert os.path.exists(os.path.join(str(tmp_path), "last_proc_import_report.json"))
 

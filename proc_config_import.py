@@ -1056,6 +1056,12 @@ def run_proc_config_import(dry_run: bool = False) -> tuple[bool, dict]:
 
         # Post-transaction stored proc
         try:
+            # sp_TARGETS_MASTER owns its internal publication transactions and
+            # deliberately rejects ambient caller transactions. With pyodbc,
+            # autocommit=False starts a new transaction for the EXEC itself even
+            # after the import commit above, so this post-import call must run in
+            # autocommit mode.
+            conn.autocommit = True
             if latest_kvk is not None:
                 logger.info(
                     "Running sp_TARGETS_MASTER for KVK %s (incremental refresh)", latest_kvk
@@ -1071,7 +1077,6 @@ def run_proc_config_import(dry_run: bool = False) -> tuple[bool, dict]:
                 report["targets_master_mode"] = "full"
                 report["targets_master_kvk"] = None
 
-            conn.commit()
             report["targets_master_executed"] = True
         except Exception:
             logger.exception("sp_TARGETS_MASTER execution failed")
