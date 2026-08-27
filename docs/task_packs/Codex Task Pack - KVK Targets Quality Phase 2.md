@@ -93,6 +93,9 @@ The following Phase 1 contracts are fixed inputs to Phase 2:
 - Phase 2C architecture, 60-second refresh lease, five-second cold-follower bound, durable Draft
   poll coordination, crash recovery, and exact bot-only manifest were approved on 2026-08-27.
   This approval does not approve Phase 2D.
+- Phase 2C implementation is prepared in mirror PR #239. Its final bot `Changes + Deep Off`
+  review completed with full coverage and zero reportable findings; the SQL repository remains
+  unchanged and is a documented security-review skip. Phase 2D remains unapproved.
 
 ## 4. Objective
 
@@ -330,7 +333,7 @@ Provisional runtime-slice decisions:
 
 | Repository | Decision | Target | Expected setup | Evidence |
 |---|---|---|---|---|
-| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Phase 2B completed with zero reportable findings; Phase 2C pending final diff review |
+| Bot | Changes review | Each final approved Phase 2A/2B/2C/2D base..head separately | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Phase 2B and Phase 2C completed separately with zero reportable findings |
 | SQL | Changes review for the approved Phase 2A companion migration; documented skip for later slices while SQL remains unchanged | SQL working-tree diff against `b26c19c5ff4ce9f123f24201fc17fbf8c342f87e` | `Changes + Deep Off` with `$codex-security:security-diff-scan` | Migration, rollback, schema snapshot, validation, and final scan artifacts |
 
 The Phase 2A SQL companion is separately approved and uses its own SQL Git target and SQL Changes

@@ -412,7 +412,9 @@ class TargetCacheRepository:
             if typed_row.governor_id != str(governor_id):
                 return None
             rows.append(typed_row)
-        rows.sort(key=lambda row: ((row.target_rank is None), row.target_rank or 0, row.governor_id))
+        rows.sort(
+            key=lambda row: ((row.target_rank is None), row.target_rank or 0, row.governor_id)
+        )
         return TargetCacheSnapshot(
             requested_kvk_no=_positive_int(ctx.get("kvk_no")),
             metadata=metadata,
@@ -482,8 +484,10 @@ class TargetCacheRepository:
             snapshot = self._read_validated_snapshot(ctx)
             coordination = self._read_coordination()
             now = self._wall_clock()
-            if respect_draft_poll and snapshot is not None and self._draft_poll_active(
-                coordination, snapshot, now
+            if (
+                respect_draft_poll
+                and snapshot is not None
+                and self._draft_poll_active(coordination, snapshot, now)
             ):
                 return "reuse", None, snapshot
 
@@ -531,8 +535,7 @@ class TargetCacheRepository:
             active = coordination.get("active_refresh")
             if (
                 not isinstance(active, Mapping)
-                or _positive_int(active.get("requested_kvk_no"))
-                != _positive_int(ctx.get("kvk_no"))
+                or _positive_int(active.get("requested_kvk_no")) != _positive_int(ctx.get("kvk_no"))
                 or not self._active_owner_is_current(active, self._wall_clock())
             ):
                 completed = self._read_validated_snapshot(ctx)
@@ -571,9 +574,7 @@ class TargetCacheRepository:
             self._process_matcher(
                 pid,
                 exe_path=(
-                    str(active.get("owner_executable"))
-                    if active.get("owner_executable")
-                    else None
+                    str(active.get("owner_executable")) if active.get("owner_executable") else None
                 ),
                 created_before=claimed_at,
             )
@@ -783,9 +784,7 @@ class TargetCacheRepository:
             publication_reason=reason,
             kvk_fighting_state=str((ctx or {}).get("state") or "") or None,
             kvk_fighting_state_reason=(
-                str((ctx or {}).get("state_reason"))
-                if (ctx or {}).get("state_reason")
-                else None
+                str((ctx or {}).get("state_reason")) if (ctx or {}).get("state_reason") else None
             ),
         )
 

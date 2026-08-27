@@ -115,8 +115,7 @@ def _multiprocess_refresh_worker(
         coordination = repository._read_coordination()
         active = coordination.get("active_refresh")
         pre_active = bool(
-            isinstance(active, dict)
-            and repository._active_owner_is_current(active, time.time())
+            isinstance(active, dict) and repository._active_owner_is_current(active, time.time())
         )
     result_queue.put((repository.refresh().outcome.value, pre_active))
 
@@ -165,9 +164,9 @@ def test_two_processes_perform_one_metadata_and_rowset_fetch(tmp_path):
     assert first_ready.wait(5)
     start_event.set()
     assert rowset_started.wait(5)
-    active = json.loads(
-        Path(f"{cache_path}.coordination.json").read_text(encoding="utf-8")
-    )["active_refresh"]
+    active = json.loads(Path(f"{cache_path}.coordination.json").read_text(encoding="utf-8"))[
+        "active_refresh"
+    ]
     assert matches_process(
         active["owner_pid"],
         exe_path=active["owner_executable"],
@@ -310,9 +309,7 @@ def test_impossible_future_lease_is_non_authoritative(tmp_path):
                     "owner_pid": os.getpid(),
                     "owner_executable": sys.executable,
                     "claimed_at_utc": datetime.fromtimestamp(now, UTC).isoformat(),
-                    "lease_expires_at_utc": datetime.fromtimestamp(
-                        now + 600, UTC
-                    ).isoformat(),
+                    "lease_expires_at_utc": datetime.fromtimestamp(now + 600, UTC).isoformat(),
                 },
             }
         ),
@@ -378,9 +375,7 @@ def test_lower_version_and_conflicting_signature_cannot_replace_cache(tmp_path):
     assert conflict_result.outcome == TargetCacheRefreshOutcome.REJECTED_MISMATCH
     persisted = json.loads(cache_path.read_text(encoding="utf-8"))
     assert persisted["_meta"]["publication_version"] == 2
-    assert persisted["_meta"]["publication_signature"] == _metadata(
-        version=2
-    ).publication_signature
+    assert persisted["_meta"]["publication_signature"] == _metadata(version=2).publication_signature
 
 
 def test_official_cache_never_downgrades_to_newer_draft(tmp_path):

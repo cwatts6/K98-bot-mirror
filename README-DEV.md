@@ -34,9 +34,10 @@ separately approval-gated slice.
 
 Phase 2B was subsequently merged, deployed, and operator accepted on 2026-08-27 after Discord
 smoke covered numeric and fuzzy-name lookup, account selection, public output, exemptions, and
-last-KVK comparison. Phase 2C architecture and its exact bot-only manifest are now approved for
-implementation. It retains cache schema version 2 and adds only a target-specific durable
-single-flight coordination sidecar; Phase 2D remains separately approval-gated.
+last-KVK comparison. Phase 2C implementation is prepared in mirror PR #239 with its required
+Changes-only security review complete and no reportable findings. It retains cache schema version
+2 and adds only a target-specific durable single-flight coordination sidecar; Phase 2D remains
+separately approval-gated.
 
 ## CrystalTech Path Refresh Delivery
 

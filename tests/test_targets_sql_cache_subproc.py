@@ -42,9 +42,7 @@ def _repository(tmp_path) -> TargetCacheRepository:
     )
 
 
-def test_maintenance_subprocess_result_contains_summary_not_player_rows(
-    monkeypatch, tmp_path
-):
+def test_maintenance_subprocess_result_contains_summary_not_player_rows(monkeypatch, tmp_path):
     repository = _repository(tmp_path)
     monkeypatch.setattr(cache, "_repository", lambda: repository)
     monkeypatch.setenv("MAINT_SUBPROC", "1")
@@ -71,4 +69,3 @@ def test_non_subprocess_result_preserves_full_schema_two_cache(monkeypatch, tmp_
     assert "summary" not in result
     assert result["_meta"]["schema_version"] == 2
     assert result["by_gov"]["123"]["GovernorName"] == "Alice"
-
