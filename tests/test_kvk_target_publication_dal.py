@@ -64,7 +64,8 @@ def test_full_publication_read_is_explicit_parameterized_and_single_rowset(monke
     assert snapshot is not None
     assert snapshot.metadata.source_scan_order == 1059
     assert len(snapshot.rows) == 2
-    assert snapshot.rows[0]["Power"] == 123_000_000
+    assert snapshot.rows[0].power == 123_000_000
+    assert snapshot.rows[0].governor_id == "123"
     sql, params = connection.cursor_value.executions[0]
     assert "dbo.v_KVK_TARGETS_FOR_BOT" in sql
     assert "WHERE KVK_NO = ?" in sql
@@ -102,7 +103,29 @@ def test_full_publication_read_preserves_unset_target_amounts(monkeypatch):
     snapshot = dal.fetch_current_target_publication(16)
 
     assert snapshot is not None
-    assert snapshot.rows[0]["Kill_Target"] is None
-    assert snapshot.rows[0]["Min_Kill_Target"] is None
-    assert snapshot.rows[0]["Deads_Target"] is None
-    assert snapshot.rows[0]["DKP_Target"] is None
+    assert snapshot.rows[0].kill_target is None
+    assert snapshot.rows[0].min_kill_target is None
+    assert snapshot.rows[0].deads_target is None
+    assert snapshot.rows[0].dkp_target is None
+
+
+def test_full_publication_read_rejects_missing_target_column(monkeypatch):
+    connection = _Connection()
+    row = _row(123, row_count=1)
+    del row["Kill_Target"]
+    monkeypatch.setattr(dal, "_open_connection", lambda: connection)
+    monkeypatch.setattr(dal, "fetch_all_dicts", lambda _cursor: [row])
+
+    with pytest.raises(dal.TargetPublicationContractError, match="Kill_Target"):
+        dal.fetch_current_target_publication(16)
+
+
+def test_full_publication_read_rejects_row_kvk_mismatch(monkeypatch):
+    connection = _Connection()
+    row = _row(123, row_count=1)
+    row["KVK_NO"] = 17
+    monkeypatch.setattr(dal, "_open_connection", lambda: connection)
+    monkeypatch.setattr(dal, "fetch_all_dicts", lambda _cursor: [row])
+
+    with pytest.raises(dal.TargetPublicationContractError, match="requested KVK"):
+        dal.fetch_current_target_publication(16)

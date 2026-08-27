@@ -10,6 +10,23 @@ multi-step progression, and account reset/restart-path smoke all passed after th
 no-extant-progress precondition was satisfied. Its task pack, chat starter, source review,
 approved candidate, proposed diff, and corrected workbook are archived under `archive/`.
 
+KVK Target Publication State Separation Phase 1 is deployed and operator accepted on 2026-08-26.
+Mirror PR #235, production PR #542, and SQL PR #73 delivered the durable target publication rows,
+metadata, bot-facing view, typed publication resolver, publication-identity cache behavior, and
+Draft/Official/Historical/Unverified output. Mirror PR #236 and production PR #543 corrected the
+import caller so `dbo.sp_TARGETS_MASTER` owns its transaction through a temporary autocommit
+boundary. Production object, source-scan, row-count, cache rebuild, and Discord smoke checks passed.
+The Phase 1 task pack and starter are archived under `archive/`.
+
+Active KVK Targets Phase 2 planning records:
+
+- `Codex Task Pack - KVK Targets Quality Phase 2.md`
+- `Codex Chat Starter - KVK Targets Quality Phase 2.md`
+
+Phase 2 is a deferred-optimisation programme split into approval-gated slices. It does not reopen
+the Phase 1 publication model, target formulas, shared fighting-state thresholds, command surface,
+permissions, visibility, or SQL deployment contract.
+
 Do not continue the completed DL_bot programme as Phase 6M. Open a fresh task pack for the
 queue-domain redesign, optional SQL-backed queue persistence, SQL deployment workflow, or pinned
 calendar tracker atomic-write hardening when one of those programmes is approved.

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from kvk.models.kvk_target_publication import (
     TargetPublicationMetadata,
     TargetPublicationSnapshot,
 )
+from kvk.models.kvk_target_row import TargetRow
 import targets_sql_cache as cache
 
 
@@ -43,28 +45,8 @@ def _metadata(*, state: str = "OFFICIAL", version: int = 1) -> TargetPublication
 
 def _snapshot(*, state: str = "OFFICIAL", version: int = 1) -> TargetPublicationSnapshot:
     rows = (
-        {
-            "GovernorID": "123",
-            "GovernorName": "Alice",
-            "Power": 1000,
-            "DKP_Target": 100,
-            "Kill_Target": 200,
-            "Deads_Target": 10,
-            "Min_Kill_Target": 50,
-            "TargetRank": 1,
-            "KVK_NO": 16,
-        },
-        {
-            "GovernorID": "456",
-            "GovernorName": "Bob",
-            "Power": 2000,
-            "DKP_Target": 120,
-            "Kill_Target": 240,
-            "Deads_Target": 12,
-            "Min_Kill_Target": 60,
-            "TargetRank": 2,
-            "KVK_NO": 16,
-        },
+        TargetRow("123", "Alice", 1000, 100, 200, 10, 50, 1, 16),
+        TargetRow("456", "Bob", 2000, 120, 240, 12, 60, 2, 16),
     )
     return TargetPublicationSnapshot(_metadata(state=state, version=version), rows)
 
@@ -107,13 +89,13 @@ def test_refresh_persists_verified_publication_with_unset_target_amounts(monkeyp
     monkeypatch.setattr(cache, "get_kvk_context_today", lambda: _context())
     snapshot = _snapshot()
     rows = tuple(
-        {
-            **row,
-            "DKP_Target": None,
-            "Kill_Target": None,
-            "Deads_Target": None,
-            "Min_Kill_Target": None,
-        }
+        replace(
+            row,
+            dkp_target=None,
+            kill_target=None,
+            deads_target=None,
+            min_kill_target=None,
+        )
         for row in snapshot.rows
     )
     _install_sql_snapshot(
@@ -129,6 +111,36 @@ def test_refresh_persists_verified_publication_with_unset_target_amounts(monkeyp
     assert row is not None
     assert row["DKP_Target"] is None
     assert meta["publication_state"] == "OFFICIAL"
+
+
+def test_typed_cache_entry_deserializes_schema_two_row(monkeypatch, tmp_path):
+    cache_path = tmp_path / "targets.json"
+    monkeypatch.setattr(cache, "PLAYER_TARGETS_CACHE", str(cache_path))
+    monkeypatch.setattr(cache, "get_kvk_context_today", lambda: _context())
+    _install_sql_snapshot(monkeypatch, _snapshot())
+    cache.refresh_targets_cache()
+
+    row, meta = cache.get_typed_target_cache_entry("123")
+
+    assert row == TargetRow("123", "Alice", 1000, 100, 200, 10, 50, 1, 16)
+    assert meta["publication_state"] == "OFFICIAL"
+
+
+def test_schema_two_cache_rejects_missing_canonical_target_field(monkeypatch, tmp_path):
+    cache_path = tmp_path / "targets.json"
+    monkeypatch.setattr(cache, "PLAYER_TARGETS_CACHE", str(cache_path))
+    monkeypatch.setattr(cache, "get_kvk_context_today", lambda: _context())
+    _install_sql_snapshot(monkeypatch, _snapshot())
+    cache.refresh_targets_cache()
+    persisted = cache._read_json(str(cache_path))
+    del persisted["by_gov"]["123"]["Kill_Target"]
+    cache._write_json(str(cache_path), persisted)
+    monkeypatch.setattr(cache, "fetch_current_publication_metadata", lambda _kvk_no: None)
+
+    row, meta = cache.get_typed_target_cache_entry("123")
+
+    assert row is None
+    assert meta["publication_state"] == "UNKNOWN"
 
 
 def test_matching_official_identity_is_not_rewritten_and_becomes_historic_live(

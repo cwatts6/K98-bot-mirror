@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from kvk.models.kvk_target_row import TargetRow
 from kvk.services import kvk_targets_card_service as service
 
 pytestmark = pytest.mark.asyncio
@@ -29,6 +30,34 @@ async def _acclaim_last_kvk_map():
             "Acclaim": 4_700_000,
         }
     }
+
+
+async def _kills_last_kvk_map():
+    return {"9": {"T4&T5_Kills": 50}}
+
+
+def _target_row(
+    governor_id: str,
+    *,
+    governor_name: str = "Target Gov",
+    power: int | None = None,
+    dkp_target: int | None = None,
+    kill_target: int | None = None,
+    deads_target: int | None = None,
+    min_kill_target: int | None = None,
+    kvk_no: int = 15,
+) -> TargetRow:
+    return TargetRow(
+        governor_id=governor_id,
+        governor_name=governor_name,
+        power=power,
+        dkp_target=dkp_target,
+        kill_target=kill_target,
+        deads_target=deads_target,
+        min_kill_target=min_kill_target,
+        target_rank=1,
+        kvk_no=kvk_no,
+    )
 
 
 def _publication_meta(*, state: str = "OFFICIAL") -> dict[str, object]:
@@ -64,15 +93,13 @@ async def test_targets_payload_active_progress(monkeypatch):
     def fetch_target_entry(gid, received_context):
         received_contexts.append(received_context)
         return (
-            {
-                "GovernorID": gid,
-                "GovernorName": "Target Gov",
-                "Power": 123_000_000,
-                "Kill_Target": 20_000_000,
-                "Deads_Target": 1_000_000,
-                "DKP_Target": 50_000_000,
-                "KVK_NO": 15,
-            },
+            _target_row(
+                gid,
+                power=123_000_000,
+                kill_target=20_000_000,
+                deads_target=1_000_000,
+                dkp_target=50_000_000,
+            ),
             _publication_meta(),
         )
 
@@ -123,13 +150,7 @@ async def test_targets_payload_complete(monkeypatch):
         service.kvk_targets_dal,
         "fetch_target_entry",
         lambda gid, _kvk_context=None: (
-            {
-                "GovernorID": gid,
-                "GovernorName": "Target Gov",
-                "Kill_Target": 10,
-                "Deads_Target": 5,
-                "DKP_Target": 20,
-            },
+            _target_row(gid, kill_target=10, deads_target=5, dkp_target=20),
             _publication_meta(),
         ),
     )
@@ -161,14 +182,7 @@ async def test_targets_payload_reports_no_target_values_for_unset_amounts(monkey
         service.kvk_targets_dal,
         "fetch_target_entry",
         lambda gid, _kvk_context=None: (
-            {
-                "GovernorID": gid,
-                "GovernorName": "Awaiting Targets",
-                "Kill_Target": None,
-                "Min_Kill_Target": None,
-                "Deads_Target": None,
-                "DKP_Target": None,
-            },
+            _target_row(gid, governor_name="Awaiting Targets"),
             _publication_meta(),
         ),
     )
@@ -217,12 +231,12 @@ async def test_targets_payload_source_unavailable_when_stats_missing(monkeypatch
         service.kvk_targets_dal,
         "fetch_target_entry",
         lambda _gid, _kvk_context=None: (
-            {"GovernorName": "Target Gov", "Kill_Target": 100, "Kills KVK -1": 50},
+            _target_row("9", kill_target=100),
             _publication_meta(),
         ),
     )
     monkeypatch.setattr(service.kvk_targets_dal, "fetch_exemption_row", lambda *_args: None)
-    monkeypatch.setattr(service.stats_cache_helpers, "load_last_kvk_map", _empty_last_kvk_map)
+    monkeypatch.setattr(service.stats_cache_helpers, "load_last_kvk_map", _kills_last_kvk_map)
     monkeypatch.setattr(service, "load_stat_row", lambda _gid: None)
 
     payload = await service.build_kvk_targets_card_payload("9")

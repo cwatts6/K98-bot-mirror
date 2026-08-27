@@ -2,6 +2,11 @@
 
 > Canonical implementation pack for separating KVK target publication status from the shared
 > KVK fighting-state lifecycle.
+>
+> **Delivered:** Phase 1 was deployed and operator accepted on 2026-08-26 through mirror PR #235,
+> production PR #542, and SQL PR #73. The import-path transaction follow-up was deployed through
+> mirror PR #236 and production PR #543. Production SQL verification and bot/cache smoke passed.
+> Further target-quality work is owned by `../Codex Task Pack - KVK Targets Quality Phase 2.md`.
 
 ## 1. Task Header
 

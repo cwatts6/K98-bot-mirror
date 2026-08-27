@@ -7,6 +7,31 @@ Before repo work, read `AGENTS.md` and the indexed core docs in
 domain, promotion, and operations references so routine work does not require reading the
 entire `docs/reference` folder.
 
+## KVK Target Publication Phase 1 Delivery
+
+KVK Target Publication State Separation Phase 1 was deployed and operator accepted on
+2026-08-26 through mirror PR #235, production PR #542, and SQL PR #73. The follow-up import-path
+transaction fix was delivered through mirror PR #236 and production PR #543. Production SQL
+checks confirmed the publication objects, exact source scan/type, configured scans, publication
+version/signature, output object, and row-count consistency; the rebuilt bot cache and
+`/kvk targets` output were then tested successfully.
+
+Phase 1 keeps target publication state separate from the shared Pass 4 fighting lifecycle and is
+documented in `docs/kvk/target_publication_contract.md`. Its completed task pack and chat starter
+are archived under `docs/task_packs/archive/`. The active Phase 2 quality pack is deliberately
+split into approval-gated slices covering typed target rows, legacy-path consolidation,
+target-domain cache ownership/single-flight behavior, and explicit fighting-lifecycle terminology.
+These Phase 2 planning and Phase 1 closeout documents are intentionally carried into the first
+Phase 2 implementation PR.
+
+On 2026-08-27 the operator approved Phase 2A implementation together with a companion SQL PR that
+standardises only `dbo.EXEMPT_FROM_STATS.GovernorID` from `float NOT NULL` to `bigint NOT NULL`.
+The approved SQL slice preserves every row, duplicate, exemption value, KVK value, procedure
+contract, and player rule. The operator also confirmed that production automatically transitioned
+the target cache from Draft to Official after Phase 1 deployment. That operator-attested live
+transition satisfies the Phase 2C evidence prerequisite; Phase 2C implementation remains a
+separately approval-gated slice.
+
 ## CrystalTech Path Refresh Delivery
 
 The 2026-08-25 CrystalTech path refresh is complete and operator accepted in mirror PR #234 and

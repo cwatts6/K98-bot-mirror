@@ -5,10 +5,11 @@ import logging
 from typing import Any
 
 from file_utils import fetch_one_dict, get_conn_with_retries
+from kvk.models.kvk_target_row import TargetRow
 from targets_sql_cache import (
     get_current_target_cache_meta,
     get_target_cache_entry,
-    get_targets_for_governor,
+    get_typed_target_cache_entry,
 )
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ def fetch_target_row(governor_id: str | int) -> dict[str, Any] | None:
         gid = int(str(governor_id).strip())
     except (TypeError, ValueError):
         return None
-    row = get_targets_for_governor(gid)
+    row, _ = get_target_cache_entry(gid)
     return dict(row) if isinstance(row, dict) else None
 
 
@@ -32,9 +33,9 @@ def fetch_target_cache_meta() -> dict[str, Any]:
 def fetch_target_entry(
     governor_id: str | int,
     kvk_context: Mapping[str, Any] | None = None,
-) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+) -> tuple[TargetRow | None, dict[str, Any]]:
     """Return a target row and publication metadata from one cache snapshot."""
-    return get_target_cache_entry(governor_id, kvk_context)
+    return get_typed_target_cache_entry(governor_id, kvk_context)
 
 
 def fetch_exemption_row(governor_id: str | int, kvk_no: int | None = None) -> dict[str, Any] | None:

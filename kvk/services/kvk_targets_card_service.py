@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from kvk.dal import kvk_targets_dal
+from kvk.models.kvk_target_row import TargetRow
 from kvk.models.kvk_targets_card import KvkTargetMetricProgress, KvkTargetsCardPayload
 from kvk.services.kvk_stats_card_service import load_kvk_stats_card_context
 from kvk.services.kvk_target_publication_service import (
@@ -96,9 +97,7 @@ def _progress(label: str, current: int | None, target: int | None) -> KvkTargetM
 def _metric_actual(
     primary: dict[str, Any] | None,
     fallback: dict[str, Any] | None,
-    legacy_targets: dict[str, Any] | None,
     keys: list[str],
-    legacy_keys: list[str],
 ) -> int | None:
     value = _optional_int_from_variants(primary, keys)
     if value is not None:
@@ -106,11 +105,11 @@ def _metric_actual(
     value = _optional_int_from_variants(fallback, keys)
     if value is not None:
         return value
-    return _optional_int_from_variants(legacy_targets, legacy_keys)
+    return None
 
 
 def _target_metrics(
-    targets: dict[str, Any] | None,
+    targets: TargetRow,
     actuals: dict[str, Any] | None,
     last_kvk: dict[str, Any] | None,
 ) -> tuple[KvkTargetMetricProgress, ...]:
@@ -121,23 +120,17 @@ def _target_metrics(
         kills_current = _metric_actual(
             actuals,
             last_kvk,
-            targets,
             ["T4&T5_Kills", "T4&T5 Kills"],
-            ["Kills KVK -1"],
         )
     deads_current = _metric_actual(
         last_kvk,
         actuals,
-        targets,
         ["Deads_Delta", "Deads Delta", "Deads", "DEADS KVK -1"],
-        ["DEADS KVK -1"],
     )
     dkp_current = _metric_actual(
         last_kvk,
         actuals,
-        targets,
         ["DKP_SCORE", "DKP Score", "DKP_Score", "DKP KVK -1"],
-        ["DKP KVK -1"],
     )
     acclaim_current = _optional_int_from_variants(last_kvk, ["Acclaim", "AcclaimScore"])
 
@@ -145,17 +138,17 @@ def _target_metrics(
         _progress(
             "Kills Target",
             kills_current,
-            _optional_int_from_variants(targets, ["Kill_Target", "Kill Target", "KillTarget"]),
+            targets.kill_target,
         ),
         _progress(
             "Deads Target",
             deads_current,
-            _optional_int_from_variants(targets, ["Deads_Target", "Dead Target", "DeadTarget"]),
+            targets.deads_target,
         ),
         _progress(
             "DKP Target",
             dkp_current,
-            _optional_int_from_variants(targets, ["DKP_Target", "DKP Target", "DKPTarget"]),
+            targets.dkp_target,
         ),
     ]
     metrics.append(
@@ -343,12 +336,14 @@ async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCa
     last_kvk_row = last_kvk if isinstance(last_kvk, dict) else None
     metrics = _target_metrics(target_row, actuals, last_kvk_row)
     target_state, label, detail, next_action = _status_for_metrics(metrics)
-    governor_name = _str_from_variants(
-        stats_row if stats_found else target_row,
-        ["GovernorName", "Governor_Name", "Governor Name"],
-        default=_str_from_variants(
-            target_row, ["GovernorName", "Governor_Name"], f"Governor {gid}"
-        ),
+    governor_name = (
+        _str_from_variants(
+            stats_row,
+            ["GovernorName", "Governor_Name", "Governor Name"],
+            default=target_row.governor_name or f"Governor {gid}",
+        )
+        if stats_found
+        else target_row.governor_name or f"Governor {gid}"
     )
 
     warnings: list[str] = []
@@ -360,14 +355,14 @@ async def build_kvk_targets_card_payload(governor_id: str | int) -> KvkTargetsCa
     return KvkTargetsCardPayload(
         governor_id=gid,
         governor_name=governor_name,
-        kvk_no=kvk_no or _int_from_variants(target_row, ["KVK_NO"], default=0) or None,
+        kvk_no=kvk_no or target_row.kvk_no,
         kvk_name=kvk_name,
         camp_name=context.camp_name,
         progress_state=target_state,
         status_label=label,
         status_detail=detail,
         next_action=next_action,
-        power=_optional_int_from_variants(target_row, ["Power", "Starting Power"]),
+        power=target_row.power,
         metrics=metrics,
         last_refreshed=last_refreshed,
         publication_state=publication_state,

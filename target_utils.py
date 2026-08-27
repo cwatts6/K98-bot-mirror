@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 import logging
 import time
 from typing import Any
@@ -11,6 +12,7 @@ from rapidfuzz import fuzz, process
 from unidecode import unidecode
 
 # NOTE: _conn is the repo's SQL connection helper imported from constants
+from kvk.models.kvk_target_row import TargetRow, serialize_target_row
 from kvk_state import get_kvk_context_today
 from targets_embed import build_kvk_targets_embed
 from targets_sql_cache import get_targets_for_governor, refresh_targets_cache
@@ -271,6 +273,65 @@ def _unwrap_targets_result(result: Any) -> dict[str, Any] | None:
     if isinstance(second, dict) and isinstance(second.get("result"), dict):
         return second["result"]
     return None
+
+
+_LEGACY_TARGET_ALIASES: dict[str, tuple[str, ...]] = {
+    "GovernorID": ("governor_id", "Governor ID", "Governor_ID", "Gov_ID"),
+    "GovernorName": ("governor_name", "Governor Name", "Governor_Name"),
+    "Power": ("power", "Starting Power"),
+    "DKP_Target": ("DKP Target", "DKPTarget", "dkp_target"),
+    "Kill_Target": ("Kill Target", "KillTarget", "kill_target"),
+    "Deads_Target": ("Dead_Target", "Dead Target", "DeadTarget", "deads_target"),
+    "Min_Kill_Target": (
+        "Minimum_Kill_Target",
+        "Min Kill Target",
+        "Min Kills",
+        "min_kill_target",
+    ),
+    "TargetRank": ("Target Rank", "target_rank"),
+    "KVK_NO": ("KVK NO", "kvk_no", "KVK"),
+}
+
+_LEGACY_TARGET_CONTEXT_FIELDS = (
+    "TargetState",
+    "PublicationReason",
+    "TargetSourceScan",
+    "TargetSourceType",
+    "TargetPublishedAt",
+    "PublicationVersion",
+    "PublicationSignature",
+    "last_kvk",
+)
+
+
+def adapt_target_row_for_legacy(
+    row: TargetRow | Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Confine legacy target aliases to the fallback compatibility path.
+
+    Canonical values always win when a mapping contains both a canonical key and
+    one or more historical aliases.
+    """
+    if row is None:
+        return None
+    if isinstance(row, TargetRow):
+        return serialize_target_row(row)
+    if not isinstance(row, Mapping):
+        return None
+
+    result: dict[str, Any] = {}
+    for canonical, aliases in _LEGACY_TARGET_ALIASES.items():
+        if canonical in row:
+            result[canonical] = row[canonical]
+            continue
+        for alias in aliases:
+            if alias in row:
+                result[canonical] = row[alias]
+                break
+    for field in _LEGACY_TARGET_CONTEXT_FIELDS:
+        if field in row:
+            result[field] = row[field]
+    return result
 
 
 # ---------------- Targets: EXEMPT/NOT ACTIVE fallback (still via SQL) ----------------
@@ -666,7 +727,7 @@ async def run_target_lookup(*args, **kwargs) -> dict[str, Any] | None:
 
                     targets = await _asyncio.to_thread(get_targets_for_governor, gid)
 
-                tgt = targets
+                tgt = adapt_target_row_for_legacy(targets)
 
                 # ---- Attach last-KVK data (non-fatal) ----
                 try:
@@ -798,7 +859,7 @@ async def run_target_lookup(*args, **kwargs) -> dict[str, Any] | None:
 
                     targets = await _asyncio.to_thread(get_targets_for_governor, gid)
 
-                tgt = targets
+                tgt = adapt_target_row_for_legacy(targets)
 
                 # ---- Attach last-KVK data (non-fatal) ----
                 try:

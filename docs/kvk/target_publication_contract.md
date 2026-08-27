@@ -1,5 +1,10 @@
 # KVK Target Publication Contract
 
+> Deployment status: Phase 1 deployed and operator accepted on 2026-08-26 through mirror PR #235,
+> production PR #542, and SQL PR #73. The import-path transaction follow-up was deployed through
+> mirror PR #236 and production PR #543. Production metadata/source/row-count checks and bot cache
+> rebuild smoke passed.
+
 KVK target publication is separate from the shared KVK fighting lifecycle and the broader KVK
 window. These concepts must not be used as aliases:
 
@@ -61,9 +66,23 @@ state.
 Routine SQL processing does not replace an existing Official publication. An operator force
 republish is default-off, requires an explicit reason, and creates a new version/signature.
 
+The import pipeline invokes `dbo.sp_TARGETS_MASTER` through a temporary autocommit boundary because
+the procedure owns its publication transaction. The caller restores its previous connection
+autocommit setting after success or failure; it must not wrap this procedure in an outer
+transaction.
+
 ## Deployment order
 
 Deploy and verify the SQL migration first. Republish the current KVK through the approved explicit
 operator path when required, then verify the view's KVK, exact source scan/type, row count, output
 object, version, and signature. Only after that proof exists should the bot be deployed and the
 target cache rebuilt. No command registration sync is required.
+
+## Phase 2 quality programme
+
+Phase 2 does not reopen the publication model or target formulas. It incrementally improves the
+bot-side target architecture by introducing typed target rows, making the typed service the single
+retrieval/presentation-input path, extracting target-specific cache repository ownership with
+proved refresh outcomes and cross-process coordination, and making the shared Pass 4 state
+terminology explicit without changing its thresholds. See
+`docs/task_packs/Codex Task Pack - KVK Targets Quality Phase 2.md`.

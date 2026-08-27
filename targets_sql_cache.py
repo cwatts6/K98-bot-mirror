@@ -18,6 +18,12 @@ from kvk.dal.kvk_target_publication_dal import (
     fetch_current_target_publication,
 )
 from kvk.models.kvk_target_publication import TargetPublicationMetadata
+from kvk.models.kvk_target_row import (
+    TargetRow,
+    TargetRowContractError,
+    serialize_target_row,
+    target_row_from_mapping,
+)
 from kvk.services.kvk_target_publication_service import (
     CACHE_ROW_INVALID,
     LEGACY_CACHE_UNVERIFIED,
@@ -116,21 +122,15 @@ def _validate_cache(
     for governor_id, row in by_gov.items():
         if not isinstance(row, Mapping):
             return None
-        if normalize_governor_id(row.get("GovernorID")) != str(governor_id):
+        try:
+            typed_row = target_row_from_mapping(
+                row,
+                expected_kvk_no=metadata.kvk_no,
+            )
+        except TargetRowContractError:
             return None
-        if _positive_int(row.get("KVK_NO")) != metadata.kvk_no:
+        if typed_row.governor_id != str(governor_id):
             return None
-        for field in ("DKP_Target", "Kill_Target", "Deads_Target", "Min_Kill_Target"):
-            value = row.get(field)
-            if value in (None, ""):
-                continue
-            if isinstance(value, bool):
-                return None
-            try:
-                if int(value) < 0:
-                    return None
-            except (TypeError, ValueError, OverflowError):
-                return None
     return metadata, resolution.state, resolution.reason
 
 
@@ -300,7 +300,7 @@ def _disk_has_newer_publication(
 
 def _build_cache(
     metadata: TargetPublicationMetadata,
-    rows: tuple[Mapping[str, Any], ...],
+    rows: tuple[TargetRow, ...],
     ctx: Mapping[str, Any],
 ) -> dict[str, Any]:
     resolution = resolve_target_publication_state(
@@ -325,11 +325,13 @@ def _build_cache(
         "kvk_fighting_state_reason": ctx.get("state_reason"),
     }
     by_gov: dict[str, dict[str, Any]] = {}
-    for raw_row in rows:
-        row = dict(raw_row)
-        governor_id = normalize_governor_id(row.get("GovernorID"))
-        row["GovernorID"] = governor_id
-        row["KVK_NO"] = metadata.kvk_no
+    for typed_row in rows:
+        if typed_row.kvk_no != metadata.kvk_no:
+            raise TargetPublicationContractError(
+                "Target row KVK_NO did not match publication metadata."
+            )
+        row = serialize_target_row(typed_row)
+        governor_id = typed_row.governor_id
         row["TargetState"] = resolution.state
         row["PublicationReason"] = resolution.reason
         row["TargetSourceScan"] = metadata.source_scan_order
@@ -480,6 +482,32 @@ def get_target_cache_entry(
     by_gov, meta = _load_current_cache(kvk_context)
     row = by_gov.get(governor_key)
     return (dict(row) if isinstance(row, Mapping) else None), dict(meta)
+
+
+def get_typed_target_cache_entry(
+    governor_id: int | str,
+    kvk_context: Mapping[str, Any] | None = None,
+) -> tuple[TargetRow | None, dict[str, Any]]:
+    """Return the canonical typed row and metadata from one validated snapshot."""
+    governor_key = normalize_governor_id(governor_id)
+    if not governor_key or not governor_key.isdigit():
+        return None, _unknown_meta(None, PUBLICATION_READ_FAILED)
+    by_gov, meta = _load_current_cache(kvk_context)
+    raw_row = by_gov.get(governor_key)
+    if not isinstance(raw_row, Mapping):
+        return None, dict(meta)
+    try:
+        row = target_row_from_mapping(
+            raw_row,
+            expected_kvk_no=_positive_int(meta.get("kvk_no")),
+        )
+    except TargetRowContractError:
+        logger.error(
+            "target_publication_cache_row_deserialize_failed governor_id=%s",
+            governor_key,
+        )
+        return None, _unknown_meta(kvk_context, CACHE_ROW_INVALID)
+    return row, dict(meta)
 
 
 def get_current_target_cache_meta(

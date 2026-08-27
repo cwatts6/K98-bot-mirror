@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
+
+from kvk.models.kvk_target_row import TargetRow
 
 TargetPublicationState = Literal["DRAFT", "OFFICIAL", "HISTORIC", "UNKNOWN"]
 PersistedTargetPublicationState = Literal["DRAFT", "OFFICIAL"]
@@ -46,10 +47,10 @@ class TargetPublicationResolution:
         return self.state != "UNKNOWN"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TargetPublicationSnapshot:
     metadata: TargetPublicationMetadata
-    rows: tuple[Mapping[str, Any], ...]
+    rows: tuple[TargetRow, ...]
 
 
 @dataclass(frozen=True)

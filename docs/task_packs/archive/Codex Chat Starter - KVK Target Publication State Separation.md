@@ -1,5 +1,8 @@
 # Codex Chat Starter - KVK Target Publication State Separation
 
+> Historical starter. Phase 1 was deployed and operator accepted on 2026-08-26. Use
+> `../Codex Chat Starter - KVK Targets Quality Phase 2.md` for the active follow-up.
+
 ## Copy/Paste Starter
 
 Codex, take on the task defined in:

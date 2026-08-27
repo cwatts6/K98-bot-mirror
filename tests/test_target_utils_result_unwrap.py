@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 import file_utils
+from kvk.models.kvk_target_row import TargetRow
 import target_utils
 
 
@@ -44,6 +45,50 @@ def test_unwrap_targets_result_raises_for_failed_maintenance_tuple():
 
     assert str(exc.value) == "Target maintenance failed"
     assert "secret-ish output" not in str(exc.value)
+
+
+def test_legacy_target_adapter_prefers_canonical_values_over_aliases():
+    adapted = target_utils.adapt_target_row_for_legacy(
+        {
+            "GovernorID": "2441482",
+            "GovernorName": "Canonical",
+            "Governor Name": "Legacy",
+            "Power": 100,
+            "Kill_Target": 200,
+            "Kill Target": 999,
+            "Deads_Target": 10,
+            "DKP_Target": 300,
+            "Min_Kill_Target": 50,
+            "TargetRank": 1,
+            "KVK_NO": 16,
+            "TargetState": "OFFICIAL",
+        }
+    )
+
+    assert adapted is not None
+    assert adapted["GovernorName"] == "Canonical"
+    assert adapted["Kill_Target"] == 200
+    assert adapted["TargetState"] == "OFFICIAL"
+    assert "Governor Name" not in adapted
+    assert "Kill Target" not in adapted
+
+
+def test_legacy_target_adapter_serializes_typed_row_to_canonical_keys():
+    adapted = target_utils.adapt_target_row_for_legacy(
+        TargetRow("2441482", "Alice", 100, 300, 200, 10, 50, 1, 16)
+    )
+
+    assert adapted == {
+        "GovernorID": "2441482",
+        "GovernorName": "Alice",
+        "Power": 100,
+        "DKP_Target": 300,
+        "Kill_Target": 200,
+        "Deads_Target": 10,
+        "Min_Kill_Target": 50,
+        "TargetRank": 1,
+        "KVK_NO": 16,
+    }
 
 
 @pytest.mark.asyncio
