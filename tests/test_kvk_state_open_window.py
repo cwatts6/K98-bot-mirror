@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 
 import kvk_state
@@ -210,6 +211,40 @@ def test_latest_kvk_details_returns_none_for_invalid_kvk_no(monkeypatch) -> None
     monkeypatch.setattr(kvk_state, "fetch_one_dict", lambda _cur: {"KVK_NO": None})
 
     assert kvk_state.get_latest_kvk_details() is None
+
+
+def test_latest_kvk_details_preserves_operational_log_message(monkeypatch, caplog) -> None:
+    rows = iter(
+        [
+            {
+                "KVK_NO": 16,
+                "KVK_NAME": "KVK 16",
+                "KVK_REGISTRATION_DATE": None,
+                "KVK_START_DATE": None,
+                "KVK_END_DATE": None,
+                "MATCHMAKING_START_DATE": None,
+                "FIGHTING_START_DATE": None,
+                "NEXT_KVK_NO": 17,
+                "MATCHMAKING_SCAN": 1059,
+                "PASS4_START_SCAN": 1095,
+                "KVK_END_SCAN": 1205,
+            },
+            {"MaxScanOrder": 1066},
+        ]
+    )
+    monkeypatch.setattr(kvk_state, "get_conn_with_retries", lambda: _KvkConn())
+    monkeypatch.setattr(kvk_state, "fetch_one_dict", lambda _cur: next(rows))
+
+    with caplog.at_level(logging.INFO, logger=kvk_state.log.name):
+        details = kvk_state.get_latest_kvk_details()
+
+    assert details is not None
+    assert (
+        "[kvk_state] resolved KVK state kvk_no=16 matchmaking_scan=1059 "
+        "pass4_start_scan=1095 kvk_end_scan=1205 max_scan_order=1066 "
+        "resolved_state=DRAFT reason=max_scan_order_before_pass4_start_scan" in caplog.messages
+    )
+    assert "resolved KVK fighting state" not in caplog.text
 
 
 def test_kvk_window_uses_proc_config_fallback_for_missing_detail_scans(monkeypatch) -> None:

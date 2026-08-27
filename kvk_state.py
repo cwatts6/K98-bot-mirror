@@ -222,7 +222,7 @@ def get_latest_kvk_details(today: dt.date | None = None) -> KVKDetails | None:
         )
 
     log.info(
-        "[kvk_state] resolved KVK fighting state kvk_no=%s matchmaking_scan=%r pass4_start_scan=%r "
+        "[kvk_state] resolved KVK state kvk_no=%s matchmaking_scan=%r pass4_start_scan=%r "
         "kvk_end_scan=%r max_scan_order=%r resolved_state=%s reason=%s",
         kvk_no,
         matchmaking_scan,
